@@ -14,9 +14,10 @@ enum GradeCategory {
 }
 
 // ── Records ───────────────────────────────────────────────────────────────────
-record Student(name: String, subject: String, score: Int)
+record Student(name: String, subject: String, score: Int) {
   example { new Student("Test", "Math", 75).score() == 75 }
   example { new Student("Test", "Math", 75).subject() == "Math" }
+}
 
 record SubjectSummary(
   subject: String,

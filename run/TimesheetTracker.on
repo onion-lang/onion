@@ -53,9 +53,10 @@ public:
 
 // ── TimeEntry record ──────────────────────────────────────────────────────────
 
-record TimeEntry(employeeId: String, projectCode: String, weekDay: Int, hours: Double)
+record TimeEntry(employeeId: String, projectCode: String, weekDay: Int, hours: Double) {
   example { new TimeEntry("E01", "DEV-01", 1, 8.0d).hours() == 8.0d }
   example { new TimeEntry("E01", "DEV-01", 3, 8.5d).weekDay() == 3 }
+}
 
 // ── Employee record ───────────────────────────────────────────────────────────
 

@@ -1,0 +1,367 @@
+// StringSimilarity.on — classical string-distance and sequence-alignment algorithms
+//
+// Exercises: ADT case-enum (EditOp), records (AlignResult, SimilarityReport),
+// classes with typed mutable state, 2-D array DP, collection pipelines
+// (map/filter/sortedBy/fold), foreach over ranges, select/pattern matching,
+// string interpolation, Format, nested if-else expressions, recursion.
+//
+// Run: onion run/StringSimilarity.on
+
+import {
+  java.lang.Math as JMath
+}
+
+// ── Edit operation (for tracing Levenshtein back-trace) ──────────────────────
+
+enum EditOp {
+  case Match(ch: String)
+  case Substitute(from: String, to: String)
+  case Insert(ch: String)
+  case Delete(ch: String)
+
+public:
+  def label(): String = select this {
+    case m is Match:     "MATCH(#{m.ch()})"
+    case s is Substitute: "SUBST(#{s.from()}->#{s.to()})"
+    case i is Insert:    "INS(#{i.ch()})"
+    case d is Delete:    "DEL(#{d.ch()})"
+  }
+
+  def cost(): Int = select this {
+    case m is Match: 0
+    else:            1
+  }
+}
+
+// ── Result records ────────────────────────────────────────────────────────────
+
+record AlignResult(a: String, b: String, distance: Int, similarity: Double, alignment: String)
+
+record LcsResult(source: String, target: String, lcs: String, length: Int)
+
+record JaroResult(source: String, target: String, jaro: Double, jaroWinkler: Double)
+
+// ── Levenshtein edit distance + alignment ─────────────────────────────────────
+
+class Levenshtein {
+  var dummy: Boolean
+
+public:
+  def this() { dummy = false }
+
+  def compute(a: String, b: String): AlignResult {
+    val n: Int = a.length()
+    val m: Int = b.length()
+
+    // DP matrix  dp[i][j] = edit distance of a[0..i) vs b[0..j)
+    val dp: Int[][] = new Int[n + 1][m + 1]
+    foreach i: Int in 0..<n + 1 { dp[i][0] = i }
+    foreach j: Int in 0..<m + 1 { dp[0][j] = j }
+
+    foreach i: Int in 1..<n + 1 {
+      foreach j: Int in 1..<m + 1 {
+        val ca: String = a.substring(i - 1, i)
+        val cb: String = b.substring(j - 1, j)
+        if ca == cb {
+          dp[i][j] = dp[i - 1][j - 1]
+        } else {
+          val sub: Int = dp[i - 1][j - 1] + 1
+          val del: Int = dp[i - 1][j] + 1
+          val ins: Int = dp[i][j - 1] + 1
+          dp[i][j] = JMath::min(sub, JMath::min(del, ins))
+        }
+      }
+    }
+
+    val dist: Int  = dp[n][m]
+    val maxLen: Int = JMath::max(n, m)
+    val sim: Double = if maxLen == 0 { 1.0 } else { 1.0 - dist / (maxLen * 1.0) }
+
+    // Back-trace to build alignment string
+    val ops: List[Object] = []
+    var i: Int = n
+    var j: Int = m
+    while i > 0 || j > 0 {
+      if i > 0 && j > 0 {
+        val ca: String = a.substring(i - 1, i)
+        val cb: String = b.substring(j - 1, j)
+        if dp[i][j] == dp[i - 1][j - 1] && ca == cb {
+          ops.add(new Match(ca) as Object)
+          i = i - 1
+          j = j - 1
+        } else if dp[i][j] == dp[i - 1][j - 1] + 1 {
+          ops.add(new Substitute(ca, cb) as Object)
+          i = i - 1
+          j = j - 1
+        } else if dp[i][j] == dp[i - 1][j] + 1 {
+          ops.add(new Delete(ca) as Object)
+          i = i - 1
+        } else {
+          ops.add(new Insert(cb) as Object)
+          j = j - 1
+        }
+      } else if i > 0 {
+        val ca: String = a.substring(i - 1, i)
+        ops.add(new Delete(ca) as Object)
+        i = i - 1
+      } else {
+        val cb: String = b.substring(j - 1, j)
+        ops.add(new Insert(cb) as Object)
+        j = j - 1
+      }
+    }
+
+    // Build alignment row strings
+    var topRow: String    = ""
+    var midRow: String    = ""
+    var bottomRow: String = ""
+    var k: Int = ops.size - 1
+    while k >= 0 {
+      val op: EditOp = ops[k] as EditOp
+      select op {
+        case m is Match:
+          topRow    = topRow    + m.ch()
+          midRow    = midRow    + "|"
+          bottomRow = bottomRow + m.ch()
+        case s is Substitute:
+          topRow    = topRow    + s.from()
+          midRow    = midRow    + "X"
+          bottomRow = bottomRow + s.to()
+        case ins is Insert:
+          topRow    = topRow    + "-"
+          midRow    = midRow    + " "
+          bottomRow = bottomRow + ins.ch()
+        case del is Delete:
+          topRow    = topRow    + del.ch()
+          midRow    = midRow    + " "
+          bottomRow = bottomRow + "-"
+      }
+      k = k - 1
+    }
+    val alignment: String = topRow + "\n" + midRow + "\n" + bottomRow
+    return new AlignResult(a, b, dist, sim, alignment)
+  }
+}
+
+// ── Longest Common Subsequence ────────────────────────────────────────────────
+
+class LCS {
+  var dummy: Boolean
+
+public:
+  def this() { dummy = false }
+
+  def compute(a: String, b: String): LcsResult {
+    val n: Int = a.length()
+    val m: Int = b.length()
+    val dp: Int[][] = new Int[n + 1][m + 1]
+
+    foreach i: Int in 1..<n + 1 {
+      foreach j: Int in 1..<m + 1 {
+        if a.substring(i - 1, i) == b.substring(j - 1, j) {
+          dp[i][j] = dp[i - 1][j - 1] + 1
+        } else {
+          dp[i][j] = JMath::max(dp[i - 1][j], dp[i][j - 1])
+        }
+      }
+    }
+
+    // Back-trace
+    var lcs: String = ""
+    var i: Int = n
+    var j: Int = m
+    while i > 0 && j > 0 {
+      val ca: String = a.substring(i - 1, i)
+      val cb: String = b.substring(j - 1, j)
+      if ca == cb {
+        lcs = ca + lcs
+        i = i - 1
+        j = j - 1
+      } else if dp[i - 1][j] >= dp[i][j - 1] {
+        i = i - 1
+      } else {
+        j = j - 1
+      }
+    }
+    return new LcsResult(a, b, lcs, dp[n][m])
+  }
+}
+
+// ── Jaro and Jaro-Winkler similarity ─────────────────────────────────────────
+
+class Jaro {
+  var dummy: Boolean
+
+public:
+  def this() { dummy = false }
+
+  def compute(a: String, b: String): JaroResult {
+    val n: Int = a.length()
+    val m: Int = b.length()
+    if n == 0 && m == 0 { return new JaroResult(a, b, 1.0, 1.0) }
+    if n == 0 || m == 0 { return new JaroResult(a, b, 0.0, 0.0) }
+
+    val window: Int = JMath::max(n, m) / 2 - 1
+    val matchedA: Boolean[] = new Boolean[n]
+    val matchedB: Boolean[] = new Boolean[m]
+    var matches: Int = 0
+
+    foreach i: Int in 0..<n {
+      val lo: Int = JMath::max(0, i - window)
+      val hi: Int = JMath::min(m - 1, i + window)
+      foreach j: Int in lo..<hi + 1 {
+        if !matchedB[j] && a.substring(i, i + 1) == b.substring(j, j + 1) {
+          matchedA[i] = true
+          matchedB[j] = true
+          matches = matches + 1
+          break
+        }
+      }
+    }
+
+    if matches == 0 { return new JaroResult(a, b, 0.0, 0.0) }
+
+    // Count transpositions
+    var t: Int = 0
+    var k: Int = 0
+    foreach i: Int in 0..<n {
+      if matchedA[i] {
+        while !matchedB[k] { k = k + 1 }
+        if a.substring(i, i + 1) != b.substring(k, k + 1) { t = t + 1 }
+        k = k + 1
+      }
+    }
+
+    val mD: Double  = matches * 1.0
+    val nD: Double  = n * 1.0
+    val mD2: Double = m * 1.0
+    val tD: Double  = (t / 2) * 1.0
+    val jaroScore: Double = (mD / nD + mD / mD2 + (mD - tD) / mD) / 3.0
+
+    // Jaro-Winkler: prefix bonus (up to 4 matching leading chars)
+    var prefix: Int = 0
+    foreach p: Int in 0..<JMath::min(4, JMath::min(n, m)) {
+      if a.substring(p, p + 1) == b.substring(p, p + 1) { prefix = prefix + 1 } else { break }
+    }
+    val jwScore: Double = jaroScore + prefix * 0.1 * (1.0 - jaroScore)
+    return new JaroResult(a, b, jaroScore, jwScore)
+  }
+}
+
+// ── Reporting ─────────────────────────────────────────────────────────────────
+
+def padLeft(s: String, width: Int): String {
+  var r: String = s
+  while r.length() < width { r = " " + r }
+  return r
+}
+
+def printSection(title: String): void {
+  IO::println("")
+  IO::println("--- #{title} ---")
+}
+
+def printAlign(r: AlignResult): void {
+  IO::println("  \"#{r.a()}\"  vs  \"#{r.b()}\"")
+  IO::println("  Edit distance : #{r.distance()}")
+  IO::println("  Similarity    : #{Format::fixed(r.similarity() * 100.0, 1)}%")
+  IO::println("  Alignment:")
+  val lines: List[Object] = []
+  var rem: String = r.alignment()
+  while rem.length() > 0 {
+    val nlIdx: Int = rem.indexOf("\n")
+    if nlIdx < 0 {
+      lines.add(rem as Object)
+      rem = ""
+    } else {
+      lines.add(rem.substring(0, nlIdx) as Object)
+      rem = rem.substring(nlIdx + 1)
+    }
+  }
+  foreach l: Object in lines {
+    IO::println("    #{l as String}")
+  }
+}
+
+def printLcs(r: LcsResult): void {
+  IO::println("  \"#{r.source()}\"  vs  \"#{r.target()}\"")
+  IO::println("  LCS: \"#{r.lcs()}\"  (length #{r.length()})")
+}
+
+def printJaro(r: JaroResult): void {
+  IO::println("  \"#{r.source()}\"  vs  \"#{r.target()}\"")
+  IO::println("  Jaro: #{Format::fixed(r.jaro(), 4)}   Jaro-Winkler: #{Format::fixed(r.jaroWinkler(), 4)}")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val lev: Levenshtein = new Levenshtein()
+  val lcs: LCS         = new LCS()
+  val jaro: Jaro       = new Jaro()
+
+  IO::println("String Similarity Suite")
+  IO::println("=======================")
+
+  // 1. Levenshtein distance on common typos
+  printSection("Levenshtein edit distance — typos")
+  printAlign(lev.compute("kitten",    "sitting"))
+  printAlign(lev.compute("saturday",  "sunday"))
+  printAlign(lev.compute("algorithm", "altruistic"))
+  printAlign(lev.compute("",          "abc"))
+  printAlign(lev.compute("abc",       "abc"))
+
+  // 2. DNA-like sequences (simulate biological sequences)
+  printSection("Levenshtein — DNA sequences")
+  printAlign(lev.compute("ACGTACGT", "ACGTACTT"))
+  printAlign(lev.compute("GATTACA",  "GCATGCU"))
+
+  // 3. LCS demo
+  printSection("Longest Common Subsequence")
+  printLcs(lcs.compute("ABCBDAB",    "BDCABA"))
+  printLcs(lcs.compute("AGGTAB",     "GXTXAYB"))
+  printLcs(lcs.compute("ACGT",       "ACGT"))
+  printLcs(lcs.compute("ACGT",       ""))
+
+  // 4. Jaro-Winkler similarity
+  printSection("Jaro-Winkler similarity")
+  printJaro(jaro.compute("martha",   "marhta"))
+  printJaro(jaro.compute("CRATE",    "TRACE"))
+  printJaro(jaro.compute("DwaynE",   "Duane"))
+  printJaro(jaro.compute("",         ""))
+  printJaro(jaro.compute("abc",      "xyz"))
+
+  // 5. Ranking words by distance to a query
+  printSection("Closest words to 'colour' (ranked by Levenshtein)")
+  val words: List[String] = [
+    "color", "colour", "collar", "cooler", "solar", "polar", "valor",
+    "floor", "colon", "clour"
+  ]
+  val scored: List[Object] = words.map { w ->
+    val r: AlignResult = lev.compute("colour", w as String)
+    "#{r.distance()} #{w}" as Object
+  }
+  val ranked: List[Object] = scored.sortedBy { s -> s as String }
+  foreach entry: Object in ranked {
+    val s: String = entry as String
+    IO::println("  #{s}")
+  }
+
+  // 6. Similarity matrix (selected subset)
+  printSection("Similarity matrix (Levenshtein) for weekday names")
+  val days: List[String] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  IO::print("       ")
+  foreach d: Object in days { IO::print(padLeft(d as String, 5)) }
+  IO::println("")
+  foreach da: Object in days {
+    IO::print(padLeft(da as String, 7))
+    foreach db: Object in days {
+      val dist: Int = lev.compute(da as String, db as String).distance()
+      IO::print(padLeft("" + dist, 5))
+    }
+    IO::println("")
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

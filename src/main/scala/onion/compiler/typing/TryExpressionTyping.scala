@@ -156,6 +156,17 @@ final class TryExpressionTyping(
       // Type the lock expression
       val lock = typed(node.condition, context).getOrElse(break(None))
 
+      // A nullable lock (never null-checked) gets the same null-safety
+      // diagnostic (E0070) every other dereference-like use of a nullable
+      // value already reports, instead of silently compiling into a
+      // `synchronized(null)` that only fails with an NPE at run time.
+      lock.`type` match {
+        case nullable: NullableType =>
+          bodyContext.report(NULLABLE_MEMBER_ACCESS, node.condition, nullable.displayName, "synchronized")
+          break(None)
+        case _ =>
+      }
+
       // Lock must be object type, not primitive
       if (lock.isBasicType) {
         bodyContext.report(INCOMPATIBLE_TYPE, node.condition, bodyContext.load("java.lang.Object"), lock.`type`)

@@ -1,0 +1,235 @@
+import {
+  java.util.List
+  java.util.ArrayList
+}
+
+// 2D immutable vector with vector algebra
+record Vec2(x: Double, y: Double) {
+  public:
+  def add(v: Vec2): Vec2 = new Vec2(x() + v.x(), y() + v.y())
+  def sub(v: Vec2): Vec2 = new Vec2(x() - v.x(), y() - v.y())
+  def scale(s: Double): Vec2 = new Vec2(x() * s, y() * s)
+  def magnitudeSq(): Double = x() * x() + y() * y()
+  def magnitude(): Double = Math::sqrt(magnitudeSq())
+  def normalize(): Vec2 = {
+    val m: Double = magnitude()
+    if m == 0.0 { new Vec2(0.0, 0.0) } else { new Vec2(x() / m, y() / m) }
+  }
+  def dot(v: Vec2): Double = x() * v.x() + y() * v.y()
+  def distanceTo(v: Vec2): Double = sub(v).magnitude()
+  override def toString(): String = "(#{Format::number(x(), 3)}, #{Format::number(y(), 3)})"
+}
+
+// Classification of a celestial body
+enum BodyType {
+  case Star
+  case Planet
+  case Moon
+  case Asteroid
+  case Comet
+
+  public:
+  def symbol(): String = select this {
+    case s is Star:     "[*]"
+    case p is Planet:   "[O]"
+    case m is Moon:     "[o]"
+    case a is Asteroid: "[.]"
+    case c is Comet:    "[~]"
+  }
+  def label(): String = select this {
+    case s is Star:     "Star    "
+    case p is Planet:   "Planet  "
+    case m is Moon:     "Moon    "
+    case a is Asteroid: "Asteroid"
+    case c is Comet:    "Comet   "
+  }
+}
+
+// A snapshot of a body's state at a given simulation day
+record Snapshot(day: Int, name: String, speed: Double, distFromSun: Double)
+
+// Mutable celestial body with physics state
+class Body {
+  public:
+  var name: String
+  var kind: BodyType
+  var pos: Vec2
+  var vel: Vec2
+  var mass: Double
+  var history: ArrayList[Snapshot]
+
+  def this(n: String, k: BodyType, p: Vec2, v: Vec2, m: Double) {
+    name = n; kind = k; pos = p; vel = v; mass = m
+    history = new ArrayList[Snapshot]()
+  }
+
+  def applyForce(force: Vec2, dt: Double): void {
+    val accel: Vec2 = force.scale(1.0 / mass)
+    vel = vel.add(accel.scale(dt))
+    pos = pos.add(vel.scale(dt))
+  }
+
+  def recordSnapshot(day: Int, origin: Vec2): void {
+    history.add(new Snapshot(day, name, vel.magnitude(), pos.distanceTo(origin)))
+  }
+
+  def kineticEnergy(): Double = 0.5 * mass * vel.magnitudeSq()
+
+  override def toString(): String =
+    "#{kind.symbol()} #{name} #{kind.label()}  pos=#{pos}  speed=#{Format::number(vel.magnitude() / 1000.0, 2)} km/s"
+}
+
+// Universal gravitational constant (m^3 kg^-1 s^-2)
+val G_CONST: Double = 6.674e-11
+
+// Gravitational force exerted on body `a` by body `b`
+def gravForce(a: Body, b: Body): Vec2 = {
+  val r: Vec2 = b.pos.sub(a.pos)
+  val dist: Double = r.magnitude()
+  if dist < 1000.0 { new Vec2(0.0, 0.0) }
+  else {
+    val mag: Double = G_CONST * a.mass * b.mass / (dist * dist)
+    r.normalize().scale(mag)
+  }
+}
+
+// Total mechanical energy: kinetic + gravitational potential
+def totalEnergy(bodies: ArrayList[Body]): Double = {
+  var ke: Double = 0.0
+  var pe: Double = 0.0
+  val n: Int = bodies.size
+  foreach i: Int in 0..<n {
+    ke = ke + bodies[i].kineticEnergy()
+    foreach j: Int in (i + 1)..<n {
+      val dist: Double = bodies[i].pos.distanceTo(bodies[j].pos)
+      if dist > 0.0 {
+        pe = pe - G_CONST * bodies[i].mass * bodies[j].mass / dist
+      }
+    }
+  }
+  ke + pe
+}
+
+// Advance the simulation by one time-step dt (seconds)
+def step(bodies: ArrayList[Body], dt: Double): void {
+  val n: Int = bodies.size
+  val forces: ArrayList[Vec2] = new ArrayList[Vec2]()
+  foreach i: Int in 0..<n { forces.add(new Vec2(0.0, 0.0)) }
+  foreach i: Int in 0..<n {
+    foreach j: Int in 0..<n {
+      if i != j {
+        forces[i] = forces[i].add(gravForce(bodies[i], bodies[j]))
+      }
+    }
+  }
+  foreach i: Int in 0..<n {
+    bodies[i].applyForce(forces[i], dt)
+  }
+}
+
+def hr(): void { IO::println("-".repeat(72)) }
+
+def statsRow(label: String, values: List[Double]): void {
+  val mn: Double = values.reduce { a, b -> if (a as Double) < (b as Double) { a } else { b } }
+  val mx: Double = values.reduce { a, b -> if (a as Double) > (b as Double) { a } else { b } }
+  val sumV: Double = values.fold(0.0) { acc, v -> (acc as Double) + (v as Double) }
+  val avg: Double = sumV / values.size
+  IO::println("  #{label}  min=#{Format::number(mn, 3)}  max=#{Format::number(mx, 3)}  avg=#{Format::number(avg, 3)}")
+}
+
+def nameList(lst: List[Body]): String =
+  lst.fold("") { acc, b ->
+    val n: String = (b as Body).name
+    if acc == "" { n } else { "#{acc}, #{n}" }
+  }
+
+def main(): void {
+  val AU: Double = 1.496e11   // 1 Astronomical Unit in metres
+
+  // Solar system initial conditions: positions in metres, velocities in m/s, masses in kg
+  val bodies: ArrayList[Body] = new ArrayList[Body]()
+  bodies.add(new Body("Sun",     new Star(),     new Vec2(0.0,       0.0),  new Vec2(0.0,    0.0),    1.989e30))
+  bodies.add(new Body("Mercury", new Planet(),   new Vec2(5.791e10,  0.0),  new Vec2(0.0, 47360.0),   3.302e23))
+  bodies.add(new Body("Venus",   new Planet(),   new Vec2(1.082e11,  0.0),  new Vec2(0.0, 35020.0),   4.869e24))
+  bodies.add(new Body("Earth",   new Planet(),   new Vec2(1.496e11,  0.0),  new Vec2(0.0, 29780.0),   5.972e24))
+  bodies.add(new Body("Mars",    new Planet(),   new Vec2(2.279e11,  0.0),  new Vec2(0.0, 24130.0),   6.419e23))
+  bodies.add(new Body("Ceres",   new Asteroid(), new Vec2(4.140e11,  0.0),  new Vec2(0.0, 17900.0),   9.393e20))
+
+  val sunPos: Vec2 = bodies[0].pos
+
+  IO::println("========================================================================")
+  IO::println("        N-Body Gravitational Simulation -- Inner Solar System")
+  IO::println("        6 bodies  |  daily time-step  |  365-day integration")
+  IO::println("========================================================================")
+  IO::println("")
+
+  hr()
+  IO::println("Initial state (Day 0):")
+  hr()
+  foreach b: Body in bodies { IO::println("  #{b}") }
+  val e0: Double = totalEnergy(bodies)
+  IO::println("  Total mechanical energy: #{Format::number(e0 / 1.0e33, 6)} x 10^33 J")
+  IO::println("")
+
+  val dtDay: Double = 86400.0     // seconds per day
+  val totalDays: Int = 365
+  val snapshotEvery: Int = 10
+
+  foreach b: Body in bodies { b.recordSnapshot(0, sunPos) }
+
+  // Main integration loop
+  foreach day: Int in 1..totalDays {
+    step(bodies, dtDay)
+    if day % snapshotEvery == 0 {
+      foreach b: Body in bodies { b.recordSnapshot(day, sunPos) }
+    }
+  }
+
+  hr()
+  IO::println("Final state (Day #{totalDays}):")
+  hr()
+  foreach b: Body in bodies { IO::println("  #{b}") }
+  val eF: Double = totalEnergy(bodies)
+  IO::println("  Total mechanical energy: #{Format::number(eF / 1.0e33, 6)} x 10^33 J")
+  val drift: Double = Math::abs((eF - e0) / e0) * 100.0
+  IO::println("  Energy conservation error: #{Format::number(drift, 4)}%")
+  IO::println("")
+
+  // Orbital distance statistics over the full run
+  hr()
+  IO::println("Orbital distance from Sun over #{totalDays} days (AU):")
+  hr()
+  foreach b: Body in bodies {
+    if b.history.size > 1 {
+      val dists: List[Double] = b.history.map { s -> (s as Snapshot).distFromSun() / AU }
+      statsRow("#{b.kind.symbol()} #{b.name}", dists)
+    }
+  }
+  IO::println("")
+
+  // Orbital speed statistics
+  hr()
+  IO::println("Orbital speed over #{totalDays} days (km/s):")
+  hr()
+  foreach b: Body in bodies {
+    if b.history.size > 1 {
+      val speeds: List[Double] = b.history.map { s -> (s as Snapshot).speed() / 1000.0 }
+      statsRow("#{b.kind.symbol()} #{b.name}", speeds)
+    }
+  }
+  IO::println("")
+
+  // Classification summary using ADT enum `is` matching
+  hr()
+  IO::println("Bodies by classification:")
+  hr()
+  val stars:     List[Body] = bodies.filter { b -> (b as Body).kind is Star }
+  val planets:   List[Body] = bodies.filter { b -> (b as Body).kind is Planet }
+  val asteroids: List[Body] = bodies.filter { b -> (b as Body).kind is Asteroid }
+  IO::println("  Stars     (#{stars.size}): #{nameList(stars)}")
+  IO::println("  Planets   (#{planets.size}): #{nameList(planets)}")
+  IO::println("  Asteroids (#{asteroids.size}): #{nameList(asteroids)}")
+  IO::println("")
+
+  IO::println("Done. #{totalDays} days simulated, #{bodies.size} bodies, #{bodies[1].history.size} snapshots per body.")
+}

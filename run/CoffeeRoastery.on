@@ -1,0 +1,409 @@
+import {
+  java.util.*
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+enum Grade { Premium, Standard, Commercial, Reject }
+
+enum Origin { Ethiopia, Colombia, Brazil, Guatemala, Indonesia, Yemen, Jamaica }
+
+// Data-carrying: each roast profile carries its own physical parameters
+enum RoastProfile {
+  case Light(temp: Int, minutes: Int)
+  case Medium(temp: Int, minutes: Int)
+  case Dark(temp: Int, minutes: Int)
+  case Espresso(temp: Int, pressure: Float)
+
+public:
+  def name(): String = select this {
+    case r is Light:    "Light"
+    case r is Medium:   "Medium"
+    case r is Dark:     "Dark"
+    case r is Espresso: "Espresso"
+  }
+
+  def tempC(): Int = select this {
+    case r is Light:    r.temp()
+    case r is Medium:   r.temp()
+    case r is Dark:     r.temp()
+    case r is Espresso: r.temp()
+  }
+
+  def shortDesc(): String = select this {
+    case r is Light:    "Light #{r.temp()}°C / #{r.minutes()}min"
+    case r is Medium:   "Medium #{r.temp()}°C / #{r.minutes()}min"
+    case r is Dark:     "Dark #{r.temp()}°C / #{r.minutes()}min"
+    case r is Espresso: "Espresso #{r.temp()}°C / #{r.pressure()}bar"
+  }
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record Bean(
+  id: String,
+  origin: Origin,
+  variety: String,
+  moisturePct: Float,
+  defectsPer300g: Int,
+  costPerKg: Float
+) {
+public:
+  def grade(): Grade =
+    if moisturePct() > 13.0f        { Grade::Reject }
+    else if defectsPer300g() > 15   { Grade::Commercial }
+    else if defectsPer300g() > 5    { Grade::Standard }
+    else                             { Grade::Premium }
+
+  def gradeLabel(): String = select grade() {
+    case Grade::Premium:    "★★★ Premium"
+    case Grade::Standard:   "★★  Standard"
+    case Grade::Commercial: "★   Commercial"
+    case Grade::Reject:     "    Reject"
+  }
+}
+
+record RoastBatch(
+  batchId: String,
+  bean: Bean,
+  profile: RoastProfile,
+  weightInKg: Float,
+  weightOutKg: Float,
+  roastedDate: String
+) {
+public:
+  def weightLossPct(): Float =
+    (weightInKg() - weightOutKg()) / weightInKg() * 100.0f
+
+  def revenueAt(pricePerKg: Float): Float = weightOutKg() * pricePerKg
+
+  def summary(): String =
+    "#{batchId()} | #{bean().variety()} (#{bean().origin()}) " +
+    "| #{profile().name()} | in=#{weightInKg()}kg out=#{weightOutKg()}kg " +
+    "| loss=#{weightLossPct()}%"
+}
+
+record Customer(
+  name: String,
+  tier: String,
+  totalOrdersKg: Float
+) {
+public:
+  def discountPct(): Float =
+    if tier() == "Gold"   { 0.12f }
+    else if tier() == "Silver" { 0.07f }
+    else                       { 0.0f }
+}
+
+// ── Interface and class hierarchy ────────────────────────────────────────────
+
+interface Reportable {
+  def report(): String
+}
+
+class Inventory extends Object conforms Reportable {
+  var batches: ArrayList[RoastBatch]
+  var priceTable: LinkedHashMap[String, Float]
+
+public:
+  def this {
+    batches    = new ArrayList[RoastBatch]()
+    priceTable = new LinkedHashMap[String, Float]()
+  }
+
+  def addBatch(b: RoastBatch): void {
+    batches.add(b)
+    val profile = b.profile().name()
+    if !priceTable.containsKey(profile) {
+      priceTable.put(profile, defaultPriceFor(profile))
+    }
+  }
+
+  def setPrice(profile: String, price: Float): void {
+    priceTable.put(profile, price)
+  }
+
+  def priceFor(profile: String): Float {
+    val p = priceTable.get(profile)
+    if p == null { return 14.0f }
+    return p as Float
+  }
+
+  def totalKg(): Float {
+    var sum: Float = 0.0f
+    foreach b: RoastBatch in batches {
+      sum = sum + b.weightOutKg()
+    }
+    return sum
+  }
+
+  def batchesByOrigin(origin: Origin): ArrayList[RoastBatch] {
+    val result = new ArrayList[RoastBatch]()
+    foreach b: RoastBatch in batches {
+      if b.bean().origin() == origin { result.add(b) }
+    }
+    return result
+  }
+
+  def premiumBatches(): ArrayList[RoastBatch] {
+    val result = new ArrayList[RoastBatch]()
+    foreach b: RoastBatch in batches {
+      if b.bean().grade() == Grade::Premium { result.add(b) }
+    }
+    return result
+  }
+
+  def report(): String {
+    var out = "=== Inventory Report ===\n"
+    out = out + "Total batches : #{batches.size()}\n"
+    out = out + "Total stock   : #{totalKg()}kg\n\n"
+    out = out + "Price table:\n"
+    foreach (profile, price) in priceTable {
+      out = out + "  #{profile}: $#{price}/kg\n"
+    }
+    return out
+  }
+
+  static def defaultPriceFor(profile: String): Float =
+    if profile == "Espresso" { 16.5f }
+    else if profile == "Dark" { 13.5f }
+    else if profile == "Medium" { 12.0f }
+    else { 11.0f }
+}
+
+// ── Recursive helper ─────────────────────────────────────────────────────────
+
+// Recursively scan beans to find the best blend candidate (fewest defects, then moisture)
+def bestBlendCandidate(beans: ArrayList[Bean], idx: Int, best: Bean?): Bean? {
+  if idx >= beans.size() { return best }
+  val current = beans[idx] as Bean
+  val isNewBest =
+    best == null ||
+    current.defectsPer300g() < (best as Bean).defectsPer300g() ||
+    (current.defectsPer300g() == (best as Bean).defectsPer300g() &&
+     current.moisturePct() < (best as Bean).moisturePct())
+  return bestBlendCandidate(beans, idx + 1, if isNewBest { current } else { best })
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // ── Bean catalog ──────────────────────────────────────────────────────────
+  val beans = [
+    new Bean("ETH-001", Origin::Ethiopia,   "Yirgacheffe",   11.2f,  3, 8.50f),
+    new Bean("COL-001", Origin::Colombia,   "Supremo",       10.8f,  4, 7.20f),
+    new Bean("BRZ-001", Origin::Brazil,     "Santos",        12.1f,  8, 5.80f),
+    new Bean("GTM-001", Origin::Guatemala,  "Antigua",       11.5f,  6, 7.00f),
+    new Bean("IND-001", Origin::Indonesia,  "Mandheling",    12.8f, 12, 6.40f),
+    new Bean("YEM-001", Origin::Yemen,      "Mocha Mattari", 10.5f,  2, 18.00f),
+    new Bean("JAM-001", Origin::Jamaica,    "Blue Mountain", 10.1f,  1, 45.00f)
+  ]
+
+  // ── Roast profiles ────────────────────────────────────────────────────────
+  val lightP   = new Light(196, 12)
+  val mediumP  = new Medium(210, 14)
+  val darkP    = new Dark(225, 16)
+  val espressoP = new Espresso(215, 9.2f)
+
+  // ── Batch production log ──────────────────────────────────────────────────
+  val batches = [
+    new RoastBatch("R001", beans[0] as Bean, lightP,    50.0f, 42.5f, "2026-09-01"),
+    new RoastBatch("R002", beans[0] as Bean, mediumP,   40.0f, 33.8f, "2026-09-02"),
+    new RoastBatch("R003", beans[1] as Bean, mediumP,   60.0f, 50.7f, "2026-09-03"),
+    new RoastBatch("R004", beans[2] as Bean, darkP,     80.0f, 66.4f, "2026-09-04"),
+    new RoastBatch("R005", beans[3] as Bean, espressoP, 45.0f, 37.8f, "2026-09-05"),
+    new RoastBatch("R006", beans[4] as Bean, darkP,     55.0f, 45.1f, "2026-09-06"),
+    new RoastBatch("R007", beans[5] as Bean, lightP,    20.0f, 17.2f, "2026-09-07"),
+    new RoastBatch("R008", beans[6] as Bean, mediumP,   10.0f,  8.5f, "2026-09-08"),
+    new RoastBatch("R009", beans[1] as Bean, espressoP, 50.0f, 41.9f, "2026-09-09"),
+    new RoastBatch("R010", beans[2] as Bean, lightP,    70.0f, 59.5f, "2026-09-10")
+  ]
+
+  // Populate inventory
+  val inv = new Inventory()
+  inv.setPrice("Light",    11.50f)
+  inv.setPrice("Medium",   13.00f)
+  inv.setPrice("Dark",     14.50f)
+  inv.setPrice("Espresso", 17.00f)
+  foreach b: RoastBatch in batches { inv.addBatch(b) }
+
+  // ── Inventory report (implements Reportable) ──────────────────────────────
+  IO::print(inv.report())
+
+  // ── Batch summaries with profile pattern matching ─────────────────────────
+  IO::println("=== Batch Summaries ===")
+  foreach b: RoastBatch in batches {
+    val extra = select b.profile() {
+      case p is Espresso: " [pressure=#{p.pressure()}bar]"
+      case p is Dark:     " [bold roast]"
+      else:               ""
+    }
+    IO::println("  " + b.summary() + extra)
+  }
+  IO::println("")
+
+  // ── Revenue by profile ────────────────────────────────────────────────────
+  IO::println("=== Revenue by Profile ===")
+  var lightRev: Float = 0.0f
+  var medRev:   Float = 0.0f
+  var darkRev:  Float = 0.0f
+  var espRev:   Float = 0.0f
+  foreach b: RoastBatch in batches {
+    val price = inv.priceFor(b.profile().name())
+    val rev   = b.revenueAt(price)
+    select b.profile() {
+      case p is Light:    lightRev = lightRev + rev
+      case p is Medium:   medRev   = medRev   + rev
+      case p is Dark:     darkRev  = darkRev  + rev
+      case p is Espresso: espRev   = espRev   + rev
+    }
+  }
+  val totalRev = lightRev + medRev + darkRev + espRev
+  IO::println("  Light    : $#{lightRev}")
+  IO::println("  Medium   : $#{medRev}")
+  IO::println("  Dark     : $#{darkRev}")
+  IO::println("  Espresso : $#{espRev}")
+  IO::println("  TOTAL    : $#{totalRev}")
+  IO::println("")
+
+  // ── Bean quality report (collection pipeline) ─────────────────────────────
+  IO::println("=== Bean Quality Report ===")
+  val premiumBeans = beans.filter { b -> b.grade() == Grade::Premium }
+  val sortedBeans  = beans.sortedBy { b -> b.defectsPer300g() }
+  foreach b: Bean in sortedBeans {
+    IO::println("  #{b.id()} #{b.variety()}: #{b.gradeLabel()} " +
+                "(moisture=#{b.moisturePct()}%, defects=#{b.defectsPer300g()}/300g, " +
+                "cost=$#{b.costPerKg()}/kg)")
+  }
+  IO::println("  → #{premiumBeans.size()} premium bean(s)")
+  IO::println("")
+
+  // ── Premium batches from Inventory ────────────────────────────────────────
+  val premium = inv.premiumBatches()
+  IO::println("=== Premium Batches (#{premium.size()}) ===")
+  foreach b: RoastBatch in premium {
+    IO::println("  #{b.batchId()} | #{b.bean().variety()} | #{b.profile().shortDesc()}")
+  }
+  IO::println("")
+
+  // ── Ethiopia batches (origin filter) ─────────────────────────────────────
+  val ethBatches = inv.batchesByOrigin(Origin::Ethiopia)
+  IO::println("=== Ethiopia Batches ===")
+  foreach b: RoastBatch in ethBatches {
+    IO::println("  " + b.summary())
+  }
+  IO::println("")
+
+  // ── Weight-loss statistics ────────────────────────────────────────────────
+  IO::println("=== Roast Weight-Loss Statistics ===")
+  var minLoss:   Float = 100.0f
+  var maxLoss:   Float = 0.0f
+  var totalLoss: Float = 0.0f
+  foreach b: RoastBatch in batches {
+    val loss = b.weightLossPct()
+    if loss < minLoss { minLoss = loss }
+    if loss > maxLoss { maxLoss = loss }
+    totalLoss = totalLoss + loss
+  }
+  val avgLoss = totalLoss / batches.size()
+  IO::println("  Min loss : #{minLoss}%")
+  IO::println("  Max loss : #{maxLoss}%")
+  IO::println("  Avg loss : #{avgLoss}%")
+  IO::println("")
+
+  // ── Highest-weight-loss batch by profile (groupBy + max within group) ─────
+  IO::println("=== Heaviest Loss by Profile ===")
+  val byProfile = batches.groupBy { b -> b.profile().name() }
+  foreach (profileName, group) in byProfile {
+    var worstLoss: Float = 0.0f
+    var worstId = ""
+    foreach b: RoastBatch in (group as List) {
+      if b.weightLossPct() > worstLoss {
+        worstLoss = b.weightLossPct()
+        worstId   = b.batchId()
+      }
+    }
+    IO::println("  #{profileName}: batch #{worstId} at #{worstLoss}% loss")
+  }
+  IO::println("")
+
+  // ── Customer order simulation (discount tiers) ────────────────────────────
+  IO::println("=== Customer Order Simulation ===")
+  val customers = [
+    new Customer("Sunrise Cafe",  "Gold",   450.0f),
+    new Customer("Corner Bistro", "Silver", 210.0f),
+    new Customer("Home Roaster",  "Bronze",  35.0f),
+    new Customer("Hotel Monaco",  "Gold",   820.0f)
+  ]
+  val basePrice = 13.50f
+  foreach c: Customer in customers {
+    val disc       = c.discountPct()
+    val finalPrice = basePrice * (1.0f - disc)
+    val orderKg    = 20.0f
+    val orderTotal = finalPrice * orderKg
+    IO::println("  #{c.name()} [#{c.tier()}]: $#{finalPrice}/kg × #{orderKg}kg = $#{orderTotal}" +
+                " (#{disc * 100.0f}% off)")
+  }
+  IO::println("")
+
+  // ── Top customer by order volume ──────────────────────────────────────────
+  val topCustomer = customers.find { c -> c.totalOrdersKg() == customers.fold(0.0f) { acc, c2 ->
+      val a = acc as Float
+      val kg = (c2 as Customer).totalOrdersKg()
+      if kg > a { kg } else { a }
+    }
+  }
+  if topCustomer != null {
+    val tc = topCustomer as Customer
+    IO::println("Top customer: #{tc.name()} (#{tc.totalOrdersKg()}kg total)")
+  }
+  IO::println("")
+
+  // ── Partition batches: high vs normal weight-loss ─────────────────────────
+  IO::println("=== Weight-Loss Partition (threshold 17%) ===")
+  val parts      = batches.partition { b -> b.weightLossPct() > 17.0f }
+  val highLoss   = parts[0] as List[Object]
+  val normalLoss = parts[1] as List[Object]
+  IO::println("  High loss (>17%)  : #{highLoss.size} batch(es)")
+  IO::println("  Normal loss (≤17%): #{normalLoss.size} batch(es)")
+  foreach b: RoastBatch in highLoss {
+    IO::println("    #{b.batchId()} #{b.profile().name()} #{b.weightLossPct()}%")
+  }
+  IO::println("")
+
+  // ── Zip bean catalog with projected sell prices ────────────────────────────
+  IO::println("=== Bean / Projected Sell Price ===")
+  val sellMultiplier = 2.8f
+  val costList  = beans.map { b -> b.costPerKg() }
+  val sellList  = costList.map { c -> (c as Float) * sellMultiplier }
+  val zipped    = beans.zip(sellList)
+  foreach pair: Object in zipped {
+    val b    = (pair as List)[0] as Bean
+    val sell = (pair as List)[1] as Float
+    IO::println("  #{b.variety()}: cost $#{b.costPerKg()}/kg → sell ~$#{sell}/kg")
+  }
+  IO::println("")
+
+  // ── Recursive best blend candidate ────────────────────────────────────────
+  IO::println("=== Best Single-Origin Blend Candidate ===")
+  val beanList = new ArrayList[Bean]()
+  foreach b: Bean in beans { beanList.add(b) }
+  val best = bestBlendCandidate(beanList, 0, null)
+  if best != null {
+    val b = best as Bean
+    IO::println("  #{b.variety()} from #{b.origin()} — #{b.defectsPer300g()} defects, " +
+                "#{b.moisturePct()}% moisture, grade: #{b.gradeLabel()}")
+  }
+  IO::println("")
+
+  // ── Distinct origins with batch count ────────────────────────────────────
+  IO::println("=== Origins in Production ===")
+  val originNames = batches.map { b -> b.bean().origin().toString() }.distinct()
+  foreach name: String in originNames {
+    val cnt = batches.filter { b -> b.bean().origin().toString() == name }.size()
+    IO::println("  #{name}: #{cnt} batch(es)")
+  }
+  IO::println("")
+
+  IO::println("=== Roastery run complete. ===")
+}

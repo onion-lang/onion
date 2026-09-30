@@ -1,0 +1,469 @@
+// TeaHouse.on — specialty tea shop management
+// Exercises: records with methods, data-carrying enums, ADT enums, generic ADT
+// enum, classes, interfaces, generics, collection pipelines (map/filter/fold/
+// groupBy/sortedBy/distinct/find/partition/zip), select/pattern matching,
+// nullable, do[Option], closures, string interpolation, try/catch, recursion,
+// while, foreach.
+
+import {
+  java.util.*
+  onion.Format
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+enum TeaCategory { Green, Black, Oolong, White, Herbal, Puerh }
+
+enum Origin(country: String, region: String) {
+  Darjeeling("India",     "West Bengal"),
+  Assam(     "India",     "Assam"),
+  Yunnan(    "China",     "Yunnan"),
+  WuYi(      "China",     "Fujian"),
+  Uji(       "Japan",     "Kyoto"),
+  Taiwan(    "Taiwan",    "Various"),
+  Ceylon(    "Sri Lanka", "Central Highlands"),
+  Kenya(     "Kenya",     "Rift Valley")
+}
+
+// ADT: order lifecycle state
+enum OrderStatus {
+  case Pending
+  case Brewing(startMs: Long)
+  case Ready
+  case Delivered
+  case Cancelled(reason: String)
+public:
+  def label(): String = select this {
+    case s is Pending:   "Pending"
+    case s is Brewing:   "Brewing"
+    case s is Ready:     "Ready"
+    case s is Delivered: "Delivered"
+    case s is Cancelled: "Cancelled: #{s.reason()}"
+  }
+  def isActive(): Boolean = select this {
+    case s is Pending: true
+    case s is Brewing: true
+    else:              false
+  }
+}
+
+// Generic ADT: safe result
+enum Outcome[T] {
+  case Ok(value: T)
+  case Fail(message: String)
+public:
+  def isOk(): Boolean = select this {
+    case r is Ok:   true
+    case r is Fail: false
+  }
+  def label(): String = select this {
+    case r is Ok:   "OK: #{r.value()}"
+    case r is Fail: "FAIL: #{r.message()}"
+  }
+}
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record TeaVariety(
+  id:           String,
+  name:         String,
+  origin:       Origin,
+  category:     TeaCategory,
+  brewTempC:    Int,
+  brewTimeSec:  Int,
+  pricePerGram: Double
+) {
+public:
+  def label(): String =
+    "#{name()} [#{origin().country()}/#{origin().region()}]"
+  def brewInfo(): String =
+    "#{brewTempC()}°C / #{brewTimeSec()}s"
+  def isHighTemp(): Boolean = brewTempC() >= 95
+  def priceStr(): String = "$#{Format::fixed(pricePerGram(), 2)}/g"
+}
+
+record Customer(id: Int, name: String, email: String?, loyaltyPoints: Int) {
+public:
+  def greet(): String {
+    val pts: String = if loyaltyPoints() > 0 {
+      " (#{loyaltyPoints()} pts)"
+    } else {
+      ""
+    }
+    return "Welcome, #{name()}#{pts}!"
+  }
+}
+
+record OrderLine(variety: TeaVariety, grams: Double) {
+public:
+  def subtotal(): Double = grams() * variety().pricePerGram()
+  def label(): String =
+    "  #{variety().name()} x #{grams()}g = $#{Format::fixed(subtotal(), 2)}"
+}
+
+record Order(id: Int, customer: Customer?, lines: List[OrderLine], status: OrderStatus) {
+public:
+  def total(): Double =
+    lines().fold(0.0) { acc, line -> acc + line.subtotal() }
+  def header(): String {
+    val c: Customer? = customer()
+    val who: String = if c != null { c.name() } else { "Walk-in" }
+    return "Order ##{id()} for #{who} — #{status().label()}"
+  }
+}
+
+// ── Interface + extension ─────────────────────────────────────────────────────
+
+interface Summarizable {
+  def summary(): String
+}
+
+extension String {
+  def padEnd(width: Int): String {
+    var s: String = self
+    while s.length() < width {
+      s = s + " "
+    }
+    return s
+  }
+  def center(width: Int): String {
+    val pad: Int = width - self.length()
+    if pad <= 0 { return self }
+    val left: Int = pad / 2
+    var s: String = ""
+    var i: Int = 0
+    while i < left { s = s + " "; i++ }
+    s = s + self
+    i = 0
+    while i < (pad - left) { s = s + " "; i++ }
+    return s
+  }
+}
+
+// ── TeaShop class ─────────────────────────────────────────────────────────────
+
+class TeaShop {
+  var catalog: List[TeaVariety]
+  var orders:  List[Order]
+  var nextId:  Int
+
+public:
+  def this {
+    catalog = []
+    orders  = []
+    nextId  = 1
+  }
+
+  def addVariety(v: TeaVariety): void {
+    catalog.add(v)
+  }
+
+  def findVariety(name: String): TeaVariety? {
+    foreach v: TeaVariety in catalog {
+      if v.name() == name { return v }
+    }
+    return null
+  }
+
+  def placeOrder(customer: Customer?, lines: List[OrderLine]): Outcome[Order] {
+    if lines.size == 0 {
+      return new Fail[Order]("Order must have at least one line")
+    }
+    val order: Order = new Order(nextId, customer, lines, new Pending())
+    nextId++
+    orders.add(order)
+    return new Ok[Order](order)
+  }
+
+  def advanceOrder(orderId: Int): void {
+    var i: Int = 0
+    while i < orders.size {
+      val o: Order = orders[i]
+      if o.id() == orderId {
+        val newStatus: OrderStatus = select o.status() {
+          case s is Pending: new Brewing(System::currentTimeMillis())
+          case s is Brewing: new Ready()
+          case s is Ready:   new Delivered()
+          else:              o.status()
+        }
+        orders.set(i, new Order(o.id(), o.customer(), o.lines(), newStatus))
+        return
+      }
+      i++
+    }
+  }
+
+  def cancelOrder(orderId: Int, reason: String): void {
+    var i: Int = 0
+    while i < orders.size {
+      val o: Order = orders[i]
+      if o.id() == orderId && o.status().isActive() {
+        orders.set(i, new Order(o.id(), o.customer(), o.lines(),
+                                new Cancelled(reason)))
+        return
+      }
+      i++
+    }
+  }
+
+  def deliveredOrders(): List[Order] =
+    orders.filter { o -> select o.status() {
+      case s is Delivered: true
+      else:                false
+    }}
+
+  def activeOrders(): List[Order] =
+    orders.filter { o -> o.status().isActive() }
+
+  def salesByCategory(): Map[String, Double] {
+    val result: Map[String, Double] = [:]
+    foreach o: Order in deliveredOrders() {
+      foreach line: OrderLine in o.lines() {
+        val cat: String = line.variety().category().name()
+        val prev: Double = (result[cat] ?: 0.0) as Double
+        result[cat] = prev + line.subtotal()
+      }
+    }
+    return result
+  }
+
+  def varietySales(): Map[String, Double] {
+    val result: Map[String, Double] = [:]
+    foreach o: Order in deliveredOrders() {
+      foreach line: OrderLine in o.lines() {
+        val name: String = line.variety().name()
+        val prev: Double = (result[name] ?: 0.0) as Double
+        result[name] = prev + line.subtotal()
+      }
+    }
+    return result
+  }
+
+  def printCatalog(): void {
+    val line: String = "═".repeat(56)
+    IO::println("╔#{line}╗")
+    IO::println("║#{"TEA CATALOG".center(56)}║")
+    IO::println("╠#{line}╣")
+    val sorted: List[TeaVariety] = catalog.sortedBy { v -> v.category().ordinal() }
+    foreach v: TeaVariety in sorted {
+      val nameCol: String = v.label().padEnd(36)
+      val brewCol: String = v.brewInfo().padEnd(14)
+      IO::println("║ #{nameCol}#{brewCol}║")
+    }
+    IO::println("╚#{line}╝")
+  }
+
+  def printOrders(): void {
+    IO::println("\n── Order Summary ─────────────────────────────────")
+    foreach o: Order in orders {
+      IO::println(o.header())
+      foreach line: OrderLine in o.lines() {
+        IO::println(line.label())
+      }
+      IO::println("  Total: $#{Format::fixed(o.total(), 2)}")
+    }
+  }
+
+  def getCatalog(): List[TeaVariety] = catalog
+
+  def printSalesReport(): void {
+    IO::println("\n── Sales by Category ─────────────────────────────")
+    val byCategory: Map[String, Double] = salesByCategory()
+    foreach (cat, total) in byCategory {
+      IO::println("  #{cat}: $#{Format::fixed(total, 2)}")
+    }
+
+    IO::println("\n── Sales by Variety ──────────────────────────────")
+    val byVariety: Map[String, Double] = varietySales()
+    val pairs: List[Object] = []
+    foreach (n, rev) in byVariety {
+      pairs.add([n, rev] as List[Object])
+    }
+    val sorted: List[Object] = pairs.sortedBy { p ->
+      val pair: List[Object] = p as List[Object]
+      -(pair[1] as Double)
+    }
+    var rank: Int = 1
+    foreach p: Object in sorted {
+      val pair: List[Object] = p as List[Object]
+      IO::println("  #{rank}. #{pair[0]}: $#{Format::fixed(pair[1] as Double, 2)}")
+      rank++
+    }
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+def makeLines(shop: TeaShop, specs: List[Object]): Outcome[List[OrderLine]] {
+  val result: List[OrderLine] = []
+  foreach spec: Object in specs {
+    val pair: List[Object] = spec as List[Object]
+    val varName: String = pair[0] as String
+    val grams: Double = (pair[1] as Double)
+    val v: TeaVariety? = shop.findVariety(varName)
+    if v == null {
+      return new Fail[List[OrderLine]]("Unknown tea: #{varName}")
+    }
+    result.add(new OrderLine(v, grams))
+  }
+  return new Ok[List[OrderLine]](result)
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val shop: TeaShop = new TeaShop()
+
+  // Populate catalog
+  shop.addVariety(new TeaVariety("g01", "Gyokuro Supremo",
+    Origin::Uji,         TeaCategory::Green,  60, 90,  0.85))
+  shop.addVariety(new TeaVariety("g02", "Sencha Classic",
+    Origin::Uji,         TeaCategory::Green,  75, 60,  0.42))
+  shop.addVariety(new TeaVariety("b01", "Darjeeling First Flush",
+    Origin::Darjeeling,  TeaCategory::Black,  90, 180, 0.38))
+  shop.addVariety(new TeaVariety("b02", "Assam Breakfast Blend",
+    Origin::Assam,       TeaCategory::Black,  95, 240, 0.22))
+  shop.addVariety(new TeaVariety("o01", "Dong Ding Oolong",
+    Origin::Taiwan,      TeaCategory::Oolong, 85, 120, 0.65))
+  shop.addVariety(new TeaVariety("p01", "Aged Puerh Reserve",
+    Origin::Yunnan,      TeaCategory::Puerh,  98, 300, 1.20))
+  shop.addVariety(new TeaVariety("w01", "Silver Needle White",
+    Origin::Yunnan,      TeaCategory::White,  70, 150, 0.95))
+  shop.addVariety(new TeaVariety("h01", "Chamomile Dreams",
+    Origin::Kenya,       TeaCategory::Herbal, 100, 300, 0.18))
+
+  shop.printCatalog()
+
+  // Customers
+  val alice: Customer = new Customer(1, "Alice Chen", "alice@example.com", 120)
+  val bob:   Customer = new Customer(2, "Bob Smith",  null,                 0)
+  IO::println("\n" + alice.greet())
+  IO::println(bob.greet())
+
+  // Build order lines, place orders
+  val spec1: List[Object] = [
+    (["Gyokuro Supremo", 5.0] as List[Object]),
+    (["Darjeeling First Flush", 10.0] as List[Object])
+  ]
+  val spec2: List[Object] = [
+    (["Assam Breakfast Blend", 20.0] as List[Object]),
+    (["Chamomile Dreams", 10.0] as List[Object])
+  ]
+  val spec3: List[Object] = [
+    (["Dong Ding Oolong", 8.0] as List[Object]),
+    (["Aged Puerh Reserve", 3.0] as List[Object])
+  ]
+  val specBad: List[Object] = [
+    (["UnknownTea", 5.0] as List[Object])
+  ]
+
+  val lines1Out: Outcome[List[OrderLine]] = makeLines(shop, spec1)
+  val lines2Out: Outcome[List[OrderLine]] = makeLines(shop, spec2)
+  val lines3Out: Outcome[List[OrderLine]] = makeLines(shop, spec3)
+  val linesBadOut: Outcome[List[OrderLine]] = makeLines(shop, specBad)
+
+  IO::println("\nLine parsing: #{if lines1Out.isOk() { "ok" } else { "err" }}, " +
+    "#{if lines2Out.isOk() { "ok" } else { "err" }}, " +
+    "#{if lines3Out.isOk() { "ok" } else { "err" }}, " +
+    "#{if linesBadOut.isOk() { "ok" } else { (linesBadOut as Fail[List[OrderLine]]).message() }}")
+
+  val r1: Outcome[Order] = if lines1Out.isOk() {
+    shop.placeOrder(alice, (lines1Out as Ok[List[OrderLine]]).value())
+  } else {
+    new Fail[Order]("lines failed")
+  }
+  val r2: Outcome[Order] = if lines2Out.isOk() {
+    shop.placeOrder(bob, (lines2Out as Ok[List[OrderLine]]).value())
+  } else {
+    new Fail[Order]("lines failed")
+  }
+  val r3: Outcome[Order] = if lines3Out.isOk() {
+    shop.placeOrder(null, (lines3Out as Ok[List[OrderLine]]).value())
+  } else {
+    new Fail[Order]("lines failed")
+  }
+
+  // Advance orders through lifecycle
+  if r1.isOk() {
+    val id: Int = (r1 as Ok[Order]).value().id()
+    shop.advanceOrder(id)  // Pending → Brewing
+    shop.advanceOrder(id)  // Brewing → Ready
+    shop.advanceOrder(id)  // Ready   → Delivered
+  }
+  if r2.isOk() {
+    val id: Int = (r2 as Ok[Order]).value().id()
+    shop.advanceOrder(id)  // Pending → Brewing
+    shop.cancelOrder(id, "Customer changed mind")
+  }
+  if r3.isOk() {
+    val id: Int = (r3 as Ok[Order]).value().id()
+    shop.advanceOrder(id)
+    shop.advanceOrder(id)
+    shop.advanceOrder(id)
+  }
+
+  shop.printOrders()
+  shop.printSalesReport()
+
+  // High-temp varieties (≥95°C)
+  IO::println("\n── High-Temp Brews (≥95°C) ──────────────────────")
+  val hotTeas: List[String] =
+    shop.getCatalog()
+      .filter { v -> v.isHighTemp() }
+      .map    { v -> v.name() }
+  foreach name: String in hotTeas {
+    IO::println("  • #{name}")
+  }
+
+  // Category distribution
+  IO::println("\n── Catalog by Category ───────────────────────────")
+  val byCat: Map[String, List[TeaVariety]] =
+    shop.getCatalog().groupBy { v -> v.category().name() }
+  foreach (cat, varieties) in byCat {
+    IO::println("  #{cat}: #{varieties.size} variety(ies)")
+  }
+
+  // Origin countries (distinct, sorted)
+  val countries: List[String] =
+    shop.getCatalog()
+      .map      { v -> v.origin().country() }
+      .distinct()
+      .sortedBy { c -> c as String }
+  IO::println("\n── Sourcing Countries ────────────────────────────")
+  foreach country: String in countries {
+    IO::println("  • #{country}")
+  }
+
+  // Active orders count
+  val active: List[Order] = shop.activeOrders()
+  IO::println("\nActive orders: #{active.size}")
+
+  // Premium / standard split
+  val premium: List[TeaVariety] =
+    shop.getCatalog().filter { v -> v.pricePerGram() >= 0.60 }
+  val standard: List[TeaVariety] =
+    shop.getCatalog().filter { v -> v.pricePerGram() < 0.60 }
+  IO::println("Premium (≥$0.60/g): #{premium.size}")
+  IO::println("Standard (<$0.60/g): #{standard.size}")
+
+  // Average brew temperature by category
+  IO::println("\n── Avg Brew Temp by Category ─────────────────────")
+  val grouped: Map[String, List[TeaVariety]] =
+    shop.getCatalog().groupBy { v -> v.category().name() }
+  foreach (cat, vs) in grouped {
+    val avgTemp: Double = vs.map { v -> v.brewTempC() as Double }
+                           .fold(0.0) { acc, t -> acc + t } / (vs.size as Double)
+    IO::println("  #{cat}: #{Format::fixed(avgTemp, 1)}°C")
+  }
+
+  // Most expensive variety
+  val priciest: TeaVariety? =
+    shop.getCatalog()
+      .sortedBy { v -> -v.pricePerGram() }
+      .find { v -> true } as TeaVariety?
+  if priciest != null {
+    IO::println("\nMost expensive: #{priciest.label()} at #{priciest.priceStr()}")
+  }
+
+  IO::println("\nDone.")
+}

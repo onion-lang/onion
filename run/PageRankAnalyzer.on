@@ -1,0 +1,364 @@
+// PageRankAnalyzer.on — web-graph PageRank with authority/hub scores (~270 lines)
+// Exercises: records with methods, homogeneous enum, classes, typed generics,
+//   Map[String,List[String]] adjacency, Map[String,Double] score maps,
+//   while-loop convergence, foreach (k,v) on maps, collection pipelines
+//   (map/filter/fold/sortedBy/find), string interpolation, nullable, extension
+//   methods on Double and String, try/catch.
+
+import {
+  java.util.*
+}
+
+// ─── Enum ──────────────────────────────────────────────────────────────────────
+
+enum PageCategory {
+  News, Blog, Shop, Wiki, Forum, Social, Academic, Government
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Page(
+  id:       String,
+  title:    String,
+  category: PageCategory,
+  domain:   String
+)
+
+record LinkEdge(fromId: String, toId: String)
+
+record RankedPage(page: Page, score: Double, inDegree: Int, outDegree: Int) {
+public:
+  def summary(): String =
+    "#{page().id().rpad(14)} #{page().title().rpad(28)} #{score().fmt4()} in=#{inDegree()} out=#{outDegree()}"
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt4(): String {
+    val scaled: Long = (self * 10000.0) as Long
+    val whole:  Long = scaled / 10000L
+    val frac:   Long = scaled % 10000L
+    val fs:     String = if frac < 10L   { "000" + frac }
+                         else if frac < 100L  { "00"  + frac }
+                         else if frac < 1000L { "0"   + frac }
+                         else                 { "" + frac }
+    return Long::toString(whole) + "." + fs
+  }
+  def absDiff(other: Double): Double = if self > other { self - other } else { other - self }
+}
+
+extension String {
+  def rpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def lpad(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+extension Int {
+  def lpad(n: Int): String {
+    var s: String = "" + self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+// ─── WebGraph class ───────────────────────────────────────────────────────────
+
+class WebGraph {
+  var pages:    Map[String, Page]
+  var outLinks: Map[String, List[String]]
+  var inLinks:  Map[String, List[String]]
+
+public:
+  def this {
+    pages    = [:]
+    outLinks = [:]
+    inLinks  = [:]
+  }
+
+  def addPage(p: Page): void {
+    pages[p.id()]    = p
+    if outLinks[p.id()] == null { outLinks[p.id()] = new ArrayList[String]() }
+    if inLinks [p.id()] == null { inLinks [p.id()] = new ArrayList[String]() }
+  }
+
+  def addLink(fromId: String, toId: String): void {
+    val out: List[String]? = outLinks[fromId]
+    if out != null { out.add(toId) }
+    val inL: List[String]? = inLinks[toId]
+    if inL != null { inL.add(fromId) }
+  }
+
+  def pageCount(): Int = pages.size
+
+  def linkCount(): Int {
+    var total: Int = 0
+    foreach (_, outList) in outLinks {
+      total = total + (outList as List[String]).size
+    }
+    return total
+  }
+
+  def outDegree(id: String): Int {
+    val out: List[String]? = outLinks[id]
+    return if out == null { 0 } else { out.size }
+  }
+
+  def inDegree(id: String): Int {
+    val inL: List[String]? = inLinks[id]
+    return if inL == null { 0 } else { inL.size }
+  }
+
+  // Classic PageRank: PR(p) = (1-d)/N + d * sum_q( PR(q) / |out(q)| )
+  def computePageRank(damping: Double, maxIter: Int, tol: Double): Map[String, Double] {
+    val N: Int = pages.size
+    val initScore: Double = 1.0 / (N as Double)
+    val scores:    Map[String, Double] = [:]
+    foreach (id, _) in pages { scores[id] = initScore }
+
+    var iter: Int = 0
+    var converged: Boolean = false
+    while iter < maxIter && !converged {
+      val newScores: Map[String, Double] = [:]
+      foreach (id, _) in pages { newScores[id] = (1.0 - damping) / (N as Double) }
+
+      foreach (srcId, outList) in outLinks {
+        val outL: List[String] = outList as List[String]
+        val od: Int = outL.size
+        if od > 0 {
+          val srcScore: Double? = scores[srcId]
+          val contrib: Double   = if srcScore == null { 0.0 } else { (srcScore as Double) * damping / (od as Double) }
+          foreach dstId: String in outL {
+            val cur: Double? = newScores[dstId]
+            val prev: Double  = if cur == null { 0.0 } else { cur as Double }
+            newScores[dstId] = prev + contrib
+          }
+        }
+      }
+
+      // Check convergence (L1 norm of delta)
+      var delta: Double = 0.0
+      foreach (id, ns) in newScores {
+        val os: Double? = scores[id]
+        val o:  Double  = if os == null { 0.0 } else { os as Double }
+        delta = delta + (ns as Double).absDiff(o)
+      }
+      converged = delta < tol
+      foreach (id, ns) in newScores { scores[id] = ns as Double }
+      iter = iter + 1
+    }
+
+    return scores
+  }
+
+  // HITS: authority/hub scores (simplified power iteration)
+  def computeHITS(maxIter: Int, tol: Double): Map[String, Double] {
+    var auth: Map[String, Double] = [:]
+    var hub:  Map[String, Double] = [:]
+    foreach (id, _) in pages { auth[id] = 1.0; hub[id] = 1.0 }
+
+    var iter: Int = 0
+    var converged: Boolean = false
+    while iter < maxIter && !converged {
+      val newAuth: Map[String, Double] = [:]
+      val newHub:  Map[String, Double] = [:]
+      foreach (id, _) in pages { newAuth[id] = 0.0; newHub[id] = 0.0 }
+
+      // auth(p) = sum over q->p of hub(q)
+      foreach (srcId, outList) in outLinks {
+        val outL: List[String] = outList as List[String]
+        val srcHub: Double?    = hub[srcId]
+        val h: Double          = if srcHub == null { 0.0 } else { srcHub as Double }
+        foreach dstId: String in outL {
+          val cur: Double? = newAuth[dstId]
+          val prev: Double = if cur == null { 0.0 } else { cur as Double }
+          newAuth[dstId] = prev + h
+        }
+      }
+
+      // hub(p) = sum over p->q of auth(q)
+      foreach (srcId, outList) in outLinks {
+        val outL: List[String] = outList as List[String]
+        var sumAuth: Double = 0.0
+        foreach dstId: String in outL {
+          val a: Double? = newAuth[dstId]
+          sumAuth = sumAuth + (if a == null { 0.0 } else { a as Double })
+        }
+        newHub[srcId] = sumAuth
+      }
+
+      // Normalize
+      var authNorm: Double = 0.0
+      var hubNorm:  Double = 0.0
+      foreach (id, a) in newAuth { authNorm = authNorm + (a as Double) * (a as Double) }
+      foreach (id, h) in newHub  { hubNorm  = hubNorm  + (h as Double) * (h as Double) }
+      authNorm = if authNorm > 0.0 { authNorm } else { 1.0 }
+      hubNorm  = if hubNorm  > 0.0 { hubNorm  } else { 1.0 }
+
+      var delta: Double = 0.0
+      foreach (id, a) in newAuth {
+        val normalized: Double = (a as Double) / authNorm
+        val old: Double? = auth[id]
+        val o: Double = if old == null { 0.0 } else { old as Double }
+        delta = delta + normalized.absDiff(o)
+        newAuth[id] = normalized
+      }
+      foreach (id, h) in newHub {
+        newHub[id] = (h as Double) / hubNorm
+      }
+
+      converged = delta < tol
+      auth = newAuth
+      hub  = newHub
+      iter = iter + 1
+    }
+    return auth
+  }
+
+  def rankedPages(scores: Map[String, Double]): List[RankedPage] {
+    val result: List[RankedPage] = new ArrayList[RankedPage]()
+    foreach (id, p) in pages {
+      val score: Double? = scores[id]
+      val s: Double = if score == null { 0.0 } else { score as Double }
+      result.add(new RankedPage(p as Page, s, inDegree(id), outDegree(id)))
+    }
+    return result.sortedBy { rp -> -((rp as RankedPage).score()) }
+  }
+}
+
+// ─── Sample data ──────────────────────────────────────────────────────────────
+
+def buildGraph(): WebGraph {
+  val g = new WebGraph()
+
+  g.addPage(new Page("wiki_ml",   "Machine Learning — Wikipedia", PageCategory::Wiki,       "en.wikipedia.org"))
+  g.addPage(new Page("wiki_dl",   "Deep Learning — Wikipedia",    PageCategory::Wiki,       "en.wikipedia.org"))
+  g.addPage(new Page("arxiv_gpt", "Attention Is All You Need",    PageCategory::Academic,   "arxiv.org"))
+  g.addPage(new Page("arxiv_res", "Residual Networks (ResNet)",   PageCategory::Academic,   "arxiv.org"))
+  g.addPage(new Page("blog_ai",   "AI Trends 2025",               PageCategory::Blog,       "aitrends.io"))
+  g.addPage(new Page("blog_llm",  "Large Language Models",        PageCategory::Blog,       "nlpblog.io"))
+  g.addPage(new Page("forum_ml",  "ML Reddit Community",          PageCategory::Forum,      "reddit.com"))
+  g.addPage(new Page("news_ai",   "AI Weekly News",               PageCategory::News,       "ainews.com"))
+  g.addPage(new Page("gov_ai",    "AI Policy Report",             PageCategory::Government, "whitehouse.gov"))
+  g.addPage(new Page("social_ai", "AI Twitter Thread",            PageCategory::Social,     "twitter.com"))
+
+  // Links — wiki pages are highly cited
+  g.addLink("arxiv_gpt",  "wiki_ml")
+  g.addLink("arxiv_gpt",  "wiki_dl")
+  g.addLink("arxiv_res",  "wiki_ml")
+  g.addLink("arxiv_res",  "wiki_dl")
+  g.addLink("blog_ai",    "wiki_ml")
+  g.addLink("blog_ai",    "arxiv_gpt")
+  g.addLink("blog_ai",    "news_ai")
+  g.addLink("blog_llm",   "wiki_dl")
+  g.addLink("blog_llm",   "arxiv_gpt")
+  g.addLink("blog_llm",   "wiki_ml")
+  g.addLink("forum_ml",   "wiki_ml")
+  g.addLink("forum_ml",   "arxiv_gpt")
+  g.addLink("forum_ml",   "arxiv_res")
+  g.addLink("forum_ml",   "blog_ai")
+  g.addLink("forum_ml",   "blog_llm")
+  g.addLink("news_ai",    "wiki_ml")
+  g.addLink("news_ai",    "gov_ai")
+  g.addLink("news_ai",    "blog_ai")
+  g.addLink("gov_ai",     "wiki_ml")
+  g.addLink("social_ai",  "blog_ai")
+  g.addLink("social_ai",  "blog_llm")
+  g.addLink("social_ai",  "arxiv_gpt")
+  g.addLink("wiki_ml",    "wiki_dl")
+  g.addLink("wiki_dl",    "wiki_ml")
+  g.addLink("wiki_ml",    "arxiv_gpt")
+  g.addLink("wiki_ml",    "arxiv_res")
+
+  return g
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val g: WebGraph = buildGraph()
+
+  IO::println("╔════════════════════════════════════════════════════════════╗")
+  IO::println("║              PAGE RANK ANALYZER                           ║")
+  IO::println("╚════════════════════════════════════════════════════════════╝")
+  IO::println("Graph: #{g.pageCount()} pages, #{g.linkCount()} directed links\n")
+
+  // ── PageRank
+  val damping: Double = 0.85
+  val prScores: Map[String, Double] = g.computePageRank(damping, 100, 0.000001)
+  val prRanked: List[RankedPage]    = g.rankedPages(prScores)
+
+  IO::println("─── PageRank (d=0.85) ──────────────────────────────────────")
+  IO::println("  Rank  Page-ID         Title                        Score    In  Out")
+  IO::println("  " + "─".rpad(70))
+  var rank: Int = 1
+  foreach rp: RankedPage in prRanked {
+    IO::println("  #{rank.lpad(4)}  #{rp.summary()}")
+    rank = rank + 1
+  }
+
+  // ── HITS authority scores
+  val authScores: Map[String, Double] = g.computeHITS(100, 0.000001)
+  val authRanked: List[RankedPage]    = g.rankedPages(authScores)
+
+  IO::println("\n─── HITS Authority Ranking ─────────────────────────────────")
+  IO::println("  Rank  Page-ID         Title                        Auth")
+  IO::println("  " + "─".rpad(60))
+  var rank2: Int = 1
+  foreach rp: RankedPage in authRanked {
+    if rank2 <= 5 {
+      IO::println("  #{rank2.lpad(4)}  #{rp.page().id().rpad(14)} #{rp.page().title().rpad(28)} #{rp.score().fmt4()}")
+    }
+    rank2 = rank2 + 1
+  }
+
+  // ── Category breakdown
+  IO::println("\n─── Average PageRank by Category ───────────────────────────")
+  val cats: List[String] = new ArrayList[String]()
+  cats.add("Wiki"); cats.add("Academic"); cats.add("Blog")
+  cats.add("Forum"); cats.add("News"); cats.add("Government"); cats.add("Social")
+  foreach catName: String in cats {
+    val inCat: List[RankedPage] = prRanked.filter { rp ->
+      (rp as RankedPage).page().category().toString() == catName
+    }
+    if inCat.size > 0 {
+      var total: Double = 0.0
+      foreach rp: RankedPage in inCat { total = total + rp.score() }
+      val avg: Double   = total / (inCat.size as Double)
+      IO::println("  #{catName.rpad(12)}  avg=#{avg.fmt4()}  (#{inCat.size} page(s))")
+    }
+  }
+
+  // ── Sink/source analysis
+  val sinks:   List[RankedPage] = prRanked.filter { rp -> (rp as RankedPage).outDegree() == 0 }
+  val sources: List[RankedPage] = prRanked.filter { rp -> (rp as RankedPage).inDegree()  == 0 }
+  IO::println("\n─── Graph Structure ────────────────────────────────────────")
+  IO::println("  Sink pages (no outgoing links)  : #{sinks.size}")
+  foreach rp: RankedPage in sinks {
+    IO::println("    - #{rp.page().title()}")
+  }
+  IO::println("  Source pages (no incoming links): #{sources.size}")
+  foreach rp: RankedPage in sources {
+    IO::println("    - #{rp.page().title()}")
+  }
+
+  // ── Top by in-degree
+  val byInDeg: List[RankedPage] = prRanked.sortedBy { rp -> -((rp as RankedPage).inDegree()) }
+  IO::println("\n─── Top 3 by In-Degree (most cited) ───────────────────────")
+  var i: Int = 0
+  foreach rp: RankedPage in byInDeg {
+    if i < 3 {
+      IO::println("  #{(i+1).lpad(2)}. #{rp.page().title()} (#{rp.inDegree()} citations)")
+    }
+    i = i + 1
+  }
+
+  IO::println("\n[Done]")
+}

@@ -1,0 +1,261 @@
+// FarmSimulator.on — farm management and crop planning across growing seasons
+// Exercises: records with methods, data-carrying enums, classes, List pipelines,
+// select/pattern matching, extension methods, closures, try/catch, recursion,
+// foreach with ranges, map iteration, string interpolation, nullable.
+
+// --- Records ---
+
+record Crop(
+  name: String,
+  growDays: Int,
+  yieldPerAcre: Double,
+  waterNeed: Int,
+  seedCostPerAcre: Double,
+  pricePerUnit: Double
+)
+
+record Field(
+  name: String,
+  acres: Double,
+  soilQuality: Double       // 0.0 = barren, 1.0 = excellent
+)
+
+record Planting(field: Field, crop: Crop, season: String)
+
+record HarvestResult(
+  planting: Planting,
+  actualYield: Double,
+  revenue: Double,
+  cost: Double
+) {
+public:
+  def profit(): Double = revenue() - cost()
+  def profitPerAcre(): Double = profit() / planting().field().acres()
+}
+
+// --- Data-carrying enum: season characteristics ---
+
+enum Season(label: String, startMonth: Int, endMonth: Int, rainfall: Int) {
+  Spring("Spring", 3, 5, 120),
+  Summer("Summer", 6, 8, 50),
+  Autumn("Autumn", 9, 11, 90),
+  Winter("Winter", 12, 2, 30)
+}
+
+// --- Extension methods on Double for display ---
+
+extension Double {
+  def dollar(): String = "$#{self}"
+  def pct(): String    = "#{self}%"
+}
+
+// --- Helper functions ---
+
+def roundTo2(x: Double): Double {
+  val scaled = (x * 100.0) as Long
+  return (scaled as Double) / 100.0
+}
+
+def computeYieldFactor(field: Field, crop: Crop, season: Season): Double {
+  val rainfall = season.rainfall()
+  val need = crop.waterNeed()
+  val waterRatio: Double = if rainfall >= need { 1.0 }
+                           else { (rainfall as Double) / (need as Double) }
+  return field.soilQuality() * (0.7 + 0.3 * waterRatio)
+}
+
+def harvest(planting: Planting, season: Season): HarvestResult {
+  val field = planting.field()
+  val crop = planting.crop()
+  val factor = computeYieldFactor(field, crop, season)
+  val actualYield = field.acres() * crop.yieldPerAcre() * factor
+  val revenue = actualYield * crop.pricePerUnit()
+  val cost = field.acres() * crop.seedCostPerAcre()
+  return new HarvestResult(planting, roundTo2(actualYield), roundTo2(revenue), roundTo2(cost))
+}
+
+// Select-based crop recommendation by soil quality tier.
+def recommendCrop(soilQuality: Double, corn: Crop, soybeans: Crop, barley: Crop,
+                  wheat: Crop, canola: Crop): Crop {
+  val tier: Int = if soilQuality >= 0.8 { 3 }
+                  else if soilQuality >= 0.6 { 2 }
+                  else { 1 }
+  select tier {
+    case 3: return if soilQuality > 0.9 { canola } else { corn }  // premium soil
+    case 2: return if soilQuality > 0.65 { soybeans } else { wheat } // good soil
+    else:   return barley     // low-water, tolerates poor soil
+  }
+}
+
+// Recursive: compound growth of capital over n years at rate r.
+def compoundGrowth(principal: Double, rate: Double, years: Int): Double {
+  if years <= 0 { return principal }
+  return compoundGrowth(principal * (1.0 + rate), rate, years - 1)
+}
+
+// --- Farm class ---
+
+class Farm {
+public:
+  val name: String
+  var capital: Double
+  val log: List[HarvestResult]
+
+  def this(farmName: String, initialCapital: Double) {
+    this.name = farmName
+    this.capital = initialCapital
+    this.log = []
+  }
+
+  def runSeason(season: Season, plantings: List[Planting]): void {
+    IO::println("--- #{season.label()} ---")
+    foreach p: Planting in plantings {
+      val result = harvest(p, season)
+      this.log.add(result)
+      this.capital = this.capital + result.profit()
+      IO::println("  #{result.planting().crop().name()} @ #{result.planting().field().name()}: " +
+                  "yield=#{result.actualYield()}, profit=#{roundTo2(result.profit()).dollar()}")
+    }
+  }
+
+  def totalRevenue(): Double =
+    log.fold(0.0) { acc, r -> (acc as Double) + r.revenue() }
+
+  def totalCost(): Double =
+    log.fold(0.0) { acc, r -> (acc as Double) + r.cost() }
+
+  def bestCropName(): String {
+    val byName = log.groupBy { r -> r.planting().crop().name() }
+    var best: String = "none"
+    var bestProfit: Double = 0.0 - 999999.0
+    foreach (cropName, entries) in byName {
+      val profit = (entries as List[HarvestResult]).fold(0.0) { acc, r -> (acc as Double) + r.profit() }
+      if (profit as Double) > bestProfit {
+        bestProfit = profit as Double
+        best = cropName as String
+      }
+    }
+    return best
+  }
+
+  def worstSeasonName(): String {
+    val bySeason = log.groupBy { r -> r.planting().season() }
+    var worst: String = "none"
+    var worstProfit: Double = 999999.0
+    foreach (seasonName, entries) in bySeason {
+      val profit = (entries as List[HarvestResult]).fold(0.0) { acc, r -> (acc as Double) + r.profit() }
+      if (profit as Double) < worstProfit {
+        worstProfit = profit as Double
+        worst = seasonName as String
+      }
+    }
+    return worst
+  }
+
+  def avgProfitPerAcre(): Double {
+    if log.size == 0 { return 0.0 }
+    val total = log.fold(0.0) { acc, r -> (acc as Double) + r.profitPerAcre() }
+    return total / (log.size as Double)
+  }
+
+  def report(): void {
+    IO::println("")
+    IO::println("=== Annual Farm Report: #{name} ===")
+    IO::println("Harvests:           #{log.size}")
+    IO::println("Total revenue:      #{roundTo2(totalRevenue()).dollar()}")
+    IO::println("Total cost:         #{roundTo2(totalCost()).dollar()}")
+    IO::println("Net profit:         #{roundTo2(totalRevenue() - totalCost()).dollar()}")
+    IO::println("Avg profit/acre:    #{roundTo2(avgProfitPerAcre()).dollar()}")
+    IO::println("Ending capital:     #{roundTo2(capital).dollar()}")
+    IO::println("Best crop:          #{bestCropName()}")
+    IO::println("Weakest season:     #{worstSeasonName()}")
+  }
+}
+
+// --- Main entry point ---
+
+def main(): void {
+  val northField  = new Field("North Field",  50.0, 0.85)
+  val southField  = new Field("South Field",  30.0, 0.70)
+  val eastPasture = new Field("East Pasture", 25.0, 0.60)
+
+  val wheat    = new Crop("Wheat",    120, 45.0,  150, 25.0,  8.50)
+  val corn     = new Crop("Corn",      90, 180.0, 200, 40.0,  4.20)
+  val soybeans = new Crop("Soybeans", 100, 50.0,  130, 35.0,  12.00)
+  val barley   = new Crop("Barley",    80, 70.0,  100, 20.0,  6.75)
+  val canola   = new Crop("Canola",    95, 40.0,  110, 30.0,  14.00)
+
+  val farm = new Farm("Sunrise Valley Farm", 100000.0)
+
+  IO::println("=== Sunrise Valley Farm — Two-Season Simulation ===")
+  IO::println("")
+
+  farm.runSeason(Season::Spring, [
+    new Planting(northField,  wheat,    "Spring"),
+    new Planting(southField,  corn,     "Spring"),
+    new Planting(eastPasture, soybeans, "Spring")
+  ])
+
+  farm.runSeason(Season::Autumn, [
+    new Planting(northField,  barley,   "Autumn"),
+    new Planting(southField,  canola,   "Autumn"),
+    new Planting(eastPasture, barley,   "Autumn")
+  ])
+
+  farm.report()
+
+  // Per-field revenue breakdown
+  IO::println("")
+  IO::println("=== Revenue by Field ===")
+  val fields = [northField, southField, eastPasture]
+  foreach f: Field in fields {
+    val fieldRevenue = farm.log
+      .filter { r -> r.planting().field().name() == f.name() }
+      .fold(0.0) { acc, r -> (acc as Double) + r.revenue() }
+    IO::println("  #{f.name()} (#{f.acres()} acres, quality=#{f.soilQuality()}): #{roundTo2(fieldRevenue as Double).dollar()}")
+  }
+
+  // Automated crop recommendations based on soil quality
+  IO::println("")
+  IO::println("=== Crop Recommendations (by soil quality) ===")
+  foreach f: Field in fields {
+    val rec = recommendCrop(f.soilQuality(), corn, soybeans, barley, wheat, canola)
+    IO::println("  #{f.name()} (quality=#{f.soilQuality()}): plant #{rec.name()}")
+  }
+
+  // Drought impact analysis using extension pct() method
+  IO::println("")
+  IO::println("=== Drought Impact Analysis (Summer vs Spring yield) ===")
+  val allCrops = [wheat, corn, soybeans, barley, canola]
+  foreach c: Crop in allCrops {
+    val normalFactor  = computeYieldFactor(northField, c, Season::Spring)
+    val droughtFactor = computeYieldFactor(northField, c, Season::Summer)
+    val lossPercent   = roundTo2((1.0 - droughtFactor / normalFactor) * 100.0)
+    IO::println("  #{c.name()}: #{lossPercent.pct()} yield loss in drought year")
+  }
+
+  // Capital growth projection via compound interest (safe try/catch wrapper)
+  IO::println("")
+  IO::println("=== Capital Growth Forecast (3% annual return) ===")
+  var i: Int = 1
+  while i <= 5 {
+    try {
+      val projected = compoundGrowth(farm.capital, 0.03, i)
+      IO::println("  Year #{i}: #{roundTo2(projected).dollar()}")
+    } catch e: Exception {
+      IO::println("  Year #{i}: forecast error — #{e.message()}")
+    }
+    i = i + 1
+  }
+
+  // Seasonal ROI comparison using range
+  IO::println("")
+  IO::println("=== Monthly Water Deficit Index per Crop (harvest season) ===")
+  val seasons = [Season::Spring, Season::Summer, Season::Autumn]
+  foreach s: Season in seasons {
+    val deficitCrops = allCrops
+      .filter { c -> (c as Crop).waterNeed() > s.rainfall() }
+      .map { c -> (c as Crop).name() }
+    IO::println("  #{s.label()}: needs irrigation → #{deficitCrops.toString()}")
+  }
+}

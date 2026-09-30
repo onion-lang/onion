@@ -1,0 +1,215 @@
+// KMeans.on — K-Means clustering on 2D points with three distance metrics.
+//
+// Exercises: records; plain enum; closures; typed collection pipelines
+// (map/filter/fold/sortedBy/find); while loops; foreach (ranges and enum
+// values); pattern matching on select; string interpolation; helper functions.
+
+import {
+  java.lang.Math
+}
+
+// ── Data types ──────────────────────────────────────────────────────────────
+
+record Point(x: Double, y: Double)
+record Centroid(id: Int, x: Double, y: Double)
+record Assignment(point: Point, centroidId: Int)
+record ClusterStats(centroidId: Int, size: Int, avgX: Double, avgY: Double, minX: Double, maxX: Double, minY: Double, maxY: Double)
+
+enum DistanceMetric { Euclidean, Manhattan, Chebyshev }
+
+// ── Distance ─────────────────────────────────────────────────────────────────
+
+def dist(p: Point, c: Centroid, metric: DistanceMetric): Double {
+  val dx = p.x() - c.x()
+  val dy = p.y() - c.y()
+  return select metric {
+    case DistanceMetric::Euclidean: Math::sqrt(dx * dx + dy * dy)
+    case DistanceMetric::Manhattan: Math::abs(dx) + Math::abs(dy)
+    case DistanceMetric::Chebyshev: Math::max(Math::abs(dx), Math::abs(dy))
+  }
+}
+
+// ── Assignment step ──────────────────────────────────────────────────────────
+
+def nearestCentroid(p: Point, centroids: List[Centroid], metric: DistanceMetric): Centroid {
+  var best: Centroid = centroids[0]
+  var bestDist: Double = dist(p, best, metric)
+  foreach c: Centroid in centroids {
+    val d = dist(p, c, metric)
+    if d < bestDist { bestDist = d; best = c }
+  }
+  return best
+}
+
+def assignPoints(points: List[Point], centroids: List[Centroid], metric: DistanceMetric): List[Assignment] {
+  return points.map { p -> new Assignment(p, nearestCentroid(p, centroids, metric).id()) }
+}
+
+// ── Centroid update step ─────────────────────────────────────────────────────
+
+def computeNewCentroid(c: Centroid, members: List[Assignment]): Centroid {
+  if members.size == 0 { return c }
+  val sumX: Double = members.fold(0.0) { acc, a -> acc + a.point().x() }
+  val sumY: Double = members.fold(0.0) { acc, a -> acc + a.point().y() }
+  val n: Double    = members.size as Double
+  return new Centroid(c.id(), sumX / n, sumY / n)
+}
+
+def updateCentroids(assignments: List[Assignment], centroids: List[Centroid]): List[Centroid] {
+  return centroids.map { c ->
+    val members: List[Assignment] = assignments.filter { a -> a.centroidId() == c.id() }
+    computeNewCentroid(c, members)
+  }
+}
+
+// ── Convergence check ────────────────────────────────────────────────────────
+
+def hasConverged(prev: List[Centroid], nxt: List[Centroid], eps: Double): Boolean {
+  foreach i: Int in 0..<prev.size {
+    val dx = prev[i].x() - nxt[i].x()
+    val dy = prev[i].y() - nxt[i].y()
+    if Math::sqrt(dx * dx + dy * dy) > eps { return false }
+  }
+  return true
+}
+
+// ── K-Means loop ─────────────────────────────────────────────────────────────
+
+def kmeans(points: List[Point], seeds: List[Centroid], maxIter: Int, eps: Double, metric: DistanceMetric): List[Assignment] {
+  var centroids: List[Centroid] = seeds
+  var iter: Int     = 0
+  var done: Boolean = false
+  while !done && iter < maxIter {
+    val asgn    = assignPoints(points, centroids, metric)
+    val updated = updateCentroids(asgn, centroids)
+    done        = hasConverged(centroids, updated, eps)
+    centroids   = updated
+    iter++
+  }
+  IO::println("  [#{metricLabel(metric)}] converged in #{iter} iteration(s)")
+  return assignPoints(points, centroids, metric)
+}
+
+// ── Summary statistics ───────────────────────────────────────────────────────
+
+def computeStats(c: Centroid, members: List[Assignment]): ClusterStats {
+  if members.size == 0 {
+    return new ClusterStats(c.id(), 0, c.x(), c.y(), c.x(), c.x(), c.y(), c.y())
+  }
+  val n: Double    = members.size as Double
+  val sumX: Double = members.fold(0.0) { acc, a -> acc + a.point().x() }
+  val sumY: Double = members.fold(0.0) { acc, a -> acc + a.point().y() }
+  val minX: Double = members.fold(members[0].point().x()) { acc, a -> Math::min(acc, a.point().x()) }
+  val maxX: Double = members.fold(members[0].point().x()) { acc, a -> Math::max(acc, a.point().x()) }
+  val minY: Double = members.fold(members[0].point().y()) { acc, a -> Math::min(acc, a.point().y()) }
+  val maxY: Double = members.fold(members[0].point().y()) { acc, a -> Math::max(acc, a.point().y()) }
+  return new ClusterStats(c.id(), members.size, sumX / n, sumY / n, minX, maxX, minY, maxY)
+}
+
+def clusterStats(asgn: List[Assignment], centroids: List[Centroid]): List[ClusterStats] {
+  return centroids.map { c ->
+    val members: List[Assignment] = asgn.filter { a -> a.centroidId() == c.id() }
+    computeStats(c, members)
+  }
+}
+
+// ── Within-cluster sum of squares (Elbow method) ─────────────────────────────
+
+def squaredDist(a: Assignment, centroids: List[Centroid]): Double {
+  val c: Centroid? = centroids.find { cc -> cc.id() == a.centroidId() }
+  if c == null { return 0.0 }
+  val dx = a.point().x() - c.x()
+  val dy = a.point().y() - c.y()
+  return dx * dx + dy * dy
+}
+
+def wcss(asgn: List[Assignment], centroids: List[Centroid]): Double {
+  return asgn.fold(0.0) { acc, a -> acc + squaredDist(a, centroids) }
+}
+
+// ── Labels and printing ───────────────────────────────────────────────────────
+
+def metricLabel(m: DistanceMetric): String {
+  return select m {
+    case DistanceMetric::Euclidean: "Euclidean"
+    case DistanceMetric::Manhattan: "Manhattan"
+    case DistanceMetric::Chebyshev: "Chebyshev"
+  }
+}
+
+def printStats(stats: List[ClusterStats], m: DistanceMetric): void {
+  IO::println("")
+  IO::println("=== Results — #{metricLabel(m)} ===")
+  foreach s: ClusterStats in stats {
+    IO::println("Cluster #{s.centroidId()}: #{s.size()} points")
+    IO::println("  Center : (#{Format::fixed(s.avgX(), 3)}, #{Format::fixed(s.avgY(), 3)})")
+    IO::println("  X range: [#{Format::fixed(s.minX(), 2)}, #{Format::fixed(s.maxX(), 2)}]")
+    IO::println("  Y range: [#{Format::fixed(s.minY(), 2)}, #{Format::fixed(s.maxY(), 2)}]")
+  }
+}
+
+// ── Elbow analysis ────────────────────────────────────────────────────────────
+
+def elbowAnalysis(points: List[Point], maxK: Int): void {
+  IO::println("")
+  IO::println("=== Elbow Method (Euclidean, maxIter=50) ===")
+  var k: Int = 1
+  while k <= maxK {
+    val seeds: List[Centroid] = []
+    foreach i: Int in 0..<k {
+      val p = points[i]
+      seeds.add(new Centroid(i, p.x(), p.y()))
+    }
+    val asgn  = kmeans(points, seeds, 50, 1e-6, DistanceMetric::Euclidean)
+    val finalC = updateCentroids(asgn, seeds)
+    val w     = wcss(asgn, finalC)
+    IO::println("  k=#{k}: WCSS = #{Format::fixed(w, 2)}")
+    k++
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val points: List[Point] = [
+    new Point(1.0, 1.0), new Point(1.5, 1.2), new Point(0.8, 1.8),
+    new Point(1.3, 0.9), new Point(0.9, 1.5), new Point(1.1, 1.1),
+    new Point(5.0, 8.0), new Point(4.5, 7.5), new Point(5.5, 8.5),
+    new Point(4.8, 8.2), new Point(5.2, 7.8), new Point(5.0, 7.0),
+    new Point(6.0, 9.0), new Point(4.0, 8.0),
+    new Point(9.0, 4.0), new Point(9.5, 3.5), new Point(8.5, 4.5),
+    new Point(10.0, 4.0), new Point(9.0, 5.0), new Point(8.0, 3.0),
+    new Point(9.5, 4.5), new Point(8.8, 4.2)
+  ]
+
+  val seeds: List[Centroid] = [
+    new Centroid(0, 0.0, 0.0),
+    new Centroid(1, 5.0, 5.0),
+    new Centroid(2, 10.0, 2.0)
+  ]
+
+  IO::println("Dataset: #{points.size} points, k=3")
+
+  foreach metric: DistanceMetric in DistanceMetric::values() {
+    val asgn  = kmeans(points, seeds, 100, 1e-6, metric)
+    val finalC = updateCentroids(asgn, seeds)
+    val stats = clusterStats(asgn, finalC)
+    printStats(stats, metric)
+  }
+
+  // Verification: Euclidean run must produce 3 non-empty clusters summing to 22
+  val fa = kmeans(points, seeds, 100, 1e-6, DistanceMetric::Euclidean)
+  var s0: Int = 0; var s1: Int = 0; var s2: Int = 0
+  foreach a: Assignment in fa {
+    if a.centroidId() == 0 { s0++ }
+    else if a.centroidId() == 1 { s1++ }
+    else { s2++ }
+  }
+  IO::println("")
+  IO::println("Verification (Euclidean):")
+  IO::println("  Total assigned  = #{fa.size}  (expected 22)")
+  IO::println("  Cluster sizes   = #{s0}, #{s1}, #{s2}")
+  IO::println("  All non-empty   = #{s0 > 0 && s1 > 0 && s2 > 0}")
+
+  elbowAnalysis(points, 6)
+}

@@ -1,0 +1,352 @@
+// MonteCarlo.on — Monte Carlo probability simulation suite
+//
+// Five classic simulations: π estimation, birthday paradox, Monty Hall
+// problem, geometric-distribution mean, and the 1-D drunkard's walk.
+//
+// Exercises: ADT case-enum with methods; records with methods; classes
+//   implementing an interface (public: section); extension methods on
+//   Double/Int/String; collection pipelines (map/filter/fold/reduce/
+//   sortedBy/find/groupBy/partition/any/count); select + type-pattern
+//   matching; nullable types; closures; string interpolation;
+//   foreach (ranges and List); while loop; try/catch.
+
+import {
+  java.lang.Math
+}
+
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+extension Double {
+  def dabs(): Double = if self < 0.0 { -self } else { self }
+  def dsqrt(): Double = Math::sqrt(self)
+
+  // Format to dp decimal places (no locale dependency).
+  def fmt(dp: Int): String {
+    val neg: Boolean  = self < 0.0
+    val v: Double     = if neg { -self } else { self }
+    var scale: Long   = 1L
+    foreach k: Int in 0..<dp { scale = scale * 10L }
+    val shifted: Long = (v * (scale as Double) + 0.5) as Long
+    val ip: Long      = shifted / scale
+    val fp: Long      = shifted % scale
+    var fs: String    = "" + fp
+    while fs.length() < dp { fs = "0" + fs }
+    return (if neg { "-" } else { "" }) + ip + "." + fs
+  }
+  def pct(dp: Int): String = (self * 100.0).fmt(dp) + "%"
+}
+
+extension Int {
+  def iabs(): Int = if self < 0 { -self } else { self }
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def toD(): Double = self as Double
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def slpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+// ─── SimResult ───────────────────────────────────────────────────────────────
+
+record SimResult(
+  name:      String,
+  estimate:  Double,
+  reference: Double,
+  n:         Int
+) {
+public:
+  def relErr(): Double {
+    if reference == 0.0 { return estimate.dabs() }
+    return ((estimate - reference) / reference).dabs()
+  }
+  def row(): String {
+    val ns: String = n.lpad(8)
+    val es: String = estimate.fmt(6).rpad(12)
+    val rs: String = reference.fmt(6).rpad(12)
+    val pe: String = relErr().pct(3).slpad(9)
+    return "  #{name().rpad(34)} #{es} #{rs} #{pe}  #{ns}"
+  }
+}
+
+// ─── ADT: SimKind ────────────────────────────────────────────────────────────
+
+enum SimKind {
+  case PiEstimation
+  case BirthdayParadox(grp: Int)
+  case MontyHall
+  case GeomMean
+  case DrunkardWalk(steps: Int)
+public:
+  def label(): String = select this {
+    case k is PiEstimation:    "π via unit-circle dart throw"
+    case k is BirthdayParadox: "P(collision) in group of #{k.grp()}"
+    case k is MontyHall:       "Monty Hall win-by-switching"
+    case k is GeomMean:        "E[flips to first head] (fair coin)"
+    case k is DrunkardWalk:    "1D walk mean |x| after #{k.steps()} steps"
+  }
+  def refValue(): Double = select this {
+    case k is PiEstimation:    Math::PI
+    case k is BirthdayParadox: 1.0 - birthdayNone(k.grp())
+    case k is MontyHall:       2.0 / 3.0
+    case k is GeomMean:        2.0
+    case k is DrunkardWalk:    Math::sqrt(2.0 * k.steps().toD() / Math::PI)
+  }
+}
+
+// ─── Exact birthday probability ──────────────────────────────────────────────
+
+// P(no shared birthday in a group of n people, 365-day year)
+def birthdayNone(n: Int): Double {
+  var p: Double = 1.0
+  foreach i: Int in 1..<n {
+    p = p * (365.0 - i.toD()) / 365.0
+  }
+  return p
+}
+
+// ─── Interface ───────────────────────────────────────────────────────────────
+
+interface Simulator {
+  def kind(): SimKind
+  def simulate(n: Int): Double
+}
+
+// ─── PiSimulator: estimate π by sampling the unit circle ─────────────────────
+
+class PiSimulator conforms Simulator {
+public:
+  def kind(): SimKind = new PiEstimation()
+  def simulate(n: Int): Double {
+    var hits: Int = 0
+    foreach i: Int in 0..<n {
+      val x: Double = Rand::nextDouble()
+      val y: Double = Rand::nextDouble()
+      if x * x + y * y <= 1.0 { hits = hits + 1 }
+    }
+    return 4.0 * hits.toD() / n.toD()
+  }
+}
+
+// ─── BirthdaySimulator: estimate P(collision) in group of grpSize ────────────
+
+class BirthdaySimulator conforms Simulator {
+  val grpSize: Int
+public:
+  def this(g: Int) { grpSize = g }
+  def kind(): SimKind = new BirthdayParadox(grpSize)
+  def simulate(n: Int): Double {
+    var cols: Int = 0
+    foreach trial: Int in 0..<n {
+      val seen: List[Object] = []
+      var collision: Boolean = false
+      var j: Int = 0
+      while j < grpSize && !collision {
+        val bday: Int = Rand::nextInt(365)
+        if seen.contains(bday) {
+          collision = true
+        } else {
+          seen.add(bday)
+        }
+        j = j + 1
+      }
+      if collision { cols = cols + 1 }
+    }
+    return cols.toD() / n.toD()
+  }
+}
+
+// ─── MontyHallSimulator: always-switch strategy ──────────────────────────────
+
+class MontyHallSimulator conforms Simulator {
+public:
+  def kind(): SimKind = new MontyHall()
+  def simulate(n: Int): Double {
+    var wins: Int = 0
+    foreach trial: Int in 0..<n {
+      val prize: Int = Rand::nextInt(3)
+      val pick: Int  = Rand::nextInt(3)
+      // After switching: win iff the original pick was NOT the prize door.
+      if pick != prize { wins = wins + 1 }
+    }
+    return wins.toD() / n.toD()
+  }
+}
+
+// ─── GeomSimulator: estimate E[flips until first head] ───────────────────────
+
+class GeomSimulator conforms Simulator {
+public:
+  def kind(): SimKind = new GeomMean()
+  def simulate(n: Int): Double {
+    var total: Long = 0L
+    foreach trial: Int in 0..<n {
+      var flips: Int = 1
+      while !Rand::nextBoolean() { flips = flips + 1 }
+      total = total + flips
+    }
+    return (total as Double) / n.toD()
+  }
+}
+
+// ─── DrunkardSimulator: mean |position| after numSteps steps ─────────────────
+
+class DrunkardSimulator conforms Simulator {
+  val numSteps: Int
+public:
+  def this(s: Int) { numSteps = s }
+  def kind(): SimKind = new DrunkardWalk(numSteps)
+  def simulate(n: Int): Double {
+    var sumAbs: Double = 0.0
+    foreach trial: Int in 0..<n {
+      var pos: Int = 0
+      foreach step: Int in 0..<numSteps {
+        if Rand::nextBoolean() { pos = pos + 1 } else { pos = pos - 1 }
+      }
+      sumAbs = sumAbs + pos.iabs().toD()
+    }
+    return sumAbs / n.toD()
+  }
+}
+
+// ─── Table helpers ───────────────────────────────────────────────────────────
+
+def printHeader(): void {
+  val h1: String = "Simulation".rpad(34)
+  val h2: String = "estimate".rpad(12)
+  val h3: String = "reference".rpad(12)
+  val h4: String = "rel err".slpad(9)
+  val h5: String = "n".slpad(8)
+  println("  #{h1} #{h2} #{h3} #{h4}  #{h5}")
+  println("  #{"-".rpad(34)} #{"-".rpad(12)} #{"-".rpad(12)} #{"-".slpad(9)}  #{"-".slpad(8)}")
+}
+
+def runBatch(simulators: List[Object], n: Int): List[Object] {
+  return simulators.map { sim ->
+    val s: Simulator = sim as Simulator
+    val k: SimKind   = s.kind()
+    new SimResult(k.label(), s.simulate(n), k.refValue(), n)
+  }
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val simulators: List[Object] = [
+    new PiSimulator(),
+    new BirthdaySimulator(23),
+    new BirthdaySimulator(50),
+    new MontyHallSimulator(),
+    new GeomSimulator(),
+    new DrunkardSimulator(100)
+  ]
+
+  // ── Run at three sample sizes ─────────────────────────────────────────────
+  foreach nObj: Object in [1000, 10000, 100000] {
+    val n: Int = nObj as Int
+    println("")
+    println("══ n = #{n} ══════════════════════════════════════════════════════════")
+    printHeader()
+    val batch: List[Object] = runBatch(simulators, n)
+    foreach r: Object in batch {
+      println((r as SimResult).row())
+    }
+  }
+
+  // ── Accuracy statistics at n = 100 000 ───────────────────────────────────
+  println("")
+  println("══ Accuracy analysis at n = 100 000 ════════════════════════════════")
+  val bigBatch: List[Object] = runBatch(simulators, 100000)
+  val errs: List[Object] = bigBatch.map { r -> (r as SimResult).relErr() }
+
+  val sumErr: Double = errs.fold(0.0) { acc, e -> (acc as Double) + (e as Double) }
+  val avgErr: Double = sumErr / errs.size.toD()
+
+  val maxR: Object? = errs.reduce { a, b ->
+    if (a as Double) > (b as Double) { a } else { b }
+  }
+  val minR: Object? = errs.reduce { a, b ->
+    if (a as Double) < (b as Double) { a } else { b }
+  }
+
+  println("  Simulations run : #{errs.size}")
+  println("  Mean rel. error : #{avgErr.pct(3)}")
+  if maxR != null { println("  Max  rel. error : #{(maxR as Double).pct(3)}") }
+  if minR != null { println("  Min  rel. error : #{(minR as Double).pct(3)}") }
+
+  // ── Filter by error threshold ─────────────────────────────────────────────
+  val accurate: List[Object] = bigBatch.filter { r -> (r as SimResult).relErr() < 0.01 }
+  val rough:    List[Object] = bigBatch.filter { r -> (r as SimResult).relErr() >= 0.01 }
+  println("  < 1% error      : #{accurate.size} simulation(s)")
+  println("  ≥ 1% error      : #{rough.size} simulation(s)")
+
+  if rough.size > 0 {
+    println("  Outliers:")
+    foreach r: Object in rough {
+      val res: SimResult = r as SimResult
+      println("    #{res.name().rpad(34)} #{res.relErr().pct(2)} error")
+    }
+  }
+
+  // ── Sorted by error ───────────────────────────────────────────────────────
+  println("")
+  println("══ Ranked by accuracy (ascending error) ════════════════════════════")
+  val sorted: List[Object] = bigBatch.sortedBy { r -> (r as SimResult).relErr() }
+  var rank: Int = 1
+  foreach r: Object in sorted {
+    val res: SimResult = r as SimResult
+    println("  #{rank.lpad(2)}. #{res.name().rpad(34)} #{res.relErr().pct(3)}")
+    rank = rank + 1
+  }
+
+  // ── Convergence demo: π at n = 100, 1000, 10000, 100000 ──────────────────
+  println("")
+  println("══ π convergence (PiSimulator, 5 runs averaged) ═════════════════════")
+  println("  #{("n").slpad(8)}   #{("estimate").rpad(12)}  #{("rel err").slpad(9)}")
+  val piSim: Simulator = new PiSimulator()
+  foreach nObj2: Object in [100, 1000, 10000, 100000] {
+    val n2: Int = nObj2 as Int
+    var runSum: Double = 0.0
+    foreach run: Int in 0..<5 {
+      runSum = runSum + piSim.simulate(n2)
+    }
+    val avgEst: Double = runSum / 5.0
+    val err: Double    = ((avgEst - Math::PI) / Math::PI).dabs()
+    println("  #{n2.lpad(8)}   #{avgEst.fmt(6).rpad(12)}  #{err.pct(3)}")
+  }
+
+  // ── any / find checks ─────────────────────────────────────────────────────
+  val anyAbove5pct: Boolean = bigBatch.any { r -> (r as SimResult).relErr() > 0.05 }
+  println("")
+  println("Any simulation with > 5% error at n=100000: #{anyAbove5pct}")
+
+  val best: Object? = bigBatch.find { r -> (r as SimResult).relErr() < 0.001 }
+  if best != null {
+    println("First simulation with < 0.1% error: #{(best as SimResult).name()}")
+  } else {
+    println("No simulation achieved < 0.1% error at n=100000")
+  }
+
+  // ── GroupBy above/below mean ──────────────────────────────────────────────
+  val grouped: Map[Object, List[Object]] = bigBatch.groupBy { r ->
+    val err: Double = (r as SimResult).relErr()
+    if err < avgErr { "below-avg" } else { "above-avg" }
+  }
+  println("")
+  println("Grouped by error vs mean (#{avgErr.pct(2)}):")
+  foreach (k, v) in grouped {
+    println("  #{k as String}: #{(v as List[Object]).size} simulation(s)")
+  }
+}

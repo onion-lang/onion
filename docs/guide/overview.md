@@ -15,8 +15,9 @@ boundary once, and derives the reading, the writing, the failure reporting and t
 from that one description.
 
 ```onion
-record Access(ip: String, method: String, path: String, status: Int)
+record Access(ip: String, method: String, path: String, status: Int) {
   shape common = re"(\S+) (\w+) (\S+) (\d+)"
+}
 
 val each = file"access.log".eachLine(Access::common())
 val rows = Outcome::values(each)      // the lines that read

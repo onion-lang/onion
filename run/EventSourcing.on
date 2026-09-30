@@ -1,0 +1,401 @@
+// EventSourcing.on — a minimal event-sourcing engine with aggregates, projections,
+// and time-travel queries. Exercises: generic records/classes, ADT enums,
+// closures as first-class values, do[Option] notation, collection pipelines
+// (fold/filter/map/sortedBy/groupBy/find), select/pattern matching, string
+// interpolation, nullable types, foreach over maps.
+
+import {
+  java.util.*
+}
+
+// ── Event types (ADT enum) ────────────────────────────────────────────────────
+
+enum AccountEvent {
+  case Opened(owner: String, initialBalance: Double)
+  case Deposited(amount: Double, note: String)
+  case Withdrawn(amount: Double, note: String)
+  case Closed(reason: String)
+public:
+  def label(): String = select this {
+    case e is Opened:    "Opened(#{e.owner()}, #{e.initialBalance()})"
+    case e is Deposited: "Deposited(#{e.amount()}, \"#{e.note()}\")"
+    case e is Withdrawn: "Withdrawn(#{e.amount()}, \"#{e.note()}\")"
+    case e is Closed:    "Closed(\"#{e.reason()}\")"
+  }
+}
+
+// ── Stamped event wrapper ─────────────────────────────────────────────────────
+
+record StampedEvent(seqNum: Int, timestamp: Long, event: AccountEvent)
+
+// ── Account aggregate state ───────────────────────────────────────────────────
+
+record AccountState(
+  owner: String,
+  balance: Double,
+  isOpen: Boolean,
+  eventCount: Int
+) {
+public:
+  static def initial(): AccountState =
+    new AccountState("", 0.0, false, 0)
+  def withOwner(o: String): AccountState =
+    new AccountState(o, balance(), isOpen(), eventCount() + 1)
+  def withBalance(b: Double): AccountState =
+    new AccountState(owner(), b, isOpen(), eventCount() + 1)
+  def withOpen(flag: Boolean): AccountState =
+    new AccountState(owner(), balance(), flag, eventCount() + 1)
+  def summary(): String =
+    "#{owner()} | balance=#{balance()} | open=#{isOpen()} | events=#{eventCount()}"
+}
+
+// ── Event log (generic, keyed by account id) ─────────────────────────────────
+
+class EventLog {
+  var streams: HashMap[String, ArrayList[StampedEvent]] = new HashMap[String, ArrayList[StampedEvent]]()
+  var seqCounter: Int = 0
+
+public:
+  def append(accountId: String, event: AccountEvent): StampedEvent {
+    seqCounter++
+    val stamped: StampedEvent = new StampedEvent(seqCounter, Timing::millis(), event)
+    var stream: ArrayList[StampedEvent]? = streams.get(accountId)
+    if stream == null {
+      val newStream: ArrayList[StampedEvent] = new ArrayList[StampedEvent]()
+      streams.put(accountId, newStream)
+      stream = newStream
+    }
+    (stream as ArrayList[StampedEvent]).add(stamped)
+    return stamped
+  }
+
+  def eventsFor(accountId: String): List[StampedEvent] {
+    val s: ArrayList[StampedEvent]? = streams.get(accountId)
+    if s == null { return [] }
+    return s
+  }
+
+  def eventsUpTo(accountId: String, maxSeq: Int): List[StampedEvent] {
+    return eventsFor(accountId).filter { e ->
+      (e as StampedEvent).seqNum() <= maxSeq
+    } as List[StampedEvent]
+  }
+
+  def allAccountIds(): List[String] {
+    val ids: ArrayList[String] = new ArrayList[String]()
+    foreach (k, _) in streams { ids.add(k) }
+    return ids
+  }
+
+  def totalEventCount(): Int {
+    var total: Int = 0
+    foreach accountId: String in allAccountIds() {
+      total += eventsFor(accountId).size
+    }
+    return total
+  }
+}
+
+// ── Account aggregate: replay events into state ───────────────────────────────
+
+def applyEvent(state: AccountState, event: AccountEvent): AccountState? {
+  select event {
+    case e is Opened: {
+      if state.isOpen() { return null }  // already open
+      return state.withOwner(e.owner()).withOpen(true).withBalance(e.initialBalance())
+    }
+    case e is Deposited: {
+      if !state.isOpen() { return null }
+      if e.amount() <= 0.0 { return null }
+      return state.withBalance(state.balance() + e.amount())
+    }
+    case e is Withdrawn: {
+      if !state.isOpen() { return null }
+      if e.amount() <= 0.0 || e.amount() > state.balance() { return null }
+      return state.withBalance(state.balance() - e.amount())
+    }
+    case e is Closed: {
+      if !state.isOpen() { return null }
+      return state.withOpen(false)
+    }
+  }
+}
+
+def replayEvents(events: List[StampedEvent]): AccountState? {
+  var state: AccountState? = AccountState::initial()
+  foreach se: StampedEvent in events {
+    val current: AccountState = state as AccountState
+    val next: AccountState? = applyEvent(current, se.event())
+    if next == null { return null }
+    state = next
+  }
+  return state
+}
+
+// ── Projection: extract typed summaries ──────────────────────────────────────
+
+record TxRecord(seq: Int, kind: String, amount: Double, note: String)
+
+def buildTransactionLedger(events: List[StampedEvent]): List[TxRecord] {
+  val ledger: ArrayList[TxRecord] = new ArrayList[TxRecord]()
+  foreach se: StampedEvent in events {
+    select se.event() {
+      case e is Deposited:
+        ledger.add(new TxRecord(se.seqNum(), "DEPOSIT",  e.amount(), e.note()))
+      case e is Withdrawn:
+        ledger.add(new TxRecord(se.seqNum(), "WITHDRAW", e.amount(), e.note()))
+      else: {}
+    }
+  }
+  return ledger
+}
+
+def totalDeposited(events: List[StampedEvent]): Double {
+  return events.fold(0.0) { acc, e ->
+    val se: StampedEvent = e as StampedEvent
+    select se.event() {
+      case ev is Deposited: (acc as Double) + ev.amount()
+      else: acc as Double
+    }
+  } as Double
+}
+
+def totalWithdrawn(events: List[StampedEvent]): Double {
+  return events.fold(0.0) { acc, e ->
+    val se: StampedEvent = e as StampedEvent
+    select se.event() {
+      case ev is Withdrawn: (acc as Double) + ev.amount()
+      else: acc as Double
+    }
+  } as Double
+}
+
+// ── Command handler: validates and records events ─────────────────────────────
+
+enum CommandResult {
+  case Ok(seqNum: Int)
+  case Rejected(reason: String)
+public:
+  def isOk(): Boolean = select this { case r is Ok: true; else: false }
+  def show(): String = select this {
+    case r is Ok:       "OK (seq=#{r.seqNum()})"
+    case r is Rejected: "REJECTED: #{r.reason()}"
+  }
+}
+
+class AccountService {
+  val log: EventLog
+  val snapshots: HashMap[String, AccountState] = new HashMap[String, AccountState]()
+
+public:
+  def this(l: EventLog) { log = l }
+
+  def currentState(accountId: String): AccountState? {
+    val cached: AccountState? = snapshots.get(accountId)
+    if cached != null { return cached }
+    val events: List[StampedEvent] = log.eventsFor(accountId)
+    if events.size == 0 { return null }
+    val result: AccountState? = replayEvents(events)
+    if result != null { snapshots.put(accountId, result as AccountState) }
+    return result
+  }
+
+  def stateAt(accountId: String, maxSeq: Int): AccountState? {
+    val events: List[StampedEvent] = log.eventsUpTo(accountId, maxSeq)
+    return replayEvents(events)
+  }
+
+  def handle(accountId: String, event: AccountEvent): CommandResult {
+    val stateOpt: AccountState? = currentState(accountId)
+    val currentSt: AccountState = stateOpt ?: AccountState::initial()
+    val next: AccountState? = applyEvent(currentSt, event)
+    if next == null {
+      return new Rejected("event #{event.label()} invalid in state: #{currentSt.summary()}")
+    }
+    val stamped: StampedEvent = log.append(accountId, event)
+    snapshots.put(accountId, next as AccountState)
+    return new Ok(stamped.seqNum())
+  }
+}
+
+// ── Demo scenarios ────────────────────────────────────────────────────────────
+
+def printSectionHeader(title: String): void {
+  val line: String = Strings::repeat("-", 50)
+  IO::println("\n#{line}")
+  IO::println("  #{title}")
+  IO::println(line)
+}
+
+def printAccount(svc: AccountService, id: String): void {
+  val st: AccountState? = svc.currentState(id)
+  if st == null {
+    IO::println("  #{id}: no state")
+  } else {
+    IO::println("  #{id}: #{(st as AccountState).summary()}")
+  }
+}
+
+def scenarioHappyPath(svc: AccountService, log: EventLog): void {
+  printSectionHeader("Scenario 1: Happy path")
+  val id: String = "acc-001"
+
+  var r: CommandResult = svc.handle(id, new Opened("Alice", 500.0))
+  IO::println("  open:        #{r.show()}")
+
+  r = svc.handle(id, new Deposited(200.0, "salary"))
+  IO::println("  deposit 200: #{r.show()}")
+
+  r = svc.handle(id, new Deposited(100.0, "bonus"))
+  IO::println("  deposit 100: #{r.show()}")
+
+  r = svc.handle(id, new Withdrawn(350.0, "rent"))
+  IO::println("  withdraw 350: #{r.show()}")
+
+  printAccount(svc, id)
+
+  // Transaction ledger
+  val events: List[StampedEvent] = log.eventsFor(id)
+  val ledger: List[TxRecord] = buildTransactionLedger(events)
+  IO::println("  ledger (#{ledger.size} tx):")
+  foreach tx: TxRecord in ledger {
+    val t: TxRecord = tx as TxRecord
+    IO::println("    [seq #{t.seq()}] #{t.kind()} #{t.amount()} — #{t.note()}")
+  }
+  IO::println("  total deposited:  #{totalDeposited(events)}")
+  IO::println("  total withdrawn:  #{totalWithdrawn(events)}")
+}
+
+def scenarioRejections(svc: AccountService): void {
+  printSectionHeader("Scenario 2: Rejected commands")
+  val id: String = "acc-002"
+
+  // Withdraw before opening
+  var r: CommandResult = svc.handle(id, new Withdrawn(50.0, "attempt"))
+  IO::println("  withdraw before open: #{r.show()}")
+
+  r = svc.handle(id, new Opened("Bob", 100.0))
+  IO::println("  open Bob: #{r.show()}")
+
+  // Overdraft
+  r = svc.handle(id, new Withdrawn(999.0, "overdraft"))
+  IO::println("  overdraft attempt: #{r.show()}")
+
+  // Negative deposit
+  r = svc.handle(id, new Deposited(-50.0, "negative"))
+  IO::println("  negative deposit: #{r.show()}")
+
+  // Double-open
+  r = svc.handle(id, new Opened("Bob2", 200.0))
+  IO::println("  double open: #{r.show()}")
+
+  printAccount(svc, id)
+}
+
+def scenarioTimeTravel(svc: AccountService, log: EventLog): void {
+  printSectionHeader("Scenario 3: Time-travel queries")
+  val id: String = "acc-003"
+
+  svc.handle(id, new Opened("Carol", 1000.0))
+  svc.handle(id, new Deposited(500.0, "investment"))
+  val seq2: Int = log.eventsFor(id).size
+  svc.handle(id, new Withdrawn(200.0, "expense"))
+  svc.handle(id, new Withdrawn(300.0, "rent"))
+
+  // Look at state at different sequence points
+  val events: List[StampedEvent] = log.eventsFor(id)
+  val maxSeq1: Int = (events[0] as StampedEvent).seqNum()
+  val maxSeq2: Int = if seq2 > 1 { (events[1] as StampedEvent).seqNum() } else { maxSeq1 }
+
+  val stateAt1: AccountState? = svc.stateAt(id, maxSeq1)
+  val stateAt2: AccountState? = svc.stateAt(id, maxSeq2)
+  val stateFinal: AccountState? = svc.currentState(id)
+
+  val s1: String = if stateAt1 != null { (stateAt1 as AccountState).summary() } else { "?" }
+  val s2: String = if stateAt2 != null { (stateAt2 as AccountState).summary() } else { "?" }
+  val sf: String = if stateFinal != null { (stateFinal as AccountState).summary() } else { "?" }
+  IO::println("  after event 1: #{s1}")
+  IO::println("  after event 2: #{s2}")
+  IO::println("  final state:   #{sf}")
+}
+
+def scenarioMultiAccount(svc: AccountService, log: EventLog): void {
+  printSectionHeader("Scenario 4: Multi-account portfolio")
+  val accounts: List[Object] = [
+    ["acc-A", "Dave", 2000.0] as Object,
+    ["acc-B", "Eve", 500.0] as Object,
+    ["acc-C", "Frank", 1200.0] as Object
+  ]
+
+  foreach row: Object in accounts {
+    val r: List[Object] = row as List[Object]
+    val aid: String = r[0] as String
+    val owner: String = r[1] as String
+    val init: Double = r[2] as Double
+    svc.handle(aid, new Opened(owner, init))
+  }
+
+  svc.handle("acc-A", new Deposited(800.0, "quarterly bonus"))
+  svc.handle("acc-A", new Withdrawn(300.0, "vacation"))
+  svc.handle("acc-B", new Deposited(150.0, "freelance"))
+  svc.handle("acc-C", new Withdrawn(400.0, "equipment"))
+  svc.handle("acc-C", new Deposited(600.0, "refund"))
+
+  // Portfolio summary
+  IO::println("  Portfolio summary:")
+  var totalBalance: Double = 0.0
+  foreach accountId: String in log.allAccountIds() {
+    val st: AccountState? = svc.currentState(accountId)
+    if st != null {
+      val state: AccountState = st as AccountState
+      if state.isOpen() {
+        IO::println("    #{state.owner()}: #{state.balance()}")
+        totalBalance += state.balance()
+      }
+    }
+  }
+  IO::println("  Total portfolio balance: #{totalBalance}")
+}
+
+def scenarioEventStats(log: EventLog): void {
+  printSectionHeader("Scenario 5: Event stream statistics")
+  IO::println("  Total events logged: #{log.totalEventCount()}")
+  IO::println("  Active accounts:     #{log.allAccountIds().size}")
+
+  // Count events by type across all accounts
+  var openCount: Int = 0
+  var depositCount: Int = 0
+  var withdrawCount: Int = 0
+  var closeCount: Int = 0
+
+  foreach accountId: String in log.allAccountIds() {
+    foreach se: StampedEvent in log.eventsFor(accountId) {
+      select se.event() {
+        case e is Opened:    openCount++
+        case e is Deposited: depositCount++
+        case e is Withdrawn: withdrawCount++
+        case e is Closed:    closeCount++
+      }
+    }
+  }
+  IO::println("  Event breakdown:")
+  IO::println("    Opened:    #{openCount}")
+  IO::println("    Deposited: #{depositCount}")
+  IO::println("    Withdrawn: #{withdrawCount}")
+  IO::println("    Closed:    #{closeCount}")
+}
+
+def main(): void {
+  IO::println("=== Event Sourcing Engine Demo ===")
+
+  val log: EventLog = new EventLog()
+  val svc: AccountService = new AccountService(log)
+
+  scenarioHappyPath(svc, log)
+  scenarioRejections(svc)
+  scenarioTimeTravel(svc, log)
+  scenarioMultiAccount(svc, log)
+  scenarioEventStats(log)
+
+  IO::println("\nDone.")
+}

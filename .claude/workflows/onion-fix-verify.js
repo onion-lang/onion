@@ -21,7 +21,7 @@ const VERDICT = {
 
 const COMMON = `Onionコンパイラ（${JAR}）の修正を検証します。
 修正内容: ${FIX}
-プローブ方法: /tmp/verify-N.on にコードをWrite → java -cp ${JAR} onion.tools.ScriptRunner <ファイル>
+プローブ方法: /tmp/verify-<視点番号>-N.on にコードをWrite（3視点が並列で走るので視点ごとにファイル名を分ける） → java -cp ${JAR} onion.tools.ScriptRunner <ファイル>
 sbtは使わない。日本語で簡潔に。`
 
 phase('Verify')

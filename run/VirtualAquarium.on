@@ -1,0 +1,346 @@
+// VirtualAquarium.on — virtual aquarium stocking, compatibility, and maintenance (~280 lines)
+//
+// Exercises: ADT case-enum (WaterType); homogeneous enum with methods (FeedingFreq);
+// records (FishSpecies, Tank, WaterParams) with computed methods; classes
+// (Aquarium, MaintenanceLog) with encapsulated state; interface (Reportable);
+// generics; collection pipelines (filter/map/fold/groupBy/sortedBy/distinct/
+// find/count/any/partition); foreach over typed lists and map (k,v) entries;
+// nullable types; select/is exhaustive patterns; extension methods on Int and
+// Double; string interpolation; while; try/catch; closures.
+
+// ── Water type ADT ────────────────────────────────────────────────────────────
+
+enum WaterType {
+  case Freshwater
+  case Saltwater
+  case Brackish
+public:
+  def label(): String = select this {
+    case f is Freshwater: "Freshwater"
+    case s is Saltwater:  "Saltwater"
+    case b is Brackish:   "Brackish"
+  }
+  def salinityRange(): String = select this {
+    case f is Freshwater: "0 ppt"
+    case s is Saltwater:  "32–35 ppt"
+    case b is Brackish:   "0.5–30 ppt"
+  }
+  def compatibleWith(other: WaterType): Boolean =
+    label() == other.label() || (this is Brackish) || (other is Brackish)
+}
+
+// ── Feeding frequency (homogeneous enum) ──────────────────────────────────────
+
+enum FeedingFreq {
+  Once, TwiceDaily, AlternateDay, TwiceWeekly
+public:
+  def label(): String = select this {
+    case FeedingFreq::Once:         "Once / day"
+    case FeedingFreq::TwiceDaily:   "Twice / day"
+    case FeedingFreq::AlternateDay: "Alternate days"
+    case FeedingFreq::TwiceWeekly:  "Twice / week"
+  }
+  def timesPerWeek(): Int = select this {
+    case FeedingFreq::Once:         7
+    case FeedingFreq::TwiceDaily:   14
+    case FeedingFreq::AlternateDay: 4
+    case FeedingFreq::TwiceWeekly:  2
+  }
+}
+
+// ── Fish species ──────────────────────────────────────────────────────────────
+
+record FishSpecies(
+  commonName:  String,
+  sciName:     String,
+  waterType:   WaterType,
+  minTempC:    Double,
+  maxTempC:    Double,
+  minPhLevel:  Double,
+  maxPhLevel:  Double,
+  minTankLitre: Int,
+  maxGroupSize: Int,
+  feeding:     FeedingFreq,
+  aggressiveToSameSpecies: Boolean
+) {
+public:
+  def tempRange(): String  = "#{minTempC()}–#{maxTempC()} °C"
+  def phRange(): String    = "#{minPhLevel()}–#{maxPhLevel()}"
+  def summary(): String    = "#{commonName()} (#{sciName()})"
+  def minTank(): String    = "#{minTankLitre()} L"
+}
+
+// ── Water parameters ──────────────────────────────────────────────────────────
+
+record WaterParams(tempC: Double, phLevel: Double, salinityPpt: Double,
+                   ammoniaLow: Boolean, nitriteLow: Boolean) {
+public:
+  def healthy(): Boolean = ammoniaLow() && nitriteLow()
+  def summary(): String  =
+    "temp=#{tempC()}°C  pH=#{phLevel()}  sal=#{salinityPpt()}ppt  " +
+    "NH3=#{if ammoniaLow() { "OK" } else { "HIGH" }}  " +
+    "NO2=#{if nitriteLow() { "OK" } else { "HIGH" }}"
+}
+
+// ── Tank (container for fish and water) ───────────────────────────────────────
+
+record Tank(id: String, volumeLitres: Int, waterType: WaterType, params: WaterParams) {
+public:
+  def suitable(s: FishSpecies): Boolean =
+    s.waterType().compatibleWith(waterType()) &&
+    volumeLitres() >= s.minTankLitre() &&
+    params().tempC() >= s.minTempC() && params().tempC() <= s.maxTempC() &&
+    params().phLevel() >= s.minPhLevel() && params().phLevel() <= s.maxPhLevel()
+}
+
+// ── Extensions ────────────────────────────────────────────────────────────────
+
+extension Int {
+  def pluralize(word: String): String =
+    if self == 1 { "1 " + word } else { "" + self + " " + word + "s" }
+}
+
+extension Double {
+  def oneDecimal(): String = {
+    val i   = self as Int
+    val frac = ((self - (i as Double)) * 10.0) as Int
+    "" + i + "." + frac
+  }
+}
+
+// ── Reportable interface ──────────────────────────────────────────────────────
+
+interface Reportable {
+  def report(): void
+}
+
+// ── Aquarium ──────────────────────────────────────────────────────────────────
+
+class Aquarium conforms Reportable {
+  val _tank:    Tank
+  var _fish:    List[FishSpecies]
+  var _counts:  List[Int]
+public:
+  def this(tank: Tank) { _tank = tank; _fish = []; _counts = [] }
+
+  def tank():      Tank             = _tank
+  def fishTypes(): List[FishSpecies] = _fish
+
+  def add(species: FishSpecies, count: Int): void {
+    _fish.add(species)
+    _counts.add(count)
+  }
+
+  def countOf(idx: Int): Int = _counts[idx] as Int
+  def totalFish(): Int = _counts.fold(0) { acc, c -> (acc as Int) + (c as Int) }
+
+  def compatible(s: FishSpecies): Boolean = _tank.suitable(s)
+
+  def warnings(): List[String] {
+    val ws: List[String] = []
+    if !_tank.params().healthy() {
+      ws.add("⚠ Water quality problem: " + _tank.params().summary())
+    }
+    var i = 0
+    foreach sp: FishSpecies in _fish {
+      val cnt = countOf(i)
+      if sp.aggressiveToSameSpecies() && cnt > 1 {
+        ws.add("⚠ #{sp.commonName()} is aggressive with its own kind (#{cnt} in tank)")
+      }
+      if !_tank.suitable(sp) {
+        ws.add("⚠ #{sp.commonName()} may not thrive in this tank (check temp/pH/size)")
+      }
+      i = i + 1
+    }
+    return ws
+  }
+
+  def weeklyFeedingEvents(): Int =
+    _fish.fold(0) { acc, sp -> (acc as Int) + (sp as FishSpecies).feeding().timesPerWeek() }
+
+  def byWaterType(): Map[Object, List[FishSpecies]] = _fish.groupBy { sp -> (sp as FishSpecies).waterType().label() }
+
+  override def report(): void {
+    println("  Tank  : #{_tank.id()}  #{_tank.volumeLitres()} L  #{_tank.waterType().label()}")
+    println("  Water : #{_tank.params().summary()}")
+    println("  Fish  : #{totalFish()} fish across #{_fish.size.pluralize("kind")}")
+    println("  Feeds/wk: #{weeklyFeedingEvents()}")
+    val ws = warnings()
+    if ws.size == 0 {
+      println("  Status: All good ✓")
+    } else {
+      foreach w: String in ws { println("  " + w) }
+    }
+  }
+}
+
+// ── Maintenance log ───────────────────────────────────────────────────────────
+
+record MaintenanceEntry(week: Int, task: String, done: Boolean)
+
+class MaintenanceLog {
+  var _entries: List[MaintenanceEntry]
+public:
+  def this() { _entries = [] }
+  def add(e: MaintenanceEntry): void { _entries.add(e) }
+  def pending(): List[MaintenanceEntry] = _entries.filter { e -> !(e as MaintenanceEntry).done() }
+  def done():    List[MaintenanceEntry] = _entries.filter { e -> (e as MaintenanceEntry).done() }
+  def size():    Int = _entries.size
+}
+
+// ── Helper functions ──────────────────────────────────────────────────────────
+
+def ruler(n: Int): String = {
+  var s = ""
+  foreach i: Int in 0..<n { s = s + "─" }
+  s
+}
+
+def section(title: String): void {
+  println("")
+  println("╔══ " + title + " " + ruler(55 - title.length()))
+  println("")
+}
+
+def pad(s: String, n: Int): String = {
+  var r = s
+  while r.length() < n { r = r + " " }
+  r
+}
+
+def printSpeciesTable(species: List[FishSpecies]): void {
+  println("  Name                     Water       Temp          pH        Tank")
+  println("  " + ruler(70))
+  foreach sp: FishSpecies in species {
+    val row = "  " +
+      pad(sp.commonName(),          25) + "  " +
+      pad(sp.waterType().label(),   12) +
+      pad(sp.tempRange(),           14) +
+      pad(sp.phRange(),             10) +
+      sp.minTank()
+    println(row)
+  }
+}
+
+def printCompatibilityMatrix(species: List[FishSpecies], tank: Tank): void {
+  println("  Species compatibility with tank #{tank.id()} (#{tank.waterType().label()}, #{tank.volumeLitres()}L):")
+  foreach sp: FishSpecies in species {
+    val ok = if tank.suitable(sp) { "✓  compatible" } else { "✗  NOT suitable" }
+    println("    #{sp.commonName()} — #{ok}")
+  }
+}
+
+// ── Species database ──────────────────────────────────────────────────────────
+
+val neonTetra    = new FishSpecies("Neon Tetra",    "Paracheirodon innesi",  new Freshwater(), 20.0, 26.0, 6.0, 7.5, 40,  12, FeedingFreq::Once,         false)
+val goldenBarb   = new FishSpecies("Golden Barb",   "Puntius semifasciolatus", new Freshwater(), 18.0, 24.0, 6.5, 7.5, 60,   8, FeedingFreq::Once,        false)
+val bettaFish    = new FishSpecies("Betta",          "Betta splendens",       new Freshwater(), 24.0, 30.0, 6.5, 7.5, 20,   1, FeedingFreq::Once,         true)
+val angelFish    = new FishSpecies("Angelfish",      "Pterophyllum scalare",  new Freshwater(), 24.0, 30.0, 6.0, 7.5, 120,  4, FeedingFreq::TwiceDaily,   false)
+val corydoras    = new FishSpecies("Corydoras",      "Corydoras paleatus",    new Freshwater(), 20.0, 26.0, 6.0, 7.5, 60,   6, FeedingFreq::AlternateDay, false)
+val clownFish    = new FishSpecies("Clownfish",      "Amphiprioninae",        new Saltwater(),  24.0, 27.0, 8.1, 8.4, 80,   2, FeedingFreq::Once,         false)
+val blueTang     = new FishSpecies("Blue Tang",      "Paracanthurus hepatus", new Saltwater(),  22.0, 26.0, 8.1, 8.4, 300,  1, FeedingFreq::TwiceDaily,   true)
+val mandarinFish = new FishSpecies("Mandarin Dragonet","Synchiropus splendidus", new Saltwater(), 24.0, 28.0, 8.1, 8.4, 200, 2, FeedingFreq::TwiceWeekly,  false)
+val figureEightPuffer = new FishSpecies("Figure-Eight Puffer", "Tetraodon biocellatus", new Brackish(), 22.0, 28.0, 7.0, 8.0, 100, 1, FeedingFreq::AlternateDay, true)
+val greenSpottedPuffer = new FishSpecies("Green Spotted Puffer", "Dichotomyctere nigroviridis", new Brackish(), 24.0, 28.0, 7.5, 8.5, 120, 1, FeedingFreq::AlternateDay, true)
+
+val allSpecies: List[FishSpecies] = [
+  neonTetra, goldenBarb, bettaFish, angelFish, corydoras,
+  clownFish, blueTang, mandarinFish, figureEightPuffer, greenSpottedPuffer
+]
+
+// ── Tanks ─────────────────────────────────────────────────────────────────────
+
+val freshTank = new Tank("FW-01", 200,
+  new Freshwater(),
+  new WaterParams(25.0, 7.0, 0.0, true, true))
+
+val saltTank = new Tank("SW-01", 350,
+  new Saltwater(),
+  new WaterParams(25.5, 8.2, 33.5, true, false))   // nitrite high — water quality issue
+
+val brachTank = new Tank("BK-01", 150,
+  new Brackish(),
+  new WaterParams(26.0, 7.8, 10.0, true, true))
+
+// ── Build aquaria ─────────────────────────────────────────────────────────────
+
+val fw = new Aquarium(freshTank)
+fw.add(neonTetra,  8)
+fw.add(corydoras,  5)
+fw.add(angelFish,  2)
+fw.add(bettaFish,  1)
+
+val sw = new Aquarium(saltTank)
+sw.add(clownFish,    2)
+sw.add(mandarinFish, 1)
+sw.add(blueTang,     1)
+
+val bk = new Aquarium(brachTank)
+bk.add(figureEightPuffer,  1)
+bk.add(greenSpottedPuffer, 1)
+
+// ── Maintenance log ───────────────────────────────────────────────────────────
+
+val log = new MaintenanceLog()
+log.add(new MaintenanceEntry(1, "20% water change FW-01", true))
+log.add(new MaintenanceEntry(1, "Check filter cartridge FW-01", true))
+log.add(new MaintenanceEntry(2, "20% water change SW-01", false))
+log.add(new MaintenanceEntry(2, "Calibrate salinity probe SW-01", false))
+log.add(new MaintenanceEntry(2, "Dose nitrate bacteria SW-01", false))
+log.add(new MaintenanceEntry(3, "20% water change BK-01", true))
+log.add(new MaintenanceEntry(3, "Adjust specific gravity BK-01", false))
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+
+section("SPECIES DATABASE")
+printSpeciesTable(allSpecies)
+
+section("TANK STATUS")
+val aquaria: List[Aquarium] = [fw, sw, bk]
+foreach aq: Aquarium in aquaria {
+  aq.report()
+  println("")
+}
+
+section("COMPATIBILITY CHECK — freshwater species in FW-01")
+val fwSpecies = allSpecies.filter { sp -> (sp as FishSpecies).waterType() is Freshwater }
+printCompatibilityMatrix(fwSpecies, freshTank)
+
+section("FISH BY WATER TYPE")
+val byWater = allSpecies.groupBy { sp -> (sp as FishSpecies).waterType().label() }
+foreach (wtype, group) in byWater {
+  println("  #{wtype}:")
+  foreach sp: FishSpecies in group {
+    println("    • #{sp.summary()}")
+  }
+}
+
+section("FEEDING SCHEDULE SUMMARY")
+val byFreq: Map[Object, List[FishSpecies]] = allSpecies.groupBy { sp -> (sp as FishSpecies).feeding().label() }
+foreach (freq, group) in byFreq {
+  val names: List[Object] = (group as List[FishSpecies]).map { sp -> (sp as FishSpecies).commonName() }
+  println("  #{freq}:")
+  foreach n: Object in names { println("    – #{n}") }
+}
+
+section("MAINTENANCE LOG")
+println("  Total tasks: #{log.size()}")
+println("  Completed  : #{log.done().size}")
+println("  Pending    : #{log.pending().size}")
+println("")
+println("  Pending tasks:")
+foreach e: MaintenanceEntry in log.pending() {
+  println("    Week #{e.week()}  #{e.task()}")
+}
+
+section("SUMMARY")
+var totalFish = 0
+foreach aq: Aquarium in aquaria { totalFish = totalFish + aq.totalFish() }
+println("  Tanks: 3  (freshwater, saltwater, brackish)")
+println("  Fish: #{totalFish} fish across #{allSpecies.size} species")
+println("  Species with compatibility warnings:")
+val aggressive = allSpecies.filter { sp -> (sp as FishSpecies).aggressiveToSameSpecies() }
+foreach sp: FishSpecies in aggressive {
+  println("    #{sp.commonName()} — aggressive with own kind")
+}
+println("")

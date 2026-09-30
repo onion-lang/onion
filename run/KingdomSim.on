@@ -134,10 +134,9 @@ public:
 
 // ─── Resource record with operator overloading ────────────────────────────────
 
-record Resource(kind: ResourceType, amount: Int)
+record Resource(kind: ResourceType, amount: Int) {
   example { new Resource(ResourceType::Gold, 100).plus(new Resource(ResourceType::Gold, 50)).amount() == 150 }
   law times_zero_gives_zero(n: Int) { new Resource(ResourceType::Gold, n).times(0).amount() == 0 }
-{
 public:
   def plus(o: Resource): Resource {
     if kind == o.kind() { return new Resource(kind, amount + o.amount()) }

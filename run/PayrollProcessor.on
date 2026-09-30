@@ -1,0 +1,269 @@
+// PayrollProcessor.on — payroll system with multiple pay types, tax brackets, deductions
+
+import {
+  java.util.List as JList
+}
+
+// ── pay type enum ──────────────────────────────────────────────────────────────
+enum PayType {
+  case Hourly(ratePerHour: Double, hoursWorked: Double)
+  case Salaried(annualSalary: Double)
+  case Commission(baseSalary: Double, salesAmount: Double, commissionRate: Double)
+
+  public:
+  def grossPay(): Double =
+    select this {
+      case h is Hourly:
+        val overtime: Double = if h.hoursWorked() > 40.0 { (h.hoursWorked() - 40.0) * h.ratePerHour() * 1.5 } else { 0.0 }
+        40.0 * h.ratePerHour() + overtime
+      case s is Salaried:
+        s.annualSalary() / 26.0
+      case c is Commission:
+        c.baseSalary() + c.salesAmount() * c.commissionRate()
+    }
+
+  def label(): String =
+    select this {
+      case h is Hourly:   "Hourly (#{h.hoursWorked()}h @ $#{h.ratePerHour()}/h)"
+      case s is Salaried: "Salaried ($#{s.annualSalary()}/yr)"
+      case c is Commission:
+        val pctX10: Long = (c.commissionRate() * 1000.0 + 0.5) as Long
+        val whole: Long = pctX10 / 10L
+        val frac: Long = pctX10 % 10L
+        "Commission (base $#{c.baseSalary()} + #{whole}.#{frac}% of $#{c.salesAmount()})"
+    }
+}
+
+// ── tax bracket record ─────────────────────────────────────────────────────────
+record TaxBracket(upTo: Double, rate: Double)
+
+// ── deduction interface ────────────────────────────────────────────────────────
+interface Deduction {
+  def name(): String
+  def amount(gross: Double): Double
+}
+
+class HealthInsurance conforms Deduction {
+  val plan: String
+  val premium: Double
+public:
+  def this(plan: String, premium: Double) {
+    self.plan = plan
+    self.premium = premium
+  }
+  def name(): String = "Health (#{plan})"
+  def amount(gross: Double): Double = premium
+}
+
+class Retirement401k conforms Deduction {
+  val contributionPct: Double
+public:
+  def this(pct: Double) { self.contributionPct = pct }
+  def name(): String = "401k (#{contributionPct * 100.0}%)"
+  def amount(gross: Double): Double = gross * contributionPct
+}
+
+class FlatDeduction conforms Deduction {
+  val label: String
+  val flatAmount: Double
+public:
+  def this(label: String, flatAmount: Double) {
+    self.label = label
+    self.flatAmount = flatAmount
+  }
+  def name(): String = label
+  def amount(gross: Double): Double = flatAmount
+}
+
+// ── tax engine ────────────────────────────────────────────────────────────────
+class TaxEngine {
+  val brackets: List[TaxBracket]
+public:
+  def this(brackets: List[TaxBracket]) { self.brackets = brackets }
+
+  def federalTax(gross: Double): Double {
+    var remaining: Double = gross
+    var tax: Double = 0.0
+    var prev: Double = 0.0
+    foreach b: TaxBracket in brackets {
+      if remaining <= 0.0 { break }
+      val band: Double = b.upTo() - prev
+      val taxable: Double = if remaining < band { remaining } else { band }
+      tax = tax + taxable * b.rate()
+      remaining = remaining - taxable
+      prev = b.upTo()
+    }
+    return tax
+  }
+
+  static def standard(): TaxEngine {
+    val bs: List[TaxBracket] = [
+      new TaxBracket(538.46, 0.10),
+      new TaxBracket(1730.77, 0.12),
+      new TaxBracket(3461.54, 0.22),
+      new TaxBracket(6538.46, 0.24),
+      new TaxBracket(8269.23, 0.32),
+      new TaxBracket(10961.54, 0.35),
+      new TaxBracket(999999.0, 0.37)
+    ]
+    return new TaxEngine(bs)
+  }
+}
+
+// ── employee record ───────────────────────────────────────────────────────────
+record Employee(id: String, name: String, department: String, payType: PayType, deductions: List[Deduction])
+
+// ── pay stub record ───────────────────────────────────────────────────────────
+record PayStub(employee: Employee, gross: Double, federalTax: Double, ficaTax: Double,
+               deductionTotal: Double, net: Double)
+
+// ── payroll processor ─────────────────────────────────────────────────────────
+class Payroll {
+  val engine: TaxEngine
+  val employees: List[Employee]
+public:
+  def this() {
+    self.engine = TaxEngine::standard()
+    self.employees = []
+  }
+
+  def addEmployee(e: Employee): void {
+    employees.add(e)
+  }
+
+  def computeStub(e: Employee): PayStub {
+    val gross: Double = e.payType().grossPay()
+    val federal: Double = engine.federalTax(gross)
+    val fica: Double = gross * 0.0765
+    var dedTotal: Double = 0.0
+    foreach d: Deduction in e.deductions() {
+      dedTotal = dedTotal + d.amount(gross)
+    }
+    val net: Double = gross - federal - fica - dedTotal
+    return new PayStub(e, gross, federal, fica, dedTotal, net)
+  }
+
+  def run(): List[PayStub] = employees.map { e: Employee -> computeStub(e) }
+}
+
+// ── formatting helpers ────────────────────────────────────────────────────────
+def fmt(v: Double): String {
+  val cents: Long = (v * 100.0) as Long
+  val dollars: Long = cents / 100L
+  val centsRem: Long = cents % 100L
+  val centStr: String = if centsRem < 10L { "0#{centsRem}" } else { "#{centsRem}" }
+  return "$#{dollars}.#{centStr}"
+}
+
+def pad(s: String, w: Int): String {
+  var r: String = s
+  while r.length() < w { r = r + " " }
+  return r
+}
+
+def printStub(stub: PayStub): void {
+  val e: Employee = stub.employee()
+  IO::println("─────────────────────────────────────────")
+  IO::println("  Employee : #{e.name()} [#{e.id()}]")
+  IO::println("  Dept     : #{e.department()}")
+  IO::println("  Pay Type : #{e.payType().label()}")
+  IO::println("  Gross    : #{fmt(stub.gross())}")
+  IO::println("  Fed Tax  : #{fmt(stub.federalTax())}")
+  IO::println("  FICA     : #{fmt(stub.ficaTax())}")
+  foreach d: Deduction in e.deductions() {
+    IO::println("  #{pad(d.name(), 8)}: #{fmt(d.amount(stub.gross()))}")
+  }
+  IO::println("  ───────────────────────────────────────")
+  IO::println("  NET PAY  : #{fmt(stub.net())}")
+}
+
+// ── department summary ────────────────────────────────────────────────────────
+def printDeptSummary(stubs: List[PayStub]): void {
+  IO::println("")
+  IO::println("═════════════════════════════════════════")
+  IO::println("  DEPARTMENT SUMMARY")
+  IO::println("═════════════════════════════════════════")
+  val depts: List[String] = stubs.map { s: PayStub -> s.employee().department() }.distinct()
+  foreach dept: String in depts {
+    val dStubs: List[PayStub] = stubs.filter { s: PayStub -> s.employee().department() == dept }
+    var totalGross: Double = 0.0
+    var totalNet: Double = 0.0
+    foreach s: PayStub in dStubs {
+      totalGross = totalGross + s.gross()
+      totalNet   = totalNet   + s.net()
+    }
+    IO::println("  #{pad(dept, 12)}  gross=#{fmt(totalGross)}  net=#{fmt(totalNet)}  count=#{dStubs.size()}")
+  }
+}
+
+// ── overall totals ────────────────────────────────────────────────────────────
+def printTotals(stubs: List[PayStub]): void {
+  IO::println("")
+  IO::println("═════════════════════════════════════════")
+  IO::println("  COMPANY TOTALS")
+  IO::println("═════════════════════════════════════════")
+  var totalGross: Double = 0.0
+  var totalTax:   Double = 0.0
+  var totalFica:  Double = 0.0
+  var totalDed:   Double = 0.0
+  var totalNet:   Double = 0.0
+  foreach s: PayStub in stubs {
+    totalGross = totalGross + s.gross()
+    totalTax   = totalTax   + s.federalTax()
+    totalFica  = totalFica  + s.ficaTax()
+    totalDed   = totalDed   + s.deductionTotal()
+    totalNet   = totalNet   + s.net()
+  }
+  IO::println("  Employees  : #{stubs.size()}")
+  IO::println("  Total Gross: #{fmt(totalGross)}")
+  IO::println("  Total Fed  : #{fmt(totalTax)}")
+  IO::println("  Total FICA : #{fmt(totalFica)}")
+  IO::println("  Total Ded  : #{fmt(totalDed)}")
+  IO::println("  Total Net  : #{fmt(totalNet)}")
+}
+
+// ── main ──────────────────────────────────────────────────────────────────────
+val payroll: Payroll = new Payroll()
+
+payroll.addEmployee(new Employee("E001", "Alice Nguyen",   "Engineering",
+  new Hourly(48.50, 45.0),
+  [new HealthInsurance("PPO", 120.0), new Retirement401k(0.06)]))
+
+payroll.addEmployee(new Employee("E002", "Bob Martinez",   "Engineering",
+  new Salaried(110000.0),
+  [new HealthInsurance("HMO", 85.0), new Retirement401k(0.08)]))
+
+payroll.addEmployee(new Employee("E003", "Carol Kim",      "Sales",
+  new Commission(800.0, 32000.0, 0.04),
+  [new HealthInsurance("PPO", 120.0), new FlatDeduction("ParkPass", 50.0)]))
+
+payroll.addEmployee(new Employee("E004", "David Osei",     "Sales",
+  new Commission(750.0, 18500.0, 0.035),
+  [new HealthInsurance("HMO", 85.0)]))
+
+payroll.addEmployee(new Employee("E005", "Eva Rossi",      "Operations",
+  new Salaried(72000.0),
+  [new HealthInsurance("HMO", 85.0), new Retirement401k(0.05)]))
+
+payroll.addEmployee(new Employee("E006", "Frank Chen",     "Operations",
+  new Hourly(32.00, 40.0),
+  [new HealthInsurance("HMO", 85.0)]))
+
+payroll.addEmployee(new Employee("E007", "Grace Patel",    "HR",
+  new Salaried(65000.0),
+  [new HealthInsurance("PPO", 120.0), new Retirement401k(0.06),
+   new FlatDeduction("Gym", 25.0)]))
+
+payroll.addEmployee(new Employee("E008", "Henry Wilson",   "HR",
+  new Hourly(27.75, 38.5),
+  [new HealthInsurance("HMO", 85.0)]))
+
+IO::println("═════════════════════════════════════════")
+IO::println("  PAYROLL RUN — PERIOD 2024-26")
+IO::println("═════════════════════════════════════════")
+
+val stubs: List[PayStub] = payroll.run()
+foreach stub: PayStub in stubs { printStub(stub) }
+
+printDeptSummary(stubs)
+printTotals(stubs)

@@ -1,0 +1,334 @@
+// EpidemicSim.on — SEIR compartmental epidemic model with multi-scenario comparison
+// Exercises: records with methods; plain and data-carrying enums; classes; interfaces;
+//            collection pipelines (map/filter/sortedBy/reduce/find); closures; select;
+//            extension methods; nullable; string interpolation; while + foreach.
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt1(): String {
+    val v: Int = (self * 10.0 + 0.5) as Int
+    return (v / 10) + "." + (v % 10)
+  }
+  def fmt2(): String {
+    val v: Int = (self * 100.0 + 0.5) as Int
+    val frac: Int = v % 100
+    val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
+    return (v / 100) + "." + fracStr
+  }
+}
+
+def dmax(a: Double, b: Double): Double = if a > b { a } else { b }
+def dmin(a: Double, b: Double): Double = if a < b { a } else { b }
+
+// ─── Severity classification ─────────────────────────────────────────────────
+
+enum SeverityLevel { LOW, MODERATE, HIGH, CRITICAL }
+
+// ─── Disease parameters ──────────────────────────────────────────────────────
+
+record DiseaseProfile(
+  name: String,
+  r0: Double,
+  latencyDays: Double,
+  infectiousDays: Double,
+  caseFatalityRate: Double
+) {
+public:
+  def beta(): Double = r0 / infectiousDays
+  def sigma(): Double = 1.0 / latencyDays
+  def gamma(): Double = 1.0 / infectiousDays
+
+  def severity(): SeverityLevel {
+    if r0 < 2.0  { return SeverityLevel::LOW }
+    if r0 < 4.0  { return SeverityLevel::MODERATE }
+    if r0 < 8.0  { return SeverityLevel::HIGH }
+    return SeverityLevel::CRITICAL
+  }
+
+  def describe(): String =
+    "#{name} | R0=#{r0.fmt1()} latency=#{latencyDays.fmt1()}d " +
+    "infectious=#{infectiousDays.fmt1()}d CFR=#{(caseFatalityRate * 100.0).fmt2()}%"
+}
+
+// ─── Scenario presets (data-carrying ADT enum) ───────────────────────────────
+
+enum Scenario {
+  case SeasonalFlu(dp: DiseaseProfile)
+  case CovidLike(dp: DiseaseProfile)
+  case MeaslesLike(dp: DiseaseProfile)
+  case CustomOutbreak(dp: DiseaseProfile)
+public:
+  def profile(): DiseaseProfile = select this {
+    case s is SeasonalFlu:     s.dp()
+    case c is CovidLike:       c.dp()
+    case m is MeaslesLike:     m.dp()
+    case cu is CustomOutbreak: cu.dp()
+  }
+  def label(): String = select this {
+    case s is SeasonalFlu:     "Seasonal Flu"
+    case c is CovidLike:       "COVID-19-like"
+    case m is MeaslesLike:     "Measles-like"
+    case cu is CustomOutbreak: cu.dp().name()
+  }
+}
+
+def makeFlu(): Scenario =
+  new SeasonalFlu(new DiseaseProfile("Seasonal Flu", 1.3, 2.0, 5.0, 0.001))
+def makeCovid(): Scenario =
+  new CovidLike(new DiseaseProfile("COVID-19-like", 2.5, 5.0, 7.0, 0.01))
+def makeMeasles(): Scenario =
+  new MeaslesLike(new DiseaseProfile("Measles-like", 15.0, 8.0, 8.0, 0.002))
+
+// ─── Daily snapshot ──────────────────────────────────────────────────────────
+
+record DayReport(
+  day: Int,
+  susceptible: Double,
+  exposed: Double,
+  infected: Double,
+  recovered: Double,
+  deceased: Double
+) {
+public:
+  def population(): Double = susceptible + exposed + infected + recovered + deceased
+  def activeCases(): Int = ((exposed + infected) as Int)
+  def cumulativeInfected(): Double = infected + recovered + deceased
+  def attackRate(): Double = cumulativeInfected() / population() * 100.0
+}
+
+// ─── Report formatter interface ──────────────────────────────────────────────
+
+interface ReportFormatter {
+  def formatDay(r: DayReport): String
+  def formatHeader(label: String): String
+  def formatFooter(): String
+}
+
+class TerseFormatter conforms ReportFormatter {
+public:
+  def formatHeader(label: String): String = "--- #{label} ---"
+  def formatFooter(): String = ""
+  def formatDay(r: DayReport): String {
+    val i: Int = (r.infected() as Int)
+    val d: Int = (r.deceased() as Int)
+    val ar: String = r.attackRate().fmt2()
+    return "  Day #{r.day()}: active=#{r.activeCases()} infected=#{i} deaths=#{d} attack=#{ar}%"
+  }
+}
+
+class VerboseFormatter conforms ReportFormatter {
+public:
+  def formatHeader(label: String): String {
+    val bar: String = "═══════════════════════════════════"
+    return "#{bar}\n  #{label}\n#{bar}"
+  }
+  def formatFooter(): String = "  ─────────────────────────────────"
+  def formatDay(r: DayReport): String {
+    val s: Int = (r.susceptible() as Int)
+    val e: Int = (r.exposed() as Int)
+    val i: Int = (r.infected() as Int)
+    val rv: Int = (r.recovered() as Int)
+    val d: Int = (r.deceased() as Int)
+    return "  Day #{r.day(),3}: S=#{s,7} E=#{e,6} I=#{i,6} R=#{rv,7} D=#{d,5}"
+  }
+}
+
+// ─── SEIR simulator ──────────────────────────────────────────────────────────
+
+class SeirModel {
+  val profile: DiseaseProfile
+  var population: Double
+  var s: Double
+  var e: Double
+  var i: Double
+  var r: Double
+  var d: Double
+public:
+  def this(prof: DiseaseProfile, pop: Double, initExposed: Double) {
+    profile = prof
+    population = pop
+    s = pop - initExposed
+    e = initExposed
+    i = 0.0
+    r = 0.0
+    d = 0.0
+  }
+
+  def snapshot(day: Int): DayReport = new DayReport(day, s, e, i, r, d)
+
+  def step(): void {
+    val beta: Double = profile.beta()
+    val sigma: Double = profile.sigma()
+    val gamma: Double = profile.gamma()
+    val cfr: Double = profile.caseFatalityRate()
+    val n: Double = population
+
+    val newE: Double = dmax(0.0, dmin(s, beta * s * i / n))
+    val newI: Double = dmax(0.0, dmin(e, sigma * e))
+    val removal: Double = dmax(0.0, dmin(i, gamma * i))
+    val newD: Double = cfr * removal
+    val newR: Double = (1.0 - cfr) * removal
+
+    s = s - newE
+    e = e + newE - newI
+    i = i + newI - removal
+    r = r + newR
+    d = d + newD
+  }
+}
+
+// ─── Simulation result ───────────────────────────────────────────────────────
+
+record SimResult(
+  label: String,
+  history: List[Object],
+  peakDay: Int,
+  peakActive: Int,
+  totalDeaths: Int,
+  finalAttackRate: Double
+)
+
+// ─── Run one scenario ────────────────────────────────────────────────────────
+
+def runScenario(scenario: Scenario, pop: Double, initExposed: Double, days: Int): SimResult {
+  val model: SeirModel = new SeirModel(scenario.profile(), pop, initExposed)
+  val history: List[Object] = []
+  var day: Int = 0
+  var peakDay: Int = 0
+  var peakActive: Int = 0
+
+  while day <= days {
+    val snap: DayReport = model.snapshot(day)
+    history.add(snap)
+    val active: Int = snap.activeCases()
+    if active > peakActive {
+      peakActive = active
+      peakDay = day
+    }
+    model.step()
+    day = day + 1
+  }
+
+  val last: DayReport = history[history.size - 1] as DayReport
+  return new SimResult(
+    scenario.label(),
+    history,
+    peakDay,
+    peakActive,
+    (last.deceased() as Int),
+    last.attackRate()
+  )
+}
+
+// ─── Print scenario report ───────────────────────────────────────────────────
+
+def printReport(result: SimResult, fmt: ReportFormatter, printEvery: Int): void {
+  IO::println(fmt.formatHeader(result.label()))
+  val hist: List[Object] = result.history()
+  var idx: Int = 0
+  var printedZero: Boolean = false
+  while idx < hist.size {
+    val snap: DayReport = hist[idx] as DayReport
+    val isZero: Boolean = snap.activeCases() == 0
+    if snap.day() % printEvery == 0 || (isZero && !printedZero) {
+      IO::println(fmt.formatDay(snap))
+      if isZero { printedZero = true }
+    }
+    idx = idx + 1
+  }
+  IO::println(fmt.formatFooter())
+  IO::println("  → Peak: day #{result.peakDay()} with #{result.peakActive()} active cases")
+  IO::println("  → Total deaths: #{result.totalDeaths()}")
+  IO::println("  → Attack rate: #{result.finalAttackRate().fmt2()}%")
+  IO::println("")
+}
+
+// ─── Summary comparison ──────────────────────────────────────────────────────
+
+def printSummary(results: List[Object]): void {
+  IO::println("════════════════════════════════════════")
+  IO::println("  COMPARATIVE SUMMARY")
+  IO::println("════════════════════════════════════════")
+  IO::println("  Scenario       | Peak Active | Deaths  | Attack%")
+  IO::println("  ───────────────────────────────────────────────")
+
+  foreach item: Object in results {
+    val r: SimResult = item as SimResult
+    val pct: String = r.finalAttackRate().fmt2()
+    IO::println("  #{r.label(),15} | #{r.peakActive(),11} | #{r.totalDeaths(),7} | #{pct}%")
+  }
+
+  IO::println("")
+
+  // Worst by peak active using collection pipeline
+  val sorted: List[Object] = results.sortedBy { item -> (item as SimResult).peakActive() }
+  val worst: SimResult = sorted[sorted.size - 1] as SimResult
+  val best: SimResult = sorted[0] as SimResult
+
+  IO::println("  Worst peak load: #{worst.label()} (#{worst.peakActive()} concurrent active)")
+  IO::println("  Best contained:  #{best.label()} (#{best.peakActive()} concurrent active)")
+  IO::println("  Capacity ratio:  #{((worst.peakActive() as Double) / (best.peakActive() as Double)).fmt1()}x")
+
+  // Sum deaths across scenarios (loop avoids Object-typed reduce boxing)
+  var totalDeaths: Int = 0
+  foreach item: Object in results {
+    totalDeaths = totalDeaths + (item as SimResult).totalDeaths()
+  }
+  IO::println("  Combined deaths across all scenarios: #{totalDeaths}")
+
+  IO::println("")
+  IO::println("  Scenarios over 10% attack rate:")
+  val highAttack: List[Object] = results.filter { item -> (item as SimResult).finalAttackRate() > 10.0 }
+  if highAttack.size == 0 {
+    IO::println("    (none)")
+  } else {
+    foreach item: Object in highAttack {
+      val r: SimResult = item as SimResult
+      IO::println("    - #{r.label()}: #{r.finalAttackRate().fmt2()}%")
+    }
+  }
+}
+
+// ─── Profile severity display ────────────────────────────────────────────────
+
+def severityLabel(level: SeverityLevel): String = select level {
+  case SeverityLevel::LOW:      "Low"
+  case SeverityLevel::MODERATE: "Moderate"
+  case SeverityLevel::HIGH:     "High"
+  case SeverityLevel::CRITICAL: "Critical"
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+val POP: Double = 100000.0
+val INIT_EXPOSED: Double = 10.0
+val SIM_DAYS: Int = 180
+
+val scenarios: List[Object] = [makeFlu(), makeCovid(), makeMeasles()]
+
+IO::println("════════════════════════════════════════")
+IO::println("  SEIR EPIDEMIC SIMULATION")
+IO::println("  Population: #{(POP as Int)} | Initial exposed: #{(INIT_EXPOSED as Int)} | Days: #{SIM_DAYS}")
+IO::println("════════════════════════════════════════\n")
+
+IO::println("Disease profiles:")
+foreach item: Object in scenarios {
+  val sc: Scenario = item as Scenario
+  val prof: DiseaseProfile = sc.profile()
+  val sev: String = severityLabel(prof.severity())
+  IO::println("  [#{sev}] #{prof.describe()}")
+}
+IO::println("")
+
+val results: List[Object] = []
+val fmt: VerboseFormatter = new VerboseFormatter()
+
+foreach item: Object in scenarios {
+  val sc: Scenario = item as Scenario
+  val result: SimResult = runScenario(sc, POP, INIT_EXPOSED, SIM_DAYS)
+  results.add(result)
+  printReport(result, fmt, 30)
+}
+
+printSummary(results)

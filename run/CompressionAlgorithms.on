@@ -1,0 +1,372 @@
+// CompressionAlgorithms.on — Run-Length Encoding and LZ77 sliding-window compression.
+// Exercises: ADT case-enum (Token), records with methods (RlePair, CompressStats),
+//   class with Int[] array (Lz77Coder), extension methods on Int/String,
+//   collection pipelines (map/fold/filter/find/sortedBy/groupBy),
+//   while/foreach, nullable types, select with type patterns,
+//   string interpolation, static val, try/catch.
+
+import { java.lang.Character as JChar }
+
+// ─── Extension methods ──────────────────────────────────────────────────────
+
+extension Int {
+  def lpad(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def pct(total: Int): String {
+    if total == 0 { return "  0%" }
+    val p: Int = self * 100 / total
+    return p.lpad(3) + "%"
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def charAt(i: Int): Int = self.charAt(i) as Int
+  def repeat(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+}
+
+// ─── Token ADT for LZ77 ─────────────────────────────────────────────────────
+
+enum Token {
+  case Lit(code: Int)
+  case Back(offset: Int, length: Int)
+public:
+  def display(): String = select this {
+    case l is Lit:  "Lit(#{l.code()})"
+    case b is Back: "Back(#{b.offset()},#{b.length()})"
+  }
+  def expandedLen(): Int = select this {
+    case l is Lit:  1
+    case b is Back: b.length()
+  }
+  def isBack(): Boolean = select this {
+    case b is Back: true
+    else:           false
+  }
+}
+
+// ─── Records ────────────────────────────────────────────────────────────────
+
+record RlePair(code: Int, count: Int) {
+public:
+  def display(): String {
+    val ch: Int = code()
+    val c: String = if ch >= 32 { "" + (ch as Char) } else { "#" + ch }
+    return "('#{c}'×#{count()})"
+  }
+}
+
+record CompressStats(algorithm: String, originalLen: Int, encodedTokens: Int, expandedBytes: Int) {
+public:
+  def ratio(): String {
+    if originalLen() == 0 { return "n/a" }
+    val saved: Int = originalLen() - expandedBytes()
+    return saved.pct(originalLen())
+  }
+  def summary(): String =
+    "#{algorithm().rpad(8)} original=#{originalLen()} tokens=#{encodedTokens()} " +
+    "expanded=#{expandedBytes()} saving=#{ratio()}"
+}
+
+// ─── RLE ────────────────────────────────────────────────────────────────────
+
+def rleEncode(text: String): List[RlePair] {
+  val result: List[RlePair] = []
+  val len: Int = text.length()
+  var i: Int = 0
+  while i < len {
+    val ch: Int = text.charAt(i)
+    var count: Int = 1
+    while i + count < len && text.charAt(i + count) == ch {
+      count = count + 1
+    }
+    result.add(new RlePair(ch, count))
+    i = i + count
+  }
+  return result
+}
+
+def rleDecode(pairs: List[RlePair]): String {
+  var s: String = ""
+  foreach p: Object in pairs {
+    val pair: RlePair = p as RlePair
+    val ch: Int = pair.code()
+    val c: String = "" + (ch as Char)
+    var j: Int = 0
+    while j < pair.count() { s = s + c; j = j + 1 }
+  }
+  return s
+}
+
+// RLE "size" in bytes: 2 bytes per pair (code + count, each 1 byte when ≤255)
+def rleEncodedSize(pairs: List[RlePair]): Int = pairs.size * 2
+
+// ─── LZ77 ───────────────────────────────────────────────────────────────────
+
+static val LZ_WINDOW:    Int = 128
+static val LZ_MIN_MATCH: Int = 3
+static val LZ_MAX_MATCH: Int = 18
+
+def lz77Encode(text: String): List[Token] {
+  val tokens: List[Token] = []
+  val len: Int = text.length()
+  var pos: Int = 0
+  while pos < len {
+    val winStart: Int = if pos < LZ_WINDOW { 0 } else { pos - LZ_WINDOW }
+    var bestOff: Int = 0
+    var bestLen: Int = 0
+    // Search the look-back window for the longest match
+    var j: Int = winStart
+    while j < pos {
+      var mlen: Int = 0
+      val maxM: Int = if LZ_MAX_MATCH < len - pos { LZ_MAX_MATCH } else { len - pos }
+      while mlen < maxM && text.charAt(j + (mlen % (pos - j))) == text.charAt(pos + mlen) {
+        mlen = mlen + 1
+      }
+      if mlen > bestLen {
+        bestLen = mlen
+        bestOff = pos - j
+      }
+      j = j + 1
+    }
+    if bestLen >= LZ_MIN_MATCH {
+      tokens.add(new Back(bestOff, bestLen))
+      pos = pos + bestLen
+    } else {
+      tokens.add(new Lit(text.charAt(pos)))
+      pos = pos + 1
+    }
+  }
+  return tokens
+}
+
+def lz77Decode(tokens: List[Token]): String {
+  var output: String = ""
+  foreach t: Object in tokens {
+    val tok: Token = t as Token
+    select tok {
+      case l is Lit:
+        output = output + ("" + (l.code() as Char))
+      case b is Back:
+        val start: Int = output.length() - b.offset()
+        var k: Int = 0
+        while k < b.length() {
+          val idx: Int = start + (k % b.offset())
+          output = output + ("" + (output.charAt(idx) as Char))
+          k = k + 1
+        }
+    }
+  }
+  return output
+}
+
+// LZ77 "size": Lit=1 byte, Back=2 bytes (offset+len packed)
+def lz77EncodedSize(tokens: List[Token]): Int {
+  return tokens.fold(0) { acc, t ->
+    val tok: Token = t as Token
+    val sz: Int = select tok {
+      case x is Lit:  1
+      case x is Back: 2
+    }
+    (acc as Int) + sz
+  } as Int
+}
+
+// ─── Benchmark helpers ───────────────────────────────────────────────────────
+
+def benchmarkRle(label: String, text: String): CompressStats {
+  val pairs: List[RlePair] = rleEncode(text)
+  val encoded: Int = rleEncodedSize(pairs)
+  val decoded: String = rleDecode(pairs)
+  val ok: Boolean = decoded == text
+  if !ok { IO::println("  [RLE ERROR] round-trip failed for: " + label) }
+  return new CompressStats("RLE", text.length(), pairs.size, encoded)
+}
+
+def benchmarkLz77(label: String, text: String): CompressStats {
+  val tokens: List[Token] = lz77Encode(text)
+  val encoded: Int = lz77EncodedSize(tokens)
+  val decoded: String = lz77Decode(tokens)
+  val ok: Boolean = decoded == text
+  if !ok { IO::println("  [LZ77 ERROR] round-trip failed for: " + label) }
+  return new CompressStats("LZ77", text.length(), tokens.size, encoded)
+}
+
+// ─── Static corpus ───────────────────────────────────────────────────────────
+
+static val CORPUS: List[String] = [
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "abcabcabcabcabcabcabcabcabcabcabc",
+  "the quick brown fox jumps over the lazy dog",
+  "aaabbbcccdddeeefffggghhhiiijjjkkk",
+  "to be or not to be that is the question whether tis nobler"
+]
+
+static val LABELS: List[String] = [
+  "all-same",
+  "repeat-3",
+  "pangram",
+  "run-triples",
+  "shakespeare"
+]
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+def main(): void {
+
+  // 1. RLE walkthrough on the first two samples
+  IO::println("=== Run-Length Encoding (detailed) ===")
+  foreach i: Int in 0..<2 {
+    val text: String = CORPUS.get(i) as String
+    val label: String = LABELS.get(i) as String
+    val pairs: List[RlePair] = rleEncode(text)
+    IO::print("  [#{label}] pairs: ")
+    foreach p: Object in pairs {
+      IO::print((p as RlePair).display() + " ")
+    }
+    IO::println("")
+  }
+  IO::println("")
+
+  // 2. LZ77 walkthrough on "abcabcabc..."
+  IO::println("=== LZ77 Tokens (repeat-3) ===")
+  val repeatText: String = CORPUS.get(1) as String
+  val lzTokens: List[Token] = lz77Encode(repeatText)
+  foreach t: Object in lzTokens {
+    IO::print("  " + (t as Token).display())
+  }
+  IO::println("")
+  IO::println("")
+
+  // 3. Benchmark: RLE on all corpus texts
+  IO::println("=== RLE Benchmark ===")
+  val rleStats: List[CompressStats] = []
+  foreach i: Int in 0..<CORPUS.size {
+    val text: String = CORPUS.get(i) as String
+    val label: String = LABELS.get(i) as String
+    val stats: CompressStats = benchmarkRle(label, text)
+    rleStats.add(stats)
+    IO::println("  " + stats.summary())
+  }
+  IO::println("")
+
+  // 4. Benchmark: LZ77 on all corpus texts
+  IO::println("=== LZ77 Benchmark ===")
+  val lzStats: List[CompressStats] = []
+  foreach i: Int in 0..<CORPUS.size {
+    val text: String = CORPUS.get(i) as String
+    val label: String = LABELS.get(i) as String
+    val stats: CompressStats = benchmarkLz77(label, text)
+    lzStats.add(stats)
+    IO::println("  " + stats.summary())
+  }
+  IO::println("")
+
+  // 5. Collection pipeline: find best-saved text per algorithm (by ratio)
+  IO::println("=== Best Compression per Algorithm ===")
+  val bestRle = rleStats.fold(rleStats.get(0)) { best, s ->
+    val b: CompressStats = best as CompressStats
+    val c: CompressStats = s as CompressStats
+    val bSaved: Int = b.originalLen() - b.expandedBytes()
+    val cSaved: Int = c.originalLen() - c.expandedBytes()
+    if cSaved > bSaved { c } else { b }
+  } as CompressStats
+  IO::println("  RLE  best: " + bestRle.summary())
+
+  val bestLz = lzStats.fold(lzStats.get(0)) { best, s ->
+    val b: CompressStats = best as CompressStats
+    val c: CompressStats = s as CompressStats
+    val bSaved: Int = b.originalLen() - b.expandedBytes()
+    val cSaved: Int = c.originalLen() - c.expandedBytes()
+    if cSaved > bSaved { c } else { b }
+  } as CompressStats
+  IO::println("  LZ77 best: " + bestLz.summary())
+  IO::println("")
+
+  // 6. LZ77: count back-references vs literals (pipeline: filter + size)
+  IO::println("=== LZ77 Token Analysis (pangram) ===")
+  val pangramTokens: List[Token] = lz77Encode(CORPUS.get(2) as String)
+  val backRefs: List[Token] = pangramTokens.filter { t -> (t as Token).isBack() }
+  val lits: List[Token]     = pangramTokens.filter { t -> !(t as Token).isBack() }
+  IO::println("  Total tokens : #{pangramTokens.size}")
+  IO::println("  Back-refs    : #{backRefs.size}")
+  IO::println("  Literals     : #{lits.size}")
+
+  // Total bytes recovered by back-references
+  val bytesFromRefs: Int = backRefs.fold(0) { acc, t ->
+    (acc as Int) + (t as Token).expandedLen()
+  } as Int
+  IO::println("  Bytes from back-refs: #{bytesFromRefs}")
+  IO::println("")
+
+  // 7. sortedBy: rank corpus texts by RLE compression saving (descending)
+  IO::println("=== Corpus Ranked by RLE Saving ===")
+  val ranked: List[CompressStats] = rleStats.sortedBy { s ->
+    val stat: CompressStats = s as CompressStats
+    0 - (stat.originalLen() - stat.expandedBytes())
+  }
+  var rank: Int = 1
+  foreach s: Object in ranked {
+    val stat: CompressStats = s as CompressStats
+    val saved: Int = stat.originalLen() - stat.expandedBytes()
+    IO::println("  #{rank.lpad(2)}. saving=#{saved.lpad(3)} bytes  #{stat.summary()}")
+    rank = rank + 1
+  }
+  IO::println("")
+
+  // 8. find: first token in LZ77 of shakespeare text that is a back-ref
+  IO::println("=== LZ77 First Back-Reference (shakespeare) ===")
+  val shakeTokens: List[Token] = lz77Encode(CORPUS.get(4) as String)
+  val firstBack = shakeTokens.find { t -> (t as Token).isBack() }
+  if firstBack != null {
+    IO::println("  " + (firstBack as Token).display())
+  } else {
+    IO::println("  (no back-reference found)")
+  }
+  IO::println("")
+
+  // 9. select: classify each text by its RLE pair count
+  IO::println("=== Text Complexity (by RLE pair count) ===")
+  foreach i: Int in 0..<rleStats.size {
+    val stat: CompressStats = rleStats.get(i) as CompressStats
+    val label: String = LABELS.get(i) as String
+    val pairs: Int = stat.encodedTokens()
+    val cls: String = select pairs {
+      case 1:       "trivial"
+      case 2, 3, 4: "simple"
+      else:         "mixed"
+    }
+    IO::println("  #{label.rpad(14)} #{pairs.lpad(3)} pairs -> #{cls}")
+  }
+  IO::println("")
+
+  // 10. Round-trip verification with try/catch
+  IO::println("=== Round-Trip Verification ===")
+  foreach i: Int in 0..<CORPUS.size {
+    val text: String = CORPUS.get(i) as String
+    val label: String = LABELS.get(i) as String
+    try {
+      val rleOk:  Boolean = rleDecode(rleEncode(text)) == text
+      val lzOk:   Boolean = lz77Decode(lz77Encode(text)) == text
+      val status: String = if rleOk && lzOk { "OK" } else { "FAIL" }
+      IO::println("  #{label.rpad(14)} #{status}")
+    } catch e: Exception {
+      IO::println("  #{label.rpad(14)} ERROR: " + e.message())
+    }
+  }
+
+  IO::println("")
+  IO::println("Done.")
+}

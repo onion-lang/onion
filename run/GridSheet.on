@@ -1,0 +1,616 @@
+// SpreadsheetEngine.on — a mini spreadsheet engine with formula evaluation
+// Exercises: records, ADT enums, data-carrying enums, classes, interfaces,
+// collection pipelines (map/filter/fold/groupBy/sortedBy/find/partition),
+// select/pattern matching, nullable, closures, string interpolation,
+// try/catch, recursion, while, foreach (ranges and map entries).
+
+import {
+  java.util.ArrayList
+  java.lang.Double as JDouble
+  java.lang.Integer as JInteger
+}
+
+// ─── Value types ──────────────────────────────────────────────────────────────
+
+enum CellVal {
+  case Num(n: Double)
+  case Str(s: String)
+  case Err(msg: String)
+  case Empty
+public:
+  def asDouble(): Double? = select this {
+    case v is Num: v.n()
+    else: null
+  }
+  def asString(): String = select this {
+    case v is Num: formatNum(v.n())
+    case v is Str: v.s()
+    case v is Err: "#ERR:" + v.msg()
+    case e is Empty: ""
+  }
+  def isError(): Boolean = select this {
+    case e is Err: true
+    else: false
+  }
+}
+
+def formatNum(d: Double): String {
+  val i: Int = d.intValue()
+  if (d - i.doubleValue()) == 0.0 { return i.toString() }
+  val scaled: Long = (d * 100.0).longValue()
+  val whole: Long = scaled / 100L
+  val frac: Long = scaled % 100L
+  val fracStr: String = if frac < 10L { "0" + frac.toString() } else { frac.toString() }
+  return whole.toString() + "." + fracStr
+}
+
+// ─── Cell address ─────────────────────────────────────────────────────────────
+
+record CellAddr(col: Int, row: Int) {
+public:
+  def label(): String {
+    val colChar: String = "" + ((65 + col()) as Char)
+    return colChar + (row() + 1).toString()
+  }
+}
+
+record CellRange(from: CellAddr, to: CellAddr) {}
+
+record CellEntry(label: String, content: String) {}
+
+def parseAddr(s: String): CellAddr? {
+  if s.length() < 2 { return null }
+  val colChar: Int = (s.charAt(0) as Int) - 65
+  if colChar < 0 || colChar > 25 { return null }
+  try {
+    val row: Int = JInteger::parseInt(s.substring(1)) - 1
+    if row < 0 { return null }
+    return new CellAddr(colChar, row)
+  } catch e: Exception {
+    return null
+  }
+}
+
+// ─── Simple tokeniser ─────────────────────────────────────────────────────────
+
+class Tokeniser {
+public:
+  val input: String
+  var pos: Int
+  def this(s: String) {
+    this.input = s
+    this.pos = 0
+  }
+
+  def skipSpaces(): void {
+    while pos < input.length() && input.charAt(pos) == ' ' {
+      pos = pos + 1
+    }
+  }
+
+  def readNumStr(): String {
+    var start: Int = pos
+    while pos < input.length() && (isDigitCh(input.charAt(pos)) || input.charAt(pos) == '.') {
+      pos = pos + 1
+    }
+    return input.substring(start, pos)
+  }
+
+  def readWord(): String {
+    var start: Int = pos
+    while pos < input.length() && isAlNumCh(input.charAt(pos)) {
+      pos = pos + 1
+    }
+    return input.substring(start, pos)
+  }
+
+  // Returns a token as a tagged string: "TAG" or "TAG:data"
+  def nextToken(): String {
+    skipSpaces()
+    if pos >= input.length() { return "EOF" }
+    val curCh: Char = input.charAt(pos)
+    if curCh == '(' { pos++; return "LPAREN" }
+    if curCh == ')' { pos++; return "RPAREN" }
+    if curCh == ',' { pos++; return "COMMA" }
+    if curCh == ':' { pos++; return "COLON" }
+    if curCh == '+' { pos++; return "OP:+" }
+    if curCh == '-' { pos++; return "OP:-" }
+    if curCh == '*' { pos++; return "OP:*" }
+    if curCh == '/' { pos++; return "OP:/" }
+    if curCh == '"' {
+      pos++
+      var start: Int = pos
+      while pos < input.length() && input.charAt(pos) != '"' { pos++ }
+      val s: String = input.substring(start, pos)
+      if pos < input.length() { pos++ }
+      return "STR:" + s
+    }
+    if isDigitCh(input.charAt(pos)) {
+      val ns: String = readNumStr()
+      try { JDouble::parseDouble(ns); return "NUM:" + ns }
+      catch e: Exception { return "ERR:badnum" }
+    }
+    if isAlphaCh(input.charAt(pos)) {
+      val word: String = readWord()
+      if word == "SUM"   { return "FUNC:SUM" }
+      if word == "AVG"   { return "FUNC:AVG" }
+      if word == "MIN"   { return "FUNC:MIN" }
+      if word == "MAX"   { return "FUNC:MAX" }
+      if word == "COUNT" { return "FUNC:COUNT" }
+      val addr: CellAddr? = parseAddr(word)
+      if addr != null { return "REF:" + addr.col().toString() + "," + addr.row().toString() }
+      return "STR:" + word
+    }
+    pos++
+    return "ERR:unknown"
+  }
+}
+
+def isDigitCh(c: Char): Boolean { val i: Int = c as Int; return i >= 48 && i <= 57 }
+def isAlphaCh(c: Char): Boolean {
+  val i: Int = c as Int
+  return (i >= 65 && i <= 90) || (i >= 97 && i <= 122)
+}
+def isAlNumCh(c: Char): Boolean = isAlphaCh(c) || isDigitCh(c)
+
+def tokTag(t: String): String {
+  val idx: Int = t.indexOf(":")
+  if idx < 0 { return t }
+  return t.substring(0, idx)
+}
+def tokData(t: String): String {
+  val idx: Int = t.indexOf(":")
+  if idx < 0 { return "" }
+  return t.substring(idx + 1)
+}
+
+// ─── Sheet ────────────────────────────────────────────────────────────────────
+
+class Sheet {
+  val cells: List[CellEntry]
+  var evalStack: List[String]
+public:
+  def this {
+    this.cells = new ArrayList[CellEntry]()
+    this.evalStack = new ArrayList[String]()
+  }
+
+  def set(addr: CellAddr, content: String): void {
+    val lbl: String = addr.label()
+    val kept: List[CellEntry] = cells.filter { e -> e.label() != lbl }
+    cells.clear()
+    foreach e: CellEntry in kept { cells.add(e) }
+    cells.add(new CellEntry(lbl, content))
+  }
+
+  def getRaw(addr: CellAddr): String? {
+    val lbl: String = addr.label()
+    val found: CellEntry? = cells.find { e -> e.label() == lbl }
+    if found == null { return null }
+    return found.content()
+  }
+
+  def eval(addr: CellAddr): CellVal {
+    val lbl: String = addr.label()
+    if evalStack.find { s -> s == lbl } != null {
+      return new Err("CYCLE")
+    }
+    evalStack.add(lbl)
+    val result: CellVal = evalInner(addr)
+    evalStack.remove(lbl)
+    return result
+  }
+
+  def rangeVals(from: CellAddr, to: CellAddr): List[CellVal] {
+    val result: List[CellVal] = new ArrayList[CellVal]()
+    foreach r: Int in from.row()..to.row() {
+      foreach c: Int in from.col()..to.col() {
+        result.add(eval(new CellAddr(c, r)))
+      }
+    }
+    return result
+  }
+
+private:
+  def evalInner(addr: CellAddr): CellVal {
+    val raw: String? = getRaw(addr)
+    if raw == null { return new Empty() }
+    val trimmed: String = raw.trim()
+    if trimmed.length() == 0 { return new Empty() }
+    if trimmed.startsWith("=") {
+      return evalFormula(trimmed.substring(1), this)
+    }
+    try {
+      val d: Double = JDouble::parseDouble(trimmed)
+      return new Num(d)
+    } catch e: Exception {
+      return new Str(trimmed)
+    }
+  }
+}
+
+// ─── Formula evaluator ────────────────────────────────────────────────────────
+
+def evalFormula(expr: String, sheet: Sheet): CellVal {
+  val tok: Tokeniser = new Tokeniser(expr)
+  try {
+    return parseExpr(tok, sheet)
+  } catch e: Exception {
+    return new Err(e.message())
+  }
+}
+
+def parseExpr(tok: Tokeniser, sheet: Sheet): CellVal {
+  var left: CellVal = parseTerm(tok, sheet)
+  var saved: Int = tok.pos
+  tok.skipSpaces()
+  var t: String = tok.nextToken()
+  while t == "OP:+" || t == "OP:-" {
+    val right: CellVal = parseTerm(tok, sheet)
+    left = applyOp(tokData(t), left, right)
+    saved = tok.pos
+    tok.skipSpaces()
+    t = tok.nextToken()
+  }
+  tok.pos = saved  // un-consume the non-operator token
+  return left
+}
+
+def parseTerm(tok: Tokeniser, sheet: Sheet): CellVal {
+  var left: CellVal = parsePrimary(tok, sheet)
+  var saved: Int = tok.pos
+  tok.skipSpaces()
+  var t: String = tok.nextToken()
+  while t == "OP:*" || t == "OP:/" {
+    val right: CellVal = parsePrimary(tok, sheet)
+    left = applyOp(tokData(t), left, right)
+    saved = tok.pos
+    tok.skipSpaces()
+    t = tok.nextToken()
+  }
+  tok.pos = saved
+  return left
+}
+
+def parsePrimary(tok: Tokeniser, sheet: Sheet): CellVal {
+  tok.skipSpaces()
+  val t: String = tok.nextToken()
+  val tag: String = tokTag(t)
+  val data: String = tokData(t)
+
+  if tag == "NUM" {
+    try { return new Num(JDouble::parseDouble(data)) }
+    catch e: Exception { return new Err("bad num") }
+  }
+  if tag == "STR" { return new Str(data) }
+  if tag == "REF" {
+    val parts: List[String] = Strings::split(data, ",")
+    val col: Int = JInteger::parseInt(parts[0])
+    val row: Int = JInteger::parseInt(parts[1])
+    val addr: CellAddr = new CellAddr(col, row)
+    val savedPos: Int = tok.pos
+    tok.skipSpaces()
+    val peek: String = tok.nextToken()
+    if peek == "COLON" {
+      val t2: String = tok.nextToken()
+      if tokTag(t2) == "REF" {
+        val parts2: List[String] = Strings::split(tokData(t2), ",")
+        val col2: Int = JInteger::parseInt(parts2[0])
+        val row2: Int = JInteger::parseInt(parts2[1])
+        val addr2: CellAddr = new CellAddr(col2, row2)
+        return funcSum(sheet.rangeVals(addr, addr2))
+      }
+    }
+    tok.pos = savedPos
+    return sheet.eval(addr)
+  }
+  if tag == "FUNC" {
+    tok.nextToken()  // consume LPAREN
+    val args: ArgAccum = parseArgs(tok, sheet)
+    // parseArgs already consumed RPAREN
+    return applyFunc(data, args.vals(), args.ranges(), sheet)
+  }
+  if t == "LPAREN" {
+    val inner: CellVal = parseExpr(tok, sheet)
+    tok.nextToken()  // consume RPAREN
+    return inner
+  }
+  return new Empty()
+}
+
+// ─── Argument parsing ─────────────────────────────────────────────────────────
+
+record ArgAccum(vals: List[CellVal], ranges: List[CellRange]) {}
+
+def parseArgs(tok: Tokeniser, sheet: Sheet): ArgAccum {
+  val vals: List[CellVal] = new ArrayList[CellVal]()
+  val ranges: List[CellRange] = new ArrayList[CellRange]()
+  tok.skipSpaces()
+  val savedPos: Int = tok.pos
+  val peek: String = tok.nextToken()
+  if peek == "RPAREN" { return new ArgAccum(vals, ranges) }
+  tok.pos = savedPos
+  parseOneArg(tok, sheet, vals, ranges)
+  tok.skipSpaces()
+  var next: String = tok.nextToken()
+  while next == "COMMA" {
+    parseOneArg(tok, sheet, vals, ranges)
+    tok.skipSpaces()
+    next = tok.nextToken()
+  }
+  // next should be RPAREN; consumed it
+  return new ArgAccum(vals, ranges)
+}
+
+def parseOneArg(tok: Tokeniser, sheet: Sheet, vals: List[CellVal], ranges: List[CellRange]): void {
+  tok.skipSpaces()
+  val saved: Int = tok.pos
+  val t: String = tok.nextToken()
+  if tokTag(t) == "REF" {
+    val parts: List[String] = Strings::split(tokData(t), ",")
+    val col: Int = JInteger::parseInt(parts[0])
+    val row: Int = JInteger::parseInt(parts[1])
+    tok.skipSpaces()
+    val peek: String = tok.nextToken()
+    if peek == "COLON" {
+      val t2: String = tok.nextToken()
+      if tokTag(t2) == "REF" {
+        val parts2: List[String] = Strings::split(tokData(t2), ",")
+        val col2: Int = JInteger::parseInt(parts2[0])
+        val row2: Int = JInteger::parseInt(parts2[1])
+        ranges.add(new CellRange(new CellAddr(col, row), new CellAddr(col2, row2)))
+        return
+      }
+    }
+    tok.pos = saved
+  } else {
+    tok.pos = saved
+  }
+  vals.add(parseExpr(tok, sheet))
+}
+
+// ─── Operators and functions ───────────────────────────────────────────────────
+
+def applyOp(op: String, a: CellVal, b: CellVal): CellVal {
+  val av: Double? = a.asDouble()
+  val bv: Double? = b.asDouble()
+  if av == null || bv == null {
+    if op == "+" { return new Str(a.asString() + b.asString()) }
+    return new Err("not a number for op " + op)
+  }
+  if op == "+" { return new Num(av + bv) }
+  if op == "-" { return new Num(av - bv) }
+  if op == "*" { return new Num(av * bv) }
+  if op == "/" {
+    if bv == 0.0 { return new Err("DIV0") }
+    return new Num(av / bv)
+  }
+  return new Err("unknown op: " + op)
+}
+
+def applyFunc(name: String, vals: List[CellVal], ranges: List[CellRange], sheet: Sheet): CellVal {
+  val all: List[CellVal] = new ArrayList[CellVal]()
+  foreach v: CellVal in vals { all.add(v) }
+  foreach r: CellRange in ranges {
+    val rv: List[CellVal] = sheet.rangeVals(r.from(), r.to())
+    foreach cv: CellVal in rv { all.add(cv) }
+  }
+  if name == "SUM"   { return funcSum(all) }
+  if name == "AVG"   { return funcAvg(all) }
+  if name == "MIN"   { return funcMin(all) }
+  if name == "MAX"   { return funcMax(all) }
+  if name == "COUNT" { return funcCount(all) }
+  return new Err("unknown function: " + name)
+}
+
+def numVals(vals: List[CellVal]): List[Double] =
+  vals.filter { v -> v.asDouble() != null }
+      .map { v -> v.asDouble() ?: 0.0 }
+
+def funcSum(vals: List[CellVal]): CellVal {
+  val ns: List[Double] = numVals(vals)
+  if ns.size == 0 { return new Num(0.0) }
+  var total: Double = 0.0
+  foreach n: Double in ns { total = total + n }
+  return new Num(total)
+}
+
+def funcAvg(vals: List[CellVal]): CellVal {
+  val ns: List[Double] = numVals(vals)
+  if ns.size == 0 { return new Err("AVG empty") }
+  var total: Double = 0.0
+  foreach n: Double in ns { total = total + n }
+  return new Num(total / ns.size.doubleValue())
+}
+
+def funcMin(vals: List[CellVal]): CellVal {
+  val ns: List[Double] = numVals(vals)
+  if ns.size == 0 { return new Err("MIN empty") }
+  var m: Double = ns[0] as Double
+  foreach n: Double in ns { if n < m { m = n } }
+  return new Num(m)
+}
+
+def funcMax(vals: List[CellVal]): CellVal {
+  val ns: List[Double] = numVals(vals)
+  if ns.size == 0 { return new Err("MAX empty") }
+  var m: Double = ns[0] as Double
+  foreach n: Double in ns { if n > m { m = n } }
+  return new Num(m)
+}
+
+def funcCount(vals: List[CellVal]): CellVal = new Num(numVals(vals).size.doubleValue())
+
+// ─── Renderer ─────────────────────────────────────────────────────────────────
+
+def renderSheet(sheet: Sheet, rows: Int, cols: Int): void {
+  var header: String = "     "
+  foreach c: Int in 0..<cols {
+    val lbl: String = "" + ((65 + c) as Char)
+    header = header + padLeft(lbl, 10)
+  }
+  IO::println(header)
+  foreach r: Int in 0..<rows {
+    var line: String = padLeft((r + 1).toString(), 4) + " "
+    foreach c: Int in 0..<cols {
+      val v: CellVal = sheet.eval(new CellAddr(c, r))
+      line = line + padLeft(v.asString(), 10)
+    }
+    IO::println(line)
+  }
+}
+
+def padLeft(s: String, width: Int): String {
+  var result: String = s
+  while result.length() < width { result = " " + result }
+  return result
+}
+
+// ─── Demo ─────────────────────────────────────────────────────────────────────
+
+val sheet: Sheet = new Sheet()
+
+// Column headers (row 0)
+sheet.set(new CellAddr(0, 0), "Q1")
+sheet.set(new CellAddr(1, 0), "Q2")
+sheet.set(new CellAddr(2, 0), "Q3")
+sheet.set(new CellAddr(3, 0), "Q4")
+sheet.set(new CellAddr(4, 0), "Total")
+sheet.set(new CellAddr(5, 0), "Avg")
+
+// Revenue row (row 1)
+sheet.set(new CellAddr(0, 1), "12500")
+sheet.set(new CellAddr(1, 1), "15800")
+sheet.set(new CellAddr(2, 1), "13200")
+sheet.set(new CellAddr(3, 1), "19700")
+sheet.set(new CellAddr(4, 1), "=SUM(A2:D2)")
+sheet.set(new CellAddr(5, 1), "=AVG(A2:D2)")
+
+// Cost row (row 2)
+sheet.set(new CellAddr(0, 2), "8000")
+sheet.set(new CellAddr(1, 2), "9500")
+sheet.set(new CellAddr(2, 2), "8800")
+sheet.set(new CellAddr(3, 2), "11200")
+sheet.set(new CellAddr(4, 2), "=SUM(A3:D3)")
+sheet.set(new CellAddr(5, 2), "=AVG(A3:D3)")
+
+// Profit row (row 3): revenue - cost
+sheet.set(new CellAddr(0, 3), "=A2-A3")
+sheet.set(new CellAddr(1, 3), "=B2-B3")
+sheet.set(new CellAddr(2, 3), "=C2-C3")
+sheet.set(new CellAddr(3, 3), "=D2-D3")
+sheet.set(new CellAddr(4, 3), "=SUM(A4:D4)")
+sheet.set(new CellAddr(5, 3), "=AVG(A4:D4)")
+
+// Stats row (row 4)
+sheet.set(new CellAddr(0, 4), "=MAX(A2:D2)")
+sheet.set(new CellAddr(1, 4), "=MIN(A2:D2)")
+sheet.set(new CellAddr(2, 4), "=COUNT(A2:D2)")
+
+IO::println("=== Quarterly Financial Spreadsheet ===")
+IO::println("")
+renderSheet(sheet, 5, 6)
+
+IO::println("")
+IO::println("--- Key Metrics ---")
+IO::println("Total Revenue:  " + sheet.eval(new CellAddr(4, 1)).asString())
+IO::println("Total Cost:     " + sheet.eval(new CellAddr(4, 2)).asString())
+IO::println("Total Profit:   " + sheet.eval(new CellAddr(4, 3)).asString())
+IO::println("Avg Revenue:    " + sheet.eval(new CellAddr(5, 1)).asString())
+IO::println("Max Revenue:    " + sheet.eval(new CellAddr(0, 4)).asString())
+IO::println("Min Revenue:    " + sheet.eval(new CellAddr(1, 4)).asString())
+IO::println("Quarter Count:  " + sheet.eval(new CellAddr(2, 4)).asString())
+
+// Cycle detection
+sheet.set(new CellAddr(0, 6), "=A8")
+sheet.set(new CellAddr(0, 7), "=A7+1")
+IO::println("")
+IO::println("--- Special Cases ---")
+IO::println("Cycle test:    " + sheet.eval(new CellAddr(0, 6)).asString())
+
+// Division by zero
+sheet.set(new CellAddr(0, 8), "=B9/C9")
+sheet.set(new CellAddr(1, 8), "42")
+sheet.set(new CellAddr(2, 8), "0")
+IO::println("Div by zero:   " + sheet.eval(new CellAddr(0, 8)).asString())
+
+// String concatenation
+sheet.set(new CellAddr(0, 9), "Hello")
+sheet.set(new CellAddr(1, 9), " World")
+sheet.set(new CellAddr(2, 9), "=A10+B10")
+IO::println("String concat: " + sheet.eval(new CellAddr(2, 9)).asString())
+
+// Profit margins using collection pipelines
+IO::println("")
+IO::println("--- Profit Margins ---")
+val quarters: List[String] = ["Q1", "Q2", "Q3", "Q4"]
+foreach q: Int in 0..<4 {
+  val rev: CellVal = sheet.eval(new CellAddr(q, 1))
+  val profit: CellVal = sheet.eval(new CellAddr(q, 3))
+  val rd: Double? = rev.asDouble()
+  val pd: Double? = profit.asDouble()
+  if rd != null && pd != null && rd != 0.0 {
+    val margin: Double = (pd / rd) * 100.0
+    IO::println("#{quarters[q]}: #{formatNum(margin)}%")
+  }
+}
+
+// Revenue tier analysis with groupBy
+IO::println("")
+IO::println("--- Revenue Tier Analysis ---")
+val revVals: List[CellVal] = [
+  sheet.eval(new CellAddr(0, 1)),
+  sheet.eval(new CellAddr(1, 1)),
+  sheet.eval(new CellAddr(2, 1)),
+  sheet.eval(new CellAddr(3, 1))
+]
+
+def revTier(v: CellVal): String {
+  val d: Double? = v.asDouble()
+  if d == null { return "unknown" }
+  if d >= 18000.0 { return "premium" }
+  if d >= 14000.0 { return "standard" }
+  return "budget"
+}
+
+val grouped = revVals.groupBy { v -> revTier(v as CellVal) }
+foreach (tier, grp) in grouped {
+  val lst: List[CellVal] = grp as List[CellVal]
+  val total: Double = (lst.fold(0.0) { acc, v -> (acc as Double) + ((v as CellVal).asDouble() ?: 0.0) }) as Double
+  IO::println("#{tier}: #{lst.size} quarter(s), total revenue #{formatNum(total)}")
+}
+
+// Sort quarters by profit
+IO::println("")
+IO::println("--- Quarters by Profit (desc) ---")
+val profitData: List[CellVal] = [
+  sheet.eval(new CellAddr(0, 3)),
+  sheet.eval(new CellAddr(1, 3)),
+  sheet.eval(new CellAddr(2, 3)),
+  sheet.eval(new CellAddr(3, 3))
+]
+val sorted: List[CellVal] = profitData.sortedBy { v -> 0.0 - ((v as CellVal).asDouble() ?: 0.0) }
+foreach v: CellVal in sorted {
+  val pd: Double? = v.asDouble()
+  if pd != null { IO::println("  Profit: " + formatNum(pd)) }
+}
+
+// Select-based categorization of each quarter
+IO::println("")
+IO::println("--- Quarter Summaries ---")
+foreach q: Int in 0..<4 {
+  val rev: CellVal = sheet.eval(new CellAddr(q, 1))
+  val cost: CellVal = sheet.eval(new CellAddr(q, 2))
+  val profit: CellVal = sheet.eval(new CellAddr(q, 3))
+  val qLabel: String = quarters[q]
+  select profit {
+    case p is Num:
+      val pv: Double = p.n()
+      val verdict: String = if pv >= 8000.0 { "excellent" } else if pv >= 4000.0 { "good" } else { "poor" }
+      IO::println("#{qLabel}: rev=#{rev.asString()} cost=#{cost.asString()} profit=#{formatNum(pv)} [#{verdict}]")
+    case e is Err:
+      IO::println("#{qLabel}: ERROR - #{e.msg()}")
+    else:
+      IO::println("#{qLabel}: no data")
+  }
+}

@@ -43,16 +43,16 @@ public:
 
 // ── Schema column record with example ────────────────────────────────────────
 
-record SchemaColumn(name: String, colType: ColType, required: Boolean)
+record SchemaColumn(name: String, colType: ColType, required: Boolean) {
   example { new SchemaColumn("age", new IntCol(0, 150), true).required() }
   example { new SchemaColumn("x", new StringCol(1, 50), false).colType().describe() == "String(1..50)" }
+}
 
 // ── ColumnStats record ────────────────────────────────────────────────────────
 
-record ColumnStats(name: String, total: Int, missing: Int, errors: Int, warnings: Int)
+record ColumnStats(name: String, total: Int, missing: Int, errors: Int, warnings: Int) {
   example { new ColumnStats("x", 10, 0, 0, 0).errorRate() == 0.0 }
   example { new ColumnStats("x", 0, 0, 0, 0).errorRate() == 0.0 }
-{
 public:
   def errorRate(): Double = if self.total() == 0 { 0.0 }
     else { (self.errors() as Double) / (self.total() as Double) * 100.0 }
@@ -67,9 +67,8 @@ public:
 
 // ── ValidationError record: one error with row number ────────────────────────
 
-record ValidationError(row: Int, column: String, severity: Severity, message: String)
+record ValidationError(row: Int, column: String, severity: Severity, message: String) {
   example { new ValidationError(1, "age", Severity::ERROR, "too young").row() == 1 }
-{
 public:
   def isError(): Boolean = self.severity() == Severity::ERROR
   def describe(): String = "row #{self.row()} | #{self.column()} [#{self.severity()}]: #{self.message()}"

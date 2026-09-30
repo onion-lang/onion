@@ -1,0 +1,332 @@
+// MolecularWeight.on — Chemistry toolkit: elements, molecules, weight
+// calculation, composition, and simple reaction balancing.
+//
+// Features: data-carrying enums, records, classes, ADT enum, generics,
+// collection pipelines, string interpolation, pattern matching, nullable,
+// try/catch, while/foreach loops, closures, recursion.
+
+// ─── Periodic table elements ───────────────────────────────────────────────────
+
+enum Element(symbol: String, atomicNumber: Int, atomicWeight: Double,
+             group: Int, period: Int, category: String) {
+  H ("H",  1,  1.008,   1, 1, "nonmetal"),
+  He("He", 2,  4.003,  18, 1, "noble-gas"),
+  Li("Li", 3,  6.941,   1, 2, "alkali-metal"),
+  Be("Be", 4,  9.012,   2, 2, "alkaline-earth"),
+  B ("B",  5, 10.811,  13, 2, "metalloid"),
+  C ("C",  6, 12.011,  14, 2, "nonmetal"),
+  N ("N",  7, 14.007,  15, 2, "nonmetal"),
+  O ("O",  8, 15.999,  16, 2, "nonmetal"),
+  F ("F",  9, 18.998,  17, 2, "nonmetal"),
+  Ne("Ne",10, 20.180,  18, 2, "noble-gas"),
+  Na("Na",11, 22.990,   1, 3, "alkali-metal"),
+  Mg("Mg",12, 24.305,   2, 3, "alkaline-earth"),
+  Al("Al",13, 26.982,  13, 3, "post-transition"),
+  Si("Si",14, 28.086,  14, 3, "metalloid"),
+  P ("P", 15, 30.974,  15, 3, "nonmetal"),
+  S ("S", 16, 32.065,  16, 3, "nonmetal"),
+  Cl("Cl",17, 35.453,  17, 3, "halogen"),
+  Ar("Ar",18, 39.948,  18, 3, "noble-gas"),
+  K ("K", 19, 39.098,   1, 4, "alkali-metal"),
+  Ca("Ca",20, 40.078,   2, 4, "alkaline-earth"),
+  Fe("Fe",26, 55.845,   8, 4, "transition"),
+  Cu("Cu",29, 63.546,  11, 4, "transition"),
+  Zn("Zn",30, 65.38,   12, 4, "transition"),
+  Br("Br",35, 79.904,  17, 4, "halogen"),
+  Ag("Ag",47,107.868,  11, 5, "transition"),
+  Sn("Sn",50,118.710,  14, 5, "post-transition"),
+  I ("I", 53,126.904,  17, 5, "halogen"),
+  Au("Au",79,196.967,  11, 6, "transition"),
+  Pb("Pb",82,207.2,    14, 6, "post-transition"),
+  Hg("Hg",80,200.59,   12, 6, "transition")
+public:
+  def isNobleGas(): Boolean   = category() == "noble-gas"
+  def isMetal(): Boolean      = category() == "alkali-metal" || category() == "alkaline-earth" ||
+                                 category() == "transition"   || category() == "post-transition"
+  def isHalogen(): Boolean    = category() == "halogen"
+  def isNonmetal(): Boolean   = category() == "nonmetal"
+}
+
+// ─── Molecule component: element + count ──────────────────────────────────────
+
+record Component(element: Element, count: Int)
+
+// ─── Molecule ─────────────────────────────────────────────────────────────────
+
+record Molecule(name: String, formula: String, components: List[Object]) {
+public:
+  def molarMass(): Double {
+    var total = 0.0
+    foreach comp: Object in components() {
+      val c = comp as Component
+      total = total + c.element().atomicWeight() * c.count()
+    }
+    return total
+  }
+
+  def percentComposition(): List[Object] {
+    val mm = molarMass()
+    val result: List[Object] = []
+    foreach comp: Object in components() {
+      val c = comp as Component
+      val pct = (c.element().atomicWeight() * c.count() / mm) * 100.0
+      result.add([c.element().symbol(), pct] as Object)
+    }
+    return result
+  }
+
+  def elementCount(): Int = components().size
+
+  def hasElement(sym: String): Boolean {
+    foreach comp: Object in components() {
+      val c = comp as Component
+      if c.element().symbol() == sym { return true }
+    }
+    return false
+  }
+
+  def atomCount(): Int {
+    var total = 0
+    foreach comp: Object in components() {
+      val c = comp as Component
+      total = total + c.count()
+    }
+    return total
+  }
+}
+
+// ─── Molecule builder helper ───────────────────────────────────────────────────
+
+def comp(elem: Element, n: Int): Object = new Component(elem, n) as Object
+
+// ─── Molecule library ─────────────────────────────────────────────────────────
+
+val water     = new Molecule("Water",              "H2O",
+  [comp(Element::H, 2), comp(Element::O, 1)])
+
+val co2       = new Molecule("Carbon Dioxide",     "CO2",
+  [comp(Element::C, 1), comp(Element::O, 2)])
+
+val glucose   = new Molecule("Glucose",            "C6H12O6",
+  [comp(Element::C, 6), comp(Element::H, 12), comp(Element::O, 6)])
+
+val nacl      = new Molecule("Sodium Chloride",    "NaCl",
+  [comp(Element::Na, 1), comp(Element::Cl, 1)])
+
+val ammonia   = new Molecule("Ammonia",            "NH3",
+  [comp(Element::N, 1), comp(Element::H, 3)])
+
+val ethanol   = new Molecule("Ethanol",            "C2H5OH",
+  [comp(Element::C, 2), comp(Element::H, 6), comp(Element::O, 1)])
+
+val sulfuricAcid = new Molecule("Sulfuric Acid",   "H2SO4",
+  [comp(Element::H, 2), comp(Element::S, 1), comp(Element::O, 4)])
+
+val caffeine  = new Molecule("Caffeine",           "C8H10N4O2",
+  [comp(Element::C, 8), comp(Element::H, 10), comp(Element::N, 4), comp(Element::O, 2)])
+
+val ironOxide = new Molecule("Iron(III) Oxide",    "Fe2O3",
+  [comp(Element::Fe, 2), comp(Element::O, 3)])
+
+val calciumCarbonate = new Molecule("Calcium Carbonate", "CaCO3",
+  [comp(Element::Ca, 1), comp(Element::C, 1), comp(Element::O, 3)])
+
+val molecules: List[Object] = [
+  water as Object, co2 as Object, glucose as Object, nacl as Object,
+  ammonia as Object, ethanol as Object, sulfuricAcid as Object,
+  caffeine as Object, ironOxide as Object, calciumCarbonate as Object
+]
+
+// ─── Formatting helpers ───────────────────────────────────────────────────────
+
+def fmtMass(m: Double): String = Format::number(m, 3) + " g/mol"
+
+def pad(s: String, n: Int): String {
+  var out = s
+  while out.length() < n { out = out + " " }
+  return out
+}
+
+// ─── Molar mass table ─────────────────────────────────────────────────────────
+
+IO::println("=== Molar Masses ===")
+IO::println(pad("Molecule", 22) + pad("Formula", 12) + "Molar Mass")
+IO::println("-".repeat(50))
+foreach mol: Object in molecules {
+  val m = mol as Molecule
+  IO::println(pad(m.name(), 22) + pad(m.formula(), 12) + fmtMass(m.molarMass()))
+}
+IO::println("")
+
+// ─── Composition breakdown for glucose ───────────────────────────────────────
+
+IO::println("=== Percent Composition: Glucose (C6H12O6) ===")
+foreach entry: Object in glucose.percentComposition() {
+  val pair = entry as List
+  val sym = pair[0] as String
+  val pct = pair[1] as Double
+  IO::println("  " + sym + ": " + Format::number(pct, 2) + "%")
+}
+IO::println("")
+
+// ─── Collection pipeline: sort by molar mass descending ───────────────────────
+
+IO::println("=== Molecules by Molar Mass (heaviest first) ===")
+val sorted = molecules.sortedBy { mol ->
+  val m = mol as Molecule
+  0.0 - m.molarMass()
+}
+foreach mol: Object in sorted {
+  val m = mol as Molecule
+  IO::println("  " + pad(m.name(), 22) + fmtMass(m.molarMass()))
+}
+IO::println("")
+
+// ─── Molecules containing oxygen ──────────────────────────────────────────────
+
+IO::println("=== Molecules containing Oxygen ===")
+val withOxygen = molecules.filter { mol -> (mol as Molecule).hasElement("O") }
+IO::println("  " + withOxygen.map { mol -> (mol as Molecule).formula() }.toString())
+IO::println("")
+
+// ─── Group by dominant category ───────────────────────────────────────────────
+
+// For each molecule, find the element with the highest atomic weight
+def heaviestElement(m: Molecule): Element {
+  var best: Element? = null
+  foreach comp: Object in m.components() {
+    val c = comp as Component
+    if best == null || c.element().atomicWeight() > (best as Element).atomicWeight() {
+      best = c.element()
+    }
+  }
+  return best as Element
+}
+
+IO::println("=== Molecules grouped by heaviest-element category ===")
+val byCat = molecules.groupBy { mol ->
+  val m = mol as Molecule
+  heaviestElement(m).category()
+}
+foreach (k, v) in byCat {
+  val names = (v as List).map { mol -> (mol as Molecule).formula() }
+  IO::println("  " + k + ": " + names.toString())
+}
+IO::println("")
+
+// ─── Stoichiometry: combustion of glucose ─────────────────────────────────────
+// C6H12O6 + 6 O2 → 6 CO2 + 6 H2O
+// Given 1 mol glucose, how many grams of CO2 and H2O are produced?
+
+IO::println("=== Stoichiometry: Combustion of Glucose ===")
+val molesGlucose = 1.0
+val molesCO2Produced = molesGlucose * 6.0
+val molesH2OProduced = molesGlucose * 6.0
+val gramsCO2  = molesCO2Produced * co2.molarMass()
+val gramsH2O  = molesH2OProduced * water.molarMass()
+val gramsO2   = molesGlucose * 6.0 * (2.0 * Element::O.atomicWeight())
+
+IO::println("  Reaction: C6H12O6 + 6 O2 → 6 CO2 + 6 H2O")
+IO::println("  Input:    1 mol glucose = " + Format::number(glucose.molarMass(), 2) + " g")
+IO::println("  O2 consumed:   " + Format::number(gramsO2, 2) + " g")
+IO::println("  CO2 produced:  " + Format::number(gramsCO2, 2) + " g (#{Format::number(molesCO2Produced, 1)} mol)")
+IO::println("  H2O produced:  " + Format::number(gramsH2O, 2) + " g (#{Format::number(molesH2OProduced, 1)} mol)")
+IO::println("")
+
+// ─── Moles-to-grams converter ─────────────────────────────────────────────────
+
+def molesToGrams(mol: Molecule, moles: Double): Double = moles * mol.molarMass()
+def gramsToMoles(mol: Molecule, grams: Double): Double = grams / mol.molarMass()
+
+IO::println("=== Unit conversions ===")
+IO::println("  5.00 mol NaCl = " + Format::number(molesToGrams(nacl, 5.0), 2) + " g")
+IO::println("  250.0 g H2O   = " + Format::number(gramsToMoles(water, 250.0), 4) + " mol")
+IO::println("  10.0 g Fe2O3  = " + Format::number(gramsToMoles(ironOxide, 10.0), 4) + " mol")
+IO::println("")
+
+// ─── Empirical formula check: is it simplified? ───────────────────────────────
+
+def gcd(a: Int, b: Int): Int = if b == 0 { a } else { gcd(b, a % b) }
+
+def empiricalGcd(m: Molecule): Int {
+  var g = 0
+  foreach comp: Object in m.components() {
+    val c = comp as Component
+    g = if g == 0 { c.count() } else { gcd(g, c.count()) }
+  }
+  return g
+}
+
+IO::println("=== Empirical formula GCDs (1 = already empirical) ===")
+foreach mol: Object in molecules {
+  val m = mol as Molecule
+  val g = empiricalGcd(m)
+  val note = if g == 1 { " (empirical)" } else { " (reducible by " + g + ")" }
+  IO::println("  " + pad(m.formula(), 12) + "GCD = " + g + note)
+}
+IO::println("")
+
+// ─── Element statistics ───────────────────────────────────────────────────────
+
+IO::println("=== Periodic Table Subset Statistics ===")
+val allElements = Colls::toList(Element::values())
+val metals    = allElements.filter { e -> (e as Element).isMetal() }
+val halogens  = allElements.filter { e -> (e as Element).isHalogen() }
+val nobleGases= allElements.filter { e -> (e as Element).isNobleGas() }
+IO::println("  Total elements (subset): " + allElements.size)
+IO::println("  Metals:       " + metals.size)
+IO::println("  Halogens:     " + halogens.size)
+IO::println("  Noble gases:  " + nobleGases.size)
+
+val lightestMetal = metals.sortedBy { e -> (e as Element).atomicWeight() }
+if !lightestMetal.isEmpty {
+  val lm = lightestMetal[0] as Element
+  IO::println("  Lightest metal: " + lm.symbol() + " (" + lm.name() + ", " + Format::number(lm.atomicWeight(), 3) + ")")
+}
+
+val heaviestElement = allElements.sortedBy { e -> 0.0 - (e as Element).atomicWeight() }
+if !heaviestElement.isEmpty {
+  val he = heaviestElement[0] as Element
+  IO::println("  Heaviest in set: " + he.symbol() + " (" + he.name() + ", " + Format::number(he.atomicWeight(), 3) + ")")
+}
+IO::println("")
+
+// ─── Molecule with highest atom count ─────────────────────────────────────────
+
+IO::println("=== Molecule with most atoms ===")
+var maxAtoms = 0
+var maxMol: Molecule? = null
+foreach mol: Object in molecules {
+  val m = mol as Molecule
+  val n = m.atomCount()
+  if n > maxAtoms {
+    maxAtoms = n
+    maxMol = m
+  }
+}
+if maxMol != null {
+  val m = maxMol as Molecule
+  IO::println("  " + m.name() + " (" + m.formula() + "): " + maxAtoms + " atoms")
+}
+IO::println("")
+
+// ─── Assertions ───────────────────────────────────────────────────────────────
+
+def approxEq(a: Double, b: Double): Boolean {
+  val diff = if a > b { a - b } else { b - a }
+  return diff < 0.001
+}
+
+IO::println("=== Assertions ===")
+IO::println("H2O molar mass ≈ 18.015: "   + approxEq(water.molarMass(),    18.015))
+IO::println("CO2 molar mass ≈ 44.010: "   + approxEq(co2.molarMass(),      44.010))
+IO::println("NaCl molar mass ≈ 58.443: "  + approxEq(nacl.molarMass(),     58.443))
+IO::println("C6H12O6 mass ≈ 180.156: "    + approxEq(glucose.molarMass(),  180.156))
+IO::println("Glucose atom count == 24: "  + (glucose.atomCount() == 24))
+IO::println("Glucose has O: "             + glucose.hasElement("O"))
+IO::println("NaCl no oxygen: "            + !nacl.hasElement("O"))
+IO::println("GCD of glucose == 6: "       + (empiricalGcd(glucose) == 6))
+IO::println("GCD of water == 1: "         + (empiricalGcd(water) == 1))
+
+IO::println("")
+IO::println("done")

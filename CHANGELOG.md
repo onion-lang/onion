@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.130.0] - 2026-09-30
+
 ### Added
 
 - **`run/SurveyEngine.on`** — a 571-line survey creation, response collection, and analytics engine, a new domain for the `run/` corpus (an ADT case-enum `QuestionType` (`YesNo`/`RatingScale(lo, hi)`/`MultiChoice(options)`/`Likert(labels)`/`FreeText`) with `label()`/`isNumeric()` dispatched via `select this`; a homogeneous data-carrying enum `Sentiment` (`Positive`/`Neutral`/`Mixed`/`Negative`); records with methods `Question`/`Answer`/`Submission`; a class `Survey` conforms `Reportable`, plus `NpsScorer` and `SurveyReport`; extension methods on `Int` (`clamp`/`lpad`/`stars`), `Double` (`round2`), and `String` (`rpad`/`truncate`/`repeatStr`); collection pipelines `map`/`filter`/`fold`/`groupBy`/`sortedBy`/`distinct`/`find`/`partition`; a recursive quicksort (`sortInts`) and `median`; `foreach` over ranges and `(k, v)` map entries; nullable `Answer?`/`Question?` with null guards; `try`/`catch` around `Integer::parseInt`; `while` loops; `select`/`is` pattern matching on both ADTs; string interpolation throughout — rendering a survey report with per-question stats, a Net Promoter Score breakdown, response-completeness figures, and a pain-point distribution across 11 simulated responses), added to the `run/` corpus (merged via #1761).

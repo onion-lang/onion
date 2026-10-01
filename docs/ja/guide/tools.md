@@ -122,8 +122,12 @@ usage: ingest.on <src> <dst> [--count <Int>] [--loud]
 これ）、`--help`・フラグ解析・型付き変換・エラーメッセージはすべて実行時にそこから
 導出され、あなたの tool への型付き呼び出しはコンパイル時に同じ宣言から導出されます。
 必須パラメータは位置引数、デフォルト付きパラメータは `--name` フラグ（`--count 5` /
-`--count=5`）、`Boolean` のデフォルトはスイッチになります。コマンドラインで省略された
-デフォルトは元の式として言語内で評価されます — 文字列を経由した往復はしません。
+`--count=5`）、`Boolean` のデフォルトはスイッチになります。camelCase のパラメータは、
+名前そのままのフラグに加えて kebab-case のフラグでも指定できます —— `maxRows` は
+`--max-rows` でも `--maxRows` でもよく、`--help` には kebab-case のほうが表示されます。
+同じフラグになってしまう2つのパラメータ（`parseURL` と `parseUrl`）はコンパイルエラーです。
+コマンドラインで省略されたデフォルトは元の式として言語内で評価されます — 文字列を経由した
+往復はしません。
 
 `--help` やフラグ処理の背後にあるパースと型変換は、生成コードが `onion.Cli` という
 より低レベルのランタイムモジュールを呼び出して行っています。このモジュールは直接
@@ -201,7 +205,7 @@ API のホスト、tool が呼び出すコマンド、読む環境変数。`--pl
 $ onion digest.on out/digest.md gh --plan
 plan: `digest` would
   write   derived from out = out/digest.md
-  exec    gh
+  exec    gh … list --repo onion-lang/onion --state all --search … --json number,…
   net     $SLACK_WEBHOOK_URL
   net     api.github.com
   env     SLACK_WEBHOOK_URL
@@ -218,7 +222,7 @@ plan: `digest` would
 | 効果 | 表示されるオペランド | 読み取り元 |
 |------|----------------------|------------|
 | `net` | ホスト（とポート） | `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse`/`request`（ビルダーのステップをたどって `send()` まで）の URL、`http"…"` リソース、`Net::connect` |
-| `exec` | コマンド名 | `Proc::capture`/`run`/`exec` のコマンドの先頭語、`captureIn`/`runIn`/`execIn` ではディレクトリの次の語 |
+| `exec` | コマンド（リテラルでない引数は `…`） | `Proc::capture`/`run`/`exec` のコマンドの語、`captureIn`/`runIn`/`execIn` ではディレクトリより後の語 |
 | `env` | 変数名 | `System::getenv("NAME")`、`Config::getEnv("NAME", …)` |
 | `read`/`write` | パス | `Files` の各操作のパス引数、`file"…"` リソース |
 
@@ -229,6 +233,15 @@ plan: `digest` would
 入れた Webhook URL は `net $SLACK_WEBHOOK_URL` と表示されます）。URL のユーザー情報
 （`user:password@`）は決して表示しません。オペランドは1行に1つで、効果名を繰り返し、呼び出しが見つかった順 —— tool 自身の本体が
 先、そのあと本体が呼ぶメソッド —— に並びます。
+
+`exec` の行にはコマンド全体が並びます。リテラルの引数はそのまま、完全なリテラルでない
+引数（パラメータ、ループ変数、`"updated:>=" + since` など）はそれぞれ `…` になり、
+連続する `…` は1つにまとめます。たとえば
+`Proc::capture("gh", kind, "list", "--repo", "onion-lang/onion")` は
+`exec    gh … list --repo onion-lang/onion` と表示され、上の `digest.on` の行もこうして
+できています。72 文字を超えるコマンドは切り詰めて `…` で終わり、空白や引用符を含む
+引数はシングルクォートで囲んで表示します。2つの呼び出し箇所から到達する同じコマンドは
+1度だけ並びます。
 
 この一覧は**下界**です。それ以外 —— パラメータ、`var`、実行時に計算される値、ヘルパーの
 パラメータに渡されたリテラル（引数を呼び出し先まで追うことはしません）—— は推測しません。
@@ -245,5 +258,11 @@ plan: `digest` would
 ```
 
 `unresolved` は、その効果の呼び出し箇所のうち少なくとも1つで、解析がオペランドを決定
-できなかったときに `true` になります。
+できなかったときに `true` になります。`exec` のエントリには `commands` も入ります。
+呼び出し箇所ごとの引数列全体で、リテラルでない引数は `null` です。`known` はこれまで
+どおりコマンド名の一覧です：
+
+```json
+"exec":{"known":["gh"],"unresolved":false,"commands":[["gh",null,"list","--repo","onion-lang/onion","--state","all","--search",null,"--json","number,title,author,url","--limit","100"]]}
+```
 

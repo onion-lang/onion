@@ -1991,7 +1991,12 @@ Cli::parseBoolean("loud", "true")       // accepts true/false only, unlike Boole
 
 Cli::rest(rawArgs, 2)                   // trailing positionals from index 2 on, for a String[] rest param
 Cli::requireArgs(rawArgs, 1, "<name> [more...]")  // usage-and-exit if fewer than 1 argument given
+
+Cli::kebab("makeSample")                // "make-sample": the flag spelling usage shows
 ```
+
+A flag entry matches both its own name and its kebab-case spelling, so
+`"makeSample?"` accepts `--make-sample` and `--makeSample`.
 
 `Cli::tryParse(args, specString)` is the non-exiting counterpart to `parse`:
 it returns an `Outcome[String[]]` instead of printing to stderr and calling

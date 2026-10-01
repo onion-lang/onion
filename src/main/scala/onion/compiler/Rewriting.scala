@@ -286,6 +286,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
           ScalarConversions.supportedNames)),
       Some(TOOL_PARAMETER_NOT_CLI_CONVERTIBLE.errorCode))
     if (badParams.nonEmpty) throw new CompilationException(badParams)
+    val collisions = tools.flatMap(t => flagSpellingCollisions(t.name, t.args))
+    if (collisions.nonEmpty) throw new CompilationException(collisions)
 
     val loc = tools.head.location
     val contractJson = tools.map(toolContractJson).mkString("[", ",", "]")
@@ -450,6 +452,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
           if (f.args.isEmpty) {
             toplevels += AST.UnqualifiedMethodCall(loc, "main", Nil)
           } else {
+            val collisions = flagSpellingCollisions("main", f.args)
+            if (collisions.nonEmpty) throw new CompilationException(collisions)
             val cliVar = "__cliArgs"
             val spec = f.args.map { a =>
               val kind = cliKindOf(a.typeRef).get
@@ -479,6 +483,27 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
             toplevels += AST.UnqualifiedMethodCall(loc, "main", argExprs)
           }
         }
+    }
+  }
+
+  /**
+   * A command-line flag answers to the parameter's own name and to its kebab-case
+   * spelling (`makeSample`: `--makeSample`, `--make-sample`; FRICTION F13), computed by
+   * `onion.Cli.kebab` so the compiler and the runtime cannot disagree. Two flag
+   * parameters whose spellings overlap (`parseURL` and `parseUrl` are both
+   * `--parse-url`) would make one of them unreachable, so that is reported here, at the
+   * second parameter, rather than resolved silently at run time. Positionals have no
+   * flag and are not checked.
+   */
+  private def flagSpellingCollisions(owner: String, args: List[AST.Argument]): List[CompileError] = {
+    def spellings(a: AST.Argument): Set[String] = Set(a.name, onion.Cli.kebab(a.name))
+    val flags = args.filter(_.defaultValue != null)
+    flags.zipWithIndex.flatMap { case (b, j) =>
+      flags.take(j).find(a => (spellings(a) & spellings(b)).nonEmpty).map { a =>
+        val shared = (spellings(a) & spellings(b)).toSeq.sorted.head
+        CompileError("", b.location,
+          Message("error.cli.flagSpellingCollision", Array[Any](owner, a.name, b.name, shared)))
+      }
     }
   }
 

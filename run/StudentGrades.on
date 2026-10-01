@@ -1,0 +1,252 @@
+// --warn off suppresses W0015 (auto-unbox from fold on List[Object]) and W0012 (null in fold accumulator)
+// Student Grade Management System
+// Demonstrates: records, enums, functions, typed collection pipelines,
+//   string interpolation, pattern matching, nullable fields, fold/filter/map.
+
+import {
+  java.util.*
+}
+
+enum Semester { FALL, SPRING, SUMMER }
+
+enum LetterGrade { A_PLUS, A, A_MINUS, B_PLUS, B, B_MINUS, C_PLUS, C, C_MINUS, D, F }
+
+record Course(code: String, title: String, credits: Int, semester: Semester) {
+public:
+  def semLabel(): String = select semester {
+    case Semester::FALL:   "Fall"
+    case Semester::SPRING: "Spring"
+    case Semester::SUMMER: "Summer"
+  }
+  def label(): String = "#{code}: #{title} (#{credits}cr, #{semLabel()})"
+}
+
+record Grade(course: Course, score: Double, letter: LetterGrade) {
+public:
+  def gradePoints(): Double = select letter {
+    case LetterGrade::A_PLUS:  4.0
+    case LetterGrade::A:       4.0
+    case LetterGrade::A_MINUS: 3.7
+    case LetterGrade::B_PLUS:  3.3
+    case LetterGrade::B:       3.0
+    case LetterGrade::B_MINUS: 2.7
+    case LetterGrade::C_PLUS:  2.3
+    case LetterGrade::C:       2.0
+    case LetterGrade::C_MINUS: 1.7
+    case LetterGrade::D:       1.0
+    case LetterGrade::F:       0.0
+  }
+  def letterStr(): String = select letter {
+    case LetterGrade::A_PLUS:  "A+"
+    case LetterGrade::A:       "A"
+    case LetterGrade::A_MINUS: "A-"
+    case LetterGrade::B_PLUS:  "B+"
+    case LetterGrade::B:       "B"
+    case LetterGrade::B_MINUS: "B-"
+    case LetterGrade::C_PLUS:  "C+"
+    case LetterGrade::C:       "C"
+    case LetterGrade::C_MINUS: "C-"
+    case LetterGrade::D:       "D"
+    case LetterGrade::F:       "F"
+  }
+  def qualityPoints(): Double = gradePoints() * course.credits
+  def passed(): Boolean = letter != LetterGrade::F
+}
+
+def scoreToLetter(score: Double): LetterGrade =
+  if score >= 97.0      { LetterGrade::A_PLUS  }
+  else if score >= 93.0 { LetterGrade::A       }
+  else if score >= 90.0 { LetterGrade::A_MINUS }
+  else if score >= 87.0 { LetterGrade::B_PLUS  }
+  else if score >= 83.0 { LetterGrade::B       }
+  else if score >= 80.0 { LetterGrade::B_MINUS }
+  else if score >= 77.0 { LetterGrade::C_PLUS  }
+  else if score >= 73.0 { LetterGrade::C       }
+  else if score >= 70.0 { LetterGrade::C_MINUS }
+  else if score >= 60.0 { LetterGrade::D       }
+  else                  { LetterGrade::F       }
+
+def makeGrade(c: Course, score: Double): Grade =
+  new Grade(c, score, scoreToLetter(score))
+
+record Student(id: Int, name: String, major: String) {
+public:
+  def header(): String = "#{name} (#{major}, ID #{id})"
+}
+
+record Transcript(student: Student, grades: List[Grade]) {
+public:
+  def creditAttempted(): Int =
+    grades.fold(0) { acc, g -> acc + g.course.credits }
+  def creditEarned(): Int =
+    grades.filter { g -> g.passed() }
+          .fold(0) { acc, g -> acc + g.course.credits }
+  def totalQualityPoints(): Double =
+    grades.fold(0.0) { acc, g -> acc + g.qualityPoints() }
+  def gpa(): Double =
+    if creditAttempted() == 0 { 0.0 }
+    else { totalQualityPoints() / creditAttempted() }
+  def standing(): String =
+    if gpa() >= 3.7      { "Dean's List"         }
+    else if gpa() >= 3.0 { "Good Standing"        }
+    else if gpa() >= 2.0 { "Satisfactory"         }
+    else                 { "Academic Probation"   }
+  def highestGrade(): Grade? =
+    grades.fold(null) { best, g ->
+      if best == null { g }
+      else if g.gradePoints() > (best as Grade).gradePoints() { g }
+      else { best }
+    } as Grade?
+  def lowestGrade(): Grade? =
+    grades.fold(null) { worst, g ->
+      if worst == null { g }
+      else if g.gradePoints() < (worst as Grade).gradePoints() { g }
+      else { worst }
+    } as Grade?
+}
+
+def rep(ch: String, n: Int): String {
+  var s: String = ""
+  var i: Int = 0
+  while i < n { s = s + ch; i++ }
+  return s
+}
+
+def padR(s: String, w: Int): String {
+  var out: String = s
+  while out.length() < w { out = out + " " }
+  return out
+}
+
+def printTranscript(t: Transcript): void {
+  IO::println(rep("=", 62))
+  IO::println("TRANSCRIPT: #{t.student.header()}")
+  IO::println(rep("-", 62))
+  foreach g: Grade in t.grades {
+    val pts: String = String::format("%.1f", g.gradePoints())
+    IO::println("  #{padR(g.course.code, 6)} #{padR(g.course.title, 28)} #{String::format("%5.1f", g.score)}  #{padR(g.letterStr(), 3)}  #{pts}qp x #{g.course.credits}cr")
+  }
+  IO::println(rep("-", 62))
+  IO::println("  Credits Attempted : #{t.creditAttempted()}    Earned: #{t.creditEarned()}")
+  IO::println("  Total QualityPts  : #{String::format("%.2f", t.totalQualityPoints())}")
+  IO::println("  Cumulative GPA    : #{String::format("%.3f", t.gpa())}  [#{t.standing()}]")
+  val best:  Grade? = t.highestGrade()
+  val worst: Grade? = t.lowestGrade()
+  if best != null {
+    IO::println("  Best course       : #{(best as Grade).course.title} (#{(best as Grade).letterStr()})")
+  }
+  if worst != null {
+    IO::println("  Weakest course    : #{(worst as Grade).course.title} (#{(worst as Grade).letterStr()})")
+  }
+  IO::println(rep("=", 62))
+}
+
+// ---- course catalogue ----
+val cs101: Course = new Course("CS101", "Intro to Programming",   3, Semester::FALL)
+val cs201: Course = new Course("CS201", "Data Structures",        4, Semester::FALL)
+val cs301: Course = new Course("CS301", "Algorithms",             4, Semester::SPRING)
+val ma101: Course = new Course("MA101", "Calculus I",             4, Semester::FALL)
+val ma201: Course = new Course("MA201", "Calculus II",            4, Semester::SPRING)
+val en101: Course = new Course("EN101", "English Composition",    3, Semester::FALL)
+val ph101: Course = new Course("PH101", "Physics I",              4, Semester::SPRING)
+val cs401: Course = new Course("CS401", "Operating Systems",      3, Semester::SPRING)
+
+// ---- students ----
+val alice: Student = new Student(1001, "Alice Chen",   "Computer Science")
+val bob:   Student = new Student(1002, "Bob Martinez", "Computer Science")
+val carol: Student = new Student(1003, "Carol Smith",  "Mathematics")
+
+val aliceGrades: List[Grade] = [
+  makeGrade(cs101, 98.5),
+  makeGrade(cs201, 94.2),
+  makeGrade(cs301, 91.8),
+  makeGrade(ma101, 95.0),
+  makeGrade(ma201, 89.3),
+  makeGrade(en101, 87.5),
+  makeGrade(ph101, 82.4),
+  makeGrade(cs401, 96.1)
+]
+
+val bobGrades: List[Grade] = [
+  makeGrade(cs101, 78.9),
+  makeGrade(cs201, 72.4),
+  makeGrade(cs301, 68.5),
+  makeGrade(ma101, 75.1),
+  makeGrade(ma201, 62.0),
+  makeGrade(en101, 83.7),
+  makeGrade(ph101, 70.2),
+  makeGrade(cs401, 77.8)
+]
+
+val carolGrades: List[Grade] = [
+  makeGrade(ma101, 99.1),
+  makeGrade(ma201, 97.8),
+  makeGrade(en101, 91.4),
+  makeGrade(ph101, 88.6),
+  makeGrade(cs101, 85.3)
+]
+
+val aliceTranscript: Transcript = new Transcript(alice, aliceGrades)
+val bobTranscript:   Transcript = new Transcript(bob,   bobGrades)
+val carolTranscript: Transcript = new Transcript(carol, carolGrades)
+
+printTranscript(aliceTranscript)
+IO::println("")
+printTranscript(bobTranscript)
+IO::println("")
+printTranscript(carolTranscript)
+
+// ---- class summary ----
+IO::println("")
+IO::println("CLASS SUMMARY")
+IO::println(rep("=", 62))
+
+val transcripts: List[Transcript] = [aliceTranscript, bobTranscript, carolTranscript]
+
+val sumGpa: Double = transcripts.fold(0.0) { acc, t -> acc + t.gpa() }
+val avgGpa: Double = sumGpa / transcripts.size
+IO::println("  Class average GPA : #{String::format("%.3f", avgGpa)}")
+
+val deansList: List[Transcript] = transcripts.filter { t -> t.gpa() >= 3.7 }
+IO::println("  Dean's List (GPA >= 3.7):")
+foreach t: Transcript in deansList {
+  IO::println("    #{t.student.name}: #{String::format("%.3f", t.gpa())}")
+}
+
+val topTranscript: Transcript? = transcripts.fold(null) { best, t ->
+  if best == null { t }
+  else if t.gpa() > (best as Transcript).gpa() { t }
+  else { best }
+} as Transcript?
+
+if topTranscript != null {
+  val top: Transcript = topTranscript as Transcript
+  IO::println("  Top student       : #{top.student.name} (GPA #{String::format("%.3f", top.gpa())})")
+}
+
+// ---- course performance across all students ----
+IO::println("")
+IO::println("COURSE PERFORMANCE")
+IO::println(rep("-", 62))
+
+val allCourses: List[Course] = [cs101, cs201, cs301, ma101, ma201, en101, ph101, cs401]
+val allGrades: List[Object] = []
+allGrades.addAll(aliceGrades)
+allGrades.addAll(bobGrades)
+allGrades.addAll(carolGrades)
+
+foreach c: Course in allCourses {
+  val courseGrades: List[Object] = allGrades.filter { g -> (g as Grade).course.code == c.code }
+  if courseGrades.size > 0 {
+    val total: Double = courseGrades.fold(0.0) { acc, g -> acc + (g as Grade).score }
+    val avg: Double = total / courseGrades.size
+    val passing: Int = courseGrades.filter { g -> (g as Grade).passed() }.size
+    val gpsum: Double = courseGrades.fold(0.0) { acc, g -> acc + (g as Grade).gradePoints() }
+    val gpavg: Double = gpsum / courseGrades.size
+    IO::println("  #{padR(c.code, 6)} avg #{String::format("%5.1f", avg)}  gp #{String::format("%.2f", gpavg)}  #{passing}/#{courseGrades.size} pass")
+  }
+}
+
+IO::println(rep("=", 62))
+IO::println("")
+IO::println("Report generated for #{transcripts.size} students across #{allCourses.size} courses.")

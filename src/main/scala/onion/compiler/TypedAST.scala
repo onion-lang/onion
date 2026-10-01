@@ -1343,6 +1343,15 @@ object TypedAST {
     def findConstructor(params: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef]
 
     def typeParameters: Array[TypedAST.TypeParameter] = Array()
+
+    /** Binary names (`onion.Result$Ok`) of the classes a Java `sealed` class or interface
+      * `permits` -- its PermittedSubclasses attribute. Empty for a class that is not a
+      * sealed Java class; an Onion `sealed` hierarchy is ClassDefinition.sealedSubtypes. */
+    def javaPermittedSubclassNames: Seq[String] = Nil
+
+    /** Binary names of the member classes this (Java) class declares, e.g. `onion.Result$Ok`
+      * for `onion.Result`. Only used to suggest a spelling for an unknown nested name. */
+    def memberClassNames: Seq[String] = Nil
   }
 
   class ConstructorFinder {

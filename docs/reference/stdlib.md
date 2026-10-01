@@ -1035,6 +1035,7 @@ Provided via `onion.Result`.
 - `res.fold(e -> ifErr, v -> ifOk)` — collapse to a single value
 - `res.recover(e -> value)` / `res.recoverWith(e -> otherResult)` — rescue an `Err`
 - `res.exists(predicate)` / `res.toList()`
+- Match by case: `case o is Result.Ok` / `case e is Result.Err`, then `o.value()` / `e.error()` at the scrutinee's type arguments; a `select` with both cases is exhaustive (see [Matching Nested Java Types](../guide/control-flow.md#matching-nested-java-types)). `Option.Some`/`Option.None` and `Outcome.Ok`/`Outcome.Bad` match the same way.
 
 ## Future Module
 
@@ -2162,6 +2163,17 @@ if r.isOk() {
     case "connect": IO::println("could not reach #{f.url()}: #{f.message()}")
     else:           IO::println("connection broke: #{f.message()}")
   }
+}
+```
+
+The two outcomes can also be matched by case. The bindings are typed from the `Result`'s type
+arguments, so `ok.value()` is an `Http.Response` and `no.error()` an `Http.HttpFailure`, and the
+`select` needs no `else`:
+
+```
+select Http::request("GET", url).send() {
+  case ok is Result.Ok:  IO::println("HTTP #{ok.value().status}")
+  case no is Result.Err: IO::println("no response (#{no.error().kind()})")
 }
 ```
 

@@ -33,7 +33,7 @@ final class TypingTypeSupport(private val typing: Typing) {
   def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver, banRaw: Boolean): Option[Type] = {
     val mappedType = mapper.resolveNode(typeNode)
     if (mappedType == null) {
-      typing.report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames)
+      typing.report(CLASS_NOT_FOUND, typeNode, typeNode.desc.toString, mapper.getCandidateClassNames(typeNode.desc))
       None
     } else {
       validateTypeApplication(typeNode, mappedType)

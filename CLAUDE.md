@@ -455,6 +455,7 @@ These are frequently confused with other languages. **Always check these:**
 | `elif condition { }` (Python) | `else if condition { }` - no `elif` keyword, chain with `else if` |
 | `switch value { case 1: }` | `select value { case 1: }` - use `select` not `switch` |
 | `case s: String:` (Java/Scala pattern) | `case s is String:` - type patterns use `is`; sealed exhaustiveness (E0042) applies |
+| `case o is Result.Ok:` (nested Java type) unsupported? | ✓ correct - a type pattern names a nested Java class with dots (`Result.Ok`, `onion.Outcome.Bad`, `Map.Entry`, deeper `a.B.C.D`); the binding recovers the scrutinee's type arguments, and a Java `sealed ... permits` scrutinee gets E0042 exhaustiveness too. Java records are matched by type only: `case Ok(v)` destructuring is for Onion records |
 | `case Add(l, n is Num):` nested type pattern? | ✓ correct - type patterns nest inside destructuring, and the binding is usable at the narrowed type; also works for a non-record component (`case Wrap(s is String)`) |
 | `case Circle(r):` unsupported? | ✓ correct - record destructuring patterns work, also `case x when guard:` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
@@ -487,6 +488,7 @@ These are frequently confused with other languages. **Always check these:**
 |--------------------------|-----------------|
 | `import java.util.*;` | `import { java.util.* }` - braces required |
 | `import { Foo = pkg.Class; }` | `import { pkg.Class as Foo; }` - `as` for alias |
+| `import { onion.Result$Ok }` | `import { onion.Result.Ok }` (or `... as ROk`) - a nested class is imported with dots, never the JVM `$` name; `a.b.C` resolves Java's way: the longest prefix that is a top-level class, then member classes |
 | `new int[10]` | `new Int[10]` - capitalized primitive names |
 | `int`, `long`, `boolean` | `Int`, `Long`, `Boolean` - capitalized |
 
@@ -538,6 +540,7 @@ These are frequently confused with other languages. **Always check these:**
 | `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ correct - data-carrying enums; `mass()` accessor, `values()`/`valueOf()` work |
 | ADT / sum-of-products enum? | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case`-keyword cases each carry their own fields; desugars to a sealed interface + one record per case, so `select` exhaustiveness (E0042) applies. Singleton case = zero-field record via `new Origin()`. A `case`-enum is a sealed hierarchy, not a `java.lang.Enum` (no `values()`/`ordinal()`); mixing shared params with `case` cases is an error |
 | generic ADT enum? | `enum Opt[T] { case Some(value: T); case Nothing }` - type parameters flow onto the generated sealed interface and each case record. A type pattern recovers the scrutinee's type argument, so matching `Some` out of an `Opt[String]` binds `Some[String]` and `s.value()` is a `String`. A *homogeneous* enum cannot take type parameters (it becomes a `java.lang.Enum`) |
+| match `onion.Result`/`Option`/`Outcome` by case? | `select r { case o is Result.Ok: o.value(); case e is Result.Err: e.error() }` (likewise `Option.Some`/`Option.None`, `Outcome.Ok`/`Outcome.Bad`) - Java records nested in sealed Java interfaces: matched by type (no `Result.Ok(v)` destructuring), bound at the scrutinee's type arguments, exhaustive with every case |
 | derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `conforms` |
 | need every parse failure, not just `null`, or more than one named boundary per record? | `record R(...) { shape name = re"..." }` - synthesizes `R::name(): onion.Shape[R]`; `.parse(s)` returns an `Outcome[R]` (a value, or every reason there is not one, via `Defect`) and `.print(v)` renders back when invertible. A record may carry several `shape` clauses (also `shape name = json`/`config` for a non-regex format); coexists with `from re"..."` |
 | a list or nested object in a `shape doc = json` record? / a JSON Schema for LLM structured output? | `record S(tags: List[String], owner: Action, acts: List[Action], note: String?) { shape doc = json }` - a json shape (only json; regex/yaml/config stay scalar, else E0061 naming the clause) also reads `List[S]` of a scalar, a record `R` that declares its own json shape (read through its first one), `List[R]`, and `T?` (key absent or null); defects carry paths like `acts[2].owner`. `S::doc().jsonSchema()` returns the JSON Schema text (closed objects, `required` = non-nullable components); `hasJsonSchema()` is true only for json shapes |

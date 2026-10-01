@@ -1013,6 +1013,7 @@ val timeNanos: Long = Timing::time { expensiveOperation() }
 - `res.fold(e -> ifErr, v -> ifOk)` — 単一の値へ畳み込む
 - `res.recover(e -> value)` / `res.recoverWith(e -> otherResult)` — `Err` を回復
 - `res.exists(predicate)` / `res.toList()`
+- ケースでマッチ: `case o is Result.Ok` / `case e is Result.Err` とし、`o.value()` / `e.error()` は検査対象の型引数の型になる。両方のケースがそろった `select` は網羅的（[Java のネストした型にマッチする](../guide/control-flow.md#java-のネストした型にマッチする)を参照）。`Option.Some`/`Option.None`、`Outcome.Ok`/`Outcome.Bad` も同様にマッチできる。
 
 ## Future モジュール
 
@@ -2327,6 +2328,17 @@ if r.isOk() {
     case "connect": IO::println("could not reach #{f.url()}: #{f.message()}")
     else:           IO::println("connection broke: #{f.message()}")
   }
+}
+```
+
+二つの結果はケースでマッチすることもできる。束縛は `Result` の型引数から型が決まるので、
+`ok.value()` は `Http.Response`、`no.error()` は `Http.HttpFailure` になり、`select` に `else` は
+要らない:
+
+```
+select Http::request("GET", url).send() {
+  case ok is Result.Ok:  IO::println("HTTP #{ok.value().status}")
+  case no is Result.Err: IO::println("no response (#{no.error().kind()})")
 }
 ```
 

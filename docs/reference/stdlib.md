@@ -1893,10 +1893,11 @@ would be the same JVM signature.
 ## Format Module
 
 Locale-independent human-readable formatting (`onion.Format`) — commas, decimals,
-sizes and durations.
+sizes and durations. For a thousands separator (digit grouping) on a whole number, use
+`Format::integer`; `Format::number` groups a `Double` and rounds it to fixed decimals.
 
 ```onion
-Format::integer(1234567)          // "1,234,567"
+Format::integer(1234567)          // "1,234,567"  (thousands separator / digit grouping)
 Format::number(1234.5678, 2)      // "1,234.57"
 Format::fixed(3.14159, 2)         // "3.14"
 Format::percent(0.756, 1)         // "75.6%"

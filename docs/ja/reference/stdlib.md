@@ -1746,9 +1746,11 @@ Stats::min(xs)       // 10.0 （Double。空リストでも例外ではなく 0.
 ## Format モジュール
 
 locale 非依存の人間可読フォーマット（`onion.Format`）——桁区切り・小数・サイズ・時間。
+整数の桁区切り（3 桁ごとのカンマ、thousands separator / digit grouping）は `Format::integer`、
+`Double` の桁区切りと小数桁の丸めは `Format::number` を使います。
 
 ```onion
-Format::integer(1234567)          // "1,234,567"
+Format::integer(1234567)          // "1,234,567"（桁区切り / thousands separator）
 Format::number(1234.5678, 2)      // "1,234.57"
 Format::fixed(3.14159, 2)         // "3.14"
 Format::percent(0.756, 1)         // "75.6%"

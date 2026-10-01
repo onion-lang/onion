@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The auto-CLI flag-collision error (two flag parameters of a `def main` or a `tool` answering to the same kebab-case flag, e.g. `parseURL` and `parseUrl` both `--parse-url`) had no error code**, so it could not be looked up in `error-codes.md` or asserted on locale-independently. It is now **`E0093` `CLI_FLAG_SPELLING_COLLISION`**. Covered by `KebabCaseFlagSpec`; `error-codes.md` (en/ja) and `specification.md`/`guide/tools.md` (en/ja) updated (merged via #1844).
+
 ### Added
 
 - **`run/MusicComposer.on`** — a 451-line music composition engine, a new domain for the `run/` corpus (homogeneous enums with methods `Pitch`/`Duration`/`ChordQuality`/`ScaleMode`, including `static def Pitch::fromSemitone(n)`; records with methods `Note`/`Chord`/`Scale`/`Measure`/`Melody`; `select` matching on enum values (`case Pitch::C:`) and on `Int`; collection pipelines `map`/`filter`/`fold`/`find`; `foreach (k, v) in LMap` for a note histogram and duration stats; `|>` pipeline with a named-function right-hand side; nullable `Note?`/`Scale?`/`Int?` fold accumulators; multi-param trailing-lambda closures; string interpolation — rendering diatonic chord tables for C Ionian and D Aeolian, chord MIDI-number analysis, a 14-note "Ode to Joy" melody with note histogram and best-fit-scale analysis across 6 candidates, perfect-fifth transposition, and per-measure beat-completeness checks), added to the `run/` corpus (merged via #1823).

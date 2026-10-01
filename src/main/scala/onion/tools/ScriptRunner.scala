@@ -73,7 +73,9 @@ object ScriptRunner {
       // happens here (the program must run in the user's own process). When the daemon
       // cannot be reached, everything happens here as before.
       val viaDaemon =
-        if (onion.tools.daemon.DaemonClient.enabledByEnvironment) onion.tools.daemon.DaemonClient.compileScript(runnerArgs) else None
+        if (!onion.tools.daemon.DaemonClient.enabledByEnvironment) None
+        else if (!prefetchDependencies(runnerArgs)) Some(Left(-1))
+        else onion.tools.daemon.DaemonClient.compileScript(runnerArgs)
       viaDaemon match {
         case Some(Left(exitCode)) => exitCode
         case Some(Right(prepared)) => new ScriptRunner().execute(prepared)
@@ -87,6 +89,31 @@ object ScriptRunner {
         val script = args.lift(scriptIndex(args)).getOrElse("<script>")
         System.err.print(RuntimeErrorReporter.render(cause, script))
         1
+    }
+  }
+
+  /**
+   * Before a daemon compile: resolves the script's `//> using` directives here, so download
+   * progress reaches this terminal as it happens (the daemon's output is captured and only
+   * relayed once it answers) and the daemon then finds the classpath cache warm. The daemon
+   * still resolves for itself, from that cache, so its class path is the same either way. A
+   * directive error is printed here and ends the run; false then.
+   */
+  private def prefetchDependencies(args: Array[String]): Boolean = {
+    val si = scriptIndex(args)
+    if (si >= args.length) true
+    else {
+      val prefix = args.take(si)
+      val encoding = prefix.indexOf(ENCODING) match {
+        case i if i >= 0 && i + 1 < prefix.length => prefix(i + 1)
+        case _ => DEFAULT_ENCODING
+      }
+      ScriptDependencies.classpathFor(args(si), encoding, System.err) match {
+        case Left(message) =>
+          System.err.println(message)
+          false
+        case Right(_) => true
+      }
     }
   }
 
@@ -186,7 +213,18 @@ class ScriptRunner {
         }
         createConfig(success, verbose) match {
           case None => Left(-1)
-          case Some(config) =>
+          case Some(baseConfig) =>
+            // `//> using dep` directives: their jars join the class path for compiling and,
+            // through Prepared.classPath, for running (in this process or via the daemon).
+            val dependencyJars = ScriptDependencies.classpathFor(params.head, baseConfig.encoding, System.err) match {
+              case Left(message) =>
+                System.err.println(message)
+                return Left(-1)
+              case Right(jars) => jars
+            }
+            val config =
+              if (dependencyJars.isEmpty) baseConfig
+              else baseConfig.copy(classPath = baseConfig.classPath ++ dependencyJars)
             val scriptArgs = passThroughArgs
             val result = compile(config, Array(params.head))
             if (config.dumpAst) emitAstDump(result)
@@ -248,6 +286,11 @@ class ScriptRunner {
          |  --watch                     Re-run the script whenever its file changes
          |  -h, --help                  Show this help message
          |  -v, --version               Show version information
+         |
+         |Dependencies:
+         |  A script can declare Maven dependencies in its leading comment block:
+         |    //> using dep "group:artifact:version"
+         |    //> using repository "https://repo.example.com/maven"
          |
          |Examples:
          |  onion Hello.on

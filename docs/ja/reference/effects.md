@@ -53,7 +53,9 @@ onion.Cli#parse=console,exec
 `Archive`、`Db`、`Net`、`Server`、`Future`、`Concurrent`、`ToolCli` — の
 分類に加えて、純粋な残りの stdlib（`Proc` の結果、`Http` のレスポンス、`Json::value` のように
 入口の関数が返す入れ子の値も含む）、よく使う JDK の値型・コレクション型と `java.time`
-（`now` だけは `clock`）の純粋ベースライン、JDK の既知の効果点（`System::getenv`、`System::exit`、`Runtime::exec`、`Thread::sleep`、
+（`now` だけは `clock`）の純粋ベースライン、JDK のファイル I/O（`java.io` のファイルストリームと
+`File`、`java.nio.file.Files`。`BufferedReader` などのラッパーは `System.in` やソケットを包むこともあるため
+`unknown` のまま）、JDK の既知の効果点（`System::getenv`、`System::exit`、`Runtime::exec`、`Thread::sleep`、
 `System::out` の型としての `PrintStream`）が入っています。
 
 粒度は型単位であり、インスタンス単位ではありません。ファイルの上の `PrintStream` は本来
@@ -88,3 +90,10 @@ stdlib を分類したものであり、`onion.Files` という名前のユー�
 合わせることはしません。そして効果集合はセキュリティサンドボックスではありません。何も
 プログラムの実行を止めません。集合は「実行して*よいか*」を決める上位の層への、正直な入力
 です。
+
+同じ走査は `--plan` のために、ソースから読み取れるオペランド —— リテラル URL のホスト、
+`Proc` のコマンド名、`System::getenv` の変数名、リテラルのパス —— も記録します
+（[ソースに書かれたオペランド](../guide/tools.md#ソースに書かれたオペランド) を参照）。
+これは効果集合とは逆向きの下界です。並んだオペランドはどれもプログラムが実際に到達しうる
+ものですが、リテラルでないオペランドは推測されず `(operand not statically known)` と
+報告されます。

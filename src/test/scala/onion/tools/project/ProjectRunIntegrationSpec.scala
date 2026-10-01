@@ -70,8 +70,75 @@ class ProjectRunIntegrationSpec extends AnyFunSuite with Matchers:
     invoke(project.root) shouldBe Invocation(
       1,
       "",
-      "error: Project has no entrypoint; add executable top-level code to src/main.on or define a top-level main function\n"
+      "error: Project has no entrypoint; add executable top-level code to src/main.on, define a top-level main function, or declare a top-level tool\n"
     )
+
+  test("a tool-only src/main.on runs through the synthesized tool CLI"):
+    val key = propertyKey("tool")
+    val project = fixture(
+      Map(
+        "src/main.on" ->
+          s"""tool store(value: String): Int requires { env } {
+             |  System::setProperty("$key", value)
+             |  return 0
+             |}
+             |""".stripMargin
+      )
+    )
+
+    try
+      invoke(project.root, args = Array("ran")) shouldBe Invocation(0, "", "")
+      System.getProperty(key) shouldBe "ran"
+    finally System.clearProperty(key)
+
+  test("onion run -- --help and -- --plan reach the tool CLI, named after the package"):
+    val programNameBefore = System.getProperty("onion.cli.script")
+    val project = fixture(
+      Map(
+        "src/main.on" ->
+          """tool save(dst: String): Int requires { write(dst) } {
+            |  Files::writeText(dst, "saved")
+            |  return 0
+            |}
+            |""".stripMargin
+      )
+    )
+    val target = project.root.resolve("out.txt")
+
+    val (helpCode, help) = captureSystemOut(OnionCli.run(
+      Array("run", "--", "--help"), project.root, System.out, System.err))
+    helpCode shouldBe 0
+    help should include("usage: demo <dst>")
+    help should include("--plan")
+
+    val (planCode, plan) = captureSystemOut(OnionCli.run(
+      Array("run", "--", target.toString, "--plan"), project.root, System.out, System.err))
+    planCode shouldBe 0
+    plan should include("plan: `save` would")
+    plan should include(s"derived from dst = $target")
+    // --plan executes nothing.
+    Files.exists(target) shouldBe false
+    // The program name is restored once the run is over.
+    System.getProperty("onion.cli.script") shouldBe programNameBefore
+
+    val (runCode, _) = captureSystemOut(OnionCli.run(
+      Array("run", "--", target.toString), project.root, System.out, System.err))
+    runCode shouldBe 0
+    Files.readString(target, UTF_8) shouldBe "saved"
+
+  test("a tool source beside an explicit main is still ambiguous"):
+    val project = fixture(
+      Map(
+        "src/cli.on" -> "tool ping(): Int { return 0 }\n",
+        "src/main.on" -> "def main(): void {}\n"
+      )
+    )
+
+    val result = invoke(project.root)
+    result.exitCode shouldBe 1
+    result.stderr should startWith("error: Project has multiple entrypoints:")
+    result.stderr should include("src/cli.on:1:1 (cliMain)")
+    result.stderr should include("src/main.on:1:1 (mainMain)")
 
   test("lists ambiguous entrypoints by normalized source path and location"):
     val project = fixture(
@@ -261,6 +328,18 @@ class ProjectRunIntegrationSpec extends AnyFunSuite with Matchers:
         out.close()
         err.close()
     Invocation(exitCode, stdout.toString(UTF_8), stderr.toString(UTF_8))
+
+  /** The tool CLI prints through `System.out`, not through the command's `out` stream. */
+  private def captureSystemOut(body: => Int): (Int, String) =
+    val buffer = ByteArrayOutputStream()
+    val stream = PrintStream(buffer, true, UTF_8)
+    val saved = System.out
+    val code =
+      try
+        System.setOut(stream)
+        Console.withOut(stream)(body)
+      finally System.setOut(saved)
+    (code, buffer.toString(UTF_8))
 
   private def propertyKey(label: String): String =
     s"onion.project.run.$label.${java.util.UUID.randomUUID()}"

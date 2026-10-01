@@ -318,15 +318,28 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           report(SemanticError.RECORD_DERIVE_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
             ScalarConversions.supportedNames)
         }
-        // A shape reads its components out of captured text, so it needs the same
-        // component types `from` does.
-        val unsupportedShape =
-          if (hasShapes) node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
-          else Nil
+        // A shape reads its components out of captured text or a document, so every
+        // format reads the scalars `from` does. A json shape also reads lists, nested
+        // records with a json shape of their own, and absent keys (JsonShapeComponents) --
+        // but only when every shape clause of the record is json, since the others share
+        // the same components and cannot read them.
+        val unsupportedShape: List[(AST.Argument, Type, AST.ShapeClause)] =
+          if (hasShapes) node.args.zip(argTypes).flatMap { case (arg, argType) =>
+            if (isFromDerivableType(argType)) None
+            else {
+              val resolved = JsonShapeComponents.tagOfType(argType, isJsonRecord)
+              // The runtime reads what Rewriting classified from the written type; accept
+              // the component only when that agrees with the resolved type.
+              val jsonReadable = resolved.isDefined && resolved == JsonShapeComponents.tagOfAst(arg.typeRef)
+              node.shapes.find(sc => !(jsonReadable && isJsonClause(sc))).map(sc => (arg, argType, sc))
+            }
+          } else Nil
         // Name the clause the user wrote, not `from`: a `shape doc = json` record has no `from`.
-        if (hasShapes && unsupportedFrom.isEmpty) unsupportedShape.foreach { case (arg, argType) =>
+        if (hasShapes && unsupportedFrom.isEmpty) unsupportedShape.foreach { case (arg, argType, sc) =>
+          val supported =
+            if (isJsonClause(sc)) JsonShapeComponents.supportedDescription else ScalarConversions.supportedNames
           report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
-            ScalarConversions.supportedNames, shapeClauseSyntax(node.shapes.head))
+            supported, shapeClauseSyntax(sc))
         }
         // The `from` synthesis inherits E0059/E0060 by lowering to a regex select pattern;
         // a shape lowers to a Shapes.regex call, so the same two checks are made here.
@@ -350,6 +363,26 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   private def shapeClauseSyntax(sc: AST.ShapeClause): String = sc.source match
     case AST.FormatSource(format) => s"shape ${sc.name} = $format"
     case AST.RegexSource(_)       => s"""shape ${sc.name} = re"...""""
+
+  private def isJsonClause(sc: AST.ShapeClause): Boolean = sc.source match
+    case AST.FormatSource(format) => JsonShapeComponents.isJsonFormat(format)
+    case AST.RegexSource(_)       => false
+
+  /**
+   * Whether a class is a record a json shape can nest: one that declares a json shape of
+   * its own (and so gets the hidden `onion$$jsonShape()`), without type parameters. A
+   * record compiled in this run is judged by its declaration, since its members may not be
+   * registered yet; a class from the classpath by the hidden method itself.
+   */
+  private def isJsonRecord(ct: ClassType): Boolean = ct match
+    case cd: ClassDefinition =>
+      typing.lookupAST(cd) match
+        case Some(rd: AST.RecordDeclaration) =>
+          rd.typeParameters.isEmpty && rd.args.nonEmpty && JsonShapeComponents.firstJsonClause(rd).isDefined
+        case _ => false
+    case other =>
+      other.methods(JsonShapeComponents.HiddenShapeMethod)
+        .exists(m => Modifier.isStatic(m.modifier) && m.arguments.isEmpty)
 
   /** Component types a `from re"..."` clause can produce from a captured String. */
   private def isFromDerivableType(tp: Type): Boolean = ScalarConversions.isDerivable(tp)

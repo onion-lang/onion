@@ -201,8 +201,10 @@ class SemanticErrorReporter(threshold: Int) {
    * second group, as they were before. Private members of a class compiled elsewhere are
    * left out: the program cannot call them.
    *
-   * The result is a single tier: the first tier with a name close enough to suggest. An
-   * empty result means no suggestion, which beats one that cannot be called this way.
+   * The result is a single tier: the first tier with a name close enough to suggest. When
+   * neither of those tiers has one, the methods that take no overload of that many
+   * arguments form a last tier: `Strings::trimm(s, 1)` is a misspelled `trim` called with
+   * one argument too many, and naming `trim` beats saying nothing. Library privates stay out of every tier.
    */
   private def rankedCallCandidates(obj: TypedAST.ObjectType, name: String, argTypes: Array[TypedAST.Type]): Seq[String] = {
     val argc = argTypes.length
@@ -218,8 +220,10 @@ class SemanticErrorReporter(threshold: Int) {
       case (n, ms) if !applicable.contains(n) && ms.exists(m => acceptsArity(m, argc)) => n
     }.toSeq
     val fields = obj.fields.toSeq.filter(visible).map(_.name).filterNot(byName.contains)
+    // Arity misfits come last: only a fallback when nothing that fits is close by name.
+    val arityMisfits = byName.keys.filterNot(n => applicable.contains(n) || countOnly.contains(n)).toSeq
     // findSimilar applies the distance cut-off; the first tier with a close name wins.
-    val tiers = Seq(applicable.sorted, (countOnly ++ fields).distinct.sorted)
+    val tiers = Seq(applicable.sorted, (countOnly ++ fields).distinct.sorted, arityMisfits.sorted)
     tiers.find(tier => toolbox.Suggestions.findSimilar(name, tier).isDefined).getOrElse(Seq.empty)
   }
 

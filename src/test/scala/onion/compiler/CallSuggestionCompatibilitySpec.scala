@@ -9,7 +9,9 @@ import java.io.StringReader
  * answered with `group`, a private `group(String, Boolean)` helper that no program can
  * call and that could not take a `Long` anyway. Candidates are now limited to members the
  * program can call with that many arguments, and ones whose parameters also take the
- * argument types are tried first.
+ * argument types are tried first. Only when no candidate that fits is close by name does a
+ * member taking a different number of arguments get suggested, so a typo with the wrong
+ * argument count (`Strings::trimm(s, 1)`) is not left without a suggestion.
  *
  * The suggested name is spliced into the localized text verbatim, so substring checks on
  * identifiers hold in both locales.
@@ -46,7 +48,23 @@ class CallSuggestionCompatibilitySpec extends AnyFunSpec {
     assert(!msg.contains("sizeOff"), msg)
   }
 
-  it("drops a candidate no overload of which takes that many arguments") {
+  it("passes over a closer-named candidate no overload of which takes that many arguments") {
+    // `total` is one edit from `totl` but takes two arguments; `totals` takes the call.
+    val msg = e0005(
+      """class K {
+        |public:
+        |  static def total(a: Int, b: Int): Int { return a + b }
+        |  static def totals(a: Int): Int { return a }
+        |}
+        |println(K::totl(1))
+        |""".stripMargin)
+    assert(msg.contains("totals"), msg)
+    assert(!msg.replace("totals", "").contains("total"), msg)
+  }
+
+  it("falls back to the closest name when no candidate takes that many arguments") {
+    // A typo with the wrong argument count: no candidate fits, so the nearest name is
+    // still better than no suggestion at all.
     val msg = e0005(
       """class K {
         |public:
@@ -54,7 +72,20 @@ class CallSuggestionCompatibilitySpec extends AnyFunSpec {
         |}
         |println(K::totl(1))
         |""".stripMargin)
-    assert(!msg.contains("total"), msg)
+    assert(msg.contains("total"), msg)
+  }
+
+  it("falls back for a library method too: Strings::trimm(s, 1) names trim(String)") {
+    val msg = e0005("val s = \" x \"\nprintln(Strings::trimm(s, 1))\n")
+    // The base message names `trimm`; the suggestion is the only other mention of `trim`.
+    assert(msg.replace("trimm", "").contains("trim"), msg)
+  }
+
+  it("keeps a library class's private members out of the fallback") {
+    // Format.group(String, boolean) is private; grouped(1, 2, 3) fits no Format method,
+    // so only the fallback tier could reach it, and it must still not.
+    val msg = e0005("println(Format::grouped(1, 2, 3))\n")
+    assert(!msg.replace("grouped", "").contains("group"), msg)
   }
 
   it("still suggests a plain typo whose arguments fit") {

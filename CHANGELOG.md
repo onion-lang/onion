@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/ITAssetManager.on`** — a 350-line IT hardware asset tracker, a new domain for the `run/` corpus (a data-carrying ADT enum `HardwareCategory` with 8 cases, each carrying `warrantyMonths: Int`, dispatched via `case x is Type:`; a homogeneous enum `AssetStatus` (`InStock`/`Deployed`/`UnderMaintenance`/`Retired`/`Disposed`) with `label()`/`isActive()` methods; records with methods `Asset`/`Employee`/`MaintenanceRecord`; a class `AssetManager` holding `List[Asset]` and `HMap[String, List[MaintenanceRecord]]` fields; collection pipelines `filter`/`fold`/`groupBy`/`sortedBy`/`map`; nullable `Employee?` and `List[MaintenanceRecord]?` handling with `!!`/`?:`/`!= null` guards; `foreach` over ranges and `(k, v)` map destructuring; string interpolation throughout — generating 7 reports (inventory summary, by-category, by-department, warranty status, maintenance log, top-5 value, assets needing attention) over 20 sample assets and 5 maintenance records), added to the `run/` corpus (merged via #1824).
+
 ## [0.133.0] - 2026-10-01
 
 ### Fixed

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/ChemLab.on`** — a 341-line periodic table explorer, compound analyzer, and reaction stoichiometry calculator, a new domain for the `run/` corpus (a homogeneous enum `ElemCategory` with `select`-dispatched `label()`/`isMetal()`; records with block-body methods `Compound.percentOfElement`/`Reaction.massOfProduct` using early `return`; an `extension Double` method `rounded2()`; `foreach (k, v) in map` over element-composition and groupBy results; collection pipelines `groupBy`/`filter`/`sortedBy`/`map`/`reduce`/`find`; closures throughout; nullable `Element?` lookup via `findElement`; string interpolation; a Newton's-method `while` loop approximating `sqrt` for `stddev`; `avg`/`stddev` statistics helpers — reporting metal vs. non-metal element counts and average mass, elemental composition of H2O/glucose, neutralisation and combustion reaction stoichiometry, and molar-mass distribution statistics across a 14-compound library), added to the `run/` corpus (merged via #1853).
+
 ## [0.134.0] - 2026-10-01
 
 ### Fixed

@@ -36,20 +36,28 @@ object LspProjectClasspath {
   def forDocument(file: Option[Path]): Seq[String] =
     file.flatMap(project).getOrElse(standalone)
 
-  private def project(file: Path): Option[Seq[String]] =
+  /**
+   * The root of the project (the directory holding `onion.toml`) the document belongs to,
+   * or None for a standalone file. A file with a manifest above it validates as `onion
+   * build` compiles it, from the manifest; one without is a script.
+   */
+  def projectRoot(file: Path): Option[Path] = locate(file).map(_.root)
+
+  private def locate(file: Path): Option[ProjectPaths] =
     val start = if Files.isDirectory(file) then file else file.getParent
-    if start == null then None
-    else
-      ProjectLocator.locate(start).toOption.flatMap { paths =>
-        stampOf(paths.manifest).map { stamp =>
-          val cached = cache.get(paths.root)
-          if cached != null && cached.stamp == stamp then cached.classpath
-          else
-            val computed = compute(paths)
-            cache.put(paths.root, Entry(stamp, computed))
-            computed
-        }
+    if start == null then None else ProjectLocator.locate(start).toOption
+
+  private def project(file: Path): Option[Seq[String]] =
+    locate(file).flatMap { paths =>
+      stampOf(paths.manifest).map { stamp =>
+        val cached = cache.get(paths.root)
+        if cached != null && cached.stamp == stamp then cached.classpath
+        else
+          val computed = compute(paths)
+          cache.put(paths.root, Entry(stamp, computed))
+          computed
       }
+    }
 
   private def compute(paths: ProjectPaths): Seq[String] =
     val root = paths.root

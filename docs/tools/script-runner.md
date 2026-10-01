@@ -203,7 +203,10 @@ A library that is not on Maven Central needs its repository too:
   accepts too. Scala's `group::artifact` form is not supported; name the full artifact.
 - Download progress is printed to stderr.
 - `onionc` reads the same directives from the files it compiles, through the same parser
-  and cache (see [the compiler](compiler.md)).
+  and cache (see [the compiler](compiler.md)), and `onionc --print-classpath` prints the
+  classpath they resolve to.
+- The language server reads them too: a standalone script is validated against the jars
+  its directives resolve to (see [the language server](language-server.md)).
 
 **A script has no lock file.** The directives pin each direct dependency, but transitive
 versions are whatever resolution picks at the time, so two machines can run the same script

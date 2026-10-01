@@ -1234,6 +1234,10 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(null) == runSample("run/ShiftPlanner.on"))
     }
 
+    it("runs SimulatedAnnealing.on") {
+      assert(Shell.Success(null) == runSample("run/SimulatedAnnealing.on"))
+    }
+
     it("runs SmartHome.on") {
       assert(Shell.Success(null) == runSample("run/SmartHome.on"))
     }

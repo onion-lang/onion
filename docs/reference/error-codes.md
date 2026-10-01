@@ -252,7 +252,9 @@ A top-level function is named on its own (`a function applicable for helper(Int,
 not found`), never through the file's synthetic container class. A "did you mean"
 suggestion names only a member the call could reach — not a library class's private
 member, and one that takes that many arguments — and prefers one whose parameters also
-take the argument types.
+take the argument types. When no such member is close by name, it falls back to the
+closest-named member that takes a different number of arguments (`Strings::trimm(s, 1)`
+suggests `trim`), still never a library class's private member.
 
 ### `E0006` — Ambiguous method
 

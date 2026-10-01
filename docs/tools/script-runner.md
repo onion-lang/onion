@@ -20,7 +20,7 @@ onion -classpath lib/mylib.jar MyScript.on
 
 ### `-encoding <encoding>`
 
-Specify the character encoding of source files.
+Specify the character encoding of source files. Default is UTF-8.
 
 ```bash
 onion -encoding UTF-8 MyScript.on
@@ -197,10 +197,13 @@ A library that is not on Maven Central needs its repository too:
   directive, and a `//> using` line after code is an error, not an ignored comment. A
   malformed directive names the script, line and column and stops the run before
   compiling.
-- Versions must be exact: a range (`[1.0,2.0)`), `latest.*`, `RELEASE` or `1.+` is
-  rejected, as is the same module at two versions. Scala's `group::artifact` form is not
-  supported; name the full artifact.
+- Versions must be exact: a range (`[1.0,2.0)`), `latest.*`, `LATEST`, `RELEASE` or `1.+`
+  is rejected, as is the same module at two versions. This is the rule `onion.toml`'s
+  `[dependencies]` applies, from the same code, so a coordinate a project accepts a script
+  accepts too. Scala's `group::artifact` form is not supported; name the full artifact.
 - Download progress is printed to stderr.
+- `onionc` reads the same directives from the files it compiles, through the same parser
+  and cache (see [the compiler](compiler.md)).
 
 **A script has no lock file.** The directives pin each direct dependency, but transitive
 versions are whatever resolution picks at the time, so two machines can run the same script

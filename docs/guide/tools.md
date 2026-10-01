@@ -213,7 +213,7 @@ a tool shells out to, the environment variable it reads. `--plan` prints those:
 $ onion digest.on out/digest.md gh --plan
 plan: `digest` would
   write   derived from out = out/digest.md
-  exec    gh …
+  exec    gh … list --repo onion-lang/onion --state all --search … --json number,…
   net     $SLACK_WEBHOOK_URL
   net     api.github.com
   env     SLACK_WEBHOOK_URL
@@ -229,8 +229,8 @@ and the program's own methods it calls, transitively):
 
 | Effect | Operand shown | Read from |
 |--------|---------------|-----------|
-| `net` | the host (and port) | the URL of `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse`, an `http"…"` resource, `Net::connect` |
-| `exec` | the command, up to its first non-literal argument | the command words of `Proc::capture`/`run`/`exec`, or those after the directory for `captureIn`/`runIn`/`execIn` |
+| `net` | the host (and port) | the URL of `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse`/`request` (through the builder steps to `send()`), an `http"…"` resource, `Net::connect` |
+| `exec` | the command, with `…` for each non-literal argument | the command words of `Proc::capture`/`run`/`exec`, or those after the directory for `captureIn`/`runIn`/`execIn` |
 | `env` | the variable name | `System::getenv("NAME")`, `Config::getEnv("NAME", …)` |
 | `read`/`write` | the path | the path argument of `Files` operations, a `file"…"` resource |
 
@@ -243,14 +243,14 @@ local `val` assigned once from either; or `System::getenv("NAME")`, which is sho
 Each operand gets its own line, with the effect name repeated, in the order the calls
 are found — the tool's own body first, then the methods it calls.
 
-An `exec` line shows the command with its leading run of literal arguments, so
-`Proc::capture("gh", "pr", "list", "--repo", "onion-lang/onion")` plans as
-`exec    gh pr list --repo onion-lang/onion`. The run stops at the first argument that
-is not an exact literal (a parameter, a loop variable, `"updated:>=" + since`), and
-` …` marks that more arguments follow: `digest.on` above passes the loop variable
-`kind` second, so its line is `gh …`. A command longer than 72 characters is cut and
-ends in `…`; an argument holding whitespace or a quote is shown single-quoted. The same
-command reached from two call sites is listed once.
+An `exec` line shows the whole command: literal arguments verbatim, and `…` in place
+of each argument that is not an exact literal (a parameter, a loop variable,
+`"updated:>=" + since`), several in a row collapsing into one. So
+`Proc::capture("gh", kind, "list", "--repo", "onion-lang/onion")` plans as
+`exec    gh … list --repo onion-lang/onion`, which is how `digest.on` above gets its
+line. A command longer than 72 characters is cut and ends in `…`; an argument holding
+whitespace or a quote is shown single-quoted. The same command reached from two call
+sites is listed once.
 
 The list is a **lower bound**. Anything else — a parameter, a `var`, a value computed at
 run time, a literal passed into a helper's parameter (arguments are not followed into

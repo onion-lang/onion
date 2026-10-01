@@ -45,9 +45,8 @@ import java.util.Map;
  * known operand on its own line. An {@code exec} entry may also carry
  * {@code "commands": [["gh", "pr", "list", null, ...]]}: each call site's argument
  * vector, {@code null} where an argument is not a literal. {@code --plan} then prints
- * each command's leading run of literal arguments instead of the bare name, followed by
- * {@code " …"} when a non-literal argument follows, and cut at
- * {@value #COMMAND_WIDTH} characters.
+ * the whole command instead of the bare name: literal arguments verbatim, {@code …} for
+ * each run of non-literal ones, cut at {@value #COMMAND_WIDTH} characters.
  */
 public final class ToolCli {
     private ToolCli() {}
@@ -349,23 +348,23 @@ public final class ToolCli {
     static final int COMMAND_WIDTH = 72;
 
     /**
-     * A command's leading run of literal arguments, as a plan line shows it: {@code gh pr
-     * list --repo onion-lang/onion}, then {@code " …"} when a non-literal argument
-     * ({@code null}) follows. The run stops at the first non-literal on purpose: what
-     * comes after it depends on a value only the run knows, and a line that skipped the
-     * hole would read as the command itself. Past {@link #COMMAND_WIDTH} characters the
-     * line is cut and ends in {@code …}. An argument that is empty or holds whitespace or
-     * a quote is shown single-quoted, so the words stay countable.
+     * A command as a plan line shows it: every literal argument verbatim, and {@code …} in
+     * place of an argument that is not a literal ({@code null}), consecutive holes
+     * collapsing into one -- {@code gh … list --repo onion-lang/onion --search …}. Past
+     * {@link #COMMAND_WIDTH} characters the line is cut and ends in {@code …}. An argument
+     * that is empty or holds whitespace or a quote is shown single-quoted, so the words
+     * stay countable and a literal {@code …} argument cannot pass for a hole.
      */
     static String renderCommand(List<?> argv) {
         StringBuilder sb = new StringBuilder();
-        boolean more = false;
+        boolean lastWasHole = false;
         for (Object a : argv) {
-            if (a == null) { more = true; break; }
+            if (a == null && lastWasHole) continue;
             if (sb.length() > 0) sb.append(' ');
-            sb.append(shellWord(String.valueOf(a)));
+            if (a == null) sb.append('…');
+            else sb.append(shellWord(String.valueOf(a)));
+            lastWasHole = a == null;
         }
-        if (more) sb.append(sb.length() > 0 ? " …" : "…");
         if (sb.length() > COMMAND_WIDTH) {
             sb.setLength(COMMAND_WIDTH - 1);
             sb.append('…');
@@ -377,7 +376,7 @@ public final class ToolCli {
         boolean plain = !s.isEmpty();
         for (int i = 0; plain && i < s.length(); i++) {
             char c = s.charAt(i);
-            if (Character.isWhitespace(c) || c == '\'' || c == '"') plain = false;
+            if (Character.isWhitespace(c) || c == '\'' || c == '"' || c == '…') plain = false;
         }
         return plain ? s : "'" + s.replace("'", "'\\''") + "'";
     }

@@ -85,8 +85,8 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "--plan")
       assert(Shell.Success(0) == r, r.toString)
-      // `kind` is a parameter, so the literal run of the first command stops there.
-      assert(operands(out, "exec") == Seq("gh …", "git status"), out)
+      // `kind` is a parameter: a hole, shown as `…`, with the literals after it kept.
+      assert(operands(out, "exec") == Seq("gh … list --repo onion-lang/onion", "git status"), out)
     }
 
     it("names the variable of System::getenv, and a URL taken from one as $NAME") {
@@ -122,6 +122,41 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
       assert(operands(out, "write") == Seq("out/log.txt"), out)
     }
 
+    it("reads the host of an Http::request builder through send()/sendOrThrow(), its steps and a val") {
+      val (r, out) = run(
+        """tool ask(prompt: String): Int
+          |  requires { net, env, console }
+          |{
+          |  val res = Http::request("POST", "https://api.example.com/v1/messages")
+          |    .header("content-type", "application/json")
+          |    .header("x-api-key", System::getenv("API_KEY") ?: "")
+          |    .body(prompt)
+          |    .timeoutSeconds(120)
+          |    .send()
+          |  val base = Http::request("GET", "https://builder.example.org/" + prompt)
+          |  val status = base.headers(["accept", "text/plain"]).sendOrThrow().status
+          |  IO::println(res.isOk() + " " + status)
+          |  return 0
+          |}
+          |""".stripMargin, "hi", "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(operands(out, "net") == Seq("api.example.com", "builder.example.org"), out)
+      assert(!out.contains(Unknown), out)
+    }
+
+    it("leaves an Http::request whose URL is a parameter unresolved") {
+      val (r, out) = run(
+        """tool hit(url: String): Int
+          |  requires { net, console }
+          |{
+          |  IO::println(Http::request("DELETE", url).send().isOk())
+          |  return 0
+          |}
+          |""".stripMargin, "https://x.example.com", "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(operands(out, "net") == Seq(Unknown), out)
+    }
+
     it("never prints user-info from a literal URL") {
       val (r, out) = run(
         """tool secret(): Int
@@ -137,7 +172,7 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
     }
   }
 
-  describe("--plan shows an exec command's leading literal arguments") {
+  describe("--plan shows an exec command's literal arguments, … for the rest") {
     it("prints the whole command when every argument is a literal") {
       val (r, out) = run(
         """tool prs(): Int
@@ -152,7 +187,7 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
       assert(!out.contains(Unknown), out)
     }
 
-    it("stops at the first non-literal argument and marks the elision with …") {
+    it("shows a non-literal argument as … and keeps the literals after it") {
       val (r, out) = run(
         """tool prs(since: String): Int
           |  requires { exec, console }
@@ -164,9 +199,35 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "2026-01-01", "--plan")
       assert(Shell.Success(0) == r, r.toString)
-      // A literal PREFIX is not the argument, so the run stops before it.
-      assert(operands(out, "exec") == Seq("gh pr list --state all --search …"), out)
-      assert(!out.contains("number"), out)
+      // A literal PREFIX is not the argument, so it is a hole too.
+      assert(operands(out, "exec") == Seq("gh pr list --state all --search … --json number"), out)
+    }
+
+    it("collapses consecutive non-literal arguments into one …") {
+      val (r, out) = run(
+        """tool cp(src: String, dst: String): Int
+          |  requires { exec, console }
+          |{
+          |  IO::println(Proc::capture("cp", "-r", src, dst).stdout())
+          |  IO::println(Proc::capture("rsync", src, dst, "--dry-run").stdout())
+          |  return 0
+          |}
+          |""".stripMargin, "a", "b", "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(operands(out, "exec") == Seq("cp -r …", "rsync … --dry-run"), out)
+    }
+
+    it("quotes a literal … argument so it cannot pass for a hole") {
+      val (r, out) = run(
+        """tool e(): Int
+          |  requires { exec, console }
+          |{
+          |  IO::println(Proc::capture("echo", "…").stdout())
+          |  return 0
+          |}
+          |""".stripMargin, "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(operands(out, "exec") == Seq("echo '…'"), out)
     }
 
     it("follows a once-assigned val, and runIn/captureIn's command after the directory") {

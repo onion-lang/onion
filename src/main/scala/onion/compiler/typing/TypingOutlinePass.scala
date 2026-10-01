@@ -289,8 +289,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // Pattern-attached records (`record ... from re"..."`): validate that every
       // component type can be derived from a captured String, then register the
       // synthesized parse/parseAll static methods so their bodies type normally.
-      // When a component type is unsupported we report E0061 and skip synthesis so
-      // the otherwise-invalid bodies don't produce noisy follow-on errors.
+      // When a component type is unsupported we report E0061 and register only the
+      // methods' signatures, so neither the otherwise-invalid bodies nor the call sites
+      // produce noisy follow-on errors.
       // A componentless record has nothing to parse into, so a `from` clause on it
       // is meaningless; skip synthesis (no parse/parseAll) rather than emit a select
       // whose zero bindings would also dodge the E0060 group-count check.
@@ -302,7 +303,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // params drive the check). from/data methods stay gated on the component-type check.
       val (checkMethods, derivedMethods) = node.synthesizedMethods.partition(m =>
         m.name.startsWith("onion$$law$$") || m.name.startsWith("onion$$example$$"))
-      checkMethods.foreach(processMethodDeclaration)
+      checkMethods.foreach(processMethodDeclaration(_))
       if ((hasFrom || hasData || hasShapes) && node.args.nonEmpty) {
         val unsupportedFrom =
           if (hasFrom) node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
@@ -345,7 +346,21 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         // a shape lowers to a Shapes.regex call, so the same two checks are made here.
         val badShapes = if (hasShapes) node.shapes.filterNot(sc => checkShapePattern(sc, node.args.length)) else Nil
         if (unsupportedFrom.isEmpty && unsupportedData.isEmpty && unsupportedShape.isEmpty && badShapes.isEmpty)
-          derivedMethods.foreach(processMethodDeclaration)
+          derivedMethods.foreach(processMethodDeclaration(_))
+        else
+          // Every path into this branch has reported an error (E0059/E0060/E0061/E0062), so
+          // compilation stops before codegen. Register the synthesized methods' signatures
+          // anyway -- `R::doc()`, `R::parse(s)`, `R::fromJson(s)` -- so each call site still
+          // resolves instead of cascading into an E0005 "not found" per use. The bodies are
+          // never typed: without a kernel binding the body and duplication passes skip them.
+          derivedMethods.foreach(processMethodDeclaration(_, signatureOnly = true))
+          // Rewriting synthesizes no accessor at all for a shape whose component types it
+          // cannot classify from the written types (`xs: Map[String, String]`) or whose
+          // format is unknown; give those the accessor's signature too.
+          val synthesized = derivedMethods.map(_.name).toSet
+          node.shapes.filterNot(sc => synthesized.contains(sc.name)).foreach { sc =>
+            processMethodDeclaration(shapeAccessorSignature(node, sc), signatureOnly = true)
+          }
       }
       // Unknown derive! markers.
       node.derives.filterNot(DeriveMarkers.isSupported).foreach { mk =>
@@ -357,6 +372,17 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     // section methods can call `x()` / bare fields and each other.
     node.sections.foreach(processAccessSection)
     }
+  }
+
+  /**
+   * `static def name(): onion.Shape[R]`, the signature Rewriting gives a shape accessor.
+   * Only ever registered signature-only, so the empty body is never typed or emitted.
+   */
+  private def shapeAccessorSignature(node: AST.RecordDeclaration, sc: AST.ShapeClause): AST.MethodDeclaration = {
+    val loc = sc.location
+    val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
+      AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(node.name, false))), false)
+    AST.MethodDeclaration(loc, AST.M_PUBLIC | AST.M_STATIC, sc.name, Nil, shapeType, AST.BlockExpression(loc, Nil))
   }
 
   /** How a shape clause reads in source, for diagnostics: `shape doc = json`, `shape s = re"..."`. */
@@ -653,7 +679,13 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     definition_.add(field)
   }
 
-  private def processMethodDeclaration(node: AST.MethodDeclaration): Unit = {
+  /**
+   * Registers a method's signature on the current definition. With `signatureOnly`, the
+   * method is added without binding it to its AST node, so later passes never type or
+   * check its body; used for a record's synthesized methods once their derivation has
+   * already been rejected with an error.
+   */
+  private def processMethodDeclaration(node: AST.MethodDeclaration, signatureOnly: Boolean = false): Unit = {
     val methodTypeParams = createTypeParams(node.typeParameters)
     declaredTypeParams_(node) = methodTypeParams
     openTypeParams(typeParams_ ++ methodTypeParams) {
@@ -693,7 +725,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           hasVararg,
           annotations
         )
-        put(node, method)
+        if (!signatureOnly) put(node, method)
         definition_.add(method)
       }
     }

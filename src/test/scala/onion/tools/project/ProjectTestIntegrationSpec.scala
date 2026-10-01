@@ -478,7 +478,7 @@ class ProjectTestIntegrationSpec extends AnyFunSuite with Matchers:
       finally
         out.close()
         err.close()
-    Invocation(exitCode, stdout.toString(UTF_8), stderr.toString(UTF_8))
+    Invocation(exitCode, Captured.text(stdout), Captured.text(stderr))
 
   private def invokeCli(cwd: Path, verbose: Boolean = false): Invocation =
     val stdout = ByteArrayOutputStream()
@@ -491,7 +491,7 @@ class ProjectTestIntegrationSpec extends AnyFunSuite with Matchers:
       finally
         out.close()
         err.close()
-    Invocation(exitCode, stdout.toString(UTF_8), stderr.toString(UTF_8))
+    Invocation(exitCode, Captured.text(stdout), Captured.text(stderr))
 
   private def compileJava(className: String, source: String): Path =
     val root = Files.createTempDirectory("onion-project-test-stale-api")

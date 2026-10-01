@@ -205,7 +205,7 @@ API のホスト、tool が呼び出すコマンド、読む環境変数。`--pl
 $ onion digest.on out/digest.md gh --plan
 plan: `digest` would
   write   derived from out = out/digest.md
-  exec    gh …
+  exec    gh … list --repo onion-lang/onion --state all --search … --json number,…
   net     $SLACK_WEBHOOK_URL
   net     api.github.com
   env     SLACK_WEBHOOK_URL
@@ -221,8 +221,8 @@ plan: `digest` would
 
 | 効果 | 表示されるオペランド | 読み取り元 |
 |------|----------------------|------------|
-| `net` | ホスト（とポート） | `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse` の URL、`http"…"` リソース、`Net::connect` |
-| `exec` | コマンド（最初のリテラルでない引数の手前まで） | `Proc::capture`/`run`/`exec` のコマンドの語、`captureIn`/`runIn`/`execIn` ではディレクトリより後の語 |
+| `net` | ホスト（とポート） | `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse`/`request`（ビルダーのステップをたどって `send()` まで）の URL、`http"…"` リソース、`Net::connect` |
+| `exec` | コマンド（リテラルでない引数は `…`） | `Proc::capture`/`run`/`exec` のコマンドの語、`captureIn`/`runIn`/`execIn` ではディレクトリより後の語 |
 | `env` | 変数名 | `System::getenv("NAME")`、`Config::getEnv("NAME", …)` |
 | `read`/`write` | パス | `Files` の各操作のパス引数、`file"…"` リソース |
 
@@ -234,14 +234,14 @@ plan: `digest` would
 （`user:password@`）は決して表示しません。オペランドは1行に1つで、効果名を繰り返し、呼び出しが見つかった順 —— tool 自身の本体が
 先、そのあと本体が呼ぶメソッド —— に並びます。
 
-`exec` の行には、コマンドと、その先頭から続くリテラル引数が並びます。
-`Proc::capture("gh", "pr", "list", "--repo", "onion-lang/onion")` は
-`exec    gh pr list --repo onion-lang/onion` と表示されます。並びは、完全なリテラルで
-ない最初の引数（パラメータ、ループ変数、`"updated:>=" + since` など）の手前で止まり、
-後ろにまだ引数があることを ` …` で示します。上の `digest.on` は2番目にループ変数 `kind`
-を渡しているので、その行は `gh …` です。72 文字を超えるコマンドは切り詰めて `…` で
-終わり、空白や引用符を含む引数はシングルクォートで囲んで表示します。2つの呼び出し箇所
-から到達する同じコマンドは1度だけ並びます。
+`exec` の行にはコマンド全体が並びます。リテラルの引数はそのまま、完全なリテラルでない
+引数（パラメータ、ループ変数、`"updated:>=" + since` など）はそれぞれ `…` になり、
+連続する `…` は1つにまとめます。たとえば
+`Proc::capture("gh", kind, "list", "--repo", "onion-lang/onion")` は
+`exec    gh … list --repo onion-lang/onion` と表示され、上の `digest.on` の行もこうして
+できています。72 文字を超えるコマンドは切り詰めて `…` で終わり、空白や引用符を含む
+引数はシングルクォートで囲んで表示します。2つの呼び出し箇所から到達する同じコマンドは
+1度だけ並びます。
 
 この一覧は**下界**です。それ以外 —— パラメータ、`var`、実行時に計算される値、ヘルパーの
 パラメータに渡されたリテラル（引数を呼び出し先まで追うことはしません）—— は推測しません。

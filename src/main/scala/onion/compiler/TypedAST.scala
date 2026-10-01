@@ -409,6 +409,13 @@ object TypedAST {
     /** Check if this is a record type */
     def isRecord: Boolean = recordComponents_.isDefined
 
+    /**
+     * True for the synthetic `<file>Main` class that holds a source file's top-level
+     * functions and statements. Diagnostics name a top-level function by its own name
+     * (`answerText`), never through this compiler-chosen owner (`mainMain::answerText`).
+     */
+    var isTopLevelContainer: Boolean = false
+
     override def typeParameters: Array[TypedAST.TypeParameter] = typeParameters_
 
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =

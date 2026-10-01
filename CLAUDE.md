@@ -45,6 +45,7 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 - `--law-seed <n>` / `--law-samples <n>` - Control law sampling; a falsified law reports the settings that produced its counterexample
 - `--stacktrace` - Print the raw JVM trace for an uncaught runtime error (the default is a diagnostic-style report with the script's own frames only)
 - `ONION_DAEMON=1` (environment) - `onionc` and `onion script.on` compile through a resident daemon (`onion.tools.daemon`), started on first use; a script's classes come back and run in the caller's process; falls back to in-process compilation when the daemon cannot be reached. `java -cp onion.jar onion.tools.daemon.DaemonClient stop|status` controls it
+- `ONION_CONSOLE_ENCODING=auto|native|utf-8` (environment) - the launchers' stdout/stderr encoding (`onion.tools.ConsoleEncoding`). `auto` (default): on Windows a stream that is not a console (pipe, file, mintty) is written in UTF-8 and a console keeps its code page; other OSes unchanged. Source files default to UTF-8 (`-encoding` overrides)
 
 ## High-Level Architecture
 
@@ -180,7 +181,7 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `Files` - File operations
 - `DateTime` - Date/time utilities
 - `Json` - JSON parsing/serialization
-- `Http` - HTTP client
+- `Http` - HTTP client; `Http::request(method, url).header(..).body(..).timeoutSeconds(n).send()` returns `Result[Http.Response, Http.HttpFailure]` (any status, 4xx/5xx included, is `Ok`; no response is `Err` with `kind()` `"timeout"`/`"connect"`/`"io"`); `sendOrThrow()` throws instead
 - `Regex` - Regular expressions
 - `Option`, `Result`, `Future` - Functional types
 - `Db` - JDBC access (connect, query, update, transactions)

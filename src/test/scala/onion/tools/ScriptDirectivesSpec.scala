@@ -113,3 +113,37 @@ class ScriptDirectivesSpec extends AnyFunSuite with Matchers with EitherValues:
 
   test("renders like a compiler diagnostic, naming the script"):
     ScriptDirectives.DirectiveError(3, 5, "boom").render("s.on") shouldBe "s.on:3:5: error: boom"
+
+  // ------------------------------------------------- several sources (onionc a.on b.on)
+
+  test("parseAll unions the directives of several files, each module once"):
+    val merged = ScriptDirectives.parseAll(Seq(
+      "a.on" -> "//> using repository \"https://one.example.com/maven\"\n//> using dep \"a:b:1\"\n",
+      "b.on" -> "//> using dep \"a:b:1\" \"c:d:2\"\n//> using repository \"https://two.example.com/maven\"\n",
+      "c.on" -> "IO::println(\"no directives\")\n"
+    )).value
+    merged.dependencies.map(_.render) shouldBe Seq("a:b:1", "c:d:2")
+    merged.repositories shouldBe Seq("https://one.example.com/maven", "https://two.example.com/maven")
+
+  test("parseAll of one file is parse"):
+    val text = "//> using dep \"a:b:1\"\n//> using repository \"https://x.example.com/m\"\n"
+    ScriptDirectives.parseAll(Seq("s.on" -> text)).value shouldBe parse(text).value
+
+  test("parseAll rejects two versions of one module across files, naming both"):
+    val error = ScriptDirectives.parseAll(Seq(
+      "a.on" -> "//> using dep \"a:b:1\"\n",
+      "b.on" -> "// header\n//> using dep \"a:b:2\"\n"
+    )).left.value
+    error should startWith("b.on:2:15: error:")
+    error should include("a:b is declared at 1 in a.on and at 2 here")
+
+  test("parseAll reports a conflict within one file as parse does"):
+    ScriptDirectives.parseAll(Seq(
+      "a.on" -> "//> using dep \"a:b:1\"\n//> using dep \"a:b:2\"\n"
+    )).left.value should (startWith("a.on:2:") and include("a:b is declared twice"))
+
+  test("parseAll renders a single file's error against that file"):
+    ScriptDirectives.parseAll(Seq(
+      "ok.on" -> "//> using dep \"a:b:1\"\n",
+      "bad.on" -> "//> using dep \"a:b:[1,2)\"\n"
+    )).left.value should (startWith("bad.on:1:") and include("must be exact"))

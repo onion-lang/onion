@@ -95,6 +95,13 @@ onion.Http#decodeUrl=pure
 onion.Http#isOk=pure
 onion.Http#isError=pure
 onion.Http$Response#*=pure
+# The request builder: describing a request is pure; only sending it is `net`.
+# An HttpFailure (why send() got no response) is a plain value.
+onion.Http#request=pure
+onion.Http$Request#*=pure
+onion.Http$Request#send=net
+onion.Http$Request#sendOrThrow=net
+onion.Http$HttpFailure#*=pure
 
 # TCP sockets. Everything that touches the socket is `net`; the accessors that only
 # report what was already established are not.

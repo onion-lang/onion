@@ -100,7 +100,7 @@ stops a program from running; the set is the honest input to the layers that dec
 whether it *should*.
 
 The same walk also records, for `--plan`, the operands it can read off the source — a
-literal URL's host, a `Proc` command with its leading literal arguments, a
+literal URL's host, a `Proc` command with its literal arguments, a
 `System::getenv` variable name, a literal path (see [Operands the source spells out](../guide/tools.md#operands-the-source-spells-out)).
 Those are a lower bound in the opposite sense from the effect set: every operand listed
 is one the program can reach, but an operand that is not a literal is reported as

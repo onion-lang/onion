@@ -98,6 +98,28 @@ ONION_JAVA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5
 `ONION_DEBUG_STARTUP=1` stops the launcher silencing the JVM's class-sharing messages,
 which is how to find out why an archive is being ignored.
 
+### Console encoding (Windows)
+
+On Windows, `onion`, `onionc`, `onion repl` and the project commands write their output and
+diagnostics in UTF-8 when the output is not a Windows console: a pipe, a file, or a terminal
+such as Git Bash (mintty). A real console (cmd.exe, PowerShell, Windows Terminal, the VS Code
+terminal) keeps its own code page, which it already displays correctly. Each of stdout and
+stderr is judged separately, so `onion script.on > out.txt` writes UTF-8 to the file while
+diagnostics on the console stay readable. Other platforms are unchanged. Source files are
+read as UTF-8 unless `-encoding` says otherwise.
+
+`ONION_CONSOLE_ENCODING` overrides the choice:
+
+```bash
+ONION_CONSOLE_ENCODING=utf-8 onion script.on   # always UTF-8, consoles included (any OS)
+ONION_CONSOLE_ENCODING=native onion script.on  # leave it to the JVM, as before
+```
+
+Unset, or `auto`, is the behaviour described above. To pin some other encoding, combine
+`native` with the JVM's own flag in `ONION_JAVA_OPTS`: `-Dstdout.encoding=...` and
+`-Dstderr.encoding=...` on JDK 19+, `-Dsun.stdout.encoding=...` and
+`-Dsun.stderr.encoding=...` on JDK 17 and 18.
+
 ### The compile daemon
 
 Every `onionc` run starts a JVM, loads the compiler and compiles it just-in-time before it

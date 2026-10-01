@@ -1,7 +1,7 @@
 package onion.compiler.diagnostics
 
 import onion.compiler.{AST, CompileError, CompileWarning, Location, Modifier, TypedAST}
-import onion.compiler.toolbox.{Inputs, Message, Systems}
+import onion.compiler.toolbox.{Message, Systems}
 
 import java.io.{FileNotFoundException, IOException, PrintStream}
 import scala.math.max
@@ -140,7 +140,7 @@ object DiagnosticRenderer {
 
   private def readSourceLine(sourceFile: String, lineNumber: Int): Option[String] = {
     if (lineNumber <= 0) return None
-    Using(Inputs.newReader(sourceFile)) { reader =>
+    Using(new java.io.BufferedReader(new java.io.StringReader(decodeSource(sourceFile)))) { reader =>
       Iterator
         .continually(reader.readLine())
         .takeWhile(_ != null)
@@ -149,6 +149,24 @@ object DiagnosticRenderer {
     }.recover {
       case _: FileNotFoundException | _: IOException => None
     }.getOrElse(None)
+  }
+
+  // Sources default to UTF-8 (CompilerOptions.DEFAULT_ENCODING), so the quoted line is
+  // decoded as UTF-8 too; a file that is not valid UTF-8 was read with an explicit
+  // -encoding, most likely the platform's, so that is the fallback. Decoding in the platform
+  // charset alone quoted every UTF-8 line as mojibake on JDK 17 under a Japanese locale.
+  private def decodeSource(sourceFile: String): String = {
+    val bytes = java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(sourceFile))
+    try
+      java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+        .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+        .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+        .decode(java.nio.ByteBuffer.wrap(bytes))
+        .toString
+    catch {
+      case _: java.nio.charset.CharacterCodingException =>
+        new String(bytes, java.nio.charset.Charset.defaultCharset())
+    }
   }
 
   private def formatClass(cls: TypedAST.ClassDefinition): String = {

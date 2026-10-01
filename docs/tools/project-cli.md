@@ -184,7 +184,12 @@ version = "0.1.0"
 ```
 
 The key has to be quoted, because a Maven coordinate contains a colon. Versions are
-exact — no ranges, no `latest`. Transitive dependencies are resolved and land on the
+exact — no ranges, no `latest`. The manifest rejects, naming the dependency and its
+line, a Maven range (`[1.0,2.0)`, `(,1.0]`, or anything else with `[`, `]`, `(`, `)`
+or `,`), a dynamic revision ending in `+` (`1.+`), and the moving aliases `LATEST`,
+`RELEASE` and `latest.*` (`latest.release`, `latest.integration`). A `+` inside SemVer
+build metadata (`1.0.0+build.5`) and a `-SNAPSHOT` version are accepted. A script's
+`//> using dep` directive applies the same rule. Transitive dependencies are resolved and land on the
 classpath for `build`, `run` and `test` alike, so a library you compile against is also
 there when the program runs.
 
@@ -300,7 +305,7 @@ directory is a successful test run with a zero-test summary.
 
 `build` compiles once and caches the result under `target/`. A second `build`
 (or the build that `run` and `test` perform first) reuses that output when a
-SHA-256 fingerprint over the compiler version, the Java version, the exact
+SHA-256 fingerprint over the compiler's identity, the Java version, the exact
 manifest bytes, and every source path and its bytes still matches:
 
 ```text
@@ -311,7 +316,18 @@ Built hello (cached)
 ```
 
 Any source addition, removal, rename, or content change invalidates the
-cache and triggers a full rebuild. A failed rebuild never destroys the
+cache and triggers a full rebuild.
+
+The compiler's identity is its version plus a digest of the jar (or class
+directory) it was loaded from, so a new compiler rebuilds the project even when
+it reports the same version: an upgraded or locally rebuilt `onion.jar`, or a
+changed compiler resource such as the effect table. New diagnostics and effect
+checks then run on the next `build`, with no `onion clean` needed. Hashing the
+jar is not repeated on every build: its digest is cached under the user cache
+directory (`-Donion.cache.dir`, `$ONION_CACHE_DIR`, or the platform default),
+keyed by the jar's path, size and modification time.
+
+A failed rebuild never destroys the
 previous successful `target/classes` or build-state file — the new output is
 staged and only promoted after every artifact is written successfully.
 

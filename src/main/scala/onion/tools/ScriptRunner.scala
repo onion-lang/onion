@@ -38,6 +38,7 @@ object ScriptRunner {
   }
 
   def main(args: Array[String]): Unit = {
+    ConsoleEncoding.install()
     val exitCode = runMain(args)
     if (exitCode != 0) System.exit(exitCode)
   }

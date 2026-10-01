@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.133.0] - 2026-10-01
+
 ### Fixed
 
 - **`FileOutputStream`, `FileInputStream`, `FileReader`, `FileWriter`, `RandomAccessFile`, `java.io.File`, and `java.nio.file.Files`/`Path`/`Paths` were `unknown` in the effect table**, so a tool that saved output through `new FileOutputStream(dst)` (the usual way to write a POI workbook, for instance) could not declare `requires { write(dst) }` — it failed with `[E0078] tool \`name\` declares capability \`write\` but nothing in its body can perform it`, and the only clause that compiled, `requires { unknown }`, hid the actual read/write targets from `--plan`. The class that opens a file now carries the effect for its whole lifetime: `FileInputStream`/`FileReader` are `read`, `FileOutputStream`/`FileWriter` are `write`, `RandomAccessFile` is both; `java.io.File` is `read` for queries (`exists`, `length`, `listFiles`, ...), `write` for `mkdir(s)`/`delete`/`createNewFile`/`renameTo`/`setLastModified`, `pure` for naming (`getName`, `getPath`, `getParent`, `toPath`), and `env` for `getAbsolutePath`/`getAbsoluteFile`; `java.nio.file.Files` defaults to `read,write` so an unlisted operation is never under-reported, with known reads/writes (and `copy`/`move`) listed exactly; `Path`/`Paths` are `pure` except `toAbsolutePath`/`toRealPath` (`env`); in-memory streams (`ByteArray*Stream`, `StringReader`/`Writer`) are `pure`. Stream wrappers (`BufferedReader`, `InputStreamReader`, `PrintWriter`) deliberately stay `unknown`, since they can just as well wrap `System.in` or a socket. `docs/reference/effects.md` (en/ja) updated. Covered by new `EffectTableSpec` cases (merged via #1821).

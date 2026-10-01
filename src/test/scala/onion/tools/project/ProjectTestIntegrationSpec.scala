@@ -76,7 +76,7 @@ class ProjectTestIntegrationSpec extends AnyFunSuite with Matchers:
     invoke(project.root) shouldBe Invocation(0, expectedOut, expectedErr)
     invoke(project.root, verbose = true) shouldBe Invocation(0, expectedOut, expectedErr)
 
-  test("shows captured output and a concise assertion failure"):
+  test("shows captured output and a concise assertion failure, at its line"):
     val project = fixture(
       tests = Map(
         "tests/assertion_test.on" ->
@@ -98,7 +98,8 @@ class ProjectTestIntegrationSpec extends AnyFunSuite with Matchers:
         |""".stripMargin
     result.stderr shouldBe
       """assertion-err
-        |error: tests/assertion_test.on: AssertionError: not true
+        |error: tests/assertion_test.on:3: AssertionError: not true
+        |  3 | Assert::isTrue(false, "not true")
         |""".stripMargin
     temporaryTestDirectories(project.paths) shouldBe empty
 
@@ -126,9 +127,52 @@ class ProjectTestIntegrationSpec extends AnyFunSuite with Matchers:
     result.stderr should include("a_compile_test.on")
     result.stderr should include("error: tests/a_compile_test.on: Test compilation failed\n")
     result.stderr should include(
-      "error: tests/b_runtime_test.on: IllegalStateException: runtime boom\n"
+      "error: tests/b_runtime_test.on:1: IllegalStateException: runtime boom\n"
     )
     temporaryTestDirectories(project.paths) shouldBe empty
+
+  test("reports a failed assertion inside a function at the assertion, not the call"):
+    val project = fixture(
+      tests = Map(
+        "tests/helper_test.on" ->
+          """def check(n: Int): void {
+            |  Assert::equals(3, n)
+            |}
+            |check(3)
+            |check(2)
+            |""".stripMargin
+      )
+    )
+
+    val result = invoke(project.root)
+
+    result.exitCode shouldBe 1
+    result.stderr shouldBe
+      """error: tests/helper_test.on:2: AssertionError: Expected <3> but was <2>
+        |  2 |   Assert::equals(3, n)
+        |""".stripMargin
+
+  test("maps an assertion in a project source back to that file"):
+    val project = fixture(
+      production =
+        """class Checks {
+          |public:
+          |  static def positive(n: Int): void {
+          |    Assert::isTrue(n > 0, "not positive")
+          |  }
+          |}
+          |def main(): void {}
+          |""".stripMargin,
+      tests = Map("tests/uses_checks_test.on" -> "Checks::positive(1)\nChecks::positive(-1)\n")
+    )
+
+    val result = invoke(project.root)
+
+    result.exitCode shouldBe 1
+    result.stderr shouldBe
+      """error: src/main.on:4: AssertionError: not positive
+        |  4 |     Assert::isTrue(n > 0, "not positive")
+        |""".stripMargin
 
   test("a nonzero raw-argv main fails while an auto-CLI wrapper remains successful"):
     val project = fixture(

@@ -374,6 +374,21 @@ test tests/main_test.on ... ok
 残りのテストはすべて実行され続けます。テストが1つも無いプロジェクトは
 `0 tests, 0 passed, 0 failed` というサマリーとともに成功します。
 
+アサーション失敗や実行時例外は、それを起こした行 —— `Assert::` の呼び出しなら、
+テスト内であれ、テストから到達したプロジェクトのソース内であれ、その呼び出しの行 ——
+で報告され、続けてその行が表示されます：
+
+```text
+$ onion test
+test tests/summary_test.on ... FAILED
+
+1 tests, 0 passed, 1 failed
+error: tests/summary_test.on:4: AssertionError: Expected true but was false
+  4 | Assert::isTrue(words.size == 4)
+```
+
+`onion script.on` でも、失敗したアサーションは同じように報告されます。
+
 ## クリーン
 
 `clean` はプロジェクトの正規の `target/` ディレクトリだけを削除します。

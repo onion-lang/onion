@@ -42,7 +42,10 @@ object JUnitXmlReport:
       body ++= s"""  <testcase classname="${attribute(testCase.source)}" name="${attribute(name)}">""" + "\n"
       testCase.failure.foreach { message =>
         val summary = message.linesIterator.nextOption().getOrElse(message)
-        body ++= s"""    <failure message="${attribute(summary)}">${text(message)}</failure>""" + "\n"
+        // The position (`tests/x_test.on:12`) goes in the body, so the summary a CI view
+        // shows stays the message itself.
+        val detail = testCase.location.fold(message)(where => s"$where: $message")
+        body ++= s"""    <failure message="${attribute(summary)}">${text(detail)}</failure>""" + "\n"
       }
       if testCase.stdout.nonEmpty then
         body ++= s"""    <system-out>${text(testCase.stdout)}</system-out>""" + "\n"

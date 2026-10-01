@@ -24,7 +24,15 @@ final case class TestCaseResult(
   passed: Boolean,
   stdout: String,
   stderr: String,
-  failure: Option[String]
+  failure: Option[String],
+  /**
+   * Where a runtime failure happened in the user's own source (`tests/x_test.on:12`),
+   * read off the first frame the user wrote -- for a failed `Assert::` call, the line
+   * of that call (FRICTION F12). None when no frame carries a position.
+   */
+  location: Option[String] = None,
+  /** The source line at [[location]], when the file could be read. */
+  sourceLine: Option[(Int, String)] = None
 )
 
 final case class TestRunResult(cases: Vector[TestCaseResult]):
@@ -301,8 +309,11 @@ final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
             captured.stderr,
             s"Could not invoke test: ${describe(error)}"
           )
-        case Right(ProgramResult.Failure(message, _)) =>
-          failed(source, captured.stdout, captured.stderr, message)
+        case Right(ProgramResult.Failure(message, cause)) =>
+          val base = failed(source, captured.stdout, captured.stderr, message)
+          cause.flatMap(locate(build, source, _)) match
+            case Some((where, line)) => base.copy(location = Some(where), sourceLine = line)
+            case None => base
         case Right(ProgramResult.Success(value))
             if ProjectCommands.programExitCode(value) != 0 =>
           failed(
@@ -332,6 +343,37 @@ final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
     }
     CompletedTestCase(withLifecycleFailures, prepared.diagnostics)
 
+  /**
+   * The test-relative position of `cause`'s first user frame, and that line's text.
+   *
+   * The compiler records a bare file name in each class (`x_test.on`), so the frame is
+   * mapped back to a project file by name: the test being run first, then any other
+   * project source of that name if exactly one exists. An ambiguous or unknown name is
+   * still reported (`name.on:12`), just without the source line.
+   */
+  private def locate(
+    build: ProjectBuild,
+    source: ProjectSource,
+    cause: Throwable
+  ): Option[(String, Option[(Int, String)])] =
+    onion.tools.RuntimeErrorReporter.firstUserFrame(cause).map { frame =>
+      val name = frame.getFileName
+      val line = frame.getLineNumber
+      def named(s: ProjectSource) =
+        Option(s.path.getFileName).exists(_.toString == name)
+      val file =
+        if named(source) then Some(source)
+        else
+          (build.layout.productionSources ++ build.layout.testSources).filter(named) match
+            case Vector(only) => Some(only)
+            case _ => None
+      file match
+        case Some(f) =>
+          (s"${f.relative}:$line",
+            onion.tools.RuntimeErrorReporter.sourceLine(f.path, line).map(line -> _))
+        case None => (s"$name:$line", None)
+    }
+
   private def failed(
     source: ProjectSource,
     stdout: String,
@@ -353,9 +395,12 @@ final class ProjectTestRunner private[project] (backend: ProjectTestBackend):
     if verbose || !result.passed then
       printCaptured(out, result.stdout)
       printCaptured(err, result.stderr)
-    result.failure.foreach(message =>
-      err.println(s"error: ${result.source}: $message")
-    )
+    result.failure.foreach { message =>
+      err.println(s"error: ${result.location.getOrElse(result.source)}: $message")
+      result.sourceLine.foreach((line, text) =>
+        err.println(onion.tools.RuntimeErrorReporter.excerpt(line, text))
+      )
+    }
 
   private def printCaptured(stream: PrintStream, value: String): Unit =
     if value.nonEmpty then

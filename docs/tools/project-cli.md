@@ -372,6 +372,21 @@ exception, or nonzero numeric result is reported against that test alone —
 every remaining test still runs, and a project with no tests at all succeeds
 with a `0 tests, 0 passed, 0 failed` summary.
 
+A failed assertion or runtime exception is reported at the line that raised it
+— for an `Assert::` call, the line of that call, in the test or in a project
+source it reached — followed by that line:
+
+```text
+$ onion test
+test tests/summary_test.on ... FAILED
+
+1 tests, 0 passed, 1 failed
+error: tests/summary_test.on:4: AssertionError: Expected true but was false
+  4 | Assert::isTrue(words.size == 4)
+```
+
+`onion script.on` reports a failed assertion the same way.
+
 ## Clean
 
 `clean` removes exactly the project's canonical `target/` directory:

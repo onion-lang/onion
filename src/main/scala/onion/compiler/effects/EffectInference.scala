@@ -225,7 +225,8 @@ object EffectInference {
 
     private def method(m: TypedAST.Method, location: onion.compiler.Location,
                        target: Term, args: Array[Term]): scala.Unit = {
-      val callee = s"${m.affiliation.name}::${m.name}"
+      // A top-level function is named as written, not through its synthetic owner.
+      val callee = onion.compiler.toolbox.TypeFormatting.methodReference(m.affiliation, m.name)
       m match {
         case md: MethodDefinition if units.contains(md) =>
           internalCallees += md

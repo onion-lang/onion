@@ -248,6 +248,12 @@ public:
 
 No method matches the call.  If a method with the same name exists but the argument types differ, the compiler lists the available signatures.
 
+A top-level function is named on its own (`a function applicable for helper(Int, Int) is
+not found`), never through the file's synthetic container class. A "did you mean"
+suggestion names only a member the call could reach — not a library class's private
+member, and one that takes that many arguments — and prefers one whose parameters also
+take the argument types.
+
 ### `E0006` — Ambiguous method
 
 Two overloads are equally applicable to the call and neither is more specific than

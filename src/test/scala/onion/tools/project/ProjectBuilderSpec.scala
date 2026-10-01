@@ -76,7 +76,7 @@ class ProjectBuilderSpec extends AnyFunSuite with Matchers:
     val result =
       try builder.build(fixture.paths, fixture.manifest, fixture.layout, err)
       finally err.close()
-    result -> bytes.toString(UTF_8)
+    result -> Captured.text(bytes)
 
   private def temporaryDirectories(paths: ProjectPaths): Vector[Path] =
     if !Files.isDirectory(paths.onionState, NOFOLLOW_LINKS) then Vector.empty
@@ -316,7 +316,8 @@ class ProjectBuilderSpec extends AnyFunSuite with Matchers:
     // The `path:line:col:` prefix is structural; the message text and the closing
     // "N errors are found." trailer are localized (error.count), so asserting on
     // them passes in an English locale and fails only under -Duser.language=ja.
-    errors should include("src/main.on:1:10:")
+    // The path is the platform's own (backslashes on Windows); compare it in "/" form.
+    errors.replace('\\', '/') should include("src/main.on:1:10:")
     temporaryDirectories(errorProject.paths) shouldBe Vector.empty
 
   test("requires successful compiler results to contain parsed source units"):
@@ -338,7 +339,7 @@ class ProjectBuilderSpec extends AnyFunSuite with Matchers:
 
     result.isLeft shouldBe true
     // Locale-agnostic: the diagnostic's position prefix, not its localized text.
-    diagnostics should include("src/main.on:1:10:")
+    diagnostics.replace('\\', '/') should include("src/main.on:1:10:")
     outputSnapshot(project.paths) shouldBe before
     temporaryDirectories(project.paths) shouldBe Vector.empty
 
@@ -367,8 +368,8 @@ class ProjectBuilderSpec extends AnyFunSuite with Matchers:
     )
 
     firstExit shouldBe 0
-    firstOut.toString(UTF_8) shouldBe "Built demo (2 classes)\n"
-    firstErr.toString(UTF_8) shouldBe empty
+    Captured.text(firstOut) shouldBe "Built demo (2 classes)\n"
+    Captured.text(firstErr) shouldBe empty
 
     val cachedOut = ByteArrayOutputStream()
     val cachedErr = ByteArrayOutputStream()
@@ -380,8 +381,8 @@ class ProjectBuilderSpec extends AnyFunSuite with Matchers:
     )
 
     cachedExit shouldBe 0
-    cachedOut.toString(UTF_8) shouldBe "Built demo (cached)\n"
-    cachedErr.toString(UTF_8) shouldBe empty
+    Captured.text(cachedOut) shouldBe "Built demo (cached)\n"
+    Captured.text(cachedErr) shouldBe empty
 
   test("build command reports project failures only to stderr"):
     val root = Files.createTempDirectory("onion-project-builder-command")
@@ -401,5 +402,5 @@ class ProjectBuilderSpec extends AnyFunSuite with Matchers:
     )
 
     exitCode shouldBe 1
-    stdout.toString(UTF_8) shouldBe empty
-    stderr.toString(UTF_8) should startWith("error: ")
+    Captured.text(stdout) shouldBe empty
+    Captured.text(stderr) should startWith("error: ")

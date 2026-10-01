@@ -24,7 +24,7 @@ class ProjectLocatorSpec extends AnyFunSuite with Matchers:
     val paths = ProjectLocator.locate(root).toOption.value
 
     paths.root shouldBe root.toRealPath()
-    paths.manifest shouldBe manifestPath
+    paths.manifest shouldBe manifestPath.toRealPath()
     paths.target shouldBe paths.root.resolve("target")
     paths.classes shouldBe paths.target.resolve("classes")
     paths.onionState shouldBe paths.target.resolve(".onion")

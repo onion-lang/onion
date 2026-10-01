@@ -198,8 +198,8 @@ class ProjectRunIntegrationSpec extends AnyFunSuite with Matchers:
       )
 
       exitCode shouldBe 0
-      stdout.toString(UTF_8) shouldBe empty
-      stderr.toString(UTF_8) shouldBe empty
+      Captured.text(stdout) shouldBe empty
+      Captured.text(stderr) shouldBe empty
       System.getProperty(key) shouldBe "--verbose||--"
     finally System.clearProperty(key)
 
@@ -327,7 +327,7 @@ class ProjectRunIntegrationSpec extends AnyFunSuite with Matchers:
       finally
         out.close()
         err.close()
-    Invocation(exitCode, stdout.toString(UTF_8), stderr.toString(UTF_8))
+    Invocation(exitCode, Captured.text(stdout), Captured.text(stderr))
 
   /** The tool CLI prints through `System.out`, not through the command's `out` stream. */
   private def captureSystemOut(body: => Int): (Int, String) =
@@ -339,7 +339,7 @@ class ProjectRunIntegrationSpec extends AnyFunSuite with Matchers:
         System.setOut(stream)
         Console.withOut(stream)(body)
       finally System.setOut(saved)
-    (code, buffer.toString(UTF_8))
+    (code, Captured.text(buffer))
 
   private def propertyKey(label: String): String =
     s"onion.project.run.$label.${java.util.UUID.randomUUID()}"

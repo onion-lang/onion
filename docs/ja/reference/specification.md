@@ -669,7 +669,11 @@ def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
 ```
 
 必須パラメータは位置引数です。デフォルト付きパラメータは `--name` フラグになります
-（`Boolean` のデフォルトはプレゼンススイッチになります）。値は宣言型に変換され、
+（`Boolean` のデフォルトはプレゼンススイッチになります）。camelCase の名前は kebab-case
+でも受け付け（`makeSample: Boolean = false` は `--make-sample` と `--makeSample` の
+どちらでも指定できます）、使用法の行には kebab-case の綴りを表示します。フラグが一致して
+しまう2つのパラメータ（`parseURL` と `parseUrl` はどちらも `--parse-url`）はコンパイル
+エラーです。値は宣言型に変換され、
 フラグがない場合はデフォルト式が評価され、エラー時はシグネチャから使用法の行が
 導出されます。`onion` コマンドラインでは、スクリプトファイル以降のすべてが
 そのままスクリプトに渡されます。

@@ -85,7 +85,8 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "--plan")
       assert(Shell.Success(0) == r, r.toString)
-      assert(operands(out, "exec") == Seq("gh", "git"), out)
+      // `kind` is a parameter, so the literal run of the first command stops there.
+      assert(operands(out, "exec") == Seq("gh …", "git status"), out)
     }
 
     it("names the variable of System::getenv, and a URL taken from one as $NAME") {
@@ -133,6 +134,102 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, r.toString)
       assert(operands(out, "net") == Seq("internal.example.com"), out)
       assert(!out.contains("hunter2"), out)
+    }
+  }
+
+  describe("--plan shows an exec command's leading literal arguments") {
+    it("prints the whole command when every argument is a literal") {
+      val (r, out) = run(
+        """tool prs(): Int
+          |  requires { exec, console }
+          |{
+          |  IO::println(Proc::capture("gh", "pr", "list", "--repo", "onion-lang/onion").stdout())
+          |  return 0
+          |}
+          |""".stripMargin, "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(operands(out, "exec") == Seq("gh pr list --repo onion-lang/onion"), out)
+      assert(!out.contains(Unknown), out)
+    }
+
+    it("stops at the first non-literal argument and marks the elision with …") {
+      val (r, out) = run(
+        """tool prs(since: String): Int
+          |  requires { exec, console }
+          |{
+          |  val r = Proc::capture("gh", "pr", "list", "--state", "all",
+          |                       "--search", "updated:>=" + since, "--json", "number")
+          |  IO::println(r.stdout())
+          |  return 0
+          |}
+          |""".stripMargin, "2026-01-01", "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      // A literal PREFIX is not the argument, so the run stops before it.
+      assert(operands(out, "exec") == Seq("gh pr list --state all --search …"), out)
+      assert(!out.contains("number"), out)
+    }
+
+    it("follows a once-assigned val, and runIn/captureIn's command after the directory") {
+      val (r, out) = run(
+        """tool st(): Int
+          |  requires { exec, console }
+          |{
+          |  val fmt = "--short"
+          |  IO::println(Proc::captureIn(".", "git", "status", fmt).stdout())
+          |  return 0
+          |}
+          |""".stripMargin, "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(operands(out, "exec") == Seq("git status --short"), out)
+    }
+
+    it("cuts a long command at 72 characters with …") {
+      val (r, out) = run(
+        """tool long(): Int
+          |  requires { exec, console }
+          |{
+          |  IO::println(Proc::capture("gh", "api", "--paginate", "repos/onion-lang/onion/pulls",
+          |    "--jq", ".[].title", "--header", "Accept:application/vnd.github+json").stdout())
+          |  return 0
+          |}
+          |""".stripMargin, "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      val Seq(line) = operands(out, "exec")
+      assert(line.length == 72, line)
+      assert(line.startsWith("gh api --paginate repos/onion-lang/onion/pulls --jq .[].title"), line)
+      assert(line.endsWith("…"), line)
+    }
+
+    it("quotes an argument holding whitespace, and lists a repeated command once") {
+      val (r, out) = run(
+        """tool commit(): Int
+          |  requires { exec, console }
+          |{
+          |  IO::println(Proc::capture("git", "commit", "-m", "two words").stdout())
+          |  IO::println(Proc::capture("git", "commit", "-m", "two words").stdout())
+          |  return 0
+          |}
+          |""".stripMargin, "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(operands(out, "exec") == Seq("git commit -m 'two words'"), out)
+    }
+
+    it("records each call site's argument vector in --contract, null for a non-literal") {
+      val (r, out) = run(
+        """tool prs(since: String): Int
+          |  requires { exec, console }
+          |{
+          |  IO::println(Proc::capture("gh", "pr", "list", "--search", since).stdout())
+          |  return 0
+          |}
+          |""".stripMargin, "--contract")
+      assert(Shell.Success(0) == r, r.toString)
+      val json = out.trim
+      assert(json.contains(
+        """"staticOperands":{"exec":{"known":["gh"],"unresolved":false,""" +
+        """"commands":[["gh","pr","list","--search",null]]}}"""), json)
+      val parsed = onion.Json.parse(json).asInstanceOf[java.util.List[?]]
+      assert(parsed.size == 1, json)
     }
   }
 
@@ -282,7 +379,7 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
         """"returns":"Int","capabilities":["net","exec","console"],"""), json)
       assert(json.contains(
         """"staticOperands":{"net":{"known":["api.example.com"],"unresolved":false},""" +
-        """"exec":{"known":["gh"],"unresolved":false}}"""), json)
+        """"exec":{"known":["gh"],"unresolved":false,"commands":[["gh","--version"]]}}"""), json)
       // Still one well-formed contract a JSON reader accepts.
       val parsed = onion.Json.parse(json).asInstanceOf[java.util.List[?]]
       assert(parsed.size == 1, json)

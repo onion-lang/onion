@@ -131,6 +131,9 @@ read; `--help`, flag parsing, typed conversion and error messages are all derive
 it at runtime, and the typed call into your tool is derived from the same declaration
 at compile time. Required parameters are positionals; defaulted parameters become
 `--name` flags (`--count 5` or `--count=5`); `Boolean` defaults become switches. A
+camelCase parameter answers to its kebab-case flag as well as to its own name —
+`maxRows` is `--max-rows` or `--maxRows` — and `--help` shows the kebab-case one; two
+parameters that would share a flag (`parseURL` and `parseUrl`) are a compile error. A
 default that is absent on the command line is evaluated as the original expression, in
 the language — it is never round-tripped through a string.
 
@@ -210,7 +213,7 @@ a tool shells out to, the environment variable it reads. `--plan` prints those:
 $ onion digest.on out/digest.md gh --plan
 plan: `digest` would
   write   derived from out = out/digest.md
-  exec    gh
+  exec    gh …
   net     $SLACK_WEBHOOK_URL
   net     api.github.com
   env     SLACK_WEBHOOK_URL
@@ -227,7 +230,7 @@ and the program's own methods it calls, transitively):
 | Effect | Operand shown | Read from |
 |--------|---------------|-----------|
 | `net` | the host (and port) | the URL of `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse`, an `http"…"` resource, `Net::connect` |
-| `exec` | the command name | the first command word of `Proc::capture`/`run`/`exec`, or the first after the directory for `captureIn`/`runIn`/`execIn` |
+| `exec` | the command, up to its first non-literal argument | the command words of `Proc::capture`/`run`/`exec`, or those after the directory for `captureIn`/`runIn`/`execIn` |
 | `env` | the variable name | `System::getenv("NAME")`, `Config::getEnv("NAME", …)` |
 | `read`/`write` | the path | the path argument of `Files` operations, a `file"…"` resource |
 
@@ -239,6 +242,15 @@ local `val` assigned once from either; or `System::getenv("NAME")`, which is sho
 `net $SLACK_WEBHOOK_URL`). User-info in a URL (`user:password@`) is never printed.
 Each operand gets its own line, with the effect name repeated, in the order the calls
 are found — the tool's own body first, then the methods it calls.
+
+An `exec` line shows the command with its leading run of literal arguments, so
+`Proc::capture("gh", "pr", "list", "--repo", "onion-lang/onion")` plans as
+`exec    gh pr list --repo onion-lang/onion`. The run stops at the first argument that
+is not an exact literal (a parameter, a loop variable, `"updated:>=" + since`), and
+` …` marks that more arguments follow: `digest.on` above passes the loop variable
+`kind` second, so its line is `gh …`. A command longer than 72 characters is cut and
+ends in `…`; an argument holding whitespace or a quote is shown single-quoted. The same
+command reached from two call sites is listed once.
 
 The list is a **lower bound**. Anything else — a parameter, a `var`, a value computed at
 run time, a literal passed into a helper's parameter (arguments are not followed into
@@ -256,5 +268,11 @@ something is known — every existing key keeps its value and position:
 ```
 
 `unresolved` is `true` when at least one call site of that effect had an operand the
-analysis could not determine.
+analysis could not determine. An `exec` entry also carries `commands`, each call site's
+full argument vector, with `null` for an argument that is not a literal — `known` stays
+the list of command names:
+
+```json
+"exec":{"known":["gh"],"unresolved":false,"commands":[["gh",null,"list","--repo","onion-lang/onion","--state","all","--search",null,"--json","number,title,author,url","--limit","100"]]}
+```
 

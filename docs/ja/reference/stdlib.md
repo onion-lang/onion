@@ -2153,7 +2153,12 @@ Cli::parseBoolean("loud", "true")       // Boolean::parseBoolean と異なり tr
 
 Cli::rest(rawArgs, 2)                   // インデックス2以降の残りの位置引数（String[] rest 用）
 Cli::requireArgs(rawArgs, 1, "<name> [more...]")  // 引数が1個未満なら usage を出して終了
+
+Cli::kebab("makeSample")                // "make-sample": usage に表示するフラグの綴り
 ```
+
+フラグの要素は、名前そのものと kebab-case の綴りの両方に一致します。
+`"makeSample?"` は `--make-sample` と `--makeSample` を受け付けます。
 
 `Cli::tryParse(args, specString)` は `parse` の非終了版です。stderr への出力や
 `System::exit` を行わず、代わりに `Outcome[String[]]` を返すので、呼び出し側で

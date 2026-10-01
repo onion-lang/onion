@@ -33,11 +33,21 @@ import scala.collection.mutable
  * passed INTO a program-defined helper are not followed (no interprocedural binding):
  * a helper that forwards its parameter to `Http::get` is unresolved even when every
  * caller passes a literal.
+ *
+ * For `exec`, the operand is the command NAME (the first element of `Proc`'s varargs),
+ * but each call site's whole argument vector is kept as well, element by element, with
+ * `None` where an argument is not a literal: `Proc::capture("gh", "pr", "list", q)` is
+ * `gh pr list` and one unknown. `--plan` shows the leading run of literals.
  */
 object StaticOperands {
 
-  /** What is known about one effect's operands in one tool. */
-  final case class Operands(known: Seq[String], unresolved: Boolean)
+  /**
+   * What is known about one effect's operands in one tool. `commands` is filled for
+   * `exec` only: one argument vector per distinct call site whose command name is
+   * known, `None` standing for an argument that is not a literal.
+   */
+  final case class Operands(known: Seq[String], unresolved: Boolean,
+                            commands: Seq[Seq[Option[String]]] = Nil)
 
   /** A statically known string, or what is known about it. */
   private sealed trait Str
@@ -66,6 +76,7 @@ object StaticOperands {
               classes: Seq[ClassDefinition]): Seq[(Effect, Operands)] = {
     val known = mutable.LinkedHashMap[Effect, mutable.LinkedHashSet[String]]()
     val unresolved = mutable.Set[Effect]()
+    val commands = mutable.LinkedHashSet[Seq[Option[String]]]()
     val seen = mutable.Set[EffectInference.Unit0](tool)
     val queue = mutable.Queue[EffectInference.Unit0](tool)
     while (queue.nonEmpty) {
@@ -75,7 +86,9 @@ object StaticOperands {
       unresolved ++= facts.unsitedEffects
       for (site <- facts.sites; effect <- site.effects) {
         operand(site, effect, locals) match {
-          case Some(op) => known.getOrElseUpdate(effect, mutable.LinkedHashSet[String]()) += op
+          case Some(op) =>
+            known.getOrElseUpdate(effect, mutable.LinkedHashSet[String]()) += op
+            if (effect == Effect.Exec) procArgv(site, locals).foreach(commands += _)
           case None     => unresolved += effect
         }
       }
@@ -85,21 +98,30 @@ object StaticOperands {
       }
     }
     Effect.all.flatMap { e =>
-      known.get(e).filter(_.nonEmpty).map(ops => e -> Operands(ops.toSeq, unresolved.contains(e)))
+      known.get(e).filter(_.nonEmpty).map(ops => e -> Operands(ops.toSeq, unresolved.contains(e),
+        if (e == Effect.Exec) commands.toSeq else Nil))
     }
   }
 
   /**
    * The contract fragment for `operands` — `"staticOperands":{"net":{"known":[...],
    * "unresolved":false},...}` — or None when nothing is known (the contract then stays
-   * byte-for-byte what it was).
+   * byte-for-byte what it was). An `exec` entry also carries
+   * `"commands":[["gh","pr","list",null,...],...]`, each call site's argument vector
+   * with `null` for an argument that is not a literal; `known` stays the command names.
    */
   def contractFragment(operands: Seq[(Effect, Operands)]): Option[String] =
     if (operands.isEmpty) None
     else Some(operands.map { case (e, ops) =>
-      val known = ops.known.map(k => "\"" + jsonEscape(k) + "\"").mkString("[", ",", "]")
-      s""""${e.name}":{"known":$known,"unresolved":${ops.unresolved}}"""
+      val known = ops.known.map(quote).mkString("[", ",", "]")
+      val commands =
+        if (ops.commands.isEmpty) ""
+        else ops.commands.map(_.map(_.fold("null")(quote)).mkString("[", ",", "]"))
+          .mkString(""","commands":[""", ",", "]")
+      s""""${e.name}":{"known":$known,"unresolved":${ops.unresolved}$commands}"""
     }.mkString("\"staticOperands\":{", ",", "}"))
+
+  private def quote(s: String): String = "\"" + jsonEscape(s) + "\""
 
   /**
    * Inserts `fragment` as the last key of `tool`'s entry in the contract JSON built by
@@ -193,6 +215,35 @@ object StaticOperands {
         exactOrEnv(resolve(a.values(0), locals, site.depth, Fuel))
       case _ => None
     }
+
+  /**
+   * The whole argument vector of a varargs `Proc` call whose command name is known: the
+   * name as [[command]] reads it, then each further argument if it is an exact literal
+   * (or a once-assigned `val` of one), `None` otherwise. A literal PREFIX is not an
+   * argument (`"updated:>=" + since` is not `updated:>=`), and neither is an env var:
+   * its value is not in the source.
+   */
+  private def procArgv(site: EffectInference.ExternalSite,
+                       locals: Map[Int, Term]): Option[Seq[Option[String]]] = {
+    val index = site.methodName match {
+      case "capture" | "run" | "exec"       => 0
+      case "captureIn" | "runIn" | "execIn" => 1
+      case _                                => return None
+    }
+    if (site.className != "onion.Proc" || index >= site.args.length) None
+    else site.args(index) match {
+      case a: NewArrayWithValues if a.values.nonEmpty =>
+        command(site, index, locals).map { name =>
+          Option(name) +: a.values.toSeq.drop(1).map { v =>
+            resolve(v, locals, site.depth, Fuel) match {
+              case Some(Exact(x)) => Some(x)
+              case _              => None
+            }
+          }
+        }
+      case _ => None
+    }
+  }
 
   private def exactOrEnv(s: Option[Str]): Option[String] = s match {
     case Some(Exact(v)) if v.nonEmpty => Some(v)

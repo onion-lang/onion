@@ -42,7 +42,12 @@ import java.util.Map;
  * </pre>
  * {@code known} is a lower bound; {@code unresolved} is true when some call site of that
  * effect has an operand the analysis could not determine. {@code --plan} prints each
- * known operand on its own line.
+ * known operand on its own line. An {@code exec} entry may also carry
+ * {@code "commands": [["gh", "pr", "list", null, ...]]}: each call site's argument
+ * vector, {@code null} where an argument is not a literal. {@code --plan} then prints
+ * each command's leading run of literal arguments instead of the bare name, followed by
+ * {@code " …"} when a non-literal argument follows, and cut at
+ * {@value #COMMAND_WIDTH} characters.
  */
 public final class ToolCli {
     private ToolCli() {}
@@ -147,7 +152,15 @@ public final class ToolCli {
         for (int i = 0; i < params.size(); i++) {
             String role = str(params.get(i), "role");
             if (role.equals("positional")) positionals.add(i);
-            else named.put("--" + str(params.get(i), "name"), i);
+            else {
+                // The parameter's own name and its kebab-case spelling both select it
+                // (`makeSample` answers to `--make-sample` and `--makeSample`). The
+                // compiler rejects two parameters that would share a spelling, so
+                // neither put can shadow another parameter.
+                String pname = str(params.get(i), "name");
+                named.put("--" + pname, i);
+                named.put("--" + Cli.kebab(pname), i);
+            }
         }
 
         int nextPositional = 0;
@@ -261,7 +274,7 @@ public final class ToolCli {
                     // Known operands replace the bare line. A lower bound: when some
                     // call site's operand could not be read, say so on its own line.
                     if (staticDone.add(effect)) {
-                        appendStaticOperands(sb, effect, known);
+                        appendStaticOperands(sb, effect, map(staticOps, effect));
                         if (Boolean.TRUE.equals(map(staticOps, effect).get("unresolved")))
                             sb.append("  ").append(pad(effect, 8)).append("(operand not statically known)\n");
                     }
@@ -309,7 +322,8 @@ public final class ToolCli {
                 // file next to `write(out)`) are added below the parameter line, which
                 // itself stays exactly as it was.
                 List<Object> known = list(map(staticOps, effect), "known");
-                if (!known.isEmpty() && staticDone.add(effect)) appendStaticOperands(sb, effect, known);
+                if (!known.isEmpty() && staticDone.add(effect))
+                    appendStaticOperands(sb, effect, map(staticOps, effect));
             }
         }
         sb.append("(nothing was executed; operands are the arguments the effects are\n");
@@ -317,8 +331,55 @@ public final class ToolCli {
         return sb.toString();
     }
 
-    private static void appendStaticOperands(StringBuilder sb, String effect, List<Object> known) {
-        for (Object k : known) sb.append("  ").append(pad(effect, 8)).append(k).append('\n');
+    private static void appendStaticOperands(StringBuilder sb, String effect,
+                                             Map<String, Object> entry) {
+        List<Object> lines = list(entry, "known");
+        List<Object> commands = list(entry, "commands");
+        if (!commands.isEmpty()) {
+            java.util.Set<String> rendered = new java.util.LinkedHashSet<>();
+            for (Object c : commands) {
+                if (c instanceof List) rendered.add(renderCommand((List<?>) c));
+            }
+            if (!rendered.isEmpty()) lines = new ArrayList<>(rendered);
+        }
+        for (Object k : lines) sb.append("  ").append(pad(effect, 8)).append(k).append('\n');
+    }
+
+    /** How wide a command may get on a plan line before it is cut with {@code …}. */
+    static final int COMMAND_WIDTH = 72;
+
+    /**
+     * A command's leading run of literal arguments, as a plan line shows it: {@code gh pr
+     * list --repo onion-lang/onion}, then {@code " …"} when a non-literal argument
+     * ({@code null}) follows. The run stops at the first non-literal on purpose: what
+     * comes after it depends on a value only the run knows, and a line that skipped the
+     * hole would read as the command itself. Past {@link #COMMAND_WIDTH} characters the
+     * line is cut and ends in {@code …}. An argument that is empty or holds whitespace or
+     * a quote is shown single-quoted, so the words stay countable.
+     */
+    static String renderCommand(List<?> argv) {
+        StringBuilder sb = new StringBuilder();
+        boolean more = false;
+        for (Object a : argv) {
+            if (a == null) { more = true; break; }
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(shellWord(String.valueOf(a)));
+        }
+        if (more) sb.append(sb.length() > 0 ? " …" : "…");
+        if (sb.length() > COMMAND_WIDTH) {
+            sb.setLength(COMMAND_WIDTH - 1);
+            sb.append('…');
+        }
+        return sb.toString();
+    }
+
+    private static String shellWord(String s) {
+        boolean plain = !s.isEmpty();
+        for (int i = 0; plain && i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isWhitespace(c) || c == '\'' || c == '"') plain = false;
+        }
+        return plain ? s : "'" + s.replace("'", "'\\''") + "'";
     }
 
     // ---- help / usage, straight from the contract -------------------------------
@@ -352,8 +413,8 @@ public final class ToolCli {
         for (Map<String, Object> p : params(tool)) {
             String role = str(p, "role");
             if (role.equals("positional")) sb.append(" <").append(str(p, "name")).append('>');
-            else if (role.equals("switch")) sb.append(" [--").append(str(p, "name")).append(']');
-            else sb.append(" [--").append(str(p, "name")).append(" <").append(str(p, "type")).append(">]");
+            else if (role.equals("switch")) sb.append(" [--").append(flagName(p)).append(']');
+            else sb.append(" [--").append(flagName(p)).append(" <").append(str(p, "type")).append(">]");
         }
         sb.append('\n');
         return sb.toString();
@@ -362,8 +423,13 @@ public final class ToolCli {
     private static String paramLabel(Map<String, Object> p) {
         String role = str(p, "role");
         if (role.equals("positional")) return "<" + str(p, "name") + ">";
-        if (role.equals("switch")) return "--" + str(p, "name");
-        return "--" + str(p, "name") + " <" + str(p, "type").toLowerCase() + ">";
+        if (role.equals("switch")) return "--" + flagName(p);
+        return "--" + flagName(p) + " <" + str(p, "type").toLowerCase() + ">";
+    }
+
+    /** The spelling `--help` and usage show for a flag: kebab-case (FRICTION F13). */
+    private static String flagName(Map<String, Object> p) {
+        return Cli.kebab(str(p, "name"));
     }
 
     private static String paramDoc(Map<String, Object> p) {

@@ -43,6 +43,7 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 - `--Wno <codes>` - Suppress specific warnings (e.g., W0001,unused-parameter)
 - `--no-check-laws` - Do not execute record `law`/`example` clauses (they run at compile time by default; the LSP always has them off)
 - `--law-seed <n>` / `--law-samples <n>` - Control law sampling; a falsified law reports the settings that produced its counterexample
+- `--print-classpath` - `onionc` only: print the classpath to run its output with (`-d` dir or `.`, then `-classpath`, then the jars the files' `//> using dep` directives resolve to), platform-separated on stdout, and exit without compiling
 - `--stacktrace` - Print the raw JVM trace for an uncaught runtime error (the default is a diagnostic-style report with the script's own frames only)
 - `ONION_DAEMON=1` (environment) - `onionc` and `onion script.on` compile through a resident daemon (`onion.tools.daemon`), started on first use; a script's classes come back and run in the caller's process; falls back to in-process compilation when the daemon cannot be reached. `java -cp onion.jar onion.tools.daemon.DaemonClient stop|status` controls it
 - `ONION_CONSOLE_ENCODING=auto|native|utf-8` (environment) - the launchers' stdout/stderr encoding (`onion.tools.ConsoleEncoding`). `auto` (default): on Windows a stream that is not a console (pipe, file, mintty) is written in UTF-8 and a console keeps its code page; other OSes unchanged. Source files default to UTF-8 (`-encoding` overrides)

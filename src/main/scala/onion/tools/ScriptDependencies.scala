@@ -67,12 +67,23 @@ object ScriptDependencies {
     directives: ScriptDirectives.Directives,
     cacheDir: Option[Path],
     progress: PrintStream
+  ): Either[String, Seq[String]] =
+    resolve(directives, cacheDir, Some(progress))
+
+  /**
+   * [[resolve]], drawing download progress only when `progress` is given: the language
+   * server passes None, because its stdout is the protocol and its stderr is a log.
+   */
+  def resolve(
+    directives: ScriptDirectives.Directives,
+    cacheDir: Option[Path],
+    progress: Option[PrintStream]
   ): Either[String, Seq[String]] = {
-    val cacheFile = cacheDir.map(_.resolve("script-deps").resolve(cacheKey(directives) + ".classpath"))
+    val cacheFile = cacheFileFor(directives, cacheDir)
     cacheFile.flatMap(readCache) match {
       case Some(hit) => Right(hit)
       case None =>
-        DependencyResolver.resolve(directives.dependencies, directives.repositories, Some(progress)) match {
+        DependencyResolver.resolve(directives.dependencies, directives.repositories, progress) match {
           case Left(error) => Left(error.message)
           case Right(resolved) =>
             val jars = resolved.classpath.map(_.toAbsolutePath.toString)
@@ -81,6 +92,17 @@ object ScriptDependencies {
         }
     }
   }
+
+  /**
+   * The cached classpath for `directives`, without resolving: None when there is no usable
+   * entry. Reads one small file and checks that its jars exist, so a caller that must not
+   * block on the network (the language server) can ask before deciding to resolve.
+   */
+  def cached(directives: ScriptDirectives.Directives, cacheDir: Option[Path]): Option[Seq[String]] =
+    cacheFileFor(directives, cacheDir).flatMap(readCache)
+
+  private def cacheFileFor(directives: ScriptDirectives.Directives, cacheDir: Option[Path]): Option[Path] =
+    cacheDir.map(_.resolve("script-deps").resolve(cacheKey(directives) + ".classpath"))
 
   /**
    * SHA-256 over the format tag, the dependencies sorted by coordinate (declaration order does

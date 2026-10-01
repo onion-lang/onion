@@ -194,6 +194,27 @@ onionc -g:none MyProgram.on
 Running a script with `onion` always emits the table, since a script is compiled in
 memory and there is no artefact to keep small.
 
+### `--print-classpath`
+
+Print the classpath to run the compiled classes with, and exit without compiling anything.
+The line goes to stdout, separated with the platform's path separator (`:`, or `;` on
+Windows), and holds, in this order and each entry once:
+
+1. the output directory: the `-d` value, or `.` when there is none, since that is where
+   `onionc` writes the classes;
+2. the `-classpath` entries, when `-classpath` is given;
+3. the jars the given files' `//> using dep` directives resolve to, transitives included
+   (see Dependencies below).
+
+The directives are resolved exactly as a compile resolves them, through the same cache, so
+asking costs nothing extra afterwards. Download progress and errors go to stderr; a
+malformed directive or a file that cannot be read exits non-zero with no classpath printed.
+
+```bash
+onionc -d out Main.on
+java -cp "$(onionc --print-classpath -d out Main.on)" Main
+```
+
 ## Dependencies (`//> using dep`)
 
 `onionc` reads the `//> using dep` and `//> using repository` directives of the files it
@@ -223,8 +244,8 @@ versions is an error whether the two declarations are in one file or in two, and
 error names both files. A directive error stops `onionc` before anything is compiled.
 
 `onionc` only compiles: to run the classes, the same jars must be on the `java`
-classpath. A [project](project-cli.md) (`onion run`) or the script runner puts them
-there for you.
+classpath. [`--print-classpath`](#--print-classpath) prints that classpath; a
+[project](project-cli.md) (`onion run`) or the script runner puts it there for you.
 
 ## Examples
 

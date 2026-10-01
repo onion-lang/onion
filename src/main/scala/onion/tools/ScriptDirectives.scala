@@ -137,6 +137,14 @@ object ScriptDirectives {
     }
   }
 
+  /**
+   * The 1-based lines of the `//>` lines in the leading comment block, well-formed or not:
+   * where an editor anchors a diagnostic about the directives as a whole (a resolution
+   * failure, or directives that a project does not use).
+   */
+  def directiveLines(text: String): Seq[Int] =
+    leadingBlock(splitLines(text))._1.map(_._1 + 1)
+
   private def declaredTwice(previous: Dependency, dependency: Dependency): String =
     s"${dependency.group}:${dependency.artifact} is declared twice, at ${previous.version} and ${dependency.version}"
 

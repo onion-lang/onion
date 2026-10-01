@@ -43,6 +43,7 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
 - `--Wno <codes>` - 特定の警告を抑制 (例: W0001,unused-parameter)
 - `--no-check-laws` - レコードの `law`/`example` 節を実行しない（既定ではコンパイル時に実行される。LSPでは常に無効）
 - `--law-seed <n>` / `--law-samples <n>` - lawのサンプリングを制御。反証されたlawは、その反例を生成した設定を報告する
+- `--print-classpath` - `onionc` のみ: 出力を実行するための classpath（`-d` のディレクトリまたは `.`、`-classpath`、ファイルの `//> using dep` ディレクティブが解決する jar の順）をプラットフォームの区切り文字で標準出力に表示し、コンパイルせずに終了する
 - `--stacktrace` - 未捕捉の実行時エラーで生のJVMスタックトレースを表示する（既定ではスクリプト自身のフレームのみを含む診断形式のレポートになる）
 - `ONION_DAEMON=1` (環境変数) - `onionc` と `onion script.on` は常駐デーモン（`onion.tools.daemon`）経由でコンパイルする。デーモンは初回利用時に起動し、スクリプトのクラスは呼び出し元プロセスに戻って実行される。デーモンに接続できない場合はプロセス内コンパイルにフォールバックする。`java -cp onion.jar onion.tools.daemon.DaemonClient stop|status` で制御できる
 - `ONION_CONSOLE_ENCODING=auto|native|utf-8` (環境変数) - ランチャの stdout/stderr の文字コード（`onion.tools.ConsoleEncoding`）。`auto`（既定）: Windows ではコンソールでないストリーム（パイプ、ファイル、mintty）を UTF-8 で書き、コンソールはそのコードページのまま。他の OS は変更なし。ソースファイルの既定は UTF-8（`-encoding` で上書き）

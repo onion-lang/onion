@@ -25,7 +25,8 @@ object CompilerFrontend {
     // With ONION_DAEMON set, the command line goes to the resident compile daemon (see
     // onion.tools.daemon.DaemonClient); when the daemon cannot be reached, compile here.
     val viaDaemon =
-      if (onion.tools.daemon.DaemonClient.enabledByEnvironment && !args.exists(a => a == "-h" || a == "--help" || a == "-v" || a == "--version")) {
+      // --print-classpath compiles nothing, so there is nothing to hand the daemon.
+      if (onion.tools.daemon.DaemonClient.enabledByEnvironment && !args.exists(a => a == "-h" || a == "--help" || a == "-v" || a == "--version" || a == PRINT_CLASSPATH)) {
         if (!new CompilerFrontend().prefetchDependencies(args.filterNot(_ == "--verbose"))) Some(-1)
         else onion.tools.daemon.DaemonClient.compile(args)
       }
@@ -59,7 +60,8 @@ class CompilerFrontend {
 
 
   private val commandLineParser = new CommandLineParser(
-    (sharedOptionConfigs :+ OptionConfig(OUTPUT, true) :+ OptionConfig(NO_DEBUG_INFO, false))*
+    (sharedOptionConfigs :+ OptionConfig(OUTPUT, true) :+ OptionConfig(NO_DEBUG_INFO, false) :+
+      OptionConfig(PRINT_CLASSPATH, false))*
   )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
@@ -78,6 +80,8 @@ class CompilerFrontend {
         }
         createConfig(success, verbose) match {
           case None => -1
+          case Some(baseConfig) if success.options.contains(PRINT_CLASSPATH) =>
+            printClasspath(success.options.toMap, baseConfig, params.toSeq)
           case Some(baseConfig) =>
             // `//> using dep` directives of the files being compiled, as `onion script.on`
             // reads them: their union joins the compile classpath (after -classpath).
@@ -100,6 +104,35 @@ class CompilerFrontend {
             else if (generateFiles(result.classes)) 0
             else -1
         }
+    }
+  }
+
+  /**
+   * `--print-classpath`: the classpath to run what this command line compiles with `java`,
+   * on stdout as one platform-separated line, and nothing compiled. In order: the output
+   * directory (`-d`, else `.`, where the classes land), the `-classpath` entries when one is
+   * given, then the jars the files' `//> using` directives resolve to (resolved, and cached,
+   * exactly as a compile would). Each entry once. Resolution progress and errors go to
+   * stderr, so the line can be captured: `java -cp "$(onionc --print-classpath -d out a.on)" A`.
+   * A file that cannot be read is an error here rather than a file with no directives, since
+   * a classpath silently missing its jars is worse than no answer.
+   */
+  private def printClasspath(options: Map[String, CommandLineParam], config: CompilerConfig, files: Seq[String]): Int = {
+    val unreadable = files.filterNot(file => java.nio.file.Files.isReadable(java.nio.file.Paths.get(file)))
+    if (unreadable.nonEmpty) {
+      unreadable.foreach(file => System.err.println(onion.compiler.toolbox.Message("error.parsing.read_error", file)))
+      return -1
+    }
+    ScriptDependencies.classpathForSources(files, config.encoding, System.err) match {
+      case Left(message) =>
+        System.err.println(message)
+        -1
+      case Right(jars) =>
+        val explicit = options.get(CLASSPATH).collect { case ValuedParam(path) => pathArray(path).toSeq }.getOrElse(Seq.empty)
+        val entries = (config.outputDirectory +: (explicit ++ jars)).filter(_.nonEmpty).distinct
+        System.out.println(entries.mkString(java.io.File.pathSeparator))
+        System.out.flush()
+        0
     }
   }
 
@@ -151,6 +184,9 @@ class CompilerFrontend {
          |  --law-seed <n>              RNG seed for law sample generation
          |  --law-samples <n>           Number of samples generated per law parameter
          |  --effects                   Print each method's inferred effect set to stderr
+         |  --print-classpath           Print the classpath to run the output with (the -d
+         |                              directory, -classpath, and the jars of the files'
+         |                              //> using directives) and exit without compiling
          |  -g:none                     Omit the LocalVariableTable (smaller class files,
          |                              but a debugger can no longer show variable values)
          |  -h, --help                  Show this help message
@@ -158,7 +194,8 @@ class CompilerFrontend {
          |
          |Examples:
          |  onionc Hello.on
-         |  onionc -d out -classpath lib/*.jar *.on""".stripMargin)
+         |  onionc -d out -classpath lib/*.jar *.on
+         |  java -cp "$$(onionc --print-classpath -d out Main.on)" Main""".stripMargin)
   }
 
   private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {

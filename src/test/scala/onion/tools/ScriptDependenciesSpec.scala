@@ -225,5 +225,44 @@ class ScriptDependenciesSpec extends AnyFunSuite with Matchers with EitherValues
     err should include("deps.on:2:1: error:")
     err should include("must come before any code")
 
+  // ------------------------------------------------- onionc --print-classpath
+
+  test("onionc --print-classpath prints -d, then -classpath, then the resolved jars, and compiles nothing"):
+    val script = writeScript(header + "class UsesGreeter {}\n")
+    val out = script.resolveSibling("out")
+    val lib = script.resolveSibling("lib.jar").toString
+
+    val (code, stdout, err) = onionc("--print-classpath", "-d", out.toString, "-classpath", lib, script.toString)
+
+    withClue(err) { code shouldBe 0 }
+    val entries = stdout.trim.split(java.io.File.pathSeparator, -1).toSeq
+    entries.take(2) shouldBe Seq(out.toString, lib)
+    entries.drop(2) should have size 2 // greeter and its transitive core
+    entries.exists(_.endsWith("greeter-1.0.0.jar")) shouldBe true
+    entries.exists(_.endsWith("core-1.0.0.jar")) shouldBe true
+    stdout.linesIterator.size shouldBe 1
+    Files.exists(out) shouldBe false
+
+  test("onionc --print-classpath without -d starts with `.`, where the classes would go"):
+    val script = writeScript("class Plain {}\n")
+    val (code, stdout, err) = onionc("--print-classpath", script.toString)
+    withClue(err) { code shouldBe 0 }
+    stdout.trim shouldBe "."
+    Files.exists(Path.of("Plain.class")) shouldBe false // `.` is the working directory
+
+  test("onionc --print-classpath fails on a directive error, printing no classpath"):
+    val script = writeScript("class A {}\n//> using dep \"a:b:1\"\n")
+    val (code, stdout, err) = onionc("--print-classpath", script.toString)
+    code should not be 0
+    stdout.trim shouldBe empty
+    err should include("deps.on:2:1: error:")
+
+  test("onionc --print-classpath fails on a file it cannot read, rather than leaving its jars out"):
+    val missing = Files.createTempDirectory("onionc-missing").resolve("missing.on")
+    val (code, stdout, err) = onionc("--print-classpath", missing.toString)
+    code should not be 0
+    stdout.trim shouldBe empty
+    err should include("missing.on")
+
   test("the runner's own cache directory is the one this suite configured"):
     ScriptDependencies.cacheDirectory() shouldBe Some(cacheRoot)

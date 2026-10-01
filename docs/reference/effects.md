@@ -57,7 +57,9 @@ The table ships with the whole effectful surface of the standard library classif
 `Concurrent`, `ToolCli` — plus the pure remainder of the stdlib (including the nested
 values its entry points hand back, such as `Proc`'s result, `Http`'s response and
 `Json::value`), a pure baseline for common JDK value and collection types and for
-`java.time` (whose `now` methods are `clock`), and the JDK's well-known
+`java.time` (whose `now` methods are `clock`), JDK file I/O (`java.io` file
+streams and `File`, `java.nio.file.Files`; stream wrappers such as `BufferedReader`
+stay `unknown` because they may wrap `System.in` or a socket), and the JDK's well-known
 effect points (`System::getenv`, `System::exit`, `Runtime::exec`, `Thread::sleep`,
 `PrintStream` as the type of `System::out`).
 

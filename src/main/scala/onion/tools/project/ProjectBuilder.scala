@@ -17,7 +17,6 @@ import onion.compiler.StreamInputSource
 import onion.compiler.WarningLevel
 import onion.compiler.diagnostics.DiagnosticRenderer
 import onion.tools.CompiledClassWriter
-import onion.tools.OnionVersion
 
 final case class ProjectBuild(
   paths: ProjectPaths,
@@ -43,7 +42,12 @@ object ProjectBuilder:
     ))
 
 final class ProjectBuilder(
-  compilerVersion: String = OnionVersion.value,
+  /**
+   * Which compiler is building: its version plus a digest of its jar or class directory
+   * (see [[CompilerIdentity]]), so that a new compiler with the same version string — or a
+   * changed compiler resource — invalidates the build cache. Injectable for tests.
+   */
+  compilerIdentity: String = CompilerIdentity.current,
   javaFeature: Int = Runtime.version.feature,
   mover: PathMover = PathMover.system,
   resolver: DependencyResolver.Resolution = DependencyResolver.resolve
@@ -70,7 +74,7 @@ final class ProjectBuilder(
         fingerprint = BuildFingerprint.compute(
           manifest.bytes,
           sources.map(snapshot => snapshot.source.relative -> snapshot.bytes),
-          compilerVersion,
+          compilerIdentity,
           javaFeature,
           resolved.coordinates
         )

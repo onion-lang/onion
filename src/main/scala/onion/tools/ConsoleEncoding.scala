@@ -35,11 +35,29 @@ import java.nio.charset.{Charset, StandardCharsets}
  * A `sun.*` property given with `-D`, or a `stdout.encoding`/`stderr.encoding` that names
  * something other than `native.encoding`, therefore also counts as "keep what the JVM chose".
  *
+ * Standard input follows the same rule, read the other way round: [[install]] records in the
+ * `onion.stdin.encoding` system property the charset `onion.IO` decodes stdin with --
+ *
+ *  - `native`: the JVM's default charset, as before (MS932 on JDK 17 under a Japanese locale).
+ *  - `utf-8`: UTF-8, console or not.
+ *  - `auto`: on Windows, the console's code page when stdin is a console and UTF-8 when it is
+ *    a pipe or a file; UTF-8 on other platforms (what JDK 18+ already does, JEP 400).
+ *
+ * A Windows console hands typed text over in its code page, so decoding it as UTF-8 (the JDK
+ * 18+ default) garbles it, while a pipe carries whatever the producer wrote -- UTF-8 in
+ * practice. Whether stdin is a console is read from `stdin.encoding` on JDK 25+ (set the way
+ * `stdout.encoding` is), otherwise from `System.console()`, which before JDK 22 exists only
+ * when stdin *and* stdout are both a terminal. A `-Donion.stdin.encoding=...` the user gave is
+ * kept. Without a launcher (`java -cp`, tests, embedding hosts) `onion.IO` reads UTF-8.
+ *
  * Only the launchers' `main` methods call [[install]]; embedding hosts, tests and the language
  * server (whose stdout is a protocol channel) are never affected.
  */
 object ConsoleEncoding {
   val EnvironmentVariable = "ONION_CONSOLE_ENCODING"
+
+  /** The system property `onion.IO` decodes standard input with (see the class comment). */
+  val StdinEncodingProperty = "onion.stdin.encoding"
 
   enum Mode {
     case Auto, Native, Utf8
@@ -82,6 +100,48 @@ object ConsoleEncoding {
           Decision(reencode("stdout"), reencode("stderr"))
         }
     }
+
+  /**
+   * The charset standard input should be decoded with in a given environment: None for
+   * `native` (leave it to the JVM's default charset), otherwise the charset's name. Pure, like
+   * [[decide]].
+   */
+  def decideStdin(
+    mode: Mode,
+    osName: String,
+    property: String => Option[String],
+    consoleIsTerminal: () => Boolean
+  ): Option[String] =
+    mode match {
+      case Mode.Native => None
+      case Mode.Utf8 => Some("UTF-8")
+      case Mode.Auto =>
+        if (osName.startsWith("Windows") && stdinIsConsole(property, consoleIsTerminal))
+          Some(consoleCodePage(property).getOrElse("UTF-8"))
+        else Some("UTF-8")
+    }
+
+  private def stdinIsConsole(property: String => Option[String], consoleIsTerminal: () => Boolean): Boolean =
+    property("stdin.encoding") match {
+      case Some(encoding) if property("native.encoding").exists(_ != encoding) => true
+      case _ => consoleIsTerminal()
+    }
+
+  // The code page a console hands typed text over in. JDK 25+ records it for stdin itself;
+  // before that, the console's output code page (the same one unless changed separately) is
+  // what the JVM recorded for a console stdout or stderr, and the ANSI code page is the last
+  // resort.
+  private def consoleCodePage(property: String => Option[String]): Option[String] = {
+    val native = property("native.encoding")
+    def console(key: String): Option[String] = property(key).filter(e => !native.contains(e))
+    console("stdin.encoding")
+      .orElse(property("sun.stdout.encoding"))
+      .orElse(property("sun.stderr.encoding"))
+      .orElse(console("stdout.encoding"))
+      .orElse(console("stderr.encoding"))
+      .orElse(native)
+      .orElse(property("file.encoding"))
+  }
 
   private def attachedToConsole(
     stream: String,
@@ -138,6 +198,15 @@ object ConsoleEncoding {
       if (decision.stderr) {
         System.err.flush()
         System.setErr(utf8Stream(FileDescriptor.err))
+      }
+      if (System.getProperty(StdinEncodingProperty) == null) {
+        val stdin = decideStdin(
+          mode,
+          System.getProperty("os.name", ""),
+          key => Option(System.getProperty(key)),
+          () => consoleIsTerminal()
+        ).getOrElse(Charset.defaultCharset().name)
+        System.setProperty(StdinEncodingProperty, stdin)
       }
       installed = Some(decision)
     }

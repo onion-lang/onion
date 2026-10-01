@@ -32,6 +32,10 @@ formatting (`(1536L).bytes()`, `(21L).ordinal()`).
 
 Console input and output operations.
 
+Standard input is decoded as UTF-8 when it is a pipe or a file, on every JDK; a Windows
+console is decoded in its own code page (see
+[Console encoding](../getting-started/installation.md#console-encoding-windows)).
+
 ### IO::println
 
 Print a line to standard output:
@@ -1491,7 +1495,9 @@ form when the receiver may be an unchecked platform `null`.
 
 ## Files Module
 
-File I/O (`onion.Files`):
+File I/O (`onion.Files`). Text is read and written as UTF-8 on every JDK and platform;
+`Files::readText(path, charset)` and `Files::writeText(path, content, charset)` take a
+`java.nio.charset.Charset` for another encoding:
 
 ```onion
 Files::readText("path.txt")            // whole file as String

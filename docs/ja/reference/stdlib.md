@@ -32,6 +32,9 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 
 コンソール入出力操作。
 
+標準入力は、パイプやファイルのときはどの JDK でも UTF-8 としてデコードします。Windows の
+コンソールはそのコードページでデコードします（[コンソールの文字コード](../getting-started/installation.md)を参照）。
+
 ### IO::println
 
 標準出力に改行付きで出力：
@@ -1998,7 +2001,9 @@ Iterables::sort(xs, (a, b) -> a - b)  // ok -- 新しいソート済みコピー
 
 ## Files モジュール
 
-ファイル I/O（`onion.Files`）:
+ファイル I/O（`onion.Files`）。テキストはどの JDK・プラットフォームでも UTF-8 で読み書きします。
+別の文字コードには、`Files::readText(path, charset)` と `Files::writeText(path, content, charset)` に
+`java.nio.charset.Charset` を渡します:
 
 ```onion
 Files::readText("path.txt")            // ファイル全体を String として

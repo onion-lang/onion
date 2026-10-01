@@ -989,6 +989,22 @@ tool same(b: String): Int requires { console } { IO::println("B"); return 0 }
 // E0082: duplicate tool name `same`.
 ```
 
+### `E0093` — Two parameters answer to the same command-line flag
+
+A flag parameter of a `def main` auto-CLI or a `tool` is accepted both under its own
+name and in kebab-case (`makeSample` answers to `--makeSample` and `--make-sample`).
+When two flag parameters share a spelling, one of them could never be set, so the
+second one is reported at compile time instead of being resolved silently at run time.
+
+```onion
+def main(parseURL: Int = 1, parseUrl: Int = 2): void { IO::println(parseURL + parseUrl) }
+// E0093: parameters `parseURL` and `parseUrl` of `main` would both answer to the
+//        command-line flag `--parse-url`.
+```
+
+Rename one of them. Positional parameters (those without a default) have no flag and
+are not checked.
+
 ## Try/catch errors
 
 ### `E0083` — Unreachable catch clause
@@ -1648,6 +1664,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 | `E0091` | … is a class, not a variable |
 | `E0092` | cannot instantiate primitive type … with `new` |
+| `E0093` | parameters `…` and `…` of `…` would both answer to the command-line flag `--…` |
 
 ## See also
 

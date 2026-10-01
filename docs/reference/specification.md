@@ -707,7 +707,7 @@ flags (`Boolean` defaults become presence switches). A camelCase name is
 also accepted in kebab-case (`makeSample: Boolean = false` answers to
 `--make-sample` and `--makeSample`), and the usage line shows the kebab-case
 spelling; two parameters whose flags would coincide (`parseURL` and
-`parseUrl`, both `--parse-url`) are a compile error. Values are converted
+`parseUrl`, both `--parse-url`) are a compile error (`E0093`). Values are converted
 to the declared types, default expressions are evaluated when the flag is
 absent, and a usage line is derived from the signature on error.
 Everything after the script file on the `onion` command line is passed to

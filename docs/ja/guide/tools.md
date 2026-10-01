@@ -125,7 +125,7 @@ usage: ingest.on <src> <dst> [--count <Int>] [--loud]
 `--count=5`）、`Boolean` のデフォルトはスイッチになります。camelCase のパラメータは、
 名前そのままのフラグに加えて kebab-case のフラグでも指定できます —— `maxRows` は
 `--max-rows` でも `--maxRows` でもよく、`--help` には kebab-case のほうが表示されます。
-同じフラグになってしまう2つのパラメータ（`parseURL` と `parseUrl`）はコンパイルエラーです。
+同じフラグになってしまう2つのパラメータ（`parseURL` と `parseUrl`）はコンパイルエラー（`E0093`）です。
 コマンドラインで省略されたデフォルトは元の式として言語内で評価されます — 文字列を経由した
 往復はしません。
 

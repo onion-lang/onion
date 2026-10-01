@@ -502,7 +502,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       flags.take(j).find(a => (spellings(a) & spellings(b)).nonEmpty).map { a =>
         val shared = (spellings(a) & spellings(b)).toSeq.sorted.head
         CompileError("", b.location,
-          Message("error.cli.flagSpellingCollision", Array[Any](owner, a.name, b.name, shared)))
+          Message("error.semantic.cliFlagSpellingCollision", Array[Any](owner, a.name, b.name, shared)),
+          Some(CLI_FLAG_SPELLING_COLLISION.errorCode))
       }
     }
   }

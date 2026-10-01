@@ -217,7 +217,7 @@ plan: `digest` would
 
 | 効果 | 表示されるオペランド | 読み取り元 |
 |------|----------------------|------------|
-| `net` | ホスト（とポート） | `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse` の URL、`http"…"` リソース、`Net::connect` |
+| `net` | ホスト（とポート） | `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse`/`request`（ビルダーのステップをたどって `send()` まで）の URL、`http"…"` リソース、`Net::connect` |
 | `exec` | コマンド名 | `Proc::capture`/`run`/`exec` のコマンドの先頭語、`captureIn`/`runIn`/`execIn` ではディレクトリの次の語 |
 | `env` | 変数名 | `System::getenv("NAME")`、`Config::getEnv("NAME", …)` |
 | `read`/`write` | パス | `Files` の各操作のパス引数、`file"…"` リソース |

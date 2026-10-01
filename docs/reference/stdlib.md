@@ -2119,12 +2119,101 @@ Http::post(url, body, headers): String   // headers: as for get
 
 ```
 Http::getResponse(url): Response                  // status/body/headers, instead of just the body
+Http::getResponse(url, headers): Response         // headers: as for get
 Http::postResponse(url, body): Response
+Http::postResponse(url, body, headers): Response
 ```
 
 `Response` has `status: Int`, `body: String`, and `headers: List` fields,
-plus `isOk(): Boolean` (2xx) and `isError(): Boolean` (4xx/5xx) helpers — use
+plus `isOk(): Boolean` (2xx) and `isError(): Boolean` (4xx/5xx) helpers, and
+`header(name): String?` (the first value of that header, any case) — use
 these when the status code or headers matter, not just the body.
+
+### Request Builder
+
+For any method, custom headers, a body and a timeout, build the request and `send()` it.
+`send()` returns a `Result[Http.Response, Http.HttpFailure]` (see the Result Module above),
+which keeps two outcomes apart:
+
+- **`Ok(response)`**: the server answered, *whatever the status*. A 404 or a 500 is an
+  `Ok` too; check `status`, `isOk()` or `isError()` on the `Response`.
+- **`Err(failure)`**: no response arrived. The `Http.HttpFailure` says why.
+
+```
+val r = Http::request("POST", "https://api.example.com/v1/messages")
+  .header("content-type", "application/json")
+  .header("x-api-key", key)
+  .body(json)
+  .timeoutSeconds(120)
+  .send()                                  // Result[Http.Response, Http.HttpFailure]
+
+if r.isOk() {
+  val res = r.get()
+  if res.isError() {
+    IO::println("the API said no: #{res.status} #{res.body}")
+  } else {
+    IO::println(res.body)
+  }
+} else {
+  val f = r.getError()
+  select f.kind() {
+    case "timeout": IO::println("gave up after 120 s")
+    case "connect": IO::println("could not reach #{f.url()}: #{f.message()}")
+    else:           IO::println("connection broke: #{f.message()}")
+  }
+}
+```
+
+The usual `Result` combinators apply. `fold` collapses both outcomes, `map` reaches into the
+response, and `do[Result]` chains requests and stops at the first one that got no response:
+
+```
+val line = r.fold((f) -> "no response: #{f.kind()}", (res) -> "HTTP #{res.status}")
+val body = r.map { res -> res.body }.getOrElse("")
+val both = do[Result] {
+  a <- Http::request("GET", urlA).send()
+  b <- Http::request("GET", urlB).send()
+  ret a.status + b.status
+}
+```
+
+For a script where "no response" should simply stop the program, use `sendOrThrow()`. It returns
+the `Response` and rethrows the original exception: `java.net.http.HttpTimeoutException`, or
+another `java.io.IOException`. `send().getOrThrow()` would instead wrap the failure's text in a
+`RuntimeException`.
+
+```
+Http::request(method, url): Http.Request   // method sent as written: "GET", "PUT", "PATCH", ...
+  .header(name, value)                     // adds a header (a repeated name is sent twice)
+  .headers(pairs)                          // adds ["Name1", "Value1", ...]
+  .body(text)                              // UTF-8 body; without one, no body is sent
+  .timeoutSeconds(n) / .timeoutMillis(n)   // per-request timeout (default: none)
+  .send(): Result[Http.Response, Http.HttpFailure]
+  .sendOrThrow(): Http.Response            // throws on no response
+
+Http.HttpFailure                           // a value, never thrown
+  .kind(): String                          // "timeout" | "connect" | "io"
+  .isTimeout() / .isConnect(): Boolean
+  .method() / .url() / .message(): String
+  .cause(): Throwable                      // the underlying exception
+```
+
+- `kind` is one of:
+  - `"timeout"`: the per-request timeout elapsed.
+  - `"connect"`: no connection was made. That covers refused, unknown host, unreachable,
+    the 30-second connect timeout, and a failed TLS handshake.
+  - `"io"`: the connection broke while sending or receiving.
+- Connecting is bounded at 30 seconds with or without a per-request timeout.
+- A `Request` is immutable: every step returns a new one, so a base request with
+  authentication headers can be shared and extended.
+- Programming errors are not outcomes, so they still throw `IllegalArgumentException` at the
+  step that names them, not at `send()`. That covers:
+  - a malformed URL or method
+  - a null header name or value
+  - a header the JDK client manages itself (`Host`, `Content-Length`, ...)
+  - a non-positive timeout
+- Effects: building is pure, and only `send()`/`sendOrThrow()` are `net`. `--plan` follows the
+  builder steps back to a literal URL and shows its host (`net api.example.com`).
 
 ### Other Methods
 

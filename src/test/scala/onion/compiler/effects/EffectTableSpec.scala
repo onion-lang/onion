@@ -45,6 +45,17 @@ class EffectTableSpec extends AnyFunSpec {
       assert(of("onion.HttpResource", "read") == Set(Net))
       assert(of("onion.HttpResource", "url").isEmpty)
     }
+    it("keeps the Http request builder pure until send") {
+      assert(of("onion.Http", "request").isEmpty)
+      for (m <- Seq("header", "headers", "body", "timeoutSeconds", "timeoutMillis", "method", "url"))
+        assert(of("onion.Http$Request", m).isEmpty, m)
+      assert(of("onion.Http$Request", "send") == Set(Net))
+      assert(of("onion.Http$Request", "sendOrThrow") == Set(Net))
+      for (m <- Seq("kind", "method", "url", "message", "cause", "isTimeout", "isConnect"))
+        assert(of("onion.Http$HttpFailure", m).isEmpty, m)
+      assert(of("onion.Http", "getResponse") == Set(Net))
+      assert(of("onion.Http", "postResponse") == Set(Net))
+    }
     it("marks IO console except the pure formatter") {
       assert(of("onion.IO", "println") == Set(Console))
       assert(of("onion.IO", "readLine") == Set(Console))

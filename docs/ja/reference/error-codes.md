@@ -658,11 +658,25 @@ record Inner(x: Int)
 record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner はサポートされていない成分型
 ```
 
-`shape name = ...` 句（正規表現、`json`、`yaml`、`config`）も同じ方法で成分を読むため、
-同じ制限がかかります。メッセージには成分を作れなかった句（`shape doc = json`、`from re"..."`）が表示されます。
+`shape name = ...` 句（正規表現、`yaml`、`config`）も同じ方法で成分を読むため、
+同じ制限がかかります。メッセージには成分を作れなかった句（`shape line = re"..."`、`from re"..."`）が表示されます。
 
-対処: すべての成分をサポートされているスカラー型にとどめるか、通常の `from re"..."`
-マッチのあとで該当フィールドを手動でパースしてください。
+`shape name = json` 句はそれより多くを読みます。スカラーに加えて、スカラーの `List[S]`、
+自身も json shape を宣言したレコード `R`、`List[R]`、およびこれらすべての `T?` です。
+それ以外は json 句でも E0061 のままです —— `Map`、配列、`List[List[S]]`、`List[S?]`、
+json shape を持たないレコード、受け付ける型を指す型エイリアスなど。
+
+```onion
+record Inner(x: Int)                                   // json shape を持たない
+record R(a: String, b: Inner) { shape doc = json }     // E0061: shape doc = json は Inner を読めない
+```
+
+レコードの shape はすべて同じ成分を読むため、json shape が `List[String]` を読めても、
+同じレコードが `shape line = re"..."` も宣言していれば、正規表現の句を名指しする E0061 になります。
+
+対処: すべての成分をサポートされているスカラー型にとどめる（json shape なら上の拡張された
+範囲にとどめ、入れ子のレコードにはそれ自身の `shape doc = json` を与える）か、通常の
+`from re"..."` マッチのあとで該当フィールドを手動でパースしてください。
 
 ### `E0062` — `derive!` がサポートしないレコード成分型
 

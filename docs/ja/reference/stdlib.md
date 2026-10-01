@@ -508,6 +508,28 @@ val out = r.edit { v -> v.copy(port = 9090) }.render()
 `shape name = yaml` の糖衣構文の裏にある lossless shape を、それぞれ `Shape[T]` の値として
 直接組み立てます。
 
+### 構造化 JSON と JSON Schema
+
+json shape の成分には、スカラーの `List[S]`、json shape を宣言した入れ子のレコード、
+そのようなレコードの `List[R]`、およびこれらすべての `T?`（キーが欠けても `null` でもよい）
+も使えます。構造の内側の欠陥はパスを持ちます（`actions[2].owner`）。その裏にあるのが
+オーバーロード `Shapes::json(names, tags, nested, build, explode)` です。タグは
+`List[K]`・`Nested`・末尾の `?` を受け付け、`nested` は `Nested` の成分ごとに入れ子の
+shape を返す `Function0` を持ちます（それ以外は `null`）。
+
+`hasJsonSchema()` は、その shape が読むものを JSON Schema として記述できるかに答えます。
+true になるのは json shape だけです。`jsonSchema()` はそのスキーマを JSON テキストで
+返します。成分ごとに 1 つのプロパティを持つ `object` で、`required` には null 非許容の
+成分をすべて挙げ、`additionalProperties: false` とし、配列と入れ子のオブジェクトにも同じ
+規則で再帰します —— LLM の構造化出力モードが受け取る形式です。
+
+```onion
+val schema = Json::parse(summaryShape.jsonSchema())   // リクエスト本文に埋め込む
+```
+
+ほかの shape の `jsonSchema()` は `UnsupportedOperationException` を投げます。有限の
+インライン スキーマを持たない再帰的なレコードの場合も同様です。
+
 ### コンビネータ
 
 - `eachLine(text[, origin])` — 1行ごとに `Outcome[T]` を返し、読めた行と読めなかった

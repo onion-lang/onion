@@ -301,6 +301,13 @@ wrongly-typed value is a defect, and a malformed document reports the line it
 failed on — the position `Json.JsonParseException` carries and the `derive!`
 path discards. An unrecognised format name is **E0076**.
 
+A `json` shape's components may go beyond the scalars: `List[S]` of a scalar, a record
+that declares a json shape of its own (read through its first json shape), `List[R]` of
+such records, and `T?` of any of these, meaning the key may be absent or `null`. A defect
+inside a structure carries its path (`actions[2].owner`), and `jsonSchema()` describes the
+documents such a shape reads as a JSON Schema. Other formats and regex shapes keep to the
+scalars (**E0061**, naming the clause).
+
 A record may carry **several** shapes, in any mix of forms — the thing
 `from re"..."` and `derive!` structurally cannot do, since each allows one
 pattern or one static per format. For the regex form, the component types,

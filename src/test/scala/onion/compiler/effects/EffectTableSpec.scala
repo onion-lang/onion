@@ -50,6 +50,9 @@ class EffectTableSpec extends AnyFunSpec {
       for (m <- Seq("header", "headers", "body", "timeoutSeconds", "timeoutMillis", "method", "url"))
         assert(of("onion.Http$Request", m).isEmpty, m)
       assert(of("onion.Http$Request", "send") == Set(Net))
+      assert(of("onion.Http$Request", "sendOrThrow") == Set(Net))
+      for (m <- Seq("kind", "method", "url", "message", "cause", "isTimeout", "isConnect"))
+        assert(of("onion.Http$HttpFailure", m).isEmpty, m)
       assert(of("onion.Http", "getResponse") == Set(Net))
       assert(of("onion.Http", "postResponse") == Set(Net))
     }

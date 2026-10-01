@@ -208,10 +208,10 @@ public final class Http {
      *   .header("content-type", "application/json")
      *   .body(json)
      *   .timeoutSeconds(120)
-     *   .send()
-     * if res.isError() { ... res.status ... res.body ... }
+     *   .send()                    // Result[Http.Response, Http.HttpFailure]
      * </pre>
-     * Building is effect-free; only {@link Request#send()} touches the network.
+     * Building is effect-free; only {@link Request#send()} (and
+     * {@link Request#sendOrThrow()}) touches the network.
      * The method is sent as written (HTTP methods are case-sensitive; use upper case).
      *
      * @throws IllegalArgumentException if the method is not a valid HTTP method token,
@@ -306,8 +306,9 @@ public final class Http {
 
         /**
          * Sets a per-request timeout: if no response arrives in time, {@link #send()}
-         * throws {@code java.net.http.HttpTimeoutException}. Without one, a request waits
-         * as long as the server takes (connecting is always bounded at 30 seconds).
+         * returns an {@code Err} whose {@link HttpFailure#kind()} is {@code "timeout"}.
+         * Without one, a request waits as long as the server takes (connecting is always
+         * bounded at 30 seconds).
          *
          * @throws IllegalArgumentException if seconds is not positive
          */
@@ -331,14 +332,38 @@ public final class Http {
         }
 
         /**
-         * Sends the request and returns the response, whatever its status: a 4xx or 5xx
-         * is a Response like any other (check {@code status}, {@code isOk()} or
-         * {@code isError()}), never an exception.
+         * Sends the request. Any HTTP response, whatever its status, is
+         * {@code Ok(response)}: a 4xx or 5xx is a Response like any other (check
+         * {@code status}, {@code isOk()} or {@code isError()}). Not getting a response at
+         * all is {@code Err(failure)}, an {@link HttpFailure} saying why: {@code "timeout"},
+         * {@code "connect"} or {@code "io"}. So "the server said no" and "the server was
+         * never reached" are distinct in the type, and neither one throws.
          *
-         * @throws java.net.http.HttpTimeoutException if a timeout was set and elapsed
-         * @throws java.io.IOException if the connection fails (unknown host, refused, reset)
+         * @throws InterruptedException if the calling thread is interrupted while waiting
          */
-        public Response send() throws Exception {
+        public Result<Response, HttpFailure> send() throws InterruptedException {
+            try {
+                return Result.ok(toResponse(client.send(build(),
+                        java.net.http.HttpResponse.BodyHandlers.ofString())));
+            } catch (java.io.IOException e) {
+                return Result.err(HttpFailure.of(method, url, e));
+            }
+        }
+
+        /**
+         * Sends the request and returns the response, whatever its status, or throws the
+         * underlying exception when no response arrives: {@code HttpTimeoutException}
+         * for a timeout, another {@code java.io.IOException} for a connection failure.
+         * For scripts where "no response" should simply stop the program. Unlike
+         * {@code send().getOrThrow()}, it rethrows the original exception (its type and
+         * cause) instead of wrapping the {@link HttpFailure}'s text.
+         */
+        public Response sendOrThrow() throws java.io.IOException, InterruptedException {
+            return toResponse(client.send(build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofString()));
+        }
+
+        private HttpRequest build() {
             HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .method(method, body == null
@@ -348,13 +373,86 @@ public final class Http {
                 builder.header(headers.get(i), headers.get(i + 1));
             }
             if (timeoutMillis > 0) builder.timeout(Duration.ofMillis(timeoutMillis));
-            return toResponse(client.send(builder.build(),
-                    java.net.http.HttpResponse.BodyHandlers.ofString()));
+            return builder.build();
         }
 
         @Override
         public String toString() {
             return method + " " + url;
+        }
+    }
+
+    /**
+     * Why {@link Request#send()} got no response at all (as opposed to an HTTP error
+     * status, which is an ordinary {@link Response}). A plain value: it is returned in
+     * an {@code Err}, never thrown.
+     *
+     * <p>{@code kind} is one of three strings, so it can be matched with {@code select}:
+     * <ul>
+     *   <li>{@code "timeout"}: the per-request timeout elapsed before a response arrived</li>
+     *   <li>{@code "connect"}: no connection was made (refused, unknown host, unreachable,
+     *       the 30-second connect timeout, a failed TLS handshake)</li>
+     *   <li>{@code "io"}: the connection broke while sending or receiving</li>
+     * </ul>
+     *
+     * @param kind    {@code "timeout"}, {@code "connect"} or {@code "io"}
+     * @param method  the request's HTTP method
+     * @param url     the request's URL
+     * @param message a human-readable reason (never null)
+     * @param cause   the underlying exception
+     */
+    public record HttpFailure(String kind, String method, String url, String message, Throwable cause) {
+
+        /** True when the per-request timeout elapsed. */
+        public boolean isTimeout() {
+            return "timeout".equals(kind);
+        }
+
+        /** True when no connection could be made. */
+        public boolean isConnect() {
+            return "connect".equals(kind);
+        }
+
+        @Override
+        public String toString() {
+            return kind + ": " + method + " " + url + ": " + message;
+        }
+
+        static HttpFailure of(String method, String url, java.io.IOException e) {
+            String kind = classify(e);
+            return new HttpFailure(kind, method, url, describe(e, kind), e);
+        }
+
+        private static String classify(Throwable e) {
+            // The connect timeout is a subclass of the request timeout, so check it first.
+            if (e instanceof java.net.http.HttpConnectTimeoutException) return "connect";
+            if (e instanceof java.net.http.HttpTimeoutException) return "timeout";
+            for (Throwable t = e; t != null; t = t.getCause()) {
+                if (t instanceof java.net.ConnectException
+                        || t instanceof java.net.UnknownHostException
+                        || t instanceof java.net.NoRouteToHostException
+                        || t instanceof java.nio.channels.UnresolvedAddressException
+                        || t instanceof javax.net.ssl.SSLHandshakeException) {
+                    return "connect";
+                }
+                if (t.getCause() == t) break;
+            }
+            return "io";
+        }
+
+        /** The first message in the cause chain; the JDK often leaves ConnectException's empty. */
+        private static String describe(Throwable e, String kind) {
+            for (Throwable t = e; t != null; t = t.getCause()) {
+                String m = t.getMessage();
+                if (m != null && !m.isEmpty()) return m;
+                if (t.getCause() == t) break;
+            }
+            String what = switch (kind) {
+                case "timeout" -> "timed out";
+                case "connect" -> "could not connect";
+                default -> "I/O error";
+            };
+            return what + " (" + e.getClass().getSimpleName() + ")";
         }
     }
 

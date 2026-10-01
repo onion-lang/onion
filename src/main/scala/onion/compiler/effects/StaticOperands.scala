@@ -172,7 +172,7 @@ object StaticOperands {
       case ("onion.Http", m, Effect.Net) if HttpUrlFirst(m) && stringParam(0) => host(arg(0))
       case ("onion.HttpResource", _, Effect.Net) =>
         host(resource(site.target, locals, site.depth, "http", "onion.HttpResource", Fuel))
-      case ("onion.Http$Request", "send", Effect.Net) =>
+      case ("onion.Http$Request", "send" | "sendOrThrow", Effect.Net) =>
         host(httpRequest(site.target, locals, site.depth, Fuel))
       case ("onion.Net", "connect", Effect.Net) if stringParam(0) => exactOrEnv(arg(0))
       case ("onion.Proc", "capture" | "run" | "exec", Effect.Exec)          => command(site, 0, locals)

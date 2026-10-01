@@ -2295,19 +2295,57 @@ Http::postResponse(url, body, headers): Response
 
 ### リクエストビルダー
 
-任意のメソッド・独自ヘッダー・ボディ・タイムアウトが必要なら、リクエストを組み立てて `send()` する:
+任意のメソッド・独自ヘッダー・ボディ・タイムアウトが必要なら、リクエストを組み立てて `send()` する。
+`send()` は `Result[Http.Response, Http.HttpFailure]` を返し（上の「Result モジュール」を参照）、
+二つの結果を区別して保つ:
+
+- **`Ok(response)`**: サーバーが応答した。*ステータスが何であっても*そうなる。404 や 500 も
+  `Ok` なので、`Response` の `status`・`isOk()`・`isError()` で確認する。
+- **`Err(failure)`**: 応答が得られなかった。`Http.HttpFailure` がその理由を表す。
 
 ```
-val res = Http::request("POST", "https://api.example.com/v1/messages")
+val r = Http::request("POST", "https://api.example.com/v1/messages")
   .header("content-type", "application/json")
   .header("x-api-key", key)
   .body(json)
   .timeoutSeconds(120)
-  .send()                                  // -> Response
-if res.isError() {
-  IO::println("failed: #{res.status} #{res.body}")
+  .send()                                  // Result[Http.Response, Http.HttpFailure]
+
+if r.isOk() {
+  val res = r.get()
+  if res.isError() {
+    IO::println("the API said no: #{res.status} #{res.body}")
+  } else {
+    IO::println(res.body)
+  }
+} else {
+  val f = r.getError()
+  select f.kind() {
+    case "timeout": IO::println("gave up after 120 s")
+    case "connect": IO::println("could not reach #{f.url()}: #{f.message()}")
+    else:           IO::println("connection broke: #{f.message()}")
+  }
 }
 ```
+
+いつもの `Result` のコンビネーターが使える。`fold` は二つの結果を一つにまとめ、`map` は
+レスポンスの中身に手を入れる。`do[Result]` はリクエストを連ね、応答が得られなかった最初の
+ところで止まる:
+
+```
+val line = r.fold((f) -> "no response: #{f.kind()}", (res) -> "HTTP #{res.status}")
+val body = r.map { res -> res.body }.getOrElse("")
+val both = do[Result] {
+  a <- Http::request("GET", urlA).send()
+  b <- Http::request("GET", urlB).send()
+  ret a.status + b.status
+}
+```
+
+「応答なし」なら単にプログラムを止めたいスクリプトでは `sendOrThrow()` を使う。これは
+`Response` を返し、元の例外（`java.net.http.HttpTimeoutException` か、その他の
+`java.io.IOException`）をそのまま投げ直す。`send().getOrThrow()` の場合は、失敗の文面を
+`RuntimeException` で包むことになる。
 
 ```
 Http::request(method, url): Http.Request   // メソッドは書いたとおりに送る: "GET", "PUT", "PATCH", ...
@@ -2315,21 +2353,32 @@ Http::request(method, url): Http.Request   // メソッドは書いたとおり�
   .headers(pairs)                          // ["Name1", "Value1", ...] を追加
   .body(text)                              // UTF-8 のボディ。指定しなければボディなし
   .timeoutSeconds(n) / .timeoutMillis(n)   // リクエスト単位のタイムアウト（既定: なし）
-  .send(): Response
+  .send(): Result[Http.Response, Http.HttpFailure]
+  .sendOrThrow(): Http.Response            // 応答がなければ例外
+
+Http.HttpFailure                           // 値であり、投げられることはない
+  .kind(): String                          // "timeout" | "connect" | "io"
+  .isTimeout() / .isConnect(): Boolean
+  .method() / .url() / .message(): String
+  .cause(): Throwable                      // 元になった例外
 ```
 
-- `send()` は 4xx・5xx のステータスでは例外を投げない。`Response` がステータスを運ぶので、
-  `status`・`isOk()`・`isError()` で確認する。
-- 応答が得られないときは例外を**投げる**。タイムアウト経過時は
-  `java.net.http.HttpTimeoutException`、接続失敗（ホスト不明・拒否・リセット）時は
-  `java.io.IOException`。接続そのものはタイムアウトの有無にかかわらず 30 秒で打ち切られる。
+- `kind` は次のいずれか:
+  - `"timeout"`: リクエスト単位のタイムアウトが経過した。
+  - `"connect"`: 接続できなかった。拒否・ホスト不明・到達不能・30 秒の接続タイムアウト・
+    TLS ハンドシェイク失敗がこれに当たる。
+  - `"io"`: 送受信の途中で接続が壊れた。
+- 接続そのものは、リクエスト単位のタイムアウトの有無にかかわらず 30 秒で打ち切られる。
 - `Request` は不変。各ステップは新しい `Request` を返すので、認証ヘッダー付きの土台を
   共有して拡張できる。
-- 不正な URL やメソッド、null のヘッダー名・値、JDK クライアントが自分で管理するヘッダー
-  （`Host`・`Content-Length` など）、正でないタイムアウトは、`send()` ではなくそれを書いた
-  ステップで `IllegalArgumentException` になる。
-- 効果: 組み立ては pure で、`send()` だけが `net`。`--plan` はビルダーのステップをたどって
-  リテラル URL のホストを読む（`net api.example.com`）。
+- プログラミングの誤りは「結果」ではないので、`send()` ではなくそれを書いたステップで
+  `IllegalArgumentException` を投げる。対象は次のとおり:
+  - 不正な URL やメソッド
+  - null のヘッダー名・値
+  - JDK クライアントが自分で管理するヘッダー（`Host`・`Content-Length` など）
+  - 正でないタイムアウト
+- 効果: 組み立ては pure で、`send()`/`sendOrThrow()` だけが `net`。`--plan` はビルダーの
+  ステップをたどってリテラル URL まで戻り、そのホストを示す（`net api.example.com`）。
 
 ### その他のメソッド
 

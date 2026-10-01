@@ -121,7 +121,7 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
       assert(operands(out, "write") == Seq("out/log.txt"), out)
     }
 
-    it("reads the host of an Http::request builder, through its steps and a val") {
+    it("reads the host of an Http::request builder through send()/sendOrThrow(), its steps and a val") {
       val (r, out) = run(
         """tool ask(prompt: String): Int
           |  requires { net, env, console }
@@ -133,8 +133,8 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
           |    .timeoutSeconds(120)
           |    .send()
           |  val base = Http::request("GET", "https://builder.example.org/" + prompt)
-          |  val status = base.headers(["accept", "text/plain"]).send().status
-          |  IO::println(res.status + status)
+          |  val status = base.headers(["accept", "text/plain"]).sendOrThrow().status
+          |  IO::println(res.isOk() + " " + status)
           |  return 0
           |}
           |""".stripMargin, "hi", "--plan")
@@ -148,7 +148,7 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
         """tool hit(url: String): Int
           |  requires { net, console }
           |{
-          |  IO::println(Http::request("DELETE", url).send().status)
+          |  IO::println(Http::request("DELETE", url).send().isOk())
           |  return 0
           |}
           |""".stripMargin, "https://x.example.com", "--plan")

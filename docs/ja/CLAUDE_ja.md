@@ -439,6 +439,7 @@ try {
 | `else if condition { }` | ✓ 正しい - `else if`チェーンはサポートされている（式としても使える） |
 | `switch value { case 1: }` | `select value { case 1: }` - `switch`ではなく`select` |
 | `case s: String:`（Java/Scala流パターン） | `case s is String:` - 型パターンは`is`を使う。sealedの網羅性チェック（E0042）が適用される |
+| `case o is Result.Ok:`（ネストしたJava型）は未対応？ | ✓ 正しい - 型パターンにはネストしたJavaクラスをドット区切りで書ける（`Result.Ok`、`onion.Outcome.Bad`、`Map.Entry`、さらに深い`a.B.C.D`）。束縛はスクルーティニーの型引数を復元し、Javaの`sealed ... permits`なスクルーティニーにもE0042の網羅性チェックが効く。Javaのレコードは型でのみマッチする（`case Ok(v)`の分解はOnionのレコード専用） |
 | `case Add(l, n is Num):` のようなネストした型パターン？ | ✓ 正しい - 型パターンはデストラクチャリングの中にネストでき、束縛された値は絞り込まれた型として使える。レコードでない要素にも使える（`case Wrap(s is String)`） |
 | `case Circle(r):` は非サポート？ | ✓ 正しい - レコードのデストラクチャリングパターンは動作する。`case x when guard:` も使える |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - 括弧なし |
@@ -470,6 +471,7 @@ try {
 |---------------------|----------------|
 | `import java.util.*;` | `import { java.util.* }` - 波括弧が必要 |
 | `import { Foo = pkg.Class; }` | `import { pkg.Class as Foo; }` - エイリアスに`as` |
+| `import { onion.Result$Ok }` | `import { onion.Result.Ok }`（または`... as ROk`） - ネストしたクラスはドット区切りでインポートし、JVMの`$`名は書かない。`a.b.C`はJavaと同じく、トップレベルクラスを指す最長の接頭辞を優先し、残りをメンバークラスとして解決する |
 | `new int[10]` | `new Int[10]` - プリミティブ型名は大文字 |
 | `int`, `long`, `boolean` | `Int`, `Long`, `Boolean` - 大文字 |
 
@@ -521,6 +523,7 @@ try {
 | `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ 正しい - データを持つenum。`mass()` アクセサ、`values()`/`valueOf()` が使える |
 | ADT（直和型）のenum？ | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case` キーワードで宣言する各ケースがそれぞれのフィールドを持つ。sealedインターフェース＋ケースごとのrecordに脱糖され、`select` の網羅性チェック（E0042）が適用される。フィールドが無いケース（シングルトン）は `new Origin()` で作るゼロフィールドrecordになる。`case`-enumは `java.lang.Enum` ではなくsealed階層（`values()`/`ordinal()` は無い）。共有パラメータと `case` ケースの混在はエラー |
 | ジェネリックなADT enum？ | `enum Opt[T] { case Some(value: T); case Nothing }` - 型パラメータは生成されるsealedインターフェースと各ケースのrecordに伝播する。型パターンはスクルーティニーの型引数を復元するので、`Opt[String]` から `Some` をマッチさせると `Some[String]` が束縛され、`s.value()` は `String` になる。*homogeneous*（データを持たない）enumは型パラメータを取れない（`java.lang.Enum`になるため） |
+| `onion.Result`/`Option`/`Outcome`をケースでマッチ？ | `select r { case o is Result.Ok: o.value(); case e is Result.Err: e.error() }`（`Option.Some`/`Option.None`、`Outcome.Ok`/`Outcome.Bad`も同様） - sealedなJavaインターフェースにネストしたJavaレコード。型でマッチし（`Result.Ok(v)`の分解は不可）、スクルーティニーの型引数で束縛され、全ケースをそろえれば網羅的 |
 | レコードから手でパーサーを書く | `record R(...) from re"..."` - `R::parse(s): R?`（アンカー一致、非マッチ/変換失敗はnull）と `R::parseAll(text): List` を合成する。`from` は `conforms` より前に書く |
 | `null` ではなく失敗理由すべてが欲しい、あるいはレコード1つに複数の境界を名付けたい？ | `record R(...) { shape name = re"..." }` - `R::name(): onion.Shape[R]` を合成する。`.parse(s)` は `Outcome[R]`（値、またはそれが得られなかった全理由を `Defect` として保持する）を返し、可逆な場合は `.print(v)` で書き戻せる。`shape` 節はレコード1つに複数付けられる（正規表現以外に `shape name = json`/`config` という書式指定も可）。`from re"..."` と共存できる |
 | `shape doc = json` のレコードにリストや入れ子のオブジェクトを持たせたい？ / LLM の構造化出力用の JSON Schema が欲しい？ | `record S(tags: List[String], owner: Action, acts: List[Action], note: String?) { shape doc = json }` - json shape （json だけ。正規表現/yaml/config はスカラーのままで、それ以外は句を名指しする E0061）はスカラーの `List[S]`、自身の json shape を宣言したレコード `R`（その最初の json shape で読む）、`List[R]`、`T?`（キーの欠落または null）も読む。欠陥は `acts[2].owner` のようなパスを持つ。`S::doc().jsonSchema()` は JSON Schema のテキストを返し（閉じたオブジェクト、`required` は null 非許容の成分）、`hasJsonSchema()` が true になるのは json shape だけ |

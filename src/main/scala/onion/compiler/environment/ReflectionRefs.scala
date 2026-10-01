@@ -236,5 +236,14 @@ object ReflectionRefs {
       }
       constructors_.toArray(new Array[TypedAST.ConstructorRef](0))
     }
+
+    override lazy val javaPermittedSubclassNames: Seq[String] = {
+      val permitted = try klass.getPermittedSubclasses catch { case _: LinkageError => null }
+      if (permitted == null) Nil else permitted.toList.map(_.getName)
+    }
+
+    override lazy val memberClassNames: Seq[String] =
+      try klass.getDeclaredClasses.toList.map(_.getName)
+      catch { case _: LinkageError | _: SecurityException => Nil }
   }
 }

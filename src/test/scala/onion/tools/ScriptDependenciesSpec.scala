@@ -162,5 +162,68 @@ class ScriptDependenciesSpec extends AnyFunSuite with Matchers with EitherValues
     key(ScriptDirectives.Directives(Seq(a), Seq.empty)) should not be
       key(ScriptDirectives.Directives(Seq(Dependency("a", "a", "2")), Seq.empty))
 
+  // ------------------------------------------------------------------- onionc
+
+  private def onionc(args: String*): (Int, String, String) =
+    capture(new CompilerFrontend().run(args.toArray))
+
+  test("onionc compiles a file against its //> using dep"):
+    val script = writeScript(
+      header +
+        """import { com.example.oniontest.Greeter }
+          |class UsesGreeter {
+          |public:
+          |  static def hello(): String { return Greeter::greet() }
+          |}
+          |""".stripMargin)
+    val out = Files.createTempDirectory("onionc-deps-out")
+
+    val (code, _, err) = onionc("-d", out.toString, script.toString)
+
+    withClue(err) { code shouldBe 0 }
+    Files.isRegularFile(out.resolve("UsesGreeter.class")) shouldBe true
+
+  test("onionc compiles several files against the union of their directives"):
+    // Only a.on declares the dependency; b.on uses it. Compiled together, they share one classpath.
+    val dir = Files.createTempDirectory("onionc-deps-union")
+    val a = dir.resolve("a.on")
+    val b = dir.resolve("b.on")
+    Files.writeString(a, header + "class A {}\n", UTF_8)
+    Files.writeString(b,
+      """import { com.example.oniontest.Greeter }
+        |class B {
+        |public:
+        |  static def hello(): String { return Greeter::greet() }
+        |}
+        |""".stripMargin, UTF_8)
+    val out = dir.resolve("out")
+
+    val (code, _, err) = onionc("-d", out.toString, a.toString, b.toString)
+
+    withClue(err) { code shouldBe 0 }
+    Files.isRegularFile(out.resolve("B.class")) shouldBe true
+
+  test("onionc rejects two versions of one module across files before compiling"):
+    val dir = Files.createTempDirectory("onionc-deps-conflict")
+    val a = dir.resolve("a.on")
+    val b = dir.resolve("b.on")
+    Files.writeString(a, "//> using dep \"com.example:lib:1.0.0\"\nclass A {}\n", UTF_8)
+    Files.writeString(b, "//> using dep \"com.example:lib:2.0.0\"\nclass B {}\n", UTF_8)
+    val out = dir.resolve("out")
+
+    val (code, _, err) = onionc("-d", out.toString, a.toString, b.toString)
+
+    code should not be 0
+    err should include("b.on:1:15: error:")
+    err should include("com.example:lib is declared at 1.0.0 in " + a + " and at 2.0.0 here")
+    Files.exists(out.resolve("A.class")) shouldBe false
+
+  test("onionc reports a directive error with the file and line, like the script runner"):
+    val script = writeScript("class A {}\n//> using dep \"a:b:1\"\n")
+    val (code, _, err) = onionc("-d", script.resolveSibling("out").toString, script.toString)
+    code should not be 0
+    err should include("deps.on:2:1: error:")
+    err should include("must come before any code")
+
   test("the runner's own cache directory is the one this suite configured"):
     ScriptDependencies.cacheDirectory() shouldBe Some(cacheRoot)

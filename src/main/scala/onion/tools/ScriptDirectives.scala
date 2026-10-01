@@ -3,7 +3,7 @@ package onion.tools
 import scala.util.boundary
 import scala.util.boundary.break
 
-import onion.tools.project.{Dependency, ProjectManifest}
+import onion.tools.project.{Dependency, DependencyVersion, ProjectManifest}
 
 /**
  * `//> using` directives: the Maven dependencies a single-file script declares for itself.
@@ -49,10 +49,17 @@ object ScriptDirectives {
   /** A `//> using` line anywhere: what the after-the-leading-block check looks for. */
   private val UsingLine = raw"""^[ \t]*//>[ \t]*using\b.*$$""".r
 
-  def parse(text: String): Either[DirectiveError, Directives] = boundary {
+  /** A `using dep` value with the 1-based position it was written at. */
+  private final case class Declared(dependency: Dependency, line: Int, column: Int)
+
+  /**
+   * One file's directives, every check applied except the one between declarations (two
+   * versions of a module), which [[parse]] and [[parseAll]] apply over their own scope.
+   */
+  private def scan(text: String): Either[DirectiveError, (Seq[Declared], Seq[String])] = boundary {
     val lines = splitLines(text)
     val (leading, firstCodeLine) = leadingBlock(lines)
-    val dependencies = scala.collection.mutable.ArrayBuffer[(Dependency, Int, Int)]()
+    val dependencies = scala.collection.mutable.ArrayBuffer[Declared]()
     val repositories = scala.collection.mutable.ArrayBuffer[String]()
 
     for ((lineIndex, column) <- leading) {
@@ -63,7 +70,7 @@ object ScriptDirectives {
             for ((value, valueColumn) <- values) {
               parseDependency(value) match {
                 case Left(message) => break(Left(DirectiveError(lineIndex + 1, valueColumn, message)))
-                case Right(dependency) => dependencies += ((dependency, lineIndex + 1, valueColumn))
+                case Right(dependency) => dependencies += Declared(dependency, lineIndex + 1, valueColumn)
               }
             }
           } else {
@@ -77,21 +84,6 @@ object ScriptDirectives {
       }
     }
 
-    // A second version of the same module is a contradiction, not a preference; say so rather
-    // than letting the resolver pick one.
-    val byModule = scala.collection.mutable.LinkedHashMap[(String, String), Dependency]()
-    for ((dependency, line, column) <- dependencies) {
-      val module = (dependency.group, dependency.artifact)
-      byModule.get(module) match {
-        case Some(previous) if previous.version != dependency.version =>
-          break(Left(DirectiveError(line, column,
-            s"${dependency.group}:${dependency.artifact} is declared twice, " +
-              s"at ${previous.version} and ${dependency.version}")))
-        case Some(_) => ()
-        case None => byModule(module) = dependency
-      }
-    }
-
     firstCodeLine.foreach { start =>
       (start until lines.length).find(i => UsingLine.matches(lines(i))).foreach { i =>
         break(Left(DirectiveError(i + 1, lines(i).indexOf("//>") + 1,
@@ -99,8 +91,74 @@ object ScriptDirectives {
       }
     }
 
-    Right(Directives(byModule.values.toSeq, repositories.toSeq))
+    Right((dependencies.toSeq, repositories.toSeq))
   }
+
+  def parse(text: String): Either[DirectiveError, Directives] =
+    scan(text).flatMap { case (declared, repositories) =>
+      // A second version of the same module is a contradiction, not a preference; say so
+      // rather than letting the resolver pick one.
+      firstConflict(declared.map(("", _))) match {
+        case Some((_, previous, _, conflicting)) =>
+          Left(DirectiveError(conflicting.line, conflicting.column, declaredTwice(previous, conflicting.dependency)))
+        case None => Right(Directives(distinctModules(declared), repositories))
+      }
+    }
+
+  /**
+   * The directives of several sources compiled together (`onionc a.on b.on`), as their union:
+   * the dependencies of every file, each module once, and the repositories in the order the
+   * files and their lines declare them. Two versions of one module are the same error they
+   * are within one script, wherever the two declarations are; the error names the second
+   * declaration's file and position (and the first's file, when it is another one).
+   *
+   * @param sources (file name, text) pairs, in command-line order
+   * @return the merged directives, or the error rendered like a compiler diagnostic
+   */
+  def parseAll(sources: Seq[(String, String)]): Either[String, Directives] = boundary {
+    val declared = scala.collection.mutable.ArrayBuffer[(String, Declared)]()
+    val repositories = scala.collection.mutable.ArrayBuffer[String]()
+    for ((file, text) <- sources) {
+      scan(text) match {
+        case Left(error) => break(Left(error.render(file)))
+        case Right((fileDeclared, fileRepositories)) =>
+          declared ++= fileDeclared.map((file, _))
+          fileRepositories.foreach(r => if (!repositories.contains(r)) repositories += r)
+      }
+    }
+    firstConflict(declared.toSeq) match {
+      case Some((previousFile, previous, file, conflicting)) =>
+        val message =
+          if (previousFile == file) declaredTwice(previous, conflicting.dependency)
+          else s"${conflicting.dependency.group}:${conflicting.dependency.artifact} is declared at " +
+            s"${previous.version} in $previousFile and at ${conflicting.dependency.version} here"
+        Left(DirectiveError(conflicting.line, conflicting.column, message).render(file))
+      case None => Right(Directives(distinctModules(declared.map(_._2).toSeq), repositories.toSeq))
+    }
+  }
+
+  private def declaredTwice(previous: Dependency, dependency: Dependency): String =
+    s"${dependency.group}:${dependency.artifact} is declared twice, at ${previous.version} and ${dependency.version}"
+
+  /** The first declaration naming a module already declared at another version, with that earlier one. */
+  private def firstConflict(declared: Seq[(String, Declared)]): Option[(String, Dependency, String, Declared)] = {
+    val byModule = scala.collection.mutable.HashMap[(String, String), (String, Dependency)]()
+    declared.iterator.flatMap { case (file, d) =>
+      val module = (d.dependency.group, d.dependency.artifact)
+      byModule.get(module) match {
+        case Some((previousFile, previous)) if previous.version != d.dependency.version =>
+          Some((previousFile, previous, file, d))
+        case Some(_) => None
+        case None =>
+          byModule(module) = (file, d.dependency)
+          None
+      }
+    }.nextOption()
+  }
+
+  /** Each module once, in first-declaration order (callers have ruled out conflicts). */
+  private def distinctModules(declared: Seq[Declared]): Seq[Dependency] =
+    declared.map(_.dependency).distinctBy(d => (d.group, d.artifact))
 
   private def splitLines(text: String): IndexedSeq[String] =
     text.stripPrefix("﻿").split("\r\n|\r|\n", -1).toIndexedSeq
@@ -212,17 +270,7 @@ object ScriptDirectives {
     }
   }
 
-  /**
-   * A version coursier will not treat as a range or a moving target: no interval brackets or
-   * commas (`[1.0,2.0)`), no Ivy-style `1.+`, and none of the `latest.*`/`LATEST`/`RELEASE`
-   * aliases. A script has no lock file, so a range would change what it runs against silently.
-   */
-  private[tools] def exactVersion(version: String): Boolean = {
-    val lower = version.toLowerCase
-    version.nonEmpty &&
-      !version.exists(c => Character.isWhitespace(c) || "[](),".indexOf(c) >= 0) &&
-      !version.endsWith("+") &&
-      !lower.startsWith("latest") &&
-      lower != "release"
-  }
+  /** The rule `onion.toml` applies too: see [[onion.tools.project.DependencyVersion]]. */
+  private[tools] def exactVersion(version: String): Boolean =
+    DependencyVersion.isExact(version)
 }

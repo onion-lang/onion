@@ -191,6 +191,39 @@ onionc -g:none MyProgram.on
 `onion` でスクリプトを実行する場合は常にテーブルを出力します。スクリプトはメモリ上で
 コンパイルされ、小さく保つべき成果物が存在しないためです。
 
+## 依存ライブラリ（`//> using dep`）
+
+`onionc` は、コンパイルするファイルの `//> using dep` と `//> using repository`
+ディレクティブを、[スクリプトランナー](script-runner.md)とまったく同じように読み取ります。
+パーサー、厳密バージョンの規則、リゾルバー、classpath キャッシュはすべて共通です。
+解決された jar（推移的依存を含む）は、`-classpath` の指定の後ろに追加されて
+コンパイル時の classpath に載ります。
+
+```onion
+//> using dep "com.google.code.gson:gson:2.11.0"
+
+import { com.google.gson.Gson }
+
+class ToJson {
+public:
+  static def of(value: Object): String { return new Gson().toJson(value) }
+}
+```
+
+```bash
+onionc -d out ToJson.on
+```
+
+複数のファイルを一緒にコンパイルすると、それぞれのディレクティブは**和集合**になります。
+どれか1つのファイルが宣言したライブラリはすべてのファイルの classpath に載り、
+リポジトリはファイルと行の順に検索されます。同じモジュールを2つのバージョンで宣言すると、
+1つのファイル内でも2つのファイルにまたがっていてもエラーになり、エラーは両方のファイルを
+示します。ディレクティブのエラーがあると、`onionc` は何もコンパイルせずに止まります。
+
+`onionc` はコンパイルするだけです。クラスを実行するには、同じ jar を `java` の
+classpath に載せる必要があります。[プロジェクト](project-cli.md)（`onion run`）や
+スクリプトランナーなら自動で載せてくれます。
+
 ## 例
 
 ### 基本的なコンパイル

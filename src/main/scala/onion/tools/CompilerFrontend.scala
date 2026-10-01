@@ -24,8 +24,10 @@ object CompilerFrontend {
     // With ONION_DAEMON set, the command line goes to the resident compile daemon (see
     // onion.tools.daemon.DaemonClient); when the daemon cannot be reached, compile here.
     val viaDaemon =
-      if (onion.tools.daemon.DaemonClient.enabledByEnvironment && !args.exists(a => a == "-h" || a == "--help" || a == "-v" || a == "--version"))
-        onion.tools.daemon.DaemonClient.compile(args)
+      if (onion.tools.daemon.DaemonClient.enabledByEnvironment && !args.exists(a => a == "-h" || a == "--help" || a == "-v" || a == "--version")) {
+        if (!new CompilerFrontend().prefetchDependencies(args.filterNot(_ == "--verbose"))) Some(-1)
+        else onion.tools.daemon.DaemonClient.compile(args)
+      }
       else None
     val exitCode = viaDaemon.getOrElse(runCommandLine(args))
     if (exitCode != 0) System.exit(exitCode)
@@ -75,7 +77,18 @@ class CompilerFrontend {
         }
         createConfig(success, verbose) match {
           case None => -1
-          case Some(config) =>
+          case Some(baseConfig) =>
+            // `//> using dep` directives of the files being compiled, as `onion script.on`
+            // reads them: their union joins the compile classpath (after -classpath).
+            val dependencyJars = ScriptDependencies.classpathForSources(params.toSeq, baseConfig.encoding, System.err) match {
+              case Left(message) =>
+                System.err.println(message)
+                return -1
+              case Right(jars) => jars
+            }
+            val config =
+              if (dependencyJars.isEmpty) baseConfig
+              else baseConfig.copy(classPath = baseConfig.classPath ++ dependencyJars)
             val result = compile(config, params)
             if (config.dumpAst) emitAstDump(result)
             if (config.dumpTypedAst) emitTypedAstDump(result)
@@ -88,6 +101,26 @@ class CompilerFrontend {
         }
     }
   }
+
+  /**
+   * Before a daemon compile: resolves the sources' `//> using` directives here, as
+   * `onion script.on` does, so download progress reaches this terminal as it happens and the
+   * daemon then finds the classpath cache warm. A directive error is printed here and ends
+   * the compile; false then. A command line that does not parse is left to the daemon to
+   * report.
+   */
+  private[tools] def prefetchDependencies(commandLine: Array[String]): Boolean =
+    commandLineParser.parse(commandLine) match {
+      case ParseSuccess(options, arguments) if arguments.nonEmpty =>
+        val encoding = options.get(ENCODING).collect { case ValuedParam(value) => value }.getOrElse(DEFAULT_ENCODING)
+        ScriptDependencies.classpathForSources(arguments.toSeq, encoding, System.err) match {
+          case Left(message) =>
+            System.err.println(message)
+            false
+          case Right(_) => true
+        }
+      case _ => true
+    }
 
   private def generateFiles(binaries: Seq[CompiledClass]): Boolean =
     CompiledClassWriter.writeAll(binaries).isRight

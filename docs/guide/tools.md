@@ -133,7 +133,7 @@ at compile time. Required parameters are positionals; defaulted parameters becom
 `--name` flags (`--count 5` or `--count=5`); `Boolean` defaults become switches. A
 camelCase parameter answers to its kebab-case flag as well as to its own name —
 `maxRows` is `--max-rows` or `--maxRows` — and `--help` shows the kebab-case one; two
-parameters that would share a flag (`parseURL` and `parseUrl`) are a compile error. A
+parameters that would share a flag (`parseURL` and `parseUrl`) are a compile error (`E0093`). A
 default that is absent on the command line is evaluated as the original expression, in
 the language — it is never round-tripped through a string.
 

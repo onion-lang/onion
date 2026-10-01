@@ -560,6 +560,11 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |tool same(b: String): Int requires { console } { IO::println("B"); return 0 }
           |""".stripMargin)
     }
+    it("E0093 two auto-CLI parameters that answer to the same flag") {
+      failsWith("E0093",
+        """def main(parseURL: Int = 1, parseUrl: Int = 2): void { IO::println(parseURL + parseUrl) }
+          |""".stripMargin)
+    }
     it("E0076 unknown shape format") {
       failsWith("E0076",
         """record P(x: Int) {

@@ -10,7 +10,7 @@ import scala.jdk.CollectionConverters._
  * `def main(makeSample: Boolean = false)` used to accept only `--makeSample` and reject
  * `--make-sample` as an unknown option. Both spellings now work, for the `def main`
  * auto-CLI and for `tool` CLIs; usage and `--help` show the kebab-case one; and two
- * parameters that would answer to the same flag are a compile error.
+ * parameters that would answer to the same flag are a compile error (E0093).
  *
  * Everything asserted here is either locale-independent output (usage text, ToolCli's
  * English-only messages) or a parameter/flag name that appears verbatim in both
@@ -88,6 +88,7 @@ class KebabCaseFlagSpec extends AbstractShellSpec {
       assert(!r.isInstanceOf[Shell.Success], r.toString)
       assert(out.contains("parseURL") && out.contains("parseUrl"), out)
       assert(out.contains("--parse-url"), out)
+      assert(out.contains("E0093"), out)
     }
 
     it("does not report positionals, which have no flag") {
@@ -155,6 +156,7 @@ class KebabCaseFlagSpec extends AbstractShellSpec {
           |""".stripMargin, "--help")
       assert(!r.isInstanceOf[Shell.Success], r.toString)
       assert(out.contains("`X`") && out.contains("`x`") && out.contains("--x"), out)
+      assert(out.contains("E0093"), out)
     }
   }
 

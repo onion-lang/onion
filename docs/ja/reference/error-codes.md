@@ -980,6 +980,22 @@ tool same(b: String): Int requires { console } { IO::println("B"); return 0 }
 // E0082: tool 名 `same` が重複しています。
 ```
 
+### `E0093` — 2つのパラメータが同じコマンドラインフラグに対応する
+
+`def main` の自動 CLI や `tool` のフラグパラメータは、パラメータ名そのままでも kebab-case
+でも受け付けます（`makeSample` は `--makeSample` と `--make-sample` の両方に対応）。2つの
+フラグパラメータの綴りが重なると片方は決して指定できないため、実行時に黙って解決するの
+ではなく、2つ目のパラメータをコンパイル時に報告します。
+
+```onion
+def main(parseURL: Int = 1, parseUrl: Int = 2): void { IO::println(parseURL + parseUrl) }
+// E0093: `main` のパラメータ `parseURL` と `parseUrl` は、どちらもコマンドラインの
+//        フラグ `--parse-url` で指定されることになります。
+```
+
+どちらかを改名してください。位置パラメータ（デフォルト値のないもの）はフラグを持たない
+ので対象外です。
+
 ## try/catch エラー
 
 ### `E0083` — 到達不能な catch 節
@@ -1633,6 +1649,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 | `E0091` | … is a class, not a variable |
 | `E0092` | cannot instantiate primitive type … with `new` |
+| `E0093` | parameters `…` and `…` of `…` would both answer to the command-line flag `--…` |
 
 ## 関連項目
 

@@ -180,7 +180,7 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `Files` - File operations
 - `DateTime` - Date/time utilities
 - `Json` - JSON parsing/serialization
-- `Http` - HTTP client
+- `Http` - HTTP client; `Http::request(method, url).header(..).body(..).timeoutSeconds(n).send()` returns a `Response` (status kept for 4xx/5xx)
 - `Regex` - Regular expressions
 - `Option`, `Result`, `Future` - Functional types
 - `Db` - JDBC access (connect, query, update, transactions)

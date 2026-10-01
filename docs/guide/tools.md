@@ -226,7 +226,7 @@ and the program's own methods it calls, transitively):
 
 | Effect | Operand shown | Read from |
 |--------|---------------|-----------|
-| `net` | the host (and port) | the URL of `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse`, an `http"…"` resource, `Net::connect` |
+| `net` | the host (and port) | the URL of `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse`/`request` (through the builder steps to `send()`), an `http"…"` resource, `Net::connect` |
 | `exec` | the command name | the first command word of `Proc::capture`/`run`/`exec`, or the first after the directory for `captureIn`/`runIn`/`execIn` |
 | `env` | the variable name | `System::getenv("NAME")`, `Config::getEnv("NAME", …)` |
 | `read`/`write` | the path | the path argument of `Files` operations, a `file"…"` resource |

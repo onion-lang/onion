@@ -14,6 +14,8 @@ import java.util.List;
  * HTTP client utilities for Onion programs.
  * All methods are static; call them qualified, e.g. {@code Http::get(url)}
  * (Http is not in the default static import set).
+ * For a request that needs its own method, headers, body or timeout and must report
+ * the status, build it with {@code Http::request(method, url)} (see {@link Request}).
  */
 public final class Http {
     private Http() {} // Prevent instantiation
@@ -125,6 +127,18 @@ public final class Http {
         public boolean isError() {
             return status >= 400;
         }
+
+        /**
+         * The first value of the named response header, compared case-insensitively,
+         * or null when the response has no such header.
+         */
+        public String header(String name) {
+            if (name == null || headers == null) return null;
+            for (int i = 0; i + 1 < headers.size(); i += 2) {
+                if (name.equalsIgnoreCase(headers.get(i))) return headers.get(i + 1);
+            }
+            return null;
+        }
     }
 
     /**
@@ -154,6 +168,194 @@ public final class Http {
         java.net.http.HttpResponse<String> response = client.send(request,
                 java.net.http.HttpResponse.BodyHandlers.ofString());
         return toResponse(response);
+    }
+
+    /**
+     * Performs a GET request with custom headers and returns a Response object.
+     * Headers are alternating names and values, as for {@link #get(String, List)}.
+     */
+    public static Response getResponse(String url, List headers) throws Exception {
+        if (url == null) return new Response(0, "", new ArrayList<String>());
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .GET();
+        addHeaders(builder, headers);
+        return toResponse(client.send(builder.build(),
+                java.net.http.HttpResponse.BodyHandlers.ofString()));
+    }
+
+    /**
+     * Performs a POST request with custom headers and returns a Response object.
+     * Headers are alternating names and values, as for {@link #post(String, String, List)}.
+     */
+    public static Response postResponse(String url, String body, List headers) throws Exception {
+        if (url == null) return new Response(0, "", new ArrayList<String>());
+        if (body == null) body = "";
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .POST(HttpRequest.BodyPublishers.ofString(body));
+        addHeaders(builder, headers);
+        return toResponse(client.send(builder.build(),
+                java.net.http.HttpResponse.BodyHandlers.ofString()));
+    }
+
+    // ========== Request Builder ==========
+
+    /**
+     * Starts building a request with any method, headers, body and timeout:
+     * <pre>
+     * val res = Http::request("POST", url)
+     *   .header("content-type", "application/json")
+     *   .body(json)
+     *   .timeoutSeconds(120)
+     *   .send()
+     * if res.isError() { ... res.status ... res.body ... }
+     * </pre>
+     * Building is effect-free; only {@link Request#send()} touches the network.
+     * The method is sent as written (HTTP methods are case-sensitive; use upper case).
+     *
+     * @throws IllegalArgumentException if the method is not a valid HTTP method token,
+     *         or the URL is not an absolute http/https URL
+     */
+    public static Request request(String method, String url) {
+        if (method == null || method.isEmpty()) {
+            throw new IllegalArgumentException("Http::request: method is null or empty");
+        }
+        if (url == null) {
+            throw new IllegalArgumentException("Http::request: url is null");
+        }
+        // Validate now, so a bad method or URL fails where it was written, not at send().
+        HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .method(method, HttpRequest.BodyPublishers.noBody());
+        return new Request(method, url, new ArrayList<String>(), null, 0L);
+    }
+
+    /**
+     * An immutable HTTP request description, made by {@link Http#request(String, String)}.
+     * Every builder method returns a new Request and leaves the receiver unchanged, so
+     * a base request (say, with authentication headers) can be shared and extended.
+     */
+    public static final class Request {
+        private final String method;
+        private final String url;
+        private final List<String> headers; // alternating names and values
+        private final String body;          // null: no body
+        private final long timeoutMillis;   // 0: no per-request timeout
+
+        private Request(String method, String url, List<String> headers, String body, long timeoutMillis) {
+            this.method = method;
+            this.url = url;
+            this.headers = headers;
+            this.body = body;
+            this.timeoutMillis = timeoutMillis;
+        }
+
+        /** The HTTP method, as given to {@code Http::request}. */
+        public String method() {
+            return method;
+        }
+
+        /** The request URL. */
+        public String url() {
+            return url;
+        }
+
+        /**
+         * Adds a header. A name given twice is sent twice (nothing is replaced).
+         *
+         * @throws IllegalArgumentException if the name or value is null, or the JDK
+         *         HTTP client does not allow setting that header (e.g. Host, Content-Length)
+         */
+        public Request header(String name, String value) {
+            if (name == null) throw new IllegalArgumentException("Http.Request.header: name is null");
+            if (value == null) {
+                throw new IllegalArgumentException("Http.Request.header: value of '" + name + "' is null");
+            }
+            HttpRequest.newBuilder().header(name, value); // validates name and value
+            List<String> next = new ArrayList<>(headers);
+            next.add(name);
+            next.add(value);
+            return new Request(method, url, next, body, timeoutMillis);
+        }
+
+        /**
+         * Adds headers given as alternating names and values: {@code ["Name1", "Value1", ...]}.
+         *
+         * @throws IllegalArgumentException if the list has an odd length or holds a null
+         */
+        public Request headers(List pairs) {
+            if (pairs == null) return this;
+            if (pairs.size() % 2 != 0) {
+                throw new IllegalArgumentException(
+                        "Http.Request.headers: expected alternating names and values, got " + pairs.size() + " elements");
+            }
+            Request r = this;
+            for (int i = 0; i < pairs.size(); i += 2) {
+                Object name = pairs.get(i);
+                Object value = pairs.get(i + 1);
+                r = r.header(name == null ? null : name.toString(), value == null ? null : value.toString());
+            }
+            return r;
+        }
+
+        /** Sets the request body (sent as UTF-8). {@code null} means no body. */
+        public Request body(String body) {
+            return new Request(method, url, headers, body, timeoutMillis);
+        }
+
+        /**
+         * Sets a per-request timeout: if no response arrives in time, {@link #send()}
+         * throws {@code java.net.http.HttpTimeoutException}. Without one, a request waits
+         * as long as the server takes (connecting is always bounded at 30 seconds).
+         *
+         * @throws IllegalArgumentException if seconds is not positive
+         */
+        public Request timeoutSeconds(int seconds) {
+            if (seconds <= 0) {
+                throw new IllegalArgumentException("Http.Request.timeoutSeconds: must be positive, got " + seconds);
+            }
+            return new Request(method, url, headers, body, seconds * 1000L);
+        }
+
+        /**
+         * Sets a per-request timeout in milliseconds; see {@link #timeoutSeconds(int)}.
+         *
+         * @throws IllegalArgumentException if millis is not positive
+         */
+        public Request timeoutMillis(long millis) {
+            if (millis <= 0) {
+                throw new IllegalArgumentException("Http.Request.timeoutMillis: must be positive, got " + millis);
+            }
+            return new Request(method, url, headers, body, millis);
+        }
+
+        /**
+         * Sends the request and returns the response, whatever its status: a 4xx or 5xx
+         * is a Response like any other (check {@code status}, {@code isOk()} or
+         * {@code isError()}), never an exception.
+         *
+         * @throws java.net.http.HttpTimeoutException if a timeout was set and elapsed
+         * @throws java.io.IOException if the connection fails (unknown host, refused, reset)
+         */
+        public Response send() throws Exception {
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .method(method, body == null
+                            ? HttpRequest.BodyPublishers.noBody()
+                            : HttpRequest.BodyPublishers.ofString(body));
+            for (int i = 0; i + 1 < headers.size(); i += 2) {
+                builder.header(headers.get(i), headers.get(i + 1));
+            }
+            if (timeoutMillis > 0) builder.timeout(Duration.ofMillis(timeoutMillis));
+            return toResponse(client.send(builder.build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofString()));
+        }
+
+        @Override
+        public String toString() {
+            return method + " " + url;
+        }
     }
 
     // ========== Other Methods ==========

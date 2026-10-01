@@ -121,6 +121,41 @@ class ToolPlanStaticOperandsSpec extends AbstractShellSpec {
       assert(operands(out, "write") == Seq("out/log.txt"), out)
     }
 
+    it("reads the host of an Http::request builder, through its steps and a val") {
+      val (r, out) = run(
+        """tool ask(prompt: String): Int
+          |  requires { net, env, console }
+          |{
+          |  val res = Http::request("POST", "https://api.example.com/v1/messages")
+          |    .header("content-type", "application/json")
+          |    .header("x-api-key", System::getenv("API_KEY") ?: "")
+          |    .body(prompt)
+          |    .timeoutSeconds(120)
+          |    .send()
+          |  val base = Http::request("GET", "https://builder.example.org/" + prompt)
+          |  val status = base.headers(["accept", "text/plain"]).send().status
+          |  IO::println(res.status + status)
+          |  return 0
+          |}
+          |""".stripMargin, "hi", "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(operands(out, "net") == Seq("api.example.com", "builder.example.org"), out)
+      assert(!out.contains(Unknown), out)
+    }
+
+    it("leaves an Http::request whose URL is a parameter unresolved") {
+      val (r, out) = run(
+        """tool hit(url: String): Int
+          |  requires { net, console }
+          |{
+          |  IO::println(Http::request("DELETE", url).send().status)
+          |  return 0
+          |}
+          |""".stripMargin, "https://x.example.com", "--plan")
+      assert(Shell.Success(0) == r, r.toString)
+      assert(operands(out, "net") == Seq(Unknown), out)
+    }
+
     it("never prints user-info from a literal URL") {
       val (r, out) = run(
         """tool secret(): Int

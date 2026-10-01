@@ -2119,12 +2119,53 @@ Http::post(url, body, headers): String   // headers: as for get
 
 ```
 Http::getResponse(url): Response                  // status/body/headers, instead of just the body
+Http::getResponse(url, headers): Response         // headers: as for get
 Http::postResponse(url, body): Response
+Http::postResponse(url, body, headers): Response
 ```
 
 `Response` has `status: Int`, `body: String`, and `headers: List` fields,
-plus `isOk(): Boolean` (2xx) and `isError(): Boolean` (4xx/5xx) helpers — use
+plus `isOk(): Boolean` (2xx) and `isError(): Boolean` (4xx/5xx) helpers, and
+`header(name): String?` (the first value of that header, any case) — use
 these when the status code or headers matter, not just the body.
+
+### Request Builder
+
+For any method, custom headers, a body and a timeout, build the request and `send()` it:
+
+```
+val res = Http::request("POST", "https://api.example.com/v1/messages")
+  .header("content-type", "application/json")
+  .header("x-api-key", key)
+  .body(json)
+  .timeoutSeconds(120)
+  .send()                                  // -> Response
+if res.isError() {
+  IO::println("failed: #{res.status} #{res.body}")
+}
+```
+
+```
+Http::request(method, url): Http.Request   // method sent as written: "GET", "PUT", "PATCH", ...
+  .header(name, value)                     // adds a header (a repeated name is sent twice)
+  .headers(pairs)                          // adds ["Name1", "Value1", ...]
+  .body(text)                              // UTF-8 body; without one, no body is sent
+  .timeoutSeconds(n) / .timeoutMillis(n)   // per-request timeout (default: none)
+  .send(): Response
+```
+
+- `send()` never throws for a 4xx or 5xx status: the `Response` carries it, so check
+  `status`, `isOk()` or `isError()`.
+- It **does** throw when no response arrives: `java.net.http.HttpTimeoutException` once
+  the timeout elapses, and a `java.io.IOException` when the connection fails (unknown
+  host, refused, reset). Connecting is bounded at 30 seconds with or without a timeout.
+- A `Request` is immutable: every step returns a new one, so a base request with
+  authentication headers can be shared and extended.
+- A malformed URL or method, a null header name or value, a header the JDK client
+  manages itself (`Host`, `Content-Length`, ...) and a non-positive timeout are rejected
+  with `IllegalArgumentException` at the step that names them, not at `send()`.
+- Effects: building is pure; only `send()` is `net`. `--plan` reads the host of a
+  literal URL through the builder steps (`net api.example.com`).
 
 ### Other Methods
 

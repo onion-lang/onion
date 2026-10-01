@@ -2283,12 +2283,53 @@ Http::post(url, body, headers): String   // headers は get と同じ
 
 ```
 Http::getResponse(url): Response                  // ボディだけでなく status/body/headers を返す
+Http::getResponse(url, headers): Response         // headers は get と同じ
 Http::postResponse(url, body): Response
+Http::postResponse(url, body, headers): Response
 ```
 
 `Response` は `status: Int`、`body: String`、`headers: List` のフィールドと、
-`isOk(): Boolean`（2xx）・`isError(): Boolean`（4xx/5xx）のヘルパーを持つ。
+`isOk(): Boolean`（2xx）・`isError(): Boolean`（4xx/5xx）のヘルパー、
+`header(name): String?`（そのヘッダーの最初の値。大文字小文字を区別しない）を持つ。
 ボディだけでなくステータスコードやヘッダーが必要なときに使う。
+
+### リクエストビルダー
+
+任意のメソッド・独自ヘッダー・ボディ・タイムアウトが必要なら、リクエストを組み立てて `send()` する:
+
+```
+val res = Http::request("POST", "https://api.example.com/v1/messages")
+  .header("content-type", "application/json")
+  .header("x-api-key", key)
+  .body(json)
+  .timeoutSeconds(120)
+  .send()                                  // -> Response
+if res.isError() {
+  IO::println("failed: #{res.status} #{res.body}")
+}
+```
+
+```
+Http::request(method, url): Http.Request   // メソッドは書いたとおりに送る: "GET", "PUT", "PATCH", ...
+  .header(name, value)                     // ヘッダーを追加（同じ名前を二度書けば二つ送る）
+  .headers(pairs)                          // ["Name1", "Value1", ...] を追加
+  .body(text)                              // UTF-8 のボディ。指定しなければボディなし
+  .timeoutSeconds(n) / .timeoutMillis(n)   // リクエスト単位のタイムアウト（既定: なし）
+  .send(): Response
+```
+
+- `send()` は 4xx・5xx のステータスでは例外を投げない。`Response` がステータスを運ぶので、
+  `status`・`isOk()`・`isError()` で確認する。
+- 応答が得られないときは例外を**投げる**。タイムアウト経過時は
+  `java.net.http.HttpTimeoutException`、接続失敗（ホスト不明・拒否・リセット）時は
+  `java.io.IOException`。接続そのものはタイムアウトの有無にかかわらず 30 秒で打ち切られる。
+- `Request` は不変。各ステップは新しい `Request` を返すので、認証ヘッダー付きの土台を
+  共有して拡張できる。
+- 不正な URL やメソッド、null のヘッダー名・値、JDK クライアントが自分で管理するヘッダー
+  （`Host`・`Content-Length` など）、正でないタイムアウトは、`send()` ではなくそれを書いた
+  ステップで `IllegalArgumentException` になる。
+- 効果: 組み立ては pure で、`send()` だけが `net`。`--plan` はビルダーのステップをたどって
+  リテラル URL のホストを読む（`net api.example.com`）。
 
 ### その他のメソッド
 

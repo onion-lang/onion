@@ -56,6 +56,9 @@ object StaticOperands {
   private val FilesCopyLike: Set[String] = Set("copy", "copyDir", "move")
   private val HttpUrlFirst: Set[String] =
     Set("get", "post", "put", "delete", "postJson", "getResponse", "postResponse")
+  /** `Http.Request` methods that return a copy with the same URL (the builder steps). */
+  private val HttpRequestSteps: Set[String] =
+    Set("header", "headers", "body", "timeoutSeconds", "timeoutMillis")
 
   /**
    * The statically known operands of `tool`, per effect, in [[Effect.all]] order. Only
@@ -169,6 +172,8 @@ object StaticOperands {
       case ("onion.Http", m, Effect.Net) if HttpUrlFirst(m) && stringParam(0) => host(arg(0))
       case ("onion.HttpResource", _, Effect.Net) =>
         host(resource(site.target, locals, site.depth, "http", "onion.HttpResource", Fuel))
+      case ("onion.Http$Request", "send", Effect.Net) =>
+        host(httpRequest(site.target, locals, site.depth, Fuel))
       case ("onion.Net", "connect", Effect.Net) if stringParam(0) => exactOrEnv(arg(0))
       case ("onion.Proc", "capture" | "run" | "exec", Effect.Exec)          => command(site, 0, locals)
       case ("onion.Proc", "captureIn" | "runIn" | "execIn", Effect.Exec)    => command(site, 1, locals)
@@ -277,6 +282,23 @@ object StaticOperands {
     case (Some(Prefix(a)), _)             => Some(Prefix(a))
     case _                                => None
   }
+
+  /** The URL an `Http.Request` receiver was built from: back through its builder steps
+   *  (`.header(..)`, `.body(..)`, ...) and once-assigned `val`s to `Http::request(m, url)`. */
+  private def httpRequest(t: Term, locals: Map[Int, Term], depth: Int, fuel: Int): Option[Str] =
+    if (fuel <= 0 || t == null) None
+    else t match {
+      case a: AsInstanceOf  => httpRequest(a.target, locals, depth, fuel - 1)
+      case n: NonNullAssert => httpRequest(n.target, locals, depth, fuel - 1)
+      case r: RefLocal if r.frame == depth =>
+        locals.get(r.index).flatMap(v => httpRequest(v, locals, 0, fuel - 1))
+      case c: Call if c.method != null && HttpRequestSteps(c.method.name) && c.method.affiliation != null
+          && c.method.affiliation.name == "onion.Http$Request" =>
+        httpRequest(c.target, locals, depth, fuel - 1)
+      case c: CallStatic if is(c.method, "onion.Http", "request") && c.parameters.length == 2 =>
+        resolve(c.parameters(1), locals, depth, fuel - 1)
+      case _ => None
+    }
 
   /** The path/URL a `FileResource`/`HttpResource` receiver was built from. */
   private def resource(t: Term, locals: Map[Int, Term], depth: Int, factory: String,

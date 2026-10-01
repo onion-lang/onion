@@ -104,11 +104,21 @@ class DaemonSpec extends AnyFunSpec with Matchers {
     }
 
     it("makes source, -d and -classpath paths absolute and supplies the defaults") {
-      val cwd = Path.of("/work/dir")
-      val args = DaemonClient.absolutize(Array("--warn", "off", "a.on", "sub/b.on"), cwd)
-      args.toList shouldBe List("--warn", "off", "/work/dir/a.on", "/work/dir/sub/b.on", "-d", "/work/dir", "-classpath", "/work/dir")
-      val explicit = DaemonClient.absolutize(Array("-d", "out", "-classpath", "lib/a.jar:/abs/b.jar", "x.on"), cwd)
-      explicit.toList shouldBe List("-d", "/work/dir/out", "-classpath", "/work/dir/lib/a.jar:/abs/b.jar", "/work/dir/x.on")
+      // Paths are the platform's: `/`-rooted with `:`-separated class paths on POSIX,
+      // drive-rooted with `\` and `;` on Windows.
+      if (java.io.File.separatorChar == '/') {
+        val cwd = Path.of("/work/dir")
+        val args = DaemonClient.absolutize(Array("--warn", "off", "a.on", "sub/b.on"), cwd)
+        args.toList shouldBe List("--warn", "off", "/work/dir/a.on", "/work/dir/sub/b.on", "-d", "/work/dir", "-classpath", "/work/dir")
+        val explicit = DaemonClient.absolutize(Array("-d", "out", "-classpath", "lib/a.jar:/abs/b.jar", "x.on"), cwd)
+        explicit.toList shouldBe List("-d", "/work/dir/out", "-classpath", "/work/dir/lib/a.jar:/abs/b.jar", "/work/dir/x.on")
+      } else {
+        val cwd = Path.of("C:\\work\\dir")
+        val args = DaemonClient.absolutize(Array("--warn", "off", "a.on", "sub/b.on"), cwd)
+        args.toList shouldBe List("--warn", "off", "C:\\work\\dir\\a.on", "C:\\work\\dir\\sub\\b.on", "-d", "C:\\work\\dir", "-classpath", "C:\\work\\dir")
+        val explicit = DaemonClient.absolutize(Array("-d", "out", "-classpath", "lib/a.jar;D:\\abs\\b.jar;\\rooted\\c.jar", "x.on"), cwd)
+        explicit.toList shouldBe List("-d", "C:\\work\\dir\\out", "-classpath", "C:\\work\\dir\\lib\\a.jar;D:\\abs\\b.jar;C:\\rooted\\c.jar", "C:\\work\\dir\\x.on")
+      }
     }
   }
 }

@@ -10,7 +10,8 @@ import onion.tools.Shell
  */
 class FilesBytesSpec extends AbstractShellSpec {
   it("writes bytes to a file and reads them back") {
-    val path = System.getProperty("java.io.tmpdir") + "/onion-files-bytes-test.bin"
+    // Forward slashes: a Windows `\` would start an escape inside the Onion string literal.
+    val path = (System.getProperty("java.io.tmpdir") + "/onion-files-bytes-test.bin").replace('\\', '/')
     val result = shell.run(
       s"""
         |class Test {

@@ -108,6 +108,12 @@ stderr is judged separately, so `onion script.on > out.txt` writes UTF-8 to the 
 diagnostics on the console stay readable. Other platforms are unchanged. Source files are
 read as UTF-8 unless `-encoding` says otherwise.
 
+Standard input follows the same rule: `IO::readLine` and the other `IO` readers decode a pipe
+or a file as UTF-8 (`echo 日本語 | onion script.on`), and a Windows console in its own code
+page, on JDK 17 as on JDK 18+. Other platforms read stdin as UTF-8, as JDK 18+ already did.
+`onion.Files` and `file"…"` always read and write text as UTF-8, whatever the platform charset;
+`Files::readText`/`writeText` take a `java.nio.charset.Charset` for anything else.
+
 `ONION_CONSOLE_ENCODING` overrides the choice:
 
 ```bash
@@ -118,7 +124,9 @@ ONION_CONSOLE_ENCODING=native onion script.on  # leave it to the JVM, as before
 Unset, or `auto`, is the behaviour described above. To pin some other encoding, combine
 `native` with the JVM's own flag in `ONION_JAVA_OPTS`: `-Dstdout.encoding=...` and
 `-Dstderr.encoding=...` on JDK 19+, `-Dsun.stdout.encoding=...` and
-`-Dsun.stderr.encoding=...` on JDK 17 and 18.
+`-Dsun.stderr.encoding=...` on JDK 17 and 18. Standard input is pinned with
+`-Donion.stdin.encoding=...`, which the launchers leave as given; with `native`, stdin is
+decoded in the JVM's default charset, as before.
 
 ### The compile daemon
 

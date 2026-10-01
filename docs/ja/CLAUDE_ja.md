@@ -46,7 +46,7 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
 - `--print-classpath` - `onionc` のみ: 出力を実行するための classpath（`-d` のディレクトリまたは `.`、`-classpath`、ファイルの `//> using dep` ディレクティブが解決する jar の順）をプラットフォームの区切り文字で標準出力に表示し、コンパイルせずに終了する
 - `--stacktrace` - 未捕捉の実行時エラーで生のJVMスタックトレースを表示する（既定ではスクリプト自身のフレームのみを含む診断形式のレポートになる）
 - `ONION_DAEMON=1` (環境変数) - `onionc` と `onion script.on` は常駐デーモン（`onion.tools.daemon`）経由でコンパイルする。デーモンは初回利用時に起動し、スクリプトのクラスは呼び出し元プロセスに戻って実行される。デーモンに接続できない場合はプロセス内コンパイルにフォールバックする。`java -cp onion.jar onion.tools.daemon.DaemonClient stop|status` で制御できる
-- `ONION_CONSOLE_ENCODING=auto|native|utf-8` (環境変数) - ランチャの stdout/stderr の文字コード（`onion.tools.ConsoleEncoding`）。`auto`（既定）: Windows ではコンソールでないストリーム（パイプ、ファイル、mintty）を UTF-8 で書き、コンソールはそのコードページのまま。他の OS は変更なし。ソースファイルの既定は UTF-8（`-encoding` で上書き）
+- `ONION_CONSOLE_ENCODING=auto|native|utf-8` (環境変数) - ランチャの stdout/stderr の文字コード（`onion.tools.ConsoleEncoding`）。`auto`（既定）: Windows ではコンソールでないストリーム（パイプ、ファイル、mintty）を UTF-8 で書き、コンソールはそのコードページのまま。他の OS は変更なし。標準入力も同様: `onion.IO` はパイプ・ファイルを UTF-8、Windows のコンソールをそのコードページでデコード（ランチャが `onion.stdin.encoding` を設定。ランチャなしでは UTF-8）。`onion.Files`/`file"…"` のテキストは常に UTF-8。ソースファイルの既定は UTF-8（`-encoding` で上書き）
 
 ## 高レベルアーキテクチャ
 

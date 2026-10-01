@@ -12,6 +12,11 @@ import java.util.List;
 /**
  * File I/O utilities for Onion programs.
  * All methods are static and can be imported via: import static onion.Files::*
+ *
+ * <p>Text is read and written as UTF-8 on every JDK, whatever the platform charset: JDK 18+
+ * made UTF-8 the default (JEP 400), and on JDK 17 a Windows machine would otherwise use its
+ * ANSI code page (MS932 under a Japanese locale). The {@code Charset} overloads of
+ * {@code readText}/{@code writeText} choose another encoding explicitly.
  */
 public final class Files {
     private Files() {} // Prevent instantiation
@@ -48,7 +53,8 @@ public final class Files {
 
     public static List<String> readLines(File file) throws IOException {
         List<String> lines = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 lines.add(line);
@@ -98,7 +104,8 @@ public final class Files {
     }
 
     public static void writeLines(File file, java.util.List<String> lines) throws IOException {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))) {
             for (String line : lines) {
                 writer.write(line);
                 writer.newLine();
@@ -112,7 +119,7 @@ public final class Files {
 
     public static void appendText(File file, String content) throws IOException {
         try (BufferedWriter writer = new BufferedWriter(
-                new FileWriter(file, true))) {
+                new OutputStreamWriter(new FileOutputStream(file, true), StandardCharsets.UTF_8))) {
             writer.write(content);
         }
     }

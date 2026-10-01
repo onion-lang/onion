@@ -213,8 +213,8 @@ URL の `http`・`https`・`file` のみです。相対パスやスペルミス�
 
 ### まだ対応していないこと
 
-オフラインモードはありません。解決はビルドのたびに実行され、取得済みの
-ものは coursier のキャッシュ（`~/.cache/coursier`）から読まれるため、ウォームな状態では
+オフラインモードはありません。解決は、現在の `onion.lock` に対して記録したクラスパスを
+ビルドが再利用できないとき（後述）に実行され、取得済みのものは coursier のキャッシュ（`~/.cache/coursier`）から読まれるため、ウォームな状態では
 ネットワークに出ません。ただしネットワークアクセスを**禁止**しているわけではありません。
 Onion が組み込んでいる coursier の Java API はキャッシュポリシーを公開していないため、
 `--offline` フラグは偽装するしかありません。保証でないものを保証のように見せないため、
@@ -231,9 +231,13 @@ Onion が組み込んでいる coursier の Java API はキャッシュポリシ
 「片方のマシンでだけ起き、もう片方では再現せず、プロジェクトは何も変わっていない」という
 一番厄介な形で出ます。
 
-ロックは推移的依存を含む座標集合全体を記録するので、以降のビルドは**その**バージョンを
-解決します。さらに各成果物の SHA-256 を記録し、コンパイル前に照合します。既に publish
-された版のバイト列が変わっていたらビルドを止めます。
+ロックは推移的依存を含む座標集合全体を記録し、以降のビルドは `[dependencies]` を
+**その**バージョンすべてを強制（force）したうえで解決します。バージョンを導き直すことは
+しません。強制はマニフェスト自身の依存グラフにかけるもので、座標を平らなルートの並びとして
+解決するのではありません。平らにすると、推移的依存がそのバージョンを管理している POM
+（`<dependencyManagement>` や親 BOM）の下から外れ、別のバージョンが選ばれることがあるからです。
+さらに各成果物の SHA-256 を記録し、コンパイル前に照合します。既に publish された版の
+バイト列が変わっていたらビルドを止めます。
 
 ```text
 error: Resolved dependencies do not match onion.lock:
@@ -245,6 +249,27 @@ A published version's bytes should never change. Check the repository, or delete
 to accept what it is serving now.
 ```
 
+成果物の**集合**が違うのはバイト列の変化ではなく解決結果の違いなので、エラーもそう述べ、
+リポジトリのせいにする代わりに動いたバージョンを列挙します。
+
+```text
+error: Resolved dependencies do not match onion.lock:
+not in the lock: lib-2.0.0.jar
+missing: lib-1.0.0.jar
+resolved versions differ from the lock:
+  com.example:lib  locked 1.0.0  resolved 2.0.0
+The artifacts resolved differently from the ones the lock records; no file's bytes changed.
+Delete onion.lock to resolve again and record the new answer.
+```
+
+ロックを解決して照合し終えたビルドは、得られたクラスパスをロックの内容をキーにして
+`target/.onion/dependency-classpath.json` に記録します。同じロックでの次の
+`build`/`run`/`test` は、記録された jar がすべて存在し、その SHA-256 がロックと一致する限り
+（サイズか更新時刻が変わった jar は再ハッシュします）、coursier に一切問い合わせずにその
+クラスパスを使います。それ以外——ロックが違う、jar が無い・変わった、記録が無い——は解決に
+戻ります。記録はこのマシンのキャッシュへの絶対パスを持つので `target/` の下に置き、
+コミットしません。`onion clean` で消えます。言語サーバーも同じ記録を読み取り専用で使います。
+
 `onion.toml` のバージョンを変えたりリポジトリを足したりすると、ロックはもう「今きいている
 問い」を説明していないので、その問いに対して強制するのではなく破棄して書き直します。
 `[dependencies]` の並べ替えは変更に当たらず、ロックは維持されます。`onion clean` はロックを
@@ -253,7 +278,8 @@ to accept what it is serving now.
 **これは offline モードではありません。** coursier の埋め込み API が露出しているのは
 キャッシュの場所・スレッドプール・ロガーだけで、キャッシュ方針は一切ありません。したがって
 「ネットワークに一切触れないビルド」を約束する誠実な方法がありません。ロックが与えるのは
-毎回同じ答えであって、問いを無くすことではありません。
+毎回同じ答えであって、問いを無くすことではありません。記録されたクラスパスは、同じ問いを
+たいてい二度きかずに済む、というだけです。
 
 ## ソースレイアウト
 

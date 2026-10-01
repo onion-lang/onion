@@ -34,19 +34,30 @@ object ScriptDependencies {
    * naming the script and the line). A script without directives, or one that cannot be read
    * (the compiler will report that), adds nothing.
    */
-  def classpathFor(script: String, encoding: String, progress: PrintStream): Either[String, Seq[String]] = {
-    val path = Paths.get(script)
-    val text =
-      try Some(new String(Files.readAllBytes(path), charset(encoding)))
+  def classpathFor(script: String, encoding: String, progress: PrintStream): Either[String, Seq[String]] =
+    classpathForSources(Seq(script), encoding, progress)
+
+  /**
+   * The classpath entries the directives of several sources compiled together add (what
+   * `onionc a.on b.on` uses): the union of their directives (see [[ScriptDirectives.parseAll]];
+   * two versions of one module across files is an error, as it is within one), resolved and
+   * cached exactly as a single script's are. Files that cannot be read add nothing.
+   */
+  def classpathForSources(files: Seq[String], encoding: String, progress: PrintStream): Either[String, Seq[String]] = {
+    val sources = files.flatMap { file =>
+      try Some(file -> new String(Files.readAllBytes(Paths.get(file)), charset(encoding)))
       catch { case NonFatal(_) => None }
-    text match {
-      case None => Right(Seq.empty)
-      case Some(source) =>
-        ScriptDirectives.parse(source) match {
-          case Left(error) => Left(error.render(script))
-          case Right(directives) if directives.isEmpty => Right(Seq.empty)
-          case Right(directives) =>
-            resolve(directives, cacheDirectory(), progress).left.map(message => s"$script: error: $message")
+    }
+    ScriptDirectives.parseAll(sources) match {
+      case Left(error) => Left(error)
+      case Right(directives) if directives.isEmpty => Right(Seq.empty)
+      case Right(directives) =>
+        resolve(directives, cacheDirectory(), progress).left.map { message =>
+          // Name the files that asked for something: they are where the fix goes.
+          val declaring = sources.collect {
+            case (file, text) if ScriptDirectives.parse(text).exists(!_.isEmpty) => file
+          }
+          s"${declaring.mkString(", ")}: error: $message"
         }
     }
   }

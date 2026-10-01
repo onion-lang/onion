@@ -193,6 +193,38 @@ onionc -g:none MyProgram.on
 Running a script with `onion` always emits the table, since a script is compiled in
 memory and there is no artefact to keep small.
 
+## Dependencies (`//> using dep`)
+
+`onionc` reads the `//> using dep` and `//> using repository` directives of the files it
+compiles, exactly as the [script runner](script-runner.md) does: the same parser, the
+same exact-version rule, the same resolver and the same classpath cache. The resolved
+jars, transitives included, join the compile classpath after any `-classpath` entries.
+
+```onion
+//> using dep "com.google.code.gson:gson:2.11.0"
+
+import { com.google.gson.Gson }
+
+class ToJson {
+public:
+  static def of(value: Object): String { return new Gson().toJson(value) }
+}
+```
+
+```bash
+onionc -d out ToJson.on
+```
+
+When several files are compiled together, their directives are **unioned**: a library
+any one of them declares is on the classpath for all of them, and repositories are
+searched in the order the files and their lines name them. The same module at two
+versions is an error whether the two declarations are in one file or in two, and the
+error names both files. A directive error stops `onionc` before anything is compiled.
+
+`onionc` only compiles: to run the classes, the same jars must be on the `java`
+classpath. A [project](project-cli.md) (`onion run`) or the script runner puts them
+there for you.
+
 ## Examples
 
 ### Basic Compilation

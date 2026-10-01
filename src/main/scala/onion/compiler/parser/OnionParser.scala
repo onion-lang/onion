@@ -1450,7 +1450,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def functionTypeTail(arg: AST.TypeNode): AST.TypeNode = {
     expect(K.ARROW)
     eols()
-    val r = typ()
+    val r = returnType()
     AST.TypeNode(arg.location, AST.FunctionType(List(arg.desc), r.desc), arg.isRelaxed)
   }
 

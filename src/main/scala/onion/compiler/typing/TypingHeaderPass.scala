@@ -224,6 +224,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
   private def registerTopLevelContainer(imports: Seq[ImportItem]): Unit = {
     val node = ClassDefinition.newClass(unit.location, 0, typing.topClass, typing.table_.rootClass, new Array[ClassType](0))
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
+    node.isTopLevelContainer = true
     node.setResolutionComplete(true)
     typing.table_.classes.add(node)
     node.addDefaultConstructor

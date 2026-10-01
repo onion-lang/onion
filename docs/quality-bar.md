@@ -19,7 +19,7 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |
-| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 90 | every common error has a dedicated code |
+| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 91 | every common error has a dedicated code |
 
 **Rows 2 and 3 are checked against a tolerance band, not exact equality** (issue #1370).
 Every PR that adds a sample to `run/` used to have to bump the exact counts in both rows

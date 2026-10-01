@@ -1,0 +1,380 @@
+// DatabaseSchema.on — Relational database schema modeler and DDL generator (~260 lines)
+//
+// Exercises: ADT case-enum (DataType, Constraint), records with methods,
+// sealed interfaces, generic record ValidationResult[T], collection pipelines
+// (map/filter/groupBy/sortedBy/find/flatMap/distinct/count), select/pattern
+// matching, nullable types, closures, string interpolation, try/catch,
+// recursion (topological sort), while/foreach loops, map (k,v) iteration.
+
+import { java.util.LinkedHashMap as LHMap; }
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padEnd(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+}
+
+// ─── Data Types (ADT) ─────────────────────────────────────────────────────────
+
+enum DataType {
+  case VarChar(maxLen: Int)
+  case FixedChar(len: Int)
+  case IntType
+  case BigIntType
+  case Decimal(precision: Int, scale: Int)
+  case BooleanType
+  case TimestampType
+  case DateType
+  case BlobType
+public:
+  def sqlName(): String = select this {
+    case d is VarChar:    "VARCHAR(#{d.maxLen()})"
+    case d is FixedChar:  "CHAR(#{d.len()})"
+    case d is IntType:    "INT"
+    case d is BigIntType: "BIGINT"
+    case d is Decimal:    "DECIMAL(#{d.precision()},#{d.scale()})"
+    case d is BooleanType:"BOOLEAN"
+    case d is TimestampType:"TIMESTAMP"
+    case d is DateType:   "DATE"
+    case d is BlobType:   "BLOB"
+  }
+  def isNumeric(): Boolean = select this {
+    case d is IntType, d is BigIntType, d is Decimal: true
+    else: false
+  }
+}
+
+// ─── Constraint (ADT) ─────────────────────────────────────────────────────────
+
+enum Constraint {
+  case NotNull
+  case Unique
+  case PrimaryKey
+  case Default(value: String)
+  case Check(expression: String)
+  case ForeignKey(refTable: String, refColumn: String)
+public:
+  def sqlFragment(): String = select this {
+    case c is NotNull:     "NOT NULL"
+    case c is Unique:      "UNIQUE"
+    case c is PrimaryKey:  "PRIMARY KEY"
+    case c is Default:     "DEFAULT #{c.value()}"
+    case c is Check:       "CHECK (#{c.expression()})"
+    case c is ForeignKey:  "REFERENCES #{c.refTable()}(#{c.refColumn()})"
+  }
+  def isPrimaryKey(): Boolean = select this {
+    case c is PrimaryKey: true
+    else: false
+  }
+  def isForeignKey(): Boolean = select this {
+    case c is ForeignKey: true
+    else: false
+  }
+}
+
+// ─── Column record ────────────────────────────────────────────────────────────
+
+record Column(name: String, dataType: DataType, constraints: List[Constraint]) {
+public:
+  def isNullable(): Boolean =
+    constraints.find { c: Constraint -> select c {
+      case n is NotNull: true; case p is PrimaryKey: true; else: false } } == null
+
+  def isPrimaryKey(): Boolean =
+    constraints.find { c: Constraint -> c.isPrimaryKey() } != null
+
+  def foreignKey(): Constraint? =
+    constraints.find { c: Constraint -> c.isForeignKey() }
+
+  def toSql(): String {
+    var sql: String = "  " + name + " " + dataType.sqlName()
+    foreach c: Constraint in constraints {
+      sql = sql + " " + c.sqlFragment()
+    }
+    return sql
+  }
+}
+
+// ─── Index record ─────────────────────────────────────────────────────────────
+
+record Index(name: String, tableName: String, columns: List[String], unique: Boolean) {
+public:
+  def toSql(): String {
+    val uniqueClause: String = if unique { "UNIQUE " } else { "" }
+    val cols: String = columns.join(", ")
+    return "CREATE #{uniqueClause}INDEX #{name} ON #{tableName} (#{cols});"
+  }
+}
+
+// ─── Table record ─────────────────────────────────────────────────────────────
+
+record Table(name: String, columns: List[Column]) {
+public:
+  def primaryKeys(): List[Column] =
+    columns.filter { c: Column -> c.isPrimaryKey() }
+
+  def foreignKeys(): List[Column] =
+    columns.filter { c: Column -> c.foreignKey() != null }
+
+  def referencedTables(): List[String] =
+    foreignKeys().map { c: Column ->
+      val fk: Constraint? = c.foreignKey()
+      if fk == null { "" }
+      else { select fk {
+        case f is ForeignKey: f.refTable()
+        else: ""
+      }}
+    }.filter { s: String -> s.length() > 0 }.distinct()
+
+  def columnCount(): Int = columns.size
+
+  def toSql(): String {
+    val lines: List[String] = columns.map { c: Column -> c.toSql() }
+    val body: String = lines.join(",\n")
+    return "CREATE TABLE #{name} (\n#{body}\n);"
+  }
+}
+
+// ─── Validation result (generic) ─────────────────────────────────────────────
+
+record ValidationError(tableName: String, message: String)
+record ValidationResult[T](value: T?, errors: List[ValidationError]) {
+public:
+  def isValid(): Boolean = errors.size == 0
+  def errorCount(): Int = errors.size
+}
+
+// ─── Schema record ────────────────────────────────────────────────────────────
+
+interface Describable { def describe(): String }
+
+record Schema(name: String, tables: List[Table], indexes: List[Index])
+  conforms Describable {
+public:
+  def findTable(tableName: String): Table? =
+    tables.find { t: Table -> t.name() == tableName }
+
+  def describe(): String = "Schema '#{name}' — #{tables.size} tables, #{indexes.size} indexes"
+
+  // Topological sort for CREATE TABLE order (dependencies first)
+  def sortedByDependency(): List[Table] = topoSort(self)
+
+  def validate(): ValidationResult[Schema] {
+    val errors: List[ValidationError] = []
+    val tableNames: List[String] = tables.map { t: Table -> t.name() }
+
+    foreach t: Table in tables {
+      // Each table must have at least one primary key
+      if t.primaryKeys().size == 0 {
+        errors.add(new ValidationError(t.name(),
+          "table '#{t.name()}' has no primary key"))
+      }
+      // All FK references must resolve
+      foreach fkCol: Column in t.foreignKeys() {
+        val fk: Constraint? = fkCol.foreignKey()
+        if fk != null {
+          select fk {
+            case f is ForeignKey:
+              if tableNames.find { n: String -> n == f.refTable() } == null {
+                errors.add(new ValidationError(t.name(),
+                  "column '#{fkCol.name()}' references unknown table '#{f.refTable()}'"))
+              }
+            else: {}
+          }
+        }
+      }
+      // Column names must be unique within a table
+      val colNames: List[String] = t.columns().map { c: Column -> c.name() }
+      val dupNames: List[String] = colNames.filter { n: String ->
+        colNames.count { x: String -> x == n } > 1
+      }.distinct()
+      foreach dup: String in dupNames {
+        errors.add(new ValidationError(t.name(), "duplicate column name '#{dup}'"))
+      }
+    }
+    return new ValidationResult[Schema](if errors.size == 0 { self } else { null }, errors)
+  }
+
+  def generateDdl(): String {
+    val sb: List[String] = []
+    sb.add("-- Schema: #{name}")
+    sb.add("-- Generated by DatabaseSchema.on\n")
+    foreach t: Table in self.sortedByDependency() {
+      sb.add(t.toSql())
+      sb.add("")
+    }
+    foreach idx: Index in indexes {
+      sb.add(idx.toSql())
+    }
+    return sb.join("\n")
+  }
+}
+
+// ─── Top-level topological sort (DFS) ────────────────────────────────────────
+
+def topoVisit(schema: Schema, tableName: String,
+              visited: List[String], sorted: List[Table]): void {
+  if visited.find { s: String -> s == tableName } != null { return }
+  visited.add(tableName)
+  val t: Table? = schema.findTable(tableName)
+  if t == null { return }
+  foreach dep: String in t.referencedTables() {
+    topoVisit(schema, dep, visited, sorted)
+  }
+  sorted.add(t)
+}
+
+def topoSort(schema: Schema): List[Table] {
+  val sorted: List[Table] = []
+  val visited: List[String] = []
+  foreach t: Table in schema.tables() {
+    topoVisit(schema, t.name(), visited, sorted)
+  }
+  return sorted
+}
+
+// ─── Helper: build common constraint lists ────────────────────────────────────
+
+def pk(): List[Constraint] = [new PrimaryKey(), new NotNull()]
+def nn(): List[Constraint] = [new NotNull()]
+def fk(table: String, col: String): List[Constraint] =
+  [new NotNull(), new ForeignKey(table, col)]
+def optFk(table: String, col: String): List[Constraint] =
+  [new ForeignKey(table, col)]
+
+// ─── Main: build an e-commerce schema and analyze it ─────────────────────────
+
+def main(args: String[]): void {
+  // Build tables
+  val customers: Table = new Table("customers", [
+    new Column("id",         new IntType(),          pk()),
+    new Column("email",      new VarChar(255),       [new NotNull(), new Unique()]),
+    new Column("name",       new VarChar(100),       nn()),
+    new Column("created_at", new TimestampType(),    [new NotNull(), new Default("CURRENT_TIMESTAMP")])
+  ])
+
+  val categories: Table = new Table("categories", [
+    new Column("id",          new IntType(),   pk()),
+    new Column("name",        new VarChar(64), nn()),
+    new Column("parent_id",   new IntType(),   optFk("categories", "id"))
+  ])
+
+  val products: Table = new Table("products", [
+    new Column("id",          new IntType(),              pk()),
+    new Column("sku",         new VarChar(50),            [new NotNull(), new Unique()]),
+    new Column("name",        new VarChar(200),           nn()),
+    new Column("price",       new Decimal(10, 2),         nn()),
+    new Column("category_id", new IntType(),              fk("categories", "id")),
+    new Column("in_stock",    new BooleanType(),          [new NotNull(), new Default("TRUE")]),
+    new Column("description", new VarChar(2000),          [])
+  ])
+
+  val orders: Table = new Table("orders", [
+    new Column("id",          new BigIntType(),   pk()),
+    new Column("customer_id", new IntType(),      fk("customers", "id")),
+    new Column("placed_at",   new TimestampType(), nn()),
+    new Column("status",      new VarChar(20),    [new NotNull(), new Default("'pending'")]),
+    new Column("total",       new Decimal(12, 2), nn())
+  ])
+
+  val orderItems: Table = new Table("order_items", [
+    new Column("order_id",    new BigIntType(),   fk("orders", "id")),
+    new Column("product_id",  new IntType(),      fk("products", "id")),
+    new Column("quantity",    new IntType(),      [new NotNull(), new Check("quantity > 0")]),
+    new Column("unit_price",  new Decimal(10, 2), nn())
+  ])
+
+  val indexes: List[Index] = [
+    new Index("idx_orders_customer", "orders",      ["customer_id"],        false),
+    new Index("idx_items_order",     "order_items", ["order_id"],           false),
+    new Index("idx_items_product",   "order_items", ["product_id"],         false),
+    new Index("idx_products_sku",    "products",    ["sku"],                true),
+    new Index("idx_products_cat",    "products",    ["category_id", "name"],false)
+  ]
+
+  val schema: Schema = new Schema("ecommerce",
+    [customers, categories, products, orders, orderItems],
+    indexes)
+
+  // 1. Describe the schema
+  println(schema.describe())
+  println("")
+
+  // 2. Validate
+  val result: ValidationResult[Schema] = schema.validate()
+  if result.isValid() {
+    println("✓ Schema is valid (#{result.errorCount()} errors)")
+  } else {
+    println("✗ #{result.errorCount()} validation error(s):")
+    foreach err: ValidationError in result.errors() {
+      println("  [#{err.tableName()}] #{err.message()}")
+    }
+  }
+  println("")
+
+  // 3. Table statistics
+  println("── Table Summary ─────────────────────────────────────────")
+  foreach t: Table in schema.tables() {
+    val pkCount: Int = t.primaryKeys().size
+    val fkCount: Int = t.foreignKeys().size
+    val nullableCount: Int = t.columns().filter { c: Column -> c.isNullable() }.size
+    val summary: String = "  #{t.name().padEnd(15)} #{t.columnCount()} cols  pk=#{pkCount}  fk=#{fkCount}  nullable=#{nullableCount}"
+    println(summary)
+  }
+  println("")
+
+  // 4. Column type distribution across schema
+  println("── Column DataType Distribution ──────────────────────────")
+  val allCols: List[Column] = schema.tables().flatMap { t: Table -> t.columns() }
+  val byType: Map[String, List[Column]] =
+    allCols.groupBy { c: Column -> c.dataType().sqlName().replaceAll("\\(.*", "") }
+  val sortedTypeKeys: List[String] =
+    Colls::toList(byType.keySet()).sortedBy { k: String -> 0 - byType[k].size }
+  foreach typeName: String in sortedTypeKeys {
+    println("  #{typeName.padEnd(15)} #{byType[typeName].size}")
+  }
+  println("")
+
+  // 5. Dependency order and generated DDL
+  println("── Topological CREATE TABLE Order ───────────────────────")
+  val orderedTables: List[Table] = schema.sortedByDependency()
+  var idx2: Int = 1
+  foreach t: Table in orderedTables {
+    println("  #{idx2}. #{t.name()}")
+    idx2++
+  }
+  println("")
+
+  println("── Generated DDL ──────────────────────────────────────────")
+  println(schema.generateDdl())
+
+  // 6. FK reference graph
+  println("── Foreign Key References ────────────────────────────────")
+  foreach t: Table in schema.tables() {
+    foreach fkCol: Column in t.foreignKeys() {
+      val fk2: Constraint? = fkCol.foreignKey()
+      if fk2 != null {
+        select fk2 {
+          case f is ForeignKey:
+            println("  #{t.name()}.#{fkCol.name()} → #{f.refTable()}.#{f.refColumn()}")
+          else: {}
+        }
+      }
+    }
+  }
+
+  // 7. Try/catch: attempt to look up a non-existent table
+  println("")
+  try {
+    val missing: Table? = schema.findTable("invoices")
+    if missing == null {
+      println("Table 'invoices' not found (expected)")
+    }
+  } catch e: Exception {
+    println("Unexpected error: #{e.message()}")
+  }
+}

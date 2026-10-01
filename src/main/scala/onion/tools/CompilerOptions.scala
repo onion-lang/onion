@@ -37,7 +37,11 @@ object CompilerOptions {
   final val STACKTRACE: String = "--stacktrace"
 
   final val DEFAULT_CLASSPATH: Array[String] = Array[String](".")
-  final val DEFAULT_ENCODING: String = System.getProperty("file.encoding")
+  // UTF-8, not the platform default: JDK 18+ already defaults to it (JEP 400), and so do
+  // projects and the LSP. On JDK 17 under a Japanese Windows locale the platform default is
+  // MS932, which read every UTF-8 script's non-ASCII literal as mojibake. `-encoding` still
+  // names another one.
+  final val DEFAULT_ENCODING: String = "UTF-8"
   final val DEFAULT_OUTPUT: String = "."
   final val DEFAULT_MAX_ERROR: Int = 10
 

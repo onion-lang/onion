@@ -18,6 +18,8 @@ import com.sun.net.httpserver.{HttpServer, HttpExchange, HttpHandler}
  */
 class ResourceShapeSpec extends AbstractShellSpec {
 
+  // `file"…"` is a raw literal, so the path is spliced in verbatim: escaping a Windows
+  // path's backslashes would put doubled backslashes into the path the defect reports.
   private def withTempFile(content: String)(body: Path => Unit): Unit = {
     val f = Files.createTempFile("resource-shape", ".txt")
     try {
@@ -37,7 +39,7 @@ class ResourceShapeSpec extends AbstractShellSpec {
              |class Test {
              |public:
              |  static def main(args: String[]): Int {
-             |    val o = file"${f.toString.replace("\\", "\\\\")}".read(Pt::doc())
+             |    val o = file"${f}".read(Pt::doc())
              |    if o.isBad() { return -1 }
              |    return o.get().x() * 10 + o.get().y()
              |  }
@@ -57,7 +59,7 @@ class ResourceShapeSpec extends AbstractShellSpec {
              |class Test {
              |public:
              |  static def main(args: String[]): String {
-             |    val o = file"${f.toString.replace("\\", "\\\\")}".read(Pt::doc())
+             |    val o = file"${f}".read(Pt::doc())
              |    if o.isOk() { return "unexpectedly ok" }
              |    return (o.defects()[0] as Defect).origin().source()
              |  }
@@ -77,7 +79,7 @@ class ResourceShapeSpec extends AbstractShellSpec {
              |class Test {
              |public:
              |  static def main(args: String[]): String {
-             |    val each = file"${f.toString.replace("\\", "\\\\")}".eachLine(Pt::text())
+             |    val each = file"${f}".eachLine(Pt::text())
              |    val bad = Outcome::defects(each)
              |    return Outcome::values(each).size + "/" + bad.size + "/" +
              |           (bad[0] as Defect).origin().line()
@@ -173,7 +175,7 @@ class ResourceShapeSpec extends AbstractShellSpec {
              |class Test {
              |public:
              |  static def main(args: String[]): String {
-             |    return file"${f.toString.replace("\\", "\\\\")}".lines().size + ""
+             |    return file"${f}".lines().size + ""
              |  }
              |}
              |""".stripMargin, "None", Array())

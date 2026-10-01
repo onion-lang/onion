@@ -20,7 +20,7 @@ onion -classpath lib/mylib.jar MyScript.on
 
 ### `-encoding <encoding>`
 
-ソースファイルの文字エンコーディングを指定します。
+ソースファイルの文字エンコーディングを指定します。未指定時は UTF-8 です。
 
 ```bash
 onion -encoding UTF-8 MyScript.on

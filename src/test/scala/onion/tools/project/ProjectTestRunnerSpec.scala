@@ -29,7 +29,7 @@ class ProjectTestRunnerSpec extends AnyFunSuite with Matchers:
       source: ProjectSource
     ): ProjectTestWorkspace =
       events += s"create:${source.relative}"
-      val root = Files.createTempDirectory("onion-project-test-unit")
+      val root = Files.createTempDirectory("onion-project-test-unit").toRealPath()
       ProjectTestWorkspace(root, Files.createDirectory(root.resolve("classes")))
 
     override def compile(
@@ -303,4 +303,4 @@ class ProjectTestRunnerSpec extends AnyFunSuite with Matchers:
       finally
         out.close()
         err.close()
-    Invocation(result, stdout.toString(UTF_8), stderr.toString(UTF_8))
+    Invocation(result, Captured.text(stdout), Captured.text(stderr))

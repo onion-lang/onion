@@ -20,7 +20,8 @@ onionc -classpath lib/mylib.jar:lib/other.jar MyProgram.on
 
 ### `-encoding <encoding>`
 
-Specify the character encoding of source files. Default is platform-dependent.
+Specify the character encoding of source files. Default is UTF-8 on every platform and JDK
+(also on JDK 17, whose platform default is MS932 under a Japanese Windows locale).
 
 ```bash
 onionc -encoding UTF-8 MyProgram.on

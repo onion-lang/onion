@@ -16,7 +16,9 @@ import scala.jdk.CollectionConverters._
 class MkDocsNavCoverageSpec extends AnyFunSpec {
 
   private val docsRoot = Path.of("docs")
-  private val mkdocsYml = Files.readString(Path.of("mkdocs.yml"))
+  // CRLF folded to LF: a Windows checkout (core.autocrlf) has CRLF here, and `.` in the
+  // exclude_docs pattern below stops at the `\r`, which silently dropped every line but the first.
+  private val mkdocsYml = Files.readString(Path.of("mkdocs.yml")).replace("\r\n", "\n")
 
   /** Every `foo/bar.md`-shaped token written anywhere in mkdocs.yml (the nav values). */
   private lazy val referenced: Set[String] =

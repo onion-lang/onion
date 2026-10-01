@@ -121,6 +121,11 @@ public final class Proc {
         try {
             ProcessBuilder builder = new ProcessBuilder(command).inheritIO();
             if (dir != null) builder.directory(new File(dir));
+            // The child writes to the same handles directly, bypassing System.out/err; flush
+            // what this script printed first (e.g. a prompt without a newline) so the two
+            // outputs appear in the order they were produced.
+            System.out.flush();
+            System.err.flush();
             return builder.start().waitFor();
         } catch (IOException e) {
             throw new RuntimeException("Proc: failed to run " + Arrays.toString(command) + ": " + e.getMessage(), e);

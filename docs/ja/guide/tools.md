@@ -191,3 +191,59 @@ capability はエフェクトを*パラメータ*に結びつけるので、`wri
 コモディティですが、検査済み効果集合から導出したプランはそうではありません ——
 本体が何をするかを知っている必要があるからです。
 
+### ソースに書かれたオペランド
+
+裸の capability（`net`、`exec`、`env`、`read`、`write`）はパラメータに結びついて
+いませんが、そのオペランドはソースにリテラルとして書かれていることがよくあります ——
+API のホスト、tool が呼び出すコマンド、読む環境変数。`--plan` はそれを表示します：
+
+```bash
+$ onion digest.on out/digest.md gh --plan
+plan: `digest` would
+  write   derived from out = out/digest.md
+  exec    gh
+  net     $SLACK_WEBHOOK_URL
+  net     api.github.com
+  env     SLACK_WEBHOOK_URL
+  env     GITHUB_TOKEN
+  clock
+  console
+(nothing was executed; operands are the arguments the effects are
+ derived from, not necessarily the exact paths or hosts touched)
+```
+
+コンパイラは、tool から到達できるすべての呼び出し（本体、本体が生成するクロージャ、
+本体が推移的に呼ぶプログラム内のメソッド）から次を読み取ります：
+
+| 効果 | 表示されるオペランド | 読み取り元 |
+|------|----------------------|------------|
+| `net` | ホスト（とポート） | `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse` の URL、`http"…"` リソース、`Net::connect` |
+| `exec` | コマンド名 | `Proc::capture`/`run`/`exec` のコマンドの先頭語、`captureIn`/`runIn`/`execIn` ではディレクトリの次の語 |
+| `env` | 変数名 | `System::getenv("NAME")`、`Config::getEnv("NAME", …)` |
+| `read`/`write` | パス | `Files` の各操作のパス引数、`file"…"` リソース |
+
+オペランドが「既知」とみなされるのは、文字列リテラル、リテラルで*始まる*連結や補間
+（`"https://api.github.com/search?q=" + q` —— このような接頭辞から読むのは URL のホスト
+だけで、リテラルがホストの先まで続いている場合に限ります）、そのどちらかで一度だけ代入
+されるローカル `val`、そして `$NAME` と表示される `System::getenv("NAME")` です（環境変数に
+入れた Webhook URL は `net $SLACK_WEBHOOK_URL` と表示されます）。URL のユーザー情報
+（`user:password@`）は決して表示しません。オペランドは1行に1つで、効果名を繰り返し、呼び出しが見つかった順 —— tool 自身の本体が
+先、そのあと本体が呼ぶメソッド —— に並びます。
+
+この一覧は**下界**です。それ以外 —— パラメータ、`var`、実行時に計算される値、ヘルパーの
+パラメータに渡されたリテラル（引数を呼び出し先まで追うことはしません）—— は推測しません。
+ある効果の呼び出し箇所に解析が読めなかったオペランドがあれば、既知のオペランドの後に同じ
+効果の `(operand not statically known)` 行が続くので、部分的な一覧が完全な一覧に見える
+ことはありません。パラメータに結びついた capability（`write(out)`）では `derived from`
+行は変わらず、本体の他の場所にある同じ効果のリテラルオペランドがその下に並びます。
+
+同じ事実は `--contract` にも tool ごとに1つの追加キーとして現れます。何か分かったときだけ
+存在し、既存のキーはすべて値も位置も変わりません：
+
+```json
+"staticOperands":{"net":{"known":["$SLACK_WEBHOOK_URL","api.github.com"],"unresolved":false}}
+```
+
+`unresolved` は、その効果の呼び出し箇所のうち少なくとも1つで、解析がオペランドを決定
+できなかったときに `true` になります。
+

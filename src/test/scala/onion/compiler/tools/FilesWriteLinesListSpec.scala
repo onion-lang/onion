@@ -9,7 +9,8 @@ import onion.tools.Shell
  */
 class FilesWriteLinesListSpec extends AbstractShellSpec {
   it("writes a List of lines and reads them back") {
-    val path = System.getProperty("java.io.tmpdir") + "/onion-writelines-list-285.txt"
+    // Forward slashes: a Windows `\` would start an escape inside the Onion string literal.
+    val path = (System.getProperty("java.io.tmpdir") + "/onion-writelines-list-285.txt").replace('\\', '/')
     val result = shell.run(
       s"""
         |def main(args: String[]): Int {

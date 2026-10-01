@@ -1,0 +1,185 @@
+// RangeQueryDS.on — Fenwick Tree (Binary Indexed Tree) and Sparse Table
+//
+//  Fenwick Tree: O(log n) point updates + prefix-sum queries → range sums.
+//  Sparse Table: O(n log n) build, O(1) static range-minimum queries (RMQ).
+//
+//  Exercises: Int[][] 2-D arrays, Int[] 1-D arrays, bitwise & and <<,
+//  records, extension methods on Int, collection pipelines, while loops,
+//  foreach over ranges, select, string interpolation.
+
+// ── Fenwick Tree (Binary Indexed Tree) ───────────────────────────────────────
+
+class FenwickTree {
+  var tree: Int[]
+  var n: Int
+
+public:
+  def this(size: Int) {
+    self.n = size
+    self.tree = new Int[size + 1]
+  }
+
+  def this(arr: Int[], size: Int) {
+    self.n = size
+    self.tree = new Int[size + 1]
+    var i: Int = 0
+    while i < size {
+      self.update(i + 1, arr[i])
+      i++
+    }
+  }
+
+  // Add delta to the element at 1-based position i.
+  def update(i: Int, delta: Int): void {
+    var pos: Int = i
+    while pos <= self.n {
+      self.tree[pos] = self.tree[pos] + delta
+      pos = pos + (pos & (-pos))
+    }
+  }
+
+  // Prefix sum of elements 1..i.
+  def query(i: Int): Int {
+    var sum: Int = 0
+    var pos: Int = i
+    while pos > 0 {
+      sum = sum + self.tree[pos]
+      pos = pos - (pos & (-pos))
+    }
+    return sum
+  }
+
+  // Sum of elements in the closed range [l, r] (1-based).
+  def rangeQuery(l: Int, r: Int): Int {
+    if l == 1 { return self.query(r) }
+    return self.query(r) - self.query(l - 1)
+  }
+
+  // O(log^2 n) k-th prefix: smallest index i with prefix_sum(i) >= k.
+  def kthPrefix(k: Int): Int {
+    var lo: Int = 1
+    var hi: Int = self.n
+    while lo < hi {
+      val mid: Int = (lo + hi) / 2
+      if self.query(mid) >= k {
+        hi = mid
+      } else {
+        lo = mid + 1
+      }
+    }
+    return lo
+  }
+}
+
+// ── Sparse Table for O(1) Range Minimum Query ──────────────────────────────────
+
+class SparseTable {
+  var table: Int[][]
+  var log2: Int[]
+  var n: Int
+  var levels: Int
+
+public:
+  def this(arr: Int[], size: Int) {
+    self.n = size
+
+    // Precompute integer log2 table: log2[i] = floor(log2(i)).
+    self.log2 = new Int[size + 1]
+    var i: Int = 2
+    while i <= size {
+      self.log2[i] = self.log2[i / 2] + 1
+      i++
+    }
+
+    // levels = floor(log2(size)) + 1
+    self.levels = self.log2[size] + 1
+
+    // table[j][i] = minimum of arr[i .. i + 2^j - 1]
+    self.table = new Int[self.levels][size]
+
+    i = 0
+    while i < size {
+      self.table[0][i] = arr[i]
+      i++
+    }
+
+    var j: Int = 1
+    while j < self.levels {
+      val half: Int = 1 << (j - 1)
+      i = 0
+      while i + (1 << j) - 1 < size {
+        val a: Int = self.table[j - 1][i]
+        val b: Int = self.table[j - 1][i + half]
+        self.table[j][i] = if a < b { a } else { b }
+        i++
+      }
+      j++
+    }
+  }
+
+  // Range minimum of arr[l..r] (0-based, inclusive) in O(1).
+  def query(l: Int, r: Int): Int {
+    val k: Int = self.log2[r - l + 1]
+    val a: Int = self.table[k][l]
+    val b: Int = self.table[k][r - (1 << k) + 1]
+    return if a < b { a } else { b }
+  }
+}
+
+// ── Demo ─────────────────────────────────────────────────────────────────────
+
+class Main {
+public:
+  static def main(args: String[]): void {
+    // ── Fenwick tree demo ─────────────────────────────────────────────────────
+    IO::println("=== Fenwick Tree (BIT) ===")
+
+    val data: Int[] = new Int[11]
+    data[0] = 3;  data[1] = 2;  data[2] = -1
+    data[3] = 6;  data[4] = 5;  data[5] = 4
+    data[6] = -3; data[7] = 3;  data[8] = 7
+    data[9] = 2;  data[10] = 3
+
+    val bit: FenwickTree = new FenwickTree(data, 11)
+
+    // Prefix sums
+    IO::println("prefix(1)  = " + bit.query(1)  + "  expected 3")
+    IO::println("prefix(5)  = " + bit.query(5)  + "  expected 15")
+    IO::println("prefix(11) = " + bit.query(11) + "  expected 31")
+
+    // Range sums (1-based)
+    IO::println("range(3,7) = " + bit.rangeQuery(3, 7) + "  expected 11")
+    IO::println("range(1,11)= " + bit.rangeQuery(1, 11)+ "  expected 31")
+
+    // Point update: add 10 to position 4
+    bit.update(4, 10)
+    IO::println("after update(4,+10):")
+    IO::println("prefix(5)  = " + bit.query(5)  + "  expected 25")
+    IO::println("range(3,7) = " + bit.rangeQuery(3, 7) + "  expected 21")
+
+    // kthPrefix: smallest i with prefix_sum(i) >= k
+    // prefix(1)=3, prefix(4)=20, so kthPrefix(3)=1 and kthPrefix(10)=4
+    IO::println("kthPrefix(3) = " + bit.kthPrefix(3)  + "  expected 1")
+    IO::println("kthPrefix(10)= " + bit.kthPrefix(10) + "  expected 4")
+
+    // ── Sparse table demo ─────────────────────────────────────────────────────
+    IO::println("")
+    IO::println("=== Sparse Table (RMQ) ===")
+
+    val rmqData: Int[] = new Int[10]
+    rmqData[0] = 5; rmqData[1] = 2; rmqData[2] = 4
+    rmqData[3] = 3; rmqData[4] = 1; rmqData[5] = 6
+    rmqData[6] = 7; rmqData[7] = 9; rmqData[8] = 0
+    rmqData[9] = 8
+
+    val st: SparseTable = new SparseTable(rmqData, 10)
+
+    IO::println("min(0,4) = " + st.query(0, 4) + "  expected 1")
+    IO::println("min(2,7) = " + st.query(2, 7) + "  expected 1")
+    IO::println("min(5,9) = " + st.query(5, 9) + "  expected 0")
+    IO::println("min(0,9) = " + st.query(0, 9) + "  expected 0")
+    IO::println("min(0,3) = " + st.query(0, 3) + "  expected 2")
+    IO::println("min(5,7) = " + st.query(5, 7) + "  expected 6")
+    IO::println("min(3,3) = " + st.query(3, 3) + "  expected 3")
+  }
+}

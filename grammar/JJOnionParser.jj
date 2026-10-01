@@ -2280,7 +2280,7 @@ AST.Argument lambda_argument(boolean parenthesized) :{Token t; AST.TypeNode type
 // The `-> R` postfix of a single-argument function type, applied to an already-parsed
 // argument type. Kept out of type_impl() so type_no_arrow() can omit it.
 AST.TypeNode function_type_tail(AST.TypeNode arg) :{AST.TypeNode r;}{
-  <ARROW> eols() r=type() {
+  <ARROW> eols() r=return_type() {
     ArrayBuffer<AST.TypeDescriptor> ps = new ArrayBuffer<AST.TypeDescriptor>();
     append(ps, arg.desc());
     return new AST.TypeNode(arg.location(), new AST.FunctionType(toList(ps), r.desc()), arg.isRelaxed());

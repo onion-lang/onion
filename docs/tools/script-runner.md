@@ -20,7 +20,7 @@ onion -classpath lib/mylib.jar MyScript.on
 
 ### `-encoding <encoding>`
 
-Specify the character encoding of source files.
+Specify the character encoding of source files. Default is UTF-8.
 
 ```bash
 onion -encoding UTF-8 MyScript.on

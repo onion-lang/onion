@@ -20,7 +20,8 @@ onionc -classpath lib/mylib.jar:lib/other.jar MyProgram.on
 
 ### `-encoding <encoding>`
 
-ソースファイルの文字エンコーディングを指定します。未指定時はプラットフォーム依存のデフォルトが使われます。
+ソースファイルの文字エンコーディングを指定します。未指定時はプラットフォームや JDK によらず UTF-8 です
+（日本語 Windows 上の JDK 17 のように、プラットフォームの既定が MS932 の場合も同じです）。
 
 ```bash
 onionc -encoding UTF-8 MyProgram.on

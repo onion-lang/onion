@@ -21,6 +21,7 @@ object CompilerFrontend {
   val VERSION = OnionVersion.value
 
   def main(args: Array[String]): Unit = {
+    ConsoleEncoding.install()
     // With ONION_DAEMON set, the command line goes to the resident compile daemon (see
     // onion.tools.daemon.DaemonClient); when the daemon cannot be reached, compile here.
     val viaDaemon =

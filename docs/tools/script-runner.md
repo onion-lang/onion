@@ -151,6 +151,70 @@ Run the script, then re-run it automatically whenever its file changes. Compile 
 onion --watch MyScript.on
 ```
 
+## Dependencies (`//> using dep`)
+
+A script declares the Maven libraries it needs in its own header, in scala-cli's
+syntax, instead of taking them from `-classpath`:
+
+```onion
+//> using dep "org.apache.poi:poi-ooxml:5.5.1"
+
+import { org.apache.poi.xssf.usermodel.XSSFWorkbook }
+
+tool book(dst: String): Int requires { write(dst), unknown } {
+  val wb = new XSSFWorkbook()
+  wb.createSheet("report").createRow(0).createCell(0).setCellValue("hello")
+  val bytes = new java.io.ByteArrayOutputStream()
+  wb.write(bytes)
+  wb.close()
+  Files::writeBytes(dst, bytes.toByteArray())   // the `write(dst)` the tool declares
+  return 0
+}
+```
+
+```bash
+onion book.on report.xlsx --plan
+```
+
+A library that is not on Maven Central needs its repository too:
+
+```onion
+//> using repository "https://nexus.example.com/repository/maven-public"   // optional
+//> using dep "com.example.internal:ledger:2.3.0"
+```
+
+- `using dep` takes one or more `"group:artifact:version"` coordinates, and
+  `using repository` one or more absolute `http`, `https` or `file` URLs. Values may be
+  quoted or bare, and a trailing `// comment` is allowed. `deps` and `repositories` are
+  accepted as the plural spellings.
+- Repositories are searched **before** Maven Central, in the order written, exactly as a
+  project's `[[repositories]]`. Resolution is the same coursier resolver a project uses.
+- The resolved jars, transitives included, are on the classpath for compiling and for
+  running, including with `--effects`, a tool's `--plan`/`--help`, `--watch`, and
+  `ONION_DAEMON=1` (the daemon compiles with the same jars).
+- Directives are read only from the **leading comment block**: an optional `#!` line, then
+  blank lines and comments, before any code. A `//>` line there must be a well-formed
+  directive, and a `//> using` line after code is an error, not an ignored comment. A
+  malformed directive names the script, line and column and stops the run before
+  compiling.
+- Versions must be exact: a range (`[1.0,2.0)`), `latest.*`, `RELEASE` or `1.+` is
+  rejected, as is the same module at two versions. Scala's `group::artifact` form is not
+  supported; name the full artifact.
+- Download progress is printed to stderr.
+
+**A script has no lock file.** The directives pin each direct dependency, but transitive
+versions are whatever resolution picks at the time, so two machines can run the same script
+against different transitive jars. When that matters, make it a
+[project](project-cli.md): `[dependencies]` in `onion.toml` plus a committed `onion.lock`.
+
+Resolving through coursier costs about a second even when everything is already downloaded,
+so the resolved classpath is cached per set of directives (a hash of the sorted
+dependencies and the ordered repositories) in `script-deps/` under Onion's cache directory,
+and reused as long as every jar it lists still exists. The cache directory is
+`$ONION_CACHE_DIR` (or `-Donion.cache.dir`) when set, else `%LOCALAPPDATA%\onion\cache` on
+Windows, `~/Library/Caches/onion` on macOS and `$XDG_CACHE_HOME/onion` (`~/.cache/onion`)
+elsewhere. Deleting it is always safe; the next run resolves afresh.
+
 ## Program Arguments
 
 Arguments after the source file(s) are passed to your program:

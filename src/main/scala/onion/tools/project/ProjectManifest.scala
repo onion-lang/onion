@@ -182,7 +182,7 @@ object ProjectManifest:
   private val RepositoryShape =
     "repositories must be declared as [[repositories]] tables with a url string"
 
-  private[project] def validRepository(value: String): Boolean =
+  private[tools] def validRepository(value: String): Boolean =
     try
       val uri = java.net.URI(value)
       uri.isAbsolute && Set("http", "https", "file").contains(uri.getScheme)

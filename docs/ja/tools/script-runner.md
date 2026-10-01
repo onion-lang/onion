@@ -150,6 +150,71 @@ onion --stacktrace MyScript.on
 onion --watch MyScript.on
 ```
 
+## 依存ライブラリ（`//> using dep`）
+
+スクリプトは、必要な Maven ライブラリを `-classpath` で受け取る代わりに、自身の
+ヘッダーで scala-cli と同じ構文を使って宣言できます。
+
+```onion
+//> using dep "org.apache.poi:poi-ooxml:5.5.1"
+
+import { org.apache.poi.xssf.usermodel.XSSFWorkbook }
+
+tool book(dst: String): Int requires { write(dst), unknown } {
+  val wb = new XSSFWorkbook()
+  wb.createSheet("report").createRow(0).createCell(0).setCellValue("hello")
+  val bytes = new java.io.ByteArrayOutputStream()
+  wb.write(bytes)
+  wb.close()
+  Files::writeBytes(dst, bytes.toByteArray())   // tool が宣言する `write(dst)`
+  return 0
+}
+```
+
+```bash
+onion book.on report.xlsx --plan
+```
+
+Maven Central にないライブラリには、そのリポジトリも指定します。
+
+```onion
+//> using repository "https://nexus.example.com/repository/maven-public"   // 任意
+//> using dep "com.example.internal:ledger:2.3.0"
+```
+
+- `using dep` には `"group:artifact:version"` 形式の座標を1つ以上、`using repository`
+  には `http`・`https`・`file` の絶対URLを1つ以上書きます。値はクォートしてもしなくても
+  よく、行末に `// コメント` を置けます。複数形の `deps`・`repositories` も使えます。
+- リポジトリはプロジェクトの `[[repositories]]` と同じく、書いた順に Maven Central
+  **より先に**検索されます。解決にはプロジェクトと同じ coursier のリゾルバーを使います。
+- 解決された jar（推移的依存を含む）はコンパイル時と実行時の両方で classpath に載ります。
+  `--effects`、ツールの `--plan`/`--help`、`--watch`、`ONION_DAEMON=1`（デーモンも同じ
+  jar でコンパイルします）でも同様です。
+- ディレクティブは**先頭のコメントブロック**、つまり任意の `#!` 行に続く空行とコメント
+  だけから、コードより前でのみ読み取られます。そこにある `//>` 行は正しい形式の
+  ディレクティブでなければならず、コードの後ろの `//> using` 行は無視されるコメントでは
+  なくエラーになります。不正なディレクティブはスクリプト名・行・列を示し、コンパイル前に
+  実行を止めます。
+- バージョンは厳密指定が必要です。範囲（`[1.0,2.0)`）、`latest.*`、`RELEASE`、`1.+` は
+  拒否され、同じモジュールを2つのバージョンで宣言することもできません。Scala の
+  `group::artifact` 形式には対応していないので、アーティファクト名を完全に書いてください。
+- ダウンロードの進捗は標準エラー出力に表示されます。
+
+**スクリプトにはロックファイルがありません。** ディレクティブは直接の依存を固定しますが、
+推移的依存のバージョンはその時点の解決結果次第なので、同じスクリプトでもマシンによって
+異なる推移的 jar で動くことがあります。それが問題になるなら、`onion.toml` の
+`[dependencies]` とコミットした `onion.lock` を持つ[プロジェクト](project-cli.md)に
+してください。
+
+coursier による解決は、すべてダウンロード済みでも1秒ほどかかります。そこで解決済みの
+classpath をディレクティブの組ごと（ソートした依存と、書いた順のリポジトリのハッシュ）に
+Onion のキャッシュディレクトリ配下の `script-deps/` にキャッシュし、記録した jar が
+すべて存在する限り再利用します。キャッシュディレクトリは `$ONION_CACHE_DIR`
+（または `-Donion.cache.dir`）が設定されていればそこ、なければ Windows では
+`%LOCALAPPDATA%\onion\cache`、macOS では `~/Library/Caches/onion`、それ以外では
+`$XDG_CACHE_HOME/onion`（`~/.cache/onion`）です。いつ削除しても安全で、次の実行で
+改めて解決されます。
+
 ## プログラム引数
 
 ソースファイルの後ろに指定した引数は、プログラムに渡されます。

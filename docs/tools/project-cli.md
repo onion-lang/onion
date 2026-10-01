@@ -195,6 +195,11 @@ recompile, rather than serving classes compiled against the old classpath as cur
 A coordinate that cannot be resolved fails the build with coursier's message, which names
 the coordinate it could not find.
 
+A single-file script declares the same thing with `//> using dep "group:artifact:version"`
+lines at its top (see [Script Runner](script-runner.md)). A script
+has no `onion.lock`, so its transitive versions are not pinned; when that matters, make it
+a project.
+
 ### `[[repositories]]`
 
 Extra Maven repositories, searched **before** Maven Central and in the order written:
@@ -320,12 +325,34 @@ builds instead look at the parsed source:
    statement (including a bare expression or variable declaration).
 2. Any production source that declares a top-level function named `main` is
    a candidate.
-3. Every other compiler-generated `main` is ignored.
+3. Any production source that declares a top-level `tool`, and has neither a
+   `main` nor a top-level statement, is a candidate. That is exactly when the
+   compiler synthesizes the source's tool CLI `main`, the same one a script
+   gets, so `run` dispatches through it: `--help`, `--contract` and `--plan`
+   all work.
+4. Every other compiler-generated `main` is ignored.
 
 `run` requires exactly one candidate. Zero candidates fail with a hint to add
-executable code to `src/main.on` or define a top-level `main`; more than one
-candidate fails and lists every candidate's source and location so the
-ambiguity can be resolved.
+executable code to `src/main.on`, define a top-level `main`, or declare a
+top-level `tool`; more than one candidate fails and lists every candidate's
+source and location so the ambiguity can be resolved.
+
+Arguments after `--` go to the program, so a tool project is driven like the
+script it would otherwise be:
+
+```text
+$ onion run -- --help
+usage: meeting-summary <notes> <out>
+  ...
+$ onion run -- samples/notes.md out.json --plan
+plan: `summarize` would
+  read    derived from notes = samples/notes.md
+  write   derived from out = out.json
+  ...
+```
+
+The usage line names the project's package (`[package].name`) where a script's
+names its file.
 
 ## Testing
 

@@ -33,6 +33,16 @@ import java.util.Map;
  * {@code = 1 + 2}) has no value to quote, so the entry carries
  * {@code "defaultComputed":true} instead of a {@code "default"} key; {@code --help}
  * and {@code --plan} describe it as computed rather than fabricating a value.
+ *
+ * <p>An entry may also carry {@code "staticOperands"}, present only when the compiler
+ * could read at least one operand off the source (a literal URL's host, a {@code Proc}
+ * command name, a {@code System::getenv} variable name, a literal path):
+ * <pre>
+ *   "staticOperands": {"net": {"known": ["api.github.com"], "unresolved": false}}
+ * </pre>
+ * {@code known} is a lower bound; {@code unresolved} is true when some call site of that
+ * effect has an operand the analysis could not determine. {@code --plan} prints each
+ * known operand on its own line.
  */
 public final class ToolCli {
     private ToolCli() {}
@@ -226,6 +236,11 @@ public final class ToolCli {
         if (caps.isEmpty()) {
             sb.append("  perform no effects (pure)\n");
         }
+        // Operands the compiler read off the source (FRICTION F11): literal hosts,
+        // commands, env-var names and paths. One line per operand, the effect repeated,
+        // printed once per effect. Absent from contracts built before this existed.
+        Map<String, Object> staticOps = map(tool, "staticOperands");
+        java.util.Set<String> staticDone = new java.util.HashSet<>();
         for (Object capObj : caps) {
             String cap = String.valueOf(capObj);
             String effect = cap;
@@ -241,6 +256,17 @@ public final class ToolCli {
                 sb.append("  unknown  — calls code the analysis cannot characterize; ")
                   .append("this plan is a lower bound\n");
             } else if (paramName == null) {
+                List<Object> known = list(map(staticOps, effect), "known");
+                if (!known.isEmpty()) {
+                    // Known operands replace the bare line. A lower bound: when some
+                    // call site's operand could not be read, say so on its own line.
+                    if (staticDone.add(effect)) {
+                        appendStaticOperands(sb, effect, known);
+                        if (Boolean.TRUE.equals(map(staticOps, effect).get("unresolved")))
+                            sb.append("  ").append(pad(effect, 8)).append("(operand not statically known)\n");
+                    }
+                    continue;
+                }
                 // Ambient effects have no operand; a parameterizable one declared bare
                 // has an operand the analysis could not tie down — say which is which.
                 if (effect.equals("console") || effect.equals("env")
@@ -279,11 +305,20 @@ public final class ToolCli {
                     operand = "derived from " + paramName + " = " + bound;
                 }
                 sb.append("  ").append(pad(effect, 8)).append(operand).append('\n');
+                // Literal operands of the same effect elsewhere in the body (a fixed log
+                // file next to `write(out)`) are added below the parameter line, which
+                // itself stays exactly as it was.
+                List<Object> known = list(map(staticOps, effect), "known");
+                if (!known.isEmpty() && staticDone.add(effect)) appendStaticOperands(sb, effect, known);
             }
         }
         sb.append("(nothing was executed; operands are the arguments the effects are\n");
         sb.append(" derived from, not necessarily the exact paths or hosts touched)\n");
         return sb.toString();
+    }
+
+    private static void appendStaticOperands(StringBuilder sb, String effect, List<Object> known) {
+        for (Object k : known) sb.append("  ").append(pad(effect, 8)).append(k).append('\n');
     }
 
     // ---- help / usage, straight from the contract -------------------------------
@@ -387,6 +422,12 @@ public final class ToolCli {
     private static List<Map<String, Object>> params(Map<String, Object> tool) {
         Object v = tool.get("params");
         return v == null ? new ArrayList<>() : (List<Map<String, Object>>) (List<?>) v;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> map(Map<String, Object> m, String key) {
+        Object v = m.get(key);
+        return v instanceof Map ? (Map<String, Object>) v : new LinkedHashMap<>();
     }
 
     @SuppressWarnings("unchecked")

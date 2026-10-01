@@ -661,12 +661,27 @@ record Inner(x: Int)
 record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner is not a supported component type
 ```
 
-A `shape name = ...` clause (regex, `json`, `yaml` or `config`) reads its components the
-same way, so the same restriction applies; the message names the clause that could not
-produce the component (`shape doc = json`, `from re"..."`).
+A `shape name = ...` clause (regex, `yaml` or `config`) reads its components the same
+way, so the same restriction applies; the message names the clause that could not
+produce the component (`shape line = re"..."`, `from re"..."`).
 
-Fix: keep every component in the supported scalar set, or parse the field
-manually after a plain `from re"..."` match on the rest.
+A `shape name = json` clause reads more: besides the scalars, `List[S]` of a scalar, a
+record `R` that declares a json shape of its own, `List[R]`, and `T?` of any of these.
+Anything else is still E0061 for it — a `Map`, an array, `List[List[S]]`, `List[S?]`, a
+record with no json shape, or a type alias standing for one of the accepted types:
+
+```onion
+record Inner(x: Int)                                   // no json shape
+record R(a: String, b: Inner) { shape doc = json }     // E0061: shape doc = json cannot read Inner
+```
+
+Every shape of a record reads the same components, so a record whose json shape reads a
+`List[String]` but which also declares `shape line = re"..."` is E0061 naming the regex
+clause.
+
+Fix: keep every component in the supported scalar set (or, for a json shape, in the
+extended set above — give a nested record its own `shape doc = json`), or parse the
+field manually after a plain `from re"..."` match on the rest.
 
 ### `E0062` — Record component type unsupported by `derive!`
 

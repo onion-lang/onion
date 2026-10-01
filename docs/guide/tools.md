@@ -200,3 +200,61 @@ plan. This is what makes the dry run *trustworthy* rather than decorative: a CLI
 derived from a signature is commodity; a plan derived from the checked effect set
 requires knowing what the body does.
 
+### Operands the source spells out
+
+A bare capability (`net`, `exec`, `env`, `read`, `write`) is not tied to a parameter,
+but its operand is often sitting in the source as a literal — the API host, the command
+a tool shells out to, the environment variable it reads. `--plan` prints those:
+
+```bash
+$ onion digest.on out/digest.md gh --plan
+plan: `digest` would
+  write   derived from out = out/digest.md
+  exec    gh
+  net     $SLACK_WEBHOOK_URL
+  net     api.github.com
+  env     SLACK_WEBHOOK_URL
+  env     GITHUB_TOKEN
+  clock
+  console
+(nothing was executed; operands are the arguments the effects are
+ derived from, not necessarily the exact paths or hosts touched)
+```
+
+The compiler reads, from every call the tool can reach (its body, closures it creates,
+and the program's own methods it calls, transitively):
+
+| Effect | Operand shown | Read from |
+|--------|---------------|-----------|
+| `net` | the host (and port) | the URL of `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse`, an `http"…"` resource, `Net::connect` |
+| `exec` | the command name | the first command word of `Proc::capture`/`run`/`exec`, or the first after the directory for `captureIn`/`runIn`/`execIn` |
+| `env` | the variable name | `System::getenv("NAME")`, `Config::getEnv("NAME", …)` |
+| `read`/`write` | the path | the path argument of `Files` operations, a `file"…"` resource |
+
+An operand counts as known when it is a string literal; a concatenation or
+interpolation that *starts* with a literal (`"https://api.github.com/search?q=" + q` —
+only a URL's host is read from such a prefix, and only when the literal runs past it); a
+local `val` assigned once from either; or `System::getenv("NAME")`, which is shown as
+`$NAME` (a webhook URL kept in an environment variable prints as
+`net $SLACK_WEBHOOK_URL`). User-info in a URL (`user:password@`) is never printed.
+Each operand gets its own line, with the effect name repeated, in the order the calls
+are found — the tool's own body first, then the methods it calls.
+
+The list is a **lower bound**. Anything else — a parameter, a `var`, a value computed at
+run time, a literal passed into a helper's parameter (arguments are not followed into
+the callee) — is not guessed. When a call site of an effect has an operand the analysis
+could not read, the known operands are followed by a `(operand not statically known)`
+line for the same effect, so a partial list never reads as a complete one. Under a
+parameter-bound capability (`write(out)`) the `derived from` line is unchanged; literal
+operands of the same effect elsewhere in the body are listed beneath it.
+
+The same facts appear in `--contract` as one extra key per tool, present only when
+something is known — every existing key keeps its value and position:
+
+```json
+"staticOperands":{"net":{"known":["$SLACK_WEBHOOK_URL","api.github.com"],"unresolved":false}}
+```
+
+`unresolved` is `true` when at least one call site of that effect had an operand the
+analysis could not determine.
+

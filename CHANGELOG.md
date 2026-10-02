@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.135.0] - 2026-10-02
+
 ### Fixed
 
 - **`onion.Server`'s internal dispatcher thread was not a daemon thread, so a script that forgot to call `server.stop()` still hung after `main` returned** — even though `Server.start`'s handler-thread pool was already daemon specifically to prevent that. The JDK's built-in `HttpServer` spawns its own internal `HTTP-Dispatcher` thread independently of the executor passed to `setExecutor`, and that thread's daemon status is inherited from whichever thread calls `HttpServer.start()`, not from the executor — which was the caller's (often non-daemon, e.g. `main`) thread. `Server.start` now creates and starts the `HttpServer` from a short-lived daemon thread of its own, so the dispatcher thread it spawns is daemon too. Covered by a new case in `NetServerSpec`.

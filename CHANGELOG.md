@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.134.0] - 2026-10-02
+
 ### Fixed
 
 - **`T -> void` and `T -> Unit` (the bare, unparenthesized single-argument function-type form) were rejected with a syntax error**, even though the equivalent parenthesized form `(T) -> void` worked fine. `function_type_tail`/`functionTypeTail` (the `T -> R` postfix) called `type()`/`typ()` in both the JavaCC grammar and the hand-written parser, which do not accept the `void`/`Unit` keyword; the parenthesized multi-arg path `(T, …) -> R` correctly called `return_type()`/`returnType()`. Both parsers now call the return-type rule here too. Covered by new cases in `FunctionVoidTypeSpec` (merged via #1846).

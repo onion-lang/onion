@@ -41,8 +41,9 @@ object EffectInference {
   final case class CallSite(location: onion.compiler.Location, callee: String, effects: Set[Effect])
 
   /** Per-method rendering for `--effects`. */
-  def infer(classes: Seq[ClassDefinition]): Seq[MethodEffects] = {
-    val (units, sets) = inferUnits(classes)
+  def infer(classes: Seq[ClassDefinition],
+            table: EffectTable.Table = EffectTable.builtin): Seq[MethodEffects] = {
+    val (units, sets) = inferUnits(classes, table)
     units.iterator.map { case (u, (cls, name, args)) =>
       MethodEffects(cls, name, args, sets(u))
     }.toSeq
@@ -53,7 +54,7 @@ object EffectInference {
    * effect set. Exposed for [[onion.compiler.typing.CapabilityCheckPass]], which needs
    * to resolve callees by definition object.
    */
-  def inferUnits(classes: Seq[ClassDefinition])
+  def inferUnits(classes: Seq[ClassDefinition], table: EffectTable.Table = EffectTable.builtin)
       : (mutable.LinkedHashMap[Unit0, (String, String, Seq[String])], Map[Unit0, Set[Effect]]) = {
     val units = mutable.LinkedHashMap[Unit0, (String, String, Seq[String])]()
     for (cd <- classes) {
@@ -73,7 +74,7 @@ object EffectInference {
     val base = mutable.LinkedHashMap[Unit0, Set[Effect]]()
     val edges = mutable.LinkedHashMap[Unit0, Set[Unit0]]()
     for ((u, _) <- units) {
-      val collector = new Collector(units.keySet, classes)
+      val collector = new Collector(units.keySet, classes, table)
       u match {
         case md: MethodDefinition =>
           if (md.getBlock != null) collector.statement(md.getBlock)
@@ -108,8 +109,9 @@ object EffectInference {
    * exactly the evidence set for a per-call-site capability diagnostic.
    */
   def callSites(body: ActionStatement, classes: Seq[ClassDefinition],
-                unitEffects: Map[Unit0, Set[Effect]]): Seq[CallSite] = {
-    val collector = new Collector(unitEffects.keySet, classes)
+                unitEffects: Map[Unit0, Set[Effect]],
+                table: EffectTable.Table = EffectTable.builtin): Seq[CallSite] = {
+    val collector = new Collector(unitEffects.keySet, classes, table)
     collector.statement(body)
     collector.rawSites.toSeq.map { raw =>
       CallSite(raw.location, raw.callee,
@@ -153,15 +155,19 @@ object EffectInference {
   private final case class RawSite(location: onion.compiler.Location, callee: String,
                                    resolved: Option[Set[Effect]], internal: Unit0,
                                    className: String = null, member: TypedAST.Method = null,
-                                   target: Term = null, args: Seq[Term] = Nil, depth: Int = 0)
+                                   target: Term = null, args: Seq[Term] = Nil, depth: Int = 0,
+                                   tableOperands: Seq[(Effect, String)] = Nil)
 
   /**
    * One external (table-classified) call in a body, with what [[StaticOperands]] needs
    * to read its operand: the receiver, the argument terms, and the closure depth.
    * `method` is null for a constructor call (`methodName` is then `<init>`).
+   * `tableOperands` are the fixed operands the effect table attaches to the callee
+   * (`Class#m=net:api.example.com`), shown by `--plan` like a literal argument.
    */
   final case class ExternalSite(className: String, methodName: String, method: TypedAST.Method,
-                                target: Term, args: Seq[Term], depth: Int, effects: Set[Effect])
+                                target: Term, args: Seq[Term], depth: Int, effects: Set[Effect],
+                                tableOperands: Seq[(Effect, String)] = Nil)
 
   /**
    * Syntactic facts about one body, for [[StaticOperands]]:
@@ -177,8 +183,9 @@ object EffectInference {
                              unsitedEffects: Set[Effect], callees: Seq[Unit0])
 
   /** [[BodyFacts]] for one inference unit; `units` is the set of program-defined bodies. */
-  def bodyFacts(unit: Unit0, units: collection.Set[Unit0], classes: Seq[ClassDefinition]): BodyFacts = {
-    val collector = new Collector(units, classes)
+  def bodyFacts(unit: Unit0, units: collection.Set[Unit0], classes: Seq[ClassDefinition],
+                table: EffectTable.Table = EffectTable.builtin): BodyFacts = {
+    val collector = new Collector(units, classes, table)
     unit match {
       case md: MethodDefinition =>
         if (md.getBlock != null) collector.statement(md.getBlock)
@@ -190,7 +197,8 @@ object EffectInference {
     val sites = collector.rawSites.iterator.collect {
       case r if r.resolved.isDefined =>
         val methodName = if (r.member == null) "<init>" else r.member.name
-        ExternalSite(r.className, methodName, r.member, r.target, r.args, r.depth, r.resolved.get)
+        ExternalSite(r.className, methodName, r.member, r.target, r.args, r.depth, r.resolved.get,
+          r.tableOperands)
     }.toSeq
     BodyFacts(sites, collector.localWrites.toSeq, collector.unsitedEffects.toSet,
       collector.internalCallees.toSeq)
@@ -202,7 +210,8 @@ object EffectInference {
    * `EffectWalkerCompletenessSpec` asserts the arms stay in sync with `TypedAST`,
    * because a missed node here means a silently dropped effect.
    */
-  private final class Collector(units: collection.Set[Unit0], classes: Seq[ClassDefinition]) {
+  private final class Collector(units: collection.Set[Unit0], classes: Seq[ClassDefinition],
+                                table: EffectTable.Table) {
     val effects = mutable.Set[Effect]()
     val internalCallees = mutable.LinkedHashSet[Unit0]()
     val rawSites = mutable.Buffer[RawSite]()
@@ -232,10 +241,11 @@ object EffectInference {
           internalCallees += md
           rawSites += RawSite(location, callee, None, md)
         case _ =>
-          val eff = m.effects // table verdict, or Unknown
+          // The compilation's table verdict (built-in + library tables), or Unknown.
+          val eff = table.effectsOrUnknown(m.affiliation.name, m.name)
           effects ++= eff
           rawSites += RawSite(location, callee, Some(eff), null,
-            m.affiliation.name, m, target, args.toSeq, depth)
+            m.affiliation.name, m, target, args.toSeq, depth, table.operands(m.affiliation.name, m.name))
       }
     }
 
@@ -247,10 +257,10 @@ object EffectInference {
           internalCallees += cd
           rawSites += RawSite(location, callee, None, cd)
         case _ =>
-          val eff = EffectTable.effectsOrUnknown(c.affiliation.name, "<init>")
+          val eff = table.effectsOrUnknown(c.affiliation.name, "<init>")
           effects ++= eff
           rawSites += RawSite(location, callee, Some(eff), null,
-            c.affiliation.name, null, null, args.toSeq, depth)
+            c.affiliation.name, null, null, args.toSeq, depth, table.operands(c.affiliation.name, "<init>"))
       }
     }
 
@@ -266,11 +276,11 @@ object EffectInference {
             cd.constructors.foreach {
               case scd: ConstructorDefinition if units.contains(scd) => internalCallees += scd
               case other =>
-                val eff = EffectTable.effectsOrUnknown(other.affiliation.name, "<init>")
+                val eff = table.effectsOrUnknown(other.affiliation.name, "<init>")
                 effects ++= eff; unsitedEffects ++= eff
             }
           case None =>
-            val eff = EffectTable.effectsOrUnknown(superName, "<init>")
+            val eff = table.effectsOrUnknown(superName, "<init>")
             effects ++= eff; unsitedEffects ++= eff
         }
       }

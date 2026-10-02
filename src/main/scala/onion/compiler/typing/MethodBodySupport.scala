@@ -217,7 +217,12 @@ private[compiler] final class MethodBodySupport(
 
     val extArgs = receiverArgument(node, receiverType) :: node.args
     markCapturedVariables(context, extArgs, node.block)
-    context.add("this", receiverType)
+    // `this`/`self` can never be reassigned, so bind it immutable like any val --
+    // the 2-arg `add` defaults to isMutable = true, which would otherwise route a
+    // null check on a nullable `self` (extension T? { ... }) into the mutable-var
+    // narrowing path, whose flow-sensitive result the guard-clause early-return
+    // narrowing in BlockElementLowering never consults.
+    context.add("this", receiverType, isMutable = false)
 
     val arguments = staticMethod.arguments
     val assigned = if (node.block == null) node.args.map(_.name).toSet else bodyContext.assignedNames(node.block)

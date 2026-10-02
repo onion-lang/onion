@@ -38,6 +38,12 @@ import scala.collection.mutable
  * but each call site's whole argument vector is kept as well, element by element, with
  * `None` where an argument is not a literal: `Proc::capture("gh", "pr", "list", q)` is
  * `gh pr list` and one unknown. `--plan` shows the literals with `…` for the unknowns.
+ *
+ * An effect-table entry may also attach FIXED operands to a method
+ * (`Class#m=net:api.example.com,env:API_KEY`, see [[EffectTable]]); a library uses this
+ * to say which host its client talks to. They join `known` for every call of that
+ * method, and such a call counts as resolved for that effect even when no argument is
+ * read: the operand does not depend on the arguments.
  */
 object StaticOperands {
 
@@ -76,7 +82,8 @@ object StaticOperands {
    * previous rendering.
    */
   def forTool(tool: MethodDefinition, units: collection.Set[EffectInference.Unit0],
-              classes: Seq[ClassDefinition]): Seq[(Effect, Operands)] = {
+              classes: Seq[ClassDefinition],
+              table: EffectTable.Table = EffectTable.builtin): Seq[(Effect, Operands)] = {
     val known = mutable.LinkedHashMap[Effect, mutable.LinkedHashSet[String]]()
     val unresolved = mutable.Set[Effect]()
     val commands = mutable.LinkedHashSet[Seq[Option[String]]]()
@@ -84,15 +91,22 @@ object StaticOperands {
     val queue = mutable.Queue[EffectInference.Unit0](tool)
     while (queue.nonEmpty) {
       val unit = queue.dequeue()
-      val facts = EffectInference.bodyFacts(unit, units, classes)
+      val facts = EffectInference.bodyFacts(unit, units, classes, table)
       val locals = singleAssignmentVals(unit, facts)
       unresolved ++= facts.unsitedEffects
       for (site <- facts.sites; effect <- site.effects) {
+        // Fixed operands the effect table attaches to the callee (`Class#m=net:host`):
+        // known for every call of it, whatever its arguments are.
+        val fixed = site.tableOperands.collect { case (`effect`, op) => op }
+        for (op <- fixed) {
+          known.getOrElseUpdate(effect, mutable.LinkedHashSet[String]()) += op
+          if (effect == Effect.Exec) commands += Seq(Some(op))
+        }
         operand(site, effect, locals) match {
           case Some(op) =>
             known.getOrElseUpdate(effect, mutable.LinkedHashSet[String]()) += op
             if (effect == Effect.Exec) procArgv(site, locals).foreach(commands += _)
-          case None     => unresolved += effect
+          case None     => if (fixed.isEmpty) unresolved += effect
         }
       }
       for (callee <- facts.callees if !seen.contains(callee)) {

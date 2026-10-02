@@ -1,0 +1,273 @@
+// SimplexLP.on — tableau Simplex method for linear programming (~330 lines).
+//
+// Solves standard-form maximization LPs:
+//     maximize   c . x
+//     subject to A x <= b,  x >= 0,  b >= 0
+// via Dantzig's classic tableau pivoting. The all-slack basis at the origin
+// is feasible whenever b >= 0, so this solver (like most textbook
+// introductions) covers that case and reports a clear error otherwise,
+// rather than implementing a full two-phase/Big-M method.
+//
+// Exercises: a data-carrying ADT case-enum (`Outcome`) dispatched via
+// `select`, a top-level `example` clause checked at build time (any
+// returned optimum must satisfy every original constraint), a class with
+// mutable 2-D array state (`Tableau` over
+// `Double[][]`), extension methods on `Double` (`fmt2`/`approxEq`) and `Int`
+// (`padLeft`), collection pipelines (`map`/`filter`/`fold`/`indices`-style
+// `foreach` over ranges), `select`/type-pattern matching, nullable `Int?`,
+// `try`/`catch` for input validation, and string interpolation.
+
+import {
+  java.lang.Math
+}
+
+// ─── Extensions ────────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val rounded: Double = Math::round(self * 100.0) / 100.0
+    val s: String = "" + rounded
+    val dot: Int = s.indexOf(".")
+    if dot < 0 { return s + ".00" }
+    val decimals: Int = s.length() - dot - 1
+    if decimals >= 2 { return s.substring(0, dot + 3) }
+    return s + "0"
+  }
+
+  def approxEq(other: Double, eps: Double): Boolean = Math::abs(self - other) <= eps
+}
+
+extension Int {
+  def padLeft(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ─── Problem & result types ────────────────────────────────────────────────
+
+// maximize sum(c[i] * x[i])  s.t.  for each row j: sum(a[j][i] * x[i]) <= b[j]
+record LpProblem(c: List[Double], a: List[List[Double]], b: List[Double])
+
+enum Outcome {
+  case Optimal(value: Double, x: List[Double], iterations: Int)
+  case Unbounded
+}
+
+record LpResult(problem: LpProblem, outcome: Outcome) {
+public:
+  def describe(): String =
+    select outcome {
+      case o is Optimal: {
+        val parts: List[String] = o.x().map { v -> v.fmt2() }
+        "optimal=" + o.value().fmt2() + " x=[" + Strings::join(parts, ", ") + "] iters=" + o.iterations()
+      }
+      case u is Unbounded: "unbounded"
+    }
+
+}
+
+// Every reported optimum must actually be feasible: plugging the solution
+// back into each original constraint must not exceed its right-hand side
+// (within a small numeric tolerance for the floating-point pivot
+// arithmetic). Checked against a fixed sample LP at build time.
+example feasibleAtOptimum {
+  val p: LpProblem = new LpProblem([3.0, 2.0], [[1.0, 1.0], [1.0, 3.0]], [4.0, 6.0])
+  val r: LpResult = Simplex::solve(p)
+  select r.outcome() {
+    case o is Optimal: {
+      var ok: Boolean = true
+      foreach row: Int in 0..<p.a().size {
+        var lhs: Double = 0.0
+        foreach col: Int in 0..<o.x().size { lhs = lhs + p.a()[row][col] * o.x()[col] }
+        if lhs > p.b()[row] + 1.0e-6 { ok = false }
+      }
+      ok
+    }
+    case u is Unbounded: true
+  }
+}
+
+// ─── Tableau ────────────────────────────────────────────────────────────────
+
+// Rows 0..m-1 are constraints (slack basis), row m is the objective (stored
+// as -c, so "optimal" means every objective-row coefficient is >= 0).
+// Columns 0..n-1 are the original variables, n..n+m-1 the slacks, last is RHS.
+class Tableau {
+  val m: Int
+  val n: Int
+  var rows: Double[][]
+  var basis: Int[]
+
+public:
+  def this(problem: LpProblem) {
+    m = problem.a().size
+    n = problem.c().size
+    rows = new Double[m + 1][n + m + 1]
+    foreach j: Int in 0..<m {
+      foreach i: Int in 0..<n { rows[j][i] = problem.a()[j][i] }
+      rows[j][n + j] = 1.0
+      rows[j][n + m] = problem.b()[j]
+    }
+    foreach i: Int in 0..<n { rows[m][i] = 0.0 - problem.c()[i] }
+    basis = new Int[m]
+    foreach j: Int in 0..<m { basis[j] = n + j }
+  }
+
+  def width(): Int = n + m + 1
+
+  // Most negative objective-row coefficient among the real + slack columns;
+  // null once every coefficient is >= 0 (optimal reached).
+  def enteringColumn(): Int? {
+    var best: Int? = null
+    var bestVal: Double = 0.0
+    foreach col: Int in 0..<(n + m) {
+      val v: Double = rows[m][col]
+      if v < 0.0 - 1.0e-9 {
+        if best == null || v < bestVal {
+          best = col
+          bestVal = v
+        }
+      }
+    }
+    return best
+  }
+
+  // Minimum-ratio test over rows with a positive coefficient in `col`;
+  // null means unbounded (no such row exists).
+  def leavingRow(col: Int): Int? {
+    var best: Int? = null
+    var bestRatio: Double = 0.0
+    foreach row: Int in 0..<m {
+      val coeff: Double = rows[row][col]
+      if coeff > 1.0e-9 {
+        val ratio: Double = rows[row][n + m] / coeff
+        if best == null || ratio < bestRatio {
+          best = row
+          bestRatio = ratio
+        }
+      }
+    }
+    return best
+  }
+
+  def pivot(row: Int, col: Int): void {
+    val pv: Double = rows[row][col]
+    foreach k: Int in 0..<width() { rows[row][k] = rows[row][k] / pv }
+    foreach r: Int in 0..<(m + 1) {
+      if r != row {
+        val factor: Double = rows[r][col]
+        if !factor.approxEq(0.0, 1.0e-12) {
+          foreach k: Int in 0..<width() { rows[r][k] = rows[r][k] - factor * rows[row][k] }
+        }
+      }
+    }
+    basis[row] = col
+  }
+
+  def objectiveValue(): Double = rows[m][n + m]
+
+  def solutionFor(n0: Int): List[Double] {
+    val xs: List[Double] = []
+    foreach i: Int in 0..<n0 {
+      var value: Double = 0.0
+      foreach row: Int in 0..<m { if basis[row] == i { value = rows[row][n + m] } }
+      xs.add(value)
+    }
+    return xs
+  }
+}
+
+// ─── Solver ─────────────────────────────────────────────────────────────────
+
+class Simplex {
+public:
+  static def solve(problem: LpProblem): LpResult {
+    foreach v: Double in problem.b() {
+      if v < 0.0 {
+        throw new IllegalArgumentException(
+          "all-slack basis infeasible: constraint RHS " + v.fmt2() +
+          " is negative (needs two-phase/Big-M, not supported by this solver)")
+      }
+    }
+    val t: Tableau = new Tableau(problem)
+    var iterations: Int = 0
+    var done: Boolean = false
+    var unbounded: Boolean = false
+    while !done {
+      val enter: Int? = t.enteringColumn()
+      if enter == null {
+        done = true
+      } else {
+        val leave: Int? = t.leavingRow(enter!!)
+        if leave == null {
+          unbounded = true
+          done = true
+        } else {
+          t.pivot(leave!!, enter!!)
+          iterations = iterations + 1
+        }
+      }
+    }
+    if unbounded { return new LpResult(problem, new Unbounded()) }
+    val xs: List[Double] = t.solutionFor(problem.c().size)
+    return new LpResult(problem, new Optimal(t.objectiveValue(), xs, iterations))
+  }
+}
+
+// ─── Demo problems ──────────────────────────────────────────────────────────
+
+def printResult(label: String, r: LpResult): void {
+  IO::println(label + ": " + r.describe())
+}
+
+def main: void {
+  IO::println("=== Simplex LP solver ===")
+  IO::println("")
+
+  // Classic textbook furniture-factory problem:
+  //   maximize 3x + 2y
+  //   s.t. x + y <= 4, x + 3y <= 6, x,y >= 0
+  val p1: LpProblem = new LpProblem([3.0, 2.0], [[1.0, 1.0], [1.0, 3.0]], [4.0, 6.0])
+  printResult("factory", Simplex::solve(p1))
+
+  // Three-variable diet-style problem:
+  //   maximize 5x + 4y + 3z
+  //   s.t. 2x + 3y + z <= 5, 4x + y + 2z <= 11, 3x + 4y + 2z <= 8
+  val p2: LpProblem = new LpProblem(
+    [5.0, 4.0, 3.0],
+    [[2.0, 3.0, 1.0], [4.0, 1.0, 2.0], [3.0, 4.0, 2.0]],
+    [5.0, 11.0, 8.0])
+  printResult("diet-3var", Simplex::solve(p2))
+
+  // Degenerate tie in the ratio test (two rows give the same minimum ratio).
+  val p3: LpProblem = new LpProblem([2.0, 1.0], [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]], [4.0, 4.0, 4.0])
+  printResult("tied-ratio", Simplex::solve(p3))
+
+  // Single variable, trivial bound.
+  val p4: LpProblem = new LpProblem([1.0], [[1.0]], [10.0])
+  printResult("single-var", Simplex::solve(p4))
+
+  // Unbounded feasible region: maximize x with no upper constraint on x.
+  val p5: LpProblem = new LpProblem([1.0, 0.0], [[0.0, 1.0]], [3.0])
+  printResult("unbounded", Simplex::solve(p5))
+
+  IO::println("")
+  IO::println("=== Validation: rejecting a negative right-hand side ===")
+  try {
+    val bad: LpProblem = new LpProblem([1.0], [[1.0]], [0.0 - 1.0])
+    Simplex::solve(bad)
+    IO::println("(no error thrown — unexpected)")
+  } catch e: IllegalArgumentException {
+    IO::println("rejected: " + e.message())
+  }
+
+  IO::println("")
+  IO::println("=== Pivot count sanity check ===")
+  val r1: LpResult = Simplex::solve(p1)
+  select r1.outcome() {
+    case o is Optimal: IO::println("factory took " + o.iterations() + " pivot(s)")
+    case u is Unbounded: IO::println("(unexpected: unbounded)")
+  }
+}

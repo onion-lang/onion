@@ -26,11 +26,13 @@ class WarningReporter(
     sourceFile = file
   }
 
-  def report(category: WarningCategory, location: Location, message: String): Unit = {
+  /** `source` overrides the current source file, for a warning about some other file
+   *  (a library jar's effect table). */
+  def report(category: WarningCategory, location: Location, message: String, source: String = null): Unit = {
     if (level == WarningLevel.Off) return
     if (suppressedCategories.contains(category)) return
 
-    warnings += CompileWarning(sourceFile, location, category, message)
+    warnings += CompileWarning(if (source != null) source else sourceFile, location, category, message)
   }
 
   // Convenience methods for each warning category
@@ -104,6 +106,16 @@ class WarningReporter(
     report(WarningCategory.PlatformUnboxing, location,
       s"boxed value of type '$boxedTypeName' is implicitly unboxed to non-null '$primitiveTypeName'; " +
         s"if the platform value can be null (e.g. a missing Json key), this throws a NullPointerException at runtime")
+  }
+
+  /** A library jar's `META-INF/onion/effect-table.txt` does not parse; it was ignored. */
+  def libraryEffectTableMalformed(source: String, location: Location, message: String): Unit = {
+    report(WarningCategory.LibraryEffectTableMalformed, location, message, source)
+  }
+
+  /** A library jar's effect table names classes outside the jar; those lines were ignored. */
+  def libraryEffectTableForeignClass(source: String, location: Location, message: String): Unit = {
+    report(WarningCategory.LibraryEffectTableForeignClass, location, message, source)
   }
 
   def getWarnings: Seq[CompileWarning] = warnings.toSeq

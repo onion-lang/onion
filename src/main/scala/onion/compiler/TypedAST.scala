@@ -1506,7 +1506,10 @@ object TypedAST {
     /**
      * Effects per the out-of-band effect table (issue #356); `None` when the table has
      * no entry — an Onion-defined method whose effects are inferred from its body, or a
-     * Java method the table cannot vouch for.
+     * Java method the table cannot vouch for. This is the BUILT-IN table only; a
+     * compilation's library tables (`META-INF/onion/effect-table.txt` in classpath jars)
+     * are consulted by [[onion.compiler.effects.EffectInference]] through the
+     * compilation's own `EffectTable.Table`.
      */
     def tableEffects: Option[scala.collection.immutable.Set[onion.compiler.effects.Effect]] =
       onion.compiler.effects.EffectTable.lookup(affiliation.name, name)

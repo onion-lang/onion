@@ -1,0 +1,399 @@
+// IrOptimizer.on — A three-address code IR with three optimization passes:
+//   constant folding, copy propagation, dead-code elimination.
+//
+// Exercises: ADT enum (Instr, Value, BinOp), classes with mutable state,
+// generic collection pipelines (map/filter/fold), records, interfaces,
+// select/pattern matching, closures, string interpolation, foreach over
+// List and Map, while loops, recursion, nullable fields.
+
+import {
+  java.util.LinkedHashMap as LHMap
+  java.util.LinkedHashSet as LHSet
+}
+
+// ── Value operands ────────────────────────────────────────────────────────────
+enum Value {
+  case Const(n: Int)
+  case Var(name: String)
+
+public:
+  def show(): String = select this {
+    case c is Const: "" + c.n()
+    case v is Var:   v.name()
+  }
+}
+
+// ── Binary operators (case-enum so select works as expression body) ───────────
+enum BinOp {
+  case BAdd
+  case BSub
+  case BMul
+  case BDiv
+
+public:
+  def show(): String = select this {
+    case x is BAdd: "+"
+    case x is BSub: "-"
+    case x is BMul: "*"
+    case x is BDiv: "/"
+  }
+
+  def apply(a: Int, b: Int): Int = select this {
+    case x is BAdd: a + b
+    case x is BSub: a - b
+    case x is BMul: a * b
+    case x is BDiv: if b != 0 { a / b } else { 0 }
+  }
+}
+
+// ── Three-address instructions ────────────────────────────────────────────────
+enum Instr {
+  case Assign(dst: String, src: Value)
+  case Binary(dst: String, op: BinOp, lhs: Value, rhs: Value)
+  case Negate(dst: String, src: Value)
+  case Print(src: Value)
+  case Label(name: String)
+  case Jump(target: String)
+  case CondJump(cond: Value, thenL: String, elseL: String)
+  case Return(src: Value)
+  case Phi(dst: String, left: Value, right: Value)
+  case Nop
+
+public:
+  def writesTo(): String? = select this {
+    case a is Assign: a.dst()
+    case b is Binary: b.dst()
+    case n is Negate: n.dst()
+    case p is Phi:    p.dst()
+    else:             null
+  }
+
+  def show(): String = select this {
+    case a is Assign:
+      "  #{a.dst()} = #{a.src().show()}"
+    case b is Binary:
+      "  #{b.dst()} = #{b.lhs().show()} #{b.op().show()} #{b.rhs().show()}"
+    case n is Negate:
+      "  #{n.dst()} = -#{n.src().show()}"
+    case p is Print:
+      "  print #{p.src().show()}"
+    case l is Label:
+      "#{l.name()}:"
+    case j is Jump:
+      "  jump #{j.target()}"
+    case cj is CondJump:
+      "  if #{cj.cond().show()} goto #{cj.thenL()} else #{cj.elseL()}"
+    case r is Return:
+      "  return #{r.src().show()}"
+    case ph is Phi:
+      "  #{ph.dst()} = phi(#{ph.left().show()}, #{ph.right().show()})"
+    case i is Nop:
+      "  nop"
+  }
+}
+
+// ── A linear sequence of instructions ────────────────────────────────────────
+class BasicBlock {
+  var instrs: List[Instr]
+public:
+  val label: String
+  def this(lbl: String) {
+    this.label  = lbl
+    this.instrs = []
+  }
+  def add(i: Instr): void          { instrs.add(i) }
+  def size(): Int                  = instrs.size
+  def getInstrs(): List[Instr]     = instrs
+  def show(): String {
+    val sb = new StringBuilder()
+    sb.append("block " + label + ":\n")
+    foreach i: Instr in instrs { sb.append(i.show() + "\n") }
+    return sb.toString()
+  }
+}
+
+// ── Constant environment for folding ─────────────────────────────────────────
+class ConstEnv {
+  val map: LHMap[String, Int]
+public:
+  def this() { this.map = new LHMap[String, Int]() }
+  def bind(name: String, v: Int): void    { map.put(name, v) }
+  def lookup(name: String): Int?          = map.get(name)
+  def remove(name: String): void          { map.remove(name) }
+  def contains(name: String): Boolean     = map.containsKey(name)
+}
+
+// ── Copy environment for propagation ─────────────────────────────────────────
+class CopyEnv {
+  val map: LHMap[String, String]
+public:
+  def this() { this.map = new LHMap[String, String]() }
+  def bind(dst: String, src: String): void { map.put(dst, src) }
+  def lookup(dst: String): String?         = map.get(dst)
+  def remove(dst: String): void            { map.remove(dst) }
+  def contains(dst: String): Boolean       = map.containsKey(dst)
+}
+
+// ── Helper: resolve a Value through the const + copy environments ─────────────
+def resolveValue(v: Value, consts: ConstEnv, copies: CopyEnv): Value {
+  select v {
+    case c is Const: return c
+    case r is Var:
+      var name: String = r.name()
+      var limit: Int = 20
+      while copies.contains(name) && limit > 0 {
+        val next: String? = copies.lookup(name)
+        if next != null { name = next }
+        limit = limit - 1
+      }
+      val cv: Int? = consts.lookup(name)
+      if cv != null { return new Const(cv) }
+      return new Var(name)
+  }
+}
+
+// ── Pass 1: constant folding + copy propagation (single-block, forward) ───────
+def foldAndPropagate(block: BasicBlock): BasicBlock {
+  val consts = new ConstEnv()
+  val copies = new CopyEnv()
+  val out    = new BasicBlock(block.label)
+
+  foreach raw: Instr in block.getInstrs() {
+    val folded: Instr = select raw {
+      case a is Assign: {
+        val src2: Value = resolveValue(a.src(), consts, copies)
+        select src2 {
+          case c is Const: {
+            consts.bind(a.dst(), c.n())
+            copies.remove(a.dst())
+            new Assign(a.dst(), src2)
+          }
+          case vr is Var: {
+            copies.bind(a.dst(), vr.name())
+            consts.remove(a.dst())
+            new Assign(a.dst(), src2)
+          }
+        }
+      }
+      case b is Binary: {
+        val l2: Value = resolveValue(b.lhs(), consts, copies)
+        val r2: Value = resolveValue(b.rhs(), consts, copies)
+        select l2 {
+          case lc is Const:
+            select r2 {
+              case rc is Const: {
+                val res: Int = b.op().apply(lc.n(), rc.n())
+                consts.bind(b.dst(), res)
+                copies.remove(b.dst())
+                new Assign(b.dst(), new Const(res))
+              }
+              else: {
+                consts.remove(b.dst())
+                copies.remove(b.dst())
+                new Binary(b.dst(), b.op(), l2, r2)
+              }
+            }
+          else: {
+            consts.remove(b.dst())
+            copies.remove(b.dst())
+            new Binary(b.dst(), b.op(), l2, r2)
+          }
+        }
+      }
+      case n is Negate: {
+        val s2: Value = resolveValue(n.src(), consts, copies)
+        select s2 {
+          case c is Const: {
+            val neg: Int = 0 - c.n()
+            consts.bind(n.dst(), neg)
+            copies.remove(n.dst())
+            new Assign(n.dst(), new Const(neg))
+          }
+          else: {
+            consts.remove(n.dst())
+            copies.remove(n.dst())
+            new Negate(n.dst(), s2)
+          }
+        }
+      }
+      case p is Print:    new Print(resolveValue(p.src(), consts, copies))
+      case cj is CondJump: new CondJump(resolveValue(cj.cond(), consts, copies), cj.thenL(), cj.elseL())
+      case r is Return:   new Return(resolveValue(r.src(), consts, copies))
+      case ph is Phi: {
+        val l2: Value = resolveValue(ph.left(),  consts, copies)
+        val r2: Value = resolveValue(ph.right(), consts, copies)
+        new Phi(ph.dst(), l2, r2)
+      }
+      else: raw
+    }
+    out.add(folded)
+  }
+  return out
+}
+
+// ── Pass 2: dead-code elimination ─────────────────────────────────────────────
+def addVarToSet(v: Value, used: LHSet[String]): void {
+  select v {
+    case r is Var: used.add(r.name())
+    else:
+  }
+}
+
+def collectUses(block: BasicBlock): LHSet[String] {
+  val used: LHSet[String] = new LHSet[String]()
+  foreach i: Instr in block.getInstrs() {
+    select i {
+      case a is Assign:    addVarToSet(a.src(), used)
+      case b is Binary:    addVarToSet(b.lhs(), used) ; addVarToSet(b.rhs(), used)
+      case n is Negate:    addVarToSet(n.src(), used)
+      case p is Print:     addVarToSet(p.src(), used)
+      case cj is CondJump: addVarToSet(cj.cond(), used)
+      case r is Return:    addVarToSet(r.src(), used)
+      case ph is Phi:      addVarToSet(ph.left(), used) ; addVarToSet(ph.right(), used)
+      else:
+    }
+  }
+  return used
+}
+
+def eliminateDead(block: BasicBlock): BasicBlock {
+  var current: BasicBlock = block
+  var changed: Boolean = true
+  while changed {
+    val used: LHSet[String] = collectUses(current)
+    val out   = new BasicBlock(current.label)
+    changed = false
+    foreach i: Instr in current.getInstrs() {
+      val dst_: String? = i.writesTo()
+      val drop: Boolean = dst_ != null && !used.contains(dst_)
+      if !drop { out.add(i) } else { changed = true }
+    }
+    current = out
+  }
+  return current
+}
+
+// ── Pretty-print a diff between two blocks ────────────────────────────────────
+def showDiff(label: String, before: BasicBlock, after: BasicBlock): void {
+  IO::println("=== #{label} ===")
+  IO::println("--- before (#{before.size()} instrs) ---")
+  IO::print(before.show())
+  IO::println("--- after  (#{after.size()} instrs) ---")
+  IO::print(after.show())
+  IO::println("")
+}
+
+// ── Run all passes and report ─────────────────────────────────────────────────
+def optimize(block: BasicBlock): BasicBlock {
+  IO::println("==== Optimizing block '#{block.label}' ====")
+  IO::println("Original:")
+  IO::print(block.show())
+  IO::println("")
+
+  val pass1: BasicBlock = foldAndPropagate(block)
+  showDiff("After constant-fold + copy-propagation", block, pass1)
+
+  val pass2: BasicBlock = eliminateDead(pass1)
+  showDiff("After dead-code elimination", pass1, pass2)
+
+  IO::println("Final (#{pass2.size()} of #{block.size()} instructions survive):")
+  IO::print(pass2.show())
+  IO::println("----------------------------------------")
+  return pass2
+}
+
+// ── Demo: build several test blocks ──────────────────────────────────────────
+def makeBlock1(): BasicBlock {
+  // Constant folding: all arithmetic folds to a single constant.
+  //   a = 3; b = 4; c = a + b -> 7; d = c * 2 -> 14; print d -> 14
+  val b = new BasicBlock("fold_arith")
+  b.add(new Assign("a", new Const(3)))
+  b.add(new Assign("b", new Const(4)))
+  b.add(new Binary("c", new BAdd(), new Var("a"), new Var("b")))
+  b.add(new Binary("d", new BMul(), new Var("c"), new Const(2)))
+  b.add(new Print(new Var("d")))
+  return b
+}
+
+def makeBlock2(): BasicBlock {
+  // Copy propagation: c = 99; b = c; a = b; print a -> print 99
+  val b = new BasicBlock("copy_prop")
+  b.add(new Assign("c", new Const(99)))
+  b.add(new Assign("b", new Var("c")))
+  b.add(new Assign("a", new Var("b")))
+  b.add(new Print(new Var("a")))
+  return b
+}
+
+def makeBlock3(): BasicBlock {
+  // Dead-code elimination: x = 5; y = x+1 (dead); z = 10; print z
+  val b = new BasicBlock("dce")
+  b.add(new Assign("x", new Const(5)))
+  b.add(new Binary("y", new BAdd(), new Var("x"), new Const(1)))
+  b.add(new Assign("z", new Const(10)))
+  b.add(new Print(new Var("z")))
+  return b
+}
+
+def makeBlock4(): BasicBlock {
+  // Combined passes: fold p=6, q=7; sum=13, diff=-1, prod=-13;
+  //                  dead1 and dead2 eliminated; result = prod; print -13
+  val b = new BasicBlock("combined")
+  b.add(new Assign("p", new Const(6)))
+  b.add(new Assign("q", new Const(7)))
+  b.add(new Binary("sum",   new BAdd(), new Var("p"),    new Var("q")))
+  b.add(new Binary("diff",  new BSub(), new Var("p"),    new Var("q")))
+  b.add(new Binary("prod",  new BMul(), new Var("sum"),  new Var("diff")))
+  b.add(new Binary("dead1", new BAdd(), new Var("prod"),  new Const(1)))
+  b.add(new Binary("dead2", new BMul(), new Var("dead1"), new Const(2)))
+  b.add(new Assign("result", new Var("prod")))
+  b.add(new Print(new Var("result")))
+  return b
+}
+
+def makeBlock5(): BasicBlock {
+  // Negation folding + dead: base=8; neg=-8; doubled=-16; unused (dead); return -16
+  val b = new BasicBlock("negate_fold")
+  b.add(new Assign("base", new Const(8)))
+  b.add(new Negate("neg", new Var("base")))
+  b.add(new Binary("doubled", new BMul(), new Var("neg"), new Const(2)))
+  b.add(new Binary("unused", new BAdd(), new Var("doubled"), new Const(1)))
+  b.add(new Return(new Var("doubled")))
+  return b
+}
+
+def makeBlock6(): BasicBlock {
+  // Division fold: num=100, den=4, q=25, r=22, s=484; print 484
+  val b = new BasicBlock("div_fold")
+  b.add(new Assign("num", new Const(100)))
+  b.add(new Assign("den", new Const(4)))
+  b.add(new Binary("q", new BDiv(), new Var("num"), new Var("den")))
+  b.add(new Binary("r", new BSub(), new Var("q"),   new Const(3)))
+  b.add(new Binary("s", new BMul(), new Var("r"),   new Var("r")))
+  b.add(new Print(new Var("s")))
+  return b
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+val blocks: List[BasicBlock] = [
+  makeBlock1(),
+  makeBlock2(),
+  makeBlock3(),
+  makeBlock4(),
+  makeBlock5(),
+  makeBlock6()
+]
+
+var totalBefore: Int = 0
+var totalAfter: Int  = 0
+foreach blk: BasicBlock in blocks {
+  totalBefore = totalBefore + blk.size()
+  val opt: BasicBlock = optimize(blk)
+  totalAfter = totalAfter + opt.size()
+}
+
+IO::println("==== Summary ====")
+IO::println("Total blocks optimized : #{blocks.size}")
+IO::println("Instructions before    : #{totalBefore}")
+IO::println("Instructions after     : #{totalAfter}")
+IO::println("Instructions eliminated: #{totalBefore - totalAfter}")

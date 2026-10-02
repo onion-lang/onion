@@ -276,3 +276,38 @@ the list of command names:
 "exec":{"known":["gh"],"unresolved":false,"commands":[["gh",null,"list","--repo","onion-lang/onion","--state","all","--search",null,"--json","number,title,author,url","--limit","100"]]}
 ```
 
+
+### Libraries can classify their own calls
+
+A call into a library jar is `unknown` unless something says otherwise — and the
+library itself can. A jar on the compile classpath (`-classpath`, a `//> using dep`
+directive, a project's `[dependencies]`) may ship an effect table at
+`META-INF/onion/effect-table.txt`, in the format of the built-in table, with an optional
+fixed operand per effect:
+
+```text
+onion.llm.Llm#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+onion.llm.Llm#text=pure
+```
+
+With that jar on the classpath, a tool calling `Llm::ask(...)` declares
+`requires { net, env, console }` — no `unknown` — and its plan names the host and the
+variable even though neither appears in the script:
+
+```bash
+$ onion ask.on "What is Onion?" --plan
+plan: `ask` would
+  net     api.anthropic.com
+  env     ANTHROPIC_API_KEY
+  console
+(nothing was executed; operands are the arguments the effects are
+ derived from, not necessarily the exact paths or hosts touched)
+```
+
+The fixed operands also join `--contract`'s `staticOperands`, alongside any read off
+literals. A library may classify only classes whose class file is in its own jar
+(other lines are ignored, with warning W0018); for `onion.*` and `java.*` classes a
+built-in entry always wins; when two jars classify the same class, the one earlier on
+the classpath is used; and a table that does not parse is ignored whole, with warning
+W0017 naming the jar and line. The [effects reference](../reference/effects.md) has the
+full line grammar and rules.

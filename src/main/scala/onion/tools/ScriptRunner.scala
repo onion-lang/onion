@@ -232,12 +232,7 @@ class ScriptRunner {
             if (config.dumpTypedAst) emitTypedAstDump(result)
             emitDiagnostics(result)
             emitProfile(config, result)
-            if (!result.hasErrors && success.options.contains(SHOW_EFFECTS)) {
-              val typed = result.debugArtifacts.typedClasses.getOrElse(Seq.empty)
-              onion.compiler.effects.EffectInference.infer(typed).foreach { me =>
-                System.err.println(me.render)
-              }
-            }
+            if (!result.hasErrors && success.options.contains(SHOW_EFFECTS)) emitEffects(config, result)
             if (result.hasErrors) Left(-1)
             else Right(ScriptRunner.Prepared(new java.io.File(params.head).getName, config.classPath, result.classes, scriptArgs))
         }

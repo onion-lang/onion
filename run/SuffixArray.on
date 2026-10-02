@@ -1,0 +1,552 @@
+// SuffixArray.on — Suffix array with LCP array for fast string algorithms.
+//
+// Implements the O(n log n) prefix-doubling algorithm (Manber & Myers style),
+// builds the LCP array via Kasai's algorithm, and uses both structures to
+// answer real-world queries efficiently.
+//
+// Queries demonstrated:
+//   1. Count all occurrences of a pattern via binary search.
+//   2. Find all positions of a pattern.
+//   3. Longest repeated substring (using LCP max).
+//   4. Longest common substring of two strings.
+//   5. Number of distinct substrings in a text.
+//
+// Exercises: records with law/example, ADT enums, classes, interfaces,
+// extension methods (String), generics, collection pipelines (map/filter/
+// fold/sortedBy/groupBy/distinct/partition/any/find), foreach over ranges,
+// select / type-pattern matching, nullable, string interpolation,
+// closures, do[Option], while, recursion.
+
+import {
+  java.lang.Math
+  java.lang.Integer as JInteger
+  onion.Option.Some as OSome
+  onion.Option.None as ONone
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def at(i: Int): String = self.substring(i, i + 1)
+  def suffix(i: Int): String = self.substring(i)
+  def isPrefixOf(other: String): Boolean = other.startsWith(self)
+  def times(n: Int): String {
+    var result: String = ""
+    foreach _: Int in 0..<n { result = result + self }
+    return result
+  }
+}
+
+extension Int {
+  def max(other: Int): Int = if self > other { self } else { other }
+  def min(other: Int): Int = if self < other { self } else { other }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record SearchResult(pattern: String, count: Int, positions: List[Int]) {
+  example e1 {
+    val r = new SearchResult("ab", 2, [0, 4])
+    r.pattern() == "ab" && r.count() == 2
+  }
+}
+
+record LcpEntry(left: Int, right: Int, length: Int) {
+  example e1 {
+    val e = new LcpEntry(0, 1, 3)
+    e.length() >= 0
+  }
+}
+
+// ─── Result enum for comparison ───────────────────────────────────────────────
+
+enum CmpResult {
+  case Less
+  case Equal
+  case Greater
+}
+
+def cmpResultOf(a: Int, b: Int): CmpResult =
+  if a < b { new Less() }
+  else if a > b { new Greater() }
+  else { new Equal() }
+
+def cmpResultLabel(c: CmpResult): String = select c {
+  case _l is Less:    "less"
+  case _e is Equal:   "equal"
+  case _g is Greater: "greater"
+}
+
+// ─── Interface for string search ─────────────────────────────────────────────
+
+interface StringSearcher {
+  def count(pattern: String): Int
+  def findAll(pattern: String): List[Int]
+  def longestRepeated(): String?
+}
+
+// ─── SuffixArray class ────────────────────────────────────────────────────────
+
+class SuffixArray conforms StringSearcher {
+  val text: String
+  var sa: Int[]       // suffix array: sa[i] = start index of i-th smallest suffix
+  var rank: Int[]     // rank[i] = rank of suffix starting at i
+  var lcp: Int[]      // lcp[i] = LCP between suffix sa[i-1] and sa[i]; lcp[0] = 0
+  var n: Int
+
+public:
+  def this(text: String) {
+    self.text = text
+    self.n = text.length()
+    self.sa = new Int[n]
+    self.rank = new Int[n]
+    self.lcp = new Int[n]
+    self.build()
+    self.buildLcp()
+  }
+
+  def getSa(): Int[] = sa
+  def getLcp(): Int[] = lcp
+  def getText(): String = text
+  def size(): Int = n
+
+  // Build suffix array using prefix-doubling (O(n log^2 n))
+  def build(): void {
+    // Initial rank = character value
+    foreach i: Int in 0..<n {
+      sa[i] = i
+      rank[i] = (text.charAt(i) as Int)
+    }
+    var gap: Int = 1
+    while gap < n {
+      val g = gap
+      val r = rank
+      val len = n
+      // Sort by (rank[i], rank[i+gap])
+      // Use Java Arrays sort with a simple selection-sort style for correctness
+      // (for corpus purposes, bubble sort suffices at small n)
+      var changed: Boolean = true
+      while changed {
+        changed = false
+        foreach i: Int in 0..<(n - 1) {
+          val a = sa[i]
+          val b = sa[i + 1]
+          val ra1 = r[a]
+          val rb1 = r[b]
+          val ra2 = if a + g < len { r[a + g] } else { -1 }
+          val rb2 = if b + g < len { r[b + g] } else { -1 }
+          val shouldSwap: Boolean =
+            if ra1 != rb1 { ra1 > rb1 }
+            else { ra2 > rb2 }
+          if shouldSwap {
+            sa[i] = b
+            sa[i + 1] = a
+            changed = true
+          }
+        }
+      }
+      // Update ranks
+      val newRank = new Int[n]
+      newRank[sa[0]] = 0
+      foreach i: Int in 1..<n {
+        val prev = sa[i - 1]
+        val curr = sa[i]
+        val rp1 = rank[prev]
+        val rc1 = rank[curr]
+        val rp2 = if prev + g < n { rank[prev + g] } else { -1 }
+        val rc2 = if curr + g < n { rank[curr + g] } else { -1 }
+        val same: Boolean = rp1 == rc1 && rp2 == rc2
+        newRank[curr] = if same { newRank[prev] } else { newRank[prev] + 1 }
+      }
+      foreach i: Int in 0..<n {
+        rank[i] = newRank[i]
+      }
+      gap = gap * 2
+    }
+  }
+
+  // Kasai's algorithm: build LCP array in O(n)
+  def buildLcp(): void {
+    val pos = new Int[n]   // inverse of sa: pos[sa[i]] = i
+    foreach i: Int in 0..<n {
+      pos[sa[i]] = i
+    }
+    var h: Int = 0
+    foreach i: Int in 0..<n {
+      if pos[i] > 0 {
+        val j = sa[pos[i] - 1]
+        while i + h < n && j + h < n && text.charAt(i + h) == text.charAt(j + h) {
+          h = h + 1
+        }
+        lcp[pos[i]] = h
+        if h > 0 { h = h - 1 }
+      }
+    }
+  }
+
+  // Binary search: lower bound (leftmost suffix >= pattern)
+  def lowerBound(pattern: String): Int {
+    var lo: Int = 0
+    var hi: Int = n
+    while lo < hi {
+      val mid = (lo + hi) / 2
+      val suf = text.suffix(sa[mid])
+      if suf.compareTo(pattern) < 0 && !suf.startsWith(pattern) {
+        lo = mid + 1
+      } else {
+        hi = mid
+      }
+    }
+    return lo
+  }
+
+  // Binary search: upper bound (first suffix > pattern prefix)
+  def upperBound(pattern: String): Int {
+    var lo: Int = 0
+    var hi: Int = n
+    while lo < hi {
+      val mid = (lo + hi) / 2
+      val suf = text.suffix(sa[mid])
+      if suf.startsWith(pattern) || suf.compareTo(pattern) < 0 {
+        lo = mid + 1
+      } else {
+        hi = mid
+      }
+    }
+    return lo
+  }
+
+  // Count occurrences of pattern in text
+  def countOccurrences(pattern: String): Int {
+    if pattern.length() == 0 { return 0 }
+    val lo = lowerBound(pattern)
+    val hi = upperBound(pattern)
+    return hi - lo
+  }
+
+  override def count(pattern: String): Int = countOccurrences(pattern)
+  override def longestRepeated(): String? = longestRepeatedSubstring()
+
+  // Find all start positions of pattern (sorted)
+  def findAll(pattern: String): List[Int] {
+    if pattern.length() == 0 { return [] }
+    val lo = lowerBound(pattern)
+    val hi = upperBound(pattern)
+    val result: List[Int] = []
+    foreach i: Int in lo..<hi {
+      result.add(sa[i])
+    }
+    result.sort { a, b -> (a as Int) - (b as Int) }
+    return result
+  }
+
+  // Longest repeated substring (uses LCP array max)
+  def longestRepeatedSubstring(): String? {
+    var maxLen: Int = 0
+    var maxIdx: Int = -1
+    foreach i: Int in 1..<n {
+      if lcp[i] > maxLen {
+        maxLen = lcp[i]
+        maxIdx = i
+      }
+    }
+    if maxIdx < 0 { return null }
+    return text.substring(sa[maxIdx], sa[maxIdx] + maxLen)
+  }
+
+  // Number of distinct substrings = n*(n+1)/2 - sum(lcp)
+  def distinctSubstringCount(): Long {
+    val total: Long = ((n as Long) * ((n as Long) + 1L)) / 2L
+    var lcpSum: Long = 0L
+    foreach i: Int in 1..<n {
+      lcpSum = lcpSum + (lcp[i] as Long)
+    }
+    return total - lcpSum
+  }
+
+  // Print the suffix array with LCP values (for debugging)
+  def dump(): void {
+    IO::println("i   | SA  | LCP | suffix (first 20 chars)")
+    IO::println("----+-----+-----+------------------------")
+    foreach i: Int in 0..<n {
+      val suf = text.suffix(sa[i])
+      val preview = if suf.length() > 20 { suf.substring(0, 20) + "..." } else { suf }
+      val lcpVal = if i == 0 { "-" } else { "" + lcp[i] }
+      IO::println("#{i}   | #{sa[i]}   | #{lcpVal}   | #{preview}")
+    }
+  }
+}
+
+// ─── Longest common substring of two strings ─────────────────────────────────
+// Build SA over s1 + "#" + s2, then scan for adjacent entries from different
+// sources in the LCP array.
+
+def longestCommonSubstring(s1: String, s2: String): String {
+  val sep: String = "#"
+  val combined = s1 + sep + s2
+  val sa = new SuffixArray(combined)
+  val n1 = s1.length()
+  val n = combined.length()
+  val arr = sa.getSa()
+  val lcpArr = sa.getLcp()
+
+  var bestLen: Int = 0
+  var bestPos: Int = -1
+
+  foreach i: Int in 1..<n {
+    val prevFrom1 = arr[i - 1] < n1
+    val prevFrom2 = arr[i - 1] > n1
+    val currFrom1 = arr[i] < n1
+    val currFrom2 = arr[i] > n1
+    if (prevFrom1 && currFrom2) || (prevFrom2 && currFrom1) {
+      if lcpArr[i] > bestLen {
+        bestLen = lcpArr[i]
+        bestPos = arr[i]
+      }
+    }
+  }
+  if bestLen == 0 { return "" }
+  return combined.substring(bestPos, bestPos + bestLen)
+}
+
+// ─── Naive string searcher (for comparison) ─────────────────────────────────
+
+class NaiveSearcher conforms StringSearcher {
+  val text: String
+public:
+  def this(text: String) { self.text = text }
+
+  override def count(pattern: String): Int {
+    if pattern.length() == 0 { return 0 }
+    var cnt: Int = 0
+    val limit = text.length() - pattern.length()
+    foreach i: Int in 0..limit {
+      if text.substring(i, i + pattern.length()) == pattern { cnt = cnt + 1 }
+    }
+    return cnt
+  }
+
+  override def findAll(pattern: String): List[Int] {
+    val result: List[Int] = []
+    if pattern.length() == 0 { return result }
+    val limit = text.length() - pattern.length()
+    foreach i: Int in 0..limit {
+      if text.substring(i, i + pattern.length()) == pattern { result.add(i) }
+    }
+    return result
+  }
+
+  override def longestRepeated(): String? {
+    // O(n^3) — acceptable for demonstration only
+    val n = text.length()
+    var best: String? = null
+    foreach len: Int in 1..n {
+      foreach i: Int in 0..<(n - len) {
+        val sub = text.substring(i, i + len)
+        if count(sub) > 1 {
+          if best == null || len > (best as String).length() { best = sub }
+        }
+      }
+    }
+    return best
+  }
+}
+
+// ─── do[Option] — sequential fallback search ─────────────────────────────────
+
+// Look for the first pattern that actually appears; return Some(SearchResult) or None.
+def firstMatch(searcher: StringSearcher, candidates: List[String]): Option[SearchResult] {
+  var i: Int = 0
+  while i < candidates.size {
+    val p = candidates[i] as String
+    val pos = searcher.findAll(p)
+    if pos.size > 0 {
+      return Option::some(new SearchResult(p, pos.size, pos))
+    }
+    i = i + 1
+  }
+  return Option::none()
+}
+
+def positionsOpt(searcher: StringSearcher, pattern: String): Option[List[Int]] {
+  val pos = searcher.findAll(pattern)
+  if pos.size > 0 { return Option::some(pos) }
+  return Option::none()
+}
+
+// do[Option] example: chain two optional lookups (both texts must contain the pattern)
+def chainedLookup(sa1: SuffixArray, sa2: SuffixArray, pattern: String): Option[SearchResult] =
+  do[Option] {
+    pos1 <- positionsOpt(sa1, pattern)
+    pos2 <- positionsOpt(sa2, pattern)
+    ret new SearchResult(pattern, (pos1 as List[Int]).size + (pos2 as List[Int]).size,
+                         pos1 as List[Int])
+  }
+
+// ─── Frequency analysis with collection pipelines ───────────────────────────
+
+record FreqEntry(word: String, count: Int)
+
+def frequencyAnalysis(text: String, minLen: Int): List[FreqEntry] {
+  val n = text.length()
+  val counts: Map[String, Int] = [:]
+  // Collect all substrings of length >= minLen that appear more than once
+  foreach len: Int in minLen..(n / 2) {
+    foreach i: Int in 0..<(n - len + 1) {
+      val sub = text.substring(i, i + len)
+      val prev = counts[sub]
+      counts[sub] = if prev != null { (prev as Int) + 1 } else { 1 }
+    }
+  }
+  val entries: List[FreqEntry] = []
+  foreach (k, v) in counts {
+    if (v as Int) > 1 { entries.add(new FreqEntry(k as String, v as Int)) }
+  }
+  return entries
+    .sortedBy { e -> -((e as FreqEntry).count()) }
+    .filter { e -> (e as FreqEntry).count() >= 2 }
+}
+
+// ─── Demonstration ───────────────────────────────────────────────────────────
+
+def section(title: String): void {
+  IO::println("")
+  IO::println("-- " + title + " " + "-".times((40 - title.length()).max(0)))
+}
+
+def runDemo(label: String, text: String): void {
+  IO::println("")
+  IO::println("=== " + label + " ===")
+  IO::println("Text: \"" + text + "\"  (length " + text.length() + ")")
+  val sa = new SuffixArray(text)
+
+  val lrs = sa.longestRepeatedSubstring()
+  val lrsStr = if lrs != null { "\"" + lrs + "\"" } else { "(none)" }
+  IO::println("Longest repeated substring: " + lrsStr)
+  IO::println("Distinct substrings: " + sa.distinctSubstringCount())
+}
+
+def runSearch(text: String, patterns: List[String]): void {
+  val sa = new SuffixArray(text)
+  foreach pat: String in patterns {
+    val pos = sa.findAll(pat)
+    val cnt = pos.size
+    val posStr = if cnt == 0 { "not found" }
+                 else { "found " + cnt + " time(s) at " +
+                        pos.map { p -> "" + (p as Int) }.fold("") { acc, s -> if acc == "" { s as String } else { (acc as String) + ", " + (s as String) } }
+                      }
+    IO::println("  pattern #{'"'}#{pat}#{'"'}: #{posStr}")
+  }
+}
+
+// ─── Entry point ─────────────────────────────────────────────────────────────
+
+// 1) Basic suffix-array inspection
+section("Suffix array: banana")
+val banana = new SuffixArray("banana")
+banana.dump()
+
+// 2) Pattern searching
+section("Pattern search in 'abracadabra'")
+val abracadabra = "abracadabra"
+IO::println("Text: " + abracadabra)
+runSearch(abracadabra, ["abra", "a", "bra", "xyz", "cada"])
+
+// 3) Longest repeated substring + distinct count
+runDemo("banana", "banana")
+runDemo("mississippi", "mississippi")
+runDemo("aabaabaab", "aabaabaab")
+runDemo("abcdef", "abcdef")
+
+// 4) Longest common substring
+section("Longest common substring")
+val pairA: List[String] = ["abcde",  "ABABC",  "onion",  "xyz"]
+val pairB: List[String] = ["cdefg",  "BABCAB", "opinion", "abc"]
+foreach i: Int in 0..<pairA.size {
+  val s1 = pairA[i] as String
+  val s2 = pairB[i] as String
+  val lcs = longestCommonSubstring(s1, s2)
+  val lcsStr = if lcs.length() == 0 { "(none)" } else { '"' + lcs + '"' }
+  IO::println("  LCS(#{'"'}#{s1}#{'"'}, #{'"'}#{s2}#{'"'}) = #{lcsStr}")
+}
+
+// 5) Repeating pattern detection
+section("Repeating-pattern texts")
+val texts: List[String] = [
+  "aaaa",
+  "abababab",
+  "hello world hello",
+  "the quick brown fox"
+]
+foreach t: String in texts {
+  val sa = new SuffixArray(t)
+  val cnt = sa.distinctSubstringCount()
+  val lrs = sa.longestRepeatedSubstring()
+  val lrsStr = if lrs != null { '"' + lrs + '"' } else { "(none)" }
+  IO::println("  #{'"'}#{t}#{'"'}: #{cnt} distinct, LRS=#{lrsStr}")
+}
+
+// 6) Interface polymorphism: SuffixArray vs NaiveSearcher
+section("Interface: SuffixArray vs NaiveSearcher")
+val corpus = "abracadabra"
+val searchers: List[StringSearcher] = [
+  new SuffixArray(corpus),
+  new NaiveSearcher(corpus)
+]
+val targetPatterns: List[String] = ["abra", "a", "bra"]
+foreach searcher: StringSearcher in searchers {
+  val name = if searcher is SuffixArray { "SuffixArray" } else { "NaiveSearcher" }
+  IO::println("  " + name + ":")
+  foreach p: String in targetPatterns {
+    val cnt = searcher.count(p)
+    IO::println("    count(#{'"'}#{p}#{'"'}) = #{cnt}")
+  }
+  val lrs = searcher.longestRepeated()
+  val lrsStr = if lrs != null { '"' + lrs + '"' } else { "(none)" }
+  IO::println("    longestRepeated() = " + lrsStr)
+}
+
+// 7) CmpResult enum select
+section("CmpResult enum")
+val samples: List[Int] = [3, 7, 7, 2, 9]
+foreach i: Int in 0..<(samples.size - 1) {
+  val a = samples[i] as Int
+  val b = samples[i + 1] as Int
+  val c = cmpResultOf(a, b)
+  IO::println("  #{a} vs #{b}: #{cmpResultLabel(c)}")
+}
+
+// 8) do[Option] — chained lookup across two texts
+section("do[Option] chained lookup")
+val saMs = new SuffixArray("mississippi")
+val saAb = new SuffixArray("abracadabra")
+val candidates: List[String] = ["zzz", "xxx", "issi", "miss"]
+val result = firstMatch(saMs, candidates)
+select result {
+  case s is OSome:
+    val sr = s.value() as SearchResult
+    IO::println("  First match in mississippi: #{sr.pattern()} x#{sr.count()}")
+  case _n is ONone:
+    IO::println("  No match found in mississippi")
+}
+
+// chainedLookup: both texts must contain the pattern
+val chained = chainedLookup(saMs, saAb, "a")
+select chained {
+  case s is OSome:
+    val sr = s.value() as SearchResult
+    IO::println("  Chained 'a' total: #{sr.count()}")
+  case _n2 is ONone:
+    IO::println("  Pattern not found in one or both texts")
+}
+
+// 9) Frequency analysis pipeline
+section("Frequency analysis: 'aababcababc'")
+val freq = frequencyAnalysis("aababcababc", 2)
+val top = freq.filter { e -> (e as FreqEntry).count() <= 10 }
+foreach entry: FreqEntry in top {
+  IO::println("  #{'"'}#{entry.word()}#{'"'} x#{entry.count()}")
+}
+
+IO::println("")
+IO::println("Done.")

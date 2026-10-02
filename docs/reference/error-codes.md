@@ -1564,6 +1564,8 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0014` | top-level statements ignored because a main is defined |
 | `W0015` | boxed platform value implicitly unboxed to a non-null primitive |
 | `W0016` | `@TailRecursive` annotation present but its mutual-recursion group could not be optimized |
+| `W0017` | a library jar's `META-INF/onion/effect-table.txt` is malformed and was ignored whole (reported at the jar and line) |
+| `W0018` | a library jar's effect table names classes outside the jar; those entries were ignored |
 
 ## Every diagnostic code
 

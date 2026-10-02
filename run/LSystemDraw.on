@@ -1,0 +1,362 @@
+// LSystemDraw.on — Lindenmayer System fractal renderer (ASCII-art canvas)
+// Extends LSystem.on (which shows string statistics) with a two-pass turtle
+// renderer: first pass finds the bounding box, second renders a scaled version
+// onto a char-grid Canvas.
+//
+// Exercises: ADT case-enum (Symbol: Forward/Move/TurnLeft/TurnRight/PushState/
+//   PopState/Grow); records (LSystemDef, BBox); classes with public/private
+//   sections and mutable state (Canvas, TurtleRenderer, LSystemExpander);
+//   generics (ArrayList[String], ArrayList[Object], Stack[String]); select /
+//   type-pattern matching (is); extension String (rep, trimR); string
+//   interpolation; while / foreach; closures; nullable; static methods.
+
+import {
+  java.util.ArrayList;
+  java.util.Stack;
+  java.lang.Double as JDouble;
+  java.lang.Integer as JInteger;
+  java.lang.Math as JMath;
+}
+
+// ── Extension helpers ─────────────────────────────────────────────────────────
+
+extension String {
+  def rep(n: Int): String {
+    val sb: StringBuilder = new StringBuilder()
+    var i: Int = 0
+    while i < n { sb.append(self); i++ }
+    return sb.toString()
+  }
+  def trimR(): String {
+    var s: String = self
+    while s.length() > 0 && s.charAt(s.length() - 1) == ' ' {
+      s = s.substring(0, s.length() - 1)
+    }
+    return s
+  }
+}
+
+// ── L-System symbol ADT ───────────────────────────────────────────────────────
+
+enum Symbol {
+  case Forward        // F — draw and advance
+  case Move           // f — advance without drawing
+  case TurnLeft       // + — rotate left by angle
+  case TurnRight      // - — rotate right by angle
+  case PushState      // [ — push (x, y, heading) onto stack
+  case PopState       // ] — pop (x, y, heading) from stack
+  case Grow(ch: Char) // any other char — non-terminal, rewritten but not drawn
+public:
+  static def fromChar(c: Char): Symbol = select c {
+    case 'F': new Forward()
+    case 'f': new Move()
+    case '+': new TurnLeft()
+    case '-': new TurnRight()
+    case '[': new PushState()
+    case ']': new PopState()
+    else:     new Grow(c)
+  }
+  def label(): String = select this {
+    case _f is Forward:   "Forward"
+    case _m is Move:      "Move"
+    case _l is TurnLeft:  "TurnLeft"
+    case _r is TurnRight: "TurnRight"
+    case _p is PushState: "Push"
+    case _q is PopState:  "Pop"
+    case g  is Grow:      "Grow(#{g.ch()})"
+  }
+}
+
+// ── L-System definition ───────────────────────────────────────────────────────
+
+record LSystemDef(name: String, axiom: String, rules: ArrayList[String], angleDeg: Double)
+
+// ── Bounding box ──────────────────────────────────────────────────────────────
+
+record BBox(minX: Int, minY: Int, maxX: Int, maxY: Int) {
+public:
+  def width(): Int  = maxX() - minX() + 1
+  def height(): Int = maxY() - minY() + 1
+}
+
+// ── L-System expander ─────────────────────────────────────────────────────────
+
+class LSystemExpander {
+public:
+  static def expand(axiom: String, rules: ArrayList[String], gens: Int): String {
+    var current: String = axiom
+    var g: Int = 0
+    while g < gens {
+      val sb: StringBuilder = new StringBuilder()
+      var i: Int = 0
+      while i < current.length() {
+        val c: Char = current.charAt(i)
+        var replaced: Boolean = false
+        var ri: Int = 0
+        while ri < rules.size {
+          val rule: String = rules.get(ri) as String
+          val colon: Int = rule.indexOf(':')
+          if colon >= 0 {
+            val lhs: String = rule.substring(0, colon)
+            val rhs: String = rule.substring(colon + 1)
+            if lhs.length() == 1 && lhs.charAt(0) == c {
+              sb.append(rhs)
+              replaced = true
+              ri = rules.size  // break inner loop
+            }
+          }
+          ri++
+        }
+        if !replaced { sb.append(c) }
+        i++
+      }
+      current = sb.toString()
+      g++
+    }
+    return current
+  }
+}
+
+// ── Canvas ────────────────────────────────────────────────────────────────────
+
+class Canvas {
+  var _cols: Int
+  var _rows: Int
+  var _cells: ArrayList[Object]   // rows: each element is a StringBuilder
+
+public:
+  def this(cols: Int, rows: Int) {
+    _cols = cols
+    _rows = rows
+    _cells = new ArrayList[Object]()
+    var r: Int = 0
+    while r < rows {
+      val row: StringBuilder = new StringBuilder()
+      var c: Int = 0
+      while c < cols { row.append(' '); c++ }
+      _cells.add(row)
+      r++
+    }
+  }
+
+  def set(x: Int, y: Int, ch: Char): void {
+    if x >= 0 && x < _cols && y >= 0 && y < _rows {
+      val row: StringBuilder = _cells.get(y) as StringBuilder
+      row.setCharAt(x, ch)
+    }
+  }
+
+  def render(): String {
+    val sb: StringBuilder = new StringBuilder()
+    var r: Int = 0
+    while r < _rows {
+      val row: StringBuilder = _cells.get(r) as StringBuilder
+      sb.append(row.toString().trimR())
+      if r < _rows - 1 { sb.append("\n") }
+      r++
+    }
+    return sb.toString()
+  }
+}
+
+// ── Turtle renderer ───────────────────────────────────────────────────────────
+
+class TurtleRenderer {
+  var _x: Double
+  var _y: Double
+  var _angle: Double             // degrees; 0 = right, 90 = down
+  var _stepLen: Double
+  var _turnAngle: Double
+  var _segs: ArrayList[String]   // "x1,y1,x2,y2" per drawn segment
+  var _stack: Stack[String]      // saved state: "x|y|angle"
+
+public:
+  def this(startX: Double, startY: Double, heading: Double,
+           stepLen: Double, turnAngle: Double) {
+    _x = startX
+    _y = startY
+    _angle = heading
+    _stepLen = stepLen
+    _turnAngle = turnAngle
+    _segs = new ArrayList[String]()
+    _stack = new Stack[String]()
+  }
+
+  def pi(): Double = 3.14159265358979323846
+
+  def run(symbols: String): void {
+    var i: Int = 0
+    while i < symbols.length() {
+      val sym: Symbol = Symbol::fromChar(symbols.charAt(i))
+      select sym {
+        case _f is Forward: {
+          val rad: Double = _angle * pi() / 180.0
+          val nx: Double = _x + _stepLen * JMath::cos(rad)
+          val ny: Double = _y + _stepLen * JMath::sin(rad)
+          _segs.add("#{(_x as Int)},#{(_y as Int)},#{(nx as Int)},#{(ny as Int)}")
+          _x = nx
+          _y = ny
+        }
+        case _m is Move: {
+          val rad: Double = _angle * pi() / 180.0
+          _x = _x + _stepLen * JMath::cos(rad)
+          _y = _y + _stepLen * JMath::sin(rad)
+        }
+        case _l is TurnLeft:  { _angle = _angle - _turnAngle }
+        case _r is TurnRight: { _angle = _angle + _turnAngle }
+        case _p is PushState: {
+          _stack.push("#{_x}|#{_y}|#{_angle}")
+        }
+        case _q is PopState: {
+          val saved: String = _stack.pop() as String
+          val parts: ArrayList[String] = splitOn(saved, '|')
+          _x     = JDouble::parseDouble(parts.get(0) as String)
+          _y     = JDouble::parseDouble(parts.get(1) as String)
+          _angle = JDouble::parseDouble(parts.get(2) as String)
+        }
+        else: {}   // Grow — non-terminal, no drawing
+      }
+      i++
+    }
+  }
+
+  static def splitOn(s: String, delim: Char): ArrayList[String] {
+    val parts: ArrayList[String] = new ArrayList[String]()
+    var start: Int = 0
+    var i: Int = 0
+    while i < s.length() {
+      if s.charAt(i) == delim {
+        parts.add(s.substring(start, i))
+        start = i + 1
+      }
+      i++
+    }
+    parts.add(s.substring(start))
+    return parts
+  }
+
+  def boundingBox(): BBox {
+    if _segs.size == 0 { return new BBox(0, 0, 1, 1) }
+    var minX: Int = 999999
+    var minY: Int = 999999
+    var maxX: Int = -999999
+    var maxY: Int = -999999
+    foreach seg: String in _segs {
+      val cs: ArrayList[String] = splitOn(seg, ',')
+      val x1: Int = JInteger::parseInt(cs.get(0) as String)
+      val y1: Int = JInteger::parseInt(cs.get(1) as String)
+      val x2: Int = JInteger::parseInt(cs.get(2) as String)
+      val y2: Int = JInteger::parseInt(cs.get(3) as String)
+      if x1 < minX { minX = x1 }  if y1 < minY { minY = y1 }
+      if x1 > maxX { maxX = x1 }  if y1 > maxY { maxY = y1 }
+      if x2 < minX { minX = x2 }  if y2 < minY { minY = y2 }
+      if x2 > maxX { maxX = x2 }  if y2 > maxY { maxY = y2 }
+    }
+    return new BBox(minX, minY, maxX, maxY)
+  }
+
+  def renderOn(canvas: Canvas, offX: Int, offY: Int): void {
+    foreach seg: String in _segs {
+      val cs: ArrayList[String] = splitOn(seg, ',')
+      val x1: Int = JInteger::parseInt(cs.get(0) as String) - offX
+      val y1: Int = JInteger::parseInt(cs.get(1) as String) - offY
+      val x2: Int = JInteger::parseInt(cs.get(2) as String) - offX
+      val y2: Int = JInteger::parseInt(cs.get(3) as String) - offY
+      TurtleRenderer::drawLine(canvas, x1, y1, x2, y2)
+    }
+  }
+
+  static def drawLine(canvas: Canvas, x1: Int, y1: Int, x2: Int, y2: Int): void {
+    val dx: Int = x2 - x1
+    val dy: Int = y2 - y1
+    val steps: Int = if JMath::abs(dx) > JMath::abs(dy) { JMath::abs(dx) } else { JMath::abs(dy) }
+    if steps == 0 { canvas.set(x1, y1, '*'); return }
+    var s: Int = 0
+    while s <= steps {
+      val px: Int = x1 + dx * s / steps
+      val py: Int = y1 + dy * s / steps
+      val ch: Char = if dx == 0 { '|' } else if dy == 0 { '-' } else { '+' }
+      canvas.set(px, py, ch)
+      s++
+    }
+  }
+
+  def segCount(): Int = _segs.size
+}
+
+// ── Rendering harness ─────────────────────────────────────────────────────────
+
+def renderFractal(lsd: LSystemDef, gens: Int, stepLen: Double,
+                  maxCols: Int, maxRows: Int, startAngle: Double): void {
+  val expanded: String = LSystemExpander::expand(lsd.axiom(), lsd.rules(), gens)
+
+  // Pass 1 — bounding box at the given step length
+  val t1: TurtleRenderer = new TurtleRenderer(0.0, 0.0, startAngle, stepLen, lsd.angleDeg())
+  t1.run(expanded)
+  val bb: BBox = t1.boundingBox()
+
+  // Compute uniform scale so the drawing fits within maxCols × maxRows
+  val sx: Double = if bb.width() == 0 { 1.0 }
+                   else { (maxCols - 4) as Double / bb.width() as Double }
+  val sy: Double = if bb.height() == 0 { 1.0 }
+                   else { (maxRows - 4) as Double / bb.height() as Double }
+  val scale: Double  = if sx < sy { sx } else { sy }
+  val eff: Double    = if stepLen * scale < 1.0 { 1.0 } else { stepLen * scale }
+
+  // Pass 2 — scaled rendering
+  val t2: TurtleRenderer = new TurtleRenderer(0.0, 0.0, startAngle, eff, lsd.angleDeg())
+  t2.run(expanded)
+  val bb2: BBox = t2.boundingBox()
+
+  val rawCols: Int = bb2.width() + 4
+  val rawRows: Int = bb2.height() + 4
+  val cols: Int = if rawCols > maxCols { maxCols } else { rawCols }
+  val rows: Int = if rawRows > maxRows { maxRows } else { rawRows }
+
+  val canvas: Canvas = new Canvas(cols, rows)
+  t2.renderOn(canvas, bb2.minX() - 2, bb2.minY() - 2)
+
+  val pad: Int = JMath::max(0, 52 - lsd.name().length())
+  IO::println("┌─ #{lsd.name()} (gen=#{gens}, segs=#{t2.segCount()}) " + "─".rep(pad) + "┐")
+  val rendered: String = canvas.render()
+  val lines: ArrayList[String] = TurtleRenderer::splitOn(rendered, '\n')
+  foreach line: String in lines { IO::println("│ #{line}") }
+  IO::println("└" + "─".rep(64) + "┘")
+}
+
+// ── L-System library ──────────────────────────────────────────────────────────
+
+def rules(vararg: List[String]): ArrayList[String] {
+  val r: ArrayList[String] = new ArrayList[String]()
+  foreach s: String in vararg { r.add(s) }
+  return r
+}
+
+val kochCurve: LSystemDef   = new LSystemDef("Koch Curve",         "F",     rules(["F:F+F-F-F+F"]),                  90.0)
+val dragonCurve: LSystemDef = new LSystemDef("Dragon Curve",        "FX",    rules(["X:X+YF+", "Y:-FX-Y"]),           90.0)
+val sierpinski: LSystemDef  = new LSystemDef("Sierpinski Triangle", "F-G-G", rules(["F:F-G+F+G-F", "G:GG"]),         120.0)
+val plant: LSystemDef       = new LSystemDef("Fractal Plant",       "X",     rules(["F:FF", "X:F+[[X]-X]-F[-FX]+X"]), 25.0)
+val levy: LSystemDef        = new LSystemDef("Lévy C Curve",        "F",     rules(["F:+F--F+"]),                     45.0)
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+IO::println("")
+IO::println("  L-System Fractal Renderer — ASCII-Art Edition")
+IO::println("  " + "═".rep(46))
+IO::println("  Five classic L-system fractals, rendered on a character grid.")
+IO::println("  Each is expanded for the given number of generations, then")
+IO::println("  auto-scaled to fit in the target bounding box.")
+IO::println("")
+
+renderFractal(kochCurve,   3, 4.0, 68, 26,  0.0)
+IO::println("")
+renderFractal(levy,        9, 2.0, 68, 32,  0.0)
+IO::println("")
+renderFractal(dragonCurve, 7, 2.0, 68, 32,  0.0)
+IO::println("")
+renderFractal(sierpinski,  4, 3.0, 68, 32,  0.0)
+IO::println("")
+renderFractal(plant,       4, 2.5, 68, 42, -90.0)
+
+IO::println("")
+IO::println("  Five fractals rendered.")

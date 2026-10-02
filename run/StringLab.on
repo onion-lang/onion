@@ -1,0 +1,402 @@
+// StringLab.on — string-algorithm laboratory: LCS, Levenshtein edit distance,
+// KMP substring search, Z-array string matching, and character-frequency
+// analysis with collection pipelines.
+//
+// Exercises: 2-D arrays, records, data-carrying ADT enum, classes,
+// generics, collection pipelines (sortedBy/map/filter/fold/distinct),
+// closures, foreach over ranges and map entries, select/type-pattern
+// matching, string interpolation, try/catch, recursive backtracking,
+// while, nullable types.
+
+import {
+  java.util.ArrayList
+  java.util.HashMap
+}
+
+// ── Data types ────────────────────────────────────────────────────────────────
+
+record LCSResult(seqA: String, seqB: String, lcs: String, length: Int)
+
+record EditResult(src: String, dst: String, distance: Int)
+
+record KMPResult(pattern: String, text: String, positions: List[Int])
+
+record FreqEntry(ch: String, count: Int)
+
+// Edit operation as a data-carrying ADT enum
+enum EditOp {
+  case Keep(ch: Char)
+  case Sub(from: Char, to: Char)
+  case Ins(ch: Char)
+  case Del(ch: Char)
+public:
+  def show(): String = select this {
+    case k is Keep: "=#{k.ch()}"
+    case s is Sub:  "#{s.from()}→#{s.to()}"
+    case i is Ins:  "+#{i.ch()}"
+    case d is Del:  "-#{d.ch()}"
+  }
+}
+
+// ── LCS ──────────────────────────────────────────────────────────────────────
+
+def lcsTable(a: String, b: String): Int[][] {
+  val m = a.length()
+  val n = b.length()
+  val dp = new Int[m + 1][n + 1]
+  foreach i: Int in 1..m {
+    foreach j: Int in 1..n {
+      if a.charAt(i - 1) == b.charAt(j - 1) {
+        dp[i][j] = dp[i - 1][j - 1] + 1
+      } else {
+        dp[i][j] = if dp[i - 1][j] > dp[i][j - 1] { dp[i - 1][j] } else { dp[i][j - 1] }
+      }
+    }
+  }
+  return dp
+}
+
+// Recursive backtracking to reconstruct the LCS.
+def lcsBacktrack(dp: Int[][], a: String, b: String, i: Int, j: Int): String {
+  if i == 0 || j == 0 { return "" }
+  if a.charAt(i - 1) == b.charAt(j - 1) {
+    return lcsBacktrack(dp, a, b, i - 1, j - 1) + a.charAt(i - 1)
+  } else if dp[i - 1][j] > dp[i][j - 1] {
+    return lcsBacktrack(dp, a, b, i - 1, j)
+  } else {
+    return lcsBacktrack(dp, a, b, i, j - 1)
+  }
+}
+
+def lcs(a: String, b: String): LCSResult {
+  val dp  = lcsTable(a, b)
+  val seq = lcsBacktrack(dp, a, b, a.length(), b.length())
+  return new LCSResult(a, b, seq, seq.length())
+}
+
+// ── Edit distance (Levenshtein) with operation trace ──────────────────────────
+
+def editDistance(s: String, t: String): EditResult {
+  val m = s.length()
+  val n = t.length()
+  val dp = new Int[m + 1][n + 1]
+  foreach i: Int in 0..m { dp[i][0] = i }
+  foreach j: Int in 0..n { dp[0][j] = j }
+  foreach i: Int in 1..m {
+    foreach j: Int in 1..n {
+      if s.charAt(i - 1) == t.charAt(j - 1) {
+        dp[i][j] = dp[i - 1][j - 1]
+      } else {
+        val sub = dp[i - 1][j - 1] + 1
+        val del = dp[i - 1][j]     + 1
+        val ins = dp[i][j - 1]     + 1
+        dp[i][j] = if sub <= del && sub <= ins { sub }
+                   else if del <= ins           { del }
+                   else                         { ins }
+      }
+    }
+  }
+  return new EditResult(s, t, dp[m][n])
+}
+
+// Trace edit operations by backtracking the DP table (returns in correct order).
+def traceOps(s: String, t: String): List[EditOp] {
+  val m = s.length()
+  val n = t.length()
+  val dp = new Int[m + 1][n + 1]
+  foreach i: Int in 0..m { dp[i][0] = i }
+  foreach j: Int in 0..n { dp[0][j] = j }
+  foreach i: Int in 1..m {
+    foreach j: Int in 1..n {
+      if s.charAt(i - 1) == t.charAt(j - 1) {
+        dp[i][j] = dp[i - 1][j - 1]
+      } else {
+        val sub = dp[i - 1][j - 1] + 1
+        val del = dp[i - 1][j]     + 1
+        val ins = dp[i][j - 1]     + 1
+        dp[i][j] = if sub <= del && sub <= ins { sub }
+                   else if del <= ins           { del }
+                   else                         { ins }
+      }
+    }
+  }
+  // Backtrack from (m,n) to (0,0), building ops in reverse
+  val rev: List[EditOp] = []
+  var i = m
+  var j = n
+  while i > 0 || j > 0 {
+    if i > 0 && j > 0 && s.charAt(i - 1) == t.charAt(j - 1) {
+      rev.add(new Keep(s.charAt(i - 1)))
+      i--; j--
+    } else if i > 0 && j > 0 && dp[i][j] == dp[i - 1][j - 1] + 1 {
+      rev.add(new Sub(s.charAt(i - 1), t.charAt(j - 1)))
+      i--; j--
+    } else if i > 0 && dp[i][j] == dp[i - 1][j] + 1 {
+      rev.add(new Del(s.charAt(i - 1)))
+      i--
+    } else {
+      rev.add(new Ins(t.charAt(j - 1)))
+      j--
+    }
+  }
+  // Reverse to get forward order (descending loop via while)
+  val ops: List[EditOp] = []
+  var k = rev.size - 1
+  while k >= 0 { ops.add(rev[k]); k-- }
+  return ops
+}
+
+// ── KMP string search ─────────────────────────────────────────────────────────
+
+def kmpFailure(pat: String): Int[] {
+  val m  = pat.length()
+  val f  = new Int[m]
+  f[0]   = 0
+  var k  = 0
+  foreach i: Int in 1..<m {
+    while k > 0 && pat.charAt(k) != pat.charAt(i) { k = f[k - 1] }
+    if pat.charAt(k) == pat.charAt(i) { k++ }
+    f[i] = k
+  }
+  return f
+}
+
+def kmpSearch(pattern: String, text: String): KMPResult {
+  val positions: List[Int] = []
+  if pattern.length() == 0 { return new KMPResult(pattern, text, positions) }
+  val fail = kmpFailure(pattern)
+  var q = 0
+  foreach i: Int in 0..<text.length() {
+    while q > 0 && pattern.charAt(q) != text.charAt(i) { q = fail[q - 1] }
+    if pattern.charAt(q) == text.charAt(i) { q++ }
+    if q == pattern.length() {
+      positions.add(i - pattern.length() + 1)
+      q = fail[q - 1]
+    }
+  }
+  return new KMPResult(pattern, text, positions)
+}
+
+// ── Z-algorithm ───────────────────────────────────────────────────────────────
+
+def zArray(s: String): Int[] {
+  val n = s.length()
+  val z = new Int[n]
+  var l = 0
+  var r = 0
+  foreach i: Int in 1..<n {
+    if i < r {
+      z[i] = if z[i - l] < r - i { z[i - l] } else { r - i }
+    }
+    while i + z[i] < n && s.charAt(z[i]) == s.charAt(i + z[i]) { z[i]++ }
+    if i + z[i] > r { l = i; r = i + z[i] }
+  }
+  return z
+}
+
+def zSearch(pattern: String, text: String): List[Int] {
+  val positions: List[Int] = []
+  if pattern.length() == 0 { return positions }
+  val combined = pattern + "$" + text
+  val z = zArray(combined)
+  val m = pattern.length()
+  foreach i: Int in (m + 1)..<combined.length() {
+    if z[i] == m { positions.add(i - m - 1) }
+  }
+  return positions
+}
+
+// ── Character frequency analysis ─────────────────────────────────────────────
+
+def charFrequency(text: String): List[FreqEntry] {
+  val counts: HashMap[String, Int] = new HashMap[String, Int]()
+  foreach i: Int in 0..<text.length() {
+    val ch = "" + text.charAt(i)
+    val cur: Int? = counts.get(ch)
+    counts.put(ch, if cur != null { cur + 1 } else { 1 })
+  }
+  val entries: List[FreqEntry] = []
+  foreach (ch, cnt) in counts { entries.add(new FreqEntry(ch, cnt)) }
+  return entries.sortedBy { e -> 0 - e.count() }
+}
+
+// ── Formatting helpers ────────────────────────────────────────────────────────
+
+extension String {
+  def rep(n: Int): String {
+    var s = ""
+    foreach i: Int in 1..n { s = s + self }
+    return s
+  }
+  def q(): String = "\"" + self + "\""
+}
+
+def pad(s: String, w: Int): String {
+  var r = s
+  while r.length() < w { r = r + " " }
+  return r
+}
+
+def banner(title: String): void {
+  IO::println("")
+  IO::println("─".rep(54))
+  IO::println("  " + title)
+  IO::println("─".rep(54))
+}
+
+// Join a list of strings with a separator
+def joinStr(parts: List[String], sep: String): String {
+  return parts.fold("") { acc, p -> if acc == "" { p } else { acc + sep + p } }
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+
+def demoLCS(): void {
+  banner("Longest Common Subsequence")
+  val pairs: List[List[String]] = [
+    ["ABCBDAB",  "BDCAB"],
+    ["AGGTAB",   "GXTXAYB"],
+    ["Saturday", "Sunday"]
+  ]
+  foreach pair: List[String] in pairs {
+    val r = lcs(pair[0], pair[1])
+    IO::println("  A   = " + r.seqA().q())
+    IO::println("  B   = " + r.seqB().q())
+    IO::println("  LCS = " + r.lcs().q() + "  (len=" + r.length() + ")")
+    IO::println("")
+  }
+}
+
+def demoEditDistance(): void {
+  banner("Levenshtein Edit Distance")
+  val cases: List[List[String]] = [
+    ["kitten",    "sitting"],
+    ["Saturday",  "Sunday"],
+    ["intention", "execution"]
+  ]
+  foreach pair: List[String] in cases {
+    val r    = editDistance(pair[0], pair[1])
+    val ops  = traceOps(pair[0], pair[1])
+    val opStr = joinStr(ops.map { op -> op.show() }, " ")
+    IO::println("  " + r.src().q() + " → " + r.dst().q() + "  dist=" + r.distance())
+    IO::println("  ops: " + opStr)
+    IO::println("")
+  }
+  // Edge cases
+  val empty = ""
+  val r0 = editDistance(empty, "abc")
+  IO::println("  " + empty.q() + " → " + "abc".q() + "  dist=" + r0.distance())
+  val r1 = editDistance("abc", "abc")
+  IO::println("  " + "abc".q() + " → " + "abc".q() + "  dist=" + r1.distance())
+}
+
+def demoKMP(): void {
+  banner("KMP String Search")
+  val text = "AABAACAADAABAABA"
+  IO::println("  Text: " + text.q())
+  IO::println("")
+  val patterns: List[String] = ["AABA", "AA", "BA", "XYZ"]
+  foreach pat: String in patterns {
+    val r = kmpSearch(pat, text)
+    val posStr = if r.positions().size == 0 {
+      "(no match)"
+    } else {
+      joinStr(r.positions().map { p -> "" + p }, ", ")
+    }
+    IO::println("  " + pad(pat.q(), 8) + "  positions: [" + posStr + "]")
+  }
+}
+
+def demoZAlgorithm(): void {
+  banner("Z-Algorithm (cross-check with KMP)")
+  val text = "AABAACAADAABAABA"
+  IO::println("  Text: " + text.q())
+  IO::println("")
+  val patterns: List[String] = ["AABA", "AA", "BA", "XYZ"]
+  foreach pat: String in patterns {
+    val kmpPos = kmpSearch(pat, text).positions()
+    val zPos   = zSearch(pat, text)
+    val kmpStr = joinStr(kmpPos.map { p -> "" + p }, ", ")
+    val zStr   = joinStr(zPos.map   { p -> "" + p }, ", ")
+    val check  = if kmpStr == zStr { "✓" } else { "MISMATCH" }
+    IO::println("  " + pad(pat.q(), 8) + "  KMP=[" + kmpStr + "]  Z=[" + zStr + "]  " + check)
+  }
+}
+
+def demoFrequency(): void {
+  banner("Character Frequency Analysis")
+  val texts: List[String] = [
+    "hello world",
+    "the quick brown fox jumps over the lazy dog"
+  ]
+  foreach text: String in texts {
+    IO::println("  " + text.q())
+    val freq = charFrequency(text)
+    val top5 = freq.filter { e -> e.ch() != " " }.take(5)
+    IO::println("  Top-5 chars (excl. space):")
+    foreach e: FreqEntry in top5 {
+      val bar = "#".rep(e.count())
+      IO::println("    " + pad(e.ch(), 3) + " " + pad("" + e.count(), 3) + "  " + bar)
+    }
+    val total    = text.length()
+    val distinct = freq.filter { e -> e.ch() != " " }.size
+    IO::println("  Total chars: " + total + ", distinct (non-space): " + distinct)
+    IO::println("")
+  }
+}
+
+def demoEdgeCases(): void {
+  banner("Edge Cases / Try-Catch")
+  try {
+    val empty = ""
+    val r1 = lcs(empty, "abc")
+    IO::println("  lcs(\"\", \"abc\") = " + r1.lcs().q() + "  len=" + r1.length() + "  OK")
+    val r2 = kmpSearch("abc", empty)
+    IO::println("  kmpSearch(\"abc\", \"\") matches=" + r2.positions().size + "  OK")
+    val r3 = kmpSearch(empty, "abc")
+    IO::println("  kmpSearch(\"\", \"abc\") matches=" + r3.positions().size + "  OK")
+  } catch e: Exception {
+    IO::println("  ERROR: " + e.message())
+  }
+}
+
+// ── Pipeline demo: summarise LCS lengths for a matrix of string pairs ─────────
+
+def demoMatrix(): void {
+  banner("LCS-Length Matrix (word pairs)")
+  val words: List[String] = ["algorithm", "alignment", "alligator", "altimeter", "algebra"]
+  // Compute all-pairs LCS lengths via nested pipelines
+  foreach a: String in words {
+    val row = words.map { b ->
+      val r = lcs(a, b)
+      pad("" + r.length(), 4)
+    }
+    IO::println("  " + pad(a, 12) + " " + joinStr(row, ""))
+  }
+  IO::println("")
+  // Statistics across all pairs using fold + closure
+  val lengths: List[Int] = []
+  foreach a: String in words {
+    foreach b: String in words {
+      if a != b { lengths.add(lcs(a, b).length()) }
+    }
+  }
+  val sum = lengths.fold(0) { acc, x -> acc + x }
+  val mx  = lengths.fold(0) { acc, x -> if x > acc { x } else { acc } }
+  val mn  = lengths.fold(999) { acc, x -> if x < acc { x } else { acc } }
+  IO::println("  Pairs: " + lengths.size + "  avg=" + (sum / lengths.size) + "  min=" + mn + "  max=" + mx)
+}
+
+def main(): void {
+  IO::println("╔══════════════════════════════════════════════════════╗")
+  IO::println("║            S T R I N G   L A B                      ║")
+  IO::println("╚══════════════════════════════════════════════════════╝")
+  demoLCS()
+  demoEditDistance()
+  demoKMP()
+  demoZAlgorithm()
+  demoFrequency()
+  demoEdgeCases()
+  demoMatrix()
+  IO::println("Done.")
+}

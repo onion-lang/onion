@@ -68,6 +68,59 @@ Granularity is per-type, not per-instance. A `PrintStream` over a file would be 
 type is classified `console`. When that distinction matters, the stdlib's own entry
 points (`Files`, `IO`) are the precise path.
 
+## Libraries can classify their own calls
+
+A library jar does not have to leave its calls `unknown`. A jar on the **compile
+classpath** — `-classpath`, the jars of a script's `//> using dep` directives, a
+project's `[dependencies]` — may ship its own table at
+
+```text
+META-INF/onion/effect-table.txt
+```
+
+in the same format as the built-in one, and the compiler merges it in for that
+compilation. A `tool` that calls the library then declares the real effects
+(`requires { net, env }`) instead of `unknown`.
+
+An effect in any table line may carry a **fixed operand**, `effect:operand`:
+
+```text
+# Class#method=effect[:operand][,effect[:operand]...]   or   Class#method=pure
+onion.llm.Llm#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+onion.llm.Llm#text=pure
+```
+
+The operand is everything after the first `:` up to the next `,`, trimmed; it may not be
+empty, and `pure` and `unknown` take none. A bare `net` still means "no operand", as
+before. A fixed operand is shown by `--plan` and listed in `--contract`'s
+`staticOperands` for every call of that method, exactly like an operand read off a
+literal argument (see [Operands the source spells out](../guide/tools.md#operands-the-source-spells-out)); it
+adds to those, it does not replace them. So a tool calling `Llm::ask(...)` plans as
+`net api.anthropic.com` and `env ANTHROPIC_API_KEY`. The built-in table may use the
+syntax too.
+
+The rules a library table is held to:
+
+- **Only its own classes.** A line counts only if the class's file
+  (`a/b/C$D.class` for `a.b.C$D`) is in the same jar. Lines naming any other class are
+  ignored, with one warning per jar, **W0018**, naming the jar, the line, and the classes.
+- **The built-in table wins for `onion.*` and `java.*`.** For a class in either
+  namespace, a built-in entry (specific or wildcard) beats the library's; a library may
+  still classify an `onion.*` class the built-in table does not cover, such as
+  `onion.llm.Llm`.
+- **First on the classpath owns a class.** When two jars both classify a class, the one
+  earlier on the classpath — the one the JVM loads the class from — is used, and the
+  other's lines for that class are not consulted.
+- **A malformed table is ignored whole.** A line that does not parse makes the entire
+  table count for nothing (dropping a single line could leave a looser wildcard in
+  charge of its method), reported as **W0017** with the jar and the line. Calls into the
+  jar are then `unknown` again, so a tool fails with E0077 unless it admits `unknown`.
+
+Library tables are read only when a program declares a `tool` (and for `--effects`),
+and each jar's parsed table is cached by path, size and modification time, so the
+resident daemon and the language server pay for a jar once. Directories on the
+classpath are not consulted. Both warnings can be silenced with `--Wno W0017,W0018`.
+
 ## How a method's set is computed
 
 For a method defined in your program, the compiler walks the typed body and takes the

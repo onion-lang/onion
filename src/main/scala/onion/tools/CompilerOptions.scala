@@ -1,7 +1,7 @@
 package onion.tools
 
 import java.io.UnsupportedEncodingException
-import onion.compiler.{CompilerConfig, OnionCompiler, WarningCategory, WarningLevel}
+import onion.compiler.{CompilerConfig, Location, OnionCompiler, WarningCategory, WarningLevel, WarningReporter}
 import onion.compiler.diagnostics.DiagnosticRenderer
 import onion.compiler.pipeline.{CompilationResult, CompileProfileFormat, CompileProfileReporter, CompileProfileSettings}
 import onion.compiler.toolbox.{Message, Systems}
@@ -160,10 +160,29 @@ object CompilerOptions {
   def emitDiagnostics(result: CompilationResult): Unit =
     DiagnosticRenderer.printDiagnostics(result.diagnostics)
 
-  /** `--effects`: the inferred effect set of every compiled method, to stderr. */
-  def emitEffects(result: CompilationResult): Unit = {
+  /**
+   * `--effects`: the inferred effect set of every compiled method, to stderr, against the
+   * same table the compilation's capability check uses — the built-in one plus the
+   * library tables of `config`'s classpath. The compilation loads that table only when
+   * the program declares a tool, so a library-table warning (W0017/W0018) it did not
+   * already report is printed here, under the same `--warn`/`--Wno` settings.
+   */
+  def emitEffects(config: CompilerConfig, result: CompilationResult): Unit = {
+    import onion.compiler.effects.EffectTable
     val classes = result.debugArtifacts.typedClasses.getOrElse(Seq.empty)
-    onion.compiler.effects.EffectInference.infer(classes).foreach { me => System.err.println(me.render) }
+    val loaded = EffectTable.forClasspath(config.classPath)
+    val already = result.diagnostics.warnings.map(w => (w.category, w.sourceFile, w.location)).toSet
+    val reporter = new WarningReporter(config.warningLevel, config.suppressedWarnings)
+    for (p <- loaded.problems) {
+      val at = Location(p.line, 1)
+      p.kind match {
+        case EffectTable.ProblemKind.Malformed    => reporter.libraryEffectTableMalformed(p.source, at, p.message)
+        case EffectTable.ProblemKind.ForeignClass => reporter.libraryEffectTableForeignClass(p.source, at, p.message)
+      }
+    }
+    reporter.getWarnings.filterNot(w => already((w.category, w.sourceFile, w.location)))
+      .foreach(w => System.err.println(DiagnosticRenderer.formatWarning(w)))
+    onion.compiler.effects.EffectInference.infer(classes, loaded.table).foreach { me => System.err.println(me.render) }
   }
 
   /** `--dump-ast`: the parsed AST, to stderr. Available even if a later phase fails. */

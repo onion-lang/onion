@@ -145,6 +145,8 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 | `W0014` | `discarded-toplevel` | Top-level statements ignored because a main is defined |
 | `W0015` | `platform-unboxing` | Boxed platform value implicitly unboxed to a non-null primitive |
 | `W0016` | `ineffective-tail-recursive` | `@TailRecursive` annotation present but its mutual-recursion group could not be optimized |
+| `W0017` | `malformed-effect-table` | A library jar's effect table is malformed and was ignored |
+| `W0018` | `foreign-effect-entry` | A library jar's effect table names classes outside the jar; those entries were ignored |
 
 ### `--no-check-laws`
 

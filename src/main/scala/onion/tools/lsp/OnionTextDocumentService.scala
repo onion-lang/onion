@@ -862,13 +862,21 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
   }
 
   private def warningToDiagnostic(warning: CompileWarning, content: String): Diagnostic = {
-    val range = locationToRange(warning.location, content)
+    // A library jar's effect-table warning (W0017/W0018) is located in that jar's table,
+    // not in this document: pin it to the top and say where it really is.
+    val elsewhere = warning.category == onion.compiler.WarningCategory.LibraryEffectTableMalformed ||
+      warning.category == onion.compiler.WarningCategory.LibraryEffectTableForeignClass
+    val range =
+      if (elsewhere) new Range(new Position(0, 0), new Position(0, 0))
+      else locationToRange(warning.location, content)
     val diagnostic = new Diagnostic()
     diagnostic.setRange(range)
     diagnostic.setSeverity(DiagnosticSeverity.Warning)
     diagnostic.setSource("onion")
     diagnostic.setCode(warning.category.code)
-    diagnostic.setMessage(warning.message)
+    diagnostic.setMessage(
+      if (elsewhere) s"${warning.sourceFile}:${Option(warning.location).map(_.line).getOrElse(0)}: ${warning.message}"
+      else warning.message)
     diagnostic
   }
 

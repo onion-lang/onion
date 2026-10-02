@@ -182,21 +182,10 @@ public final class Yaml {
      */
     private static boolean looksLikeNumber(String s) {
         if (s.isEmpty()) return false;
-        // Quick reject: must start with '-' or a digit
-        char first = s.charAt(0);
-        if (first != '-' && (first < '0' || first > '9')) return false;
-        // Try integer pattern: -?\d+
         if (s.matches("-?\\d+")) return true;
-        // Try float pattern: -? digits (. digits)? ([eE] [+-]? digits)?
-        // Use Double.parseDouble as the canonical check
-        try {
-            // Only treat as float if it contains '.' or 'e'/'E'
-            if (s.indexOf('.') < 0 && s.indexOf('e') < 0 && s.indexOf('E') < 0) return false;
-            Double.parseDouble(s);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
+        if (s.matches("-?\\d*\\.\\d+([eE][+\\-]?\\d+)?")) return true;
+        if (s.matches("-?\\d+\\.?\\d*[eE][+\\-]?\\d+")) return true;
+        return false;
     }
 
     /**

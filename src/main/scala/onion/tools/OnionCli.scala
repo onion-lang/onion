@@ -25,6 +25,7 @@ object OnionCli:
       |""".stripMargin
 
   def main(args: Array[String]): Unit =
+    ConsoleEncoding.install()
     val exitCode = run(args, Paths.get("").toAbsolutePath, System.out, System.err)
     if exitCode != 0 then System.exit(exitCode)
 

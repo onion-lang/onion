@@ -405,5 +405,20 @@ object AsmRefs {
     def fields: Array[TypedAST.FieldRef] = fields_.values.toArray
     def field(name: String): TypedAST.FieldRef = fields_.get(name).orNull
     def constructors: Array[TypedAST.ConstructorRef] = constructors_.toArray
+
+    override lazy val javaPermittedSubclassNames: Seq[String] = {
+      import scala.jdk.CollectionConverters._
+      val permitted = node.permittedSubclasses
+      if (permitted == null) Nil else permitted.asScala.map(_.replace('/', '.')).toList
+    }
+
+    override lazy val memberClassNames: Seq[String] = {
+      import scala.jdk.CollectionConverters._
+      val inner = node.innerClasses
+      if (inner == null) Nil
+      else inner.asScala.collect {
+        case ic if ic.outerName == node.name && ic.innerName != null => ic.name.replace('/', '.')
+      }.toList
+    }
   }
 }

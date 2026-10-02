@@ -1,0 +1,385 @@
+// SymbolicDiff — symbolic differentiation of algebraic expressions.
+// Exercises: ADT enums with many cases, deep recursive pattern matching,
+// algebraic simplification rules, expression evaluation, pretty printing,
+// closures and pipeline operators, records, generics (Map[String, Double]).
+
+import {
+  java.util.HashMap as HMap
+}
+
+// ── Expression tree ──────────────────────────────────────────────────────────
+enum Expr {
+  case Const(value: Double)
+  case Var(name: String)
+  case Add(left: Expr, right: Expr)
+  case Sub(left: Expr, right: Expr)
+  case Mul(left: Expr, right: Expr)
+  case Div(num: Expr, den: Expr)
+  case Pow(base: Expr, exp: Expr)
+  case Neg(operand: Expr)
+  case Sin(arg: Expr)
+  case Cos(arg: Expr)
+  case Ln(arg: Expr)
+  case Exp(arg: Expr)
+
+public:
+  // Evaluate the expression given a variable-to-value map.
+  def eval(env: HMap[String, Double]): Double = select this {
+    case c is Const: c.value()
+    case v is Var:
+      val val_: Double? = env.get(v.name())
+      if val_ != null { val_ } else { 0.0 }
+    case a is Add:  a.left().eval(env) + a.right().eval(env)
+    case s is Sub:  s.left().eval(env) - s.right().eval(env)
+    case m is Mul:  m.left().eval(env) * m.right().eval(env)
+    case d is Div:  d.num().eval(env) / d.den().eval(env)
+    case p is Pow:
+      Math::pow(p.base().eval(env), p.exp().eval(env))
+    case n is Neg:  0.0 - n.operand().eval(env)
+    case si is Sin: Math::sin(si.arg().eval(env))
+    case co is Cos: Math::cos(co.arg().eval(env))
+    case l is Ln:   Math::log(l.arg().eval(env))
+    case e is Exp:  Math::exp(e.arg().eval(env))
+  }
+
+  // Pretty-print the expression with minimal parentheses.
+  def show(): String = select this {
+    case c is Const:
+      val dv: Double = c.value()
+      if dv == Math::floor(dv) { "" + dv.intValue() } else { "" + dv }
+    case v is Var:   v.name()
+    case a is Add:   "(" + a.left().show() + " + " + a.right().show() + ")"
+    case s is Sub:   "(" + s.left().show() + " - " + s.right().show() + ")"
+    case m is Mul:   m.left().show() + "*" + m.right().show()
+    case d is Div:   "(" + d.num().show() + "/" + d.den().show() + ")"
+    case p is Pow:   p.base().show() + "^" + p.exp().show()
+    case n is Neg:   "-" + n.operand().show()
+    case si is Sin:  "sin(" + si.arg().show() + ")"
+    case co is Cos:  "cos(" + co.arg().show() + ")"
+    case l is Ln:    "ln(" + l.arg().show() + ")"
+    case e is Exp:   "exp(" + e.arg().show() + ")"
+  }
+
+  // Differentiate with respect to variable `wrt`.
+  def diff(wrt: String): Expr = select this {
+    case anyc is Const: new Const(0.0)
+    case vr is Var:   if vr.name() == wrt { new Const(1.0) } else { new Const(0.0) }
+    case a is Add:   new Add(a.left().diff(wrt), a.right().diff(wrt))
+    case s is Sub:   new Sub(s.left().diff(wrt), s.right().diff(wrt))
+    // product rule: (f*g)' = f'*g + f*g'
+    case m is Mul:
+      new Add(
+        new Mul(m.left().diff(wrt), m.right()),
+        new Mul(m.left(), m.right().diff(wrt))
+      )
+    // quotient rule: (f/g)' = (f'g - fg') / g^2
+    case d is Div:
+      new Div(
+        new Sub(
+          new Mul(d.num().diff(wrt), d.den()),
+          new Mul(d.num(), d.den().diff(wrt))
+        ),
+        new Pow(d.den(), new Const(2.0))
+      )
+    // power rule (general): (f^g)' = f^g * (g'*ln(f) + g*f'/f)
+    case p is Pow:
+      new Mul(
+        new Pow(p.base(), p.exp()),
+        new Add(
+          new Mul(p.exp().diff(wrt), new Ln(p.base())),
+          new Mul(p.exp(), new Div(p.base().diff(wrt), p.base()))
+        )
+      )
+    case n is Neg:   new Neg(n.operand().diff(wrt))
+    case si is Sin:  new Mul(new Cos(si.arg()), si.arg().diff(wrt))
+    case co is Cos:  new Mul(new Neg(new Sin(co.arg())), co.arg().diff(wrt))
+    case l is Ln:    new Div(l.arg().diff(wrt), l.arg())
+    case e is Exp:   new Mul(new Exp(e.arg()), e.arg().diff(wrt))
+  }
+
+  // Algebraic simplification: collapse constant sub-trees and apply
+  // obvious identities (x+0, 0+x, x*1, 1*x, x*0, 0*x, x-0, x^1, x^0).
+  def simplify(): Expr = select this {
+    case c is Const: c
+    case v is Var:   v
+    case a is Add:
+      val l: Expr = a.left().simplify()
+      val r: Expr = a.right().simplify()
+      select l {
+        case lc is Const: select r {
+          case rc is Const: new Const(lc.value() + rc.value())
+          else: if lc.value() == 0.0 { r } else { new Add(l, r) }
+        }
+        else: select r {
+          case rc is Const: if rc.value() == 0.0 { l } else { new Add(l, r) }
+          else: new Add(l, r)
+        }
+      }
+    case s is Sub:
+      val l: Expr = s.left().simplify()
+      val r: Expr = s.right().simplify()
+      select l {
+        case lc is Const: select r {
+          case rc is Const: new Const(lc.value() - rc.value())
+          else: new Sub(l, r)
+        }
+        else: select r {
+          case rc is Const: if rc.value() == 0.0 { l } else { new Sub(l, r) }
+          else: new Sub(l, r)
+        }
+      }
+    case m is Mul:
+      val l: Expr = m.left().simplify()
+      val r: Expr = m.right().simplify()
+      select l {
+        case lc is Const: select r {
+          case rc is Const: new Const(lc.value() * rc.value())
+          else:
+            if lc.value() == 0.0 { new Const(0.0) }
+            else if lc.value() == 1.0 { r }
+            else { new Mul(l, r) }
+        }
+        else: select r {
+          case rc is Const:
+            if rc.value() == 0.0 { new Const(0.0) }
+            else if rc.value() == 1.0 { l }
+            else { new Mul(l, r) }
+          else: new Mul(l, r)
+        }
+      }
+    case d is Div:
+      val l: Expr = d.num().simplify()
+      val r: Expr = d.den().simplify()
+      select l {
+        case lc is Const: select r {
+          case rc is Const: new Const(lc.value() / rc.value())
+          else: if lc.value() == 0.0 { new Const(0.0) } else { new Div(l, r) }
+        }
+        else: select r {
+          case rc is Const: if rc.value() == 1.0 { l } else { new Div(l, r) }
+          else: new Div(l, r)
+        }
+      }
+    case p is Pow:
+      val b: Expr = p.base().simplify()
+      val e: Expr = p.exp().simplify()
+      select e {
+        case ec is Const:
+          if ec.value() == 0.0 { new Const(1.0) }
+          else if ec.value() == 1.0 { b }
+          else { new Pow(b, e) }
+        else: new Pow(b, e)
+      }
+    case n is Neg:
+      val inner: Expr = n.operand().simplify()
+      select inner {
+        case ic is Const: new Const(0.0 - ic.value())
+        else: new Neg(inner)
+      }
+    case si is Sin:  new Sin(si.arg().simplify())
+    case co is Cos:  new Cos(co.arg().simplify())
+    case l is Ln:    new Ln(l.arg().simplify())
+    case e is Exp:   new Exp(e.arg().simplify())
+  }
+}
+
+// ── Helper: build environment ─────────────────────────────────────────────────
+def makeEnv(key: String, val_: Double): HMap[String, Double] {
+  val m = new HMap[String, Double]()
+  m.put(key, val_)
+  return m
+}
+
+def makeEnv2(k1: String, v1: Double, k2: String, v2: Double): HMap[String, Double] {
+  val m = new HMap[String, Double]()
+  m.put(k1, v1)
+  m.put(k2, v2)
+  return m
+}
+
+// ── Convenience constructors (avoids `new` noise in expressions) ─────────────
+def c(v: Double): Expr = new Const(v)
+def v(n: String): Expr = new Var(n)
+def add(l: Expr, r: Expr): Expr = new Add(l, r)
+def sub(l: Expr, r: Expr): Expr = new Sub(l, r)
+def mul(l: Expr, r: Expr): Expr = new Mul(l, r)
+def div(n: Expr, d: Expr): Expr = new Div(n, d)
+def pow(b: Expr, e: Expr): Expr = new Pow(b, e)
+def neg(e: Expr): Expr = new Neg(e)
+
+// ── Simplify until stable (at most 10 passes) ─────────────────────────────────
+def fullySimplify(e: Expr): Expr {
+  var prev: Expr = e
+  var i: Int = 0
+  while i < 10 {
+    val next: Expr = prev.simplify()
+    if next.show() == prev.show() {
+      i = 10
+    } else {
+      prev = next
+      i = i + 1
+    }
+  }
+  return prev
+}
+
+// ── Demonstration ─────────────────────────────────────────────────────────────
+def printDiff(label: String, expr: Expr, wrt: String): void {
+  val d: Expr = fullySimplify(expr.diff(wrt))
+  IO::println(label + " => d/d" + wrt + " = " + d.show())
+}
+
+def printEval(label: String, expr: Expr, env: HMap[String, Double]): void {
+  val result: Double = expr.eval(env)
+  IO::println(label + " => " + result)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 1: Polynomial derivatives
+// ─────────────────────────────────────────────────────────────────────────────
+IO::println("=== Polynomial Derivatives ===")
+
+// f(x) = x^3
+val x3: Expr = pow(v("x"), c(3.0))
+printDiff("x^3", x3, "x")
+
+// f(x) = 2x^2 + 3x - 5
+val poly1: Expr = add(add(mul(c(2.0), pow(v("x"), c(2.0))), mul(c(3.0), v("x"))), neg(c(5.0)))
+printDiff("2x^2 + 3x - 5", poly1, "x")
+
+// Evaluate at x=2: 2*4 + 3*2 - 5 = 8 + 6 - 5 = 9
+printEval("2x^2 + 3x - 5 at x=2", poly1, makeEnv("x", 2.0))
+
+// Derivative 4x + 3, evaluated at x=2: 11
+val dpoly1: Expr = fullySimplify(poly1.diff("x"))
+printEval("d/dx(2x^2+3x-5) at x=2", dpoly1, makeEnv("x", 2.0))
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 2: Trigonometric derivatives
+// ─────────────────────────────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Trigonometric Derivatives ===")
+
+// d/dx sin(x) = cos(x)
+val sinx: Expr = new Sin(v("x"))
+printDiff("sin(x)", sinx, "x")
+
+// d/dx cos(x) = -sin(x)
+val cosx: Expr = new Cos(v("x"))
+printDiff("cos(x)", cosx, "x")
+
+// d/dx sin(x^2) = cos(x^2) * 2x  (chain rule)
+val sinx2: Expr = new Sin(pow(v("x"), c(2.0)))
+printDiff("sin(x^2)", sinx2, "x")
+
+// Evaluate sin(x) at x=pi/2 ~ 1.0
+val piOver2: Double = Math::PI / 2.0
+printEval("sin(pi/2)", sinx, makeEnv("x", piOver2))
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 3: Exponential and logarithm derivatives
+// ─────────────────────────────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Exponential and Logarithm Derivatives ===")
+
+// d/dx e^x = e^x
+val ex: Expr = new Exp(v("x"))
+printDiff("exp(x)", ex, "x")
+
+// d/dx ln(x) = 1/x
+val lnx: Expr = new Ln(v("x"))
+printDiff("ln(x)", lnx, "x")
+
+// d/dx e^(x^2) = e^(x^2) * 2x
+val exsq: Expr = new Exp(pow(v("x"), c(2.0)))
+printDiff("exp(x^2)", exsq, "x")
+
+// e^1 ~ 2.718
+printEval("exp(1)", ex, makeEnv("x", 1.0))
+
+// ln(e) = 1
+printEval("ln(e)", lnx, makeEnv("x", Math::E))
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 4: Product and quotient rules
+// ─────────────────────────────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Product and Quotient Rules ===")
+
+// d/dx (x * sin(x)) = sin(x) + x*cos(x)
+val xsinx: Expr = mul(v("x"), new Sin(v("x")))
+printDiff("x*sin(x)", xsinx, "x")
+
+// d/dx (x^2 / sin(x))
+val xsqoversin: Expr = div(pow(v("x"), c(2.0)), new Sin(v("x")))
+printDiff("x^2/sin(x)", xsqoversin, "x")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 5: Partial derivatives (two-variable function)
+// ─────────────────────────────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Partial Derivatives (f(x,y) = x^2 * y + y^3) ===")
+
+// f(x,y) = x^2 * y + y^3
+val fxy: Expr = add(mul(pow(v("x"), c(2.0)), v("y")), pow(v("y"), c(3.0)))
+printDiff("x^2*y + y^3", fxy, "x")  // 2xy
+printDiff("x^2*y + y^3", fxy, "y")  // x^2 + 3y^2
+
+// Evaluate at x=2, y=3: 4*3 + 27 = 12 + 27 = 39
+printEval("f(2,3)", fxy, makeEnv2("x", 2.0, "y", 3.0))
+
+// df/dx at (2,3): 2*2*3 = 12
+val dfxy_dx: Expr = fullySimplify(fxy.diff("x"))
+printEval("df/dx at (2,3)", dfxy_dx, makeEnv2("x", 2.0, "y", 3.0))
+
+// df/dy at (2,3): 4 + 3*9 = 4 + 27 = 31
+val dfxy_dy: Expr = fullySimplify(fxy.diff("y"))
+printEval("df/dy at (2,3)", dfxy_dy, makeEnv2("x", 2.0, "y", 3.0))
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 6: Second derivatives
+// ─────────────────────────────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Second Derivatives ===")
+
+// f(x) = x^4
+// f'(x) = 4x^3
+// f''(x) = 12x^2
+val x4: Expr = pow(v("x"), c(4.0))
+val dx4: Expr = fullySimplify(x4.diff("x"))
+val d2x4: Expr = fullySimplify(dx4.diff("x"))
+IO::println("f  = " + x4.show())
+IO::println("f' = " + dx4.show())
+IO::println("f'' = " + d2x4.show())
+
+// Verify: f''(2) = 12*4 = 48
+printEval("f''(2)", d2x4, makeEnv("x", 2.0))
+
+// d2/dx2 sin(x) = -sin(x)
+val d2sinx: Expr = fullySimplify(sinx.diff("x").diff("x"))
+IO::println("d2/dx2 sin(x) = " + d2sinx.show())
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 7: Simplification stress test
+// ─────────────────────────────────────────────────────────────────────────────
+IO::println("")
+IO::println("=== Simplification Identities ===")
+
+val tests: List[Expr] = [
+  add(v("x"), c(0.0)),           // x + 0 => x
+  add(c(0.0), v("x")),           // 0 + x => x
+  mul(v("x"), c(1.0)),           // x * 1 => x
+  mul(c(1.0), v("x")),           // 1 * x => x
+  mul(v("x"), c(0.0)),           // x * 0 => 0
+  mul(c(0.0), v("x")),           // 0 * x => 0
+  sub(v("x"), c(0.0)),           // x - 0 => x
+  pow(v("x"), c(1.0)),           // x^1  => x
+  pow(v("x"), c(0.0)),           // x^0  => 1
+  div(c(6.0), c(2.0)),           // 6/2  => 3
+  add(c(3.0), c(4.0))            // 3+4  => 7
+]
+
+foreach expr: Expr in tests {
+  val s: Expr = expr.simplify()
+  IO::println(expr.show() + "  =>  " + s.show())
+}

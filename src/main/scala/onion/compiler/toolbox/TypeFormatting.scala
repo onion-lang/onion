@@ -28,6 +28,19 @@ object TypeFormatting {
       simple.replace('$', '.')
     })
 
+  /** Whether `tp` is a source file's synthetic top-level container (`<file>Main`). */
+  def isTopLevelContainer(tp: TypedAST.Type): Boolean = tp match {
+    case cd: ClassDefinition => cd.isTopLevelContainer
+    case _ => false
+  }
+
+  /**
+   * A method as a diagnostic names it: `Owner::name`, or just `name` for a top-level
+   * function, whose owner is a synthetic class the user never wrote.
+   */
+  def methodReference(owner: TypedAST.ClassType, name: String): String =
+    if (owner == null || isTopLevelContainer(owner)) name else s"${owner.name}::$name"
+
   def sourceForm(tp: TypedAST.Type): String = tp match {
     case null => "<unknown>"
     case n: NullableType => sourceForm(n.innerType) + "?"

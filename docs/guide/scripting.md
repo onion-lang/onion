@@ -198,7 +198,9 @@ usage: <script> <name> [--count VALUE] [--loud] [--help]
 ```
 
 Flags accept both `--name value` and `--name=value`; `--help` (or `-h`) prints
-the generated usage and exits.
+the generated usage and exits. A camelCase parameter is a kebab-case flag as well:
+`def main(makeSample: Boolean = false)` accepts `--make-sample` (shown in the
+usage) and `--makeSample`.
 
 ## Putting It Together
 

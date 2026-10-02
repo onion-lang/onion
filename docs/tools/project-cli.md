@@ -184,7 +184,12 @@ version = "0.1.0"
 ```
 
 The key has to be quoted, because a Maven coordinate contains a colon. Versions are
-exact — no ranges, no `latest`. Transitive dependencies are resolved and land on the
+exact — no ranges, no `latest`. The manifest rejects, naming the dependency and its
+line, a Maven range (`[1.0,2.0)`, `(,1.0]`, or anything else with `[`, `]`, `(`, `)`
+or `,`), a dynamic revision ending in `+` (`1.+`), and the moving aliases `LATEST`,
+`RELEASE` and `latest.*` (`latest.release`, `latest.integration`). A `+` inside SemVer
+build metadata (`1.0.0+build.5`) and a `-SNAPSHOT` version are accepted. A script's
+`//> using dep` directive applies the same rule. Transitive dependencies are resolved and land on the
 classpath for `build`, `run` and `test` alike, so a library you compile against is also
 there when the program runs.
 
@@ -194,6 +199,11 @@ recompile, rather than serving classes compiled against the old classpath as cur
 
 A coordinate that cannot be resolved fails the build with coursier's message, which names
 the coordinate it could not find.
+
+A single-file script declares the same thing with `//> using dep "group:artifact:version"`
+lines at its top (see [Script Runner](script-runner.md)). A script
+has no `onion.lock`, so its transitive versions are not pinned; when that matters, make it
+a project.
 
 ### `[[repositories]]`
 
@@ -215,7 +225,8 @@ in the file.
 
 ### Not yet supported
 
-There is no offline mode. Resolution runs on every build, reading coursier's cache
+There is no offline mode. Resolution runs whenever a build cannot reuse the classpath it
+recorded for the current `onion.lock` (see below), reading coursier's cache
 (`~/.cache/coursier`) for anything already fetched, so a warm build does not hit the
 network — but it is not *prevented* from doing so. Onion embeds coursier's Java API,
 which does not expose a cache policy, so an `--offline` flag would have to be faked; it is
@@ -232,10 +243,13 @@ builds of a byte-identical `onion.toml` can compile against different jars the m
 transitive publishes a release. That failure appears on one machine, cannot be reproduced on
 another, and nothing in the project changed.
 
-The lock records the whole transitive coordinate set, so a later build resolves *those*
-versions rather than re-deriving them, and a SHA-256 for each artifact, compared before
-anything is compiled. Different bytes for a version that was already published stops the
-build:
+The lock records the whole transitive coordinate set, and a later build resolves
+`[dependencies]` with every one of *those* versions forced, rather than re-deriving them. They
+are forced onto the manifest's own graph, not resolved as a flat list of roots: flattening
+takes a transitive out from under the POM that manages its version (`<dependencyManagement>`,
+a parent BOM) and can pick a different one. The lock also records a SHA-256 for each
+artifact, compared before anything is compiled. Different bytes for a version that was
+already published stops the build:
 
 ```text
 error: Resolved dependencies do not match onion.lock:
@@ -247,6 +261,28 @@ A published version's bytes should never change. Check the repository, or delete
 to accept what it is serving now.
 ```
 
+A different *set* of artifacts is a resolution difference rather than changed bytes, and the
+error says so, listing the versions that moved instead of blaming the repository:
+
+```text
+error: Resolved dependencies do not match onion.lock:
+not in the lock: lib-2.0.0.jar
+missing: lib-1.0.0.jar
+resolved versions differ from the lock:
+  com.example:lib  locked 1.0.0  resolved 2.0.0
+The artifacts resolved differently from the ones the lock records; no file's bytes changed.
+Delete onion.lock to resolve again and record the new answer.
+```
+
+Once a build has resolved and verified a lock, it records the resulting classpath in
+`target/.onion/dependency-classpath.json`, keyed by the lock's contents. The next
+`build`/`run`/`test` with the same lock takes that classpath without asking coursier at all,
+provided every recorded jar still exists and its SHA-256 still matches the lock (a jar is
+re-hashed when its size or modification time has changed). Anything else — a different lock,
+a missing or changed jar, no record — falls back to resolving. The record holds absolute
+paths into this machine's cache, which is why it lives under `target/` and is not committed;
+`onion clean` removes it. The language server reads the same record, read-only.
+
 Change a version in `onion.toml`, or add a repository, and the lock no longer describes what
 you are asking for -- it is discarded and rewritten rather than enforced against a different
 question. Reordering `[dependencies]` is not a change and does not discard it. `onion clean`
@@ -255,7 +291,7 @@ does not remove it: it is an input to the next build, not an output of this one.
 **It is not an offline mode.** coursier's embedding API exposes a cache location, a thread
 pool and a logger, and no cache policy at all, so there is no honest way to promise a build
 that never reaches the network. The lock gives the same answer every time, not the absence
-of the question.
+of the question; the recorded classpath only means the question is usually not asked twice.
 
 ## Source Layout
 
@@ -269,7 +305,7 @@ directory is a successful test run with a zero-test summary.
 
 `build` compiles once and caches the result under `target/`. A second `build`
 (or the build that `run` and `test` perform first) reuses that output when a
-SHA-256 fingerprint over the compiler version, the Java version, the exact
+SHA-256 fingerprint over the compiler's identity, the Java version, the exact
 manifest bytes, and every source path and its bytes still matches:
 
 ```text
@@ -280,7 +316,18 @@ Built hello (cached)
 ```
 
 Any source addition, removal, rename, or content change invalidates the
-cache and triggers a full rebuild. A failed rebuild never destroys the
+cache and triggers a full rebuild.
+
+The compiler's identity is its version plus a digest of the jar (or class
+directory) it was loaded from, so a new compiler rebuilds the project even when
+it reports the same version: an upgraded or locally rebuilt `onion.jar`, or a
+changed compiler resource such as the effect table. New diagnostics and effect
+checks then run on the next `build`, with no `onion clean` needed. Hashing the
+jar is not repeated on every build: its digest is cached under the user cache
+directory (`-Donion.cache.dir`, `$ONION_CACHE_DIR`, or the platform default),
+keyed by the jar's path, size and modification time.
+
+A failed rebuild never destroys the
 previous successful `target/classes` or build-state file — the new output is
 staged and only promoted after every artifact is written successfully.
 
@@ -294,12 +341,34 @@ builds instead look at the parsed source:
    statement (including a bare expression or variable declaration).
 2. Any production source that declares a top-level function named `main` is
    a candidate.
-3. Every other compiler-generated `main` is ignored.
+3. Any production source that declares a top-level `tool`, and has neither a
+   `main` nor a top-level statement, is a candidate. That is exactly when the
+   compiler synthesizes the source's tool CLI `main`, the same one a script
+   gets, so `run` dispatches through it: `--help`, `--contract` and `--plan`
+   all work.
+4. Every other compiler-generated `main` is ignored.
 
 `run` requires exactly one candidate. Zero candidates fail with a hint to add
-executable code to `src/main.on` or define a top-level `main`; more than one
-candidate fails and lists every candidate's source and location so the
-ambiguity can be resolved.
+executable code to `src/main.on`, define a top-level `main`, or declare a
+top-level `tool`; more than one candidate fails and lists every candidate's
+source and location so the ambiguity can be resolved.
+
+Arguments after `--` go to the program, so a tool project is driven like the
+script it would otherwise be:
+
+```text
+$ onion run -- --help
+usage: meeting-summary <notes> <out>
+  ...
+$ onion run -- samples/notes.md out.json --plan
+plan: `summarize` would
+  read    derived from notes = samples/notes.md
+  write   derived from out = out.json
+  ...
+```
+
+The usage line names the project's package (`[package].name`) where a script's
+names its file.
 
 ## Testing
 
@@ -318,6 +387,21 @@ A test's own `stdout`/`stderr` are shown only when it fails, unless
 exception, or nonzero numeric result is reported against that test alone —
 every remaining test still runs, and a project with no tests at all succeeds
 with a `0 tests, 0 passed, 0 failed` summary.
+
+A failed assertion or runtime exception is reported at the line that raised it
+— for an `Assert::` call, the line of that call, in the test or in a project
+source it reached — followed by that line:
+
+```text
+$ onion test
+test tests/summary_test.on ... FAILED
+
+1 tests, 0 passed, 1 failed
+error: tests/summary_test.on:4: AssertionError: Expected true but was false
+  4 | Assert::isTrue(words.size == 4)
+```
+
+`onion script.on` reports a failed assertion the same way.
 
 ## Clean
 

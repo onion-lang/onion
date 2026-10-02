@@ -290,6 +290,46 @@ When the matched value's type is a `sealed` interface, the compiler
 checks exhaustiveness (E0042) and lists any uncovered subtypes — an
 `else` branch is unnecessary once every case is handled.
 
+### Matching Nested Java Types
+
+A type pattern can name a nested Java class with dots, the way Java source
+does: `Result.Ok`, `onion.Result.Ok`, `Map.Entry`. That is how the standard
+library's own sum types are matched by case: `onion.Result` (`Ok`/`Err`),
+`onion.Outcome` (`Ok`/`Bad`) and `onion.Option` (`Some`/`None`):
+
+```onion
+def describe(r: Result[Int, String]): String = select r {
+  case o is Result.Ok:  "ok " + (o.value() + 1)    // o: Result.Ok[Int, String]
+  case e is Result.Err: "failed: " + e.error()
+}
+```
+
+The binding recovers the scrutinee's type arguments, just as it does for an
+Onion `enum`, so `o.value()` is an `Int` and `e.error()` a `String`. The three
+interfaces are `sealed` Java interfaces, and the exhaustiveness check reads a
+Java class's `permits` list too: leave out `Result.Err` above and the select is
+E0042, with no `else` needed once both cases are there. The same holds for a
+sealed hierarchy in a jar of your own.
+
+A nested class can also be imported by its dotted name, with or without an
+alias, and then used by its simple name:
+
+```onion
+import {
+  onion.Result.Ok
+  onion.Result.Err as Failed
+}
+```
+
+A dotted name is read the way Java reads it: the longest prefix that names a
+top-level class wins, and the rest are member classes inside it, so
+`a.b.C.D` is `D` inside class `a.b.C` before it is `C.D` inside class `a.b`.
+An unknown member (`Result.Okk`) is E0003 with a suggestion from the outer
+class's members (`did you mean: Result.Ok`).
+
+Destructuring (`case Ok(v)`) applies to Onion records only; for a Java record,
+match the type and call its accessor (`o.value()`).
+
 ### Regex Patterns
 
 A regex literal is a first-class pattern: `case re"..." (g1, g2)` matches a

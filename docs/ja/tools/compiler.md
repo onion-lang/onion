@@ -20,7 +20,8 @@ onionc -classpath lib/mylib.jar:lib/other.jar MyProgram.on
 
 ### `-encoding <encoding>`
 
-ソースファイルの文字エンコーディングを指定します。未指定時はプラットフォーム依存のデフォルトが使われます。
+ソースファイルの文字エンコーディングを指定します。未指定時はプラットフォームや JDK によらず UTF-8 です
+（日本語 Windows 上の JDK 17 のように、プラットフォームの既定が MS932 の場合も同じです）。
 
 ```bash
 onionc -encoding UTF-8 MyProgram.on
@@ -190,6 +191,61 @@ onionc -g:none MyProgram.on
 
 `onion` でスクリプトを実行する場合は常にテーブルを出力します。スクリプトはメモリ上で
 コンパイルされ、小さく保つべき成果物が存在しないためです。
+
+### `--print-classpath`
+
+コンパイルしたクラスを実行するための classpath を表示し、何もコンパイルせずに終了します。
+標準出力に1行で、プラットフォームのパス区切り文字（`:`、Windows では `;`）で区切って
+出力します。並びは次の順で、同じエントリは1回だけです。
+
+1. 出力ディレクトリ: `-d` の値。指定がなければ `.`（`onionc` がクラスを書き出す場所）
+2. `-classpath` を指定した場合は、そのエントリ
+3. 指定したファイルの `//> using dep` ディレクティブが解決する jar（推移的依存を含む。
+   後述の「依存ライブラリ」を参照）
+
+ディレクティブはコンパイル時とまったく同じように、同じキャッシュを通して解決されるので、
+後で問い合わせても追加のコストはかかりません。ダウンロードの進捗とエラーは標準エラー出力に
+出ます。ディレクティブの誤りや読めないファイルがあると、classpath を出力せずに
+0 以外で終了します。
+
+```bash
+onionc -d out Main.on
+java -cp "$(onionc --print-classpath -d out Main.on)" Main
+```
+
+## 依存ライブラリ（`//> using dep`）
+
+`onionc` は、コンパイルするファイルの `//> using dep` と `//> using repository`
+ディレクティブを、[スクリプトランナー](script-runner.md)とまったく同じように読み取ります。
+パーサー、厳密バージョンの規則、リゾルバー、classpath キャッシュはすべて共通です。
+解決された jar（推移的依存を含む）は、`-classpath` の指定の後ろに追加されて
+コンパイル時の classpath に載ります。
+
+```onion
+//> using dep "com.google.code.gson:gson:2.11.0"
+
+import { com.google.gson.Gson }
+
+class ToJson {
+public:
+  static def of(value: Object): String { return new Gson().toJson(value) }
+}
+```
+
+```bash
+onionc -d out ToJson.on
+```
+
+複数のファイルを一緒にコンパイルすると、それぞれのディレクティブは**和集合**になります。
+どれか1つのファイルが宣言したライブラリはすべてのファイルの classpath に載り、
+リポジトリはファイルと行の順に検索されます。同じモジュールを2つのバージョンで宣言すると、
+1つのファイル内でも2つのファイルにまたがっていてもエラーになり、エラーは両方のファイルを
+示します。ディレクティブのエラーがあると、`onionc` は何もコンパイルせずに止まります。
+
+`onionc` はコンパイルするだけです。クラスを実行するには、同じ jar を `java` の
+classpath に載せる必要があります。[`--print-classpath`](#--print-classpath) がその
+classpath を表示します。[プロジェクト](project-cli.md)（`onion run`）や
+スクリプトランナーなら自動で載せてくれます。
 
 ## 例
 

@@ -1,0 +1,508 @@
+// ProbabilisticSets.on — Approximate set operations: HyperLogLog cardinality,
+// MinHash Jaccard similarity, and Count-Min Sketch frequency estimation.
+//
+// Three probabilistic data structures let you trade a bounded error for
+// massively lower memory and time costs on large data sets.  This demo
+// runs each structure against a synthetic corpus of "documents" (lists of
+// words) and compares the estimates to their exact counterparts.
+//
+// Exercises: records with methods and extension Int/String, ADT enum
+// (HashFamily), `List[Int]` as flat 2D array (depth×width indexing),
+// extension Int for nibble-level leading-zeros, collection pipelines
+// (map/filter/fold/distinct/sortedBy/groupBy/find), foreach range loops,
+// closures, string interpolation, pattern matching, nullable types,
+// while loops, Math/Integer stdlib calls.
+
+import {
+  java.lang.Math
+  java.lang.Integer as JInteger
+}
+
+// ─── Tiny hash utilities ──────────────────────────────────────────────────────
+
+// 32-bit Murmur3-finaliser mix: avalanche a single Int seed
+def mix32(h0: Int): Int {
+  var h = h0 ^ (h0 >>> 16)
+  h = h * -2048144789   // 0x85ebca6b in two's complement
+  h = h ^ (h >>> 13)
+  h = h * -1028477387   // 0xc2b2ae35
+  h = h ^ (h >>> 16)
+  return h
+}
+
+// Polynomial rolling hash of a string, seeded with a salt
+def hashStr(s: String, seed: Int): Int {
+  var h = seed
+  var i = 0
+  while i < s.length() {
+    h = h * 31 + s.charAt(i)
+    i++
+  }
+  return mix32(h)
+}
+
+// Leading zero count for 32-bit Int (1-32: we add 1 so empty = 0 register)
+extension Int {
+  def nlz32(): Int {
+    if self == 0 { return 32 }
+    return JInteger::numberOfLeadingZeros(self)
+  }
+  def abs32(): Int = if self < 0 { -self } else { self }
+}
+
+// ─── HyperLogLog — approximate cardinality ───────────────────────────────────
+//
+// Uses m = 2^b buckets (b = 10 → 1024 buckets, ~1 KB).
+// Bias correction: α_m * m² * Z  where Z = 1 / Σ 2^{-M[j]}.
+
+class HyperLogLog {
+  val b: Int       // bucket bits (6–16)
+  val m: Int       // number of buckets = 2^b
+  val alpha: Double
+  val reg: List[Int]  // m one-byte max-leading-zeros registers
+
+public:
+  def this(bits: Int) {
+    b     = bits
+    m     = 1 << bits
+    alpha = HyperLogLog::computeAlpha(m)
+    reg   = []
+    var i = 0
+    while i < m { reg.add(0); i++ }
+  }
+
+  static def computeAlpha(m: Int): Double {
+    if m == 16  { return 0.673 }
+    if m == 32  { return 0.697 }
+    if m == 64  { return 0.709 }
+    return 0.7213 / (1.0 + 1.079 / (m + 0.0))
+  }
+
+  def add(item: String): void {
+    val h = hashStr(item, 0xdeadbeef)
+    // low b bits = bucket index
+    val idx = h & (m - 1)
+    // remaining high bits for leading-zero count
+    val w   = h >>> b
+    val rho = (w >>> 0).nlz32() - b + 1  // #leading zeros in the upper 32-b bits + 1
+    val cur = reg[idx] as Int
+    if rho > cur { reg[idx] = rho }
+  }
+
+  def cardinality(): Long {
+    var sum = 0.0
+    var j = 0
+    while j < m {
+      val v = reg[j] as Int
+      sum = sum + Math::pow(2.0, -(v + 0.0))
+      j++
+    }
+    val raw = alpha * (m + 0.0) * (m + 0.0) / sum
+    // Small-range correction: when raw < 2.5*m use linear counting (count empty buckets)
+    if raw < 2.5 * (m + 0.0) {
+      var empty = 0
+      var k = 0
+      while k < m {
+        if (reg[k] as Int) == 0 { empty++ }
+        k++
+      }
+      if empty > 0 {
+        val linear = (m + 0.0) * Math::log((m + 0.0) / (empty + 0.0))
+        return (linear as Long)
+      }
+    }
+    return (raw as Long)
+  }
+}
+
+// ─── MinHash — approximate Jaccard similarity ─────────────────────────────────
+//
+// k independent hash functions; the signature is [min_h1, min_h2, …, min_hk].
+// Jaccard(A,B) ≈ |{i : sig_A[i] == sig_B[i]}| / k.
+
+class MinHashSketch {
+  val k: Int       // number of hash functions
+  val sig: List[Int]  // k minimum hashes
+
+public:
+  def this(numHashes: Int) {
+    k   = numHashes
+    sig = []
+    var i = 0
+    while i < k { sig.add(2147483647); i++ }  // Integer.MAX_VALUE
+  }
+
+  def add(item: String): void {
+    var i = 0
+    while i < k {
+      val h = hashStr(item, mix32(i * 1000003))
+      val cur = sig[i] as Int
+      if h < cur { sig[i] = h }
+      i++
+    }
+  }
+
+  def jaccard(other: MinHashSketch): Double {
+    var matches = 0
+    var i = 0
+    while i < k {
+      val a = sig[i] as Int
+      val b = other.sig[i] as Int
+      if a == b { matches++ }
+      i++
+    }
+    return (matches + 0.0) / (k + 0.0)
+  }
+}
+
+// ─── Count-Min Sketch — approximate frequency ────────────────────────────────
+//
+// depth × width matrix; add/count use `depth` independent hashes across rows.
+
+class CountMinSketch {
+  val depth: Int
+  val width: Int
+  val grid: List[Int]   // depth * width cells
+
+public:
+  def this(d: Int, w: Int) {
+    depth = d
+    width = w
+    grid  = []
+    var i = 0
+    while i < d * w { grid.add(0); i++ }
+  }
+
+  def add(item: String): void {
+    var row = 0
+    while row < depth {
+      val col = (hashStr(item, mix32(row * 9999991)).abs32()) % width
+      val idx = row * width + col
+      grid[idx] = (grid[idx] as Int) + 1
+      row++
+    }
+  }
+
+  def count(item: String): Int {
+    var best = 2147483647
+    var row = 0
+    while row < depth {
+      val col = (hashStr(item, mix32(row * 9999991)).abs32()) % width
+      val v = grid[row * width + col] as Int
+      if v < best { best = v }
+      row++
+    }
+    return best
+  }
+}
+
+// ─── Demo data ───────────────────────────────────────────────────────────────
+
+val DOC_A: List[String] = ["the", "quick", "brown", "fox", "jumps", "over",
+                            "the", "lazy", "dog", "the", "fox", "is", "quick"]
+val DOC_B: List[String] = ["the", "lazy", "dog", "sat", "on", "the", "mat",
+                            "the", "dog", "is", "lazy", "and", "the", "mat", "is", "old"]
+val DOC_C: List[String] = ["the", "quick", "fox", "ran", "fast", "past",
+                            "the", "dog", "quick", "fox", "quick"]
+val DOC_D: List[String] = ["roses", "are", "red", "violets", "are", "blue",
+                            "sugar", "is", "sweet", "and", "so", "are", "you"]
+
+record Doc(name: String, words: List[String])
+
+val DOCS: List[Doc] = [
+  new Doc("DocA", DOC_A),
+  new Doc("DocB", DOC_B),
+  new Doc("DocC", DOC_C),
+  new Doc("DocD", DOC_D)
+]
+
+// ─── Exact helpers ───────────────────────────────────────────────────────────
+
+def exactCardinality(words: List[String]): Int {
+  val seen: List[String] = []
+  foreach w: String in words {
+    if !seen.contains(w) { seen.add(w) }
+  }
+  return seen.size
+}
+
+def exactJaccard(a: List[String], b: List[String]): Double {
+  val setA: List[String] = []
+  val setB: List[String] = []
+  foreach w: String in a { if !setA.contains(w) { setA.add(w) } }
+  foreach w: String in b { if !setB.contains(w) { setB.add(w) } }
+  var inter = 0
+  foreach w: String in setA { if setB.contains(w) { inter++ } }
+  val union = setA.size + setB.size - inter
+  if union == 0 { return 0.0 }
+  return (inter + 0.0) / (union + 0.0)
+}
+
+def exactFrequency(words: List[String], target: String): Int {
+  var n = 0
+  foreach w: String in words { if w == target { n++ } }
+  return n
+}
+
+// ─── Section 1: HyperLogLog cardinality ──────────────────────────────────────
+
+def runHyperLogLog(): void {
+  IO::println("=== HyperLogLog Cardinality (b=10, m=1024) ===")
+  foreach doc: Doc in DOCS {
+    val hll = new HyperLogLog(10)
+    foreach w: String in doc.words() { hll.add(w) }
+    val est   = hll.cardinality()
+    val exact = exactCardinality(doc.words())
+    val err   = (Math::abs(est - exact) + 0.0) / (exact + 0.0) * 100.0
+    IO::println("  #{doc.name()}: exact=#{exact}  hll≈#{est}  err=#{Math::round(err * 10.0) / 10.0}%")
+  }
+  IO::println("")
+}
+
+// ─── Section 2: MinHash Jaccard similarity ───────────────────────────────────
+
+def runMinHash(): void {
+  IO::println("=== MinHash Jaccard Similarity (k=128) ===")
+  val sketches: List[MinHashSketch] = []
+  foreach doc: Doc in DOCS {
+    val mh = new MinHashSketch(128)
+    foreach w: String in doc.words() { mh.add(w) }
+    sketches.add(mh)
+  }
+  var i = 0
+  while i < DOCS.size {
+    var j = i + 1
+    while j < DOCS.size {
+      val docI = DOCS[i] as Doc
+      val docJ = DOCS[j] as Doc
+      val est   = (sketches[i] as MinHashSketch).jaccard(sketches[j] as MinHashSketch)
+      val exact = exactJaccard(docI.words(), docJ.words())
+      val estPct   = Math::round(est   * 1000.0) / 10.0
+      val exactPct = Math::round(exact * 1000.0) / 10.0
+      IO::println("  #{docI.name()} ∩ #{docJ.name()}: exact=#{exactPct}%  minhash≈#{estPct}%")
+      j++
+    }
+    i++
+  }
+  IO::println("")
+}
+
+// ─── Section 3: Count-Min Sketch frequency ───────────────────────────────────
+
+def runCountMin(): void {
+  IO::println("=== Count-Min Sketch Frequency (depth=4, width=512) ===")
+  val all: List[String] = []
+  foreach doc: Doc in DOCS { foreach w: String in doc.words() { all.add(w) } }
+  val cms = new CountMinSketch(4, 512)
+  foreach w: String in all { cms.add(w) }
+  // Query a few words
+  val queries: List[String] = ["the", "fox", "dog", "quick", "roses", "and", "is"]
+  foreach q: String in queries {
+    val est   = cms.count(q)
+    val exact = exactFrequency(all, q)
+    IO::println("  '#{q}': exact=#{exact}  cms≈#{est}")
+  }
+  IO::println("")
+}
+
+// ─── Doc pair for similarity ranking ─────────────────────────────────────────
+
+record DocPair(nameA: String, nameB: String, jaccard: Double)
+
+// ─── Section 4: Finding similar document pairs ────────────────────────────────
+
+def runSimilarityRanking(): void {
+  IO::println("=== Most Similar Document Pairs (MinHash k=64) ===")
+
+  val sketches: List[MinHashSketch] = []
+  foreach doc: Doc in DOCS {
+    val mh = new MinHashSketch(64)
+    foreach w: String in doc.words() { mh.add(w) }
+    sketches.add(mh)
+  }
+
+  val pairs: List[DocPair] = []
+  var i = 0
+  while i < DOCS.size {
+    var j = i + 1
+    while j < DOCS.size {
+      val docI = DOCS[i] as Doc
+      val docJ = DOCS[j] as Doc
+      val sim   = (sketches[i] as MinHashSketch).jaccard(sketches[j] as MinHashSketch)
+      pairs.add(new DocPair(docI.name(), docJ.name(), sim))
+      j++
+    }
+    i++
+  }
+  val ranked = pairs.sortedByDescending { p -> (p as DocPair).jaccard() }
+  foreach p: DocPair in ranked {
+    val pct = Math::round(p.jaccard() * 1000.0) / 10.0
+    IO::println("  #{p.nameA()} ~ #{p.nameB()}: #{pct}%")
+  }
+  IO::println("")
+}
+
+// ─── Sketch configuration ADT ────────────────────────────────────────────────
+//
+// Bundles the parameters for each structure type together with a factory method
+// so the benchmark loop can iterate over configurations uniformly.
+
+enum SketchConfig {
+  case HllConfig(bits: Int)
+  case MinHashConfig(k: Int)
+  case CmsConfig(depth: Int, width: Int)
+
+public:
+  def label(): String = select this {
+    case c is HllConfig:    "HyperLogLog b=#{c.bits()} m=#{1 << c.bits()}"
+    case c is MinHashConfig:"MinHash k=#{c.k()}"
+    case c is CmsConfig:    "CountMin depth=#{c.depth()} width=#{c.width()}"
+  }
+  def memoryBytes(): Int = select this {
+    case c is HllConfig:    (1 << c.bits()) * 1
+    case c is MinHashConfig: c.k() * 4
+    case c is CmsConfig:    c.depth() * c.width() * 4
+  }
+}
+
+// ─── Extension String for hash convenience ───────────────────────────────────
+
+extension String {
+  def hash32(seed: Int): Int = hashStr(self, seed)
+}
+
+// ─── Section 5: Scale benchmark with synthetic data ──────────────────────────
+//
+// Generates N synthetic words and tests HyperLogLog accuracy at multiple
+// bucket counts.  Also shows memory used vs error trade-off.
+
+def synthWords(n: Int, vocab: Int): List[String] {
+  val out: List[String] = []
+  var i = 0
+  while i < n {
+    val code = (mix32(i * 1234567 + 9999) & 2147483647) % vocab
+    out.add("w" + code)
+    i++
+  }
+  return out
+}
+
+def runScaleBenchmark(): void {
+  IO::println("=== Scale Benchmark: HyperLogLog error vs bucket count ===")
+  val N     = 2000   // stream length
+  val VOCAB = 500    // true cardinality (unique words)
+  val words = synthWords(N, VOCAB)
+
+  val configs: List[SketchConfig] = [
+    new HllConfig(6),   // 64 buckets  ~64 B
+    new HllConfig(8),   // 256 buckets ~256 B
+    new HllConfig(10),  // 1024 buckets ~1 KB
+    new HllConfig(12)   // 4096 buckets ~4 KB
+  ]
+
+  foreach cfg: SketchConfig in configs {
+    select cfg {
+      case c is HllConfig:
+        val hll = new HyperLogLog(c.bits())
+        foreach w: String in words { hll.add(w) }
+        val est   = hll.cardinality()
+        val errPct = (Math::abs(est - VOCAB) + 0.0) / (VOCAB + 0.0) * 100.0
+        val errRnd = Math::round(errPct * 10.0) / 10.0
+        IO::println("  #{cfg.label()}  mem=#{cfg.memoryBytes()}B  est=#{est}  err=#{errRnd}%")
+      else:
+    }
+  }
+  IO::println("")
+}
+
+// ─── Section 6: MinHash set similarity at scale ──────────────────────────────
+
+def runMinHashScale(): void {
+  IO::println("=== MinHash Jaccard at scale (two random 200-word sets, 100-word overlap) ===")
+  val setA: List[String] = []
+  val setB: List[String] = []
+  // setA: words 0-199, setB: words 100-299 → overlap 100-199 (100 words)
+  foreach i: Int in 0..<200 { setA.add("w" + i) }
+  foreach i: Int in 100..<300 { setB.add("w" + i) }
+  // Exact Jaccard: |A∩B| / |A∪B| = 100 / 300 ≈ 0.333
+  val exact = exactJaccard(setA, setB)
+
+  val ks: List[Int] = [16, 32, 64, 128, 256]
+  foreach k: Int in ks {
+    val mhA = new MinHashSketch(k)
+    val mhB = new MinHashSketch(k)
+    foreach w: String in setA { mhA.add(w) }
+    foreach w: String in setB { mhB.add(w) }
+    val est = mhA.jaccard(mhB)
+    val errPct = Math::abs((est - exact) + 0.0) / (exact + 0.0) * 100.0
+    val estRnd  = Math::round(est * 1000.0) / 10.0
+    val errRnd  = Math::round(errPct * 10.0) / 10.0
+    IO::println("  k=#{k}  exact=#{Math::round(exact*1000.0)/10.0}%  est=#{estRnd}%  err=#{errRnd}%")
+  }
+  IO::println("")
+}
+
+// ─── Section 7: Count-Min heavy-hitter detection ─────────────────────────────
+
+record HeavyHitter(word: String, estFreq: Int, exactFreq: Int)
+
+def runHeavyHitters(): void {
+  IO::println("=== Count-Min Heavy-Hitter Detection (top words in synthetic stream) ===")
+  val N    = 1000
+  // Zipf-like: word i appears floor(N / (i+1)) times
+  val stream: List[String] = []
+  var wid = 0
+  while wid < 20 {
+    val freq = N / (wid + 1)
+    var rep = 0
+    while rep < freq { stream.add("word" + wid); rep++ }
+    wid++
+  }
+  // Shuffle the stream deterministically using mix32
+  val arr: List[String] = []
+  arr.addAll(stream)
+  var sz = arr.size
+  while sz > 1 {
+    sz--
+    val j = (mix32(sz * 777777) & 2147483647) % (sz + 1)
+    val tmp = arr[sz] as String
+    arr[sz] = arr[j]
+    arr[j] = tmp
+  }
+
+  val cms = new CountMinSketch(4, 256)
+  foreach w: String in arr { cms.add(w) }
+
+  // Build exact freq map
+  val exact: List[HeavyHitter] = []
+  var w2 = 0
+  while w2 < 20 {
+    val wrd = "word" + w2
+    val ef = exactFrequency(arr, wrd)
+    val ef2 = cms.count(wrd)
+    exact.add(new HeavyHitter(wrd, ef2, ef))
+    w2++
+  }
+  val top = exact.sortedByDescending { h -> (h as HeavyHitter).exactFreq() }
+
+  IO::println("  word       exact  cms_est  err")
+  foreach h: HeavyHitter in top {
+    if h.exactFreq() >= 30 {
+      val diff = (h.estFreq() - h.exactFreq()).abs32()
+      val label = if diff == 0 { " OK" } else { " +" + diff }
+      IO::println("  #{h.word()}  #{h.exactFreq()}  #{h.estFreq()}#{label}")
+    }
+  }
+  IO::println("")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+runHyperLogLog()
+runMinHash()
+runCountMin()
+runSimilarityRanking()
+runScaleBenchmark()
+runMinHashScale()
+runHeavyHitters()
+IO::println("Done.")

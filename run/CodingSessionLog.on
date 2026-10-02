@@ -1,0 +1,332 @@
+// CodingSessionLog.on — programmer session journal with analytics.
+//
+// Exercises: ADT enum (SessionType); homogeneous enum (Language);
+// records (Session) with example clause; extension methods on Int;
+// interface (Summarizable); class (SessionStats) with inheritance-style;
+// generics; collection pipelines (map/filter/fold/groupBy/sortedBy/
+// distinct/find/partition/zip/reduce); select / pattern matching;
+// nullable; closures; string interpolation; try/catch; recursion;
+// while; foreach with ranges and map entries.
+
+// ── Session type ──────────────────────────────────────────────────────────────
+
+enum SessionType {
+  case Feature
+  case BugFix
+  case Refactor
+  case Review
+  case Learning
+  case Documentation
+
+public:
+  def label(): String = select this {
+    case t is Feature:       "Feature      "
+    case t is BugFix:        "Bug Fix      "
+    case t is Refactor:      "Refactor     "
+    case t is Review:        "Review       "
+    case t is Learning:      "Learning     "
+    case t is Documentation: "Docs         "
+  }
+
+  def emoji(): String = select this {
+    case t is Feature:       "[+]"
+    case t is BugFix:        "[!]"
+    case t is Refactor:      "[~]"
+    case t is Review:        "[R]"
+    case t is Learning:      "[L]"
+    case t is Documentation: "[D]"
+  }
+
+  def isProductive(): Boolean = select this {
+    case t is Feature:  true
+    case t is BugFix:   true
+    case t is Refactor: true
+    else:               false
+  }
+}
+
+// ── Language ──────────────────────────────────────────────────────────────────
+
+enum Language {
+  SCALA, JAVA, PYTHON, TYPESCRIPT, GO, RUST, KOTLIN, ONION
+public:
+  def ecosystem(): String = select this {
+    case Language::SCALA:      "JVM"
+    case Language::JAVA:       "JVM"
+    case Language::KOTLIN:     "JVM"
+    case Language::ONION:      "JVM"
+    case Language::PYTHON:     "CPython"
+    case Language::TYPESCRIPT: "Node"
+    case Language::GO:         "Native"
+    case Language::RUST:       "Native"
+    else:                      "Other"
+  }
+}
+
+// ── Extension on Int for time formatting ─────────────────────────────────────
+
+extension Int {
+  def asHoursMinutes(): String {
+    val h = self / 60
+    val m = self % 60
+    if h == 0 { return "#{m}m" }
+    return "#{h}h #{m}m"
+  }
+
+  def padLeft(width: Int): String {
+    val s = self.toString()
+    if s.length() >= width { return s }
+    var result: String = s
+    var i: Int = 0
+    while i < width - s.length() {
+      result = " " + result
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ── Session record ────────────────────────────────────────────────────────────
+
+record Session(
+  id:           Int,
+  date:         String,
+  lang:         Language,
+  sessionType:  SessionType,
+  durationMins: Int,
+  linesChanged: Int,
+  notes:        String?
+) {
+  example { new Session(1, "2024-01-15", Language::SCALA, new Feature(), 90, 120, null).velocity() == 80 }
+  example { new Session(2, "2024-01-16", Language::JAVA,  new BugFix(),  60, 30,  "fix NPE").velocity() == 30 }
+}
+
+extension Session {
+  def velocity(): Int = if self.durationMins() > 0 { self.linesChanged() * 60 / self.durationMins() } else { 0 }
+  def hoursLabel(): String = self.durationMins().asHoursMinutes()
+  def hasNotes(): Boolean = self.notes() != null
+  def noteText(): String  = if self.notes() != null { self.notes() as String } else { "—" }
+}
+
+// ── Summarizable interface ────────────────────────────────────────────────────
+
+interface Summarizable {
+  def summary(): String
+}
+
+// ── SessionStats class ────────────────────────────────────────────────────────
+
+class SessionStats conforms Summarizable {
+  val sessions:      List[Session]
+  var sumMins:       Int
+  var sumLines:      Int
+  var productiveN:   Int
+
+public:
+  def this(ss: List[Session]) {
+    sessions    = ss
+    sumMins     = (ss.fold(0) { acc, s -> (acc as Int) + (s as Session).durationMins() }) as Int
+    sumLines    = (ss.fold(0) { acc, s -> (acc as Int) + (s as Session).linesChanged() }) as Int
+    productiveN = ss.filter { s -> (s as Session).sessionType().isProductive() }.size
+  }
+
+  def totalMins():  Int = sumMins
+  def totalLines(): Int = sumLines
+
+  def count():          Int = sessions.size
+  def avgMins():        Int = if sessions.size > 0 { sumMins  / sessions.size } else { 0 }
+  def avgLines():       Int = if sessions.size > 0 { sumLines / sessions.size } else { 0 }
+  def avgVelocity():    Int {
+    val velSum = sessions.fold(0) { acc, s -> acc + (s as Session).velocity() }
+    if sessions.size > 0 { return velSum / sessions.size }
+    return 0
+  }
+  def productiveRate(): Int = if sessions.size > 0 { productiveN * 100 / sessions.size } else { 0 }
+
+  override def summary(): String =
+    "Sessions: #{count()}  Total: #{sumMins.asHoursMinutes()}  " +
+    "Avg/sess: #{avgMins().asHoursMinutes()}  Avg vel: #{avgVelocity()} loc/h"
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def mkSession(id: Int, date: String, lang: Language, t: SessionType, mins: Int, lines: Int, notes: String?): Session =
+  new Session(id, date, lang, t, mins, lines, notes)
+
+def longestCommonPrefix(a: String, b: String): Int {
+  var i: Int = 0
+  while i < a.length() && i < b.length() && a.charAt(i) == b.charAt(i) {
+    i = i + 1
+  }
+  return i
+}
+
+def formatRow(n: Int, label: String, mins: Int, lines: Int): String =
+  "  #{n.padLeft(2)}.  #{label}  #{mins.asHoursMinutes()}  lines: #{lines}"
+
+def minDate(list: List[Session], acc: String): String {
+  if list.isEmpty { return acc }
+  val head = list[0] as Session
+  val rest  = list.subList(1, list.size) as List[Session]
+  val winner = if acc == "" { head.date() } else if head.date().compareTo(acc) < 0 { head.date() } else { acc }
+  return minDate(rest, winner)
+}
+
+def maxDate(list: List[Session], acc: String): String {
+  if list.isEmpty { return acc }
+  val head = list[0] as Session
+  val rest  = list.subList(1, list.size) as List[Session]
+  val winner = if acc == "" { head.date() } else if head.date().compareTo(acc) > 0 { head.date() } else { acc }
+  return maxDate(rest, winner)
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val ss: List[Session] = [
+    mkSession( 1, "2024-01-08", Language::SCALA,      new Feature(),       120, 340, "Implement parser phase"),
+    mkSession( 2, "2024-01-09", Language::SCALA,      new BugFix(),         45,  30, "Fix off-by-one in lexer"),
+    mkSession( 3, "2024-01-10", Language::JAVA,       new Feature(),        90, 210, null),
+    mkSession( 4, "2024-01-11", Language::PYTHON,     new Learning(),       60,   0, "Study PEP-695 generics"),
+    mkSession( 5, "2024-01-12", Language::TYPESCRIPT, new Feature(),       150, 480, "New UI component"),
+    mkSession( 6, "2024-01-15", Language::SCALA,      new Refactor(),      100, 200, "Extract type checker pass"),
+    mkSession( 7, "2024-01-16", Language::GO,         new Feature(),        75, 180, null),
+    mkSession( 8, "2024-01-17", Language::RUST,       new BugFix(),         30,  20, "Fix borrow error"),
+    mkSession( 9, "2024-01-18", Language::KOTLIN,     new Review(),         45,   0, "Review PR #42"),
+    mkSession(10, "2024-01-19", Language::ONION,      new Feature(),       200, 560, "Add ADT enum support"),
+    mkSession(11, "2024-01-22", Language::SCALA,      new Documentation(),  60,  80, "Write compiler CLAUDE.md"),
+    mkSession(12, "2024-01-23", Language::PYTHON,     new Feature(),       120, 310, "Data pipeline ETL"),
+    mkSession(13, "2024-01-24", Language::JAVA,       new Refactor(),       90, 150, null),
+    mkSession(14, "2024-01-25", Language::TYPESCRIPT, new BugFix(),         20,  15, "Fix Promise leak"),
+    mkSession(15, "2024-01-26", Language::ONION,      new Refactor(),      180, 420, "Codegen refactor"),
+    mkSession(16, "2024-01-29", Language::SCALA,      new Feature(),        90, 260, "Generic method inference"),
+    mkSession(17, "2024-01-30", Language::GO,         new Learning(),       50,   0, "Go generics tutorial"),
+    mkSession(18, "2024-01-31", Language::RUST,       new Feature(),       120, 300, "Async executor"),
+    mkSession(19, "2024-02-01", Language::KOTLIN,     new Feature(),       100, 240, "Coroutine channel"),
+    mkSession(20, "2024-02-02", Language::ONION,      new BugFix(),         40,  25, "Fix record copy bug")
+  ]
+
+  val stats = new SessionStats(ss)
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  IO::println("╔══════════════════════════════════════════════════╗")
+  IO::println("║         CODING SESSION LOG — Jan/Feb 2024        ║")
+  IO::println("╚══════════════════════════════════════════════════╝")
+  IO::println("")
+  IO::println(stats.summary())
+  IO::println("Productive rate: #{stats.productiveRate()}%  (Feature+BugFix+Refactor)")
+  IO::println("")
+
+  // ── 1. Sessions by language ───────────────────────────────────────────────
+  IO::println("── By Language ─────────────────────────────────────────────────────────────")
+  val byLang = ss.groupBy { s -> s.lang().toString() }
+  foreach (lang, group) in byLang {
+    val gs = group as List
+    val langStats = new SessionStats(gs.map { x -> x as Session })
+    IO::println("  #{lang}  #{langStats.count()} sess  #{langStats.totalMins().asHoursMinutes()}  #{langStats.totalLines()} lines")
+  }
+  IO::println("")
+
+  // ── 2. Sessions by type ───────────────────────────────────────────────────
+  IO::println("── By Session Type ─────────────────────────────────────────────────────────")
+  val byType = ss.groupBy { s -> s.sessionType().label() }
+  foreach (typeLabel, group) in byType {
+    val gs = group as List
+    IO::println("  #{typeLabel}  #{gs.size} sess")
+  }
+  IO::println("")
+
+  // ── 3. Top 5 sessions by lines changed ────────────────────────────────────
+  IO::println("── Top 5 Sessions (lines changed) ──────────────────────────────────────────")
+  val top5 = ss.sortedBy { s -> 0 - s.linesChanged() }.filter { s -> true }
+  var rank: Int = 1
+  foreach s: Session in top5 {
+    if rank > 5 { break }
+    IO::println(formatRow(rank, s.lang().toString() + " " + s.sessionType().emoji(), s.durationMins(), s.linesChanged()))
+    rank = rank + 1
+  }
+  IO::println("")
+
+  // ── 4. Longest sessions ───────────────────────────────────────────────────
+  IO::println("── Longest Sessions ────────────────────────────────────────────────────────")
+  val longest = ss.sortedBy { s -> 0 - s.durationMins() }
+  foreach i: Int in 0..<3 {
+    val s: Session = longest[i] as Session
+    IO::println("  #{s.date()}  #{s.lang()}  #{s.durationMins().asHoursMinutes()}  #{s.noteText()}")
+  }
+  IO::println("")
+
+  // ── 5. Nullable notes handling ────────────────────────────────────────────
+  IO::println("── Sessions with Notes ─────────────────────────────────────────────────────")
+  val withNotes = ss.filter { s -> s.hasNotes() }
+  IO::println("  #{withNotes.size} of #{ss.size} sessions have notes")
+  val noNotes   = ss.filter { s -> !s.hasNotes() }
+  IO::println("  #{noNotes.size} sessions without notes")
+  IO::println("")
+
+  // ── 6. Velocity report ────────────────────────────────────────────────────
+  IO::println("── Velocity (loc/h) by Language ────────────────────────────────────────────")
+  val jvmSessions  = ss.filter { s -> s.lang().ecosystem() == "JVM" }
+  val jvmStats     = new SessionStats(jvmSessions.map { s -> s as Session })
+  val nativeSessions = ss.filter { s -> s.lang().ecosystem() == "Native" }
+  val nativeStats  = new SessionStats(nativeSessions.map { s -> s as Session })
+  IO::println("  JVM    avg velocity: #{jvmStats.avgVelocity()} loc/h  (#{jvmStats.count()} sessions)")
+  IO::println("  Native avg velocity: #{nativeStats.avgVelocity()} loc/h  (#{nativeStats.count()} sessions)")
+  IO::println("")
+
+  // ── 7. Partition: productive vs. non-productive ───────────────────────────
+  IO::println("── Productive vs. Non-Productive ───────────────────────────────────────────")
+  val parts = ss.partition { s -> s.sessionType().isProductive() }
+  val prod    = parts[0] as List
+  val nonprod = parts[1] as List
+  val prodStats    = new SessionStats(prod.map { s -> s as Session })
+  val nonprodStats = new SessionStats(nonprod.map { s -> s as Session })
+  IO::println("  Productive:     #{prodStats.count()} sess  #{prodStats.totalMins.asHoursMinutes()}")
+  IO::println("  Non-productive: #{nonprodStats.count()} sess  #{nonprodStats.totalMins.asHoursMinutes()}")
+  IO::println("")
+
+  // ── 8. Languages used (distinct) ─────────────────────────────────────────
+  IO::println("── Languages Used ──────────────────────────────────────────────────────────")
+  val langs = ss.map { s -> s.lang().toString() }.distinct()
+  IO::println("  #{langs.size} languages: #{langs.toString()}")
+  IO::println("")
+
+  // ── 9. Date range via recursion ───────────────────────────────────────────
+  val first = minDate(ss, "")
+  val last  = maxDate(ss, "")
+  IO::println("── Date Range ──────────────────────────────────────────────────────────────")
+  IO::println("  First session: #{first}  Last session: #{last}")
+  IO::println("")
+
+  // ── 10. Try/catch ─────────────────────────────────────────────────────────
+  IO::println("── Safe Access Demo ────────────────────────────────────────────────────────")
+  try {
+    val idx: Int = 999
+    val badSession = ss[idx] as Session
+    IO::println("  Found: " + badSession.id())
+  } catch e: Exception {
+    IO::println("  Caught out-of-bounds: " + e.getClass().getSimpleName())
+  }
+  IO::println("")
+
+  // ── 11. Find best day ─────────────────────────────────────────────────────
+  val mostLines = ss.find { s -> s.linesChanged() == ss.map { x -> x.linesChanged() }.fold(0) { acc, n -> if (n as Int) > acc { n as Int } else { acc } } }
+  if mostLines != null {
+    val best = mostLines as Session
+    IO::println("Best session: #{best.date()}  #{best.lang()}  #{best.linesChanged()} lines  (#{best.noteText()})")
+  }
+
+  // ── 12. Weekly summary (foreach range) ────────────────────────────────────
+  IO::println("")
+  IO::println("── Weekly Minutes (range foreach) ──────────────────────────────────────────")
+  val weeks: List[String] = ["Week 1 (Jan 8-12)", "Week 2 (Jan 15-19)", "Week 3 (Jan 22-26)", "Week 4 (Jan 29-Feb 2)"]
+  val weekIds: List[List[Int]] = [[1,2,3,4,5], [6,7,8,9,10], [11,12,13,14,15], [16,17,18,19,20]]
+  foreach i: Int in 0..<4 {
+    val ids = weekIds[i] as List
+    val weekSess = ss.filter { s -> ids.contains(s.id()) }
+    val weekMins = weekSess.fold(0) { acc, s -> acc + (s as Session).durationMins() }
+    IO::println("  #{weeks[i]}: #{weekMins.asHoursMinutes()}")
+  }
+  IO::println("")
+  IO::println("Done.")
+}

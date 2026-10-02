@@ -1,0 +1,364 @@
+// ODESolver — solve initial value problems y' = f(t, y) using multiple methods.
+// Features: records with examples, ADT enums, interface+inheritance, extension methods,
+//           closures, collection pipelines, foreach(k,v), recursion,
+//           string interpolation, try/catch, while, nullable.
+
+import {
+  java.lang.Math
+}
+
+// ── Domain records ────────────────────────────────────────────────────────────
+
+record Point(t: Double, y: Double) {
+  example { new Point(0.0, 1.0).t() == 0.0 }
+  example { new Point(0.0, 1.0).y() == 1.0 }
+}
+
+record SolveConfig(h: Double, maxSteps: Int, tol: Double) {
+  example { new SolveConfig(0.01, 1000, 1.0e-6).h() == 0.01 }
+}
+
+val defaultConfig = new SolveConfig(0.01, 100000, 1.0e-6)
+
+// ── Extension methods on Double ───────────────────────────────────────────────
+
+extension Double {
+  def abs(): Double  = if self < 0.0 { -self } else { self }
+  def sq():  Double  = self * self
+  def sign(): Double = if self > 0.0 { 1.0 } else if self < 0.0 { -1.0 } else { 0.0 }
+  def clamp(lo: Double, hi: Double): Double = if self < lo { lo } else if self > hi { hi } else { self }
+}
+
+// ── Solver status ADT ─────────────────────────────────────────────────────────
+
+enum SolveStatus {
+  case Done(points: List[Point])
+  case MaxStepsExceeded(points: List[Point], atStep: Int)
+  case Diverged(atT: Double, atY: Double, step: Int)
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+def isFinite(v: Double): Boolean = !Double::isNaN(v) && !Double::isInfinite(v)
+
+def fmt4(v: Double): String = Format::fixed(v, 4)
+
+// ── Problem definition ────────────────────────────────────────────────────────
+
+record IVProblem(t0: Double, y0: Double, tEnd: Double, f: (Double, Double) -> Double) {
+  example { new IVProblem(0.0, 1.0, 5.0, (t, y) -> y).t0() == 0.0 }
+  example { new IVProblem(0.0, 1.0, 5.0, (t, y) -> y).tEnd() == 5.0 }
+}
+
+// ── ODE Solver interface ──────────────────────────────────────────────────────
+
+interface ODESolver {
+  def solve(prob: IVProblem, cfg: SolveConfig): SolveStatus
+  def name(): String
+}
+
+// ── Euler method ─────────────────────────────────────────────────────────────
+
+class EulerSolver conforms ODESolver {
+public:
+  def name(): String = "Euler"
+
+  def solve(prob: IVProblem, cfg: SolveConfig): SolveStatus {
+    val pts: List[Point] = []
+    var t: Double = prob.t0()
+    var y: Double = prob.y0()
+    var step: Int = 0
+    val fn: (Double, Double) -> Double = prob.f()
+    pts.add(new Point(t, y))
+    while t < prob.tEnd() && step < cfg.maxSteps() {
+      if !isFinite(y) { return new Diverged(t, y, step) }
+      val dt: Double = (prob.tEnd() - t).clamp(0.0, cfg.h())
+      val k: Double = fn(t, y)
+      t = t + dt
+      y = y + k * dt
+      pts.add(new Point(t, y))
+      step = step + 1
+    }
+    if step >= cfg.maxSteps() && t < prob.tEnd() {
+      return new MaxStepsExceeded(pts, step)
+    }
+    return new Done(pts)
+  }
+}
+
+// ── RK4 method ───────────────────────────────────────────────────────────────
+
+class RK4Solver conforms ODESolver {
+public:
+  def name(): String = "RK4"
+
+  def solve(prob: IVProblem, cfg: SolveConfig): SolveStatus {
+    val pts: List[Point] = []
+    var t: Double = prob.t0()
+    var y: Double = prob.y0()
+    var step: Int = 0
+    pts.add(new Point(t, y))
+    while t < prob.tEnd() && step < cfg.maxSteps() {
+      if !isFinite(y) { return new Diverged(t, y, step) }
+      val dt: Double = (prob.tEnd() - t).clamp(0.0, cfg.h())
+      val f = prob.f()
+      val k1: Double = f(t, y)
+      val k2: Double = f(t + dt / 2.0, y + k1 * dt / 2.0)
+      val k3: Double = f(t + dt / 2.0, y + k2 * dt / 2.0)
+      val k4: Double = f(t + dt, y + k3 * dt)
+      t = t + dt
+      y = y + (k1 + 2.0 * k2 + 2.0 * k3 + k4) * dt / 6.0
+      pts.add(new Point(t, y))
+      step = step + 1
+    }
+    if step >= cfg.maxSteps() && t < prob.tEnd() {
+      return new MaxStepsExceeded(pts, step)
+    }
+    return new Done(pts)
+  }
+}
+
+// ── Reporting helpers ─────────────────────────────────────────────────────────
+
+def reportStatus(methodName: String, status: SolveStatus): void {
+  select status {
+    case d is Done:
+      val pts = d.points()
+      val last = pts.get(pts.size - 1) as Point
+      IO::println("#{methodName}: Done, #{pts.size} steps, y(end)=#{fmt4(last.y())}")
+    case m is MaxStepsExceeded:
+      IO::println("#{methodName}: MaxStepsExceeded at step #{m.atStep()}")
+    case dv is Diverged:
+      IO::println("#{methodName}: Diverged at t=#{fmt4(dv.atT())}")
+  }
+}
+
+// ── Evaluate absolute error against known solution ────────────────────────────
+
+def absError(status: SolveStatus, exact: (Double) -> Double): Double? {
+  select status {
+    case d is Done:
+      val pts = d.points()
+      val last = pts.get(pts.size - 1) as Point
+      val err = (last.y() - exact(last.t())).abs()
+      return err
+    else:
+      return null
+  }
+}
+
+// ── Extract a subset of solution points evenly spaced ────────────────────────
+
+def samplePoints(status: SolveStatus, n: Int): List[Point] {
+  val result: List[Point] = []
+  select status {
+    case d is Done:
+      val pts = d.points()
+      val total = pts.size
+      if total == 0 { return result }
+      val step: Int = if total <= n { 1 } else { total / n }
+      var i: Int = 0
+      while i < total {
+        result.add(pts.get(i) as Point)
+        i = i + step
+      }
+      if (pts.get(total - 1) as Point) !== (result.get(result.size - 1) as Point) {
+        result.add(pts.get(total - 1) as Point)
+      }
+    else: {}
+  }
+  return result
+}
+
+// ── Compute max pointwise error against exact solution ────────────────────────
+
+def maxError(status: SolveStatus, exact: (Double) -> Double): Double {
+  var maxErr: Double = 0.0
+  select status {
+    case d is Done:
+      foreach p: Object in d.points() {
+        val pt = p as Point
+        val err = (pt.y() - exact(pt.t())).abs()
+        if err > maxErr { maxErr = err }
+      }
+    else: {}
+  }
+  return maxErr
+}
+
+// ── Main demonstration ────────────────────────────────────────────────────────
+
+val euler = new EulerSolver()
+val rk4   = new RK4Solver()
+
+IO::println("=== ODE Solver ===")
+IO::println("Config: h=#{defaultConfig.h()}, maxSteps=#{defaultConfig.maxSteps()}")
+
+// Problem 1: exponential growth — y' = y, y(0)=1 → exact: e^t
+IO::println("\n--- Problem 1: y' = y, y(0)=1 (exponential growth) ---")
+val expGrowth = new IVProblem(0.0, 1.0, 2.0, (t: Double, y: Double) -> y)
+val exactExp: (Double) -> Double = (t: Double) -> Math::exp(t)
+
+val eulerStatus1 = euler.solve(expGrowth, defaultConfig)
+val rk4Status1   = rk4.solve(expGrowth, defaultConfig)
+reportStatus("Euler", eulerStatus1)
+reportStatus("RK4",   rk4Status1)
+val eulerErr1 = maxError(eulerStatus1, exactExp)
+val rk4Err1   = maxError(rk4Status1,   exactExp)
+IO::println("Euler max error: #{Format::fixed(eulerErr1, 6)}")
+IO::println("RK4   max error: #{Format::fixed(rk4Err1,   6)}")
+IO::println("RK4 more accurate: #{rk4Err1 < eulerErr1}")
+
+// Problem 2: harmonic oscillator — y' = -y, y(0)=1 → exact: e^(-t)
+IO::println("\n--- Problem 2: y' = -y, y(0)=1 (exponential decay) ---")
+val expDecay = new IVProblem(0.0, 1.0, 3.0, (t: Double, y: Double) -> -y)
+val exactDecay: (Double) -> Double = (t: Double) -> Math::exp(-t)
+
+val eulerStatus2 = euler.solve(expDecay, defaultConfig)
+val rk4Status2   = rk4.solve(expDecay, defaultConfig)
+reportStatus("Euler", eulerStatus2)
+reportStatus("RK4",   rk4Status2)
+val eulerErr2 = maxError(eulerStatus2, exactDecay)
+val rk4Err2   = maxError(rk4Status2,   exactDecay)
+IO::println("Euler max error: #{Format::fixed(eulerErr2, 6)}")
+IO::println("RK4   max error: #{Format::fixed(rk4Err2,   6)}")
+
+// Problem 3: logistic growth — y' = y*(1-y), y(0)=0.1 → exact: 1/(1+(9*e^(-t)))
+IO::println("\n--- Problem 3: logistic growth y'=y(1-y), y(0)=0.1 ---")
+val logistic = new IVProblem(0.0, 0.1, 10.0, (t: Double, y: Double) -> y * (1.0 - y))
+val exactLog: (Double) -> Double = (t: Double) -> 1.0 / (1.0 + 9.0 * Math::exp(-t))
+
+val cfg2 = new SolveConfig(0.05, 100000, 1.0e-8)
+val eulerStatus3 = euler.solve(logistic, cfg2)
+val rk4Status3   = rk4.solve(logistic, cfg2)
+reportStatus("Euler", eulerStatus3)
+reportStatus("RK4",   rk4Status3)
+val eulerErr3 = maxError(eulerStatus3, exactLog)
+val rk4Err3   = maxError(rk4Status3,   exactLog)
+IO::println("Euler max error: #{Format::fixed(eulerErr3, 6)}")
+IO::println("RK4   max error: #{Format::fixed(rk4Err3,   6)}")
+
+// ── Benchmark: vary step size and measure accuracy ───────────────────────────
+
+IO::println("\n--- Step-size convergence (y'=y, Euler) ---")
+val steps  = [0.1, 0.05, 0.02, 0.01, 0.005]
+val labels = ["0.1 ", "0.05", "0.02", "0.01", "0.005"]
+var idx: Int = 0
+foreach h: Object in steps {
+  val hv = h as Double
+  val cfg = new SolveConfig(hv, 100000, 1.0e-12)
+  val st  = euler.solve(expGrowth, cfg)
+  val err = maxError(st, exactExp)
+  IO::println("  h=#{labels[idx] as String}: maxErr=#{Format::fixed(err, 6)}")
+  idx = idx + 1
+}
+
+IO::println("\n--- Step-size convergence (y'=y, RK4) ---")
+idx = 0
+foreach h: Object in steps {
+  val hv = h as Double
+  val cfg = new SolveConfig(hv, 100000, 1.0e-12)
+  val st  = rk4.solve(expGrowth, cfg)
+  val err = maxError(st, exactExp)
+  IO::println("  h=#{labels[idx] as String}: maxErr=#{Format::fixed(err, 6)}")
+  idx = idx + 1
+}
+
+// ── Comparison table ─────────────────────────────────────────────────────────
+
+IO::println("\n--- Accuracy comparison (maxError on 3 problems) ---")
+
+record BenchRow(name: String, p1err: Double, p2err: Double, p3err: Double)
+
+val solvers: List[ODESolver] = [euler as ODESolver, rk4 as ODESolver]
+val rows: List[BenchRow] = []
+foreach s: Object in solvers {
+  val sv = s as ODESolver
+  val cfg = new SolveConfig(0.01, 100000, 1.0e-12)
+  val e1 = maxError(sv.solve(expGrowth, cfg), exactExp)
+  val e2 = maxError(sv.solve(expDecay,  cfg), exactDecay)
+  val e3 = maxError(sv.solve(logistic,  new SolveConfig(0.05, 100000, 1.0e-12)), exactLog)
+  rows.add(new BenchRow(sv.name(), e1, e2, e3))
+}
+
+IO::println("Method | Exp-grow | Exp-decay | Logistic")
+IO::println("-------+----------+-----------+---------")
+foreach r: Object in rows {
+  val row = r as BenchRow
+  IO::println("#{Strings::padRight(row.name(), 6, ' ')} | #{Format::fixed(row.p1err(), 6)}   | #{Format::fixed(row.p2err(), 6)}    | #{Format::fixed(row.p3err(), 6)}")
+}
+
+// ── Divergence detection (stiff ODE demo) ────────────────────────────────────
+
+def findDivergence(probs: List[IVProblem], solver: ODESolver, cfg: SolveConfig): SolveStatus? {
+  foreach p: Object in probs {
+    val prob = p as IVProblem
+    val st = solver.solve(prob, cfg)
+    select st {
+      case dv is Diverged: return st
+      else: {}
+    }
+  }
+  return null
+}
+
+// stiff ODE: y' = -1e7*y, y(0)=1; Euler with h=0.01 → |1-1e5| is huge, overflows fast
+val stiffProb = new IVProblem(0.0, 1.0, 1.0, (t: Double, y: Double) -> -1.0e7 * y)
+val safeProb  = new IVProblem(0.0, 1.0, 1.0, (t: Double, y: Double) -> y)
+val probList: List[IVProblem] = [safeProb, stiffProb]
+val bigStep = new SolveConfig(0.01, 200, 1.0e-12)
+
+IO::println("\n--- Divergence detection (stiff ODE) ---")
+val div = findDivergence(probList, euler, bigStep)
+if div != null {
+  select div as SolveStatus {
+    case d is Diverged:
+      IO::println("Found divergence at step=#{d.step()}, t=#{fmt4(d.atT())}")
+    else:
+      IO::println("Unexpected status")
+  }
+} else {
+  IO::println("No divergence (all finite)")
+}
+// Show RK4 is also not suitable for this stiff ODE at h=0.01
+val rk4Stiff = rk4.solve(stiffProb, bigStep)
+select rk4Stiff {
+  case d is Diverged:
+    IO::println("RK4 also diverged at step=#{d.step()}")
+  case d is Done:
+    val last = d.points().get(d.points().size - 1) as Point
+    IO::println("RK4 done, y(end)=#{fmt4(last.y())}")
+  else:
+    IO::println("RK4: other status")
+}
+
+// ── Statistics on solution accuracy ──────────────────────────────────────────
+
+IO::println("\n--- Pointwise errors (Euler, exp-growth at sampled points) ---")
+val eulerPts = samplePoints(eulerStatus1, 5)
+val rk4Pts   = samplePoints(rk4Status1, 5)
+var totalEulerErr: Double = 0.0
+var totalRk4Err:   Double = 0.0
+var cnt: Int = 0
+foreach p: Object in eulerPts {
+  val pt = p as Point
+  val err = (pt.y() - exactExp(pt.t())).abs()
+  totalEulerErr = totalEulerErr + err
+  cnt = cnt + 1
+}
+IO::println("Euler avg pointwise error: #{fmt4(totalEulerErr / cnt)}")
+cnt = 0
+foreach p: Object in rk4Pts {
+  val pt = p as Point
+  val err = (pt.y() - exactExp(pt.t())).abs()
+  totalRk4Err = totalRk4Err + err
+  cnt = cnt + 1
+}
+IO::println("RK4   avg pointwise error: #{fmt4(totalRk4Err / cnt)}")
+
+// ── Final smoke test ──────────────────────────────────────────────────────────
+val pt = new Point(0.0, 1.0)
+IO::println("\nSmoke: t=#{fmt4(pt.t())}, y=#{fmt4(pt.y())}")
+val dv: Double = -3.5
+IO::println("(-3.5).abs() = #{fmt4(dv.abs())}")
+IO::println("Done.")

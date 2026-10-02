@@ -1,327 +1,454 @@
-// NumberTheory.on — Number theory explorer.
-// Exercises: extension methods on Int literals and variables, records with
-// example clauses, ADT case-enum with select/type-pattern, collection pipelines
-// (map/filter/fold/sortedBy/distinct), foreach over ranges and List[Object],
-// foreach (k,v) on Map, string interpolation, recursion, nullable types,
-// closures, while loops.
+// NumberTheory.on — comprehensive number theory workbench
+// Exercises: extension methods, records, plain and data-carrying enums,
+// classes with static methods, collection pipelines (map/filter/fold/sortedBy/
+// groupBy/find/reduce/zip/distinct), select/pattern matching, nullable,
+// closures, string interpolation, foreach (ranges), while loops, recursion,
+// try/catch, operator methods, generics.
 
-// ─── Extension methods on Int ─────────────────────────────────────────────────
+import {
+  java.util.*
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Extension helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 extension Int {
-  def isPrime(): Boolean {
-    if self < 2 { return false }
-    if self == 2 { return true }
-    if self % 2 == 0 { return false }
-    var i: Int = 3
-    while i * i <= self {
-      if self % i == 0 { return false }
-      i = i + 2
+  def isEven(): Boolean = self % 2 == 0
+  def isOdd(): Boolean  = self % 2 != 0
+
+  // integer square-root (floor)
+  def isqrt(): Int {
+    if self < 0 { return -1 }
+    if self == 0 { return 0 }
+    var r: Int = self
+    var r1: Int = (r + 1) / 2
+    while r1 < r {
+      r = r1
+      r1 = (r + self / r) / 2
+    }
+    return r
+  }
+
+  def pow(e: Int): Long {
+    var result: Long = 1L
+    var base: Long = self as Long
+    var exp: Int = e
+    while exp > 0 {
+      if exp % 2 == 1 { result = result * base }
+      base = base * base
+      exp = exp / 2
+    }
+    return result
+  }
+}
+
+extension Long {
+  def modPow(exp: Long, mod: Long): Long {
+    var result: Long = 1L
+    var b: Long = self % mod
+    var e: Long = exp
+    while e > 0L {
+      if e % 2L == 1L { result = result * b % mod }
+      b = b * b % mod
+      e = e / 2L
+    }
+    return result
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum PrimeStatus { PRIME, COMPOSITE, ONE, ZERO }
+
+enum NumberClass(label: String) {
+  PERFECT("perfect"),
+  ABUNDANT("abundant"),
+  DEFICIENT("deficient")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Records
+// ─────────────────────────────────────────────────────────────────────────────
+
+record FactorizationResult(n: Int, factors: List[Int])
+
+record CongruenceSolution(remainder: Long, modulus: Long, exists: Boolean)
+
+record CollatzStats(start: Int, length: Int, maxValue: Int)
+
+// Used as the return type of extGcd
+record ExtGcdResult(g: Int, x: Int, y: Int)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core arithmetic utilities — Euclid, totient, sieve
+// ─────────────────────────────────────────────────────────────────────────────
+
+class Arith {
+public:
+  static def gcd(a: Int, b: Int): Int {
+    var x: Int = if a < 0 { -a } else { a }
+    var y: Int = if b < 0 { -b } else { b }
+    while y != 0 {
+      val t: Int = y
+      y = x % y
+      x = t
+    }
+    return x
+  }
+
+  static def lcm(a: Int, b: Int): Long {
+    val g: Int = Arith::gcd(a, b)
+    return (a as Long) / g * b
+  }
+
+  // Extended Euclidean: a*result.x + b*result.y = result.g = gcd(a,b)
+  static def extGcd(a: Int, b: Int): ExtGcdResult {
+    if b == 0 { return new ExtGcdResult(a, 1, 0) }
+    val sub: ExtGcdResult = Arith::extGcd(b, a % b)
+    return new ExtGcdResult(sub.g(), sub.y(), sub.x() - (a / b) * sub.y())
+  }
+
+  // Euler's totient function φ(n)
+  static def totient(n: Int): Int {
+    var result: Int = n
+    var p: Int = 2
+    var m: Int = n
+    while p * p <= m {
+      if m % p == 0 {
+        while m % p == 0 { m = m / p }
+        result = result - result / p
+      }
+      p++
+    }
+    if m > 1 { result = result - result / m }
+    return result
+  }
+
+  // Sieve of Eratosthenes — returns primes up to n
+  static def sieve(n: Int): List[Int] {
+    val composite = new Boolean[n + 1]
+    val primes = new java.util.ArrayList[Int]()
+    var p: Int = 2
+    while p <= n {
+      if !composite[p] {
+        primes.add(p)
+        var m: Int = p * 2
+        while m <= n {
+          composite[m] = true
+          m = m + p
+        }
+      }
+      p++
+    }
+    return primes
+  }
+
+  // Trial-division factorization
+  static def factorize(n: Int): FactorizationResult {
+    val factors = new java.util.ArrayList[Int]()
+    var rem: Int = n
+    var d: Int = 2
+    while d * d <= rem {
+      while rem % d == 0 {
+        factors.add(d)
+        rem = rem / d
+      }
+      d++
+    }
+    if rem > 1 { factors.add(rem) }
+    return new FactorizationResult(n, factors)
+  }
+
+  // Sum of proper divisors of n
+  static def sumDivisors(n: Int): Int {
+    if n <= 1 { return 0 }
+    var s: Int = 1
+    var d: Int = 2
+    while d * d <= n {
+      if n % d == 0 {
+        s = s + d
+        if d != n / d { s = s + n / d }
+      }
+      d++
+    }
+    return s
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Primality
+// ─────────────────────────────────────────────────────────────────────────────
+
+class PrimalityChecker {
+public:
+  // Deterministic Miller-Rabin for n < 3,215,031,751 (witnesses 2,3,5,7 suffice)
+  static def millerRabin(n: Long): Boolean {
+    if n < 2L  { return false }
+    if n == 2L || n == 3L || n == 5L || n == 7L { return true }
+    if n % 2L == 0L { return false }
+    var d: Long = n - 1L
+    var r: Int = 0
+    while d % 2L == 0L { d = d / 2L; r++ }
+    val witnesses = [2L, 3L, 5L, 7L]
+    foreach w: Long in witnesses {
+      if w >= n { continue }
+      var x: Long = w.modPow(d, n)
+      if x == 1L || x == n - 1L { continue }
+      var composite: Boolean = true
+      foreach _: Int in 1..<r {
+        x = x.modPow(2L, n)
+        if x == n - 1L { composite = false; break }
+      }
+      if composite { return false }
     }
     return true
   }
 
-  def gcd(other: Int): Int {
-    var a: Int = if self < 0 { -self } else { self }
-    var b: Int = if other < 0 { -other } else { other }
-    while b != 0 {
-      val t: Int = b
-      b = a % b
-      a = t
+  static def classify(n: Int): PrimeStatus {
+    if n == 0 { return PrimeStatus::ZERO }
+    if n == 1 { return PrimeStatus::ONE }
+    if PrimalityChecker::millerRabin(n as Long) { return PrimeStatus::PRIME }
+    return PrimeStatus::COMPOSITE
+  }
+
+  static def classifyLabel(s: PrimeStatus): String {
+    select s {
+      case PrimeStatus::PRIME:     return "prime"
+      case PrimeStatus::COMPOSITE: return "composite"
+      case PrimeStatus::ONE:       return "one"
+      case PrimeStatus::ZERO:      return "zero"
+      else: return "?"
     }
-    return a
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chinese Remainder Theorem — pair-wise combination
+// ─────────────────────────────────────────────────────────────────────────────
+
+class CRT {
+public:
+  // Solve x ≡ r1 (mod m1), x ≡ r2 (mod m2)
+  static def combine(r1: Long, m1: Long, r2: Long, m2: Long): CongruenceSolution {
+    val ext: ExtGcdResult = Arith::extGcd(m1 as Int, m2 as Int)
+    val g: Int = ext.g()
+    if (r2 - r1) % g != 0L { return new CongruenceSolution(0L, 0L, false) }
+    val lcm: Long = m1 / g * m2
+    val diff: Long = (r2 - r1) / g
+    val inv: Long = ext.x() as Long
+    val x: Long = ((r1 + m1 * (diff * inv % (m2 / g))) % lcm + lcm) % lcm
+    return new CongruenceSolution(x, lcm, true)
   }
 
-  def lcm(other: Int): Int {
-    val g: Int = self.gcd(other)
-    if g == 0 { return 0 }
-    return (self / g) * other
-  }
-
-  def eulerPhi(): Int {
-    var n: Int = self
-    var result: Int = n
-    var p: Int = 2
-    while p * p <= n {
-      if n % p == 0 {
-        while n % p == 0 { n = n / p }
-        result = result - result / p
-      }
-      p = p + 1
-    }
-    if n > 1 { result = result - result / n }
-    return result
-  }
-
-  def divisors(): List[Object] {
-    val divs: List[Object] = []
+  // Solve a system of congruences given parallel lists
+  static def solve(remainders: List[Long], moduli: List[Long]): CongruenceSolution {
+    var cur: CongruenceSolution = new CongruenceSolution(remainders[0] as Long, moduli[0] as Long, true)
     var i: Int = 1
-    while i * i <= self {
-      if self % i == 0 {
-        divs.add(i)
-        if i != self / i { divs.add(self / i) }
-      }
-      i = i + 1
+    while i < remainders.size {
+      if !cur.exists() { return cur }
+      cur = CRT::combine(cur.remainder(), cur.modulus(), remainders[i] as Long, moduli[i] as Long)
+      i++
     }
-    return divs.sortedBy { x -> x as Int }
-  }
-
-  def sumOfDivisors(): Int {
-    val divs: List[Object] = self.divisors()
-    return divs.fold(0) { acc, x -> (acc as Int) + (x as Int) } as Int
-  }
-
-  def isAbundant(): Boolean  = self.sumOfDivisors() - self > self
-  def isDeficient(): Boolean = self.sumOfDivisors() - self < self
-  def isPerfect(): Boolean   = self.sumOfDivisors() - self == self
-}
-
-// ─── Prime factorization records ─────────────────────────────────────────────
-
-record PrimeFactor(base: Int, exponent: Int) {
-  public:
-  def display(): String =
-    if self.exponent() == 1 { "" + self.base() } else { "#{self.base()}^#{self.exponent()}" }
-}
-
-record Factorization(n: Int, factors: List[Object]) {
-  public:
-  def display(): String {
-    if self.factors().size == 0 { return "#{self.n()} (unit)" }
-    val parts: List[Object] = self.factors().map { f -> (f as PrimeFactor).display() }
-    var s: String = parts[0] as String
-    var i: Int = 1
-    while i < parts.size {
-      s = s + " × " + (parts[i] as String)
-      i = i + 1
-    }
-    return "#{self.n()} = #{s}"
+    return cur
   }
 }
 
-def factorize(n: Int): Factorization {
-  val factors: List[Object] = []
-  var rem: Int = n
-  var p: Int = 2
-  while p * p <= rem {
-    if rem % p == 0 {
-      var exp: Int = 0
-      while rem % p == 0 { rem = rem / p; exp = exp + 1 }
-      factors.add(new PrimeFactor(p, exp))
-    }
-    p = p + 1
-  }
-  if rem > 1 { factors.add(new PrimeFactor(rem, 1)) }
-  return new Factorization(n, factors)
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Collatz sequence
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ─── Number classification ADT ────────────────────────────────────────────────
-
-enum NumberKind {
-  case PrimeNum
-  case PerfectNumber
-  case AbundantNumber
-  case DeficientNumber
-  case UnitNum
-  case ZeroNum
-
-  public:
-  def label(): String = select this {
-    case k is PrimeNum:       "prime"
-    case k is PerfectNumber:  "perfect"
-    case k is AbundantNumber: "abundant"
-    case k is DeficientNumber:"deficient"
-    case k is UnitNum:        "unit (1)"
-    case k is ZeroNum:        "zero"
-  }
-}
-
-def classify(n: Int): NumberKind {
-  if n == 0         { return new ZeroNum() }
-  if n == 1         { return new UnitNum() }
-  if n.isPrime()    { return new PrimeNum() }
-  if n.isPerfect()  { return new PerfectNumber() }
-  if n.isAbundant() { return new AbundantNumber() }
-  return new DeficientNumber()
-}
-
-// ─── Collatz sequence ─────────────────────────────────────────────────────────
-
-def collatz(start: Int): List[Object] {
-  val seq: List[Object] = []
+def collatz(start: Int): CollatzStats {
   var n: Int = start
+  var len: Int = 1
+  var mx: Int = n
   while n != 1 {
-    seq.add(n)
-    if n % 2 == 0 { n = n / 2 } else { n = 3 * n + 1 }
+    if n.isEven() { n = n / 2 } else { n = 3 * n + 1 }
+    len++
+    if n > mx { mx = n }
   }
-  seq.add(1)
-  return seq
+  return new CollatzStats(start, len, mx)
 }
 
-// ─── Goldbach conjecture ──────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Perfect / abundant / deficient classification
+// ─────────────────────────────────────────────────────────────────────────────
 
-record GoldbachPair(a: Int, b: Int)
+def classifyNumber(n: Int): NumberClass {
+  val s: Int = Arith::sumDivisors(n)
+  if s == n { return NumberClass::PERFECT }
+  if s > n  { return NumberClass::ABUNDANT }
+  return NumberClass::DEFICIENT
+}
 
-def goldbach(n: Int): GoldbachPair? {
-  if n <= 2 || n % 2 != 0 { return null }
+// ─────────────────────────────────────────────────────────────────────────────
+// Goldbach conjecture: every even n > 2 = p + q, both prime
+// ─────────────────────────────────────────────────────────────────────────────
+
+def goldbach(n: Int): String {
+  if n <= 2 || n.isOdd() { return "n/a" }
   var p: Int = 2
   while p <= n / 2 {
-    if p.isPrime() && (n - p).isPrime() { return new GoldbachPair(p, n - p) }
-    p = p + 1
-  }
-  return null
-}
-
-// ─── Sieve of Eratosthenes ────────────────────────────────────────────────────
-
-def sieve(limit: Int): List[Object] {
-  val composite: Boolean[] = new Boolean[limit + 1]
-  var i: Int = 2
-  while i * i <= limit {
-    if !composite[i] {
-      var j: Int = i * i
-      while j <= limit { composite[j] = true; j = j + i }
+    if PrimalityChecker::millerRabin(p as Long) &&
+       PrimalityChecker::millerRabin((n - p) as Long) {
+      return "#{n} = #{p} + #{n - p}"
     }
-    i = i + 1
+    p++
   }
-  val primes: List[Object] = []
-  foreach p: Int in 2..limit { if !composite[p] { primes.add(p) } }
-  return primes
+  return "none"
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper used in main (must be top-level in Onion)
+// ─────────────────────────────────────────────────────────────────────────────
 
-IO::println("=== Number Theory Explorer ===")
-IO::println("")
-
-// Prime listing via sieve
-val primes50: List[Object] = sieve(50)
-IO::println("Primes up to 50 (#{primes50.size}):")
-var primeLine: String = " "
-foreach p: Object in primes50 { primeLine = primeLine + " " + p }
-IO::println(primeLine)
-IO::println("")
-
-// Extension method demo on literals — exercises the Int extension mechanism
-IO::println("Extension methods on Int literals and variables:")
-val x: Int = 12
-IO::println("  (7).isPrime()       = #{(7).isPrime()}")
-IO::println("  (12).gcd(8)         = #{(12).gcd(8)}")
-IO::println("  (4).lcm(6)          = #{(4).lcm(6)}")
-IO::println("  x.eulerPhi() [x=12] = #{x.eulerPhi()}")
-IO::println("  x.divisors()        = #{x.divisors()}")
-IO::println("  x.sumOfDivisors()   = #{x.sumOfDivisors()}")
-IO::println("  x.isPerfect()       = #{x.isPerfect()}")
-IO::println("")
-
-// Factorizations
-IO::println("Prime factorizations:")
-val targets: List[Object] = [12, 60, 360, 2310, 9699690]
-foreach n: Object in targets {
-  IO::println("  #{factorize(n as Int).display()}")
-}
-IO::println("")
-
-// Number classification in 1..30 — grouped by kind
-IO::println("Number classification 1..30:")
-val groups: Map[Object, Object] = [:]
-foreach n: Int in 1..30 {
-  val kind: NumberKind = classify(n)
-  val label: String = kind.label()
-  if groups[label] == null { groups[label] = [] }
-  (groups[label] as List[Object]).add(n)
-}
-val orderedLabels: List[Object] = ["prime", "perfect", "abundant", "deficient", "unit (1)"]
-foreach lbl: Object in orderedLabels {
-  val members: List[Object]? = groups[lbl] as List[Object]
-  if members != null {
-    IO::println("  #{lbl}: #{members}")
+def checkedMod(a: Int, b: Int): String {
+  try {
+    return "" + (a % b)
+  } catch e: Exception {
+    return "error"
   }
 }
-IO::println("")
 
-// GCD and LCM table
-IO::println("GCD / LCM pairs:")
-record IntPair(a: Int, b: Int)
-val gcdPairs: List[Object] = [new IntPair(12, 18), new IntPair(35, 14),
-                               new IntPair(100, 75), new IntPair(17, 13)]
-foreach pair: Object in gcdPairs {
-  val ip: IntPair = pair as IntPair
-  IO::println("  gcd(#{ip.a()},#{ip.b()})=#{ip.a().gcd(ip.b())}  lcm(#{ip.a()},#{ip.b()})=#{ip.a().lcm(ip.b())}")
-}
-IO::println("")
+// ─────────────────────────────────────────────────────────────────────────────
+// Main: exercise everything and print results
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Euler's totient
-IO::println("Euler's totient phi(n) for n in 1..12:")
-var phiLine: String = " "
-foreach n: Int in 1..12 { phiLine = phiLine + " phi(#{n})=#{n.eulerPhi()}" }
-IO::println(phiLine)
-IO::println("")
+def main(): void {
 
-// Perfect / abundant numbers in 1..100
-val range100: List[Object] = []
-foreach n: Int in 1..100 { range100.add(n) }
-val perfect: List[Object]  = range100.filter { n -> (n as Int).isPerfect() }
-val abundant: List[Object] = range100.filter { n -> (n as Int).isAbundant() }
-IO::println("Perfect numbers in 1..100:  #{perfect}")
-IO::println("Abundant numbers in 1..100: #{abundant}")
-IO::println("")
+  // --- Sieve & basic prime list ---
+  val primes30: List[Int] = Arith::sieve(30)
+  IO::println("primes ≤ 30: " + primes30)
 
-// Collatz stopping times
-IO::println("Collatz sequence stats:")
-val seeds: List[Object] = [6, 11, 27, 97]
-foreach s: Object in seeds {
-  val seq: List[Object] = collatz(s as Int)
-  val maxVal: Int = seq.fold(0) { acc, x -> if (x as Int) > (acc as Int) { x as Int } else { acc as Int } } as Int
-  IO::println("  start=#{s}: #{seq.size} steps, max=#{maxVal}")
-}
-IO::println("")
+  // --- Primality classification with select ---
+  val candidates = [1, 2, 17, 25, 97, 100]
+  foreach n: Int in candidates {
+    val status: String = PrimalityChecker::classifyLabel(PrimalityChecker::classify(n))
+    IO::println("  #{n} → #{status}")
+  }
 
-// Goldbach decompositions for even n in 4..30
-IO::println("Goldbach decompositions (even n, 4..30):")
-foreach n: Int in 4..30 {
-  if n % 2 == 0 {
-    val pair: GoldbachPair? = goldbach(n)
-    if pair != null {
-      IO::println("  #{n} = #{pair.a()} + #{pair.b()}")
+  // --- Factorization pipeline: sort factors, join as string ---
+  val toFactor = [12, 360, 1001, 9999]
+  foreach n: Int in toFactor {
+    val fr: FactorizationResult = Arith::factorize(n)
+    val joined: String = fr.factors().fold("") { acc, f ->
+      val a: String = acc as String
+      if a == "" { "" + f } else { a + " × " + f }
+    }
+    IO::println("  #{fr.n()} = #{joined}")
+  }
+
+  // --- GCD / LCM ---
+  IO::println("gcd(48,36) = #{Arith::gcd(48, 36)}")
+  IO::println("lcm(12,18) = #{Arith::lcm(12, 18)}")
+
+  // --- Extended GCD ---
+  val ext: ExtGcdResult = Arith::extGcd(35, 15)
+  IO::println("extGcd(35,15): gcd=#{ext.g()}, x=#{ext.x()}, y=#{ext.y()}")
+
+  // --- Euler's totient ---
+  val totients = [1, 2, 6, 12, 30]
+  val totientPairs = totients.map { n -> "φ(#{n})=#{Arith::totient(n)}" }
+  IO::println("totients: " + totientPairs)
+
+  // --- Collection pipelines over primes ---
+  val primes100: List[Int] = Arith::sieve(100)
+  val twinPrimes: List[Int] = primes100.filter { p -> PrimalityChecker::millerRabin((p + 2) as Long) }
+  IO::println("twin-prime bases ≤ 100: " + twinPrimes.filter { p -> p + 2 <= 100 })
+
+  val sumP: Long = (primes100.fold(0L) { acc, p -> (acc as Long) + (p as Int) }) as Long
+  IO::println("sum of primes ≤ 100: #{sumP}")
+
+  // groupBy last digit
+  val byLastDigit = primes100.groupBy { p -> p % 10 }
+  val digits = [1, 3, 7, 9]
+  foreach d: Int in digits {
+    val group = byLastDigit[d]
+    if group != null {
+      IO::println("  primes ending in #{d}: #{(group as List).size}")
     }
   }
-}
-IO::println("")
 
-// Twin primes in 1..100
-val primes100: List[Object] = sieve(100)
-IO::println("Twin primes up to 100:")
-var twinLine: String = " "
-var ti: Int = 0
-while ti < primes100.size - 1 {
-  val p: Int = primes100[ti] as Int
-  val q: Int = primes100[ti + 1] as Int
-  if q - p == 2 { twinLine = twinLine + " (#{p},#{q})" }
-  ti = ti + 1
-}
-IO::println(twinLine)
-IO::println("")
+  // --- modPow ---
+  IO::println("2^10 mod 1000 = #{2L.modPow(10L, 1000L)}")
+  IO::println("3^100 mod 1000000007 = #{3L.modPow(100L, 1000000007L)}")
 
-// Coprimality grid — exercises (k,v) foreach on a Map
-IO::println("Coprimality table for {6,10,15,35} (gcd=1 means coprime):")
-val testNums: List[Object] = [6, 10, 15, 35]
-val coprime: Map[Object, Object] = [:]
-foreach a: Object in testNums {
-  val row: List[Object] = []
-  foreach b: Object in testNums {
-    val g: Int = (a as Int).gcd(b as Int)
-    row.add(if g == 1 { "Y" } else { "." })
+  // --- CRT ---
+  val rems: List[Long] = [2L, 3L, 2L]
+  val mods: List[Long] = [3L, 5L, 7L]
+  val sol: CongruenceSolution = CRT::solve(rems, mods)
+  if sol.exists() {
+    IO::println("CRT([2,3,2],[3,5,7]): x=#{sol.remainder()} mod #{sol.modulus()}")
+  } else {
+    IO::println("CRT: no solution")
   }
-  coprime[a] = row
-}
-var header: String = "      "
-foreach b: Object in testNums { header = header + " " + b + "   " }
-IO::println(header)
-foreach (a, row) in coprime {
-  var rowStr: String = "  #{a}   "
-  foreach cell: Object in (row as List[Object]) { rowStr = rowStr + " #{cell}   " }
-  IO::println(rowStr)
-}
-IO::println("")
 
-IO::println("Done.")
+  // --- Collatz ---
+  val starts = [6, 27, 871]
+  foreach s: Int in starts {
+    val cs: CollatzStats = collatz(s)
+    IO::println("  collatz(#{cs.start()}): len=#{cs.length()}, max=#{cs.maxValue()}")
+  }
+
+  // --- Perfect / abundant / deficient with groupBy ---
+  val nums1to30 = [1, 2, 3, 4, 5, 6, 12, 15, 18, 20, 28]
+  val classified = nums1to30.groupBy { n -> classifyNumber(n).label() }
+  foreach (label, members) in classified {
+    IO::println("  #{label}: #{members}")
+  }
+
+  // --- Goldbach ---
+  val goldbachNs = [4, 28, 100]
+  foreach n: Int in goldbachNs {
+    IO::println("  goldbach: #{goldbach(n)}")
+  }
+
+  // --- isqrt extension ---
+  val sqrts = [0, 1, 4, 9, 15, 16, 100]
+  IO::println("isqrts: " + sqrts.map { n -> "√#{n as Int}=#{(n as Int).isqrt()}" })
+
+  // --- pow extension ---
+  IO::println("2^10 = #{2.pow(10)}, 3^7 = #{3.pow(7)}")
+
+  // --- nullable: find first perfect number in range ---
+  val maybePerf = nums1to30.find { n -> classifyNumber(n as Int) == NumberClass::PERFECT }
+  if maybePerf != null {
+    IO::println("first perfect in list: #{maybePerf as Int}")
+  }
+
+  // --- closure stored in val, applied via inline lambda ---
+  val isPrime: Function1[Int, Boolean] = (n: Int) -> PrimalityChecker::millerRabin(n as Long)
+  val under20 = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+  val primesUnder20: List[Int] = under20.filter { n -> isPrime(n as Int) }
+  IO::println("closure filter primes<20: " + primesUnder20)
+
+  // --- try / catch (uses top-level checkedMod) ---
+  IO::println("10 mod 3 = #{checkedMod(10, 3)}")
+  IO::println("10 mod 0 = #{checkedMod(10, 0)}")
+
+  // --- consecutive prime gaps ---
+  val shortPrimes: List[Int] = Arith::sieve(50)
+  val primeGaps = new java.util.ArrayList[Int]()
+  var pi: Int = 1
+  while pi < shortPrimes.size {
+    primeGaps.add((shortPrimes[pi] as Int) - (shortPrimes[pi - 1] as Int))
+    pi++
+  }
+  IO::println("prime gaps ≤ 50: " + primeGaps)
+  val maxGap: Int = primeGaps.fold(0) { acc, g -> if (g as Int) > (acc as Int) { g } else { acc } } as Int
+  IO::println("max gap: #{maxGap}")
+
+  // --- sortedBy: sort numbers by their totient value ---
+  val toSort = [12, 15, 20, 30, 36]
+  val sortedByTotient = toSort.sortedBy { n -> Arith::totient(n) }
+  IO::println("sorted by totient: " + sortedByTotient)
+
+  // --- reduce: product of first 5 primes ---
+  val first5: List[Int] = Arith::sieve(12).filter { p -> p <= 11 }
+  val primorial: Long = (first5.fold(1L) { acc, p -> (acc as Long) * (p as Int) }) as Long
+  IO::println("primorial(5) = #{primorial}")
+
+  IO::println("done.")
+}

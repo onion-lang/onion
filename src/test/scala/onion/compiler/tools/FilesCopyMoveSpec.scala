@@ -5,6 +5,9 @@ import java.nio.file.{Files => JFiles}
 
 /**
  * Tests for Files.copy/move/copyDir added to the stdlib.
+ *
+ * Paths are spliced into Onion string literals with forward slashes: a Windows `\` would
+ * start an escape there.
  */
 class FilesCopyMoveSpec extends AbstractShellSpec {
   describe("Files.copy") {
@@ -15,8 +18,8 @@ class FilesCopyMoveSpec extends AbstractShellSpec {
       dst.delete() // ensure dst doesn't exist beforehand
       JFiles.writeString(src.toPath, "copy content")
 
-      val srcPath = src.getAbsolutePath
-      val dstPath = dst.getAbsolutePath
+      val srcPath = src.getAbsolutePath.replace('\\', '/')
+      val dstPath = dst.getAbsolutePath.replace('\\', '/')
 
       val result = shell.run(
         s"""
@@ -43,8 +46,8 @@ class FilesCopyMoveSpec extends AbstractShellSpec {
       JFiles.writeString(src.toPath, "new content")
       JFiles.writeString(dst.toPath, "old content")
 
-      val srcPath = src.getAbsolutePath
-      val dstPath = dst.getAbsolutePath
+      val srcPath = src.getAbsolutePath.replace('\\', '/')
+      val dstPath = dst.getAbsolutePath.replace('\\', '/')
 
       val result = shell.run(
         s"""
@@ -72,8 +75,8 @@ class FilesCopyMoveSpec extends AbstractShellSpec {
       dst.delete()
       JFiles.writeString(src.toPath, "move content")
 
-      val srcPath = src.getAbsolutePath
-      val dstPath = dst.getAbsolutePath
+      val srcPath = src.getAbsolutePath.replace('\\', '/')
+      val dstPath = dst.getAbsolutePath.replace('\\', '/')
 
       val result = shell.run(
         s"""
@@ -110,8 +113,8 @@ class FilesCopyMoveSpec extends AbstractShellSpec {
       val srcFile = new java.io.File(srcDir, "hello.txt")
       JFiles.writeString(srcFile.toPath, "dir content")
 
-      val srcPath = srcDir.getAbsolutePath
-      val dstPath = dstDir.getAbsolutePath
+      val srcPath = srcDir.getAbsolutePath.replace('\\', '/')
+      val dstPath = dstDir.getAbsolutePath.replace('\\', '/')
 
       val result = shell.run(
         s"""

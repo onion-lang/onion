@@ -43,8 +43,10 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
 - `--Wno <codes>` - 特定の警告を抑制 (例: W0001,unused-parameter)
 - `--no-check-laws` - レコードの `law`/`example` 節を実行しない（既定ではコンパイル時に実行される。LSPでは常に無効）
 - `--law-seed <n>` / `--law-samples <n>` - lawのサンプリングを制御。反証されたlawは、その反例を生成した設定を報告する
+- `--print-classpath` - `onionc` のみ: 出力を実行するための classpath（`-d` のディレクトリまたは `.`、`-classpath`、ファイルの `//> using dep` ディレクティブが解決する jar の順）をプラットフォームの区切り文字で標準出力に表示し、コンパイルせずに終了する
 - `--stacktrace` - 未捕捉の実行時エラーで生のJVMスタックトレースを表示する（既定ではスクリプト自身のフレームのみを含む診断形式のレポートになる）
 - `ONION_DAEMON=1` (環境変数) - `onionc` と `onion script.on` は常駐デーモン（`onion.tools.daemon`）経由でコンパイルする。デーモンは初回利用時に起動し、スクリプトのクラスは呼び出し元プロセスに戻って実行される。デーモンに接続できない場合はプロセス内コンパイルにフォールバックする。`java -cp onion.jar onion.tools.daemon.DaemonClient stop|status` で制御できる
+- `ONION_CONSOLE_ENCODING=auto|native|utf-8` (環境変数) - ランチャの stdout/stderr の文字コード（`onion.tools.ConsoleEncoding`）。`auto`（既定）: Windows ではコンソールでないストリーム（パイプ、ファイル、mintty）を UTF-8 で書き、コンソールはそのコードページのまま。他の OS は変更なし。標準入力も同様: `onion.IO` はパイプ・ファイルを UTF-8、Windows のコンソールをそのコードページでデコード（ランチャが `onion.stdin.encoding` を設定。ランチャなしでは UTF-8）。`onion.Files`/`file"…"` のテキストは常に UTF-8。ソースファイルの既定は UTF-8（`-encoding` で上書き）
 
 ## 高レベルアーキテクチャ
 
@@ -437,6 +439,7 @@ try {
 | `else if condition { }` | ✓ 正しい - `else if`チェーンはサポートされている（式としても使える） |
 | `switch value { case 1: }` | `select value { case 1: }` - `switch`ではなく`select` |
 | `case s: String:`（Java/Scala流パターン） | `case s is String:` - 型パターンは`is`を使う。sealedの網羅性チェック（E0042）が適用される |
+| `case o is Result.Ok:`（ネストしたJava型）は未対応？ | ✓ 正しい - 型パターンにはネストしたJavaクラスをドット区切りで書ける（`Result.Ok`、`onion.Outcome.Bad`、`Map.Entry`、さらに深い`a.B.C.D`）。束縛はスクルーティニーの型引数を復元し、Javaの`sealed ... permits`なスクルーティニーにもE0042の網羅性チェックが効く。Javaのレコードは型でのみマッチする（`case Ok(v)`の分解はOnionのレコード専用） |
 | `case Add(l, n is Num):` のようなネストした型パターン？ | ✓ 正しい - 型パターンはデストラクチャリングの中にネストでき、束縛された値は絞り込まれた型として使える。レコードでない要素にも使える（`case Wrap(s is String)`） |
 | `case Circle(r):` は非サポート？ | ✓ 正しい - レコードのデストラクチャリングパターンは動作する。`case x when guard:` も使える |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - 括弧なし |
@@ -468,6 +471,7 @@ try {
 |---------------------|----------------|
 | `import java.util.*;` | `import { java.util.* }` - 波括弧が必要 |
 | `import { Foo = pkg.Class; }` | `import { pkg.Class as Foo; }` - エイリアスに`as` |
+| `import { onion.Result$Ok }` | `import { onion.Result.Ok }`（または`... as ROk`） - ネストしたクラスはドット区切りでインポートし、JVMの`$`名は書かない。`a.b.C`はJavaと同じく、トップレベルクラスを指す最長の接頭辞を優先し、残りをメンバークラスとして解決する |
 | `new int[10]` | `new Int[10]` - プリミティブ型名は大文字 |
 | `int`, `long`, `boolean` | `Int`, `Long`, `Boolean` - 大文字 |
 
@@ -519,8 +523,10 @@ try {
 | `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ 正しい - データを持つenum。`mass()` アクセサ、`values()`/`valueOf()` が使える |
 | ADT（直和型）のenum？ | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case` キーワードで宣言する各ケースがそれぞれのフィールドを持つ。sealedインターフェース＋ケースごとのrecordに脱糖され、`select` の網羅性チェック（E0042）が適用される。フィールドが無いケース（シングルトン）は `new Origin()` で作るゼロフィールドrecordになる。`case`-enumは `java.lang.Enum` ではなくsealed階層（`values()`/`ordinal()` は無い）。共有パラメータと `case` ケースの混在はエラー |
 | ジェネリックなADT enum？ | `enum Opt[T] { case Some(value: T); case Nothing }` - 型パラメータは生成されるsealedインターフェースと各ケースのrecordに伝播する。型パターンはスクルーティニーの型引数を復元するので、`Opt[String]` から `Some` をマッチさせると `Some[String]` が束縛され、`s.value()` は `String` になる。*homogeneous*（データを持たない）enumは型パラメータを取れない（`java.lang.Enum`になるため） |
+| `onion.Result`/`Option`/`Outcome`をケースでマッチ？ | `select r { case o is Result.Ok: o.value(); case e is Result.Err: e.error() }`（`Option.Some`/`Option.None`、`Outcome.Ok`/`Outcome.Bad`も同様） - sealedなJavaインターフェースにネストしたJavaレコード。型でマッチし（`Result.Ok(v)`の分解は不可）、スクルーティニーの型引数で束縛され、全ケースをそろえれば網羅的 |
 | レコードから手でパーサーを書く | `record R(...) from re"..."` - `R::parse(s): R?`（アンカー一致、非マッチ/変換失敗はnull）と `R::parseAll(text): List` を合成する。`from` は `conforms` より前に書く |
 | `null` ではなく失敗理由すべてが欲しい、あるいはレコード1つに複数の境界を名付けたい？ | `record R(...) { shape name = re"..." }` - `R::name(): onion.Shape[R]` を合成する。`.parse(s)` は `Outcome[R]`（値、またはそれが得られなかった全理由を `Defect` として保持する）を返し、可逆な場合は `.print(v)` で書き戻せる。`shape` 節はレコード1つに複数付けられる（正規表現以外に `shape name = json`/`config` という書式指定も可）。`from re"..."` と共存できる |
+| `shape doc = json` のレコードにリストや入れ子のオブジェクトを持たせたい？ / LLM の構造化出力用の JSON Schema が欲しい？ | `record S(tags: List[String], owner: Action, acts: List[Action], note: String?) { shape doc = json }` - json shape （json だけ。正規表現/yaml/config はスカラーのままで、それ以外は句を名指しする E0061）はスカラーの `List[S]`、自身の json shape を宣言したレコード `R`（その最初の json shape で読む）、`List[R]`、`T?`（キーの欠落または null）も読む。欠陥は `acts[2].owner` のようなパスを持つ。`S::doc().jsonSchema()` は JSON Schema のテキストを返し（閉じたオブジェクト、`required` は null 非許容の成分）、`hasJsonSchema()` が true になるのは json shape だけ |
 | レコードを手でシリアライズ（JSON/YAML） | `record R(...) derive!(Json, Yaml)` - 共通の `toMap`/`fromMap` を介して `R::fromJson`/`toJson`/`fromYaml`/`toYaml` をマクロ生成する。スカラー型のコンポーネントのみ（それ以外はE0062）、未知のマーカーはE0063。`from re"..."` と共存できる |
 | 別スイートでレコードをテストする | `record R(...) { law name(p: T) { boolExpr } example { boolExpr } }` - `law`/`example`/`shape` 節はレコードの波括弧本体の中にメソッドと並べて書く（節の後の `;` は構文エラー）。コンパイラがビルド時に実行する。偽の `example` はE0065、反証された `law` はE0064（反例付き）になる。`parse∘format==id` のような性質を機械的に検証できる |
 
@@ -562,7 +568,8 @@ try {
 | 誤り | 正しい（Onion） |
 |-----|----------------|
 | 裸の`readText(p)` / `get(url)` / `now()` / `exit(1)` | **もう解決しない** — デフォルトの静的インポートが純粋なクラスに限定された。`Files::readText`のように修飾するか、明示的にインポートする: `import { onion.Files::*; java.lang.System::exit }`。裸の`println`だけは引き続き使用可能（`onion.IO`が唯一の例外） |
-| 手書きの引数解析を行うCLI関数 | `tool name(args) [: T] [requires { caps }] { body }` — トップレベルのtool宣言。トップレベルでtoolを宣言し（`main`を持たない）スクリプトはCLIそのものになる: `--help`、`--contract`（機械可読なJSON）、`--plan`（バインドされた効果を表示するだけで何も実行しないドライラン）はすべて宣言から自動導出される |
+| 手書きの引数解析を行うCLI関数 | `tool name(args) [: T] [requires { caps }] { body }` — トップレベルのtool宣言。トップレベルでtoolを宣言し（`main`を持たない）スクリプトはCLIそのものになる: `--help`、`--contract`（機械可読なJSON）、`--plan`（バインドされた効果を表示するだけで何も実行しないドライラン）はすべて宣言から自動導出される。プロジェクトではtoolだけのソースが `onion run` のエントリーポイントになる（`onion run -- --plan ...`） |
+| スクリプトにMavenライブラリを渡すための `-classpath` | スクリプト先頭のコメントブロック（コードより前）に `//> using dep "g:a:v"`（必要なら `//> using repository "url"` も）を書く — プロジェクトの `[dependencies]` と同じく解決され、ディレクティブの組ごとにキャッシュされる。バージョンは厳密指定のみ。ロックファイルはない（推移的依存を再現可能にするにはプロジェクトを使う） |
 | tool内の未宣言の副作用 | 呼び出し箇所でE0077 — 本体の効果は推移的に推論され、`requires { read(src), write(dst), console, unknown }`と照合される。過剰申告はE0078、不正なcapabilityはE0079。リストにないJava呼び出しは`unknown`として明示的に許可する必要がある |
 | コメントを保持したい場合の`shape doc = json` | `shape doc = config` — コメント付きの`key = value`形式ファイル向けのLOSSLESSなshape。`parseLossless`は`Residue`（コメント、空白、キー順序、未知キー、値の表記）を保持し、`r.edit { v -> v.copy(port = 9090) }.render()`は該当する値のスロットだけを書き換える |
 | その場しのぎのカスタムフォーマット実装 | `class MyShape conforms Shape[T]` — ユーザー定義のshapeはコンビネータとOutcome/Defectを無償で得られるが、そのファイルは法則を主張しなければならない（`example l1 { s.parse(s.print(v)).get() == v }`）。さもなければそのクラスはE0080になる |

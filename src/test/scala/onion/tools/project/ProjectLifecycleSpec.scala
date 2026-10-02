@@ -104,4 +104,4 @@ class ProjectLifecycleSpec extends AnyFunSuite with Matchers:
       finally
         out.close()
         err.close()
-    Invocation(exitCode, stdout.toString(UTF_8), stderr.toString(UTF_8))
+    Invocation(exitCode, Captured.text(stdout), Captured.text(stderr))

@@ -23,7 +23,13 @@ class OnionCompiler(val config: CompilerConfig) {
     compileDetailed(srcs).toOutcome
 
   def compileDetailed(fileNames: Array[String]): CompilationResult =
-    compileDetailed(fileNames.iterator.map(new FileInputSource(_)).toSeq)
+    compileDetailed(fileNames.iterator.map(new FileInputSource(_, sourceCharset)).toSeq)
+
+  // The configured -encoding. Files used to be read in the platform default charset
+  // whatever -encoding said.
+  private def sourceCharset: java.nio.charset.Charset =
+    try java.nio.charset.Charset.forName(config.encoding)
+    catch { case _: Exception => java.nio.charset.Charset.defaultCharset() }
 
   def compileDetailed(srcs: Seq[InputSource]): CompilationResult =
     new PipelineRunner(PipelineRunner.defaultPhases(config))

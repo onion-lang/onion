@@ -145,9 +145,56 @@ object EffectInference {
     case other                 => other.name
   }
 
-  /** A recorded call: resolved effects for external callees, the unit for internal. */
+  /** A recorded call: resolved effects for external callees, the unit for internal.
+   *  `className`/`member`/`target`/`args`/`depth` are kept for [[StaticOperands]]: the
+   *  callee's class, the called method (null for a constructor), the receiver (null
+   *  for a static call or constructor), the argument terms, and how many closures deep
+   *  the call sits in its body. */
   private final case class RawSite(location: onion.compiler.Location, callee: String,
-                                   resolved: Option[Set[Effect]], internal: Unit0)
+                                   resolved: Option[Set[Effect]], internal: Unit0,
+                                   className: String = null, member: TypedAST.Method = null,
+                                   target: Term = null, args: Seq[Term] = Nil, depth: Int = 0)
+
+  /**
+   * One external (table-classified) call in a body, with what [[StaticOperands]] needs
+   * to read its operand: the receiver, the argument terms, and the closure depth.
+   * `method` is null for a constructor call (`methodName` is then `<init>`).
+   */
+  final case class ExternalSite(className: String, methodName: String, method: TypedAST.Method,
+                                target: Term, args: Seq[Term], depth: Int, effects: Set[Effect])
+
+  /**
+   * Syntactic facts about one body, for [[StaticOperands]]:
+   *
+   *   - `sites`          — every external call, in walk order
+   *   - `localWrites`    — every assignment to a local of the body's OWN frame, as
+   *                        (index, value, closure depth the assignment sits at)
+   *   - `unsitedEffects` — external effects the body has that no recorded site carries
+   *                        (a super-constructor call, a node the walker does not know)
+   *   - `callees`        — program-defined methods/constructors it calls, in order
+   */
+  final case class BodyFacts(sites: Seq[ExternalSite], localWrites: Seq[(Int, Term, Int)],
+                             unsitedEffects: Set[Effect], callees: Seq[Unit0])
+
+  /** [[BodyFacts]] for one inference unit; `units` is the set of program-defined bodies. */
+  def bodyFacts(unit: Unit0, units: collection.Set[Unit0], classes: Seq[ClassDefinition]): BodyFacts = {
+    val collector = new Collector(units, classes)
+    unit match {
+      case md: MethodDefinition =>
+        if (md.getBlock != null) collector.statement(md.getBlock)
+      case ctor: ConstructorDefinition =>
+        if (ctor.block != null) collector.statement(ctor.block)
+        collector.superInit(ctor)
+      case _ =>
+    }
+    val sites = collector.rawSites.iterator.collect {
+      case r if r.resolved.isDefined =>
+        val methodName = if (r.member == null) "<init>" else r.member.name
+        ExternalSite(r.className, methodName, r.member, r.target, r.args, r.depth, r.resolved.get)
+    }.toSeq
+    BodyFacts(sites, collector.localWrites.toSeq, collector.unsitedEffects.toSet,
+      collector.internalCallees.toSeq)
+  }
 
   /**
    * Collects, from one body, the external effects, the internal callees, and the raw
@@ -157,8 +204,12 @@ object EffectInference {
    */
   private final class Collector(units: collection.Set[Unit0], classes: Seq[ClassDefinition]) {
     val effects = mutable.Set[Effect]()
-    val internalCallees = mutable.Set[Unit0]()
+    val internalCallees = mutable.LinkedHashSet[Unit0]()
     val rawSites = mutable.Buffer[RawSite]()
+    // For StaticOperands only; neither inference nor the capability check reads these.
+    val localWrites = mutable.Buffer[(Int, Term, Int)]()
+    val unsitedEffects = mutable.Set[Effect]()
+    private var depth = 0
 
     // Typed call terms are mostly built without locations (convenience constructors
     // throughout typing), but many statements keep theirs. Track the nearest located
@@ -172,8 +223,10 @@ object EffectInference {
     private val userClasses: Map[String, ClassDefinition] =
       classes.map(c => c.name -> c).toMap
 
-    private def method(m: TypedAST.Method, location: onion.compiler.Location): scala.Unit = {
-      val callee = s"${m.affiliation.name}::${m.name}"
+    private def method(m: TypedAST.Method, location: onion.compiler.Location,
+                       target: Term, args: Array[Term]): scala.Unit = {
+      // A top-level function is named as written, not through its synthetic owner.
+      val callee = onion.compiler.toolbox.TypeFormatting.methodReference(m.affiliation, m.name)
       m match {
         case md: MethodDefinition if units.contains(md) =>
           internalCallees += md
@@ -181,11 +234,13 @@ object EffectInference {
         case _ =>
           val eff = m.effects // table verdict, or Unknown
           effects ++= eff
-          rawSites += RawSite(location, callee, Some(eff), null)
+          rawSites += RawSite(location, callee, Some(eff), null,
+            m.affiliation.name, m, target, args.toSeq, depth)
       }
     }
 
-    private def constructor(c: ConstructorRef, location: onion.compiler.Location): scala.Unit = {
+    private def constructor(c: ConstructorRef, location: onion.compiler.Location,
+                            args: Array[Term]): scala.Unit = {
       val callee = s"new ${c.affiliation.name}"
       c match {
         case cd: ConstructorDefinition if units.contains(cd) =>
@@ -194,7 +249,8 @@ object EffectInference {
         case _ =>
           val eff = EffectTable.effectsOrUnknown(c.affiliation.name, "<init>")
           effects ++= eff
-          rawSites += RawSite(location, callee, Some(eff), null)
+          rawSites += RawSite(location, callee, Some(eff), null,
+            c.affiliation.name, null, null, args.toSeq, depth)
       }
     }
 
@@ -209,10 +265,13 @@ object EffectInference {
             // Over-approximate: any of the user superclass's constructors.
             cd.constructors.foreach {
               case scd: ConstructorDefinition if units.contains(scd) => internalCallees += scd
-              case other => effects ++= EffectTable.effectsOrUnknown(other.affiliation.name, "<init>")
+              case other =>
+                val eff = EffectTable.effectsOrUnknown(other.affiliation.name, "<init>")
+                effects ++= eff; unsitedEffects ++= eff
             }
           case None =>
-            effects ++= EffectTable.effectsOrUnknown(superName, "<init>")
+            val eff = EffectTable.effectsOrUnknown(superName, "<init>")
+            effects ++= eff; unsitedEffects ++= eff
         }
       }
     }
@@ -235,18 +294,22 @@ object EffectInference {
       case _ =>
         // A statement this walker does not know cannot be vouched for. Never crash
         // over it (no-crash bar); EffectWalkerCompletenessSpec keeps this arm dead.
-        effects += Effect.Unknown
+        effects += Effect.Unknown; unsitedEffects += Effect.Unknown
     }}
 
     def term(t: Term): scala.Unit = { if (t != null) noteLoc(t.location); t match {
       case null => ()
-      case c: Call          => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location))
-      case c: SafeCall      => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location))
-      case c: SafeStaticExtensionCall => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location))
-      case c: CallStatic    => c.parameters.foreach(term); method(c.method, here(c.location))
-      case c: CallSuper     => term(c.target); c.params.foreach(term); method(c.method, here(c.location))
-      case n: NewObject     => n.parameters.foreach(term); constructor(n.constructor, here(n.location))
-      case n: NewClosure    => statement(n.block) // absorbed at the creation site
+      case c: Call          => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location), c.target, c.parameters)
+      case c: SafeCall      => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location), c.target, c.parameters)
+      case c: SafeStaticExtensionCall => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location), null, Array.empty)
+      case c: CallStatic    => c.parameters.foreach(term); method(c.method, here(c.location), null, c.parameters)
+      case c: CallSuper     => term(c.target); c.params.foreach(term); method(c.method, here(c.location), null, Array.empty)
+      case n: NewObject     => n.parameters.foreach(term); constructor(n.constructor, here(n.location), n.parameters)
+      case n: NewClosure    =>
+        // Absorbed at the creation site. The closure body is one frame deeper, which
+        // is what `depth` tracks for the local-write bookkeeping below.
+        depth += 1
+        try statement(n.block) finally depth -= 1
       case b: Begin         => b.terms.foreach(term)
       case b: BinaryTerm    => term(b.lhs); term(b.rhs)
       case u: UnaryTerm     => term(u.operand)
@@ -263,7 +326,11 @@ object EffectInference {
       case r: SafeFieldAccess => term(r.target)
       case s: SetField      => term(s.target); term(s.value)
       case s: SetStaticField => term(s.value)
-      case s: SetLocal      => term(s.value)
+      case s: SetLocal      =>
+        // A write whose relative frame equals the closure depth targets the body's own
+        // frame (frame 0 from the body itself, 1 from a closure directly inside it, ...).
+        if (s.frame == depth) localWrites += ((s.index, s.value, depth))
+        term(s.value)
       case l: ListLiteral   => l.elements.foreach(term)
       case m: MapLiteral    => m.keys.foreach(term); m.values.foreach(term)
       case n: NewArray      => n.parameters.foreach(term)
@@ -273,7 +340,7 @@ object EffectInference {
       case _: FloatValue | _: DoubleValue | _: CharacterValue | _: StringValue | _: NullValue => ()
       case _ =>
         // Same contract as the statement fallback: unknown, never a crash.
-        effects += Effect.Unknown
+        effects += Effect.Unknown; unsitedEffects += Effect.Unknown
     }}
   }
 }

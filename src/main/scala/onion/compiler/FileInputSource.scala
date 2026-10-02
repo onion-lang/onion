@@ -9,4 +9,8 @@ package onion.compiler
 
 import onion.compiler.source.FileSource
 
-class FileInputSource(name: String) extends FileSource(name) with InputSource
+import java.nio.charset.Charset
+
+class FileInputSource(name: String, charset: Charset) extends FileSource(name, charset) with InputSource {
+  def this(name: String) = this(name, Charset.defaultCharset())
+}

@@ -1,0 +1,505 @@
+// TypeInference.on — Hindley-Milner type inference for a small lambda calculus.
+//
+// Language (System F-ish subset):
+//   • Integer and Boolean literals
+//   • Variables
+//   • Lambda abstractions:  fun x -> body
+//   • Applications:         f arg
+//   • Let bindings:         let x = e1 in e2   (polymorphic — let generalises)
+//   • If-then-else:         if e1 then e2 else e3
+//   • Arithmetic ops:       + - * /  (Int × Int → Int)
+//   • Comparison ops:       == != < <=  (Int × Int → Bool)
+//
+// Algorithm W (Damas-Milner):
+//   1. Assign a fresh unification variable to every unknown.
+//   2. Walk the expression tree, collecting constraints.
+//   3. Unify (union-find via a mutable Map) as each constraint arrives.
+//   4. Generalise free variables at let-bindings → ∀ quantified schemes.
+//   5. Instantiate a fresh copy of the scheme at every use of a let-bound name.
+//
+// Features exercised: ADT (case) enums; records; select / type-pattern matching;
+// Map[K,V] literals and foreach destructuring; List generics; closures;
+// class with mutable fields; string interpolation; recursion; extension methods.
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+enum Ty {
+  case TInt
+  case TBool
+  case TVar(id: Int)                      // unification variable
+  case TFun(from: Ty, to: Ty)
+}
+
+// A type scheme: ∀ vars. body
+record Scheme(vars: List[Int], body: Ty)
+
+// ── Expressions ───────────────────────────────────────────────────────────────
+
+enum Expr {
+  case EInt(n: Int)
+  case EBool(b: Boolean)
+  case EVar(name: String)
+  case ELam(param: String, body: Expr)
+  case EApp(func: Expr, arg: Expr)
+  case ELet(name: String, value: Expr, body: Expr)
+  case EIf(cond: Expr, thenE: Expr, elseE: Expr)
+  case EAdd(l: Expr, r: Expr)
+  case ESub(l: Expr, r: Expr)
+  case EMul(l: Expr, r: Expr)
+  case EDiv(l: Expr, r: Expr)
+  case EEq(l: Expr, r: Expr)
+  case ENeq(l: Expr, r: Expr)
+  case ELt(l: Expr, r: Expr)
+  case ELe(l: Expr, r: Expr)
+}
+
+// ── Union-find substitution ────────────────────────────────────────────────────
+
+class Subst {
+  var counter: Int
+  val table: Map[Int, Ty]
+public:
+  def this { self.counter = 0; self.table = [:] }
+
+  def fresh(): Ty = {
+    val id: Int = counter
+    counter++
+    new TVar(id)
+  }
+
+  def bind(id: Int, t: Ty): void { table[id] = t }
+
+  // Walk the table until we find a non-variable or an unbound variable.
+  def find(t: Ty): Ty = {
+    select t {
+      case v is TVar:
+        if table[v.id()] != null {
+          val resolved: Ty = find(table[v.id()])
+          table[v.id()] = resolved   // path compression
+          resolved
+        } else {
+          t
+        }
+      else: t
+    }
+  }
+
+  // Full apply: recurse into constructor types.
+  def apply(t: Ty): Ty = {
+    val r: Ty = find(t)
+    select r {
+      case f is TFun: new TFun(apply(f.from()), apply(f.to()))
+      else: r
+    }
+  }
+
+  def occursIn(id: Int, t: Ty): Boolean = {
+    val r: Ty = find(t)
+    select r {
+      case v is TVar: v.id() == id
+      case f is TFun: occursIn(id, f.from()) || occursIn(id, f.to())
+      else: false
+    }
+  }
+
+  def bindVar(id: Int, t: Ty): void {
+    if occursIn(id, t) {
+      throw new RuntimeException("Occurs check failed: t#{id} in #{showTy(t)}")
+    }
+    bind(id, t)
+  }
+
+  def unify(a: Ty, b: Ty): void {
+    val ra: Ty = find(a)
+    val rb: Ty = find(b)
+    unifyFound(ra, rb)
+  }
+
+  def unifyFound(ra: Ty, rb: Ty): void {
+    select ra {
+      case va is TVar: unifyLeftVar(va.id(), rb)
+      case fa is TFun: unifyLeftFun(fa, rb)
+      else:            unifyLeftConcrete(ra, rb)
+    }
+  }
+
+  def unifyLeftVar(id: Int, rb: Ty): void {
+    select rb {
+      case vb is TVar: { if id != vb.id() { bind(id, rb) } }
+      else:            bindVar(id, rb)
+    }
+  }
+
+  def unifyLeftFun(fa: TFun, rb: Ty): void {
+    select rb {
+      case vb is TVar: bindVar(vb.id(), fa)
+      case fb is TFun: {
+        unify(fa.from(), fb.from())
+        unify(fa.to(),   fb.to())
+      }
+      else: throw new RuntimeException("Cannot unify #{showTy(fa)} with #{showTy(rb)}")
+    }
+  }
+
+  def unifyLeftConcrete(ra: Ty, rb: Ty): void {
+    select rb {
+      case vb is TVar: bindVar(vb.id(), ra)
+      else:            unifyBothConcrete(ra, rb)
+    }
+  }
+
+  def sameConcrete(ra: Ty, rb: Ty): Boolean = {
+    select ra {
+      case _i is TInt:  select rb { case _j is TInt:  true; else: false }
+      case _b is TBool: select rb { case _j is TBool: true; else: false }
+      else: false
+    }
+  }
+
+  def unifyBothConcrete(ra: Ty, rb: Ty): void {
+    if !sameConcrete(ra, rb) {
+      throw new RuntimeException("Cannot unify #{showTy(ra)} with #{showTy(rb)}")
+    }
+  }
+}
+
+// ── Free variables ─────────────────────────────────────────────────────────────
+
+def freeVarsTy(t: Ty, s: Subst): List[Int] = {
+  val r: Ty = s.apply(t)
+  select r {
+    case v is TVar: [v.id()]
+    case f is TFun:
+      val acc: List[Int] = []
+      foreach id: Int in freeVarsTy(f.from(), s) { acc.add(id) }
+      foreach id: Int in freeVarsTy(f.to(), s) {
+        if !acc.contains(id) { acc.add(id) }
+      }
+      acc
+    else: []
+  }
+}
+
+def freeVarsEnv(env: Map[String, Scheme], s: Subst): List[Int] = {
+  val acc: List[Int] = []
+  foreach (_, sc) in env {
+    foreach id: Int in freeVarsTy(sc.body(), s) {
+      if !sc.vars().contains(id) && !acc.contains(id) {
+        acc.add(id)
+      }
+    }
+  }
+  acc
+}
+
+// ── Generalisation & instantiation ────────────────────────────────────────────
+
+def generalise(t: Ty, env: Map[String, Scheme], s: Subst): Scheme = {
+  val tyFree: List[Int] = freeVarsTy(t, s)
+  val envFree: List[Int] = freeVarsEnv(env, s)
+  val gens: List[Int] = tyFree.filter { id -> !envFree.contains(id) }
+  new Scheme(gens, s.apply(t))
+}
+
+def instantiate(sc: Scheme, s: Subst): Ty = {
+  val mapping: Map[Int, Ty] = [:]
+  foreach id: Int in sc.vars() { mapping[id] = s.fresh() }
+  substTy(sc.body(), mapping)
+}
+
+def substTy(t: Ty, mapping: Map[Int, Ty]): Ty = {
+  select t {
+    case v is TVar:
+      if mapping[v.id()] != null { mapping[v.id()] } else { t }
+    case f is TFun:
+      new TFun(substTy(f.from(), mapping), substTy(f.to(), mapping))
+    else: t
+  }
+}
+
+// ── Type inference ─────────────────────────────────────────────────────────────
+
+def copyEnv(env: Map[String, Scheme]): Map[String, Scheme] = {
+  val out: Map[String, Scheme] = [:]
+  foreach (k, v) in env { out[k] = v }
+  out
+}
+
+def infer(e: Expr, env: Map[String, Scheme], s: Subst): Ty = {
+  select e {
+    case _n is EInt:  new TInt
+    case _b is EBool: new TBool
+
+    case v is EVar:
+      val sc: Scheme? = env[v.name()]
+      if sc == null {
+        throw new RuntimeException("Unbound variable: #{v.name()}")
+      }
+      instantiate(sc, s)
+
+    case lam is ELam:
+      val argTy: Ty = s.fresh()
+      val env2: Map[String, Scheme] = copyEnv(env)
+      env2[lam.param()] = new Scheme([], argTy)
+      val retTy: Ty = infer(lam.body(), env2, s)
+      new TFun(argTy, retTy)
+
+    case app is EApp:
+      val fTy: Ty  = infer(app.func(), env, s)
+      val aTy: Ty  = infer(app.arg(),  env, s)
+      val resTy: Ty = s.fresh()
+      s.unify(fTy, new TFun(aTy, resTy))
+      s.apply(resTy)
+
+    case lt is ELet:
+      val valTy: Ty = infer(lt.value(), env, s)
+      val sc: Scheme = generalise(valTy, env, s)
+      val env2: Map[String, Scheme] = copyEnv(env)
+      env2[lt.name()] = sc
+      infer(lt.body(), env2, s)
+
+    case fi is EIf:
+      val condTy: Ty  = infer(fi.cond(),  env, s)
+      val thenTy: Ty  = infer(fi.thenE(), env, s)
+      val elseTy: Ty  = infer(fi.elseE(), env, s)
+      s.unify(condTy, new TBool)
+      s.unify(thenTy, elseTy)
+      s.apply(thenTy)
+
+    case op is EAdd: inferArith(op.l(), op.r(), env, s)
+    case op is ESub: inferArith(op.l(), op.r(), env, s)
+    case op is EMul: inferArith(op.l(), op.r(), env, s)
+    case op is EDiv: inferArith(op.l(), op.r(), env, s)
+    case op is EEq:  inferCmp(op.l(), op.r(), env, s)
+    case op is ENeq: inferCmp(op.l(), op.r(), env, s)
+    case op is ELt:  inferCmp(op.l(), op.r(), env, s)
+    case op is ELe:  inferCmp(op.l(), op.r(), env, s)
+    else: throw new RuntimeException("infer: unhandled expression")
+  }
+}
+
+def inferArith(l: Expr, r: Expr, env: Map[String, Scheme], s: Subst): Ty = {
+  s.unify(infer(l, env, s), new TInt)
+  s.unify(infer(r, env, s), new TInt)
+  new TInt
+}
+
+def inferCmp(l: Expr, r: Expr, env: Map[String, Scheme], s: Subst): Ty = {
+  s.unify(infer(l, env, s), new TInt)
+  s.unify(infer(r, env, s), new TInt)
+  new TBool
+}
+
+// ── Pretty-printer ─────────────────────────────────────────────────────────────
+
+def showTy(t: Ty): String = {
+  select t {
+    case _i is TInt:  "Int"
+    case _b is TBool: "Bool"
+    case v is TVar:   "t#{v.id()}"
+    case f is TFun:
+      val fromStr: String = select f.from() {
+        case _f is TFun: "(#{showTy(f.from())})"
+        else: showTy(f.from())
+      }
+      "#{fromStr} -> #{showTy(f.to())}"
+    else: "?"
+  }
+}
+
+def showScheme(sc: Scheme): String = {
+  if sc.vars().size == 0 {
+    showTy(sc.body())
+  } else {
+    val varsStr: String = sc.vars().map { id -> "t#{id}" }.fold("") { acc, s -> if acc == "" { s } else { "#{acc} #{s}" } }
+    "forall #{varsStr}. #{showTy(sc.body())}"
+  }
+}
+
+// ── Convenience: infer and return a readable type string ──────────────────────
+
+def typeOf(e: Expr): String = {
+  val s: Subst = new Subst
+  val t: Ty = infer(e, [:], s)
+  showTy(s.apply(t))
+}
+
+def typeOfScheme(e: Expr): String = {
+  val s: Subst = new Subst
+  val t: Ty = infer(e, [:], s)
+  showScheme(generalise(t, [:], s))
+}
+
+// ── Test harness ───────────────────────────────────────────────────────────────
+
+var passed: Int = 0
+var failed: Int = 0
+
+def check(label: String, expr: Expr, expected: String): void {
+  val got: String = typeOf(expr)
+  if got == expected {
+    IO::println("  PASS  #{label}")
+    passed++
+  } else {
+    IO::println("  FAIL  #{label}: expected #{expected}, got #{got}")
+    failed++
+  }
+}
+
+def checkScheme(label: String, expr: Expr, expected: String): void {
+  val got: String = typeOfScheme(expr)
+  if got == expected {
+    IO::println("  PASS  #{label}")
+    passed++
+  } else {
+    IO::println("  FAIL  #{label}: expected #{expected}, got #{got}")
+    failed++
+  }
+}
+
+def checkErr(label: String, expr: Expr): void {
+  var caught: Boolean = false
+  try {
+    typeOf(expr)
+  } catch e: RuntimeException {
+    caught = true
+  }
+  if caught {
+    IO::println("  PASS  #{label} (expected error)")
+    passed++
+  } else {
+    IO::println("  FAIL  #{label}: expected a type error but got none")
+    failed++
+  }
+}
+
+// ── Test cases ─────────────────────────────────────────────────────────────────
+
+IO::println("=== Literals ===")
+check("integer literal",     new EInt(42),     "Int")
+check("boolean true",        new EBool(true),  "Bool")
+check("boolean false",       new EBool(false), "Bool")
+
+IO::println("=== Arithmetic ===")
+check("1 + 2",  new EAdd(new EInt(1), new EInt(2)),  "Int")
+check("3 - 4",  new ESub(new EInt(3), new EInt(4)),  "Int")
+check("5 * 6",  new EMul(new EInt(5), new EInt(6)),  "Int")
+check("8 / 2",  new EDiv(new EInt(8), new EInt(2)),  "Int")
+
+IO::println("=== Comparisons ===")
+check("1 == 2", new EEq(new EInt(1), new EInt(2)),   "Bool")
+check("1 != 2", new ENeq(new EInt(1), new EInt(2)),  "Bool")
+check("1 < 2",  new ELt(new EInt(1), new EInt(2)),   "Bool")
+check("1 <= 2", new ELe(new EInt(1), new EInt(2)),   "Bool")
+
+IO::println("=== Lambda ===")
+// fun x -> x + 1  :  Int -> Int
+check("fun x -> x+1",
+  new ELam("x", new EAdd(new EVar("x"), new EInt(1))),
+  "Int -> Int")
+
+// fun x -> x  :  t0 -> t0 (after full substitution, just a fresh var)
+// We test the scheme instead:
+checkScheme("fun x -> x  (polymorphic id)",
+  new ELam("x", new EVar("x")),
+  "forall t0. t0 -> t0")
+
+IO::println("=== Application ===")
+// (fun x -> x + 1) 5  :  Int
+check("(fun x -> x+1) 5",
+  new EApp(
+    new ELam("x", new EAdd(new EVar("x"), new EInt(1))),
+    new EInt(5)),
+  "Int")
+
+// (fun f -> fun x -> f x)  :  should be polymorphic (t1 -> t2) -> t1 -> t2
+// We verify it applies cleanly: ((fun f -> fun x -> f x) (fun n -> n+1)) 3  :  Int
+check("higher-order app",
+  new EApp(
+    new EApp(
+      new ELam("f", new ELam("x", new EApp(new EVar("f"), new EVar("x")))),
+      new ELam("n", new EAdd(new EVar("n"), new EInt(1)))),
+    new EInt(3)),
+  "Int")
+
+IO::println("=== Let ===")
+// let x = 5 in x + x
+check("let x = 5 in x+x",
+  new ELet("x", new EInt(5), new EAdd(new EVar("x"), new EVar("x"))),
+  "Int")
+
+// let id = fun x -> x in id 42
+check("let id = fun x -> x in id 42",
+  new ELet("id",
+    new ELam("x", new EVar("x")),
+    new EApp(new EVar("id"), new EInt(42))),
+  "Int")
+
+// let id = fun x -> x in if (id true) then (id 1) else (id 2)
+// This exercises *polymorphic* let: id is used at both Bool and Int.
+check("poly let: id used at Bool and Int",
+  new ELet("id",
+    new ELam("x", new EVar("x")),
+    new EIf(
+      new EApp(new EVar("id"), new EBool(true)),
+      new EApp(new EVar("id"), new EInt(1)),
+      new EApp(new EVar("id"), new EInt(2)))),
+  "Int")
+
+IO::println("=== If ===")
+check("if true then 1 else 2",
+  new EIf(new EBool(true), new EInt(1), new EInt(2)),
+  "Int")
+
+check("if 1<2 then true else false",
+  new EIf(new ELt(new EInt(1), new EInt(2)), new EBool(true), new EBool(false)),
+  "Bool")
+
+IO::println("=== Nested let / closure ===")
+// let add = fun x -> fun y -> x + y in
+//   let add5 = add 5 in
+//     add5 3
+check("curried add via nested let",
+  new ELet("add",
+    new ELam("x", new ELam("y", new EAdd(new EVar("x"), new EVar("y")))),
+    new ELet("add5",
+      new EApp(new EVar("add"), new EInt(5)),
+      new EApp(new EVar("add5"), new EInt(3)))),
+  "Int")
+
+IO::println("=== Type errors (should be caught) ===")
+// true + 1  — Bool is not Int
+checkErr("Bool + Int",
+  new EAdd(new EBool(true), new EInt(1)))
+
+// if 1 then 2 else 3  — condition must be Bool
+checkErr("non-Bool condition",
+  new EIf(new EInt(1), new EInt(2), new EInt(3)))
+
+// if true then 1 else false  — branches must agree
+checkErr("branch type mismatch",
+  new EIf(new EBool(true), new EInt(1), new EBool(false)))
+
+// (fun x -> x + 1) true  — apply Int→Int to Bool
+checkErr("Int->Int applied to Bool",
+  new EApp(
+    new ELam("x", new EAdd(new EVar("x"), new EInt(1))),
+    new EBool(true)))
+
+// fun x -> x x  — infinite type (occurs check)
+checkErr("occurs check: fun x -> x x",
+  new ELam("x", new EApp(new EVar("x"), new EVar("x"))))
+
+// unbound variable
+checkErr("unbound variable",
+  new EVar("notDefined"))
+
+IO::println("")
+IO::println("=== Summary ===")
+IO::println("Passed: #{passed}")
+IO::println("Failed: #{failed}")
+if failed == 0 {
+  IO::println("All tests passed.")
+} else {
+  IO::println("SOME TESTS FAILED.")
+}

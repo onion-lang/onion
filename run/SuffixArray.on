@@ -1,0 +1,254 @@
+// SuffixArray — builds a suffix array and LCP array for a string.
+// Algorithm: O(n log² n) doubling (Manber & Myers style).
+//
+// Exercises: record, typed generic lists (List[Suffix], List[Int]),
+//   Int[] arrays, sortedBy with Long combined key, while/foreach loops,
+//   closures, string interpolation, as-cast, explicit return paths.
+
+// ─── data type ───────────────────────────────────────────────────────────────
+
+record Suffix(pos: Int, rank: Int, nextRank: Int)
+
+// ─── suffix array construction ───────────────────────────────────────────────
+
+// Returns the suffix array: sa[i] = starting position of the i-th
+// lexicographically smallest suffix of `text`.
+def buildSuffixArray(text: String): Int[] {
+  val n: Int = text.length
+  if n == 0 { return new Int[0] }
+
+  // Span for the doubling loop: after rank normalisation ranks are in 0..n-1,
+  // so span = n+2 properly separates any (rank, nextRank) pair where
+  // nextRank ∈ {-1} ∪ [0, n-1].
+  val span: Long = (n + 2L)
+
+  // Initial sort: ranks are raw char codes (Java charAt, 0..65535) and
+  // nextRank is a char code or -1. We need initSpan > 65535 so that
+  // rank 'a'(97) always sorts before rank 'b'(98) regardless of nextRank.
+  val initSpan: Long = 65538L
+
+  // Phase 1: initial ranking by first character and second character.
+  var suffixes: List[Suffix] = []
+  var i: Int = 0
+  while i < n {
+    val r: Int = text.charAt(i)
+    val nr: Int = if i + 1 < n { text.charAt(i + 1) } else { -1 }
+    suffixes.add(new Suffix(i, r, nr))
+    i++
+  }
+
+  suffixes = suffixes.sortedBy { raw ->
+    val s: Suffix = raw as Suffix
+    (s.rank() as Long) * initSpan + ((s.nextRank() as Long) + 1L)
+  }
+
+  // Build rank array (position → rank in sorted order)
+  var rankArr: Int[] = new Int[n]
+  rankArr[(suffixes[0] as Suffix).pos()] = 0
+  var curRank: Int = 0
+  var j: Int = 1
+  while j < n {
+    val prev: Suffix = suffixes[j - 1] as Suffix
+    val curr: Suffix = suffixes[j] as Suffix
+    if curr.rank() != prev.rank() || curr.nextRank() != prev.nextRank() {
+      curRank++
+    }
+    rankArr[curr.pos()] = curRank
+    j++
+  }
+
+  // Doubling loop: extend gap 1 → 2 → 4 → ... until all ranks distinct.
+  var gap: Int = 2
+  while gap < n * 2 {
+    val g: Int = gap
+    val ra: Int[] = rankArr
+
+    // Rebuild suffix descriptors using current ranks
+    var updated: List[Suffix] = []
+    var k: Int = 0
+    while k < n {
+      val s: Suffix = suffixes[k] as Suffix
+      val nxtPos: Int = s.pos() + g
+      val nxtRank: Int = if nxtPos < n { ra[nxtPos] } else { -1 }
+      updated.add(new Suffix(s.pos(), ra[s.pos()], nxtRank))
+      k++
+    }
+    suffixes = updated
+
+    suffixes = suffixes.sortedBy { raw ->
+      val s: Suffix = raw as Suffix
+      (s.rank() as Long) * span + ((s.nextRank() as Long) + 1L)
+    }
+
+    // Assign new ranks
+    val newRank: Int[] = new Int[n]
+    newRank[(suffixes[0] as Suffix).pos()] = 0
+    var nr2: Int = 0
+    j = 1
+    while j < n {
+      val prev: Suffix = suffixes[j - 1] as Suffix
+      val curr2: Suffix = suffixes[j] as Suffix
+      if curr2.rank() != prev.rank() || curr2.nextRank() != prev.nextRank() {
+        nr2++
+      }
+      newRank[curr2.pos()] = nr2
+      j++
+    }
+    rankArr = newRank
+
+    if nr2 == n - 1 { gap = n * 2 } else { gap = gap * 2 }
+  }
+
+  // Extract final suffix array from sorted list
+  val sa: Int[] = new Int[n]
+  var ii: Int = 0
+  while ii < n {
+    sa[ii] = (suffixes[ii] as Suffix).pos()
+    ii++
+  }
+  return sa
+}
+
+// ─── LCP array — Kasai's O(n) algorithm ──────────────────────────────────────
+
+def buildLCP(text: String, sa: Int[]): Int[] {
+  val n: Int = text.length
+  if n == 0 { return new Int[0] }
+
+  // rank[sa[i]] = i (inverse suffix array)
+  val rank: Int[] = new Int[n]
+  var i: Int = 0
+  while i < n { rank[sa[i]] = i; i++ }
+
+  val lcp: Int[] = new Int[n]
+  var h: Int = 0
+  i = 0
+  while i < n {
+    if rank[i] > 0 {
+      val j: Int = sa[rank[i] - 1]
+      while i + h < n && j + h < n && text.charAt(i + h) == text.charAt(j + h) {
+        h++
+      }
+      lcp[rank[i]] = h
+      if h > 0 { h = h - 1 }
+    }
+    i++
+  }
+  return lcp
+}
+
+// ─── compare suffix at sa[mid] against pattern ───────────────────────────────
+
+def cmpSuffix(text: String, sa: Int[], mid: Int, pattern: String): Int {
+  val pos: Int = sa[mid]
+  val m: Int = pattern.length
+  val sfx: String = text.substring(pos, Math::min(pos + m, text.length))
+  val c: Int = sfx.compareTo(pattern)
+  if c < 0 { return -1 }
+  else if c == 0 { return 0 }
+  else { return 1 }
+}
+
+// ─── pattern search: binary search on suffix array ───────────────────────────
+
+def searchAll(text: String, sa: Int[], pattern: String): List[Int] {
+  val n: Int = sa.length
+  val m: Int = pattern.length
+  if m == 0 || n == 0 { return [] }
+
+  // Lower bound: leftmost index where suffix ≥ pattern
+  var lo: Int = 0
+  var hi: Int = n
+  while lo < hi {
+    val mid: Int = (lo + hi) / 2
+    if cmpSuffix(text, sa, mid, pattern) < 0 { lo = mid + 1 } else { hi = mid }
+  }
+  val left: Int = lo
+
+  // Upper bound: leftmost index where suffix > pattern
+  hi = n
+  while lo < hi {
+    val mid: Int = (lo + hi) / 2
+    if cmpSuffix(text, sa, mid, pattern) <= 0 { lo = mid + 1 } else { hi = mid }
+  }
+
+  val results: List[Int] = []
+  var ii: Int = left
+  while ii < lo { results.add(sa[ii]); ii++ }
+  return results.sortedBy { x -> x as Int }
+}
+
+// ─── longest repeated substring: maximise LCP values ─────────────────────────
+
+def longestRepeated(text: String, sa: Int[], lcp: Int[]): String {
+  var maxLen: Int = 0
+  var maxPos: Int = 0
+  var i: Int = 1
+  while i < lcp.length {
+    if lcp[i] > maxLen { maxLen = lcp[i]; maxPos = sa[i] }
+    i++
+  }
+  if maxLen == 0 { return "" }
+  return text.substring(maxPos, maxPos + maxLen)
+}
+
+// ─── number of distinct substrings: n(n+1)/2 − Σ lcp ────────────────────────
+
+def countDistinct(text: String, lcp: Int[]): Long {
+  val n: Long = text.length as Long
+  if n == 0L { return 0L }
+  val total: Long = n * (n + 1L) / 2L
+  var sumLcp: Long = 0L
+  var i: Int = 1
+  while i < lcp.length { sumLcp = sumLcp + (lcp[i] as Long); i++ }
+  return total - sumLcp
+}
+
+// ─── display ─────────────────────────────────────────────────────────────────
+
+def printTable(text: String, sa: Int[], lcp: Int[]): void {
+  IO::println("   i  lcp  sa   suffix")
+  IO::println("  --- ---  ---  ------")
+  var i: Int = 0
+  while i < sa.length {
+    val lcpVal: Int = if i == 0 { 0 } else { lcp[i] }
+    val sfx: String = text.substring(sa[i], text.length)
+    IO::println("  #{i}   #{lcpVal}    #{sa[i]}   #{sfx}")
+    i++
+  }
+}
+
+def demo(text: String): void {
+  IO::println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  IO::println("Text: \"#{text}\"  (n=#{text.length})")
+  val sa: Int[] = buildSuffixArray(text)
+  val lcp: Int[] = buildLCP(text, sa)
+  printTable(text, sa, lcp)
+  IO::println("Longest repeated : \"#{longestRepeated(text, sa, lcp)}\"")
+  IO::println("Distinct substrs : #{countDistinct(text, lcp)}")
+  IO::println("")
+}
+
+def main(): void {
+  demo("banana")
+  demo("mississippi")
+  demo("abracadabra")
+  demo("aaaaaa")
+
+  IO::println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  IO::println("Pattern search in \"mississippi\"")
+  val txt: String = "mississippi"
+  val sa2: Int[] = buildSuffixArray(txt)
+  foreach pat: String in ["issi", "ss", "miss", "xyz", "i", "ippi"] {
+    val hits: List[Int] = searchAll(txt, sa2, pat)
+    IO::println("  \"#{pat}\" -> #{hits}")
+  }
+  IO::println("")
+
+  // Spot-check: "banana" → longest repeated = "ana"
+  val bananaSA: Int[] = buildSuffixArray("banana")
+  val banaLCP: Int[] = buildLCP("banana", bananaSA)
+  val lr: String = longestRepeated("banana", bananaSA, banaLCP)
+  val check: String = if lr == "ana" { "OK" } else { "FAIL: got " + lr }
+  IO::println("Verification (banana longest repeated=\"ana\"): #{check}")
+}

@@ -89,6 +89,30 @@ class ScriptDependenciesSpec extends AnyFunSuite with Matchers with EitherValues
     withClue(runErr) { runCode shouldBe 0 }
     Files.readString(target, UTF_8) shouldBe FixtureMavenRepository.Greeting
 
+  test("a //> using dep jar's own effect table classifies its calls for the tool, --plan and --effects"):
+    val effectful = FixtureMavenRepository.Effectful
+    val repo = effectful.publish()
+    val script = writeScript(
+      s"""//> using repository "${repo.toUri}"
+         |//> using dep "${effectful.Coordinate.render}"
+         |import { ${effectful.ClassName} }
+         |tool weather(city: String): Int requires { net, env, console } {
+         |  IO::println(Weather::forecast(city))
+         |  return 0
+         |}
+         |""".stripMargin)
+
+    // No `unknown` in the requires clause: the jar's table says what forecast does.
+    val (planCode, plan, planErr) = capture(ScriptRunner.runMain(Array(script.toString, "Osaka", "--plan")))
+    withClue(planErr) { planCode shouldBe 0 }
+    val lines = plan.linesIterator.map(_.trim).toSeq
+    lines should contain("net     " + effectful.Host)
+    lines should contain("env     " + effectful.EnvVar)
+
+    val (effectsCode, _, effectsErr) = capture(ScriptRunner.runMain(Array("--effects", script.toString, "Osaka", "--plan")))
+    withClue(effectsErr) { effectsCode shouldBe 0 }
+    effectsErr should include("weather(java.lang.String): console,env,net")
+
   test("--effects works with directives"):
     val script = writeScript(
       header +

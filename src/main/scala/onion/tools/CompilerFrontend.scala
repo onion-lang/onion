@@ -99,7 +99,7 @@ class CompilerFrontend {
             if (config.dumpTypedAst) emitTypedAstDump(result)
             emitDiagnostics(result)
             emitProfile(config, result)
-            if (!result.hasErrors && success.options.contains(SHOW_EFFECTS)) emitEffects(result)
+            if (!result.hasErrors && success.options.contains(SHOW_EFFECTS)) emitEffects(config, result)
             if (result.hasErrors) -1
             else if (generateFiles(result.classes)) 0
             else -1

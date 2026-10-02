@@ -37,6 +37,8 @@ enum WarningCategory(val code: String, val description: String):
   case DiscardedTopLevelStmts extends WarningCategory("W0014", "Top-level statements ignored because a main is defined")
   case PlatformUnboxing     extends WarningCategory("W0015", "Boxed platform value implicitly unboxed to a non-null primitive")
   case IneffectiveTailRecursive extends WarningCategory("W0016", "@TailRecursive annotation present but its mutual-recursion group could not be optimized")
+  case LibraryEffectTableMalformed extends WarningCategory("W0017", "A library jar's effect table is malformed and was ignored")
+  case LibraryEffectTableForeignClass extends WarningCategory("W0018", "A library jar's effect table names classes outside the jar; those entries were ignored")
 
 object WarningCategory:
   private val aliases: Map[String, WarningCategory] = Map(
@@ -57,7 +59,9 @@ object WarningCategory:
     "suspicious-interpolation" -> WarningCategory.SuspiciousInterpolation,
     "discarded-toplevel" -> WarningCategory.DiscardedTopLevelStmts,
     "platform-unboxing" -> WarningCategory.PlatformUnboxing,
-    "ineffective-tail-recursive" -> WarningCategory.IneffectiveTailRecursive
+    "ineffective-tail-recursive" -> WarningCategory.IneffectiveTailRecursive,
+    "malformed-effect-table" -> WarningCategory.LibraryEffectTableMalformed,
+    "foreign-effect-entry" -> WarningCategory.LibraryEffectTableForeignClass
   )
 
   def fromString(value: String): Option[WarningCategory] =

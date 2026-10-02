@@ -151,6 +151,41 @@ object FixtureMavenRepository:
         UTF_8
       )
 
+  /**
+   * A library that classifies its own calls: `weather:1.0.0` holds
+   * `com.example.oniontest.Weather` (`forecast(String)`, `local()`) and ships
+   * `META-INF/onion/effect-table.txt` saying `forecast` is `net` to a fixed host and
+   * reads a fixed env var — the shape of a battery such as onion-llm.
+   */
+  object Effectful:
+    val Coordinate: Dependency = Dependency(Group, "weather", "1.0.0")
+    val ClassName = s"$Group.Weather"
+    val Host = "api.weather.example"
+    val EnvVar = "WEATHER_KEY"
+
+    def publish(): Path =
+      val repository = Files.createTempDirectory("onion-maven-effectful")
+      val directory = repository.resolve(Group.replace('.', '/'))
+        .resolve(Coordinate.artifact).resolve(Coordinate.version)
+      Files.createDirectories(directory)
+      val base = s"${Coordinate.artifact}-${Coordinate.version}"
+      onion.compiler.effects.LibraryEffectTableSpec.writeJar(directory.resolve(s"$base.jar"), Seq(ClassName),
+        Seq(s"$ClassName#forecast=net:$Host,env:$EnvVar", s"$ClassName#local=pure").mkString("", "\n", "\n"))
+      Files.writeString(
+        directory.resolve(s"$base.pom"),
+        s"""<?xml version="1.0" encoding="UTF-8"?>
+           |<project xmlns="http://maven.apache.org/POM/4.0.0">
+           |  <modelVersion>4.0.0</modelVersion>
+           |  <groupId>$Group</groupId>
+           |  <artifactId>${Coordinate.artifact}</artifactId>
+           |  <version>${Coordinate.version}</version>
+           |  <packaging>jar</packaging>
+           |</project>
+           |""".stripMargin,
+        UTF_8
+      )
+      repository
+
   /** The `[[repositories]]` / `[dependencies]` stanzas naming this repository. */
   def manifestStanzas(repository: Path): String =
     s"""[[repositories]]

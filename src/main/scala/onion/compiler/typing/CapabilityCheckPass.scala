@@ -3,7 +3,7 @@ package onion.compiler.typing
 import onion.compiler.{Location, SemanticError, Typing}
 import onion.compiler.toolbox.Message
 import onion.compiler.TypedAST._
-import onion.compiler.effects.{Effect, EffectInference, StaticOperands}
+import onion.compiler.effects.{Effect, EffectInference, EffectTable, StaticOperands}
 
 /**
  * Pass 5 of typing (issue #357): the capability boundary.
@@ -42,17 +42,18 @@ final class CapabilityCheckPass(typing: Typing) {
     } yield md
     if (tools.isEmpty) return
 
-    val (units, unitEffects) = EffectInference.inferUnits(classes)
+    val table = typing.effectTable
+    val (units, unitEffects) = EffectInference.inferUnits(classes, table)
 
     for (tool <- tools) {
       val declared = declaredCapabilities(tool)
       if (tool.getBlock != null) {
-        checkUndeclared(tool, declared, classes, unitEffects)
+        checkUndeclared(tool, declared, classes, unitEffects, table)
         checkUnused(tool, declared, unitEffects)
       }
     }
 
-    recordStaticOperands(tools, units.keySet, classes)
+    recordStaticOperands(tools, units.keySet, classes, table)
   }
 
   /**
@@ -65,9 +66,10 @@ final class CapabilityCheckPass(typing: Typing) {
    */
   private def recordStaticOperands(tools: Seq[MethodDefinition],
                                    units: collection.Set[EffectInference.Unit0],
-                                   classes: Seq[ClassDefinition]): Unit = {
+                                   classes: Seq[ClassDefinition],
+                                   table: EffectTable.Table): Unit = {
     val fragments = tools.filter(_.getBlock != null).flatMap { tool =>
-      StaticOperands.contractFragment(StaticOperands.forTool(tool, units, classes)).map(tool.name -> _)
+      StaticOperands.contractFragment(StaticOperands.forTool(tool, units, classes, table)).map(tool.name -> _)
     }
     if (fragments.isEmpty) return
     val toolClasses = tools.map(_.classType.name).toSet
@@ -136,9 +138,10 @@ final class CapabilityCheckPass(typing: Typing) {
   /** E0077 per effect, at the first call site that introduces it. */
   private def checkUndeclared(tool: MethodDefinition, declared: Set[Effect],
                               classes: Seq[ClassDefinition],
-                              unitEffects: Map[EffectInference.Unit0, Set[Effect]]): Unit = {
+                              unitEffects: Map[EffectInference.Unit0, Set[Effect]],
+                              table: EffectTable.Table): Unit = {
     val reported = scala.collection.mutable.Set[Effect]()
-    for (site <- EffectInference.callSites(tool.getBlock, classes, unitEffects)) {
+    for (site <- EffectInference.callSites(tool.getBlock, classes, unitEffects, table)) {
       val missing = (site.effects -- declared) -- reported
       for (effect <- missing.toSeq.sorted) {
         reported += effect

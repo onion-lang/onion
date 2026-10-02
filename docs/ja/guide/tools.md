@@ -266,3 +266,36 @@ plan: `digest` would
 "exec":{"known":["gh"],"unresolved":false,"commands":[["gh",null,"list","--repo","onion-lang/onion","--state","all","--search",null,"--json","number,title,author,url","--limit","100"]]}
 ```
 
+
+### ライブラリは自分の呼び出しを分類できる
+
+ライブラリの jar への呼び出しは、何も言われなければ `unknown` です —— そして言えるのは
+ライブラリ自身です。コンパイル時クラスパス上の jar（`-classpath`、`//> using dep`
+ディレクティブ、プロジェクトの `[dependencies]`）は、組み込みの表と同じ形式の効果表を
+`META-INF/onion/effect-table.txt` に同梱でき、効果ごとに固定オペランドを付けられます：
+
+```text
+onion.llm.Llm#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+onion.llm.Llm#text=pure
+```
+
+この jar がクラスパスにあれば、`Llm::ask(...)` を呼ぶ tool は `unknown` なしで
+`requires { net, env, console }` と宣言でき、ホストも変数もスクリプトに書かれていないのに
+plan がそれらを示します：
+
+```bash
+$ onion ask.on "What is Onion?" --plan
+plan: `ask` would
+  net     api.anthropic.com
+  env     ANTHROPIC_API_KEY
+  console
+(nothing was executed; operands are the arguments the effects are
+ derived from, not necessarily the exact paths or hosts touched)
+```
+
+固定オペランドは `--contract` の `staticOperands` にも、リテラルから読んだものと並んで
+入ります。ライブラリが分類できるのは自分の jar にクラスファイルがあるクラスだけ（それ以外の
+行は無視され、警告 W0018 が出ます）、`onion.*` と `java.*` のクラスでは組み込みのエントリが
+常に勝ち、2つの jar が同じクラスを分類していればクラスパスで先の jar が使われ、解析できない
+表は丸ごと無視されて jar と行を示す警告 W0017 が出ます。行の文法と規則の全体は
+[効果リファレンス](../reference/effects.md)にあります。

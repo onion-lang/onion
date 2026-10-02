@@ -40,7 +40,8 @@ class DocExamplesCompileSpec extends AnyFunSpec {
       .filter(_.getName.endsWith(".md"))
       .sortBy(_.getPath)
       .flatMap { f =>
-        val txt = Source.fromFile(f, "UTF-8").mkString
+        // CRLF folded to LF, as a Windows checkout (core.autocrlf) has it: both patterns match "\n".
+        val txt = Source.fromFile(f, "UTF-8").mkString.replace("\r\n", "\n")
         labeled.findAllMatchIn(txt).flatMap { m =>
           val name = m.group(1)
           val blocks = onionBlock.findAllMatchIn(m.group(2)).map(_.group(1))

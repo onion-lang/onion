@@ -29,7 +29,9 @@ class RecordComponentClauseMessageSpec extends AnyFunSpec {
   // The clause text is spliced in verbatim, so these substrings hold in both locales.
   it("names the shape clause for a json shape, and does not mention `from`") {
     val msg = e0061(
-      """record Summary(title: String, actions: List[String]) {
+      // A json shape reads List[String] now; a Map is still beyond it.
+      """import { java.util.Map }
+        |record Summary(title: String, actions: Map[String, String]) {
         |  shape doc = json
         |}
         |println("x")

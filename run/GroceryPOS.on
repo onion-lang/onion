@@ -1,0 +1,202 @@
+// GroceryPOS.on — point-of-sale system for a grocery store.
+// Exercises: ADT enums, records with methods, classes, interfaces,
+// collection pipelines (groupBy, sortedBy, filter, map, fold, find, partition),
+// select / pattern matching, nullable, closures, string interpolation,
+// foreach over ranges and map entries, try/catch, recursion.
+
+enum Category {
+  PRODUCE, DAIRY, BAKERY, MEAT, BEVERAGE, FROZEN
+}
+
+enum Promo {
+  case PctOff(pct: Int)
+  case FlatOff(cents: Int)
+  case Bogo
+  case NoPromo
+}
+
+record Product(sku: String, name: String, cat: Category, unitPrice: Int)
+
+record LineItem(product: Product, qty: Int, promo: Promo) {
+public:
+  def subtotal(): Int {
+    val base: Int = product().unitPrice() * qty()
+    return select promo() {
+      case p is PctOff:  base - base * p.pct() / 100
+      case f is FlatOff: if base > f.cents() { base - f.cents() } else { 0 }
+      case b is Bogo:    (qty() + 1) / 2 * product().unitPrice()
+      case n is NoPromo: base
+    }
+  }
+
+  def promoLabel(): String = select promo() {
+    case p is PctOff:  "(-#{p.pct()}%)"
+    case f is FlatOff: "(-#{f.cents()}c off)"
+    case b is Bogo:    "(BOGO)"
+    case n is NoPromo: ""
+  }
+}
+
+// ── Catalogue ────────────────────────────────────────────────────────────────
+
+val catalogue: List[Product] = [
+  new Product("P001", "Organic Apples",    Category::PRODUCE,  349),
+  new Product("P002", "Whole Milk 1L",     Category::DAIRY,    189),
+  new Product("P003", "Sourdough Loaf",    Category::BAKERY,   499),
+  new Product("P004", "Chicken Breast 1kg",Category::MEAT,     899),
+  new Product("P005", "Orange Juice 1L",   Category::BEVERAGE, 299),
+  new Product("P006", "Frozen Peas 500g",  Category::FROZEN,   199),
+  new Product("P007", "Cheddar 400g",      Category::DAIRY,    429),
+  new Product("P008", "Baguette",          Category::BAKERY,   159),
+  new Product("P009", "Broccoli",          Category::PRODUCE,  129),
+  new Product("P010", "Ground Beef 500g",  Category::MEAT,     749)
+]
+
+def findProduct(sku: String): Product? =
+  catalogue.find { p -> (p as Product).sku() == sku }
+
+IO::println("Catalogue loaded: #{catalogue.size} items")
+
+val cheapest = catalogue.sortedBy { p -> (p as Product).unitPrice() }.map { p -> (p as Product).name() }
+IO::println("Cheapest first: #{cheapest.toString()}")
+
+// ── Cart ─────────────────────────────────────────────────────────────────────
+
+class Cart {
+  val lines: List[LineItem]
+  var cashier: String
+public:
+  def this(cashier: String) {
+    this.lines = []
+    this.cashier = cashier
+  }
+
+  def getLines(): List[LineItem] = lines
+
+  def add(sku: String, qty: Int, promo: Promo): void {
+    val p: Product? = findProduct(sku)
+    if p != null {
+      this.lines.add(new LineItem((p as Product), qty, promo))
+    } else {
+      IO::println("  [warn] unknown SKU: #{sku}")
+    }
+  }
+
+  def total(): Int =
+    lines.fold(0) { acc, li -> (acc as Int) + (li as LineItem).subtotal() }
+
+  def itemCount(): Int =
+    lines.fold(0) { acc, li -> (acc as Int) + (li as LineItem).qty() }
+
+  def printReceipt(): void {
+    IO::println("=================================")
+    IO::println("  GREENLEAF GROCERY")
+    IO::println("  Cashier: #{cashier}")
+    IO::println("---------------------------------")
+    foreach li: LineItem in lines {
+      val name: String = li.product().name()
+      val qty_: Int    = li.qty()
+      val sub: Int     = li.subtotal()
+      val label: String = li.promoLabel()
+      IO::println("  #{name} x#{qty_}  #{label}  #{sub}c")
+    }
+    IO::println("---------------------------------")
+    IO::println("  TOTAL: #{total()}c  (#{itemCount()} items)")
+    IO::println("=================================")
+  }
+}
+
+// ── Transactions ─────────────────────────────────────────────────────────────
+
+val cart1 = new Cart("Alice")
+cart1.add("P001", 3, new PctOff(10))
+cart1.add("P003", 1, new NoPromo())
+cart1.add("P005", 2, new Bogo())
+cart1.add("P007", 1, new FlatOff(50))
+cart1.add("P009", 4, new NoPromo())
+cart1.printReceipt()
+
+val cart2 = new Cart("Bob")
+cart2.add("P004", 2, new PctOff(15))
+cart2.add("P002", 3, new Bogo())
+cart2.add("P008", 2, new NoPromo())
+cart2.add("P010", 1, new FlatOff(100))
+cart2.printReceipt()
+
+// ── Sales-by-category summary ─────────────────────────────────────────────────
+
+val allLines: List[LineItem] = []
+foreach li: LineItem in cart1.getLines() { allLines.add(li) }
+foreach li: LineItem in cart2.getLines() { allLines.add(li) }
+
+val byCat = allLines.groupBy { li -> (li as LineItem).product().cat().toString() }
+IO::println("\n--- Sales by Category ---")
+foreach (cat, items) in byCat {
+  val catTotal: Int = (items as List[LineItem]).fold(0) { acc, li -> (acc as Int) + (li as LineItem).subtotal() }
+  IO::println("  #{cat}: #{catTotal}c")
+}
+
+// ── Promo effectiveness ───────────────────────────────────────────────────────
+
+val discountedLines: List[LineItem] = allLines.filter { li ->
+  val pr: Promo = (li as LineItem).promo()
+  val isDisc: Boolean = select pr {
+    case p is NoPromo: false
+    else: true
+  }
+  isDisc
+}
+IO::println("\nDiscounted lines: #{discountedLines.size} of #{allLines.size}")
+
+// ── Most expensive item in cart1 ───────────────────────────────────────────────
+
+val priciest: LineItem? = cart1.getLines().fold(null) { acc, li ->
+  val liT: LineItem = li as LineItem
+  if acc == null { liT }
+  else if liT.subtotal() > (acc as LineItem).subtotal() { liT }
+  else { acc }
+}
+if priciest != null {
+  IO::println("Priciest in cart1: #{(priciest as LineItem).product().name()}")
+}
+
+// ── Loyalty points (1 point per 100c spent) ────────────────────────────────────
+
+def loyaltyPoints(total: Int): Int = total / 100
+val pts1: Int = loyaltyPoints(cart1.total())
+val pts2: Int = loyaltyPoints(cart2.total())
+IO::println("\nLoyalty: cart1=#{pts1}pts  cart2=#{pts2}pts")
+
+// ── try/catch: safe SKU lookup ────────────────────────────────────────────────
+
+def strictFind(sku: String): Product {
+  val p: Product? = findProduct(sku)
+  if p == null { throw new Exception("SKU not found: " + sku) }
+  return p as Product
+}
+
+try {
+  val item: Product = strictFind("P999")
+  IO::println("Found: #{item.name()}")
+} catch e: Exception {
+  IO::println("Caught: " + e.getMessage())
+}
+
+// ── Recursion: Fibonacci loyalty multiplier ────────────────────────────────────
+
+def fib(n: Int): Int = if n <= 1 { n } else { fib(n - 1) + fib(n - 2) }
+IO::println("\nFib loyalty multipliers: " + [1, 2, 3, 4, 5].map { n -> fib(n as Int) }.toString())
+
+// ── foreach over range: stock threshold check ─────────────────────────────────
+
+IO::println("\nPrice tiers:")
+foreach idx: Int in 0..<catalogue.size {
+  val prod: Product = catalogue.get(idx) as Product
+  val tier: String =
+    if prod.unitPrice() < 200      { "budget" }
+    else if prod.unitPrice() < 400 { "mid" }
+    else                           { "premium" }
+  IO::println("  #{prod.name()}: #{tier} (#{prod.unitPrice()}c)")
+}
+
+IO::println("\nAll done.")

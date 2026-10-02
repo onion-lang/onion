@@ -1,0 +1,20 @@
+# Effect table of the onion-llm battery, in the format of the compiler's own
+# onion/effect-table.txt (Class#method=effect[,effect...], Class#*=..., =pure),
+# with `effect:operand` naming what an effect touches. The compiler loads
+# META-INF/onion/effect-table.txt from every jar on the classpath, so `--effects`,
+# `--plan` and `tool ... requires { ... }` see these entries.
+#
+# Building a client is effect-free; only the two calls reach the network. They
+# resolve credentials from the environment (ANTHROPIC_API_KEY) at call time.
+onion.llm.Llm#*=pure
+onion.llm.Claude#*=pure
+onion.llm.Claude#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+onion.llm.Claude#text=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+
+# Errors are plain values, returned in an Err and never thrown.
+onion.llm.LlmError#*=pure
+onion.llm.LlmError$Transport#*=pure
+onion.llm.LlmError$Api#*=pure
+onion.llm.LlmError$Refusal#*=pure
+onion.llm.LlmError$Truncated#*=pure
+onion.llm.LlmError$Invalid#*=pure

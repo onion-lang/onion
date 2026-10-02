@@ -21,11 +21,15 @@ object CompilerFrontend {
   val VERSION = OnionVersion.value
 
   def main(args: Array[String]): Unit = {
+    ConsoleEncoding.install()
     // With ONION_DAEMON set, the command line goes to the resident compile daemon (see
     // onion.tools.daemon.DaemonClient); when the daemon cannot be reached, compile here.
     val viaDaemon =
-      if (onion.tools.daemon.DaemonClient.enabledByEnvironment && !args.exists(a => a == "-h" || a == "--help" || a == "-v" || a == "--version"))
-        onion.tools.daemon.DaemonClient.compile(args)
+      // --print-classpath compiles nothing, so there is nothing to hand the daemon.
+      if (onion.tools.daemon.DaemonClient.enabledByEnvironment && !args.exists(a => a == "-h" || a == "--help" || a == "-v" || a == "--version" || a == PRINT_CLASSPATH)) {
+        if (!new CompilerFrontend().prefetchDependencies(args.filterNot(_ == "--verbose"))) Some(-1)
+        else onion.tools.daemon.DaemonClient.compile(args)
+      }
       else None
     val exitCode = viaDaemon.getOrElse(runCommandLine(args))
     if (exitCode != 0) System.exit(exitCode)
@@ -56,7 +60,8 @@ class CompilerFrontend {
 
 
   private val commandLineParser = new CommandLineParser(
-    (sharedOptionConfigs :+ OptionConfig(OUTPUT, true) :+ OptionConfig(NO_DEBUG_INFO, false))*
+    (sharedOptionConfigs :+ OptionConfig(OUTPUT, true) :+ OptionConfig(NO_DEBUG_INFO, false) :+
+      OptionConfig(PRINT_CLASSPATH, false))*
   )
 
   def run(commandLine: Array[String], verbose: Boolean = false): Int = {
@@ -75,19 +80,81 @@ class CompilerFrontend {
         }
         createConfig(success, verbose) match {
           case None => -1
-          case Some(config) =>
+          case Some(baseConfig) if success.options.contains(PRINT_CLASSPATH) =>
+            printClasspath(success.options.toMap, baseConfig, params.toSeq)
+          case Some(baseConfig) =>
+            // `//> using dep` directives of the files being compiled, as `onion script.on`
+            // reads them: their union joins the compile classpath (after -classpath).
+            val dependencyJars = ScriptDependencies.classpathForSources(params.toSeq, baseConfig.encoding, System.err) match {
+              case Left(message) =>
+                System.err.println(message)
+                return -1
+              case Right(jars) => jars
+            }
+            val config =
+              if (dependencyJars.isEmpty) baseConfig
+              else baseConfig.copy(classPath = baseConfig.classPath ++ dependencyJars)
             val result = compile(config, params)
             if (config.dumpAst) emitAstDump(result)
             if (config.dumpTypedAst) emitTypedAstDump(result)
             emitDiagnostics(result)
             emitProfile(config, result)
-            if (!result.hasErrors && success.options.contains(SHOW_EFFECTS)) emitEffects(result)
+            if (!result.hasErrors && success.options.contains(SHOW_EFFECTS)) emitEffects(config, result)
             if (result.hasErrors) -1
             else if (generateFiles(result.classes)) 0
             else -1
         }
     }
   }
+
+  /**
+   * `--print-classpath`: the classpath to run what this command line compiles with `java`,
+   * on stdout as one platform-separated line, and nothing compiled. In order: the output
+   * directory (`-d`, else `.`, where the classes land), the `-classpath` entries when one is
+   * given, then the jars the files' `//> using` directives resolve to (resolved, and cached,
+   * exactly as a compile would). Each entry once. Resolution progress and errors go to
+   * stderr, so the line can be captured: `java -cp "$(onionc --print-classpath -d out a.on)" A`.
+   * A file that cannot be read is an error here rather than a file with no directives, since
+   * a classpath silently missing its jars is worse than no answer.
+   */
+  private def printClasspath(options: Map[String, CommandLineParam], config: CompilerConfig, files: Seq[String]): Int = {
+    val unreadable = files.filterNot(file => java.nio.file.Files.isReadable(java.nio.file.Paths.get(file)))
+    if (unreadable.nonEmpty) {
+      unreadable.foreach(file => System.err.println(onion.compiler.toolbox.Message("error.parsing.read_error", file)))
+      return -1
+    }
+    ScriptDependencies.classpathForSources(files, config.encoding, System.err) match {
+      case Left(message) =>
+        System.err.println(message)
+        -1
+      case Right(jars) =>
+        val explicit = options.get(CLASSPATH).collect { case ValuedParam(path) => pathArray(path).toSeq }.getOrElse(Seq.empty)
+        val entries = (config.outputDirectory +: (explicit ++ jars)).filter(_.nonEmpty).distinct
+        System.out.println(entries.mkString(java.io.File.pathSeparator))
+        System.out.flush()
+        0
+    }
+  }
+
+  /**
+   * Before a daemon compile: resolves the sources' `//> using` directives here, as
+   * `onion script.on` does, so download progress reaches this terminal as it happens and the
+   * daemon then finds the classpath cache warm. A directive error is printed here and ends
+   * the compile; false then. A command line that does not parse is left to the daemon to
+   * report.
+   */
+  private[tools] def prefetchDependencies(commandLine: Array[String]): Boolean =
+    commandLineParser.parse(commandLine) match {
+      case ParseSuccess(options, arguments) if arguments.nonEmpty =>
+        val encoding = options.get(ENCODING).collect { case ValuedParam(value) => value }.getOrElse(DEFAULT_ENCODING)
+        ScriptDependencies.classpathForSources(arguments.toSeq, encoding, System.err) match {
+          case Left(message) =>
+            System.err.println(message)
+            false
+          case Right(_) => true
+        }
+      case _ => true
+    }
 
   private def generateFiles(binaries: Seq[CompiledClass]): Boolean =
     CompiledClassWriter.writeAll(binaries).isRight
@@ -117,6 +184,9 @@ class CompilerFrontend {
          |  --law-seed <n>              RNG seed for law sample generation
          |  --law-samples <n>           Number of samples generated per law parameter
          |  --effects                   Print each method's inferred effect set to stderr
+         |  --print-classpath           Print the classpath to run the output with (the -d
+         |                              directory, -classpath, and the jars of the files'
+         |                              //> using directives) and exit without compiling
          |  -g:none                     Omit the LocalVariableTable (smaller class files,
          |                              but a debugger can no longer show variable values)
          |  -h, --help                  Show this help message
@@ -124,7 +194,8 @@ class CompilerFrontend {
          |
          |Examples:
          |  onionc Hello.on
-         |  onionc -d out -classpath lib/*.jar *.on""".stripMargin)
+         |  onionc -d out -classpath lib/*.jar *.on
+         |  java -cp "$$(onionc --print-classpath -d out Main.on)" Main""".stripMargin)
   }
 
   private def parseCommandLine(commandLine: Array[String]): Option[ParseSuccess] = {

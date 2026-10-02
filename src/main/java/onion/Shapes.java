@@ -54,6 +54,33 @@ public final class Shapes {
     }
 
     /**
+     * A shape over a JSON document whose components may be lists, nested objects, or
+     * absent. {@code tags} extends the scalar vocabulary:
+     *
+     * <ul>
+     *   <li>{@code Nested} &mdash; an object read by the shape {@code nested.get(i)}
+     *       supplies, a {@link Function0} called once, on first use, so a record may
+     *       contain itself;</li>
+     *   <li>{@code List[K]} &mdash; an array of {@code K} (a scalar kind or
+     *       {@code Nested});</li>
+     *   <li>a trailing {@code ?} &mdash; the key may be absent or {@code null}.</li>
+     * </ul>
+     *
+     * <p>A defect inside a structure names the whole path to it ({@code actions[2]},
+     * {@code owner.name}), and every element of every array is read, so one bad element
+     * never hides another.
+     *
+     * @param nested for each component, a {@code Function0} returning the nested shape
+     *               when its tag names {@code Nested}, and {@code null} otherwise
+     */
+    public static <T> Shape<T> json(
+        List<String> names, List<String> tags, List<Object> nested,
+        Function1<List<Object>, T> build, Function1<T, List<Object>> explode
+    ) {
+        return new MappedShape<>(JSON, names, tags, nested, build, explode);
+    }
+
+    /**
      * A lossless shape over a commented {@code key = value} config document. Unlike
      * {@link #json} and {@link #yaml} this one also supports
      * {@link Shape#parseLossless}/{@link Shape#printLossless}: comments, blank lines,

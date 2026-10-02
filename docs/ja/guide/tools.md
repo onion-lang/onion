@@ -122,8 +122,12 @@ usage: ingest.on <src> <dst> [--count <Int>] [--loud]
 これ）、`--help`・フラグ解析・型付き変換・エラーメッセージはすべて実行時にそこから
 導出され、あなたの tool への型付き呼び出しはコンパイル時に同じ宣言から導出されます。
 必須パラメータは位置引数、デフォルト付きパラメータは `--name` フラグ（`--count 5` /
-`--count=5`）、`Boolean` のデフォルトはスイッチになります。コマンドラインで省略された
-デフォルトは元の式として言語内で評価されます — 文字列を経由した往復はしません。
+`--count=5`）、`Boolean` のデフォルトはスイッチになります。camelCase のパラメータは、
+名前そのままのフラグに加えて kebab-case のフラグでも指定できます —— `maxRows` は
+`--max-rows` でも `--maxRows` でもよく、`--help` には kebab-case のほうが表示されます。
+同じフラグになってしまう2つのパラメータ（`parseURL` と `parseUrl`）はコンパイルエラー（`E0093`）です。
+コマンドラインで省略されたデフォルトは元の式として言語内で評価されます — 文字列を経由した
+往復はしません。
 
 `--help` やフラグ処理の背後にあるパースと型変換は、生成コードが `onion.Cli` という
 より低レベルのランタイムモジュールを呼び出して行っています。このモジュールは直接
@@ -191,3 +195,107 @@ capability はエフェクトを*パラメータ*に結びつけるので、`wri
 コモディティですが、検査済み効果集合から導出したプランはそうではありません ——
 本体が何をするかを知っている必要があるからです。
 
+### ソースに書かれたオペランド
+
+裸の capability（`net`、`exec`、`env`、`read`、`write`）はパラメータに結びついて
+いませんが、そのオペランドはソースにリテラルとして書かれていることがよくあります ——
+API のホスト、tool が呼び出すコマンド、読む環境変数。`--plan` はそれを表示します：
+
+```bash
+$ onion digest.on out/digest.md gh --plan
+plan: `digest` would
+  write   derived from out = out/digest.md
+  exec    gh … list --repo onion-lang/onion --state all --search … --json number,…
+  net     $SLACK_WEBHOOK_URL
+  net     api.github.com
+  env     SLACK_WEBHOOK_URL
+  env     GITHUB_TOKEN
+  clock
+  console
+(nothing was executed; operands are the arguments the effects are
+ derived from, not necessarily the exact paths or hosts touched)
+```
+
+コンパイラは、tool から到達できるすべての呼び出し（本体、本体が生成するクロージャ、
+本体が推移的に呼ぶプログラム内のメソッド）から次を読み取ります：
+
+| 効果 | 表示されるオペランド | 読み取り元 |
+|------|----------------------|------------|
+| `net` | ホスト（とポート） | `Http::get`/`post`/`put`/`delete`/`postJson`/`getResponse`/`postResponse`/`request`（ビルダーのステップをたどって `send()` まで）の URL、`http"…"` リソース、`Net::connect` |
+| `exec` | コマンド（リテラルでない引数は `…`） | `Proc::capture`/`run`/`exec` のコマンドの語、`captureIn`/`runIn`/`execIn` ではディレクトリより後の語 |
+| `env` | 変数名 | `System::getenv("NAME")`、`Config::getEnv("NAME", …)` |
+| `read`/`write` | パス | `Files` の各操作のパス引数、`file"…"` リソース |
+
+オペランドが「既知」とみなされるのは、文字列リテラル、リテラルで*始まる*連結や補間
+（`"https://api.github.com/search?q=" + q` —— このような接頭辞から読むのは URL のホスト
+だけで、リテラルがホストの先まで続いている場合に限ります）、そのどちらかで一度だけ代入
+されるローカル `val`、そして `$NAME` と表示される `System::getenv("NAME")` です（環境変数に
+入れた Webhook URL は `net $SLACK_WEBHOOK_URL` と表示されます）。URL のユーザー情報
+（`user:password@`）は決して表示しません。オペランドは1行に1つで、効果名を繰り返し、呼び出しが見つかった順 —— tool 自身の本体が
+先、そのあと本体が呼ぶメソッド —— に並びます。
+
+`exec` の行にはコマンド全体が並びます。リテラルの引数はそのまま、完全なリテラルでない
+引数（パラメータ、ループ変数、`"updated:>=" + since` など）はそれぞれ `…` になり、
+連続する `…` は1つにまとめます。たとえば
+`Proc::capture("gh", kind, "list", "--repo", "onion-lang/onion")` は
+`exec    gh … list --repo onion-lang/onion` と表示され、上の `digest.on` の行もこうして
+できています。72 文字を超えるコマンドは切り詰めて `…` で終わり、空白や引用符を含む
+引数はシングルクォートで囲んで表示します。2つの呼び出し箇所から到達する同じコマンドは
+1度だけ並びます。
+
+この一覧は**下界**です。それ以外 —— パラメータ、`var`、実行時に計算される値、ヘルパーの
+パラメータに渡されたリテラル（引数を呼び出し先まで追うことはしません）—— は推測しません。
+ある効果の呼び出し箇所に解析が読めなかったオペランドがあれば、既知のオペランドの後に同じ
+効果の `(operand not statically known)` 行が続くので、部分的な一覧が完全な一覧に見える
+ことはありません。パラメータに結びついた capability（`write(out)`）では `derived from`
+行は変わらず、本体の他の場所にある同じ効果のリテラルオペランドがその下に並びます。
+
+同じ事実は `--contract` にも tool ごとに1つの追加キーとして現れます。何か分かったときだけ
+存在し、既存のキーはすべて値も位置も変わりません：
+
+```json
+"staticOperands":{"net":{"known":["$SLACK_WEBHOOK_URL","api.github.com"],"unresolved":false}}
+```
+
+`unresolved` は、その効果の呼び出し箇所のうち少なくとも1つで、解析がオペランドを決定
+できなかったときに `true` になります。`exec` のエントリには `commands` も入ります。
+呼び出し箇所ごとの引数列全体で、リテラルでない引数は `null` です。`known` はこれまで
+どおりコマンド名の一覧です：
+
+```json
+"exec":{"known":["gh"],"unresolved":false,"commands":[["gh",null,"list","--repo","onion-lang/onion","--state","all","--search",null,"--json","number,title,author,url","--limit","100"]]}
+```
+
+
+### ライブラリは自分の呼び出しを分類できる
+
+ライブラリの jar への呼び出しは、何も言われなければ `unknown` です —— そして言えるのは
+ライブラリ自身です。コンパイル時クラスパス上の jar（`-classpath`、`//> using dep`
+ディレクティブ、プロジェクトの `[dependencies]`）は、組み込みの表と同じ形式の効果表を
+`META-INF/onion/effect-table.txt` に同梱でき、効果ごとに固定オペランドを付けられます：
+
+```text
+onion.llm.Llm#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+onion.llm.Llm#text=pure
+```
+
+この jar がクラスパスにあれば、`Llm::ask(...)` を呼ぶ tool は `unknown` なしで
+`requires { net, env, console }` と宣言でき、ホストも変数もスクリプトに書かれていないのに
+plan がそれらを示します：
+
+```bash
+$ onion ask.on "What is Onion?" --plan
+plan: `ask` would
+  net     api.anthropic.com
+  env     ANTHROPIC_API_KEY
+  console
+(nothing was executed; operands are the arguments the effects are
+ derived from, not necessarily the exact paths or hosts touched)
+```
+
+固定オペランドは `--contract` の `staticOperands` にも、リテラルから読んだものと並んで
+入ります。ライブラリが分類できるのは自分の jar にクラスファイルがあるクラスだけ（それ以外の
+行は無視され、警告 W0018 が出ます）、`onion.*` と `java.*` のクラスでは組み込みのエントリが
+常に勝ち、2つの jar が同じクラスを分類していればクラスパスで先の jar が使われ、解析できない
+表は丸ごと無視されて jar と行を示す警告 W0017 が出ます。行の文法と規則の全体は
+[効果リファレンス](../reference/effects.md)にあります。

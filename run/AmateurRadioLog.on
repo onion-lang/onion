@@ -1,0 +1,269 @@
+import {
+  java.util.LinkedHashMap
+}
+
+// ── Enumerations ─────────────────────────────────────────────────────────────
+
+enum Band {
+  BAND_160M, BAND_80M, BAND_40M, BAND_20M, BAND_15M, BAND_10M, BAND_6M, BAND_2M
+  public:
+    def displayName(): String = select this {
+      case Band::BAND_160M: "160m"
+      case Band::BAND_80M:  "80m"
+      case Band::BAND_40M:  "40m"
+      case Band::BAND_20M:  "20m"
+      case Band::BAND_15M:  "15m"
+      case Band::BAND_10M:  "10m"
+      case Band::BAND_6M:   "6m"
+      case Band::BAND_2M:   "2m"
+      else:                  "?"
+    }
+    def frequencyMHz(): Double = select this {
+      case Band::BAND_160M: 1.8
+      case Band::BAND_80M:  3.5
+      case Band::BAND_40M:  7.0
+      case Band::BAND_20M:  14.0
+      case Band::BAND_15M:  21.0
+      case Band::BAND_10M:  28.0
+      case Band::BAND_6M:   50.0
+      case Band::BAND_2M:   144.0
+      else:                  0.0
+    }
+    def isHF(): Boolean = select this {
+      case Band::BAND_6M:  false
+      case Band::BAND_2M:  false
+      else:                true
+    }
+}
+
+enum Mode {
+  CW, SSB, FT8, RTTY, PSK31, AM, FM
+  public:
+    def isDigital(): Boolean = select this {
+      case Mode::FT8:   true
+      case Mode::RTTY:  true
+      case Mode::PSK31: true
+      else:             false
+    }
+    def typicalRST(): Int = select this {
+      case Mode::CW:  599
+      case Mode::FT8: 599
+      else:           59
+    }
+}
+
+enum Continent {
+  NA, SA, EU, AF, AS, OC, AN
+  public:
+    def fullName(): String = select this {
+      case Continent::NA: "North America"
+      case Continent::SA: "South America"
+      case Continent::EU: "Europe"
+      case Continent::AF: "Africa"
+      case Continent::AS: "Asia"
+      case Continent::OC: "Oceania"
+      case Continent::AN: "Antarctica"
+      else:               "Unknown"
+    }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record QSO(callsign: String, band: Band, mode: Mode, date: String, rstSent: Int, rstRecv: Int, entity: String, continent: Continent) {
+  public:
+    def display(): String = "#{date} #{callsign} #{band.displayName()} #{mode} #{entity}"
+    def bandModeKey(): String = band.displayName() + "/" + mode
+    def isHFContact(): Boolean = band.isHF()
+    def isDigitalContact(): Boolean = mode.isDigital()
+}
+
+record DXEntity(prefix: String, name: String, continent: Continent, cqZone: Int) {
+  public:
+    def display(): String = "#{prefix} - #{name} (#{continent.fullName()}, CQ#{cqZone})"
+}
+
+record AwardProgress(awardName: String, needed: Int, confirmed: Int) {
+  public:
+    def pct(): Int = if needed == 0 { 0 } else { (confirmed * 100) / needed }
+    def display(): String = "#{awardName}: #{confirmed}/#{needed} (#{pct()}%)"
+    def isComplete(): Boolean = confirmed >= needed
+}
+
+// ── Helper functions ──────────────────────────────────────────────────────────
+
+def countByKey(qsos: List[QSO], keyFn: QSO -> String): Map[String, Int] {
+  val result: Map[String, Int] = [:]
+  foreach q: QSO in qsos {
+    val key: String = keyFn(q)
+    val cur: Int? = result[key] as Int?
+    if cur == null { result.put(key, 1) } else { result.put(key, cur + 1) }
+  }
+  return result
+}
+
+def uniqueCount(qsos: List[QSO], keyFn: QSO -> String): Int {
+  val seen: Map[String, Int] = [:]
+  foreach q: QSO in qsos {
+    seen.put(keyFn(q), 1)
+  }
+  return seen.size()
+}
+
+def continentsWorked(qsos: List[QSO]): Int {
+  val seen: Map[String, Int] = [:]
+  foreach q: QSO in qsos {
+    seen.put(q.continent().fullName(), 1)
+  }
+  return seen.size()
+}
+
+def hfOnlyQSOs(qsos: List[QSO]): List[QSO] =
+  qsos.filter { q -> q.isHFContact() }
+
+def digitalQSOs(qsos: List[QSO]): List[QSO] =
+  qsos.filter { q -> q.isDigitalContact() }
+
+def joinStrings(items: List[String], sep: String): String =
+  items.fold("") { acc, s -> if acc == "" { s } else { acc + sep + s } }
+
+// ── DX entity reference ───────────────────────────────────────────────────────
+
+val entityTable: List[DXEntity] = [
+  new DXEntity("VK", "Australia",     Continent::OC, 29),
+  new DXEntity("JA", "Japan",         Continent::AS, 25),
+  new DXEntity("DL", "Germany",       Continent::EU, 14),
+  new DXEntity("W",  "United States", Continent::NA,  4),
+  new DXEntity("PY", "Brazil",        Continent::SA, 11),
+  new DXEntity("ZS", "South Africa",  Continent::AF, 38),
+  new DXEntity("UA", "Russia",        Continent::EU, 16),
+  new DXEntity("VE", "Canada",        Continent::NA,  3),
+  new DXEntity("OH", "Finland",       Continent::EU, 18),
+  new DXEntity("HS", "Thailand",      Continent::AS, 26)
+]
+
+// ── QSO log ───────────────────────────────────────────────────────────────────
+
+val allQSOs: List[QSO] = [
+  new QSO("VK2ABC", Band::BAND_20M, Mode::FT8,  "2024-01-15", 599, 599, "VK", Continent::OC),
+  new QSO("JA1XYZ", Band::BAND_15M, Mode::SSB,  "2024-01-16", 59,  57,  "JA", Continent::AS),
+  new QSO("DL2DEF", Band::BAND_40M, Mode::CW,   "2024-01-17", 599, 579, "DL", Continent::EU),
+  new QSO("W3GHI",  Band::BAND_20M, Mode::SSB,  "2024-01-18", 59,  59,  "W",  Continent::NA),
+  new QSO("PY5JKL", Band::BAND_20M, Mode::FT8,  "2024-01-19", 599, 599, "PY", Continent::SA),
+  new QSO("ZS6MNO", Band::BAND_15M, Mode::FT8,  "2024-01-20", 599, 599, "ZS", Continent::AF),
+  new QSO("UA3PQR", Band::BAND_40M, Mode::SSB,  "2024-01-21", 59,  55,  "UA", Continent::EU),
+  new QSO("VE7STU", Band::BAND_20M, Mode::CW,   "2024-01-22", 599, 599, "VE", Continent::NA),
+  new QSO("OH2VWX", Band::BAND_80M, Mode::CW,   "2024-01-23", 599, 589, "OH", Continent::EU),
+  new QSO("HS0YZA", Band::BAND_10M, Mode::SSB,  "2024-01-24", 59,  58,  "HS", Continent::AS),
+  new QSO("JA3BCD", Band::BAND_20M, Mode::FT8,  "2024-01-25", 599, 599, "JA", Continent::AS),
+  new QSO("DL5EFG", Band::BAND_15M, Mode::CW,   "2024-01-26", 599, 599, "DL", Continent::EU),
+  new QSO("VK4HIJ", Band::BAND_10M, Mode::SSB,  "2024-01-27", 59,  56,  "VK", Continent::OC),
+  new QSO("W7KLM",  Band::BAND_15M, Mode::FT8,  "2024-01-28", 599, 599, "W",  Continent::NA),
+  new QSO("PY3NOP", Band::BAND_40M, Mode::RTTY, "2024-01-29", 599, 599, "PY", Continent::SA),
+  new QSO("UA9QRS", Band::BAND_10M, Mode::FT8,  "2024-01-30", 599, 599, "UA", Continent::AS),
+  new QSO("OH5TUV", Band::BAND_20M, Mode::CW,   "2024-02-01", 599, 599, "OH", Continent::EU),
+  new QSO("ZS4WXY", Band::BAND_40M, Mode::FT8,  "2024-02-02", 599, 599, "ZS", Continent::AF),
+  new QSO("VK6ZAB", Band::BAND_15M, Mode::CW,   "2024-02-03", 599, 599, "VK", Continent::OC),
+  new QSO("W1CDE",  Band::BAND_80M, Mode::SSB,  "2024-02-04", 59,  57,  "W",  Continent::NA)
+]
+
+// ── Analysis ──────────────────────────────────────────────────────────────────
+
+IO::println("=== Amateur Radio Station Log ===")
+IO::println("Total QSOs : " + allQSOs.size)
+IO::println("HF QSOs    : " + hfOnlyQSOs(allQSOs).size)
+IO::println("Digital    : " + digitalQSOs(allQSOs).size)
+IO::println("")
+
+IO::println("── Band Breakdown ─")
+val bandMap: Map[String, Int] = countByKey(allQSOs, { q -> q.band().displayName() })
+foreach (band, cnt) in bandMap {
+  IO::println("  #{band}: #{cnt}")
+}
+IO::println("")
+
+IO::println("── Mode Breakdown ─")
+val modeMap: Map[String, Int] = countByKey(allQSOs, { q -> "" + q.mode() })
+foreach (m, cnt) in modeMap {
+  IO::println("  #{m}: #{cnt}")
+}
+IO::println("")
+
+IO::println("── Continent Breakdown ─")
+val contMap: Map[String, Int] = countByKey(allQSOs, { q -> q.continent().fullName() })
+foreach (cont, cnt) in contMap {
+  IO::println("  #{cont}: #{cnt}")
+}
+IO::println("")
+
+IO::println("── Entity Breakdown ─")
+val entityMap: Map[String, Int] = countByKey(allQSOs, { q -> q.entity() })
+foreach (ent, cnt) in entityMap {
+  IO::println("  #{ent}: #{cnt}")
+}
+IO::println("")
+
+IO::println("── Award Progress ─")
+val dxccWorked: Int  = uniqueCount(allQSOs, { q -> q.entity() })
+val waWorked: Int    = continentsWorked(allQSOs)
+val dxcc: AwardProgress = new AwardProgress("DXCC (entities)", 100, dxccWorked)
+val wac:  AwardProgress = new AwardProgress("WAC (continents)",  7, waWorked)
+val was:  AwardProgress = new AwardProgress("WAS (US states)",  50, 3)
+IO::println("  " + dxcc.display())
+IO::println("  " + wac.display())
+IO::println("  " + was.display())
+IO::println("")
+
+IO::println("── CW-Only Stats ─")
+val cwQSOs: List[QSO] = allQSOs.filter { q -> q.mode() == Mode::CW }
+val cwEntities: Int    = uniqueCount(cwQSOs, { q -> q.entity() })
+val cwConts: Int       = continentsWorked(cwQSOs)
+IO::println("  CW QSOs      : " + cwQSOs.size)
+IO::println("  CW entities  : " + cwEntities)
+IO::println("  CW continents: " + cwConts)
+IO::println("")
+
+IO::println("── Average RST Received ─")
+val totalRST: Int = allQSOs.fold(0) { acc, q -> acc + q.rstRecv() }
+val avgRST: Int   = totalRST / allQSOs.size
+IO::println("  Average: " + avgRST + " (over " + allQSOs.size + " QSOs)")
+IO::println("")
+
+IO::println("── Band/Mode Combinations ─")
+val bmMap: Map[String, Int] = countByKey(allQSOs, { q -> q.bandModeKey() })
+foreach (bm, cnt) in bmMap {
+  IO::println("  #{bm}: #{cnt}")
+}
+IO::println("")
+
+IO::println("── First 5 QSO Band Summary ─")
+val firstFiveBands: List[String] = []
+var i: Int = 0
+foreach q: QSO in allQSOs {
+  if i < 5 {
+    firstFiveBands.add(q.band().displayName())
+  }
+  i++
+}
+val bandSummary: String = firstFiveBands |> joinStrings(", ")
+IO::println("  " + bandSummary)
+IO::println("")
+
+IO::println("── DX Entity Reference ─")
+foreach e: DXEntity in entityTable {
+  IO::println("  " + e.display())
+}
+IO::println("")
+
+IO::println("── HF Band Frequencies ─")
+val hfBands: List[Band] = [Band::BAND_160M, Band::BAND_80M, Band::BAND_40M, Band::BAND_20M, Band::BAND_15M, Band::BAND_10M]
+foreach b: Band in hfBands {
+  IO::println("  #{b.displayName()}: #{b.frequencyMHz()} MHz")
+}
+IO::println("")
+
+IO::println("── Recent QSOs (Feb 2024) ─")
+foreach q: QSO in allQSOs {
+  if q.date().startsWith("2024-02") {
+    IO::println("  " + q.display())
+  }
+}

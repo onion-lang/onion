@@ -85,6 +85,55 @@ class EntryPointDiscoverySpec extends AnyFunSuite with Matchers:
 
     EntryPointDiscovery.discover(root, units).toOption.value shouldBe Vector.empty
 
+  test("a tool-only source is an entrypoint: the compiler synthesizes its CLI main"):
+    val root = Files.createTempDirectory("entry-point-discovery")
+    val units = parse(
+      root,
+      "src/main.on" ->
+        """// a CLI made of tools
+          |def helper(): Int = 1
+          |tool greet(name: String): Int requires { console } {
+          |  println("hi " + name)
+          |  return 0
+          |}
+          |""".stripMargin
+    )
+
+    EntryPointDiscovery.discover(root, units).toOption.value shouldBe
+      Vector(EntryPoint("mainMain", "src/main.on", 3, 1))
+
+  test("a tool in any production source counts, not only src/main.on"):
+    val root = Files.createTempDirectory("entry-point-discovery")
+    val units = parse(root, "src/cli.on" -> "tool ping(): Int { return 0 }\n")
+
+    EntryPointDiscovery.discover(root, units).toOption.value.map(_.source) shouldBe
+      Vector("src/cli.on")
+
+  test("tools beside top-level statements are not a CLI, so they add no candidate"):
+    // Rewriting synthesizes the tool CLI main only when the file has no top-level
+    // statement; with one, the statements are what the class runs.
+    val root = Files.createTempDirectory("entry-point-discovery")
+    val units = parse(
+      root,
+      "src/helpers.on" ->
+        """val answer: Int = 42
+          |tool ping(): Int { return answer }
+          |""".stripMargin
+    )
+
+    EntryPointDiscovery.discover(root, units).toOption.value shouldBe Vector.empty
+
+  test("a tool source and an explicit main elsewhere are two candidates"):
+    val root = Files.createTempDirectory("entry-point-discovery")
+    val units = parse(
+      root,
+      "src/cli.on" -> "tool ping(): Int { return 0 }\n",
+      "src/runner.on" -> "def main(): void {}\n"
+    )
+
+    EntryPointDiscovery.discover(root, units).toOption.value.map(_.source) shouldBe
+      Vector("src/cli.on", "src/runner.on")
+
   test("returns multiple candidates in deterministic source order"):
     val root = Files.createTempDirectory("entry-point-discovery")
     val parsed = parse(

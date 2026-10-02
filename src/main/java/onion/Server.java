@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A small HTTP server.
@@ -190,29 +191,56 @@ public final class Server {
             throw new IllegalArgumentException(
                 "Server: port must be between 0 and 65535, got " + port);
         }
+        InetSocketAddress address = host == null
+            ? new InetSocketAddress(port)
+            : new InetSocketAddress(host, port);
+        // A pool rather than the default (which runs handlers on the accept thread and
+        // serialises every request), bounded so a flood cannot exhaust memory.
+        //
+        // Daemon threads, deliberately: a non-daemon pool keeps the JVM alive after
+        // `main` returns, so a script that forgets to call `stop()` never exits. That
+        // is not a hypothetical -- it hung the first sample written against this API.
+        ExecutorService pool = Executors.newFixedThreadPool(8, runnable -> {
+            Thread thread = new Thread(runnable, "onion-server");
+            thread.setDaemon(true);
+            return thread;
+        });
+        AtomicReference<HttpServer> started = new AtomicReference<>();
+        AtomicReference<IOException> failure = new AtomicReference<>();
+        // The daemon pool above only covers handler threads. The JDK's HttpServer also
+        // spawns its own internal dispatcher thread, and that thread's daemon status is
+        // inherited from whichever thread calls HttpServer.start() -- not from the
+        // executor. Calling it here from the caller's (often non-daemon, e.g. `main`)
+        // thread would leave that dispatcher thread non-daemon, defeating the whole
+        // point of the daemon pool above: the JVM would still hang if a script forgot
+        // to call `stop()`. Creating and starting the server from a daemon thread of
+        // our own makes the dispatcher thread daemon too.
+        Thread starter = new Thread(() -> {
+            try {
+                HttpServer server = HttpServer.create(address, 0);
+                server.setExecutor(pool);
+                server.start();
+                started.set(server);
+            } catch (IOException e) {
+                failure.set(e);
+            }
+        }, "onion-server-starter");
+        starter.setDaemon(true);
+        starter.start();
         try {
-            InetSocketAddress address = host == null
-                ? new InetSocketAddress(port)
-                : new InetSocketAddress(host, port);
-            HttpServer server = HttpServer.create(address, 0);
-            // A pool rather than the default (which runs handlers on the accept thread and
-            // serialises every request), bounded so a flood cannot exhaust memory.
-            //
-            // Daemon threads, deliberately: a non-daemon pool keeps the JVM alive after
-            // `main` returns, so a script that forgets to call `stop()` never exits. That
-            // is not a hypothetical -- it hung the first sample written against this API.
-            ExecutorService pool = Executors.newFixedThreadPool(8, runnable -> {
-                Thread thread = new Thread(runnable, "onion-server");
-                thread.setDaemon(true);
-                return thread;
-            });
-            server.setExecutor(pool);
-            server.start();
-            return new Instance(server, pool);
-        } catch (IOException e) {
+            starter.join();
+        } catch (InterruptedException e) {
+            pool.shutdownNow();
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Server: interrupted while starting", e);
+        }
+        if (failure.get() != null) {
+            pool.shutdownNow();
+            IOException e = failure.get();
             throw new RuntimeException("Server: could not bind "
                 + (host == null ? "*" : host) + ":" + port + " (" + e.getMessage() + ")", e);
         }
+        return new Instance(started.get(), pool);
     }
 
     /** A running server. */

@@ -1,0 +1,391 @@
+// UnitCalc — type-safe dimensional unit converter and quantity calculator.
+//
+// Exercises: ADT enums with many cases, records with laws/examples, classes
+// with maps, extension methods, collection pipelines, nullable handling,
+// string interpolation, foreach over map values, foreach over ArrayList.
+
+import {
+  java.util.HashMap as HMap
+  java.util.ArrayList as AList
+}
+
+// ── Dimensions ────────────────────────────────────────────────────────────────
+
+enum Dimension {
+  case Length
+  case Mass
+  case Time
+  case Temperature
+  case Area
+  case Volume
+  case Speed
+  case Force
+  case Energy
+  case Pressure
+  case Dimensionless
+
+public:
+  def label(): String = select this {
+    case d is Length:       "length"
+    case d is Mass:         "mass"
+    case d is Time:         "time"
+    case d is Temperature:  "temperature"
+    case d is Area:         "area"
+    case d is Volume:       "volume"
+    case d is Speed:        "speed"
+    case d is Force:        "force"
+    case d is Energy:       "energy"
+    case d is Pressure:     "pressure"
+    else:                   "dimensionless"
+  }
+}
+
+// ── Units ─────────────────────────────────────────────────────────────────────
+
+record Measure(symbol: String, name: String, dim: Dimension, toSI: Double, offsetToSI: Double) {
+  // law: converting to SI and back must be identity (within floating-point tolerance)
+  example roundTrip {
+    val u = new Measure("m", "metre", new Length(), 1.0, 0.0)
+    val v = 42.5
+    val si = v * u.toSI() + u.offsetToSI()
+    val back = (si - u.offsetToSI()) / u.toSI()
+    OnionMath::abs(back - v) < 1e-9
+  }
+}
+
+// ── Quantity ──────────────────────────────────────────────────────────────────
+
+record Quantity(value: Double, unit: Measure) {
+  example positiveLength {
+    val m = new Measure("m", "metre", new Length(), 1.0, 0.0)
+    val q = new Quantity(5.0, m)
+    q.value() > 0.0
+  }
+
+public:
+  def toSI(): Double = value() * unit().toSI() + unit().offsetToSI()
+
+  def convertTo(target: Measure): Quantity? {
+    if unit().dim().label() != target.dim().label() { return null }
+    val siVal = toSI()
+    val converted = (siVal - target.offsetToSI()) / target.toSI()
+    return new Quantity(converted, target)
+  }
+
+  def display(): String = "#{format6(value())} #{unit().symbol()}"
+}
+
+def format6(v: Double): String {
+  val s = Double::toString(v)
+  if s.length() <= 10 { return s }
+  return s.substring(0, 10)
+}
+
+// ── Unit registry ────────────────────────────────────────────────────────────
+
+class UnitRegistry {
+  val units: HMap[String, Measure]
+
+public:
+  def this {
+    units = new HMap[String, Measure]()
+    registerDefaults()
+  }
+
+  def register(u: Measure): void {
+    units.put(u.symbol(), u)
+  }
+
+  def get(symbol: String): Measure? = units.get(symbol)
+
+  def allByDimension(dim: Dimension): AList[Measure] {
+    val result: AList[Measure] = new AList[Measure]()
+    foreach u: Measure in units.values() {
+      if u.dim().label() == dim.label() { result.add(u) }
+    }
+    return result
+  }
+
+  def registerDefaults(): void {
+    // Length
+    register(new Measure("m",   "metre",      new Length(), 1.0,       0.0))
+    register(new Measure("km",  "kilometre",  new Length(), 1000.0,    0.0))
+    register(new Measure("cm",  "centimetre", new Length(), 0.01,      0.0))
+    register(new Measure("mm",  "millimetre", new Length(), 0.001,     0.0))
+    register(new Measure("in",  "inch",       new Length(), 0.0254,    0.0))
+    register(new Measure("ft",  "foot",       new Length(), 0.3048,    0.0))
+    register(new Measure("mi",  "mile",       new Length(), 1609.344,  0.0))
+    register(new Measure("yd",  "yard",       new Length(), 0.9144,    0.0))
+
+    // Mass
+    register(new Measure("kg",  "kilogram",   new Mass(), 1.0,     0.0))
+    register(new Measure("g",   "gram",       new Mass(), 0.001,   0.0))
+    register(new Measure("mg",  "milligram",  new Mass(), 1e-6,    0.0))
+    register(new Measure("lb",  "pound",      new Mass(), 0.453592, 0.0))
+    register(new Measure("oz",  "ounce",      new Mass(), 0.028350, 0.0))
+    register(new Measure("t",   "tonne",      new Mass(), 1000.0,  0.0))
+
+    // Time
+    register(new Measure("s",   "second",     new Time(), 1.0,     0.0))
+    register(new Measure("ms",  "millisecond",new Time(), 0.001,   0.0))
+    register(new Measure("min", "minute",     new Time(), 60.0,    0.0))
+    register(new Measure("h",   "hour",       new Time(), 3600.0,  0.0))
+    register(new Measure("day", "day",        new Time(), 86400.0, 0.0))
+
+    // Temperature (with offsets)
+    register(new Measure("K",   "kelvin",     new Temperature(), 1.0,   0.0))
+    register(new Measure("C",   "celsius",    new Temperature(), 1.0,   273.15))
+    register(new Measure("F",   "fahrenheit", new Temperature(), 5.0/9.0, 273.15 - 32.0 * 5.0/9.0))
+
+    // Area
+    register(new Measure("m2",  "sq.metre",   new Area(), 1.0,     0.0))
+    register(new Measure("km2", "sq.km",      new Area(), 1e6,     0.0))
+    register(new Measure("ha",  "hectare",    new Area(), 10000.0, 0.0))
+    register(new Measure("ac",  "acre",       new Area(), 4046.856, 0.0))
+
+    // Volume
+    register(new Measure("L",   "litre",      new Volume(), 0.001,   0.0))
+    register(new Measure("mL",  "millilitre", new Volume(), 1e-6,    0.0))
+    register(new Measure("m3",  "cu.metre",   new Volume(), 1.0,     0.0))
+    register(new Measure("gal", "gallon(US)", new Volume(), 0.003785, 0.0))
+    register(new Measure("fl",  "fl.oz(US)",  new Volume(), 2.957e-5, 0.0))
+
+    // Speed
+    register(new Measure("m/s",  "m/s",        new Speed(), 1.0,       0.0))
+    register(new Measure("km/h", "km/h",       new Speed(), 1.0/3.6,   0.0))
+    register(new Measure("mph",  "mph",        new Speed(), 0.44704,    0.0))
+    register(new Measure("kn",   "knot",       new Speed(), 0.514444,   0.0))
+
+    // Force
+    register(new Measure("N",   "newton",     new Force(), 1.0,     0.0))
+    register(new Measure("kN",  "kilonewton", new Force(), 1000.0,  0.0))
+    register(new Measure("lbf", "pound-force",new Force(), 4.44822, 0.0))
+
+    // Energy
+    register(new Measure("J",   "joule",      new Energy(), 1.0,      0.0))
+    register(new Measure("kJ",  "kilojoule",  new Energy(), 1000.0,   0.0))
+    register(new Measure("cal", "calorie",    new Energy(), 4.184,    0.0))
+    register(new Measure("kcal","kilocalorie",new Energy(), 4184.0,   0.0))
+    register(new Measure("Wh",  "watt-hour",  new Energy(), 3600.0,   0.0))
+    register(new Measure("kWh", "kWh",        new Energy(), 3.6e6,    0.0))
+
+    // Pressure
+    register(new Measure("Pa",  "pascal",     new Pressure(), 1.0,       0.0))
+    register(new Measure("kPa", "kilopascal", new Pressure(), 1000.0,    0.0))
+    register(new Measure("bar", "bar",        new Pressure(), 100000.0,  0.0))
+    register(new Measure("atm", "atmosphere", new Pressure(), 101325.0,  0.0))
+    register(new Measure("psi", "psi",        new Pressure(), 6894.76,   0.0))
+  }
+}
+
+// ── Conversion helpers ────────────────────────────────────────────────────────
+
+def convert(reg: UnitRegistry, value: Double, from: String, to: String): String {
+  val fromUnit: Measure? = reg.get(from)
+  val toUnit: Measure? = reg.get(to)
+  if fromUnit == null { return "unknown unit: #{from}" }
+  if toUnit == null   { return "unknown unit: #{to}" }
+  val q = new Quantity(value, (fromUnit as Measure))
+  val result: Quantity? = q.convertTo((toUnit as Measure))
+  if result == null { return "incompatible dimensions: #{from} vs #{to}" }
+  return "#{value} #{from} = #{(result as Quantity).display()}"
+}
+
+// ── Conversion table printer ──────────────────────────────────────────────────
+
+def printTable(reg: UnitRegistry, value: Double, fromSym: String): void {
+  val fromUnit: Measure? = reg.get(fromSym)
+  if fromUnit == null {
+    IO::println("unknown unit: #{fromSym}")
+    return
+  }
+  val q = new Quantity(value, (fromUnit as Measure))
+  val peers = reg.allByDimension(fromUnit.dim())
+  IO::println("=== #{value} #{fromSym} (#{fromUnit.dim().label()}) ===")
+  foreach peer: Measure in peers {
+    val r: Quantity? = q.convertTo(peer)
+    if r != null {
+      IO::println("  -> #{(r as Quantity).display().padEnd(20)} (#{peer.name()})")
+    }
+  }
+}
+
+// ── Extension methods on String for padding ───────────────────────────────────
+
+extension String {
+  def padEnd(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def padStart(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ── Conversion chain: follow a path of units ─────────────────────────────────
+
+def chain(reg: UnitRegistry, value: Double, path: AList[String]): void {
+  if path.size() < 2 {
+    IO::println("chain needs at least 2 units")
+    return
+  }
+  IO::print("Chain: #{value} #{path[0]}")
+  var current = value
+  var i = 0
+  while i < path.size() - 1 {
+    val fromSym = path[i]
+    val toSym   = path[i + 1]
+    val fromUnit: Measure? = reg.get(fromSym)
+    val toUnit: Measure?   = reg.get(toSym)
+    if fromUnit == null || toUnit == null { IO::println(" -> ERROR"); return }
+    val q = new Quantity(current, (fromUnit as Measure))
+    val r: Quantity? = q.convertTo((toUnit as Measure))
+    if r == null { IO::println(" -> INCOMPATIBLE"); return }
+    current = (r as Quantity).value()
+    IO::print(" -> #{format6(current)} #{toSym}")
+    i++
+  }
+  IO::println("")
+}
+
+// ── Best-fit: pick the unit where the value is between 1 and 1000 ────────────
+
+def bestFit(reg: UnitRegistry, value: Double, fromSym: String): String {
+  val fromUnit: Measure? = reg.get(fromSym)
+  if fromUnit == null { return "unknown unit" }
+  val q = new Quantity(value, (fromUnit as Measure))
+  val peers = reg.allByDimension(fromUnit.dim())
+  var bestSym: String = fromSym
+  var bestVal: Double = value
+  foreach peer: Measure in peers {
+    val r: Quantity? = q.convertTo(peer)
+    if r != null {
+      val v = (r as Quantity).value()
+      if v >= 1.0 && v < 1000.0 {
+        if bestSym == fromSym || v < bestVal {
+          bestVal = v
+          bestSym = peer.symbol()
+        }
+      }
+    }
+  }
+  return "#{format6(bestVal)} #{bestSym}"
+}
+
+// ── Statistics over a list of quantities ─────────────────────────────────────
+
+def statsReport(label: String, values: AList[Double], unit: String): void {
+  if values.size() == 0 { IO::println("#{label}: no data"); return }
+  var sum = 0.0
+  var mn = 0.0
+  var mx = 0.0
+  var first = true
+  foreach v: Double in values {
+    sum = sum + v
+    if first { mn = v; mx = v; first = false }
+    else {
+      if v < mn { mn = v }
+      if v > mx { mx = v }
+    }
+  }
+  val avg = sum / values.size()
+  IO::println("#{label}:")
+  IO::println("  count = #{values.size()}")
+  IO::println("  min   = #{format6(mn)} #{unit}")
+  IO::println("  max   = #{format6(mx)} #{unit}")
+  IO::println("  avg   = #{format6(avg)} #{unit}")
+  IO::println("  sum   = #{format6(sum)} #{unit}")
+}
+
+// ── Main program ──────────────────────────────────────────────────────────────
+
+val reg = new UnitRegistry()
+
+IO::println("=== UnitCalc — Type-safe Unit Converter ===")
+IO::println("")
+
+// Length conversions
+IO::println(convert(reg, 1.0,     "mi",  "km"))
+IO::println(convert(reg, 100.0,   "cm",  "ft"))
+IO::println(convert(reg, 26.2188, "mi",  "km"))   // marathon
+IO::println(convert(reg, 8848.0,  "m",   "ft"))   // Everest
+IO::println(convert(reg, 1.0,     "in",  "mm"))
+IO::println("")
+
+// Mass conversions
+IO::println(convert(reg, 70.0,  "kg", "lb"))
+IO::println(convert(reg, 1.0,   "t",  "kg"))
+IO::println(convert(reg, 16.0,  "oz", "g"))
+IO::println("")
+
+// Temperature conversions
+IO::println(convert(reg, 0.0,   "C", "F"))
+IO::println(convert(reg, 100.0, "C", "F"))
+IO::println(convert(reg, 98.6,  "F", "C"))
+IO::println(convert(reg, 0.0,   "K", "C"))
+IO::println("")
+
+// Energy
+IO::println(convert(reg, 1.0,    "kWh", "kJ"))
+IO::println(convert(reg, 2000.0, "kcal","kJ"))
+IO::println("")
+
+// Speed
+IO::println(convert(reg, 100.0,  "km/h", "mph"))
+IO::println(convert(reg, 343.0,  "m/s",  "km/h"))  // speed of sound
+IO::println("")
+
+// Tables
+IO::println("")
+printTable(reg, 1.0, "km")
+IO::println("")
+printTable(reg, 1.0, "kg")
+IO::println("")
+printTable(reg, 25.0, "C")
+IO::println("")
+
+// Chain conversion
+val path: AList[String] = new AList[String]()
+path.add("mi")
+path.add("km")
+path.add("m")
+path.add("cm")
+chain(reg, 1.0, path)
+
+val path2: AList[String] = new AList[String]()
+path2.add("kWh")
+path2.add("kJ")
+path2.add("cal")
+chain(reg, 1.0, path2)
+IO::println("")
+
+// Best-fit demo
+IO::println("Best-fit units:")
+IO::println("  5000 m  -> #{bestFit(reg, 5000.0, "m")}")
+IO::println("  0.5 km  -> #{bestFit(reg, 0.5,    "km")}")
+IO::println("  500 g   -> #{bestFit(reg, 500.0,  "g")}")
+IO::println("  3600 s  -> #{bestFit(reg, 3600.0, "s")}")
+IO::println("")
+
+// Statistics
+val temps: AList[Double] = new AList[Double]()
+temps.add(20.5)
+temps.add(22.1)
+temps.add(19.8)
+temps.add(23.4)
+temps.add(21.0)
+temps.add(18.9)
+temps.add(25.3)
+statsReport("Daily temperatures", temps, "C")
+IO::println("")
+
+// Error handling
+IO::println("Error cases:")
+IO::println(convert(reg, 1.0, "m",  "kg"))  // incompatible
+IO::println(convert(reg, 1.0, "xy", "m"))   // unknown
+IO::println("")
+
+IO::println("Done.")

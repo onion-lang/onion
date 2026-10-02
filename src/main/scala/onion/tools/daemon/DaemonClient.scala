@@ -30,6 +30,7 @@ object DaemonClient {
   }
 
   def main(args: Array[String]): Unit = {
+    onion.tools.ConsoleEncoding.install()
     val code = args.headOption match {
       case Some("stop") => control("stop")
       case Some("status") => control("ping")

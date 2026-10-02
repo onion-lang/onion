@@ -178,4 +178,24 @@ class ErrorCodeDocCoverageSpec extends AnyFunSpec {
   it("the Japanese E0079 section names every effect in the vocabulary") {
     checkEffectVocabulary("docs/ja/reference/error-codes.md")
   }
+
+  // E0093's example claims `parseURL` and `parseUrl` collide on one flag. Which flag that
+  // is comes from `onion.Cli.kebab`, the same function the compiler and the runtime
+  // use, so the section is checked against it rather than against a copied spelling.
+
+  private def checkFlagCollisionExample(docPath: String): Unit = {
+    val flag = "--" + onion.Cli.kebab("parseURL")
+    assert(onion.Cli.kebab("parseUrl") == onion.Cli.kebab("parseURL"), "the E0093 example no longer collides")
+    val e0093 = section(read(docPath), "E0093")
+    assert(e0093.contains("parseURL") && e0093.contains("parseUrl"), s"$docPath E0093 section lost its example")
+    assert(e0093.contains(flag), s"$docPath E0093 section does not name the shared flag $flag")
+  }
+
+  it("the English E0093 section names the flag its example's parameters share") {
+    checkFlagCollisionExample("docs/reference/error-codes.md")
+  }
+
+  it("the Japanese E0093 section names the flag its example's parameters share") {
+    checkFlagCollisionExample("docs/ja/reference/error-codes.md")
+  }
 }

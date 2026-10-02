@@ -1,0 +1,300 @@
+import {
+  java.util.LinkedHashMap
+}
+
+// ── Enumerations ──────────────────────────────────────────────────────────────
+
+enum BowType {
+  RECURVE, COMPOUND, BAREBOW, LONGBOW
+  public:
+    def displayName(): String = select this {
+      case BowType::RECURVE:  "Recurve"
+      case BowType::COMPOUND: "Compound"
+      case BowType::BAREBOW:  "Barebow"
+      case BowType::LONGBOW:  "Longbow"
+      else:                    "Unknown"
+    }
+    def isOlympic(): Boolean = select this {
+      case BowType::RECURVE:  true
+      case BowType::COMPOUND: true
+      else:                    false
+    }
+}
+
+enum Discipline {
+  INDOOR_18M, INDOOR_25M, OUTDOOR_70M, OUTDOOR_90M, FIELD_3D
+  public:
+    def displayName(): String = select this {
+      case Discipline::INDOOR_18M:  "Indoor 18m"
+      case Discipline::INDOOR_25M:  "Indoor 25m"
+      case Discipline::OUTDOOR_70M: "Outdoor 70m"
+      case Discipline::OUTDOOR_90M: "Outdoor 90m"
+      case Discipline::FIELD_3D:    "Field 3D"
+      else:                          "Unknown"
+    }
+    def arrowsPerEnd(): Int = select this {
+      case Discipline::FIELD_3D: 1
+      else:                       3
+    }
+    def isIndoor(): Boolean = select this {
+      case Discipline::INDOOR_18M: true
+      case Discipline::INDOOR_25M: true
+      else:                         false
+    }
+}
+
+enum ArrowZone {
+  MISS, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, X
+  public:
+    def points(): Int = select this {
+      case ArrowZone::MISS:  0
+      case ArrowZone::TWO:   2
+      case ArrowZone::THREE: 3
+      case ArrowZone::FOUR:  4
+      case ArrowZone::FIVE:  5
+      case ArrowZone::SIX:   6
+      case ArrowZone::SEVEN: 7
+      case ArrowZone::EIGHT: 8
+      case ArrowZone::NINE:  9
+      case ArrowZone::TEN:   10
+      case ArrowZone::X:     10
+      else:                   0
+    }
+    def label(): String = select this {
+      case ArrowZone::MISS: "M"
+      case ArrowZone::X:    "X"
+      else:                  "" + points()
+    }
+    def isGold(): Boolean = select this {
+      case ArrowZone::TEN: true
+      case ArrowZone::X:   true
+      else:                false
+    }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Archer(name: String, club: String, bowType: BowType) {
+  public:
+    def tag(): String = "#{name} (#{club}, #{bowType.displayName()})"
+}
+
+record ArrowEnd(arrows: List[ArrowZone]) {
+  public:
+    def score(): Int = arrows().fold(0) { acc, a -> acc + a.points() }
+    def xCount(): Int = arrows().filter { a -> a == ArrowZone::X }.size
+    def goldCount(): Int = arrows().filter { a -> a.isGold() }.size
+    def render(): String = arrows().fold("") { acc, a ->
+      if acc == "" { a.label() } else { acc + "-" + a.label() }
+    }
+}
+
+record Round(archer: Archer, discipline: Discipline, ends: List[ArrowEnd], date: String) {
+  public:
+    def totalScore(): Int  = ends().fold(0) { acc, e -> acc + e.score() }
+    def totalX(): Int      = ends().fold(0) { acc, e -> acc + e.xCount() }
+    def totalGolds(): Int  = ends().fold(0) { acc, e -> acc + e.goldCount() }
+    def arrowsFired(): Int = ends().size * discipline().arrowsPerEnd()
+    def maxScore(): Int    = arrowsFired() * 10
+    def pct(): Int = if maxScore() == 0 { 0 } else { (totalScore() * 100) / maxScore() }
+    def summary(): String = "#{date} #{archer().name()} [#{discipline().displayName()}] #{totalScore()}/#{maxScore()} (#{pct()}%)"
+}
+
+// ── Helper functions ──────────────────────────────────────────────────────────
+
+def countRoundsByKey(rounds: List[Round], key: Round -> String): Map[String, Int] {
+  val tally: Map[String, Int] = [:]
+  foreach r: Round in rounds {
+    val k: String = key(r)
+    val cur: Int? = tally[k] as Int?
+    if cur == null { tally.put(k, 1) } else { tally.put(k, cur + 1) }
+  }
+  return tally
+}
+
+def sumScoresByKey(rounds: List[Round], key: Round -> String): Map[String, Int] {
+  val totals: Map[String, Int] = [:]
+  foreach r: Round in rounds {
+    val k: String = key(r)
+    val cur: Int? = totals[k] as Int?
+    if cur == null { totals.put(k, r.totalScore()) } else { totals.put(k, cur + r.totalScore()) }
+  }
+  return totals
+}
+
+def joinEndSummaries(ends: List[ArrowEnd], sep: String): String =
+  ends.fold("") { acc, e ->
+    val piece: String = e.render() + "=" + e.score()
+    if acc == "" { piece } else { acc + sep + piece }
+  }
+
+// ── Archer roster ─────────────────────────────────────────────────────────────
+
+val alice: Archer = new Archer("Alice Chen",    "Lakewood AC",  BowType::RECURVE)
+val bob:   Archer = new Archer("Bob Torres",    "City Archers", BowType::COMPOUND)
+val carol: Archer = new Archer("Carol Schmidt", "Lakewood AC",  BowType::BAREBOW)
+val dave:  Archer = new Archer("Dave Novak",    "Mountain AC",  BowType::RECURVE)
+val eve:   Archer = new Archer("Eve Okafor",    "City Archers", BowType::COMPOUND)
+
+// ── Round data ────────────────────────────────────────────────────────────────
+
+val r1: Round = new Round(alice, Discipline::INDOOR_18M, [
+  new ArrowEnd([ArrowZone::X,    ArrowZone::TEN,  ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::TEN,  ArrowZone::TEN,  ArrowZone::TEN]),
+  new ArrowEnd([ArrowZone::X,    ArrowZone::X,    ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::TEN,  ArrowZone::NINE, ArrowZone::EIGHT]),
+  new ArrowEnd([ArrowZone::X,    ArrowZone::TEN,  ArrowZone::TEN]),
+  new ArrowEnd([ArrowZone::NINE, ArrowZone::NINE, ArrowZone::EIGHT])
+], "2024-03-01")
+
+val r2: Round = new Round(bob, Discipline::INDOOR_18M, [
+  new ArrowEnd([ArrowZone::X,   ArrowZone::X,    ArrowZone::TEN]),
+  new ArrowEnd([ArrowZone::X,   ArrowZone::TEN,  ArrowZone::TEN]),
+  new ArrowEnd([ArrowZone::X,   ArrowZone::X,    ArrowZone::X]),
+  new ArrowEnd([ArrowZone::TEN, ArrowZone::TEN,  ArrowZone::TEN]),
+  new ArrowEnd([ArrowZone::X,   ArrowZone::X,    ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::TEN, ArrowZone::TEN,  ArrowZone::X])
+], "2024-03-01")
+
+val r3: Round = new Round(carol, Discipline::INDOOR_18M, [
+  new ArrowEnd([ArrowZone::NINE,  ArrowZone::NINE,  ArrowZone::EIGHT]),
+  new ArrowEnd([ArrowZone::TEN,   ArrowZone::NINE,  ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::NINE,  ArrowZone::EIGHT, ArrowZone::EIGHT]),
+  new ArrowEnd([ArrowZone::TEN,   ArrowZone::TEN,   ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::NINE,  ArrowZone::NINE,  ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::TEN,   ArrowZone::NINE,  ArrowZone::EIGHT])
+], "2024-03-01")
+
+val r4: Round = new Round(dave, Discipline::INDOOR_18M, [
+  new ArrowEnd([ArrowZone::TEN,  ArrowZone::TEN,  ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::X,    ArrowZone::TEN,  ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::TEN,  ArrowZone::NINE, ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::TEN,  ArrowZone::TEN,  ArrowZone::TEN]),
+  new ArrowEnd([ArrowZone::X,    ArrowZone::NINE, ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::TEN,  ArrowZone::TEN,  ArrowZone::EIGHT])
+], "2024-03-01")
+
+val r5: Round = new Round(eve, Discipline::INDOOR_18M, [
+  new ArrowEnd([ArrowZone::X,   ArrowZone::X,   ArrowZone::TEN]),
+  new ArrowEnd([ArrowZone::X,   ArrowZone::TEN, ArrowZone::TEN]),
+  new ArrowEnd([ArrowZone::TEN, ArrowZone::TEN, ArrowZone::TEN]),
+  new ArrowEnd([ArrowZone::X,   ArrowZone::X,   ArrowZone::TEN]),
+  new ArrowEnd([ArrowZone::TEN, ArrowZone::TEN, ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::X,   ArrowZone::TEN, ArrowZone::TEN])
+], "2024-03-02")
+
+val r6: Round = new Round(alice, Discipline::OUTDOOR_70M, [
+  new ArrowEnd([ArrowZone::NINE,  ArrowZone::EIGHT, ArrowZone::SEVEN]),
+  new ArrowEnd([ArrowZone::TEN,   ArrowZone::NINE,  ArrowZone::EIGHT]),
+  new ArrowEnd([ArrowZone::X,     ArrowZone::NINE,  ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::NINE,  ArrowZone::NINE,  ArrowZone::EIGHT])
+], "2024-04-15")
+
+val r7: Round = new Round(bob, Discipline::OUTDOOR_70M, [
+  new ArrowEnd([ArrowZone::TEN, ArrowZone::TEN,  ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::X,   ArrowZone::NINE, ArrowZone::NINE]),
+  new ArrowEnd([ArrowZone::TEN, ArrowZone::TEN,  ArrowZone::EIGHT]),
+  new ArrowEnd([ArrowZone::X,   ArrowZone::TEN,  ArrowZone::NINE])
+], "2024-04-15")
+
+val allRounds: List[Round]    = [r1, r2, r3, r4, r5, r6, r7]
+val indoorRounds: List[Round] = allRounds.filter { r -> r.discipline().isIndoor() }
+
+// ── Analysis ──────────────────────────────────────────────────────────────────
+
+IO::println("=== Archery Tournament Log ===")
+IO::println("Rounds logged : " + allRounds.size)
+IO::println("Indoor rounds : " + indoorRounds.size)
+IO::println("")
+
+IO::println("── Round Summaries ─")
+foreach r: Round in allRounds {
+  IO::println("  " + r.summary() + "  X:" + r.totalX() + " golds:" + r.totalGolds())
+}
+IO::println("")
+
+IO::println("── Indoor 18m Leaderboard (Mar 2024) ─")
+var rank: Int = 1
+foreach r: Round in indoorRounds {
+  IO::println("  #{rank}. #{r.archer().tag()} — #{r.totalScore()} pts  #{r.totalX()}X")
+  rank++
+}
+IO::println("")
+
+IO::println("── Bow Type Distribution ─")
+val bowTally: Map[String, Int] = countRoundsByKey(allRounds, { r -> r.archer().bowType().displayName() })
+foreach (bt, cnt) in bowTally {
+  IO::println("  #{bt}: #{cnt} rounds")
+}
+IO::println("")
+
+IO::println("── Discipline Count ─")
+val discTally: Map[String, Int] = countRoundsByKey(allRounds, { r -> r.discipline().displayName() })
+foreach (disc, cnt) in discTally {
+  IO::println("  #{disc}: #{cnt} rounds")
+}
+IO::println("")
+
+IO::println("── Club Score Totals ─")
+val clubTotals: Map[String, Int] = sumScoresByKey(allRounds, { r -> r.archer().club() })
+foreach (club, pts) in clubTotals {
+  IO::println("  #{club}: #{pts} pts")
+}
+IO::println("")
+
+IO::println("── X-Ring Leader ─")
+var bestX: Int    = 0
+var bestName: String = ""
+foreach r: Round in allRounds {
+  if r.totalX() > bestX {
+    bestX    = r.totalX()
+    bestName = r.archer().name()
+  }
+}
+IO::println("  Most X's in one round: #{bestName} with #{bestX} X's")
+IO::println("")
+
+IO::println("── End-by-End: Alice Indoor Round ─")
+var endNum: Int = 1
+foreach e: ArrowEnd in r1.ends() {
+  IO::println("  End #{endNum}: [#{e.render()}] = #{e.score()} pts  (golds: #{e.goldCount()})")
+  endNum++
+}
+IO::println("  Total: " + r1.totalScore() + " / " + r1.maxScore())
+IO::println("")
+
+IO::println("── End-by-End: Bob Indoor Round ─")
+endNum = 1
+foreach e: ArrowEnd in r2.ends() {
+  IO::println("  End #{endNum}: [#{e.render()}] = #{e.score()} pts  (golds: #{e.goldCount()})")
+  endNum++
+}
+IO::println("  Total: " + r2.totalScore() + " / " + r2.maxScore())
+IO::println("")
+
+IO::println("── Average Score per Arrow ─")
+foreach r: Round in allRounds {
+  val fired: Int = r.arrowsFired()
+  val avg: Int   = if fired == 0 { 0 } else { r.totalScore() / fired }
+  IO::println("  #{r.archer().name()} (#{r.discipline().displayName()}): #{avg} avg / arrow  (#{r.pct()}% of max)")
+}
+IO::println("")
+
+IO::println("── Olympic Bow Rounds ─")
+val olympicRounds: List[Round] = allRounds.filter { r -> r.archer().bowType().isOlympic() }
+IO::println("  Rounds shot with Olympic bow types: " + olympicRounds.size)
+IO::println("")
+
+IO::println("── End Summary Pipeline Demo ─")
+val aliceSummary: String = r1.ends() |> joinEndSummaries(" | ")
+IO::println("  Alice: " + aliceSummary)
+val bobSummary: String = r2.ends() |> joinEndSummaries(" | ")
+IO::println("  Bob  : " + bobSummary)
+IO::println("")
+
+IO::println("── Outdoor vs Indoor Comparison ─")
+val outdoorRounds: List[Round] = allRounds.filter { r -> !r.discipline().isIndoor() }
+val indoorTotal:   Int = indoorRounds.fold(0) { acc, r -> acc + r.totalScore() }
+val outdoorTotal:  Int = outdoorRounds.fold(0) { acc, r -> acc + r.totalScore() }
+IO::println("  Indoor total score : " + indoorTotal + " (" + indoorRounds.size + " rounds)")
+IO::println("  Outdoor total score: " + outdoorTotal + " (" + outdoorRounds.size + " rounds)")

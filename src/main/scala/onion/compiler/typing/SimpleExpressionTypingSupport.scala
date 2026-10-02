@@ -314,7 +314,13 @@ private[compiler] final class SimpleExpressionTypingSupport(
     val thisBinding = context.lookup("this")
     if (thisBinding != null) {
       context.recordUsage("this")
-      Some(new RefLocal(thisBinding))
+      // A nullable `self` receiver (`extension T? { ... }`) can be smart-cast by
+      // a null check just like any other immutable local (issue: self/this was
+      // never narrowed, so a null-guarded `self` inside such an extension always
+      // stayed nullable).
+      val effectiveType = context.getEffectiveType("this")
+      if (effectiveType != thisBinding.tp) Some(new AsInstanceOf(new RefLocal(thisBinding), effectiveType))
+      else Some(new RefLocal(thisBinding))
     } else if (context.isStatic) {
       bodyContext.report(CURRENT_INSTANCE_NOT_AVAILABLE, node)
       None

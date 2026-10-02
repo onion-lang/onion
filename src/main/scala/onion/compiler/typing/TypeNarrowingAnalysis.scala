@@ -115,16 +115,19 @@ private[typing] object TypeNarrowingAnalysis {
   }
 
   /**
-   * Matches the operand of a null-check that this analysis can narrow: either a
-   * bare identifier `x` or an explicit current-instance field access
-   * `this.field` / `self.field`. Returns the target name and whether the form
-   * was an explicit `this`-field selection (in which case only a field, never a
-   * local of the same name, is eligible for narrowing).
+   * Matches the operand of a null-check that this analysis can narrow: a bare
+   * identifier `x`, an explicit current-instance field access `this.field` /
+   * `self.field`, or a bare `this`/`self` (nullable only for a `self` receiver
+   * on `extension T? { ... }`, bound as the ordinary immutable local "this").
+   * Returns the target name and whether the form was an explicit `this`-field
+   * selection (in which case only a field, never a local of the same name, is
+   * eligible for narrowing).
    */
   private object NullCheckTarget {
     def unapply(expr: AST.Expression): Option[(String, Boolean)] = expr match {
       case AST.Id(_, name) => Some((name, false))
       case AST.MemberSelection(_, AST.CurrentInstance(_), name) => Some((name, true))
+      case AST.CurrentInstance(_) => Some(("this", false))
       case _ => None
     }
   }

@@ -1,0 +1,379 @@
+// TypeClassShowcase — polymorphic numeric algorithms and functional data structures
+// driven by type-class constraints.
+// Exercises: trait/instance type classes, constrained generics [T: C], Numeric[T]::,
+// ADT enums, records, generics, closures, collection pipelines, string interpolation,
+// do notation, ranges, recursive algorithms, extension methods.
+
+import { java.util.ArrayList }
+
+// ── Typeclass declarations ────────────────────────────────────────────────────
+
+trait Numeric[T] {
+  def zero(): T
+  def one(): T
+  def plus(a: T, b: T): T
+  def minus(a: T, b: T): T
+  def times(a: T, b: T): T
+  def negate(a: T): T
+  def fromInt(n: Int): T
+  def toDouble(a: T): Double
+  def show(a: T): String
+}
+
+instance Numeric[Integer] {
+  def zero(): Integer = 0
+  def one(): Integer = 1
+  def plus(a: Integer, b: Integer): Integer = a + b
+  def minus(a: Integer, b: Integer): Integer = a - b
+  def times(a: Integer, b: Integer): Integer = a * b
+  def negate(a: Integer): Integer = 0 - a
+  def fromInt(n: Int): Integer = n
+  def toDouble(a: Integer): Double = a.doubleValue()
+  def show(a: Integer): String = a.toString()
+}
+
+instance Numeric[Long] {
+  def zero(): Long = 0L
+  def one(): Long = 1L
+  def plus(a: Long, b: Long): Long = a + b
+  def minus(a: Long, b: Long): Long = a - b
+  def times(a: Long, b: Long): Long = a * b
+  def negate(a: Long): Long = 0L - a
+  def fromInt(n: Int): Long = n.longValue()
+  def toDouble(a: Long): Double = a.doubleValue()
+  def show(a: Long): String = a.toString() + "L"
+}
+
+instance Numeric[Double] {
+  def zero(): Double = 0.0
+  def one(): Double = 1.0
+  def plus(a: Double, b: Double): Double = a + b
+  def minus(a: Double, b: Double): Double = a - b
+  def times(a: Double, b: Double): Double = a * b
+  def negate(a: Double): Double = 0.0 - a
+  def fromInt(n: Int): Double = n.doubleValue()
+  def toDouble(a: Double): Double = a
+  def show(a: Double): String = a.toString()
+}
+
+// ── Generic numeric algorithms ────────────────────────────────────────────────
+
+def sum[T: Numeric](xs: List[T]): T {
+  var acc: T = Numeric[T]::zero()
+  foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
+  return acc
+}
+
+def product[T: Numeric](xs: List[T]): T {
+  var acc: T = Numeric[T]::one()
+  foreach x: T in xs { acc = Numeric[T]::times(acc, x) }
+  return acc
+}
+
+def mean[T: Numeric](xs: List[T]): Double {
+  if xs.size == 0 { return 0.0 }
+  val s: Double = Numeric[T]::toDouble(sum(xs))
+  return s / xs.size.doubleValue()
+}
+
+def dot[T: Numeric](a: List[T], b: List[T]): T {
+  var acc: T = Numeric[T]::zero()
+  var i: Int = 0
+  val n: Int = if a.size < b.size { a.size } else { b.size }
+  while i < n {
+    acc = Numeric[T]::plus(acc, Numeric[T]::times(a[i], b[i]))
+    i++
+  }
+  return acc
+}
+
+def scale[T: Numeric](xs: List[T], factor: T): List[T] =
+  xs.map { x -> Numeric[T]::times(x, factor) }
+
+def showList[T: Numeric](xs: List[T]): String {
+  var parts: List[String] = xs.map { x -> Numeric[T]::show(x) }
+  var sb: String = "["
+  var first: Boolean = true
+  foreach p: String in parts {
+    if !first { sb = sb + ", " }
+    sb = sb + p
+    first = false
+  }
+  return sb + "]"
+}
+
+
+// ── Vec2 — 2-D vector using typeclass arithmetic ──────────────────────────────
+
+record Vec2[T](x: T, y: T) {
+public:
+  def add(other: Vec2[T], n: Numeric[T]): Vec2[T] =
+    new Vec2[T](n.plus(x(), other.x()), n.plus(y(), other.y()))
+
+  def scale(factor: T, n: Numeric[T]): Vec2[T] =
+    new Vec2[T](n.times(x(), factor), n.times(y(), factor))
+
+  def dot(other: Vec2[T], n: Numeric[T]): T =
+    n.plus(n.times(x(), other.x()), n.times(y(), other.y()))
+
+  def show(n: Numeric[T]): String =
+    "(" + n.show(x()) + ", " + n.show(y()) + ")"
+}
+
+
+// ── Ord typeclass for ordering ────────────────────────────────────────────────
+
+trait Ord[T] {
+  def compare(a: T, b: T): Int  // negative, zero, positive
+}
+
+instance Ord[Integer] {
+  def compare(a: Integer, b: Integer): Int {
+    if a < b { return -1 }
+    if a > b { return 1 }
+    return 0
+  }
+}
+
+instance Ord[String] {
+  def compare(a: String, b: String): Int = a.compareTo(b)
+}
+
+instance Ord[Double] {
+  def compare(a: Double, b: Double): Int {
+    if a < b { return -1 }
+    if a > b { return 1 }
+    return 0
+  }
+}
+
+def minimum[T: Ord](xs: List[T]): T? {
+  if xs.size == 0 { return null }
+  var best: T = xs[0]
+  var i: Int = 1
+  while i < xs.size {
+    if Ord[T]::compare(xs[i], best) < 0 { best = xs[i] }
+    i++
+  }
+  return best
+}
+
+def maximum[T: Ord](xs: List[T]): T? {
+  if xs.size == 0 { return null }
+  var best: T = xs[0]
+  var i: Int = 1
+  while i < xs.size {
+    if Ord[T]::compare(xs[i], best) > 0 { best = xs[i] }
+    i++
+  }
+  return best
+}
+
+def isSorted[T: Ord](xs: List[T]): Boolean {
+  var i: Int = 0
+  while i < xs.size - 1 {
+    if Ord[T]::compare(xs[i], xs[i + 1]) > 0 { return false }
+    i++
+  }
+  return true
+}
+
+def insertionSort[T: Ord](xs: List[T]): List[T] {
+  val result: List[T] = new ArrayList[T](xs)
+  var i: Int = 1
+  while i < result.size {
+    val key: T = result[i]
+    var j: Int = i - 1
+    while j >= 0 && Ord[T]::compare(result[j], key) > 0 {
+      result[j + 1] = result[j]
+      j = j - 1
+    }
+    result[j + 1] = key
+    i++
+  }
+  return result
+}
+
+
+// ── Show typeclass ────────────────────────────────────────────────────────────
+
+trait Show[T] {
+  def display(a: T): String
+}
+
+instance Show[Integer] {
+  def display(a: Integer): String = "Int(" + a + ")"
+}
+
+instance Show[String] {
+  def display(a: String): String = "\"" + a + "\""
+}
+
+instance Show[Boolean] {
+  def display(a: Boolean): String = if a { "true" } else { "false" }
+}
+
+def printAll[T: Show](xs: List[T]): void {
+  var i: Int = 0
+  foreach x: T in xs {
+    IO::println("  [#{i}] " + Show[T]::display(x))
+    i++
+  }
+}
+
+// ── Matrix[T] backed by a flat list ──────────────────────────────────────────
+
+class Matrix[T] {
+  val rows: Int
+  val cols: Int
+  val data: List[T]
+
+public:
+  def this(rows: Int, cols: Int, fill: T) {
+    this.rows = rows
+    this.cols = cols
+    this.data = new java.util.ArrayList[T]()
+    var i: Int = 0
+    while i < rows * cols {
+      data.add(fill)
+      i++
+    }
+  }
+
+  def get(r: Int, c: Int): T = data[r * cols + c]
+
+  def set(r: Int, c: Int, v: T): void {
+    data[r * cols + c] = v
+  }
+
+  def multiply(other: Matrix[T], n: Numeric[T]): Matrix[T] {
+    val result: Matrix[T] = new Matrix[T](rows, other.cols, n.zero())
+    var r: Int = 0
+    while r < rows {
+      var c: Int = 0
+      while c < other.cols {
+        var acc: T = n.zero()
+        var k: Int = 0
+        while k < cols {
+          acc = n.plus(acc, n.times(get(r, k), other.get(k, c)))
+          k++
+        }
+        result.set(r, c, acc)
+        c++
+      }
+      r++
+    }
+    return result
+  }
+
+  def show(n: Numeric[T]): String {
+    var sb: String = "[\n"
+    var r: Int = 0
+    while r < rows {
+      sb = sb + "  ["
+      var c: Int = 0
+      while c < cols {
+        if c > 0 { sb = sb + ", " }
+        sb = sb + n.show(get(r, c))
+        c++
+      }
+      sb = sb + "]\n"
+      r++
+    }
+    return sb + "]"
+  }
+}
+
+
+// ── Main demonstration ────────────────────────────────────────────────────────
+
+IO::println("=== Numeric typeclass ===")
+
+val ints   = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]
+val longs  = [10L, 20L, 30L, 40L, 50L]
+val floats = [1.1, 2.2, 3.3, 4.4, 5.5]
+
+IO::println("sum(ints)    = " + sum(ints))
+IO::println("product(ints[0..4]) = " + product(ints.take(4)))
+IO::println("mean(floats) = " + mean(floats))
+IO::println("sum(longs)   = " + sum(longs))
+IO::println("dot([1,2,3],[4,5,6]) = " + dot([1,2,3],[4,5,6]))
+
+IO::println("")
+IO::println("showList(ints) = " + showList(ints))
+IO::println("scale([1,2,3], 5) = " + showList(scale([1,2,3], 5)))
+
+IO::println("")
+IO::println("=== Vec2 ===")
+val nI: `Numeric$$Integer` = new `Numeric$$Integer`()
+val v1: Vec2[Integer] = new Vec2[Integer](3, 4)
+val v2: Vec2[Integer] = new Vec2[Integer](1, 2)
+IO::println("v1 = " + v1.show(nI))
+IO::println("v2 = " + v2.show(nI))
+IO::println("v1+v2 = " + v1.add(v2, nI).show(nI))
+IO::println("v1*3 = " + v1.scale(3, nI).show(nI))
+IO::println("v1·v2 = " + v1.dot(v2, nI))
+
+IO::println("")
+IO::println("=== Ord typeclass ===")
+val words = ["banana", "apple", "cherry", "date", "elderberry"]
+IO::println("min = " + minimum(words))
+IO::println("max = " + maximum(words))
+IO::println("isSorted(ints) = " + isSorted(ints))
+
+val sortedInts = insertionSort(ints)
+IO::println("sorted(ints) = " + showList(sortedInts))
+IO::println("isSorted after sort = " + isSorted(sortedInts))
+
+val sortedWords = insertionSort(words)
+IO::println("sorted(words) = " + sortedWords.toString())
+
+IO::println("")
+IO::println("=== Show typeclass ===")
+val nums: List[Integer] = [10, 20, 30]
+val strs: List[String] = ["foo", "bar", "baz"]
+IO::println("integers:")
+printAll(nums)
+IO::println("strings:")
+printAll(strs)
+
+IO::println("")
+IO::println("=== Matrix multiplication ===")
+// 2x3 * 3x2 = 2x2
+val nD: `Numeric$$Double` = new `Numeric$$Double`()
+val A: Matrix[Double] = new Matrix[Double](2, 3, 0.0)
+A.set(0, 0, 1.0); A.set(0, 1, 2.0); A.set(0, 2, 3.0)
+A.set(1, 0, 4.0); A.set(1, 1, 5.0); A.set(1, 2, 6.0)
+
+val B: Matrix[Double] = new Matrix[Double](3, 2, 0.0)
+B.set(0, 0, 7.0); B.set(0, 1, 8.0)
+B.set(1, 0, 9.0); B.set(1, 1, 10.0)
+B.set(2, 0, 11.0); B.set(2, 1, 12.0)
+
+val C: Matrix[Double] = A.multiply(B, nD)
+IO::println("A * B =")
+IO::println(C.show(nD))
+
+// Verify: C[0][0] = 1*7+2*9+3*11 = 7+18+33 = 58
+// C[0][1] = 1*8+2*10+3*12 = 8+20+36 = 64
+// C[1][0] = 4*7+5*9+6*11 = 28+45+66 = 139
+// C[1][1] = 4*8+5*10+6*12 = 32+50+72 = 154
+IO::println("Expected: [[58, 64], [139, 154]]")
+
+IO::println("")
+IO::println("=== Statistics via Numeric + Ord ===")
+val data = [4.0, 8.0, 15.0, 16.0, 23.0, 42.0]
+IO::println("data = " + showList(data))
+IO::println("sum  = " + sum(data))
+IO::println("mean = " + mean(data))
+IO::println("min  = " + minimum(data))
+IO::println("max  = " + maximum(data))
+
+// Variance: mean of squared deviations
+val mu: Double = mean(data)
+val deviations: List[Double] = data.map { x -> (x - mu) * (x - mu) }
+val variance: Double = mean(deviations)
+IO::println("variance  = " + variance)
+
+IO::println("")
+IO::println("All done.")

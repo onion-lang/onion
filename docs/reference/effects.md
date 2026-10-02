@@ -57,7 +57,9 @@ The table ships with the whole effectful surface of the standard library classif
 `Concurrent`, `ToolCli` — plus the pure remainder of the stdlib (including the nested
 values its entry points hand back, such as `Proc`'s result, `Http`'s response and
 `Json::value`), a pure baseline for common JDK value and collection types and for
-`java.time` (whose `now` methods are `clock`), and the JDK's well-known
+`java.time` (whose `now` methods are `clock`), JDK file I/O (`java.io` file
+streams and `File`, `java.nio.file.Files`; stream wrappers such as `BufferedReader`
+stay `unknown` because they may wrap `System.in` or a socket), and the JDK's well-known
 effect points (`System::getenv`, `System::exit`, `Runtime::exec`, `Thread::sleep`,
 `PrintStream` as the type of `System::out`).
 
@@ -96,3 +98,10 @@ table classifies the stdlib as shipped — a user-supplied class named `onion.Fi
 not consulted against its source. And an effect set is not a security sandbox: nothing
 stops a program from running; the set is the honest input to the layers that decide
 whether it *should*.
+
+The same walk also records, for `--plan`, the operands it can read off the source — a
+literal URL's host, a `Proc` command with its literal arguments, a
+`System::getenv` variable name, a literal path (see [Operands the source spells out](../guide/tools.md#operands-the-source-spells-out)).
+Those are a lower bound in the opposite sense from the effect set: every operand listed
+is one the program can reach, but an operand that is not a literal is reported as
+`(operand not statically known)`, never guessed.

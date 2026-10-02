@@ -1,0 +1,257 @@
+// LogAnalyzer.on — A realistic log analysis report demonstrating:
+//   from re"..." record parsing, ADT enums, collection pipelines,
+//   extension methods, |> pipeline, pattern matching, and records with methods.
+
+// ---------------------------------------------------------------------------
+// Data model
+// ---------------------------------------------------------------------------
+
+record LogEntry(timestamp: String, level: String, component: String, message: String)
+  from re"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] \[(\w+)\] (.*)"
+
+enum Alert {
+  case Healthy
+  case Warning(component: String, reason: String)
+  case Critical(component: String, reason: String)
+}
+
+record ComponentStats(
+  name:     String,
+  total:    Int,
+  debugs:   Int,
+  infos:    Int,
+  warns:    Int,
+  errors:   Int,
+  fatals:   Int
+) {
+public:
+  def errorRate(): Double =
+    if total == 0 { 0.0 } else { (errors as Double) / (total as Double) * 100.0 }
+
+  def fatalRate(): Double =
+    if total == 0 { 0.0 } else { (fatals as Double) / (total as Double) * 100.0 }
+
+  def toAlert(): Alert =
+    if fatals > 0 {
+      new Critical(name, "#{fatals} FATAL message(s) recorded")
+    } else if errorRate() >= 30.0 {
+      new Critical(name, "error rate #{formatPct(errorRate())} exceeds 30%")
+    } else if errors > 0 {
+      new Warning(name, "#{errors} error(s) found")
+    } else if warns > 0 {
+      new Warning(name, "#{warns} warning(s) found")
+    } else {
+      new Healthy()
+    }
+}
+
+record LevelCount(level: String, count: Int)
+
+// ---------------------------------------------------------------------------
+// String formatting helpers (extension methods + standalone)
+// ---------------------------------------------------------------------------
+
+extension String {
+  def padEnd(width: Int): String = {
+    val pad = width - self.length()
+    if pad <= 0 { self } else { self + " ".repeat(pad) }
+  }
+  def padStart(width: Int): String = {
+    val pad = width - self.length()
+    if pad <= 0 { self } else { " ".repeat(pad) + self }
+  }
+  def center(width: Int): String = {
+    val pad = width - self.length()
+    if pad <= 0 { self } else {
+      val l = pad / 2
+      " ".repeat(l) + self + " ".repeat(pad - l)
+    }
+  }
+}
+
+def formatPct(d: Double): String = "#{((d * 10.0) as Int as Double) / 10.0}%"
+
+def bar(filled: Int, total: Int, width: Int): String = {
+  val n: Int = if total == 0 { 0 } else { ((filled as Double) / (total as Double) * (width as Double)) as Int }
+  "#".repeat(n) + "-".repeat(width - n)
+}
+
+def hr(width: Int): String = "=".repeat(width)
+
+// ---------------------------------------------------------------------------
+// Sample log data — 40+ lines covering multiple components and levels
+// ---------------------------------------------------------------------------
+
+val RAW_LOG = """2024-03-15 08:00:01 [INFO] [Gateway] Service started on port 8080
+2024-03-15 08:00:05 [INFO] [AuthService] Auth service online
+2024-03-15 08:00:08 [INFO] [Database] Connection pool initialized: 20 connections
+2024-03-15 08:00:10 [INFO] [OrderService] Order service ready
+2024-03-15 08:01:14 [DEBUG] [Database] Health check query executed in 3ms
+2024-03-15 08:02:33 [INFO] [AuthService] User #101 logged in
+2024-03-15 08:03:00 [INFO] [OrderService] Order #5501 placed by user #101
+2024-03-15 08:03:15 [DEBUG] [Database] Transaction committed in 12ms
+2024-03-15 08:04:22 [INFO] [AuthService] User #102 logged in
+2024-03-15 08:05:00 [WARN] [Gateway] Request rate elevated: 450 req/s
+2024-03-15 08:05:44 [INFO] [OrderService] Order #5502 placed by user #102
+2024-03-15 08:06:01 [ERROR] [AuthService] Authentication failed for user admin (brute force suspected)
+2024-03-15 08:06:15 [WARN] [AuthService] Multiple failed logins from 192.168.1.45
+2024-03-15 08:06:30 [ERROR] [AuthService] Account locked: user admin
+2024-03-15 08:07:00 [INFO] [OrderService] Order #5503 placed by user #102
+2024-03-15 08:07:22 [WARN] [Database] Connection pool under pressure: 18/20 in use
+2024-03-15 08:08:00 [ERROR] [Database] Slow query detected: 3.2s for SELECT on orders
+2024-03-15 08:08:30 [INFO] [Gateway] Upstream latency spike: 250ms avg
+2024-03-15 08:09:00 [DEBUG] [OrderService] Payment gateway response: approved
+2024-03-15 08:09:44 [ERROR] [OrderService] Order #5504 failed: inventory check timeout
+2024-03-15 08:10:00 [WARN] [Gateway] Circuit breaker tripped for InventoryService
+2024-03-15 08:10:30 [ERROR] [Database] Replication lag: 4.5s behind primary
+2024-03-15 08:10:45 [ERROR] [Database] Deadlock detected on table orders
+2024-03-15 08:11:00 [INFO] [AuthService] Security alert escalated to on-call
+2024-03-15 08:11:30 [FATAL] [Database] Primary DB connection lost — initiating failover
+2024-03-15 08:11:45 [ERROR] [OrderService] Order #5505 failed: DB unavailable
+2024-03-15 08:11:50 [ERROR] [OrderService] Order #5506 failed: DB unavailable
+2024-03-15 08:12:00 [WARN] [Gateway] Health check failing for Database
+2024-03-15 08:12:15 [INFO] [Database] Failover to replica completed
+2024-03-15 08:12:30 [INFO] [OrderService] Retrying pending orders after DB recovery
+2024-03-15 08:13:00 [INFO] [Gateway] All services nominal
+2024-03-15 08:13:15 [DEBUG] [Database] Query cache warmed up
+2024-03-15 08:14:00 [INFO] [AuthService] Suspicious IP 192.168.1.45 blocked
+2024-03-15 08:14:30 [INFO] [OrderService] Order #5505 retried successfully
+2024-03-15 08:15:00 [INFO] [OrderService] Order #5506 retried successfully
+2024-03-15 08:16:00 [DEBUG] [Database] Replication lag normalized: 0.1s
+2024-03-15 08:17:00 [INFO] [Gateway] Throughput back to normal: 380 req/s
+2024-03-15 08:18:00 [INFO] [AuthService] Daily audit log snapshot taken
+2024-03-15 08:19:00 [DEBUG] [OrderService] Background reconciliation complete: 0 discrepancies
+2024-03-15 08:20:00 [INFO] [Gateway] Scheduled maintenance window begins at 22:00"""
+
+// ---------------------------------------------------------------------------
+// Parse and analyze
+// ---------------------------------------------------------------------------
+
+val entries: List[LogEntry] = LogEntry::parseAll(RAW_LOG)
+val total = entries.size
+
+// Level distribution
+val byLevel: Map[String, List[LogEntry]] = entries.groupBy { e -> e.level() }
+val levelOrder = ["DEBUG", "INFO", "WARN", "ERROR", "FATAL"]
+
+// Per-component stats
+val byComponent: Map[String, List[LogEntry]] = entries.groupBy { e -> e.component() }
+
+def statsFor(name: String, compEntries: List[LogEntry]): ComponentStats =
+  new ComponentStats(
+    name,
+    compEntries.size,
+    compEntries.filter { e -> e.level() == "DEBUG" }.size,
+    compEntries.filter { e -> e.level() == "INFO"  }.size,
+    compEntries.filter { e -> e.level() == "WARN"  }.size,
+    compEntries.filter { e -> e.level() == "ERROR" }.size,
+    compEntries.filter { e -> e.level() == "FATAL" }.size
+  )
+
+val statsBuf: List[ComponentStats] = []
+foreach (name, es) in byComponent {
+  statsBuf.add(statsFor(name, es))
+}
+val allStats: List[ComponentStats] = statsBuf.sortedBy { s -> s.name() }
+
+// Error burst detection: consecutive ERROR/FATAL entries
+def countBurst(ents: List[LogEntry]): Int = {
+  var maxRun = 0
+  var run = 0
+  foreach e: LogEntry in ents {
+    if e.level() == "ERROR" || e.level() == "FATAL" {
+      run = run + 1
+      if run > maxRun { maxRun = run }
+    } else {
+      run = 0
+    }
+  }
+  maxRun
+}
+
+// ---------------------------------------------------------------------------
+// Report output
+// ---------------------------------------------------------------------------
+
+val W = 62
+println(hr(W))
+println(" LOG ANALYSIS REPORT".center(W))
+println(" System: Production Cluster  |  Date: 2024-03-15".center(W))
+println(hr(W))
+println("")
+
+// 1. Overview
+println("OVERVIEW")
+println("-".repeat(W))
+println("Total log entries : #{total}")
+println("Components active : #{byComponent.size}")
+
+val errorTotal = entries.filter { e -> e.level() == "ERROR" || e.level() == "FATAL" }.size
+println("Errors + Fatals   : #{errorTotal} (#{formatPct((errorTotal as Double) / (total as Double) * 100.0)} of all entries)")
+println("Max error burst   : #{countBurst(entries)} consecutive error(s)")
+println("")
+
+// 2. Level distribution
+println("LEVEL DISTRIBUTION")
+println("-".repeat(W))
+foreach lv: String in levelOrder {
+  val cnt = byLevel.getOrDefault(lv, []).size
+  val barStr = bar(cnt, total, 30)
+  println("#{lv.padEnd(7)} [#{barStr}] #{cnt.toString().padStart(3)} (#{formatPct((cnt as Double) / (total as Double) * 100.0)})")
+}
+println("")
+
+// 3. Per-component table
+println("COMPONENT BREAKDOWN")
+println("-".repeat(W))
+println("Component".padEnd(16) + "Total".padStart(6) + " ERR".padStart(5) + " WRN".padStart(5) + " FAT".padStart(5) + "  ErrRate".padStart(10) + "  Alert".padStart(11))
+println("-".repeat(W))
+foreach s: ComponentStats in allStats {
+  val row = s.name().padEnd(16) +
+    s.total().toString().padStart(6) +
+    s.errors().toString().padStart(5) +
+    s.warns().toString().padStart(5) +
+    s.fatals().toString().padStart(5) +
+    formatPct(s.errorRate()).padStart(10) +
+    (select s.toAlert() {
+       case h is Healthy:  "OK"
+       case w is Warning:  "WARN"
+       case c is Critical: "CRIT"
+     }).padStart(11)
+  println(row)
+}
+println("")
+
+// 4. Alerts
+val alerts: List[Alert] = allStats.map { s -> s.toAlert() }.filter { a -> !(a is Healthy) }
+println("ACTIVE ALERTS  (#{alerts.size} total)")
+println("-".repeat(W))
+if alerts.size == 0 {
+  println("  No active alerts.")
+} else {
+  foreach a: Alert in alerts {
+    select a {
+      case w is Warning:
+        println("  [WARN]  #{w.component()}: #{w.reason()}")
+      case c is Critical:
+        println("  [CRIT]  #{c.component()}: #{c.reason()}")
+      else:
+    }
+  }
+}
+println("")
+
+// 5. Recent errors (last 5)
+val errorEntries: List[LogEntry] = entries.filter { e -> e.level() == "ERROR" || e.level() == "FATAL" }
+val recStart: Int = if errorEntries.size <= 5 { 0 } else { errorEntries.size - 5 }
+val recentErrors: List[LogEntry] = errorEntries.subList(recStart, errorEntries.size)
+println("RECENT ERRORS (latest #{recentErrors.size})")
+println("-".repeat(W))
+foreach e: LogEntry in recentErrors {
+  println("  #{e.timestamp()} [#{e.level()}] #{e.component()}")
+  println("    #{e.message().substring(0, if e.message().length() < 55 { e.message().length() } else { 55 })}")
+}
+println("")
+println(hr(W))
+println(" END OF REPORT".center(W))
+println(hr(W))

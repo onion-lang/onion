@@ -1,0 +1,220 @@
+// TaskManager.on — A project task management system
+// Exercises: enums with methods, records, extension methods, collection pipelines
+// (map/filter/groupBy/sortedBy/reduce/find/partition), select/pattern matching,
+// string interpolation, closures, statistics, null handling, while/foreach loops.
+
+import {
+  java.util.*
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum Priority {
+  LOW, MEDIUM, HIGH, CRITICAL
+public:
+  def label(): String = select this {
+    case Priority::LOW:      "[low]     "
+    case Priority::MEDIUM:   "[medium]  "
+    case Priority::HIGH:     "[HIGH]    "
+    case Priority::CRITICAL: "[CRITICAL]"
+  }
+  def weight(): Int = select this {
+    case Priority::LOW:      1
+    case Priority::MEDIUM:   2
+    case Priority::HIGH:     3
+    case Priority::CRITICAL: 4
+  }
+}
+
+enum Status {
+  TODO, IN_PROGRESS, BLOCKED, DONE, CANCELLED
+public:
+  def isDone(): Boolean   = this == Status::DONE || this == Status::CANCELLED
+  def isActive(): Boolean = this == Status::IN_PROGRESS
+  def label(): String = select this {
+    case Status::TODO:        "todo       "
+    case Status::IN_PROGRESS: "in-progress"
+    case Status::BLOCKED:     "BLOCKED    "
+    case Status::DONE:        "done       "
+    case Status::CANCELLED:   "cancelled  "
+  }
+}
+
+// ─── Records ────────────────────────────────────────────────────────────────
+
+record Task(id: Int, title: String, priority: Priority, status: Status, tags: List[String], effort: Int) {
+public:
+  def isHighPriority(): Boolean = priority().weight() >= 3
+  def isBlocked(): Boolean      = status() == Status::BLOCKED
+  def display(): String =
+    "#{priority().label()} #{status().label()} [#{id()}] #{title()} (effort:#{effort()})"
+}
+
+record Sprint(name: String, tasks: List[Task]) {
+public:
+  def totalEffort(): Int {
+    var total: Int = 0
+    foreach t: Task in tasks() { total = total + t.effort() }
+    return total
+  }
+  def completedEffort(): Int {
+    var total: Int = 0
+    foreach t: Task in tasks() {
+      if t.status().isDone() { total = total + t.effort() }
+    }
+    return total
+  }
+  def velocity(): Double = completedEffort().doubleValue() / totalEffort().doubleValue() * 100.0
+  def blockedCount(): Int {
+    var count: Int = 0
+    foreach t: Task in tasks() { if t.isBlocked() { count++ } }
+    return count
+  }
+}
+
+// ─── Extension methods ───────────────────────────────────────────────────────
+
+extension Int {
+  def stars(): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + "*"; i++ }
+    return s
+  }
+}
+
+extension String {
+  def padRight(width: Int): String {
+    var s: String = self
+    while s.length() < width { s = s + " " }
+    return s
+  }
+  def truncate(maxLen: Int): String =
+    if self.length() <= maxLen { self } else { self.substring(0, maxLen - 1) + "…" }
+}
+
+// ─── Task database ──────────────────────────────────────────────────────────
+
+val tasks: List[Task] = [
+  new Task(1,  "Design REST API schema",          Priority::HIGH,     Status::DONE,        ["backend", "api"],         5),
+  new Task(2,  "Set up CI pipeline",              Priority::HIGH,     Status::DONE,        ["devops", "infra"],        3),
+  new Task(3,  "Implement auth middleware",        Priority::CRITICAL, Status::IN_PROGRESS, ["backend", "security"],   8),
+  new Task(4,  "Write unit tests for auth",        Priority::HIGH,     Status::TODO,        ["backend", "testing"],    5),
+  new Task(5,  "Build user dashboard UI",          Priority::MEDIUM,   Status::IN_PROGRESS, ["frontend", "ui"],        7),
+  new Task(6,  "Fix XSS vulnerability in forms",   Priority::CRITICAL, Status::BLOCKED,     ["frontend", "security"],  3),
+  new Task(7,  "Optimize database queries",        Priority::MEDIUM,   Status::TODO,        ["backend", "perf"],       4),
+  new Task(8,  "Add password reset flow",          Priority::HIGH,     Status::TODO,        ["backend", "frontend"],   6),
+  new Task(9,  "Write API documentation",          Priority::LOW,      Status::TODO,        ["docs"],                  2),
+  new Task(10, "Deploy to staging",                Priority::HIGH,     Status::BLOCKED,     ["devops"],                1),
+  new Task(11, "Mobile responsive layout",         Priority::MEDIUM,   Status::TODO,        ["frontend", "ui"],        5),
+  new Task(12, "Add rate limiting",                Priority::HIGH,     Status::TODO,        ["backend", "security"],   3),
+  new Task(13, "Set up monitoring alerts",         Priority::MEDIUM,   Status::DONE,        ["devops", "infra"],       2),
+  new Task(14, "Code review session",              Priority::LOW,      Status::DONE,        ["team"],                  1),
+  new Task(15, "Performance profiling",            Priority::LOW,      Status::TODO,        ["backend", "perf"],       4)
+]
+
+// ─── Analysis functions ──────────────────────────────────────────────────────
+
+def printSection(title: String): void {
+  IO::println("")
+  IO::println("══════════════════════════════════════════════")
+  IO::println("  " + title)
+  IO::println("══════════════════════════════════════════════")
+}
+
+def printTaskList(taskList: List[Task]): void {
+  foreach t: Task in taskList {
+    IO::println("  " + t.display())
+  }
+}
+
+def computeTagStats(taskList: List[Task]): Map[String, Int] {
+  val counts: Map[String, Int] = [:]
+  foreach t: Task in taskList {
+    foreach tag: String in t.tags() {
+      val prev: Int? = counts[tag]
+      counts[tag] = if prev == null { 1 } else { prev + 1 }
+    }
+  }
+  return counts
+}
+
+// ─── Main report ─────────────────────────────────────────────────────────────
+
+printSection("ALL TASKS BY PRIORITY")
+val sorted: List[Task] = tasks.sortedBy { t -> -t.priority().weight() }
+printTaskList(sorted)
+
+printSection("CRITICAL & HIGH PRIORITY (unfinished)")
+val urgent: List[Task] = tasks.filter { t -> t.isHighPriority() && !t.status().isDone() }
+printTaskList(urgent.sortedBy { t -> t.status().label() })
+
+printSection("BLOCKED TASKS")
+val blocked: List[Task] = tasks.filter { t -> t.isBlocked() }
+if blocked.size == 0 {
+  IO::println("  (none blocked)")
+} else {
+  printTaskList(blocked)
+}
+
+printSection("TASKS BY STATUS")
+val grouped: Map[String, List[Task]] = ["todo": [], "in-progress": [], "blocked": [], "done": [], "cancelled": []]
+foreach t: Task in tasks {
+  val key: String = select t.status() {
+    case Status::TODO:        "todo"
+    case Status::IN_PROGRESS: "in-progress"
+    case Status::BLOCKED:     "blocked"
+    case Status::DONE:        "done"
+    case Status::CANCELLED:   "cancelled"
+  }
+  val bucket: List[Task]? = grouped[key]
+  if bucket != null { bucket.add(t) }
+}
+foreach (statusKey, bucket) in grouped {
+  if (bucket as List[Task]).size > 0 {
+    IO::println("  [#{statusKey}] #{(bucket as List[Task]).size} tasks, " +
+                "effort=#{(bucket as List[Task]).reduce(0) { acc, t -> acc + t.effort() }}")
+  }
+}
+
+printSection("TAG STATISTICS")
+val tagCounts: Map[String, Int] = computeTagStats(tasks)
+val tagPairs: List[List[Object]] = []
+foreach (tag, count) in tagCounts {
+  tagPairs.add([tag, count])
+}
+val topTags: List[List[Object]] = tagPairs.sortedBy { pair -> -(pair[1] as Int) }
+foreach pair: List[Object] in topTags {
+  val tag: String = pair[0] as String
+  val cnt: Int    = pair[1] as Int
+  IO::println("  #{tag.padRight(12)} #{cnt.stars()}")
+}
+
+printSection("SPRINT SIMULATION")
+val sprintTasks: List[Task] = tasks.filter { t -> t.priority().weight() >= 2 }
+val sprint: Sprint = new Sprint("Sprint-1", sprintTasks)
+IO::println("  Sprint: #{sprint.name()}")
+IO::println("  Total effort:     #{sprint.totalEffort()} pts")
+IO::println("  Completed effort: #{sprint.completedEffort()} pts")
+IO::println("  Velocity:         #{sprint.velocity().intValue()}%")
+IO::println("  Blocked tasks:    #{sprint.blockedCount()}")
+
+printSection("EFFORT SUMMARY")
+var totalEffort: Int = 0
+var doneEffort: Int = 0
+foreach t: Task in tasks {
+  totalEffort = totalEffort + t.effort()
+  if t.status().isDone() { doneEffort = doneEffort + t.effort() }
+}
+val pct: Int = doneEffort * 100 / totalEffort
+IO::println("  Total effort:    #{totalEffort} pts")
+IO::println("  Done effort:     #{doneEffort} pts")
+IO::println("  Progress:        #{pct}%  #{pct.stars()}")
+IO::println("  Remaining:       #{totalEffort - doneEffort} pts")
+
+val criticalOpen: List[Task] = tasks.filter { t -> t.priority() == Priority::CRITICAL && !t.status().isDone() }
+IO::println("")
+IO::println("CRITICAL open: #{criticalOpen.size}")
+foreach t: Task in criticalOpen {
+  IO::println("  >> #{t.title()}")
+}

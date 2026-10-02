@@ -301,6 +301,13 @@ wrongly-typed value is a defect, and a malformed document reports the line it
 failed on — the position `Json.JsonParseException` carries and the `derive!`
 path discards. An unrecognised format name is **E0076**.
 
+A `json` shape's components may go beyond the scalars: `List[S]` of a scalar, a record
+that declares a json shape of its own (read through its first json shape), `List[R]` of
+such records, and `T?` of any of these, meaning the key may be absent or `null`. A defect
+inside a structure carries its path (`actions[2].owner`), and `jsonSchema()` describes the
+documents such a shape reads as a JSON Schema. Other formats and regex shapes keep to the
+scalars (**E0061**, naming the clause).
+
 A record may carry **several** shapes, in any mix of forms — the thing
 `from re"..."` and `derive!` structurally cannot do, since each allows one
 pattern or one static per format. For the regex form, the component types,
@@ -696,7 +703,11 @@ def main(name: String, count: Int = 3, loud: Boolean = false): void { ... }
 ```
 
 Required parameters are positional; defaulted parameters become `--name`
-flags (`Boolean` defaults become presence switches). Values are converted
+flags (`Boolean` defaults become presence switches). A camelCase name is
+also accepted in kebab-case (`makeSample: Boolean = false` answers to
+`--make-sample` and `--makeSample`), and the usage line shows the kebab-case
+spelling; two parameters whose flags would coincide (`parseURL` and
+`parseUrl`, both `--parse-url`) are a compile error (`E0093`). Values are converted
 to the declared types, default expressions are evaluated when the flag is
 absent, and a usage line is derived from the signature on error.
 Everything after the script file on the `onion` command line is passed to

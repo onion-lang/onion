@@ -1,0 +1,41 @@
+// Nested Java types by their dotted names: the standard library's sealed
+// Result / Outcome / Option interfaces matched case by case, a nested class
+// imported with and without an alias, and Map.Entry in type positions.
+import {
+  onion.Option.Some
+  onion.Option.None as Nothing
+}
+
+// Exhaustive: Result is a sealed Java interface that permits Ok and Err.
+// `o` is a Result.Ok[Int, String], so o.value() is an Int.
+def describe(r: Result[Int, String]): String = select r {
+  case o is Result.Ok:  "ok " + (o.value() + 1)
+  case e is Result.Err: "err " + e.error().length()
+}
+
+def outcome(x: Outcome[Int]): String = select x {
+  case ok is onion.Outcome.Ok:   "parsed " + ok.value()
+  case bad is onion.Outcome.Bad: bad.defects().size + " defect(s)"
+}
+
+def option(x: Option[String]): String = select x {
+  case s is Some when s.value().isEmpty(): "empty"
+  case s is Some:                          "some " + s.value().toUpperCase()
+  case n is Nothing:                       "none"
+}
+
+def firstKey(m: Map[String, Int]): String {
+  val pick: (Map.Entry[String, Int]) -> String = (e) -> e.getKey()
+  foreach e: Map.Entry[String, Int] in m.entrySet() { return pick(e) }
+  return "-"
+}
+
+println(describe(Result::ok(41)))
+println(describe(Result::err("boom")))
+println(outcome(Outcome::ok(7)))
+println(option(Option::some("abc")))
+println(option(Option::some("")))
+println(option(Option::none()))
+println(firstKey(["a": 1]))
+val r: Result[Int, String] = Result::ok(1)
+if r is Result.Ok && r.isOk() { println("is ok") }

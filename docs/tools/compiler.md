@@ -20,7 +20,8 @@ onionc -classpath lib/mylib.jar:lib/other.jar MyProgram.on
 
 ### `-encoding <encoding>`
 
-Specify the character encoding of source files. Default is platform-dependent.
+Specify the character encoding of source files. Default is UTF-8 on every platform and JDK
+(also on JDK 17, whose platform default is MS932 under a Japanese Windows locale).
 
 ```bash
 onionc -encoding UTF-8 MyProgram.on
@@ -192,6 +193,59 @@ onionc -g:none MyProgram.on
 
 Running a script with `onion` always emits the table, since a script is compiled in
 memory and there is no artefact to keep small.
+
+### `--print-classpath`
+
+Print the classpath to run the compiled classes with, and exit without compiling anything.
+The line goes to stdout, separated with the platform's path separator (`:`, or `;` on
+Windows), and holds, in this order and each entry once:
+
+1. the output directory: the `-d` value, or `.` when there is none, since that is where
+   `onionc` writes the classes;
+2. the `-classpath` entries, when `-classpath` is given;
+3. the jars the given files' `//> using dep` directives resolve to, transitives included
+   (see Dependencies below).
+
+The directives are resolved exactly as a compile resolves them, through the same cache, so
+asking costs nothing extra afterwards. Download progress and errors go to stderr; a
+malformed directive or a file that cannot be read exits non-zero with no classpath printed.
+
+```bash
+onionc -d out Main.on
+java -cp "$(onionc --print-classpath -d out Main.on)" Main
+```
+
+## Dependencies (`//> using dep`)
+
+`onionc` reads the `//> using dep` and `//> using repository` directives of the files it
+compiles, exactly as the [script runner](script-runner.md) does: the same parser, the
+same exact-version rule, the same resolver and the same classpath cache. The resolved
+jars, transitives included, join the compile classpath after any `-classpath` entries.
+
+```onion
+//> using dep "com.google.code.gson:gson:2.11.0"
+
+import { com.google.gson.Gson }
+
+class ToJson {
+public:
+  static def of(value: Object): String { return new Gson().toJson(value) }
+}
+```
+
+```bash
+onionc -d out ToJson.on
+```
+
+When several files are compiled together, their directives are **unioned**: a library
+any one of them declares is on the classpath for all of them, and repositories are
+searched in the order the files and their lines name them. The same module at two
+versions is an error whether the two declarations are in one file or in two, and the
+error names both files. A directive error stops `onionc` before anything is compiled.
+
+`onionc` only compiles: to run the classes, the same jars must be on the `java`
+classpath. [`--print-classpath`](#--print-classpath) prints that classpath; a
+[project](project-cli.md) (`onion run`) or the script runner puts it there for you.
 
 ## Examples
 

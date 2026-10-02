@@ -14,12 +14,12 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 | # | Dimension | How to measure | Current (approx.; see note below) | Pass threshold |
 |---|-----------|----------------|----------------------|----------------|
 | 1 | Test suite | `sbt shutdown && sbt -Duser.language=en testFull` (see the note below) | 5669 pass / 0 fail / 1 cancelled | 0 failed, 0 skipped |
-| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 536 / 536 compile | all compile, no rot |
-| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 469 (see `run/` for the full, alphabetized list — no longer enumerated here, see note below) | ≥ 5 |
+| 2 | Sample health | `SampleCompilesSpec` / `SampleProgramsSpec` (both compile every `run/*.on`) | 557 / 557 compile | all compile, no rot |
+| 3 | Large programs | count of `run/*.on` ≥ 100 lines that run end-to-end as-is | 490 (see `run/` for the full, alphabetized list — no longer enumerated here, see note below) | ≥ 5 |
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |
-| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 90 | every common error has a dedicated code |
+| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 91 | every common error has a dedicated code |
 
 **Rows 2 and 3 are checked against a tolerance band, not exact equality** (issue #1370).
 Every PR that adds a sample to `run/` used to have to bump the exact counts in both rows

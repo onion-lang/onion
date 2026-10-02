@@ -98,6 +98,37 @@ ONION_JAVA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5
 `ONION_DEBUG_STARTUP=1` を設定すると、ランチャが抑止している JVM のクラス共有メッセージが
 表示されます。アーカイブが使われない理由はこれで分かります。
 
+### コンソールの文字コード（Windows）
+
+Windows では、`onion`・`onionc`・`onion repl`・プロジェクトコマンドは、出力先が Windows の
+コンソールでないとき（パイプ、ファイル、Git Bash の mintty のような端末）に、出力と診断を
+UTF-8 で書き出します。本物のコンソール（cmd.exe、PowerShell、Windows Terminal、VS Code の
+ターミナル）では、そのコンソール自身のコードページのままにします。コンソールはそれを正しく
+表示できるからです。stdout と stderr は別々に判定するので、`onion script.on > out.txt` では
+ファイルには UTF-8 が書かれ、コンソールに出る診断も読めるままです。他のプラットフォームでは
+何も変わりません。ソースファイルは `-encoding` を指定しない限り UTF-8 として読みます。
+
+標準入力も同じ規則に従います。`IO::readLine` などの `IO` の読み込み関数は、パイプやファイルを
+UTF-8 として（`echo 日本語 | onion script.on`）、Windows のコンソールはそのコードページとして
+デコードします。JDK 17 でも JDK 18 以降でも同じです。他のプラットフォームでは、JDK 18 以降が
+すでにそうだったように標準入力を UTF-8 として読みます。`onion.Files` と `file"…"` は、
+プラットフォームの文字コードにかかわらず、テキストを常に UTF-8 で読み書きします。それ以外の
+文字コードには `Files::readText`/`writeText` に `java.nio.charset.Charset` を渡します。
+
+`ONION_CONSOLE_ENCODING` でこの選択を上書きできます。
+
+```bash
+ONION_CONSOLE_ENCODING=utf-8 onion script.on   # コンソールも含め常に UTF-8（全 OS）
+ONION_CONSOLE_ENCODING=native onion script.on  # 従来どおり JVM に任せる
+```
+
+未設定または `auto` のときは上に書いた動作です。それ以外の文字コードに固定したいときは、
+`native` と JVM 自身のフラグを `ONION_JAVA_OPTS` で組み合わせます。JDK 19 以降は
+`-Dstdout.encoding=...` と `-Dstderr.encoding=...`、JDK 17・18 は `-Dsun.stdout.encoding=...` と
+`-Dsun.stderr.encoding=...` です。標準入力は `-Donion.stdin.encoding=...` で固定でき、
+ランチャは指定された値をそのまま使います。`native` のときの標準入力は、従来どおり JVM の
+既定の文字コードでデコードします。
+
 ### コンパイルデーモン
 
 `onionc` は毎回 JVM を起動し、コンパイラを読み込み、JIT で温めてからようやくファイルを

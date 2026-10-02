@@ -15,6 +15,7 @@ object OnionDoc {
   private val DefaultOutDir = "./doc"
 
   def main(args: Array[String]): Unit = {
+    onion.tools.ConsoleEncoding.install()
     val exit = run(args)
     if (exit != 0) System.exit(exit)
   }

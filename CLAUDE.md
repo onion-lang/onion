@@ -43,8 +43,10 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 - `--Wno <codes>` - Suppress specific warnings (e.g., W0001,unused-parameter)
 - `--no-check-laws` - Do not execute record `law`/`example` clauses (they run at compile time by default; the LSP always has them off)
 - `--law-seed <n>` / `--law-samples <n>` - Control law sampling; a falsified law reports the settings that produced its counterexample
+- `--print-classpath` - `onionc` only: print the classpath to run its output with (`-d` dir or `.`, then `-classpath`, then the jars the files' `//> using dep` directives resolve to), platform-separated on stdout, and exit without compiling
 - `--stacktrace` - Print the raw JVM trace for an uncaught runtime error (the default is a diagnostic-style report with the script's own frames only)
 - `ONION_DAEMON=1` (environment) - `onionc` and `onion script.on` compile through a resident daemon (`onion.tools.daemon`), started on first use; a script's classes come back and run in the caller's process; falls back to in-process compilation when the daemon cannot be reached. `java -cp onion.jar onion.tools.daemon.DaemonClient stop|status` controls it
+- `ONION_CONSOLE_ENCODING=auto|native|utf-8` (environment) - the launchers' stdout/stderr encoding (`onion.tools.ConsoleEncoding`). `auto` (default): on Windows a stream that is not a console (pipe, file, mintty) is written in UTF-8 and a console keeps its code page; other OSes unchanged. Stdin likewise: `onion.IO` decodes a pipe/file as UTF-8 and a Windows console in its code page (launcher-set `onion.stdin.encoding`; UTF-8 without a launcher). `onion.Files`/`file"…"` text is always UTF-8. Source files default to UTF-8 (`-encoding` overrides)
 
 ## High-Level Architecture
 
@@ -180,7 +182,7 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `Files` - File operations
 - `DateTime` - Date/time utilities
 - `Json` - JSON parsing/serialization
-- `Http` - HTTP client
+- `Http` - HTTP client; `Http::request(method, url).header(..).body(..).timeoutSeconds(n).send()` returns `Result[Http.Response, Http.HttpFailure]` (any status, 4xx/5xx included, is `Ok`; no response is `Err` with `kind()` `"timeout"`/`"connect"`/`"io"`); `sendOrThrow()` throws instead
 - `Regex` - Regular expressions
 - `Option`, `Result`, `Future` - Functional types
 - `Db` - JDBC access (connect, query, update, transactions)
@@ -454,6 +456,7 @@ These are frequently confused with other languages. **Always check these:**
 | `elif condition { }` (Python) | `else if condition { }` - no `elif` keyword, chain with `else if` |
 | `switch value { case 1: }` | `select value { case 1: }` - use `select` not `switch` |
 | `case s: String:` (Java/Scala pattern) | `case s is String:` - type patterns use `is`; sealed exhaustiveness (E0042) applies |
+| `case o is Result.Ok:` (nested Java type) unsupported? | ✓ correct - a type pattern names a nested Java class with dots (`Result.Ok`, `onion.Outcome.Bad`, `Map.Entry`, deeper `a.B.C.D`); the binding recovers the scrutinee's type arguments, and a Java `sealed ... permits` scrutinee gets E0042 exhaustiveness too. Java records are matched by type only: `case Ok(v)` destructuring is for Onion records |
 | `case Add(l, n is Num):` nested type pattern? | ✓ correct - type patterns nest inside destructuring, and the binding is usable at the narrowed type; also works for a non-record component (`case Wrap(s is String)`) |
 | `case Circle(r):` unsupported? | ✓ correct - record destructuring patterns work, also `case x when guard:` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
@@ -486,6 +489,7 @@ These are frequently confused with other languages. **Always check these:**
 |--------------------------|-----------------|
 | `import java.util.*;` | `import { java.util.* }` - braces required |
 | `import { Foo = pkg.Class; }` | `import { pkg.Class as Foo; }` - `as` for alias |
+| `import { onion.Result$Ok }` | `import { onion.Result.Ok }` (or `... as ROk`) - a nested class is imported with dots, never the JVM `$` name; `a.b.C` resolves Java's way: the longest prefix that is a top-level class, then member classes |
 | `new int[10]` | `new Int[10]` - capitalized primitive names |
 | `int`, `long`, `boolean` | `Int`, `Long`, `Boolean` - capitalized |
 
@@ -537,8 +541,10 @@ These are frequently confused with other languages. **Always check these:**
 | `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ correct - data-carrying enums; `mass()` accessor, `values()`/`valueOf()` work |
 | ADT / sum-of-products enum? | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case`-keyword cases each carry their own fields; desugars to a sealed interface + one record per case, so `select` exhaustiveness (E0042) applies. Singleton case = zero-field record via `new Origin()`. A `case`-enum is a sealed hierarchy, not a `java.lang.Enum` (no `values()`/`ordinal()`); mixing shared params with `case` cases is an error |
 | generic ADT enum? | `enum Opt[T] { case Some(value: T); case Nothing }` - type parameters flow onto the generated sealed interface and each case record. A type pattern recovers the scrutinee's type argument, so matching `Some` out of an `Opt[String]` binds `Some[String]` and `s.value()` is a `String`. A *homogeneous* enum cannot take type parameters (it becomes a `java.lang.Enum`) |
+| match `onion.Result`/`Option`/`Outcome` by case? | `select r { case o is Result.Ok: o.value(); case e is Result.Err: e.error() }` (likewise `Option.Some`/`Option.None`, `Outcome.Ok`/`Outcome.Bad`) - Java records nested in sealed Java interfaces: matched by type (no `Result.Ok(v)` destructuring), bound at the scrutinee's type arguments, exhaustive with every case |
 | derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `conforms` |
 | need every parse failure, not just `null`, or more than one named boundary per record? | `record R(...) { shape name = re"..." }` - synthesizes `R::name(): onion.Shape[R]`; `.parse(s)` returns an `Outcome[R]` (a value, or every reason there is not one, via `Defect`) and `.print(v)` renders back when invertible. A record may carry several `shape` clauses (also `shape name = json`/`config` for a non-regex format); coexists with `from re"..."` |
+| a list or nested object in a `shape doc = json` record? / a JSON Schema for LLM structured output? | `record S(tags: List[String], owner: Action, acts: List[Action], note: String?) { shape doc = json }` - a json shape (only json; regex/yaml/config stay scalar, else E0061 naming the clause) also reads `List[S]` of a scalar, a record `R` that declares its own json shape (read through its first one), `List[R]`, and `T?` (key absent or null); defects carry paths like `acts[2].owner`. `S::doc().jsonSchema()` returns the JSON Schema text (closed objects, `required` = non-nullable components); `hasJsonSchema()` is true only for json shapes |
 | serialize a record by hand (JSON/YAML) | `record R(...) derive!(Json, Yaml)` - macro-derives `R::fromJson`/`toJson`/`fromYaml`/`toYaml` over a shared `toMap`/`fromMap` core; scalar components only (else E0062), unknown marker E0063; coexists with `from re"..."` |
 | test a record in a separate suite | `record R(...) { law name(p: T) { boolExpr } example { boolExpr } }` - `law`/`example`/`shape` clauses live inside the record's brace-enclosed body, alongside any methods, separated by newlines or spaces (a `;` after a clause is a syntax error); the compiler runs them at build time; a false `example` is E0065, a falsified `law` is E0064 (with a counterexample); makes `parse∘format==id` machine-checked |
 
@@ -580,7 +586,8 @@ These are frequently confused with other languages. **Always check these:**
 | Wrong | Correct (Onion) |
 |-------|-----------------|
 | bare `readText(p)` / `get(url)` / `now()` / `exit(1)` | **Do not resolve** — the default static imports cover only pure classes. Qualify (`Files::readText`) or import explicitly: `import { onion.Files::*; java.lang.System::exit }`. Bare `println` still works (`onion.IO` is the one exception) |
-| a CLI function with hand-rolled arg parsing | `tool name(args) [: T] [requires { caps }] { body }` — a top-level tool; a script whose top level declares tools (and has no `main`) IS a CLI: `--help`, `--contract` (machine-readable JSON), `--plan` (dry run showing bound effects, executing nothing) all derive from the declaration |
+| a CLI function with hand-rolled arg parsing | `tool name(args) [: T] [requires { caps }] { body }` — a top-level tool; a script whose top level declares tools (and has no `main`) IS a CLI: `--help`, `--contract` (machine-readable JSON), `--plan` (dry run showing bound effects, executing nothing) all derive from the declaration. In a project, a tool-only source is the `onion run` entrypoint (`onion run -- --plan ...`) |
+| `-classpath` to give a script a Maven library | `//> using dep "g:a:v"` (plus optional `//> using repository "url"`) in the script's leading comment block, before any code — resolved like a project's `[dependencies]` and cached per directive set; exact versions only; no lock file (use a project for reproducible transitives) |
 | undeclared side effects in a tool | E0077 at the call site — the body's effects are inferred transitively and checked against `requires { read(src), write(dst), console, unknown }`. Overclaiming is E0078; a bad capability is E0079. An unlisted Java call is `unknown` and must be admitted explicitly |
 | `shape doc = json` when you need comments preserved | `shape doc = config` — a LOSSLESS shape over commented `key = value` files: `parseLossless` keeps a `Residue` (comments, spacing, key order, unknown keys, value spellings), `r.edit { v -> v.copy(port = 9090) }.render()` rewrites exactly one value slot |
 | implementing a custom format ad hoc | `class MyShape conforms Shape[T]` — user-written shapes get the combinators and Outcome/Defect for free, but the file MUST assert a law (`example l1 { s.parse(s.print(v)).get() == v }`) or the class is E0080 |

@@ -344,6 +344,10 @@ class RunSamplesSpec extends AbstractShellSpec {
     }
 
     it("runs ShellPipeline.on") {
+      // The sample is a POSIX shell demo: it writes /tmp and runs wc, sh, sort and head.
+      // Windows has none of them on a plain PATH, so the run is skipped there, not faked.
+      assume(!System.getProperty("os.name").startsWith("Windows"),
+        "ShellPipeline.on needs a POSIX shell and coreutils (wc, sh, sort, head)")
       assert(Shell.Success(null) == runSample("run/ShellPipeline.on"))
     }
 
@@ -1232,6 +1236,10 @@ class RunSamplesSpec extends AbstractShellSpec {
 
     it("runs ShiftPlanner.on") {
       assert(Shell.Success(null) == runSample("run/ShiftPlanner.on"))
+    }
+
+    it("runs SimulatedAnnealing.on") {
+      assert(Shell.Success(null) == runSample("run/SimulatedAnnealing.on"))
     }
 
     it("runs SmartHome.on") {

@@ -4,8 +4,17 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 public class IO {
+    /**
+     * The system property naming the charset standard input is decoded with. Onion's
+     * launchers set it (see {@code onion.tools.ConsoleEncoding}): UTF-8 for a pipe or a file,
+     * the console's code page for a Windows console. A value given with {@code -D} wins.
+     */
+    static final String STDIN_ENCODING_PROPERTY = "onion.stdin.encoding";
+
     private static java.io.InputStream stdinSource;
     private static BufferedReader stdinReader;
 
@@ -16,9 +25,27 @@ public class IO {
         java.io.InputStream current = System.in;
         if (stdinReader == null || stdinSource != current) {
             stdinSource = current;
-            stdinReader = new BufferedReader(new InputStreamReader(current));
+            stdinReader = new BufferedReader(new InputStreamReader(current, stdinCharset()));
         }
         return stdinReader;
+    }
+
+    /**
+     * The charset standard input is decoded with: {@link #STDIN_ENCODING_PROPERTY} when it
+     * names a supported charset, UTF-8 otherwise. UTF-8 is what JDK 18+ already used (JEP 400);
+     * on JDK 17 the platform charset (MS932 under a Japanese Windows locale) would otherwise
+     * garble UTF-8 piped in.
+     */
+    static Charset stdinCharset() {
+        String name = System.getProperty(STDIN_ENCODING_PROPERTY);
+        if (name != null && !name.isBlank()) {
+            try {
+                return Charset.forName(name.trim());
+            } catch (IllegalArgumentException unsupported) {
+                // fall back to UTF-8 below
+            }
+        }
+        return StandardCharsets.UTF_8;
     }
 
     public static void print(Object o) {
@@ -54,11 +81,16 @@ public class IO {
         }
     }
 
-    public static String readAll() throws IOException{
-        return new String(
-            System.in.readAllBytes(),
-            System.getProperty("file.encoding")
-        );
+    public static String readAll() throws IOException {
+        // Through the same reader as readLine, so input it has already buffered is not lost.
+        BufferedReader reader = stdin();
+        StringBuilder sb = new StringBuilder();
+        char[] buffer = new char[8192];
+        int n;
+        while ((n = reader.read(buffer)) != -1) {
+            sb.append(buffer, 0, n);
+        }
+        return sb.toString();
     }
 
     // Formatted output

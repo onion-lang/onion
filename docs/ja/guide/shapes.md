@@ -131,6 +131,75 @@ Person::doc().parse("{\"age\": 30}")
 
 サポートしているのは `json` と `yaml` です。未知の名前はコンパイルエラー（E0076）です。
 
+### リスト・入れ子のレコード・欠けてよいキー
+
+`json` の shape はスカラーだけでなく構造も読みます。スカラーの成分型に加えて、json
+shape の成分には次の型が使えます。
+
+- スカラー `S` の `List[S]` — そのスカラーの JSON 配列
+- 自身も json shape を宣言したレコード `R` — 入れ子の JSON オブジェクト
+- そのようなレコードの `List[R]` — オブジェクトの配列
+- これらすべての `T?` — キーが欠けていても `null` でもよく、そのとき成分は `null`
+
+```onion
+record Action(owner: String, task: String) {
+  shape doc = json
+}
+
+record Summary(title: String, decisions: List[String], actions: List[Action], lead: Action?) {
+  shape doc = json
+  example nested {
+    val v = new Summary("sync", ["ship"], [new Action("sato", "review")], null)
+    Summary::doc().parse(Summary::doc().print(v)).get() == v
+  }
+}
+```
+
+入れ子のレコードは、宣言順で**最初の** json shape を通して読まれます。json shape を複数
+持つレコードは、入れ子で使わせたいものを先頭に書きます。レコードの宣言位置は問わず、
+自分自身を含むこともできます（`record Node(name: String, kids: List[Node])`）。
+
+失敗は引き続き蓄積され、それぞれが発生箇所までのパス全体を示します。不正な要素が
+隣の要素を隠すことはありません。
+
+```onion
+Summary::doc().parse("{\"title\": \"t\", \"decisions\": [\"a\", 3], \"actions\": [{\"owner\": \"o\"}, 5]}")
+//   decisions[1]: expected String, found 3
+//   actions[0].task: expected String, found absent
+//   actions[1]: expected object, found 5
+```
+
+ここまで読めるのは `json` だけです。正規表現・`yaml`・`config` の shape はスカラーに
+留まり、レコードの shape はすべて同じ成分を読むので、それらを混在させたレコードも
+同様です —— E0061 は成分を読めない句を名指しします。
+
+### 構造化出力のための JSON Schema
+
+json shape は、自分が読む文書を JSON Schema として記述できます。LLM の構造化出力モードが
+受け取る形式です。レコードと、それに合わせて保守し続けねばならない手書きのスキーマの
+二つではなく、レコードだけが回答の唯一の記述になります。
+
+```onion
+Summary::doc().jsonSchema()
+// {"type":"object",
+//  "properties":{"title":{"type":"string"},
+//                "decisions":{"type":"array","items":{"type":"string"}},
+//                "actions":{"type":"array","items":{"type":"object", ... }},
+//                "lead":{"anyOf":[{"type":"object", ... },{"type":"null"}]}},
+//  "required":["title","decisions","actions"],
+//  "additionalProperties":false}
+```
+
+どのオブジェクトも閉じており（`additionalProperties: false`）、null 非許容の成分を
+すべて `required` に挙げます。null 許容の成分は `required` から外れ、`null` を許します。
+整数型は `integer`、`Double`/`Float` は `number` になります。スキーマは JSON テキストで、
+リクエスト本文に埋め込むには `Json::parse` でマップにします。
+
+`hasJsonSchema()` はその shape がこれをできるかに答えます。できるのは json shape だけで、
+ほかの shape の `jsonSchema()` は、読まない文書を記述する代わりに例外を投げます。
+自分自身を含むレコードには有限のインライン スキーマがないので、その `jsonSchema()` も
+例外を投げます。
+
 ## ファイルと URL
 
 ```onion
@@ -249,7 +318,8 @@ parse 専用の shape は `canPrint(): false` でそう言い、読む方向の�
 公開しています。自分で宣言していない型に対する shape はこちらで書けます:
 
 - `Shapes::regex` — `re"..."` 形式
-- `Shapes::json` — `json` 形式
+- `Shapes::json` — `json` 形式。5 引数のオーバーロードは拡張された成分タグ
+  （`List[Int]`、`Nested`、末尾の `?`）と、成分ごとの入れ子 shape のサンクを受け取る
 - `Shapes::yaml` — `yaml` 形式
 - `Shapes::config` — `config` 形式。`shape name = config` と同様に lossless
   （`parseLossless`/`printLossless`）

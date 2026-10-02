@@ -262,6 +262,10 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     withKernel[ClassDefinition](node) { clazz =>
       resetForTypeDeclaration(clazz)
       for (section <- node.sections) processAccessSection(section)
+      // Check for final-method overrides against java.lang.Enum (e.g. name(),
+      // ordinal()): without this the JVM crashes with IncompatibleClassChangeError
+      // at class-load time instead of giving a compile-time E0039.
+      DuplicationChecks.checkOverrideContracts(typing, clazz, node.location)
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
     }
 }

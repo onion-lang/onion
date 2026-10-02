@@ -126,6 +126,27 @@ class NetServerSpec extends AbstractShellSpec {
       assert(Shell.Success("handled") == result)
     }
 
+    it("starts its internal dispatcher thread as a daemon, so forgetting stop() doesn't hang the JVM") {
+      // Server.start's own doc comment claims its daemon handler pool is why a script
+      // that never calls stop() still exits. That is only half true: the JDK's built-in
+      // HttpServer spawns its own internal "HTTP-Dispatcher" thread, independent of the
+      // executor passed to setExecutor, and that thread is not a daemon unless the code
+      // that calls HttpServer.start() was itself running on a daemon thread. Reproduce
+      // that gap directly against the Java class, bypassing stop() on purpose.
+      val server = onion.Server.start("localhost", 0)
+      try {
+        var group = Thread.currentThread().getThreadGroup
+        while (group.getParent != null) group = group.getParent
+        val buffer = new Array[Thread](group.activeCount() + 16)
+        val n = group.enumerate(buffer, true)
+        val dispatchers = buffer.take(n).filter(t => t != null && t.getName == "HTTP-Dispatcher")
+        assert(dispatchers.nonEmpty, "expected to find the HttpServer's internal dispatcher thread while the server is running")
+        assert(dispatchers.forall(_.isDaemon), "Server.start's internal HTTP-Dispatcher thread must be a daemon thread, or a script that forgets to call stop() hangs after main returns")
+      } finally {
+        server.stop()
+      }
+    }
+
     it("builds a response value without any socket, so a handler is testable alone") {
       val result = shell.run(
         """

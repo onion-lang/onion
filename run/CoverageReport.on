@@ -1,0 +1,323 @@
+// CoverageReport.on — code coverage analysis and reporting (~250 lines)
+// Exercises: ADT case-enums with methods, records with example clauses,
+// classes with public accessors, collection pipelines (map/filter/fold/
+// sortedBy/groupBy/find/distinct/any/count/take), extension methods on
+// Double/Int/String, select / type-pattern matching with exhaustiveness,
+// nullable types and null checks, closures, string interpolation,
+// try/catch, recursion, while / foreach loops, do[Option] monadic chaining.
+
+import { java.util.ArrayList }
+
+// ─── Extensions ─────────────────────────────────────────────────────────────
+
+extension Double {
+  def fmtPct(): String = {
+    val i = (self * 10.0 + 0.5) as Int
+    return (i / 10) + "." + (i % 10) + "%"
+  }
+  def roundTo1(): Double = ((self * 10.0 + 0.5) as Int) / 10.0
+}
+
+extension Int {
+  def hashBar(width: Int): String {
+    var s = ""
+    foreach _: Int in 0..<self   { s = s + "#" }
+    foreach _: Int in self..<width { s = s + "." }
+    return s
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ─── Coverage Level ADT ─────────────────────────────────────────────────────
+
+enum CoverageLevel {
+  case Excellent
+  case Good
+  case Fair
+  case Poor
+  case Missing
+public:
+  def label(): String = select this {
+    case v is Excellent: "EXCELLENT"
+    case v is Good:      "GOOD     "
+    case v is Fair:      "FAIR     "
+    case v is Poor:      "POOR     "
+    case v is Missing:   "MISSING  "
+  }
+  def barFilled(): Int = select this {
+    case v is Excellent: 18
+    case v is Good:      15
+    case v is Fair:      10
+    case v is Poor:       5
+    case v is Missing:    0
+  }
+  def isAcceptable(): Boolean = select this {
+    case v is Excellent: true
+    case v is Good:      true
+    case v is Fair:      false
+    case v is Poor:      false
+    case v is Missing:   false
+  }
+  static def fromPct(pct: Double): CoverageLevel =
+    if pct >= 90.0 { new Excellent() }
+    else if pct >= 75.0 { new Good() }
+    else if pct >= 50.0 { new Fair() }
+    else if pct >= 25.0 { new Poor() }
+    else { new Missing() }
+}
+
+// ─── Records ────────────────────────────────────────────────────────────────
+
+record FileCoverage(path: String, total: Int, covered: Int) {
+  example { new FileCoverage("X.on", 10, 7).pct() > 0.0 }
+public:
+  def pct(): Double = if total == 0 { 0.0 } else { (covered * 100.0) / total }
+  def level(): CoverageLevel = CoverageLevel::fromPct(pct())
+  def uncovered(): Int = total - covered
+}
+
+record TestResult(suite: String, name: String, passed: Boolean, durationMs: Int)
+
+// ─── Module ──────────────────────────────────────────────────────────────────
+
+class Module {
+  val modName: String
+  val files:   List[FileCoverage]
+  val tests:   List[TestResult]
+public:
+  def this(n: String) {
+    this.modName = n
+    this.files   = new ArrayList[FileCoverage]()
+    this.tests   = new ArrayList[TestResult]()
+  }
+  def name(): String              = modName
+  def filesList(): List[FileCoverage] = files
+  def testsList(): List[TestResult]   = tests
+
+  def addFile(f: FileCoverage): void { files.add(f) }
+  def addTest(t: TestResult): void   { tests.add(t)  }
+
+  def totalLines(): Int =
+    files.fold(0) { a, f -> (a as Int) + (f as FileCoverage).total() }
+  def coveredLines(): Int =
+    files.fold(0) { a, f -> (a as Int) + (f as FileCoverage).covered() }
+  def pct(): Double =
+    if totalLines() == 0 { 0.0 } else { (coveredLines() * 100.0) / totalLines() }
+  def passedTests(): Int = tests.count { t -> (t as TestResult).passed() }
+  def failedTestCount(): Int = tests.size - passedTests()
+
+  def worstFiles(n: Int): List[FileCoverage] =
+    files.sortedBy { f -> (f as FileCoverage).pct() }
+         .take(n)
+         .map { f -> f as FileCoverage }
+
+  def failedTests(): List[TestResult] =
+    tests.filter { t -> !(t as TestResult).passed() }
+         .map { t -> t as TestResult }
+}
+
+// ─── Project ─────────────────────────────────────────────────────────────────
+
+class Project {
+  val projName:  String
+  val modules:   List[Module]
+  val threshold: Double
+public:
+  def this(n: String, thr: Double) {
+    this.projName   = n
+    this.modules    = new ArrayList[Module]()
+    this.threshold  = thr
+  }
+  def name(): String           = projName
+  def moduleList(): List[Module] = modules
+  def addModule(m: Module): void { modules.add(m) }
+
+  def allFiles(): List[FileCoverage] {
+    val result = new ArrayList[FileCoverage]()
+    foreach m: Module in modules {
+      foreach f: FileCoverage in m.filesList() { result.add(f) }
+    }
+    return result
+  }
+  def allTests(): List[TestResult] {
+    val result = new ArrayList[TestResult]()
+    foreach m: Module in modules {
+      foreach t: TestResult in m.testsList() { result.add(t) }
+    }
+    return result
+  }
+
+  def totalLines(): Int   = allFiles().fold(0) { a, f -> (a as Int) + (f as FileCoverage).total() }
+  def coveredLines(): Int = allFiles().fold(0) { a, f -> (a as Int) + (f as FileCoverage).covered() }
+  def pct(): Double =
+    if totalLines() == 0 { 0.0 } else { (coveredLines() * 100.0) / totalLines() }
+  def meetsThreshold(): Boolean = pct() >= threshold
+
+  def summaries(): List[Module] = modules  // iterate modules for summaries
+
+  def printReport(): void {
+    val line = "=".padRight(60)
+    IO::println(line)
+    IO::println("  Coverage Report: " + projName)
+    IO::println(line)
+
+    IO::println("")
+    IO::println("Module Coverage")
+    IO::println("-".padRight(60))
+    foreach m: Module in modules.sortedBy { m -> 0.0 - (m as Module).pct() } {
+      val pct = m.pct()
+      val lvl = CoverageLevel::fromPct(pct)
+      val bar = lvl.barFilled().hashBar(20)
+      IO::println("  " + m.name().padRight(20) + " [" + bar + "] " + pct.fmtPct() + "  " + lvl.label())
+    }
+
+    IO::println("-".padRight(60))
+    val total = pct()
+    IO::println("  TOTAL                  " + total.fmtPct() +
+                (if meetsThreshold() { "  above threshold" } else { "  BELOW threshold" }))
+
+    IO::println("")
+    IO::println("Worst-covered files (bottom 3 per module)")
+    IO::println("-".padRight(60))
+    foreach m: Module in modules {
+      IO::println("  [" + m.name() + "]")
+      foreach f: FileCoverage in m.worstFiles(3) {
+        IO::println("    " + f.path().padRight(30) + f.covered() + "/" + f.total() +
+                    "  " + f.pct().fmtPct())
+      }
+    }
+
+    IO::println("")
+    IO::println("Modules by coverage level")
+    IO::println("-".padRight(60))
+    val byLevel = modules.groupBy { m -> CoverageLevel::fromPct((m as Module).pct()).label() }
+    foreach (lvl, mods) in byLevel {
+      IO::println("  " + (lvl as String) + ": " + (mods as List).size + " module(s)")
+    }
+
+    IO::println("")
+    IO::println("Failed tests")
+    IO::println("-".padRight(60))
+    var failCount = 0
+    foreach m: Module in modules {
+      foreach t: TestResult in m.failedTests() {
+        IO::println("  FAIL  " + t.suite().padRight(20) + t.name())
+        failCount = failCount + 1
+      }
+    }
+    if failCount == 0 { IO::println("  (none)") }
+  }
+}
+
+// ─── Data ────────────────────────────────────────────────────────────────────
+
+val core = new Module("core")
+core.addFile(new FileCoverage("Lexer.on",    340, 320))
+core.addFile(new FileCoverage("Parser.on",   510, 480))
+core.addFile(new FileCoverage("TypeCheck.on",290, 210))
+core.addFile(new FileCoverage("Codegen.on",  410, 285))
+core.addFile(new FileCoverage("Optimizer.on",180,  60))
+core.addTest(new TestResult("LexerSpec",  "tokenizes identifiers", true,  12))
+core.addTest(new TestResult("LexerSpec",  "tokenizes literals",    true,   8))
+core.addTest(new TestResult("ParserSpec", "parses if-else",        true,  18))
+core.addTest(new TestResult("ParserSpec", "parses nested calls",   false, 23))
+core.addTest(new TestResult("TypeSpec",   "resolves method types", true,  41))
+core.addTest(new TestResult("TypeSpec",   "rejects type mismatch", false, 35))
+core.addTest(new TestResult("CodegenSpec","emits correct JVM",     true,  60))
+
+val stdlib = new Module("stdlib")
+stdlib.addFile(new FileCoverage("IO.on",      120, 118))
+stdlib.addFile(new FileCoverage("Strings.on", 200, 196))
+stdlib.addFile(new FileCoverage("Colls.on",   350, 340))
+stdlib.addFile(new FileCoverage("Http.on",    280, 195))
+stdlib.addFile(new FileCoverage("Json.on",    310, 265))
+stdlib.addTest(new TestResult("IOSpec",     "println roundtrip",  true,  5))
+stdlib.addTest(new TestResult("StringsSpec","split and join",     true,  9))
+stdlib.addTest(new TestResult("CollsSpec",  "map filter fold",    true, 14))
+stdlib.addTest(new TestResult("HttpSpec",   "mock GET 200",       true, 88))
+stdlib.addTest(new TestResult("JsonSpec",   "round-trip scalars", true, 11))
+
+val tools = new Module("tools")
+tools.addFile(new FileCoverage("Shell.on", 220, 165))
+tools.addFile(new FileCoverage("Daemon.on",190,  85))
+tools.addFile(new FileCoverage("Lsp.on",   310, 105))
+tools.addFile(new FileCoverage("Repl.on",  140,  98))
+tools.addTest(new TestResult("ShellSpec", "runs hello world",    true,  25))
+tools.addTest(new TestResult("ShellSpec", "reports compile err", false, 18))
+tools.addTest(new TestResult("DaemonSpec","start stop cycle",    false, 92))
+tools.addTest(new TestResult("ReplSpec",  "evaluates exprs",     true,  31))
+
+val proj = new Project("onion-compiler", 75.0)
+proj.addModule(core)
+proj.addModule(stdlib)
+proj.addModule(tools)
+
+// ─── Run report ──────────────────────────────────────────────────────────────
+
+proj.printReport()
+
+// ─── Extra pipeline exercises ────────────────────────────────────────────────
+
+val allFiles = proj.allFiles()
+val sumPct = allFiles.fold(0.0) { a, f -> (a as Double) + (f as FileCoverage).pct() }
+val avgPct = sumPct / allFiles.size
+IO::println("")
+IO::println("Average file coverage: " + (avgPct as Double).roundTo1() + "%")
+
+// partition: two halves of allFiles by acceptability
+val parts     = allFiles.partition { f -> (f as FileCoverage).level().isAcceptable() }
+val okFiles   = parts[0] as List[Object]
+val warnFiles = parts[1] as List[Object]
+IO::println("Acceptable: #{okFiles.size}  Not acceptable: #{warnFiles.size}")
+
+// distinct paths
+val distinctPaths = allFiles.map { f -> (f as FileCoverage).path() }.distinct()
+IO::println("Distinct source files: " + distinctPaths.size)
+
+// zip files with 1-based rank (sorted by coverage ascending)
+val ranked  = allFiles.sortedBy { f -> (f as FileCoverage).pct() }
+val indices = new ArrayList[Int]()
+var rank = 1
+foreach _: FileCoverage in ranked { indices.add(rank); rank = rank + 1 }
+val zipped = ranked.zip(indices)
+val lowest = (zipped.get(0) as List).get(0) as FileCoverage
+IO::println("Lowest-coverage file: " + lowest.path() + " (" + lowest.pct().fmtPct() + ")")
+
+// try/catch safe division
+def safeDiv(a: Int, b: Int): String {
+  try { return "" + (a / b) }
+  catch e: Exception { return "err" }
+}
+IO::println("safeDiv 10/0: " + safeDiv(10, 0))
+IO::println("safeDiv 10/3: " + safeDiv(10, 3))
+
+// recursion: sum covered lines
+def sumCovered(files: List[FileCoverage], i: Int): Int =
+  if i >= files.size { 0 }
+  else { files.get(i).covered() + sumCovered(files, i + 1) }
+IO::println("Recursive covered sum: " + sumCovered(proj.allFiles(), 0))
+
+// do[Option] — safe module lookup
+def findModule(name: String): Option[Module] {
+  val found = proj.moduleList().find { m -> (m as Module).name() == name }
+  if found == null { return Option::none() }
+  return Option::some(found as Module)
+}
+val coreMsg: Option[String] = do[Option] {
+  m  <- findModule("core")
+  ret "core: " + m.pct().fmtPct() + "  tests: " + m.passedTests() + "/" + m.testsList().size
+}
+IO::println(if coreMsg == null { "core not found" } else { coreMsg.get() })
+
+// any / count
+val anyMissing = allFiles.any { f -> (f as FileCoverage).level() is Missing }
+IO::println("Any missing-coverage files: " + anyMissing)
+val highCount = allFiles.count { f -> (f as FileCoverage).pct() >= 90.0 }
+IO::println("Files >= 90%%: " + highCount)

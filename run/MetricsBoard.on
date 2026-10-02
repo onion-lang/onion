@@ -1,0 +1,290 @@
+// MetricsBoard — metrics analytics dashboard.
+//
+// Exercises: ADT enums (sealed hierarchy), records with shape doc=json,
+// records with law clauses, closures / collection pipelines (map/filter/fold),
+// extension methods on Int/Double/String, select / type-pattern matching,
+// |> pipeline operator, foreach (range + map), mutable state, try/catch,
+// nullable types, records with methods.
+//
+//   onion run/MetricsBoard.on
+
+import {
+  java.lang.Math as JMath
+  onion.Result
+}
+
+// ── severity levels ───────────────────────────────────────────────────────────
+
+enum Severity {
+  case SevOk
+  case SevWarn
+  case SevCrit
+}
+
+// ── data model ────────────────────────────────────────────────────────────────
+
+record DataPoint(name: String, ts: Long, value: Double) {
+  shape doc = json
+  example roundtrip {
+    val p = new DataPoint("cpu", 1000L, 42.5)
+    DataPoint::doc().parse(DataPoint::doc().print(p)).isOk()
+  }
+}
+
+record Alert(metric: String, threshold: Double, message: String) {
+  shape doc = json
+  example roundtrip {
+    val a = new Alert("cpu_pct", 80.0, "high")
+    Alert::doc().parse(Alert::doc().print(a)).isOk()
+  }
+}
+
+// ── extension methods ─────────────────────────────────────────────────────────
+
+extension Double {
+  def rounded(places: Int): Double {
+    val factor: Double = JMath::pow(10.0, places as Double)
+    return JMath::round(self * factor) as Double / factor
+  }
+  def pctOf(total: Double): Double {
+    if total == 0.0 { return 0.0 }
+    return (self / total * 100.0).rounded(1)
+  }
+}
+
+extension Int {
+  def repeat(ch: String): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < self { s = s + ch; i++ }
+    return s
+  }
+}
+
+extension String {
+  def padLeft(width: Int): String {
+    val pad: Int = width - self.length
+    if pad <= 0 { return self }
+    return pad.repeat(" ") + self
+  }
+  def bar(pct: Double, width: Int): String {
+    val filled: Int = (pct / 100.0 * width as Double) as Int
+    val empty: Int = width - filled
+    return "[" + filled.repeat("#") + empty.repeat("-") + "]"
+  }
+}
+
+// ── MetricSeries: named time-series ──────────────────────────────────────────
+
+class MetricSeries {
+public:
+  val name: String
+  val kind: String
+  val points: List[DataPoint]
+  def this(name: String, kind: String) {
+    self.name = name
+    self.kind = kind
+    self.points = []
+  }
+  def add(point: DataPoint): void {
+    self.points.add(point)
+  }
+  def size: Int = self.points.size
+  def average: Double {
+    if self.points.isEmpty() { return 0.0 }
+    return self.points.fold(0.0) { acc, p -> acc + p.value() } / self.points.size as Double
+  }
+  def max: Double {
+    if self.points.isEmpty() { return 0.0 }
+    var best: Double = self.points[0].value() as Double
+    foreach pt: DataPoint in self.points {
+      if pt.value() > best { best = pt.value() }
+    }
+    return best
+  }
+  def min: Double {
+    if self.points.isEmpty() { return 0.0 }
+    var best: Double = self.points[0].value() as Double
+    foreach pt: DataPoint in self.points {
+      if pt.value() < best { best = pt.value() }
+    }
+    return best
+  }
+  def latest: Double {
+    if self.points.isEmpty() { return 0.0 }
+    return self.points[self.points.size - 1].value()
+  }
+  def trend: String {
+    if self.points.size < 2 { return "stable" }
+    val first: Double = self.points[0].value()
+    val last: Double = self.latest
+    val diff: Double = last - first
+    if diff > first * 0.05 { return "up" }
+    if diff < -(first * 0.05) { return "down" }
+    return "stable"
+  }
+  def stddev: Double {
+    if self.points.size < 2 { return 0.0 }
+    val avg: Double = self.average
+    val variance: Double =
+      self.points.fold(0.0) { acc, p ->
+        val d: Double = p.value() - avg
+        acc + d * d
+      } / self.points.size as Double
+    return JMath::sqrt(variance)
+  }
+}
+
+// ── severity computation ──────────────────────────────────────────────────────
+
+def checkSeverity(series: MetricSeries, alert: Alert): Severity {
+  if series.name != alert.metric() { return new SevOk }
+  val v: Double = series.latest
+  if v >= alert.threshold() * 1.5 { return new SevCrit }
+  if v >= alert.threshold() { return new SevWarn }
+  return new SevOk
+}
+
+def severityLabel(sev: Severity): String {
+  return select sev {
+    case x is SevOk:   " OK   "
+    case x is SevWarn: " WARN "
+    case x is SevCrit: " CRIT "
+  }
+}
+
+def worstOf(a: Severity, b: Severity): Severity {
+  return select a {
+    case x is SevCrit: a
+    case x is SevWarn: select b { case y is SevCrit: b; else: a }
+    else: b
+  }
+}
+
+// ── MetricsBoard ──────────────────────────────────────────────────────────────
+
+class MetricsBoard {
+public:
+  val series: Map[String, MetricSeries]
+  val alerts: List[Alert]
+  def this {
+    self.series = [:]
+    self.alerts = []
+  }
+  def addPoint(name: String, kind: String, ts: Long, value: Double): void {
+    if !self.series.containsKey(name) {
+      self.series[name] = new MetricSeries(name, kind)
+    }
+    val ms: MetricSeries = self.series[name] as MetricSeries
+    ms.add(new DataPoint(name, ts, value))
+  }
+  def addAlert(alert: Alert): void {
+    self.alerts.add(alert)
+  }
+  def seriesFor(name: String): MetricSeries? {
+    if !self.series.containsKey(name) { return null }
+    return self.series[name] as MetricSeries
+  }
+  def report: void {
+    val hr: String = 53.repeat("─")
+    IO::println("┌" + hr + "┐")
+    IO::println("│        METRICS BOARD REPORT" + 25.repeat(" ") + "│")
+    IO::println("├" + hr + "┤")
+    val names: List[String] = Colls::toList(self.series.keySet())
+    foreach n: String in names {
+      val ms: MetricSeries = self.series[n] as MetricSeries
+      val avg: Double = ms.average.rounded(2)
+      val lat: Double = ms.latest.rounded(2)
+      val mn: Double = ms.min
+      val mx: Double = ms.max
+      val range: Double = if mx - mn < 0.001 { 1.0 } else { mx - mn }
+      val pct: Double = (lat - mn).pctOf(range)
+      val bbar: String = "".bar(pct, 18)
+      var sev: Severity = new SevOk
+      foreach alert: Alert in self.alerts {
+        sev = worstOf(sev, checkSeverity(ms, alert))
+      }
+      val label: String = severityLabel(sev)
+      val namePad: String = n.padLeft(16)
+      val avgPad: String = ("" + avg).padLeft(7)
+      val latPad: String = ("" + lat).padLeft(7)
+      IO::println("│" + label + namePad + " avg=" + avgPad + " now=" + latPad + " " + bbar + "│")
+    }
+    IO::println("└" + hr + "┘")
+  }
+}
+
+// ── Demo: populate the board ──────────────────────────────────────────────────
+
+val board: MetricsBoard = new MetricsBoard
+
+// cpu usage (%)
+var ts: Long = 1000L
+foreach pct: Int in [45, 52, 61, 55, 48, 70, 85, 90, 87, 95] {
+  board.addPoint("cpu_pct", "gauge", ts, pct as Double)
+  ts = ts + 60L
+}
+
+// memory used (GB)
+ts = 1000L
+foreach gb: Double in [4.1, 4.3, 4.5, 4.4, 4.6, 4.8, 5.0, 5.1, 5.0, 5.2] {
+  board.addPoint("mem_gb", "gauge", ts, gb)
+  ts = ts + 60L
+}
+
+// request rate (req/s)
+ts = 1000L
+foreach rps: Int in [120, 135, 142, 128, 155, 160, 148, 170, 165, 180] {
+  board.addPoint("req_rps", "counter", ts, rps as Double)
+  ts = ts + 60L
+}
+
+// error rate (%)
+ts = 1000L
+foreach ep: Double in [0.1, 0.2, 0.1, 0.3, 0.2, 0.4, 0.5, 0.8, 1.2, 2.1] {
+  board.addPoint("err_pct", "gauge", ts, ep)
+  ts = ts + 60L
+}
+
+// alerts configuration
+board.addAlert(new Alert("cpu_pct",  80.0, "CPU usage high"))
+board.addAlert(new Alert("mem_gb",    5.0, "Memory pressure"))
+board.addAlert(new Alert("err_pct",   1.0, "Error rate elevated"))
+
+// print the report
+board.report
+
+// ── JSON shape round-trip demo ────────────────────────────────────────────────
+IO::println("")
+val pt: DataPoint = new DataPoint("cpu_pct", 1600L, 95.5)
+val json: String = DataPoint::doc().print(pt)
+IO::println("JSON:      " + json)
+val back: DataPoint = DataPoint::doc().parse(json).get()
+IO::println("Roundtrip: " + (back == pt))
+
+// ── pipeline + aggregate demo ─────────────────────────────────────────────────
+IO::println("")
+IO::println("Series summary:")
+val names2: List[String] = Colls::toList(board.series.keySet())
+foreach sname: String in names2 {
+  val ms2: MetricSeries = board.series[sname] as MetricSeries
+  val sd: Double = ms2.stddev.rounded(3)
+  IO::println("  " + sname.padLeft(10) + ": n=" + ms2.size + " stddev=" + sd +
+              " trend=" + ms2.trend)
+}
+
+// ── Result validation chain ───────────────────────────────────────────────────
+IO::println("")
+def validateAlert(metric: String, thresh: Double): Result[Alert, String] {
+  if metric.length == 0 { return Result::err("metric name is empty") }
+  if thresh <= 0.0 { return Result::err("threshold must be positive") }
+  return Result::ok(new Alert(metric, thresh, "Validated alert for " + metric))
+}
+
+val good: Result[Alert, String] = validateAlert("latency_ms", 200.0)
+val bad1: Result[Alert, String] = validateAlert("", 100.0)
+val bad2: Result[Alert, String] = validateAlert("rps", -1.0)
+IO::println("Validation results:")
+IO::println("  good:  " + good.isOk() + " -> " + (if good.isOk() { good.getOrElse(new Alert("", 0.0, "")).metric() } else { "n/a" }))
+IO::println("  bad1:  " + bad1.isOk() + " -> " + (if bad1.isOk() { "ok" } else { bad1.getError() }))
+IO::println("  bad2:  " + bad2.isOk() + " -> " + (if bad2.isOk() { "ok" } else { bad2.getError() }))

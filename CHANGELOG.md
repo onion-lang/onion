@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`onion.Server`'s internal dispatcher thread was not a daemon thread, so a script that forgot to call `server.stop()` still hung after `main` returned** — even though `Server.start`'s handler-thread pool was already daemon specifically to prevent that. The JDK's built-in `HttpServer` spawns its own internal `HTTP-Dispatcher` thread independently of the executor passed to `setExecutor`, and that thread's daemon status is inherited from whichever thread calls `HttpServer.start()`, not from the executor — which was the caller's (often non-daemon, e.g. `main`) thread. `Server.start` now creates and starts the `HttpServer` from a short-lived daemon thread of its own, so the dispatcher thread it spawns is daemon too. Covered by a new case in `NetServerSpec`.
+
 ### Added
 
 - **`run/ProjectConfig.on`** — a 425-line multi-tool CLI script managing three commented `key = value` config files through the Lossless/Residue lens, a new domain for the `run/` corpus (`shape cfg = config` on three records `DbConfig`/`ServerConfig`/`FeatureFlags` with 7 `example` clauses checked at build time; `parseLossless`/`edit { v -> v.copy(...) }`/`render()` edits that preserve comments, spacing, and key order; five `tool` declarations with distinct `requires` clauses — `read`, `write`, `console`; `do[Option]` chaining via `onion.Option::some`/`none`; extension methods on `String` (`padRight2`/`toIntOpt`/`isValidHost2`) and `Int` (`isPort2`/`isPositive2`); `select` dispatch on string keys; collection pipelines `filter`/`map`; string interpolation; `try`/`catch` — `inspect`/`editDb`/`diff` tool subcommands over `db.conf`/`server.conf`/`flags.conf`), added to the `run/` corpus (merged via #1878).

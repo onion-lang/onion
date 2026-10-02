@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/UnitCalc.on`** — a 391-line type-safe dimensional unit converter, a new domain for the `run/` corpus (an ADT enum `Dimension` with 11 cases dispatched via exhaustive `select`; records with `example` clauses (`Measure` round-trip law, `Quantity` positive-value check); a class `UnitRegistry` holding a `HashMap` of 47 named units across 9 physical dimensions; extension methods on `String` (`padEnd`/`padStart`); nullable `Measure?` lookups with explicit null guards; `foreach` over map values and typed `ArrayList[Double]`; chain conversion and best-fit unit selection; min/max/avg/sum statistics; incompatible-dimension and unknown-unit error cases), added to the `run/` corpus (merged via #1866).
+- **`run/CommitTracker.on`** — a 433-line three-tool Conventional-Commits log auditor (`check`/`stats`/`report`), a new domain for the `run/` corpus exercising multiple `tool` declarations in a single script — three tools, each with its own `requires { ... }` capability clause (E0077/E0078 boundary enforced), previously the most underrepresented major language feature in the corpus (only 3 programs). Also exercises `record...from re"..."` (anchored regex parser + `parseAll`), an ADT enum with methods (`CommitType`/`Severity`), `shape doc = json`, typed `Map[String, Int]` aggregation, `foreach (k, v) in map`, collection pipelines (`groupBy`/`filter`/`map`/`fold`/`sortedBy`/`find`/`partition`/`count`/`any`), extension methods on `Int`/`String`, and `select` pattern matching (merged via #1869).
+
 ## [0.134.0] - 2026-10-02
 
 ### Fixed

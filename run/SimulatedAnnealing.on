@@ -1,0 +1,220 @@
+// SimulatedAnnealing.on — TSP solved with simulated annealing
+// Exercises: records with examples, closures, Rand, java.lang.Math,
+// foreach over typed lists and ranges, while loops, collection pipelines
+// (map/fold/find), nullable types, string interpolation, ADT enum dispatch
+
+import { java.lang.Math }
+
+// ─── City ─────────────────────────────────────────────────────────────────────
+record City(name: String, x: Double, y: Double) {
+  example { new City("A", 0.0, 0.0).x() == 0.0 }
+  example { new City("X", 3.0, 4.0).distTo(new City("Y", 0.0, 0.0)) == 5.0 }
+public:
+  def distTo(o: City): Double {
+    val dx: Double = x() - o.x()
+    val dy: Double = y() - o.y()
+    return Math::sqrt(dx * dx + dy * dy)
+  }
+  def label(): String = name() + "(#{x() as Int},#{y() as Int})"
+}
+
+// ─── Tour utilities ───────────────────────────────────────────────────────────
+def tourCost(cities: List[City], order: List[Object]): Double {
+  val n: Int = order.size
+  var total: Double = 0.0
+  var i: Int = 0
+  while i < n {
+    val a: City = cities[(order[i] as Int)] as City
+    val b: City = cities[(order[(i + 1) % n] as Int)] as City
+    total = total + a.distTo(b)
+    i = i + 1
+  }
+  return total
+}
+
+def swapped(order: List[Object], i: Int, j: Int): List[Object] {
+  val out: List[Object] = []
+  var k: Int = 0
+  while k < order.size {
+    if      k == i { out.add(order[j]) }
+    else if k == j { out.add(order[i]) }
+    else           { out.add(order[k]) }
+    k = k + 1
+  }
+  return out
+}
+
+// ─── Greedy nearest-neighbour initial tour ────────────────────────────────────
+def greedyTour(cities: List[City]): List[Object] {
+  val n: Int = cities.size
+  val used: List[Object] = []
+  val tour: List[Object] = []
+  var k: Int = 0
+  while k < n { used.add(false); k = k + 1 }
+  var cur: Int = 0
+  tour.add(cur)
+  used[cur] = true
+  var step: Int = 1
+  while step < n {
+    var best: Int = -1
+    var bestDist: Double = -1.0
+    var j: Int = 0
+    while j < n {
+      if !(used[j] as Boolean) {
+        val d: Double = (cities[cur] as City).distTo(cities[j] as City)
+        if best == -1 || d < bestDist { best = j; bestDist = d }
+      }
+      j = j + 1
+    }
+    tour.add(best)
+    used[best] = true
+    cur = best
+    step = step + 1
+  }
+  return tour
+}
+
+// ─── Simulated annealing optimiser ────────────────────────────────────────────
+class SA {
+  val cities: List[City]
+public:
+  def this(cities: List[City]) { this.cities = cities }
+
+  def run(initOrder: List[Object], maxIter: Int): List[Object] {
+    val n: Int = initOrder.size
+    var order: List[Object] = initOrder
+    var cost: Double = tourCost(cities, order)
+    var bestOrder: List[Object] = order
+    var bestCost: Double = cost
+    var temp: Double = 200.0
+    var iter: Int = 0
+    while iter < maxIter && temp > 0.001 {
+      val i: Int = Rand::nextInt(n)
+      var j: Int = Rand::nextInt(n)
+      while j == i { j = Rand::nextInt(n) }
+      val candidate: List[Object] = swapped(order, i, j)
+      val newCost: Double = tourCost(cities, candidate)
+      val delta: Double = newCost - cost
+      val accept: Boolean =
+        if delta < 0.0 { true }
+        else { Rand::nextDouble() < Math::exp(-delta / temp) }
+      if accept {
+        order = candidate
+        cost = newCost
+        if cost < bestCost {
+          bestOrder = order
+          bestCost = cost
+        }
+      }
+      temp = temp * 0.9995
+      iter = iter + 1
+    }
+    return bestOrder
+  }
+
+  def printTour(order: List[Object], label: String): void {
+    IO::println(label)
+    val n: Int = order.size
+    var i: Int = 0
+    while i < n {
+      val a: City = cities[(order[i] as Int)] as City
+      val b: City = cities[(order[(i + 1) % n] as Int)] as City
+      val d: Int = a.distTo(b) as Int
+      IO::println("  " + a.name() + " -> " + b.name() + "  (~" + d + ")")
+      i = i + 1
+    }
+    val len: Int = tourCost(cities, order) as Int
+    IO::println("  Total: ~" + len)
+  }
+}
+
+// ─── Acceptance statistics: track improve/worsen/reject ───────────────────────
+enum MoveResult { IMPROVE, WORSEN_ACCEPT, REJECT }
+
+class SAStats {
+  var improve: Int
+  var worsenAccept: Int
+  var reject: Int
+public:
+  def this { this.improve = 0; this.worsenAccept = 0; this.reject = 0 }
+  def tally(mr: MoveResult): void {
+    select mr {
+      case MoveResult::IMPROVE:       improve = improve + 1
+      case MoveResult::WORSEN_ACCEPT: worsenAccept = worsenAccept + 1
+      case MoveResult::REJECT:        reject = reject + 1
+    }
+  }
+  def total(): Int = improve + worsenAccept + reject
+  def report(): void {
+    IO::println("  Moves:  improve=#{improve}  worsen-accept=#{worsenAccept}  reject=#{reject}")
+    val tot: Int = total()
+    if tot > 0 {
+      val pct: Int = (improve * 100) / tot
+      IO::println("  Improvement rate: #{pct}%")
+    }
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+val cities: List[City] = [
+  new City("A",   0.0,   0.0),
+  new City("B",  10.0,  15.0),
+  new City("C",  25.0,   5.0),
+  new City("D",  30.0,  25.0),
+  new City("E",  15.0,  30.0),
+  new City("F",   5.0,  20.0),
+  new City("G",  20.0,  10.0),
+  new City("H",  35.0,  15.0)
+]
+
+IO::println("=== TSP: 8 cities ===")
+IO::println("Cities:")
+foreach c: City in cities {
+  IO::println("  " + c.label())
+}
+IO::println("")
+
+val initTour: List[Object] = greedyTour(cities)
+val initCost: Int = tourCost(cities, initTour) as Int
+IO::println("Greedy initial tour cost: " + initCost)
+
+val sa = new SA(cities)
+val bestTour: List[Object] = sa.run(initTour, 20000)
+val bestCost: Int = tourCost(cities, bestTour) as Int
+IO::println("SA optimised tour cost:   " + bestCost)
+IO::println("")
+sa.printTour(bestTour, "Best tour found:")
+IO::println("")
+
+// Verify correctness: every city appears exactly once
+val seen: List[Object] = []
+var ci: Int = 0
+while ci < cities.size { seen.add(0); ci = ci + 1 }
+foreach idx: Object in bestTour {
+  val k: Int = idx as Int
+  seen[k] = (seen[k] as Int) + 1
+}
+val allOnce: Boolean = seen.find { v -> (v as Int) != 1 } == null
+IO::println("All 8 cities visited once: " + allOnce)
+
+// SA should at least match greedy
+IO::println("SA improved or matched: " + (bestCost <= initCost))
+
+// Distance checks (deterministic)
+val a: City = cities[0] as City
+val c: City = cities[2] as City
+val d: City = cities[3] as City
+IO::println("Dist A-C: " + (a.distTo(c) as Int) + "  (expected 25)")
+IO::println("Dist A-D: " + (a.distTo(d) as Int) + "  (expected 39)")
+
+// Statistics demonstration with MoveResult enum
+val stats = new SAStats()
+stats.tally(MoveResult::IMPROVE)
+stats.tally(MoveResult::IMPROVE)
+stats.tally(MoveResult::WORSEN_ACCEPT)
+stats.tally(MoveResult::REJECT)
+stats.tally(MoveResult::REJECT)
+stats.tally(MoveResult::REJECT)
+IO::println("")
+IO::println("=== Example move statistics ===")
+stats.report()

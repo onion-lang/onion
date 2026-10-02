@@ -1,0 +1,331 @@
+// GlobMatcher.on — Unix-style glob / fnmatch pattern matching engine.
+// Exercises: ADT enums with data, records with example, recursive
+// backtracking, extension methods on String, collection pipelines
+// (map/filter/fold/partition), select/case pattern matching, closures,
+// string interpolation, nullable types, foreach over ranges and lists,
+// while loops, try/catch.
+
+import {
+  java.util.*
+}
+
+// ── Pattern segments ──────────────────────────────────────────────────────────
+
+enum Seg {
+  case Lit(text: String)                        // exact literal text
+  case Star                                     // * matches any sequence
+  case Question                                 // ? matches any single char
+  case CharClass(chars: String, neg: Boolean)   // [abc] or [^abc]
+}
+
+// ── Parse result ──────────────────────────────────────────────────────────────
+
+record GlobPattern(raw: String, segs: List[Seg]) {
+  example { GlobPattern::parse("*.txt").raw() == "*.txt" }
+  example { GlobPattern::parse("?").segs().size == 1 }
+public:
+  static def parse(raw: String): GlobPattern = parseGlob(raw)
+}
+
+// ── Parser ────────────────────────────────────────────────────────────────────
+
+def parseGlob(raw: String): GlobPattern {
+  val segs: List[Seg] = []
+  var i: Int = 0
+  var litBuf: String = ""
+
+  while i < raw.length() {
+    val c: String = raw.substring(i, i + 1)
+    if c == "*" {
+      if litBuf.length() > 0 { segs.add(new Lit(litBuf)); litBuf = "" }
+      segs.add(new Star())
+    } else if c == "?" {
+      if litBuf.length() > 0 { segs.add(new Lit(litBuf)); litBuf = "" }
+      segs.add(new Question())
+    } else if c == "[" {
+      if litBuf.length() > 0 { segs.add(new Lit(litBuf)); litBuf = "" }
+      i = i + 1
+      val neg: Boolean = i < raw.length() && raw.substring(i, i + 1) == "^"
+      if neg { i = i + 1 }
+      var classBuf: String = ""
+      while i < raw.length() && raw.substring(i, i + 1) != "]" {
+        classBuf = classBuf + raw.substring(i, i + 1)
+        i = i + 1
+      }
+      segs.add(new CharClass(classBuf, neg))
+    } else if c == "\\" {
+      if i + 1 < raw.length() {
+        i = i + 1
+        litBuf = litBuf + raw.substring(i, i + 1)
+      } else {
+        litBuf = litBuf + c
+      }
+    } else {
+      litBuf = litBuf + c
+    }
+    i = i + 1
+  }
+  if litBuf.length() > 0 { segs.add(new Lit(litBuf)) }
+  return new GlobPattern(raw, segs)
+}
+
+// ── Recursive matcher ─────────────────────────────────────────────────────────
+
+def matchAt(segs: List[Seg], si: Int, text: String, pos: Int): Boolean {
+  if si >= segs.size {
+    return pos == text.length()
+  }
+  val seg: Seg = segs[si] as Seg
+  select seg {
+    case s is Lit: {
+      val t: String = s.text()
+      if pos + t.length() > text.length() { return false }
+      if text.substring(pos, pos + t.length()) != t { return false }
+      return matchAt(segs, si + 1, text, pos + t.length())
+    }
+    case s is Question: {
+      if pos >= text.length() { return false }
+      return matchAt(segs, si + 1, text, pos + 1)
+    }
+    case s is Star: {
+      var j: Int = pos
+      while j <= text.length() {
+        if matchAt(segs, si + 1, text, j) { return true }
+        j = j + 1
+      }
+      return false
+    }
+    case s is CharClass: {
+      if pos >= text.length() { return false }
+      val ch: String = text.substring(pos, pos + 1)
+      val inClass: Boolean = s.chars().contains(ch)
+      if inClass == s.neg() { return false }
+      return matchAt(segs, si + 1, text, pos + 1)
+    }
+  }
+}
+
+def matchGlob(pattern: String, text: String): Boolean {
+  val p: GlobPattern = parseGlob(pattern)
+  return matchAt(p.segs(), 0, text, 0)
+}
+
+// ── Extension on String ───────────────────────────────────────────────────────
+
+extension String {
+  def matchesGlob(pattern: String): Boolean = matchGlob(pattern, self)
+}
+
+// ── Test infrastructure ───────────────────────────────────────────────────────
+
+record TestCase(input: String, pattern: String, expected: Boolean)
+
+def runTests(cases: List[TestCase]): Int {
+  var passed: Int = 0
+  var failed: Int = 0
+  foreach tc: TestCase in cases {
+    val result: Boolean = tc.input().matchesGlob(tc.pattern())
+    val ok: Boolean = result == tc.expected()
+    if !ok {
+      IO::println("[FAIL] \"#{tc.input()}\" ~ \"#{tc.pattern()}\": expected #{tc.expected()}, got #{result}")
+      failed = failed + 1
+    } else {
+      passed = passed + 1
+    }
+  }
+  IO::println("#{passed} passed, #{failed} failed")
+  return failed
+}
+
+// ── Segment description ───────────────────────────────────────────────────────
+
+def segDesc(seg: Seg): String = select seg {
+  case s is Lit:       "Lit(\"#{s.text()}\")"
+  case s is Star:      "Star"
+  case s is Question:  "Question"
+  case s is CharClass: "Class(\"#{s.chars()}\",neg=#{s.neg()})"
+}
+
+def describePattern(pattern: String): void {
+  val p: GlobPattern = parseGlob(pattern)
+  val parts: List[String] = p.segs().map { s -> segDesc(s as Seg) }
+  IO::println("  \"#{pattern}\"  →  #{parts.toString()}")
+}
+
+def filterGlob(pattern: String, names: List[String]): List[String] =
+  names.filter { name -> (name as String).matchesGlob(pattern) }
+
+// Return the first pattern (from a route table) that matches text, or null.
+def firstMatch(routes: List[String], text: String): String? {
+  foreach route: String in routes {
+    if text.matchesGlob(route) { return route }
+  }
+  return null
+}
+
+// Produce a sorted ranking of which patterns match the most strings in a corpus.
+def rankPatterns(patterns: List[String], corpus: List[String]): List[String] {
+  val scored: List[String] = patterns.map { pat ->
+    val pat2: String = pat as String
+    val hits: Int = corpus.fold(0) { acc, name ->
+      (acc as Int) + (if (name as String).matchesGlob(pat2) { 1 } else { 0 })
+    } as Int
+    "#{hits}\t#{pat2}"
+  }
+  return scored.sortedBy { s -> -(Integer::parseInt(Strings::split(s as String, "\t").get(0))) }
+}
+
+// ── Statistics ────────────────────────────────────────────────────────────────
+
+def patternStats(pattern: String): String {
+  val p: GlobPattern = parseGlob(pattern)
+  val segs: List[Seg] = p.segs()
+  var stars: Int = 0; var qs: Int = 0; var lits: Int = 0; var cls: Int = 0
+  foreach s: Seg in segs {
+    select s {
+      case ss is Star:      stars = stars + 1
+      case ss is Question:  qs    = qs    + 1
+      case ss is Lit:       lits  = lits  + 1
+      case ss is CharClass: cls   = cls   + 1
+    }
+  }
+  return "n=#{segs.size} lit=#{lits} *=#{stars} ?=#{qs} []=#{cls}"
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("=== GlobMatcher ===")
+  IO::println("")
+
+  IO::println("── Parsed patterns:")
+  describePattern("*.txt")
+  describePattern("src/**/*.on")
+  describePattern("[abc]?.log")
+  describePattern("report_[^0-9]*.csv")
+  IO::println("")
+
+  val tests: List[TestCase] = [
+    // Exact literals
+    new TestCase("hello",       "hello",        true),
+    new TestCase("hello",       "world",        false),
+    new TestCase("",            "",             true),
+    // Star wildcard
+    new TestCase("foo.txt",     "*.txt",        true),
+    new TestCase("bar.csv",     "*.txt",        false),
+    new TestCase("foo",         "*",            true),
+    new TestCase("",            "*",            true),
+    new TestCase("abc",         "a*c",          true),
+    new TestCase("ac",          "a*c",          true),
+    new TestCase("a",           "a*c",          false),
+    new TestCase("foo.tar.gz",  "*.tar.*",      true),
+    new TestCase("foo.tar",     "*.tar.*",      false),
+    // Question wildcard
+    new TestCase("a",           "?",            true),
+    new TestCase("",            "?",            false),
+    new TestCase("ab",          "?b",           true),
+    new TestCase("ab",          "??",           true),
+    new TestCase("a",           "??",           false),
+    new TestCase("cab",         "?a?",          true),
+    // Combined
+    new TestCase("report_2024.csv",   "report_????.csv",  true),
+    new TestCase("report_24.csv",     "report_????.csv",  false),
+    new TestCase("test_foo_bar.log",  "test_*_*.log",     true),
+    new TestCase("test_foo.log",      "test_*_*.log",     false),
+    // CharClass
+    new TestCase("a.log",   "[abc].log",   true),
+    new TestCase("d.log",   "[abc].log",   false),
+    new TestCase("1.log",   "[^abc].log",  true),
+    new TestCase("a.log",   "[^abc].log",  false),
+    new TestCase("index.html",  "index.htm[l]",  true),
+    new TestCase("index.htmx",  "index.htm[l]",  false),
+    // Escape
+    new TestCase("literal*star",  "literal\\*star",  true),
+    new TestCase("literal_star",  "literal\\*star",  false)
+  ]
+
+  IO::println("── Test results:")
+  val failures: Int = runTests(tests)
+  IO::println("")
+
+  // File list filtering via collection pipelines
+  val files: List[String] = [
+    "src/Main.on", "src/Typing.on", "src/parsing/Lexer.on",
+    "test/HelloWorldSpec.on", "test/FactorialSpec.on",
+    "build.sbt", "README.md", ".gitignore",
+    "run/OrderReport.on", "run/GlobMatcher.on"
+  ]
+
+  IO::println("── File filter pipeline:")
+  val onFiles: List[String] = filterGlob("*.on", files)
+  IO::println("  *.on          → #{onFiles.size} files")
+
+  val testFiles: List[String] = filterGlob("test/*Spec.on", files)
+  IO::println("  test/*Spec.on → #{testFiles.size} files: #{testFiles.toString()}")
+
+  val srcFiles: List[String] = filterGlob("src/*.on", files)
+  IO::println("  src/*.on      → #{srcFiles.size} files: #{srcFiles.toString()}")
+
+  val runGFiles: List[String] = filterGlob("run/G*.on", files)
+  IO::println("  run/G*.on     → #{runGFiles.size} files: #{runGFiles.toString()}")
+  IO::println("")
+
+  // Pattern complexity statistics using fold
+  val pats: List[String] = ["*.txt", "[abc]?.log", "???", "*", "exact", "a*b*c"]
+  IO::println("── Pattern statistics:")
+  foreach pat: String in pats {
+    IO::println("  \"#{pat}\"  #{patternStats(pat)}")
+  }
+  IO::println("")
+
+  // Partition test cases into pass/fail groups
+  val parts = tests.partition { tc -> (tc as TestCase).input().matchesGlob((tc as TestCase).pattern()) == (tc as TestCase).expected() }
+  val passing: List[Object] = parts[0] as List[Object]
+  val failingPart: List[Object] = parts[1] as List[Object]
+  IO::println("── Summary: #{passing.size} correct expectations, #{failingPart.size} incorrect")
+  IO::println("")
+
+  // Route matching: find first matching pattern for a URL-like path
+  val routes: List[String] = [
+    "api/v1/users/*",
+    "api/v1/posts/*",
+    "api/v*/admin/*",
+    "static/[a-z]*.css",
+    "*"
+  ]
+  val paths: List[String] = [
+    "api/v1/users/42",
+    "api/v1/posts/hello-world",
+    "api/v2/admin/settings",
+    "static/main.css",
+    "favicon.ico"
+  ]
+  IO::println("── Route matching:")
+  foreach path: String in paths {
+    val matched: String? = firstMatch(routes, path)
+    val label: String = if matched != null { matched!! } else { "(no match)" }
+    IO::println("  #{path}  →  #{label}")
+  }
+  IO::println("")
+
+  // Pattern ranking over a corpus
+  val corpus: List[String] = [
+    "README.md", "build.sbt", "src/Main.on", "src/Typing.on",
+    "test/HelloWorldSpec.on", "run/OrderReport.on", "run/GlobMatcher.on",
+    "docs/guide.md", "docs/api.md", ".gitignore"
+  ]
+  val testPatterns: List[String] = ["*.on", "*.md", "src/*", "run/*", "*"]
+  IO::println("── Pattern ranking (by corpus matches):")
+  val ranked: List[String] = rankPatterns(testPatterns, corpus)
+  foreach row: String in ranked {
+    val parts2: List[String] = Strings::split(row as String, "\t")
+    IO::println("  #{parts2.get(1)}  matches #{parts2.get(0)}")
+  }
+  IO::println("")
+
+  if failures == 0 {
+    IO::println("All tests passed.")
+  } else {
+    IO::println("#{failures} test(s) FAILED.")
+  }
+}

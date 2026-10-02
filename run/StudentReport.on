@@ -1,0 +1,299 @@
+// StudentReport.on — academic performance tracker and report generator
+// Exercises: extension methods (Int/Double/String), data-carrying enums,
+// ADT (case) enum, records with list fields and methods, collection
+// pipelines (map/filter/fold/sortedBy/find/partition), select/pattern
+// matching, nullable, closures, string interpolation, foreach (ranges).
+
+import {
+  java.lang.Math
+}
+
+// ── Extension Methods ──────────────────────────────────────────────────────
+
+extension Double {
+  def round1(): Double = (Math::round(self * 10.0) as Double) / 10.0
+  def round2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+  def fmt(w: Int): String {
+    var s: String = "" + self.round2()
+    while s.length() < w { s = " " + s }
+    return s
+  }
+}
+
+extension String {
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def trunc(m: Int): String {
+    if self.length() <= m { return self }
+    return self.substring(0, m - 1) + "."
+  }
+}
+
+extension Int {
+  def fmt(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def starRating(): String {
+    var out: String = ""
+    foreach i: Int in 0..<self { out = out + "*" }
+    foreach i: Int in self..<5 { out = out + "-" }
+    return out
+  }
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────────
+
+enum Subject(code: String, credits: Int) {
+  Math("MTH", 4),
+  Science("SCI", 4),
+  English("ENG", 3),
+  History("HST", 3),
+  Art("ART", 2),
+  PhysEd("PE", 1)
+}
+
+enum LetterGrade {
+  case A(gpa: Double)
+  case B(gpa: Double)
+  case C(gpa: Double)
+  case D(gpa: Double)
+  case F(gpa: Double)
+
+  public:
+  def letter(): String = select this {
+    case x is A: "A"
+    case x is B: "B"
+    case x is C: "C"
+    case x is D: "D"
+    case x is F: "F"
+  }
+
+  def gpaPoints(): Double = select this {
+    case x is A: x.gpa()
+    case x is B: x.gpa()
+    case x is C: x.gpa()
+    case x is D: x.gpa()
+    case x is F: x.gpa()
+  }
+
+  def stars(): Int = select this {
+    case x is A: 5
+    case x is B: 4
+    case x is C: 3
+    case x is D: 2
+    case x is F: 1
+  }
+}
+
+def scoreToGrade(score: Double): LetterGrade =
+  if score >= 90.0 { new A(4.0) }
+  else if score >= 80.0 { new B(3.0) }
+  else if score >= 70.0 { new C(2.0) }
+  else if score >= 60.0 { new D(1.0) }
+  else { new F(0.0) }
+
+// ── Records ────────────────────────────────────────────────────────────────
+
+record Assessment(subject: Subject, score: Double, maxScore: Double)
+
+record Student(id: String, name: String, yearLevel: Int, assessments: List[Assessment]) {
+public:
+  def pct(a: Assessment): Double =
+    if a.maxScore() == 0.0 { 0.0 } else { (a.score() / a.maxScore() * 100.0).round1() }
+
+  def totalScore(): Double =
+    assessments().fold(0.0) { acc, a -> (acc as Double) + (a as Assessment).score() }
+
+  def totalMax(): Double =
+    assessments().fold(0.0) { acc, a -> (acc as Double) + (a as Assessment).maxScore() }
+
+  def overallPct(): Double =
+    if totalMax() == 0.0 { 0.0 } else { (totalScore() / totalMax() * 100.0).round1() }
+
+  def overallGrade(): LetterGrade = scoreToGrade(overallPct())
+
+  def creditHours(): Int =
+    assessments()
+      .map { a -> (a as Assessment).subject().credits() }
+      .fold(0) { acc, c -> (acc as Int) + (c as Int) }
+
+  def gpa(): Double {
+    val total: Int = creditHours()
+    if total == 0 { return 0.0 }
+    val weightedSum: Double = assessments().fold(0.0) { acc, a ->
+      val ast: Assessment = a as Assessment
+      val p: Double = if ast.maxScore() == 0.0 { 0.0 } else { ast.score() / ast.maxScore() * 100.0 }
+      val pts: Double = scoreToGrade(p).gpaPoints()
+      (acc as Double) + pts * (ast.subject().credits() as Double)
+    }
+    return (weightedSum / (total as Double)).round2()
+  }
+
+  def topAssessment(): Assessment? =
+    assessments()
+      .sortedBy { a -> 0.0 - pct(a as Assessment) }
+      .find { a -> true }
+
+  def weakAssessments(): List[Assessment] =
+    assessments().filter { a -> pct(a as Assessment) < 70.0 }
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+
+def bar(p: Double, width: Int): String {
+  val filled: Int = ((p / 100.0) * (width as Double)) as Int
+  var out: String = "["
+  foreach i: Int in 0..<width {
+    if i < filled { out = out + "=" } else { out = out + " " }
+  }
+  return out + "]"
+}
+
+def sep(w: Int): String {
+  var s: String = ""
+  foreach i: Int in 0..<w { s = s + "-" }
+  return s
+}
+
+// ── Report Printer ─────────────────────────────────────────────────────────
+
+def printStudentCard(s: Student): void {
+  val w: Int = 60
+  IO::println(sep(w))
+  IO::println("  STUDENT REPORT CARD")
+  IO::println("  ID: #{s.id()}   Name: #{s.name()}   Year #{s.yearLevel()}")
+  IO::println(sep(w))
+  IO::println("  #{"Subject".rpad(10)} #{"Score".lpad(6)} / #{"Max".rpad(5)}  #{"Pct%".lpad(6)}  Gr  Bar")
+  IO::println(sep(w))
+  foreach a: Assessment in s.assessments() {
+    val p: Double = s.pct(a)
+    val g: LetterGrade = scoreToGrade(p)
+    val b: String = bar(p, 14)
+    IO::println("  #{a.subject().code().rpad(10)} #{("" + a.score()).lpad(6)} / #{("" + a.maxScore()).rpad(5)}  #{("" + p).lpad(6)}  #{g.letter()}   #{b}")
+  }
+  IO::println(sep(w))
+  IO::println("  Overall: #{s.overallPct()}%   GPA: #{s.gpa()}   Credits: #{s.creditHours()}")
+  val og: LetterGrade = s.overallGrade()
+  IO::println("  Final Grade: #{og.letter()}  (#{og.gpaPoints()} GPA pts)  #{og.stars().starRating()}")
+  val top: Assessment? = s.topAssessment()
+  if top != null {
+    IO::println("  Best: #{top.subject().code()} (#{s.pct(top)}%)")
+  }
+  val weak: List[Assessment] = s.weakAssessments()
+  if weak.size > 0 {
+    val codes: List[String] = weak.map { a -> (a as Assessment).subject().code() }
+    IO::println("  Needs attention: #{codes.toString()}")
+  }
+  IO::println(sep(w))
+  IO::println("")
+}
+
+def printClassSummary(students: List[Student]): void {
+  val w: Int = 54
+  IO::println("═══ CLASS SUMMARY ═══")
+  IO::println("")
+  val sorted: List[Student] = students.sortedBy { s -> 0.0 - (s as Student).overallPct() }
+  IO::println("#{"#".lpad(4)}  #{"Name".rpad(16)} #{"Pct%".lpad(6)}  #{"GPA".lpad(5)}  Rating")
+  IO::println(sep(w))
+  var rank: Int = 1
+  foreach s: Student in sorted {
+    val rating: Int = s.overallGrade().stars()
+    IO::println("#{rank.fmt(4)}  #{s.name().rpad(16)} #{("" + s.overallPct()).lpad(6)}  #{("" + s.gpa()).lpad(5)}  #{rating.starRating()}")
+    rank++
+  }
+  IO::println(sep(w))
+  val cnt: Int = students.size
+  val sumPct: Double = students.fold(0.0) { acc, s -> (acc as Double) + (s as Student).overallPct() }
+  val sumGpa: Double = students.fold(0.0) { acc, s -> (acc as Double) + (s as Student).gpa() }
+  IO::println("  Avg: #{(sumPct / (cnt as Double)).round1()}%   Avg GPA: #{(sumGpa / (cnt as Double)).round2()}")
+  val parts = students.partition { s -> (s as Student).overallPct() >= 60.0 }
+  val passing: List[Student] = parts[0] as List[Student]
+  val failing: List[Student] = parts[1] as List[Student]
+  IO::println("  Passing: #{passing.size}  Failing: #{failing.size}")
+  IO::println("")
+  IO::println("  Subject pass rates:")
+  val subjects: List[Subject] = [
+    Subject::Math, Subject::Science, Subject::English,
+    Subject::History, Subject::Art, Subject::PhysEd
+  ]
+  foreach subj: Subject in subjects {
+    val passCount: Int = students
+      .filter { s ->
+        val asts: List[Assessment] = (s as Student).assessments()
+        val match: Assessment? = asts.find { a -> (a as Assessment).subject() == subj }
+        if match == null { false }
+        else { (s as Student).pct(match) >= 70.0 }
+      }
+      .size
+    val pctPass: Double = if cnt == 0 { 0.0 } else { (passCount as Double) / (cnt as Double) * 100.0 }
+    IO::println("    #{subj.code().rpad(5)} #{bar(pctPass, 10)} #{passCount}/#{cnt} (#{pctPass.round1()}%)")
+  }
+  IO::println("")
+}
+
+// ── Sample Data & Main ─────────────────────────────────────────────────────
+
+val students: List[Student] = [
+  new Student("S001", "Alice Chen", 10, [
+    new Assessment(Subject::Math,    92.0, 100.0),
+    new Assessment(Subject::Science, 88.0, 100.0),
+    new Assessment(Subject::English, 95.0, 100.0),
+    new Assessment(Subject::History, 84.0, 100.0),
+    new Assessment(Subject::Art,     91.0, 100.0),
+    new Assessment(Subject::PhysEd,  87.0, 100.0)
+  ]),
+  new Student("S002", "Bob Martinez", 10, [
+    new Assessment(Subject::Math,    74.0, 100.0),
+    new Assessment(Subject::Science, 68.0, 100.0),
+    new Assessment(Subject::English, 81.0, 100.0),
+    new Assessment(Subject::History, 76.0, 100.0),
+    new Assessment(Subject::Art,     55.0, 100.0),
+    new Assessment(Subject::PhysEd,  93.0, 100.0)
+  ]),
+  new Student("S003", "Carol Kim", 10, [
+    new Assessment(Subject::Math,    99.0, 100.0),
+    new Assessment(Subject::Science, 97.0, 100.0),
+    new Assessment(Subject::English, 89.0, 100.0),
+    new Assessment(Subject::History, 94.0, 100.0),
+    new Assessment(Subject::Art,     82.0, 100.0),
+    new Assessment(Subject::PhysEd,  78.0, 100.0)
+  ]),
+  new Student("S004", "David Okafor", 10, [
+    new Assessment(Subject::Math,    58.0, 100.0),
+    new Assessment(Subject::Science, 62.0, 100.0),
+    new Assessment(Subject::English, 71.0, 100.0),
+    new Assessment(Subject::History, 55.0, 100.0),
+    new Assessment(Subject::Art,     77.0, 100.0),
+    new Assessment(Subject::PhysEd,  88.0, 100.0)
+  ]),
+  new Student("S005", "Eva Johansson", 10, [
+    new Assessment(Subject::Math,    85.0, 100.0),
+    new Assessment(Subject::Science, 90.0, 100.0),
+    new Assessment(Subject::English, 78.0, 100.0),
+    new Assessment(Subject::History, 92.0, 100.0),
+    new Assessment(Subject::Art,     96.0, 100.0),
+    new Assessment(Subject::PhysEd,  82.0, 100.0)
+  ])
+]
+
+IO::println("")
+IO::println("  +===========================================+")
+IO::println("  |   ONION ACADEMY — TERM REPORT 2024       |")
+IO::println("  +===========================================+")
+IO::println("")
+
+foreach s: Student in students {
+  printStudentCard(s)
+}
+
+printClassSummary(students)

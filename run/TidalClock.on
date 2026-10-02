@@ -1,0 +1,322 @@
+// TidalClock — tidal prediction via simplified harmonic analysis.
+// Exercises: records with methods, data-carrying enums, ADT enums,
+// collection pipelines (map/filter/fold/sortedBy/groupBy/find/partition),
+// select/pattern matching, closures, string interpolation, recursion,
+// foreach (ranges and map entries), while, try/catch, nullable.
+
+import {
+  java.lang.Math as JMath
+}
+
+// ── Tidal constituents ────────────────────────────────────────────────────────
+// Each constituent has a period (hours), speed (deg/hr), and a role label.
+enum ConstituentRole {
+  PRINCIPAL_LUNAR, PRINCIPAL_SOLAR, LUNAR_ELLIPTIC,
+  LUNISOLAR_DIURNAL, LUNAR_DIURNAL
+}
+
+record Constituent(name: String, period: Double, speed: Double, role: ConstituentRole) {
+public:
+  def show(): String = "#{ name() } (T=#{ period() }h, S=#{ speed() }°/h)"
+}
+
+// ── Harmonic parameters for a specific station ────────────────────────────────
+record StationConstituent(constituent: Constituent, amplitude: Double, phase: Double) {
+public:
+  // Elevation contribution at time t (hours from epoch)
+  def elevation(t: Double): Double =
+    amplitude() * JMath::cos((constituent().speed() * t - phase()) * JMath::PI / 180.0)
+  def show(): String =
+    "#{ constituent().name() } amp=#{ amplitude() }m phase=#{ phase() }°"
+}
+
+// ── Tidal state classification ────────────────────────────────────────────────
+enum TidalState {
+  HIGH_TIDE, FLOOD, LOW_TIDE, EBB
+}
+
+// ── Tidal type by diurnal inequality ─────────────────────────────────────────
+enum TidalType {
+  SEMIDIURNAL, MIXED_SEMIDIURNAL, DIURNAL
+}
+
+// ── A single tidal prediction at a point in time ─────────────────────────────
+record Prediction(hour: Int, elevation: Double, state: TidalState) {
+public:
+  def show(): String {
+    val stateStr: String = select state() {
+      case TidalState::HIGH_TIDE: "HIGH"
+      case TidalState::FLOOD:     "flood"
+      case TidalState::LOW_TIDE:  "LOW "
+      case TidalState::EBB:       "ebb"
+    }
+    val sign: String = if elevation() >= 0.0 { "+" } else { "" }
+    return "  h=#{ formatHour(hour()) }  #{ sign }#{ formatElevation(elevation()) }m  [#{ stateStr }]"
+  }
+}
+
+// ── Extreme tidal event (high or low tide) ────────────────────────────────────
+record TidalExtreme(hour: Int, elevation: Double, isHigh: Boolean) {
+public:
+  def show(): String {
+    val label: String = if isHigh() { "HIGH" } else { "LOW " }
+    return "#{ label } at h=#{ formatHour(hour()) }  #{ formatElevation(elevation()) }m"
+  }
+}
+
+// ── Station model ─────────────────────────────────────────────────────────────
+record Station(name: String, lat: Double, lon: Double,
+               meanLevel: Double, constituents: List[StationConstituent]) {
+public:
+  // Total water-level deviation from mean at time t (hours)
+  def deviation(t: Double): Double {
+    var sum: Double = 0.0
+    foreach sc: StationConstituent in constituents() {
+      sum = sum + sc.elevation(t)
+    }
+    return sum
+  }
+
+  // Absolute water level
+  def level(t: Double): Double = meanLevel() + deviation(t)
+
+  // Generate hourly predictions over `hours` hours starting at epoch
+  def predict(hours: Int): List[Prediction] {
+    val result: List[Prediction] = []
+    foreach h: Int in 0..<hours {
+      val ht: Double = h + 0.0
+      val elev: Double = deviation(ht)
+      val prevElev: Double = if h > 0 { deviation(h - 1 + 0.0) } else { elev }
+      val state: TidalState = classifyState(elev, prevElev)
+      result.add(new Prediction(h, elev, state))
+    }
+    return result
+  }
+
+  // Find extremes by scanning for sign changes in derivative
+  def findExtremes(hours: Int): List[TidalExtreme] {
+    val result: List[TidalExtreme] = []
+    foreach h: Int in 1..<(hours - 1) {
+      val ht: Double = h + 0.0
+      val prev: Double = deviation(ht - 1.0)
+      val curr: Double = deviation(ht)
+      val next: Double = deviation(ht + 1.0)
+      val isLocalMax: Boolean = curr > prev && curr >= next
+      val isLocalMin: Boolean = curr < prev && curr <= next
+      if isLocalMax || isLocalMin {
+        result.add(new TidalExtreme(h, curr, isLocalMax))
+      }
+    }
+    return result
+  }
+
+  // Classify tidal type based on the form ratio K1+O1 / M2+S2
+  def tidalType(): TidalType {
+    val m2Amp: Double = findAmplitude("M2")
+    val s2Amp: Double = findAmplitude("S2")
+    val k1Amp: Double = findAmplitude("K1")
+    val o1Amp: Double = findAmplitude("O1")
+    val semidiurnal: Double = m2Amp + s2Amp
+    if semidiurnal == 0.0 { return TidalType::DIURNAL }
+    val ratio: Double = (k1Amp + o1Amp) / semidiurnal
+    if ratio < 0.25 { return TidalType::SEMIDIURNAL }
+    else if ratio < 3.0 { return TidalType::MIXED_SEMIDIURNAL }
+    else { return TidalType::DIURNAL }
+  }
+
+private:
+  def findAmplitude(cname: String): Double {
+    val found: StationConstituent? = constituents().find { sc -> sc.constituent().name() == cname }
+    return if found != null { found.amplitude() } else { 0.0 }
+  }
+}
+
+// ── Global tide constituents ───────────────────────────────────────────────────
+val M2: Constituent = new Constituent("M2", 12.421, 28.984, ConstituentRole::PRINCIPAL_LUNAR)
+val S2: Constituent = new Constituent("S2", 12.000, 30.000, ConstituentRole::PRINCIPAL_SOLAR)
+val N2: Constituent = new Constituent("N2", 12.658, 28.440, ConstituentRole::LUNAR_ELLIPTIC)
+val K1: Constituent = new Constituent("K1", 23.934, 15.041, ConstituentRole::LUNISOLAR_DIURNAL)
+val O1: Constituent = new Constituent("O1", 25.820, 13.943, ConstituentRole::LUNAR_DIURNAL)
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+def classifyState(curr: Double, prev: Double): TidalState {
+  val rising: Boolean = curr > prev
+  return if rising {
+    if curr > 1.2 { TidalState::HIGH_TIDE } else { TidalState::FLOOD }
+  } else {
+    if curr < -1.2 { TidalState::LOW_TIDE } else { TidalState::EBB }
+  }
+}
+
+def formatHour(h: Int): String {
+  val hh: Int = h % 24
+  val prefix: String = if hh < 10 { "0" } else { "" }
+  return "#{ prefix }#{ hh }:00"
+}
+
+def formatElevation(e: Double): String {
+  val abs: Double = if e < 0.0 { 0.0 - e } else { e }
+  val intPart: Int = abs.intValue()
+  val frac: Int = ((abs - intPart + 0.0) * 100.0 + 0.005).intValue()
+  val fracStr: String = if frac < 10 { "0#{ frac }" } else { "#{ frac }" }
+  val sign: String = if e < 0.0 { "-" } else { "" }
+  return "#{ sign }#{ intPart }.#{ fracStr }"
+}
+
+def barGraph(elev: Double, maxAmp: Double, width: Int): String {
+  val scaled: Int = ((elev + maxAmp) / (2.0 * maxAmp) * (width + 0.0)).intValue()
+  val clamped: Int = if scaled < 0 { 0 } else if scaled > width { width } else { scaled }
+  var bar: String = ""
+  foreach i: Int in 0..<width {
+    if i == width / 2 { bar = bar + "|" }
+    else if i < clamped { bar = bar + "=" }
+    else { bar = bar + "." }
+  }
+  return bar
+}
+
+def padRight(s: String, width: Int): String {
+  var r: String = s
+  while r.length() < width { r = r + " " }
+  return r
+}
+
+// ── Build example stations ─────────────────────────────────────────────────────
+def buildSanFrancisco(): Station {
+  val scs: List[StationConstituent] = [
+    new StationConstituent(M2, 0.604, 145.0),
+    new StationConstituent(S2, 0.135, 168.0),
+    new StationConstituent(N2, 0.138,  98.0),
+    new StationConstituent(K1, 0.397, 200.0),
+    new StationConstituent(O1, 0.257, 175.0)
+  ]
+  return new Station("San Francisco", 37.78, -122.47, 0.0, scs)
+}
+
+def buildLondon(): Station {
+  val scs: List[StationConstituent] = [
+    new StationConstituent(M2, 2.878, 120.0),
+    new StationConstituent(S2, 0.872, 158.0),
+    new StationConstituent(N2, 0.621,  80.0),
+    new StationConstituent(K1, 0.090, 240.0),
+    new StationConstituent(O1, 0.057, 220.0)
+  ]
+  return new Station("London (Thames)", 51.50, -0.12, 3.2, scs)
+}
+
+def buildHonolulu(): Station {
+  val scs: List[StationConstituent] = [
+    new StationConstituent(M2, 0.120,  70.0),
+    new StationConstituent(S2, 0.049,  90.0),
+    new StationConstituent(N2, 0.025,  50.0),
+    new StationConstituent(K1, 0.160, 180.0),
+    new StationConstituent(O1, 0.128, 170.0)
+  ]
+  return new Station("Honolulu", 21.30, -157.86, 0.0, scs)
+}
+
+// ── Analysis helpers ──────────────────────────────────────────────────────────
+def analyzeStation(station: Station): void {
+  IO::println("═══════════════════════════════════════════════════════")
+  IO::println("Station: #{ station.name() }  (lat=#{ station.lat() }, lon=#{ station.lon() })")
+
+  val ttype: TidalType = station.tidalType()
+  val ttypeStr: String = select ttype {
+    case TidalType::SEMIDIURNAL:       "Semidiurnal (2 HW + 2 LW per day)"
+    case TidalType::MIXED_SEMIDIURNAL: "Mixed semidiurnal"
+    case TidalType::DIURNAL:           "Diurnal (1 HW + 1 LW per day)"
+  }
+  IO::println("Tidal type: #{ ttypeStr }")
+
+  // 3-day prediction at hourly resolution
+  val preds: List[Prediction] = station.predict(72)
+  val extremes: List[TidalExtreme] = station.findExtremes(72)
+
+  // Stats over the 72-hour window
+  val elevations: List[Double] = preds.map { p -> (p as Prediction).elevation() }
+  var maxElev: Double = (elevations.get(0) as Double)
+  var minElev: Double = (elevations.get(0) as Double)
+  var sumElev: Double = 0.0
+  foreach e: Double in elevations {
+    if e > maxElev { maxElev = e }
+    if e < minElev { minElev = e }
+    sumElev = sumElev + e
+  }
+  val meanElev: Double = sumElev / 72.0
+
+  IO::println("3-day range: #{ formatElevation(minElev) }m to #{ formatElevation(maxElev) }m  (mean #{ formatElevation(meanElev) }m)")
+
+  // High and low water events
+  val highs: List[TidalExtreme] = extremes.filter { e -> (e as TidalExtreme).isHigh() }
+  val lows: List[TidalExtreme] = extremes.filter { e -> !(e as TidalExtreme).isHigh() }
+  IO::println("High tides: #{ highs.size() }  Low tides: #{ lows.size() } (over 72 h)")
+
+  // Spring vs neap: compare consecutive high-tide pairs
+  val highElev: List[Double] = highs.map { e -> (e as TidalExtreme).elevation() }
+  if highElev.size() >= 2 {
+    var maxHigh: Double = (highElev.get(0) as Double)
+    var minHigh: Double = (highElev.get(0) as Double)
+    foreach e: Double in highElev {
+      if e > maxHigh { maxHigh = e }
+      if e < minHigh { minHigh = e }
+    }
+    IO::println("Max high: #{ formatElevation(maxHigh) }m  Min high: #{ formatElevation(minHigh) }m  (spring/neap contrast)")
+  }
+
+  // Print first 24 hours hourly with ASCII bar
+  IO::println("── Hourly tide (first 24 h) ───────────────────────────")
+  val maxAmp: Double = if maxElev > 0.0 - minElev { maxElev } else { 0.0 - minElev }
+  foreach h: Int in 0..<24 {
+    val p: Prediction = preds.get(h) as Prediction
+    val bar: String = barGraph(p.elevation(), maxAmp + 0.1, 40)
+    IO::println("#{ formatHour(h) }  [#{ bar }]  #{ formatElevation(p.elevation()) }m")
+  }
+
+  // Print extremes in first 72h
+  IO::println("── Tidal extremes (first 72 h) ────────────────────────")
+  foreach e: TidalExtreme in extremes {
+    IO::println("  #{ e.show() }")
+  }
+
+  // Daily high-water count classification
+  val highsByDay: Map[Int, List[TidalExtreme]] = highs.groupBy { e -> (e as TidalExtreme).hour() / 24 }
+  IO::println("── Daily high water count ─────────────────────────────")
+  foreach (dayNum, dayHighs) in highsByDay {
+    IO::println("  Day #{ dayNum + 1 }: #{ dayHighs.size() } high water(s)")
+  }
+
+  // Show first 6 predictions in detail using Prediction.show()
+  IO::println("── First 6-hour detail (Prediction.show) ──────────────")
+  foreach h: Int in 0..<6 {
+    IO::println((preds.get(h) as Prediction).show())
+  }
+  IO::println("")
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+val sf: Station = buildSanFrancisco()
+val ldn: Station = buildLondon()
+val hon: Station = buildHonolulu()
+
+IO::println("TidalClock — harmonic tidal prediction")
+IO::println("Epoch: Day 0 hour 0 (arbitrary reference)")
+IO::println("")
+
+analyzeStation(sf)
+analyzeStation(ldn)
+analyzeStation(hon)
+
+// Cross-station comparison
+IO::println("═══════════════════════════════════════════════════════")
+IO::println("Cross-station 24-hour comparison (deviation from mean)")
+IO::println("Hour  SF        London    Honolulu")
+foreach h: Int in 0..<24 {
+  val ht: Double = h + 0.0
+  val sfE: String = formatElevation(sf.deviation(ht))
+  val ldnE: String = formatElevation(ldn.deviation(ht))
+  val honE: String = formatElevation(hon.deviation(ht))
+  IO::println("#{ formatHour(h) }  #{ padRight(sfE, 9) } #{ padRight(ldnE, 9) } #{ honE }")
+}
+
+IO::println("")
+IO::println("Done.")

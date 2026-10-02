@@ -17,7 +17,6 @@ import onion.compiler.StreamInputSource
 import onion.compiler.WarningLevel
 import onion.compiler.diagnostics.DiagnosticRenderer
 import onion.tools.CompiledClassWriter
-import onion.tools.OnionVersion
 
 final case class ProjectBuild(
   paths: ProjectPaths,
@@ -43,9 +42,15 @@ object ProjectBuilder:
     ))
 
 final class ProjectBuilder(
-  compilerVersion: String = OnionVersion.value,
+  /**
+   * Which compiler is building: its version plus a digest of its jar or class directory
+   * (see [[CompilerIdentity]]), so that a new compiler with the same version string — or a
+   * changed compiler resource — invalidates the build cache. Injectable for tests.
+   */
+  compilerIdentity: String = CompilerIdentity.current,
   javaFeature: Int = Runtime.version.feature,
-  mover: PathMover = PathMover.system
+  mover: PathMover = PathMover.system,
+  resolver: DependencyResolver.Resolution = DependencyResolver.resolve
 ):
   private final case class SourceSnapshot(
     source: ProjectSource,
@@ -69,7 +74,7 @@ final class ProjectBuilder(
         fingerprint = BuildFingerprint.compute(
           manifest.bytes,
           sources.map(snapshot => snapshot.source.relative -> snapshot.bytes),
-          compilerVersion,
+          compilerIdentity,
           javaFeature,
           resolved.coordinates
         )
@@ -81,15 +86,24 @@ final class ProjectBuilder(
   /**
    * Resolves through `onion.lock` when there is one that answers this manifest's question.
    *
-   * A usable lock is resolved from its own pinned coordinate set rather than from
-   * `[dependencies]`, which is what fixes the transitive versions — the ones nobody wrote
+   * A usable lock is honoured by resolving the manifest's own `[dependencies]` with every
+   * locked version ''forced'' — the transitive ones too, which are the ones nobody wrote
    * down and which otherwise change under the project without `onion.toml` changing a byte.
-   * The artifacts are then checked against the recorded hashes before anything compiles.
+   * It used to resolve the locked coordinates as a flat list of direct dependencies
+   * instead, and that is a different question: a transitive promoted to a root escapes the
+   * POM that manages its version, so a lock the first build wrote could be rejected by the
+   * second. The artifacts are then checked against the recorded hashes before anything
+   * compiles.
+   *
+   * Before any of that, a usable lock whose classpath this machine has already resolved
+   * and verified ([[DependencyClasspathRecord]]) is taken as it stands: same lock, same
+   * jars, same bytes, so asking coursier again could only repeat the answer.
    *
    * With no usable lock, resolution proceeds from the manifest and the result is written out.
    * A lock that cannot be written is reported but does not fail the build: the resolution
    * itself succeeded, and refusing to compile over a file that is only there to help the
-   * *next* build would be a strange way to help.
+   * *next* build would be a strange way to help. The classpath record is quieter still — it
+   * only saves time, so failing to write one is not worth a line on the terminal.
    */
   private def resolveDependencies(
     paths: ProjectPaths,
@@ -98,21 +112,42 @@ final class ProjectBuilder(
   ): Either[ProjectError, ResolvedDependencies] =
     DependencyLock.read(paths).filter(_.matches(manifest)) match
       case Some(locked) =>
-        for
-          resolved <- DependencyResolver.resolve(
-            pinned(locked.coordinates), manifest.repositories, Some(err))
-          _ <- DependencyLock.verify(locked, resolved)
-        yield resolved
+        DependencyClasspathRecord.reuse(DependencyClasspathRecord.path(paths), locked) match
+          case Some(recorded) => Right(recorded)
+          case None =>
+            for
+              resolved <- resolver(
+                manifest.dependencies, manifest.repositories, Some(err),
+                pinned(locked.coordinates))
+              _ <- DependencyLock.verify(locked, resolved)
+            yield
+              remember(paths, locked, resolved)
+              resolved
       case None =>
-        DependencyResolver
-          .resolve(manifest.dependencies, manifest.repositories, Some(err))
+        resolver(manifest.dependencies, manifest.repositories, Some(err), Seq.empty)
           .map { resolved =>
             if manifest.dependencies.nonEmpty then
-              DependencyLock.write(paths, manifest, resolved).left.foreach { error =>
-                err.println(s"warning: ${error.message}")
-              }
+              DependencyLock.write(paths, manifest, resolved) match
+                case Left(error) => err.println(s"warning: ${error.message}")
+                case Right(()) =>
+                  // Read back rather than rebuilt, so the record is keyed by exactly what
+                  // the next build will read.
+                  DependencyLock.read(paths).foreach(remember(paths, _, resolved))
             resolved
           }
+
+  /** Best effort: a record that cannot be written costs the next build a resolution. */
+  private def remember(
+    paths: ProjectPaths,
+    locked: DependencyLock.Locked,
+    resolved: ResolvedDependencies
+  ): Unit =
+    if resolved.classpath.nonEmpty then
+      try
+        createRealDirectory(paths.target, paths.root, "project target")
+        createRealDirectory(paths.onionState, paths.target, "project state directory")
+        DependencyClasspathRecord.write(DependencyClasspathRecord.path(paths), locked, resolved)
+      catch case NonFatal(_) => ()
 
   /** `group:artifact:version` back into a dependency; anything malformed is skipped. */
   private def pinned(coordinates: Seq[String]): Seq[Dependency] =

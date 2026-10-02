@@ -32,6 +32,9 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 
 コンソール入出力操作。
 
+標準入力は、パイプやファイルのときはどの JDK でも UTF-8 としてデコードします。Windows の
+コンソールはそのコードページでデコードします（[コンソールの文字コード](../getting-started/installation.md)を参照）。
+
 ### IO::println
 
 標準出力に改行付きで出力：
@@ -507,6 +510,28 @@ val out = r.edit { v -> v.copy(port = 9090) }.render()
 裏にある shape を、`Shapes::config` と `Shapes::yaml` は `shape name = config` /
 `shape name = yaml` の糖衣構文の裏にある lossless shape を、それぞれ `Shape[T]` の値として
 直接組み立てます。
+
+### 構造化 JSON と JSON Schema
+
+json shape の成分には、スカラーの `List[S]`、json shape を宣言した入れ子のレコード、
+そのようなレコードの `List[R]`、およびこれらすべての `T?`（キーが欠けても `null` でもよい）
+も使えます。構造の内側の欠陥はパスを持ちます（`actions[2].owner`）。その裏にあるのが
+オーバーロード `Shapes::json(names, tags, nested, build, explode)` です。タグは
+`List[K]`・`Nested`・末尾の `?` を受け付け、`nested` は `Nested` の成分ごとに入れ子の
+shape を返す `Function0` を持ちます（それ以外は `null`）。
+
+`hasJsonSchema()` は、その shape が読むものを JSON Schema として記述できるかに答えます。
+true になるのは json shape だけです。`jsonSchema()` はそのスキーマを JSON テキストで
+返します。成分ごとに 1 つのプロパティを持つ `object` で、`required` には null 非許容の
+成分をすべて挙げ、`additionalProperties: false` とし、配列と入れ子のオブジェクトにも同じ
+規則で再帰します —— LLM の構造化出力モードが受け取る形式です。
+
+```onion
+val schema = Json::parse(summaryShape.jsonSchema())   // リクエスト本文に埋め込む
+```
+
+ほかの shape の `jsonSchema()` は `UnsupportedOperationException` を投げます。有限の
+インライン スキーマを持たない再帰的なレコードの場合も同様です。
 
 ### コンビネータ
 
@@ -991,6 +1016,7 @@ val timeNanos: Long = Timing::time { expensiveOperation() }
 - `res.fold(e -> ifErr, v -> ifOk)` — 単一の値へ畳み込む
 - `res.recover(e -> value)` / `res.recoverWith(e -> otherResult)` — `Err` を回復
 - `res.exists(predicate)` / `res.toList()`
+- ケースでマッチ: `case o is Result.Ok` / `case e is Result.Err` とし、`o.value()` / `e.error()` は検査対象の型引数の型になる。両方のケースがそろった `select` は網羅的（[Java のネストした型にマッチする](../guide/control-flow.md#java-のネストした型にマッチする)を参照）。`Option.Some`/`Option.None`、`Outcome.Ok`/`Outcome.Bad` も同様にマッチできる。
 
 ## Future モジュール
 
@@ -1724,9 +1750,11 @@ Stats::min(xs)       // 10.0 （Double。空リストでも例外ではなく 0.
 ## Format モジュール
 
 locale 非依存の人間可読フォーマット（`onion.Format`）——桁区切り・小数・サイズ・時間。
+整数の桁区切り（3 桁ごとのカンマ、thousands separator / digit grouping）は `Format::integer`、
+`Double` の桁区切りと小数桁の丸めは `Format::number` を使います。
 
 ```onion
-Format::integer(1234567)          // "1,234,567"
+Format::integer(1234567)          // "1,234,567"（桁区切り / thousands separator）
 Format::number(1234.5678, 2)      // "1,234.57"
 Format::fixed(3.14159, 2)         // "3.14"
 Format::percent(0.756, 1)         // "75.6%"
@@ -1974,7 +2002,9 @@ Iterables::sort(xs, (a, b) -> a - b)  // ok -- 新しいソート済みコピー
 
 ## Files モジュール
 
-ファイル I/O（`onion.Files`）:
+ファイル I/O（`onion.Files`）。テキストはどの JDK・プラットフォームでも UTF-8 で読み書きします。
+別の文字コードには、`Files::readText(path, charset)` と `Files::writeText(path, content, charset)` に
+`java.nio.charset.Charset` を渡します:
 
 ```onion
 Files::readText("path.txt")            // ファイル全体を String として
@@ -2131,7 +2161,12 @@ Cli::parseBoolean("loud", "true")       // Boolean::parseBoolean と異なり tr
 
 Cli::rest(rawArgs, 2)                   // インデックス2以降の残りの位置引数（String[] rest 用）
 Cli::requireArgs(rawArgs, 1, "<name> [more...]")  // 引数が1個未満なら usage を出して終了
+
+Cli::kebab("makeSample")                // "make-sample": usage に表示するフラグの綴り
 ```
+
+フラグの要素は、名前そのものと kebab-case の綴りの両方に一致します。
+`"makeSample?"` は `--make-sample` と `--makeSample` を受け付けます。
 
 `Cli::tryParse(args, specString)` は `parse` の非終了版です。stderr への出力や
 `System::exit` を行わず、代わりに `Outcome[String[]]` を返すので、呼び出し側で
@@ -2261,12 +2296,113 @@ Http::post(url, body, headers): String   // headers は get と同じ
 
 ```
 Http::getResponse(url): Response                  // ボディだけでなく status/body/headers を返す
+Http::getResponse(url, headers): Response         // headers は get と同じ
 Http::postResponse(url, body): Response
+Http::postResponse(url, body, headers): Response
 ```
 
 `Response` は `status: Int`、`body: String`、`headers: List` のフィールドと、
-`isOk(): Boolean`（2xx）・`isError(): Boolean`（4xx/5xx）のヘルパーを持つ。
+`isOk(): Boolean`（2xx）・`isError(): Boolean`（4xx/5xx）のヘルパー、
+`header(name): String?`（そのヘッダーの最初の値。大文字小文字を区別しない）を持つ。
 ボディだけでなくステータスコードやヘッダーが必要なときに使う。
+
+### リクエストビルダー
+
+任意のメソッド・独自ヘッダー・ボディ・タイムアウトが必要なら、リクエストを組み立てて `send()` する。
+`send()` は `Result[Http.Response, Http.HttpFailure]` を返し（上の「Result モジュール」を参照）、
+二つの結果を区別して保つ:
+
+- **`Ok(response)`**: サーバーが応答した。*ステータスが何であっても*そうなる。404 や 500 も
+  `Ok` なので、`Response` の `status`・`isOk()`・`isError()` で確認する。
+- **`Err(failure)`**: 応答が得られなかった。`Http.HttpFailure` がその理由を表す。
+
+```
+val r = Http::request("POST", "https://api.example.com/v1/messages")
+  .header("content-type", "application/json")
+  .header("x-api-key", key)
+  .body(json)
+  .timeoutSeconds(120)
+  .send()                                  // Result[Http.Response, Http.HttpFailure]
+
+if r.isOk() {
+  val res = r.get()
+  if res.isError() {
+    IO::println("the API said no: #{res.status} #{res.body}")
+  } else {
+    IO::println(res.body)
+  }
+} else {
+  val f = r.getError()
+  select f.kind() {
+    case "timeout": IO::println("gave up after 120 s")
+    case "connect": IO::println("could not reach #{f.url()}: #{f.message()}")
+    else:           IO::println("connection broke: #{f.message()}")
+  }
+}
+```
+
+二つの結果はケースでマッチすることもできる。束縛は `Result` の型引数から型が決まるので、
+`ok.value()` は `Http.Response`、`no.error()` は `Http.HttpFailure` になり、`select` に `else` は
+要らない:
+
+```
+select Http::request("GET", url).send() {
+  case ok is Result.Ok:  IO::println("HTTP #{ok.value().status}")
+  case no is Result.Err: IO::println("no response (#{no.error().kind()})")
+}
+```
+
+いつもの `Result` のコンビネーターが使える。`fold` は二つの結果を一つにまとめ、`map` は
+レスポンスの中身に手を入れる。`do[Result]` はリクエストを連ね、応答が得られなかった最初の
+ところで止まる:
+
+```
+val line = r.fold((f) -> "no response: #{f.kind()}", (res) -> "HTTP #{res.status}")
+val body = r.map { res -> res.body }.getOrElse("")
+val both = do[Result] {
+  a <- Http::request("GET", urlA).send()
+  b <- Http::request("GET", urlB).send()
+  ret a.status + b.status
+}
+```
+
+「応答なし」なら単にプログラムを止めたいスクリプトでは `sendOrThrow()` を使う。これは
+`Response` を返し、元の例外（`java.net.http.HttpTimeoutException` か、その他の
+`java.io.IOException`）をそのまま投げ直す。`send().getOrThrow()` の場合は、失敗の文面を
+`RuntimeException` で包むことになる。
+
+```
+Http::request(method, url): Http.Request   // メソッドは書いたとおりに送る: "GET", "PUT", "PATCH", ...
+  .header(name, value)                     // ヘッダーを追加（同じ名前を二度書けば二つ送る）
+  .headers(pairs)                          // ["Name1", "Value1", ...] を追加
+  .body(text)                              // UTF-8 のボディ。指定しなければボディなし
+  .timeoutSeconds(n) / .timeoutMillis(n)   // リクエスト単位のタイムアウト（既定: なし）
+  .send(): Result[Http.Response, Http.HttpFailure]
+  .sendOrThrow(): Http.Response            // 応答がなければ例外
+
+Http.HttpFailure                           // 値であり、投げられることはない
+  .kind(): String                          // "timeout" | "connect" | "io"
+  .isTimeout() / .isConnect(): Boolean
+  .method() / .url() / .message(): String
+  .cause(): Throwable                      // 元になった例外
+```
+
+- `kind` は次のいずれか:
+  - `"timeout"`: リクエスト単位のタイムアウトが経過した。
+  - `"connect"`: 接続できなかった。拒否・ホスト不明・到達不能・30 秒の接続タイムアウト・
+    TLS ハンドシェイク失敗がこれに当たる。
+  - `"io"`: 送受信の途中で接続が壊れた。
+- 接続そのものは、リクエスト単位のタイムアウトの有無にかかわらず 30 秒で打ち切られる。
+- `Request` は不変。各ステップは新しい `Request` を返すので、認証ヘッダー付きの土台を
+  共有して拡張できる。
+- プログラミングの誤りは「結果」ではないので、`send()` ではなくそれを書いたステップで
+  `IllegalArgumentException` を投げる。対象は次のとおり:
+  - 不正な URL やメソッド
+  - null のヘッダー名・値
+  - JDK クライアントが自分で管理するヘッダー（`Host`・`Content-Length` など）
+  - 正でないタイムアウト
+- 効果: 組み立ては pure で、`send()`/`sendOrThrow()` だけが `net`。`--plan` はビルダーの
+  ステップをたどってリテラル URL まで戻り、そのホストを示す（`net api.example.com`）。
 
 ### その他のメソッド
 

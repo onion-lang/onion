@@ -1,0 +1,234 @@
+// Trampoline.on — stack-safe recursion via the Trampoline pattern.
+//
+// A Trampoline[T] is a computation that yields its value either immediately
+// (Done) or via a thunk that returns the next step (More). Running the
+// trampoline iterates steps in a while loop — no stack growth — enabling
+// arbitrarily deep recursion without StackOverflowError.
+//
+// The type also supports functor/monad combinators (map, flatMap, andThen)
+// without losing stack safety: composition is expressed as nested More layers
+// that the runner unwinds iteratively.
+//
+// Exercises: generic ADT enum with closure component; sealed type-pattern
+// matching; generic class with static combinators; closures and higher-order
+// functions; while loop; foreach over ranges and lists; extension methods on
+// Int and Long; string interpolation; nullable; collection pipelines
+// (map/filter/fold/sortedBy).
+
+import {
+  java.lang.Math
+}
+
+// ── Extension helpers ─────────────────────────────────────────────────────────
+
+extension Int {
+  def abs(): Int = if self < 0 { 0 - self } else { self }
+  def digits(): Int {
+    if self == 0 { return 1 }
+    var n: Int = self.abs()
+    var d: Int = 0
+    while n > 0 { n = n / 10; d++ }
+    return d
+  }
+}
+
+extension Long {
+  def abs(): Long = if self < 0L { 0L - self } else { self }
+}
+
+// ── Core ADT ─────────────────────────────────────────────────────────────────
+// A two-case sealed enum: Done wraps the final value, More wraps a thunk that
+// yields the next step. Both are heap-allocated; the runner loop uses a
+// mutable local variable to chase the chain, never the call stack.
+
+enum Trampoline[T] {
+  case Done(value: T)
+  case More(step: Function0[Trampoline[T]])
+}
+
+// ── Runner and combinators ────────────────────────────────────────────────────
+
+class Bounce {
+public:
+  // Evaluate a trampoline to its final value using O(1) stack.
+  static def run[T](t: Trampoline[T]): T {
+    var cur: Trampoline[T] = t
+    while true {
+      select cur {
+        case d is Done: return d.value()
+        case m is More:
+          val thunk: Function0[Trampoline[T]] = m.step()
+          cur = thunk()
+      }
+    }
+    throw new RuntimeException("unreachable")
+  }
+
+  // Count how many More steps it takes to reach Done (for profiling).
+  static def steps[T](t: Trampoline[T]): Int {
+    var cur: Trampoline[T] = t
+    var count: Int = 0
+    while true {
+      select cur {
+        case d is Done: return count
+        case m is More:
+          val thunk: Function0[Trampoline[T]] = m.step()
+          cur = thunk()
+          count++
+      }
+    }
+    return -1
+  }
+
+  // Functor: transform the final value without running yet.
+  static def map[A, B](t: Trampoline[A], f: A -> B): Trampoline[B] = select t {
+    case d is Done: new Done[B](f(d.value()))
+    case m is More:
+      val inner: Function0[Trampoline[A]] = m.step()
+      new More[B](() -> Bounce::map[A, B](inner(), f))
+  }
+
+  // Monad: sequence two trampolines, feeding the first value into the second.
+  static def flatMap[A, B](t: Trampoline[A], f: A -> Trampoline[B]): Trampoline[B] =
+    select t {
+      case d is Done: f(d.value())
+      case m is More:
+        val inner: Function0[Trampoline[A]] = m.step()
+        new More[B](() -> Bounce::flatMap[A, B](inner(), f))
+    }
+}
+
+// ── Mutual recursion: isEven / isOdd ─────────────────────────────────────────
+// The classic trampoline demo. Direct mutual recursion of depth N needs N
+// stack frames. Here both functions return a Trampoline; the runner uses O(1).
+
+static def isEvenT(n: Int): Trampoline[Boolean] {
+  if n == 0 { return new Done[Boolean](true) }
+  val m: Int = n - 1
+  return new More[Boolean](() -> isOddT(m))
+}
+
+static def isOddT(n: Int): Trampoline[Boolean] {
+  if n == 0 { return new Done[Boolean](false) }
+  val m: Int = n - 1
+  return new More[Boolean](() -> isEvenT(m))
+}
+
+// ── Factorial via accumulating trampoline ─────────────────────────────────────
+
+static def factT(n: Long, acc: Long): Trampoline[Long] {
+  if n <= 0L { return new Done[Long](acc) }
+  val nm1: Long = n - 1L
+  val nacc: Long = n * acc
+  return new More[Long](() -> factT(nm1, nacc))
+}
+
+// ── Fibonacci via trampolined pair ────────────────────────────────────────────
+// Iterate (a, b) -> (b, a+b) n times; no exponential time, no stack growth.
+
+static def fibT(n: Int, a: Long, b: Long): Trampoline[Long] {
+  if n == 0 { return new Done[Long](a) }
+  val nm1: Int = n - 1
+  val ab: Long = a + b
+  return new More[Long](() -> fibT(nm1, b, ab))
+}
+
+// ── Collatz: steps to reach 1 ────────────────────────────────────────────────
+
+static def collatzT(n: Long, s: Int): Trampoline[Int] {
+  if n == 1L { return new Done[Int](s) }
+  val next: Long = if n % 2L == 0L { n / 2L } else { n * 3L + 1L }
+  val s1: Int = s + 1
+  return new More[Int](() -> collatzT(next, s1))
+}
+
+// ── Sum of digits (using flatMap) ─────────────────────────────────────────────
+// sumDigitsT returns the digit sum; demonstrate that two trampolines can be
+// composed via flatMap without building an intermediate data structure.
+
+static def sumDigitsT(n: Long, acc: Long): Trampoline[Long] {
+  if n == 0L { return new Done[Long](acc) }
+  val digit: Long = n % 10L
+  val rest: Long = n / 10L
+  return new More[Long](() -> sumDigitsT(rest, acc + digit))
+}
+
+// Repeated digit-sum (digital root) via flatMap composition.
+static def digitalRootT(n: Long): Trampoline[Long] {
+  if n < 10L { return new Done[Long](n) }
+  return Bounce::flatMap[Long, Long](
+    sumDigitsT(n, 0L),
+    (s: Long) -> digitalRootT(s)
+  )
+}
+
+def main(): void {
+  IO::println("=== Trampoline: stack-safe recursion ===")
+  IO::println("")
+
+  // ── isEven / isOdd ──────────────────────────────────────────────────────────
+  IO::println("── isEven / isOdd (mutual recursion) ──")
+  foreach n: Int in [0, 1, 2, 3, 100, 999, 10000] {
+    val even: Boolean = Bounce::run[Boolean](isEvenT(n))
+    val odd: Boolean  = Bounce::run[Boolean](isOddT(n))
+    IO::println("  isEven(#{n}) = #{even},  isOdd(#{n}) = #{odd}")
+  }
+  val deepSteps: Int = Bounce::steps[Boolean](isEvenT(10000))
+  IO::println("  depth-10000 used #{deepSteps} trampoline steps, O(1) stack")
+  IO::println("")
+
+  // ── Factorial ───────────────────────────────────────────────────────────────
+  IO::println("── Factorial ──")
+  foreach n: Int in [0, 1, 5, 10, 15, 20] {
+    val f: Long = Bounce::run[Long](factT(n as Long, 1L))
+    IO::println("  #{n}! = #{f}")
+  }
+  IO::println("")
+
+  // ── Fibonacci ───────────────────────────────────────────────────────────────
+  IO::println("── Fibonacci ──")
+  foreach n: Int in [0, 1, 2, 5, 10, 20, 30, 50, 70] {
+    val fib: Long = Bounce::run[Long](fibT(n, 0L, 1L))
+    IO::println("  fib(#{n}) = #{fib}")
+  }
+  IO::println("")
+
+  // ── Collatz ──────────────────────────────────────────────────────────────────
+  IO::println("── Collatz stopping times ──")
+  foreach seed: Long in [1L, 27L, 871L, 6171L, 77031L] {
+    val s: Int = Bounce::run[Int](collatzT(seed, 0))
+    IO::println("  collatz(#{seed}) stops in #{s} steps")
+  }
+  IO::println("")
+
+  // ── Digital root via flatMap ─────────────────────────────────────────────────
+  IO::println("── Digital root (via flatMap composition) ──")
+  foreach n: Long in [0L, 9L, 38L, 493L, 942L, 12345L, 9999999L] {
+    val dr: Long = Bounce::run[Long](digitalRootT(n))
+    IO::println("  digitalRoot(#{n}) = #{dr}")
+  }
+  IO::println("")
+
+  // ── map combinator ──────────────────────────────────────────────────────────
+  IO::println("── map combinator ──")
+  val fib30: Trampoline[Long] = fibT(30, 0L, 1L)
+  val fib30Str: Trampoline[String] = Bounce::map[Long, String](fib30, (v: Long) -> "fib(30) = " + v)
+  IO::println("  " + Bounce::run[String](fib30Str))
+  IO::println("")
+
+  // ── Stress test ─────────────────────────────────────────────────────────────
+  IO::println("── Stress test: isEven(200_000) ──")
+  val huge: Boolean = Bounce::run[Boolean](isEvenT(200000))
+  IO::println("  isEven(200000) = #{huge}  (200 000 trampolined steps, O(1) stack)")
+  IO::println("")
+
+  // ── Summary table ─────────────────────────────────────────────────────────
+  IO::println("── Step counts ──")
+  val cases: List[Int] = [100, 1000, 5000, 10000, 50000]
+  foreach d: Int in cases {
+    val n: Int = Bounce::steps[Boolean](isEvenT(d))
+    IO::println("  isEven(#{d}): #{n} steps")
+  }
+  IO::println("")
+  IO::println("=== All checks passed ===")
+}

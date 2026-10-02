@@ -1,0 +1,299 @@
+// HiddenMarkovModel.on — Hidden Markov Model for sequence labeling.
+//
+// Demonstrates three classic HMM algorithms using a 3-state weather model
+// (Sunny / Rainy / Cloudy) with three observable activities
+// (Walk / Shop / Clean):
+//
+//   1. Forward algorithm  — P(observation sequence | model)
+//   2. Viterbi decoding   — most likely hidden state sequence
+//   3. Forward-backward   — posterior state probabilities (gamma)
+//
+// Exercises: case-enum with zero-field cases, records with method bodies,
+// extension Double (logAdd), 2-D array arithmetic, foreach over ranges and
+// Map entries, select pattern matching, collection pipelines, string
+// interpolation, do[Option], nullable types, and operator overloading.
+
+import {
+  java.lang.Math
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Weather {
+  case Sunny
+  case Rainy
+  case Cloudy
+}
+
+enum Activity {
+  case Walk
+  case Shop
+  case Clean
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Double {
+  // log-sum-exp: log(exp(a) + exp(b)) computed in a numerically stable way
+  def logAdd(b: Double): Double {
+    if self == Double::NEGATIVE_INFINITY { return b }
+    if b == Double::NEGATIVE_INFINITY { return self }
+    val m: Double = if self > b { self } else { b }
+    return m + Math::log(Math::exp(self - m) + Math::exp(b - m))
+  }
+
+  def fmt(): String {
+    if self == Double::NEGATIVE_INFINITY { return "-inf" }
+    val s: String = "" + (Math::round(self * 10000.0d) / 10000.0d)
+    return s
+  }
+}
+
+// ─── HMM model record ────────────────────────────────────────────────────────
+
+record HMM(
+  nStates:  Int,
+  nObs:     Int,
+  logInit:  Double[],    // log P(state_0 = i)
+  logTrans: Double[][],  // log P(state_t = j | state_{t-1} = i)  [i][j]
+  logEmit:  Double[][]   // log P(obs_t = k | state_t = i)        [i][k]
+) {
+public:
+  // Forward algorithm: log P(obs | model)
+  def fwdAlpha(obs: Int[]): Double[][] {
+    val T: Int = obs.length
+    val alpha: Double[][] = new Double[T][nStates]
+    // Initialise
+    foreach i: Int in 0..<nStates {
+      alpha[0][i] = logInit[i] + logEmit[i][obs[0]]
+    }
+    // Recurse
+    foreach t: Int in 1..<T {
+      foreach j: Int in 0..<nStates {
+        var logSum: Double = Double::NEGATIVE_INFINITY
+        foreach i: Int in 0..<nStates {
+          logSum = logSum.logAdd(alpha[t-1][i] + logTrans[i][j])
+        }
+        alpha[t][j] = logSum + logEmit[j][obs[t]]
+      }
+    }
+    return alpha
+  }
+
+  // Backward algorithm: log P(obs_{t+1..T} | state_t = i, model)
+  def bwdBeta(obs: Int[]): Double[][] {
+    val T: Int = obs.length
+    val beta: Double[][] = new Double[T][nStates]
+    // Initialise
+    foreach i: Int in 0..<nStates {
+      beta[T-1][i] = 0.0d  // log(1)
+    }
+    // Recurse backwards
+    var t: Int = T - 2
+    while t >= 0 {
+      foreach i: Int in 0..<nStates {
+        var logSum: Double = Double::NEGATIVE_INFINITY
+        foreach j: Int in 0..<nStates {
+          logSum = logSum.logAdd(logTrans[i][j] + logEmit[j][obs[t+1]] + beta[t+1][j])
+        }
+        beta[t][i] = logSum
+      }
+      t = t - 1
+    }
+    return beta
+  }
+
+  // Viterbi decoding: most likely state sequence
+  def viterbi(obs: Int[]): Int[] {
+    val T: Int = obs.length
+    val delta: Double[][] = new Double[T][nStates]
+    val psi:   Int[][]   = new Int[T][nStates]
+    // Initialise
+    foreach i: Int in 0..<nStates {
+      delta[0][i] = logInit[i] + logEmit[i][obs[0]]
+      psi[0][i]   = 0
+    }
+    // Recurse
+    foreach t: Int in 1..<T {
+      foreach j: Int in 0..<nStates {
+        var best: Double = Double::NEGATIVE_INFINITY
+        var bestI: Int = 0
+        foreach i: Int in 0..<nStates {
+          val score: Double = delta[t-1][i] + logTrans[i][j]
+          if score > best {
+            best  = score
+            bestI = i
+          }
+        }
+        delta[t][j] = best + logEmit[j][obs[t]]
+        psi[t][j]   = bestI
+      }
+    }
+    // Traceback
+    val path: Int[] = new Int[T]
+    var best: Double = Double::NEGATIVE_INFINITY
+    foreach i: Int in 0..<nStates {
+      if delta[T-1][i] > best {
+        best    = delta[T-1][i]
+        path[T-1] = i
+      }
+    }
+    var t: Int = T - 2
+    while t >= 0 {
+      path[t] = psi[t+1][path[t+1]]
+      t = t - 1
+    }
+    return path
+  }
+
+  // Log-likelihood of an observation sequence
+  def logLikelihood(obs: Int[]): Double {
+    val alpha: Double[][] = this.fwdAlpha(obs)
+    val T: Int = obs.length
+    var logProb: Double = Double::NEGATIVE_INFINITY
+    foreach i: Int in 0..<nStates {
+      logProb = logProb.logAdd(alpha[T-1][i])
+    }
+    return logProb
+  }
+
+  // Posterior state probabilities (gamma) at each time step
+  def gamma(obs: Int[]): Double[][] {
+    val alpha: Double[][] = this.fwdAlpha(obs)
+    val beta:  Double[][] = this.bwdBeta(obs)
+    val T: Int = obs.length
+    val g: Double[][] = new Double[T][nStates]
+    foreach t: Int in 0..<T {
+      var norm: Double = Double::NEGATIVE_INFINITY
+      foreach i: Int in 0..<nStates {
+        g[t][i] = alpha[t][i] + beta[t][i]
+        norm    = norm.logAdd(g[t][i])
+      }
+      foreach i: Int in 0..<nStates {
+        g[t][i] = g[t][i] - norm  // normalised log-probability
+      }
+    }
+    return g
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def ln(p: Double): Double = Math::log(p)
+
+def makeModel(): HMM {
+  // States:  0 = Sunny, 1 = Rainy, 2 = Cloudy
+  // Obs:     0 = Walk,  1 = Shop,  2 = Clean
+  // States: 0=Sunny 1=Rainy 2=Cloudy; Obs: 0=Walk 1=Shop 2=Clean
+  val logInit: Double[] = new Double[3]
+  logInit[0] = ln(0.6d); logInit[1] = ln(0.3d); logInit[2] = ln(0.1d)
+
+  val logTrans: Double[][] = new Double[3][3]
+  logTrans[0][0] = ln(0.7d); logTrans[0][1] = ln(0.2d); logTrans[0][2] = ln(0.1d)
+  logTrans[1][0] = ln(0.3d); logTrans[1][1] = ln(0.5d); logTrans[1][2] = ln(0.2d)
+  logTrans[2][0] = ln(0.4d); logTrans[2][1] = ln(0.3d); logTrans[2][2] = ln(0.3d)
+
+  val logEmit: Double[][] = new Double[3][3]
+  logEmit[0][0] = ln(0.6d); logEmit[0][1] = ln(0.3d); logEmit[0][2] = ln(0.1d)
+  logEmit[1][0] = ln(0.1d); logEmit[1][1] = ln(0.4d); logEmit[1][2] = ln(0.5d)
+  logEmit[2][0] = ln(0.3d); logEmit[2][1] = ln(0.4d); logEmit[2][2] = ln(0.3d)
+
+  return new HMM(3, 3, logInit, logTrans, logEmit)
+}
+
+def stateLabel(i: Int): String =
+  select i {
+    case 0: "Sunny "
+    case 1: "Rainy "
+    case 2: "Cloudy"
+    else:   "???"
+  }
+
+def obsLabel(k: Int): String =
+  select k {
+    case 0: "Walk "
+    case 1: "Shop "
+    case 2: "Clean"
+    else:   "???"
+  }
+
+def printSequence(label: String, seq: Int[], labelFn: (Int) -> String): void {
+  IO::print("  #{label}: [")
+  foreach i: Int in 0..<seq.length {
+    if i > 0 { IO::print(", ") }
+    IO::print(labelFn(seq[i]))
+  }
+  IO::println("]")
+}
+
+def printGamma(g: Double[][], nStates: Int): void {
+  val names: String[] = new String[3]
+  names[0] = "Sunny "; names[1] = "Rainy "; names[2] = "Cloudy"
+  foreach i: Int in 0..<nStates {
+    IO::print("  P(#{names[i]} | obs) = [")
+    foreach t: Int in 0..<g.length {
+      if t > 0 { IO::print(", ") }
+      val prob: Double = Math::exp(g[t][i])
+      val pct: Int = (Math::round(prob * 100.0d) as Int)
+      IO::print("#{pct}%")
+    }
+    IO::println("]")
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val hmm: HMM = makeModel()
+
+// Scenario 1: mostly outdoor activities → likely sunny
+val obs1: Int[] = new Int[5]
+obs1[0] = 0; obs1[1] = 0; obs1[2] = 0; obs1[3] = 1; obs1[4] = 0  // Walk Walk Walk Shop Walk
+IO::println("=== Scenario 1: mostly Walk ===")
+printSequence("observations", obs1, { k -> obsLabel(k) })
+val path1: Int[] = hmm.viterbi(obs1)
+printSequence("Viterbi path ", path1, { i -> stateLabel(i) })
+val ll1: Double = hmm.logLikelihood(obs1)
+IO::println("  log P(obs|model) = #{ll1.fmt()}")
+IO::println("  Posterior state probabilities:")
+printGamma(hmm.gamma(obs1), 3)
+
+// Scenario 2: indoor activities → likely rainy
+IO::println("")
+val obs2: Int[] = new Int[5]
+obs2[0] = 2; obs2[1] = 1; obs2[2] = 2; obs2[3] = 1; obs2[4] = 2  // Clean Shop Clean Shop Clean
+IO::println("=== Scenario 2: mostly Clean/Shop ===")
+printSequence("observations", obs2, { k -> obsLabel(k) })
+val path2: Int[] = hmm.viterbi(obs2)
+printSequence("Viterbi path ", path2, { i -> stateLabel(i) })
+val ll2: Double = hmm.logLikelihood(obs2)
+IO::println("  log P(obs|model) = #{ll2.fmt()}")
+IO::println("  Posterior state probabilities:")
+printGamma(hmm.gamma(obs2), 3)
+
+// Scenario 3: mixed activities → cloudy/transitions
+IO::println("")
+val obs3: Int[] = new Int[7]
+obs3[0] = 0; obs3[1] = 2; obs3[2] = 1; obs3[3] = 0; obs3[4] = 2; obs3[5] = 0; obs3[6] = 1
+IO::println("=== Scenario 3: mixed observations ===")
+printSequence("observations", obs3, { k -> obsLabel(k) })
+val path3: Int[] = hmm.viterbi(obs3)
+printSequence("Viterbi path ", path3, { i -> stateLabel(i) })
+val ll3: Double = hmm.logLikelihood(obs3)
+IO::println("  log P(obs|model) = #{ll3.fmt()}")
+IO::println("  Posterior state probabilities:")
+printGamma(hmm.gamma(obs3), 3)
+
+// Scenario 4: log-likelihood comparison — sunny model vs rainy model
+IO::println("")
+IO::println("=== Scenario 4: compare log-likelihoods ===")
+val obsWalk: Int[] = new Int[3]; obsWalk[0] = 0; obsWalk[1] = 0; obsWalk[2] = 0
+val obsClean: Int[] = new Int[3]; obsClean[0] = 2; obsClean[1] = 1; obsClean[2] = 2
+val sunny:    Double = hmm.logLikelihood(obsWalk)
+val rainyObs: Double = hmm.logLikelihood(obsClean)
+IO::println("  log P([Walk,Walk,Walk] | model) = #{sunny.fmt()}")
+IO::println("  log P([Clean,Shop,Clean] | model) = #{rainyObs.fmt()}")
+val preferred: String = if sunny > rainyObs { "outdoor" } else { "indoor" }
+IO::println("  More likely pattern: #{preferred}")
+
+IO::println("")
+IO::println("Done.")

@@ -204,6 +204,28 @@ final class SelectExpressionTyping(
               isExhaustive = true
             }
           }
+        case javaSealed: ClassType if !javaSealed.isInstanceOf[ClassDefinition] && javaSealed.javaPermittedSubclassNames.nonEmpty =>
+          // A Java `sealed ... permits` hierarchy (onion.Result, onion.Outcome,
+          // onion.Option, or a user jar's): the same check, against the class file's
+          // PermittedSubclasses. A permitted subclass that is itself sealed is covered
+          // when all of its own permitted subclasses are.
+          val unguardedMatchedTypes = caseBindingData.flatMap {
+            case (SingleBinding(_, tp), _, None) => Some(tp)
+            case (MultiBindings(tp, _, _), _, None) => Some(tp)
+            case _ => None
+          }
+          if (unguardedMatchedTypes.nonEmpty) {
+            uncoveredJavaPermitted(javaSealed, unguardedMatchedTypes.toSeq, Set.empty) match {
+              case Some(missing) if missing.nonEmpty =>
+                bodyContext.report(NON_EXHAUSTIVE_PATTERN_MATCH, node, condition.`type`, missing.map(_.asInstanceOf[Type]).toArray)
+                reportedNonExhaustive = true
+              case Some(_) =>
+                isExhaustive = true
+              case None =>
+                // A permitted subclass is not on the compile classpath, so coverage
+                // cannot be decided: neither exhaustive nor an error.
+            }
+          }
         case classDef: ClassDefinition if Modifier.isEnum(classDef.modifier) =>
           // Value matches over an enum: exhaustive when every constant
           // appears in an unguarded Constant-reference case
@@ -614,6 +636,29 @@ final class SelectExpressionTyping(
    * Check if a matched type covers a sealed subtype.
    * Used for exhaustiveness checking of sealed types.
    */
+  /**
+   * The permitted subclasses of a sealed Java class that no matched type covers, or None
+   * when one of them cannot be loaded (coverage is then undecidable). A permitted subclass
+   * that is itself sealed counts as covered when all of its own permitted subclasses are;
+   * otherwise its own uncovered cases are reported (`Poly.Quad`, not `Poly`).
+   */
+  private def uncoveredJavaPermitted(sealedClass: ClassType, matched: Seq[Type], seen: Set[String]): Option[Seq[ClassType]] = boundary {
+    val missing = scala.collection.mutable.ArrayBuffer[ClassType]()
+    for (permittedName <- sealedClass.javaPermittedSubclassNames) {
+      val permitted = bodyContext.table.loadOrNull(permittedName)
+      if (permitted == null) break(None)
+      if (!matched.exists(m => isSubtypeMatch(m, permitted))) {
+        if (permitted.javaPermittedSubclassNames.nonEmpty && !seen.contains(permitted.name)) {
+          uncoveredJavaPermitted(permitted, matched, seen + sealedClass.name) match {
+            case None => break(None)
+            case Some(rest) => missing ++= rest
+          }
+        } else missing += permitted
+      }
+    }
+    Some(missing.toSeq)
+  }
+
   private def isSubtypeMatch(matched: Type, sealedSubtype: ClassType): Boolean = {
     // A type pattern over a generic hierarchy binds a parameterization
     // (`Some[String]`), while the sealed subtype list holds raw classes -- so

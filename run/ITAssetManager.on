@@ -1,0 +1,350 @@
+// ITAssetManager — tracks hardware assets, assignments, maintenance, and
+// generates department/warranty/lifecycle reports.
+// Exercises: data-carrying ADT enums, homogeneous enums, records, classes,
+// interfaces, generics, collection pipelines (map/filter/fold/groupBy/sortedBy/
+// distinct/find/partition), pattern matching, nullable, closures, string
+// interpolation, try/catch, recursion, foreach over ranges and maps.
+
+import {
+  java.util.HashMap as HMap
+}
+
+// ── Hardware categories (data-carrying ADT enum) ──────────────────────────────
+enum HardwareCategory {
+  case Laptop(warrantyMonths: Int)
+  case Desktop(warrantyMonths: Int)
+  case Monitor(warrantyMonths: Int)
+  case Printer(warrantyMonths: Int)
+  case NetworkSwitch(warrantyMonths: Int)
+  case Server(warrantyMonths: Int)
+  case Keyboard(warrantyMonths: Int)
+  case Mouse(warrantyMonths: Int)
+
+public:
+  def label(): String = select this {
+    case lp is Laptop:        "Laptop"
+    case dt is Desktop:       "Desktop"
+    case mn is Monitor:       "Monitor"
+    case pr is Printer:       "Printer"
+    case ns is NetworkSwitch: "Network Switch"
+    case sv is Server:        "Server"
+    case kb is Keyboard:      "Keyboard"
+    case mo is Mouse:         "Mouse"
+  }
+
+  def months(): Int = select this {
+    case lp is Laptop:        lp.warrantyMonths()
+    case dt is Desktop:       dt.warrantyMonths()
+    case mn is Monitor:       mn.warrantyMonths()
+    case pr is Printer:       pr.warrantyMonths()
+    case ns is NetworkSwitch: ns.warrantyMonths()
+    case sv is Server:        sv.warrantyMonths()
+    case kb is Keyboard:      kb.warrantyMonths()
+    case mo is Mouse:         mo.warrantyMonths()
+  }
+}
+
+// ── Asset lifecycle status (homogeneous enum) ─────────────────────────────────
+enum AssetStatus {
+  InStock, Deployed, UnderMaintenance, Retired, Disposed
+
+public:
+  def label(): String = select this {
+    case AssetStatus::InStock:          "In Stock"
+    case AssetStatus::Deployed:         "Deployed"
+    case AssetStatus::UnderMaintenance: "Under Maintenance"
+    case AssetStatus::Retired:          "Retired"
+    case AssetStatus::Disposed:         "Disposed"
+  }
+
+  def isActive(): Boolean = select this {
+    case AssetStatus::InStock:          true
+    case AssetStatus::Deployed:         true
+    case AssetStatus::UnderMaintenance: true
+    case AssetStatus::Retired:          false
+    case AssetStatus::Disposed:         false
+  }
+}
+
+// ── Core data records ─────────────────────────────────────────────────────────
+record MaintenanceRecord(
+  date: String,
+  technicianName: String,
+  description: String,
+  costUsd: Double
+)
+
+record Employee(id: String, name: String, department: String)
+
+record Asset(
+  assetTag: String,
+  category: HardwareCategory,
+  make: String,
+  model: String,
+  purchaseYear: Int,
+  purchaseMonth: Int,
+  costUsd: Double,
+  assignedTo: Employee?,
+  status: AssetStatus
+) {
+public:
+  def monthsOwned(cy: Int, cm: Int): Int {
+    val m: Int = (cy - purchaseYear()) * 12 + (cm - purchaseMonth())
+    return if m < 0 { 0 } else { m }
+  }
+
+  def isWarrantyExpired(cy: Int, cm: Int): Boolean =
+    monthsOwned(cy, cm) > category().months()
+
+  def summary(): String =
+    "[#{assetTag()}] #{category().label()} #{make()} #{model()} — #{status().label()}"
+}
+
+// ── AssetManager class ────────────────────────────────────────────────────────
+class AssetManager {
+  var assets: List[Asset] = []
+  var maintenanceLog: HMap[String, List[MaintenanceRecord]] = new HMap[String, List[MaintenanceRecord]]()
+
+public:
+  def this { }
+
+  def addAsset(a: Asset): void {
+    assets.add(a)
+  }
+
+  def addMaintenance(assetTag: String, rec: MaintenanceRecord): void {
+    var existing: List[MaintenanceRecord]? = maintenanceLog.get(assetTag)
+    if existing == null {
+      val newList: List[MaintenanceRecord] = []
+      maintenanceLog.put(assetTag, newList)
+      existing = newList
+    }
+    (existing!!).add(rec)
+  }
+
+  def getAsset(tag: String): Asset? {
+    val found: List[Asset] = assets.filter { a: Asset -> a.assetTag() == tag }
+    return if found.size == 0 { null } else { found[0] }
+  }
+
+  def maintenanceFor(tag: String): List[MaintenanceRecord] {
+    val recs: List[MaintenanceRecord]? = maintenanceLog.get(tag)
+    return if recs == null { [] } else { recs }
+  }
+
+  def totalMaintenanceCost(tag: String): Double {
+    val recs: List[MaintenanceRecord] = maintenanceFor(tag)
+    return recs.fold(0.0) { acc: Double, rec: MaintenanceRecord -> acc + rec.costUsd() }
+  }
+
+  def expiredWarranty(cy: Int, cm: Int): List[Asset] =
+    assets.filter { a: Asset -> a.isWarrantyExpired(cy, cm) }
+
+  def byStatus(s: AssetStatus): List[Asset] =
+    assets.filter { a: Asset -> a.status() == s }
+
+  def totalCost(): Double =
+    assets.fold(0.0) { acc: Double, a: Asset -> acc + a.costUsd() }
+
+  def activeCount(): Int =
+    assets.filter { a: Asset -> a.status().isActive() }.size
+
+  def allAssets(): List[Asset] = assets
+
+  def assetCount(): Int = assets.size
+}
+
+// ── Formatting helpers ────────────────────────────────────────────────────────
+def sep(ch: String, width: Int): String {
+  var s: String = ""
+  foreach i: Int in 1..width { s = s + ch }
+  return s
+}
+
+def pad(s: String, width: Int): String {
+  if s.length() >= width { return s }
+  var result: String = s
+  foreach i: Int in 1..(width - s.length()) { result = result + " " }
+  return result
+}
+
+def formatUsd(d: Double): String {
+  val cents: Int = (d * 100.0 + 0.5).intValue()
+  val dollars: Int = cents / 100
+  val c: Int = cents % 100
+  val cStr: String = if c < 10 { "0" + c } else { "" + c }
+  return "$#{dollars}.#{cStr}"
+}
+
+def header(title: String): void {
+  IO::println("\n" + sep("═", 62))
+  IO::println("  " + title)
+  IO::println(sep("═", 62))
+}
+
+// ── Build sample dataset ──────────────────────────────────────────────────────
+val mgr: AssetManager = new AssetManager()
+
+val alice: Employee = new Employee("E001", "Alice Chen",     "Engineering")
+val bob:   Employee = new Employee("E002", "Bob Martinez",   "Engineering")
+val carol: Employee = new Employee("E003", "Carol Thompson", "HR")
+val dan:   Employee = new Employee("E004", "Dan Lee",        "IT")
+val emma:  Employee = new Employee("E005", "Emma Wilson",    "Finance")
+val frank: Employee = new Employee("E006", "Frank Nguyen",   "IT")
+
+val catLaptop:  HardwareCategory = new Laptop(36)
+val catDesktop: HardwareCategory = new Desktop(48)
+val catMonitor: HardwareCategory = new Monitor(36)
+val catPrinter: HardwareCategory = new Printer(24)
+val catSwitch:  HardwareCategory = new NetworkSwitch(60)
+val catServer:  HardwareCategory = new Server(60)
+val catKbd:     HardwareCategory = new Keyboard(12)
+val catMouse:   HardwareCategory = new Mouse(12)
+
+mgr.addAsset(new Asset("A001", catLaptop,  "Dell",    "XPS 15",         2022, 3,  1299.99, alice, AssetStatus::Deployed))
+mgr.addAsset(new Asset("A002", catLaptop,  "Apple",   "MacBook Pro",    2023, 6,  1999.00, bob,   AssetStatus::Deployed))
+mgr.addAsset(new Asset("A003", catDesktop, "HP",      "Elite 800 G9",   2021, 1,   899.00, carol, AssetStatus::Deployed))
+mgr.addAsset(new Asset("A004", catMonitor, "Dell",    "27in 4K",        2022, 9,   449.99, alice, AssetStatus::Deployed))
+mgr.addAsset(new Asset("A005", catMonitor, "LG",      "27in UltraWide", 2021, 5,   379.99, bob,   AssetStatus::Deployed))
+mgr.addAsset(new Asset("A006", catPrinter, "HP",      "LaserJet Pro",   2020, 11,  349.99, null,  AssetStatus::Retired))
+mgr.addAsset(new Asset("A007", catSwitch,  "Cisco",   "Catalyst 1000",  2019, 7,  1850.00, null,  AssetStatus::Deployed))
+mgr.addAsset(new Asset("A008", catServer,  "Dell",    "PowerEdge R750", 2021, 3,  5999.99, dan,   AssetStatus::Deployed))
+mgr.addAsset(new Asset("A009", catLaptop,  "Lenovo",  "ThinkPad X1",    2024, 1,  1549.00, emma,  AssetStatus::Deployed))
+mgr.addAsset(new Asset("A010", catLaptop,  "Dell",    "Latitude 5540",  2023, 11,  999.00, frank, AssetStatus::Deployed))
+mgr.addAsset(new Asset("A011", catDesktop, "Apple",   "Mac Mini M2",    2023, 4,   699.00, null,  AssetStatus::InStock))
+mgr.addAsset(new Asset("A012", catKbd,     "Logitech","MX Keys",        2022, 8,    99.99, alice, AssetStatus::Deployed))
+mgr.addAsset(new Asset("A013", catMouse,   "Logitech","MX Master 3",    2022, 8,    79.99, alice, AssetStatus::Deployed))
+mgr.addAsset(new Asset("A014", catLaptop,  "HP",      "EliteBook 840",  2020, 6,  1099.00, null,  AssetStatus::UnderMaintenance))
+mgr.addAsset(new Asset("A015", catMonitor, "Samsung", "32in WQHD",      2024, 3,   429.00, frank, AssetStatus::Deployed))
+mgr.addAsset(new Asset("A016", catServer,  "HPE",     "ProLiant DL380", 2020, 9,  7200.00, dan,   AssetStatus::Deployed))
+mgr.addAsset(new Asset("A017", catPrinter, "Epson",   "EcoTank L8180",  2023, 2,   599.00, carol, AssetStatus::Deployed))
+mgr.addAsset(new Asset("A018", catSwitch,  "Juniper", "EX2300",         2022, 12, 2100.00, null,  AssetStatus::Deployed))
+mgr.addAsset(new Asset("A019", catDesktop, "Lenovo",  "ThinkCentre M90",2019, 4,   749.00, null,  AssetStatus::Disposed))
+mgr.addAsset(new Asset("A020", catLaptop,  "Dell",    "XPS 15 (2025)",  2025, 9,  1399.00, null,  AssetStatus::InStock))
+
+mgr.addMaintenance("A014", new MaintenanceRecord("2025-06-10", "IT-Dan",   "Screen replacement",        320.00))
+mgr.addMaintenance("A014", new MaintenanceRecord("2025-09-15", "IT-Dan",   "Keyboard replacement",       85.00))
+mgr.addMaintenance("A007", new MaintenanceRecord("2024-11-02", "IT-Frank", "Firmware upgrade",            0.00))
+mgr.addMaintenance("A016", new MaintenanceRecord("2025-01-20", "IT-Frank", "RAM expansion 256 to 512 GB",650.00))
+mgr.addMaintenance("A008", new MaintenanceRecord("2024-08-05", "IT-Dan",   "Cooling fan replacement",   120.00))
+
+val CY: Int = 2025
+val CM: Int = 10
+
+// ── Report 1: Summary overview ────────────────────────────────────────────────
+header("ASSET INVENTORY SUMMARY")
+IO::println("  Total assets  : #{mgr.assetCount()}")
+IO::println("  Active assets : #{mgr.activeCount()}")
+IO::println("  Total cost    : #{formatUsd(mgr.totalCost())}")
+IO::println("")
+
+// Status breakdown
+val statuses: List[AssetStatus] = [
+  AssetStatus::InStock, AssetStatus::Deployed,
+  AssetStatus::UnderMaintenance, AssetStatus::Retired, AssetStatus::Disposed
+]
+IO::println("  Status breakdown:")
+foreach s: AssetStatus in statuses {
+  val count: Int = mgr.byStatus(s).size
+  if count > 0 {
+    IO::println("    #{pad(s.label(), 20)} #{count}")
+  }
+}
+
+// ── Report 2: Assets by category ─────────────────────────────────────────────
+header("ASSETS BY CATEGORY")
+val allAssets: List[Asset] = mgr.allAssets()
+val byCategory: Map[Object, List[Asset]] = allAssets.groupBy { a: Asset -> a.category().label() }
+val catKeys: List[Object] = byCategory.keys().sortedBy { k -> k as String }
+foreach catKey: Object in catKeys {
+  val catLabel: String = catKey as String
+  val catList: List[Asset] = byCategory.get(catKey)
+  val catCost: Double = catList.fold(0.0) { acc: Double, a: Asset -> acc + a.costUsd() }
+  IO::println("  #{pad(catLabel, 16)} #{pad("" + catList.size, 4)} assets   #{formatUsd(catCost)}")
+}
+
+// ── Report 3: Assets by department ───────────────────────────────────────────
+header("ASSETS BY DEPARTMENT")
+val deployed: List[Asset] = mgr.byStatus(AssetStatus::Deployed)
+val deployedWithOwner: List[Asset] = deployed.filter { a: Asset -> a.assignedTo() != null }
+val byDept: Map[Object, List[Asset]] = deployedWithOwner.groupBy { a: Asset ->
+  (a.assignedTo() as Employee).department()
+}
+val deptKeys: List[Object] = byDept.keys().sortedBy { k -> k as String }
+foreach deptKey: Object in deptKeys {
+  val dept: String = deptKey as String
+  val deptAssets: List[Asset] = byDept.get(deptKey)
+  val deptCost: Double = deptAssets.fold(0.0) { acc: Double, a: Asset -> acc + a.costUsd() }
+  IO::println("")
+  IO::println("  #{dept} (#{deptAssets.size} asset(s), #{formatUsd(deptCost)})")
+  foreach a: Asset in deptAssets {
+    val emp: Employee = a.assignedTo() as Employee
+    IO::println("    #{pad(a.assetTag(), 6)} #{pad(a.category().label(), 16)} #{pad(a.make() + " " + a.model(), 26)} -> #{emp.name()}")
+  }
+}
+
+// ── Report 4: Warranty status ─────────────────────────────────────────────────
+header("WARRANTY STATUS")
+val expired: List[Asset] = mgr.expiredWarranty(CY, CM)
+val active:  List[Asset] = mgr.allAssets().filter { a: Asset -> !a.isWarrantyExpired(CY, CM) && a.status().isActive() }
+IO::println("  Assets within warranty : #{active.size}")
+IO::println("  Assets past warranty   : #{expired.size}")
+IO::println("")
+IO::println("  Expired warranty assets:")
+val expiredSorted: List[Asset] = expired.sortedBy { a: Asset -> a.monthsOwned(CY, CM) * -1 }
+foreach a: Asset in expiredSorted {
+  val mo: Int = a.monthsOwned(CY, CM) - a.category().months()
+  IO::println("    #{pad(a.assetTag(), 6)} #{pad(a.category().label(), 16)} #{pad(a.make() + " " + a.model(), 26)} expired #{mo} mo ago")
+}
+
+// ── Report 5: Maintenance log ─────────────────────────────────────────────────
+header("MAINTENANCE LOG")
+val tagsSorted: List[String] = mgr.allAssets()
+  .filter { a: Asset -> mgr.maintenanceFor(a.assetTag()).size > 0 }
+  .sortedBy { a: Asset -> a.assetTag() }
+  .map { a: Asset -> a.assetTag() }
+foreach tag: String in tagsSorted {
+  val asset: Asset? = mgr.getAsset(tag)
+  if asset != null {
+    val recs: List[MaintenanceRecord] = mgr.maintenanceFor(tag)
+    val total: Double = mgr.totalMaintenanceCost(tag)
+    IO::println("  #{tag} — #{(asset as Asset).category().label()} #{(asset as Asset).make()} #{(asset as Asset).model()} (#{recs.size} record(s), total #{formatUsd(total)})")
+    foreach rec: MaintenanceRecord in recs {
+      IO::println("    #{rec.date()}  #{pad(rec.technicianName(), 10)}  #{rec.description()}")
+    }
+  }
+}
+
+// ── Report 6: High-value assets (top 5) ──────────────────────────────────────
+header("TOP 5 HIGHEST-VALUE ASSETS")
+val topAssets: List[Asset] = mgr.allAssets()
+  .sortedBy { a: Asset -> (0.0 - a.costUsd()).intValue() }
+var rank: Int = 1
+foreach a: Asset in topAssets {
+  if rank > 5 { break }
+  IO::println("  #{rank}. #{pad(formatUsd(a.costUsd()), 12)} #{a.assetTag()} #{a.category().label()} #{a.make()} #{a.model()}")
+  rank++
+}
+
+// ── Report 7: Assets needing attention ───────────────────────────────────────
+header("ASSETS NEEDING ATTENTION")
+val needAttention: List[Asset] = mgr.allAssets().filter { a: Asset ->
+  a.status() == AssetStatus::UnderMaintenance || a.status() == AssetStatus::Retired
+}
+if needAttention.size == 0 {
+  IO::println("  All active assets are operational.")
+} else {
+  foreach a: Asset in needAttention {
+    IO::println("  #{a.assetTag()} [#{a.status().label()}]  #{a.category().label()} #{a.make()} #{a.model()}")
+  }
+}
+
+// ── Summary footer ────────────────────────────────────────────────────────────
+header("REPORT COMPLETE")
+val totalMaintCost: Double = mgr.allAssets().fold(0.0) { acc: Double, a: Asset ->
+  acc + mgr.totalMaintenanceCost(a.assetTag())
+}
+IO::println("  Purchase cost total   : #{formatUsd(mgr.totalCost())}")
+IO::println("  Maintenance cost total: #{formatUsd(totalMaintCost)}")
+IO::println("  Combined TCO          : #{formatUsd(mgr.totalCost() + totalMaintCost)}")
+IO::println("")

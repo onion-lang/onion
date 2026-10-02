@@ -247,6 +247,12 @@ public:
 
 呼び出しに一致するメソッドがありません。同じ名前のメソッドが存在するが引数の型が異なる場合、コンパイラは利用可能なシグネチャを一覧表示します。
 
+トップレベル関数は関数名だけで示されます（`helper(Int, Int)` のように）。ファイルの合成コンテナクラスの名前は出ません。
+「did you mean」の候補は、その呼び出しから届くメンバー（ライブラリクラスの private メンバーではなく、その個数の引数を
+受け取れるもの）に限られ、引数の型も受け取れる候補が優先されます。
+そうした候補に名前の近いものがなければ、引数の個数が合わないメンバーのうち最も名前の近いものに
+フォールバックします（`Strings::trimm(s, 1)` には `trim` を提案）。この場合もライブラリクラスの private メンバーは候補になりません。
+
 ### `E0006` — メソッド呼び出しが曖昧
 
 2つのオーバーロードが呼び出しに対して同等に適用可能で、どちらがより特定的かを
@@ -658,11 +664,25 @@ record Inner(x: Int)
 record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner はサポートされていない成分型
 ```
 
-`shape name = ...` 句（正規表現、`json`、`yaml`、`config`）も同じ方法で成分を読むため、
-同じ制限がかかります。メッセージには成分を作れなかった句（`shape doc = json`、`from re"..."`）が表示されます。
+`shape name = ...` 句（正規表現、`yaml`、`config`）も同じ方法で成分を読むため、
+同じ制限がかかります。メッセージには成分を作れなかった句（`shape line = re"..."`、`from re"..."`）が表示されます。
 
-対処: すべての成分をサポートされているスカラー型にとどめるか、通常の `from re"..."`
-マッチのあとで該当フィールドを手動でパースしてください。
+`shape name = json` 句はそれより多くを読みます。スカラーに加えて、スカラーの `List[S]`、
+自身も json shape を宣言したレコード `R`、`List[R]`、およびこれらすべての `T?` です。
+それ以外は json 句でも E0061 のままです —— `Map`、配列、`List[List[S]]`、`List[S?]`、
+json shape を持たないレコード、受け付ける型を指す型エイリアスなど。
+
+```onion
+record Inner(x: Int)                                   // json shape を持たない
+record R(a: String, b: Inner) { shape doc = json }     // E0061: shape doc = json は Inner を読めない
+```
+
+レコードの shape はすべて同じ成分を読むため、json shape が `List[String]` を読めても、
+同じレコードが `shape line = re"..."` も宣言していれば、正規表現の句を名指しする E0061 になります。
+
+対処: すべての成分をサポートされているスカラー型にとどめる（json shape なら上の拡張された
+範囲にとどめ、入れ子のレコードにはそれ自身の `shape doc = json` を与える）か、通常の
+`from re"..."` マッチのあとで該当フィールドを手動でパースしてください。
 
 ### `E0062` — `derive!` がサポートしないレコード成分型
 
@@ -959,6 +979,22 @@ tool same(a: Int): Int requires { console } { IO::println("A"); return 0 }
 tool same(b: String): Int requires { console } { IO::println("B"); return 0 }
 // E0082: tool 名 `same` が重複しています。
 ```
+
+### `E0093` — 2つのパラメータが同じコマンドラインフラグに対応する
+
+`def main` の自動 CLI や `tool` のフラグパラメータは、パラメータ名そのままでも kebab-case
+でも受け付けます（`makeSample` は `--makeSample` と `--make-sample` の両方に対応）。2つの
+フラグパラメータの綴りが重なると片方は決して指定できないため、実行時に黙って解決するの
+ではなく、2つ目のパラメータをコンパイル時に報告します。
+
+```onion
+def main(parseURL: Int = 1, parseUrl: Int = 2): void { IO::println(parseURL + parseUrl) }
+// E0093: `main` のパラメータ `parseURL` と `parseUrl` は、どちらもコマンドラインの
+//        フラグ `--parse-url` で指定されることになります。
+```
+
+どちらかを改名してください。位置パラメータ（デフォルト値のないもの）はフラグを持たない
+ので対象外です。
 
 ## try/catch エラー
 
@@ -1513,6 +1549,8 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `W0014` | main が定義されているためトップレベル文が無視された |
 | `W0015` | ボックス化されたプラットフォーム値が非 null プリミティブへ暗黙的にアンボックスされた |
 | `W0016` | `@TailRecursive` が付与されているが、その相互再帰グループを最適化できなかった |
+| `W0017` | ライブラリ jar の `META-INF/onion/effect-table.txt` が壊れていて、表全体が無視された（jar と行で報告） |
+| `W0018` | ライブラリ jar の効果表が jar の外のクラスを名指しており、それらのエントリは無視された |
 
 ## 診断コード一覧
 
@@ -1613,6 +1651,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 | `E0091` | … is a class, not a variable |
 | `E0092` | cannot instantiate primitive type … with `new` |
+| `E0093` | parameters `…` and `…` of `…` would both answer to the command-line flag `--…` |
 
 ## 関連項目
 

@@ -12,7 +12,11 @@ public final class Format {
     private Format() {
     }
 
-    /** Formats an integer with comma thousands separators: 1234567 -> "1,234,567". */
+    /**
+     * Formats an integer with comma thousands separators (digit grouping):
+     * 1234567 -> "1,234,567". This is the grouping formatter for whole numbers;
+     * {@link #number(double, int)} groups a {@code double} with fixed decimals.
+     */
     public static String integer(long value) {
         return group(Long.toString(Math.abs(value)), value < 0);
     }

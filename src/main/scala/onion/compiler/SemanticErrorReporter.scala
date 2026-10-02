@@ -135,7 +135,12 @@ class SemanticErrorReporter(threshold: Int) {
     // Set only by an actually-unqualified call (UnqualifiedMethodCallSupport); every
     // other report site omits it, defaulting to false -- see FormerDefaultImportLookup.
     val isUnqualifiedCall = items.length > 3 && items(3) == java.lang.Boolean.TRUE
-    val baseMessage = format(message("error.semantic.methodNotFound"), Seq(typeName(targetType), name, args))
+    // A top-level function lives on the file's synthetic `<file>Main` class; name the
+    // function alone rather than leak that owner (`mainMain.helper(Int, Int)`).
+    val baseMessage =
+      if (onion.compiler.toolbox.TypeFormatting.isTopLevelContainer(targetType))
+        format(message("error.semantic.functionNotFound"), Seq(name, args))
+      else format(message("error.semantic.methodNotFound"), Seq(typeName(targetType), name, args))
     // A method with that exact name exists: show its signatures instead of
     // a (possibly misleading) name-similarity suggestion
     val sameName = targetType match
@@ -180,14 +185,103 @@ class SemanticErrorReporter(threshold: Int) {
         val className = FormerDefaultImportLookup.find(name, argTypes.length).get
         Some(format(message("suggestion.stdlibNoLongerDefaultImported"), Seq(className, name)))
       } else {
-        val candidates = targetType match
-          case obj: TypedAST.ObjectType =>
-            (obj.methods.map(_.name) ++ obj.fields.map(_.name)).distinct.toSeq
-          case _ => Seq.empty
-        toolbox.Suggestions.formatSuggestion(name, candidates)
+        targetType match
+          case obj: TypedAST.ObjectType => toolbox.Suggestions.formatSuggestion(name, rankedCallCandidates(obj, name, argTypes))
+          case _ => None
       }
     problem(position, appendSuggestion(baseMessage, suggestion))
   }
+
+  /**
+   * The names a failed call `name(argTypes)` on `obj` may be steered to.
+   * Name similarity alone once answered `Format::grouped(1234567L)` with `group`, which is
+   * `group(String, Boolean)` and could never take that call. So a method candidate is kept
+   * only when some overload accepts that many arguments, and one whose parameters also take
+   * the argument types is tried before one that only matches the count. Fields stay in the
+   * second group, as they were before. Private members of a class compiled elsewhere are
+   * left out: the program cannot call them.
+   *
+   * The result is a single tier: the first tier with a name close enough to suggest. When
+   * neither of those tiers has one, the methods that take no overload of that many
+   * arguments form a last tier: `Strings::trimm(s, 1)` is a misspelled `trim` called with
+   * one argument too many, and naming `trim` beats saying nothing. Library privates stay out of every tier.
+   */
+  private def rankedCallCandidates(obj: TypedAST.ObjectType, name: String, argTypes: Array[TypedAST.Type]): Seq[String] = {
+    val argc = argTypes.length
+    // A private member of a class compiled elsewhere (`Format.group`) can never be called
+    // from the program, so it is no suggestion; a source class's own privates may be.
+    val fromSource = obj.isInstanceOf[TypedAST.ClassDefinition]
+    def visible(m: TypedAST.MemberRef): Boolean = fromSource || !Modifier.isPrivate(m.modifier)
+    val byName = obj.methods.toSeq.filter(visible).groupBy(_.name)
+    val applicable = byName.collect {
+      case (n, ms) if ms.exists(m => acceptsArity(m, argc) && acceptsTypes(m, argTypes)) => n
+    }.toSeq
+    val countOnly = byName.collect {
+      case (n, ms) if !applicable.contains(n) && ms.exists(m => acceptsArity(m, argc)) => n
+    }.toSeq
+    val fields = obj.fields.toSeq.filter(visible).map(_.name).filterNot(byName.contains)
+    // Arity misfits come last: only a fallback when nothing that fits is close by name.
+    val arityMisfits = byName.keys.filterNot(n => applicable.contains(n) || countOnly.contains(n)).toSeq
+    // findSimilar applies the distance cut-off; the first tier with a close name wins.
+    val tiers = Seq(applicable.sorted, (countOnly ++ fields).distinct.sorted, arityMisfits.sorted)
+    tiers.find(tier => toolbox.Suggestions.findSimilar(name, tier).isDefined).getOrElse(Seq.empty)
+  }
+
+  private def acceptsArity(m: TypedAST.Method, argc: Int): Boolean =
+    if (m.isVararg) argc >= m.argumentCount - 1
+    else argc >= m.minArguments && argc <= m.argumentCount
+
+  /**
+   * Whether each argument could be passed to `m`'s parameter in its position. Deliberately
+   * lenient -- it only orders suggestions, never rejects a call: anything involving a type
+   * variable, a function value (SAM conversion) or an unknown type counts as passable.
+   */
+  private def acceptsTypes(m: TypedAST.Method, argTypes: Array[TypedAST.Type]): Boolean = {
+    val params = m.arguments
+    argTypes.indices.forall { i =>
+      val p =
+        if (i < params.length && !(m.isVararg && i == params.length - 1)) params(i)
+        else if (m.isVararg && params.nonEmpty) params.last match
+          case arr: TypedAST.ArrayType if !(argTypes.length == params.length && argTypes(i).isArrayType) => arr.component
+          case other => other
+        else null
+      p == null || argPassable(p, argTypes(i))
+    }
+  }
+
+  private def argPassable(param: TypedAST.Type, arg: TypedAST.Type): Boolean = {
+    def strip(t: TypedAST.Type): TypedAST.Type = t match
+      case n: TypedAST.NullableType => n.innerType
+      case other => other
+    val p = strip(param)
+    val a = strip(arg)
+    def className(t: TypedAST.Type): String = t match
+      case ap: TypedAST.AppliedClassType => ap.raw.name
+      case ct: TypedAST.ClassType => ct.name
+      case _ => null
+    (p, a) match
+      case (null, _) | (_, null) => true
+      case (_: TypedAST.TypeVariableType, _) | (_, _: TypedAST.TypeVariableType) => true
+      case (_, _) if a.isNullType || a.isBottomType => !p.isBasicType
+      case (pb: TypedAST.BasicType, ab: TypedAST.BasicType) => TypedAST.TypeRules.isSuperType(pb, ab)
+      case (pb: TypedAST.BasicType, _) => className(a) == boxedName(pb)
+      case (_, ab: TypedAST.BasicType) =>
+        val n = className(p)
+        n == boxedName(ab) || BoxingSupertypes.contains(n)
+      case (_, _) if className(a) != null && className(a).startsWith("onion.Function") => true
+      case (pc: TypedAST.ClassType, ac: TypedAST.ClassType) =>
+        TypedAST.TypeRules.isSuperType(pc, ac) || TypedAST.TypeRules.isSuperType(rawOf(pc), rawOf(ac))
+      case _ => TypedAST.TypeRules.isSuperType(p, a)
+  }
+
+  private def rawOf(ct: TypedAST.ClassType): TypedAST.ClassType = ct match
+    case ap: TypedAST.AppliedClassType => ap.raw
+    case other => other
+
+  private def boxedName(b: TypedAST.BasicType): String = b.name match
+    case "int" => "java.lang.Integer"
+    case "char" => "java.lang.Character"
+    case other => "java.lang." + other.capitalize
 
   /**
    * `readText(p)`, `get(url)`, `now()`, `exit(1)` and similar calls used to resolve
@@ -598,6 +692,9 @@ class SemanticErrorReporter(threshold: Int) {
 object SemanticErrorReporter {
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
+  // The reference types a primitive argument boxes into, for ranking call suggestions.
+  private val BoxingSupertypes =
+    Set("java.lang.Object", "java.lang.Number", "java.lang.Comparable", "java.io.Serializable", "java.lang.constant.Constable")
 
   private def typeName(item: AnyRef): String =
     if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.Type])

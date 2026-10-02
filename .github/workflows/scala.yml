@@ -24,3 +24,9 @@ jobs:
       env:
         SBT_OPTS: "-Xmx10G -XX:+UseG1GC -Xss16m"
       run: sbt -v +test
+    # Batteries are separate subprojects the root does not aggregate, so `+test` above
+    # does not reach them. Their tests use a local fake of each service: no secrets.
+    - name: Test batteries
+      env:
+        SBT_OPTS: "-Xmx4G -XX:+UseG1GC -Xss16m"
+      run: sbt -v llm/test

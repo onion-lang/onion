@@ -53,13 +53,67 @@ onion.Cli#parse=console,exec
 `Archive`、`Db`、`Net`、`Server`、`Future`、`Concurrent`、`ToolCli` — の
 分類に加えて、純粋な残りの stdlib（`Proc` の結果、`Http` のレスポンス、`Json::value` のように
 入口の関数が返す入れ子の値も含む）、よく使う JDK の値型・コレクション型と `java.time`
-（`now` だけは `clock`）の純粋ベースライン、JDK の既知の効果点（`System::getenv`、`System::exit`、`Runtime::exec`、`Thread::sleep`、
+（`now` だけは `clock`）の純粋ベースライン、JDK のファイル I/O（`java.io` のファイルストリームと
+`File`、`java.nio.file.Files`。`BufferedReader` などのラッパーは `System.in` やソケットを包むこともあるため
+`unknown` のまま）、JDK の既知の効果点（`System::getenv`、`System::exit`、`Runtime::exec`、`Thread::sleep`、
 `System::out` の型としての `PrintStream`）が入っています。
 
 粒度は型単位であり、インスタンス単位ではありません。ファイルの上の `PrintStream` は本来
 `write` ですが、Onion コードで `PrintStream` といえば `System::out` / `System::err` なので、
 この型は `console` に分類されています。この区別が重要な場面では、stdlib 自身の入り口
 （`Files`、`IO`）が正確な経路です。
+
+## ライブラリは自分の呼び出しを分類できる
+
+ライブラリの jar は、自分の呼び出しを `unknown` のままにしておく必要はありません。
+**コンパイル時クラスパス**上の jar —— `-classpath`、スクリプトの `//> using dep` が
+解決した jar、プロジェクトの `[dependencies]` —— は、組み込みの表と同じ形式の表を
+
+```text
+META-INF/onion/effect-table.txt
+```
+
+に同梱でき、コンパイラはそのコンパイルに限ってそれを組み込みの表に合流させます。
+そのライブラリを呼ぶ `tool` は、`unknown` ではなく本当の効果（`requires { net, env }`）を
+宣言できます。
+
+表のどの行でも、効果に**固定オペランド** `effect:operand` を付けられます：
+
+```text
+# Class#method=effect[:operand][,effect[:operand]...]   または   Class#method=pure
+onion.llm.Llm#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+onion.llm.Llm#text=pure
+```
+
+オペランドは最初の `:` の後ろから次の `,` までの全部（前後の空白は除く）です。空には
+できず、`pure` と `unknown` には付けられません。これまでどおり、素の `net` は「オペランド
+なし」です。固定オペランドは、そのメソッドのすべての呼び出しについて、リテラル引数から
+読み取ったオペランドとまったく同じように `--plan` に表示され、`--contract` の
+`staticOperands` に入ります（[tool](../guide/tools.md#ソースに書かれたオペランド) を参照）。
+それらに追加されるのであって、置き換えるのではありません。ですから `Llm::ask(...)` を
+呼ぶ tool の plan は `net api.anthropic.com` と `env ANTHROPIC_API_KEY` になります。
+組み込みの表もこの構文を使えます。
+
+ライブラリの表が従う規則：
+
+- **自分のクラスだけ。** 行が有効なのは、そのクラスのファイル（`a.b.C$D` なら
+  `a/b/C$D.class`）が同じ jar に入っているときだけです。それ以外のクラスを名指す行は
+  無視され、jar ごとに1つの警告 **W0018** が jar・行・クラス名を示します。
+- **`onion.*` と `java.*` では組み込みの表が勝つ。** どちらかの名前空間のクラスでは、
+  組み込みのエントリ（個別でもワイルドカードでも）がライブラリのものに勝ちます。組み込みの
+  表が扱っていない `onion.*` のクラス（`onion.llm.Llm` など）はライブラリが分類できます。
+- **クラスパスで先の jar がクラスを持つ。** 2つの jar が同じクラスを分類しているときは、
+  クラスパス上で先にある jar —— JVM がそのクラスを読み込む jar —— の行が使われ、もう一方の
+  そのクラスの行は参照されません。
+- **壊れた表は丸ごと無視される。** 解析できない行が1つでもあれば表全体が無効になり
+  （1行だけ捨てると、そのメソッドをもっと緩いワイルドカードが支配しかねないため）、jar と
+  行を示す **W0017** として報告されます。その jar への呼び出しは再び `unknown` になるので、
+  tool は `unknown` を認めていなければ E0077 で失敗します。
+
+ライブラリの表が読まれるのは、プログラムが `tool` を宣言しているとき（と `--effects`）
+だけです。各 jar の解析結果はパス・サイズ・更新時刻でキャッシュされるので、常駐デーモンと
+言語サーバーが jar に払うコストは1回きりです。クラスパス上のディレクトリは参照しません。
+どちらの警告も `--Wno W0017,W0018` で抑止できます。
 
 ## メソッドの集合はどう計算されるか
 
@@ -88,3 +142,10 @@ stdlib を分類したものであり、`onion.Files` という名前のユー�
 合わせることはしません。そして効果集合はセキュリティサンドボックスではありません。何も
 プログラムの実行を止めません。集合は「実行して*よいか*」を決める上位の層への、正直な入力
 です。
+
+同じ走査は `--plan` のために、ソースから読み取れるオペランド —— リテラル URL のホスト、
+`Proc` のコマンドとそのリテラル引数、`System::getenv` の変数名、リテラルのパス —— も記録します
+（[ソースに書かれたオペランド](../guide/tools.md#ソースに書かれたオペランド) を参照）。
+これは効果集合とは逆向きの下界です。並んだオペランドはどれもプログラムが実際に到達しうる
+ものですが、リテラルでないオペランドは推測されず `(operand not statically known)` と
+報告されます。

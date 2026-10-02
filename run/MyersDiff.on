@@ -1,304 +1,331 @@
-// Diff engine: LCS-based shortest edit script between two sequences of strings.
-// Produces unified-diff output with @@ hunks and context lines.
-// Exercises: ADT enum, records, generics, recursion, foreach/select patterns,
-//            flat-array DP, collection pipelines, string interpolation.
+// MyersDiff.on — LCS-based line diff with unified-diff output.
+// Exercises: ADT enums (DiffOp), records (Hunk, DiffStats), classes
+//            (DiffEngine), flat-2D Int[] DP table, collection pipelines
+//            (filter/map/fold/sortedBy), foreach ranges, closures,
+//            select type patterns, nullable types, string interpolation.
 
-enum Edit {
+// ── DiffOp ────────────────────────────────────────────────────────────────────
+
+enum DiffOp {
   case Keep(line: String)
-  case Insert(line: String)
-  case Delete(line: String)
+  case Ins(line: String)
+  case Del(line: String)
+public:
+  def sign(): String = select this {
+    case k is Keep: " "
+    case i is Ins:  "+"
+    case d is Del:  "-"
+  }
+  def content(): String = select this {
+    case k is Keep: k.line()
+    case i is Ins:  i.line()
+    case d is Del:  d.line()
+  }
+  def isChange(): Boolean = select this { case k is Keep: false; else: true }
 }
 
-record DiffResult(edits: List[Object], adds: Int, dels: Int, same: Int)
+// ── Hunk ──────────────────────────────────────────────────────────────────────
 
-record Hunk(aStart: Int, aLen: Int, bStart: Int, bLen: Int, lines: List[String])
+record Hunk(oldStart: Int, oldLen: Int, newStart: Int, newLen: Int, ops: List[DiffOp]) {
+public:
+  def header(): String =
+    "@@ -#{oldStart()},#{oldLen()} +#{newStart()},#{newLen()} @@"
+}
 
-// ---- LCS DP (flat Int[] of size (n+1)*(m+1)) ----
-def lcsFlat(a: List[String], b: List[String]): Int[] {
-  val n: Int = a.size
-  val m: Int = b.size
-  val dp: Int[] = new Int[(n + 1) * (m + 1)]
-  foreach i: Int in 1..n {
-    foreach j: Int in 1..m {
-      val ai: String = a[i - 1]
-      val bj: String = b[j - 1]
-      if ai == bj {
-        dp[i * (m + 1) + j] = dp[(i - 1) * (m + 1) + (j - 1)] + 1
+// ── DiffStats ─────────────────────────────────────────────────────────────────
+
+record DiffStats(added: Int, removed: Int, unchanged: Int) {
+public:
+  def show(): String = "+#{added()} -#{removed()} ~#{unchanged()}"
+}
+
+// ── DiffEngine ────────────────────────────────────────────────────────────────
+
+class DiffEngine {
+public:
+  // Split a multi-line string into a list of lines.
+  static def lines(text: String): List[String] =
+    Strings::split(text, "\n")
+
+  // Compute LCS-based diff between two line lists.
+  // Returns DiffOp list in forward order.
+  static def diff(a: List[String], b: List[String]): List[DiffOp] {
+    val n: Int = a.size
+    val m: Int = b.size
+    if n == 0 && m == 0 { return [] }
+
+    // Flat 2-D DP: dp[i*(m+1)+j] = LCS length of a[0..i-1] vs b[0..j-1]
+    val dp: Int[] = new Int[(n + 1) * (m + 1)]
+    foreach i: Int in 1..n {
+      foreach j: Int in 1..m {
+        val idx: Int = i * (m + 1) + j
+        if a[i - 1] == b[j - 1] {
+          dp[idx] = dp[(i - 1) * (m + 1) + (j - 1)] + 1
+        } else {
+          val up: Int   = dp[(i - 1) * (m + 1) + j]
+          val left: Int = dp[i * (m + 1) + (j - 1)]
+          dp[idx] = if up >= left { up } else { left }
+        }
+      }
+    }
+
+    // Backtrack from (n, m) — builds ops in reverse order.
+    val rops: List[DiffOp] = []
+    var i: Int = n
+    var j: Int = m
+    while i > 0 || j > 0 {
+      if i > 0 && j > 0 && a[i - 1] == b[j - 1] {
+        rops.add(new Keep(a[i - 1]))
+        i = i - 1; j = j - 1
+      } else if j > 0 && (i == 0 || dp[i * (m + 1) + j] <= dp[i * (m + 1) + (j - 1)]) {
+        rops.add(new Ins(b[j - 1]))
+        j = j - 1
       } else {
-        val up:   Int = dp[(i - 1) * (m + 1) + j]
-        val left: Int = dp[i * (m + 1) + (j - 1)]
-        dp[i * (m + 1) + j] = if up > left { up } else { left }
+        rops.add(new Del(a[i - 1]))
+        i = i - 1
       }
     }
-  }
-  return dp
-}
 
-// ---- Backtrack through DP table, appending to acc in REVERSE order ----
-def backtrack(dp: Int[], a: List[String], b: List[String],
-              m: Int, i: Int, j: Int, acc: List[Object]): void {
-  if i == 0 && j == 0 { return }
-  if i == 0 {
-    acc.add(new Insert(b[j - 1]))
-    backtrack(dp, a, b, m, i, j - 1, acc)
-    return
+    // Reverse rops → forward order
+    val ops: List[DiffOp] = []
+    var k: Int = rops.size - 1
+    while k >= 0 { ops.add(rops[k]); k = k - 1 }
+    return ops
   }
-  if j == 0 {
-    acc.add(new Delete(a[i - 1]))
-    backtrack(dp, a, b, m, i - 1, j, acc)
-    return
-  }
-  val ai: String = a[i - 1]
-  val bj: String = b[j - 1]
-  if ai == bj {
-    acc.add(new Keep(ai))
-    backtrack(dp, a, b, m, i - 1, j - 1, acc)
-  } else if dp[(i - 1) * (m + 1) + j] >= dp[i * (m + 1) + (j - 1)] {
-    acc.add(new Delete(ai))
-    backtrack(dp, a, b, m, i - 1, j, acc)
-  } else {
-    acc.add(new Insert(bj))
-    backtrack(dp, a, b, m, i, j - 1, acc)
-  }
-}
 
-def diff(a: List[String], b: List[String]): List[Object] {
-  val dp: Int[] = lcsFlat(a, b)
-  val rev: List[Object] = []
-  backtrack(dp, a, b, b.size, a.size, b.size, rev)
-  val result: List[Object] = []
-  var idx: Int = rev.size - 1
-  while idx >= 0 {
-    result.add(rev[idx])
-    idx = idx - 1
-  }
-  return result
-}
-
-// ---- Statistics ----
-def diffStats(edits: List[Object]): DiffResult {
-  var adds: Int = 0
-  var dels: Int = 0
-  var same: Int = 0
-  foreach e: Object in edits {
-    select e {
-      case ek is Keep:   { same = same + 1 }
-      case ei is Insert: { adds = adds + 1 }
-      case ed is Delete: { dels = dels + 1 }
+  // Compute aggregate stats from an ops list.
+  static def stats(ops: List[DiffOp]): DiffStats {
+    var added: Int = 0; var removed: Int = 0; var unchanged: Int = 0
+    foreach op: DiffOp in ops {
+      select op {
+        case k is Keep: unchanged = unchanged + 1
+        case i is Ins:  added = added + 1
+        case d is Del:  removed = removed + 1
+      }
     }
+    return new DiffStats(added, removed, unchanged)
   }
-  return new DiffResult(edits, adds, dels, same)
-}
 
-// ---- Position counters ----
-record Pos(a: Int, b: Int)
+  // Group ops into hunks with `ctx` context lines on each side.
+  static def hunks(ops: List[DiffOp], ctx: Int): List[Hunk] {
+    val hs: List[Hunk] = []
+    val n: Int = ops.size
+    if n == 0 { return hs }
 
-def posAfter(edits: List[Object], upTo: Int): Pos {
-  var a: Int = 0
-  var b: Int = 0
-  foreach j: Int in 0..<upTo {
-    select (edits[j] as Object) {
-      case ek is Keep:   { a = a + 1; b = b + 1 }
-      case ei is Insert: { b = b + 1 }
-      case ed is Delete: { a = a + 1 }
+    // Collect positions of all changed ops.
+    val cpos: List[Int] = []
+    foreach ci: Int in 0..<n {
+      if ops[ci].isChange() { cpos.add(ci) }
     }
-  }
-  return new Pos(a, b)
-}
+    if cpos.size == 0 { return hs }
 
-// ---- Build unified-diff hunks (context = 3 lines) ----
-def buildHunks(edits: List[Object]): List[Object] {
-  val ctx: Int = 3
-  val n: Int = edits.size
-  val hunks: List[Object] = []
-  var i: Int = 0
-  while i < n {
-    var isChange: Boolean = false
-    select (edits[i] as Object) {
-      case ek is Keep:   { isChange = false }
-      case ei is Insert: { isChange = true }
-      case ed is Delete: { isChange = true }
+    // Build span ranges (merged by ctx).
+    val spans: List[Int[]] = []
+    var lo: Int = cpos[0] - ctx
+    if lo < 0 { lo = 0 }
+    var hi2: Int = cpos[0] + ctx
+    if hi2 >= n { hi2 = n - 1 }
+    foreach si: Int in 1..<cpos.size {
+      val pos: Int = cpos[si]
+      var nlo: Int = pos - ctx
+      if nlo < 0 { nlo = 0 }
+      var nhi: Int = pos + ctx
+      if nhi >= n { nhi = n - 1 }
+      if nlo <= hi2 + 1 {
+        if nhi > hi2 { hi2 = nhi }
+      } else {
+        val sp: Int[] = new Int[2]; sp[0] = lo; sp[1] = hi2
+        spans.add(sp)
+        lo = nlo; hi2 = nhi
+      }
     }
-    if !isChange {
-      i = i + 1
-    } else {
-      val cStart: Int = if i - ctx < 0 { 0 } else { i - ctx }
-      val pos: Pos = posAfter(edits, cStart)
-      val aStart: Int = pos.a() + 1
-      val bStart: Int = pos.b() + 1
-      val hlines: List[String] = []
-      foreach j: Int in cStart..<i {
-        select (edits[j] as Object) {
-          case ek is Keep: { hlines.add(" " + ek.line()) }
-          else: {}
+    val spLast: Int[] = new Int[2]; spLast[0] = lo; spLast[1] = hi2
+    spans.add(spLast)
+
+    // Convert each span into a Hunk.
+    var oldLine: Int = 1
+    var newLine: Int = 1
+    var opPos: Int = 0
+
+    foreach span: Int[] in spans {
+      val spanStart: Int = span[0]
+      val spanEnd: Int   = span[1]
+
+      // Advance line counters to spanStart.
+      while opPos < spanStart {
+        val op: DiffOp = ops[opPos]
+        select op {
+          case k is Keep: oldLine = oldLine + 1; newLine = newLine + 1
+          case d is Del:  oldLine = oldLine + 1
+          case i is Ins:  newLine = newLine + 1
+        }
+        opPos = opPos + 1
+      }
+
+      val hops: List[DiffOp] = []
+      var oldLen: Int = 0; var newLen: Int = 0
+      val hOldStart: Int = oldLine; val hNewStart: Int = newLine
+      foreach hi: Int in spanStart..spanEnd {
+        val op: DiffOp = ops[hi]
+        hops.add(op)
+        select op {
+          case k is Keep: oldLen = oldLen + 1; newLen = newLen + 1
+          case d is Del:  oldLen = oldLen + 1
+          case i is Ins:  newLen = newLen + 1
         }
       }
-      var j: Int = i
-      var lastChange: Int = i
-      while j < n {
-        select (edits[j] as Object) {
-          case ek is Keep: {
-            if j - lastChange > ctx {
-              j = n
-            } else {
-              hlines.add(" " + ek.line())
-              j = j + 1
-            }
-          }
-          case ei is Insert: {
-            hlines.add("+" + ei.line())
-            lastChange = j
-            j = j + 1
-          }
-          case ed is Delete: {
-            hlines.add("-" + ed.line())
-            lastChange = j
-            j = j + 1
-          }
-        }
+      opPos = spanEnd + 1
+      oldLine = hOldStart + oldLen; newLine = hNewStart + newLen
+      hs.add(new Hunk(hOldStart, oldLen, hNewStart, newLen, hops))
+    }
+    return hs
+  }
+
+  // Print a unified diff to stdout.
+  static def printDiff(aName: String, bName: String, ops: List[DiffOp], ctx: Int): void {
+    val hs: List[Hunk] = hunks(ops, ctx)
+    if hs.size == 0 { IO::println("(files identical)"); return }
+    IO::println("--- #{aName}")
+    IO::println("+++ #{bName}")
+    foreach h: Hunk in hs {
+      IO::println(h.header())
+      foreach op: DiffOp in h.ops() {
+        IO::println("#{op.sign()} #{op.content()}")
       }
-      var aLen: Int = 0
-      var bLen: Int = 0
-      foreach hline: String in hlines {
-        if hline.startsWith(" ") || hline.startsWith("-") { aLen = aLen + 1 }
-        if hline.startsWith(" ") || hline.startsWith("+") { bLen = bLen + 1 }
-      }
-      hunks.add(new Hunk(aStart, aLen, bStart, bLen, hlines))
-      i = lastChange + ctx + 1
-    }
-  }
-  return hunks
-}
-
-// ---- Render unified diff ----
-def renderDiff(fileA: String, fileB: String, hunks: List[Object]): void {
-  IO::println("--- " + fileA)
-  IO::println("+++ " + fileB)
-  foreach h: Object in hunks {
-    val hunk: Hunk = h as Hunk
-    IO::println("@@ -#{hunk.aStart()},#{hunk.aLen()} +#{hunk.bStart()},#{hunk.bLen()} @@")
-    foreach line: String in hunk.lines() {
-      IO::println(line)
     }
   }
 }
 
-// ---- Split a string on newlines ----
-def splitLines(text: String): List[String] {
-  val result: List[String] = []
-  val parts: List[String] = Strings::split(text, "\n")
-  foreach p: String in parts {
-    result.add(p)
-  }
-  return result
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+def runCase(title: String, aName: String, bName: String, aText: String, bText: String): void {
+  IO::println("\n━━━ #{title} ━━━")
+  val ops: List[DiffOp] = DiffEngine::diff(DiffEngine::lines(aText), DiffEngine::lines(bText))
+  val st: DiffStats = DiffEngine::stats(ops)
+  IO::println("Stats: #{st.show()}")
+  DiffEngine::printDiff(aName, bName, ops, 2)
 }
 
-// ---- Word-level inline diff ----
-def wordDiff(sentA: String, sentB: String): String {
-  val wa: List[String] = []
-  val wb: List[String] = []
-  foreach w: Object in Strings::split(sentA, " ") { wa.add(w as String) }
-  foreach w: Object in Strings::split(sentB, " ") { wb.add(w as String) }
-  val edits: List[Object] = diff(wa, wb)
-  var out: String = ""
-  foreach e: Object in edits {
-    select e {
-      case ek is Keep:   { out = out + ek.line() + " " }
-      case ei is Insert: { out = out + "[+" + ei.line() + "] " }
-      case ed is Delete: { out = out + "[-" + ed.line() + "] " }
+// ── demo cases ────────────────────────────────────────────────────────────────
+
+val configOld: String =
+  "host = localhost\n" +
+  "port = 8080\n" +
+  "debug = false\n" +
+  "log_level = INFO\n" +
+  "timeout = 30"
+
+val configNew: String =
+  "host = localhost\n" +
+  "port = 9090\n" +
+  "debug = true\n" +
+  "log_level = DEBUG\n" +
+  "timeout = 30\n" +
+  "max_connections = 100\n" +
+  "retry_limit = 3"
+
+runCase("Config update", "config.old", "config.new", configOld, configNew)
+
+val codeOld: String =
+  "class Calculator {\n" +
+  "  def add(a, b) {\n" +
+  "    return a + b\n" +
+  "  }\n" +
+  "  def subtract(a, b) {\n" +
+  "    return a - b\n" +
+  "  }\n" +
+  "  def multiply(a, b) {\n" +
+  "    return a * b\n" +
+  "  }\n" +
+  "}"
+
+val codeNew: String =
+  "class Calculator {\n" +
+  "  def add(a: Double, b: Double): Double {\n" +
+  "    return a + b\n" +
+  "  }\n" +
+  "  def subtract(a: Double, b: Double): Double {\n" +
+  "    return a - b\n" +
+  "  }\n" +
+  "  def multiply(a: Double, b: Double): Double {\n" +
+  "    return a * b\n" +
+  "  }\n" +
+  "  def divide(a: Double, b: Double): Double {\n" +
+  "    if b == 0.0 { throw new ArithmeticException(\"division by zero\") }\n" +
+  "    return a / b\n" +
+  "  }\n" +
+  "}"
+
+runCase("Add types + new method", "Calculator.old", "Calculator.new", codeOld, codeNew)
+
+val poemOld: String =
+  "Roses are red,\n" +
+  "Violets are blue,\n" +
+  "Sugar is sweet,\n" +
+  "And so are you.\n" +
+  "The sun shines bright\n" +
+  "On a summer day,\n" +
+  "And everything\n" +
+  "Seems okay."
+
+val poemNew: String =
+  "Roses are crimson,\n" +
+  "Violets are blue,\n" +
+  "Honey is sweeter,\n" +
+  "And so are you.\n" +
+  "The moon glows soft\n" +
+  "On a winter night,\n" +
+  "And everything\n" +
+  "Will be alright."
+
+runCase("Poem revision", "poem.v1", "poem.v2", poemOld, poemNew)
+
+// ── inline word-level diff helper ────────────────────────────────────────────
+
+def wordDiff(a: String, b: String): String {
+  val aw: List[String] = Strings::split(a, " ")
+  val bw: List[String] = Strings::split(b, " ")
+  val ops: List[DiffOp] = DiffEngine::diff(aw, bw)
+  var result: String = ""
+  foreach op: DiffOp in ops {
+    select op {
+      case k is Keep: result = result + k.line() + " "
+      case i is Ins:  result = result + "[+#{i.line()}] "
+      case d is Del:  result = result + "[-#{d.line()}] "
     }
   }
-  return out.trim()
+  return result.trim()
 }
 
-// ---- main ----
-def main(): void {
-  IO::println("=== MyersDiff Demo ===")
-  IO::println("")
+IO::println("\n━━━ Inline word diff ━━━")
+IO::println(wordDiff("The quick brown fox", "The slow red fox"))
+IO::println(wordDiff("sugar is sweet", "honey is sweeter"))
 
-  // Demo 1: fruit list
-  val origFruits: List[String] = splitLines(
-    "apple\nbanana\ncherry\ndate\nelderberry\nfig\ngrape\nhoneydew\nkiwi\nlemon"
-  )
-  val modFruits: List[String] = splitLines(
-    "apple\nblueberry\ncherry\ndate\neggfruit\nelderberry\nfig\ngrapefruit\nhoneydew\njackfruit\nkiwi\nlime"
-  )
-  val fruitEdits: List[Object] = diff(origFruits, modFruits)
-  val fs: DiffResult = diffStats(fruitEdits)
-  IO::println("--- Fruit list diff ---")
-  IO::println("#{origFruits.size} -> #{modFruits.size} lines   +#{fs.adds()} -#{fs.dels()} =#{fs.same()}")
-  IO::println("")
-  renderDiff("fruits-original.txt", "fruits-modified.txt", buildHunks(fruitEdits))
-  IO::println("")
+// ── identical files ───────────────────────────────────────────────────────────
 
-  // Demo 2: Shakespeare sonnet
-  val sonnetA: List[String] = splitLines(
-    "Shall I compare thee to a summer's day?\n" +
-    "Thou art more lovely and more temperate:\n" +
-    "Rough winds do shake the darling buds of May,\n" +
-    "And summer's lease hath all too short a date:\n" +
-    "Sometime too hot the eye of heaven shines,\n" +
-    "And often is his gold complexion dimm'd;\n" +
-    "And every fair from fair sometime declines,\n" +
-    "By chance, or nature's changing course untrimm'd"
-  )
-  val sonnetB: List[String] = splitLines(
-    "Shall I compare thee to a winter's night?\n" +
-    "Thou art more lovely and more temperate:\n" +
-    "Rough winds do shake the darling buds of May,\n" +
-    "And winter's lease hath all too short a date:\n" +
-    "Sometime too cold the eye of heaven shines,\n" +
-    "And often is his gold complexion dimm'd;\n" +
-    "And every fair from fair sometime declines,\n" +
-    "By fortune, or nature's changing course untrimm'd"
-  )
-  val se: List[Object] = diff(sonnetA, sonnetB)
-  val ss: DiffResult = diffStats(se)
-  IO::println("--- Sonnet diff ---")
-  IO::println("#{sonnetA.size} -> #{sonnetB.size} lines   +#{ss.adds()} -#{ss.dels()} =#{ss.same()}")
-  IO::println("")
-  renderDiff("sonnet-a.txt", "sonnet-b.txt", buildHunks(se))
-  IO::println("")
+val emptyOps: List[DiffOp] = DiffEngine::diff(DiffEngine::lines("same\nlines\nhere"),
+                                               DiffEngine::lines("same\nlines\nhere"))
+IO::println("\n━━━ Identical files ━━━")
+DiffEngine::printDiff("file.a", "file.b", emptyOps, 2)
 
-  // Demo 3: word-level inline diff
-  IO::println("--- Word-level diff ---")
-  val pairs: List[String] = splitLines(
-    "summer's|winter's\n" +
-    "By chance|By fortune\n" +
-    "Sometime too hot|Sometime too cold"
-  )
-  foreach p: String in pairs {
-    val idx: Int = p.indexOf("|")
-    if idx >= 0 {
-      val la: String = p.substring(0, idx)
-      val lb: String = p.substring(idx + 1, p.length())
-      IO::println("A: " + la)
-      IO::println("B: " + lb)
-      IO::println("D: " + wordDiff(la, lb))
-      IO::println("")
-    }
+// ── summary ───────────────────────────────────────────────────────────────────
+
+IO::println("\n━━━ All diffs summary ━━━")
+val cases: List[List[String]] = [
+  ["Config update",        configOld, configNew],
+  ["Calculator refactor",  codeOld,   codeNew],
+  ["Poem revision",        poemOld,   poemNew]
+]
+foreach row: List[String] in cases {
+  val title: String = row[0]
+  val src: String   = row[1]
+  val dst: String   = row[2]
+  val ops: List[DiffOp] = DiffEngine::diff(DiffEngine::lines(src), DiffEngine::lines(dst))
+  val st: DiffStats = DiffEngine::stats(ops)
+  val pct: Int = if st.removed() + st.added() == 0 { 0 } else {
+    (st.added() + st.removed()) * 100 / (st.unchanged() + st.added() + st.removed())
   }
-
-  // Demo 4: identity check
-  IO::println("--- Identity check ---")
-  val sameEdits: List[Object] = diff(origFruits, origFruits)
-  val sameS: DiffResult = diffStats(sameEdits)
-  if sameS.adds() == 0 && sameS.dels() == 0 && sameS.same() == origFruits.size {
-    IO::println("PASS: identical input => no changes, #{sameS.same()} kept lines")
-  } else {
-    IO::println("FAIL: +#{sameS.adds()} -#{sameS.dels()} =#{sameS.same()}")
-  }
-
-  // Demo 5: empty vs non-empty
-  IO::println("")
-  IO::println("--- Empty vs non-empty ---")
-  val empty: List[String] = []
-  val three: List[String] = splitLines("line1\nline2\nline3")
-  val ef: DiffResult = diffStats(diff(empty, three))
-  IO::println("empty -> 3 lines: +#{ef.adds()} -#{ef.dels()} =#{ef.same()}")
-  val fe: DiffResult = diffStats(diff(three, empty))
-  IO::println("3 lines -> empty: +#{fe.adds()} -#{fe.dels()} =#{fe.same()}")
-
-  IO::println("")
-  IO::println("Done.")
+  IO::println("  #{title}: #{st.show()} (#{pct}% changed)")
 }
+
+IO::println("\ndone.")

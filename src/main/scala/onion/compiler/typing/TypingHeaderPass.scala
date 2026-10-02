@@ -62,12 +62,20 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
     if (unit.imports != null) {
       for ((key, value) <- unit.imports.mapping) {
         val item = ImportItem(key, value.split("\\.").toIndexedSeq)
-        // Single-class imports of unknown classes were accepted silently and
-        // only failed (confusingly) at the use site, if at all
-        if (!item.isOnDemand && typing.table_.loadOrNull(value) == null) {
-          typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, value)
+        if (item.isOnDemand) imports.append(item)
+        else {
+          // A single-class import may name a nested class with dots only
+          // (`onion.Result.Ok`); it is recorded under its binary name
+          // (`onion.Result$Ok`) so every use site loads it directly.
+          // Single-class imports of unknown classes were accepted silently and
+          // only failed (confusingly) at the use site, if at all
+          val resolved = typing.table_.loadDottedOrNull(value)
+          if (resolved == null) {
+            typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, value, importCandidates(value))
+            imports.append(item)
+          } else if (resolved.name == value) imports.append(item)
+          else imports.append(ImportItem(key, resolved.name.split("\\.").toIndexedSeq))
         }
-        imports.append(item)
       }
     }
     imports.toSeq
@@ -76,15 +84,32 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
   def collectStaticImports(): StaticImportList = {
     val staticList = defaultStaticImports()
     if (unit.imports != null) {
-      for ((methodName, className) <- unit.imports.staticImports) {
-        if (typing.table_.loadOrNull(className) == null) {
-          typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, className)
+      for ((methodName, writtenName) <- unit.imports.staticImports) {
+        // `onion.Result.Ok::*` names a nested class with dots, like a type import does.
+        val resolved = typing.table_.loadDottedOrNull(writtenName)
+        if (resolved == null) {
+          typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, writtenName, importCandidates(writtenName))
         }
+        val className = if (resolved == null) writtenName else resolved.name
         if (methodName == "*") staticList.add(new StaticImportItem(className, true))
         else staticList.add(new StaticImportItem(className, true, methodName))
       }
     }
     staticList
+  }
+
+  /** "Did you mean" candidates for an import whose nested part did not resolve: the member
+    * classes of the longest prefix that is a class (`onion.Result.Okk` -> `onion.Result.Ok`). */
+  private def importCandidates(name: String): Array[String] = {
+    val parts = name.split('.')
+    var i = parts.length - 1
+    while (i >= 1) {
+      val prefix = parts.take(i).mkString(".")
+      val outer = typing.table_.loadDottedOrNull(prefix)
+      if (outer != null) return typing.table_.memberClassCandidates(outer, prefix).toArray
+      i -= 1
+    }
+    Array.empty
   }
 
   private def defaultStaticImports(): StaticImportList = {
@@ -224,6 +249,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
   private def registerTopLevelContainer(imports: Seq[ImportItem]): Unit = {
     val node = ClassDefinition.newClass(unit.location, 0, typing.topClass, typing.table_.rootClass, new Array[ClassType](0))
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
+    node.isTopLevelContainer = true
     node.setResolutionComplete(true)
     typing.table_.classes.add(node)
     node.addDefaultConstructor

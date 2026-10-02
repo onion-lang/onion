@@ -1,0 +1,484 @@
+// TinyInterpreter.on — a complete interpreter for a small expression language.
+//
+// The language (mini-ML subset) supports:
+//   • Double and Boolean literals
+//   • Variables (lexical scope via immutable environments)
+//   • Arithmetic: + - * /
+//   • Comparisons: == != < <= > >=
+//   • Let bindings:  let x = e1 in e2
+//   • Conditionals:  if e1 then e2 else e3
+//   • First-class functions:  fun x -> body
+//   • Curried application:  f arg  (left-associative, juxtaposition)
+//   • Closures: functions close over their definition-time environment
+//
+// Architecture: tokenizer → recursive-descent parser → tree-walking evaluator.
+// All three phases are implemented entirely in user-level Onion:
+//   ADT enums for Token, Expr, and Val; a class for the parser's mutable state;
+//   plain recursive functions for evaluation and pretty-printing.
+//
+// Features exercised: ADT (case) enums; records; select/pattern matching with
+// type patterns; Map[K,V] literal and foreach-destructuring; generics; closures
+// and higher-order functions; class with mutable fields; string interpolation;
+// exception throwing; collection pipelines.
+
+// ── Token ─────────────────────────────────────────────────────────────────
+enum Token {
+  case TNum(value: Double)
+  case TBool(value: Boolean)
+  case TIdent(name: String)
+  case TPlus; case TMinus; case TStar; case TSlash
+  case TEq; case TNeq; case TLt; case TLe; case TGt; case TGe
+  case TLParen; case TRParen
+  case TLet; case TIn; case TIf; case TThen; case TElse
+  case TFun; case TArrow; case TAssign; case TEof
+}
+
+// ── AST ───────────────────────────────────────────────────────────────────
+enum Expr {
+  case ENum(value: Double)
+  case EBool(flag: Boolean)
+  case EVar(name: String)
+  case EAdd(left: Expr, right: Expr)
+  case ESub(left: Expr, right: Expr)
+  case EMul(left: Expr, right: Expr)
+  case EDiv(left: Expr, right: Expr)
+  case EEq(left: Expr, right: Expr)
+  case ENeq(left: Expr, right: Expr)
+  case ELt(left: Expr, right: Expr)
+  case ELe(left: Expr, right: Expr)
+  case EGt(left: Expr, right: Expr)
+  case EGe(left: Expr, right: Expr)
+  case ELet(varName: String, value: Expr, body: Expr)
+  case EIf(cond: Expr, thenE: Expr, elseE: Expr)
+  case EFun(param: String, body: Expr)
+  case EApp(func: Expr, arg: Expr)
+}
+
+// ── Value ────────────────────────────────────────────────────────────────
+enum Val {
+  case VNum(n: Double)
+  case VBool(b: Boolean)
+  case VFun(param: String, body: Expr, env: Map[String, Val])
+}
+
+def valToString(v: Val): String = select v {
+  case n is VNum:
+    if n.n() == Math::floor(n.n()) && Math::abs(n.n()) < 1.0e15 {
+      "" + n.n().longValue()
+    } else { "" + n.n() }
+  case b is VBool: "" + b.b()
+  case f is VFun: "<fun>"
+}
+
+// ── Tokenizer ─────────────────────────────────────────────────────────────
+def tokenize(src: String): List[Token] = {
+  val tokens: List[Token] = []
+  var i: Int = 0
+  val n: Int = src.length()
+  while i < n {
+    val c: Char = src.charAt(i)
+    if c == ' ' || c == '\t' || c == '\n' || c == '\r' { i++ }
+    else if c >= '0' && c <= '9' {
+      var j: Int = i
+      while j < n && (src.charAt(j) >= '0' && src.charAt(j) <= '9' || src.charAt(j) == '.') { j++ }
+      tokens.add(new TNum(Double::parseDouble(src.substring(i, j))))
+      i = j
+    } else if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_' {
+      var j: Int = i
+      while j < n && (src.charAt(j) >= 'a' && src.charAt(j) <= 'z' || src.charAt(j) >= 'A' && src.charAt(j) <= 'Z' || src.charAt(j) == '_' || src.charAt(j) >= '0' && src.charAt(j) <= '9') { j++ }
+      val word: String = src.substring(i, j)
+      val tok: Token = select word {
+        case "let": new TLet()
+        case "in": new TIn()
+        case "if": new TIf()
+        case "then": new TThen()
+        case "else": new TElse()
+        case "fun": new TFun()
+        case "true": new TBool(true)
+        case "false": new TBool(false)
+        else: new TIdent(word)
+      }
+      tokens.add(tok)
+      i = j
+    }
+    else if c == '+' { tokens.add(new TPlus()); i++ }
+    else if c == '-' {
+      if i + 1 < n && src.charAt(i + 1) == '>' { tokens.add(new TArrow()); i += 2 }
+      else { tokens.add(new TMinus()); i++ }
+    }
+    else if c == '*' { tokens.add(new TStar()); i++ }
+    else if c == '/' { tokens.add(new TSlash()); i++ }
+    else if c == '(' { tokens.add(new TLParen()); i++ }
+    else if c == ')' { tokens.add(new TRParen()); i++ }
+    else if c == '=' {
+      if i + 1 < n && src.charAt(i + 1) == '=' { tokens.add(new TEq()); i += 2 }
+      else { tokens.add(new TAssign()); i++ }
+    }
+    else if c == '!' && i + 1 < n && src.charAt(i + 1) == '=' { tokens.add(new TNeq()); i += 2 }
+    else if c == '<' {
+      if i + 1 < n && src.charAt(i + 1) == '=' { tokens.add(new TLe()); i += 2 }
+      else { tokens.add(new TLt()); i++ }
+    }
+    else if c == '>' {
+      if i + 1 < n && src.charAt(i + 1) == '=' { tokens.add(new TGe()); i += 2 }
+      else { tokens.add(new TGt()); i++ }
+    }
+    else { i++ }
+  }
+  tokens.add(new TEof())
+  tokens
+}
+
+// ── Parser ────────────────────────────────────────────────────────────────
+class Parser {
+  var pos: Int
+  val tokens: List[Token]
+public:
+  def this(tokens: List[Token]) {
+    self.tokens = tokens
+    self.pos = 0
+  }
+  def peek(): Token = tokens[pos]
+  def advance(): Token = {
+    val t: Token = tokens[pos]
+    pos++
+    t
+  }
+  def expect(check: Boolean): void {
+    if !check { throw new RuntimeException("Parse error at position #{pos}") }
+  }
+  def parseExpr(): Expr = parseLetExpr()
+  def parseLetExpr(): Expr = {
+    if peek() is TLet {
+      advance()
+      val nameTok: Token = advance()
+      var varName: String = ""
+      select nameTok {
+        case id is TIdent: varName = id.name()
+        else: throw new RuntimeException("Expected identifier after let")
+      }
+      advance()  // skip '='
+      val value: Expr = parseLetExpr()
+      advance()  // skip 'in'
+      val body: Expr = parseLetExpr()
+      new ELet(varName, value, body)
+    } else if peek() is TFun {
+      advance()
+      val paramTok: Token = advance()
+      var paramName: String = ""
+      select paramTok {
+        case id is TIdent: paramName = id.name()
+        else: throw new RuntimeException("Expected identifier after fun")
+      }
+      advance()  // skip '->'
+      val body: Expr = parseLetExpr()
+      new EFun(paramName, body)
+    } else if peek() is TIf {
+      advance()
+      val cond: Expr = parseLetExpr()
+      advance()  // then
+      val thenE: Expr = parseLetExpr()
+      advance()  // else
+      val elseE: Expr = parseLetExpr()
+      new EIf(cond, thenE, elseE)
+    } else {
+      parseCmpExpr()
+    }
+  }
+  def parseCmpExpr(): Expr = {
+    var left: Expr = parseAddExpr()
+    val op: Token = peek()
+    if op is TEq { advance(); new EEq(left, parseAddExpr()) }
+    else if op is TNeq { advance(); new ENeq(left, parseAddExpr()) }
+    else if op is TLt { advance(); new ELt(left, parseAddExpr()) }
+    else if op is TLe { advance(); new ELe(left, parseAddExpr()) }
+    else if op is TGt { advance(); new EGt(left, parseAddExpr()) }
+    else if op is TGe { advance(); new EGe(left, parseAddExpr()) }
+    else { left }
+  }
+  def parseAddExpr(): Expr = {
+    var left: Expr = parseMulExpr()
+    while peek() is TPlus || peek() is TMinus {
+      val op: Token = advance()
+      val right: Expr = parseMulExpr()
+      if op is TPlus { left = new EAdd(left, right) }
+      else { left = new ESub(left, right) }
+    }
+    left
+  }
+  def parseMulExpr(): Expr = {
+    var left: Expr = parseAppExpr()
+    while peek() is TStar || peek() is TSlash {
+      val op: Token = advance()
+      val right: Expr = parseAppExpr()
+      if op is TStar { left = new EMul(left, right) }
+      else { left = new EDiv(left, right) }
+    }
+    left
+  }
+  def parseAppExpr(): Expr = {
+    var func: Expr = parseAtom()
+    while peek() is TLParen || peek() is TIdent || peek() is TNum || peek() is TBool {
+      val arg: Expr = parseAtom()
+      func = new EApp(func, arg)
+    }
+    func
+  }
+  def parseAtom(): Expr = {
+    val t: Token = peek()
+    select t {
+      case n is TNum: advance(); new ENum(n.value())
+      case b is TBool: advance(); new EBool(b.value())
+      case id is TIdent: advance(); new EVar(id.name())
+      case lp is TLParen: {
+        advance()
+        val e: Expr = parseExpr()
+        advance()  // skip ')'
+        e
+      }
+      else: throw new RuntimeException("Unexpected token at position #{pos}")
+    }
+  }
+}
+
+// ── Evaluator ────────────────────────────────────────────────────────────
+def eval(e: Expr, env: Map[String, Val]): Val = select e {
+  case n is ENum: new VNum(n.value())
+  case b is EBool: new VBool(b.flag())
+  case v is EVar: {
+    val result: Val? = env[v.name()]
+    if result == null { throw new RuntimeException("Unbound variable: #{v.name()}") }
+    result
+  }
+  case a is EAdd: {
+    val l: Val = eval(a.left(), env)
+    val r: Val = eval(a.right(), env)
+    select l {
+      case ln is VNum: select r {
+        case rn is VNum: new VNum(ln.n() + rn.n())
+        else: throw new RuntimeException("Type error in +")
+      }
+      else: throw new RuntimeException("Type error in +")
+    }
+  }
+  case s is ESub: {
+    val l: Val = eval(s.left(), env)
+    val r: Val = eval(s.right(), env)
+    select l {
+      case ln is VNum: select r {
+        case rn is VNum: new VNum(ln.n() - rn.n())
+        else: throw new RuntimeException("Type error in -")
+      }
+      else: throw new RuntimeException("Type error in -")
+    }
+  }
+  case m is EMul: {
+    val l: Val = eval(m.left(), env)
+    val r: Val = eval(m.right(), env)
+    select l {
+      case ln is VNum: select r {
+        case rn is VNum: new VNum(ln.n() * rn.n())
+        else: throw new RuntimeException("Type error in *")
+      }
+      else: throw new RuntimeException("Type error in *")
+    }
+  }
+  case d is EDiv: {
+    val l: Val = eval(d.left(), env)
+    val r: Val = eval(d.right(), env)
+    select l {
+      case ln is VNum: select r {
+        case rn is VNum: new VNum(ln.n() / rn.n())
+        else: throw new RuntimeException("Type error in /")
+      }
+      else: throw new RuntimeException("Type error in /")
+    }
+  }
+  case eq is EEq: {
+    val l: Val = eval(eq.left(), env)
+    val r: Val = eval(eq.right(), env)
+    select l {
+      case ln is VNum: select r {
+        case rn is VNum: new VBool(ln.n() == rn.n())
+        else: new VBool(false)
+      }
+      case lb is VBool: select r {
+        case rb is VBool: new VBool(lb.b() == rb.b())
+        else: new VBool(false)
+      }
+      else: new VBool(false)
+    }
+  }
+  case ne is ENeq: {
+    val eq2: Val = eval(new EEq(ne.left(), ne.right()), env)
+    select eq2 {
+      case b is VBool: new VBool(!b.b())
+      else: new VBool(true)
+    }
+  }
+  case lt is ELt: {
+    val l: Val = eval(lt.left(), env)
+    val r: Val = eval(lt.right(), env)
+    select l {
+      case ln is VNum: select r {
+        case rn is VNum: new VBool(ln.n() < rn.n())
+        else: throw new RuntimeException("Type error in <")
+      }
+      else: throw new RuntimeException("Type error in <")
+    }
+  }
+  case le is ELe: {
+    val l: Val = eval(le.left(), env)
+    val r: Val = eval(le.right(), env)
+    select l {
+      case ln is VNum: select r {
+        case rn is VNum: new VBool(ln.n() <= rn.n())
+        else: throw new RuntimeException("Type error in <=")
+      }
+      else: throw new RuntimeException("Type error in <=")
+    }
+  }
+  case gt is EGt: {
+    val l: Val = eval(gt.left(), env)
+    val r: Val = eval(gt.right(), env)
+    select l {
+      case ln is VNum: select r {
+        case rn is VNum: new VBool(ln.n() > rn.n())
+        else: throw new RuntimeException("Type error in >")
+      }
+      else: throw new RuntimeException("Type error in >")
+    }
+  }
+  case ge is EGe: {
+    val l: Val = eval(ge.left(), env)
+    val r: Val = eval(ge.right(), env)
+    select l {
+      case ln is VNum: select r {
+        case rn is VNum: new VBool(ln.n() >= rn.n())
+        else: throw new RuntimeException("Type error in >=")
+      }
+      else: throw new RuntimeException("Type error in >=")
+    }
+  }
+  case l is ELet: {
+    val v: Val = eval(l.value(), env)
+    val newEnv: Map[String, Val] = [:]
+    foreach (k, v2) in env { newEnv[k] = v2 }
+    newEnv[l.varName()] = v
+    eval(l.body(), newEnv)
+  }
+  case i is EIf: {
+    val cond: Val = eval(i.cond(), env)
+    select cond {
+      case b is VBool: if b.b() { eval(i.thenE(), env) } else { eval(i.elseE(), env) }
+      else: throw new RuntimeException("Condition must be boolean")
+    }
+  }
+  case f is EFun: new VFun(f.param(), f.body(), env)
+  case ap is EApp: {
+    val func: Val = eval(ap.func(), env)
+    val arg: Val = eval(ap.arg(), env)
+    select func {
+      case f is VFun: {
+        val newEnv: Map[String, Val] = [:]
+        foreach (k, v) in f.env() { newEnv[k] = v }
+        newEnv[f.param()] = arg
+        eval(f.body(), newEnv)
+      }
+      else: throw new RuntimeException("Not a function")
+    }
+  }
+}
+
+// ── AST pretty-printer ────────────────────────────────────────────────────
+def exprToString(e: Expr): String = select e {
+  case n is ENum:
+    if n.value() == Math::floor(n.value()) && Math::abs(n.value()) < 1.0e15 {
+      "" + n.value().longValue()
+    } else { "" + n.value() }
+  case b is EBool: "" + b.flag()
+  case v is EVar: v.name()
+  case a is EAdd: "(#{exprToString(a.left())} + #{exprToString(a.right())})"
+  case s is ESub: "(#{exprToString(s.left())} - #{exprToString(s.right())})"
+  case m is EMul: "(#{exprToString(m.left())} * #{exprToString(m.right())})"
+  case d is EDiv: "(#{exprToString(d.left())} / #{exprToString(d.right())})"
+  case eq is EEq: "(#{exprToString(eq.left())} == #{exprToString(eq.right())})"
+  case ne is ENeq: "(#{exprToString(ne.left())} != #{exprToString(ne.right())})"
+  case lt is ELt: "(#{exprToString(lt.left())} < #{exprToString(lt.right())})"
+  case le is ELe: "(#{exprToString(le.left())} <= #{exprToString(le.right())})"
+  case gt is EGt: "(#{exprToString(gt.left())} > #{exprToString(gt.right())})"
+  case ge is EGe: "(#{exprToString(ge.left())} >= #{exprToString(ge.right())})"
+  case l is ELet: "(let #{l.varName()} = #{exprToString(l.value())} in #{exprToString(l.body())})"
+  case i is EIf:  "(if #{exprToString(i.cond())} then #{exprToString(i.thenE())} else #{exprToString(i.elseE())})"
+  case f is EFun: "(fun #{f.param()} -> #{exprToString(f.body())})"
+  case ap is EApp: "(#{exprToString(ap.func())} #{exprToString(ap.arg())})"
+}
+
+// ── Test runner ───────────────────────────────────────────────────────────
+var passed: Int = 0
+var failed: Int = 0
+
+def check(src: String, expected: String): void {
+  val toks: List[Token] = tokenize(src)
+  val parser: Parser = new Parser(toks)
+  val ast: Expr = parser.parseExpr()
+  val env: Map[String, Val] = [:]
+  val result: String = valToString(eval(ast, env))
+  if result == expected {
+    IO::println("  PASS  #{src}  =>  #{result}")
+    passed++
+  } else {
+    IO::println("  FAIL  #{src}  => expected #{expected}, got #{result}")
+    failed++
+  }
+}
+
+def runAll(): void {
+  IO::println("=== Arithmetic ===")
+  check("1 + 2 * 3",           "7")
+  check("(10 - 3) * 2",        "14")
+  check("100 / 4",             "25")
+  check("2 * 3 + 4 * 5",       "26")
+  check("10 - 2 - 3",          "5")
+
+  IO::println("=== Let bindings ===")
+  check("let x = 10 in x + 5",                     "15")
+  check("let x = 3 in let y = 4 in x * x + y * y", "25")
+  check("let a = 2 in let b = a * 3 in a + b",      "8")
+
+  IO::println("=== Conditionals ===")
+  check("if 3 > 2 then 42 else 0",        "42")
+  check("if 1 == 2 then 99 else 7",       "7")
+  check("if true then false else true",   "false")
+  check("if 10 >= 10 then 1 else 0",      "1")
+  check("if 5 != 5 then 100 else 200",    "200")
+
+  IO::println("=== Functions and closures ===")
+  check("(fun x -> x * x) 5",                         "25")
+  check("let f = fun x -> x * 2 in f (f 3)",          "12")
+  check("let add = fun x -> fun y -> x + y in (add 3) 4", "7")
+  check("(fun x -> (fun y -> x + y)) 10 20",          "30")
+
+  IO::println("=== Comparisons ===")
+  check("true == false",  "false")
+  check("true == true",   "true")
+  check("3 < 4",          "true")
+  check("4 <= 4",         "true")
+  check("5 > 10",         "false")
+  check("3 != 3",         "false")
+
+  IO::println("=== Nested let + closures ===")
+  // Pythagorean check: 3*3 + 4*4 = 25 = 5*5
+  val pyth: String = "let sq = fun x -> x * x in let a = 3 in let b = 4 in sq a + sq b"
+  check(pyth, "25")
+  // Church-encoded pair (first projection)
+  val pair: String = "let mkpair = fun x -> fun y -> fun f -> f x y in let fst = fun p -> p (fun x -> fun y -> x) in fst (mkpair 10 20)"
+  check(pair, "10")
+
+  IO::println("")
+  IO::println("Results: #{passed} passed, #{failed} failed")
+}
+
+IO::println("Tiny Expression Interpreter")
+IO::println("──────────────────────────────────────────────")
+runAll()

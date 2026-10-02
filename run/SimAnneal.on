@@ -1,0 +1,261 @@
+// SimAnneal.on — Simulated Annealing for the Travelling Salesman Problem
+// Exercises: records, data-carrying enum, extension methods on Double/Int,
+// collection pipelines (map/filter/sortedBy/find), closures, foreach (ranges
+// and map k,v), while, select/pattern matching, string interpolation #{}
+
+import { java.lang.Math }
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+record City(id: Int, name: String, x: Double, y: Double) {
+  public:
+  def distanceTo(other: City): Double {
+    val dx: Double = self.x() - other.x()
+    val dy: Double = self.y() - other.y()
+    return Math::sqrt(dx * dx + dy * dy)
+  }
+}
+
+record SAResult(initialDist: Double, bestDist: Double, iterations: Int, accepted: Int, bestOrder: List[Int])
+
+record EdgeStat(from: String, to: String, dist: Double)
+
+// ── Enum: temperature cooling schedule ───────────────────────────────────────
+
+enum CoolingSchedule { Exponential, Linear, Logarithmic }
+extension CoolingSchedule {
+  def label(): String = select self {
+    case CoolingSchedule::Exponential:  "Exponential"
+    case CoolingSchedule::Linear:       "Linear"
+    case CoolingSchedule::Logarithmic:  "Logarithmic"
+  }
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Double {
+  def fmt2(): String {
+    val scaled: Long = (self * 100.0).longValue()
+    val whole: Long = scaled / 100L
+    val frac: Long = (scaled % 100L + 100L) % 100L
+    val fracStr: String = if frac < 10L { "0" + frac } else { "" + frac }
+    return whole + "." + fracStr
+  }
+  def pct(): String = (self * 100.0).fmt2() + "%"
+}
+
+extension Int {
+  def padLeft(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ── Tour helpers ──────────────────────────────────────────────────────────────
+
+def tourLength(cities: List[City], order: List[Int]): Double {
+  val n: Int = order.size
+  if n < 2 { return 0.0 }
+  var total: Double = 0.0
+  foreach i: Int in 0..<n {
+    val ai: Int = order.get(i) as Int
+    val bi: Int = order.get((i + 1) % n) as Int
+    total = total + cities.get(ai).distanceTo(cities.get(bi))
+  }
+  return total
+}
+
+def tourShow(cities: List[City], order: List[Int]): String {
+  var result: String = ""
+  foreach i: Int in 0..<order.size {
+    val ci: Int = order.get(i) as Int
+    val name: String = cities.get(ci).name()
+    if result == "" { result = name } else { result = result + " -> " + name }
+  }
+  return result
+}
+
+def copyOrder(order: List[Int]): List[Int] {
+  val copy: List[Int] = []
+  foreach i: Int in 0..<order.size { copy.add(order.get(i) as Int) }
+  return copy
+}
+
+// ── Build initial tour (nearest-neighbour greedy) ─────────────────────────────
+
+def buildGreedyTour(cities: List[City]): List[Int] {
+  val n: Int = cities.size
+  val visited: List[Boolean] = []
+  foreach _: Int in 0..<n { visited.add(false) }
+  val order: List[Int] = []
+  var cur: Int = 0
+  visited.set(0, true)
+  order.add(0)
+  foreach _: Int in 0..<(n - 1) {
+    var bestDist: Double = 1.0e18
+    var bestIdx: Int = -1
+    foreach j: Int in 0..<n {
+      if !(visited.get(j) as Boolean) {
+        val d: Double = cities.get(cur).distanceTo(cities.get(j))
+        if d < bestDist { bestDist = d; bestIdx = j }
+      }
+    }
+    visited.set(bestIdx, true)
+    order.add(bestIdx)
+    cur = bestIdx
+  }
+  return order
+}
+
+// ── Temperature cooling ───────────────────────────────────────────────────────
+
+def coolTemp(t: Double, t0: Double, step: Int, maxSteps: Int, schedule: CoolingSchedule): Double {
+  select schedule {
+    case CoolingSchedule::Exponential:
+      return t * 0.9995
+    case CoolingSchedule::Linear:
+      return t0 * (1.0 - (step as Double) / (maxSteps as Double))
+    case CoolingSchedule::Logarithmic:
+      return t0 / Math::log((step + 2) as Double)
+  }
+}
+
+// ── Simulated annealing ───────────────────────────────────────────────────────
+
+def runSA(cities: List[City], initOrder: List[Int], maxIter: Int, schedule: CoolingSchedule): SAResult {
+  val n: Int = initOrder.size
+  var current: List[Int] = copyOrder(initOrder)
+  var best: List[Int] = copyOrder(initOrder)
+  var currentDist: Double = tourLength(cities, current)
+  val initialDist: Double = currentDist
+  var bestDist: Double = currentDist
+  var temp: Double = 100.0
+  var accepted: Int = 0
+
+  foreach iter: Int in 0..<maxIter {
+    val i: Int = Rand::nextInt(n)
+    var j: Int = Rand::nextInt(n - 1)
+    if j >= i { j = j + 1 }
+
+    val ci: Int = current.get(i) as Int
+    val cj: Int = current.get(j) as Int
+    current.set(i, cj)
+    current.set(j, ci)
+
+    val newDist: Double = tourLength(cities, current)
+    val delta: Double = newDist - currentDist
+
+    if delta < 0.0 {
+      currentDist = newDist
+      accepted = accepted + 1
+      if newDist < bestDist {
+        bestDist = newDist
+        best = copyOrder(current)
+      }
+    } else {
+      val prob: Double = Math::exp(-delta / temp)
+      if Rand::nextDouble() < prob {
+        currentDist = newDist
+        accepted = accepted + 1
+      } else {
+        current.set(i, ci)
+        current.set(j, cj)
+      }
+    }
+    temp = coolTemp(temp, 100.0, iter, maxIter, schedule)
+  }
+  return new SAResult(initialDist, bestDist, maxIter, accepted, best)
+}
+
+// ── Statistics ────────────────────────────────────────────────────────────────
+
+def buildEdgeStats(cities: List[City]): List[EdgeStat] {
+  val edges: List[EdgeStat] = []
+  foreach i: Int in 0..<cities.size {
+    foreach j: Int in (i + 1)..<cities.size {
+      val d: Double = cities.get(i).distanceTo(cities.get(j))
+      edges.add(new EdgeStat(cities.get(i).name(), cities.get(j).name(), d))
+    }
+  }
+  return edges
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val cities: List[City] = [
+  new City(0, "Amsterdam",  4.9,  52.4),
+  new City(1, "Berlin",    13.4,  52.5),
+  new City(2, "Prague",    14.4,  50.1),
+  new City(3, "Vienna",    16.4,  48.2),
+  new City(4, "Budapest",  19.0,  47.5),
+  new City(5, "Warsaw",    21.0,  52.2),
+  new City(6, "Riga",      24.1,  56.9),
+  new City(7, "Vilnius",   25.3,  54.7),
+  new City(8, "Minsk",     27.6,  53.9),
+  new City(9, "Kyiv",      30.5,  50.5)
+]
+
+IO::println("=== Simulated Annealing — TSP Demo ===")
+IO::println("Cities : #{cities.size}")
+
+val greedyOrder: List[Int] = buildGreedyTour(cities)
+val greedyDist: Double = tourLength(cities, greedyOrder)
+IO::println("")
+IO::println("Initial greedy tour:")
+IO::println("  #{tourShow(cities, greedyOrder)}")
+IO::println("  Distance: #{greedyDist.fmt2()}")
+IO::println("")
+
+val schedules: List[CoolingSchedule] = [
+  CoolingSchedule::Exponential,
+  CoolingSchedule::Linear,
+  CoolingSchedule::Logarithmic
+]
+val iters: Int = 50000
+
+IO::println("Running SA (#{iters} iterations each)...")
+IO::println("")
+
+foreach s: CoolingSchedule in schedules {
+  val result: SAResult = runSA(cities, buildGreedyTour(cities), iters, s)
+  val improvement: Double = (result.initialDist() - result.bestDist()) / result.initialDist()
+  IO::println("  [#{s.label()}]")
+  IO::println("    Best tour     : #{tourShow(cities, result.bestOrder())}")
+  IO::println("    Best distance : #{result.bestDist().fmt2()}")
+  IO::println("    Improvement   : #{improvement.pct()}")
+  IO::println("    Accepted      : #{result.accepted().padLeft(5)} / #{iters}")
+  IO::println("")
+}
+
+// Nearest-city report
+IO::println("=== Nearest neighbour for each city ===")
+foreach i: Int in 0..<cities.size {
+  val ci: City = cities.get(i)
+  var nearDist: Double = 1.0e18
+  var nearName: String = "?"
+  foreach j: Int in 0..<cities.size {
+    if j != i {
+      val d: Double = ci.distanceTo(cities.get(j))
+      if d < nearDist { nearDist = d; nearName = cities.get(j).name() }
+    }
+  }
+  IO::println("  #{ci.name()} -> #{nearName} (#{nearDist.fmt2()})")
+}
+
+// Edge statistics (min/max)
+val edges: List[EdgeStat] = buildEdgeStats(cities)
+val sortedEdges: List[EdgeStat] = edges.sortedBy { e: EdgeStat -> e.dist() }
+val shortest: EdgeStat = sortedEdges.get(0) as EdgeStat
+val longest: EdgeStat = sortedEdges.get(sortedEdges.size - 1) as EdgeStat
+IO::println("")
+IO::println("=== Distance statistics ===")
+IO::println("  Shortest edge: #{shortest.from()} <-> #{shortest.to()} = #{shortest.dist().fmt2()}")
+IO::println("  Longest  edge: #{longest.from()} <-> #{longest.to()} = #{longest.dist().fmt2()}")
+
+var totalEdgeDist: Double = 0.0
+foreach e: EdgeStat in edges { totalEdgeDist = totalEdgeDist + e.dist() }
+val avgEdgeDist: Double = totalEdgeDist / (edges.size as Double)
+IO::println("  Average edge : #{avgEdgeDist.fmt2()}")
+IO::println("")
+IO::println("Done.")

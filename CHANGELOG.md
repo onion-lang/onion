@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`self`/`this` could never be smart-cast by a null check inside an `extension T? { ... }` method** (the one place `self` is genuinely nullable — `receiverType` can itself be `T?`), so a null-guarded `return self` after `if self == null { return default }`, or a plain `if self != null { ... }` branch, still reported `self`/`this` as possibly-null (E0070). Two cooperating gaps: `TypeNarrowingAnalysis.NullCheckTarget` never matched a bare `self == null`/`this == null` (only `x == null` and `this.field == null`), and separately `this`/`self` was bound via the 2-arg `LocalContext.add` overload, which defaults to `isMutable = true` — routing any narrowing that *was* extracted into the flow-sensitive "mutable var" path, which the guard-clause early-return narrowing never consults. Fixed by recognizing a bare `self`/`this` as a null-check target and binding it immutable (it can never be reassigned). Covered by new cases in `NullableSelfNarrowingSpec`.
+
 ### Added
 
 - **`run/GroceryPOS.on`** — a 202-line grocery point-of-sale system, a new domain for the `run/` corpus (an ADT case-enum `Promo` (`PctOff`/`FlatOff`/`Bogo`/`NoPromo`) dispatched via `select`; a plain enum `Category`; a record `LineItem` with method-bodied `subtotal`/`promoLabel`; a class `Cart` with public getters; collection pipelines `filter`/`map`/`fold`/`groupBy`/`sortedBy`/`find`; `foreach` over `List[T]`, exclusive ranges, and `(k, v)` map entries; nullable `Product?`/`LineItem?`; `try`/`catch` around a strict SKU lookup; recursive Fibonacci loyalty multipliers — rendering per-cashier receipts, a sales-by-category report, discount-effectiveness and priciest-item summaries, and a price-tier listing), added to the `run/` corpus (merged via #1883).

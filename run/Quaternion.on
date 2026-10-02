@@ -1,0 +1,325 @@
+// Quaternion.on — quaternion arithmetic and 3D rotation.
+//
+// Exercises: record with operator methods, law/example clauses; extension
+// methods on Double; ADT case-enum (Axis); collection pipelines (map/fold);
+// string interpolation; nullable; select/pattern match; foreach / while.
+
+import { java.lang.Math as JMath; }
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+extension Double {
+  def abs(): Double = if self >= 0.0 { self } else { -self }
+  def sqrt(): Double = JMath::sqrt(self)
+  def sq(): Double = self * self
+  def approxEq(other: Double): Boolean = (self - other).abs() < 1.0e-9
+  def fmt3(): String = java.lang.String::format("%.3f", self)
+}
+
+// ─── Vec3: an immutable 3-component vector ───────────────────────────────────
+
+record Vec3(x: Double, y: Double, z: Double) {
+  example unitXNorm {
+    val v = new Vec3(1.0, 0.0, 0.0)
+    v.norm().approxEq(1.0)
+  }
+  example addCommutativity {
+    val a = new Vec3(1.0, 2.0, 3.0)
+    val b = new Vec3(4.0, 5.0, 6.0)
+    a.plus(b).approxEqVec(b.plus(a))
+  }
+public:
+  def approxEqVec(o: Vec3): Boolean =
+    x().approxEq(o.x()) && y().approxEq(o.y()) && z().approxEq(o.z())
+
+  def plus(o: Vec3): Vec3    = new Vec3(x() + o.x(), y() + o.y(), z() + o.z())
+  def minus(o: Vec3): Vec3   = new Vec3(x() - o.x(), y() - o.y(), z() - o.z())
+  def scale(s: Double): Vec3 = new Vec3(x() * s, y() * s, z() * s)
+  def dot(o: Vec3): Double   = x() * o.x() + y() * o.y() + z() * o.z()
+  def cross(o: Vec3): Vec3   = new Vec3(
+    y() * o.z() - z() * o.y(),
+    z() * o.x() - x() * o.z(),
+    x() * o.y() - y() * o.x()
+  )
+  def normSq(): Double = x().sq() + y().sq() + z().sq()
+  def norm(): Double   = normSq().sqrt()
+  def normalized(): Vec3 {
+    val n = norm()
+    if n < 1.0e-12 { return new Vec3(0.0, 0.0, 0.0) }
+    return scale(1.0 / n)
+  }
+  def show(): String = "(#{x().fmt3()}, #{y().fmt3()}, #{z().fmt3()})"
+}
+
+// ─── Quaternion: w + xi + yj + zk ────────────────────────────────────────────
+
+record Quaternion(w: Double, x: Double, y: Double, z: Double) {
+  // |q|^2  must be positive for any non-zero quaternion
+  law normPos(w: Double, x: Double, y: Double, z: Double) {
+    val q = new Quaternion(w, x, y, z)
+    q.normSq() >= 0.0
+  }
+  // A unit quaternion's norm is 1.0
+  example unitNorm {
+    val q = Quaternion::fromAxisAngle(new Vec3(0.0, 1.0, 0.0), JMath::PI / 4.0)
+    q.norm().approxEq(1.0)
+  }
+  // q * q_inv == identity (for non-zero q)
+  example inverseIsIdentity {
+    val q = new Quaternion(0.5, 0.5, 0.5, 0.5)
+    val id = q.times(q.inverse())
+    id.approxEqQ(Quaternion::identity())
+  }
+  // double rotation = half angle rotation squared
+  example doubleAngle {
+    val axis = new Vec3(0.0, 0.0, 1.0)
+    val q30  = Quaternion::fromAxisAngle(axis, JMath::PI / 6.0)
+    val q60  = Quaternion::fromAxisAngle(axis, JMath::PI / 3.0)
+    q30.times(q30).approxEqQ(q60)
+  }
+public:
+  // ─── arithmetic ────────────────────────────────────────────────────────────
+  def plus(o: Quaternion): Quaternion =
+    new Quaternion(w() + o.w(), x() + o.x(), y() + o.y(), z() + o.z())
+
+  def minus(o: Quaternion): Quaternion =
+    new Quaternion(w() - o.w(), x() - o.x(), y() - o.y(), z() - o.z())
+
+  // Hamilton product
+  def times(o: Quaternion): Quaternion = new Quaternion(
+    w() * o.w() - x() * o.x() - y() * o.y() - z() * o.z(),
+    w() * o.x() + x() * o.w() + y() * o.z() - z() * o.y(),
+    w() * o.y() - x() * o.z() + y() * o.w() + z() * o.x(),
+    w() * o.z() + x() * o.y() - y() * o.x() + z() * o.w()
+  )
+
+  def scale(s: Double): Quaternion =
+    new Quaternion(w() * s, x() * s, y() * s, z() * s)
+
+  // ─── derived properties ────────────────────────────────────────────────────
+  def normSq(): Double = w().sq() + x().sq() + y().sq() + z().sq()
+  def norm(): Double   = normSq().sqrt()
+  def conjugate(): Quaternion = new Quaternion(w(), -x(), -y(), -z())
+  def normalized(): Quaternion {
+    val n = norm()
+    if n < 1.0e-12 { return Quaternion::identity() }
+    return scale(1.0 / n)
+  }
+  def inverse(): Quaternion {
+    val ns = normSq()
+    if ns < 1.0e-24 { return Quaternion::identity() }
+    return conjugate().scale(1.0 / ns)
+  }
+  def approxEqQ(o: Quaternion): Boolean =
+    w().approxEq(o.w()) && x().approxEq(o.x()) &&
+    y().approxEq(o.y()) && z().approxEq(o.z())
+
+  // Extract rotation axis and angle (unit quaternion assumed)
+  def toAxisAngle(): AxisAngle {
+    val sinH = new Vec3(x(), y(), z()).norm()
+    if sinH < 1.0e-10 {
+      return new AxisAngle(new Vec3(0.0, 1.0, 0.0), 0.0)
+    }
+    val axis = new Vec3(x() / sinH, y() / sinH, z() / sinH)
+    val angle = 2.0 * JMath::atan2(sinH, w())
+    return new AxisAngle(axis, angle)
+  }
+
+  // Rotate a 3D vector by this (unit) quaternion: v' = q * v * q^-1
+  def rotateVec(v: Vec3): Vec3 {
+    val qv = new Quaternion(0.0, v.x(), v.y(), v.z())
+    val r  = times(qv).times(conjugate())
+    return new Vec3(r.x(), r.y(), r.z())
+  }
+
+  def show(): String =
+    "#{w().fmt3()} + #{x().fmt3()}i + #{y().fmt3()}j + #{z().fmt3()}k"
+
+  // ─── constructors ──────────────────────────────────────────────────────────
+  static def identity(): Quaternion = new Quaternion(1.0, 0.0, 0.0, 0.0)
+
+  // Build a unit quaternion from axis (need not be normalized) and angle (radians)
+  static def fromAxisAngle(axis: Vec3, angle: Double): Quaternion {
+    val a = axis.normalized()
+    val halfAngle = angle / 2.0
+    val s = JMath::sin(halfAngle)
+    return new Quaternion(
+      JMath::cos(halfAngle),
+      a.x() * s,
+      a.y() * s,
+      a.z() * s
+    ).normalized()
+  }
+
+  // Slerp (spherical linear interpolation) between two unit quaternions
+  static def slerp(q1: Quaternion, q2: Quaternion, t: Double): Quaternion {
+    var dot: Double = q1.w() * q2.w() + q1.x() * q2.x() + q1.y() * q2.y() + q1.z() * q2.z()
+    var q2e: Quaternion = q2
+    if dot < 0.0 { q2e = q2.scale(-1.0); dot = -dot }
+    if dot > 0.9995 {
+      return q1.plus(q2e.minus(q1).scale(t)).normalized()
+    }
+    val theta0 = JMath::acos(dot)
+    val theta  = theta0 * t
+    val sinT0  = JMath::sin(theta0)
+    val s1     = JMath::cos(theta) - dot * JMath::sin(theta) / sinT0
+    val s2     = JMath::sin(theta) / sinT0
+    return q1.scale(s1).plus(q2e.scale(s2))
+  }
+}
+
+// ─── Axis-angle representation ────────────────────────────────────────────────
+
+record AxisAngle(axis: Vec3, angle: Double) {
+public:
+  def angleDeg(): Double = angle() * 180.0 / JMath::PI
+  def show(): String = "#{axis().show()} @ #{angleDeg().fmt3()}°"
+}
+
+// ─── Named rotation axes ──────────────────────────────────────────────────────
+
+enum Axis {
+  X, Y, Z
+public:
+  def unitVec(): Vec3 = select this {
+    case Axis::X: new Vec3(1.0, 0.0, 0.0)
+    case Axis::Y: new Vec3(0.0, 1.0, 0.0)
+    case Axis::Z: new Vec3(0.0, 0.0, 1.0)
+  }
+  def label(): String = select this {
+    case Axis::X: "X"
+    case Axis::Y: "Y"
+    case Axis::Z: "Z"
+  }
+}
+
+// ─── Rotation sequence (Euler angles: a chain of axis/angle rotations) ────────
+
+class RotationSeq {
+  var steps: List[Quaternion]
+public:
+  def this {
+    steps = []
+  }
+  def rotate(axis: Axis, angleDeg: Double): RotationSeq {
+    val q = Quaternion::fromAxisAngle(axis.unitVec(), angleDeg * JMath::PI / 180.0)
+    steps.add(q)
+    return self
+  }
+  def combined(): Quaternion {
+    var result = Quaternion::identity()
+    foreach q: Quaternion in steps {
+      result = q.times(result)
+    }
+    return result
+  }
+  def apply(v: Vec3): Vec3 = combined().rotateVec(v)
+}
+
+// ─── main: demonstrations ─────────────────────────────────────────────────────
+
+def sep(): void { IO::println("─────────────────────────────────────────") }
+
+def main(): void {
+  sep()
+  IO::println("1. Basic quaternion arithmetic")
+  sep()
+
+  val q1 = new Quaternion(1.0, 2.0, 3.0, 4.0)
+  val q2 = new Quaternion(5.0, 6.0, 7.0, 8.0)
+  IO::println("q1 = #{q1.show()}")
+  IO::println("q2 = #{q2.show()}")
+  IO::println("q1 + q2 = #{q1.plus(q2).show()}")
+  IO::println("q1 * q2 = #{q1.times(q2).show()}")
+  IO::println("|q1|    = #{q1.norm().fmt3()}")
+  IO::println("q1 conj = #{q1.conjugate().show()}")
+  IO::println("q1 inv  = #{q1.inverse().show()}")
+  IO::println("q1 * q1_inv = #{q1.times(q1.inverse()).show()}")
+
+  sep()
+  IO::println("2. Unit quaternions from axis-angle")
+  sep()
+
+  val axisDeg = [[Axis::X, 90.0], [Axis::Y, 45.0], [Axis::Z, 30.0]]
+  foreach pair: List in axisDeg {
+    val axis = pair[0] as Axis
+    val boxed = pair[1]
+    val deg: Double = if boxed != null { boxed as Double } else { 0.0 }
+    val q = Quaternion::fromAxisAngle(axis.unitVec(), deg * JMath::PI / 180.0)
+    val aa = q.toAxisAngle()
+    IO::println("rot #{axis.label()} #{deg}° → q = #{q.show()}")
+    IO::println("             → axis-angle = #{aa.show()}")
+  }
+
+  sep()
+  IO::println("3. Rotating vectors")
+  sep()
+
+  val unitX = new Vec3(1.0, 0.0, 0.0)
+  val unitY = new Vec3(0.0, 1.0, 0.0)
+  val unitZ = new Vec3(0.0, 0.0, 1.0)
+
+  // 90° around Z: X → Y
+  val rotZ90 = Quaternion::fromAxisAngle(Axis::Z.unitVec(), JMath::PI / 2.0)
+  IO::println("X rotated 90° around Z = #{rotZ90.rotateVec(unitX).show()}")
+
+  // 90° around X: Y → Z
+  val rotX90 = Quaternion::fromAxisAngle(Axis::X.unitVec(), JMath::PI / 2.0)
+  IO::println("Y rotated 90° around X = #{rotX90.rotateVec(unitY).show()}")
+
+  // 180° around Y: X → -X
+  val rotY180 = Quaternion::fromAxisAngle(Axis::Y.unitVec(), JMath::PI)
+  IO::println("X rotated 180° around Y = #{rotY180.rotateVec(unitX).show()}")
+
+  // Arbitrary axis: (1,1,0)/√2, 120°
+  val diagAxis = new Vec3(1.0, 1.0, 0.0)
+  val rotDiag120 = Quaternion::fromAxisAngle(diagAxis, 2.0 * JMath::PI / 3.0)
+  val testVec = new Vec3(2.0, 3.0, 1.0)
+  IO::println("(2,3,1) rotated 120° around (1,1,0) = #{rotDiag120.rotateVec(testVec).show()}")
+  // Rotation preserves length
+  val lenBefore = testVec.norm()
+  val lenAfter  = rotDiag120.rotateVec(testVec).norm()
+  IO::println("length before = #{lenBefore.fmt3()}, after = #{lenAfter.fmt3()} (should be equal)")
+
+  sep()
+  IO::println("4. Composed rotations (RotationSeq)")
+  sep()
+
+  val seq = new RotationSeq()
+  seq.rotate(Axis::Z, 90.0).rotate(Axis::X, 45.0).rotate(Axis::Y, 30.0)
+  val rotated = seq.apply(unitX)
+  IO::println("X after Z90 → X45 → Y30: #{rotated.show()}")
+  IO::println("Combined quaternion: #{seq.combined().show()}")
+  IO::println("|combined|: #{seq.combined().norm().fmt3()} (should be 1.000)")
+
+  sep()
+  IO::println("5. Slerp interpolation (Z-axis rotation 0→90°, t=0..1)")
+  sep()
+
+  val qStart = Quaternion::identity()
+  val qEnd   = Quaternion::fromAxisAngle(Axis::Z.unitVec(), JMath::PI / 2.0)
+  val steps = 5
+  var t: Int = 0
+  while t <= steps {
+    val frac: Double = (t * 1.0) / steps
+    val q = Quaternion::slerp(qStart, qEnd, frac)
+    val aa = q.toAxisAngle()
+    IO::println("t=#{java.lang.String::format("%.1f", frac)}: #{q.show()} angle=#{aa.angleDeg().fmt3()}°")
+    t++
+  }
+
+  sep()
+  IO::println("6. Non-commutativity: q1*q2 ≠ q2*q1 in general")
+  sep()
+
+  val rotX90b = Quaternion::fromAxisAngle(Axis::X.unitVec(), JMath::PI / 2.0)
+  val rotY90  = Quaternion::fromAxisAngle(Axis::Y.unitVec(), JMath::PI / 2.0)
+  val xy = rotX90b.times(rotY90).rotateVec(unitZ)
+  val yx = rotY90.times(rotX90b).rotateVec(unitZ)
+  IO::println("X90 then Y90 applied to Z: #{xy.show()}")
+  IO::println("Y90 then X90 applied to Z: #{yx.show()}")
+  IO::println("Are they equal? #{xy.approxEqVec(yx)}")
+
+  IO::println("")
+  IO::println("Done.")
+}

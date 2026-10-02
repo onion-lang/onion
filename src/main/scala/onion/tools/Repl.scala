@@ -66,6 +66,7 @@ object Repl {
   )
 
   def main(args: Array[String]): Unit = {
+    ConsoleEncoding.install()
     new Repl(Seq(".")).run()
   }
 }
@@ -86,8 +87,10 @@ class Repl(classpath: Seq[String]) {
 
   private case class TerminalContext(terminal: Terminal, useJLine: Boolean)
 
+  // UTF-8 by default, like `onion`/`onionc` (CompilerOptions.DEFAULT_ENCODING), so `:load`
+  // reads a script the same way running it does.
   private val encoding = Option(System.getenv("ONION_ENCODING"))
-    .getOrElse(java.nio.charset.Charset.defaultCharset().name())
+    .getOrElse(CompilerOptions.DEFAULT_ENCODING)
   private val config = new CompilerConfig(classpath, null, encoding, "", 10)
   private val shell = Shell(classpath)
   private val history = ArrayBuffer[String]()
@@ -120,12 +123,15 @@ class Repl(classpath: Seq[String]) {
 
   private def buildTerminal(): TerminalContext = {
     if (System.console() == null) {
-      val dumb = TerminalBuilder.builder()
+      val builder = TerminalBuilder.builder()
         .name("Onion REPL")
         .system(true)
         .dumb(true)
-        .build()
-      return TerminalContext(dumb, useJLine = false)
+      // Not a console (a pipe, or mintty): when the launcher switched stdout to UTF-8 (see
+      // ConsoleEncoding), the terminal's own reads and writes follow, so the prompt, the
+      // echoed results and println agree on one encoding.
+      if (ConsoleEncoding.stdoutIsUtf8) builder.encoding(java.nio.charset.StandardCharsets.UTF_8)
+      return TerminalContext(builder.build(), useJLine = false)
     }
     // Prefer the system terminal: it puts the terminal into raw mode and
     // manages the echo attribute itself. The /dev/tty streams path (system=false)

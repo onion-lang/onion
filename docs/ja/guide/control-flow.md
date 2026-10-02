@@ -65,6 +65,42 @@ select w {
 
 sealed な階層に対しては網羅性が検査されます（漏れは E0042）。
 
+### Java のネストした型にマッチする
+
+型パターンには、Java のソースと同じくドット区切りでネストした Java クラスを書けます
+（`Result.Ok`、`onion.Result.Ok`、`Map.Entry`）。標準ライブラリの直和型
+`onion.Result`（`Ok`/`Err`）、`onion.Outcome`（`Ok`/`Bad`）、`onion.Option`（`Some`/`None`）
+も、これでケースごとにマッチできます。
+
+```onion
+def describe(r: Result[Int, String]): String = select r {
+  case o is Result.Ok:  "ok " + (o.value() + 1)    // o は Result.Ok[Int, String]
+  case e is Result.Err: "failed: " + e.error()
+}
+```
+
+Onion の `enum` と同じく、束縛は検査対象の型引数を引き継ぐので、`o.value()` は `Int`、
+`e.error()` は `String` になります。この 3 つは `sealed` な Java インターフェースで、網羅性検査は
+Java クラスの `permits` も読みます。上の例から `Result.Err` を外すと E0042 になり、両方そろって
+いれば `else` は要りません。自作の jar にある sealed な階層でも同じです。
+
+ネストしたクラスはドット区切りの名前でインポートでき（別名も可）、以後は単純名で使えます。
+
+```onion
+import {
+  onion.Result.Ok
+  onion.Result.Err as Failed
+}
+```
+
+ドット区切りの名前は Java と同じ規則で解釈します。トップレベルクラスを指す最も長い接頭辞を
+優先し、残りをその中のメンバークラスとみなします。つまり `a.b.C.D` は、クラス `a.b` の中の
+`C.D` より先に、クラス `a.b.C` の中の `D` として解決されます。存在しないメンバー
+（`Result.Okk`）は E0003 で、外側クラスのメンバーから候補を示します（`did you mean: Result.Ok`）。
+
+分解パターン（`case Ok(v)`）は Onion のレコード専用です。Java のレコードは型でマッチして
+アクセサ（`o.value()`）を呼んでください。
+
 ## break / continue
 
 ```onion

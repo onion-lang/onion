@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0092) for identification
+ * type checking. Each error has a unique code (E0000-E0093) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -76,10 +76,10 @@ package onion.compiler
  * '''Law and Example Errors (E0064-E0065, E0074-E0075)'''
  *   - LAW_VIOLATION, EXAMPLE_FAILED, LAW_PARAMETER_NOT_GENERATABLE, LAW_CLASS_NOT_LOADABLE
  *
- * '''Shape and Tool Errors (E0076-E0082)'''
+ * '''Shape and Tool Errors (E0076-E0082, E0093)'''
  *   - SHAPE_FORMAT_UNKNOWN, TOOL_UNDECLARED_EFFECT, TOOL_UNUSED_CAPABILITY
  *   - TOOL_BAD_CAPABILITY, SHAPE_INSTANCE_WITHOUT_LAW, TOOL_PARAMETER_NOT_CLI_CONVERTIBLE
- *   - DUPLICATE_TOOL_NAME
+ *   - DUPLICATE_TOOL_NAME, CLI_FLAG_SPELLING_COLLISION
  *
  * '''Constructor Errors (E0087-E0090)'''
  *   - SECONDARY_CONSTRUCTOR_MUST_DELEGATE, CONSTRUCTOR_DELEGATION_CYCLE
@@ -233,6 +233,14 @@ object SemanticError {
    * wrapper instead).
    */
   case object CANNOT_INSTANTIATE_PRIMITIVE_TYPE extends SemanticError(92)
+  /**
+   * Two flag parameters of a `def main` auto-CLI or a `tool` answer to the same
+   * command-line flag: a flag is accepted as the parameter's own name and as its
+   * kebab-case spelling (`onion.Cli.kebab`), so `parseURL` and `parseUrl` are both
+   * `--parse-url` and one of them could never be set. Reported during rewriting, at the
+   * second parameter. Positionals have no flag and are not checked.
+   */
+  case object CLI_FLAG_SPELLING_COLLISION extends SemanticError(93)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

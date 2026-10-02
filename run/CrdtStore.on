@@ -1,0 +1,465 @@
+// CrdtStore — CRDT (Conflict-free Replicated Data Type) simulation.
+// Four CRDTs: G-Counter, PN-Counter, LWW-Register, and OR-Set.
+// Exercises: classes, interfaces, records, ADT enums, generics via Java
+// collections, collection pipelines, nullable, select, foreach over maps,
+// string interpolation, Long arithmetic, closures, try/catch.
+
+import {
+  java.util.LinkedHashMap
+}
+
+// ── G-Counter ─────────────────────────────────────────────────────────────────
+// An increment-only distributed counter. Each node keeps its own tally;
+// value = sum of all tallies; merge = per-node maximum.
+
+class GCounter {
+  var counts: LinkedHashMap[String, Long]
+
+public:
+  def this() {
+    counts = new LinkedHashMap[String, Long]()
+  }
+
+  def increment(nodeId: String): void {
+    val prev: Long? = counts.get(nodeId)
+    counts.put(nodeId, if prev != null { prev.longValue() + 1L } else { 1L })
+  }
+
+  def value(): Long {
+    var total: Long = 0L
+    foreach (_, v) in counts {
+      total = total + (v as Long).longValue()
+    }
+    return total
+  }
+
+  def merge(other: GCounter): GCounter {
+    val result = new GCounter()
+    foreach (k, v) in counts {
+      result.counts.put(k as String, v as Long)
+    }
+    foreach (k, v) in other.counts {
+      val key: String = k as String
+      val otherVal: Long = (v as Long).longValue()
+      val cur: Long? = result.counts.get(key)
+      if cur == null || otherVal > cur.longValue() {
+        result.counts.put(key, otherVal)
+      }
+    }
+    return result
+  }
+
+  def show(): String {
+    var parts: String = ""
+    foreach (k, v) in counts {
+      if parts.length() > 0 { parts = parts + ", " }
+      parts = parts + k + "=" + (v as Long)
+    }
+    return "GCounter{" + parts + " → " + value() + "}"
+  }
+}
+
+// ── PN-Counter ────────────────────────────────────────────────────────────────
+// A counter that supports both increment and decrement by maintaining
+// two G-Counters: one for positive increments, one for negatives.
+
+class PNCounter {
+  var pos: GCounter
+  var neg: GCounter
+
+public:
+  def this() {
+    pos = new GCounter()
+    neg = new GCounter()
+  }
+
+  def increment(nodeId: String): void { pos.increment(nodeId) }
+  def decrement(nodeId: String): void { neg.increment(nodeId) }
+
+  def value(): Long = pos.value() - neg.value()
+
+  def merge(other: PNCounter): PNCounter {
+    val result = new PNCounter()
+    result.pos = pos.merge(other.pos)
+    result.neg = neg.merge(other.neg)
+    return result
+  }
+
+  def show(): String = "PNCounter{value=" + value() + "}"
+}
+
+// ── LWW-Register ──────────────────────────────────────────────────────────────
+// Last-Write-Wins register: stores the value with the highest timestamp.
+// Concurrent writes from different nodes converge to whichever has the
+// largest timestamp (a real system would use Hybrid Logical Clocks).
+
+record LWWEntry(value: String, timestamp: Long, nodeId: String)
+
+class LWWRegister {
+  var entry: LWWEntry?
+
+public:
+  def this() { entry = null }
+
+  def set(nodeId: String, value: String, ts: Long): void {
+    val cur: LWWEntry? = entry
+    if cur == null || ts > cur.timestamp() {
+      entry = new LWWEntry(value, ts, nodeId)
+    }
+  }
+
+  def get(): String? {
+    val e: LWWEntry? = entry
+    return if e != null { e.value() } else { null }
+  }
+
+  def merge(other: LWWRegister): LWWRegister {
+    val result = new LWWRegister()
+    val e1: LWWEntry? = entry
+    val e2: LWWEntry? = other.entry
+    if e1 == null {
+      result.entry = e2
+    } else if e2 == null {
+      result.entry = e1
+    } else if e2.timestamp() >= e1.timestamp() {
+      result.entry = e2
+    } else {
+      result.entry = e1
+    }
+    return result
+  }
+
+  def show(): String {
+    val cur: LWWEntry? = entry
+    if cur == null {
+      return "LWWRegister{empty}"
+    }
+    return "LWWRegister{" + cur.value() + " @t=" + cur.timestamp() + " from=" + cur.nodeId() + "}"
+  }
+}
+
+// ── OR-Set ────────────────────────────────────────────────────────────────────
+// Observed-Remove Set: each add attaches a unique (nodeId:seq) tag to the
+// element. Removing an element tombstones all currently observed tags.
+// On merge: union of all tags minus union of tombstones — so a concurrent
+// add on another replica always wins over a remove it never observed.
+// Storage: tag → element (String→String map) + a tombstone JList[String].
+
+class ORSet {
+  var addSet:     LinkedHashMap[String, String]  // tag → element
+  var tombstones: List[String]                   // removed tags
+
+public:
+  def this() {
+    addSet     = new LinkedHashMap[String, String]()
+    tombstones = []
+  }
+
+  def add(nodeId: String, element: String, seq: Long): void {
+    val tag: String = nodeId + ":" + seq
+    addSet.put(tag, element)
+  }
+
+  def remove(element: String): void {
+    val toRemove: List[String] = []
+    foreach (tag, elem) in addSet {
+      if (elem as String) == element { toRemove.add(tag as String) }
+    }
+    foreach t: String in toRemove {
+      tombstones.add(t)
+      addSet.remove(t)
+    }
+  }
+
+  def contains(element: String): Boolean {
+    foreach (tag, elem) in addSet {
+      if (elem as String) == element && !tombstones.contains(tag) { return true }
+    }
+    return false
+  }
+
+  def elements(): List[String] {
+    val seen = new LinkedHashMap[String, Boolean]()
+    foreach (tag, elem) in addSet {
+      val e: String = elem as String
+      if !tombstones.contains(tag) { seen.put(e, true) }
+    }
+    val result: List[String] = []
+    foreach (e, _) in seen { result.add(e as String) }
+    return result
+  }
+
+  def merge(other: ORSet): ORSet {
+    val result = new ORSet()
+    foreach (tag, elem) in addSet       { result.addSet.put(tag as String, elem as String) }
+    foreach (tag, elem) in other.addSet { result.addSet.put(tag as String, elem as String) }
+    foreach t: String in tombstones       { if !result.tombstones.contains(t) { result.tombstones.add(t) } }
+    foreach t: String in other.tombstones { if !result.tombstones.contains(t) { result.tombstones.add(t) } }
+    // strip tombstoned tags from the merged addSet
+    val allTombstones: List[String] = result.tombstones
+    foreach t: String in allTombstones { result.addSet.remove(t) }
+    return result
+  }
+
+  def show(): String = "ORSet{" + elements().toString() + "}"
+}
+
+// ── Replica simulation ────────────────────────────────────────────────────────
+
+record Replica(id: String, counter: GCounter, pn: PNCounter,
+               reg: LWWRegister, orset: ORSet)
+
+def demoGCounter(): void {
+  IO::println("=== G-Counter Demo ===")
+  val a = new GCounter()
+  val b = new GCounter()
+  a.increment("A"); a.increment("A"); a.increment("A")
+  b.increment("B"); b.increment("B")
+  IO::println("A: " + a.show())
+  IO::println("B: " + b.show())
+  val merged = a.merge(b)
+  IO::println("merged: " + merged.show())
+}
+
+def demoPNCounter(): void {
+  IO::println("=== PN-Counter Demo ===")
+  val x = new PNCounter()
+  val y = new PNCounter()
+  x.increment("X"); x.increment("X"); x.increment("X")
+  x.decrement("X")
+  y.increment("Y"); y.increment("Y")
+  IO::println("X: " + x.show())
+  IO::println("Y: " + y.show())
+  val merged = x.merge(y)
+  IO::println("merged: " + merged.show())
+}
+
+def demoLWW(): void {
+  IO::println("=== LWW-Register Demo ===")
+  val r1 = new LWWRegister()
+  val r2 = new LWWRegister()
+  r1.set("node1", "hello", 100L)
+  r2.set("node2", "world", 200L)
+  IO::println("r1: " + r1.show())
+  IO::println("r2: " + r2.show())
+  val merged = r1.merge(r2)
+  IO::println("merged: " + merged.show())
+  val merged2 = r2.merge(r1)
+  IO::println("merged (reversed): " + merged2.show())
+}
+
+def demoORSet(): void {
+  IO::println("=== OR-Set Demo ===")
+  val s1 = new ORSet()
+  val s2 = new ORSet()
+  s1.add("nodeA", "apple",  1L)
+  s1.add("nodeA", "banana", 2L)
+  s2.add("nodeB", "cherry", 1L)
+  s2.add("nodeB", "apple",  2L)
+  // nodeA removes "apple" before seeing nodeB's concurrent add
+  s1.remove("apple")
+  IO::println("s1: " + s1.show())
+  IO::println("s2: " + s2.show())
+  val merged = s1.merge(s2)
+  IO::println("merged: " + merged.show())
+  IO::println("  contains apple?  " + merged.contains("apple"))
+  IO::println("  contains banana? " + merged.contains("banana"))
+  IO::println("  contains cherry? " + merged.contains("cherry"))
+}
+
+// ── Convergence test ──────────────────────────────────────────────────────────
+// Two replicas diverge, then converge after a full exchange.
+
+def demoConvergence(): void {
+  IO::println("=== Convergence Test ===")
+  val r1 = new GCounter()
+  val r2 = new GCounter()
+
+  // Phase 1: independent operations
+  r1.increment("A"); r1.increment("A")
+  r2.increment("B")
+
+  IO::println("Before sync — r1: " + r1.show() + ", r2: " + r2.show())
+
+  // Phase 2: sync in both directions (simulated gossip)
+  val synced1 = r1.merge(r2)
+  val synced2 = r2.merge(r1)
+  IO::println("After sync  — r1: " + synced1.show() + ", r2: " + synced2.show())
+  IO::println("Both agree: " + (synced1.value() == synced2.value()))
+}
+
+// ── Operation log (ADT enum) ──────────────────────────────────────────────────
+// A typed operation log lets a node replay history on a fresh replica.
+
+enum CrdtOp {
+  case CounterInc(nodeId: String)
+  case CounterDec(nodeId: String)
+  case RegSet(nodeId: String, value: String, ts: Long)
+  case SetAdd(nodeId: String, element: String, seq: Long)
+  case SetRemove(element: String)
+}
+
+record OpLogEntry(seq: Int, op: CrdtOp)
+
+def applyOp(op: CrdtOp, pn: PNCounter, reg: LWWRegister, orset: ORSet): void {
+  select op {
+    case ci is CounterInc: pn.increment(ci.nodeId())
+    case cd is CounterDec: pn.decrement(cd.nodeId())
+    case rs is RegSet:     reg.set(rs.nodeId(), rs.value(), rs.ts())
+    case sa is SetAdd:     orset.add(sa.nodeId(), sa.element(), sa.seq())
+    case sr is SetRemove:  orset.remove(sr.element())
+  }
+}
+
+def replayLog(log: List[OpLogEntry]): String {
+  val pn = new PNCounter()
+  val reg = new LWWRegister()
+  val orset = new ORSet()
+  foreach entry: Object in log {
+    applyOp((entry as OpLogEntry).op(), pn, reg, orset)
+  }
+  return "counter=" + pn.value() + " reg=" + reg.get() + " set=" + orset.show()
+}
+
+def demoOpLog(): void {
+  IO::println("=== Operation Log Demo ===")
+  val log: List[OpLogEntry] = [
+    new OpLogEntry(1, new CounterInc("A")),
+    new OpLogEntry(2, new CounterInc("A")),
+    new OpLogEntry(3, new RegSet("A", "draft", 10L)),
+    new OpLogEntry(4, new SetAdd("A", "alice", 1L)),
+    new OpLogEntry(5, new SetAdd("A", "bob", 2L)),
+    new OpLogEntry(6, new CounterDec("A")),
+    new OpLogEntry(7, new RegSet("A", "final", 20L)),
+    new OpLogEntry(8, new SetRemove("alice"))
+  ]
+  val summary: String = replayLog(log)
+  IO::println("After replay: " + summary)
+
+  // Pipeline: show only set-operations from the log
+  val setOps: List[String] = log
+    .filter { e -> (e as OpLogEntry).op() is SetAdd || (e as OpLogEntry).op() is SetRemove }
+    .map { e ->
+      val entry: OpLogEntry = e as OpLogEntry
+      val opStr: String = select entry.op() {
+        case sa is SetAdd:    "add(" + sa.element() + ")"
+        case sr is SetRemove: "remove(" + sr.element() + ")"
+        else:                 "?"
+      }
+      "#" + entry.seq() + ": " + opStr
+    }
+  IO::println("Set-ops: " + setOps.toString())
+}
+
+// ── Distributed KV store simulation ──────────────────────────────────────────
+// A tiny KV store where each value is an LWW-Register.
+// Two nodes independently write different keys and one shared key; after
+// gossip they converge to the same view.
+
+class KVStore {
+  var store: LinkedHashMap[String, LWWRegister]
+  var nodeId: String
+
+public:
+  def this(nodeId: String) {
+    self.nodeId = nodeId
+    store       = new LinkedHashMap[String, LWWRegister]()
+  }
+
+  def put(key: String, value: String, ts: Long): void {
+    val existing: LWWRegister? = store.get(key)
+    val reg: LWWRegister = if existing != null { existing } else { new LWWRegister() }
+    store.put(key, reg)
+    reg.set(nodeId, value, ts)
+  }
+
+  def get(key: String): String? {
+    val reg: LWWRegister? = store.get(key)
+    return if reg != null { (reg as LWWRegister).get() } else { null }
+  }
+
+  def merge(other: KVStore): KVStore {
+    val result = new KVStore(nodeId)
+    // Copy all registers from this replica
+    foreach (k, v) in store {
+      result.store.put(k as String, v as LWWRegister)
+    }
+    // Merge in registers from the other replica
+    foreach (k, v) in other.store {
+      val key: String = k as String
+      val otherReg: LWWRegister = v as LWWRegister
+      val existing: LWWRegister? = result.store.get(key)
+      if existing == null {
+        result.store.put(key, otherReg)
+      } else {
+        result.store.put(key, existing.merge(otherReg))
+      }
+    }
+    return result
+  }
+
+  def keys(): List[String] {
+    val result: List[String] = []
+    foreach (k, _) in store { result.add(k as String) }
+    return result
+  }
+
+  def show(): String {
+    val parts: List[String] = []
+    foreach (k, v) in store {
+      val reg: LWWRegister = v as LWWRegister
+      val val_: String? = reg.get()
+      val dispVal: String = if val_ != null { val_ } else { "null" }
+      parts.add(k + "=" + dispVal)
+    }
+    return nodeId + "{" + Strings::join(parts, ", ") + "}"
+  }
+}
+
+def demoKVStore(): void {
+  IO::println("=== Distributed KV Store Demo ===")
+  val n1 = new KVStore("node1")
+  val n2 = new KVStore("node2")
+
+  // Independent writes (diverged)
+  n1.put("color",   "red",    100L)
+  n1.put("shared",  "from-1", 110L)
+  n2.put("shape",   "circle", 105L)
+  n2.put("shared",  "from-2", 150L)  // later timestamp wins
+
+  IO::println("Before sync:")
+  IO::println("  " + n1.show())
+  IO::println("  " + n2.show())
+
+  // Gossip: full exchange
+  val merged1 = n1.merge(n2)
+  val merged2 = n2.merge(n1)
+
+  IO::println("After gossip:")
+  IO::println("  " + merged1.show())
+  IO::println("  " + merged2.show())
+
+  // Verify convergence: both nodes see the same keys and values
+  val keys1: List[String] = merged1.keys().sortedBy { k -> k as String }
+  val keys2: List[String] = merged2.keys().sortedBy { k -> k as String }
+  IO::println("Keys agree: " + (keys1.toString() == keys2.toString()))
+  IO::println("shared agrees: " + (merged1.get("shared") == merged2.get("shared")))
+  IO::println("shared value: " + merged1.get("shared"))
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+demoGCounter()
+IO::println("")
+demoPNCounter()
+IO::println("")
+demoLWW()
+IO::println("")
+demoORSet()
+IO::println("")
+demoConvergence()
+IO::println("")
+demoOpLog()
+IO::println("")
+demoKVStore()
+

@@ -1,0 +1,313 @@
+// BTreeZipper.on — Generic binary tree with a functional zipper.
+//
+// A zipper is a "pointer into a tree" that tracks the path from the root
+// to the current focus so that edits to the focus can reconstruct the full
+// tree in O(depth) without copying the parts you didn't touch.
+//
+// Exercises: generic ADT enum (BTree[T]); ADT enum (Dir); generic record
+// (Crumb[T]); generic class (Zipper[T]) with mutable state; recursive
+// algorithms (insert, search, height, inorder, show, mapTree); select /
+// type-pattern matching; closures; nullable types; string interpolation;
+// while loops; foreach over ranges and lists; collection pipelines;
+// do[Option] for safe lookup; extension methods on BTree[Int].
+
+import { java.util.ArrayList; java.lang.StringBuilder }
+
+// ── Tree ADT ───────────────────────────────────────────────────────────────
+
+enum BTree[T] {
+  case BLeaf
+  case BNode(value: T, left: BTree[T], right: BTree[T])
+}
+
+// ── Direction for crumbs ───────────────────────────────────────────────────
+
+enum Dir {
+  case GoLeft
+  case GoRight
+}
+
+// ── Zipper crumb (one step up the spine) ──────────────────────────────────
+
+record Crumb[T](dir: Dir, value: T, sibling: BTree[T])
+
+// ── Tree algorithms ────────────────────────────────────────────────────────
+
+class Trees {
+public:
+  static def leaf[T](): BTree[T] = new BLeaf[T]()
+
+  static def node[T](v: T, l: BTree[T], r: BTree[T]): BTree[T] =
+    new BNode[T](v, l, r)
+
+  static def height[T](t: BTree[T]): Int = select t {
+    case bl is BLeaf: 0
+    case bn is BNode: 1 + max(height(bn.left()), height(bn.right()))
+  }
+
+  static def max(a: Int, b: Int): Int = if a > b { a } else { b }
+
+  static def countNodes[T](t: BTree[T]): Int = select t {
+    case bl is BLeaf: 0
+    case bn is BNode: 1 + countNodes(bn.left()) + countNodes(bn.right())
+  }
+
+  static def inorder[T](t: BTree[T]): List[T] {
+    val acc: List[T] = new ArrayList[T]()
+    inorderRec(t, acc)
+    return acc
+  }
+
+  static def inorderRec[T](t: BTree[T], acc: List[T]): void {
+    select t {
+      case bl is BLeaf: { }
+      case bn is BNode: {
+        inorderRec(bn.left(), acc)
+        acc.add(bn.value())
+        inorderRec(bn.right(), acc)
+      }
+    }
+  }
+
+  static def show[T](t: BTree[T]): String = select t {
+    case bl is BLeaf: "."
+    case bn is BNode: "(#{show(bn.left())} #{bn.value()} #{show(bn.right())})"
+  }
+
+  // BST insert (Int only — no generic Comparable in Onion yet)
+  static def bstInsert(t: BTree[Int], v: Int): BTree[Int] = select t {
+    case bl is BLeaf: new BNode[Int](v, new BLeaf[Int](), new BLeaf[Int]())
+    case bn is BNode: if v < bn.value() {
+      new BNode[Int](bn.value(), bstInsert(bn.left(), v), bn.right())
+    } else {
+      new BNode[Int](bn.value(), bn.left(), bstInsert(bn.right(), v))
+    }
+  }
+
+  static def bstSearch(t: BTree[Int], v: Int): Boolean = select t {
+    case bl is BLeaf: false
+    case bn is BNode: if v == bn.value() { true }
+      else if v < bn.value() { bstSearch(bn.left(), v) }
+      else { bstSearch(bn.right(), v) }
+  }
+
+  // bstFind: returns Option::some(v) if found, Option::none() otherwise
+  static def bstFind(t: BTree[Int], v: Int): Option[Int] = select t {
+    case bl is BLeaf: Option::none()
+    case bn is BNode: if v == bn.value() { Option::some(v) }
+      else if v < bn.value() { bstFind(bn.left(), v) }
+      else { bstFind(bn.right(), v) }
+  }
+
+  // Map every node value through a function (returns a new tree)
+  static def mapTree[A, B](t: BTree[A], f: A -> B): BTree[B] = select t {
+    case bl is BLeaf: new BLeaf[B]()
+    case bn is BNode: new BNode[B](f(bn.value()), mapTree(bn.left(), f), mapTree(bn.right(), f))
+  }
+
+  // Sum all Int values in a tree
+  static def sum(t: BTree[Int]): Int = select t {
+    case bl is BLeaf: 0
+    case bn is BNode: bn.value() + sum(bn.left()) + sum(bn.right())
+  }
+}
+
+// ── Zipper ─────────────────────────────────────────────────────────────────
+
+class Zipper[T] {
+  var focus: BTree[T]
+  var crumbs: List[Crumb[T]]
+
+public:
+  def this(root: BTree[T]) {
+    self.focus = root
+    self.crumbs = new ArrayList[Crumb[T]]()
+  }
+
+  def focus(): BTree[T]  = focus
+  def depth(): Int       = crumbs.size
+  def atLeaf(): Boolean  = focus is BLeaf
+
+  def goLeft(): Boolean {
+    select focus {
+      case bn is BNode: {
+        crumbs.add(new Crumb[T](new GoLeft(), bn.value(), bn.right()))
+        focus = bn.left()
+        return true
+      }
+      else: return false
+    }
+  }
+
+  def goRight(): Boolean {
+    select focus {
+      case bn is BNode: {
+        crumbs.add(new Crumb[T](new GoRight(), bn.value(), bn.left()))
+        focus = bn.right()
+        return true
+      }
+      else: return false
+    }
+  }
+
+  def goUp(): Boolean {
+    if crumbs.size == 0 { return false }
+    val c: Crumb[T] = crumbs[crumbs.size - 1]
+    crumbs.remove(crumbs.size - 1)
+    select c.dir() {
+      case d is GoLeft:  focus = new BNode[T](c.value(), focus, c.sibling())
+      case d is GoRight: focus = new BNode[T](c.value(), c.sibling(), focus)
+    }
+    return true
+  }
+
+  def gotoRoot(): void { while crumbs.size > 0 { goUp() } }
+
+  def modifyValue(v: T): void {
+    select focus {
+      case bn is BNode: focus = new BNode[T](v, bn.left(), bn.right())
+      else: { }
+    }
+  }
+
+  def replaceSubtree(t: BTree[T]): void { focus = t }
+
+  def insertLeftChild(v: T): void {
+    select focus {
+      case bn is BNode:
+        focus = new BNode[T](bn.value(), new BNode[T](v, new BLeaf[T](), bn.left()), bn.right())
+      else: { }
+    }
+  }
+
+  def insertRightChild(v: T): void {
+    select focus {
+      case bn is BNode:
+        focus = new BNode[T](bn.value(), bn.left(), new BNode[T](v, bn.right(), new BLeaf[T]()))
+      else: { }
+    }
+  }
+
+  def toTree(): BTree[T] { gotoRoot(); return focus }
+
+  def pathFromRoot(): List[Dir] {
+    val path: List[Dir] = new ArrayList[Dir]()
+    foreach i: Int in 0..<crumbs.size {
+      path.add(crumbs[i].dir())
+    }
+    return path
+  }
+}
+
+// ── BST zipper navigation: move focus to the node with value v ─────────────
+
+def bstNavigateTo(z: Zipper[Int], v: Int): Boolean {
+  while true {
+    select z.focus() {
+      case bl is BLeaf: return false
+      case bn is BNode: {
+        if v == bn.value() { return true }
+        else if v < bn.value() { if !z.goLeft() { return false } }
+        else { if !z.goRight() { return false } }
+      }
+    }
+  }
+  return false
+}
+
+// ── Safe multi-step lookup with do[Option] ─────────────────────────────────
+
+def safeLookup(t: BTree[Int], a: Int, b: Int): Option[Int] = do[Option] {
+  a2 <- Trees::bstFind(t, a)
+  b2 <- Trees::bstFind(t, b)
+  ret a2 + b2
+}
+
+// ── Pretty printer ─────────────────────────────────────────────────────────
+
+def printSection(title: String): void {
+  IO::println("")
+  val pad: Int = if 40 > title.length() { 40 - title.length() } else { 2 }
+  IO::println("── #{title} " + "─".repeat(pad))
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+def main(): void {
+  // Build a BST from a range of values
+  val values: List[Int] = [10, 5, 15, 3, 7, 12, 20, 1, 4, 6, 8]
+  var t: BTree[Int] = Trees::leaf[Int]()
+  foreach v: Int in values { t = Trees::bstInsert(t, v) }
+
+  printSection("Tree structure")
+  IO::println(Trees::show(t))
+  IO::println("Height: #{Trees::height(t)}")
+  IO::println("Nodes:  #{Trees::countNodes(t)}")
+  IO::println("Sum:    #{Trees::sum(t)}")
+  IO::println("Inorder: #{Trees::inorder(t)}")
+
+  printSection("BST search")
+  foreach target: Int in [7, 13, 20, 0] {
+    IO::println("  search(#{target}) → #{Trees::bstSearch(t, target)}")
+  }
+
+  printSection("mapTree: square all values")
+  val squared: BTree[Int] = Trees::mapTree[Int, Int](t, (v: Int) -> v * v)
+  IO::println(Trees::show(squared))
+  IO::println("Inorder: #{Trees::inorder(squared)}")
+
+  printSection("mapTree: Int → String")
+  val asStr: BTree[String] = Trees::mapTree[Int, String](t, (v: Int) -> "##{v}")
+  IO::println(Trees::show(asStr))
+
+  printSection("Zipper: navigate and modify")
+  val z: Zipper[Int] = new Zipper[Int](t)
+  IO::println("At root, depth=#{z.depth()}")
+  z.goLeft()
+  IO::println("After goLeft, depth=#{z.depth()}, focus=#{Trees::show(z.focus())}")
+  z.goRight()
+  IO::println("After goRight, depth=#{z.depth()}, focus=#{Trees::show(z.focus())}")
+  z.modifyValue(99)
+  IO::println("After modifyValue(99), focus=#{Trees::show(z.focus())}")
+  val modified: BTree[Int] = z.toTree()
+  IO::println("Reconstructed: #{Trees::show(modified)}")
+  IO::println("Inorder: #{Trees::inorder(modified)}")
+
+  printSection("Zipper: navigate to a BST value")
+  val z2: Zipper[Int] = new Zipper[Int](t)
+  val found: Boolean = bstNavigateTo(z2, 7)
+  IO::println("Navigate to 7: found=#{found}, focus=#{Trees::show(z2.focus())}")
+  IO::println("Path from root: #{z2.pathFromRoot()}")
+  IO::println("Depth: #{z2.depth()}")
+
+  printSection("Zipper: insertRightChild then reconstruct")
+  val z3: Zipper[Int] = new Zipper[Int](t)
+  bstNavigateTo(z3, 12)
+  z3.insertRightChild(14)
+  IO::println("After insertRightChild(14) at 12:")
+  IO::println(Trees::show(z3.toTree()))
+
+  printSection("do[Option] safe lookup: sum of two BST values")
+  val r1: Option[Int] = safeLookup(t, 7, 12)
+  IO::println("safeLookup(7, 12) = #{r1}")
+  val r2: Option[Int] = safeLookup(t, 7, 99)
+  IO::println("safeLookup(7, 99) = #{r2}")
+
+  printSection("String tree (BTree[String])")
+  val sl: BTree[String] = Trees::leaf[String]()
+  val stree: BTree[String] =
+    Trees::node[String]("M",
+      Trees::node[String]("B",
+        Trees::node[String]("A", sl, sl),
+        Trees::node[String]("C", sl, sl)),
+      Trees::node[String]("P",
+        Trees::node[String]("N", sl, sl),
+        Trees::node[String]("Z", sl, sl)))
+  IO::println(Trees::show(stree))
+  IO::println("Inorder: #{Trees::inorder(stree)}")
+  val lowered: BTree[String] = Trees::mapTree[String, String](stree, (s: String) -> s.toLowerCase())
+  IO::println("Lowercased inorder: #{Trees::inorder(lowered)}")
+  val lengths: BTree[Int] = Trees::mapTree[String, Int](stree, (s: String) -> s.length())
+  IO::println("Lengths inorder: #{Trees::inorder(lengths)}")
+  IO::println("Total char count: #{Trees::sum(lengths)}")
+}

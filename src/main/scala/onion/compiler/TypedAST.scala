@@ -409,6 +409,13 @@ object TypedAST {
     /** Check if this is a record type */
     def isRecord: Boolean = recordComponents_.isDefined
 
+    /**
+     * True for the synthetic `<file>Main` class that holds a source file's top-level
+     * functions and statements. Diagnostics name a top-level function by its own name
+     * (`answerText`), never through this compiler-chosen owner (`mainMain::answerText`).
+     */
+    var isTopLevelContainer: Boolean = false
+
     override def typeParameters: Array[TypedAST.TypeParameter] = typeParameters_
 
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =
@@ -1336,6 +1343,15 @@ object TypedAST {
     def findConstructor(params: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef]
 
     def typeParameters: Array[TypedAST.TypeParameter] = Array()
+
+    /** Binary names (`onion.Result$Ok`) of the classes a Java `sealed` class or interface
+      * `permits` -- its PermittedSubclasses attribute. Empty for a class that is not a
+      * sealed Java class; an Onion `sealed` hierarchy is ClassDefinition.sealedSubtypes. */
+    def javaPermittedSubclassNames: Seq[String] = Nil
+
+    /** Binary names of the member classes this (Java) class declares, e.g. `onion.Result$Ok`
+      * for `onion.Result`. Only used to suggest a spelling for an unknown nested name. */
+    def memberClassNames: Seq[String] = Nil
   }
 
   class ConstructorFinder {
@@ -1490,7 +1506,10 @@ object TypedAST {
     /**
      * Effects per the out-of-band effect table (issue #356); `None` when the table has
      * no entry — an Onion-defined method whose effects are inferred from its body, or a
-     * Java method the table cannot vouch for.
+     * Java method the table cannot vouch for. This is the BUILT-IN table only; a
+     * compilation's library tables (`META-INF/onion/effect-table.txt` in classpath jars)
+     * are consulted by [[onion.compiler.effects.EffectInference]] through the
+     * compilation's own `EffectTable.Table`.
      */
     def tableEffects: Option[scala.collection.immutable.Set[onion.compiler.effects.Effect]] =
       onion.compiler.effects.EffectTable.lookup(affiliation.name, name)

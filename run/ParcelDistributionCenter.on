@@ -1,0 +1,414 @@
+import {
+  java.util.HashMap
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum ServiceLevel { Standard, Express, Overnight, SameDay }
+enum Zone { Local, Regional, National, International }
+enum ParcelSize { Small, Medium, Large, Oversized }
+
+// ADT: tracks a parcel's lifecycle through the sorting/routing pipeline
+enum SortStatus {
+  case Pending
+  case Sorted(stationId: String)
+  case InTransit(segmentId: String, progress: Int)
+  case Delivered(recipient: String)
+  case Failed(reason: String)
+  case Returned(returnReason: String)
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+record Parcel(
+  id: String, sender: String, recipient: String,
+  destZone: Zone, weight: Double,
+  size: ParcelSize, service: ServiceLevel
+)
+
+record SortingStation(id: String, name: String, zone: Zone, capacity: Int)
+
+record RouteSegment(id: String, fromStation: String, toStation: String,
+                    zone: Zone, durationHours: Int)
+
+record DeliveryAttempt(parcelId: String, attemptNum: Int, success: Boolean, note: String)
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension String {
+  def repeated(n: Int): String {
+    var s: String = ""
+    var i: Int = 0
+    while i < n { s = s + self; i++ }
+    return s
+  }
+  def padEnd(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+extension Double {
+  def round2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+}
+
+// ─── Postage calculation ──────────────────────────────────────────────────────
+
+def zoneSurcharge(zone: Zone): Double = select zone {
+  case Zone::Local:         0.0
+  case Zone::Regional:      2.50
+  case Zone::National:      5.00
+  case Zone::International: 15.00
+}
+
+def serviceSurcharge(svc: ServiceLevel): Double = select svc {
+  case ServiceLevel::Standard:  0.0
+  case ServiceLevel::Express:   8.00
+  case ServiceLevel::Overnight: 18.00
+  case ServiceLevel::SameDay:   35.00
+}
+
+def sizeMultiplier(sz: ParcelSize): Double = select sz {
+  case ParcelSize::Small:     1.0
+  case ParcelSize::Medium:    1.4
+  case ParcelSize::Large:     2.0
+  case ParcelSize::Oversized: 3.5
+}
+
+def calcPostage(p: Parcel): Double =
+  (p.weight() * 0.85 * sizeMultiplier(p.size()) + zoneSurcharge(p.destZone()) + serviceSurcharge(p.service())).round2()
+
+// ─── Label helpers ────────────────────────────────────────────────────────────
+
+def statusLabel(s: SortStatus): String = select s {
+  case p is Pending:   "PENDING"
+  case s is Sorted:    "SORTED -> #{s.stationId()}"
+  case t is InTransit: "IN_TRANSIT[#{t.segmentId()}] #{t.progress()}%"
+  case d is Delivered: "DELIVERED to #{d.recipient()}"
+  case f is Failed:    "FAILED: #{f.reason()}"
+  case r is Returned:  "RETURNED: #{r.returnReason()}"
+}
+
+def zoneName(z: Zone): String = select z {
+  case Zone::Local:         "Local"
+  case Zone::Regional:      "Regional"
+  case Zone::National:      "National"
+  case Zone::International: "International"
+}
+
+def serviceName(s: ServiceLevel): String = select s {
+  case ServiceLevel::Standard:  "Standard"
+  case ServiceLevel::Express:   "Express"
+  case ServiceLevel::Overnight: "Overnight"
+  case ServiceLevel::SameDay:   "Same-Day"
+}
+
+def sizeName(sz: ParcelSize): String = select sz {
+  case ParcelSize::Small:     "Small"
+  case ParcelSize::Medium:    "Medium"
+  case ParcelSize::Large:     "Large"
+  case ParcelSize::Oversized: "Oversized"
+}
+
+// ─── DistributionCenter class ─────────────────────────────────────────────────
+
+class DistributionCenter {
+  val parcels:  List[Parcel]
+  val stations: List[SortingStation]
+  val segments: List[RouteSegment]
+  val statuses: HashMap[String, SortStatus]
+  val attempts: List[DeliveryAttempt]
+
+public:
+  def this {
+    this.parcels  = []
+    this.stations = []
+    this.segments = []
+    this.statuses = new HashMap[String, SortStatus]()
+    this.attempts = []
+  }
+
+  def addParcel(p: Parcel): void {
+    parcels.add(p)
+    statuses.put(p.id(), new Pending())
+  }
+
+  def addStation(s: SortingStation): void { stations.add(s) }
+  def addSegment(r: RouteSegment): void   { segments.add(r) }
+
+  def sortParcel(parcelId: String, stationId: String): void {
+    statuses.put(parcelId, new Sorted(stationId))
+  }
+
+  def dispatchParcel(parcelId: String, segmentId: String, progress: Int): void {
+    statuses.put(parcelId, new InTransit(segmentId, progress))
+  }
+
+  def deliverParcel(parcelId: String, recipient: String): void {
+    statuses.put(parcelId, new Delivered(recipient))
+    attempts.add(new DeliveryAttempt(parcelId, 1, true, "delivered on first attempt"))
+  }
+
+  def failDelivery(parcelId: String, reason: String): void {
+    statuses.put(parcelId, new Failed(reason))
+    attempts.add(new DeliveryAttempt(parcelId, 1, false, reason))
+  }
+
+  def redeliverParcel(parcelId: String, recipient: String, attemptNum: Int): void {
+    statuses.put(parcelId, new Delivered(recipient))
+    attempts.add(new DeliveryAttempt(parcelId, attemptNum, true, "redelivery succeeded"))
+  }
+
+  def returnParcel(parcelId: String, reason: String): void {
+    statuses.put(parcelId, new Returned(reason))
+  }
+
+  def getStatus(parcelId: String): SortStatus? = statuses.get(parcelId)
+
+  def findParcel(parcelId: String): Parcel? {
+    foreach p: Parcel in parcels {
+      if p.id() == parcelId { return p }
+    }
+    return null
+  }
+
+  def allParcels(): List[Parcel]           = parcels
+  def allAttempts(): List[DeliveryAttempt] = attempts
+  def parcelCount(): Int  = parcels.size()
+  def stationCount(): Int = stations.size()
+
+  def deliveredCount(): Int {
+    var n: Int = 0
+    foreach p: Parcel in parcels {
+      val st: SortStatus? = statuses.get(p.id())
+      if st != null {
+        select st {
+          case d is Delivered: n++
+          else: {}
+        }
+      }
+    }
+    return n
+  }
+
+  def failedCount(): Int {
+    var n: Int = 0
+    foreach p: Parcel in parcels {
+      val st: SortStatus? = statuses.get(p.id())
+      if st != null {
+        select st {
+          case f is Failed: n++
+          else: {}
+        }
+      }
+    }
+    return n
+  }
+
+  def inTransitCount(): Int {
+    var n: Int = 0
+    foreach p: Parcel in parcels {
+      val st: SortStatus? = statuses.get(p.id())
+      if st != null {
+        select st {
+          case t is InTransit: n++
+          else: {}
+        }
+      }
+    }
+    return n
+  }
+
+  def totalRevenue(): Double {
+    var rev: Double = 0.0
+    foreach p: Parcel in parcels { rev = rev + calcPostage(p) }
+    return rev.round2()
+  }
+
+  def heaviestParcel(): Parcel? {
+    var best: Parcel? = null
+    foreach p: Parcel in parcels {
+      if best == null || p.weight() > (best as Parcel).weight() {
+        best = p
+      }
+    }
+    return best
+  }
+}
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+def printReport(dc: DistributionCenter): void {
+  IO::println("=".repeated(64))
+  IO::println("  PARCEL DISTRIBUTION CENTER — STATUS REPORT")
+  IO::println("=".repeated(64))
+  IO::println("Total parcels : #{dc.parcelCount()}   Stations: #{dc.stationCount()}")
+  IO::println("Delivered     : #{dc.deliveredCount()}   In-transit: #{dc.inTransitCount()}   Failed: #{dc.failedCount()}")
+  IO::println("Total revenue : $#{dc.totalRevenue()}")
+  IO::println("")
+  IO::println("ID         Zone           Status                          Postage")
+  IO::println("-".repeated(64))
+  foreach p: Parcel in dc.allParcels() {
+    val st: SortStatus? = dc.getStatus(p.id())
+    if st != null {
+      val postage: Double = calcPostage(p)
+      val label: String   = statusLabel(st)
+      IO::println("#{p.id().padEnd(10)} #{zoneName(p.destZone()).padEnd(14)} #{label.padEnd(32)} $#{postage}")
+    }
+  }
+  IO::println("")
+}
+
+def printZoneSummary(dc: DistributionCenter): void {
+  IO::println("--- Zone Summary ---")
+  foreach z: Zone in Zone::values() {
+    var count: Int      = 0
+    var revenue: Double = 0.0
+    foreach p: Parcel in dc.allParcels() {
+      if p.destZone() == z {
+        count++
+        revenue = revenue + calcPostage(p)
+      }
+    }
+    if count > 0 {
+      IO::println("  #{zoneName(z).padEnd(16)} #{count} parcels   $#{revenue.round2()}")
+    }
+  }
+  IO::println("")
+}
+
+def printServiceSummary(dc: DistributionCenter): void {
+  IO::println("--- Service Level Summary ---")
+  foreach svc: ServiceLevel in ServiceLevel::values() {
+    var count: Int    = 0
+    var total: Double = 0.0
+    foreach p: Parcel in dc.allParcels() {
+      if p.service() == svc {
+        count++
+        total = total + calcPostage(p)
+      }
+    }
+    if count > 0 {
+      IO::println("  #{serviceName(svc).padEnd(12)} #{count} parcels   $#{total.round2()}")
+    }
+  }
+  IO::println("")
+}
+
+def printSizeSummary(dc: DistributionCenter): void {
+  IO::println("--- Parcel Size Distribution ---")
+  foreach sz: ParcelSize in ParcelSize::values() {
+    var count: Int      = 0
+    var totalWt: Double = 0.0
+    foreach p: Parcel in dc.allParcels() {
+      if p.size() == sz {
+        count++
+        totalWt = totalWt + p.weight()
+      }
+    }
+    if count > 0 {
+      val avg: Double = (totalWt / count).round2()
+      IO::println("  #{sizeName(sz).padEnd(12)} #{count} parcels   avg weight: #{avg} kg")
+    }
+  }
+  IO::println("")
+}
+
+def printAttemptLog(dc: DistributionCenter): void {
+  IO::println("--- Delivery Attempt Log ---")
+  foreach a: DeliveryAttempt in dc.allAttempts() {
+    val outcome: String = if a.success() { "SUCCESS" } else { "FAIL   " }
+    IO::println("  #{a.parcelId().padEnd(10)} attempt ##{a.attemptNum()} #{outcome} #{a.note()}")
+  }
+  IO::println("")
+}
+
+// ─── Main simulation ──────────────────────────────────────────────────────────
+
+val dc: DistributionCenter = new DistributionCenter()
+
+// Sorting stations
+dc.addStation(new SortingStation("HUB-A", "Central Hub",        Zone::National,       500))
+dc.addStation(new SortingStation("REG-B", "North Region",       Zone::Regional,       200))
+dc.addStation(new SortingStation("LOC-C", "East Local Depot",   Zone::Local,           80))
+dc.addStation(new SortingStation("INT-D", "International Gate", Zone::International,  300))
+
+// Route segments
+dc.addSegment(new RouteSegment("SEG-01", "HUB-A", "REG-B", Zone::Regional,       4))
+dc.addSegment(new RouteSegment("SEG-02", "REG-B", "LOC-C", Zone::Local,           2))
+dc.addSegment(new RouteSegment("SEG-03", "HUB-A", "INT-D", Zone::International,  24))
+dc.addSegment(new RouteSegment("SEG-04", "HUB-A", "LOC-C", Zone::Local,           3))
+
+// Add parcels
+dc.addParcel(new Parcel("PKG-001", "Alice Chen",    "Bob Smith",       Zone::Local,          1.2,  ParcelSize::Small,    ServiceLevel::Standard))
+dc.addParcel(new Parcel("PKG-002", "Carol Davis",   "David Wilson",    Zone::Regional,       3.8,  ParcelSize::Medium,   ServiceLevel::Express))
+dc.addParcel(new Parcel("PKG-003", "Eve Johnson",   "Frank Miller",    Zone::National,       0.5,  ParcelSize::Small,    ServiceLevel::Overnight))
+dc.addParcel(new Parcel("PKG-004", "Grace Lee",     "Henry Brown",     Zone::International, 12.5,  ParcelSize::Large,    ServiceLevel::Express))
+dc.addParcel(new Parcel("PKG-005", "Ivan Martinez", "Julia Thompson",  Zone::Local,          2.1,  ParcelSize::Medium,   ServiceLevel::SameDay))
+dc.addParcel(new Parcel("PKG-006", "Kelly White",   "Liam Harris",     Zone::Regional,       7.3,  ParcelSize::Large,    ServiceLevel::Standard))
+dc.addParcel(new Parcel("PKG-007", "Mia Clark",     "Noah Adams",      Zone::National,       0.8,  ParcelSize::Small,    ServiceLevel::Express))
+dc.addParcel(new Parcel("PKG-008", "Olivia Baker",  "Paul Garcia",     Zone::International, 25.0,  ParcelSize::Oversized,ServiceLevel::Standard))
+dc.addParcel(new Parcel("PKG-009", "Quinn Nelson",  "Rachel Hill",     Zone::Local,          1.5,  ParcelSize::Small,    ServiceLevel::Express))
+dc.addParcel(new Parcel("PKG-010", "Sam Young",     "Tina Scott",      Zone::Regional,       4.2,  ParcelSize::Medium,   ServiceLevel::Overnight))
+dc.addParcel(new Parcel("PKG-011", "Uma Patel",     "Victor Cruz",     Zone::National,      18.0,  ParcelSize::Large,    ServiceLevel::Standard))
+dc.addParcel(new Parcel("PKG-012", "Wendy Kim",     "Xavier Reyes",    Zone::International,  3.3,  ParcelSize::Small,    ServiceLevel::Express))
+
+// ─── Processing pipeline ──────────────────────────────────────────────────────
+
+dc.sortParcel    ("PKG-001", "LOC-C")
+dc.dispatchParcel("PKG-001", "SEG-04", 100)
+dc.deliverParcel ("PKG-001", "Bob Smith")
+
+dc.sortParcel    ("PKG-002", "REG-B")
+dc.dispatchParcel("PKG-002", "SEG-01", 75)
+
+dc.sortParcel    ("PKG-003", "HUB-A")
+dc.dispatchParcel("PKG-003", "SEG-01", 50)
+dc.deliverParcel ("PKG-003", "Frank Miller")
+
+dc.sortParcel    ("PKG-004", "INT-D")
+dc.dispatchParcel("PKG-004", "SEG-03", 30)
+
+dc.sortParcel    ("PKG-005", "LOC-C")
+dc.deliverParcel ("PKG-005", "Julia Thompson")
+
+dc.sortParcel    ("PKG-006", "REG-B")
+dc.failDelivery  ("PKG-006", "address not found")
+dc.redeliverParcel("PKG-006", "Liam Harris", 2)
+
+dc.sortParcel    ("PKG-007", "HUB-A")
+dc.deliverParcel ("PKG-007", "Noah Adams")
+
+dc.sortParcel    ("PKG-008", "INT-D")
+dc.dispatchParcel("PKG-008", "SEG-03", 10)
+
+dc.sortParcel    ("PKG-009", "LOC-C")
+dc.deliverParcel ("PKG-009", "Rachel Hill")
+
+dc.sortParcel    ("PKG-010", "REG-B")
+dc.returnParcel  ("PKG-010", "refused by recipient")
+
+dc.sortParcel    ("PKG-011", "HUB-A")
+dc.dispatchParcel("PKG-011", "SEG-01", 60)
+
+dc.sortParcel    ("PKG-012", "INT-D")
+dc.dispatchParcel("PKG-012", "SEG-03", 5)
+
+// ─── Print reports ────────────────────────────────────────────────────────────
+
+printReport(dc)
+printZoneSummary(dc)
+printServiceSummary(dc)
+printSizeSummary(dc)
+printAttemptLog(dc)
+
+val heaviest: Parcel? = dc.heaviestParcel()
+if heaviest != null {
+  val h: Parcel = heaviest as Parcel
+  IO::println("Heaviest parcel: #{h.id()} — #{h.weight()} kg (#{sizeName(h.size())}, #{serviceName(h.service())})")
+}
+
+IO::println("")
+IO::println("=".repeated(64))
+IO::println("Simulation complete.")

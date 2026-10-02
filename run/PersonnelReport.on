@@ -1,0 +1,193 @@
+// --warn off suppresses W0015 (auto-unbox from fold/map on List[Double])
+import {
+  java.util.*
+}
+
+enum EmployeeStatus { ACTIVE, ONLEAVE, TERMINATED }
+
+record Employee(
+  id: Int,
+  name: String,
+  dept: String,
+  salary: Double,
+  status: EmployeeStatus,
+  yearsService: Int
+) {
+public:
+  def annualBonus(): Double = select status {
+    case EmployeeStatus::ACTIVE:
+      if yearsService >= 10 { salary * 0.15 }
+      else if yearsService >= 5 { salary * 0.10 }
+      else { salary * 0.05 }
+    case EmployeeStatus::ONLEAVE: salary * 0.02
+    case EmployeeStatus::TERMINATED: 0.0
+  }
+
+  def label(): String = select status {
+    case EmployeeStatus::ACTIVE: "Active"
+    case EmployeeStatus::ONLEAVE: "On Leave"
+    case EmployeeStatus::TERMINATED: "Terminated"
+  }
+
+  def summary(): String =
+    "#{name} (#{dept}, #{yearsService}yr, $#{String::format("%.0f", salary)}) [#{label()}]"
+
+  def isActive(): Boolean = status == EmployeeStatus::ACTIVE
+}
+
+record DeptStats(
+  name: String,
+  headCount: Int,
+  totalSalary: Double,
+  totalBonus: Double
+) {
+public:
+  def avgSalary(): Double = if headCount > 0 { totalSalary / headCount } else { 0.0 }
+  def report(): String =
+    "  #{name}: #{headCount} staff, avg $#{String::format("%.0f", avgSalary())}" +
+    ", bonus pool $#{String::format("%.0f", totalBonus)}"
+}
+
+def printSeparator(): void { IO::println("-------------------------------------------") }
+
+def letterGrade(score: Double): String =
+  if score >= 90.0 { "A" }
+  else if score >= 80.0 { "B" }
+  else if score >= 70.0 { "C" }
+  else if score >= 60.0 { "D" }
+  else { "F" }
+
+// Compute a performance score: blend of seniority and salary percentile
+def perfScore(e: Employee, maxSalary: Double): Double = {
+  val salPct: Double = e.salary / maxSalary * 70.0
+  val senPct: Double = if e.yearsService >= 15 { 30.0 }
+    else if e.yearsService >= 10 { 25.0 }
+    else if e.yearsService >= 5  { 18.0 }
+    else { 10.0 }
+  salPct + senPct
+}
+
+def main(): void {
+  val employees: List[Employee] = [
+    new Employee(1, "Alice Chen",    "Engineering", 95000.0,  EmployeeStatus::ACTIVE,     8),
+    new Employee(2, "Bob Martinez",  "Engineering", 88000.0,  EmployeeStatus::ACTIVE,    12),
+    new Employee(3, "Carol Smith",   "Marketing",   72000.0,  EmployeeStatus::ONLEAVE,    5),
+    new Employee(4, "David Kim",     "Engineering", 105000.0, EmployeeStatus::ACTIVE,    15),
+    new Employee(5, "Eva Johnson",   "HR",          68000.0,  EmployeeStatus::ACTIVE,     3),
+    new Employee(6, "Frank Lee",     "Marketing",   79000.0,  EmployeeStatus::TERMINATED, 7),
+    new Employee(7, "Grace Patel",   "HR",          71000.0,  EmployeeStatus::ACTIVE,    10),
+    new Employee(8, "Henry Wilson",  "Engineering", 91000.0,  EmployeeStatus::ACTIVE,     6),
+    new Employee(9, "Iris Nakamura", "Finance",     83000.0,  EmployeeStatus::ACTIVE,     9),
+    new Employee(10,"Jake Brown",    "Finance",     78000.0,  EmployeeStatus::ONLEAVE,    4)
+  ]
+
+  IO::println("========================================")
+  IO::println("        PERSONNEL SUMMARY REPORT        ")
+  IO::println("========================================")
+  IO::println("")
+
+  // --- Section 1: Full roster ---
+  IO::println("FULL ROSTER:")
+  printSeparator()
+  foreach e: Employee in employees {
+    IO::println("  " + e.summary())
+  }
+  IO::println("")
+
+  // --- Section 2: Workforce breakdown ---
+  val active:     List[Employee] = employees.filter { e -> e.isActive() }
+  val onLeave:    List[Employee] = employees.filter { e -> e.status == EmployeeStatus::ONLEAVE }
+  val terminated: List[Employee] = employees.filter { e -> e.status == EmployeeStatus::TERMINATED }
+
+  IO::println("WORKFORCE STATUS:")
+  printSeparator()
+  IO::println("  Active:     #{active.size}")
+  IO::println("  On Leave:   #{onLeave.size}")
+  IO::println("  Terminated: #{terminated.size}")
+  IO::println("  Total:      #{employees.size}")
+  IO::println("")
+
+  // --- Section 3: Salary statistics ---
+  val totalSalary: Double = active.fold(0.0) { acc, e -> acc + e.salary }
+  val avgSalary: Double   = totalSalary / active.size
+  val maxSalary: Double   = active.fold(0.0) { acc, e -> if e.salary > acc { e.salary } else { acc } }
+  val minSalary: Double   = active.fold(999999.0) { acc, e -> if e.salary < acc { e.salary } else { acc } }
+
+  IO::println("SALARY STATISTICS (Active Staff):")
+  printSeparator()
+  IO::println("  Total payroll:   $#{String::format("%.2f", totalSalary)}")
+  IO::println("  Average salary:  $#{String::format("%.2f", avgSalary)}")
+  IO::println("  Highest salary:  $#{String::format("%.2f", maxSalary)}")
+  IO::println("  Lowest salary:   $#{String::format("%.2f", minSalary)}")
+  IO::println("")
+
+  // --- Section 4: Department breakdown ---
+  val depts: List[String] = ["Engineering", "Marketing", "HR", "Finance"]
+  IO::println("BY DEPARTMENT:")
+  printSeparator()
+
+  foreach dept: String in depts {
+    val deptEmps: List[Employee] = employees.filter { e -> e.dept == dept }
+    val deptActive: List[Employee] = deptEmps.filter { e -> e.isActive() }
+    val deptTotal: Double = deptActive.fold(0.0) { acc, e -> acc + e.salary }
+    val deptBonus: Double = deptActive.fold(0.0) { acc, e -> acc + e.annualBonus() }
+    val stats: DeptStats = new DeptStats(dept, deptActive.size, deptTotal, deptBonus)
+    IO::println(stats.report())
+  }
+  IO::println("")
+
+  // --- Section 5: Top performers ---
+  IO::println("TOP PERFORMERS (Active, by perf score):")
+  printSeparator()
+  val ranked: List[Employee] = active.sortedBy { e -> 0.0 - perfScore(e, maxSalary) }
+  var rank: Int = 1
+  foreach e: Employee in ranked {
+    val score: Double = perfScore(e, maxSalary)
+    val grade: String = letterGrade(score)
+    IO::println("  #{rank}. #{e.name} — score #{String::format("%.1f", score)} (#{grade})")
+    rank++
+  }
+  IO::println("")
+
+  // --- Section 6: Bonus summary ---
+  IO::println("ANNUAL BONUS PROJECTIONS:")
+  printSeparator()
+  val totalBonus: Double = employees.fold(0.0) { acc, e -> acc + e.annualBonus() }
+  foreach e: Employee in employees {
+    val bonus: Double = e.annualBonus()
+    if bonus > 0.0 {
+      IO::println("  #{e.name}: $#{String::format("%.2f", bonus)}")
+    }
+  }
+  IO::println("  " + "-".repeat(30))
+  IO::println("  TOTAL BONUS POOL: $#{String::format("%.2f", totalBonus)}")
+  IO::println("")
+
+  // --- Section 7: Seniority recognition ---
+  IO::println("LONG SERVICE AWARDS:")
+  printSeparator()
+  val veterans: List[Employee] = employees.filter { e -> e.yearsService >= 10 && e.isActive() }
+  if veterans.size == 0 {
+    IO::println("  (none)")
+  } else {
+    foreach v: Employee in veterans {
+      IO::println("  #{v.name} — #{v.yearsService} years")
+    }
+  }
+  IO::println("")
+
+  // --- Section 8: Leave analysis ---
+  IO::println("LEAVE IMPACT ANALYSIS:")
+  printSeparator()
+  if onLeave.size > 0 {
+    val leaveSalary: Double = onLeave.fold(0.0) { acc, e -> acc + e.salary }
+    IO::println("  #{onLeave.size} employee(s) on leave.")
+    IO::println("  Combined salary: $#{String::format("%.2f", leaveSalary)}")
+    IO::println("  Approximate coverage cost: $#{String::format("%.2f", leaveSalary * 0.8)}")
+  } else {
+    IO::println("  No employees currently on leave.")
+  }
+  IO::println("")
+
+  IO::println("Report generated. #{employees.size} records processed.")
+}

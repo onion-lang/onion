@@ -1,0 +1,263 @@
+// ModularArithmetic.on — modular arithmetic, extended GCD, Fractions, and
+// the Chinese Remainder Theorem.
+// Exercises: records with static factory methods and operator overloading
+// (Fraction), sealed ADT enum (NumberClass: IsZero/IsUnit/IsPrime/IsComposite
+// with select/type-pattern matching), plain class with val field (ModRing),
+// top-level recursive functions, collection pipelines (map/filter/fold/
+// sortedBy/any/count), foreach over ranges and collections, while loops,
+// nullable return types (Int?), and string interpolation.
+
+// ─── Core integer functions ────────────────────────────────────────────────
+
+def gcd(a: Int, b: Int): Int = if b == 0 { a } else { gcd(b, a % b) }
+
+def lcm(a: Int, b: Int): Int = a / gcd(a, b) * b
+
+// ─── Extended GCD ──────────────────────────────────────────────────────────
+
+record ExtGcd(g: Int, s: Int, t: Int) {
+public:
+  override def toString(): String = "gcd=#{g()}, s=#{s()}, t=#{t()}"
+}
+
+// Computes g = gcd(a,b) and integers s,t with a*s + b*t = g (Bézout identity)
+def extGcd(a: Int, b: Int): ExtGcd {
+  if b == 0 { return new ExtGcd(a, 1, 0) }
+  val r = extGcd(b, a % b)
+  return new ExtGcd(r.g(), r.t(), r.s() - (a / b) * r.t())
+}
+
+// Modular inverse of a mod m (null when gcd(a,m) ≠ 1)
+def modInverse(a: Int, m: Int): Int? {
+  val r = extGcd(((a % m) + m) % m, m)
+  if r.g() != 1 { return null }
+  val inv: Int = r.s() % m
+  return if inv < 0 { inv + m } else { inv }
+}
+
+// ─── Sieve of Eratosthenes ──────────────────────────────────────────────────
+
+def sieve(n: Int): List[Int] {
+  val composite = new Boolean[n + 1]
+  val primes: List[Int] = []
+  var p: Int = 2
+  while p <= n {
+    if !composite[p] {
+      primes.add(p)
+      var m: Int = p * 2
+      while m <= n {
+        composite[m] = true
+        m = m + p
+      }
+    }
+    p = p + 1
+  }
+  return primes
+}
+
+// ─── Prime factorization ────────────────────────────────────────────────────
+
+def factorize(n: Int): List[Int] {
+  val factors: List[Int] = []
+  var rem: Int = n
+  var d: Int = 2
+  while d * d <= rem {
+    while rem % d == 0 {
+      factors.add(d)
+      rem = rem / d
+    }
+    d = d + 1
+  }
+  if rem > 1 { factors.add(rem) }
+  return factors
+}
+
+// ─── NumberClass: sealed ADT classification ─────────────────────────────────
+
+enum NumberClass {
+  case IsZero
+  case IsUnit
+  case IsPrime
+  case IsComposite(factors: List[Int])
+public:
+  def label(): String = select this {
+    case z is IsZero:      "zero"
+    case u is IsUnit:      "unit (1)"
+    case p is IsPrime:     "prime"
+    case c is IsComposite: "composite #{c.factors()}"
+  }
+  def isPrime(): Boolean = select this {
+    case p is IsPrime: true
+    else:              false
+  }
+}
+
+def classify(n: Int): NumberClass {
+  if n == 0 { return new IsZero() }
+  if n == 1 { return new IsUnit() }
+  val f = factorize(n)
+  if f.size == 1 { return new IsPrime() }
+  return new IsComposite(f)
+}
+
+// ─── Divisors and totient ───────────────────────────────────────────────────
+
+def divisors(n: Int): List[Int] {
+  val divs: List[Int] = []
+  var i: Int = 1
+  while i * i <= n {
+    if n % i == 0 {
+      divs.add(i)
+      if i != n / i { divs.add(n / i) }
+    }
+    i = i + 1
+  }
+  return divs.sortedBy { d -> d as Int }
+}
+
+// Euler's totient φ(n) = number of integers in [1,n] coprime to n
+def totient(n: Int): Int {
+  var result: Int = n
+  var m: Int = n
+  var p: Int = 2
+  while p * p <= m {
+    if m % p == 0 {
+      while m % p == 0 { m = m / p }
+      result = result - result / p
+    }
+    p = p + 1
+  }
+  if m > 1 { result = result - result / m }
+  return result
+}
+
+// ─── Fraction — reduced rational number with operator overloading ───────────
+
+record Fraction(num: Int, den: Int) {
+public:
+  // Always construct via of() to ensure reduction to lowest terms
+  static def of(n: Int, d: Int): Fraction {
+    if d == 0 { throw new IllegalArgumentException("denominator is zero") }
+    val g: Int = gcd(if n < 0 { 0 - n } else { n }, if d < 0 { 0 - d } else { d })
+    val sign: Int = if d < 0 { 0 - 1 } else { 1 }
+    return new Fraction(sign * n / g, sign * d / g)
+  }
+  def plus(o: Fraction): Fraction  = Fraction::of(num * o.den() + o.num() * den, den * o.den())
+  def minus(o: Fraction): Fraction = Fraction::of(num * o.den() - o.num() * den, den * o.den())
+  def times(o: Fraction): Fraction = Fraction::of(num * o.num(), den * o.den())
+  def div(o: Fraction): Fraction   = Fraction::of(num * o.den(), den * o.num())
+  def toDouble(): Double           = (num as Double) / (den as Double)
+  def negate(): Fraction           = Fraction::of(0 - num, den)
+  def abs(): Fraction              = Fraction::of(if num < 0 { 0 - num } else { num }, den)
+  override def toString(): String  = if den == 1 { "" + num } else { "#{num()}/#{den()}" }
+}
+
+// ─── ModRing — Z/mZ: arithmetic operations modulo m ────────────────────────
+
+class ModRing {
+  val m: Int
+public:
+  def this(modulus: Int) { this.m = modulus }
+  def add(a: Int, b: Int): Int = ((a + b) % m + m) % m
+  def sub(a: Int, b: Int): Int = ((a - b) % m + m) % m
+  def mul(a: Int, b: Int): Int = (((a as Long) * (b as Long)) % (m as Long)) as Int
+  def pow(base: Int, exp: Int): Int {
+    var result: Int = 1
+    var bb: Int = ((base % m) + m) % m
+    var e: Int = exp
+    while e > 0 {
+      if e % 2 == 1 { result = mul(result, bb) }
+      bb = mul(bb, bb)
+      e = e / 2
+    }
+    return result
+  }
+  def inv(a: Int): Int? = modInverse(a, m)
+  def modulus(): Int = m
+}
+
+// ─── Chinese Remainder Theorem ──────────────────────────────────────────────
+
+// Given residues[i] ≡ r_i (mod m_i) with pairwise-coprime moduli,
+// returns the unique x in [0, M) where M = Π m_i.
+def crt(residues: List[Int], moduli: List[Int]): Int {
+  var bigM: Int = moduli.fold(1) { acc, mi -> (acc as Int) * (mi as Int) }
+  var x: Int = 0
+  foreach i: Int in 0..<residues.size {
+    val mi: Int = moduli[i] as Int
+    val ri: Int = residues[i] as Int
+    val Mi: Int = bigM / mi
+    val inv: Int? = modInverse(Mi, mi)
+    if inv == null { throw new IllegalArgumentException("moduli not pairwise coprime") }
+    x = ((x as Long + (ri as Long) * (Mi as Long) % (bigM as Long) * ((inv as Int) as Long) % (bigM as Long)) % (bigM as Long)) as Int
+  }
+  return (x % bigM + bigM) % bigM
+}
+
+// ─── Demo ───────────────────────────────────────────────────────────────────
+
+IO::println("=== gcd / lcm / extended gcd ===")
+IO::println("gcd(48,18)=#{gcd(48,18)}  lcm=#{lcm(48,18)}")
+val eg = extGcd(35, 15)
+IO::println("extGcd(35,15): #{eg}")
+IO::println("  check 35*#{eg.s()} + 15*#{eg.t()} = #{35*eg.s() + 15*eg.t()}")
+
+IO::println("")
+IO::println("=== Primes up to 50 ===")
+val ps = sieve(50)
+IO::println("primes: #{ps}")
+IO::println("count=#{ps.size}  sum=#{ps.fold(0){a,p->(a as Int)+(p as Int)}}")
+
+IO::println("")
+IO::println("=== Classification ===")
+foreach n: Int in [1, 12, 360, 97, 100, 1024] {
+  IO::println("  #{n} → #{classify(n).label()}")
+}
+
+IO::println("")
+IO::println("=== Divisors and totient ===")
+foreach n: Int in [6, 12, 30, 28] {
+  val d = divisors(n)
+  val sigma: Int = d.fold(0) { acc, x -> (acc as Int) + (x as Int) }
+  val perfect: String = if sigma == 2 * n { " (perfect!)" } else { "" }
+  IO::println("  divisors(#{n})=#{d}  σ=#{sigma}  φ=#{totient(n)}#{perfect}")
+}
+
+IO::println("")
+IO::println("=== Fractions ===")
+val a = Fraction::of(1, 3)
+val b = Fraction::of(1, 6)
+IO::println("  1/3 + 1/6 = #{a + b}")
+IO::println("  1/3 - 1/6 = #{a - b}")
+IO::println("  1/3 * 1/6 = #{a * b}")
+IO::println("  1/3 / 1/6 = #{a / b}")
+IO::println("  (1/3 + 1/6) as double = #{(a + b).toDouble()}")
+val harmonic: Fraction = [1, 2, 3, 4, 5, 6].fold(Fraction::of(0, 1)) { acc, n ->
+  (acc as Fraction) + Fraction::of(1, n as Int)
+}
+IO::println("  H_6 = 1+1/2+...+1/6 = #{harmonic}  ≈ #{harmonic.toDouble()}")
+
+IO::println("")
+IO::println("=== ModRing(13) ===")
+val ring = new ModRing(13)
+IO::println("  7^10 mod 13 = #{ring.pow(7, 10)}")
+IO::println("  inv(7, 13)  = #{modInverse(7, 13)}")
+foreach a2: Int in 1..12 {
+  val inv2: Int? = ring.inv(a2)
+  if inv2 != null { IO::println("  inv(#{a2},13)=#{inv2}  check: #{a2}*#{inv2} mod 13 = #{ring.mul(a2, inv2 as Int)}") }
+}
+
+IO::println("")
+IO::println("=== Chinese Remainder Theorem ===")
+// x ≡ 2 (mod 3), x ≡ 3 (mod 5), x ≡ 2 (mod 7)  → 23
+val x = crt([2, 3, 2], [3, 5, 7])
+IO::println("  x≡2(3), x≡3(5), x≡2(7) → x=#{x}")
+IO::println("  verify: #{x}%3=#{x%3}  #{x}%5=#{x%5}  #{x}%7=#{x%7}")
+
+IO::println("")
+IO::println("=== Fermat's little theorem: a^(p-1) ≡ 1 (mod p) ===")
+val p: Int = 17
+val rp = new ModRing(p)
+foreach a3: Int in [2, 3, 5, 7, 11] {
+  IO::println("  #{a3}^#{p-1} mod #{p} = #{rp.pow(a3, p - 1)}")
+}

@@ -1,0 +1,305 @@
+// MiniCheck.on — miniature property-based testing engine (~270 lines)
+//
+// Demonstrates: ADT case-enums (TestOutcome) with select dispatch; record with
+// example clauses; closures stored as Function1/Function2 class fields;
+// extension methods on Int and String; collection pipelines (map/filter/fold/
+// sortedBy/count/any); typed foreach over lists; string interpolation; select/is
+// patterns; while loops; Java interop (Random, Math, StringBuilder).
+
+import {
+  java.util.Random
+  java.lang.Math
+  java.lang.StringBuilder
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+val SEED:   Long = 20251001L
+val TRIALS: Int  = 120
+
+// ── TestOutcome (ADT case-enum) ───────────────────────────────────────────────
+
+enum TestOutcome {
+  case Pass(runs: Int)
+  case Fail(witness: String, after: Int)
+public:
+  def ok(): Boolean = this is Pass
+  def verdict(): String = select this {
+    case p is Pass: "PASS (#{p.runs()} runs)"
+    case f is Fail: "FAIL after #{f.after()} — witness: #{f.witness()}"
+  }
+  def badge(): String = select this {
+    case p is Pass: "  ok"
+    case f is Fail: "FAIL"
+  }
+}
+
+// ── TestResult record ─────────────────────────────────────────────────────────
+
+record TestResult(name: String, outcome: TestOutcome) {
+  example passIsOk { new TestResult("p", new Pass(10)).outcome().ok() }
+  example failBad  { !new TestResult("f", new Fail("x", 1)).outcome().ok() }
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def absVal(): Int                   = Math::abs(self)
+  def clamp(lo: Int, hi: Int): Int    = Math::max(lo, Math::min(hi, self))
+  def sign(): Int = if self > 0 { 1 } else { if self < 0 { -1 } else { 0 } }
+  def between(lo: Int, hi: Int): Boolean = self >= lo && self <= hi
+}
+
+extension String {
+  def reversed(): String = new StringBuilder(self).reverse().toString()
+  def padTo(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def freqOf(ch: Char): Int {
+    var count: Int = 0
+    var i: Int = 0
+    while i < self.length() {
+      if self.charAt(i) == ch { count++ }
+      i++
+    }
+    return count
+  }
+}
+
+// ── Random generator ──────────────────────────────────────────────────────────
+
+class Gen {
+  var rng: Random
+
+public:
+  def this(seed: Long) { rng = new Random(seed) }
+
+  def int(lo: Int, hi: Int): Int = lo + rng.nextInt(hi - lo + 1)
+
+  def str(maxLen: Int): String {
+    val alpha: String = "abcdefghijklmnopqrstuvwxyz"
+    val len:   Int    = rng.nextInt(maxLen + 1)
+    val sb = new StringBuilder()
+    var i: Int = 0
+    while i < len { sb.append(alpha.charAt(rng.nextInt(26)).toString()); i++ }
+    return sb.toString()
+  }
+
+  def intList(maxSize: Int, lo: Int, hi: Int): List[Int] {
+    val size:   Int       = rng.nextInt(maxSize + 1)
+    val result: List[Int] = []
+    var i: Int = 0
+    while i < size { result.add(int(lo, hi)); i++ }
+    return result
+  }
+}
+
+// ── Property classes ──────────────────────────────────────────────────────────
+
+class Prop1 {
+  var pname:  String
+  var pcheck: Function1[Int, Boolean]
+  var pgen:   Gen
+
+public:
+  def this(n: String, c: Function1[Int, Boolean], g: Gen) {
+    pname  = n
+    pcheck = c
+    pgen   = g
+  }
+
+  def run(trials: Int): TestResult {
+    var i: Int = 0
+    while i < trials {
+      val x: Int = pgen.int(-1000, 1000)
+      if !pcheck(x) { return new TestResult(pname, new Fail("#{x}", i + 1)) }
+      i++
+    }
+    return new TestResult(pname, new Pass(trials))
+  }
+}
+
+class Prop2 {
+  var pname:  String
+  var pcheck: Function2[Int, Int, Boolean]
+  var pgen:   Gen
+
+public:
+  def this(n: String, c: Function2[Int, Int, Boolean], g: Gen) {
+    pname  = n
+    pcheck = c
+    pgen   = g
+  }
+
+  def run(trials: Int): TestResult {
+    var i: Int = 0
+    while i < trials {
+      val a: Int = pgen.int(-500, 500)
+      val b: Int = pgen.int(-500, 500)
+      if !pcheck(a, b) {
+        return new TestResult(pname, new Fail("(#{a}, #{b})", i + 1))
+      }
+      i++
+    }
+    return new TestResult(pname, new Pass(trials))
+  }
+}
+
+class PropStr {
+  var pname:  String
+  var pcheck: Function1[String, Boolean]
+  var pgen:   Gen
+
+public:
+  def this(n: String, c: Function1[String, Boolean], g: Gen) {
+    pname  = n
+    pcheck = c
+    pgen   = g
+  }
+
+  def run(trials: Int): TestResult {
+    var i: Int = 0
+    while i < trials {
+      val s: String = pgen.str(20)
+      if !pcheck(s) {
+        return new TestResult(pname, new Fail("\"#{s}\"", i + 1))
+      }
+      i++
+    }
+    return new TestResult(pname, new Pass(trials))
+  }
+}
+
+class PropList {
+  var pname:  String
+  var pcheck: Function1[List[Int], Boolean]
+  var pgen:   Gen
+
+public:
+  def this(n: String, c: Function1[List[Int], Boolean], g: Gen) {
+    pname  = n
+    pcheck = c
+    pgen   = g
+  }
+
+  def run(trials: Int): TestResult {
+    var i: Int = 0
+    while i < trials {
+      val list: List[Int] = pgen.intList(15, -100, 100)
+      if !pcheck(list) {
+        return new TestResult(pname, new Fail(list.toString(), i + 1))
+      }
+      i++
+    }
+    return new TestResult(pname, new Pass(trials))
+  }
+}
+
+// ── Build the test suite ──────────────────────────────────────────────────────
+
+val gen = new Gen(SEED)
+
+val results: List[TestResult] = []
+
+// Int properties
+results.add(new Prop1("abs non-negative",
+  (x: Int) -> x.absVal() >= 0, gen).run(TRIALS))
+
+results.add(new Prop1("abs idempotent",
+  (x: Int) -> x.absVal().absVal() == x.absVal(), gen).run(TRIALS))
+
+results.add(new Prop1("sign in {-1,0,1}",
+  (x: Int) -> x.sign().absVal() <= 1, gen).run(TRIALS))
+
+results.add(new Prop1("clamp in range",
+  (x: Int) -> x.clamp(-100, 100).between(-100, 100), gen).run(TRIALS))
+
+results.add(new Prop1("x*x non-negative",
+  (x: Int) -> x * x >= 0, gen).run(TRIALS))
+
+// Int-pair properties
+results.add(new Prop2("add commutative",
+  (a: Int, b: Int) -> a + b == b + a, gen).run(TRIALS))
+
+results.add(new Prop2("mul commutative",
+  (a: Int, b: Int) -> a * b == b * a, gen).run(TRIALS))
+
+results.add(new Prop2("max(a,b) >= a and b",
+  (a: Int, b: Int) -> Math::max(a, b) >= a && Math::max(a, b) >= b, gen).run(TRIALS))
+
+results.add(new Prop2("min(a,b) <= a and b",
+  (a: Int, b: Int) -> Math::min(a, b) <= a && Math::min(a, b) <= b, gen).run(TRIALS))
+
+results.add(new Prop2("|a+b| <= |a|+|b|  (triangle ineq)",
+  (a: Int, b: Int) -> (a + b).absVal() <= a.absVal() + b.absVal(), gen).run(TRIALS))
+
+// String properties
+results.add(new PropStr("toUpper length stable",
+  (s: String) -> s.toUpperCase().length() == s.length(), gen).run(TRIALS))
+
+results.add(new PropStr("toLower length stable",
+  (s: String) -> s.toLowerCase().length() == s.length(), gen).run(TRIALS))
+
+results.add(new PropStr("reverse reverse = id",
+  (s: String) -> s.reversed().reversed() == s, gen).run(TRIALS))
+
+results.add(new PropStr("concat length additive",
+  (s: String) -> (s + s).length() == s.length() * 2, gen).run(TRIALS))
+
+results.add(new PropStr("freqOf 'a' <= length",
+  (s: String) -> s.freqOf('a') <= s.length(), gen).run(TRIALS))
+
+// List properties
+results.add(new PropList("sort idempotent",
+  (list: List[Int]) -> {
+    val s1: List[Int] = list.sortedBy { x: Int -> x }
+    val s2: List[Int] = s1.sortedBy { x: Int -> x }
+    s1.equals(s2)
+  }, gen).run(TRIALS))
+
+results.add(new PropList("map size stable",
+  (list: List[Int]) -> list.map { x: Int -> x * 2 }.size == list.size,
+  gen).run(TRIALS))
+
+results.add(new PropList("filter shrinks",
+  (list: List[Int]) -> list.filter { x: Int -> x > 0 }.size <= list.size,
+  gen).run(TRIALS))
+
+results.add(new PropList("fold count = size",
+  (list: List[Int]) -> {
+    val counted: Int = list.fold(0) { acc, x -> acc + 1 }
+    counted == list.size
+  }, gen).run(TRIALS))
+
+results.add(new PropList("min <= max (non-empty)",
+  (list: List[Int]) -> if list.size == 0 {
+    true
+  } else {
+    val mn: Int = list.fold(1000000)  { acc, x -> Math::min(acc, x as Int) }
+    val mx: Int = list.fold(-1000000) { acc, x -> Math::max(acc, x as Int) }
+    mn <= mx
+  }, gen).run(TRIALS))
+
+// ── Report ────────────────────────────────────────────────────────────────────
+
+val nameWidth: Int = results.map { r: TestResult -> r.name().length() }.fold(0) {
+  acc, n -> Math::max(acc, n as Int)
+}
+
+IO::println("MiniCheck — #{results.size} properties, #{TRIALS} trials each")
+IO::println("seed: #{SEED}")
+IO::println("")
+
+foreach r: TestResult in results {
+  val pad: String = r.name().padTo(nameWidth)
+  IO::println("  #{r.outcome().badge()}  #{pad}  #{r.outcome().verdict()}")
+}
+
+val passed: Int = results.filter { r: TestResult -> r.outcome().ok() }.size
+val failed: Int = results.size - passed
+
+IO::println("")
+val suffix: String = if failed > 0 { " — #{failed} FAILED" } else { "" }
+IO::println("Result: #{passed}/#{results.size} passed#{suffix}")

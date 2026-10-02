@@ -49,6 +49,143 @@ object FixtureMavenRepository:
 
     repository
 
+  /**
+   * A graph whose answer depends on ''where'' a dependency sits in it — the shape of
+   * anthropic-java, whose `<dependencyManagement>` holds kotlin-reflect at 1.9.0 while
+   * jackson-module-kotlin, one level down, asks for 1.9.25.
+   *
+   *   - `app:1.0.0` manages `lib` at 1.0.0, and depends on `mid:1.0.0` and on `lib` (no
+   *     version; the management supplies it)
+   *   - `mid:1.0.0` depends on `lib:2.0.0`
+   *   - `lib:1.0.0` and `lib:2.0.0` both exist, with `Lib.version()` saying which
+   *
+   * Resolving `app` from the root lets app's management reach mid's request: `lib:1.0.0`.
+   * Resolving the same three coordinates as a flat list of roots takes mid out from under
+   * app, and the highest request wins: `lib:2.0.0`.
+   */
+  object Managed:
+    val App: Dependency = Dependency(Group, "app", "1.0.0")
+    val Mid: Dependency = Dependency(Group, "mid", "1.0.0")
+    val Lib: Dependency = Dependency(Group, "lib", "1.0.0")
+    val NewerLib: Dependency = Dependency(Group, "lib", "2.0.0")
+
+    def publish(): Path =
+      val repository = Files.createTempDirectory("onion-maven-managed")
+      val prefix = Group.replace('.', '/')
+      for version <- Seq(Lib.version, NewerLib.version) do
+        write(repository, Dependency(Group, "lib", version), s"$prefix/Lib", classBytes(
+          internalName = s"$prefix/Lib",
+          method = "version",
+          body = _.visitLdcInsn(version)
+        ), extra = "")
+      write(repository, Mid, s"$prefix/Mid", classBytes(
+        internalName = s"$prefix/Mid", method = "name", body = _.visitLdcInsn("mid")),
+        extra = dependencies(s"""    <dependency>
+           |      <groupId>$Group</groupId>
+           |      <artifactId>lib</artifactId>
+           |      <version>${NewerLib.version}</version>
+           |    </dependency>
+           |""".stripMargin))
+      write(repository, App, s"$prefix/App", classBytes(
+        internalName = s"$prefix/App", method = "name", body = _.visitLdcInsn("app")),
+        extra = s"""  <dependencyManagement>
+           |    <dependencies>
+           |      <dependency>
+           |        <groupId>$Group</groupId>
+           |        <artifactId>lib</artifactId>
+           |        <version>${Lib.version}</version>
+           |      </dependency>
+           |    </dependencies>
+           |  </dependencyManagement>
+           |""".stripMargin + dependencies(s"""    <dependency>
+           |      <groupId>$Group</groupId>
+           |      <artifactId>mid</artifactId>
+           |      <version>${Mid.version}</version>
+           |    </dependency>
+           |    <dependency>
+           |      <groupId>$Group</groupId>
+           |      <artifactId>lib</artifactId>
+           |    </dependency>
+           |""".stripMargin))
+      repository
+
+    def manifestStanzas(repository: Path): String =
+      s"""[[repositories]]
+         |url = "${repository.toUri.toString}"
+         |
+         |[dependencies]
+         |"$Group:app" = "${App.version}"
+         |""".stripMargin
+
+    private def dependencies(body: String): String =
+      s"  <dependencies>\n$body  </dependencies>\n"
+
+    private def write(
+      repository: Path,
+      coordinate: Dependency,
+      internalName: String,
+      classFile: Array[Byte],
+      extra: String
+    ): Unit =
+      val directory = repository.resolve(coordinate.group.replace('.', '/'))
+        .resolve(coordinate.artifact).resolve(coordinate.version)
+      Files.createDirectories(directory)
+      val base = s"${coordinate.artifact}-${coordinate.version}"
+      val stream = JarOutputStream(Files.newOutputStream(directory.resolve(s"$base.jar")))
+      try
+        stream.putNextEntry(JarEntry(s"$internalName.class"))
+        stream.write(classFile)
+        stream.closeEntry()
+      finally stream.close()
+      Files.writeString(
+        directory.resolve(s"$base.pom"),
+        s"""<?xml version="1.0" encoding="UTF-8"?>
+           |<project xmlns="http://maven.apache.org/POM/4.0.0">
+           |  <modelVersion>4.0.0</modelVersion>
+           |  <groupId>${coordinate.group}</groupId>
+           |  <artifactId>${coordinate.artifact}</artifactId>
+           |  <version>${coordinate.version}</version>
+           |  <packaging>jar</packaging>
+           |$extra</project>
+           |""".stripMargin,
+        UTF_8
+      )
+
+  /**
+   * A library that classifies its own calls: `weather:1.0.0` holds
+   * `com.example.oniontest.Weather` (`forecast(String)`, `local()`) and ships
+   * `META-INF/onion/effect-table.txt` saying `forecast` is `net` to a fixed host and
+   * reads a fixed env var — the shape of a battery such as onion-llm.
+   */
+  object Effectful:
+    val Coordinate: Dependency = Dependency(Group, "weather", "1.0.0")
+    val ClassName = s"$Group.Weather"
+    val Host = "api.weather.example"
+    val EnvVar = "WEATHER_KEY"
+
+    def publish(): Path =
+      val repository = Files.createTempDirectory("onion-maven-effectful")
+      val directory = repository.resolve(Group.replace('.', '/'))
+        .resolve(Coordinate.artifact).resolve(Coordinate.version)
+      Files.createDirectories(directory)
+      val base = s"${Coordinate.artifact}-${Coordinate.version}"
+      onion.compiler.effects.LibraryEffectTableSpec.writeJar(directory.resolve(s"$base.jar"), Seq(ClassName),
+        Seq(s"$ClassName#forecast=net:$Host,env:$EnvVar", s"$ClassName#local=pure").mkString("", "\n", "\n"))
+      Files.writeString(
+        directory.resolve(s"$base.pom"),
+        s"""<?xml version="1.0" encoding="UTF-8"?>
+           |<project xmlns="http://maven.apache.org/POM/4.0.0">
+           |  <modelVersion>4.0.0</modelVersion>
+           |  <groupId>$Group</groupId>
+           |  <artifactId>${Coordinate.artifact}</artifactId>
+           |  <version>${Coordinate.version}</version>
+           |  <packaging>jar</packaging>
+           |</project>
+           |""".stripMargin,
+        UTF_8
+      )
+      repository
+
   /** The `[[repositories]]` / `[dependencies]` stanzas naming this repository. */
   def manifestStanzas(repository: Path): String =
     s"""[[repositories]]

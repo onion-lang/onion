@@ -1,0 +1,370 @@
+// XorshiftRng.on — Pseudorandom Number Generator Lab
+//
+// Implements Xorshift32, Xorshift64*, and Xorshift128+ PRNGs, generates
+// samples from Uniform, Normal (Box-Muller), and Exponential distributions,
+// and runs a chi-square uniformity test on each generator.
+//
+// Exercises: interface + 3 classes with def this constructors; ADT enum with
+// data-carrying cases; records with example clauses; extension methods on
+// Double/Int; @TailRecursive self-recursion inside a class; collection
+// pipelines (map/filter/fold/sortedBy/find); closures; foreach (range +
+// List); select / pattern matching; nullable types; string interpolation;
+// while loops.
+//
+//   onion run/XorshiftRng.on
+
+import {
+  java.lang.Math as JMath
+}
+
+// ─── Extension helpers ────────────────────────────────────────────────────────
+
+extension Int {
+  def rj(w: Int): String {
+    var s: String = "" + self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def hbar(maxV: Int, width: Int): String {
+    val filled: Int = if maxV == 0 { 0 } else { (self * width) / maxV }
+    var b: String = ""
+    var i: Int = 0
+    while i < width { b = b + (if i < filled { "#" } else { "." }); i++ }
+    return b
+  }
+}
+
+extension Double {
+  def absVal(): Double = if self < 0.0 { 0.0 - self } else { self }
+}
+
+// ─── RNG interface ────────────────────────────────────────────────────────────
+
+interface Rng {
+  def nextLong(): Long
+  def nextDouble(): Double   // uniform [0.0, 1.0)
+  def rngLabel(): String
+}
+
+// ─── Xorshift32 ──────────────────────────────────────────────────────────────
+
+class Xorshift32 conforms Rng {
+  var state: Int
+
+public:
+  def this(seed: Int) {
+    this.state = if seed == 0 { 123456789 } else { seed }
+  }
+  def nextInt(): Int {
+    var x: Int = state
+    x = x ^ (x << 13)
+    x = x ^ (x >>> 17)
+    x = x ^ (x << 5)
+    state = x
+    return x
+  }
+  def nextLong(): Long = nextInt() as Long
+  def nextDouble(): Double {
+    val u: Int = nextInt() >>> 1
+    return (u as Double) / 2147483648.0
+  }
+  def rngLabel(): String = "Xorshift32  "
+}
+
+// ─── Xorshift64* ─────────────────────────────────────────────────────────────
+
+class Xorshift64 conforms Rng {
+  var state: Long
+
+public:
+  def this(seed: Long) {
+    this.state = if seed == 0L { 88172645463325252L } else { seed }
+  }
+  def nextLong(): Long {
+    var x: Long = state
+    x = x ^ (x << 13)
+    x = x ^ (x >>> 7)
+    x = x ^ (x << 17)
+    state = x
+    return x * 2685821657736338717L
+  }
+  def nextDouble(): Double {
+    val u: Long = nextLong() >>> 1
+    return (u as Double) / 9223372036854775808.0
+  }
+  def rngLabel(): String = "Xorshift64* "
+}
+
+// ─── Xorshift128+ ────────────────────────────────────────────────────────────
+
+class Xorshift128 conforms Rng {
+  var a: Long
+  var b: Long
+
+public:
+  def this(s0: Long, s1: Long) {
+    this.a = if s0 == 0L { 362436069L } else { s0 }
+    this.b = if s1 == 0L { 521288629L } else { s1 }
+  }
+  def nextLong(): Long {
+    var x: Long = a
+    val y: Long  = b
+    a = y
+    x = x ^ (x << 23)
+    x = x ^ (x >>> 17)
+    x = x ^ y
+    x = x ^ (y >>> 26)
+    b = x
+    return x + y
+  }
+  def nextDouble(): Double {
+    val u: Long = nextLong() >>> 1
+    return (u as Double) / 9223372036854775808.0
+  }
+  def rngLabel(): String = "Xorshift128+"
+}
+
+// ─── Distribution ADT ────────────────────────────────────────────────────────
+
+enum Dist {
+  case UniformDist
+  case NormalDist(mean: Double, std: Double)
+  case ExponentialDist(rate: Double)
+
+public:
+  def distName(): String = select this {
+    case d is UniformDist:       "Uniform[0,1)"
+    case d is NormalDist:        "Normal(#{Format::fixed(d.mean(), 1)}, #{Format::fixed(d.std(), 1)})"
+    case d is ExponentialDist:   "Exponential(rate=#{Format::fixed(d.rate(), 2)})"
+  }
+}
+
+def sampleDist(dist: Dist, rng: Rng): Double = select dist {
+  case d is UniformDist: rng.nextDouble()
+  case d is NormalDist: {
+    var u1: Double = rng.nextDouble()
+    val u2: Double = rng.nextDouble()
+    if u1 < 1.0e-15 { u1 = 1.0e-15 }
+    JMath::sqrt(0.0 - 2.0 * JMath::log(u1)) * JMath::cos(6.283185307179586 * u2) * d.std() + d.mean()
+  }
+  case d is ExponentialDist: {
+    var u: Double = rng.nextDouble()
+    if u < 1.0e-15 { u = 1.0e-15 }
+    (0.0 - JMath::log(u)) / d.rate()
+  }
+}
+
+// ─── Statistics record ───────────────────────────────────────────────────────
+
+record SampleStats(lbl: String, n: Int, mean: Double, stdDev: Double, minV: Double, maxV: Double) {
+  example nonNegN { new SampleStats("t", 10, 0.5, 0.1, 0.0, 1.0).n() > 0 }
+}
+
+def computeStats(lbl: String, samples: List[Double]): SampleStats {
+  val n: Int = samples.size
+  if n == 0 { return new SampleStats(lbl, 0, 0.0, 0.0, 0.0, 0.0) }
+  var sum: Double = 0.0
+  var mn: Double  = samples[0] as Double
+  var mx: Double  = samples[0] as Double
+  foreach v: Double in samples {
+    sum = sum + v
+    if v < mn { mn = v }
+    if v > mx { mx = v }
+  }
+  val mean: Double = sum / (n as Double)
+  var vsum: Double = 0.0
+  foreach v: Double in samples {
+    val d: Double = v - mean
+    vsum = vsum + d * d
+  }
+  val sd: Double = JMath::sqrt(vsum / (n as Double))
+  return new SampleStats(lbl, n, mean, sd, mn, mx)
+}
+
+// ─── Chi-square uniformity test ───────────────────────────────────────────────
+
+record ChiResult(rngLbl: String, bins: Int, stat: Double, df: Int) {
+  example positiveStatOk {
+    val r = new ChiResult("t", 10, 5.0, 9)
+    r.stat() >= 0.0
+  }
+public:
+  def verdict(): String =
+    if stat() < (df() as Double) * 2.0 { "PASS" } else { "FAIL" }
+}
+
+def runChiSquare(rng: Rng, n: Int, bins: Int): ChiResult {
+  val counts: Int[] = new Int[bins]
+  var i: Int = 0
+  while i < n {
+    val u: Double = rng.nextDouble()
+    var bin: Int  = (u * (bins as Double)) as Int
+    if bin >= bins { bin = bins - 1 }
+    counts[bin] = counts[bin] + 1
+    i++
+  }
+  val expected: Double = (n as Double) / (bins as Double)
+  var chi: Double = 0.0
+  var k: Int = 0
+  while k < bins {
+    val d: Double = (counts[k] as Double) - expected
+    chi = chi + d * d / expected
+    k++
+  }
+  return new ChiResult(rng.rngLabel(), bins, chi, bins - 1)
+}
+
+// ─── Histogram helper ─────────────────────────────────────────────────────────
+
+def printHistogram(title: String, samples: List[Double], bins: Int, lo: Double, hi: Double): void {
+  IO::println("\n  Histogram: " + title)
+  val counts: Int[] = new Int[bins]
+  val width: Double  = (hi - lo) / (bins as Double)
+  var maxCount: Int  = 0
+  foreach v: Double in samples {
+    if v >= lo && v < hi {
+      var bin: Int = ((v - lo) / width) as Int
+      if bin >= bins { bin = bins - 1 }
+      counts[bin] = counts[bin] + 1
+      if counts[bin] > maxCount { maxCount = counts[bin] }
+    }
+  }
+  var b: Int = 0
+  while b < bins {
+    val lo2: Double = lo + width * (b as Double)
+    val hi2: Double = lo2 + width
+    val bar: String = counts[b].hbar(maxCount, 24)
+    IO::println("  [#{Format::fixed(lo2, 2)},#{Format::fixed(hi2, 2)})  #{bar}  #{counts[b].rj(5)}")
+    b++
+  }
+}
+
+// ─── Direct tail-recursive accumulator (private method → TCO applies) ────────
+
+class SampleAggregator {
+private:
+  def sumImpl(samples: List[Double], idx: Int, acc: Double): Double {
+    if idx >= samples.size { return acc }
+    return sumImpl(samples, idx + 1, acc + (samples[idx] as Double))
+  }
+  def countImpl(samples: List[Double], threshold: Double, idx: Int, acc: Int): Int {
+    if idx >= samples.size { return acc }
+    val hit: Int = if (samples[idx] as Double) > threshold { 1 } else { 0 }
+    return countImpl(samples, threshold, idx + 1, acc + hit)
+  }
+public:
+  def sum(samples: List[Double]): Double = sumImpl(samples, 0, 0.0)
+  def countAbove(samples: List[Double], threshold: Double): Int = countImpl(samples, threshold, 0, 0)
+}
+
+// ─── Mutual recursion via @TailRecursive (odd/even parity checker) ────────────
+
+class ParityChecker {
+private:
+  @TailRecursive
+  def checkEven(n: Int): Boolean {
+    if n == 0 { return true }
+    return checkOdd(n - 1)
+  }
+  @TailRecursive
+  def checkOdd(n: Int): Boolean {
+    if n == 0 { return false }
+    return checkEven(n - 1)
+  }
+public:
+  def parity(n: Int): String = if checkEven(n) { "even" } else { "odd" }
+}
+
+// ─── Generator helper ─────────────────────────────────────────────────────────
+
+def generate(rng: Rng, dist: Dist, n: Int): List[Double] {
+  val out: List[Double] = []
+  var i: Int = 0
+  while i < n { out.add(sampleDist(dist, rng)); i++ }
+  return out
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val SAMPLE_N: Int = 8000
+val CHI_BINS: Int = 20
+val agg: SampleAggregator = new SampleAggregator()
+val parity: ParityChecker = new ParityChecker()
+
+IO::println("═══════════════════════════════════════")
+IO::println("  Xorshift PRNG Lab")
+IO::println("═══════════════════════════════════════")
+
+val rngs: List[Object] = [
+  new Xorshift32(271828) as Object,
+  new Xorshift64(314159265358979L) as Object,
+  new Xorshift128(123456789L, 987654321L) as Object
+]
+
+// ── Phase 1: Uniform samples and chi-square ───────────────────────────────────
+
+IO::println("\n─── Phase 1: Uniform [0,1) uniformity test ────────────────")
+foreach rngObj: Object in rngs {
+  val rng: Rng = rngObj as Rng
+  val samples: List[Double] = generate(rng, new UniformDist(), SAMPLE_N)
+  val st: SampleStats = computeStats(rng.rngLabel(), samples)
+  val chi: ChiResult  = runChiSquare(rng, SAMPLE_N, CHI_BINS)
+  IO::println("\n  #{rng.rngLabel()}  (n=#{SAMPLE_N})")
+  IO::println("    mean=#{Format::fixed(st.mean(), 4)}  sd=#{Format::fixed(st.stdDev(), 4)}")
+  IO::println("    min=#{Format::fixed(st.minV(), 5)}  max=#{Format::fixed(st.maxV(), 5)}")
+  IO::println("    chi²=#{Format::fixed(chi.stat(), 3)}  df=#{chi.df()}  → #{chi.verdict()}")
+}
+
+// ── Phase 2: Normal distribution ─────────────────────────────────────────────
+
+IO::println("\n─── Phase 2: Normal distribution ──────────────────────────")
+val normRng: Rng   = new Xorshift64(271828182845904L)
+val normDist: Dist = new NormalDist(5.0, 2.0)
+val normSamples: List[Double] = generate(normRng, normDist, SAMPLE_N)
+val normSt: SampleStats = computeStats(normDist.distName(), normSamples)
+IO::println("  #{normDist.distName()}  (n=#{SAMPLE_N})")
+IO::println("  mean=#{Format::fixed(normSt.mean(), 3)}  sd=#{Format::fixed(normSt.stdDev(), 3)}  (expected 5.000, 2.000)")
+val tailSum: Double = agg.sum(normSamples)
+IO::println("  tail-recursive sum = #{Format::fixed(tailSum, 1)}")
+val aboveMean: Int = agg.countAbove(normSamples, normSt.mean())
+IO::println("  values above mean: #{aboveMean} / #{SAMPLE_N}")
+
+// mutual-recursion parity check on sample count
+IO::println("  sample count (#{SAMPLE_N}) is #{parity.parity(SAMPLE_N)} (via @TailRecursive mutual recursion)")
+printHistogram("Normal(5, 2)", normSamples, 12, 0.0 - 2.0, 12.0)
+
+// ── Phase 3: Exponential distribution ────────────────────────────────────────
+
+IO::println("\n─── Phase 3: Exponential distribution ─────────────────────")
+val expRng: Rng   = new Xorshift128(999999937L, 100000007L)
+val expDist: Dist = new ExponentialDist(0.5)
+val expSamples: List[Double] = generate(expRng, expDist, SAMPLE_N)
+val expSt: SampleStats = computeStats(expDist.distName(), expSamples)
+IO::println("  #{expDist.distName()}  (n=#{SAMPLE_N})")
+IO::println("  mean=#{Format::fixed(expSt.mean(), 3)}  sd=#{Format::fixed(expSt.stdDev(), 3)}  (expected 2.000, 2.000)")
+printHistogram("Exponential(0.5)", expSamples, 10, 0.0, 10.0)
+
+// ── Phase 4: Comparison summary ──────────────────────────────────────────────
+
+IO::println("\n─── Phase 4: Summary ───────────────────────────────────────")
+val allStats: List[SampleStats] = [
+  computeStats("Xorshift32  uniform", generate(new Xorshift32(11111), new UniformDist(), SAMPLE_N)),
+  computeStats("Xorshift64* uniform", generate(new Xorshift64(22222L), new UniformDist(), SAMPLE_N)),
+  computeStats("Xorshift128+uniform", generate(new Xorshift128(33333L, 44444L), new UniformDist(), SAMPLE_N))
+]
+val sorted: List[SampleStats] = allStats.sortedBy { st -> (st.mean() - 0.5).absVal() }
+foreach st: SampleStats in sorted {
+  val err: Double = (st.mean() - 0.5).absVal()
+  IO::println("  #{st.lbl()}  mean=#{Format::fixed(st.mean(), 4)}  |err|=#{Format::fixed(err, 5)}")
+}
+
+val bestSt: SampleStats? = sorted.find { st -> (st.mean() - 0.5).absVal() < 0.005 }
+if bestSt != null {
+  IO::println("\n  Best (|mean-0.5| < 0.005): #{bestSt.lbl()}")
+} else {
+  IO::println("\n  No generator hit |mean-0.5| < 0.005 at n=#{SAMPLE_N}.")
+}
+
+IO::println("\n═══════════════════════════════════════")
+IO::println("  Done.")
+IO::println("═══════════════════════════════════════")

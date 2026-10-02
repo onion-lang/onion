@@ -181,6 +181,26 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     warnings = new WarningReporter(config.warningLevel, config.suppressedWarnings)
   )
   private[compiler] val session = new TypingSession(config, globalState, emptyTypeParams)
+
+  /**
+   * The effect table this compilation consults: the built-in table plus the tables that
+   * jars on the classpath ship at `META-INF/onion/effect-table.txt` (see
+   * [[onion.compiler.effects.EffectTable]]). Loaded on first use — only a program with a
+   * `tool` needs it — and the libraries' table problems are reported as warnings then
+   * (W0017 malformed, W0018 a class outside the jar), naming the jar and line.
+   */
+  private[compiler] lazy val effectTable: onion.compiler.effects.EffectTable.Table = {
+    import onion.compiler.effects.EffectTable.ProblemKind
+    val loaded = onion.compiler.effects.EffectTable.forClasspath(config.classPath)
+    for (p <- loaded.problems) {
+      val at = Location(p.line, 1)
+      p.kind match {
+        case ProblemKind.Malformed    => globalState.warnings.libraryEffectTableMalformed(p.source, at, p.message)
+        case ProblemKind.ForeignClass => globalState.warnings.libraryEffectTableForeignClass(p.source, at, p.message)
+      }
+    }
+    loaded.table
+  }
   private val diagnostics = new TypingDiagnostics(this, session)
   private val typeSupport = new TypingTypeSupport(this)
 

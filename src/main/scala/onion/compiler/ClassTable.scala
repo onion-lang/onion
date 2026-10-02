@@ -290,6 +290,46 @@ class ClassTable(classPath: String, parent: Option[ClassTable] = None) {
 
   def load(className: String): Option[TypedAST.ClassType] = Option(loadOrNull(className))
 
+  /**
+   * Loads a class written with dots only, as a user writes it: `java.util.Map.Entry`,
+   * `onion.Result.Ok`, `a.b.Outer.Mid.Inner`. The JVM binary name (`onion.Result$Ok`) is
+   * an implementation detail users never spell.
+   *
+   * Ambiguity (`a.b.C` could be class `C` in package `a.b`, or member `C` of class `a.b`)
+   * is settled the way Java settles it: the whole name as a top-level class first, then the
+   * longest prefix that names a top-level class, with the rest of the segments as nested
+   * member classes under it (`a.b.C$D` before `a.b$C$D`). Only prefixes that load are
+   * extended, so a miss does not fan out into probes under classes that do not exist.
+   */
+  def loadDottedOrNull(name: String): TypedAST.ClassType = {
+    val direct = loadOrNull(name)
+    if (direct != null || !name.contains(".")) return direct
+    val parts = name.split('.')
+    var i = parts.length - 1
+    while (i >= 1) {
+      val outer = parts.take(i).mkString(".")
+      if (loadOrNull(outer) != null) {
+        val found = loadOrNull(outer + "$" + parts.drop(i).mkString("$"))
+        if (found != null) return found
+      }
+      i -= 1
+    }
+    null
+  }
+
+  /**
+   * Spelling candidates for a dotted name whose nested part did not resolve: when the
+   * longest resolvable prefix (`onion.Result` of `onion.Result.Okk`) is a class, its member
+   * classes, written back in the user's dotted form (`onion.Result.Ok`, `onion.Result.Err`).
+   * `prefixAsWritten` maps the resolved outer class back to how the user spelled it, so a
+   * name that went through an import (`Result.Okk`) gets `Result.Ok`, not `onion.Result.Ok`.
+   */
+  def memberClassCandidates(outer: TypedAST.ClassType, prefixAsWritten: String): Seq[String] =
+    outer.memberClassNames.flatMap { binary =>
+      val simple = binary.substring(binary.lastIndexOf('$') + 1)
+      if (simple.isEmpty || simple.head.isDigit) None else Some(prefixAsWritten + "." + simple)
+    }
+
   /** Loads a class that the compiler itself depends on (JDK / onion runtime). */
   def loadRequired(className: String): TypedAST.ClassType =
     loadOrNull(className) match {

@@ -1,0 +1,366 @@
+// TypedDispatch.on — Type-safe event bus with T -> void callbacks.
+//
+// The headline feature is List[T -> void] (a list of void-returning function
+// values) and the observer pattern built around it. This exercises the recently
+// fixed single-arg void function type (T -> void) in a realistic setting.
+//
+// Features exercised:
+//   T -> void function types           List[Event -> void], Event -> void params
+//   (T, U) -> void                     two-arg void callbacks in ErrorTracker
+//   ADT case-enums with methods        Severity, Category (exhaustive select)
+//   records with example clauses       Event layout + positive-timestamp example
+//   classes with public: fields        EventBus, FilteredBus, BusStats
+//   extension Int/String               pad/plural, padRight/cap formatting
+//   collection pipelines               filter/map/fold/sortedBy/count
+//   foreach over List and Map (k, v)   history replay, per-topic counts
+//   select / type-pattern matching     severity dispatch in FilteredBus
+//   try/catch                          isolated handler errors
+//   string interpolation               event display, stats table
+//   nullable                           subscriber map lookup (List? result)
+
+// ─── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  def plural(word: String): String = "" + self + " " + (if self == 1 { word } else { word + "s" })
+  def pad(n: Int): String {
+    val s = "" + self
+    var r = s
+    while r.length() < n { r = " " + r }
+    return r
+  }
+}
+
+extension String {
+  def padRight(n: Int): String {
+    var r = self
+    while r.length() < n { r = r + " " }
+    return r
+  }
+  def cap(): String {
+    if self.length() == 0 { return self }
+    return self.substring(0, 1).toUpperCase() + self.substring(1)
+  }
+}
+
+// ─── ADT enum: event severity ─────────────────────────────────────────────────
+
+enum Severity {
+  case Dbg
+  case Inf
+  case Wrn
+  case Err
+  case Fat
+public:
+  def label(): String = select this {
+    case d is Dbg: "DEBUG"
+    case i is Inf: "INFO "
+    case w is Wrn: "WARN "
+    case e is Err: "ERROR"
+    case f is Fat: "FATAL"
+  }
+  def level(): Int = select this {
+    case d is Dbg: 0
+    case i is Inf: 1
+    case w is Wrn: 2
+    case e is Err: 3
+    case f is Fat: 4
+  }
+}
+
+// ─── ADT enum: event category ─────────────────────────────────────────────────
+
+enum Category {
+  case Sys
+  case Usr
+  case Net
+  case Sec
+  case Biz
+public:
+  def tag(): String = select this {
+    case s is Sys: "SYS"
+    case u is Usr: "USR"
+    case n is Net: "NET"
+    case s is Sec: "SEC"
+    case b is Biz: "BIZ"
+  }
+}
+
+// ─── Record: Event ────────────────────────────────────────────────────────────
+
+record Event(
+  topic:       String,
+  severity:    Severity,
+  category:    Category,
+  source:      String,
+  message:     String,
+  timestampMs: Long
+) {
+  example positiveTs { new Event("t", new Inf(), new Sys(), "s", "m", 1L).timestampMs() > 0L }
+public:
+  def display(): String =
+    "[#{severity().label()}][#{category().tag()}] #{topic().padRight(14)} #{source().padRight(10)} #{message()}"
+}
+
+// ─── EventBus ─────────────────────────────────────────────────────────────────
+// Core pub/sub: subscribers register Event -> void callbacks per topic or
+// for all events. Handler exceptions are isolated (drop + count).
+
+class EventBus {
+public:
+  val subscribers: Map[String, List[Event -> void]] = [:]
+  val wildcardSubs: List[Event -> void]             = []
+  val eventLog:    List[Event]                      = []
+  var published:   Int = 0
+  var dropped:     Int = 0
+
+  // Subscribe to a specific topic.
+  def on(topic: String, handler: Event -> void): void {
+    if !subscribers.containsKey(topic) {
+      subscribers[topic] = []
+    }
+    (subscribers[topic] as List[Event -> void]).add(handler)
+  }
+
+  // Subscribe to ALL events (wildcard).
+  def onAny(handler: Event -> void): void {
+    wildcardSubs.add(handler)
+  }
+
+  // Publish one event: topic subscribers first, then wildcards.
+  def publish(event: Event): void {
+    eventLog.add(event)
+    published++
+    val topicSubs = subscribers[event.topic()] as List[Event -> void]?
+    if topicSubs != null {
+      foreach h: Event -> void in topicSubs {
+        try { h(event) } catch ex: Exception { dropped++ }
+      }
+    }
+    foreach h: Event -> void in wildcardSubs {
+      try { h(event) } catch ex: Exception { dropped++ }
+    }
+  }
+}
+
+// ─── FilteredBus ──────────────────────────────────────────────────────────────
+// Wraps an EventBus with a minimum severity level; events below it are silently
+// discarded so downstream subscribers only see what they care about.
+
+class FilteredBus {
+public:
+  val inner:      EventBus
+  val minLevel:   Int
+  var filteredOut: Int
+
+  def this(inner: EventBus, minLevel: Int) {
+    self.inner       = inner
+    self.minLevel    = minLevel
+    self.filteredOut = 0
+  }
+
+  def publish(event: Event): void {
+    if event.severity().level() >= minLevel {
+      inner.publish(event)
+    } else {
+      filteredOut++
+    }
+  }
+}
+
+// ─── ErrorTracker ─────────────────────────────────────────────────────────────
+// Demonstrates (String, String) -> void two-arg void callbacks.
+
+class ErrorTracker {
+public:
+  val onError: (String, String) -> void
+  val errors:  List[String] = []
+
+  def this(callback: (String, String) -> void) {
+    self.onError = callback
+  }
+
+  def capture(source: String, msg: String): void {
+    errors.add("[#{source}] #{msg}")
+    onError(source, msg)
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def mkEvent(topic: String, sev: Severity, cat: Category, src: String, msg: String): Event =
+  new Event(topic, sev, cat, src, msg, 1000L)
+
+def section(title: String): void {
+  IO::println("")
+  IO::println("=== " + title + " ===")
+}
+
+def printCounts(m: Map[String, Int], pad: Int): void {
+  val keys: List[String] = m.keySet() |> Colls::toList
+  foreach k: String in keys {
+    IO::println("  " + k.padRight(pad) + " " + (m[k] as Int).pad(4))
+  }
+}
+
+// ─── Phase 1: main bus with subscribers ───────────────────────────────────────
+
+val bus: EventBus = new EventBus()
+
+// Wildcard: capture all topics for logging
+val allTopics: List[String] = []
+bus.onAny { e -> allTopics.add((e as Event).topic()) }
+
+// Wildcard: collect alerts (WARN+)
+val alerts: List[String] = []
+bus.onAny { e ->
+  val ev: Event = e as Event
+  if ev.severity().level() >= new Wrn().level() {
+    alerts.add("[ALERT] " + ev.display())
+  }
+}
+
+// Topic subscriber: auth events
+val authEvents: List[Event] = []
+bus.on("auth") { e -> authEvents.add(e as Event) }
+
+// Topic subscriber: slow db queries
+val slowQueries: List[String] = []
+bus.on("db") { e ->
+  val ev: Event = e as Event
+  if ev.severity().level() >= new Wrn().level() {
+    slowQueries.add(ev.message())
+  }
+}
+
+// Publish 15 realistic service events
+bus.publish(mkEvent("auth",    new Inf(), new Sec(), "auth-svc",  "user alice logged in"))
+bus.publish(mkEvent("auth",    new Inf(), new Sec(), "auth-svc",  "user bob logged in"))
+bus.publish(mkEvent("db",      new Dbg(), new Sys(), "db-pool",   "connection acquired"))
+bus.publish(mkEvent("http",    new Inf(), new Net(), "gateway",   "GET /api/orders 200"))
+bus.publish(mkEvent("http",    new Inf(), new Net(), "gateway",   "POST /api/items 201"))
+bus.publish(mkEvent("db",      new Wrn(), new Sys(), "db-pool",   "slow query: 520ms on orders"))
+bus.publish(mkEvent("auth",    new Wrn(), new Sec(), "auth-svc",  "user charlie: 3rd failed login"))
+bus.publish(mkEvent("http",    new Err(), new Net(), "gateway",   "GET /api/admin 500 internal error"))
+bus.publish(mkEvent("cache",   new Dbg(), new Sys(), "redis",     "cache hit: session:alice"))
+bus.publish(mkEvent("cache",   new Inf(), new Sys(), "redis",     "cache eviction: 12 keys"))
+bus.publish(mkEvent("db",      new Err(), new Sys(), "db-pool",   "connection timeout after 5000ms"))
+bus.publish(mkEvent("auth",    new Fat(), new Sec(), "auth-svc",  "JWT signing key rotation FAILED"))
+bus.publish(mkEvent("billing", new Inf(), new Biz(), "billing",   "invoice INV-0042 created"))
+bus.publish(mkEvent("billing", new Wrn(), new Biz(), "billing",   "payment gateway latency: 3100ms"))
+bus.publish(mkEvent("http",    new Inf(), new Net(), "gateway",   "GET /health 200"))
+
+// ─── Print Phase 1 results ─────────────────────────────────────────────────────
+
+section("All Events")
+foreach e: Event in bus.eventLog {
+  IO::println("  " + e.display())
+}
+
+section("Alerts (WARN+)")
+foreach a: String in alerts { IO::println(a) }
+
+section("Auth Events")
+foreach e: Event in authEvents {
+  IO::println("  " + e.severity().label() + " " + e.message())
+}
+
+section("DB Slow Queries")
+foreach q: String in slowQueries { IO::println("  " + q) }
+
+// Build per-topic and per-severity counts using collection pipeline
+val topicCounts: Map[String, Int] = [:]
+foreach e: Event in bus.eventLog {
+  val t = e.topic()
+  if topicCounts.containsKey(t) { topicCounts[t] = (topicCounts[t] as Int) + 1 }
+  else { topicCounts[t] = 1 }
+}
+val sevCounts: Map[String, Int] = [:]
+foreach e: Event in bus.eventLog {
+  val k = e.severity().label().trim()
+  if sevCounts.containsKey(k) { sevCounts[k] = (sevCounts[k] as Int) + 1 }
+  else { sevCounts[k] = 1 }
+}
+
+section("Event Counts by Topic")
+printCounts(topicCounts, 12)
+
+section("Event Counts by Severity")
+printCounts(sevCounts, 8)
+
+section("Phase 1 Summary")
+IO::println("  published   : " + bus.published.pad(4))
+IO::println("  handler err : " + bus.dropped.pad(4))
+IO::println("  alerts      : " + alerts.size().pad(4))
+IO::println("  auth events : " + authEvents.size().pad(4))
+
+// ─── Phase 2: FilteredBus (WARN+ only) ────────────────────────────────────────
+
+section("Phase 2 — FilteredBus (WARN+ only)")
+
+val bus2: EventBus    = new EventBus()
+val fbus: FilteredBus = new FilteredBus(bus2, new Wrn().level())
+
+val warnLog: List[String] = []
+bus2.onAny { e ->
+  val ev: Event = e as Event
+  warnLog.add("[#{ev.severity().label()}] #{ev.source()}: #{ev.message()}")
+}
+
+fbus.publish(mkEvent("app", new Dbg(), new Sys(), "app", "startup complete"))
+fbus.publish(mkEvent("app", new Inf(), new Sys(), "app", "listening on :8080"))
+fbus.publish(mkEvent("app", new Wrn(), new Sys(), "app", "heap usage 78%"))
+fbus.publish(mkEvent("app", new Err(), new Sys(), "app", "disk write failure"))
+fbus.publish(mkEvent("app", new Dbg(), new Sys(), "app", "GC pause 12ms"))
+fbus.publish(mkEvent("app", new Fat(), new Sys(), "app", "OOM: killing process"))
+
+IO::println("filtered out (below WARN) : " + fbus.filteredOut)
+IO::println("reached inner bus         : " + bus2.published)
+foreach line: String in warnLog { IO::println("  " + line) }
+
+// ─── Phase 3: (String, String) -> void two-arg callback ───────────────────────
+
+section("Phase 3 — Two-arg (String, String) -> void callback")
+
+val errorLog: List[String] = []
+val tracker: ErrorTracker = new ErrorTracker((src: String, msg: String) -> {
+  errorLog.add("TRACKED " + src + ": " + msg)
+})
+
+tracker.capture("db",      "primary replica lag 2s")
+tracker.capture("auth",    "session store unavailable")
+tracker.capture("gateway", "upstream TLS handshake timeout")
+
+IO::println("errors tracked: " + tracker.errors.size().plural("error"))
+foreach line: String in errorLog { IO::println("  " + line) }
+
+// ─── Phase 4: replay via fresh bus ────────────────────────────────────────────
+
+section("Phase 4 — Replay original event log through a fresh bus")
+
+val replayBus: EventBus       = new EventBus()
+val secEvents: List[Event]    = []
+val secAlerts: List[String]   = []
+
+replayBus.on("auth") { e -> secEvents.add(e as Event) }
+replayBus.onAny { e ->
+  val ev: Event = e as Event
+  if ev.category().tag() == "SEC" && ev.severity().level() >= new Wrn().level() {
+    secAlerts.add("⚠ " + ev.source() + ": " + ev.message())
+  }
+}
+
+foreach e: Event in bus.eventLog { replayBus.publish(e) }
+
+IO::println("replayed: " + replayBus.published.plural("event"))
+IO::println("security events caught: " + secEvents.size())
+IO::println("security alerts:        " + secAlerts.size())
+foreach a: String in secAlerts { IO::println("  " + a) }
+
+// ─── Grand total ──────────────────────────────────────────────────────────────
+
+section("Grand Total")
+IO::println("  bus1 (main):   " + bus.published.pad(4) + " events")
+IO::println("  bus2 (warn+):  " + bus2.published.pad(4) + " events")
+IO::println("  replayBus:     " + replayBus.published.pad(4) + " events")
+IO::println("  filtered out:  " + fbus.filteredOut.pad(4))
+IO::println("  tracked errs:  " + tracker.errors.size().pad(4))

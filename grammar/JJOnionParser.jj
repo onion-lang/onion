@@ -2119,10 +2119,17 @@ AST.TypeNode boxed_class_type() : {Token t;}{
   }
 }
 
+// A dotted name (`java.util.Map`, `Map.Entry`, `onion.Result.Ok`) continues past a `.`
+// only when the segment after it is followed by something a type can be followed by.
+// That set includes the `:` ending a select case (`case o is Result.Ok:`), a `when`
+// guard, `&&`/`||` after an `is` test, the `->` of a function type or trailing-lambda
+// parameter, a closing `}`, a vararg `...` and a nullable-array `?[`. Which part of the
+// name is the package and which the nested class is decided by the type checker
+// (NameResolution), not here. OnionParser.rawTypeDotContinues mirrors this set.
 AST.TypeNode raw_type() :{AST.TypeNode ty; Token n; StringBuilder sb = new StringBuilder();}{
   ty = basic_type() {return ty;}
 | n=<FQCN> {return new AST.TypeNode(p(n), new AST.ReferenceType(n.image, true), false);}
-| n=id() {sb.append(c(n));} (LOOKAHEAD("." <ID> ("." | "[" | "]" | "=" | ")" | "(" | "," | ";" | ">" | "{" | "?" | <ID> | <EOL> | <EOF>)) "." n=id() {sb.append(".").append(c(n));})* {
+| n=id() {sb.append(c(n));} (LOOKAHEAD("." <ID> ("." | "[" | "]" | "=" | ")" | "(" | "," | ";" | ">" | "{" | "?" | <ID> | <EOL> | <EOF> | ":" | "when" | "&&" | "||" | <ARROW> | "}" | "..." | <SAFE_INDEX>)) "." n=id() {sb.append(".").append(c(n));})* {
     String name = sb.toString();
     boolean isFqcn = name.contains(".");
     return new AST.TypeNode(p(n), new AST.ReferenceType(name, isFqcn), false);
@@ -2273,7 +2280,7 @@ AST.Argument lambda_argument(boolean parenthesized) :{Token t; AST.TypeNode type
 // The `-> R` postfix of a single-argument function type, applied to an already-parsed
 // argument type. Kept out of type_impl() so type_no_arrow() can omit it.
 AST.TypeNode function_type_tail(AST.TypeNode arg) :{AST.TypeNode r;}{
-  <ARROW> eols() r=type() {
+  <ARROW> eols() r=return_type() {
     ArrayBuffer<AST.TypeDescriptor> ps = new ArrayBuffer<AST.TypeDescriptor>();
     append(ps, arg.desc());
     return new AST.TypeNode(arg.location(), new AST.FunctionType(toList(ps), r.desc()), arg.isRelaxed());

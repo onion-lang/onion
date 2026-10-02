@@ -133,6 +133,74 @@ Person::doc().parse("{\"age\": 30}")
 
 Supported formats are `json` and `yaml`. An unrecognised name is a compile error (E0076).
 
+### Lists, nested records and absent keys
+
+A `json` shape reads structure, not just scalars. Beyond the scalar component types, a
+json shape's components may be:
+
+- `List[S]` for a scalar `S` — a JSON array of that scalar
+- `R`, a record that declares a json shape of its own — a nested JSON object
+- `List[R]` of such a record — an array of objects
+- `T?` of any of these — the key may be absent or `null`, and the component is then `null`
+
+```onion
+record Action(owner: String, task: String) {
+  shape doc = json
+}
+
+record Summary(title: String, decisions: List[String], actions: List[Action], lead: Action?) {
+  shape doc = json
+  example nested {
+    val v = new Summary("sync", ["ship"], [new Action("sato", "review")], null)
+    Summary::doc().parse(Summary::doc().print(v)).get() == v
+  }
+}
+```
+
+A nested record is read through its **first** json shape in declaration order, so a record
+with several json shapes puts the one it wants nested first. The record may be declared
+anywhere, and may even contain itself (`record Node(name: String, kids: List[Node])`).
+
+Failures still accumulate, and each names the whole path to where it happened. A bad
+element never hides its siblings:
+
+```onion
+Summary::doc().parse("{\"title\": \"t\", \"decisions\": [\"a\", 3], \"actions\": [{\"owner\": \"o\"}, 5]}")
+//   decisions[1]: expected String, found 3
+//   actions[0].task: expected String, found absent
+//   actions[1]: expected object, found 5
+```
+
+Only `json` reaches this far. A regex, `yaml` or `config` shape keeps to the scalars, and
+because every shape of a record reads the same components, a record that mixes them does
+too — E0061 names the clause that cannot read the component.
+
+### A JSON Schema for structured output
+
+A json shape can describe the documents it reads as a JSON Schema — the form an LLM's
+structured-output mode takes. The record is then the one description of the answer, rather
+than a record plus a hand-written schema that has to be kept in step with it:
+
+```onion
+Summary::doc().jsonSchema()
+// {"type":"object",
+//  "properties":{"title":{"type":"string"},
+//                "decisions":{"type":"array","items":{"type":"string"}},
+//                "actions":{"type":"array","items":{"type":"object", ... }},
+//                "lead":{"anyOf":[{"type":"object", ... },{"type":"null"}]}},
+//  "required":["title","decisions","actions"],
+//  "additionalProperties":false}
+```
+
+Every object is closed (`additionalProperties: false`) and requires every non-nullable
+component; a nullable one is left out of `required` and admits `null`. Integers become
+`integer`, `Double`/`Float` become `number`. The schema is JSON text; `Json::parse` turns it
+into a map to embed in a request body.
+
+`hasJsonSchema()` answers whether a shape can do this — only a json shape can, and every
+other shape's `jsonSchema()` throws rather than describe documents it does not read. A
+record that contains itself has no finite inline schema, so its `jsonSchema()` throws too.
+
 ## Files and URLs
 
 ```onion
@@ -252,7 +320,9 @@ so through `canPrint(): false` and asserts whatever laws its reading direction h
 ordinary API, for a shape over a type you did not declare:
 
 - `Shapes::regex` — the `re"..."` form
-- `Shapes::json` — the `json` form
+- `Shapes::json` — the `json` form; its five-argument overload takes the extended
+  component tags (`List[Int]`, `Nested`, a trailing `?`) and one nested-shape thunk per
+  component
 - `Shapes::yaml` — the `yaml` form
 - `Shapes::config` — the `config` form, lossless (`parseLossless`/`printLossless`) like
   `shape name = config`

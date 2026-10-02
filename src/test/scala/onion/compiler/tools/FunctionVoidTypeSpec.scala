@@ -52,5 +52,29 @@ class FunctionVoidTypeSpec extends AnyFunSpec {
           |""".stripMargin
       )
     }
+
+    it("accepts Int -> Unit as a parameter type (bare single-arg form)") {
+      compile(
+        """def run(block: Int -> Unit): void { block.call(42) }
+          |run((x: Int) -> { println(x) })
+          |""".stripMargin
+      )
+    }
+
+    it("accepts Int -> void as a parameter type (bare single-arg form)") {
+      compile(
+        """def run(block: Int -> void): void { block.call(42) }
+          |run((x: Int) -> { println(x) })
+          |""".stripMargin
+      )
+    }
+
+    it("accepts String -> void as a parameter type (bare single-arg form)") {
+      compile(
+        """def run(block: String -> void): void { block.call("hi") }
+          |run((s: String) -> { println(s) })
+          |""".stripMargin
+      )
+    }
   }
 }

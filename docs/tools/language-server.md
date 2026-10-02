@@ -81,6 +81,31 @@ reconstruct the formatted text, and a formatter that corrupts a buffer on save i
 one that scrolls it. Before any edit is offered the formatted text is re-lexed and compared
 token for token against the original; if they differ, no edit is offered at all.
 
+### Classpath and script dependencies (`//> using`)
+
+A file with an `onion.toml` above it is validated as `onion build` compiles it: against the
+project's `target/classes` and the dependencies `onion.toml` declares. A file without one is
+a standalone script, validated against `.` plus the jars its
+[`//> using dep` directives](script-runner.md) resolve to — the same
+parser, resolver and cache as `onion script.on` and `onionc`, so the editor sees the
+classpath a run sees.
+
+- **Resolution never blocks the editor.** A directive set already in the cache is used at
+  once. A cold one is resolved on a background thread; until it finishes, the server
+  **holds** the script's diagnostics and shows a single information note on the directive
+  lines instead, then validates the file again on its own. Holding was chosen over
+  validating without the jars, which would underline every type the dependency provides
+  as not found for the length of a download.
+- **A malformed directive** is an error at its line and column, with the message
+  `onion` and `onionc` print. The rest of the file is still validated, against the jars
+  the script last resolved.
+- **A dependency that cannot be resolved** is an error on the directive lines with the
+  resolver's message, and the file is validated without it. The failure is remembered
+  rather than retried on every keystroke; saving the file retries it.
+- **Inside a project, directives are not used**, as `onion build` does not use them; a
+  warning on the directive lines says to declare the dependency in `onion.toml`.
+  (`onion file.on` and `onionc file.on` still read them when given the file directly.)
+
 ## Symbol support
 
 The language server indexes the following symbols from open documents:

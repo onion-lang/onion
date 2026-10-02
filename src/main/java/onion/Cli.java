@@ -18,9 +18,52 @@ import java.util.List;
  * Returns raw string values aligned with the specs: null where an optional
  * entry is absent, "true" for a present switch. On any error prints a usage
  * line to stderr and exits with status 1.
+ *
+ * A camelCase parameter is also reachable by its kebab-case spelling
+ * ({@code makeSample} answers to both {@code --make-sample} and
+ * {@code --makeSample}); usage text shows the kebab-case one. See {@link #kebab}.
  */
 public final class Cli {
     private Cli() {
+    }
+
+    /**
+     * The kebab-case spelling of a parameter name, the form a command line conventionally
+     * uses: {@code makeSample} becomes {@code make-sample}, {@code parseURL} becomes
+     * {@code parse-url}, {@code URLPath} becomes {@code url-path}, {@code level2Name}
+     * becomes {@code level2-name}. A name with no upper-case letter is returned unchanged,
+     * and so are underscores. A hyphen goes before an upper-case letter that follows a
+     * lower-case letter or a digit, or that starts a new word after an acronym (an
+     * upper-case letter followed by a lower-case one); every letter is lower-cased.
+     *
+     * <p>Shared by the auto-CLI ({@code def main}), {@link ToolCli}, and the compiler's
+     * check that two parameters of one command line do not answer to the same flag.
+     */
+    public static String kebab(String name) {
+        if (name == null) return null;
+        StringBuilder sb = new StringBuilder(name.length() + 4);
+        int n = name.length();
+        for (int i = 0; i < n; i++) {
+            char c = name.charAt(i);
+            if (Character.isUpperCase(c)) {
+                if (i > 0) {
+                    char prev = name.charAt(i - 1);
+                    boolean afterWord = Character.isLowerCase(prev) || Character.isDigit(prev);
+                    boolean startsWord = Character.isUpperCase(prev)
+                        && i + 1 < n && Character.isLowerCase(name.charAt(i + 1));
+                    if (afterWord || startsWord) sb.append('-');
+                }
+                sb.append(Character.toLowerCase(c));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /** Whether {@code given} (the part after {@code --}) names the parameter {@code name}. */
+    static boolean flagMatches(String name, String given) {
+        return name.equals(given) || kebab(name).equals(given);
     }
 
     /**
@@ -59,7 +102,7 @@ public final class Cli {
                 if (eq >= 0) { inlineValue = name.substring(eq + 1); name = name.substring(0, eq); }
                 int idx = -1;
                 for (int j = 0; j < names.length; j++) {
-                    if (names[j].equals(name) && kinds[j] != 'p') { idx = j; break; }
+                    if (flagMatches(names[j], name) && kinds[j] != 'p') { idx = j; break; }
                 }
                 if (idx < 0) return Outcome.bad(Defect.of(a, "a known option", "unknown"));
                 if (kinds[idx] == 's') {
@@ -130,7 +173,7 @@ public final class Cli {
                 }
                 int idx = -1;
                 for (int j = 0; j < names.length; j++) {
-                    if (names[j].equals(name) && kinds[j] != 'p') {
+                    if (flagMatches(names[j], name) && kinds[j] != 'p') {
                         idx = j;
                         break;
                     }
@@ -171,7 +214,7 @@ public final class Cli {
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
-            die("invalid value for --" + name + ": '" + value + "' (expected Int)");
+            die("invalid value for --" + kebab(name) + ": '" + value + "' (expected Int)");
             return 0; // unreachable
         }
     }
@@ -180,7 +223,7 @@ public final class Cli {
         try {
             return Long.parseLong(value);
         } catch (NumberFormatException e) {
-            die("invalid value for --" + name + ": '" + value + "' (expected Long)");
+            die("invalid value for --" + kebab(name) + ": '" + value + "' (expected Long)");
             return 0L; // unreachable
         }
     }
@@ -189,7 +232,7 @@ public final class Cli {
         try {
             return Double.parseDouble(value);
         } catch (NumberFormatException e) {
-            die("invalid value for --" + name + ": '" + value + "' (expected Double)");
+            die("invalid value for --" + kebab(name) + ": '" + value + "' (expected Double)");
             return 0.0; // unreachable
         }
     }
@@ -198,7 +241,7 @@ public final class Cli {
         try {
             return Float.parseFloat(value);
         } catch (NumberFormatException e) {
-            die("invalid value for --" + name + ": '" + value + "' (expected Float)");
+            die("invalid value for --" + kebab(name) + ": '" + value + "' (expected Float)");
             return 0.0f; // unreachable
         }
     }
@@ -207,7 +250,7 @@ public final class Cli {
         try {
             return Short.parseShort(value);
         } catch (NumberFormatException e) {
-            die("invalid value for --" + name + ": '" + value + "' (expected Short)");
+            die("invalid value for --" + kebab(name) + ": '" + value + "' (expected Short)");
             return 0; // unreachable
         }
     }
@@ -216,7 +259,7 @@ public final class Cli {
         try {
             return Byte.parseByte(value);
         } catch (NumberFormatException e) {
-            die("invalid value for --" + name + ": '" + value + "' (expected Byte)");
+            die("invalid value for --" + kebab(name) + ": '" + value + "' (expected Byte)");
             return 0; // unreachable
         }
     }
@@ -226,7 +269,7 @@ public final class Cli {
         // Boolean.parseBoolean, so `--count=maybe` exited with an error while
         // `--loud=maybe` silently became false (issue #349).
         if (!Scalars.isBoolean(value)) {
-            die("invalid value for --" + name + ": '" + value + "' (expected true or false)");
+            die("invalid value for --" + kebab(name) + ": '" + value + "' (expected true or false)");
         }
         return Scalars.toBoolean(value);
     }
@@ -277,8 +320,8 @@ public final class Cli {
         for (int j = 0; j < names.length; j++) {
             switch (kinds[j]) {
                 case 'p': usage.append(" <").append(names[j]).append('>'); break;
-                case 'v': usage.append(" [--").append(names[j]).append(" VALUE]"); break;
-                default:  usage.append(" [--").append(names[j]).append(']'); break;
+                case 'v': usage.append(" [--").append(kebab(names[j])).append(" VALUE]"); break;
+                default:  usage.append(" [--").append(kebab(names[j])).append(']'); break;
             }
         }
         usage.append(" [--help]");

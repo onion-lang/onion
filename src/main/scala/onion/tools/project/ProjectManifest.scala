@@ -182,7 +182,7 @@ object ProjectManifest:
   private val RepositoryShape =
     "repositories must be declared as [[repositories]] tables with a url string"
 
-  private[project] def validRepository(value: String): Boolean =
+  private[tools] def validRepository(value: String): Boolean =
     try
       val uri = java.net.URI(value)
       uri.isAbsolute && Set("http", "https", "file").contains(uri.getScheme)
@@ -192,18 +192,12 @@ object ProjectManifest:
     errorAt(path, table, at, s"""dependencies."$key" must be a version string""")
 
   /**
-   * A Maven version range (`[1.0,2.0)`, `(,2.0]`, `[1.0,)`) or an Ivy/Maven dynamic
-   * revision (`1.2.+`, `LATEST`, `RELEASE`, `latest.release`, `latest.integration`).
-   * Coursier resolves all of these, but the resolved version would then move underneath
-   * a fixed manifest text — exactly what docs/tools/project-cli.md promises `[dependencies]`
-   * does not do ("Versions are exact — no ranges, no `latest`"). Checked structurally
-   * (not against `validVersion`'s SemVer grammar) because `[dependencies]` versions are
-   * Maven coordinates, which are not required to be SemVer.
+   * Anything [[DependencyVersion.isExact]] refuses: a Maven range (`[1.0,2.0)`), an Ivy
+   * dynamic revision (`1.2.+`) or a moving alias (`LATEST`, `latest.release`). The rule is
+   * shared with `//> using dep` so a coordinate means the same thing in both places.
    */
   private[project] def isRangeOrDynamicVersion(version: String): Boolean =
-    val v = version.trim
-    v.startsWith("[") || v.startsWith("(") || v.endsWith("+") ||
-      Set("latest", "release", "latest.release", "latest.integration").contains(v.toLowerCase)
+    !DependencyVersion.isExact(version)
 
   private def rangeVersionError(path: Path, table: TomlTable, at: java.util.List[String], key: String, version: String): ProjectError =
     errorAt(path, table, at, s"""dependencies."$key" must be an exact version, not a range or "latest" (found "$version")""")

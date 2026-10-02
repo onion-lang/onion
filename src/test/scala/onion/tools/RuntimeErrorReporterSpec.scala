@@ -91,6 +91,59 @@ class RuntimeErrorReporterSpec extends AnyFunSpec {
     }
   }
 
+  describe("a failed assertion (FRICTION F12)") {
+    // A top-level statement runs inside the synthesized `start`; for `Assert::isTrue(...)`
+    // written at the top level, that frame is the only one of the user's.
+    val topLevelAssert = Seq(
+      ("onion.Assert", "isTrue", "Assert.java", 106),
+      ("onion.Assert", "isTrue", "Assert.java", 97),
+      ("tMain", "start", "t.on", 3),
+      ("tMain", "main", "t.on", -1),
+      ("java.lang.reflect.Method", "invoke", "Method.java", 565)
+    )
+
+    it("is reported at the line of a top-level Assert:: call") {
+      val out = RuntimeErrorReporter.render(
+        withTrace(new AssertionError("Expected true but was false"), topLevelAssert: _*), "t.on")
+      assert(out.startsWith("t.on:3: error: AssertionError: Expected true but was false"), out)
+      assert(!out.contains(onion.compiler.toolbox.Message("runtime.noUserFrames")), out)
+      assert(!out.contains("Assert.java"), out)
+    }
+
+    it("is reported at the assertion inside a function, never at the start wrapper") {
+      val out = RuntimeErrorReporter.render(
+        withTrace(new AssertionError("Expected <3> but was <2>"),
+          ("onion.Assert", "equals", "Assert.java", 30),
+          ("tMain", "check", "t.on", 2),
+          ("tMain", "start", "t.on", 5)), "t.on")
+      assert(out.startsWith("t.on:2: error:"), out)
+      assert(!out.contains("start"), out)
+    }
+
+    it("exposes the same position to `onion test`") {
+      val t = withTrace(new AssertionError("x"), topLevelAssert: _*)
+      val f = RuntimeErrorReporter.firstUserFrame(t)
+      assert(f.map(x => (x.getFileName, x.getLineNumber)).contains(("t.on", 3)))
+    }
+
+    it("shows the source line when the frame is in the script being run") {
+      val dir = java.nio.file.Files.createTempDirectory("onion-rer")
+      val script = dir.resolve("s.on")
+      java.nio.file.Files.writeString(script, "println(\"a\")\nval x = 2\nAssert::isTrue(x == 3)   \n")
+      val out = RuntimeErrorReporter.render(
+        withTrace(new AssertionError("Expected true but was false"),
+          ("onion.Assert", "isTrue", "Assert.java", 106), ("sMain", "start", "s.on", 3)),
+        script.toString)
+      assert(out.linesIterator.toSeq.lift(1).contains("  3 | Assert::isTrue(x == 3)"), out)
+    }
+
+    it("shows no source line for a file it cannot find") {
+      val out = RuntimeErrorReporter.render(
+        withTrace(new AssertionError("x"), ("qMain", "start", "q.on", 3)), "no/such/q.on")
+      assert(!out.contains(" | "), out)
+    }
+  }
+
   describe("failures with nothing of the user's in the trace") {
     it("falls back to the script name and says why there is no position") {
       val out = RuntimeErrorReporter.render(

@@ -1,0 +1,248 @@
+// TextReadability.on — Flesch-Kincaid, Gunning Fog, and SMOG readability metrics
+//
+// Features exercised: records (TextStats, ReadabilityReport); data-carrying
+// enum ReadabilityBand; class TextAnalyzer; collection pipelines (map/filter/
+// fold/sortedBy); closures; string interpolation; foreach; select/pattern
+// matching; static methods; recursion; nullable; while loops.
+
+record TextStats(
+  wordCount: Int,
+  sentenceCount: Int,
+  syllableCount: Int,
+  longWordCount: Int     // words with >= 3 syllables (complex words for Fog/SMOG)
+)
+
+record ReadabilityReport(
+  name: String,
+  stats: TextStats,
+  fleschKincaid: Double,  // 0-100, higher = easier
+  gunningFog: Double,     // grade level; lower = easier
+  smog: Double            // grade level; lower = easier
+)
+
+enum ReadabilityBand {
+  case VeryEasy(minScore: Double)
+  case Easy(minScore: Double)
+  case FairlyEasy(minScore: Double)
+  case Standard(minScore: Double)
+  case FairlyDifficult(minScore: Double)
+  case Difficult(minScore: Double)
+  case VeryDifficult(minScore: Double)
+
+  public:
+    def label(): String = select this {
+      case v is VeryEasy:        "Very Easy (5th grade)"
+      case v is Easy:            "Easy (6th grade)"
+      case v is FairlyEasy:      "Fairly Easy (7th grade)"
+      case v is Standard:        "Standard (8th-9th grade)"
+      case v is FairlyDifficult: "Fairly Difficult (10th-12th grade)"
+      case v is Difficult:       "Difficult (College)"
+      case v is VeryDifficult:   "Very Difficult (Professional)"
+    }
+}
+
+def bandFor(fke: Double): ReadabilityBand {
+  if fke >= 90.0 { return new VeryEasy(90.0) }
+  if fke >= 80.0 { return new Easy(80.0) }
+  if fke >= 70.0 { return new FairlyEasy(70.0) }
+  if fke >= 60.0 { return new Standard(60.0) }
+  if fke >= 50.0 { return new FairlyDifficult(50.0) }
+  if fke >= 30.0 { return new Difficult(30.0) }
+  return new VeryDifficult(0.0)
+}
+
+// ---------- text analysis helpers ----------
+
+def isVowelChar(c: String): Boolean =
+  c == "a" || c == "e" || c == "i" || c == "o" || c == "u" || c == "y"
+
+def syllablesInWord(raw: String): Int {
+  val word = raw.toLowerCase()
+  var count: Int = 0
+  var prevVowel: Boolean = false
+  var i: Int = 0
+  while i < word.length() {
+    val ch = word.substring(i, i + 1)
+    val v = isVowelChar(ch)
+    if v && !prevVowel { count++ }
+    prevVowel = v
+    i++
+  }
+  // silent trailing 'e' (only if more than one syllable remains)
+  if word.length() > 2 && word.endsWith("e") && count > 1 { count-- }
+  if count == 0 { count = 1 }
+  return count
+}
+
+def countSentenceEnds(text: String): Int {
+  var n: Int = 0
+  var i: Int = 0
+  while i < text.length() {
+    val ch = text.substring(i, i + 1)
+    if ch == "." || ch == "!" || ch == "?" { n++ }
+    i++
+  }
+  return if n == 0 { 1 } else { n }
+}
+
+def analyzeText(name: String, text: String): ReadabilityReport {
+  val rawWords = text.toLowerCase().split("[^a-z']+").toList()
+  val words = rawWords.filter { w -> (w as String).length() > 0 }
+  val wc = words.size
+  val sc = countSentenceEnds(text)
+
+  var totalSyl: Int = 0
+  var longWords: Int = 0
+  foreach w: String in words {
+    val s = syllablesInWord(w)
+    totalSyl = totalSyl + s
+    if s >= 3 { longWords++ }
+  }
+
+  val stats = new TextStats(wc, sc, totalSyl, longWords)
+
+  val wPerS: Double = (wc as Double) / (sc as Double)
+  val sylPerW: Double = (totalSyl as Double) / (wc as Double)
+  val longPerW: Double = (longWords as Double) / (wc as Double)
+
+  val fke = 206.835 - 1.015 * wPerS - 84.6 * sylPerW
+  val fog = 0.4 * (wPerS + 100.0 * longPerW)
+  val smog = 3.0 + Math::sqrt((longWords as Double) * (30.0 / (sc as Double)))
+
+  return new ReadabilityReport(name, stats, fke, fog, smog)
+}
+
+def round1(d: Double): Double = Math::round(d * 10.0) / 10.0
+
+def printReport(r: ReadabilityReport): void {
+  val s = r.stats()
+  val band = bandFor(r.fleschKincaid())
+  IO::println("=== #{r.name()} ===")
+  IO::println("  words=#{s.wordCount()}  sentences=#{s.sentenceCount()}  syllables=#{s.syllableCount()}  complex=#{s.longWordCount()}")
+  IO::println("  Flesch-Kincaid ease : #{round1(r.fleschKincaid())}  -> #{band.label()}")
+  IO::println("  Gunning Fog index   : #{round1(r.gunningFog())} (grade level)")
+  IO::println("  SMOG index          : #{round1(r.smog())} (grade level)")
+}
+
+// ---------- TextAnalyzer class ----------
+
+class TextAnalyzer {
+  val _reports: List[ReadabilityReport]
+
+public:
+  def this {
+    _reports = []
+  }
+
+  def add(name: String, text: String): void {
+    _reports.add(analyzeText(name, text))
+  }
+
+  def printAll(): void {
+    foreach r: ReadabilityReport in _reports {
+      printReport(r)
+    }
+  }
+
+  def easiest(): ReadabilityReport? {
+    val sorted = _reports.sortedByDescending { r -> (r as ReadabilityReport).fleschKincaid() }
+    if sorted.size == 0 { return null }
+    return sorted[0] as ReadabilityReport
+  }
+
+  def hardest(): ReadabilityReport? {
+    val sorted = _reports.sortedBy { r -> (r as ReadabilityReport).fleschKincaid() }
+    if sorted.size == 0 { return null }
+    return sorted[0] as ReadabilityReport
+  }
+
+  def summary(): void {
+    IO::println("\n--- Summary (#{_reports.size} texts) ---")
+    val avgFK = _reports.fold(0.0) { acc, r -> (acc as Double) + (r as ReadabilityReport).fleschKincaid() }
+    val meanFK = (avgFK as Double) / (_reports.size as Double)
+    IO::println("  Average Flesch-Kincaid ease: #{round1(meanFK)}")
+
+    val e = easiest()
+    val h = hardest()
+    if e != null { IO::println("  Easiest: #{(e as ReadabilityReport).name()} (#{round1((e as ReadabilityReport).fleschKincaid())})") }
+    if h != null { IO::println("  Hardest: #{(h as ReadabilityReport).name()} (#{round1((h as ReadabilityReport).fleschKincaid())})") }
+
+    IO::println("\n  Ranked by ease (high = easy):")
+    val ranked = _reports.sortedByDescending { r -> (r as ReadabilityReport).fleschKincaid() }
+    var rank: Int = 1
+    foreach r: ReadabilityReport in ranked {
+      IO::println("    #{rank}. #{r.name()} -- FK=#{round1(r.fleschKincaid())} Fog=#{round1(r.gunningFog())}")
+      rank++
+    }
+  }
+}
+
+// ---------- sample texts ----------
+
+val CHILDREN = "The cat sat on the mat. The dog ran and ran. It was fun. The sun is hot. We like to play."
+
+val NEWS = "The city council voted Tuesday to approve a new budget of four million dollars for road repairs. Officials said the funds would be distributed across twelve districts over the next fiscal year. The mayor praised the decision."
+
+val ACADEMIC = "The proliferation of microservices architectures has precipitated fundamental transformations in organizational software delivery paradigms. Containerization technologies facilitate declarative infrastructure management through immutable deployment artifacts, enabling reproducible environments across heterogeneous computational substrates."
+
+val LEGAL = "Notwithstanding any provisions of this Agreement to the contrary, the indemnifying party shall defend, indemnify, and hold harmless the indemnified party and its affiliates, officers, directors, employees, agents, successors, and permitted assigns from and against any and all claims, damages, losses, costs, and expenses."
+
+val NOVEL = "It was the best of times, it was the worst of times. We had everything before us, we had nothing before us. The period was so far like the present period that some of its noisiest authorities insisted on its being received, for good or for evil, in the superlative degree of comparison only."
+
+// ---------- main ----------
+
+val analyzer = new TextAnalyzer()
+analyzer.add("Children book", CHILDREN)
+analyzer.add("News article", NEWS)
+analyzer.add("Academic paper", ACADEMIC)
+analyzer.add("Legal contract", LEGAL)
+analyzer.add("Classic novel", NOVEL)
+
+analyzer.printAll()
+analyzer.summary()
+
+// ---------- word-frequency breakdown for the longest text ----------
+
+IO::println("\n=== Word-frequency breakdown (Legal contract) ===")
+val legalWords = LEGAL.toLowerCase().split("[^a-z]+").toList()
+                     .filter { w -> (w as String).length() > 2 }
+val freq = Maps::countBy(legalWords) { w -> w }
+record WordCount(word: String, count: Int)
+val wcs = Maps::toList(freq) { k, v -> new WordCount(k as String, v as Int) }
+val top10 = wcs.sortedByDescending { x -> (x as WordCount).count() }
+               .filter { x -> (x as WordCount).count() > 1 }
+IO::println("  Repeated words:")
+foreach wc: WordCount in top10 {
+  IO::println("    \"#{wc.word()}\" x#{wc.count()}")
+}
+
+// ---------- syllable distribution across all texts ----------
+
+IO::println("\n=== Syllable distribution across all texts ===")
+
+val allSampleTexts = [CHILDREN, NEWS, ACADEMIC, LEGAL, NOVEL]
+val allSampleNames = ["Children book", "News article", "Academic paper", "Legal contract", "Classic novel"]
+var idx: Int = 0
+foreach sample: String in allSampleTexts {
+  val sampleName = allSampleNames[idx] as String
+  val ws = sample.toLowerCase().split("[^a-z]+").toList()
+                 .filter { w -> (w as String).length() > 0 }
+  val syllBuckets: Map[Object, Object] = [:]
+  foreach w: String in ws {
+    val s = syllablesInWord(w)
+    val key = s + " syl"
+    val cur = syllBuckets[key]
+    if cur == null {
+      syllBuckets[key] = 1
+    } else {
+      syllBuckets[key] = (cur as Int) + 1
+    }
+  }
+  val bucketKeys = syllBuckets.keys().sortedBy { k -> k as String }
+  var bucketStr: String = ""
+  foreach k: String in bucketKeys {
+    bucketStr = bucketStr + " [#{k}: #{syllBuckets[k]}]"
+  }
+  IO::println("  #{sampleName}:#{bucketStr}")
+  idx++
+}

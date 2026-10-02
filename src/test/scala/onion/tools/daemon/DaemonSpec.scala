@@ -79,12 +79,46 @@ class DaemonSpec extends AnyFunSpec with Matchers {
       }
     }
 
+    it("compiles a script against its //> using dep jars and returns them in the class path") {
+      // The daemon's half directly, without a socket: the directive handling is in
+      // ScriptRunner.prepare, which the daemon runs.
+      if (System.getProperty("onion.cache.dir") == null)
+        System.setProperty("onion.cache.dir", Files.createTempDirectory("onion-script-cache").toString)
+      val repository = onion.tools.project.FixtureMavenRepository.publish()
+      locally {
+        val work = Files.createTempDirectory("onion-daemon-deps")
+        val source = work.resolve("Deps.on")
+        Files.writeString(source,
+          s"""//> using repository "${repository.toUri}"
+             |//> using dep "${onion.tools.project.FixtureMavenRepository.Coordinate.render}"
+             |import { com.example.oniontest.Greeter }
+             |IO::println(Greeter::greet())
+             |""".stripMargin)
+        val runner = DaemonClient.absolutizeRunnerOptions(Array.empty, work) :+ source.toString
+        val (response, bundle) = OnionDaemon.compileScript(runner)
+        withClue(response.err) { response.exitCode shouldBe 0 }
+        bundle.classPath.head shouldBe work.toString
+        bundle.classPath.exists(_.endsWith("greeter-1.0.0.jar")) shouldBe true
+        bundle.classPath.exists(_.endsWith("core-1.0.0.jar")) shouldBe true
+      }
+    }
+
     it("makes source, -d and -classpath paths absolute and supplies the defaults") {
-      val cwd = Path.of("/work/dir")
-      val args = DaemonClient.absolutize(Array("--warn", "off", "a.on", "sub/b.on"), cwd)
-      args.toList shouldBe List("--warn", "off", "/work/dir/a.on", "/work/dir/sub/b.on", "-d", "/work/dir", "-classpath", "/work/dir")
-      val explicit = DaemonClient.absolutize(Array("-d", "out", "-classpath", "lib/a.jar:/abs/b.jar", "x.on"), cwd)
-      explicit.toList shouldBe List("-d", "/work/dir/out", "-classpath", "/work/dir/lib/a.jar:/abs/b.jar", "/work/dir/x.on")
+      // Paths are the platform's: `/`-rooted with `:`-separated class paths on POSIX,
+      // drive-rooted with `\` and `;` on Windows.
+      if (java.io.File.separatorChar == '/') {
+        val cwd = Path.of("/work/dir")
+        val args = DaemonClient.absolutize(Array("--warn", "off", "a.on", "sub/b.on"), cwd)
+        args.toList shouldBe List("--warn", "off", "/work/dir/a.on", "/work/dir/sub/b.on", "-d", "/work/dir", "-classpath", "/work/dir")
+        val explicit = DaemonClient.absolutize(Array("-d", "out", "-classpath", "lib/a.jar:/abs/b.jar", "x.on"), cwd)
+        explicit.toList shouldBe List("-d", "/work/dir/out", "-classpath", "/work/dir/lib/a.jar:/abs/b.jar", "/work/dir/x.on")
+      } else {
+        val cwd = Path.of("C:\\work\\dir")
+        val args = DaemonClient.absolutize(Array("--warn", "off", "a.on", "sub/b.on"), cwd)
+        args.toList shouldBe List("--warn", "off", "C:\\work\\dir\\a.on", "C:\\work\\dir\\sub\\b.on", "-d", "C:\\work\\dir", "-classpath", "C:\\work\\dir")
+        val explicit = DaemonClient.absolutize(Array("-d", "out", "-classpath", "lib/a.jar;D:\\abs\\b.jar;\\rooted\\c.jar", "x.on"), cwd)
+        explicit.toList shouldBe List("-d", "C:\\work\\dir\\out", "-classpath", "C:\\work\\dir\\lib\\a.jar;D:\\abs\\b.jar;C:\\rooted\\c.jar", "C:\\work\\dir\\x.on")
+      }
     }
   }
 }

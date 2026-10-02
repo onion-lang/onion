@@ -8,6 +8,7 @@
 package onion.tools.lsp
 
 import onion.compiler._
+import onion.tools.ScriptDirectives
 import org.eclipse.lsp4j._
 import org.eclipse.lsp4j.jsonrpc.messages.{Either => LspEither}
 import org.eclipse.lsp4j.services.TextDocumentService
@@ -96,13 +97,36 @@ object OnionTextDocumentService {
    *             wrong for anything in a project.
    */
   def validationConfig(file: Option[java.nio.file.Path]): CompilerConfig =
-    CompilerConfig(LspProjectClasspath.forDocument(file), null, "UTF-8", "", 100, checkLaws = false)
+    validationConfig(file, Seq.empty)
+
+  /**
+   * @param scriptJars what a standalone script's `//> using dep` directives resolved to
+   *                   (see [[LspScriptClasspath]]); they follow the document's own classpath,
+   *                   as they follow `-classpath` for `onion script.on`.
+   */
+  def validationConfig(file: Option[java.nio.file.Path], scriptJars: Seq[String]): CompilerConfig =
+    CompilerConfig(LspProjectClasspath.forDocument(file) ++ scriptJars, null, "UTF-8", "", 100, checkLaws = false)
 }
 
 class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocumentService {
   private var client: org.eclipse.lsp4j.services.LanguageClient = _
   private val documents = new ConcurrentHashMap[String, DocumentState]()
   private val symbolTable = new SymbolTable()
+
+  /** The directive set (by key) each open standalone script declares, for revalidation. */
+  private val scriptKeys = new ConcurrentHashMap[String, String]()
+
+  /**
+   * The jars each open script last validated with, kept for while its header is
+   * momentarily malformed (half-typed): validating without them would underline every
+   * imported type for the length of one keystroke.
+   */
+  private val lastScriptJars = new ConcurrentHashMap[String, Seq[String]]()
+
+  private val scriptClasspath = new LspScriptClasspath(
+    wanted = key => scriptKeys.containsValue(key),
+    onSettled = key => scriptKeys.forEach { (uri, k) => if (k == key) revalidate(uri) }
+  )
 
   // Onion keywords for completion
   private val keywords = Array(
@@ -151,6 +175,8 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     val uri = params.getTextDocument.getUri
     documents.remove(uri)
     symbolTable.clear(uri)
+    scriptKeys.remove(uri)
+    lastScriptJars.remove(uri)
     // Clear diagnostics
     client.publishDiagnostics(new PublishDiagnosticsParams(uri, java.util.Collections.emptyList()))
   }
@@ -159,6 +185,10 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     val uri = params.getTextDocument.getUri
     val state = documents.get(uri)
     if (state != null) {
+      // Saving is the signal to retry a dependency resolution that failed.
+      ScriptDirectives.parse(state.content).foreach { d =>
+        if (!d.isEmpty) scriptClasspath.retryIfFailed(d)
+      }
       validateDocument(uri, state.content)
     }
   }
@@ -692,22 +722,132 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     symbolTable.allSymbols.filter(_.name.toLowerCase.contains(lowerQuery))
   }
 
-  private def validateDocument(uri: String, content: String): Unit = {
-    val fileName = extractFileName(uri)
-    val compiler = new OnionCompiler(OnionTextDocumentService.validationConfig(extractPath(uri)))
+  /** Validates the document's current text again, if it is still open. */
+  private def revalidate(uri: String): Unit = synchronized {
+    val state = documents.get(uri)
+    if (state != null) validateDocument(uri, state.content)
+  }
 
-    val diagnostics =
-      try {
-        val result = compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(content), fileName)))
-        result.diagnostics.errors.map(errorToDiagnostic(_, content)) ++
-          result.diagnostics.warnings.map(warningToDiagnostic(_, content))
-      } catch {
-        case e: Throwable =>
-          // Compiler crashes should never bring down the LSP server.
-          Seq(internalErrorToDiagnostic(e, content))
-      }
+  /**
+   * Synchronized because a background dependency resolution revalidates too (see
+   * [[revalidate]]): without the lock it could publish diagnostics for older text after
+   * the listener thread had published them for newer.
+   */
+  private def validateDocument(uri: String, content: String): Unit = synchronized {
+    val fileName = extractFileName(uri)
+    val path = extractPath(uri)
+
+    val diagnostics = scriptDependencies(uri, path, content) match {
+      case ScriptPlan.Hold(notes) => notes
+      case ScriptPlan.Compile(jars, notes) =>
+        val compiler = new OnionCompiler(OnionTextDocumentService.validationConfig(path, jars))
+        notes ++ (
+          try {
+            val result = compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(content), fileName)))
+            result.diagnostics.errors.map(errorToDiagnostic(_, content)) ++
+              result.diagnostics.warnings.map(warningToDiagnostic(_, content))
+          } catch {
+            case e: Throwable =>
+              // Compiler crashes should never bring down the LSP server.
+              Seq(internalErrorToDiagnostic(e, content))
+          })
+    }
 
     client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics.asJava))
+  }
+
+  /** What a document's `//> using` directives mean for validating it now. */
+  private enum ScriptPlan {
+    /** Compile with these extra jars, and publish `notes` with the compiler's diagnostics. */
+    case Compile(jars: Seq[String], notes: Seq[Diagnostic])
+    /** Do not compile yet (dependencies are resolving); publish only `notes`. */
+    case Hold(notes: Seq[Diagnostic])
+  }
+
+  /**
+   * A file inside a project takes its dependencies from `onion.toml`, as `onion build`
+   * does, so its directives are not resolved; a warning says so, since otherwise the
+   * dependency's types would be underlined with no hint why. A standalone script's
+   * directives are parsed exactly as `onion script.on` parses them: a malformed one is an
+   * error at its line with the CLI's message, and a well-formed set is resolved in the
+   * background (see [[LspScriptClasspath]]). Until it is, diagnostics are held: the
+   * compiler would otherwise report every type the dependency provides as not found.
+   */
+  private def scriptDependencies(uri: String, path: Option[java.nio.file.Path], content: String): ScriptPlan = {
+    def noDirectives(): ScriptPlan = {
+      scriptKeys.remove(uri)
+      lastScriptJars.remove(uri)
+      ScriptPlan.Compile(Seq.empty, Seq.empty)
+    }
+    path.flatMap(LspProjectClasspath.projectRoot) match {
+      case Some(root) =>
+        val lines = ScriptDirectives.directiveLines(content)
+        if (lines.isEmpty) noDirectives()
+        else {
+          scriptKeys.remove(uri)
+          lastScriptJars.remove(uri)
+          ScriptPlan.Compile(Seq.empty, Seq(directiveBlockDiagnostic(content, lines, DiagnosticSeverity.Warning,
+            "`//> using` directives are not used inside a project: `onion build` (and this editor) take " +
+              s"dependencies from ${root.resolve("onion.toml")}. Declare them under [dependencies] there; " +
+              "`onion` and `onionc` still read these directives when given this file directly.")))
+        }
+      case None =>
+        ScriptDirectives.parse(content) match {
+          case Left(error) =>
+            ScriptPlan.Compile(
+              Option(lastScriptJars.get(uri)).getOrElse(Seq.empty),
+              Seq(directiveErrorDiagnostic(content, error)))
+          case Right(directives) if directives.isEmpty => noDirectives()
+          case Right(directives) =>
+            scriptKeys.put(uri, scriptClasspath.keyOf(directives))
+            scriptClasspath.lookup(directives) match {
+              case LspScriptClasspath.Lookup.Ready(jars) =>
+                lastScriptJars.put(uri, jars)
+                ScriptPlan.Compile(jars, Seq.empty)
+              case LspScriptClasspath.Lookup.Pending =>
+                ScriptPlan.Hold(Seq(directiveBlockDiagnostic(content, ScriptDirectives.directiveLines(content),
+                  DiagnosticSeverity.Information,
+                  "Resolving the `//> using` dependencies; this file is checked once they are on the classpath")))
+              case LspScriptClasspath.Lookup.Failed(message) =>
+                lastScriptJars.remove(uri)
+                ScriptPlan.Compile(Seq.empty, Seq(directiveBlockDiagnostic(content,
+                  ScriptDirectives.directiveLines(content), DiagnosticSeverity.Error, message)))
+            }
+        }
+    }
+  }
+
+  /** A directive error at the line and column the CLI reports it at, to the end of that line. */
+  private def directiveErrorDiagnostic(content: String, error: ScriptDirectives.DirectiveError): Diagnostic = {
+    val line = Math.max(0, error.line - 1)
+    val lineText = getLineAt(content, line).stripSuffix("\r")
+    val start = Math.min(Math.max(0, error.column - 1), lineText.length)
+    val diagnostic = new Diagnostic()
+    diagnostic.setRange(new Range(new Position(line, start), new Position(line, Math.max(start, lineText.length))))
+    diagnostic.setSeverity(DiagnosticSeverity.Error)
+    diagnostic.setSource("onion")
+    diagnostic.setMessage(error.message)
+    diagnostic
+  }
+
+  /** A diagnostic about the directives as a whole, spanning the `//>` lines (1-based `lines`). */
+  private def directiveBlockDiagnostic(
+    content: String,
+    lines: Seq[Int],
+    severity: DiagnosticSeverity,
+    message: String
+  ): Diagnostic = {
+    val first = Math.max(0, lines.headOption.getOrElse(1) - 1)
+    val last = Math.max(first, lines.lastOption.getOrElse(1) - 1)
+    val firstText = getLineAt(content, first).stripSuffix("\r")
+    val diagnostic = new Diagnostic()
+    diagnostic.setRange(new Range(
+      new Position(first, firstText.length - firstText.stripLeading().length),
+      new Position(last, getLineAt(content, last).stripSuffix("\r").length)))
+    diagnostic.setSeverity(severity)
+    diagnostic.setSource("onion")
+    diagnostic.setMessage(message)
+    diagnostic
   }
 
   private def errorToDiagnostic(error: CompileError, content: String): Diagnostic = {
@@ -716,18 +856,27 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     diagnostic.setRange(range)
     diagnostic.setSeverity(DiagnosticSeverity.Error)
     diagnostic.setSource("onion")
+    error.errorCode.foreach(diagnostic.setCode(_))
     diagnostic.setMessage(error.message)
     diagnostic
   }
 
   private def warningToDiagnostic(warning: CompileWarning, content: String): Diagnostic = {
-    val range = locationToRange(warning.location, content)
+    // A library jar's effect-table warning (W0017/W0018) is located in that jar's table,
+    // not in this document: pin it to the top and say where it really is.
+    val elsewhere = warning.category == onion.compiler.WarningCategory.LibraryEffectTableMalformed ||
+      warning.category == onion.compiler.WarningCategory.LibraryEffectTableForeignClass
+    val range =
+      if (elsewhere) new Range(new Position(0, 0), new Position(0, 0))
+      else locationToRange(warning.location, content)
     val diagnostic = new Diagnostic()
     diagnostic.setRange(range)
     diagnostic.setSeverity(DiagnosticSeverity.Warning)
     diagnostic.setSource("onion")
     diagnostic.setCode(warning.category.code)
-    diagnostic.setMessage(warning.message)
+    diagnostic.setMessage(
+      if (elsewhere) s"${warning.sourceFile}:${Option(warning.location).map(_.line).getOrElse(0)}: ${warning.message}"
+      else warning.message)
     diagnostic
   }
 

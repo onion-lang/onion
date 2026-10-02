@@ -1,0 +1,425 @@
+// ProjectConfig.on — Multi-config project configuration manager.
+//
+// Manages three `key = value` config files. Edits preserve comments, spacing
+// and unknown keys through the Lossless lens (parseLossless / edit / render).
+//
+//   inspect  [db] [server] [flags]        show live config values (defaults if absent)
+//   editDb   <db.conf> <key> <value>       update db.conf in-place
+//   editSrv  <server.conf> <key> <val>     update server.conf in-place
+//   toggle   <flags.conf> <flag>           flip a boolean feature flag
+//   diff     [db] [server] [flags]         show deltas from factory defaults
+//
+// Exercises:
+//   record { shape = config }     lossless config parsing (3 schemas, 7 examples)
+//   parseLossless / edit / render the Lossless / Residue lens pair
+//   multiple tool declarations    5 tools, distinct requires clauses
+//   do[Option]                    chained nullable lookup in diff + inspect
+//   extension methods on String/Int  padding, port/positive validators
+//   select / pattern matching     key dispatch in editDb / editSrv / toggle
+//   collection pipelines          filter / map / any in diff
+//   string interpolation          all report lines
+//   try/catch                     resilient file-not-found handling
+
+import {
+  java.lang.StringBuilder;
+  onion.Option
+}
+
+// ─── Extensions ───────────────────────────────────────────────────────────────
+
+extension String {
+  def padRight2(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def toIntOpt(): Int? {
+    try { return Integer::parseInt(self) }
+    catch e: java.lang.NumberFormatException { return null }
+  }
+  def isValidHost2(): Boolean = self.length() > 0 && !self.contains(" ")
+}
+
+extension Int {
+  def isPort2(): Boolean     = self >= 1 && self <= 65535
+  def isPositive2(): Boolean = self > 0
+}
+
+// ─── DbConfig ─────────────────────────────────────────────────────────────────
+
+record DbConfig(host: String, port: Int, database: String, maxPool: Int) {
+  shape cfg = config
+  example roundTripDb {
+    val t = "# Database\nhost = localhost\nport = 5432\ndatabase = myapp\nmaxPool = 10\n"
+    val r = DbConfig::cfg().parseLossless(t).get()
+    DbConfig::cfg().printLossless(r.value(), r.residue()) == t
+  }
+  example editPortDb {
+    val t = "# Database\nhost = example.com\nport = 5432\ndatabase = prod\nmaxPool = 20\n"
+    val r = DbConfig::cfg().parseLossless(t).get()
+    val out = r.edit { v -> v.copy(port = 5433) }.render()
+    out == "# Database\nhost = example.com\nport = 5433\ndatabase = prod\nmaxPool = 20\n"
+  }
+}
+
+// ─── ServerConfig ─────────────────────────────────────────────────────────────
+
+record ServerConfig(host: String, port: Int, workers: Int, timeout: Int) {
+  shape cfg = config
+  example roundTripSrv {
+    val t = "# Server\nhost = 0.0.0.0\nport = 8080\nworkers = 4\ntimeout = 30\n"
+    val r = ServerConfig::cfg().parseLossless(t).get()
+    ServerConfig::cfg().printLossless(r.value(), r.residue()) == t
+  }
+  example editWorkersSrv {
+    val t = "# Server\nhost = 0.0.0.0\nport = 8080\nworkers = 4\ntimeout = 30\n"
+    val r = ServerConfig::cfg().parseLossless(t).get()
+    val out = r.edit { v -> v.copy(workers = 8) }.render()
+    out == "# Server\nhost = 0.0.0.0\nport = 8080\nworkers = 8\ntimeout = 30\n"
+  }
+}
+
+// ─── FeatureFlags ─────────────────────────────────────────────────────────────
+
+record FeatureFlags(darkMode: Boolean, betaSearch: Boolean, analytics: Boolean, debugLog: Boolean) {
+  shape cfg = config
+  example roundTripFlags {
+    val t = "# Flags\ndarkMode = false\nbetaSearch = false\nanalytics = true\ndebugLog = false\n"
+    val r = FeatureFlags::cfg().parseLossless(t).get()
+    FeatureFlags::cfg().printLossless(r.value(), r.residue()) == t
+  }
+  example toggleDarkMode {
+    val t = "# Flags\ndarkMode = false\nbetaSearch = false\nanalytics = true\ndebugLog = false\n"
+    val r = FeatureFlags::cfg().parseLossless(t).get()
+    val out = r.edit { v -> v.copy(darkMode = true) }.render()
+    out == "# Flags\ndarkMode = true\nbetaSearch = false\nanalytics = true\ndebugLog = false\n"
+  }
+  example toggleAnalytics {
+    val t = "# Flags\ndarkMode = false\nbetaSearch = false\nanalytics = true\ndebugLog = false\n"
+    val r = FeatureFlags::cfg().parseLossless(t).get()
+    val out = r.edit { v -> v.copy(analytics = false) }.render()
+    out == "# Flags\ndarkMode = false\nbetaSearch = false\nanalytics = false\ndebugLog = false\n"
+  }
+}
+
+// ─── Default file contents ────────────────────────────────────────────────────
+// Stored as static fields to avoid top-level val statements (which would
+// prevent the runtime from treating this file as a multi-tool CLI script).
+
+class Defaults {
+public:
+  static val DB: String =
+    "# Database configuration\nhost = localhost\nport = 5432\ndatabase = myapp\nmaxPool = 10\n"
+  static val SERVER: String =
+    "# Server configuration\nhost = 0.0.0.0\nport = 8080\nworkers = 4\ntimeout = 30\n"
+  static val FLAGS: String =
+    "# Feature flags\ndarkMode = false\nbetaSearch = false\nanalytics = true\ndebugLog = false\n"
+}
+
+// Read a config file; fall back to defaults if absent or unreadable.
+def readOrDefault(path: String, defaults: String): String {
+  try { return Files::readText(path) }
+  catch e: Exception { return defaults }
+}
+
+// Print a two-column config line.
+def cfgLine(key: String, value: String): void {
+  IO::println("  " + key.padRight2(12) + value)
+}
+
+// ─── Validation helpers ────────────────────────────────────────────────────────
+
+def validPort2(s: String): Int? {
+  val n = s.toIntOpt()
+  if n == null { return null }
+  val i = n as Int
+  return if i.isPort2() { i } else { null }
+}
+
+def validPositive2(s: String): Int? {
+  val n = s.toIntOpt()
+  if n == null { return null }
+  val i = n as Int
+  return if i.isPositive2() { i } else { null }
+}
+
+// Lift a nullable String to Option[String] for do[Option] chaining.
+def toOpt(s: String?): Option[String] =
+  if s == null { Option::none() } else { Option::some(s as String) }
+
+// ─── tools ────────────────────────────────────────────────────────────────────
+
+tool inspect(db: String = "db.conf",
+             server: String = "server.conf",
+             flags: String = "flags.conf"): Int
+  requires { read(db), read(server), read(flags), console }
+{
+  var rc: Int = 0
+
+  // ── db ──
+  val dbText = readOrDefault(db, Defaults::DB)
+  val dbRes = DbConfig::cfg().parse(dbText)
+  if dbRes.isOk() {
+    val c = dbRes.get()
+    IO::println("── #{db}")
+    cfgLine("host:",     c.host())
+    cfgLine("port:",     "#{c.port()}")
+    cfgLine("database:", c.database())
+    cfgLine("maxPool:",  "#{c.maxPool()}")
+  } else {
+    IO::println("#{db}: PARSE ERRORS")
+    foreach d: Defect in dbRes.defects() { IO::println("  ! " + d.describe()) }
+    rc = 1
+  }
+
+  // ── server ──
+  val srvText = readOrDefault(server, Defaults::SERVER)
+  val srvRes = ServerConfig::cfg().parse(srvText)
+  if srvRes.isOk() {
+    val c = srvRes.get()
+    IO::println("── #{server}")
+    cfgLine("host:",    c.host())
+    cfgLine("port:",    "#{c.port()}")
+    cfgLine("workers:", "#{c.workers()}")
+    cfgLine("timeout:", "#{c.timeout()}s")
+  } else {
+    IO::println("#{server}: PARSE ERRORS")
+    foreach d: Defect in srvRes.defects() { IO::println("  ! " + d.describe()) }
+    rc = 1
+  }
+
+  // ── flags ──
+  val fText = readOrDefault(flags, Defaults::FLAGS)
+  val fRes = FeatureFlags::cfg().parse(fText)
+  if fRes.isOk() {
+    val f = fRes.get()
+    IO::println("── #{flags}")
+    cfgLine("darkMode:",   if f.darkMode()   { "ON" } else { "off" })
+    cfgLine("betaSearch:", if f.betaSearch() { "ON" } else { "off" })
+    cfgLine("analytics:",  if f.analytics()  { "ON" } else { "off" })
+    cfgLine("debugLog:",   if f.debugLog()   { "ON" } else { "off" })
+  } else {
+    IO::println("#{flags}: PARSE ERRORS")
+    foreach d: Defect in fRes.defects() { IO::println("  ! " + d.describe()) }
+    rc = 1
+  }
+
+  // ── do[Option]: summary line using nullable chain ──
+  val dbHostOpt: Option[String] =
+    if dbRes.isOk() { Option::some(dbRes.get().host()) } else { Option::none() }
+  val srvPortOpt: Option[String] =
+    if srvRes.isOk() { Option::some("#{srvRes.get().port()}") } else { Option::none() }
+  val summary: Option[String] = do[Option] {
+    dbHost  <- dbHostOpt
+    srvPort <- srvPortOpt
+    ret "summary: db=#{dbHost} srv=:#{srvPort}"
+  }
+  if summary != null { IO::println(summary.get()) }
+
+  return rc
+}
+
+tool editDb(db: String, key: String, value: String): Int
+  requires { read(db), write(db), console }
+{
+  val existing = readOrDefault(db, Defaults::DB)
+  val doc = DbConfig::cfg().parseLossless(existing)
+  if doc.isBad() {
+    IO::println("#{db}: parse error")
+    foreach d: Defect in doc.defects() { IO::println("  ! " + d.describe()) }
+    return 1
+  }
+  val r = doc.get()
+  val c = r.value()
+
+  val updated: DbConfig? = select key {
+    case "host":
+      if !value.isValidHost2() { IO::println("bad host: #{value}"); return 1 }
+      c.copy(host = value)
+    case "port":
+      val p = validPort2(value)
+      if p == null { IO::println("bad port: #{value}  (1-65535)"); return 1 }
+      c.copy(port = p as Int)
+    case "database":
+      if value.length() == 0 { IO::println("database cannot be empty"); return 1 }
+      c.copy(database = value)
+    case "maxPool":
+      val n = validPositive2(value)
+      if n == null { IO::println("bad maxPool: #{value}  (> 0)"); return 1 }
+      c.copy(maxPool = n as Int)
+    else:
+      IO::println("unknown db key: #{key}  (host | port | database | maxPool)")
+      return 1
+  }
+
+  if updated != null {
+    val rendered = r.edit { _ -> updated as DbConfig }.render()
+    Files::writeText(db, rendered)
+    IO::println("#{db}: #{key} = #{value}")
+  }
+  return 0
+}
+
+tool editSrv(server: String, key: String, value: String): Int
+  requires { read(server), write(server), console }
+{
+  val existing = readOrDefault(server, Defaults::SERVER)
+  val doc = ServerConfig::cfg().parseLossless(existing)
+  if doc.isBad() {
+    IO::println("#{server}: parse error")
+    foreach d: Defect in doc.defects() { IO::println("  ! " + d.describe()) }
+    return 1
+  }
+  val r = doc.get()
+  val c = r.value()
+
+  val updated: ServerConfig? = select key {
+    case "host":
+      if !value.isValidHost2() { IO::println("bad host: #{value}"); return 1 }
+      c.copy(host = value)
+    case "port":
+      val p = validPort2(value)
+      if p == null { IO::println("bad port: #{value}  (1-65535)"); return 1 }
+      c.copy(port = p as Int)
+    case "workers":
+      val n = validPositive2(value)
+      if n == null { IO::println("bad workers: #{value}  (> 0)"); return 1 }
+      c.copy(workers = n as Int)
+    case "timeout":
+      val t = validPositive2(value)
+      if t == null { IO::println("bad timeout: #{value}  (> 0)"); return 1 }
+      c.copy(timeout = t as Int)
+    else:
+      IO::println("unknown server key: #{key}  (host | port | workers | timeout)")
+      return 1
+  }
+
+  if updated != null {
+    val rendered = r.edit { _ -> updated as ServerConfig }.render()
+    Files::writeText(server, rendered)
+    IO::println("#{server}: #{key} = #{value}")
+  }
+  return 0
+}
+
+tool toggle(flags: String, flag: String): Int
+  requires { read(flags), write(flags), console }
+{
+  val existing = readOrDefault(flags, Defaults::FLAGS)
+  val doc = FeatureFlags::cfg().parseLossless(existing)
+  if doc.isBad() {
+    IO::println("#{flags}: parse error")
+    foreach d: Defect in doc.defects() { IO::println("  ! " + d.describe()) }
+    return 1
+  }
+  val r = doc.get()
+  val f = r.value()
+
+  val toggled: FeatureFlags? = select flag {
+    case "darkMode":   f.copy(darkMode   = !f.darkMode())
+    case "betaSearch": f.copy(betaSearch = !f.betaSearch())
+    case "analytics":  f.copy(analytics  = !f.analytics())
+    case "debugLog":   f.copy(debugLog   = !f.debugLog())
+    else:
+      IO::println("unknown flag: #{flag}  (darkMode | betaSearch | analytics | debugLog)")
+      return 1
+  }
+
+  if toggled != null {
+    val wasBool: Boolean = select flag {
+      case "darkMode":   f.darkMode()
+      case "betaSearch": f.betaSearch()
+      case "analytics":  f.analytics()
+      case "debugLog":   f.debugLog()
+      else: false
+    }
+    val nowStr = if wasBool { "false" } else { "true" }
+    val rendered = r.edit { _ -> toggled as FeatureFlags }.render()
+    Files::writeText(flags, rendered)
+    IO::println("#{flags}: #{flag} #{if wasBool { "ON" } else { "off" }} -> #{nowStr}")
+  }
+  return 0
+}
+
+// ─── Diff helper: build a list of changed-field lines comparing two records ───
+
+def dbDiffs(path: String): List[String] {
+  val text = readOrDefault(path, Defaults::DB)
+  val cur = DbConfig::cfg().parse(text)
+  val dflt = DbConfig::cfg().parse(Defaults::DB)
+  if !cur.isOk() || !dflt.isOk() { return [] }
+  val c = cur.get()
+  val d = dflt.get()
+  val lines: List[String?] = [
+    if c.host()     != d.host()     { "  db.host:     #{d.host()} -> #{c.host()}" }     else { null },
+    if c.port()     != d.port()     { "  db.port:     #{d.port()} -> #{c.port()}" }     else { null },
+    if c.database() != d.database() { "  db.database: #{d.database()} -> #{c.database()}" } else { null },
+    if c.maxPool()  != d.maxPool()  { "  db.maxPool:  #{d.maxPool()} -> #{c.maxPool()}" }  else { null }
+  ]
+  return lines.filter { s -> s != null }.map { s -> s as String }
+}
+
+def srvDiffs(path: String): List[String] {
+  val text = readOrDefault(path, Defaults::SERVER)
+  val cur = ServerConfig::cfg().parse(text)
+  val dflt = ServerConfig::cfg().parse(Defaults::SERVER)
+  if !cur.isOk() || !dflt.isOk() { return [] }
+  val c = cur.get()
+  val d = dflt.get()
+  val lines: List[String?] = [
+    if c.host()    != d.host()    { "  srv.host:    #{d.host()} -> #{c.host()}" }    else { null },
+    if c.port()    != d.port()    { "  srv.port:    #{d.port()} -> #{c.port()}" }    else { null },
+    if c.workers() != d.workers() { "  srv.workers: #{d.workers()} -> #{c.workers()}" } else { null },
+    if c.timeout() != d.timeout() { "  srv.timeout: #{d.timeout()} -> #{c.timeout()}" } else { null }
+  ]
+  return lines.filter { s -> s != null }.map { s -> s as String }
+}
+
+def flagDiffs(path: String): List[String] {
+  val text = readOrDefault(path, Defaults::FLAGS)
+  val cur = FeatureFlags::cfg().parse(text)
+  val dflt = FeatureFlags::cfg().parse(Defaults::FLAGS)
+  if !cur.isOk() || !dflt.isOk() { return [] }
+  val c = cur.get()
+  val d = dflt.get()
+  val lines: List[String?] = [
+    if c.darkMode()   != d.darkMode()   { "  flag.darkMode:   #{d.darkMode()} -> #{c.darkMode()}" }   else { null },
+    if c.betaSearch() != d.betaSearch() { "  flag.betaSearch: #{d.betaSearch()} -> #{c.betaSearch()}" } else { null },
+    if c.analytics()  != d.analytics()  { "  flag.analytics:  #{d.analytics()} -> #{c.analytics()}" }  else { null },
+    if c.debugLog()   != d.debugLog()   { "  flag.debugLog:   #{d.debugLog()} -> #{c.debugLog()}" }   else { null }
+  ]
+  return lines.filter { s -> s != null }.map { s -> s as String }
+}
+
+tool diff(db: String = "db.conf",
+          server: String = "server.conf",
+          flags: String = "flags.conf"): Int
+  requires { read(db), read(server), read(flags), console }
+{
+  val all: List[String] =
+    dbDiffs(db)
+      .map { s -> s }
+      .filter { _ -> true }
+
+  val allSrv: List[String] = srvDiffs(server)
+  val allFlags: List[String] = flagDiffs(flags)
+
+  // combine with distinct header per section
+  var totalChanges: Int = 0
+  if all.size > 0 {
+    foreach line: String in all { IO::println(line); totalChanges++ }
+  }
+  if allSrv.size > 0 {
+    foreach line: String in allSrv { IO::println(line); totalChanges++ }
+  }
+  if allFlags.size > 0 {
+    foreach line: String in allFlags { IO::println(line); totalChanges++ }
+  }
+
+  if totalChanges == 0 {
+    IO::println("all configs are at factory defaults")
+  } else {
+    IO::println("#{totalChanges} field(s) differ from defaults")
+  }
+  return 0
+}

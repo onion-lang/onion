@@ -106,6 +106,34 @@ public interface Shape<T> {
             "shape " + describe() + " is not lossless; printLossless has no meaning for it");
     }
 
+    // ------------------------------------------------------------- JSON Schema
+
+    /**
+     * Whether this shape can describe the documents it reads as a JSON Schema. True for a
+     * {@code shape name = json} shape (and {@link Shapes#json}); false for every other
+     * shape, which says so here instead of answering with a schema that does not match
+     * what it reads.
+     */
+    default boolean hasJsonSchema() {
+        return false;
+    }
+
+    /**
+     * The JSON Schema of the documents this shape reads, as JSON text: an {@code object}
+     * with one property per component, {@code required} listing every non-nullable one,
+     * and {@code additionalProperties: false}; lists become {@code array}s and nested
+     * records nested objects, described the same way. This is the form an LLM's
+     * structured-output mode takes, so the record is the one description of the answer.
+     *
+     * @throws UnsupportedOperationException when {@link #hasJsonSchema()} is false, or
+     *         when the shape is recursive (a record that contains itself has no finite
+     *         inline schema)
+     */
+    default String jsonSchema() {
+        throw new UnsupportedOperationException(
+            "shape " + describe() + " has no JSON Schema; only a json shape does");
+    }
+
     // ------------------------------------------------------------- combinators
 
     /**

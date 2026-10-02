@@ -1801,6 +1801,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#using" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        クラスパスとスクリプトの依存（//&gt; using）
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4528,6 +4539,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#using" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        クラスパスとスクリプトの依存（//&gt; using）
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4674,6 +4696,30 @@ TextMate 文法が 70% まで腐ったのはまさにその二重管理が原因
 生む危険があります。保存のたびにバッファを壊すフォーマッタは、スクロール位置を飛ばす
 フォーマッタより悪いです。編集を返す前に、整形後のテキストを再度字句解析して元とトークン単位で
 比較し、一致しない場合は編集を一切返しません。</p>
+<h3 id="using">クラスパスとスクリプトの依存（<code>//&gt; using</code>）<a class="headerlink" href="#using" title="Permanent link">&para;</a></h3>
+<p>上位のディレクトリに <code>onion.toml</code> があるファイルは、<code>onion build</code> がコンパイルするのと
+同じように検証されます。つまりプロジェクトの <code>target/classes</code> と、<code>onion.toml</code> が宣言する
+依存に対して検証します。<code>onion.toml</code> が無いファイルは単独のスクリプトとして、<code>.</code> と、
+その <a href="../script-runner/"><code>//&gt; using dep</code> ディレクティブ</a>が解決する jar に対して検証されます。
+パーサー、リゾルバー、キャッシュは <code>onion script.on</code> や <code>onionc</code> と共通なので、エディタは
+実行時と同じ classpath を見ます。</p>
+<ul>
+<li><strong>解決でエディタを止めません。</strong> キャッシュにあるディレクティブの組はすぐに使われます。
+  キャッシュに無い組はバックグラウンドのスレッドで解決し、終わるまでの間、サーバーは
+  そのスクリプトの診断を<strong>保留</strong>して、代わりにディレクティブの行に情報メッセージを1つだけ
+  表示します。解決が終わると自動でファイルを検証し直します。jar 無しで検証する方式を
+  選ばなかったのは、ダウンロードの間ずっと、依存が提供するすべての型が「見つからない」と
+  下線表示されてしまうからです。</li>
+<li><strong>形式の誤ったディレクティブ</strong>は、その行と桁に、<code>onion</code> や <code>onionc</code> と同じメッセージの
+  エラーとして表示されます。ファイルの残りの部分は、そのスクリプトが最後に解決した jar に
+  対して引き続き検証されます。</li>
+<li><strong>解決できない依存</strong>は、リゾルバーのメッセージを持つエラーとしてディレクティブの行に
+  表示され、ファイルはその依存無しで検証されます。失敗は記憶され、キーを打つたびに
+  再試行することはありません。ファイルを保存すると再試行します。</li>
+<li><strong>プロジェクト内ではディレクティブを使いません。</strong> <code>onion build</code> が使わないのと同じです。
+  ディレクティブの行に、依存は <code>onion.toml</code> に宣言するよう促す警告が表示されます
+  （ファイルを直接 <code>onion file.on</code> や <code>onionc file.on</code> に渡した場合は、引き続き読み取られます）。</li>
+</ul>
 <h2 id="_6">シンボル対応<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p>言語サーバーは開いているドキュメントから以下のシンボルをインデックス化します。</p>
 <ul>

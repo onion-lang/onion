@@ -4539,7 +4539,9 @@ capability 層は今それを土台にして動いています。</p>
 <code>Archive</code>、<code>Db</code>、<code>Net</code>、<code>Server</code>、<code>Future</code>、<code>Concurrent</code>、<code>ToolCli</code> — の
 分類に加えて、純粋な残りの stdlib（<code>Proc</code> の結果、<code>Http</code> のレスポンス、<code>Json::value</code> のように
 入口の関数が返す入れ子の値も含む）、よく使う JDK の値型・コレクション型と <code>java.time</code>
-（<code>now</code> だけは <code>clock</code>）の純粋ベースライン、JDK の既知の効果点（<code>System::getenv</code>、<code>System::exit</code>、<code>Runtime::exec</code>、<code>Thread::sleep</code>、
+（<code>now</code> だけは <code>clock</code>）の純粋ベースライン、JDK のファイル I/O（<code>java.io</code> のファイルストリームと
+<code>File</code>、<code>java.nio.file.Files</code>。<code>BufferedReader</code> などのラッパーは <code>System.in</code> やソケットを包むこともあるため
+<code>unknown</code> のまま）、JDK の既知の効果点（<code>System::getenv</code>、<code>System::exit</code>、<code>Runtime::exec</code>、<code>Thread::sleep</code>、
 <code>System::out</code> の型としての <code>PrintStream</code>）が入っています。</p>
 <p>粒度は型単位であり、インスタンス単位ではありません。ファイルの上の <code>PrintStream</code> は本来
 <code>write</code> ですが、Onion コードで <code>PrintStream</code> といえば <code>System::out</code> / <code>System::err</code> なので、
@@ -4567,6 +4569,12 @@ stdlib を分類したものであり、<code>onion.Files</code> という名前
 合わせることはしません。そして効果集合はセキュリティサンドボックスではありません。何も
 プログラムの実行を止めません。集合は「実行して<em>よいか</em>」を決める上位の層への、正直な入力
 です。</p>
+<p>同じ走査は <code>--plan</code> のために、ソースから読み取れるオペランド —— リテラル URL のホスト、
+<code>Proc</code> のコマンドとそのリテラル引数、<code>System::getenv</code> の変数名、リテラルのパス —— も記録します
+（<a href="../../guide/tools/#ソースに書かれたオペランド">ソースに書かれたオペランド</a> を参照）。
+これは効果集合とは逆向きの下界です。並んだオペランドはどれもプログラムが実際に到達しうる
+ものですが、リテラルでないオペランドは推測されず <code>(operand not statically known)</code> と
+報告されます。</p>
 
 
 

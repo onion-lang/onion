@@ -4937,7 +4937,12 @@ entrypoint overrides, compiler flags, or scripts are accepted.</p>
 </span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="s2">"com.fasterxml.jackson.core:jackson-databind"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2.17.0"</span>
 </span></code></pre></div>
 <p>The key has to be quoted, because a Maven coordinate contains a colon. Versions are
-exact — no ranges, no <code>latest</code>. Transitive dependencies are resolved and land on the
+exact — no ranges, no <code>latest</code>. The manifest rejects, naming the dependency and its
+line, a Maven range (<code>[1.0,2.0)</code>, <code>(,1.0]</code>, or anything else with <code>[</code>, <code>]</code>, <code>(</code>, <code>)</code>
+or <code>,</code>), a dynamic revision ending in <code>+</code> (<code>1.+</code>), and the moving aliases <code>LATEST</code>,
+<code>RELEASE</code> and <code>latest.*</code> (<code>latest.release</code>, <code>latest.integration</code>). A <code>+</code> inside SemVer
+build metadata (<code>1.0.0+build.5</code>) and a <code>-SNAPSHOT</code> version are accepted. A script's
+<code>//&gt; using dep</code> directive applies the same rule. Transitive dependencies are resolved and land on the
 classpath for <code>build</code>, <code>run</code> and <code>test</code> alike, so a library you compile against is also
 there when the program runs.</p>
 <p>The <strong>resolved</strong> set — transitives included — is part of the build fingerprint, not just
@@ -4945,6 +4950,10 @@ the manifest text. A transitive moving underneath you invalidates the cache and 
 recompile, rather than serving classes compiled against the old classpath as current.</p>
 <p>A coordinate that cannot be resolved fails the build with coursier's message, which names
 the coordinate it could not find.</p>
+<p>A single-file script declares the same thing with <code>//&gt; using dep "group:artifact:version"</code>
+lines at its top (see <a href="../script-runner/">Script Runner</a>). A script
+has no <code>onion.lock</code>, so its transitive versions are not pinned; when that matters, make it
+a project.</p>
 <h3 id="repositories"><code>[[repositories]]</code><a class="headerlink" href="#repositories" title="Permanent link">&para;</a></h3>
 <p>Extra Maven repositories, searched <strong>before</strong> Maven Central and in the order written:</p>
 <div class="language-toml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">[[repositories]]</span>
@@ -4958,7 +4967,8 @@ bare key-value pair belongs to whatever table header precedes it, so written aft
 <code>[package]</code> it would quietly become <code>package.repositories</code>; a table header can go anywhere
 in the file.</p>
 <h3 id="not-yet-supported">Not yet supported<a class="headerlink" href="#not-yet-supported" title="Permanent link">&para;</a></h3>
-<p>There is no offline mode. Resolution runs on every build, reading coursier's cache
+<p>There is no offline mode. Resolution runs whenever a build cannot reuse the classpath it
+recorded for the current <code>onion.lock</code> (see below), reading coursier's cache
 (<code>~/.cache/coursier</code>) for anything already fetched, so a warm build does not hit the
 network — but it is not <em>prevented</em> from doing so. Onion embeds coursier's Java API,
 which does not expose a cache policy, so an <code>--offline</code> flag would have to be faked; it is
@@ -4971,10 +4981,13 @@ reproduce a build: a transitive dependency's version is chosen at resolution tim
 builds of a byte-identical <code>onion.toml</code> can compile against different jars the moment a
 transitive publishes a release. That failure appears on one machine, cannot be reproduced on
 another, and nothing in the project changed.</p>
-<p>The lock records the whole transitive coordinate set, so a later build resolves <em>those</em>
-versions rather than re-deriving them, and a SHA-256 for each artifact, compared before
-anything is compiled. Different bytes for a version that was already published stops the
-build:</p>
+<p>The lock records the whole transitive coordinate set, and a later build resolves
+<code>[dependencies]</code> with every one of <em>those</em> versions forced, rather than re-deriving them. They
+are forced onto the manifest's own graph, not resolved as a flat list of roots: flattening
+takes a transitive out from under the POM that manages its version (<code>&lt;dependencyManagement&gt;</code>,
+a parent BOM) and can pick a different one. The lock also records a SHA-256 for each
+artifact, compared before anything is compiled. Different bytes for a version that was
+already published stops the build:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>error: Resolved dependencies do not match onion.lock:
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>different bytes for the same file:
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  postgresql-42.7.3.jar
@@ -4983,6 +4996,24 @@ build:</p>
 </span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>A published version's bytes should never change. Check the repository, or delete onion.lock
 </span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>to accept what it is serving now.
 </span></code></pre></div>
+<p>A different <em>set</em> of artifacts is a resolution difference rather than changed bytes, and the
+error says so, listing the versions that moved instead of blaming the repository:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>error: Resolved dependencies do not match onion.lock:
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>not in the lock: lib-2.0.0.jar
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>missing: lib-1.0.0.jar
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>resolved versions differ from the lock:
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>  com.example:lib  locked 1.0.0  resolved 2.0.0
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>The artifacts resolved differently from the ones the lock records; no file's bytes changed.
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>Delete onion.lock to resolve again and record the new answer.
+</span></code></pre></div>
+<p>Once a build has resolved and verified a lock, it records the resulting classpath in
+<code>target/.onion/dependency-classpath.json</code>, keyed by the lock's contents. The next
+<code>build</code>/<code>run</code>/<code>test</code> with the same lock takes that classpath without asking coursier at all,
+provided every recorded jar still exists and its SHA-256 still matches the lock (a jar is
+re-hashed when its size or modification time has changed). Anything else — a different lock,
+a missing or changed jar, no record — falls back to resolving. The record holds absolute
+paths into this machine's cache, which is why it lives under <code>target/</code> and is not committed;
+<code>onion clean</code> removes it. The language server reads the same record, read-only.</p>
 <p>Change a version in <code>onion.toml</code>, or add a repository, and the lock no longer describes what
 you are asking for -- it is discarded and rewritten rather than enforced against a different
 question. Reordering <code>[dependencies]</code> is not a change and does not discard it. <code>onion clean</code>
@@ -4990,7 +5021,7 @@ does not remove it: it is an input to the next build, not an output of this one.
 <p><strong>It is not an offline mode.</strong> coursier's embedding API exposes a cache location, a thread
 pool and a logger, and no cache policy at all, so there is no honest way to promise a build
 that never reaches the network. The lock gives the same answer every time, not the absence
-of the question.</p>
+of the question; the recorded classpath only means the question is usually not asked twice.</p>
 <h2 id="source-layout">Source Layout<a class="headerlink" href="#source-layout" title="Permanent link">&para;</a></h2>
 <p>Production sources are every <code>.on</code> file under <code>src/</code>; tests are every
 <code>_test.on</code> file under <code>tests/</code>. Both are discovered recursively, sorted by
@@ -5000,15 +5031,24 @@ directory is a successful test run with a zero-test summary.</p>
 <h2 id="build-cache">Build Cache<a class="headerlink" href="#build-cache" title="Permanent link">&para;</a></h2>
 <p><code>build</code> compiles once and caches the result under <code>target/</code>. A second <code>build</code>
 (or the build that <code>run</code> and <code>test</code> perform first) reuses that output when a
-SHA-256 fingerprint over the compiler version, the Java version, the exact
+SHA-256 fingerprint over the compiler's identity, the Java version, the exact
 manifest bytes, and every source path and its bytes still matches:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>$ onion build
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>Built hello (1 classes)
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>$ onion build
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>Built hello (cached)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion build
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>Built hello (1 classes)
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>$ onion build
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>Built hello (cached)
 </span></code></pre></div>
 <p>Any source addition, removal, rename, or content change invalidates the
-cache and triggers a full rebuild. A failed rebuild never destroys the
+cache and triggers a full rebuild.</p>
+<p>The compiler's identity is its version plus a digest of the jar (or class
+directory) it was loaded from, so a new compiler rebuilds the project even when
+it reports the same version: an upgraded or locally rebuilt <code>onion.jar</code>, or a
+changed compiler resource such as the effect table. New diagnostics and effect
+checks then run on the next <code>build</code>, with no <code>onion clean</code> needed. Hashing the
+jar is not repeated on every build: its digest is cached under the user cache
+directory (<code>-Donion.cache.dir</code>, <code>$ONION_CACHE_DIR</code>, or the platform default),
+keyed by the jar's path, size and modification time.</p>
+<p>A failed rebuild never destroys the
 previous successful <code>target/classes</code> or build-state file — the new output is
 staged and only promoted after every artifact is written successfully.</p>
 <h2 id="entrypoint-convention">Entrypoint Convention<a class="headerlink" href="#entrypoint-convention" title="Permanent link">&para;</a></h2>
@@ -5020,29 +5060,58 @@ builds instead look at the parsed source:</p>
    statement (including a bare expression or variable declaration).</li>
 <li>Any production source that declares a top-level function named <code>main</code> is
    a candidate.</li>
+<li>Any production source that declares a top-level <code>tool</code>, and has neither a
+   <code>main</code> nor a top-level statement, is a candidate. That is exactly when the
+   compiler synthesizes the source's tool CLI <code>main</code>, the same one a script
+   gets, so <code>run</code> dispatches through it: <code>--help</code>, <code>--contract</code> and <code>--plan</code>
+   all work.</li>
 <li>Every other compiler-generated <code>main</code> is ignored.</li>
 </ol>
 <p><code>run</code> requires exactly one candidate. Zero candidates fail with a hint to add
-executable code to <code>src/main.on</code> or define a top-level <code>main</code>; more than one
-candidate fails and lists every candidate's source and location so the
-ambiguity can be resolved.</p>
+executable code to <code>src/main.on</code>, define a top-level <code>main</code>, or declare a
+top-level <code>tool</code>; more than one candidate fails and lists every candidate's
+source and location so the ambiguity can be resolved.</p>
+<p>Arguments after <code>--</code> go to the program, so a tool project is driven like the
+script it would otherwise be:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ onion run -- --help
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>usage: meeting-summary &lt;notes&gt; &lt;out&gt;
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>  ...
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>$ onion run -- samples/notes.md out.json --plan
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>plan: `summarize` would
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>  read    derived from notes = samples/notes.md
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>  write   derived from out = out.json
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>  ...
+</span></code></pre></div>
+<p>The usage line names the project's package (<code>[package].name</code>) where a script's
+names its file.</p>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <p><code>test</code> builds production sources once, then compiles and runs each discovered
 test file in sorted order, sequentially:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion test
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>test tests/main_test.on ... ok
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>1 tests, 1 passed, 0 failed
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>$ onion test
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>test tests/main_test.on ... ok
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>1 tests, 1 passed, 0 failed
 </span></code></pre></div>
 <p>A test's own <code>stdout</code>/<code>stderr</code> are shown only when it fails, unless
 <code>--verbose</code> is given. One test's compile failure, assertion failure, runtime
 exception, or nonzero numeric result is reported against that test alone —
 every remaining test still runs, and a project with no tests at all succeeds
 with a <code>0 tests, 0 passed, 0 failed</code> summary.</p>
+<p>A failed assertion or runtime exception is reported at the line that raised it
+— for an <code>Assert::</code> call, the line of that call, in the test or in a project
+source it reached — followed by that line:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>$ onion test
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>test tests/summary_test.on ... FAILED
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>1 tests, 0 passed, 1 failed
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>error: tests/summary_test.on:4: AssertionError: Expected true but was false
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>  4 | Assert::isTrue(words.size == 4)
+</span></code></pre></div>
+<p><code>onion script.on</code> reports a failed assertion the same way.</p>
 <h2 id="clean">Clean<a class="headerlink" href="#clean" title="Permanent link">&para;</a></h2>
 <p><code>clean</code> removes exactly the project's canonical <code>target/</code> directory:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ onion clean
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>Cleaned target
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>$ onion clean
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>Cleaned target
 </span></code></pre></div>
 <p>It requires a valid, located project first, succeeds (printing the same
 message) whether <code>target/</code> exists or not, and refuses to touch a <code>target</code>

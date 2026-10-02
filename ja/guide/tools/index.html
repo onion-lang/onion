@@ -1270,6 +1270,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="--plan：実行せずに「実行したら何が起きるか」">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ソースに書かれたオペランド
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -4541,6 +4558,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="--plan：実行せずに「実行したら何が起きるか」">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ソースに書かれたオペランド
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -4658,8 +4692,12 @@ tool が印字するラムダを作るなら、そのラムダが他所でしか
 これ）、<code>--help</code>・フラグ解析・型付き変換・エラーメッセージはすべて実行時にそこから
 導出され、あなたの tool への型付き呼び出しはコンパイル時に同じ宣言から導出されます。
 必須パラメータは位置引数、デフォルト付きパラメータは <code>--name</code> フラグ（<code>--count 5</code> /
-<code>--count=5</code>）、<code>Boolean</code> のデフォルトはスイッチになります。コマンドラインで省略された
-デフォルトは元の式として言語内で評価されます — 文字列を経由した往復はしません。</p>
+<code>--count=5</code>）、<code>Boolean</code> のデフォルトはスイッチになります。camelCase のパラメータは、
+名前そのままのフラグに加えて kebab-case のフラグでも指定できます —— <code>maxRows</code> は
+<code>--max-rows</code> でも <code>--maxRows</code> でもよく、<code>--help</code> には kebab-case のほうが表示されます。
+同じフラグになってしまう2つのパラメータ（<code>parseURL</code> と <code>parseUrl</code>）はコンパイルエラー（<code>E0093</code>）です。
+コマンドラインで省略されたデフォルトは元の式として言語内で評価されます — 文字列を経由した
+往復はしません。</p>
 <p><code>--help</code> やフラグ処理の背後にあるパースと型変換は、生成コードが <code>onion.Cli</code> という
 より低レベルのランタイムモジュールを呼び出して行っています。このモジュールは直接
 使うことも可能です — stdlib リファレンスの <a href="../../reference/stdlib/#cli-モジュール"><code>Cli</code> モジュール</a>
@@ -4712,6 +4750,87 @@ CLI は<em>この呼び出し</em>が何をするかを —— 宣言された�
 ドライランを飾りではなく<em>信頼に足るもの</em>にしています。シグネチャから導出した CLI は
 コモディティですが、検査済み効果集合から導出したプランはそうではありません ——
 本体が何をするかを知っている必要があるからです。</p>
+<h3 id="_4">ソースに書かれたオペランド<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>裸の capability（<code>net</code>、<code>exec</code>、<code>env</code>、<code>read</code>、<code>write</code>）はパラメータに結びついて
+いませんが、そのオペランドはソースにリテラルとして書かれていることがよくあります ——
+API のホスト、tool が呼び出すコマンド、読む環境変数。<code>--plan</code> はそれを表示します：</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>$<span class="w"> </span>onion<span class="w"> </span>digest.on<span class="w"> </span>out/digest.md<span class="w"> </span>gh<span class="w"> </span>--plan
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>plan:<span class="w"> </span><span class="sb">`</span>digest<span class="sb">`</span><span class="w"> </span>would
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>write<span class="w">   </span>derived<span class="w"> </span>from<span class="w"> </span><span class="nv">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>out/digest.md
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nb">exec</span><span class="w">    </span>gh<span class="w"> </span>…<span class="w"> </span>list<span class="w"> </span>--repo<span class="w"> </span>onion-lang/onion<span class="w"> </span>--state<span class="w"> </span>all<span class="w"> </span>--search<span class="w"> </span>…<span class="w"> </span>--json<span class="w"> </span>number,…
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>net<span class="w">     </span><span class="nv">$SLACK_WEBHOOK_URL</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span>net<span class="w">     </span>api.github.com
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span>env<span class="w">     </span>SLACK_WEBHOOK_URL
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span>env<span class="w">     </span>GITHUB_TOKEN
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span>clock
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">  </span>console
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="o">(</span>nothing<span class="w"> </span>was<span class="w"> </span>executed<span class="p">;</span><span class="w"> </span>operands<span class="w"> </span>are<span class="w"> </span>the<span class="w"> </span>arguments<span class="w"> </span>the<span class="w"> </span>effects<span class="w"> </span>are
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w"> </span>derived<span class="w"> </span>from,<span class="w"> </span>not<span class="w"> </span>necessarily<span class="w"> </span>the<span class="w"> </span>exact<span class="w"> </span>paths<span class="w"> </span>or<span class="w"> </span>hosts<span class="w"> </span>touched<span class="o">)</span>
+</span></code></pre></div>
+<p>コンパイラは、tool から到達できるすべての呼び出し（本体、本体が生成するクロージャ、
+本体が推移的に呼ぶプログラム内のメソッド）から次を読み取ります：</p>
+<table>
+<thead>
+<tr>
+<th>効果</th>
+<th>表示されるオペランド</th>
+<th>読み取り元</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>net</code></td>
+<td>ホスト（とポート）</td>
+<td><code>Http::get</code>/<code>post</code>/<code>put</code>/<code>delete</code>/<code>postJson</code>/<code>getResponse</code>/<code>postResponse</code>/<code>request</code>（ビルダーのステップをたどって <code>send()</code> まで）の URL、<code>http"…"</code> リソース、<code>Net::connect</code></td>
+</tr>
+<tr>
+<td><code>exec</code></td>
+<td>コマンド（リテラルでない引数は <code>…</code>）</td>
+<td><code>Proc::capture</code>/<code>run</code>/<code>exec</code> のコマンドの語、<code>captureIn</code>/<code>runIn</code>/<code>execIn</code> ではディレクトリより後の語</td>
+</tr>
+<tr>
+<td><code>env</code></td>
+<td>変数名</td>
+<td><code>System::getenv("NAME")</code>、<code>Config::getEnv("NAME", …)</code></td>
+</tr>
+<tr>
+<td><code>read</code>/<code>write</code></td>
+<td>パス</td>
+<td><code>Files</code> の各操作のパス引数、<code>file"…"</code> リソース</td>
+</tr>
+</tbody>
+</table>
+<p>オペランドが「既知」とみなされるのは、文字列リテラル、リテラルで<em>始まる</em>連結や補間
+（<code>"https://api.github.com/search?q=" + q</code> —— このような接頭辞から読むのは URL のホスト
+だけで、リテラルがホストの先まで続いている場合に限ります）、そのどちらかで一度だけ代入
+されるローカル <code>val</code>、そして <code>$NAME</code> と表示される <code>System::getenv("NAME")</code> です（環境変数に
+入れた Webhook URL は <code>net $SLACK_WEBHOOK_URL</code> と表示されます）。URL のユーザー情報
+（<code>user:password@</code>）は決して表示しません。オペランドは1行に1つで、効果名を繰り返し、呼び出しが見つかった順 —— tool 自身の本体が
+先、そのあと本体が呼ぶメソッド —— に並びます。</p>
+<p><code>exec</code> の行にはコマンド全体が並びます。リテラルの引数はそのまま、完全なリテラルでない
+引数（パラメータ、ループ変数、<code>"updated:&gt;=" + since</code> など）はそれぞれ <code>…</code> になり、
+連続する <code>…</code> は1つにまとめます。たとえば
+<code>Proc::capture("gh", kind, "list", "--repo", "onion-lang/onion")</code> は
+<code>exec    gh … list --repo onion-lang/onion</code> と表示され、上の <code>digest.on</code> の行もこうして
+できています。72 文字を超えるコマンドは切り詰めて <code>…</code> で終わり、空白や引用符を含む
+引数はシングルクォートで囲んで表示します。2つの呼び出し箇所から到達する同じコマンドは
+1度だけ並びます。</p>
+<p>この一覧は<strong>下界</strong>です。それ以外 —— パラメータ、<code>var</code>、実行時に計算される値、ヘルパーの
+パラメータに渡されたリテラル（引数を呼び出し先まで追うことはしません）—— は推測しません。
+ある効果の呼び出し箇所に解析が読めなかったオペランドがあれば、既知のオペランドの後に同じ
+効果の <code>(operand not statically known)</code> 行が続くので、部分的な一覧が完全な一覧に見える
+ことはありません。パラメータに結びついた capability（<code>write(out)</code>）では <code>derived from</code>
+行は変わらず、本体の他の場所にある同じ効果のリテラルオペランドがその下に並びます。</p>
+<p>同じ事実は <code>--contract</code> にも tool ごとに1つの追加キーとして現れます。何か分かったときだけ
+存在し、既存のキーはすべて値も位置も変わりません：</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">"staticOperands"</span><span class="p">:{</span><span class="nt">"net"</span><span class="p">:{</span><span class="nt">"known"</span><span class="p">:[</span><span class="s2">"$SLACK_WEBHOOK_URL"</span><span class="p">,</span><span class="s2">"api.github.com"</span><span class="p">],</span><span class="nt">"unresolved"</span><span class="p">:</span><span class="kc">false</span><span class="p">}}</span>
+</span></code></pre></div>
+<p><code>unresolved</code> は、その効果の呼び出し箇所のうち少なくとも1つで、解析がオペランドを決定
+できなかったときに <code>true</code> になります。<code>exec</code> のエントリには <code>commands</code> も入ります。
+呼び出し箇所ごとの引数列全体で、リテラルでない引数は <code>null</code> です。<code>known</code> はこれまで
+どおりコマンド名の一覧です：</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">"exec"</span><span class="p">:{</span><span class="nt">"known"</span><span class="p">:[</span><span class="s2">"gh"</span><span class="p">],</span><span class="nt">"unresolved"</span><span class="p">:</span><span class="kc">false</span><span class="p">,</span><span class="nt">"commands"</span><span class="p">:[[</span><span class="s2">"gh"</span><span class="p">,</span><span class="kc">null</span><span class="p">,</span><span class="s2">"list"</span><span class="p">,</span><span class="s2">"--repo"</span><span class="p">,</span><span class="s2">"onion-lang/onion"</span><span class="p">,</span><span class="s2">"--state"</span><span class="p">,</span><span class="s2">"all"</span><span class="p">,</span><span class="s2">"--search"</span><span class="p">,</span><span class="kc">null</span><span class="p">,</span><span class="s2">"--json"</span><span class="p">,</span><span class="s2">"number,title,author,url"</span><span class="p">,</span><span class="s2">"--limit"</span><span class="p">,</span><span class="s2">"100"</span><span class="p">]]}</span>
+</span></code></pre></div>
 
 
 

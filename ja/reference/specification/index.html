@@ -5688,6 +5688,11 @@
 型の不一致も defect で、文書が壊れている場合は失敗した行を報告します——
 <code>Json.JsonParseException</code> が持っていて <code>derive!</code> の経路が捨てていた位置情報です。
 未知のフォーマット名は <strong>E0076</strong> です。</p>
+<p><code>json</code> の shape の成分はスカラーを超えられます。スカラーの <code>List[S]</code>、自身も json shape を
+宣言したレコード（その最初の json shape で読む）、そのようなレコードの <code>List[R]</code>、そして
+これらすべての <code>T?</code>（キーが欠けても <code>null</code> でもよい）です。構造の内側の欠陥はパスを持ち
+（<code>actions[2].owner</code>）、<code>jsonSchema()</code> はそのような shape が読む文書を JSON Schema として
+記述します。ほかのフォーマットと正規表現の shape はスカラーのままです（句を名指しする <strong>E0061</strong>）。</p>
 <p>1つのレコードが<strong>複数の</strong> shape を、形式を混ぜて持てます。<code>from re"..."</code> も <code>derive!</code> も
 1パターン・フォーマットごとに固定名の静的メソッド1つしか許さないため、構造的にできなかった
 ことです。正規表現形式の成分型、グループ数検査（<strong>E0060</strong>）、妥当性検査（<strong>E0059</strong>）は
@@ -5988,7 +5993,11 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 </span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="c1">// $ onion greet.on world --count 5 --loud</span>
 </span></code></pre></div>
 <p>必須パラメータは位置引数です。デフォルト付きパラメータは <code>--name</code> フラグになります
-（<code>Boolean</code> のデフォルトはプレゼンススイッチになります）。値は宣言型に変換され、
+（<code>Boolean</code> のデフォルトはプレゼンススイッチになります）。camelCase の名前は kebab-case
+でも受け付け（<code>makeSample: Boolean = false</code> は <code>--make-sample</code> と <code>--makeSample</code> の
+どちらでも指定できます）、使用法の行には kebab-case の綴りを表示します。フラグが一致して
+しまう2つのパラメータ（<code>parseURL</code> と <code>parseUrl</code> はどちらも <code>--parse-url</code>）はコンパイル
+エラー（<code>E0093</code>）です。値は宣言型に変換され、
 フラグがない場合はデフォルト式が評価され、エラー時はシグネチャから使用法の行が
 導出されます。<code>onion</code> コマンドラインでは、スクリプトファイル以降のすべてが
 そのままスクリプトに渡されます。</p>

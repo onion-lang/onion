@@ -2572,6 +2572,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#console-encoding-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Console encoding (Windows)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-compile-daemon" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4581,6 +4592,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#console-encoding-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Console encoding (Windows)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-compile-daemon" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4745,14 +4767,37 @@ quietly refuses the stale archive and runs normally, just without the speedup.</
 </span></code></pre></div>
 <p><code>ONION_DEBUG_STARTUP=1</code> stops the launcher silencing the JVM's class-sharing messages,
 which is how to find out why an archive is being ignored.</p>
+<h3 id="console-encoding-windows">Console encoding (Windows)<a class="headerlink" href="#console-encoding-windows" title="Permanent link">&para;</a></h3>
+<p>On Windows, <code>onion</code>, <code>onionc</code>, <code>onion repl</code> and the project commands write their output and
+diagnostics in UTF-8 when the output is not a Windows console: a pipe, a file, or a terminal
+such as Git Bash (mintty). A real console (cmd.exe, PowerShell, Windows Terminal, the VS Code
+terminal) keeps its own code page, which it already displays correctly. Each of stdout and
+stderr is judged separately, so <code>onion script.on &gt; out.txt</code> writes UTF-8 to the file while
+diagnostics on the console stay readable. Other platforms are unchanged. Source files are
+read as UTF-8 unless <code>-encoding</code> says otherwise.</p>
+<p>Standard input follows the same rule: <code>IO::readLine</code> and the other <code>IO</code> readers decode a pipe
+or a file as UTF-8 (<code>echo 日本語 | onion script.on</code>), and a Windows console in its own code
+page, on JDK 17 as on JDK 18+. Other platforms read stdin as UTF-8, as JDK 18+ already did.
+<code>onion.Files</code> and <code>file"…"</code> always read and write text as UTF-8, whatever the platform charset;
+<code>Files::readText</code>/<code>writeText</code> take a <code>java.nio.charset.Charset</code> for anything else.</p>
+<p><code>ONION_CONSOLE_ENCODING</code> overrides the choice:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">ONION_CONSOLE_ENCODING</span><span class="o">=</span>utf-8<span class="w"> </span>onion<span class="w"> </span>script.on<span class="w">   </span><span class="c1"># always UTF-8, consoles included (any OS)</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nv">ONION_CONSOLE_ENCODING</span><span class="o">=</span>native<span class="w"> </span>onion<span class="w"> </span>script.on<span class="w">  </span><span class="c1"># leave it to the JVM, as before</span>
+</span></code></pre></div>
+<p>Unset, or <code>auto</code>, is the behaviour described above. To pin some other encoding, combine
+<code>native</code> with the JVM's own flag in <code>ONION_JAVA_OPTS</code>: <code>-Dstdout.encoding=...</code> and
+<code>-Dstderr.encoding=...</code> on JDK 19+, <code>-Dsun.stdout.encoding=...</code> and
+<code>-Dsun.stderr.encoding=...</code> on JDK 17 and 18. Standard input is pinned with
+<code>-Donion.stdin.encoding=...</code>, which the launchers leave as given; with <code>native</code>, stdin is
+decoded in the JVM's default charset, as before.</p>
 <h3 id="the-compile-daemon">The compile daemon<a class="headerlink" href="#the-compile-daemon" title="Permanent link">&para;</a></h3>
 <p>Every <code>onionc</code> run starts a JVM, loads the compiler and compiles it just-in-time before it
 gets to your file. With <code>ONION_DAEMON=1</code>, <code>onionc</code> instead hands the command line to a
 resident compiler process — started on first use, one per user, JDK and Onion
 installation — and relays its output and exit code. The daemon keeps the warmed-up
 compiler between runs, so a typical single-file compile takes a fraction of the time:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ONION_DAEMON</span><span class="o">=</span><span class="m">1</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>onionc<span class="w"> </span>Hello.on<span class="w">            </span><span class="c1"># starts the daemon the first time, then reuses it</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ONION_DAEMON</span><span class="o">=</span><span class="m">1</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>onionc<span class="w"> </span>Hello.on<span class="w">            </span><span class="c1"># starts the daemon the first time, then reuses it</span>
 </span></code></pre></div>
 <p>The daemon stops itself after 30 minutes without work; <code>java -cp onion.jar
 onion.tools.daemon.DaemonClient stop</code> (or <code>status</code>) controls it by hand. It listens on a

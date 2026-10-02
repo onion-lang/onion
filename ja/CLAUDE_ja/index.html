@@ -5201,8 +5201,10 @@
 <li><code>--Wno &lt;codes&gt;</code> - 特定の警告を抑制 (例: W0001,unused-parameter)</li>
 <li><code>--no-check-laws</code> - レコードの <code>law</code>/<code>example</code> 節を実行しない（既定ではコンパイル時に実行される。LSPでは常に無効）</li>
 <li><code>--law-seed &lt;n&gt;</code> / <code>--law-samples &lt;n&gt;</code> - lawのサンプリングを制御。反証されたlawは、その反例を生成した設定を報告する</li>
+<li><code>--print-classpath</code> - <code>onionc</code> のみ: 出力を実行するための classpath（<code>-d</code> のディレクトリまたは <code>.</code>、<code>-classpath</code>、ファイルの <code>//&gt; using dep</code> ディレクティブが解決する jar の順）をプラットフォームの区切り文字で標準出力に表示し、コンパイルせずに終了する</li>
 <li><code>--stacktrace</code> - 未捕捉の実行時エラーで生のJVMスタックトレースを表示する（既定ではスクリプト自身のフレームのみを含む診断形式のレポートになる）</li>
 <li><code>ONION_DAEMON=1</code> (環境変数) - <code>onionc</code> と <code>onion script.on</code> は常駐デーモン（<code>onion.tools.daemon</code>）経由でコンパイルする。デーモンは初回利用時に起動し、スクリプトのクラスは呼び出し元プロセスに戻って実行される。デーモンに接続できない場合はプロセス内コンパイルにフォールバックする。<code>java -cp onion.jar onion.tools.daemon.DaemonClient stop|status</code> で制御できる</li>
+<li><code>ONION_CONSOLE_ENCODING=auto|native|utf-8</code> (環境変数) - ランチャの stdout/stderr の文字コード（<code>onion.tools.ConsoleEncoding</code>）。<code>auto</code>（既定）: Windows ではコンソールでないストリーム（パイプ、ファイル、mintty）を UTF-8 で書き、コンソールはそのコードページのまま。他の OS は変更なし。標準入力も同様: <code>onion.IO</code> はパイプ・ファイルを UTF-8、Windows のコンソールをそのコードページでデコード（ランチャが <code>onion.stdin.encoding</code> を設定。ランチャなしでは UTF-8）。<code>onion.Files</code>/<code>file"…"</code> のテキストは常に UTF-8。ソースファイルの既定は UTF-8（<code>-encoding</code> で上書き）</li>
 </ul>
 <h2 id="_3">高レベルアーキテクチャ<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <p>Onionコンパイラは、古典的なコンパイラアーキテクチャに従った<strong>マルチフェーズパイプラインコンパイラ</strong>です。</p>
@@ -5624,6 +5626,10 @@
 <td><code>case s is String:</code> - 型パターンは<code>is</code>を使う。sealedの網羅性チェック（E0042）が適用される</td>
 </tr>
 <tr>
+<td><code>case o is Result.Ok:</code>（ネストしたJava型）は未対応？</td>
+<td>✓ 正しい - 型パターンにはネストしたJavaクラスをドット区切りで書ける（<code>Result.Ok</code>、<code>onion.Outcome.Bad</code>、<code>Map.Entry</code>、さらに深い<code>a.B.C.D</code>）。束縛はスクルーティニーの型引数を復元し、Javaの<code>sealed ... permits</code>なスクルーティニーにもE0042の網羅性チェックが効く。Javaのレコードは型でのみマッチする（<code>case Ok(v)</code>の分解はOnionのレコード専用）</td>
+</tr>
+<tr>
 <td><code>case Add(l, n is Num):</code> のようなネストした型パターン？</td>
 <td>✓ 正しい - 型パターンはデストラクチャリングの中にネストでき、束縛された値は絞り込まれた型として使える。レコードでない要素にも使える（<code>case Wrap(s is String)</code>）</td>
 </tr>
@@ -5728,6 +5734,10 @@
 <tr>
 <td><code>import { Foo = pkg.Class; }</code></td>
 <td><code>import { pkg.Class as Foo; }</code> - エイリアスに<code>as</code></td>
+</tr>
+<tr>
+<td><code>import { onion.Result$Ok }</code></td>
+<td><code>import { onion.Result.Ok }</code>（または<code>... as ROk</code>） - ネストしたクラスはドット区切りでインポートし、JVMの<code>$</code>名は書かない。<code>a.b.C</code>はJavaと同じく、トップレベルクラスを指す最長の接頭辞を優先し、残りをメンバークラスとして解決する</td>
 </tr>
 <tr>
 <td><code>new int[10]</code></td>
@@ -5898,12 +5908,20 @@
 <td><code>enum Opt[T] { case Some(value: T); case Nothing }</code> - 型パラメータは生成されるsealedインターフェースと各ケースのrecordに伝播する。型パターンはスクルーティニーの型引数を復元するので、<code>Opt[String]</code> から <code>Some</code> をマッチさせると <code>Some[String]</code> が束縛され、<code>s.value()</code> は <code>String</code> になる。<em>homogeneous</em>（データを持たない）enumは型パラメータを取れない（<code>java.lang.Enum</code>になるため）</td>
 </tr>
 <tr>
+<td><code>onion.Result</code>/<code>Option</code>/<code>Outcome</code>をケースでマッチ？</td>
+<td><code>select r { case o is Result.Ok: o.value(); case e is Result.Err: e.error() }</code>（<code>Option.Some</code>/<code>Option.None</code>、<code>Outcome.Ok</code>/<code>Outcome.Bad</code>も同様） - sealedなJavaインターフェースにネストしたJavaレコード。型でマッチし（<code>Result.Ok(v)</code>の分解は不可）、スクルーティニーの型引数で束縛され、全ケースをそろえれば網羅的</td>
+</tr>
+<tr>
 <td>レコードから手でパーサーを書く</td>
 <td><code>record R(...) from re"..."</code> - <code>R::parse(s): R?</code>（アンカー一致、非マッチ/変換失敗はnull）と <code>R::parseAll(text): List</code> を合成する。<code>from</code> は <code>conforms</code> より前に書く</td>
 </tr>
 <tr>
 <td><code>null</code> ではなく失敗理由すべてが欲しい、あるいはレコード1つに複数の境界を名付けたい？</td>
 <td><code>record R(...) { shape name = re"..." }</code> - <code>R::name(): onion.Shape[R]</code> を合成する。<code>.parse(s)</code> は <code>Outcome[R]</code>（値、またはそれが得られなかった全理由を <code>Defect</code> として保持する）を返し、可逆な場合は <code>.print(v)</code> で書き戻せる。<code>shape</code> 節はレコード1つに複数付けられる（正規表現以外に <code>shape name = json</code>/<code>config</code> という書式指定も可）。<code>from re"..."</code> と共存できる</td>
+</tr>
+<tr>
+<td><code>shape doc = json</code> のレコードにリストや入れ子のオブジェクトを持たせたい？ / LLM の構造化出力用の JSON Schema が欲しい？</td>
+<td><code>record S(tags: List[String], owner: Action, acts: List[Action], note: String?) { shape doc = json }</code> - json shape （json だけ。正規表現/yaml/config はスカラーのままで、それ以外は句を名指しする E0061）はスカラーの <code>List[S]</code>、自身の json shape を宣言したレコード <code>R</code>（その最初の json shape で読む）、<code>List[R]</code>、<code>T?</code>（キーの欠落または null）も読む。欠陥は <code>acts[2].owner</code> のようなパスを持つ。<code>S::doc().jsonSchema()</code> は JSON Schema のテキストを返し（閉じたオブジェクト、<code>required</code> は null 非許容の成分）、<code>hasJsonSchema()</code> が true になるのは json shape だけ</td>
 </tr>
 <tr>
 <td>レコードを手でシリアライズ（JSON/YAML）</td>
@@ -6035,7 +6053,11 @@
 </tr>
 <tr>
 <td>手書きの引数解析を行うCLI関数</td>
-<td><code>tool name(args) [: T] [requires { caps }] { body }</code> — トップレベルのtool宣言。トップレベルでtoolを宣言し（<code>main</code>を持たない）スクリプトはCLIそのものになる: <code>--help</code>、<code>--contract</code>（機械可読なJSON）、<code>--plan</code>（バインドされた効果を表示するだけで何も実行しないドライラン）はすべて宣言から自動導出される</td>
+<td><code>tool name(args) [: T] [requires { caps }] { body }</code> — トップレベルのtool宣言。トップレベルでtoolを宣言し（<code>main</code>を持たない）スクリプトはCLIそのものになる: <code>--help</code>、<code>--contract</code>（機械可読なJSON）、<code>--plan</code>（バインドされた効果を表示するだけで何も実行しないドライラン）はすべて宣言から自動導出される。プロジェクトではtoolだけのソースが <code>onion run</code> のエントリーポイントになる（<code>onion run -- --plan ...</code>）</td>
+</tr>
+<tr>
+<td>スクリプトにMavenライブラリを渡すための <code>-classpath</code></td>
+<td>スクリプト先頭のコメントブロック（コードより前）に <code>//&gt; using dep "g:a:v"</code>（必要なら <code>//&gt; using repository "url"</code> も）を書く — プロジェクトの <code>[dependencies]</code> と同じく解決され、ディレクティブの組ごとにキャッシュされる。バージョンは厳密指定のみ。ロックファイルはない（推移的依存を再現可能にするにはプロジェクトを使う）</td>
 </tr>
 <tr>
 <td>tool内の未宣言の副作用</td>

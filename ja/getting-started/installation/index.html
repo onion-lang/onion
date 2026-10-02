@@ -756,6 +756,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンソールの文字コード（Windows）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4602,6 +4613,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンソールの文字コード（Windows）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4766,14 +4788,38 @@ JDK を切り替えたときは作り直してください。作り直すまで�
 </span></code></pre></div>
 <p><code>ONION_DEBUG_STARTUP=1</code> を設定すると、ランチャが抑止している JVM のクラス共有メッセージが
 表示されます。アーカイブが使われない理由はこれで分かります。</p>
+<h3 id="windows">コンソールの文字コード（Windows）<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h3>
+<p>Windows では、<code>onion</code>・<code>onionc</code>・<code>onion repl</code>・プロジェクトコマンドは、出力先が Windows の
+コンソールでないとき（パイプ、ファイル、Git Bash の mintty のような端末）に、出力と診断を
+UTF-8 で書き出します。本物のコンソール（cmd.exe、PowerShell、Windows Terminal、VS Code の
+ターミナル）では、そのコンソール自身のコードページのままにします。コンソールはそれを正しく
+表示できるからです。stdout と stderr は別々に判定するので、<code>onion script.on &gt; out.txt</code> では
+ファイルには UTF-8 が書かれ、コンソールに出る診断も読めるままです。他のプラットフォームでは
+何も変わりません。ソースファイルは <code>-encoding</code> を指定しない限り UTF-8 として読みます。</p>
+<p>標準入力も同じ規則に従います。<code>IO::readLine</code> などの <code>IO</code> の読み込み関数は、パイプやファイルを
+UTF-8 として（<code>echo 日本語 | onion script.on</code>）、Windows のコンソールはそのコードページとして
+デコードします。JDK 17 でも JDK 18 以降でも同じです。他のプラットフォームでは、JDK 18 以降が
+すでにそうだったように標準入力を UTF-8 として読みます。<code>onion.Files</code> と <code>file"…"</code> は、
+プラットフォームの文字コードにかかわらず、テキストを常に UTF-8 で読み書きします。それ以外の
+文字コードには <code>Files::readText</code>/<code>writeText</code> に <code>java.nio.charset.Charset</code> を渡します。</p>
+<p><code>ONION_CONSOLE_ENCODING</code> でこの選択を上書きできます。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">ONION_CONSOLE_ENCODING</span><span class="o">=</span>utf-8<span class="w"> </span>onion<span class="w"> </span>script.on<span class="w">   </span><span class="c1"># コンソールも含め常に UTF-8（全 OS）</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nv">ONION_CONSOLE_ENCODING</span><span class="o">=</span>native<span class="w"> </span>onion<span class="w"> </span>script.on<span class="w">  </span><span class="c1"># 従来どおり JVM に任せる</span>
+</span></code></pre></div>
+<p>未設定または <code>auto</code> のときは上に書いた動作です。それ以外の文字コードに固定したいときは、
+<code>native</code> と JVM 自身のフラグを <code>ONION_JAVA_OPTS</code> で組み合わせます。JDK 19 以降は
+<code>-Dstdout.encoding=...</code> と <code>-Dstderr.encoding=...</code>、JDK 17・18 は <code>-Dsun.stdout.encoding=...</code> と
+<code>-Dsun.stderr.encoding=...</code> です。標準入力は <code>-Donion.stdin.encoding=...</code> で固定でき、
+ランチャは指定された値をそのまま使います。<code>native</code> のときの標準入力は、従来どおり JVM の
+既定の文字コードでデコードします。</p>
 <h3 id="_5">コンパイルデーモン<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
 <p><code>onionc</code> は毎回 JVM を起動し、コンパイラを読み込み、JIT で温めてからようやくファイルを
 コンパイルします。<code>ONION_DAEMON=1</code> を設定すると、<code>onionc</code> はコマンドラインを常駐の
 コンパイラプロセス（初回に自動起動、ユーザー・JDK・Onion のインストールごとに 1 つ）へ
 渡し、その出力と終了コードを中継します。デーモンは温まったコンパイラを実行間で保持する
 ので、典型的な 1 ファイルのコンパイルはずっと短い時間で終わります。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ONION_DAEMON</span><span class="o">=</span><span class="m">1</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>onionc<span class="w"> </span>Hello.on<span class="w">            </span><span class="c1"># 初回はデーモンを起動し、以後はそれを再利用する</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ONION_DAEMON</span><span class="o">=</span><span class="m">1</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>onionc<span class="w"> </span>Hello.on<span class="w">            </span><span class="c1"># 初回はデーモンを起動し、以後はそれを再利用する</span>
 </span></code></pre></div>
 <p>デーモンは 30 分仕事が無ければ自分で終了します。手動では <code>java -cp onion.jar
 onion.tools.daemon.DaemonClient stop</code>（または <code>status</code>）で操作できます。待ち受けは自分

@@ -4796,7 +4796,9 @@ generated on error:</p>
 </span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="go">usage: &lt;script&gt; &lt;name&gt; [--count VALUE] [--loud] [--help]</span>
 </span></code></pre></div>
 <p>Flags accept both <code>--name value</code> and <code>--name=value</code>; <code>--help</code> (or <code>-h</code>) prints
-the generated usage and exits.</p>
+the generated usage and exits. A camelCase parameter is a kebab-case flag as well:
+<code>def main(makeSample: Boolean = false)</code> accepts <code>--make-sample</code> (shown in the
+usage) and <code>--makeSample</code>.</p>
 <h2 id="putting-it-together">Putting It Together<a class="headerlink" href="#putting-it-together" title="Permanent link">&para;</a></h2>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="ch">#!/usr/bin/env onion</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Hit</span><span class="p">(</span><span class="n">ip</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">method</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>

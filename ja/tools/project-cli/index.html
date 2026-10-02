@@ -4957,13 +4957,22 @@ production ソースを対象に <code>target/doc</code> へ出力します。</
 </span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="s2">"com.fasterxml.jackson.core:jackson-databind"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2.17.0"</span>
 </span></code></pre></div>
 <p>Maven の座標はコロンを含むため、キーは必ずクォートします。バージョンは厳密指定で、
-範囲指定や <code>latest</code> は使えません。推移的依存も解決され、<code>build</code>・<code>run</code>・<code>test</code> の
+範囲指定や <code>latest</code> は使えません。Maven の範囲指定（<code>[1.0,2.0)</code>・<code>(,1.0]</code> など、<code>[</code>・<code>]</code>・
+<code>(</code>・<code>)</code>・<code>,</code> を含むもの）、<code>+</code> で終わる動的リビジョン（<code>1.+</code>）、動くエイリアス
+（<code>LATEST</code>・<code>RELEASE</code>・<code>latest.release</code> や <code>latest.integration</code> などの <code>latest.*</code>）は、
+マニフェストが依存の名前と行を示してエラーにします。SemVer のビルドメタデータ中の <code>+</code>
+（<code>1.0.0+build.5</code>）と <code>-SNAPSHOT</code> は受け付けます。スクリプトの <code>//&gt; using dep</code> も
+同じ規則です。推移的依存も解決され、<code>build</code>・<code>run</code>・<code>test</code> の
 いずれでも classpath に載ります。コンパイル時に使えるライブラリは実行時にも存在します。</p>
 <p>ビルドのフィンガープリントに入るのはマニフェストの本文だけでなく、<strong>解決後</strong>の集合
 （推移的依存を含む）です。推移的依存が動けばキャッシュは無効化されて再コンパイルされ、
 古い classpath でコンパイルされたクラスが現行のものとして使われることはありません。</p>
 <p>解決できない座標があるとビルドは失敗し、coursier のメッセージがどの座標を見つけられ
 なかったかを示します。</p>
+<p>単一ファイルのスクリプトでは、同じことを先頭の <code>//&gt; using dep "group:artifact:version"</code>
+行で宣言します（<a href="../script-runner/">スクリプトランナー</a> を参照）。スクリプトには
+<code>onion.lock</code> がないため推移的依存のバージョンは固定されません。それが問題になるなら
+プロジェクトにしてください。</p>
 <h3 id="repositories"><code>[[repositories]]</code><a class="headerlink" href="#repositories" title="Permanent link">&para;</a></h3>
 <p>追加の Maven リポジトリを、書いた順に、<strong>Maven Central より先に</strong>探索します。</p>
 <div class="language-toml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">[[repositories]]</span>
@@ -4977,8 +4986,8 @@ URL の <code>http</code>・<code>https</code>・<code>file</code> のみです�
 <code>package.repositories</code> になってしまいます。テーブルヘッダならファイル中のどこに書いても
 同じ意味になります。</p>
 <h3 id="_4">まだ対応していないこと<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
-<p>オフラインモードはありません。解決はビルドのたびに実行され、取得済みの
-ものは coursier のキャッシュ（<code>~/.cache/coursier</code>）から読まれるため、ウォームな状態では
+<p>オフラインモードはありません。解決は、現在の <code>onion.lock</code> に対して記録したクラスパスを
+ビルドが再利用できないとき（後述）に実行され、取得済みのものは coursier のキャッシュ（<code>~/.cache/coursier</code>）から読まれるため、ウォームな状態では
 ネットワークに出ません。ただしネットワークアクセスを<strong>禁止</strong>しているわけではありません。
 Onion が組み込んでいる coursier の Java API はキャッシュポリシーを公開していないため、
 <code>--offline</code> フラグは偽装するしかありません。保証でないものを保証のように見せないため、
@@ -4991,9 +5000,13 @@ Onion が組み込んでいる coursier の Java API はキャッシュポリシ
 推移的依存が新しい版を publish した瞬間に別の jar でコンパイルされます。この種の失敗は
 「片方のマシンでだけ起き、もう片方では再現せず、プロジェクトは何も変わっていない」という
 一番厄介な形で出ます。</p>
-<p>ロックは推移的依存を含む座標集合全体を記録するので、以降のビルドは<strong>その</strong>バージョンを
-解決します。さらに各成果物の SHA-256 を記録し、コンパイル前に照合します。既に publish
-された版のバイト列が変わっていたらビルドを止めます。</p>
+<p>ロックは推移的依存を含む座標集合全体を記録し、以降のビルドは <code>[dependencies]</code> を
+<strong>その</strong>バージョンすべてを強制（force）したうえで解決します。バージョンを導き直すことは
+しません。強制はマニフェスト自身の依存グラフにかけるもので、座標を平らなルートの並びとして
+解決するのではありません。平らにすると、推移的依存がそのバージョンを管理している POM
+（<code>&lt;dependencyManagement&gt;</code> や親 BOM）の下から外れ、別のバージョンが選ばれることがあるからです。
+さらに各成果物の SHA-256 を記録し、コンパイル前に照合します。既に publish された版の
+バイト列が変わっていたらビルドを止めます。</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>error: Resolved dependencies do not match onion.lock:
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>different bytes for the same file:
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  postgresql-42.7.3.jar
@@ -5002,6 +5015,23 @@ Onion が組み込んでいる coursier の Java API はキャッシュポリシ
 </span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>A published version's bytes should never change. Check the repository, or delete onion.lock
 </span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>to accept what it is serving now.
 </span></code></pre></div>
+<p>成果物の<strong>集合</strong>が違うのはバイト列の変化ではなく解決結果の違いなので、エラーもそう述べ、
+リポジトリのせいにする代わりに動いたバージョンを列挙します。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>error: Resolved dependencies do not match onion.lock:
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>not in the lock: lib-2.0.0.jar
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>missing: lib-1.0.0.jar
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>resolved versions differ from the lock:
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>  com.example:lib  locked 1.0.0  resolved 2.0.0
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>The artifacts resolved differently from the ones the lock records; no file's bytes changed.
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>Delete onion.lock to resolve again and record the new answer.
+</span></code></pre></div>
+<p>ロックを解決して照合し終えたビルドは、得られたクラスパスをロックの内容をキーにして
+<code>target/.onion/dependency-classpath.json</code> に記録します。同じロックでの次の
+<code>build</code>/<code>run</code>/<code>test</code> は、記録された jar がすべて存在し、その SHA-256 がロックと一致する限り
+（サイズか更新時刻が変わった jar は再ハッシュします）、coursier に一切問い合わせずにその
+クラスパスを使います。それ以外——ロックが違う、jar が無い・変わった、記録が無い——は解決に
+戻ります。記録はこのマシンのキャッシュへの絶対パスを持つので <code>target/</code> の下に置き、
+コミットしません。<code>onion clean</code> で消えます。言語サーバーも同じ記録を読み取り専用で使います。</p>
 <p><code>onion.toml</code> のバージョンを変えたりリポジトリを足したりすると、ロックはもう「今きいている
 問い」を説明していないので、その問いに対して強制するのではなく破棄して書き直します。
 <code>[dependencies]</code> の並べ替えは変更に当たらず、ロックは維持されます。<code>onion clean</code> はロックを
@@ -5009,7 +5039,8 @@ Onion が組み込んでいる coursier の Java API はキャッシュポリシ
 <p><strong>これは offline モードではありません。</strong> coursier の埋め込み API が露出しているのは
 キャッシュの場所・スレッドプール・ロガーだけで、キャッシュ方針は一切ありません。したがって
 「ネットワークに一切触れないビルド」を約束する誠実な方法がありません。ロックが与えるのは
-毎回同じ答えであって、問いを無くすことではありません。</p>
+毎回同じ答えであって、問いを無くすことではありません。記録されたクラスパスは、同じ問いを
+たいてい二度きかずに済む、というだけです。</p>
 <h2 id="_5">ソースレイアウト<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>プロダクションソースは <code>src/</code> 以下のすべての <code>.on</code> ファイル、テストは
 <code>tests/</code> 以下のすべての <code>_test.on</code> ファイルです。どちらも再帰的に探索され、
@@ -5018,17 +5049,26 @@ Onion が組み込んでいる coursier の Java API はキャッシュポリシ
 存在しない・空の場合はテスト0件の成功として扱われます。</p>
 <h2 id="_6">ビルドキャッシュ<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p><code>build</code> は一度だけコンパイルし、結果を <code>target/</code> 以下にキャッシュします。
-コンパイラのバージョン・Javaのバージョン・マニフェストの正確なバイト列・
+コンパイラの識別子・Javaのバージョン・マニフェストの正確なバイト列・
 すべてのソースパスとその内容から計算したSHA-256フィンガープリントが
 一致する限り、2回目以降の <code>build</code>（および <code>run</code>・<code>test</code> が最初に行う
 ビルド）はそのキャッシュを再利用します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>$ onion build
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>Built hello (1 classes)
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>$ onion build
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>Built hello (cached)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion build
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>Built hello (1 classes)
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>$ onion build
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>Built hello (cached)
 </span></code></pre></div>
 <p>ソースの追加・削除・リネーム・内容の変更はいずれもキャッシュを無効化し、
-フルリビルドを引き起こします。リビルドに失敗しても、直前の成功した
+フルリビルドを引き起こします。</p>
+<p>コンパイラの識別子は、バージョンに加えて、コンパイラを読み込んだ jar（またはクラス
+ディレクトリ）のダイジェストを含みます。そのため、アップグレードやローカルで作り直した
+<code>onion.jar</code>、エフェクトテーブルのようなコンパイラのリソースの変更など、バージョンが
+同じでもコンパイラが変われば、次の <code>build</code> でプロジェクトが再ビルドされます。新しい
+診断やエフェクト検査が <code>onion clean</code> なしで走ります。jar のハッシュ計算はビルドの
+たびには行いません。ダイジェストはユーザーキャッシュディレクトリ
+（<code>-Donion.cache.dir</code>・<code>$ONION_CACHE_DIR</code>・プラットフォームの既定）に、jar の
+パス・サイズ・更新時刻をキーとしてキャッシュされます。</p>
+<p>リビルドに失敗しても、直前の成功した
 <code>target/classes</code> やビルド状態ファイルが壊れることはありません —
 新しい出力は一時領域にステージングされ、すべての成果物が正しく
 書き込まれた後にのみ昇格されます。</p>
@@ -5042,29 +5082,59 @@ Onion が組み込んでいる coursier の Java API はキャッシュポリシ
    1つ以上持つ場合に候補となります。</li>
 <li>トップレベルに <code>main</code> という名前の関数を宣言しているプロダクション
    ソースは、それだけで候補となります。</li>
+<li>トップレベルに <code>tool</code> を宣言し、<code>main</code> もトップレベルの文も持たない
+   プロダクションソースは候補となります。これはちょうどコンパイラが
+   そのソースにツールCLI用の <code>main</code>（スクリプトが得るものと同じ）を
+   合成する条件なので、<code>run</code> はそれを通じて実行され、<code>--help</code>・
+   <code>--contract</code>・<code>--plan</code> がすべて使えます。</li>
 <li>それ以外のコンパイラ生成の <code>main</code> はすべて無視されます。</li>
 </ol>
 <p><code>run</code> は候補がちょうど1つであることを要求します。候補が0件の場合は
 <code>src/main.on</code> に実行可能なコードを追加するか、トップレベルの <code>main</code> を
-定義するようヒントとともに失敗し、候補が2件以上の場合はすべての候補の
-ソースと位置を列挙して失敗するため、あいまいさを解消できます。</p>
+定義するか、トップレベルの <code>tool</code> を宣言するようヒントとともに失敗し、
+候補が2件以上の場合はすべての候補のソースと位置を列挙して失敗するため、
+あいまいさを解消できます。</p>
+<p><code>--</code> より後ろの引数はプログラムに渡されるので、ツールのプロジェクトは
+スクリプトの場合と同じように操作できます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ onion run -- --help
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>usage: meeting-summary &lt;notes&gt; &lt;out&gt;
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>  ...
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>$ onion run -- samples/notes.md out.json --plan
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>plan: `summarize` would
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>  read    derived from notes = samples/notes.md
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>  write   derived from out = out.json
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>  ...
+</span></code></pre></div>
+<p>使い方の行には、スクリプトならファイル名が入るところにプロジェクトの
+パッケージ名（<code>[package].name</code>）が入ります。</p>
 <h2 id="_8">テスト<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <p><code>test</code> はまずプロダクションソースを一度だけビルドし、その後、発見した
 各テストファイルをソート順に1つずつ、順番にコンパイル・実行します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion test
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>test tests/main_test.on ... ok
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>1 tests, 1 passed, 0 failed
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>$ onion test
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>test tests/main_test.on ... ok
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>1 tests, 1 passed, 0 failed
 </span></code></pre></div>
 <p>各テストの <code>stdout</code>/<code>stderr</code> は、<code>--verbose</code> を指定しない限り失敗した
 場合にのみ表示されます。あるテストのコンパイル失敗・アサーション失敗・
 実行時例外・0以外の数値結果は、そのテスト単体の失敗として報告され、
 残りのテストはすべて実行され続けます。テストが1つも無いプロジェクトは
 <code>0 tests, 0 passed, 0 failed</code> というサマリーとともに成功します。</p>
+<p>アサーション失敗や実行時例外は、それを起こした行 —— <code>Assert::</code> の呼び出しなら、
+テスト内であれ、テストから到達したプロジェクトのソース内であれ、その呼び出しの行 ——
+で報告され、続けてその行が表示されます：</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>$ onion test
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>test tests/summary_test.on ... FAILED
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>1 tests, 0 passed, 1 failed
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>error: tests/summary_test.on:4: AssertionError: Expected true but was false
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>  4 | Assert::isTrue(words.size == 4)
+</span></code></pre></div>
+<p><code>onion script.on</code> でも、失敗したアサーションは同じように報告されます。</p>
 <h2 id="_9">クリーン<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <p><code>clean</code> はプロジェクトの正規の <code>target/</code> ディレクトリだけを削除します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ onion clean
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>Cleaned target
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>$ onion clean
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>Cleaned target
 </span></code></pre></div>
 <p>実行には有効な、発見済みのプロジェクトであることが前提となり、
 <code>target/</code> が存在するかどうかにかかわらず同じメッセージで成功します。

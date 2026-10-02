@@ -4525,7 +4525,9 @@ mostly-pure class declares its exceptions:</p>
 <code>Concurrent</code>, <code>ToolCli</code> — plus the pure remainder of the stdlib (including the nested
 values its entry points hand back, such as <code>Proc</code>'s result, <code>Http</code>'s response and
 <code>Json::value</code>), a pure baseline for common JDK value and collection types and for
-<code>java.time</code> (whose <code>now</code> methods are <code>clock</code>), and the JDK's well-known
+<code>java.time</code> (whose <code>now</code> methods are <code>clock</code>), JDK file I/O (<code>java.io</code> file
+streams and <code>File</code>, <code>java.nio.file.Files</code>; stream wrappers such as <code>BufferedReader</code>
+stay <code>unknown</code> because they may wrap <code>System.in</code> or a socket), and the JDK's well-known
 effect points (<code>System::getenv</code>, <code>System::exit</code>, <code>Runtime::exec</code>, <code>Thread::sleep</code>,
 <code>PrintStream</code> as the type of <code>System::out</code>).</p>
 <p>Granularity is per-type, not per-instance. A <code>PrintStream</code> over a file would be a
@@ -4557,6 +4559,12 @@ table classifies the stdlib as shipped — a user-supplied class named <code>oni
 not consulted against its source. And an effect set is not a security sandbox: nothing
 stops a program from running; the set is the honest input to the layers that decide
 whether it <em>should</em>.</p>
+<p>The same walk also records, for <code>--plan</code>, the operands it can read off the source — a
+literal URL's host, a <code>Proc</code> command with its literal arguments, a
+<code>System::getenv</code> variable name, a literal path (see <a href="../../guide/tools/#operands-the-source-spells-out">Operands the source spells out</a>).
+Those are a lower bound in the opposite sense from the effect set: every operand listed
+is one the program can reach, but an operand that is not a literal is reported as
+<code>(operand not statically known)</code>, never guessed.</p>
 
 
 

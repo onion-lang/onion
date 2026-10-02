@@ -3605,6 +3605,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#classpath-and-script-dependencies-using" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classpath and script dependencies (//&gt; using)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4507,6 +4518,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#classpath-and-script-dependencies-using" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classpath and script dependencies (//&gt; using)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4655,6 +4677,30 @@ decorations better, but computing one from two strings risks producing an edit t
 reconstruct the formatted text, and a formatter that corrupts a buffer on save is worse than
 one that scrolls it. Before any edit is offered the formatted text is re-lexed and compared
 token for token against the original; if they differ, no edit is offered at all.</p>
+<h3 id="classpath-and-script-dependencies-using">Classpath and script dependencies (<code>//&gt; using</code>)<a class="headerlink" href="#classpath-and-script-dependencies-using" title="Permanent link">&para;</a></h3>
+<p>A file with an <code>onion.toml</code> above it is validated as <code>onion build</code> compiles it: against the
+project's <code>target/classes</code> and the dependencies <code>onion.toml</code> declares. A file without one is
+a standalone script, validated against <code>.</code> plus the jars its
+<a href="../script-runner/"><code>//&gt; using dep</code> directives</a> resolve to — the same
+parser, resolver and cache as <code>onion script.on</code> and <code>onionc</code>, so the editor sees the
+classpath a run sees.</p>
+<ul>
+<li><strong>Resolution never blocks the editor.</strong> A directive set already in the cache is used at
+  once. A cold one is resolved on a background thread; until it finishes, the server
+  <strong>holds</strong> the script's diagnostics and shows a single information note on the directive
+  lines instead, then validates the file again on its own. Holding was chosen over
+  validating without the jars, which would underline every type the dependency provides
+  as not found for the length of a download.</li>
+<li><strong>A malformed directive</strong> is an error at its line and column, with the message
+  <code>onion</code> and <code>onionc</code> print. The rest of the file is still validated, against the jars
+  the script last resolved.</li>
+<li><strong>A dependency that cannot be resolved</strong> is an error on the directive lines with the
+  resolver's message, and the file is validated without it. The failure is remembered
+  rather than retried on every keystroke; saving the file retries it.</li>
+<li><strong>Inside a project, directives are not used</strong>, as <code>onion build</code> does not use them; a
+  warning on the directive lines says to declare the dependency in <code>onion.toml</code>.
+  (<code>onion file.on</code> and <code>onionc file.on</code> still read them when given the file directly.)</li>
+</ul>
 <h2 id="symbol-support">Symbol support<a class="headerlink" href="#symbol-support" title="Permanent link">&para;</a></h2>
 <p>The language server indexes the following symbols from open documents:</p>
 <ul>

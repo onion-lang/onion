@@ -3054,6 +3054,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="--plan: what a run would do, without doing it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operands-the-source-spells-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operands the source spells out
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -4520,6 +4537,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="--plan: what a run would do, without doing it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operands-the-source-spells-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operands the source spells out
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -4646,6 +4680,9 @@ read; <code>--help</code>, flag parsing, typed conversion and error messages are
 it at runtime, and the typed call into your tool is derived from the same declaration
 at compile time. Required parameters are positionals; defaulted parameters become
 <code>--name</code> flags (<code>--count 5</code> or <code>--count=5</code>); <code>Boolean</code> defaults become switches. A
+camelCase parameter answers to its kebab-case flag as well as to its own name —
+<code>maxRows</code> is <code>--max-rows</code> or <code>--maxRows</code> — and <code>--help</code> shows the kebab-case one; two
+parameters that would share a flag (<code>parseURL</code> and <code>parseUrl</code>) are a compile error (<code>E0093</code>). A
 default that is absent on the command line is evaluated as the original expression, in
 the language — it is never round-tripped through a string.</p>
 <p>The parsing and typed conversion behind <code>--help</code>/flag handling is generated code calling
@@ -4700,6 +4737,89 @@ guessed. And a body carrying <code>unknown</code> says so out loud:</p>
 plan. This is what makes the dry run <em>trustworthy</em> rather than decorative: a CLI
 derived from a signature is commodity; a plan derived from the checked effect set
 requires knowing what the body does.</p>
+<h3 id="operands-the-source-spells-out">Operands the source spells out<a class="headerlink" href="#operands-the-source-spells-out" title="Permanent link">&para;</a></h3>
+<p>A bare capability (<code>net</code>, <code>exec</code>, <code>env</code>, <code>read</code>, <code>write</code>) is not tied to a parameter,
+but its operand is often sitting in the source as a literal — the API host, the command
+a tool shells out to, the environment variable it reads. <code>--plan</code> prints those:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>$<span class="w"> </span>onion<span class="w"> </span>digest.on<span class="w"> </span>out/digest.md<span class="w"> </span>gh<span class="w"> </span>--plan
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>plan:<span class="w"> </span><span class="sb">`</span>digest<span class="sb">`</span><span class="w"> </span>would
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>write<span class="w">   </span>derived<span class="w"> </span>from<span class="w"> </span><span class="nv">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>out/digest.md
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nb">exec</span><span class="w">    </span>gh<span class="w"> </span>…<span class="w"> </span>list<span class="w"> </span>--repo<span class="w"> </span>onion-lang/onion<span class="w"> </span>--state<span class="w"> </span>all<span class="w"> </span>--search<span class="w"> </span>…<span class="w"> </span>--json<span class="w"> </span>number,…
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>net<span class="w">     </span><span class="nv">$SLACK_WEBHOOK_URL</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span>net<span class="w">     </span>api.github.com
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span>env<span class="w">     </span>SLACK_WEBHOOK_URL
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span>env<span class="w">     </span>GITHUB_TOKEN
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span>clock
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">  </span>console
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="o">(</span>nothing<span class="w"> </span>was<span class="w"> </span>executed<span class="p">;</span><span class="w"> </span>operands<span class="w"> </span>are<span class="w"> </span>the<span class="w"> </span>arguments<span class="w"> </span>the<span class="w"> </span>effects<span class="w"> </span>are
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w"> </span>derived<span class="w"> </span>from,<span class="w"> </span>not<span class="w"> </span>necessarily<span class="w"> </span>the<span class="w"> </span>exact<span class="w"> </span>paths<span class="w"> </span>or<span class="w"> </span>hosts<span class="w"> </span>touched<span class="o">)</span>
+</span></code></pre></div>
+<p>The compiler reads, from every call the tool can reach (its body, closures it creates,
+and the program's own methods it calls, transitively):</p>
+<table>
+<thead>
+<tr>
+<th>Effect</th>
+<th>Operand shown</th>
+<th>Read from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>net</code></td>
+<td>the host (and port)</td>
+<td>the URL of <code>Http::get</code>/<code>post</code>/<code>put</code>/<code>delete</code>/<code>postJson</code>/<code>getResponse</code>/<code>postResponse</code>/<code>request</code> (through the builder steps to <code>send()</code>), an <code>http"…"</code> resource, <code>Net::connect</code></td>
+</tr>
+<tr>
+<td><code>exec</code></td>
+<td>the command, with <code>…</code> for each non-literal argument</td>
+<td>the command words of <code>Proc::capture</code>/<code>run</code>/<code>exec</code>, or those after the directory for <code>captureIn</code>/<code>runIn</code>/<code>execIn</code></td>
+</tr>
+<tr>
+<td><code>env</code></td>
+<td>the variable name</td>
+<td><code>System::getenv("NAME")</code>, <code>Config::getEnv("NAME", …)</code></td>
+</tr>
+<tr>
+<td><code>read</code>/<code>write</code></td>
+<td>the path</td>
+<td>the path argument of <code>Files</code> operations, a <code>file"…"</code> resource</td>
+</tr>
+</tbody>
+</table>
+<p>An operand counts as known when it is a string literal; a concatenation or
+interpolation that <em>starts</em> with a literal (<code>"https://api.github.com/search?q=" + q</code> —
+only a URL's host is read from such a prefix, and only when the literal runs past it); a
+local <code>val</code> assigned once from either; or <code>System::getenv("NAME")</code>, which is shown as
+<code>$NAME</code> (a webhook URL kept in an environment variable prints as
+<code>net $SLACK_WEBHOOK_URL</code>). User-info in a URL (<code>user:password@</code>) is never printed.
+Each operand gets its own line, with the effect name repeated, in the order the calls
+are found — the tool's own body first, then the methods it calls.</p>
+<p>An <code>exec</code> line shows the whole command: literal arguments verbatim, and <code>…</code> in place
+of each argument that is not an exact literal (a parameter, a loop variable,
+<code>"updated:&gt;=" + since</code>), several in a row collapsing into one. So
+<code>Proc::capture("gh", kind, "list", "--repo", "onion-lang/onion")</code> plans as
+<code>exec    gh … list --repo onion-lang/onion</code>, which is how <code>digest.on</code> above gets its
+line. A command longer than 72 characters is cut and ends in <code>…</code>; an argument holding
+whitespace or a quote is shown single-quoted. The same command reached from two call
+sites is listed once.</p>
+<p>The list is a <strong>lower bound</strong>. Anything else — a parameter, a <code>var</code>, a value computed at
+run time, a literal passed into a helper's parameter (arguments are not followed into
+the callee) — is not guessed. When a call site of an effect has an operand the analysis
+could not read, the known operands are followed by a <code>(operand not statically known)</code>
+line for the same effect, so a partial list never reads as a complete one. Under a
+parameter-bound capability (<code>write(out)</code>) the <code>derived from</code> line is unchanged; literal
+operands of the same effect elsewhere in the body are listed beneath it.</p>
+<p>The same facts appear in <code>--contract</code> as one extra key per tool, present only when
+something is known — every existing key keeps its value and position:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">"staticOperands"</span><span class="p">:{</span><span class="nt">"net"</span><span class="p">:{</span><span class="nt">"known"</span><span class="p">:[</span><span class="s2">"$SLACK_WEBHOOK_URL"</span><span class="p">,</span><span class="s2">"api.github.com"</span><span class="p">],</span><span class="nt">"unresolved"</span><span class="p">:</span><span class="kc">false</span><span class="p">}}</span>
+</span></code></pre></div>
+<p><code>unresolved</code> is <code>true</code> when at least one call site of that effect had an operand the
+analysis could not determine. An <code>exec</code> entry also carries <code>commands</code>, each call site's
+full argument vector, with <code>null</code> for an argument that is not a literal — <code>known</code> stays
+the list of command names:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">"exec"</span><span class="p">:{</span><span class="nt">"known"</span><span class="p">:[</span><span class="s2">"gh"</span><span class="p">],</span><span class="nt">"unresolved"</span><span class="p">:</span><span class="kc">false</span><span class="p">,</span><span class="nt">"commands"</span><span class="p">:[[</span><span class="s2">"gh"</span><span class="p">,</span><span class="kc">null</span><span class="p">,</span><span class="s2">"list"</span><span class="p">,</span><span class="s2">"--repo"</span><span class="p">,</span><span class="s2">"onion-lang/onion"</span><span class="p">,</span><span class="s2">"--state"</span><span class="p">,</span><span class="s2">"all"</span><span class="p">,</span><span class="s2">"--search"</span><span class="p">,</span><span class="kc">null</span><span class="p">,</span><span class="s2">"--json"</span><span class="p">,</span><span class="s2">"number,title,author,url"</span><span class="p">,</span><span class="s2">"--limit"</span><span class="p">,</span><span class="s2">"100"</span><span class="p">]]}</span>
+</span></code></pre></div>
 
 
 

@@ -3015,6 +3015,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Documents">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#lists-nested-records-and-absent-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lists, nested records and absent keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-json-schema-for-structured-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A JSON Schema for structured output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4581,6 +4609,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Documents">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#lists-nested-records-and-absent-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lists, nested records and absent keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-json-schema-for-structured-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A JSON Schema for structured output
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4778,10 +4834,64 @@ as keys:</p>
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1">//   name: expected String, found absent</span>
 </span></code></pre></div>
 <p>Supported formats are <code>json</code> and <code>yaml</code>. An unrecognised name is a compile error (E0076).</p>
+<h3 id="lists-nested-records-and-absent-keys">Lists, nested records and absent keys<a class="headerlink" href="#lists-nested-records-and-absent-keys" title="Permanent link">&para;</a></h3>
+<p>A <code>json</code> shape reads structure, not just scalars. Beyond the scalar component types, a
+json shape's components may be:</p>
+<ul>
+<li><code>List[S]</code> for a scalar <code>S</code> — a JSON array of that scalar</li>
+<li><code>R</code>, a record that declares a json shape of its own — a nested JSON object</li>
+<li><code>List[R]</code> of such a record — an array of objects</li>
+<li><code>T?</code> of any of these — the key may be absent or <code>null</code>, and the component is then <code>null</code></li>
+</ul>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Action</span><span class="p">(</span><span class="n">owner</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">task</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="p">}</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Summary</span><span class="p">(</span><span class="n">title</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">decisions</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">String</span><span class="p">],</span><span class="w"> </span><span class="n">actions</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Action</span><span class="p">],</span><span class="w"> </span><span class="n">lead</span><span class="p">:</span><span class="w"> </span><span class="nc">Action</span><span class="p">?)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="k">example</span><span class="w"> </span><span class="n">nested</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Summary</span><span class="p">(</span><span class="s2">"sync"</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="s2">"ship"</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="k">new</span><span class="w"> </span><span class="nc">Action</span><span class="p">(</span><span class="s2">"sato"</span><span class="p">,</span><span class="w"> </span><span class="s2">"review"</span><span class="p">)],</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">().</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">().</span><span class="nf">print</span><span class="p">(</span><span class="n">v</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">v</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>A nested record is read through its <strong>first</strong> json shape in declaration order, so a record
+with several json shapes puts the one it wants nested first. The record may be declared
+anywhere, and may even contain itself (<code>record Node(name: String, kids: List[Node])</code>).</p>
+<p>Failures still accumulate, and each names the whole path to where it happened. A bad
+element never hides its siblings:</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">().</span><span class="nf">parse</span><span class="p">(</span><span class="s2">"{</span><span class="se">\"</span><span class="s2">title</span><span class="se">\"</span><span class="s2">: </span><span class="se">\"</span><span class="s2">t</span><span class="se">\"</span><span class="s2">, </span><span class="se">\"</span><span class="s2">decisions</span><span class="se">\"</span><span class="s2">: [</span><span class="se">\"</span><span class="s2">a</span><span class="se">\"</span><span class="s2">, 3], </span><span class="se">\"</span><span class="s2">actions</span><span class="se">\"</span><span class="s2">: [{</span><span class="se">\"</span><span class="s2">owner</span><span class="se">\"</span><span class="s2">: </span><span class="se">\"</span><span class="s2">o</span><span class="se">\"</span><span class="s2">}, 5]}"</span><span class="p">)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="c1">//   decisions[1]: expected String, found 3</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1">//   actions[0].task: expected String, found absent</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1">//   actions[1]: expected object, found 5</span>
+</span></code></pre></div>
+<p>Only <code>json</code> reaches this far. A regex, <code>yaml</code> or <code>config</code> shape keeps to the scalars, and
+because every shape of a record reads the same components, a record that mixes them does
+too — E0061 names the clause that cannot read the component.</p>
+<h3 id="a-json-schema-for-structured-output">A JSON Schema for structured output<a class="headerlink" href="#a-json-schema-for-structured-output" title="Permanent link">&para;</a></h3>
+<p>A json shape can describe the documents it reads as a JSON Schema — the form an LLM's
+structured-output mode takes. The record is then the one description of the answer, rather
+than a record plus a hand-written schema that has to be kept in step with it:</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">().</span><span class="nf">jsonSchema</span><span class="p">()</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1">// {"type":"object",</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="c1">//  "properties":{"title":{"type":"string"},</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1">//                "decisions":{"type":"array","items":{"type":"string"}},</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1">//                "actions":{"type":"array","items":{"type":"object", ... }},</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="c1">//                "lead":{"anyOf":[{"type":"object", ... },{"type":"null"}]}},</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1">//  "required":["title","decisions","actions"],</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="c1">//  "additionalProperties":false}</span>
+</span></code></pre></div>
+<p>Every object is closed (<code>additionalProperties: false</code>) and requires every non-nullable
+component; a nullable one is left out of <code>required</code> and admits <code>null</code>. Integers become
+<code>integer</code>, <code>Double</code>/<code>Float</code> become <code>number</code>. The schema is JSON text; <code>Json::parse</code> turns it
+into a map to embed in a request body.</p>
+<p><code>hasJsonSchema()</code> answers whether a shape can do this — only a json shape can, and every
+other shape's <code>jsonSchema()</code> throws rather than describe documents it does not read. A
+record that contains itself has no finite inline schema, so its <code>jsonSchema()</code> throws too.</p>
 <h2 id="files-and-urls">Files and URLs<a class="headerlink" href="#files-and-urls" title="Permanent link">&para;</a></h2>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">one</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="sx">"person.json"</span><span class="p">.</span><span class="nf">read</span><span class="p">(</span><span class="nc">Person</span><span class="o">::</span><span class="nf">doc</span><span class="p">())</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">many</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="sx">"access.log"</span><span class="p">.</span><span class="nf">eachLine</span><span class="p">(</span><span class="nc">Access</span><span class="o">::</span><span class="nf">common</span><span class="p">())</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">api</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nf">http</span><span class="sx">"https://example.com/p"</span><span class="p">.</span><span class="nf">read</span><span class="p">(</span><span class="nc">Person</span><span class="o">::</span><span class="nf">doc</span><span class="p">())</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">one</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="sx">"person.json"</span><span class="p">.</span><span class="nf">read</span><span class="p">(</span><span class="nc">Person</span><span class="o">::</span><span class="nf">doc</span><span class="p">())</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">many</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="sx">"access.log"</span><span class="p">.</span><span class="nf">eachLine</span><span class="p">(</span><span class="nc">Access</span><span class="o">::</span><span class="nf">common</span><span class="p">())</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">api</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nf">http</span><span class="sx">"https://example.com/p"</span><span class="p">.</span><span class="nf">read</span><span class="p">(</span><span class="nc">Person</span><span class="o">::</span><span class="nf">doc</span><span class="p">())</span>
 </span></code></pre></div>
 <p>Every defect carries the path or URL, so a failure says <em>which</em> resource. An unreadable
 file is a defect too, not an exception — reading something that might not be there is the
@@ -4797,14 +4907,14 @@ that differ only in whitespace parse alike. A shape that satisfies L2 as well is
 <code>parseLossless</code> returns the value together with a <code>Residue</code> — everything the shape did
 not consume: comments, blank lines, key order, spacing, unknown keys, and the original
 spelling of every value. <code>printLossless</code> reassembles the two:</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Server</span><span class="p">(</span><span class="n">host</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">debug</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">cfg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="k">example</span><span class="w"> </span><span class="n">l2</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"# prod</span><span class="se">\n</span><span class="s2">host = h</span><span class="se">\n</span><span class="s2">port = 007</span><span class="se">\n</span><span class="s2">debug = true</span><span class="se">\n</span><span class="s2">"</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Server</span><span class="o">::</span><span class="nf">cfg</span><span class="p">().</span><span class="nf">parseLossless</span><span class="p">(</span><span class="n">t</span><span class="p">).</span><span class="nf">get</span><span class="p">()</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="nc">Server</span><span class="o">::</span><span class="nf">cfg</span><span class="p">().</span><span class="nf">printLossless</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="nf">value</span><span class="p">(),</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="nf">residue</span><span class="p">())</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">t</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Server</span><span class="p">(</span><span class="n">host</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">debug</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">cfg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="k">example</span><span class="w"> </span><span class="n">l2</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"# prod</span><span class="se">\n</span><span class="s2">host = h</span><span class="se">\n</span><span class="s2">port = 007</span><span class="se">\n</span><span class="s2">debug = true</span><span class="se">\n</span><span class="s2">"</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Server</span><span class="o">::</span><span class="nf">cfg</span><span class="p">().</span><span class="nf">parseLossless</span><span class="p">(</span><span class="n">t</span><span class="p">).</span><span class="nf">get</span><span class="p">()</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">    </span><span class="nc">Server</span><span class="o">::</span><span class="nf">cfg</span><span class="p">().</span><span class="nf">printLossless</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="nf">value</span><span class="p">(),</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="nf">residue</span><span class="p">())</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">t</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>The <code>example</code> clause is the point: L2 is not a comment, it is machine-checked at build
 time, and a shape that stopped satisfying it would stop compiling. Editing goes through
@@ -4820,18 +4930,18 @@ text through the residue. With <code>file"..."</code> supplying a byte-faithful 
 key in the config without destroying it" — the task every ad-hoc config editor gets
 wrong — is three lines, and the write-back is a declared, checked effect when it lives
 in a <code>tool</code>:</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">lens</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="n">path</span><span class="p">).</span><span class="nf">readLossless</span><span class="p">(</span><span class="nc">Server</span><span class="o">::</span><span class="nf">cfg</span><span class="p">()).</span><span class="nf">get</span><span class="p">()</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">out</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">lens</span><span class="p">.</span><span class="n">edit</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">v</span><span class="p">.</span><span class="nf">copy</span><span class="p">(</span><span class="n">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">9090</span><span class="p">)</span><span class="w"> </span><span class="p">}.</span><span class="nf">render</span><span class="p">()</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="nb">Files</span><span class="o">::</span><span class="nf">writeText</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">out</span><span class="p">)</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">lens</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="n">path</span><span class="p">).</span><span class="nf">readLossless</span><span class="p">(</span><span class="nc">Server</span><span class="o">::</span><span class="nf">cfg</span><span class="p">()).</span><span class="nf">get</span><span class="p">()</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">out</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">lens</span><span class="p">.</span><span class="n">edit</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">v</span><span class="p">.</span><span class="nf">copy</span><span class="p">(</span><span class="n">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">9090</span><span class="p">)</span><span class="w"> </span><span class="p">}.</span><span class="nf">render</span><span class="p">()</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="nb">Files</span><span class="o">::</span><span class="nf">writeText</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">out</span><span class="p">)</span>
 </span></code></pre></div>
 <p><code>diff</code> afterwards shows exactly one changed line. The demo (<code>run/ConfigEditDemo.on</code>)
 runs this as a tool, so <code>--plan</code> shows the read and the write before anything happens.</p>
 <h2 id="checking-a-shape-at-build-time">Checking a shape at build time<a class="headerlink" href="#checking-a-shape-at-build-time" title="Permanent link">&para;</a></h2>
 <p><code>law</code> runs at compile time, so the round-trip property can be machine-checked:</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">,</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="k">law</span><span class="w"> </span><span class="nf">roundtrip</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">Pt</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">Pt</span><span class="o">::</span><span class="nf">text</span><span class="p">().</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Pt</span><span class="o">::</span><span class="nf">text</span><span class="p">().</span><span class="nf">print</span><span class="p">(</span><span class="n">p</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">,</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="k">law</span><span class="w"> </span><span class="nf">roundtrip</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">Pt</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">Pt</span><span class="o">::</span><span class="nf">text</span><span class="p">().</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Pt</span><span class="o">::</span><span class="nf">text</span><span class="p">().</span><span class="nf">print</span><span class="p">(</span><span class="n">p</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>A law whose parameter type cannot be sampled is an error (E0074), not a silent skip — a
 check that does not run must not look like one that passed.</p>
@@ -4839,20 +4949,20 @@ check that does not run must not look like one that passed.</p>
 <p>The shipped derivations (<code>re""</code>, <code>json</code>, <code>yaml</code>, <code>config</code>) are a closed set on purpose —
 their laws come with them. For a format the compiler has never heard of — fixed-width
 records, binary framing, a bespoke wire protocol — implement <code>onion.Shape[T]</code> directly:</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">FixedWidth</span><span class="w"> </span><span class="k">conforms</span><span class="w"> </span><span class="nb">Shape</span><span class="p">[</span><span class="nc">Person</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kd">public</span><span class="p">:</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="n">text</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">origin</span><span class="p">:</span><span class="w"> </span><span class="nc">Origin</span><span class="p">):</span><span class="w"> </span><span class="nb">Outcome</span><span class="p">[</span><span class="nc">Person</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">canPrint</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">print</span><span class="p">(</span><span class="n">v</span><span class="p">:</span><span class="w"> </span><span class="nc">Person</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">describe</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"fixed-width Person"</span>
-</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="p">}</span>
-</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
-</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="k">example</span><span class="w"> </span><span class="n">fixedWidthL1</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">FixedWidth</span><span class="p">()</span>
-</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Person</span><span class="p">(</span><span class="s2">"KOTA"</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">)</span>
-</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="w">  </span><span class="n">s</span><span class="p">.</span><span class="nf">parse</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="nf">print</span><span class="p">(</span><span class="n">v</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">v</span>
-</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">FixedWidth</span><span class="w"> </span><span class="k">conforms</span><span class="w"> </span><span class="nb">Shape</span><span class="p">[</span><span class="nc">Person</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="n">text</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">origin</span><span class="p">:</span><span class="w"> </span><span class="nc">Origin</span><span class="p">):</span><span class="w"> </span><span class="nb">Outcome</span><span class="p">[</span><span class="nc">Person</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">canPrint</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">print</span><span class="p">(</span><span class="n">v</span><span class="p">:</span><span class="w"> </span><span class="nc">Person</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">describe</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"fixed-width Person"</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="p">}</span>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="k">example</span><span class="w"> </span><span class="n">fixedWidthL1</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">FixedWidth</span><span class="p">()</span>
+</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Person</span><span class="p">(</span><span class="s2">"KOTA"</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">)</span>
+</span><span id="__span-17-13"><a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="w">  </span><span class="n">s</span><span class="p">.</span><span class="nf">parse</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="nf">print</span><span class="p">(</span><span class="n">v</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">v</span>
+</span><span id="__span-17-14"><a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>The combinators — <code>eachLine</code>, <code>sepBy</code>, <code>xmap</code>, <code>orElse</code> — come for free, and failures
 speak the same <code>Outcome</code>/<code>Defect</code> vocabulary as every shipped shape.</p>
@@ -4868,7 +4978,9 @@ so through <code>canPrint(): false</code> and asserts whatever laws its reading 
 ordinary API, for a shape over a type you did not declare:</p>
 <ul>
 <li><code>Shapes::regex</code> — the <code>re"..."</code> form</li>
-<li><code>Shapes::json</code> — the <code>json</code> form</li>
+<li><code>Shapes::json</code> — the <code>json</code> form; its five-argument overload takes the extended
+  component tags (<code>List[Int]</code>, <code>Nested</code>, a trailing <code>?</code>) and one nested-shape thunk per
+  component</li>
 <li><code>Shapes::yaml</code> — the <code>yaml</code> form</li>
 <li><code>Shapes::config</code> — the <code>config</code> form, lossless (<code>parseLossless</code>/<code>printLossless</code>) like
   <code>shape name = config</code></li>

@@ -1,0 +1,364 @@
+// BlackScholesGreeks.on — European option pricing: Black-Scholes closed-form + Monte Carlo
+//
+// Prices European call/put options, computes the five Greeks (delta, gamma,
+// theta, vega, rho), validates put-call parity, and runs a Monte Carlo path
+// simulation to estimate a tail-loss figure. All math is pure Onion — no
+// extra Java finance libraries needed.
+//
+// Exercises: ADT enum with case records; records with law/example clauses;
+// extension methods on Double (abs, max, min, fmt2, fmt4); interface with
+// two implementations (BlackScholes + MonteCarlo); generics in collection
+// pipelines (map/fold/sortedBy on List[Double] and List[Greeks]); closures;
+// foreach over a List[Double]; string interpolation; while loops;
+// select / pattern matching on a sealed hierarchy.
+//
+//   onion run/BlackScholesGreeks.on
+
+import {
+  java.lang.Math
+}
+
+// ─── Double helpers ───────────────────────────────────────────────────────────
+
+extension Double {
+  def absVal(): Double  = if self < 0.0 { 0.0 - self } else { self }
+  def maxWith(b: Double): Double = if self > b { self } else { b }
+  def minWith(b: Double): Double = if self < b { self } else { b }
+
+  def fmt2(): String {
+    if self < 0.0 { return "-" + (0.0 - self).fmt2() }
+    val s: String = "" + Math::round(self * 100.0)
+    val len: Int = s.length()
+    if len <= 2 {
+      return "0." + (if len == 1 { "0" + s } else { s })
+    }
+    return s.substring(0, len - 2) + "." + s.substring(len - 2)
+  }
+
+  def fmt4(): String {
+    if self < 0.0 { return "-" + (0.0 - self).fmt4() }
+    val s: String = "" + Math::round(self * 10000.0)
+    val len: Int = s.length()
+    if len <= 4 {
+      var pad: String = s
+      while pad.length() < 4 { pad = "0" + pad }
+      return "0." + pad
+    }
+    return s.substring(0, len - 4) + "." + s.substring(len - 4)
+  }
+}
+
+// ─── Normal distribution helpers ─────────────────────────────────────────────
+
+// Abramowitz & Stegun rational approximation: maximum error 7.5e-8.
+def normCdf(x: Double): Double {
+  if x < 0.0 { return 1.0 - normCdf(0.0 - x) }
+  val t:  Double = 1.0 / (1.0 + 0.2316419 * x)
+  val t2: Double = t * t
+  val t3: Double = t2 * t
+  val t4: Double = t3 * t
+  val t5: Double = t4 * t
+  val poly: Double = t * 0.319381530 + t2 * (0.0 - 0.356563782) + t3 * 1.781477937 + t4 * (0.0 - 1.821255978) + t5 * 1.330274429
+  val phiX: Double = Math::exp(0.0 - 0.5 * x * x) / Math::sqrt(2.0 * 3.14159265358979)
+  return 1.0 - phiX * poly
+}
+
+def normPdf(x: Double): Double = Math::exp(0.0 - 0.5 * x * x) / Math::sqrt(2.0 * 3.14159265358979)
+
+// ─── Option type (ADT enum) ───────────────────────────────────────────────────
+
+enum OptionKind {
+  case CallOpt
+  case PutOpt
+public:
+  def label(): String = select this { case c is CallOpt: "Call"; case p is PutOpt: "Put" }
+}
+
+// ─── Option contract ──────────────────────────────────────────────────────────
+
+record OptionContract(
+  kind:   OptionKind,
+  spot:   Double,
+  strike: Double,
+  rate:   Double,
+  vol:    Double,
+  tenor:  Double
+) {
+  example { new OptionContract(new CallOpt(), 100.0, 100.0, 0.05, 0.20, 1.0).spot() > 0.0 }
+  example { new OptionContract(new PutOpt(), 50.0, 55.0, 0.03, 0.15, 0.5).strike() > 0.0 }
+  example { new OptionContract(new CallOpt(), 100.0, 100.0, 0.05, 0.20, 1.0).vol() > 0.0 }
+
+public:
+  def label(): String {
+    val k: String = kind().label()
+    return k + " S=#{spot().fmt2()} K=#{strike().fmt2()} r=#{rate().fmt2()} v=#{vol().fmt2()} T=#{tenor().fmt2()}"
+  }
+}
+
+// ─── Greeks result ────────────────────────────────────────────────────────────
+
+record Greeks(
+  price: Double,
+  delta: Double,
+  gamma: Double,
+  theta: Double,
+  vega:  Double,
+  rho:   Double
+) {
+  example { new Greeks(10.0, 0.5, 0.02, -0.01, 20.0, 5.0).gamma() >= 0.0 }
+  example { new Greeks(10.0, 0.5, 0.02, -0.01, 20.0, 5.0).vega()  >= 0.0 }
+}
+
+// ─── Pricer interface ─────────────────────────────────────────────────────────
+
+interface Pricer {
+  def price(c: OptionContract): Double
+  def greeks(c: OptionContract): Greeks
+  def name(): String
+}
+
+// ─── Black-Scholes closed-form ────────────────────────────────────────────────
+
+class BlackScholes conforms Pricer {
+public:
+  def name(): String = "Black-Scholes"
+
+  def d1(c: OptionContract): Double {
+    val logRatio: Double = Math::log(c.spot() / c.strike())
+    val drift:    Double = (c.rate() + 0.5 * c.vol() * c.vol()) * c.tenor()
+    return (logRatio + drift) / (c.vol() * Math::sqrt(c.tenor()))
+  }
+
+  def d2(c: OptionContract): Double = d1(c) - c.vol() * Math::sqrt(c.tenor())
+
+  def price(c: OptionContract): Double {
+    val d1v:  Double = d1(c)
+    val d2v:  Double = d2(c)
+    val disc: Double = Math::exp(0.0 - c.rate() * c.tenor())
+    return select c.kind() {
+      case k is CallOpt: c.spot() * normCdf(d1v) - c.strike() * disc * normCdf(d2v)
+      case k is PutOpt:  c.strike() * disc * normCdf(0.0 - d2v) - c.spot() * normCdf(0.0 - d1v)
+    }
+  }
+
+  def greeks(c: OptionContract): Greeks {
+    val d1v:   Double = d1(c)
+    val d2v:   Double = d2(c)
+    val disc:  Double = Math::exp(0.0 - c.rate() * c.tenor())
+    val sqrtT: Double = Math::sqrt(c.tenor())
+
+    val gamma: Double = normPdf(d1v) / (c.spot() * c.vol() * sqrtT)
+    val vega:  Double = c.spot() * normPdf(d1v) * sqrtT
+    val p:     Double = price(c)
+
+    val isCall: Boolean = select c.kind() { case k is CallOpt: true; case k is PutOpt: false }
+    val signN:  Double  = if isCall { 1.0 } else { 0.0 - 1.0 }
+    val nd2:    Double  = normCdf(if isCall { d2v } else { 0.0 - d2v })
+
+    val delta: Double = if isCall { normCdf(d1v) } else { normCdf(d1v) - 1.0 }
+    val thetaSpot: Double = 0.0 - c.spot() * normPdf(d1v) * c.vol() / (2.0 * sqrtT)
+    val thetaRate: Double = signN * (0.0 - c.rate()) * c.strike() * disc * nd2
+    val theta: Double = (thetaSpot + thetaRate) / 365.0
+    val rho:   Double = signN * c.strike() * c.tenor() * disc * nd2 / 100.0
+
+    return new Greeks(p, delta, gamma, theta, vega, rho)
+  }
+}
+
+// ─── Box-Muller transform: two U(0,1) values → standard normal ───────────────
+
+def boxMuller(u1: Double, u2: Double): Double = Math::sqrt(0.0 - 2.0 * Math::log(u1)) * Math::cos(2.0 * 3.14159265358979 * u2)
+
+// ─── Monte Carlo pricer ───────────────────────────────────────────────────────
+
+class MonteCarlo conforms Pricer {
+  val paths: Int
+  var seed:  Long
+
+public:
+  def this(paths: Int) {
+    this.paths = paths
+    this.seed  = 42L
+  }
+
+  def name(): String = "Monte Carlo (#{paths} paths)"
+
+  def nextUniform(): Double {
+    seed = seed * 6364136223846793005L + 1442695040888963407L
+    val bits: Long = (seed >>> 33) & 2147483647L
+    return (bits as Double) / 2147483648.0
+  }
+
+  def nextNormal(): Double = boxMuller(nextUniform().maxWith(1.0e-15), nextUniform())
+
+  def price(c: OptionContract): Double {
+    val logFwd:   Double = (c.rate() - 0.5 * c.vol() * c.vol()) * c.tenor()
+    val volSqrtT: Double = c.vol() * Math::sqrt(c.tenor())
+    val disc:     Double = Math::exp(0.0 - c.rate() * c.tenor())
+    var total:    Double = 0.0
+    var i: Int = 0
+    while i < paths {
+      val z:      Double = nextNormal()
+      val st:     Double = c.spot() * Math::exp(logFwd + volSqrtT * z)
+      val payoff: Double = select c.kind() {
+        case k is CallOpt: (st - c.strike()).maxWith(0.0)
+        case k is PutOpt:  (c.strike() - st).maxWith(0.0)
+      }
+      total = total + payoff
+      i++
+    }
+    return disc * total / (paths as Double)
+  }
+
+  def greeks(c: OptionContract): Greeks {
+    val p:   Double = price(c)
+    val dS:  Double = c.spot() * 0.001
+    val cUp: OptionContract = new OptionContract(c.kind(), c.spot() + dS, c.strike(), c.rate(), c.vol(), c.tenor())
+    val cDn: OptionContract = new OptionContract(c.kind(), c.spot() - dS, c.strike(), c.rate(), c.vol(), c.tenor())
+    val pUp: Double = price(cUp)
+    val pDn: Double = price(cDn)
+    val delta: Double = (pUp - pDn) / (2.0 * dS)
+    val gamma: Double = (pUp - 2.0 * p + pDn) / (dS * dS)
+    val dV:    Double = 0.001
+    val cVup:  OptionContract = new OptionContract(c.kind(), c.spot(), c.strike(), c.rate(), c.vol() + dV, c.tenor())
+    val vega:  Double = (price(cVup) - p) / dV
+    return new Greeks(p, delta, gamma, 0.0, vega, 0.0)
+  }
+}
+
+// ─── Put-call parity check ────────────────────────────────────────────────────
+
+def checkParity(call: Greeks, put: Greeks, c: OptionContract): String {
+  val disc: Double = Math::exp(0.0 - c.rate() * c.tenor())
+  val lhs:  Double = call.price() - put.price()
+  val rhs:  Double = c.spot() - c.strike() * disc
+  val err:  Double = (lhs - rhs).absVal()
+  return if err < 0.05 { "PASS (diff=" + err.fmt4() + ")" } else { "FAIL (diff=" + err.fmt4() + ")" }
+}
+
+// ─── Vol sensitivity table ────────────────────────────────────────────────────
+
+def printVolTable(base: OptionContract, bs: BlackScholes): void {
+  IO::println("\nVol sensitivity (call price vs implied vol):")
+  IO::println("  Vol    Price   Delta   Vega/100")
+  val vols: List[Double] = [0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50]
+  foreach v: Double in vols {
+    val c: OptionContract = new OptionContract(base.kind(), base.spot(), base.strike(), base.rate(), v, base.tenor())
+    val g: Greeks = bs.greeks(c)
+    val volPct: Int = (v * 100.0) as Int
+    val volStr: String = if volPct < 10 { " " + volPct } else { "" + volPct }
+    IO::println("  #{volStr}%  #{g.price().fmt2()}   #{g.delta().fmt2()}   #{(g.vega() / 100.0).fmt2()}")
+  }
+}
+
+// ─── Strike grid ─────────────────────────────────────────────────────────────
+
+def printStrikeGrid(bs: BlackScholes): void {
+  IO::println("\nStrike grid (call) S=100 r=5% vol=25% T=0.5y:")
+  IO::println("  Strike  Price   Delta")
+  val strikes: List[Double] = [80.0, 85.0, 90.0, 95.0, 100.0, 105.0, 110.0, 115.0, 120.0]
+  foreach k: Double in strikes {
+    val opt: OptionContract = new OptionContract(new CallOpt(), 100.0, k, 0.05, 0.25, 0.5)
+    val g: Greeks = bs.greeks(opt)
+    IO::println("  #{k.fmt2()}    #{g.price().fmt2()}    #{g.delta().fmt2()}")
+  }
+}
+
+// ─── Monte Carlo tail-loss (1-step) ──────────────────────────────────────────
+
+def printTailLoss(base: OptionContract, mc: MonteCarlo, bs: BlackScholes): void {
+  IO::println("\nTail-loss (Monte Carlo, 2000 scenarios, 5th-percentile):")
+  val n: Int = 2000
+  val prices: List[Double] = []
+  var i: Int = 0
+  while i < n {
+    prices.add(mc.price(base))
+    i++
+  }
+  val sorted: List[Double] = prices.sortedBy { p -> p }
+  val cutIdx: Int = (0.05 * (n as Double)) as Int
+  val tailPrice: Double = sorted[cutIdx]
+  val bsPrice:   Double = bs.price(base)
+  IO::println("  BS expected price:    " + bsPrice.fmt2())
+  IO::println("  5th-pct tail price:   " + tailPrice.fmt2())
+  IO::println("  Tail loss vs BS:      " + (bsPrice - tailPrice).fmt2())
+}
+
+// ─── Collection pipeline summary ─────────────────────────────────────────────
+
+def printPipelineSummary(bs: BlackScholes): void {
+  IO::println("\nPipeline: call Greeks across 5 strikes [90..110]:")
+  val strikeList: List[Double] = [90.0, 95.0, 100.0, 105.0, 110.0]
+  val greeksList: List[Greeks] = strikeList.map { k -> bs.greeks(new OptionContract(new CallOpt(), 100.0, k, 0.05, 0.20, 1.0)) }
+  val deltaSum: Double = greeksList.fold(0.0) { acc, g -> acc + (g as Greeks).delta() }
+  val avgDelta: Double = deltaSum / (strikeList.size as Double)
+  IO::println("  Avg delta:  " + avgDelta.fmt2())
+  val vegaList: List[Double] = greeksList.map { g -> (g as Greeks).vega() }
+  val maxVega: Double = vegaList.fold(0.0) { acc, v -> (acc as Double).maxWith(v as Double) }
+  IO::println("  Max vega:   " + (maxVega / 100.0).fmt2())
+  val inTheMoney: List[Greeks] = greeksList.filter { g -> (g as Greeks).delta() > 0.5 }
+  IO::println("  ITM strikes (delta>0.5): #{inTheMoney.size}")
+}
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val bs: BlackScholes = new BlackScholes()
+  val mc: MonteCarlo   = new MonteCarlo(10000)
+
+  // ATM call and put: S=100 K=100 r=5% vol=20% T=1y
+  val atmCall: OptionContract = new OptionContract(new CallOpt(), 100.0, 100.0, 0.05, 0.20, 1.0)
+  val atmPut:  OptionContract = new OptionContract(new PutOpt(),  100.0, 100.0, 0.05, 0.20, 1.0)
+
+  IO::println("=== " + atmCall.label() + " ===\n")
+
+  val callBs: Greeks = bs.greeks(atmCall)
+  IO::println("Black-Scholes call Greeks:")
+  IO::println("  Price  " + callBs.price().fmt2())
+  IO::println("  Delta  " + callBs.delta().fmt2())
+  IO::println("  Gamma  " + callBs.gamma().fmt4())
+  IO::println("  Theta  " + callBs.theta().fmt2())
+  IO::println("  Vega   " + (callBs.vega() / 100.0).fmt2())
+  IO::println("  Rho    " + callBs.rho().fmt2())
+
+  val putBs: Greeks = bs.greeks(atmPut)
+  IO::println("\nBlack-Scholes put Greeks:")
+  IO::println("  Price  " + putBs.price().fmt2())
+  IO::println("  Delta  " + putBs.delta().fmt2())
+
+  IO::println("\nPut-call parity: " + checkParity(callBs, putBs, atmCall))
+
+  // Monte Carlo comparison
+  val callMc: Greeks = mc.greeks(atmCall)
+  IO::println("\nMonte Carlo call (10 000 paths):")
+  IO::println("  Price  " + callMc.price().fmt2())
+  IO::println("  Delta  " + callMc.delta().fmt2())
+  val pricingError: Double = (callBs.price() - callMc.price()).absVal()
+  IO::println("  BS vs MC price error: " + pricingError.fmt2())
+
+  // Vol sensitivity
+  printVolTable(atmCall, bs)
+
+  // Strike grid
+  printStrikeGrid(bs)
+
+  // OTM put
+  IO::println("\nOTM put S=100 K=90 r=5% vol=20% T=0.5y:")
+  val otmPut: OptionContract = new OptionContract(new PutOpt(), 100.0, 90.0, 0.05, 0.20, 0.5)
+  val otmG: Greeks = bs.greeks(otmPut)
+  IO::println("  Price  " + otmG.price().fmt2())
+  IO::println("  Delta  " + otmG.delta().fmt2())
+  IO::println("  Vega   " + (otmG.vega() / 100.0).fmt2())
+
+  // Delta sum check: for ATM, call.delta + |put.delta| ≈ 1
+  val deltaCheck: Double = (callBs.delta() + putBs.delta().absVal()).absVal()
+  IO::println("\nATM call.delta + |put.delta| ≈ 1: " + deltaCheck.fmt4())
+
+  // Tail-loss via Monte Carlo
+  printTailLoss(atmCall, mc, bs)
+
+  // Collection pipeline summary
+  printPipelineSummary(bs)
+
+  IO::println("\nDone.")
+}

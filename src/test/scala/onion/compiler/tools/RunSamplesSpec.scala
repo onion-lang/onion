@@ -1341,5 +1341,9 @@ class RunSamplesSpec extends AbstractShellSpec {
     it("runs IteratedPD.on") {
       assert(Shell.Success(null) == runSample("run/IteratedPD.on"))
     }
+
+    it("runs SimplexLP.on") {
+      assert(Shell.Success(null) == runSample("run/SimplexLP.on"))
+    }
   }
 }

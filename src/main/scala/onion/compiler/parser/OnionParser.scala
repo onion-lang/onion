@@ -1309,7 +1309,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     if (kind(1) != K.DOT || kind(2) != K.ID) return false
     kind(3) match {
       case K.DOT | K.LBRACKET | K.RBRACKET | K.ASSIGN | K.RPAREN | K.LPAREN | K.COMMA | K.SEMI | K.GT |
-           K.LBRACE | K.QUESTION | K.ID | K.EOL | K.EOF => true
+           K.LBRACE | K.QUESTION | K.ID | K.EOL | K.EOF | K.COLON => true
       case _ => false
     }
   }

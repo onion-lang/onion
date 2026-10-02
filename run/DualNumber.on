@@ -1,0 +1,239 @@
+// DualNumber.on — Forward-mode automatic differentiation using dual numbers.
+//
+// A dual number (re, eps) satisfies eps^2 = 0.  Evaluating f(x + 1·eps) gives
+// f(x) + f'(x)·eps — the exact derivative in one forward pass: no symbolic
+// manipulation, no finite differences, no discretisation error.
+//
+// Exercises: record with operator overloading (plus/minus/times/div);
+// example and law clauses; closures; extension methods; generic higher-order
+// functions; pipeline |>; foreach on ranges; string interpolation; try/catch.
+
+import {
+  java.lang.Math as JMath
+}
+
+// ── Dual number arithmetic ────────────────────────────────────────────────────
+
+record Dual(re: Double, eps: Double) {
+public:
+  // Binary arithmetic operators (Dual OP Dual)
+  def plus(o: Dual): Dual  = new Dual(re() + o.re(), eps() + o.eps())
+  def minus(o: Dual): Dual = new Dual(re() - o.re(), eps() - o.eps())
+  def times(o: Dual): Dual = new Dual(re() * o.re(), re() * o.eps() + eps() * o.re())
+  def div(o: Dual): Dual   = new Dual(re() / o.re(), (eps() * o.re() - re() * o.eps()) / (o.re() * o.re()))
+  def neg(): Dual = new Dual(0.0 - re(), 0.0 - eps())
+
+  // Scaling by a plain constant
+  def timesD(c: Double): Dual = new Dual(re() * c, eps() * c)
+  def divD(c: Double): Dual   = new Dual(re() / c, eps() / c)
+
+  // Transcendental lifts — chain rule is built into the eps propagation
+  def dsin(): Dual  = new Dual(JMath::sin(re()),  JMath::cos(re()) * eps())
+  def dcos(): Dual  = new Dual(JMath::cos(re()),  0.0 - JMath::sin(re()) * eps())
+  def dtan(): Dual  = new Dual(JMath::tan(re()),  eps() / (JMath::cos(re()) * JMath::cos(re())))
+  def dexp(): Dual  = new Dual(JMath::exp(re()),  JMath::exp(re()) * eps())
+  def dln(): Dual   = new Dual(JMath::log(re()),  eps() / re())
+  def dsqrt(): Dual = new Dual(JMath::sqrt(re()), eps() / (2.0 * JMath::sqrt(re())))
+  def dpow(n: Double): Dual = new Dual(JMath::pow(re(), n), n * JMath::pow(re(), n - 1.0) * eps())
+
+  def show(): String = "(re=#{fmtD(re())}, ε=#{fmtD(eps())})"
+
+  // ── Compile-time property checks ──────────────────────────────────────────
+  // d/dx [x^2] at x=2 → re=4, eps=4
+  example {
+    val x: Dual = new Dual(2.0, 1.0)
+    val sq: Dual = x * x
+    sq.re() == 4.0 && sq.eps() == 4.0
+  }
+  // d/dx [x^3] at x=3 → re=27, eps=27  (3*3^2 = 27)
+  example {
+    val x: Dual = new Dual(3.0, 1.0)
+    val cube: Dual = x * x * x
+    cube.re() == 27.0 && cube.eps() == 27.0
+  }
+  // d/dx [sin x] at x=0 → eps=cos(0)=1
+  example {
+    val x: Dual = new Dual(0.0, 1.0)
+    val s: Dual = x.dsin()
+    s.re() == 0.0 && s.eps() == 1.0
+  }
+  // (a+b).re == a.re + b.re for all doubles
+  law addRealPart(a: Double, b: Double) {
+    (new Dual(a, 0.0) + new Dual(b, 0.0)).re() == a + b
+  }
+  // product rule: d/dx [x*x] = 2x
+  law productRule(x: Double) {
+    val d: Dual = new Dual(x, 1.0) * new Dual(x, 1.0)
+    d.eps() == x + x
+  }
+}
+
+// ── Format a Double compactly (strip trailing ".0") ──────────────────────────
+
+def fmtD(x: Double): String = {
+  val s: String = Double::toString(x)
+  if s.endsWith(".0") { s.substring(0, s.length - 2) } else { s }
+}
+
+// Pad a string on the right to width w
+def padR(s: String, w: Int): String = {
+  var out: String = s
+  while out.length < w { out = out + " " }
+  out
+}
+
+// Pad a string on the left to width w
+def padL(s: String, w: Int): String = {
+  var out: String = s
+  while out.length < w { out = " " + out }
+  out
+}
+
+// ── Core AD operations ────────────────────────────────────────────────────────
+
+// Lift a Double to a "constant" dual (zero derivative)
+def kon(c: Double): Dual = new Dual(c, 0.0)
+
+// Lift a Double to the "seed" dual (derivative seed = 1)
+def seed(x: Double): Dual = new Dual(x, 1.0)
+
+// First derivative of f at x
+def diff(f: (Dual) -> Dual, x: Double): Double = f(seed(x)).eps()
+
+// Compute both value and derivative at x
+def valDeriv(f: (Dual) -> Dual, x: Double): Dual = f(seed(x))
+
+// Partial derivative of f(x, y) with respect to x, evaluated at (x0, y0)
+def partialX(f: (Dual, Dual) -> Dual, x0: Double, y0: Double): Double =
+  f(seed(x0), kon(y0)).eps()
+
+// Partial derivative of f(x, y) with respect to y, evaluated at (x0, y0)
+def partialY(f: (Dual, Dual) -> Dual, x0: Double, y0: Double): Double =
+  f(kon(x0), seed(y0)).eps()
+
+// ── Newton's method using AD for the derivative ───────────────────────────────
+
+def newton(f: (Dual) -> Dual, x0: Double, maxIter: Int, tol: Double): Double = {
+  var x: Double = x0
+  var i: Int = 0
+  while i < maxIter {
+    val d: Dual = valDeriv(f, x)
+    val fx: Double = d.re()
+    val dfx: Double = d.eps()
+    if dfx == 0.0 { i = maxIter }  // avoid division by zero — exit
+    else {
+      val xn: Double = x - fx / dfx
+      if JMath::abs(xn - x) < tol { x = xn; i = maxIter }
+      else { x = xn; i++ }
+    }
+  }
+  x
+}
+
+// ── Derivative table printer ──────────────────────────────────────────────────
+
+def printDerivTable(label: String, f: (Dual) -> Dual, xs: List[Double]): void {
+  IO::println(label)
+  IO::println(padR("  x", 10) + padL("f(x)", 14) + padL("f'(x)", 14))
+  IO::println("  " + "-".repeat(34))
+  foreach x: Double in xs {
+    val d: Dual = valDeriv(f, x)
+    val fx: String = fmtD(JMath::rint(d.re() * 1000.0) / 1000.0)
+    val dfx: String = fmtD(JMath::rint(d.eps() * 1000.0) / 1000.0)
+    IO::println(padR("  " + fmtD(x), 10) + padL(fx, 14) + padL(dfx, 14))
+  }
+  IO::println("")
+}
+
+// ── Demo functions ────────────────────────────────────────────────────────────
+
+// f(x) = x^3 - 2x + 1
+val poly: (Dual) -> Dual = (x: Dual) -> x * x * x - x.timesD(2.0) + kon(1.0)
+
+// f(x) = sin(x) * exp(-x/4)
+val dampedSin: (Dual) -> Dual = (x: Dual) -> x.dsin() * x.divD(4.0).neg().dexp()
+
+// f(x) = sqrt(1 + x^2)
+val hypot1: (Dual) -> Dual = (x: Dual) -> (kon(1.0) + x * x).dsqrt()
+
+// f(x) = ln(1 + exp(x))  — the softplus function
+val softplus: (Dual) -> Dual = (x: Dual) -> (kon(1.0) + x.dexp()).dln()
+
+// g(x, y) = x^2 + y^2  (gradient should be (2x, 2y))
+val circle: (Dual, Dual) -> Dual = (x: Dual, y: Dual) -> x * x + y * y
+
+// g(x, y) = x * sin(y) + y * cos(x)
+val mixed: (Dual, Dual) -> Dual = (x: Dual, y: Dual) -> x * y.dsin() + y * x.dcos()
+
+// ── Helper records ────────────────────────────────────────────────────────────
+
+record RootTask(label: String, x0: Double, f: (Dual) -> Dual)
+record GradPoint(x: Double, y: Double)
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  IO::println("╔══════════════════════════════════════════════╗")
+  IO::println("║  Dual-Number Automatic Differentiation Demo  ║")
+  IO::println("╚══════════════════════════════════════════════╝")
+  IO::println("")
+  IO::println("Compile-time example/law clauses passed (build succeeded).")
+  IO::println("")
+
+  // ── Derivative tables ──────────────────────────────────────────────────────
+  val xs: List[Double] = [-2.0, -1.0, 0.0, 1.0, 2.0]
+
+  printDerivTable("f(x) = x³ - 2x + 1  (poly):", poly, xs)
+  printDerivTable("f(x) = sin(x)·exp(-x/4)  (damped sine):", dampedSin, xs)
+  printDerivTable("f(x) = √(1+x²)  (hypot):", hypot1, xs)
+  printDerivTable("f(x) = ln(1+eˣ)  (softplus):", softplus, xs)
+
+  // ── Gradient of a 2D function ──────────────────────────────────────────────
+  IO::println("Gradient of g(x,y) = x² + y² at selected points:")
+  IO::println(padR("  (x,y)", 14) + padL("∂g/∂x", 10) + padL("∂g/∂y", 10))
+  IO::println("  " + "-".repeat(30))
+  val pts: List[GradPoint] = [
+    new GradPoint(1.0, 2.0), new GradPoint(3.0, 4.0),
+    new GradPoint(0.0, 5.0), new GradPoint(-1.0, -1.0)
+  ]
+  foreach pt: GradPoint in pts {
+    val gx: Double = partialX(circle, pt.x(), pt.y())
+    val gy: Double = partialY(circle, pt.x(), pt.y())
+    IO::println(padR("  (#{fmtD(pt.x())},#{fmtD(pt.y())})", 14) + padL(fmtD(gx), 10) + padL(fmtD(gy), 10))
+  }
+  IO::println("")
+
+  IO::println("Gradient of g(x,y) = x·sin(y) + y·cos(x) at (π/2, π/4):")
+  val px: Double = JMath::PI / 2.0
+  val py: Double = JMath::PI / 4.0
+  val mx: Double = partialX(mixed, px, py)
+  val my_: Double = partialY(mixed, px, py)
+  IO::println("  ∂g/∂x = #{fmtD(JMath::rint(mx * 10000.0) / 10000.0)}")
+  IO::println("  ∂g/∂y = #{fmtD(JMath::rint(my_ * 10000.0) / 10000.0)}")
+  IO::println("")
+
+  // ── Newton's method ────────────────────────────────────────────────────────
+  IO::println("Newton's method (root finding via AD derivative):")
+  val roots: List[RootTask] = [
+    new RootTask("x³ - 2x + 1 = 0  (near x=-2)", -2.0, poly),
+    new RootTask("x³ - 2x + 1 = 0  (near x= 0)",  0.5, poly),
+    new RootTask("x³ - 2x + 1 = 0  (near x=1.5)", 1.5, poly)
+  ]
+  foreach r: RootTask in roots {
+    val root: Double = newton(r.f(), r.x0(), 50, 1.0e-12)
+    val check: Double = JMath::abs(valDeriv(r.f(), root).re())
+    IO::println("  #{r.label()}")
+    IO::println("    root ≈ #{root}  |f(root)| = #{fmtD(JMath::rint(check * 1.0e12) / 1.0e12)}")
+  }
+  IO::println("")
+
+  // ── Pipeline demo ──────────────────────────────────────────────────────────
+  IO::println("Derivative of softplus at x = 0..4 (σ(x), the sigmoid):")
+  val sigmaVals: List[String] = [0.0, 1.0, 2.0, 3.0, 4.0]
+    .map { x: Double -> diff(softplus, x) }
+    .map { d: Double -> fmtD(JMath::rint(d * 10000.0) / 10000.0) }
+  sigmaVals |> IO::println
+
+  IO::println("")
+  IO::println("Done.")
+}

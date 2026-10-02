@@ -111,6 +111,8 @@ nav:
           - プロジェクトCLI: ja/tools/project-cli.md
           - REPL: ja/tools/repl.md
           - 言語サーバー: ja/tools/language-server.md
+      - バッテリー:
+          - LLM（Claude）: ja/batteries/llm.md
       - リファレンス:
           - 言語仕様: ja/reference/specification.md
           - 標準ライブラリ: ja/reference/stdlib.md
@@ -166,6 +168,8 @@ nav:
       - Project CLI: tools/project-cli.md
       - REPL: tools/repl.md
       - Language Server: tools/language-server.md
+  - Batteries:
+      - LLM (Claude): batteries/llm.md
   - Reference:
       - Language Specification: reference/specification.md
       - Standard Library: reference/stdlib.md

@@ -73,6 +73,30 @@ class LspProjectClasspathSpec extends AnyFunSuite with Matchers:
     // The stamp is size plus modification time, and the size definitely changed here.
     LspProjectClasspath.forDocument(Some(project.resolve("src/main.on"))) should have size 3
 
+  test("a cold dependency resolution runs in the background instead of blocking the lookup"):
+    val project = fixture(dependencies = Some(FixtureMavenRepository.publish()))
+    val file = Some(project.resolve("src/main.on"))
+    val settled = new java.util.concurrent.CountDownLatch(1)
+    val settledRoot = new java.util.concurrent.atomic.AtomicReference[Path]()
+
+    LspProjectClasspath.invalidate()
+    LspProjectClasspath.lookup(file, root => { settledRoot.set(root); settled.countDown() }) shouldBe
+      LspProjectClasspath.Lookup.Pending
+    settled.await(60, java.util.concurrent.TimeUnit.SECONDS) shouldBe true
+    settledRoot.get() shouldBe project
+
+    LspProjectClasspath.lookup(file, _ => ()) match
+      case LspProjectClasspath.Lookup.Ready(classpath) =>
+        classpath.head shouldBe project.resolve("target").resolve("classes").toString
+        classpath.tail should have size 2
+      case other => fail(s"expected a cached classpath, got $other")
+
+  test("a project without dependencies is ready at once"):
+    val project = fixture(dependencies = None)
+    LspProjectClasspath.invalidate()
+    LspProjectClasspath.lookup(Some(project.resolve("src/main.on")), _ => ()) shouldBe
+      LspProjectClasspath.Lookup.Ready(Seq(project.resolve("target").resolve("classes").toString))
+
   private def fixture(dependencies: Option[Path]): Path =
     val root = Files.createTempDirectory("onion-lsp-project").toRealPath()
     Files.writeString(

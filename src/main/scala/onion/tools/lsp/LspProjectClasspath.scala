@@ -1,7 +1,9 @@
 package onion.tools.lsp
 
 import java.nio.file.{Files, Path}
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors, ThreadFactory}
+
+import scala.util.control.NonFatal
 
 import onion.tools.project.{DependencyClasspathRecord, DependencyLock, DependencyResolver, ProjectLocator, ProjectManifest, ProjectPaths}
 
@@ -17,6 +19,12 @@ import onion.tools.project.{DependencyClasspathRecord, DependencyLock, Dependenc
  * Resolution is cached per project root and invalidated by the manifest's size and
  * modification time. Resolving on every keystroke would be unusable even with a warm
  * coursier cache, and the manifest is the only input that can change the answer.
+ *
+ * [[lookup]] never resolves on the caller's thread: it answers from the cache or from the
+ * classpath the last build recorded, and hands a colder miss (the first request after a
+ * manifest or lock change) to one background thread, as [[LspScriptClasspath]] does for a
+ * standalone script. [[forDocument]] is the blocking form, for callers that have no
+ * revalidation to wait for.
  */
 object LspProjectClasspath {
 
@@ -24,6 +32,24 @@ object LspProjectClasspath {
   private final case class Entry(stamp: Stamp, classpath: Seq[String])
 
   private val cache = new ConcurrentHashMap[Path, Entry]()
+
+  /** The manifest stamp whose resolution is running in the background, per project root. */
+  private val pending = new ConcurrentHashMap[Path, Stamp]()
+
+  private lazy val executor: ExecutorService =
+    Executors.newSingleThreadExecutor(new ThreadFactory:
+      override def newThread(task: Runnable): Thread =
+        val thread = new Thread(task, "onion-lsp-project-dependencies")
+        thread.setDaemon(true)
+        thread
+    )
+
+  /** The answer to [[lookup]]. */
+  enum Lookup:
+    /** The classpath to validate against. */
+    case Ready(classpath: Seq[String])
+    /** Resolution is running in the background; `onSettled` follows with the project root. */
+    case Pending
 
   /** What the fixed configuration used before any of this existed. */
   private val standalone: Seq[String] = Seq(".")
@@ -35,6 +61,42 @@ object LspProjectClasspath {
    */
   def forDocument(file: Option[Path]): Seq[String] =
     file.flatMap(project).getOrElse(standalone)
+
+  /**
+   * Like [[forDocument]] but never blocks on dependency resolution.
+   *
+   * @param onSettled called on the background thread, with the project root, once a
+   *                  [[Lookup.Pending]] answer has been replaced by a cached one
+   */
+  def lookup(file: Option[Path], onSettled: Path => Unit): Lookup =
+    file.flatMap(locate) match
+      case None => Lookup.Ready(standalone)
+      case Some(paths) =>
+        stampOf(paths.manifest) match
+          case None => Lookup.Ready(standalone)
+          case Some(stamp) =>
+            val cached = cache.get(paths.root)
+            if cached != null && cached.stamp == stamp then Lookup.Ready(cached.classpath)
+            else
+              compute(paths, resolveNow = false) match
+                case Some(classpath) =>
+                  cache.put(paths.root, Entry(stamp, classpath))
+                  Lookup.Ready(classpath)
+                case None =>
+                  if pending.get(paths.root) != stamp then
+                    pending.put(paths.root, stamp)
+                    executor.execute(() => settle(paths, stamp, onSettled))
+                  Lookup.Pending
+
+  private def settle(paths: ProjectPaths, stamp: Stamp, onSettled: Path => Unit): Unit =
+    try
+      cache.put(paths.root, Entry(stamp, compute(paths, resolveNow = true).getOrElse(Seq(paths.classes.toString))))
+    catch case NonFatal(e) =>
+      warn(s"${paths.root}: ${e.getClass.getSimpleName}: ${e.getMessage}; validating without dependencies")
+      cache.put(paths.root, Entry(stamp, Seq(paths.classes.toString)))
+    finally pending.remove(paths.root, stamp)
+    try onSettled(paths.root)
+    catch case NonFatal(e) => warn(s"revalidation after dependency resolution failed: $e")
 
   /**
    * The root of the project (the directory holding `onion.toml`) the document belongs to,
@@ -53,13 +115,14 @@ object LspProjectClasspath {
         val cached = cache.get(paths.root)
         if cached != null && cached.stamp == stamp then cached.classpath
         else
-          val computed = compute(paths)
+          val computed = compute(paths, resolveNow = true).get
           cache.put(paths.root, Entry(stamp, computed))
           computed
       }
     }
 
-  private def compute(paths: ProjectPaths): Seq[String] =
+  /** None only when `resolveNow` is false and the answer needs the resolver. */
+  private def compute(paths: ProjectPaths, resolveNow: Boolean): Option[Seq[String]] =
     val root = paths.root
     val manifestPath = paths.manifest
     val classes = paths.classes
@@ -72,7 +135,7 @@ object LspProjectClasspath {
         // A malformed manifest is the build's problem to report, not a reason to stop
         // validating the file the author is looking at.
         warn(s"$manifestPath: ${error.message}")
-        own
+        Some(own)
       case Right(manifest) =>
         // The classpath the last build resolved and verified against `onion.lock`, when
         // the lock still answers this manifest and every jar is still what it records.
@@ -80,7 +143,8 @@ object LspProjectClasspath {
         // of an exact match falls through to resolving as before.
         val recorded = DependencyLock.read(paths).filter(_.matches(manifest)).flatMap(
           DependencyClasspathRecord.reuse(DependencyClasspathRecord.path(paths), _))
-        recorded.map(Right(_)).getOrElse(
+        if recorded.isEmpty && manifest.dependencies.nonEmpty && !resolveNow then None
+        else Some(recorded.map(Right(_)).getOrElse(
           DependencyResolver.resolve(manifest.dependencies, manifest.repositories)) match
           case Left(error) =>
             // Degrading here is deliberate: an editor that refuses to validate because a
@@ -89,7 +153,7 @@ object LspProjectClasspath {
             warn(s"$root: ${error.message}; validating without dependencies")
             own
           case Right(resolved) =>
-            own ++ resolved.classpath.map(_.toString)
+            own ++ resolved.classpath.map(_.toString))
 
   private def warn(message: String): Unit =
     // The server's stderr is surfaced by the client as the language server's output
@@ -98,7 +162,9 @@ object LspProjectClasspath {
     System.err.println(s"[onion-lsp] $message")
 
   /** Cleared between tests, and whenever a client reconnects to a fresh workspace. */
-  private[lsp] def invalidate(): Unit = cache.clear()
+  private[lsp] def invalidate(): Unit =
+    cache.clear()
+    pending.clear()
 
   private def stampOf(manifest: Path): Option[Stamp] =
     try

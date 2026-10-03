@@ -105,7 +105,11 @@ object OnionTextDocumentService {
    *                   as they follow `-classpath` for `onion script.on`.
    */
   def validationConfig(file: Option[java.nio.file.Path], scriptJars: Seq[String]): CompilerConfig =
-    CompilerConfig(LspProjectClasspath.forDocument(file) ++ scriptJars, null, "UTF-8", "", 100, checkLaws = false)
+    validationConfig(LspProjectClasspath.forDocument(file), scriptJars)
+
+  /** @param classpath the document's own classpath, as [[LspProjectClasspath]] answers it */
+  def validationConfig(classpath: Seq[String], scriptJars: Seq[String]): CompilerConfig =
+    CompilerConfig(classpath ++ scriptJars, null, "UTF-8", "", 100, checkLaws = false)
 }
 
 class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocumentService {
@@ -740,20 +744,42 @@ class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocument
     val diagnostics = scriptDependencies(uri, path, content) match {
       case ScriptPlan.Hold(notes) => notes
       case ScriptPlan.Compile(jars, notes) =>
-        val compiler = new OnionCompiler(OnionTextDocumentService.validationConfig(path, jars))
-        notes ++ (
-          try {
-            val result = compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(content), fileName)))
-            result.diagnostics.errors.map(errorToDiagnostic(_, content)) ++
-              result.diagnostics.warnings.map(warningToDiagnostic(_, content))
-          } catch {
-            case e: Throwable =>
-              // Compiler crashes should never bring down the LSP server.
-              Seq(internalErrorToDiagnostic(e, content))
-          })
+        LspProjectClasspath.lookup(path, onProjectSettled) match {
+          case LspProjectClasspath.Lookup.Pending =>
+            notes :+ projectPendingDiagnostic()
+          case LspProjectClasspath.Lookup.Ready(classpath) =>
+            val compiler = new OnionCompiler(OnionTextDocumentService.validationConfig(classpath, jars))
+            notes ++ (
+              try {
+                val result = compiler.compileDetailed(Seq(new StreamInputSource(() => new StringReader(content), fileName)))
+                result.diagnostics.errors.map(errorToDiagnostic(_, content)) ++
+                  result.diagnostics.warnings.map(warningToDiagnostic(_, content))
+              } catch {
+                case e: Throwable =>
+                  // Compiler crashes should never bring down the LSP server.
+                  Seq(internalErrorToDiagnostic(e, content))
+              })
+        }
     }
 
     client.publishDiagnostics(new PublishDiagnosticsParams(uri, diagnostics.asJava))
+  }
+
+  /** Validates again every open document of the project whose dependencies have just resolved. */
+  private def onProjectSettled(root: java.nio.file.Path): Unit =
+    documents.keySet.asScala.toSeq.foreach { uri =>
+      if (extractPath(uri).flatMap(LspProjectClasspath.projectRoot).contains(root)) revalidate(uri)
+    }
+
+  /** Held diagnostics: the compiler would report every type a dependency provides as not found. */
+  private def projectPendingDiagnostic(): Diagnostic = {
+    val diagnostic = new Diagnostic()
+    diagnostic.setRange(new Range(new Position(0, 0), new Position(0, 0)))
+    diagnostic.setSeverity(DiagnosticSeverity.Information)
+    diagnostic.setSource("onion")
+    diagnostic.setMessage(
+      "Resolving the project's dependencies; this file is checked once they are on the classpath")
+    diagnostic
   }
 
   /** What a document's `//> using` directives mean for validating it now. */

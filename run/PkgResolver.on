@@ -1,0 +1,271 @@
+// PkgResolver.on — npm-style package dependency resolver
+// Demonstrates: records, ADT enums, collection pipelines, pattern matching,
+//               extension methods, string interpolation, generics, closures
+
+record Version(major: Int, minor: Int, patch: Int) from re"(\d+)\.(\d+)\.(\d+)" {
+  public:
+  def compareTo(other: Version): Int {
+    if major() != other.major() { return major() - other.major() }
+    if minor() != other.minor() { return minor() - other.minor() }
+    return patch() - other.patch()
+  }
+  def isCompatibleWith(req: VersionReq): Boolean = req.accepts(self)
+  def show(): String = "#{major()}.#{minor()}.#{patch()}"
+  def isBreakingFrom(older: Version): Boolean = major() > older.major()
+  def bumpMajor(): Version = new Version(major() + 1, 0, 0)
+  def bumpMinor(): Version = new Version(major(), minor() + 1, 0)
+  def bumpPatch(): Version = new Version(major(), minor(), patch() + 1)
+}
+
+enum VersionReq {
+  case Any
+  case Exact(v: Version)
+  case MinInclusive(v: Version)
+  case Range(lo: Version, hi: Version)
+
+  public:
+  def accepts(ver: Version): Boolean = select this {
+    case a is Any: true
+    case e is Exact: ver.compareTo(e.v()) == 0
+    case m is MinInclusive: ver.compareTo(m.v()) >= 0
+    case r is Range: ver.compareTo(r.lo()) >= 0 && ver.compareTo(r.hi()) < 0
+  }
+
+  def show(): String = select this {
+    case a is Any: "*"
+    case e is Exact: "=" + e.v().show()
+    case m is MinInclusive: ">=" + m.v().show()
+    case r is Range: "#{r.lo().show()}..#{r.hi().show()}"
+  }
+}
+
+record Dependency(name: String, req: VersionReq) {
+  public:
+  def show(): String = "#{name()} #{req().show()}"
+}
+
+record Package(name: String, version: Version, deps: List[Dependency]) {
+  public:
+  def id(): String = "#{name()}@#{version().show()}"
+}
+
+enum ResolveResult {
+  case Resolved(order: List[Package])
+  case CycleDetected(cycle: List[String])
+  case Missing(name: String, req: VersionReq)
+  case Conflict(name: String, a: Version, b: Version)
+}
+
+
+class Registry {
+  val packages: List[Package] = []
+
+public:
+  def add(pkg: Package): void {
+    packages.add(pkg)
+  }
+
+  def findBest(name: String, req: VersionReq): Package? {
+    val candidates: List[Package] = packages.filter { p -> p.name() == name && req.accepts(p.version()) }
+    if candidates.size == 0 { return null }
+    // Pick highest version
+    var best: Package = candidates[0]
+    var i: Int = 1
+    while i < candidates.size {
+      if candidates[i].version().compareTo(best.version()) > 0 {
+        best = candidates[i]
+      }
+      i++
+    }
+    return best
+  }
+
+  def findAll(name: String): List[Package] {
+    return packages.filter { p -> p.name() == name }
+  }
+}
+
+
+class Resolver {
+  val registry: Registry
+
+public:
+  def this(reg: Registry) {
+    registry = reg
+  }
+
+  // Topological sort with cycle detection via DFS
+  def resolve(root: Package): ResolveResult {
+    val resolved: List[Package] = []
+    val visited: List[String] = []   // fully done
+    val inStack: List[String] = []   // currently in DFS stack
+
+    val result: ResolveResult? = dfs(root, resolved, visited, inStack)
+    if result != null { return result }
+    return new Resolved(resolved)
+  }
+
+  def dfs(pkg: Package, resolved: List[Package], visited: List[String], inStack: List[String]): ResolveResult? {
+    val id: String = pkg.id()
+    if visited.contains(id) { return null }
+    if inStack.contains(id) {
+      val cycle: List[String] = []
+      cycle.add(id)
+      return new CycleDetected(cycle)
+    }
+
+    inStack.add(id)
+    foreach dep: Dependency in pkg.deps() {
+      val found: Package? = registry.findBest(dep.name(), dep.req())
+      if found == null {
+        inStack.remove(id)
+        return new Missing(dep.name(), dep.req())
+      }
+      val subResult: ResolveResult? = dfs(found as Package, resolved, visited, inStack)
+      if subResult != null {
+        inStack.remove(id)
+        return subResult
+      }
+    }
+
+    inStack.remove(id)
+    if !visited.contains(id) {
+      visited.add(id)
+      resolved.add(pkg)
+    }
+    return null
+  }
+}
+
+
+def printResult(label: String, result: ResolveResult): void {
+  IO::println("\n=== " + label + " ===")
+  select result {
+    case r is Resolved: {
+      IO::println("OK - install order:")
+      foreach pkg: Package in r.order() {
+        IO::println("  " + pkg.id())
+      }
+    }
+    case c is CycleDetected: {
+      IO::println("CYCLE DETECTED: " + c.cycle())
+    }
+    case m is Missing: {
+      IO::println("MISSING: " + m.name() + " " + m.req().show())
+    }
+    case con is Conflict: {
+      IO::println("CONFLICT: " + con.name() + " (" + con.a().show() + " vs " + con.b().show() + ")")
+    }
+  }
+}
+
+def v(major: Int, minor: Int, patch: Int): Version = new Version(major, minor, patch)
+def pkg(name: String, ver: Version, deps: List[Dependency]): Package = new Package(name, ver, deps)
+def dep(name: String, req: VersionReq): Dependency = new Dependency(name, req)
+
+def printTree(p: Package, reg: Registry, indent: Int): void {
+  var pad: String = ""
+  var i: Int = 0
+  while i < indent { pad = pad + "  "; i++ }
+  IO::println(pad + p.id())
+  foreach d: Dependency in p.deps() {
+    val found: Package? = reg.findBest(d.name(), d.req())
+    if found != null {
+      printTree(found as Package, reg, indent + 1)
+    } else {
+      IO::println(pad + "  [MISSING: " + d.show() + "]")
+    }
+  }
+}
+
+def stats(pkgs: List[Package]): void {
+  IO::println("\n--- Package statistics ---")
+  val totalDeps: Int = pkgs.fold(0) { acc, p -> acc + (p as Package).deps().size }
+  IO::println("Packages:     " + pkgs.size)
+  IO::println("Total deps:   " + totalDeps)
+  val avgDeps: Double = if pkgs.size > 0 { totalDeps as Double / pkgs.size as Double } else { 0.0 }
+  IO::println("Avg deps/pkg: " + avgDeps)
+  val leafs: List[Package] = pkgs.filter { p -> (p as Package).deps().size == 0 }
+  IO::println("Leaf pkgs:    " + leafs.size)
+  val versions: List[String] = pkgs.map { p -> (p as Package).version().show() }
+  IO::println("Versions:     [" + Strings::join(versions, ", ") + "]")
+}
+
+def main(): void {
+  val reg: Registry = new Registry()
+
+  // Scenario 1: simple chain  A -> B -> C
+  val verC: Version = v(1, 0, 0)
+  val verB: Version = v(2, 1, 0)
+  val verA: Version = v(3, 0, 0)
+  val pkgC: Package = pkg("libC", verC, [])
+  val pkgB: Package = pkg("libB", verB, [dep("libC", new MinInclusive(v(1, 0, 0)))])
+  val pkgA: Package = pkg("appA", verA, [dep("libB", new Exact(v(2, 1, 0))), dep("libC", new MinInclusive(v(1, 0, 0)))])
+
+  reg.add(pkgC)
+  reg.add(pkgB)
+  reg.add(pkgA)
+
+  val resolver: Resolver = new Resolver(reg)
+  printResult("Simple chain A->B->C", resolver.resolve(pkgA))
+
+  // Scenario 2: diamond  App -> [Lib1, Lib2] -> Common
+  val reg2: Registry = new Registry()
+  val common10: Package = pkg("common", v(1, 0, 0), [])
+  val common12: Package = pkg("common", v(1, 2, 0), [])
+  val lib1: Package = pkg("lib1", v(1, 0, 0), [dep("common", new MinInclusive(v(1, 0, 0)))])
+  val lib2: Package = pkg("lib2", v(1, 0, 0), [dep("common", new MinInclusive(v(1, 1, 0)))])
+  val app: Package = pkg("app", v(1, 0, 0), [dep("lib1", new Any()), dep("lib2", new Any())])
+
+  reg2.add(common10)
+  reg2.add(common12)
+  reg2.add(lib1)
+  reg2.add(lib2)
+  reg2.add(app)
+
+  val resolver2: Resolver = new Resolver(reg2)
+  printResult("Diamond dep (common shared)", resolver2.resolve(app))
+
+  // Scenario 3: missing dependency
+  val reg3: Registry = new Registry()
+  val needsMissing: Package = pkg("app2", v(1, 0, 0), [dep("ghost", new Exact(v(9, 9, 9)))])
+  reg3.add(needsMissing)
+  val resolver3: Resolver = new Resolver(reg3)
+  printResult("Missing dependency", resolver3.resolve(needsMissing))
+
+  // Scenario 4: cycle detection
+  val reg4: Registry = new Registry()
+  val cycleA: Package = pkg("cycle-a", v(1, 0, 0), [dep("cycle-b", new Any())])
+  val cycleB: Package = pkg("cycle-b", v(1, 0, 0), [dep("cycle-c", new Any())])
+  val cycleC: Package = pkg("cycle-c", v(1, 0, 0), [dep("cycle-a", new Any())])
+  reg4.add(cycleA); reg4.add(cycleB); reg4.add(cycleC)
+  val resolver4: Resolver = new Resolver(reg4)
+  printResult("Cycle A->B->C->A", resolver4.resolve(cycleA))
+
+  // Scenario 5: dependency tree view
+  IO::println("\n=== Dependency tree ===")
+  printTree(pkgA, reg, 0)
+
+  // Scenario 6: version bump / breaking change check
+  IO::println("\n=== Version operations ===")
+  val base: Version = v(1, 4, 2)
+  val next: Version = base.bumpMajor()
+  IO::println(base.show() + " -> bumpMajor -> " + next.show())
+  IO::println("is breaking: " + next.isBreakingFrom(base))
+  IO::println(base.show() + " -> bumpMinor -> " + base.bumpMinor().show())
+  IO::println(base.show() + " -> bumpPatch -> " + base.bumpPatch().show())
+
+  // Scenario 7: range-based version constraint
+  val rangeReq: VersionReq = new Range(v(1, 0, 0), v(2, 0, 0))
+  IO::println("\n=== Range constraint " + rangeReq.show() + " ===")
+  val testVersions: List[Version] = [v(0, 9, 9), v(1, 0, 0), v(1, 5, 3), v(1, 9, 9), v(2, 0, 0), v(2, 1, 0)]
+  foreach ver: Version in testVersions {
+    IO::println("  " + ver.show() + " -> " + (if rangeReq.accepts(ver) { "accepted" } else { "rejected" }))
+  }
+
+  // Scenario 8: registry summary statistics
+  val allPkgs: List[Package] = []
+  allPkgs.add(pkgA); allPkgs.add(pkgB); allPkgs.add(pkgC)
+  allPkgs.add(lib1); allPkgs.add(lib2); allPkgs.add(common10); allPkgs.add(common12)
+  stats(allPkgs)
+}

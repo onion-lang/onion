@@ -233,6 +233,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
     if (found == null || found.isEmpty) return Message("error.parsing.unexpected_eof")
     val base =
       if (found == "\"") Message("error.parsing.unterminated_string")
+      else if (found == OnionParser.UnclosedInterpolationMarker) Message("error.parsing.unclosed_interpolation")
       else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
     val hint = SyntaxHintClassifier
       .classify(found, if (expectedAll == null) expected else expectedAll, context, sourceLine)

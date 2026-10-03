@@ -42,6 +42,11 @@ object OnionParser {
    */
   final case class CollectedError(line: Int, column: Int, found: String, expectedKinds: List[Int])
 
+  /** Sentinel `found` image for a `CollectedError`/`ParseException` raised for an unclosed
+   *  `#{...}` string interpolation, so `Parsing.syntaxErrorMessage` can report it with its own
+   *  message instead of the expected-kind set at the (unrelated) resync point. */
+  val UnclosedInterpolationMarker: String = "#{"
+
   private val theFail = new Fail(null)
   private val debug = java.lang.Boolean.getBoolean("onion.parser.debug")
 
@@ -2777,7 +2782,13 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           else if (ch == '}') braceCount -= 1
           interpEnd += 1
         }
-        if (braceCount > 0) throw fail
+        if (braceCount > 0) {
+          // Anchor the diagnostic at the '#' of the unclosed '#{', not wherever
+          // parsing eventually resynchronizes (issue #1953).
+          val (hashLine, hashCol) = interpolationOrigin(str, interpStart, loc, quoteLen)
+          adoptFailure(Location(hashLine, hashCol), UnclosedInterpolationMarker, new java.util.LinkedHashSet[Integer]())
+          throw fail
+        }
         val exprStr = str.substring(interpStart + 2, interpEnd - 1)
         val (line, col) = interpolationOrigin(str, interpStart + 2, loc, quoteLen)
         // `#{name}` is most interpolations; a plain identifier needs no sub-parser (and its

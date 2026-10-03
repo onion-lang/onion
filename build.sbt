@@ -5,7 +5,7 @@ import sbt.internal.librarymanagement.StringUtilities
 
 import java.util.jar.{Attributes, Manifest}
 
-lazy val onion = (project in file(".")).settings(onionSettings)
+lazy val onion = (project in file(".")).settings(onionSettings, publishingSettings)
 
 @transient
 lazy val dist = taskKey[Unit]("Builds a runnable distribution under target/dist")
@@ -107,7 +107,32 @@ inline def javacc(classpath: Classpath, output: File, log: Logger): Seq[File] = 
 lazy val onionSettings = Seq(
   scalaVersion := "3.3.7",
   name := "onion",
-  organization := "org.onion_lang",
+  description := "Onion: a statically typed, object-oriented language for the JVM (compiler, runtime library and tools)",
+  // Published as plain `onion`, not `onion_3`: Java and Gradle consumers depend on the
+  // compiler and runtime too, and the Scala library is an ordinary POM dependency.
+  // crossPaths stays on, so the target/out/jvm/scala-3.3.7/onion/ layout that the
+  // release workflow and RELEASING.md point at does not move.
+  crossVersion := CrossVersion.disabled,
+  // With crossVersion disabled the thin jar would default to onion-<version>.jar, the
+  // very name `assembly` gives the fat jar in the same directory, and `assembly; dist`
+  // would overwrite one with the other. Keep the thin jar's local name as it was; the
+  // published file name comes from the module id, not from this path.
+  Compile / packageBin / artifactName := { (sv, module, artifact) =>
+    Artifact.artifactName(sv, module.withCrossVersion(CrossVersion.binary), artifact)
+  },
+  // The thin jar is also the distribution's onion.jar. Keep its manifest as it was:
+  // `homepage` (set for the POM's <url>) would otherwise add an Implementation-URL line.
+  Compile / packageBin / homepage := None,
+  // The published -javadoc.jar. Scaladoc 3.3 cannot document this build (it dies with
+  // "UnsupportedOperationException: complete" reading onion.compiler.Parsing's TASTy), and
+  // the API a Java or Scala consumer calls is the Java runtime library anyway (onion.IO,
+  // onion.Result, onion.Shape, ...). So it is javadoc over src/main/java/onion, leaving
+  // out the compiler-internal parser glue under onion/compiler.
+  Compile / doc / sources := (Compile / doc / sources).value.filter { f =>
+    val p = f.toString.replace('\\', '/')
+    p.contains("/src/main/java/onion/") && !p.contains("/src/main/java/onion/compiler/")
+  },
+  Compile / doc / javacOptions := Seq("-Xdoclint:none", "-quiet", "-encoding", "UTF-8"),
   // Generated parser sources come in via sourceGenerators (managedSources); listing
   // sourceManaged here too made them unmanaged as well, so the directory was scanned
   // before javacc's IO.delete ran and a regenerate-from-scratch tripped over the
@@ -195,6 +220,68 @@ lazy val onionSettings = Seq(
 // cost a few seconds and make the signal trustworthy.
 Test / parallelExecution := false
 
+// ---- Maven Central publishing ---------------------------------------------------
+//
+// sbt 2 talks to the Central Portal itself: `publishTo := localStaging.value` makes
+// `publish`/`publishSigned` write a Maven layout (with .md5/.sha1) under
+// target/sona-staging, and the `sonaUpload` / `sonaRelease` commands zip that directory
+// and upload it as one deployment, for manual or automatic release respectively.
+// Signatures come from sbt-pgp (project/plugins.sbt), which drives the `gpg` binary.
+// RELEASING.md ("Publishing to Maven Central") has the whole procedure.
+//
+// Only a release version may reach the staging directory. sbt-dynver gives every
+// untagged or dirty checkout a version like 0.136.0+27-2abbe990 (or +...-SNAPSHOT), and
+// Central would accept the former as a real, permanent, immutable release.
+lazy val centralVersionCheck =
+  taskKey[Unit]("Fails unless the version is a release version that may be published to Maven Central")
+
+def centralPublishable(v: String): Boolean =
+  v.matches("""[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9]+(\.[A-Za-z0-9]+)*)?""") &&
+    !v.toUpperCase.contains("SNAPSHOT")
+
+lazy val publishingSettings = Seq(
+  organization := "org.onion-lang",
+  organizationHomepage := Some(url("https://onion-lang.org")),
+  homepage := Some(url("https://onion-lang.org")),
+  licenses := Seq(License("BSD-3-Clause", url("https://github.com/onion-lang/onion/blob/develop/LICENSE"))),
+  scmInfo := Some(ScmInfo(
+    url("https://github.com/onion-lang/onion"),
+    "scm:git:https://github.com/onion-lang/onion.git",
+    Some("scm:git:git@github.com:onion-lang/onion.git")
+  )),
+  developers := List(
+    Developer("kmizu", "Kota Mizushima", "kmizu.main@gmail.com", url("https://github.com/kmizu"))
+  ),
+  versionScheme := Some("early-semver"),
+  publishMavenStyle := true,
+  pomIncludeRepository := { _ => false },
+  publishTo := localStaging.value,
+  // The Central Portal user token (the CI secrets of the same names). sonaUpload and
+  // sonaRelease look credentials up by host, central.sonatype.com.
+  credentials ++= (for {
+    user <- sys.env.get("CENTRAL_USERNAME").filter(_.nonEmpty)
+    pass <- sys.env.get("CENTRAL_PASSWORD").filter(_.nonEmpty)
+  } yield Credentials("Sonatype Nexus Repository Manager", "central.sonatype.com", user, pass)).toSeq,
+  centralVersionCheck := {
+    val v = version.value
+    if (!centralPublishable(v))
+      throw new MessageOnlyException(
+        s"Refusing to publish version '$v' to Maven Central. Only a release tag " +
+        "(vX.Y.Z, vX.Y.Z-RC1, ...) checked out exactly, on a clean tree, gives a publishable " +
+        "version; sbt-dynver's +<distance>-<sha>, dirty and SNAPSHOT versions never are. " +
+        "For a local install use publishM2/publishLocal instead.")
+  },
+  publish := publish.dependsOn(centralVersionCheck).value,
+  PgpKeys.publishSigned := PgpKeys.publishSigned.dependsOn(centralVersionCheck).value,
+  sonaBundle := sonaBundle.dependsOn(centralVersionCheck).value
+)
+
+// Stage both artifacts, signed, under target/sona-staging; then `sonaUpload` (manual
+// release in the Portal UI) or `sonaRelease` (automatic). The version check runs first,
+// as its own command, so a bad version fails before anything is compiled.
+addCommandAlias("centralStage",
+  "; onion/centralVersionCheck; llm/centralVersionCheck; onion/publishSigned; llm/publishSigned")
+
 // ---- batteries ------------------------------------------------------------------
 //
 // A battery is an optional library shipped as its own Maven artifact, next to (never
@@ -203,14 +290,17 @@ Test / parallelExecution := false
 // `sbt assembly`/`dist`/`test` and the size of onion.jar are exactly what they were;
 // build or test one by name (`sbt llm/test`, `sbt llm/publishM2`).
 //
-// The Onion runtime (onion.Result, onion.Shape, ...) is a *provided* dependency: every
-// Onion script already runs with onion.jar on its classpath, so the battery's POM must
-// not drag a second copy (or the Scala library) in.
+// The Onion runtime (onion.Result, onion.Shape, ...) is a *provided* dependency, and stays
+// one now that org.onion-lang:onion is on Maven Central: every Onion script already runs
+// with onion.jar on its classpath, and `//> using dep` / `[dependencies]` resolve the full
+// transitive set with no exclusions, so a compile-scope edge would put a second (possibly
+// differently versioned) compiler, ASM, JLine and LSP4J next to the running one. A Java or
+// Scala consumer declares org.onion-lang:onion itself, at the same version.
 lazy val llm = (project in file("batteries/llm"))
   .dependsOn(onion % "provided")
+  .settings(publishingSettings)
   .settings(
     name := "onion-llm",
-    organization := "org.onion_lang",
     description := "Onion battery: Claude (Anthropic Messages API) with Shape-typed structured output",
     scalaVersion := "3.3.7",
     // A Java library: no _3 suffix on the artifact, no Scala library in its POM.

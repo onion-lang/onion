@@ -377,7 +377,7 @@ java -version
 // バージョンは sbt-dynver によって git タグから導出される
 scalaVersion := "3.3.7"
 name := "onion"
-organization := "org.onion_lang"
+organization := "org.onion-lang"   // Maven の groupId。パッケージ名は onion.* のまま
 
 // 依存関係
 libraryDependencies ++= Seq(

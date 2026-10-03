@@ -6,8 +6,7 @@ Messages API 経由で Claude を呼び出し、その答えを型付きのレ�
 読み戻しには、JSON ファイルを読むのに使っているのと同じ `Shape` を使います:
 
 ```onion
-//> using dep "org.onion_lang:onion-llm:<version>"
-//> using repository "file:///C:/Users/you/.m2/repository"   // 当面はローカルインストール
+//> using dep "org.onion-lang:onion-llm:<version>"
 import { onion.llm.Llm; onion.llm.LlmError }
 
 record Action(owner: String, task: String) { shape doc = json }
@@ -37,8 +36,39 @@ val t: Result[String, LlmError] = claude.text("Say hi in Japanese")
 
 ## インストール
 
-このバッテリーはまだ公開リポジトリに公開されていません。Onion のチェックアウトから
-ローカルの Maven リポジトリにインストールします:
+リリースは Maven Central に `org.onion-lang:onion-llm` として、Onion 本体と同じ
+バージョンで公開されます（Central への公開を設定した後の最初のリリースから。
+[リリース手順](../RELEASING.md#publishing-to-maven-central)を参照）。スクリプトに必要なのは
+`//> using dep` の行だけです（[スクリプトランナー](../tools/script-runner.md)を参照）:
+
+```onion
+//> using dep "org.onion-lang:onion-llm:<version>"
+```
+
+プロジェクトでは `onion.toml` に書きます:
+
+```toml
+[dependencies]
+"org.onion-lang:onion-llm" = "<version>"
+```
+
+| | |
+|---|---|
+| 座標 | `org.onion-lang:onion-llm:<version>` |
+| パッケージ | `onion.llm`（`Llm`、`Claude`、`LlmError`） |
+| 依存 | `com.anthropic:anthropic-java` 2.68.0（公式 Java SDK） |
+| Onion ランタイム | `org.onion-lang:onion`、`provided`: スクリプトはもともと `onion.jar` 付きで動くので、バッテリーは2つ目のコピーを持ち込みません |
+
+Onion ランタイムを `provided` にしているのは意図的です。`//> using dep` と
+`[dependencies]` は推移的な依存をすべてクラスパスに載せるので、通常の依存にすると、
+スクリプトを動かしているコンパイラの隣に2つ目のコンパイラ（とその ASM、JLine、
+LSP4J）が、場合によっては別のバージョンで読み込まれます。バッテリーを直接使う Java・
+Scala・Kotlin のプログラムは、`org.onion-lang:onion` を同じバージョンで自分で宣言します。
+
+### 未リリースのビルド
+
+まだリリースされていないバッテリーを試すには、Onion のチェックアウトからローカルの
+Maven リポジトリにインストールします:
 
 ```bash
 sbt llm/publishM2
@@ -53,26 +83,17 @@ sbt llm/publishM2
 sbt 'set llm / version := "0.135.0-local"' llm/publishM2
 ```
 
-| | |
-|---|---|
-| 座標 | `org.onion_lang:onion-llm:<version>` |
-| パッケージ | `onion.llm`（`Llm`、`Claude`、`LlmError`） |
-| 依存 | `com.anthropic:anthropic-java` 2.68.0（公式 Java SDK） |
-| Onion ランタイム | `provided`: スクリプトはもともと `onion.jar` 付きで動くので、バッテリーは2つ目のコピーを持ち込みません |
-
-スクリプトでは `//> using dep` でバッテリーを、`//> using repository` でローカル
-リポジトリを指定します（[スクリプトランナー](../tools/script-runner.md)を参照）:
+そのうえで、スクリプトでは `//> using repository`、`onion.toml` では
+`[[repositories]]` で、依存と一緒にローカルリポジトリを指定します:
 
 ```onion
-//> using dep "org.onion_lang:onion-llm:0.135.0-local"
+//> using dep "org.onion-lang:onion-llm:0.135.0-local"
 //> using repository "file:///C:/Users/you/.m2/repository"
 ```
 
-プロジェクトでは `onion.toml` に書きます:
-
 ```toml
 [dependencies]
-"org.onion_lang:onion-llm" = "0.135.0-local"
+"org.onion-lang:onion-llm" = "0.135.0-local"
 
 [[repositories]]
 url = "file:///C:/Users/you/.m2/repository"

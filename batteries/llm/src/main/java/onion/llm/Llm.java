@@ -4,7 +4,7 @@ package onion.llm;
  * Entry point of the {@code onion-llm} battery.
  *
  * <pre>
- * //&gt; using dep "org.onion_lang:onion-llm:&lt;version&gt;"
+ * //&gt; using dep "org.onion-lang:onion-llm:&lt;version&gt;"
  * import { onion.llm.Llm; onion.llm.LlmError }
  *
  * val claude = Llm::claude().effort("low").system("You summarize meetings.")

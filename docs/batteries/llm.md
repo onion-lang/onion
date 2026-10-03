@@ -6,8 +6,7 @@ Anthropic Messages API and reads the answer back as a typed record, through the 
 `Shape` that already reads your JSON files:
 
 ```onion
-//> using dep "org.onion_lang:onion-llm:<version>"
-//> using repository "file:///C:/Users/you/.m2/repository"   // local install, for now
+//> using dep "org.onion-lang:onion-llm:<version>"
 import { onion.llm.Llm; onion.llm.LlmError }
 
 record Action(owner: String, task: String) { shape doc = json }
@@ -37,8 +36,39 @@ back as defects with paths such as `actions[1].owner`, not as an exception.
 
 ## Install
 
-The battery is not published to a public repository yet. Install it into your local
-Maven repository from an Onion checkout:
+Releases are published to Maven Central as `org.onion-lang:onion-llm`, at the same
+version as Onion itself (from the first release made after Central publishing was set
+up; see [Releasing](../RELEASING.md#publishing-to-maven-central)). A script needs only
+the `//> using dep` line (see the [script runner](../tools/script-runner.md)):
+
+```onion
+//> using dep "org.onion-lang:onion-llm:<version>"
+```
+
+A project lists it in `onion.toml`:
+
+```toml
+[dependencies]
+"org.onion-lang:onion-llm" = "<version>"
+```
+
+| | |
+|---|---|
+| Coordinates | `org.onion-lang:onion-llm:<version>` |
+| Package | `onion.llm` (`Llm`, `Claude`, `LlmError`) |
+| Depends on | `com.anthropic:anthropic-java` 2.68.0 (the official Java SDK) |
+| Onion runtime | `org.onion-lang:onion`, `provided`: scripts already run with `onion.jar`, so the battery does not bring a second copy |
+
+The Onion runtime is `provided` on purpose. `//> using dep` and `[dependencies]` put the
+whole transitive set on the classpath, so a normal dependency would load a second
+compiler (and its ASM, JLine and LSP4J), possibly at another version, next to the one
+running the script. A Java, Scala or Kotlin program that uses the battery directly
+declares `org.onion-lang:onion` itself, at the same version.
+
+### An unreleased build
+
+To try a battery that has not been released yet, install it into your local Maven
+repository from an Onion checkout:
 
 ```bash
 sbt llm/publishM2
@@ -52,26 +82,17 @@ and date suffix, so pin something easier to type when you install for local use:
 sbt 'set llm / version := "0.135.0-local"' llm/publishM2
 ```
 
-| | |
-|---|---|
-| Coordinates | `org.onion_lang:onion-llm:<version>` |
-| Package | `onion.llm` (`Llm`, `Claude`, `LlmError`) |
-| Depends on | `com.anthropic:anthropic-java` 2.68.0 (the official Java SDK) |
-| Onion runtime | `provided`: scripts already run with `onion.jar`, so the battery does not bring a second copy |
-
-A script names it with `//> using dep` and the local repository with
-`//> using repository` (see the [script runner](../tools/script-runner.md)):
+Then name the local repository next to the dependency, with `//> using repository` in a
+script or `[[repositories]]` in `onion.toml`:
 
 ```onion
-//> using dep "org.onion_lang:onion-llm:0.135.0-local"
+//> using dep "org.onion-lang:onion-llm:0.135.0-local"
 //> using repository "file:///C:/Users/you/.m2/repository"
 ```
 
-A project lists it in `onion.toml`:
-
 ```toml
 [dependencies]
-"org.onion_lang:onion-llm" = "0.135.0-local"
+"org.onion-lang:onion-llm" = "0.135.0-local"
 
 [[repositories]]
 url = "file:///C:/Users/you/.m2/repository"

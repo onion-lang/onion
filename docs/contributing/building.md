@@ -377,7 +377,7 @@ Key settings:
 // Version is derived from git tags via sbt-dynver
 scalaVersion := "3.3.7"
 name := "onion"
-organization := "org.onion_lang"
+organization := "org.onion-lang"   // the Maven groupId; packages stay onion.*
 
 // Dependencies
 libraryDependencies ++= Seq(

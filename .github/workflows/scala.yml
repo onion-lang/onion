@@ -30,3 +30,10 @@ jobs:
       env:
         SBT_OPTS: "-Xmx4G -XX:+UseG1GC -Xss16m"
       run: sbt -v llm/test
+    # A release tag also publishes both modules to Maven Central (release.yml,
+    # publish-central). Build what that job uploads -- jars, sources, javadoc, POMs -- on
+    # every push, so a broken javadoc or POM shows up here and not on release day.
+    - name: Build Maven Central artifacts
+      env:
+        SBT_OPTS: "-Xmx4G -XX:+UseG1GC -Xss16m"
+      run: sbt -v "onion/packageDoc; onion/packageSrc; onion/makePom; llm/packageDoc; llm/packageSrc; llm/makePom"

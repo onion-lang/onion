@@ -27,6 +27,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Resolve release tag
         id: tag
@@ -137,3 +140,94 @@ jobs:
             release-artifacts/onion-${VERSION}.jar \
             release-artifacts/onion-dist-${VERSION}.zip \
             release-artifacts/checksums.txt
+
+  # Maven Central: org.onion-lang:onion and org.onion-lang:onion-llm, signed, uploaded to
+  # the Central Portal as one deployment. A separate job, after the GitHub Release, so a
+  # Central problem can never block or undo the release the project already ships.
+  #
+  # Until the maintainer has added the four secrets (RELEASING.md, "Publishing to Maven
+  # Central") this job only leaves a notice and succeeds. By default the deployment is
+  # uploaded and validated but NOT released: it waits in the Portal UI for a manual
+  # "Publish", because a release on Central is permanent. Set the repository variable
+  # CENTRAL_AUTO_RELEASE to `true` to release automatically once that has been proven.
+  publish-central:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    env:
+      CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+      CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+      PGP_SECRET: ${{ secrets.PGP_SECRET }}
+      PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+    steps:
+      - name: Check publishing secrets
+        id: secrets
+        run: |
+          missing=""
+          present=""
+          for name in CENTRAL_USERNAME CENTRAL_PASSWORD PGP_SECRET PGP_PASSPHRASE; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; else present="$present $name"; fi
+          done
+          if [ -z "$present" ]; then
+            echo "::notice title=Maven Central publishing skipped::No publishing secrets are set, so nothing was uploaded to Maven Central. The GitHub Release is unaffected. See RELEASING.md, 'Publishing to Maven Central'."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          elif [ -n "$missing" ]; then
+            echo "::error title=Maven Central publishing misconfigured::Set all four secrets or none. Missing:$missing" >&2
+            exit 1
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install sbt
+        if: steps.secrets.outputs.available == 'true'
+        uses: sbt/setup-sbt@v1
+        with:
+          # No build caches in this job (here or in setup-java below): what goes to
+          # Central, permanently, is built from the tag's sources from scratch.
+          disk-cache: false
+      - name: Checkout the release tag
+        if: steps.secrets.outputs.available == 'true'
+        uses: actions/checkout@v4
+        with:
+          # The release job created the tag already (for a manual run, through the API).
+          ref: refs/tags/${{ needs.release.outputs.tag }}
+          fetch-depth: 0
+      - name: Setup JDK
+        if: steps.secrets.outputs.available == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Import the signing key
+        if: steps.secrets.outputs.available == 'true'
+        run: |
+          # PGP_SECRET is the base64 of the ASCII-armored secret key; armored text pasted
+          # as-is is accepted too.
+          if printf '%s' "$PGP_SECRET" | head -c 40 | grep -q -- '-----BEGIN PGP'; then
+            printf '%s\n' "$PGP_SECRET" | gpg --batch --import
+          else
+            printf '%s' "$PGP_SECRET" | base64 --decode | gpg --batch --import
+          fi
+          gpg --list-secret-keys --keyid-format long
+      - name: Stage, sign and upload
+        if: steps.secrets.outputs.available == 'true'
+        env:
+          SBT_OPTS: "-Xmx6G -XX:+UseG1GC -Xss16m"
+          AUTO_RELEASE: ${{ vars.CENTRAL_AUTO_RELEASE }}
+        run: |
+          # centralStage refuses any version that is not a clean release version, then
+          # runs publishSigned for both artifacts into target/sona-staging.
+          if [ "$AUTO_RELEASE" = "true" ]; then UPLOAD=sonaRelease; else UPLOAD=sonaUpload; fi
+          echo "version: ${{ needs.release.outputs.version }}, upload command: $UPLOAD"
+          sbt -v centralStage "$UPLOAD"
+          if [ "$UPLOAD" = "sonaUpload" ]; then
+            echo "::notice title=Maven Central deployment awaiting release::${{ needs.release.outputs.tag }} is uploaded and validated. Release it at https://central.sonatype.com/publishing/deployments (Publish), or Drop it."
+          fi
+      - name: Keep the staged bundle
+        if: always() && steps.secrets.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-central-${{ needs.release.outputs.tag }}
+          path: target/sona-staging
+          if-no-files-found: ignore

@@ -236,6 +236,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       if (found == "\"") Message("error.parsing.unterminated_string")
       else if (found == "'") Message("error.parsing.unterminated_char")
       else if (found == OnionParser.UnclosedInterpolationMarker) Message("error.parsing.unclosed_interpolation")
+      else if (found == OnionParser.TooDeepInterpolationMarker) Message("error.parsing.interpolation_too_deep", OnionLexer.MaxInterpBraceDepth)
       else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
     val hint = SyntaxHintClassifier
       .classify(found, if (expectedAll == null) expected else expectedAll, context, sourceLine)

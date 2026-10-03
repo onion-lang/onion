@@ -73,6 +73,9 @@ is no manual `version := ...` line to update in `build.sbt`.
    - smoke-test the fat jar,
    - generate SHA-256 checksums,
    - create a GitHub Release with the artifacts and auto-generated notes.
+   - then, in a separate job, publish `org.onion-lang:onion` and `org.onion-lang:onion-llm`
+     to Maven Central (see [Publishing to Maven Central](#publishing-to-maven-central);
+     until its secrets exist this job only leaves a notice).
 
 6. **Verify the release.**
    - Check the GitHub Release page.
@@ -92,6 +95,149 @@ sbt "assembly; dist"
 Outputs (sbt 2's default layout nests build products under `target/out/<platform>/<scalaVersion>/<project>/`):
 - `target/out/jvm/scala-3.3.7/onion/onion-<version>.jar` (fat jar)
 - `target/out/jvm/scala-3.3.7/onion/onion-dist-<version>.zip` (distribution archive)
+
+## Publishing to Maven Central
+
+Every release also publishes two artifacts to Maven Central:
+
+| Artifact | What it is |
+|---|---|
+| `org.onion-lang:onion` | The compiler, runtime library and tools as a normal library jar (not the fat jar), with a POM listing its dependencies: `scala3-library_3`, ASM, JLine, LSP4J, tomlj, coursier `interface`, ... |
+| `org.onion-lang:onion-llm` | The [LLM battery](batteries/llm.md). Depends on `com.anthropic:anthropic-java`, and on `org.onion-lang:onion` as `provided` |
+
+Each comes with a `-sources.jar`, a `-javadoc.jar`, `.asc` signatures and `.md5`/`.sha1`
+checksums. Only the Maven groupId is `org.onion-lang`; the packages stay `onion.*`.
+
+### How it works
+
+- The `publish-central` job of the [release workflow](https://github.com/onion-lang/onion/blob/develop/.github/workflows/release.yml) runs after the
+  `release` job, on the same tag. It imports the signing key and runs
+  `sbt centralStage sonaUpload`: `centralStage` checks the version and then runs
+  `publishSigned` for both modules into `target/sona-staging`, and `sonaUpload` (built
+  into sbt 2) zips that directory and uploads it to the Central Portal as one deployment.
+  Signatures come from [sbt-pgp](https://github.com/sbt/sbt-pgp) 2.3.2, the sbt 2 build,
+  which drives the `gpg` binary.
+- **Manual release by default.** `sonaUpload` leaves the deployment validated but not
+  published. Open <https://central.sonatype.com/publishing/deployments> and press
+  **Publish** (or **Drop**). A release on Central is permanent: it can never be deleted or
+  replaced, so the first releases get a human look. When that has gone well a few times,
+  set the repository variable `CENTRAL_AUTO_RELEASE` to `true` (Settings → Secrets and
+  variables → Actions → Variables) and the job runs `sonaRelease` instead, which
+  publishes without waiting.
+- **Without the secrets** the job only prints the notice "Maven Central publishing
+  skipped" and succeeds; the GitHub Release is not affected. If only some of the four
+  secrets are set it fails, so a half-finished setup does not go unnoticed.
+- **Only release versions.** `centralStage`, `publish`, `publishSigned`, `sonaUpload` and
+  `sonaRelease` refuse any version that is not a plain release version (`0.137.0`,
+  `0.138.0-RC1`): sbt-dynver's `+<distance>-<sha>` versions of an untagged commit, the
+  date suffix of a dirty tree and `-SNAPSHOT` all fail before anything is built.
+  `publishM2` and `publishLocal` are not affected.
+- The job builds from the tag's sources with no build cache, and keeps the staged
+  directory as a workflow artifact (`maven-central-vX.Y.Z`) for inspection.
+
+### One-time setup
+
+1. **Sign in to the Central Portal.** Open <https://central.sonatype.com> and sign in
+   with GitHub, as `kmizu`. No new account is needed. (A legacy OSSRH/Sonatype account
+   from earlier Scala releases, if you have one, can be used instead.)
+2. **Add the namespace.** Publishing → Namespaces → **Add Namespace**: `org.onion-lang`.
+3. **Verify it with DNS.** The Portal shows a verification key for the namespace. Add a
+   TXT record on `onion-lang.org` (the apex, `@`) whose value is that key, wait until
+   `dig +short TXT onion-lang.org` shows it, and press **Verify Namespace**. The record
+   can be removed once the namespace is verified.
+4. **Generate a user token.** Account menu → View Account → **Generate User Token**. The
+   username and password it shows once are `CENTRAL_USERNAME` and `CENTRAL_PASSWORD`
+   (not your login).
+5. **Prepare a GPG key.** Your personal key is fine; a dedicated project key is optional.
+   To create one: `gpg --full-generate-key` (ed25519 or RSA 4096), then find its id with
+   `gpg --list-secret-keys --keyid-format long`. Publish the public key, which Central
+   uses to check the signatures:
+   ```bash
+   gpg --keyserver hkps://keys.openpgp.org --send-keys <KEYID>
+   # keys.openpgp.org then mails you a link; confirm it so the key's user id is listed
+   ```
+   Export the secret key, base64 on one line, for CI:
+   ```bash
+   gpg --armor --export-secret-keys <KEYID> | base64 | tr -d '\n' > PGP_SECRET.txt
+   ```
+6. **Add the four repository secrets** (Settings → Secrets and variables → Actions), or
+   with `gh`, which prompts for each value:
+   ```bash
+   gh secret set CENTRAL_USERNAME --repo onion-lang/onion
+   gh secret set CENTRAL_PASSWORD --repo onion-lang/onion
+   gh secret set PGP_SECRET --repo onion-lang/onion < PGP_SECRET.txt
+   gh secret set PGP_PASSPHRASE --repo onion-lang/onion
+   rm PGP_SECRET.txt
+   ```
+7. **Run the first release** the usual way (step 4 above): push the tag `vX.Y.Z`, or,
+   where a client tag push is rejected with HTTP 403, start the workflow with
+   `gh workflow run release.yml -f version=vX.Y.Z --ref develop`. When
+   `publish-central` is green, open <https://central.sonatype.com/publishing/deployments>,
+   check that the deployment holds `onion` and `onion-llm` (jar, sources, javadoc, pom,
+   each signed) and press **Publish**. The files reach `repo1.maven.org` within about
+   half an hour; search.maven.org takes longer.
+
+### Local dry run
+
+The same staging runs locally and uploads nothing. On a release tag (or after
+`set ThisBuild / version := "0.0.0-dryrun"`), with a throwaway key in a temporary
+`GNUPGHOME` and its passphrase in `PGP_PASSPHRASE`:
+
+```bash
+sbt centralStage sonaBundle
+```
+
+`target/sona-staging/org/onion-lang/` then holds both modules and
+`target/sona-bundle/bundle.zip` is exactly what `sonaUpload` would send. On Windows,
+point sbt-pgp at Git's gpg: `set Global / PgpKeys.gpgCommand := "C:/Program Files/Git/usr/bin/gpg.exe"`.
+
+### Depending on the artifacts
+
+`org.onion-lang:onion` has no `_3` suffix: use `%`, not `%%`. A program that uses
+`onion-llm` from Java or Scala also declares `onion`, because the battery has it as
+`provided`.
+
+```scala
+// sbt
+libraryDependencies ++= Seq(
+  "org.onion-lang" % "onion"     % "<version>",
+  "org.onion-lang" % "onion-llm" % "<version>"
+)
+```
+
+```kotlin
+// Gradle (Kotlin DSL)
+dependencies {
+    implementation("org.onion-lang:onion:<version>")
+    implementation("org.onion-lang:onion-llm:<version>")
+}
+```
+
+```xml
+<!-- Maven -->
+<dependency>
+  <groupId>org.onion-lang</groupId>
+  <artifactId>onion</artifactId>
+  <version>X.Y.Z</version>
+</dependency>
+<dependency>
+  <groupId>org.onion-lang</groupId>
+  <artifactId>onion-llm</artifactId>
+  <version>X.Y.Z</version>
+</dependency>
+```
+
+An Onion script or project already runs on Onion, so it names only the battery:
+
+```onion
+//> using dep "org.onion-lang:onion-llm:<version>"
+```
+
+```toml
+# onion.toml
+[dependencies]
+"org.onion-lang:onion-llm" = "<version>"
+```
 
 ## Hotfix releases
 

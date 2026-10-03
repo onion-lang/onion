@@ -53,7 +53,9 @@ object OnionDoc {
     }
 
     val files = scala.collection.mutable.ListBuffer[DocFile]()
-    for (path <- sources) {
+    var si = 0
+    while (si < sources.length) {
+      val path = sources(si)
       val f = new File(path)
       if (!f.exists()) {
         System.err.println(s"error: file not found: $path")
@@ -67,6 +69,7 @@ object OnionDoc {
           System.err.println(s"error: failed to parse $path: ${e.getMessage}")
           return 1
       }
+      si += 1
     }
 
     val out = new File(outDir)

@@ -31,7 +31,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   def boxAsmType(tp: TypedAST.Type): AsmType = AsmCodeGeneration.boxAsmType(tp)
 
   private def boxedValueType(tp: TypedAST.Type): AsmType = tp match
-    case BasicType.INT     => AsmType.INT_TYPE
+    case BasicType.INT | BasicType.BOOLEAN | BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
+      AsmType.INT_TYPE // sub-int values are ints on the JVM stack, so they share IntBox
     case BasicType.LONG    => AsmType.LONG_TYPE
     case BasicType.DOUBLE  => AsmType.DOUBLE_TYPE
     case BasicType.FLOAT   => AsmType.FLOAT_TYPE
@@ -1057,7 +1058,8 @@ object AsmCodeGeneration:
    * Get the box class name for a given type (for boxed mutable variables)
    */
   def boxClassName(tp: TypedAST.Type): String = tp match
-    case BasicType.INT     => "onion/runtime/IntBox"
+    case BasicType.INT | BasicType.BOOLEAN | BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
+      "onion/runtime/IntBox"
     case BasicType.LONG    => "onion/runtime/LongBox"
     case BasicType.DOUBLE  => "onion/runtime/DoubleBox"
     case BasicType.FLOAT   => "onion/runtime/FloatBox"

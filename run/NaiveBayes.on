@@ -1,0 +1,248 @@
+// NaiveBayes.on — a multinomial Naive Bayes text classifier for spam detection.
+// Exercises: generic records, classes with multiple methods, Map (k,v) foreach,
+// collection pipelines (map/filter/fold/sortedBy/distinct/find/partition),
+// nullable types, closures, string interpolation, while/foreach, extension methods.
+
+import {
+  java.lang.Math;
+  java.util.HashMap as HMap
+}
+
+// ─── Extension Methods ────────────────────────────────────────────────────────
+
+extension String {
+  def tokens(): List[String] {
+    val lower: List[String] = Strings::splitRegex(self.toLowerCase(), "[^a-z0-9]+")
+    return lower.filter { t -> t.length() > 0 }
+  }
+  def lpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = " " + s }
+    return s
+  }
+  def rpad(w: Int): String {
+    var s: String = self
+    while s.length() < w { s = s + " " }
+    return s
+  }
+}
+
+// ─── Data Model ───────────────────────────────────────────────────────────────
+
+record TrainingExample(text: String, label: String)
+
+record Prediction(label: String, logProb: Double)
+
+// ─── Naive Bayes Classifier ───────────────────────────────────────────────────
+
+class NaiveBayes {
+  var classCounts: HMap[String, Int]
+  var wordCounts:  HMap[String, HMap[String, Int]]
+  var vocab:       HMap[String, Boolean]
+  var totalDocs:   Int
+
+public:
+  def this {
+    classCounts = new HMap[String, Int]()
+    wordCounts  = new HMap[String, HMap[String, Int]]()
+    vocab       = new HMap[String, Boolean]()
+    totalDocs   = 0
+  }
+
+  def vocabSize(): Int = vocab.size
+
+  def train(examples: List[TrainingExample]): void {
+    foreach ex: TrainingExample in examples {
+      totalDocs = totalDocs + 1
+      val oldCount: Int? = classCounts.get(ex.label()) as Int?
+      classCounts.put(ex.label(), (oldCount ?: 0) + 1)
+      var classMap: HMap[String, Int]? = wordCounts.get(ex.label()) as HMap[String, Int]?
+      if classMap == null {
+        val newMap: HMap[String, Int] = new HMap[String, Int]()
+        wordCounts.put(ex.label(), newMap)
+        classMap = newMap
+      }
+      val cm: HMap[String, Int] = classMap!!
+      foreach tok: String in ex.text().tokens() {
+        val old: Int? = cm.get(tok) as Int?
+        cm.put(tok, (old ?: 0) + 1)
+        vocab.put(tok, true)
+      }
+    }
+  }
+
+  def classify(text: String): Prediction {
+    val toks: List[String] = text.tokens()
+    var bestLabel: String = "unknown"
+    var bestScore: Double = -1.0e300
+    foreach (label, count) in classCounts {
+      var score: Double = Math::log(count * 1.0 / totalDocs)
+      val classMap: HMap[String, Int]? = wordCounts.get(label) as HMap[String, Int]?
+      var totalWords: Int = 0
+      if classMap != null {
+        foreach (w, c) in classMap { totalWords = totalWords + c }
+      }
+      foreach tok: String in toks {
+        val wc: Int? = if classMap != null { classMap.get(tok) as Int? } else { null }
+        score = score + Math::log(((wc ?: 0) + 1.0) / (totalWords + vocab.size))
+      }
+      if score > bestScore {
+        bestScore = score
+        bestLabel = label
+      }
+    }
+    return new Prediction(bestLabel, bestScore)
+  }
+
+  def classNames(): List[String] {
+    val names: List[String] = []
+    foreach (label, count) in classCounts { names.add(label) }
+    return names.sortedBy { n -> n }
+  }
+
+  def topWords(className: String, n: Int): List[String] {
+    val classMap: HMap[String, Int]? = wordCounts.get(className) as HMap[String, Int]?
+    if classMap == null { return [] }
+    val pairs: List[String] = []
+    foreach (word, count) in classMap {
+      val padded: String = ("00000" + count)
+      pairs.add(padded.substring(padded.length() - 5) + " " + word)
+    }
+    val sorted: List[String] = pairs.sortedBy { p -> p }.reversed()
+    val result: List[String] = []
+    var i: Int = 0
+    foreach entry: String in sorted {
+      if i >= n { break }
+      result.add(entry.substring(6))
+      i = i + 1
+    }
+    return result
+  }
+}
+
+// ─── Dataset ──────────────────────────────────────────────────────────────────
+
+def makeTraining(): List[TrainingExample] {
+  val d: List[TrainingExample] = []
+  d.add(new TrainingExample("win free money now click here prize winner",             "spam"))
+  d.add(new TrainingExample("you have been selected for a cash prize click to claim", "spam"))
+  d.add(new TrainingExample("limited time offer buy now discount sale free gift",      "spam"))
+  d.add(new TrainingExample("earn money fast work from home guaranteed income",        "spam"))
+  d.add(new TrainingExample("congratulations you won lottery claim your prize today",  "spam"))
+  d.add(new TrainingExample("free iPhone winner selected click link urgent action",    "spam"))
+  d.add(new TrainingExample("make money online easy investment double your cash",      "spam"))
+  d.add(new TrainingExample("hot singles in your area click now free registration",    "spam"))
+  d.add(new TrainingExample("your account has been compromised verify now urgent",     "spam"))
+  d.add(new TrainingExample("exclusive offer members only free trial limited seats",   "spam"))
+  d.add(new TrainingExample("meeting scheduled for thursday at three pm",              "ham"))
+  d.add(new TrainingExample("please review the attached report and send feedback",     "ham"))
+  d.add(new TrainingExample("can we reschedule the call to friday morning please",     "ham"))
+  d.add(new TrainingExample("attached is the invoice for last month services",         "ham"))
+  d.add(new TrainingExample("the project deadline is next week lets sync tomorrow",    "ham"))
+  d.add(new TrainingExample("thanks for your help with the presentation yesterday",    "ham"))
+  d.add(new TrainingExample("quarterly results look good team did excellent work",     "ham"))
+  d.add(new TrainingExample("reminder annual performance reviews start monday",        "ham"))
+  d.add(new TrainingExample("new version of the software is ready for testing",        "ham"))
+  d.add(new TrainingExample("please confirm your attendance for the team lunch",       "ham"))
+  return d
+}
+
+def makeTestSet(): List[TrainingExample] {
+  val d: List[TrainingExample] = []
+  d.add(new TrainingExample("click here to claim your free prize winner",        "spam"))
+  d.add(new TrainingExample("buy discount products limited offer money",         "spam"))
+  d.add(new TrainingExample("project update meeting agenda attached for review", "ham"))
+  d.add(new TrainingExample("invoice for services rendered please approve",      "ham"))
+  d.add(new TrainingExample("free money fast guaranteed win now click",          "spam"))
+  d.add(new TrainingExample("schedule the interview for next tuesday please",    "ham"))
+  d.add(new TrainingExample("you are selected exclusive member free gift",       "spam"))
+  d.add(new TrainingExample("code review feedback please check the pull request","ham"))
+  return d
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def joinComma(items: List[String]): String {
+  var s: String = ""
+  foreach item: String in items {
+    if s != "" { s = s + ", " }
+    s = s + item
+  }
+  return s
+}
+
+// ─── Evaluation ───────────────────────────────────────────────────────────────
+
+def evaluate(nb: NaiveBayes, tests: List[TrainingExample]): void {
+  var correct: Int = 0
+  IO::println("  actual  pred    excerpt")
+  IO::println("  ──────  ──────  ────────────────────────────────────────")
+  foreach ex: TrainingExample in tests {
+    val pred: Prediction = nb.classify(ex.text())
+    val ok: Boolean = pred.label() == ex.label()
+    if ok { correct = correct + 1 }
+    val marker: String = if ok { "+" } else { "-" }
+    val len: Int = Math::min(38, ex.text().length())
+    val excerpt: String = ex.text().substring(0, len)
+    IO::println("  #{ex.label().rpad(6)}  #{pred.label().rpad(6)}  #{marker} #{excerpt}")
+  }
+  IO::println("  ──────  ──────  ────────────────────────────────────────")
+  val pct: Int = (correct * 100) / tests.size
+  IO::println("  Accuracy: #{correct}/#{tests.size} (#{pct}%)")
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+val trainSet: List[TrainingExample] = makeTraining()
+val testSet:  List[TrainingExample] = makeTestSet()
+
+val nb: NaiveBayes = new NaiveBayes()
+nb.train(trainSet)
+
+IO::println("==================================================")
+IO::println("  Naive Bayes Spam Classifier")
+IO::println("==================================================")
+IO::println("Training : #{trainSet.size} examples")
+IO::println("Vocab    : #{nb.vocabSize()} unique tokens")
+IO::println("Classes  : #{joinComma(nb.classNames())}")
+IO::println("")
+
+IO::println("--- Test Set Predictions ---")
+evaluate(nb, testSet)
+IO::println("")
+
+IO::println("--- Top 6 discriminative words ---")
+foreach cls: String in nb.classNames() {
+  val words: List[String] = nb.topWords(cls, 6)
+  val line: String = joinComma(words)
+  IO::println("  #{cls.rpad(6)}: #{line}")
+}
+IO::println("")
+
+// ─── Confusion matrix ─────────────────────────────────────────────────────────
+
+IO::println("--- Confusion Matrix ---")
+val allExamples: List[TrainingExample] = []
+foreach ex: TrainingExample in trainSet { allExamples.add(ex) }
+foreach ex: TrainingExample in testSet  { allExamples.add(ex) }
+
+val classes: List[String] = nb.classNames()
+var header: String = "         "
+foreach c: String in classes { header = header + c.rpad(8) }
+IO::println(header)
+
+foreach actual: String in classes {
+  var row: String = actual.rpad(9)
+  foreach predicted: String in classes {
+    var count: Int = 0
+    foreach ex: TrainingExample in allExamples {
+      val p: Prediction = nb.classify(ex.text())
+      if ex.label() == actual && p.label() == predicted { count = count + 1 }
+    }
+    row = row + ("" + count).rpad(8)
+  }
+  IO::println(row)
+}
+
+IO::println("")
+IO::println("Done.")

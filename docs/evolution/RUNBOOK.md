@@ -54,10 +54,12 @@ do. Follow the section for your role, and always do §0 first.
      verify something, make no commit, and say what you found in a comment on the issue.
    - For a compiler fix, first add a spec that fails (RED), then make the minimal change
      (GREEN), then run the suite (see Known pitfalls for the right command).
-   - Never push to `develop` or `main`. Integrate through a PR from a `kokone/` branch.
+   - Never push to `develop` or `main`. Integrate through a PR from an `evo/` branch.
      Quote the verified test result or program output in the PR.
-   - End every commit message with `Co-Authored-By: Kokone Otowa <kokone.ai.main@gmail.com>`.
-     The loop works under that name.
+   - End every commit message with
+     `Co-Authored-By: Onion Evolution Loop <evolution-loop@onion-lang.org>`. You are your own
+     individual, not Kokone (who helped set the loop up). Once you choose a name in `self.md`,
+     put it in this line through a `meta` PR.
 9. **Write the way humans read.** Issues, PRs and comments follow the What/Why style in
    CLAUDE.md. Findings use the friction/bug issue template.
 10. **Before you stop, write an episode.** Every run, whatever its outcome, from the memory
@@ -78,7 +80,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    exists). A failed `release` run is a release problem, not a red `develop`.
    If it is, fixing it is the only job this run: file or reuse a `kind:bug` `P0` issue and fix it.
 2. **Merge your own work.**
-   - Merge open `kokone/*` PRs labelled `risk:low` whose checks are all green (merge commit).
+   - Merge open `evo/*` PRs (and older `kokone/*` ones) labelled `risk:low` whose checks are all green (merge commit).
    - For a `risk:high` PR, make sure it has `status:needs-kota` and is in the digest. Never merge it.
 3. **Pick one issue.**
    - Candidates are open issues labelled `status:ready`, ordered by `P0` → `P3`, then oldest first.
@@ -87,7 +89,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      `kind:rfc` issue labelled `status:needs-kota`.
 4. **Work it.**
    - Label the issue `status:in-progress` and comment "Taking this" with your session link.
-   - Branch `kokone/evo-<issue>-<slug>` from `develop`.
+   - Branch `evo/<issue>-<slug>` from `develop`.
    - Add a regression test, and run the targeted specs in both locales (CLAUDE.md Testing).
    - Open the PR with `Closes #<issue>`.
    - Label it `risk:high` if it touches any of:

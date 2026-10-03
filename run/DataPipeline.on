@@ -1,0 +1,328 @@
+// DataPipeline.on — asynchronous multi-stage ETL data pipeline
+//
+// Three async "extract" workers run in parallel (Future::all), their
+// results are merged, then fed through a sequential transform chain via
+// do[Future], producing a per-region analytics report.
+//
+// Exercises: do[Future] sequential composition, Future::all parallel
+// fan-out, homogeneous enum, ADT case-enum (StageResult), records with
+// example clauses, extension methods (String / Double / Int), collection
+// pipelines (groupBy / filter / map / fold / sortedBy / find / partition),
+// foreach (k,v) in map, closures, nullable, select / is pattern matching,
+// string interpolation.
+//
+//   onion DataPipeline.on
+
+// ── homogeneous enums ─────────────────────────────────────────────────────────
+
+enum Region { APAC, EMEA, AMER, LATAM }
+
+enum ProductTier { BUDGET, STANDARD, PREMIUM, ENTERPRISE }
+
+// ── ADT case-enum ─────────────────────────────────────────────────────────────
+
+enum StageResult {
+  case Ok(sales: List[Sale], region: Region, tookMs: Long)
+  case Err(region: Region, reason: String)
+}
+
+// ── records ───────────────────────────────────────────────────────────────────
+
+record Sale(id: Int, region: Region, product: String, tier: ProductTier, amount: Double) {
+  example validAmount {
+    new Sale(1, Region::APAC, "Widget", ProductTier::STANDARD, 99.99).amount() > 0.0
+  }
+}
+
+record RegionStats(
+  region: Region,
+  count: Int,
+  total: Double,
+  avg: Double,
+  maxSale: Double,
+  topProduct: String
+) {
+  example nonEmpty {
+    val s = new RegionStats(Region::APAC, 5, 250.0, 50.0, 120.0, "Widget")
+    s.count() > 0 && s.total() >= s.avg()
+  }
+
+  public:
+  def label(): String = select region {
+    case Region::APAC:  "APAC"
+    case Region::EMEA:  "EMEA"
+    case Region::AMER:  "AMER"
+    case Region::LATAM: "LATAM"
+  }
+}
+
+record BatchSummary(regions: Int, totalSales: Int, grandTotal: Double, topRegion: String) {
+  example positive {
+    new BatchSummary(2, 20, 1000.0, "AMER").grandTotal() > 0.0
+  }
+}
+
+// ── extension methods ─────────────────────────────────────────────────────────
+
+extension String {
+  def rpadTo(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def lpadTo(n: Int): String {
+    var s: String = self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+extension Double {
+  def round2(): Double {
+    val scaled: Long = (self * 100.0 + 0.5) as Long
+    return scaled as Double / 100.0
+  }
+  def fmt(): String = Format::fixed(self, 2).lpadTo(10)
+}
+
+extension Int {
+  def lpadNum(n: Int): String {
+    var s: String = "" + self
+    while s.length() < n { s = " " + s }
+    return s
+  }
+}
+
+
+// ── RNG / data generation ─────────────────────────────────────────────────────
+
+def nextRng(rng: Long): Long = rng * 6364136223846793005L + 1442695040888963407L
+
+def generateSales(region: Region, n: Int, seed: Long): List[Sale] {
+  val products: List[String] = ["Widget", "Gadget", "Doohickey", "Thingamajig", "Gizmo", "Apparatus", "Contraption"]
+  val tiers: List[ProductTier] = [
+    ProductTier::BUDGET, ProductTier::STANDARD, ProductTier::STANDARD,
+    ProductTier::PREMIUM, ProductTier::ENTERPRISE
+  ]
+  val out: List[Sale] = []
+  var rng: Long = seed
+  foreach i: Int in 1..n {
+    rng = nextRng(rng)
+    val pi: Int = ((rng >>> 33) as Int & 0x7fffffff) % 7
+    rng = nextRng(rng)
+    val ti: Int = ((rng >>> 33) as Int & 0x7fffffff) % 5
+    rng = nextRng(rng)
+    val amt: Double = (((rng >>> 17) as Int & 0xfff) as Double / 10.0 + 10.0).round2()
+    out.add(new Sale(i, region, products[pi], tiers[ti], amt))
+  }
+  return out
+}
+
+// ── async extract stage ────────────────────────────────────────────────────────
+
+def extractRegion(region: Region): Future[StageResult] = Future::async {
+  val seed: Long  = select region { case Region::APAC: 42L; case Region::EMEA: 137L; case Region::AMER: 99L; case Region::LATAM: 7L }
+  val count: Int  = select region { case Region::APAC: 45;  case Region::EMEA: 60;  case Region::AMER: 50;  case Region::LATAM: 35 }
+  val t0: Long = Timing::nanos()
+  val sales: List[Sale] = generateSales(region, count, seed)
+  val took: Long = (Timing::nanos() - t0) / 1000000L
+  new Ok(sales, region, took) as StageResult
+}
+
+
+// ── transform: filter by tier ────────────────────────────────────────────────
+
+def isPremiumOrAbove(t: ProductTier): Boolean = select t {
+  case ProductTier::PREMIUM:    true
+  case ProductTier::ENTERPRISE: true
+  else: false
+}
+
+def computeStats(region: Region, sales: List[Sale]): RegionStats {
+  if sales.size == 0 {
+    return new RegionStats(region, 0, 0.0, 0.0, 0.0, "-")
+  }
+  var total: Double = 0.0
+  var maxSale: Double = 0.0
+  foreach s: Sale in sales {
+    total = total + s.amount()
+    if s.amount() > maxSale { maxSale = s.amount() }
+  }
+  val avg: Double = (total / (sales.size as Double)).round2()
+  // group by product name to find top seller
+  val byProduct: Map[String, List[Object]] = (sales as List[Object]).groupBy { s -> (s as Sale).product() }
+  var topProduct: String = "-"
+  var topCount: Int = 0
+  foreach (prod, items) in byProduct {
+    val n: Int = (items as List[Object]).size
+    if n > topCount { topCount = n; topProduct = prod as String }
+  }
+  return new RegionStats(region, sales.size, total.round2(), avg, maxSale.round2(), topProduct)
+}
+
+// ── per-region processing (async) ─────────────────────────────────────────────
+
+def processResult(r: StageResult): Future[RegionStats?] = Future::async {
+  select r {
+    case ok is Ok:
+      val premSales: List[Sale] = (ok.sales() as List[Sale])
+        .filter { s -> isPremiumOrAbove((s as Sale).tier()) } as List[Sale]
+      computeStats(ok.region(), premSales) as RegionStats?
+    case e is Err:
+      IO::println("  [WARN] region #{e.region()} extraction failed: #{e.reason()}")
+      null
+  }
+}
+
+
+// ── summary builder ───────────────────────────────────────────────────────────
+
+def buildSummary(stats: List[RegionStats]): BatchSummary {
+  if stats.size == 0 { return new BatchSummary(0, 0, 0.0, "none") }
+  var grandTotal: Double = 0.0
+  var totalSales: Int    = 0
+  var topRegion: String  = "none"
+  var topTotal: Double   = -1.0
+  foreach s: RegionStats in stats {
+    grandTotal = grandTotal + s.total()
+    totalSales = totalSales + s.count()
+    if s.total() > topTotal { topTotal = s.total(); topRegion = s.label() }
+  }
+  return new BatchSummary(stats.size, totalSales, grandTotal.round2(), topRegion)
+}
+
+// ── tier distribution helper ──────────────────────────────────────────────────
+
+def tierLabel(t: ProductTier): String = select t {
+  case ProductTier::BUDGET:     "Budget"
+  case ProductTier::STANDARD:   "Standard"
+  case ProductTier::PREMIUM:    "Premium"
+  case ProductTier::ENTERPRISE: "Enterprise"
+}
+
+// ── main pipeline ─────────────────────────────────────────────────────────────
+
+IO::println("=== DataPipeline: Async ETL Report ===")
+IO::println("")
+
+// Phase 1 — parallel extract
+IO::println("Phase 1: extracting all 4 regions in parallel via Future::all ...")
+val fApac:  Future[StageResult] = extractRegion(Region::APAC)
+val fEmea:  Future[StageResult] = extractRegion(Region::EMEA)
+val fAmer:  Future[StageResult] = extractRegion(Region::AMER)
+val fLatam: Future[StageResult] = extractRegion(Region::LATAM)
+val defaultRaw: List[Object] = []
+val allRaw: List[Object] = Future::all(fApac, fEmea, fAmer, fLatam).getOrElse(defaultRaw)
+IO::println("  received #{allRaw.size} result(s)")
+
+// Unpack stage results
+val stageResults: List[StageResult] = allRaw.map { r -> r as StageResult } as List[StageResult]
+IO::println("")
+
+// Phase 2 — sequential transform via do[Future]
+IO::println("Phase 2: transforming via do[Future] sequential pipeline ...")
+val fAllStats: Future[List[RegionStats?]] = do[Future] {
+  s0 <- processResult(stageResults[0])
+  s1 <- processResult(stageResults[1])
+  s2 <- processResult(stageResults[2])
+  s3 <- processResult(stageResults[3])
+  ret [s0, s1, s2, s3]
+}
+val rawStats: List[RegionStats?] = fAllStats.getOrElse([])
+val statsList: List[RegionStats] = rawStats
+  .filter { s -> s != null }
+  .map    { s -> s as RegionStats } as List[RegionStats]
+IO::println("  #{statsList.size} region(s) produced stats")
+IO::println("")
+
+// Phase 3 — report
+IO::println("Phase 3: per-region report (premium + enterprise only)")
+IO::println("─────────────────────────────────────────────────────────────────────")
+IO::println("Region  n      total        avg       max    top product")
+IO::println("─────────────────────────────────────────────────────────────────────")
+val sorted: List[RegionStats] = statsList.sortedBy { s -> -((s as RegionStats).total()) } as List[RegionStats]
+foreach stats: RegionStats in sorted {
+  val row: String =
+    stats.label().rpadTo(6) + "  " +
+    stats.count().lpadNum(4)  + "  " +
+    stats.total().fmt()       + "  " +
+    stats.avg().fmt()         + "  " +
+    stats.maxSale().fmt()     + "  " +
+    stats.topProduct()
+  IO::println(row)
+}
+IO::println("─────────────────────────────────────────────────────────────────────")
+IO::println("")
+
+// Summary
+val summary: BatchSummary = buildSummary(statsList)
+IO::println("Grand total : " + Format::fixed(summary.grandTotal(), 2))
+IO::println("Total sales : " + summary.totalSales())
+IO::println("Top region  : " + summary.topRegion())
+IO::println("Regions ok  : " + summary.regions())
+IO::println("")
+
+// Phase 4 — full-corpus tier breakdown (all sales, all tiers)
+IO::println("Phase 4: full-corpus tier breakdown (all tiers, all regions)")
+val allSales: List[Sale] = stageResults
+  .filter { r -> r is Ok }
+  .map { r ->
+    val ok: Ok = r as Ok
+    ok.sales()
+  }
+  .fold([] as List[Object]) { acc, chunk ->
+    val list: List[Object] = acc as List[Object]
+    list.addAll(chunk as List[Object])
+    list
+  } as List[Sale]
+IO::println("  total raw sales: " + allSales.size)
+val tierGroups: Map[String, List[Object]] = (allSales as List[Object])
+  .groupBy { s -> tierLabel((s as Sale).tier()) }
+foreach (tLabel, tSales) in tierGroups {
+  val tList: List[Object] = tSales as List[Object]
+  var tTotal: Double = 0.0
+  foreach s: Object in tList { tTotal = tTotal + (s as Sale).amount() }
+  IO::println("  " + (tLabel as String).rpadTo(12) + " : n=" + tList.size.lpadNum(4) + "  total=" + Format::fixed(tTotal.round2(), 2))
+}
+IO::println("")
+
+// Phase 5 — do[Option] chained lookup
+IO::println("Phase 5: do[Option] — chained stats lookup for EMEA + AMER")
+val statsByRegion: Map[String, List[Object]] = (statsList as List[Object]).groupBy { s -> (s as RegionStats).label() }
+
+def lookupStats(byLabel: Map[String, List[Object]], label: String): RegionStats? {
+  val items: List[Object]? = byLabel.get(label) as List[Object]?
+  if items == null { return null }
+  if (items as List[Object]).size == 0 { return null }
+  return (items as List[Object])[0] as RegionStats
+}
+
+val emeaStats: RegionStats? = lookupStats(statsByRegion, "EMEA")
+val amerStats: RegionStats? = lookupStats(statsByRegion, "AMER")
+
+val emeaOpt: Option[RegionStats?] = Option::of(emeaStats)
+val amerOpt: Option[RegionStats?] = Option::of(amerStats)
+
+val combined: String = do[Option] {
+  e <- emeaOpt
+  a <- amerOpt
+  ret "EMEA+AMER total = #{Format::fixed((e as RegionStats).total() + (a as RegionStats).total(), 2)}"
+} .getOrElse("one or both regions missing")
+IO::println("  " + combined)
+IO::println("")
+
+// Phase 6 — top-product per region (partition by tier)
+IO::println("Phase 6: partition enterprise vs non-enterprise per region")
+foreach stats: RegionStats in sorted {
+  val regionSales: List[Sale] = allSales
+    .filter { s -> (s as Sale).region() == stats.region() } as List[Sale]
+  val parts: List[Object] = regionSales.partition { s -> isPremiumOrAbove((s as Sale).tier()) } as List[Object]
+  val enterprise: List[Object] = parts[0] as List[Object]
+  val other: List[Object]      = parts[1] as List[Object]
+  IO::println("  " + stats.label().rpadTo(6) +
+    "  premium+enterprise=" + enterprise.size.lpadNum(4) +
+    "  budget+standard="   + other.size.lpadNum(4))
+}
+IO::println("")
+IO::println("Done.")
+

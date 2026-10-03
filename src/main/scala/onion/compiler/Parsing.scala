@@ -223,9 +223,10 @@ class Parsing(config: CompilerConfig) extends AnyRef
   }
 
   /**
-   * A lone double quote can only come from an unterminated string literal
-   * (complete strings lex as a single STRING token); report it as such
-   * instead of listing unrelated expected tokens.
+   * A lone double quote (or single quote) can only come from an unterminated
+   * string (or character) literal -- a complete one lexes as a single
+   * STRING/CHARACTER token, never leaving the quote behind as its own token;
+   * report it as such instead of listing unrelated expected tokens.
    */
   private def syntaxErrorMessage(found: String, expected: String, context: String, sourceLine: String, expectedAll: String): String = {
     // At EOF the expected-token list is a large, unhelpful dump; report the real
@@ -233,6 +234,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
     if (found == null || found.isEmpty) return Message("error.parsing.unexpected_eof")
     val base =
       if (found == "\"") Message("error.parsing.unterminated_string")
+      else if (found == "'") Message("error.parsing.unterminated_char")
       else if (found == OnionParser.UnclosedInterpolationMarker) Message("error.parsing.unclosed_interpolation")
       else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
     val hint = SyntaxHintClassifier

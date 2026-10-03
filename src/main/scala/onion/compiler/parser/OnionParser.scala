@@ -121,6 +121,14 @@ object OnionParser {
     b.toString
   }
 
+  /**
+   * A multi-line string literal's value normalizes CRLF/CR to LF, like a Java text block,
+   * so the value does not depend on whether the source file was written with Windows or
+   * Unix line endings.
+   */
+  private def normalizeMultiLineEol(s: String): String =
+    if (s.indexOf('\r') < 0) s else s.replace("\r\n", "\n").replace("\r", "\n")
+
   private def findInterpStart(str: String, from: Int): Int = {
     var pos = from
     while (true) {
@@ -2717,7 +2725,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       else AST.StringLiteral(p(t), unescape(str.substring(1, str.length - 1)))
     } else {
       if (str.contains("#{")) interpolated(p(t), str, 3)
-      else AST.StringLiteral(p(t), str.substring(3, str.length - 3))
+      else AST.StringLiteral(p(t), normalizeMultiLineEol(str.substring(3, str.length - 3)))
     }
   }
 
@@ -2738,8 +2746,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   /** `parseInterpolatedString` / `parseMultiLineInterpolatedString` of the grammar. */
   private def interpolated(loc: Location, whole: String, quoteLen: Int): AST.Expression = {
-    val str = whole.substring(quoteLen, whole.length - quoteLen)
     val single = quoteLen == 1
+    val inner = whole.substring(quoteLen, whole.length - quoteLen)
+    // A single-quoted STRING can never contain a raw '\n'/'\r' (the lexer's stringEnd stops
+    // there), so normalization only applies to a multi-line string's content.
+    val str = if (single) inner else normalizeMultiLineEol(inner)
     val parts = new ArrayBuffer[String]()
     val expressions = new ArrayBuffer[AST.Expression]()
     var start = 0

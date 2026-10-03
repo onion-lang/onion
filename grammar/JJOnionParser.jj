@@ -1028,7 +1028,7 @@ public class JJOnionParser implements Parser {
    */
   private AST.Expression parseMultiLineInterpolatedString(Location loc, String str) throws ParseException {
     // Remove the triple quotes (""" from start and end)
-    str = str.substring(3, str.length() - 3);
+    str = normalizeMultiLineEol(str.substring(3, str.length() - 3));
 
     ArrayBuffer<String> parts = new ArrayBuffer<String>();
     ArrayBuffer<AST.Expression> expressions = new ArrayBuffer<AST.Expression>();
@@ -1096,7 +1096,17 @@ public class JJOnionParser implements Parser {
    * Extract content from multi-line string (remove triple quotes).
    */
   private static String chopMultiLineEdge(String s) {
-    return s.substring(3, s.length() - 3);
+    return normalizeMultiLineEol(s.substring(3, s.length() - 3));
+  }
+
+  /**
+   * A multi-line string literal's value normalizes CRLF/CR to LF, like a Java text block,
+   * so the value does not depend on whether the source file was written with Windows or
+   * Unix line endings.
+   */
+  private static String normalizeMultiLineEol(String s) {
+    if (s.indexOf('\r') < 0) return s;
+    return s.replace("\r\n", "\n").replace("\r", "\n");
   }
 }
 PARSER_END(JJOnionParser)

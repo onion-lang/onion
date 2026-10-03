@@ -24,7 +24,19 @@ do. Follow the section for your role, and always do §0 first.
    - edit `docs/evolution/` outside a `meta` PR
    - expose secrets
    - make paid external API calls, unless the issue asks for one and a key is configured
-5. **Write the way humans read.** Issues, PRs and comments follow the What/Why style in
+5. **Discipline (carried over from the original hourly routine).**
+   - Never fabricate or guess a command's result. Trust only real tool output. If output
+     looks garbled, redirect it to a file and read the file back.
+   - Verify git state with real commands before committing or pushing.
+   - Ship **one solid, verified, reviewable change per run**. If you cannot finish and
+     verify something, make no commit, and say what you found in a comment on the issue.
+   - For a compiler fix, first add a spec that fails (RED), then make the minimal change
+     (GREEN), then run the suite (see Known pitfalls for the right command).
+   - Never push to `develop` or `main`. Integrate through a PR from a `kokone/` branch.
+     Quote the verified test result or program output in the PR.
+   - End every commit message with `Co-Authored-By: Kokone Otowa <kokone.ai.main@gmail.com>`.
+     The loop works under that name.
+6. **Write the way humans read.** Issues, PRs and comments follow the What/Why style in
    CLAUDE.md. Findings use the friction/bug issue template.
 
 ## §1 Maintainer (hourly)
@@ -34,7 +46,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
 1. **Health first.** Check whether `develop` is red (`gh run list --branch develop --limit 3`).
    If it is, fixing it is the only job this run: file or reuse a `kind:bug` `P0` issue and fix it.
 2. **Merge your own work.**
-   - Merge open `evo/*` PRs labelled `risk:low` whose checks are all green (merge commit).
+   - Merge open `kokone/*` PRs labelled `risk:low` whose checks are all green (merge commit).
    - For a `risk:high` PR, make sure it has `status:needs-kota` and is in the digest. Never merge it.
 3. **Pick one issue.**
    - Candidates are open issues labelled `status:ready`, ordered by `P0` → `P3`, then oldest first.
@@ -43,7 +55,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      `kind:rfc` issue labelled `status:needs-kota`.
 4. **Work it.**
    - Label the issue `status:in-progress` and comment "Taking this" with your session link.
-   - Branch `evo/<issue>-<slug>` from `develop`.
+   - Branch `kokone/evo-<issue>-<slug>` from `develop`.
    - Add a regression test, and run the targeted specs in both locales (CLAUDE.md Testing).
    - Open the PR with `Closes #<issue>`.
    - Label it `risk:high` if it touches any of:
@@ -113,6 +125,15 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
 
 ## Known pitfalls
 
+- **Build and run in a cloud checkout:**
+  - Build with `SBT_OPTS='-Xmx2g -XX:+UseG1GC' sbt -batch assembly`.
+  - sbt 2 puts the fat jar at `target/out/jvm/scala-3.3.7/onion/onion-<version>.jar`; the old
+    `target/scala-3.3.7/onion.jar` path is gone.
+  - Run a script with `java -cp <that jar> onion.tools.ScriptRunner run/NAME.on < /dev/null`.
+  - The whole suite is `sbt -batch testFull`. Under sbt 2, `test` only reruns what changed.
+  - Raise `-Xmx` for the full suite (CI uses 10G), or `MutationFuzzSpec` can run out of memory.
+- **Check that a bug still exists before chasing it.** The original routine's prompt named an
+  `extension Int` bug that had long been fixed (it printed `10`).
 - **sbt 2:**
   - `test` is incremental; use `testFull`.
   - `-D` options only reach a freshly started server, so run `sbt shutdown` first.

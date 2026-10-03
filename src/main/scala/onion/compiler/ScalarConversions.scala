@@ -93,6 +93,17 @@ private[compiler] object ScalarConversions {
   /** Whether a checked type can be read out of text at all. */
   def isDerivable(tp: TypedAST.Type): Boolean = ofType(tp).isDefined
 
+  /**
+   * Whether a checked type can be read out of text, itself or as `T?` of such a type --
+   * for `from re"..."`, where an unmatched optional group becomes `null` rather than the
+   * non-null sentinel `""`. Kept separate from `isDerivable` so callers that must stay
+   * nullable-free (`derive!`'s JSON/YAML serialization) are unaffected.
+   */
+  def isDerivableOrNullable(tp: TypedAST.Type): Boolean = tp match {
+    case nt: TypedAST.NullableType => isDerivable(nt.innerType)
+    case _                         => isDerivable(tp)
+  }
+
   /** The supported spellings, for a diagnostic that has to list them. */
   def supportedNames: String = all.map(_.tag).mkString(", ")
 }

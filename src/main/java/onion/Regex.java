@@ -35,6 +35,21 @@ public final class Regex {
         return result;
     }
 
+    /**
+     * Anchored match, like {@link #matchGroups}, but for a single group and without the
+     * "" substitution: returns the group's captured text, or null both when the whole
+     * match fails and when the group did not participate in it. Used by
+     * {@code record ... from re"..."} synthesis to give a nullable (`T?`) component a
+     * real null for an unmatched optional group, rather than the non-null sentinel
+     * {@code matchGroups} uses for the (non-nullable) {@code case re"..." (a, b):} bindings.
+     */
+    public static String captureGroup(String input, String pattern, int group) {
+        if (input == null || pattern == null) return null;
+        Matcher m = MATCH_CACHE.computeIfAbsent(pattern, Pattern::compile).matcher(input);
+        if (!m.matches()) return null;
+        return m.group(group);
+    }
+
     // ========== Matching ==========
 
     /**

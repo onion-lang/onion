@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.137.0] - 2026-10-03
+
 ### Added
 
 - **`run/HindleyMilner.on`** — a 431-line Hindley-Milner (Algorithm W) type inferencer for a mini functional language, a new domain for the `run/` corpus (ADT enums with recursive types `Expr` (13 cases) and `Ty` (`TVar`/`TInt`/`TBool`/`TFun`); records with methods (`Scheme`'s `show()`/`instantiate()`); classes with mutable state (`Inferencer`'s counter and substitution map, `TypeEnv`); exhaustive `select`/type-pattern matching across all `Expr` cases; nullable `Scheme?`/`Object?`; `try`/`catch` error reporting; mutually/self-recursive `infer`/`unify`/`collectFreeVars`/`addFreeVars`; the `|>` pipeline operator — demonstrating let-polymorphism, unification failures, and a let-polymorphism stress test), added to the `run/` corpus (merged via #1909).

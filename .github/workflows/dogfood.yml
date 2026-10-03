@@ -1,0 +1,52 @@
+name: dogfood
+
+# Builds and tests every project under dogfood/ (real tasks written in Onion) with the
+# compiler and onion-llm battery from this commit. Fully offline apart from fetching
+# Maven dependencies: every test talks to a local fake server, no secrets are used, and
+# dogfood/run.sh points the API base URLs at a closed port in case one ever does not.
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+jobs:
+  dogfood:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+    - name: Install sbt
+      uses: sbt/setup-sbt@v1
+      with:
+        disk-cache: false
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+    # One cache for sbt's and the dogfood projects' downloads (onion resolves through
+    # coursier too), keyed on everything that decides what is downloaded. Not
+    # setup-java's sbt cache: its key ignores dogfood/, so POI and the Anthropic SDK
+    # would be fetched again on every run.
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/coursier
+          ~/.sbt
+          ~/.ivy2/cache
+        key: dogfood-${{ runner.os }}-${{ hashFiles('build.sbt', 'project/**', 'dogfood/*/onion.toml', 'dogfood/*/onion.lock') }}
+        restore-keys: |
+          dogfood-${{ runner.os }}-
+    - name: Build and test the dogfood projects
+      env:
+        SBT_OPTS: "-Xmx4G -XX:+UseG1GC -Xss16m"
+      run: dogfood/run.sh
+    - name: Upload test reports
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: dogfood-test-reports
+        path: dogfood/*/target/test-reports/
+        if-no-files-found: ignore

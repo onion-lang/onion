@@ -1,0 +1,4 @@
+target/
+out/
+# Pins the locally published onion-llm build, so it is stale whenever the battery changes.
+meeting-summary/onion.lock

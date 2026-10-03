@@ -1,0 +1,18 @@
+// xlsx-report: a sales spreadsheet in, a slide deck of regional totals out.
+// `--make-sample` writes a small workbook with two unreadable rows first.
+def main(src: String = "samples/sales.xlsx", dst: String = "out/report.pptx", makeSample: Boolean = false): void {
+  if makeSample {
+    Files::mkdirs("samples")
+    Report::writeSample(src)
+    println("wrote " + src)
+    return
+  }
+  val defects: List[CellDefect] = []
+  val sales = Report::readSales(src, defects)
+  foreach d: CellDefect in defects {
+    println("unreadable " + d.sheet() + "!R" + d.row() + "C" + d.col() + ": " + d.message())
+  }
+  Files::mkdirs("out")
+  Report::writeDeck(dst, Report::summarize(sales), defects.size)
+  println("wrote " + dst + " from " + sales.size + " rows (" + defects.size + " unreadable)")
+}

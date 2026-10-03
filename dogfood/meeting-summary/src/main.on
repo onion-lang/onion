@@ -1,0 +1,50 @@
+// meeting-summary: raw meeting notes in, a typed Summary out, through the
+// onion-llm battery. The record is the only description of the answer: its
+// JSON Schema is sent as the structured output, and the reply is read back
+// through the same shape, so a bad answer comes back as defects.
+import { onion.llm.Llm; onion.llm.Claude; onion.llm.LlmError }
+
+record Action(owner: String, task: String) { shape doc = json }
+record Summary(title: String, decisions: List[String], actions: List[Action], risk: Int) { shape doc = json }
+
+// Kept in a class: tests cannot see the top-level functions of src/ (F7).
+class Meeting {
+public:
+  static def prompt(notes: String): String =
+    "Summarize these meeting notes in Japanese. risk: 0 = none, 1 = low, 2 = medium, 3 = high.\n\n" + notes
+
+  static def summarize(claude: Claude, notes: String): Result[Summary, LlmError] =
+    claude.ask(Summary::doc(), prompt(notes))
+
+  static def markdown(s: Summary): String {
+    val sb = new StringBuilder()
+    sb.append("# " + s.title() + "\n\nrisk: " + s.risk() + "\n\n## Decisions\n")
+    foreach d: String in s.decisions() { sb.append("- " + d + "\n") }
+    sb.append("\n## Actions\n")
+    foreach a: Action in s.actions() { sb.append("- " + a.owner() + ": " + a.task() + "\n") }
+    return sb.toString()
+  }
+
+  static def explain(e: LlmError): String = select e {
+    case r is LlmError.Refusal:   "declined (" + r.category() + ")"
+    case i is LlmError.Invalid:   "unreadable answer: " + i.defects().map { d -> d.describe() }.join("; ")
+    case t is LlmError.Truncated: "answer cut off at max_tokens"
+    case a is LlmError.Api:       "API error " + a.status() + " " + a.errorType() + ": " + a.message()
+    case n is LlmError.Transport: "no response: " + n.message()
+  }
+}
+
+tool summarize(notes: String, out: String): Int
+  requires { read(notes), write(out), net, env, console }
+{
+  val r = Meeting::summarize(Llm::claude().effort("low"), Files::readText(notes))
+  select r {
+    case ok is Result.Ok:
+      Files::writeText(out, Meeting::markdown(ok.value()))
+      println("wrote " + out)
+      return 0
+    case err is Result.Err:
+      println(Meeting::explain(err.error()))
+      return 1
+  }
+}

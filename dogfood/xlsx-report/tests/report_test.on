@@ -1,0 +1,46 @@
+// Spreadsheet in, deck out, entirely on local files: the sample workbook is
+// generated here, so no binary fixture is needed.
+import {
+  org.apache.poi.xslf.usermodel.XMLSlideShow
+  org.apache.poi.xslf.usermodel.XSLFTable
+  java.io.FileInputStream
+}
+
+Files::mkdirs("target/test-out")
+Report::writeSample("target/test-out/sales.xlsx")
+
+// Two rows of the sample are unreadable; each is named by sheet, row and column.
+val defects: List[CellDefect] = []
+val sales = Report::readSales("target/test-out/sales.xlsx", defects)
+Assert::equals(5, sales.size)
+Assert::equals(2, defects.size)
+Assert::equals(5, defects[0].row())
+Assert::equals(4, defects[0].col())
+Assert::isTrue(defects[0].message().contains("十二"))
+Assert::equals(7, defects[1].row())
+Assert::equals(5, defects[1].col())
+
+// Totals by region, largest revenue first.
+val totals = Report::summarize(sales)
+Assert::equals(2, totals.size)
+Assert::equals("関東", totals[0].region())
+Assert::equals(24, totals[0].units())
+Assert::equals(265000.0, totals[0].revenue())
+Assert::equals("関西", totals[1].region())
+Assert::equals(17, totals[1].units())
+
+// The deck has a cover and a table slide whose rows are the totals.
+Report::writeDeck("target/test-out/report.pptx", totals, defects.size)
+try (val input = new FileInputStream("target/test-out/report.pptx"); val ppt = new XMLSlideShow(input)) {
+  Assert::equals(2, ppt.getSlides().size())
+  var table: XSLFTable? = null
+  foreach shape: Object in ppt.getSlides()[1].getShapes() {
+    if shape is XSLFTable { table = shape as XSLFTable }
+  }
+  Assert::notNull(table)
+  val t = table as XSLFTable
+  Assert::equals(3, t.getNumberOfRows())
+  Assert::equals("関東", t.getCell(1, 0).getText())
+  Assert::equals("265,000", t.getCell(1, 2).getText())
+}
+println("report tests passed")

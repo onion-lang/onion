@@ -1,0 +1,6 @@
+[package]
+name = "xlsx-report"
+version = "0.1.0"
+
+[dependencies]
+"org.apache.poi:poi-ooxml" = "5.5.1"

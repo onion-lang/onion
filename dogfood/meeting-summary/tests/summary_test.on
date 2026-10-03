@@ -1,0 +1,57 @@
+// The whole tool path against a local fake of the Messages API: no key, no network.
+// Each fixture under tests/fixtures is a synthetic API response (see README.md there).
+import { onion.llm.Llm; onion.llm.Claude; onion.llm.LlmError }
+
+val notes = Files::readText("samples/notes.md")
+val requests: List[String] = []
+
+// Serves one fixture with the given status, records each request body, and stops the server.
+def against(fixture: String, status: Int): Result[Summary, LlmError] {
+  val body = Files::readText("tests/fixtures/" + fixture)
+  val server = Server::start("127.0.0.1", 0).handleAll { req ->
+    requests << req.body()
+    Server::status(status, body).withHeader("Content-Type", "application/json")
+  }
+  try {
+    val claude: Claude = Llm::claude().effort("low").baseUrl("http://127.0.0.1:" + server.port()).apiKey("test-key")
+    return Meeting::summarize(claude, notes)
+  } finally {
+    server.stop()
+  }
+}
+
+def errorOf(r: Result[Summary, LlmError]): LlmError = select r {
+  case ok is Result.Ok:   throw new IllegalStateException("expected an error, got " + ok.value())
+  case err is Result.Err: err.error()
+}
+
+// A good answer reads into the record, lists and nested records included.
+val ok = against("ok.json", 200)
+Assert::isTrue(ok.isOk())
+val s = ok.getOrThrow()
+Assert::equals(2, s.risk())
+Assert::equals(2, s.decisions().size)
+Assert::equals(3, s.actions().size)
+Assert::equals("鈴木", s.actions()[1].owner())
+Assert::isTrue(Meeting::markdown(s).contains("- 田中: ガイドラインのドラフト"))
+
+// What was sent: the record's JSON Schema as the structured output, and the notes.
+val sent = Json::value(requests[0])
+Assert::equals("low", sent["output_config"]["effort"].asString())
+Assert::equals("json_schema", sent["output_config"]["format"]["type"].asString())
+Assert::isTrue(sent["output_config"]["format"]["schema"]["properties"]["actions"]["type"].asString() == "array")
+Assert::isTrue(sent["messages"][0]["content"].toString().contains("ログ基盤"))
+
+// An answer that does not fit the record is every reason, each with its path.
+val bad = errorOf(against("bad_fields.json", 200))
+Assert::isTrue(bad is LlmError.Invalid)
+val why = Meeting::explain(bad)
+Assert::isTrue(why.contains("risk"))
+Assert::isTrue(why.contains("actions[1].owner"))
+
+Assert::isTrue(errorOf(against("truncated.json", 200)) is LlmError.Truncated)
+Assert::isTrue(errorOf(against("refusal.json", 200)) is LlmError.Refusal)
+
+val auth = errorOf(against("auth_error.json", 401))
+Assert::isTrue(Meeting::explain(auth).contains("401 authentication_error"))
+println("summary tests passed")

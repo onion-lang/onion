@@ -1,0 +1,9 @@
+[package]
+name = "meeting-summary"
+version = "0.1.0"
+
+# The in-tree battery, installed into ~/.ivy2/local by dogfood/run.sh
+# (`sbt llm/publishLocal` at the fixed version below), so this project always
+# runs against the battery from the same commit as the compiler.
+[dependencies]
+"org.onion-lang:onion-llm" = "0.0.0-dogfood"

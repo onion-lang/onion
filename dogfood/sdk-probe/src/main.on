@@ -1,0 +1,54 @@
+// sdk-probe: Java interop with a large Kotlin-built SDK, the official Anthropic
+// Java SDK, with no battery in between: builders, overloads, Optional, Kotlin
+// collections and a caught SDK exception with its status code.
+import {
+  com.anthropic.client.AnthropicClient
+  com.anthropic.client.okhttp.AnthropicOkHttpClient
+  com.anthropic.models.messages.MessageCreateParams
+  com.anthropic.models.messages.Message
+  com.anthropic.models.messages.ContentBlock
+  com.anthropic.errors.AnthropicServiceException
+}
+
+// Kept in a class: tests cannot see the top-level functions of src/ (F7).
+class Probe {
+public:
+  // baseUrl null means the SDK's default (or ANTHROPIC_BASE_URL).
+  static def client(key: String, baseUrl: String?): AnthropicClient {
+    var b = AnthropicOkHttpClient::builder().apiKey(key).maxRetries(0)
+    if baseUrl != null { b = b.baseUrl(baseUrl as String) }
+    return b.build()
+  }
+
+  static def params(prompt: String): MessageCreateParams =
+    MessageCreateParams::builder()
+      .model("claude-opus-5-5")
+      .maxTokens(1024L)
+      .addUserMessage(prompt)
+      .build()
+
+  // The reply's text blocks, joined; thinking blocks are skipped.
+  // An API error is "error <status>: <message>" rather than an exception.
+  static def ask(client: AnthropicClient, prompt: String): String {
+    try {
+      val msg: Message = client.messages().create(params(prompt))
+      val sb = new StringBuilder()
+      foreach block: ContentBlock in msg.content() {
+        val t = block.text()
+        if t.isPresent() { sb.append(t.get().text()) }
+      }
+      return sb.toString()
+    } catch e: AnthropicServiceException {
+      return "error " + e.statusCode() + ": " + e.getMessage()
+    }
+  }
+}
+
+def main(): void {
+  val key = System::getenv("ANTHROPIC_API_KEY")
+  if key == null {
+    println("ANTHROPIC_API_KEY is not set; nothing was sent.")
+    return
+  }
+  println(Probe::ask(Probe::client(key, System::getenv("ANTHROPIC_BASE_URL")), "Say hello in Japanese, one short line."))
+}

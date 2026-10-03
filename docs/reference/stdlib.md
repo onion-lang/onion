@@ -2731,6 +2731,17 @@ yields `""` rather than `null`. This is the primitive behind the `case re"..." (
 select pattern (see "Regex literals" in CLAUDE.md) — the compiler desugars an anchored
 regex pattern into a `matchGroups` call plus a null check.
 
+```
+Regex::captureGroup(input, pattern, group): String?
+```
+
+The same anchored match, for a single 1-based group, without the `""` substitution:
+returns `null` both when the whole match fails and when `group` did not participate in
+it, so it distinguishes "absent" from "present but empty" — unlike `matchGroups`, whose
+non-null bindings can't. This is the primitive behind a nullable (`T?`) component in
+`record ... from re"..."` (see "Shape-First Scripting" in CLAUDE.md): an unmatched
+optional group becomes a real `null` there, while a non-nullable component keeps `""`.
+
 ### Pattern literal overloads
 
 A `re"..."` literal compiles to a `java.util.regex.Pattern`, not a `String`.

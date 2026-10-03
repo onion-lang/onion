@@ -306,7 +306,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       checkMethods.foreach(processMethodDeclaration(_))
       if ((hasFrom || hasData || hasShapes) && node.args.nonEmpty) {
         val unsupportedFrom =
-          if (hasFrom) node.args.zip(argTypes).filterNot { case (_, argType) => isFromDerivableType(argType) }
+          if (hasFrom) node.args.zip(argTypes).filterNot { case (_, argType) => isFromReDerivableType(argType) }
           else Nil
         unsupportedFrom.foreach { case (arg, argType) =>
           report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
@@ -412,6 +412,14 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   /** Component types a `from re"..."` clause can produce from a captured String. */
   private def isFromDerivableType(tp: Type): Boolean = ScalarConversions.isDerivable(tp)
+
+  /**
+   * Same as `isFromDerivableType`, but also accepts `T?` of a supported scalar: an
+   * unmatched optional capture group becomes `null` instead of the non-null `""`
+   * sentinel. Only `from re"..."` accepts this; `shape ... = re"..."` and `derive!`
+   * keep the non-nullable check above (#1967).
+   */
+  private def isFromReDerivableType(tp: Type): Boolean = ScalarConversions.isDerivableOrNullable(tp)
 
   /**
    * A shape's pattern must compile (E0059) and expose exactly one capture group per

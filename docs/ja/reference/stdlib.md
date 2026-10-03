@@ -2889,6 +2889,18 @@ Regex::matchGroups(input, pattern): List[String]
 コンパイラはアンカー付き正規表現パターンを `matchGroups` 呼び出しと null チェックに
 脱糖する。
 
+```
+Regex::captureGroup(input, pattern, group): String?
+```
+
+同じアンカー付きマッチを、1-based なグループ1つ分だけ、`""` への置き換え無しで返す:
+マッチ全体が失敗した場合と、`group` がマッチに参加しなかった場合のどちらも `null` を
+返すので、「無い」と「あるが空文字列」を区別できる — 非 null な束縛しか持てない
+`matchGroups` にはできない区別である。これは `record ... from re"..."`
+（CLAUDE.md の「Shape-First Scripting」を参照）の nullable (`T?`) な成分を支える基本
+操作で、マッチしなかった省略可能なグループはそこでは実際の `null` になり、非 null な
+成分は従来どおり `""` のままになる。
+
 ### Pattern リテラルのオーバーロード
 
 `re"..."` リテラルは `String` ではなく `java.util.regex.Pattern` にコンパイルされます。

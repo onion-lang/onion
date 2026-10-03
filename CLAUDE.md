@@ -260,6 +260,58 @@ SBT_OPTS="-Xmx10G -XX:+UseG1GC -Xss16m" sbt -Duser.language=en testFull
 
 **Test Resources:** `src/test/run/` contains example Onion programs used by tests
 
+## Commit Messages and Pull Requests
+
+Write for a human skimming `git log` or the PR list. Lead with **what** changed and **why**;
+the diff already shows **how**. Write them in English.
+
+**Commit message**
+
+```
+type(scope): what changed, imperative, <= 72 chars
+
+What:
+- one bullet per user-visible change (before -> after)
+
+Why: the problem or motivation, in one or two sentences.
+
+Co-Authored-By: ...
+```
+
+- `type` uses the prefixes already in the history: `feat`, `fix`, `docs`, `test`, `build`, `refactor`, `samples`.
+- Wrap the body at 72 characters.
+- Leave out implementation walkthroughs, file-by-file lists, internal class or method names a
+  release-notes reader would not recognise, test counts, and process narration ("I ran ...",
+  "first I tried ...").
+- Mention a design decision only when a user or reviewer would notice it: a default, a
+  compatibility break, a new error code.
+
+Bad:  `Pass DependencyLock coordinates to Coursier forceVersion in ProjectBuilder and add DependencyClasspathRecord`
+Good: `fix(project): onion.lock pins versions, so run no longer rejects the lock build just wrote`
+
+**Pull request description**
+
+```markdown
+## What
+- one bullet per user-visible change (before -> after, or a short example)
+
+## Why
+1-3 sentences: the problem and who it affects; link the issue or friction ID.
+
+## Notes for reviewers        (optional)
+- breaking changes, defaults chosen, follow-ups deliberately left out
+
+## Verification
+- one line per check: "targeted specs pass in en/ja", "CI green", "tried X end to end"
+```
+
+- A reviewer should be able to read it in under a minute (roughly 25 lines). A short code or
+  output example under **What** beats a paragraph.
+- Mark breaking changes explicitly: **Breaking:** ...
+- No implementation walkthroughs, pasted test logs, or per-file change lists. If a reviewer
+  needs to know where to look, one bullet under "Notes for reviewers" is enough.
+- The PR title follows the commit subject format.
+
 ## Example Programs
 
 Located in `run/` directory:

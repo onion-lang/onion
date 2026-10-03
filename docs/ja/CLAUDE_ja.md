@@ -240,6 +240,55 @@ CI はどちらの影響も受けません。差分実行の状態は `target/` 
 
 **テストリソース:** `src/test/run/` にはテストで使用されるOnionプログラムの例が含まれています
 
+## コミットメッセージとプルリクエスト
+
+`git log` や PR 一覧を流し読みする人間に向けて書く。まず**何が**変わったかと**なぜ**かを書き、
+**どうやって**は差分に任せる。英語で書く。
+
+**コミットメッセージ**
+
+```
+type(scope): what changed, imperative, <= 72 chars
+
+What:
+- one bullet per user-visible change (before -> after)
+
+Why: the problem or motivation, in one or two sentences.
+
+Co-Authored-By: ...
+```
+
+- `type` は履歴で使われている接頭辞（`feat`、`fix`、`docs`、`test`、`build`、`refactor`、`samples`）を使う。
+- 本文は 72 文字で折り返す。
+- 実装の手順の説明、ファイルごとの変更一覧、リリースノートの読者が知らない内部のクラス名や
+  メソッド名、テスト件数、作業の経緯（「〜を実行した」「最初は〜を試した」）は書かない。
+- 設計上の判断は、利用者やレビュアーが気づくもの（既定値、互換性の破壊、新しいエラーコード）だけ書く。
+
+悪い例: `Pass DependencyLock coordinates to Coursier forceVersion in ProjectBuilder and add DependencyClasspathRecord`
+良い例: `fix(project): onion.lock pins versions, so run no longer rejects the lock build just wrote`
+
+**プルリクエストの説明**
+
+```markdown
+## What
+- one bullet per user-visible change (before -> after, or a short example)
+
+## Why
+1-3 sentences: the problem and who it affects; link the issue or friction ID.
+
+## Notes for reviewers        (optional)
+- breaking changes, defaults chosen, follow-ups deliberately left out
+
+## Verification
+- one line per check: "targeted specs pass in en/ja", "CI green", "tried X end to end"
+```
+
+- レビュアーが 1 分以内（目安 25 行）で読める長さにする。**What** には、段落より短いコード例や出力例を置く。
+- 互換性を壊す変更は **Breaking:** と明記する。
+- 実装の手順の説明、テストログの貼り付け、ファイルごとの変更一覧は書かない。見るべき場所を
+  伝えたいときは「Notes for reviewers」に 1 行あれば足りる。
+- PR のタイトルはコミットの件名と同じ形式にする。
+
 ## サンプルプログラム
 
 `run/` ディレクトリにあります：

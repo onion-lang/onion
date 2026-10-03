@@ -255,6 +255,10 @@ class RunSamplesSpec extends AbstractShellSpec {
       assert(Shell.Success(null) == runSample("run/StaticImports.on"))
     }
 
+    it("runs DataPipeline.on") {
+      assert(Shell.Success(null) == runSample("run/DataPipeline.on"))
+    }
+
     it("runs Delegation.on") {
       assert(Shell.Success(null) == runSample("run/Delegation.on"))
     }

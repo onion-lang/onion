@@ -406,7 +406,7 @@ final class OnionLexer(text: String)
           depth -= 1
           i += 1
         case '{' =>
-          if depth == 1 then return -1
+          if depth == OnionLexer.MaxInterpBraceDepth then return -1
           depth += 1
           i += 1
         case '"' =>
@@ -614,6 +614,14 @@ object OnionLexer:
 
   private val TabSize = 8
   private val IN_STATEMENT = 1
+
+  /**
+   * How many levels of `{...}` may nest inside a `#{...}` interpolation body, for tokenizing
+   * the STRING token itself (the later parse of the extracted expression has no such limit).
+   * Mirrors the depth the `INTERP_BODY` token in `grammar/JJOnionParser.jj` unrolls to; raise
+   * both together.
+   */
+  private val MaxInterpBraceDepth = 4
 
   private def isIdentStart(c: Char): Boolean =
     (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'

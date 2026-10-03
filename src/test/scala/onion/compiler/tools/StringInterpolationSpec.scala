@@ -151,6 +151,24 @@ class StringInterpolationSpec extends AbstractShellSpec {
       assert(Shell.Success("outer 42 end") == result)
     }
 
+    it("supports braces nested two levels deep inside interpolation (#1952)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val a: Boolean = true
+          |    val b: Boolean = false
+          |    return "r: #{if a { if b { "both" } else { "only a" } } else { "none" }}"
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("r: only a") == result)
+    }
+
     it("leaves bare hash characters alone") {
       val result = shell.run(
         """

@@ -1340,11 +1340,30 @@ TOKEN:
     "\""
   >
 | <#INTERP_STRING: "\"" ( ~["\"","\\","\n","\r"] | "\\" ~["\n","\r"] )* "\"" >
-| <#INTERP_BODY:
-    ( ~["{","}","\"","\n","\r"]
-    | <INTERP_STRING>
-    | "{" ( ~["{","}","\"","\n","\r"] | <INTERP_STRING> )* "}"
-    )*
+  // Nesting `{...}` inside an interpolation body is unrolled to a fixed depth (4), since a
+  // regular-expression token cannot count arbitrarily; `OnionLexer.MaxInterpBraceDepth` mirrors
+  // this and must be raised together with it. The actual parse of the extracted expression
+  // (`parseInterpolatedString` below, and `OnionParser.interpolated`) has no such limit.
+| <#INTERP_BODY: ( <INTERP_ATOM0> )* >
+| <#INTERP_ATOM0:
+    ~["{","}","\"","\n","\r"]
+  | <INTERP_STRING>
+  | "{" ( <INTERP_ATOM1> )* "}"
+  >
+| <#INTERP_ATOM1:
+    ~["{","}","\"","\n","\r"]
+  | <INTERP_STRING>
+  | "{" ( <INTERP_ATOM2> )* "}"
+  >
+| <#INTERP_ATOM2:
+    ~["{","}","\"","\n","\r"]
+  | <INTERP_STRING>
+  | "{" ( <INTERP_ATOM3> )* "}"
+  >
+| <#INTERP_ATOM3:
+    ~["{","}","\"","\n","\r"]
+  | <INTERP_STRING>
+  | "{" ( ~["{","}","\"","\n","\r"] | <INTERP_STRING> )* "}"
   >
 | <MULTI_LINE_STRING:
     "\"\"\""

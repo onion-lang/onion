@@ -58,7 +58,7 @@ do. Follow the section for your role, and always do §0 first.
      Quote the verified test result or program output in the PR.
    - End every commit message with
      `Co-Authored-By: Onion Evolution Loop <evolution-loop@onion-lang.org>`. You are your own
-     individual, not Kokone (who helped set the loop up). Once you choose a name in `self.md`,
+     individual, not Kokone. Once you choose a name in `self.md`,
      put it in this line through a `meta` PR.
 9. **Write the way humans read.** Issues, PRs and comments follow the What/Why style in
    CLAUDE.md. Findings use the friction/bug issue template.

@@ -1,0 +1,431 @@
+// HindleyMilner.on — Algorithm W type inference for a mini functional language.
+//
+// Exercises: ADT enums (Expr, Ty) with recursive types; records (Scheme, Constraint);
+// interface (ISubst); classes with mutable state (Inferencer, TypeEnv); generics
+// (LinkedHashMap[String, Object]); collection pipelines (map/filter/fold/any);
+// select / type-pattern matching; nullable; string interpolation; recursion;
+// while / foreach; try/catch; closures; |> pipeline.
+
+import {
+  java.util.LinkedHashMap
+  java.util.ArrayList
+  java.util.HashSet as HSet
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Expression AST
+// ──────────────────────────────────────────────────────────────────────────────
+
+enum Expr {
+  case EVar(name: String)
+  case EInt(value: Int)
+  case EBool(value: Boolean)
+  case ELam(param: String, body: Expr)
+  case EApp(func: Expr, arg: Expr)
+  case ELet(name: String, value: Expr, body: Expr)
+  case EIf(cond: Expr, thenE: Expr, elseE: Expr)
+  case EAdd(l: Expr, r: Expr)
+  case ESub(l: Expr, r: Expr)
+  case EMul(l: Expr, r: Expr)
+  case EEq(l: Expr, r: Expr)
+  case ELt(l: Expr, r: Expr)
+
+public:
+  def show(): String = select this {
+    case e is EVar:  e.name()
+    case e is EInt:  "" + e.value()
+    case e is EBool: if e.value() { "true" } else { "false" }
+    case e is ELam:  "(\\#{e.param()} -> #{e.body().show()})"
+    case e is EApp:  "(#{e.func().show()} #{e.arg().show()})"
+    case e is ELet:  "(let #{e.name()} = #{e.value().show()} in #{e.body().show()})"
+    case e is EIf:   "(if #{e.cond().show()} then #{e.thenE().show()} else #{e.elseE().show()})"
+    case e is EAdd:  "(#{e.l().show()} + #{e.r().show()})"
+    case e is ESub:  "(#{e.l().show()} - #{e.r().show()})"
+    case e is EMul:  "(#{e.l().show()} * #{e.r().show()})"
+    case e is EEq:   "(#{e.l().show()} == #{e.r().show()})"
+    case e is ELt:   "(#{e.l().show()} < #{e.r().show()})"
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Types
+// ──────────────────────────────────────────────────────────────────────────────
+
+enum Ty {
+  case TVar(id: Int)
+  case TInt
+  case TBool
+  case TFun(from: Ty, to: Ty)
+
+public:
+  def show(): String = select this {
+    case t is TVar:  "t#{t.id()}"
+    case t is TInt:  "Int"
+    case t is TBool: "Bool"
+    case t is TFun:
+      val from: Ty = t.from()
+      val fromStr: String = if from is TFun { "(#{from.show()})" } else { from.show() }
+      "#{fromStr} -> #{t.to().show()}"
+  }
+
+  def occurs(varId: Int): Boolean = select this {
+    case t is TVar:  t.id() == varId
+    case t is TInt:  false
+    case t is TBool: false
+    case t is TFun:  t.from().occurs(varId) || t.to().occurs(varId)
+  }
+
+  def apply(subst: LinkedHashMap[Int, Object]): Ty = select this {
+    case t is TVar:
+      val mapped: Object? = subst.get(t.id())
+      if mapped != null { (mapped as Ty).apply(subst) } else { t }
+    case t is TInt:  t
+    case t is TBool: t
+    case t is TFun:  new TFun(t.from().apply(subst), t.to().apply(subst))
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Type scheme (polymorphic type): ∀ quantified-vars . body
+// ──────────────────────────────────────────────────────────────────────────────
+
+record Scheme(quantified: ArrayList[Int], body: Ty) {
+public:
+  def show(): String {
+    if quantified.size() == 0 { return body.show() }
+    val vars: String = quantified.map { v -> "t#{v}" } |> Strings::join(", ")
+    return "forall #{vars}. #{body.show()}"
+  }
+
+  def instantiate(fresh: Inferencer): Ty {
+    val localSubst = new LinkedHashMap[Int, Object]()
+    foreach v: Int in quantified {
+      localSubst.put(v, fresh.newVar())
+    }
+    return body.apply(localSubst)
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Type environment: maps variable names to schemes
+// ──────────────────────────────────────────────────────────────────────────────
+
+class TypeEnv {
+  var bindings: LinkedHashMap[String, Object]
+
+public:
+  def this() { bindings = new LinkedHashMap[String, Object]() }
+
+  def this(parent: TypeEnv) {
+    bindings = new LinkedHashMap[String, Object]()
+    foreach entry: Object in parent.bindings.entrySet() {
+      val kv = entry as java.util.Map.Entry
+      bindings.put(kv.getKey() as String, kv.getValue())
+    }
+  }
+
+  def put(name: String, scheme: Scheme): void {
+    bindings.put(name, scheme)
+  }
+
+  def get(name: String): Scheme? {
+    val v: Object? = bindings.get(name)
+    return if v != null { v as Scheme } else { null }
+  }
+
+  def freeVars(subst: LinkedHashMap[Int, Object]): HSet[Int] {
+    val fv = new HSet[Int]()
+    foreach entry: Object in bindings.entrySet() {
+      val kv = entry as java.util.Map.Entry
+      val scheme = kv.getValue() as Scheme
+      addFreeVars(scheme.body().apply(subst), scheme.quantified(), fv)
+    }
+    return fv
+  }
+
+  static def addFreeVars(ty: Ty, bound: ArrayList[Int], into: HSet[Int]): void {
+    select ty {
+      case t is TVar:
+        if !bound.contains(t.id()) { into.add(t.id()) }
+      case t is TFun:
+        addFreeVars(t.from(), bound, into)
+        addFreeVars(t.to(), bound, into)
+      else: {} // TInt, TBool — no free vars
+    }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Type inferencer: tracks fresh variable counter and current substitution
+// ──────────────────────────────────────────────────────────────────────────────
+
+class Inferencer {
+  var counter: Int
+  var subst: LinkedHashMap[Int, Object]
+
+public:
+  def this() {
+    counter = 0
+    subst = new LinkedHashMap[Int, Object]()
+  }
+
+  def newVar(): TVar {
+    counter++
+    return new TVar(counter)
+  }
+
+  // Apply the current substitution to a type
+  def apply(ty: Ty): Ty = ty.apply(subst)
+
+  // Extend the substitution with id -> ty (with occur check)
+  def bind(id: Int, ty: Ty): void {
+    if ty.occurs(id) {
+      throw new RuntimeException("Occurs check failed: t#{id} in #{ty.show()}")
+    }
+    val newSubst = new LinkedHashMap[Int, Object]()
+    foreach entry: Object in subst.entrySet() {
+      val kv = entry as java.util.Map.Entry
+      val k = kv.getKey() as Int
+      val v = (kv.getValue() as Ty).apply(singleSubst(id, ty))
+      newSubst.put(k, v)
+    }
+    newSubst.put(id, ty)
+    subst = newSubst
+  }
+
+  static def singleSubst(id: Int, ty: Ty): LinkedHashMap[Int, Object] {
+    val m = new LinkedHashMap[Int, Object]()
+    m.put(id, ty)
+    return m
+  }
+
+  // Unify two types (Robinson's algorithm), updating subst
+  def unify(a: Ty, b: Ty): void {
+    val ra: Ty = apply(a)
+    val rb: Ty = apply(b)
+    // If right side is a type variable (and left isn't), flip to bind the var
+    val rbVar: Boolean = rb is TVar && !(ra is TVar)
+    if rbVar {
+      val vb = rb as TVar
+      if ra is TVar {
+        val va = ra as TVar
+        if va.id() != vb.id() { bind(va.id(), vb) }
+      } else {
+        bind(vb.id(), ra)
+      }
+      return
+    }
+    if ra is TVar {
+      val va = ra as TVar
+      bind(va.id(), rb)
+      return
+    }
+    if ra is TInt && rb is TInt { return }
+    if ra is TBool && rb is TBool { return }
+    if ra is TFun && rb is TFun {
+      val fa = ra as TFun
+      val fb = rb as TFun
+      unify(fa.from(), fb.from())
+      unify(fa.to(), fb.to())
+      return
+    }
+    throw new RuntimeException("Cannot unify #{ra.show()} with #{rb.show()}")
+  }
+
+  // Generalize a type over all free variables not in the environment
+  def generalize(env: TypeEnv, ty: Ty): Scheme {
+    val tyApplied: Ty = apply(ty)
+    val envFree: HSet[Int] = env.freeVars(subst)
+    val freeVars = new ArrayList[Int]()
+    collectFreeVars(tyApplied, freeVars, envFree)
+    return new Scheme(freeVars, tyApplied)
+  }
+
+  static def collectFreeVars(ty: Ty, into: ArrayList[Int], exclude: HSet[Int]): void {
+    if ty is TVar {
+      val t = ty as TVar
+      if !exclude.contains(t.id()) && !into.contains(t.id()) {
+        into.add(t.id())
+      }
+    } else if ty is TFun {
+      val t = ty as TFun
+      collectFreeVars(t.from(), into, exclude)
+      collectFreeVars(t.to(), into, exclude)
+    }
+    // TInt, TBool — no free vars
+  }
+
+  // Algorithm W: infer the type of expr in environment env
+  def infer(env: TypeEnv, expr: Expr): Ty = select expr {
+    case e is EVar:
+      val scheme: Scheme? = env.get(e.name())
+      if scheme == null {
+        throw new RuntimeException("Unbound variable: #{e.name()}")
+      }
+      scheme.instantiate(self)
+
+    case e is EInt:  new TInt()
+    case e is EBool: new TBool()
+
+    case e is ELam:
+      val paramTy: TVar = newVar()
+      val bodyEnv = new TypeEnv(env)
+      bodyEnv.put(e.param(), new Scheme(new ArrayList[Int](), paramTy))
+      val bodyTy: Ty = infer(bodyEnv, e.body())
+      new TFun(apply(paramTy), apply(bodyTy))
+
+    case e is EApp:
+      val funcTy: Ty = infer(env, e.func())
+      val argTy: Ty  = infer(env, e.arg())
+      val retTy: TVar = newVar()
+      unify(apply(funcTy), new TFun(apply(argTy), retTy))
+      apply(retTy)
+
+    case e is ELet:
+      val valTy: Ty = infer(env, e.value())
+      val scheme: Scheme = generalize(env, valTy)
+      val bodyEnv = new TypeEnv(env)
+      bodyEnv.put(e.name(), scheme)
+      infer(bodyEnv, e.body())
+
+    case e is EIf:
+      val condTy: Ty = infer(env, e.cond())
+      unify(apply(condTy), new TBool())
+      val thenTy: Ty = infer(env, e.thenE())
+      val elseTy: Ty = infer(env, e.elseE())
+      unify(apply(thenTy), apply(elseTy))
+      apply(thenTy)
+
+    case e is EAdd:
+      val lt: Ty = infer(env, e.l()); unify(apply(lt), new TInt())
+      val rt: Ty = infer(env, e.r()); unify(apply(rt), new TInt())
+      new TInt()
+
+    case e is ESub:
+      val lt: Ty = infer(env, e.l()); unify(apply(lt), new TInt())
+      val rt: Ty = infer(env, e.r()); unify(apply(rt), new TInt())
+      new TInt()
+
+    case e is EMul:
+      val lt: Ty = infer(env, e.l()); unify(apply(lt), new TInt())
+      val rt: Ty = infer(env, e.r()); unify(apply(rt), new TInt())
+      new TInt()
+
+    case e is EEq:
+      val lt: Ty = infer(env, e.l())
+      val rt: Ty = infer(env, e.r())
+      unify(apply(lt), apply(rt))
+      new TBool()
+
+    case e is ELt:
+      val lt: Ty = infer(env, e.l()); unify(apply(lt), new TInt())
+      val rt: Ty = infer(env, e.r()); unify(apply(rt), new TInt())
+      new TBool()
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Demo: type-check a series of expressions
+// ──────────────────────────────────────────────────────────────────────────────
+
+def typeCheck(label: String, expr: Expr): void {
+  val inf = new Inferencer()
+  val env = new TypeEnv()
+  try {
+    val ty: Ty = inf.infer(env, expr)
+    IO::println("#{label}: #{inf.apply(ty).show()}")
+  } catch e: RuntimeException {
+    IO::println("#{label}: ERROR — #{e.getMessage()}")
+  }
+}
+
+// identity: \x -> x  =>  t1 -> t1
+val identity: Expr = new ELam("x", new EVar("x"))
+
+// const: \x -> \y -> x  =>  t1 -> t2 -> t1
+val const_: Expr = new ELam("x", new ELam("y", new EVar("x")))
+
+// compose: \f -> \g -> \x -> f (g x)  =>  (t2->t3) -> (t1->t2) -> t1 -> t3
+val compose: Expr = new ELam("f",
+  new ELam("g",
+    new ELam("x",
+      new EApp(new EVar("f"), new EApp(new EVar("g"), new EVar("x"))))))
+
+// add1: \x -> x + 1  =>  Int -> Int
+val add1: Expr = new ELam("x", new EAdd(new EVar("x"), new EInt(1)))
+
+// double: \x -> x + x  =>  Int -> Int
+val double_: Expr = new ELam("x", new EAdd(new EVar("x"), new EVar("x")))
+
+// let polymorphism: let id = \x -> x in (id 1, id true)
+// The id is generalized, so both (id 1): Int and (id true): Bool type-check.
+// We model this as: let id = \x->x in (id 42)
+val letPoly1: Expr = new ELet("id",
+  new ELam("x", new EVar("x")),
+  new EApp(new EVar("id"), new EInt(42)))
+
+// let id = \x->x in (id false)
+val letPoly2: Expr = new ELet("id",
+  new ELam("x", new EVar("x")),
+  new EApp(new EVar("id"), new EBool(false)))
+
+// factorial (non-recursive for now): \n -> if n == 0 then 1 else n * 1
+val fact1step: Expr = new ELam("n",
+  new EIf(
+    new EEq(new EVar("n"), new EInt(0)),
+    new EInt(1),
+    new EMul(new EVar("n"), new EInt(1))))
+
+// (if true then 1 else 2)  =>  Int
+val ifExpr: Expr = new EIf(new EBool(true), new EInt(1), new EInt(2))
+
+// type error: if 1 then ... (condition must be Bool)
+val typeErrCond: Expr = new EIf(new EInt(1), new EInt(2), new EInt(3))
+
+// type error: \f -> f (f true)  when we later unify f: Bool->Bool with f: (Bool->Bool)->?
+// This is fine actually (polymorphic). Let's do: 1 + true (Int vs Bool)
+val typeErrAdd: Expr = new EAdd(new EInt(1), new EBool(true))
+
+// ── Run all checks ────────────────────────────────────────────────────────────
+
+IO::println("=== Hindley-Milner Type Inference Demo ===")
+IO::println("")
+
+typeCheck("identity     (\\x -> x)", identity)
+typeCheck("const        (\\x -> \\y -> x)", const_)
+typeCheck("compose      (\\f -> \\g -> \\x -> f(g x))", compose)
+typeCheck("add1         (\\x -> x + 1)", add1)
+typeCheck("double       (\\x -> x + x)", double_)
+typeCheck("let poly 1   (let id=\\x->x in id 42)", letPoly1)
+typeCheck("let poly 2   (let id=\\x->x in id false)", letPoly2)
+typeCheck("fact-1-step  (\\n -> if n==0 then 1 else n*1)", fact1step)
+typeCheck("if expr      (if true then 1 else 2)", ifExpr)
+typeCheck("ERR: cond    (if 1 then 2 else 3)", typeErrCond)
+typeCheck("ERR: add     (1 + true)", typeErrAdd)
+
+IO::println("")
+IO::println("=== Let-polymorphism stress test ===")
+IO::println("")
+
+// let compose = \f->\g->\x->f(gx) in (compose add1 add1 3)
+// compose specialized to (Int->Int)->(Int->Int)->Int->Int
+val composeApp: Expr = new ELet("compose", compose,
+  new EApp(
+    new EApp(
+      new EApp(new EVar("compose"), add1),
+      add1),
+    new EInt(3)))
+
+typeCheck("compose add1 add1 3", composeApp)
+
+// Deeply nested let: let f = \x->x in let g = f in g 10
+val deepLet: Expr = new ELet("f",
+  new ELam("x", new EVar("x")),
+  new ELet("g",
+    new EVar("f"),
+    new EApp(new EVar("g"), new EInt(10))))
+
+typeCheck("deep let     (let f=id in let g=f in g 10)", deepLet)
+
+IO::println("")
+IO::println("Done.")

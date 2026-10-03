@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/PropCheck.on`** — a 427-line QuickCheck-inspired property-based testing framework, a new domain for the `run/` corpus (a class with mutable state `Lcg`, a pure-Onion linear congruential RNG with no Java imports; records with methods `TestResult`; an ADT case-enum `CheckStatus` (`Pass`/`Fail`/`Discard`) dispatched via `select` + type patterns; extension methods on `Int` (`abs`/`clamp`/`padLeft`/`sign`) and `String` (`pad`/`repeat`/`isPalindrome`); multi-argument closures as property predicates; collection pipelines `filter`/`map`/`sortedBy`/`fold`/`size`; `while`/`for`/`foreach` loops; nullable `String?`; recursive integer shrinking toward a minimal counterexample) — running 16 properties across integer arithmetic, strings, and integer lists, including two intentional failures that demonstrate counterexample reporting and shrinking (merged via #1916).
+
 ## [0.137.0] - 2026-10-03
 
 ### Added

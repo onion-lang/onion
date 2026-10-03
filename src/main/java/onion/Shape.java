@@ -124,10 +124,10 @@ public interface Shape<T> {
      * and {@code additionalProperties: false}; lists become {@code array}s and nested
      * records nested objects, described the same way. This is the form an LLM's
      * structured-output mode takes, so the record is the one description of the answer.
+     * A record that contains itself, directly or through another, is described once under
+     * a top-level {@code $defs} and referenced by {@code $ref} everywhere it recurs.
      *
-     * @throws UnsupportedOperationException when {@link #hasJsonSchema()} is false, or
-     *         when the shape is recursive (a record that contains itself has no finite
-     *         inline schema)
+     * @throws UnsupportedOperationException when {@link #hasJsonSchema()} is false
      */
     default String jsonSchema() {
         throw new UnsupportedOperationException(

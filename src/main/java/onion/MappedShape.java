@@ -268,32 +268,53 @@ final class MappedShape<T> implements Shape<T> {
             throw new UnsupportedOperationException(
                 "shape " + describe() + " is not a JSON shape, so it has no JSON Schema");
         }
-        return Json.stringify(schemaTree(Collections.newSetFromMap(new IdentityHashMap<>())));
+        SchemaDefs defs = new SchemaDefs();
+        Map<String, Object> schema = schemaTree(Collections.newSetFromMap(new IdentityHashMap<>()), defs);
+        if (!defs.defs.isEmpty()) {
+            schema = new LinkedHashMap<>(schema);
+            schema.put("$defs", defs.defs);
+        }
+        return Json.stringify(schema);
     }
 
     private boolean isJson() {
         return "JSON".equals(codec.name());
     }
 
+    /** The record schemas a recursive shape's {@code $ref}s point at, assigned on first cycle. */
+    private static final class SchemaDefs {
+        final Map<String, Object> defs = new LinkedHashMap<>();
+        final Map<Object, String> names = new IdentityHashMap<>();
+
+        String nameFor(Object key) {
+            return names.computeIfAbsent(key, k -> "Def" + (names.size() + 1));
+        }
+    }
+
     /**
      * {@code {"type": "object", "properties": ..., "required": [...], "additionalProperties": false}}.
      *
      * <p>{@code visiting} holds the build function's class of every record on the current
-     * path: a record that contains itself, directly or through another, has no finite
-     * inline schema, and saying so beats overflowing the stack.
+     * path. A record that contains itself, directly or through another, has no finite
+     * <em>inline</em> schema, but it still has a finite one: the first encounter builds it
+     * as usual, and any later encounter while it is still on the path (a genuine cycle, not
+     * just a repeated sibling) refers to it by name under {@code defs} instead of recursing
+     * forever. Once a type has been referenced that way, its own finished schema is also
+     * published into {@code defs} under that name, alongside its natural inline occurrence.
      */
-    private Map<String, Object> schemaTree(Set<Object> visiting) {
+    private Map<String, Object> schemaTree(Set<Object> visiting, SchemaDefs defs) {
         Object key = build.getClass();
         if (!visiting.add(key)) {
-            throw new UnsupportedOperationException(
-                "a recursive JSON shape has no finite inline JSON Schema");
+            Map<String, Object> ref = new LinkedHashMap<>();
+            ref.put("$ref", "#/$defs/" + defs.nameFor(key));
+            return ref;
         }
         try {
             Map<String, Object> props = new LinkedHashMap<>();
             List<Object> required = new ArrayList<>();
             for (int i = 0; i < kinds.size(); i++) {
                 Kind kind = kinds.get(i);
-                props.put(names.get(i), componentSchema(i, kind, visiting));
+                props.put(names.get(i), componentSchema(i, kind, visiting, defs));
                 if (!kind.nullable) required.add(names.get(i));
             }
             Map<String, Object> schema = new LinkedHashMap<>();
@@ -301,14 +322,16 @@ final class MappedShape<T> implements Shape<T> {
             schema.put("properties", props);
             schema.put("required", required);
             schema.put("additionalProperties", Boolean.FALSE);
+            String name = defs.names.get(key);
+            if (name != null) defs.defs.put(name, schema);
             return schema;
         } finally {
             visiting.remove(key);
         }
     }
 
-    private Object componentSchema(int index, Kind kind, Set<Object> visiting) {
-        Map<String, Object> element = elementSchema(index, kind, visiting);
+    private Object componentSchema(int index, Kind kind, Set<Object> visiting, SchemaDefs defs) {
+        Map<String, Object> element = elementSchema(index, kind, visiting, defs);
         Map<String, Object> schema;
         if (kind.list) {
             schema = new LinkedHashMap<>();
@@ -333,10 +356,10 @@ final class MappedShape<T> implements Shape<T> {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> elementSchema(int index, Kind kind, Set<Object> visiting) {
+    private Map<String, Object> elementSchema(int index, Kind kind, Set<Object> visiting, SchemaDefs defs) {
         if (kind.isNested()) {
             Shape<Object> inner = nestedShape(index);
-            if (inner instanceof MappedShape) return ((MappedShape<Object>) inner).schemaTree(visiting);
+            if (inner instanceof MappedShape) return ((MappedShape<Object>) inner).schemaTree(visiting, defs);
             if (inner.hasJsonSchema()) {
                 Object parsed = Json.parseOrNull(inner.jsonSchema());
                 if (parsed instanceof Map) return new LinkedHashMap<>((Map<String, Object>) parsed);

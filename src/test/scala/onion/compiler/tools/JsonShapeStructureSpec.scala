@@ -262,7 +262,7 @@ class JsonShapeStructureSpec extends AbstractShellSpec {
       assert(Shell.Success("truefalsefalsetrue") == r)
     }
 
-    it("refuses a recursive shape instead of overflowing the stack") {
+    it("describes a self-recursive shape via $defs/$ref instead of overflowing the stack") {
       val r = shell.run(
         """
           |record Node(name: String, kids: List[Node]) {
@@ -271,11 +271,51 @@ class JsonShapeStructureSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    try { return Node::doc().jsonSchema() } catch e: UnsupportedOperationException { return "refused" }
+          |    return Node::doc().jsonSchema()
           |  }
           |}
           |""".stripMargin, "None", Array())
-      assert(Shell.Success("refused") == r)
+      r match {
+        case Shell.Success(schema: String) =>
+          assert(schema.contains("\"$defs\""))
+          assert(schema.contains("\"$ref\""))
+          // The schema must itself be valid, parseable JSON -- not just a string containing
+          // the right substrings -- and the $ref must point at a $defs entry that exists.
+          val parsed = onion.Json.parse(schema).asInstanceOf[java.util.Map[String, Object]]
+          val defs = parsed.get("$defs").asInstanceOf[java.util.Map[String, Object]]
+          assert(defs != null && !defs.isEmpty)
+          val kids = parsed.get("properties").asInstanceOf[java.util.Map[String, Object]].get("kids")
+            .asInstanceOf[java.util.Map[String, Object]]
+          val ref = kids.get("items").asInstanceOf[java.util.Map[String, Object]].get("$ref").asInstanceOf[String]
+          assert(ref != null && ref.startsWith("#/$defs/"))
+          assert(defs.containsKey(ref.stripPrefix("#/$defs/")))
+        case other => fail(s"expected a schema, got $other")
+      }
+    }
+
+    it("describes a mutually-recursive pair of shapes via $defs/$ref") {
+      val r = shell.run(
+        """
+          |record Branch(label: String, leaf: Leaf?) {
+          |  shape doc = json
+          |}
+          |record Leaf(value: Int, back: Branch?) {
+          |  shape doc = json
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return Branch::doc().jsonSchema()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      r match {
+        case Shell.Success(schema: String) =>
+          val parsed = onion.Json.parse(schema)
+          assert(parsed != null)
+          assert(schema.contains("\"$ref\""))
+        case other => fail(s"expected a schema, got $other")
+      }
     }
   }
 }

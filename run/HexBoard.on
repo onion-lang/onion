@@ -1,0 +1,406 @@
+// HexBoard.on — the classic Hex board-game simulator (deterministic scenarios)
+//
+// Two players alternate placing stones on an n×n rhombus grid.  Red wins by
+// connecting the TOP row to the BOTTOM row; Blue wins by connecting the LEFT
+// column to the RIGHT column.  No draw is possible in Hex.
+//
+// Four scripted scenarios are run so the output is fully reproducible without
+// real-time input.
+//
+// Exercises: ADT case enum (Cell), data-carrying homogeneous enum (Player),
+// records with inline methods (Pos, MoveRecord, GameReport), mutable class
+// state (HexBoard with List[List[Cell]] grid), DFS connectivity via typed
+// List stack + visited, extension methods on Int, collection pipelines
+// (filter/map/count/groupBy/fold/sortedBy), select + type patterns, while
+// loops, foreach over typed lists and ranges, nullable types (Player?),
+// string interpolation, try/catch.
+
+// ── Player (homogeneous enum) ─────────────────────────────────────────────────
+
+enum Player(sym: String, description: String) {
+  RED("R",  "top↔bottom"),
+  BLUE("B", "left↔right")
+
+public:
+  def opponent(): Player {
+    if this == Player::RED  { return Player::BLUE }
+    return Player::RED
+  }
+}
+
+// ── Cell state (ADT case enum) ────────────────────────────────────────────────
+
+enum Cell {
+  case Empty
+  case Stone(owner: Player)
+
+public:
+  def glyph(): String = select this {
+    case e is Empty: "."
+    case s is Stone: s.owner().sym()
+  }
+
+  def isEmpty(): Boolean = this is Empty
+
+  def ownedBy(p: Player): Boolean = select this {
+    case s is Stone: s.owner() == p
+    else:            false
+  }
+}
+
+// ── Records ───────────────────────────────────────────────────────────────────
+
+record Pos(row: Int, col: Int) {
+public:
+  def key(n: Int): Int  = row() * n + col()
+  def label(): String   = "(#{row()},#{col()})"
+  def sameAs(o: Pos): Boolean = row() == o.row() && col() == o.col()
+}
+
+record MoveRecord(turn: Int, pos: Pos, player: Player) {
+public:
+  def label(): String = "T#{turn()} #{player().sym()}@#{pos().label()}"
+}
+
+record GameReport(
+  scenario:   String,
+  size:       Int,
+  totalMoves: Int,
+  winner:     Player?,
+  redStones:  Int,
+  blueStones: Int
+) {
+public:
+  def summary(): String {
+    val w: Player? = winner()
+    val outcome: String =
+      if w != null {
+        "#{(w as Player).sym()} wins (#{(w as Player).description()})"
+      } else {
+        "no winner"
+      }
+    return "#{scenario()}: #{outcome} | moves=#{totalMoves()}, R=#{redStones()}, B=#{blueStones()}, size=#{size()}×#{size()}"
+  }
+}
+
+// ── Extension methods ─────────────────────────────────────────────────────────
+
+extension Int {
+  // True when self is a valid index for a grid of size n.
+  def inGrid(n: Int): Boolean = self >= 0 && self < n
+
+  // Repeat a string self times (used for indent / separators).
+  def times(s: String): String {
+    var r: String = ""
+    var i: Int = 0
+    while i < self { r = r + s; i = i + 1 }
+    return r
+  }
+
+  // Right-align self in a field of the given width.
+  def pad(width: Int): String {
+    var s: String = "" + self
+    while s.length() < width { s = " " + s }
+    return s
+  }
+}
+
+// ── HexBoard class ────────────────────────────────────────────────────────────
+
+class HexBoard {
+  val n:           Int
+  var grid:        List[List[Cell]]
+  var moveHistory: List[MoveRecord]
+  var winner:      Player?
+
+public:
+  def this(size: Int) {
+    n           = size
+    grid        = []
+    moveHistory = []
+    winner      = null
+    var r: Int = 0
+    while r < n {
+      var row: List[Cell] = []
+      var c: Int = 0
+      while c < n { row << new Empty(); c = c + 1 }
+      grid << row
+      r = r + 1
+    }
+  }
+
+  def get(r: Int, c: Int): Cell = (grid[r] as List[Cell])[c] as Cell
+
+  // Place a stone; returns false if the cell is occupied or out of bounds.
+  def place(r: Int, c: Int, p: Player): Boolean {
+    if !r.inGrid(n) || !c.inGrid(n) { return false }
+    val row: List[Cell] = grid[r] as List[Cell]
+    if !(row[c] as Cell).isEmpty() { return false }
+    row[c] = new Stone(p)
+    moveHistory << new MoveRecord(moveHistory.size + 1, new Pos(r, c), p)
+    return true
+  }
+
+  // Six hex-adjacency neighbors of (r, c) on an n×n grid.
+  // Offsets: (r-1,c), (r-1,c+1), (r,c-1), (r,c+1), (r+1,c-1), (r+1,c)
+  def neighbors(r: Int, c: Int): List[Pos] {
+    val ns: List[Pos] = []
+    if (r - 1).inGrid(n)                          { ns << new Pos(r - 1, c) }
+    if (r - 1).inGrid(n) && (c + 1).inGrid(n)     { ns << new Pos(r - 1, c + 1) }
+    if (c - 1).inGrid(n)                           { ns << new Pos(r, c - 1) }
+    if (c + 1).inGrid(n)                           { ns << new Pos(r, c + 1) }
+    if (r + 1).inGrid(n) && (c - 1).inGrid(n)     { ns << new Pos(r + 1, c - 1) }
+    if (r + 1).inGrid(n)                           { ns << new Pos(r + 1, c) }
+    return ns
+  }
+
+  // DFS connectivity check: does player p have a winning path?
+  // Red: top-row → bottom-row; Blue: left-col → right-col.
+  def hasWon(p: Player): Boolean {
+    val visited: List[Int] = []
+    val stack: List[Pos]   = []
+
+    if p == Player::RED {
+      var c: Int = 0
+      while c < n {
+        if get(0, c).ownedBy(p) { stack << new Pos(0, c) }
+        c = c + 1
+      }
+    } else {
+      var r: Int = 0
+      while r < n {
+        if get(r, 0).ownedBy(p) { stack << new Pos(r, 0) }
+        r = r + 1
+      }
+    }
+
+    while stack.size > 0 {
+      val pos: Pos = stack.remove(stack.size - 1) as Pos
+      val key: Int = pos.key(n)
+      if visited.contains(key) { continue }
+      visited << key
+      val reached: Boolean =
+        if p == Player::RED  { pos.row() == n - 1 }
+        else                 { pos.col() == n - 1 }
+      if reached { return true }
+      foreach nb: Pos in neighbors(pos.row(), pos.col()) {
+        if !visited.contains(nb.key(n)) && get(nb.row(), nb.col()).ownedBy(p) {
+          stack << nb
+        }
+      }
+    }
+    return false
+  }
+
+  // Check both players; update winner field on first win found.
+  def checkWinner(): Player? {
+    if winner != null { return winner }
+    if hasWon(Player::RED)  { winner = Player::RED;  return winner }
+    if hasWon(Player::BLUE) { winner = Player::BLUE; return winner }
+    return null
+  }
+
+  def countStones(p: Player): Int {
+    var cnt: Int = 0
+    var r: Int = 0
+    while r < n {
+      var c: Int = 0
+      while c < n {
+        if get(r, c).ownedBy(p) { cnt = cnt + 1 }
+        c = c + 1
+      }
+      r = r + 1
+    }
+    return cnt
+  }
+
+  // ASCII display: each row indented by r spaces, cells separated by " - ".
+  def display(): void {
+    var r: Int = 0
+    while r < n {
+      var line: String = r.times(" ") + r.pad(2) + ": "
+      var c: Int = 0
+      while c < n {
+        line = line + get(r, c).glyph()
+        if c < n - 1 { line = line + " - " }
+        c = c + 1
+      }
+      IO::println(line)
+      r = r + 1
+    }
+  }
+
+  // Return the last k moves (or all if fewer).
+  def recentMoves(k: Int): List[MoveRecord] {
+    val start: Int = if moveHistory.size > k { moveHistory.size - k } else { 0 }
+    val result: List[MoveRecord] = []
+    var i: Int = start
+    while i < moveHistory.size { result << (moveHistory[i] as MoveRecord); i = i + 1 }
+    return result
+  }
+
+  def getWinner(): Player? = winner
+  def moveCount(): Int    = moveHistory.size
+
+  def makeReport(label: String): GameReport = new GameReport(
+    label,
+    n,
+    moveHistory.size,
+    winner,
+    countStones(Player::RED),
+    countStones(Player::BLUE)
+  )
+}
+
+// ── Scenario runner ───────────────────────────────────────────────────────────
+
+// Play a scripted game.  Moves is a List[Pos]; Red plays at even indices,
+// Blue at odd.  Stops early when a winner is found.
+def playScenario(label: String, size: Int, moves: List[Pos]): GameReport {
+  val board = new HexBoard(size)
+  var i: Int = 0
+  while i < moves.size && board.getWinner() == null {
+    val pos: Pos = moves[i] as Pos
+    val player: Player = if i % 2 == 0 { Player::RED } else { Player::BLUE }
+    val placed: Boolean = board.place(pos.row(), pos.col(), player)
+    if placed { board.checkWinner() }
+    i = i + 1
+  }
+  IO::println("\n=== Scenario: #{label} ===")
+  board.display()
+  val report: GameReport = board.makeReport(label)
+  val w: Player? = board.getWinner()
+  if w != null {
+    IO::println("  Winner : #{(w as Player).sym()} (#{(w as Player).description()})")
+    val last: List[MoveRecord] = board.recentMoves(1)
+    if last.size > 0 {
+      IO::println("  Winning move: " + (last[0] as MoveRecord).label())
+    }
+  } else {
+    IO::println("  No winner after #{board.moveCount()} moves")
+  }
+  return report
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val reports: List[GameReport] = []
+
+  // ── Scenario 1: Red straight down on 3×3 ─────────────────────────────────
+  // Red: (0,0),(1,0),(2,0) — the left column; Blue plays elsewhere.
+  reports << playScenario("Red column 3×3", 3, [
+    new Pos(0, 0), new Pos(0, 2),
+    new Pos(1, 0), new Pos(1, 2),
+    new Pos(2, 0)
+  ])
+
+  // ── Scenario 2: Blue straight across on 4×4 ──────────────────────────────
+  // Blue fills row 2 (cols 0–3) while Red fills row 0.
+  reports << playScenario("Blue row 4×4", 4, [
+    new Pos(0, 0), new Pos(2, 0),
+    new Pos(0, 1), new Pos(2, 1),
+    new Pos(0, 2), new Pos(2, 2),
+    new Pos(0, 3), new Pos(2, 3)
+  ])
+
+  // ── Scenario 3: Red zigzag on 5×5 ────────────────────────────────────────
+  // Red: (0,2)→(1,2)→(2,1)→(3,1)→(4,0) — valid hex path top→bottom.
+  // Each step uses an allowed hex neighbor offset.
+  reports << playScenario("Red zigzag 5×5", 5, [
+    new Pos(0, 2), new Pos(0, 0),
+    new Pos(1, 2), new Pos(4, 4),
+    new Pos(2, 1), new Pos(4, 3),
+    new Pos(3, 1), new Pos(3, 4),
+    new Pos(4, 0)
+  ])
+
+  // ── Scenario 4: Blue zigzag on 5×5 ───────────────────────────────────────
+  // Blue: (2,0)→(2,1)→(1,2)→(1,3)→(0,4) — valid hex path left→right.
+  // (2,0)→(2,1): right; (2,1)→(1,2): up-right; (1,2)→(1,3): right; (1,3)→(0,4): up-right.
+  reports << playScenario("Blue zigzag 5×5", 5, [
+    new Pos(0, 0), new Pos(2, 0),
+    new Pos(0, 1), new Pos(2, 1),
+    new Pos(0, 2), new Pos(1, 2),
+    new Pos(0, 3), new Pos(1, 3),
+    new Pos(4, 4), new Pos(0, 4)
+  ])
+
+  // ── Summary ───────────────────────────────────────────────────────────────
+  IO::println("\n" + 56.times("═"))
+  IO::println("RESULTS")
+  IO::println(56.times("═"))
+  var idx: Int = 1
+  foreach r: GameReport in reports {
+    IO::println("  #{idx}. " + r.summary())
+    idx = idx + 1
+  }
+
+  // Derived statistics via collection pipelines
+  val winners: List[Object] = reports
+    .filter { r -> (r as GameReport).winner() != null }
+    .map    { r -> (r as GameReport).winner() as Player }
+
+  val redWins:  Int = winners.count { w -> (w as Player) == Player::RED  }
+  val blueWins: Int = winners.count { w -> (w as Player) == Player::BLUE }
+  val noWinner: Int = reports.size - winners.size
+
+  IO::println("\nRed wins: #{redWins}  Blue wins: #{blueWins}  No winner: #{noWinner}")
+
+  // Average moves per game
+  val totalMoves: Int = (reports
+    .map  { r -> (r as GameReport).totalMoves() }
+    .fold(0) { acc, m -> (acc as Int) + (m as Int) }) as Int
+  IO::println("Average moves per game: #{totalMoves / reports.size}")
+
+  // Most stones placed in any single game
+  val maxStones: Int = (reports
+    .map  { r -> (r as GameReport).redStones() + (r as GameReport).blueStones() }
+    .fold(0) { acc, m -> if (m as Int) > (acc as Int) { m as Int } else { acc as Int } }) as Int
+  IO::println("Most stones placed in a game: #{maxStones}")
+
+  // Group by winner symbol, iterate with (key, group) destructuring
+  val byWinner = reports.groupBy { r ->
+    val w: Player? = (r as GameReport).winner()
+    if w != null { (w as Player).sym() } else { "-" }
+  }
+  IO::println("\nBy winner symbol:")
+  foreach (sym, group) in byWinner {
+    IO::println("  #{sym}: #{(group as List[GameReport]).size} game(s)")
+  }
+
+  // Group by board size
+  val bySizeMap = reports.groupBy { r -> "#{(r as GameReport).size()}×#{(r as GameReport).size()}" }
+  IO::println("\nBy board size:")
+  foreach (sz, group) in bySizeMap {
+    IO::println("  #{sz}: #{(group as List[GameReport]).size} game(s)")
+  }
+
+  // Longest and shortest game
+  val sortedByMoves: List[GameReport] = reports
+    .sortedBy { r -> (r as GameReport).totalMoves() }
+  val shortest: GameReport = sortedByMoves[0] as GameReport
+  val longest:  GameReport = sortedByMoves[sortedByMoves.size - 1] as GameReport
+  IO::println("\nShortest game: \"#{shortest.scenario()}\" (#{shortest.totalMoves()} moves)")
+  IO::println("Longest  game: \"#{longest.scenario()}\" (#{longest.totalMoves()} moves)")
+
+  // DFS sanity: the winner must have at least n stones (a path needs n cells).
+  IO::println("\nDFS sanity check (winner stone count ≥ board size):")
+  foreach r: GameReport in reports {
+    val w: Player? = r.winner()
+    if w != null {
+      val stones: Int = if (w as Player) == Player::RED { r.redStones() } else { r.blueStones() }
+      val ok: Boolean = stones >= r.size()
+      IO::println("  #{r.scenario()}: #{(w as Player).sym()} has #{stones} stone(s), need ≥ #{r.size()} — #{if ok { "OK" } else { "FAIL" }}")
+    }
+  }
+
+  // Exception-safety: a zero-size board can be created but is degenerate.
+  try {
+    val empty = new HexBoard(0)
+    val won: Boolean = empty.hasWon(Player::RED)
+    IO::println("\nZero-size board: hasWon=#{won} (always false, no cells)")
+  } catch e: Exception {
+    IO::println("\nZero-size board threw: " + e.getMessage())
+  }
+}

@@ -47,6 +47,11 @@ object OnionParser {
    *  message instead of the expected-kind set at the (unrelated) resync point. */
   val UnclosedInterpolationMarker: String = "#{"
 
+  /** Sentinel `found` image for a `#{...}` interpolation whose body nests `{...}` more than
+   *  `OnionLexer.MaxInterpBraceDepth` levels deep, so it is reported with its own message
+   *  rather than (wrongly) as unclosed (issue #1966): the body IS balanced, just too deep. */
+  val TooDeepInterpolationMarker: String = "#{..}"
+
   private val theFail = new Fail(null)
   private val debug = java.lang.Boolean.getBoolean("onion.parser.debug")
 
@@ -2769,6 +2774,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       } else {
         parts += (if (single) unescape(str.substring(start, interpStart)) else str.substring(start, interpStart))
         var braceCount = 1
+        var maxBraceCount = 1
         var interpEnd = interpStart + 2
         while (interpEnd < str.length && braceCount > 0) {
           val ch = str.charAt(interpEnd)
@@ -2778,8 +2784,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
               if (str.charAt(interpEnd) == '\\') interpEnd += 1
               interpEnd += 1
             }
-          } else if (ch == '{') braceCount += 1
-          else if (ch == '}') braceCount -= 1
+          } else if (ch == '{') {
+            braceCount += 1
+            if (braceCount > maxBraceCount) maxBraceCount = braceCount
+          } else if (ch == '}') braceCount -= 1
           interpEnd += 1
         }
         if (braceCount > 0) {
@@ -2787,6 +2795,14 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           // parsing eventually resynchronizes (issue #1953).
           val (hashLine, hashCol) = interpolationOrigin(str, interpStart, loc, quoteLen)
           adoptFailure(Location(hashLine, hashCol), UnclosedInterpolationMarker, new java.util.LinkedHashSet[Integer]())
+          throw fail
+        }
+        // The body IS balanced, but nests deeper than the fixed-depth `INTERP_BODY` token
+        // JavaCC's grammar unrolls to (`OnionLexer.MaxInterpBraceDepth`) can express; report
+        // the real limit instead of accepting what JavaCC would reject (issue #1966).
+        if (maxBraceCount - 1 > OnionLexer.MaxInterpBraceDepth) {
+          val (hashLine, hashCol) = interpolationOrigin(str, interpStart, loc, quoteLen)
+          adoptFailure(Location(hashLine, hashCol), TooDeepInterpolationMarker, new java.util.LinkedHashSet[Integer]())
           throw fail
         }
         val exprStr = str.substring(interpStart + 2, interpEnd - 1)

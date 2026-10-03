@@ -394,7 +394,19 @@ final class OnionLexer(text: String)
         case _ => i += 1
     -1
 
-  /** After `#{`: INTERP_BODY then `}`; returns the index after `}` or -1. */
+  /**
+   * After `#{`: INTERP_BODY then `}`; returns the index after `}` or -1.
+   *
+   * Brace nesting itself is unbounded here (a plain counter, unlike the finite unroll
+   * `INTERP_BODY` is forced into in `grammar/JJOnionParser.jj`) so this always finds the
+   * real end of the interpolation body and the enclosing STRING token is tokenized
+   * correctly regardless of nesting depth. `OnionParser.interpolated` -- which re-parses
+   * this same body once the token exists -- is what actually enforces
+   * `MaxInterpBraceDepth`, with a dedicated diagnostic (issue #1966: this function used to
+   * cap depth too and bail with -1, which sent a *correctly* nested but deep `#{...}` down
+   * the "maybe this `#{` is literal text" fallback, truncating the STRING token at the
+   * first unescaped quote inside the interpolation and misreporting it as unclosed).
+   */
   private def interpBodyEnd(from: Int): Int =
     var i = from
     var depth = 0
@@ -406,7 +418,6 @@ final class OnionLexer(text: String)
           depth -= 1
           i += 1
         case '{' =>
-          if depth == OnionLexer.MaxInterpBraceDepth then return -1
           depth += 1
           i += 1
         case '"' =>
@@ -616,12 +627,13 @@ object OnionLexer:
   private val IN_STATEMENT = 1
 
   /**
-   * How many levels of `{...}` may nest inside a `#{...}` interpolation body, for tokenizing
-   * the STRING token itself (the later parse of the extracted expression has no such limit).
-   * Mirrors the depth the `INTERP_BODY` token in `grammar/JJOnionParser.jj` unrolls to; raise
-   * both together.
+   * How many levels of `{...}` a `#{...}` interpolation body may nest, enforced by
+   * `OnionParser.interpolated` (a dedicated diagnostic, not the misleading "unclosed"
+   * one -- issue #1966) once the STRING token itself has been correctly tokenized.
+   * Mirrors the depth the `INTERP_BODY` token in `grammar/JJOnionParser.jj` unrolls to;
+   * raise both together.
    */
-  private val MaxInterpBraceDepth = 4
+  private[compiler] val MaxInterpBraceDepth = 4
 
   private def isIdentStart(c: Char): Boolean =
     (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'

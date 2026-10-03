@@ -222,6 +222,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val ctorSignature =
       GenericSignatureEncoder.methodSignature(ctor.typeParameters, ctor.arguments, BasicType.VOID)
     val gen = MethodEmitter.newGenerator(cw, toAsmModifier(ctor.modifier), "<init>", AsmType.VOID_TYPE, argTypes, signature = ctorSignature)
+    NullabilityMetadata.emitParameters(gen, ctor.arguments)
 
     // Emit line number for constructor declaration
     if ctor.location != null then
@@ -346,6 +347,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     // Just visit the method without any code (abstract method needs visitEnd but no code)
     val mv = cw.visitMethod(access, node.name, desc, methodSignature, exceptions)
+    NullabilityMetadata.emitParameters(mv, node.arguments)
     mv.visitEnd()
 
   /**
@@ -374,6 +376,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val methodSignature =
       GenericSignatureEncoder.methodSignature(node.typeParameters, node.arguments, node.returnType)
     val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes, exceptions, methodSignature)
+    NullabilityMetadata.emitParameters(gen, node.arguments)
 
     // Bounds for every LocalVariableTable entry. Marked before anything else is emitted,
     // so the range covers the whole body. Each slot is allocated fresh (newLocal never

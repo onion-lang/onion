@@ -108,6 +108,12 @@ class WarningReporter(
         s"if the platform value can be null (e.g. a missing Json key), this throws a NullPointerException at runtime")
   }
 
+  def discardedBuilderResult(location: Location, className: String, methodName: String): Unit = {
+    report(WarningCategory.DiscardedBuilderResult, location,
+      s"the result of '$className.$methodName' is discarded; '$className' is immutable, so this call has no effect " +
+        s"(use the returned value, e.g. 'val r = x.$methodName(...)')")
+  }
+
   /** A library jar's `META-INF/onion/effect-table.txt` does not parse; it was ignored. */
   def libraryEffectTableMalformed(source: String, location: Location, message: String): Unit = {
     report(WarningCategory.LibraryEffectTableMalformed, location, message, source)

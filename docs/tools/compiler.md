@@ -147,6 +147,7 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 | `W0016` | `ineffective-tail-recursive` | `@TailRecursive` annotation present but its mutual-recursion group could not be optimized |
 | `W0017` | `malformed-effect-table` | A library jar's effect table is malformed and was ignored |
 | `W0018` | `foreign-effect-entry` | A library jar's effect table names classes outside the jar; those entries were ignored |
+| `W0019` | `discarded-builder-result` | The result of an immutable builder method is discarded, so the call has no effect |
 
 ### `--no-check-laws`
 

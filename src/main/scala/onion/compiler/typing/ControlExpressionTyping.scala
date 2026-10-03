@@ -215,7 +215,9 @@ final class ControlExpressionTyping(
 
   private[typing] def termToStatement(node: AST.Node, term: Term): ActionStatement = term match {
     case stmtTerm: StatementTerm => stmtTerm.statement
-    case _ => new ExpressionActionStatement(node.location, term)
+    case _ =>
+      DiscardedBuilderResultCheck.check(typing, bodyContext, node, term)
+      new ExpressionActionStatement(node.location, term)
   }
 
   private[typing] def assignBranch(node: AST.Node, term: Term, resultVar: ClosureLocalBinding, resultType: Type): ActionStatement =

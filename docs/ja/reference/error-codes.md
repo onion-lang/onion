@@ -1551,6 +1551,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `W0016` | `@TailRecursive` が付与されているが、その相互再帰グループを最適化できなかった |
 | `W0017` | ライブラリ jar の `META-INF/onion/effect-table.txt` が壊れていて、表全体が無視された（jar と行で報告） |
 | `W0018` | ライブラリ jar の効果表が jar の外のクラスを名指しており、それらのエントリは無視された |
+| `W0019` | イミュータブルなビルダーのメソッド（`Http.Request.header` など）の結果が文として捨てられており、呼び出しが何も行わない |
 
 ## 診断コード一覧
 

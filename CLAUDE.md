@@ -23,6 +23,7 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 - **Run Onion script**: `sbt 'runScript path/to/script.on [args]'`
 - **Start REPL**: `sbt repl`
 - **Clean build**: `sbt clean`
+- **Build/test a battery** (optional library under `batteries/`, e.g. `onion-llm`): `sbt llm/test`, `sbt llm/publishM2` - the root project never aggregates or depends on a battery, so these never affect `sbt assembly`/`dist`/`test` or the size of `onion.jar`
 - **Scala console**: `sbt console`
 
 ### Compiler Options (for onionc/onion)
@@ -214,6 +215,14 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `ConfigShape` - The `Shape[T]` backing `shape name = config`: a lossless shape over commented `key = value` documents
 - `ToolCli` - The runtime dispatch behind a top-level `tool` declaration's synthesized `main` (`--help`, `--contract`, `--plan`, flag/positional parsing)
 
+**Batteries** (`batteries/<name>/`, e.g. `batteries/llm/`): optional libraries published as
+their own Maven artifact next to (never inside) `onion.jar`; a script pulls one in with
+`//> using dep "org.onion-lang:onion-<name>:<version>"`, a project with `[dependencies]`.
+Built/tested by sbt subproject name (`sbt llm/test`), documented separately under
+`docs/batteries/` (en) and `docs/ja/batteries/` (ja). The first one, `onion-llm`
+(`batteries/llm/src/main/java/onion/llm/Llm.java`), calls Claude through the Anthropic
+Messages API and reads the answer back as a `Shape`-typed record.
+
 ## Testing
 
 **Framework:** ScalaTest 3.2.19
@@ -333,6 +342,7 @@ If modifying the parser grammar (`grammar/JJOnionParser.jj`):
   - `MutualRecursionOptimization.scala` - `@TailRecursive` mutual-recursion group → state machine
 - **Parser grammar**: `grammar/JJOnionParser.jj`
 - **Runtime library**: `src/main/java/onion/` (Java interfaces)
+- **Batteries (optional libraries)**: `batteries/` (e.g. `batteries/llm/`)
 - **Tools (CLI)**: `src/main/scala/onion/tools/`
 - **Tests**: `src/test/scala/onion/compiler/tools/`
 - **Test programs**: `src/test/run/` (example Onion programs)

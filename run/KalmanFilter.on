@@ -1,0 +1,250 @@
+// KalmanFilter.on — discrete-time Kalman filter with three tracking scenarios.
+//
+// Implements a 2-state (position + velocity) constant-velocity Kalman filter
+// and demonstrates its ability to smooth noisy position measurements.
+//
+// Algorithm:
+//   Predict:  x' = Fx,   P' = FPF^T + Q   (F = [[1,dt],[0,1]])
+//   Update:   K  = PH^T(HPH^T+R)^-1,      x ← x+K(z−Hx),  P ← (I−KH)P
+//             (H = [1,0], measurement selects position only)
+//
+// Exercises: records with methods, classes, extension methods on Double,
+//   foreach ranges, ArrayList, Format::fixed, Math::sqrt, string interpolation,
+//   if-expressions, select, nullable, collection pipeline (map/fold).
+//
+// Run: java -cp onion.jar onion.tools.ScriptRunner run/KalmanFilter.on
+
+import {
+  java.lang.Math
+  java.util.ArrayList
+}
+
+// ── Extension helpers ─────────────────────────────────────────────────────────
+
+extension Double {
+  def absd():  Double = if self >= 0.0 { self } else { -self }
+  def f2():    String = Format::fixed(self, 2)
+  def f3():    String = Format::fixed(self, 3)
+  def f4():    String = Format::fixed(self, 4)
+}
+
+// ── State: 2-vector [x,v] + 2×2 covariance ────────────────────────────────────
+
+record KState(
+  x:   Double, v:   Double,
+  p00: Double, p01: Double, p10: Double, p11: Double
+) {
+public:
+  def posStd(): Double = Math::sqrt(p00().absd())
+  def velStd(): Double = Math::sqrt(p11().absd())
+}
+
+// ── Kalman Filter (constant-velocity model) ────────────────────────────────────
+
+class KalmanFilter {
+  var dt:   Double
+  var sigQ: Double
+
+public:
+  def this(dt: Double, sigQ: Double) {
+    self.dt   = dt
+    self.sigQ = sigQ
+  }
+
+  // Predict step: advance state one dt forward.
+  //   fp00 = p00 + dt*(p01+p10) + dt²*p11  + Q[0,0]
+  //   fp01 = p01 + dt*p11                   + Q[0,1]
+  //   fp10 = p10 + dt*p11                   + Q[1,0]
+  //   fp11 = p11                             + Q[1,1]
+  //   where Q = sigQ² * [[dt⁴/4, dt³/2], [dt³/2, dt²]]
+  def predict(s: KState): KState {
+    val dt2  = dt * dt
+    val dt3  = dt2 * dt
+    val dt4  = dt3 * dt
+    val q    = sigQ * sigQ
+    val xp   = s.x() + s.v() * dt
+    val vp   = s.v()
+    val fp00 = s.p00() + dt * (s.p01() + s.p10()) + dt2 * s.p11()
+    val fp01 = s.p01() + dt * s.p11()
+    val fp10 = s.p10() + dt * s.p11()
+    val fp11 = s.p11()
+    return new KState(
+      xp, vp,
+      fp00 + q * dt4 / 4.0,
+      fp01 + q * dt3 / 2.0,
+      fp10 + q * dt3 / 2.0,
+      fp11 + q * dt2
+    )
+  }
+
+  // Update step: fuse position measurement z (noise variance r).
+  //   S  = p00 + r,   K = [p00/S, p10/S]^T
+  //   x ← x + K*(z−x),  P ← (I − KH)*P
+  def update(s: KState, z: Double, r: Double): KState {
+    val S  = s.p00() + r
+    val k0 = s.p00() / S
+    val k1 = s.p10() / S
+    val y  = z - s.x()
+    return new KState(
+      s.x() + k0 * y, s.v() + k1 * y,
+      (1.0 - k0) * s.p00(),
+      (1.0 - k0) * s.p01(),
+      s.p10() - k1 * s.p00(),
+      s.p11() - k1 * s.p01()
+    )
+  }
+}
+
+// ── Running mean-absolute error tracker ───────────────────────────────────────
+
+class MAE {
+  var rawSum:  Double
+  var filtSum: Double
+  var n:       Int
+
+public:
+  def this() { rawSum = 0.0; filtSum = 0.0; n = 0 }
+
+  def add(trueX: Double, raw: Double, filt: Double): void {
+    rawSum  = rawSum  + (raw  - trueX).absd()
+    filtSum = filtSum + (filt - trueX).absd()
+    n = n + 1
+  }
+
+  def rawMAE():  Double = if n == 0 { 0.0 } else { rawSum  / (n as Double) }
+  def filtMAE(): Double = if n == 0 { 0.0 } else { filtSum / (n as Double) }
+}
+
+// ── Scenario 1: constant-velocity object ──────────────────────────────────────
+
+def scenario1(): void {
+  IO::println("--- Scenario 1: Constant Velocity (v=5 m/s, dt=1 s, sigR=2 m) ---")
+  IO::println(" step | meas z   | est x    | est v    | sigma_x")
+  IO::println("------+----------+----------+----------+--------")
+
+  val kf  = new KalmanFilter(1.0, 0.1)
+  var st  = new KState(0.0, 0.0, 200.0, 0.0, 0.0, 200.0)
+  val mae = new MAE()
+  val trueV = 5.0
+  val sigR  = 2.0
+  val R     = sigR * sigR
+
+  // Noise values (drawn from N(0, sigR)); pre-fixed for reproducibility
+  val noise = [2.84, -1.36, 3.64, -3.12, 0.82, -3.86, 2.92, 2.54, -3.52, 2.08,
+               -4.44, 2.86, -1.84, 3.36, -2.92, 4.24, -1.28, 2.76, -4.92, 2.48]
+
+  foreach i: Int in 0..<20 {
+    val trueX = trueV * (i + 1) as Double
+    val z     = trueX + noise[i] as Double
+    st  = kf.predict(st)
+    st  = kf.update(st, z, R)
+    mae.add(trueX, z, st.x())
+    if i < 8 {
+      IO::println("  #{i + 1}   | #{z.f3()}  | #{st.x().f3()}  | #{st.v().f3()}  | #{st.posStd().f3()}")
+    }
+  }
+  IO::println("  ...   (20 steps total)")
+  IO::println("MAE raw=#{mae.rawMAE().f3()}  filtered=#{mae.filtMAE().f3()}")
+  IO::println("")
+}
+
+// ── Scenario 2: decelerating object ───────────────────────────────────────────
+
+def scenario2(): void {
+  IO::println("--- Scenario 2: Decelerating Object (v0=20 m/s, a=-2 m/s², sigR=3 m) ---")
+  IO::println(" step | meas z   | est x    | est v    | sigma_x")
+  IO::println("------+----------+----------+----------+--------")
+
+  val kf  = new KalmanFilter(0.5, 1.5)   // dt=0.5 s, higher sigQ for acceleration
+  var st  = new KState(0.0, 0.0, 400.0, 0.0, 0.0, 400.0)
+  val mae = new MAE()
+  val v0  = 20.0
+  val a   = -2.0
+  val DT  = 0.5
+  val R   = 9.0  // sigR=3
+
+  val noise2 = [3.12, -2.08, 5.22, -3.69, 2.04, -6.42, 1.17, 5.25, -2.73, 2.82,
+                -4.86, 4.74, -1.05, 5.64, -3.21]
+
+  foreach i: Int in 0..<15 {
+    val t     = (i + 1) as Double * DT
+    val trueX = v0 * t + 0.5 * a * t * t
+    val z     = trueX + noise2[i] as Double
+    st  = kf.predict(st)
+    st  = kf.update(st, z, R)
+    mae.add(trueX, z, st.x())
+    IO::println("  #{i + 1}   | #{z.f3()}  | #{st.x().f3()}  | #{st.v().f3()}  | #{st.posStd().f3()}")
+  }
+  IO::println("MAE raw=#{mae.rawMAE().f3()}  filtered=#{mae.filtMAE().f3()}")
+  IO::println("")
+}
+
+// ── Scenario 3: manoeuvring target ────────────────────────────────────────────
+
+def scenario3(): void {
+  IO::println("--- Scenario 3: Manoeuvring Target (high sigQ=3, sigR=3 m) ---")
+  IO::println(" step | true x   | meas z   | est x    | sigma_x")
+  IO::println("------+----------+----------+----------+--------")
+
+  val kf  = new KalmanFilter(1.0, 3.0)
+  var st  = new KState(0.0, 5.0, 100.0, 0.0, 0.0, 100.0)
+  val mae = new MAE()
+  val R   = 9.0
+
+  // True positions: steady then sharp deceleration
+  val trueXs = [5.0, 10.0, 15.0, 20.0, 25.0,
+                27.5, 28.5, 28.8, 28.3, 27.2,
+                25.8, 24.1, 22.4, 20.8, 19.3]
+  val noise3 = [3.15, -6.57, 10.26, -4.59, 8.28,
+                -11.61, 4.23, -7.92, 2.79, 7.65,
+                -4.41, 9.63, -2.16, 5.49, -7.02]
+
+  foreach i: Int in 0..<15 {
+    val tx = trueXs[i] as Double
+    val z  = tx + noise3[i] as Double
+    st  = kf.predict(st)
+    st  = kf.update(st, z, R)
+    mae.add(tx, z, st.x())
+    IO::println("  #{i + 1}   | #{tx.f3()}  | #{z.f3()}  | #{st.x().f3()}  | #{st.posStd().f3()}")
+  }
+  IO::println("MAE raw=#{mae.rawMAE().f3()}  filtered=#{mae.filtMAE().f3()}")
+  IO::println("")
+}
+
+// ── Covariance convergence ─────────────────────────────────────────────────────
+
+def showConvergence(): void {
+  IO::println("--- Covariance Convergence (15 steps, R=4, sigQ=0.1) ---")
+  IO::println(" step | P[0,0]   | P[1,1]   | gain K0  | K0 stable?")
+  IO::println("------+----------+----------+----------+----------")
+
+  val kf   = new KalmanFilter(1.0, 0.1)
+  var st   = new KState(0.0, 0.0, 200.0, 0.0, 0.0, 200.0)
+  val R    = 4.0
+  var prevK0 = 0.0
+
+  foreach i: Int in 0..<15 {
+    st = kf.predict(st)
+    val S  = st.p00() + R
+    val k0 = st.p00() / S
+    st = kf.update(st, 0.0, R)
+    val stable = if (k0 - prevK0).absd() < 0.0001 { "yes" } else { "converging" }
+    IO::println("  #{i + 1}   | #{st.p00().f4()}  | #{st.p11().f4()}  | #{k0.f4()}  | #{stable}")
+    prevK0 = k0
+  }
+  IO::println("")
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+IO::println("======================================================")
+IO::println("  Kalman Filter — Discrete-Time State Estimation")
+IO::println("======================================================")
+IO::println("")
+
+scenario1()
+scenario2()
+scenario3()
+showConvergence()
+
+IO::println("Done.")

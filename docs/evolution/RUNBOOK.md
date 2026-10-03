@@ -6,10 +6,12 @@ do. Follow the section for your role, and always do §0 first.
 
 ## §0 Every run, every role
 
-1. **Kill switch.** Find the pinned Roadmap issue
-   (`gh issue list --label kind:roadmap --state open`). If it carries `evolution:pause`, stop
-   and report "paused".
-2. **Orient.** Read:
+1. **Kill switch.** The Roadmap issue is the open issue titled "Roadmap: Onion evolution" (`kind:roadmap`); Direction proposals share the label, so match the title:
+   `gh issue list --label kind:roadmap --state open --search "Roadmap: Onion evolution in:title"`.
+   If it carries `evolution:pause`, stop and report "paused".
+2. **Orient.** The newest `approved` Direction proposal is the active direction; issues it
+   names, or that serve its bets, are in scope. If none is approved yet, work only on `P0`/`P1`
+   bugs. Read:
    - the Roadmap issue
    - the newest Direction proposal labelled `approved`
    - "Known pitfalls" at the end of this file
@@ -43,7 +45,9 @@ do. Follow the section for your role, and always do §0 first.
 
 Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day**.
 
-1. **Health first.** Check whether `develop` is red (`gh run list --branch develop --limit 3`).
+1. **Health first.** Check whether `develop` is red, looking only at the test workflows:
+   `gh run list --branch develop --workflow scala.yml --limit 3` (and `dogfood.yml` once it
+   exists). A failed `release` run is a release problem, not a red `develop`.
    If it is, fixing it is the only job this run: file or reuse a `kind:bug` `P0` issue and fix it.
 2. **Merge your own work.**
    - Merge open `kokone/*` PRs labelled `risk:low` whose checks are all green (merge commit).
@@ -66,18 +70,24 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      - build or publishing
      - major dependency upgrades
      - deleted tests
-   - Otherwise label it `risk:low`.
+   - Otherwise label it `risk:low`. `risk:*` describes a PR, not an issue; an issue's label is
+     only a forecast, and the PR's diff decides.
+   - A `risk:high` PR gets `status:needs-kota` too (on the PR); leave the issue `status:in-progress`.
+   - Bugs you find along the way: file them as issues (template, labels, repro) instead of
+     fixing them in the same PR.
 5. **Nothing ready?** Run one Sensor probe (§2 step 2) instead of inventing work. Add a `run/`
    sample only when an issue asks for one or it exercises a feature you just changed, and never
    more than one a day.
 6. **Close the loop.**
-   - Comment on the issue with **What changed** and **What I learned** (1–3 bullets).
+   - Comment on the issue with **What changed** and **What I learned** (1–3 bullets), and link
+     your session (cloud runs have a claude.ai/code/session link; a local run says "local").
    - Leave it open with `status:ready` if work remains, or `status:blocked` with the reason.
    - If a lesson applies beyond this issue, also comment it on the Roadmap issue, prefixed `Pitfall:`.
 
 ## §2 Sensor (daily)
 
-1. **Dogfood.** Build and test every project under `dogfood/`, once that directory exists. A
+1. **Dogfood.** Run `dogfood/run.sh` (builds and tests every project under `dogfood/`, offline),
+   once that directory exists. A
    failure or awkwardness becomes a `kind:friction` or `kind:bug` issue with `source:dogfood`.
 2. **Probe.** Run the gap-probe workflow (`.claude/workflows/onion-gap-probe.js`) on **two**
    domains, rotating through its domain list. Record which ones in the digest. Each verified
@@ -94,8 +104,9 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    - PRs merged in the last 24h
    - issues opened
    - the `status:needs-kota` list
-   - a metrics snapshot: open friction issues by priority, the share of last week's PRs that
-     closed an issue, the share that were samples, and the CI result on `develop`
+   - a metrics snapshot: the dogfood result, open friction issues by priority, the share of
+     last week's PRs that closed an issue, the share that were samples, and the CI result on
+     `develop`
 
 ## §3 Strategist (weekly)
 
@@ -131,6 +142,10 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
     `target/scala-3.3.7/onion.jar` path is gone.
   - Run a script with `java -cp <that jar> onion.tools.ScriptRunner run/NAME.on < /dev/null`.
   - The whole suite is `sbt -batch testFull`. Under sbt 2, `test` only reruns what changed.
+    Use targeted `testOnly` while iterating and `testFull` once before a compiler-fix PR; CI
+    runs the whole suite on every PR anyway.
+  - "Both locales" applies to changes that touch messages or docs; a change with no Scala,
+    message or doc impact only needs what it touches.
   - Raise `-Xmx` for the full suite (CI uses 10G), or `MutationFuzzSpec` can run out of memory.
 - **Check that a bug still exists before chasing it.** The original routine's prompt named an
   `extension Int` bug that had long been fixed (it printed `10`).
@@ -153,5 +168,9 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
 - **A grammar change must be made in both parsers:** `grammar/JJOnionParser.jj` and
   `parser/OnionParser.scala`. `FastPathParserParitySpec` checks them.
 - **Docs come in pairs:** `docs/...` and `docs/ja/...` must stay structurally parallel.
+- **Windows/PowerShell (local runs only):** PowerShell drops inner quotes in
+  `sbt.bat '...'` arguments; pass sbt commands from Git Bash, or write them to a file.
+- **Workflow triggers:** a workflow on both `push` and `pull_request` runs twice per PR push;
+  new workflows should run on `pull_request` plus `push` to `develop` only.
 - **Scratch files:** write PR bodies to uniquely named files. A shared scratch file has been
   overwritten by a concurrent session before.

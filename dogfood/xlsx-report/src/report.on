@@ -1,0 +1,125 @@
+// Spreadsheet in, slide deck out, through Apache POI by plain Java interop.
+// Kept in a class because tests cannot reach top-level functions of src/.
+import {
+  org.apache.poi.xssf.usermodel.XSSFWorkbook
+  org.apache.poi.ss.usermodel.Row
+  org.apache.poi.ss.usermodel.Cell
+  org.apache.poi.ss.usermodel.CellType
+  org.apache.poi.ss.usermodel.DataFormatter
+  org.apache.poi.xslf.usermodel.XMLSlideShow
+  org.apache.poi.xslf.usermodel.XSLFSlide
+  org.apache.poi.xslf.usermodel.XSLFTextBox
+  org.apache.poi.xslf.usermodel.XSLFTable
+  java.io.FileInputStream
+  java.io.FileOutputStream
+  java.awt.Rectangle
+}
+
+record Sale(date: String, region: String, product: String, units: Int, revenue: Double)
+// Where a value could not be read, spreadsheet style: sheet, 1-based row and column.
+record CellDefect(sheet: String, row: Int, col: Int, message: String)
+record RegionTotal(region: String, units: Int, revenue: Double)
+
+class Report {
+public:
+  static val SHEET: String = "売上"
+
+  // Rows 2.. of the sheet; unreadable rows are reported in `defects` and skipped.
+  static def readSales(path: String, defects: List[CellDefect]): List[Sale] {
+    val sales: List[Sale] = []
+    val fmt = new DataFormatter()
+    try (val input = new FileInputStream(path); val wb = new XSSFWorkbook(input)) {
+      val sheet = wb.getSheet(SHEET)
+      foreach i: Int in 1..sheet.getLastRowNum() {
+        val row: Row? = sheet.getRow(i)
+        if row == null { continue }
+        val r = row as Row
+        val units = numberAt(r, 3, "units", defects)
+        val revenue = numberAt(r, 4, "revenue", defects)
+        if units == null || revenue == null { continue }
+        sales << new Sale(fmt.formatCellValue(r.getCell(0)), fmt.formatCellValue(r.getCell(1)),
+                          fmt.formatCellValue(r.getCell(2)), (units as Double).intValue(), revenue as Double)
+      }
+    }
+    return sales
+  }
+
+  static def numberAt(row: Row, col: Int, name: String, defects: List[CellDefect]): Double? {
+    val cell: Cell? = row.getCell(col)
+    if cell != null && (cell as Cell).getCellType() == CellType::NUMERIC {
+      return (cell as Cell).getNumericCellValue()
+    }
+    val shown = if cell == null { "(empty)" } else { new DataFormatter().formatCellValue(cell) }
+    defects << new CellDefect(SHEET, row.getRowNum() + 1, col + 1, name + ": expected a number, found '" + shown + "'")
+    return null
+  }
+
+  static def summarize(sales: List[Sale]): List[RegionTotal] {
+    val totals: List[RegionTotal] = []
+    foreach (region, rows) in sales.groupBy { s -> s.region() } {
+      val rs = rows as List[Sale]
+      totals << new RegionTotal(region as String,
+                                rs.fold(0) { acc, s -> (acc as Int) + (s as Sale).units() } as Int,
+                                rs.sumBy { s -> s.revenue() })
+    }
+    return totals.sortedByDescending { t -> t.revenue() }
+  }
+
+  static def writeDeck(path: String, totals: List[RegionTotal], unreadable: Int): void {
+    val ppt = new XMLSlideShow()
+    val cover: XSLFSlide = ppt.createSlide()
+    val title: XSLFTextBox = cover.createTextBox()
+    title.setAnchor(new Rectangle(60, 180, 600, 90))
+    title.setText("地域別 売上レポート")
+    title.getTextParagraphs()[0].getTextRuns()[0].setFontSize(40.0)
+    val note: XSLFTextBox = cover.createTextBox()
+    note.setAnchor(new Rectangle(60, 290, 600, 60))
+    note.setText("読めなかった行: " + unreadable + " 件（シート・行・列はコンソール出力を参照）")
+
+    val body: XSLFSlide = ppt.createSlide()
+    val head: XSLFTextBox = body.createTextBox()
+    head.setAnchor(new Rectangle(40, 20, 640, 60))
+    head.setText("地域別の合計")
+    val table: XSLFTable = body.createTable(totals.size + 1, 3)
+    table.setAnchor(new Rectangle(40, 100, 640, 40 * (totals.size + 1)))
+    table.getCell(0, 0).setText("地域")
+    table.getCell(0, 1).setText("数量")
+    table.getCell(0, 2).setText("売上 (円)")
+    foreach i: Int in 0..<totals.size {
+      val t = totals[i]
+      table.getCell(i + 1, 0).setText(t.region())
+      table.getCell(i + 1, 1).setText("" + t.units())
+      table.getCell(i + 1, 2).setText(Format::integer(Math::round(t.revenue())))
+    }
+    try (val out = new FileOutputStream(path)) { ppt.write(out) }
+    ppt.close()
+  }
+
+  // A small sheet with two deliberately bad rows, so the defect path is exercised.
+  static def writeSample(path: String): void {
+    val wb = new XSSFWorkbook()
+    val sheet = wb.createSheet(SHEET)
+    val rows: List[List[Object]] = [
+      ["日付", "地域", "商品", "数量", "売上"],
+      ["2026-09-01", "関東", "A", 12, 120000.0],
+      ["2026-09-01", "関西", "A", 8, 80000.0],
+      ["2026-09-02", "関東", "B", 5, 75000.0],
+      ["2026-09-02", "九州", "A", "十二", 120000.0],
+      ["2026-09-03", "関西", "B", 9, 135000.0],
+      ["2026-09-03", "九州", "B", 4, ""],
+      ["2026-09-04", "関東", "A", 7, 70000.0]
+    ]
+    foreach i: Int in 0..<rows.size {
+      val row = sheet.createRow(i)
+      val values = rows[i]
+      foreach j: Int in 0..<values.size {
+        val v = values[j]
+        val cell = row.createCell(j)
+        if v is String { cell.setCellValue(v as String) }
+        else { cell.setCellValue((v as Number).doubleValue()) }
+      }
+    }
+    try (val out = new FileOutputStream(path)) { wb.write(out) }
+    wb.close()
+  }
+}

@@ -1,0 +1,1 @@
+{"id": "msg_synthetic", "type": "message", "role": "assistant", "model": "claude-opus-5-5", "content": [], "stop_reason": "refusal", "stop_sequence": null, "stop_details": {"type": "refusal", "category": "cyber", "explanation": "synthetic refusal"}, "usage": {"input_tokens": 412, "output_tokens": 0}}

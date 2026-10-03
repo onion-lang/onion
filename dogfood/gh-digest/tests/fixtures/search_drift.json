@@ -1,0 +1,138 @@
+{
+ "total_count": 4,
+ "incomplete_results": false,
+ "items": [
+  {
+   "url": "https://api.github.com/repos/onion-lang/onion/issues/101",
+   "repository_url": "https://api.github.com/repos/onion-lang/onion",
+   "html_url": "https://github.com/onion-lang/onion/pull/101",
+   "id": 3000000101,
+   "number": 101,
+   "title": "feat(shapes): json shapes read lists",
+   "user": {
+    "login": "alice",
+    "id": 1101,
+    "type": "User",
+    "site_admin": false
+   },
+   "labels": [
+    {
+     "id": 1,
+     "name": "kind:feature",
+     "color": "1d76db",
+     "default": false
+    }
+   ],
+   "state": "open",
+   "locked": false,
+   "comments": 1,
+   "created_at": "2026-10-02T09:00:00Z",
+   "updated_at": "2026-10-03T11:00:00Z",
+   "closed_at": null,
+   "author_association": "MEMBER",
+   "body": "synthetic",
+   "score": 1.0,
+   "pull_request": {
+    "url": "https://api.github.com/repos/onion-lang/onion/pulls/101",
+    "html_url": "https://github.com/onion-lang/onion/pull/101",
+    "diff_url": null,
+    "patch_url": null,
+    "merged_at": null
+   }
+  },
+  {
+   "url": "https://api.github.com/repos/onion-lang/onion/issues/102",
+   "repository_url": "https://api.github.com/repos/onion-lang/onion",
+   "html_url": "https://github.com/onion-lang/onion/issues/102",
+   "id": 3000000102,
+   "number": "#102",
+   "title": "Dogfood scenario suite",
+   "user": {
+    "login": "bob",
+    "id": 1102,
+    "type": "User",
+    "site_admin": false
+   },
+   "labels": [
+    {
+     "id": 1,
+     "name": "kind:feature",
+     "color": "1d76db",
+     "default": false
+    }
+   ],
+   "state": "open",
+   "locked": false,
+   "comments": 2,
+   "created_at": "2026-10-02T09:00:00Z",
+   "updated_at": "2026-10-03T11:00:00Z",
+   "closed_at": null,
+   "author_association": "MEMBER",
+   "body": "synthetic",
+   "score": 1.0
+  },
+  {
+   "url": "https://api.github.com/repos/onion-lang/onion/issues/103",
+   "repository_url": "https://api.github.com/repos/onion-lang/onion",
+   "html_url": "https://github.com/onion-lang/onion/pull/103",
+   "id": 3000000103,
+   "number": 103,
+   "title": "fix(project): lock pins versions",
+   "labels": [
+    {
+     "id": 1,
+     "name": "kind:feature",
+     "color": "1d76db",
+     "default": false
+    }
+   ],
+   "state": "open",
+   "locked": false,
+   "comments": 3,
+   "created_at": "2026-10-02T09:00:00Z",
+   "updated_at": "2026-10-03T11:00:00Z",
+   "closed_at": null,
+   "author_association": "MEMBER",
+   "body": "synthetic",
+   "score": 1.0,
+   "pull_request": {
+    "url": "https://api.github.com/repos/onion-lang/onion/pulls/103",
+    "html_url": "https://github.com/onion-lang/onion/pull/103",
+    "diff_url": null,
+    "patch_url": null,
+    "merged_at": null
+   }
+  },
+  {
+   "url": "https://api.github.com/repos/onion-lang/onion/issues/104",
+   "repository_url": "https://api.github.com/repos/onion-lang/onion",
+   "html_url": "https://github.com/onion-lang/onion/issues/104",
+   "id": 3000000104,
+   "number": 104,
+   "title": "JSON Schema: field descriptions",
+   "user": {
+    "login": "carol",
+    "id": 1104,
+    "type": "User",
+    "site_admin": false
+   },
+   "labels": [
+    {
+     "id": 1,
+     "name": "kind:feature",
+     "color": "1d76db",
+     "default": false
+    }
+   ],
+   "state": "open",
+   "locked": false,
+   "comments": 0,
+   "created_at": "2026-10-02T09:00:00Z",
+   "updated_at": "2026-10-03T11:00:00Z",
+   "closed_at": null,
+   "author_association": "MEMBER",
+   "body": "synthetic",
+   "score": 1.0
+  }
+ ]
+}

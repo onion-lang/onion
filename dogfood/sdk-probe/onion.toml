@@ -1,0 +1,8 @@
+[package]
+name = "sdk-probe"
+version = "0.1.0"
+
+# The official Kotlin-built Java SDK, called directly (no battery), at the
+# version onion-llm uses so the two projects share one dependency cache.
+[dependencies]
+"com.anthropic:anthropic-java" = "2.68.0"

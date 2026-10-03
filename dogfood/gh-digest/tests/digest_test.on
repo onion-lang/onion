@@ -1,0 +1,60 @@
+// The digest against a local fake of the GitHub API and of a Slack webhook:
+// no token, no network. Fixtures are synthetic (see tests/fixtures/README.md).
+val seen: List[String] = []
+
+def withServer(status: Int, fixture: String, f: (String) -> Object): Object {
+  val body = Files::readText("tests/fixtures/" + fixture)
+  val server = Server::start("127.0.0.1", 0).handleAll { req ->
+    seen << req.method() + " " + req.path() + "?" + req.query() + " auth=" + req.header("Authorization") + " body=" + req.body()
+    Server::status(status, body).withHeader("Content-Type", "application/json")
+  }
+  try {
+    return f("http://127.0.0.1:" + server.port())
+  } finally {
+    server.stop()
+  }
+}
+
+// Workaround: seen from a test, `Gh::search`'s `token: String?` is a plain `String`
+// (the `?` does not survive into tests/, #1940), so a `String?` argument is E0005. A
+// literal null still fits, with a W0012 warning, so branch on it.
+def search(status: Int, fixture: String, token: String?): Result[List[Issue], String] =
+  withServer(status, fixture) { base ->
+    if token == null { Gh::search(base, "onion-lang/onion", "2026-10-02", null) }
+    else { Gh::search(base, "onion-lang/onion", "2026-10-02", token as String) }
+  } as Result[List[Issue], String]
+
+// A good response: unknown fields are ignored, and `pull_request` tells PRs from issues.
+val items = search(200, "search.json", "test-token").getOrThrow()
+Assert::equals(4, items.size)
+Assert::isTrue(seen[0].startsWith("GET /search/issues?q=repo:onion-lang/onion+updated:%3E%3D2026-10-02&per_page=100"))
+Assert::isTrue(seen[0].contains("auth=Bearer test-token"))
+val md = Gh::markdown("onion-lang/onion", "2026-10-02", items)
+Assert::isTrue(md.contains("## Pull requests (2)"))
+Assert::isTrue(md.contains("## Issues (2)"))
+// Newest first within a section.
+Assert::isTrue(md.indexOf("#103 ") < md.indexOf("#101 "))
+Assert::isTrue(md.contains("- #104 JSON Schema: field descriptions (@carol) https://github.com/onion-lang/onion/issues/104"))
+
+// Without a token, no Authorization header is sent.
+search(200, "search.json", null)
+Assert::isTrue(seen[1].contains("auth=null"))
+
+// An error status is a reason, not an exception.
+val limited = search(403, "rate_limited.json", null)
+Assert::isTrue(limited.isErr())
+Assert::isTrue(limited.toString().contains("403"))
+
+// A response that drifted from the records names every field that no longer fits.
+val drift = search(200, "search_drift.json", null)
+Assert::isTrue(drift.isErr())
+Assert::isTrue(drift.toString().contains("items[1].number"))
+Assert::isTrue(drift.toString().contains("items[2].user"))
+
+// Posting to Slack sends the Markdown as the message text.
+val posted = withServer(200, "rate_limited.json") { base -> Gh::postToSlack(base + "/hook", md) } as Boolean
+Assert::isTrue(posted)
+val slack = seen[seen.size - 1]
+Assert::isTrue(slack.startsWith("POST /hook"))
+Assert::isTrue(Json::value(slack.substring(slack.indexOf("body=") + 5))["text"].asString() == md)
+println("digest tests passed")

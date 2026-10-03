@@ -1,0 +1,32 @@
+// The SDK against a local fake of the Messages API: no key, no network.
+// The responses are synthetic, in the Messages API's shape.
+val okBody = "{\"id\":\"msg_synthetic\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-5-5\"," +
+  "\"content\":[{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"synthetic\"},{\"type\":\"text\",\"text\":\"こんにちは！\"}]," +
+  "\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":12,\"output_tokens\":5}}"
+val errorBody = "{\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_synthetic\"}"
+
+val seen: List[String] = []
+
+def against(status: Int, body: String): String {
+  val server = Server::start("127.0.0.1", 0).handleAll { req ->
+    seen << req.method() + " " + req.path() + " key=" + req.header("x-api-key") + " " + req.body()
+    Server::status(status, body).withHeader("Content-Type", "application/json")
+  }
+  try {
+    return Probe::ask(Probe::client("test-key", "http://127.0.0.1:" + server.port()), "Say hello in Japanese")
+  } finally {
+    server.stop()
+  }
+}
+
+Assert::equals("こんにちは！", against(200, okBody))
+Assert::isTrue(seen[0].startsWith("POST /v1/messages key=test-key "))
+val sent = Json::value(seen[0].substring(seen[0].indexOf("{")))
+Assert::equals("claude-opus-5-5", sent["model"].asString())
+Assert::equals(1024, sent["max_tokens"].asInt())
+Assert::equals("Say hello in Japanese", sent["messages"][0]["content"].asString())
+
+val failed = against(401, errorBody)
+Assert::isTrue(failed.startsWith("error 401: "))
+Assert::isTrue(failed.contains("invalid x-api-key"))
+println("probe tests passed")

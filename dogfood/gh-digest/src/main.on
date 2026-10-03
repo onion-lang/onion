@@ -1,0 +1,93 @@
+// gh-digest: what changed in a GitHub repository over the last days, as Markdown,
+// optionally posted to Slack. Reads the GitHub search API through json shapes, so
+// an API change shows up as defects with paths rather than as a null deep inside.
+// GITHUB_API_URL (set by GitHub Actions, and by the tests) overrides the API host.
+import {
+  java.time.LocalDate
+  java.time.ZoneOffset
+}
+
+record User(login: String) { shape doc = json }
+record PullRef(url: String) { shape doc = json }
+record Issue(number: Int, title: String, user: User, html_url: String, pull_request: PullRef?) { shape doc = json }
+record Search(total_count: Int, items: List[Issue]) { shape doc = json }
+
+// Kept in a class: tests cannot see the top-level functions of src/ (F7).
+class Gh {
+public:
+  static def since(days: Int): String = LocalDate::now(ZoneOffset::UTC).minusDays(days as Long).toString()
+
+  static def searchUrl(base: String, repo: String, since: String): String =
+    base + "/search/issues?q=repo:" + repo + "+updated:%3E%3D" + since + "&per_page=100"
+
+  // The items, or one line saying why there are none.
+  static def search(base: String, repo: String, since: String, token: String?): Result[List[Issue], String] {
+    var req = Http::request("GET", searchUrl(base, repo, since))
+      .header("Accept", "application/vnd.github+json")
+      .header("User-Agent", "onion-dogfood")
+      .timeoutSeconds(30)
+    // The builder is immutable: a bare `req.header(...)` would be silently dropped (#1941).
+    if token != null { req = req.header("Authorization", "Bearer " + token) }
+    select req.send() {
+      case failed is Result.Err:
+        return Result::err("no response: " + failed.error().message())
+      case got is Result.Ok:
+        val res = got.value()
+        if !res.isOk() { return Result::err("GitHub answered " + res.status + ": " + res.body) }
+        val parsed = Search::doc().parse(res.body)
+        if parsed.isBad() {
+          return Result::err("unexpected response: " + parsed.defects().map { d -> d.describe() }.join("; "))
+        }
+        return Result::ok(parsed.get().items())
+    }
+  }
+
+  static def kindOf(i: Issue): String = if i.pull_request() != null { "pr" } else { "issue" }
+
+  static def markdown(repo: String, since: String, items: List[Issue]): String {
+    val sb = new StringBuilder()
+    sb.append("# " + repo + ": updated since " + since + "\n\n")
+    // A String loop variable, not `foreach prs: Boolean in [true, false]`: a lambda
+    // capturing a Boolean foreach variable fails bytecode verification (#1939).
+    foreach kind: String in ["pr", "issue"] {
+      val some = items.filter { it -> kindOf(it) == kind }.sortedByDescending { it -> it.number() }
+      sb.append("## " + (if kind == "pr" { "Pull requests" } else { "Issues" }) + " (" + some.size + ")\n\n")
+      foreach it: Issue in some {
+        sb.append("- #" + it.number() + " " + it.title() + " (@" + it.user().login() + ") " + it.html_url() + "\n")
+      }
+      sb.append("\n")
+    }
+    return sb.toString()
+  }
+
+  static def postToSlack(hook: String, md: String): Boolean {
+    val sent = Http::request("POST", hook)
+      .header("Content-Type", "application/json")
+      .body(Json::stringify(["text": md]))
+      .timeoutSeconds(30)
+      .send()
+    return sent.isOk() && sent.getOrThrow().isOk()
+  }
+}
+
+tool digest(out: String, repo: String = "onion-lang/onion", days: Int = 1): Int
+  requires { write(out), net, env, clock, console }
+{
+  val since = Gh::since(days)
+  val base = System::getenv("GITHUB_API_URL") ?: "https://api.github.com"
+  select Gh::search(base, repo, since, System::getenv("GITHUB_TOKEN")) {
+    case failed is Result.Err:
+      println(failed.error())
+      return 1
+    case got is Result.Ok:
+      val md = Gh::markdown(repo, since, got.value())
+      Files::writeText(out, md)
+      println("wrote " + out + ": " + got.value().size + " items")
+      val hook = System::getenv("SLACK_WEBHOOK_URL")
+      if hook != null && !Gh::postToSlack(hook, md) {
+        println("posting to Slack failed")
+        return 1
+      }
+      return 0
+  }
+}

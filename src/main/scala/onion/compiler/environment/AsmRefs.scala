@@ -273,6 +273,22 @@ object AsmRefs {
     }
   }
 
+  /** Re-applies the `T?` an Onion compilation recorded on a parameter (see NullabilityMetadata). */
+  private def markNullable(method: MethodNode, args: Array[TypedAST.Type]): Array[TypedAST.Type] = {
+    val marks = method.invisibleParameterAnnotations
+    if (marks == null || marks.length != args.length) args
+    else args.zipWithIndex.map { case (arg, i) =>
+      val list = marks(i)
+      val nullable = list != null && {
+        val it = list.iterator
+        var found = false
+        while (it.hasNext && !found) found = it.next().desc == onion.compiler.backend.asm.NullabilityMetadata.NullableDescriptor
+        found
+      }
+      if (nullable) TypedAST.NullableType.of(arg) else arg
+    }
+  }
+
   class AsmMethodRef(method: MethodNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.Method {
     override val modifier: Int = toOnionModifier(method.access)
     override val name: String = method.name
@@ -285,9 +301,9 @@ object AsmRefs {
     override val typeParameters: Array[TypedAST.TypeParameter] =
       if (parsed == null) Array()
       else parsed.typeParameters.clone()
-    private val argTypes: Array[TypedAST.Type] =
+    private val argTypes: Array[TypedAST.Type] = markNullable(method,
       if (parsed == null) Type.getArgumentTypes(method.desc).map(bridge.toOnionType)
-      else parsed.arguments
+      else parsed.arguments)
     // Keep the stored signature isolated from callers. Count-only queries need
     // not allocate the defensive array.
     override def arguments: Array[TypedAST.Type] = argTypes.clone()
@@ -320,9 +336,9 @@ object AsmRefs {
     override val typeParameters: Array[TypedAST.TypeParameter] =
       if (parsed == null) Array()
       else parsed.typeParameters.clone()
-    private val args0 =
+    private val args0 = markNullable(method,
       if (parsed == null) Type.getArgumentTypes(method.desc).map(bridge.toOnionType)
-      else parsed.arguments
+      else parsed.arguments)
     override def getArgs: Array[TypedAST.Type] = args0.clone()
     val underlying: MethodNode = method
   }

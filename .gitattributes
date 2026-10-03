@@ -28,3 +28,12 @@
 # failed only on Windows checkouts. An existing checkout picks this up after
 # `git rm --cached -r -q . && git reset --hard` (or a fresh clone).
 *.scala text eol=lf
+
+# `.on` sources are always checked out with LF line endings too.
+#
+# FreshCompileScenarioSpec compares freshly generated benchmark fixtures byte-for-byte
+# against the `.on` files committed under benchmarks/fixtures/, and OnionFormatterSpec reads
+# every sample under run/ to check the formatter's token/line-break preservation against the
+# file as checked out. Both comparisons silently failed on a Windows checkout with
+# `core.autocrlf=true`, since `.on` files were not covered by the rule above.
+*.on text eol=lf

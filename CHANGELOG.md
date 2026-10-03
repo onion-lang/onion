@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A multi-line string literal (`"""..."""`) kept raw `\r\n`/`\r` line endings instead of normalizing them to `\n`.** A program written (or checked out) with Windows line endings therefore produced a different string value than the same program with Unix line endings — a miscompile depending only on the source file's own EOL convention. Multi-line strings now normalize CRLF/CR to LF, like a Java text block, in both the fast-path parser and the JavaCC grammar. `.on` sample and fixture files are also checked out with LF line endings now (`.gitattributes`), fixing `OnionFormatterSpec` and `FreshCompileScenarioSpec` on a Windows checkout (#1930).
 - **Maven Central publishing works.** The v0.137.0 release reached GitHub but not Maven Central: the publish step passed `centralStage` and the upload as separate arguments, which the sbt 2 client joins into one invalid command. They are now one `;`-separated command.
 
 ## [0.137.0] - 2026-10-03

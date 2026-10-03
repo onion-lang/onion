@@ -158,6 +158,14 @@ lazy val onionSettings = Seq(
     // API (`io.get-coursier::coursier`) has no Scala 3 build, so it would have to come
     // in through for3Use2_13 and drag its own dependency graph along.
     "io.get-coursier" % "interface" % "1.0.28",
+    // slf4j-api above comes in transitively with no binding, so any class that logs
+    // through it (coursier itself, or a JDBC driver resolved via `using dep`, e.g.
+    // sqlite-jdbc) makes SLF4J print "Failed to load class StaticLoggerBinder" /
+    // "Defaulting to no-operation (NOP) logger" to stderr ahead of the script's own
+    // output (#1951). slf4j-nop *is* that no-op binding; shipping it means the same
+    // no-op behavior, minus the warning. Pinned to slf4j-api's resolved version so the
+    // two stay a matched pair.
+    "org.slf4j" % "slf4j-nop" % "1.7.36",
     // A pure-Java in-memory database, test scope only, so onion.Db can be tested against
     // a real JDBC driver without a server and without growing the shipped jar.
     "com.h2database" % "h2" % "2.3.232" % "test",

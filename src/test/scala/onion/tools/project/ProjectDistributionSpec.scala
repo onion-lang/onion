@@ -70,6 +70,13 @@ class ProjectDistributionSpec extends AnyFunSuite with Matchers:
           .map(_.getFileName.toString)
           .toVector
         jars.exists(_.startsWith("tomlj-")) shouldBe true
+        // slf4j-api comes in transitively via the coursier interface jar with no
+        // binding; slf4j-nop must ship alongside it or every script that logs through
+        // SLF4J (a JDBC driver resolved via `using dep`, coursier itself) prints
+        // "Failed to load class StaticLoggerBinder" / "Defaulting to no-operation
+        // (NOP) logger" ahead of its own output (#1951).
+        jars.exists(_.startsWith("slf4j-api-")) shouldBe true
+        jars.exists(_.startsWith("slf4j-nop-")) shouldBe true
 
   private def run(onionBin: Path, cwd: Path, args: String*): Invocation =
     val process = ProcessBuilder((onionBin.toString +: args).asJava)

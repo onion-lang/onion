@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Maven Central publishing works.** The v0.137.0 release reached GitHub but not Maven Central: the publish step passed `centralStage` and the upload as separate arguments, which the sbt 2 client joins into one invalid command. They are now one `;`-separated command.
+
 ## [0.137.0] - 2026-10-03
 
 ### Added

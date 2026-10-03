@@ -1,0 +1,285 @@
+// WaveformAnalyzer.on — Digital signal analysis: waveform generation, statistics,
+// filtering, and ASCII oscilloscope plots.
+//
+// Features: ADT enum with data-carrying cases, records with example clauses,
+//   extension Double, closures, collection pipelines, foreach/while loops,
+//   pattern matching on enum cases, Format::fixed, string interpolation.
+
+import {
+  java.lang.Math
+}
+
+// ─── ADT enum: Waveform types ─────────────────────────────────────────────────
+
+enum Waveform {
+  case Sine(freq: Double, amp: Double)
+  case Square(freq: Double, duty: Double)   // duty in 0.0..1.0 (fraction of high)
+  case Sawtooth(freq: Double, amp: Double)
+  case Triangle(freq: Double, amp: Double)
+  case Chirp(startFreq: Double, endFreq: Double, amp: Double) // linear frequency sweep
+}
+
+// ─── Extension Double ─────────────────────────────────────────────────────────
+
+extension Double {
+  def abs(): Double  = if self < 0.0 { -self } else { self }
+  def sq():  Double  = self * self
+  def clamp(lo: Double, hi: Double): Double =
+    if self < lo { lo } else if self > hi { hi } else { self }
+  def f2(): String = Format::fixed(self, 2)
+  def f4(): String = Format::fixed(self, 4)
+  def f6(): String = Format::fixed(self, 6)
+}
+
+// ─── Extension Int ────────────────────────────────────────────────────────────
+
+extension Int {
+  def toDouble(): Double = self as Double
+}
+
+// ─── Record: signal statistics ───────────────────────────────────────────────
+
+record SignalStats(name: String, n: Int, rms: Double, peak: Double,
+                  mean: Double, zcr: Double) {
+  example {
+    val st = new SignalStats("test", 100, 0.707, 1.0, 0.0, 0.4)
+    st.n() == 100 && st.rms() > 0.0
+  }
+
+  public:
+  def label(): String =
+    "  #{name()} n=#{n()}  rms=#{rms().f4()}  peak=#{peak().f4()}  " +
+    "mean=#{mean().f4()}  zcr=#{zcr().f4()}"
+}
+
+// ─── Sample generation ───────────────────────────────────────────────────────
+
+def sampleAt(wf: Waveform, t: Double): Double = select wf {
+  case s is Sine:
+    s.amp() * Math::sin(2.0 * Math::PI * s.freq() * t)
+  case sq is Square:
+    val period = 1.0 / sq.freq()
+    val phase  = t % period
+    if phase < period * sq.duty() { 1.0 } else { -1.0 }
+  case saw is Sawtooth:
+    val period = 1.0 / saw.freq()
+    saw.amp() * (2.0 * (t % period) / period - 1.0)
+  case tri is Triangle:
+    val period = 1.0 / tri.freq()
+    val phase  = t % period
+    val half   = period / 2.0
+    if phase < half {
+      tri.amp() * (4.0 * phase / period - 1.0)
+    } else {
+      tri.amp() * (3.0 - 4.0 * phase / period)
+    }
+  case ch is Chirp:
+    // Instantaneous frequency increases linearly from startFreq to endFreq over 1 s
+    val rate = ch.endFreq() - ch.startFreq()
+    val instFreq = ch.startFreq() + rate * t
+    ch.amp() * Math::sin(2.0 * Math::PI * instFreq * t)
+}
+
+def generate(wf: Waveform, sampleRate: Int, durationMs: Int): List[Double] {
+  val n = sampleRate * durationMs / 1000
+  val buf: List[Double] = []
+  foreach i: Int in 0..<n {
+    val t = i.toDouble() / sampleRate.toDouble()
+    buf.add(sampleAt(wf, t))
+  }
+  return buf
+}
+
+// ─── Signal statistics ────────────────────────────────────────────────────────
+
+def computeStats(name: String, samples: List[Double]): SignalStats {
+  val n = samples.size
+  var sumSq: Double = 0.0
+  var peak:  Double = 0.0
+  var sum:   Double = 0.0
+  foreach s: Double in samples {
+    sumSq = sumSq + s * s
+    val ab = s.abs()
+    if ab > peak { peak = ab }
+    sum = sum + s
+  }
+  var crossings: Int = 0
+  var prev: Double = samples[0] as Double
+  var i: Int = 1
+  while i < n {
+    val cur = samples[i] as Double
+    if (prev >= 0.0 && cur < 0.0) || (prev < 0.0 && cur >= 0.0) {
+      crossings++
+    }
+    prev = cur
+    i++
+  }
+  val rms  = Math::sqrt(sumSq / n.toDouble())
+  val mean = sum / n.toDouble()
+  val zcr  = crossings.toDouble() / n.toDouble()
+  return new SignalStats(name, n, rms, peak, mean, zcr)
+}
+
+// ─── Mix two signals ─────────────────────────────────────────────────────────
+
+def mix(a: List[Double], b: List[Double], gainA: Double, gainB: Double): List[Double] {
+  val n = if a.size < b.size { a.size } else { b.size }
+  val out: List[Double] = []
+  foreach i: Int in 0..<n {
+    val va = a[i] as Double
+    val vb = b[i] as Double
+    out.add(va * gainA + vb * gainB)
+  }
+  return out
+}
+
+// ─── Filters ─────────────────────────────────────────────────────────────────
+
+// Moving-average low-pass filter
+def lowpass(samples: List[Double], halfWin: Int): List[Double] {
+  val n = samples.size
+  val out: List[Double] = []
+  foreach i: Int in 0..<n {
+    val lo = if i - halfWin < 0 { 0 } else { i - halfWin }
+    val hi = if i + halfWin >= n { n - 1 } else { i + halfWin }
+    var s: Double = 0.0
+    var c: Int = 0
+    foreach j: Int in lo..hi {
+      s = s + (samples[j] as Double)
+      c++
+    }
+    out.add(s / c.toDouble())
+  }
+  return out
+}
+
+// First-order high-pass (RC) filter: y[n] = α·(y[n-1] + x[n] - x[n-1])
+def highpass(samples: List[Double], alpha: Double): List[Double] {
+  val n = samples.size
+  val out: List[Double] = []
+  val first = samples[0] as Double
+  out.add(first)
+  var prevIn:  Double = first
+  var prevOut: Double = first
+  foreach i: Int in 1..<n {
+    val cur = samples[i] as Double
+    val y   = alpha * (prevOut + cur - prevIn)
+    out.add(y)
+    prevIn  = cur
+    prevOut = y
+  }
+  return out
+}
+
+// ─── ASCII oscilloscope ───────────────────────────────────────────────────────
+
+def plotSignal(label: String, samples: List[Double], cols: Int, rows: Int): void {
+  IO::println(label)
+  // Find amplitude range
+  var minV: Double = samples[0] as Double
+  var maxV: Double = samples[0] as Double
+  foreach s: Double in samples {
+    if s < minV { minV = s }
+    if s > maxV { maxV = s }
+  }
+  val range = if (maxV - minV).abs() < 1.0e-9 { 1.0 } else { maxV - minV }
+
+  // Compute display row for each column
+  val step    = if samples.size > cols { samples.size / cols } else { 1 }
+  val rowOf: List[Int] = []
+  foreach col: Int in 0..<cols {
+    val idx = col * step
+    val v   = if idx < samples.size { samples[idx] as Double } else { 0.0 }
+    val norm = (v - minV) / range         // 0.0 .. 1.0 bottom-to-top
+    val r    = rows - 1 - ((norm * (rows - 1).toDouble()) as Int)
+    rowOf.add(if r < 0 { 0 } else if r >= rows { rows - 1 } else { r })
+  }
+
+  // Print rows top-to-bottom
+  foreach row: Int in 0..<rows {
+    var line: String = "|"
+    foreach col: Int in 0..<cols {
+      line = line + (if (rowOf[col] as Int) == row { "*" } else { " " })
+    }
+    IO::println(line + "|")
+  }
+  var axis: String = "+"
+  foreach c: Int in 0..<cols { axis = axis + "-" }
+  IO::println(axis + "+  min=#{minV.f2()} max=#{maxV.f2()}")
+}
+
+// ─── DFT: find dominant frequency bin ────────────────────────────────────────
+
+// Compute the single peak-magnitude bin in the first half of the spectrum.
+// Full DFT is O(n²); we only compute magnitudes, not phases.
+def dominantFreq(samples: List[Double], sampleRate: Int): Double {
+  val n  = samples.size
+  var bestMag: Double = -1.0
+  var bestK:   Int    = 0
+  foreach k: Int in 0..<(n / 2) {
+    var re: Double = 0.0
+    var im: Double = 0.0
+    foreach j: Int in 0..<n {
+      val angle = -2.0 * Math::PI * k.toDouble() * j.toDouble() / n.toDouble()
+      re = re + (samples[j] as Double) * Math::cos(angle)
+      im = im + (samples[j] as Double) * Math::sin(angle)
+    }
+    val mag = Math::sqrt(re * re + im * im)
+    if mag > bestMag { bestMag = mag; bestK = k }
+  }
+  return bestK.toDouble() * sampleRate.toDouble() / n.toDouble()
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+IO::println("=== WaveformAnalyzer ===\n")
+
+val SR  = 400  // sample rate: 400 Hz
+val DUR = 200  // 200 ms → 80 samples per signal (≥2 full cycles at 10 Hz)
+
+// Generate five waveforms
+val sine10  = generate(new Sine(10.0, 1.0),          SR, DUR)
+val sq20    = generate(new Square(20.0, 0.5),          SR, DUR)
+val saw5    = generate(new Sawtooth(5.0, 0.8),         SR, DUR)
+val tri15   = generate(new Triangle(15.0, 0.9),        SR, DUR)
+val chirp   = generate(new Chirp(5.0, 80.0, 0.7),      SR, DUR)
+
+IO::println("=== Signal statistics ===")
+IO::println(computeStats("sine 10 Hz  ", sine10).label())
+IO::println(computeStats("square 20 Hz", sq20).label())
+IO::println(computeStats("sawtooth 5Hz", saw5).label())
+IO::println(computeStats("triangle 15H", tri15).label())
+IO::println(computeStats("chirp 5-80Hz", chirp).label())
+
+// Mixing
+IO::println("\n=== Signal mixing ===")
+val mixed = mix(sine10, sq20, 0.6, 0.4)
+IO::println(computeStats("mixed      ", mixed).label())
+
+// Filtering
+IO::println("\n=== Filters applied to mixed signal ===")
+val lp = lowpass(mixed, 2)
+val hp = highpass(mixed, 0.9)
+IO::println(computeStats("after LP(2)", lp).label())
+IO::println(computeStats("after HP(.9)", hp).label())
+
+// DFT dominant frequency: use N=100 samples at 400 Hz → 4 Hz resolution.
+// Choose frequencies that sit exactly on a DFT bin: multiples of SR/N = 4 Hz.
+IO::println("\n=== DFT dominant frequency ===")
+val SR2  = 400
+val DUR2 = 250  // 250 ms → 100 samples; freq resolution = 400/100 = 4 Hz
+val sineA = generate(new Sine(12.0, 1.0), SR2, DUR2)  // k=3  → 12 Hz
+val sineB = generate(new Sine(28.0, 0.8), SR2, DUR2)  // k=7  → 28 Hz
+val sineC = generate(new Sine(40.0, 0.6), SR2, DUR2)  // k=10 → 40 Hz
+IO::println("Sine 12 Hz: dominant = #{dominantFreq(sineA, SR2).f2()} Hz")
+IO::println("Sine 28 Hz: dominant = #{dominantFreq(sineB, SR2).f2()} Hz")
+IO::println("Sine 40 Hz: dominant = #{dominantFreq(sineC, SR2).f2()} Hz")
+
+// ASCII plots
+IO::println("\n=== Plots (cols=60 rows=8) ===")
+plotSignal("10 Hz sine:", sine10, 60, 8)
+plotSignal("20 Hz square (50% duty):", sq20, 60, 8)
+plotSignal("5 Hz sawtooth:", saw5, 60, 8)
+plotSignal("Chirp 5→80 Hz:", chirp, 60, 8)
+
+IO::println("\nDone.")

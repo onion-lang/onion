@@ -1,0 +1,311 @@
+// TennisTournament.on — Grand Slam tennis tournament draw and match simulator
+// Exercises: data-carrying enums (Surface, Round), plain enums with methods,
+// records (Player, SetScore, MatchResult), collection pipelines (filter/sort/
+// groupBy/map), pattern matching, closures, string interpolation, nullable
+// checks, while/foreach, Rand for random match outcomes.
+
+import { java.util.* }
+
+enum Surface(label: String) {
+  CLAY("Clay"),
+  GRASS("Grass"),
+  HARD("Hard"),
+  INDOOR("Indoor")
+}
+
+enum Round(label: String, loserPrizeUSD: Int, winnerPrizeUSD: Int) {
+  WILDCARD("Wild Card", 0, 15000),
+  FIRST("Round of 128", 15000, 25000),
+  SECOND("Round of 64", 25000, 40000),
+  THIRD("Round of 32", 40000, 60000),
+  FOURTH("Round of 16", 60000, 90000),
+  QUARTERFINAL("Quarter-Final", 90000, 200000),
+  SEMIFINAL("Semi-Final", 200000, 500000),
+  FINAL("Final", 500000, 1200000)
+}
+
+record Player(name: String, ranking: Int, nationality: String) {
+public:
+  def display(): String = "#{self.name} (#{self.nationality}, ##{self.ranking})"
+}
+
+record SetScore(playerOneGames: Int, playerTwoGames: Int, wasTiebreak: Boolean) {
+public:
+  def winner(): Int = if self.playerOneGames > self.playerTwoGames { 1 } else { 2 }
+  def show(): String {
+    val base: String = "#{self.playerOneGames}-#{self.playerTwoGames}"
+    return if self.wasTiebreak { base + "(TB)" } else { base }
+  }
+}
+
+record MatchResult(
+  player1: Player,
+  player2: Player,
+  sets: List[SetScore],
+  winnerIndex: Int,
+  round: Round
+) {
+public:
+  def winner(): Player = if self.winnerIndex == 1 { self.player1 } else { self.player2 }
+  def loser(): Player = if self.winnerIndex == 1 { self.player2 } else { self.player1 }
+  def setsWonByP1(): Int = self.sets.filter((s: SetScore) -> s.winner() == 1).size
+  def setsWonByP2(): Int = self.sets.filter((s: SetScore) -> s.winner() == 2).size
+  def showScore(): String {
+    val parts: List[String] = self.sets.map((s: SetScore) -> s.show())
+    var s: String = ""
+    foreach p: String in parts { s = s + p + " " }
+    return s.trim()
+  }
+  def summary(): String {
+    return "#{self.round.label()}: #{self.player1.name()} vs #{self.player2.name()} → " +
+           "#{self.winner().name()} d. #{self.loser().name()} #{self.showScore()}"
+  }
+}
+
+// ─── Match Simulation ────────────────────────────────────────────────────────
+
+def simulateSet(rankP1: Int, rankP2: Int): SetScore {
+  val totalRanks: Int = rankP1 + rankP2
+  val p1WinProb: Double = rankP2 as Double / totalRanks as Double
+  var p1Games: Int = 0
+  var p2Games: Int = 0
+  while true {
+    if Rand::nextDouble() < p1WinProb { p1Games = p1Games + 1 }
+    else { p2Games = p2Games + 1 }
+    if p1Games >= 6 && p1Games - p2Games >= 2 { return new SetScore(p1Games, p2Games, false) }
+    if p2Games >= 6 && p2Games - p1Games >= 2 { return new SetScore(p1Games, p2Games, false) }
+    if p1Games == 6 && p2Games == 6 {
+      val tbWinner: Int = if Rand::nextDouble() < p1WinProb { 1 } else { 2 }
+      return if tbWinner == 1 { new SetScore(7, 6, true) } else { new SetScore(6, 7, true) }
+    }
+  }
+  return new SetScore(6, 0, false)
+}
+
+def simulateMatch(p1: Player, p2: Player, round: Round, bestOf5: Boolean): MatchResult {
+  val setsNeeded: Int = if bestOf5 { 3 } else { 2 }
+  val sets: List[SetScore] = []
+  var p1Sets: Int = 0
+  var p2Sets: Int = 0
+  while p1Sets < setsNeeded && p2Sets < setsNeeded {
+    val s: SetScore = simulateSet(p1.ranking(), p2.ranking())
+    sets.add(s)
+    if s.winner() == 1 { p1Sets = p1Sets + 1 } else { p2Sets = p2Sets + 1 }
+  }
+  val winner: Int = if p1Sets >= setsNeeded { 1 } else { 2 }
+  return new MatchResult(p1, p2, sets, winner, round)
+}
+
+def main(): void {
+  val surface: Surface = Surface::CLAY
+  val bestOf5: Boolean = true
+  IO::println("══════════════════════════════════════════════")
+  IO::println("   GRAND SLAM — #{surface.label()} Court")
+  IO::println("══════════════════════════════════════════════")
+  IO::println("")
+
+  val players: List[Player] = seedPlayers()
+  IO::println("=== Draw (#{players.size} players) ===")
+  var i: Int = 0
+  while i < players.size {
+    IO::println("  #{players[i].display()}")
+    i = i + 1
+  }
+  IO::println("")
+
+  val results: List[MatchResult] = runTournament(players, bestOf5)
+  IO::println("")
+  printSummary(players, results)
+
+  val allSurfaces: List[Surface] = Colls::toList(Surface::values())
+  runSeasonSim(players, allSurfaces, bestOf5)
+}
+
+def seedPlayers(): List[Player] {
+  val players: List[Player] = [
+    new Player("Rafael Alcazar",   1, "Spain"),
+    new Player("Novak Brankovic",  2, "Serbia"),
+    new Player("Carlos Dominguez", 3, "Spain"),
+    new Player("Daniil Fedotov",   4, "Russia"),
+    new Player("Jannik Ferretti",  5, "Italy"),
+    new Player("Holger Groth",     6, "Denmark"),
+    new Player("Taylor Hayes",     7, "USA"),
+    new Player("Frances Inagaki",  8, "USA")
+  ]
+  return players
+}
+
+def runRound(players: List[Player], round: Round, bestOf5: Boolean): List[MatchResult] {
+  IO::println("── #{round.label()} ─────────────────────────────────")
+  val matches: List[MatchResult] = []
+  var i: Int = 0
+  while i + 1 < players.size {
+    val p1: Player = players[i]
+    val p2: Player = players[i + 1]
+    val result: MatchResult = simulateMatch(p1, p2, round, bestOf5)
+    IO::println("  #{result.summary()}")
+    matches.add(result)
+    i = i + 2
+  }
+  return matches
+}
+
+def winners(matches: List[MatchResult]): List[Player] {
+  return matches.map((m: MatchResult) -> m.winner())
+}
+
+def runTournament(players: List[Player], bestOf5: Boolean): List[MatchResult] {
+  val allMatches: List[MatchResult] = []
+  var current: List[Player] = players
+
+  val rounds: List[Round] = [Round::QUARTERFINAL, Round::SEMIFINAL, Round::FINAL]
+  foreach round: Round in rounds {
+    if current.size < 2 { break }
+    val roundMatches: List[MatchResult] = runRound(current, round, bestOf5)
+    foreach m: MatchResult in roundMatches { allMatches.add(m) }
+    current = winners(roundMatches)
+    IO::println("")
+  }
+  return allMatches
+}
+
+def printSummary(players: List[Player], results: List[MatchResult]): void {
+  IO::println("=== Tournament Results ===")
+  if results.size == 0 { IO::println("  No matches played."); return }
+  val finalMatch: MatchResult? = results.find((m: MatchResult) -> m.round() == Round::FINAL)
+  if finalMatch != null {
+    val champion: Player = finalMatch.winner()
+    val runnerUp: Player = finalMatch.loser()
+    IO::println("  Champion:   #{champion.display()}")
+    IO::println("  Runner-up:  #{runnerUp.display()}")
+    IO::println("")
+  }
+
+  IO::println("=== Prize Money ===")
+  val eliminated: Map[String, Round] = [:]
+  foreach m: MatchResult in results {
+    eliminated[m.loser().name()] = m.round()
+  }
+  val sortedByRank: List[Player] = players.sortedBy((p: Player) -> p.ranking())
+  val champion: String? = if finalMatch != null { finalMatch.winner().name() } else { null }
+  foreach p: Player in sortedByRank {
+    val lostAt: Round? = eliminated[p.name()]
+    val isChampion: Boolean = champion != null && p.name() == champion
+    val prize: Int = if isChampion {
+      Round::FINAL.winnerPrizeUSD()
+    } else if lostAt != null {
+      lostAt.loserPrizeUSD()
+    } else {
+      Round::FINAL.loserPrizeUSD()
+    }
+    val tag: String = if isChampion { " 🏆" } else { "" }
+    IO::println("  #{p.name()}#{tag}: $#{String::format("%,d", prize)}")
+  }
+
+  IO::println("")
+  IO::println("=== Sets by Round ===")
+  val roundGroups: Map[String, List[MatchResult]] = [:]
+  foreach m: MatchResult in results {
+    val lbl: String = m.round().label()
+    val group: List[MatchResult]? = roundGroups[lbl]
+    if group == null { roundGroups[lbl] = [m] } else { group.add(m) }
+  }
+  foreach (lbl, ms) in roundGroups {
+    val totalSets: Int = ms.map((m: MatchResult) -> m.sets().size).fold(0, (acc: Int, x: Int) -> acc + x)
+    val tbSets: Int = ms.map((m: MatchResult) ->
+      m.sets().filter((s: SetScore) -> s.wasTiebreak()).size
+    ).fold(0, (acc: Int, x: Int) -> acc + x)
+    IO::println("  #{lbl}: #{ms.size} match(es), #{totalSets} sets, #{tbSets} tiebreak(s)")
+  }
+
+  IO::println("")
+  printH2H(results)
+}
+
+def printH2H(results: List[MatchResult]): void {
+  IO::println("=== Head-to-Head Results ===")
+  foreach m: MatchResult in results {
+    val p1: String = m.player1().name()
+    val p2: String = m.player2().name()
+    val w: String = m.winner().name()
+    val p1sets: Int = m.setsWonByP1()
+    val p2sets: Int = m.setsWonByP2()
+    IO::println("  #{p1} #{p1sets}-#{p2sets} #{p2}  [#{m.round().label()}]")
+  }
+}
+
+def runSeasonSim(players: List[Player], surfaces: List[Surface], bestOf5: Boolean): void {
+  IO::println("")
+  IO::println("══════════════════════════════════════════════")
+  IO::println("           SEASON SIMULATION (4 Slams)")
+  IO::println("══════════════════════════════════════════════")
+
+  val seasonWins: Map[String, Int] = [:]
+  val seasonPrize: Map[String, Int] = [:]
+  foreach p: Player in players {
+    seasonWins[p.name()] = 0
+    seasonPrize[p.name()] = 0
+  }
+
+  foreach surface: Surface in surfaces {
+    IO::println("")
+    IO::println("── #{surface.label()} Grand Slam ─────────────────────")
+    val shuffled: List[Player] = Rand::shuffle(players)
+    val sliced: List[Player] = []
+    var idx: Int = 0
+    while idx < players.size { sliced.add(shuffled[idx]); idx = idx + 1 }
+    val results: List[MatchResult] = runTournamentQuiet(sliced, bestOf5)
+    val finalMatch: MatchResult? = results.find((m: MatchResult) -> m.round() == Round::FINAL)
+    if finalMatch != null {
+      val champ: Player = finalMatch.winner()
+      val prev: Int? = seasonWins[champ.name()]
+      seasonWins[champ.name()] = if prev == null { 1 } else { prev + 1 }
+      IO::println("  Champion: #{champ.display()}")
+    }
+    val eliminated: Map[String, Round] = [:]
+    foreach m: MatchResult in results { eliminated[m.loser().name()] = m.round() }
+    val champName: String? = if finalMatch != null { finalMatch.winner().name() } else { null }
+    foreach p: Player in players {
+      val lostAt: Round? = eliminated[p.name()]
+      val isChamp: Boolean = champName != null && p.name() == champName
+      val prize: Int = if isChamp { Round::FINAL.winnerPrizeUSD() }
+        else if lostAt != null { lostAt.loserPrizeUSD() }
+        else { Round::FINAL.loserPrizeUSD() }
+      val prev: Int? = seasonPrize[p.name()]
+      seasonPrize[p.name()] = if prev == null { prize } else { prev + prize }
+    }
+  }
+
+  IO::println("")
+  IO::println("=== Season Standings ===")
+  val standings: List[Player] = players.sortedBy((p: Player) -> {
+    val w: Int? = seasonWins[p.name()]
+    return -(if w == null { 0 } else { w })
+  })
+  foreach p: Player in standings {
+    val wins: Int? = seasonWins[p.name()]
+    val prize: Int? = seasonPrize[p.name()]
+    val w: Int = if wins == null { 0 } else { wins }
+    val pr: Int = if prize == null { 0 } else { prize }
+    IO::println("  #{p.name()}: #{w} titles, $#{String::format("%,d", pr)} prize money")
+  }
+}
+
+def runTournamentQuiet(players: List[Player], bestOf5: Boolean): List[MatchResult] {
+  val allMatches: List[MatchResult] = []
+  var current: List[Player] = players
+  val rounds: List[Round] = [Round::QUARTERFINAL, Round::SEMIFINAL, Round::FINAL]
+  foreach round: Round in rounds {
+    if current.size < 2 { break }
+    val matches: List[MatchResult] = []
+    var i: Int = 0
+    while i + 1 < current.size {
+      val m: MatchResult = simulateMatch(current[i], current[i + 1], round, bestOf5)
+      matches.add(m)
+      allMatches.add(m)
+      i = i + 2
+    }
+    current = matches.map((m: MatchResult) -> m.winner())
+  }
+  return allMatches
+}

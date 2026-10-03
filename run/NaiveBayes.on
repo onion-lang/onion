@@ -1,0 +1,256 @@
+// NaiveBayes.on — text classification via Naive Bayes (Laplace-smoothed).
+// Domain: email spam vs. ham classifier, trained on small built-in dataset.
+// Exercises: records with methods; data-carrying enums; plain enum; class
+// implementing interface; generics (ArrayList[T], LHMap[K,V]); collection
+// pipelines (filter/map/sortedBy/size); foreach on ranges and Map (k,v);
+// nullable; select/pattern matching; closures; string interpolation;
+// extension Double; while; try/catch; recursion (tokenise).
+
+import {
+  java.lang.Math
+  java.util.LinkedHashMap as LHMap
+  java.util.ArrayList
+}
+
+// ── Label enum ────────────────────────────────────────────────────────────────
+
+enum Label {
+  Spam, Ham
+public:
+  def display(): String = select this {
+    case Label::Spam: "SPAM"
+    case Label::Ham:  "HAM "
+  }
+}
+
+// ── Per-word occurrence counts ────────────────────────────────────────────────
+
+record WCount(spam: Int, ham: Int) {
+public:
+  def inc(isSpam: Boolean): WCount =
+    if isSpam { new WCount(spam + 1, ham) } else { new WCount(spam, ham + 1) }
+  def display(): String = "spam=#{spam} ham=#{ham}"
+}
+
+// ── Training example ──────────────────────────────────────────────────────────
+
+record TrainingExample(text: String, label: Label)
+
+// ── Extension for Double log-probability formatting ───────────────────────────
+
+extension Double {
+  def asPercent(): String = "" + ((self * 100.0) as Int) + "%"
+}
+
+// ── Classifier interface ──────────────────────────────────────────────────────
+
+interface Classifier {
+  def classify(text: String): Label
+  def confidence(text: String): Double
+}
+
+// ── NaiveBayes classifier ─────────────────────────────────────────────────────
+
+class NaiveBayes conforms Classifier {
+public:
+  var spamDocs: Int = 0
+  var hamDocs: Int = 0
+  var vocab: LHMap[String, WCount] = new LHMap[String, WCount]()
+
+private:
+  def tokenize(text: String): ArrayList[String] {
+    val lower: String = text.toLowerCase()
+    val words: ArrayList[String] = new ArrayList[String]()
+    var current: StringBuilder = new StringBuilder()
+    foreach i: Int in 0..<lower.length() {
+      val c: String = lower.substring(i, i + 1)
+      if c == " " || c == "," || c == "." || c == "!" || c == "?" || c == ":" {
+        if current.length() > 0 {
+          words.add(current.toString())
+          current = new StringBuilder()
+        }
+      } else {
+        current.append(c)
+      }
+    }
+    if current.length() > 0 {
+      words.add(current.toString())
+    }
+    return words
+  }
+
+public:
+  def train(examples: ArrayList[TrainingExample]): void {
+    foreach ex: TrainingExample in examples {
+      val isSpam: Boolean = ex.label() == Label::Spam
+      if isSpam { spamDocs = spamDocs + 1 } else { hamDocs = hamDocs + 1 }
+      val tokens: ArrayList[String] = tokenize(ex.text())
+      foreach word: String in tokens {
+        val current: WCount? = vocab.get(word)
+        val next: WCount = if current == null {
+          if isSpam { new WCount(1, 0) } else { new WCount(0, 1) }
+        } else {
+          current.inc(isSpam)
+        }
+        vocab.put(word, next)
+      }
+    }
+  }
+
+  def totalSpamWords(): Int {
+    var total: Int = 0
+    foreach wc: WCount in vocab.values() { total = total + wc.spam() }
+    return total
+  }
+
+  def totalHamWords(): Int {
+    var total: Int = 0
+    foreach wc: WCount in vocab.values() { total = total + wc.ham() }
+    return total
+  }
+
+  def classify(text: String): Label =
+    if logScore(text, true) > logScore(text, false) { Label::Spam } else { Label::Ham }
+
+  def confidence(text: String): Double = {
+    val spamScore: Double = logScore(text, true)
+    val hamScore: Double = logScore(text, false)
+    val maxScore: Double = if spamScore > hamScore { spamScore } else { hamScore }
+    val expSpam: Double = Math::exp(spamScore - maxScore)
+    val expHam: Double  = Math::exp(hamScore  - maxScore)
+    val total: Double = expSpam + expHam
+    if spamScore > hamScore { expSpam / total } else { expHam / total }
+  }
+
+private:
+  def logScore(text: String, forSpam: Boolean): Double {
+    val totalDocs: Int = spamDocs + hamDocs
+    var score: Double = if forSpam {
+      Math::log((spamDocs as Double) / (totalDocs as Double))
+    } else {
+      Math::log((hamDocs as Double) / (totalDocs as Double))
+    }
+    val vocabSize: Int = vocab.size()
+    val totalWords: Int = if forSpam { totalSpamWords() } else { totalHamWords() }
+    val tokens: ArrayList[String] = tokenize(text)
+    foreach word: String in tokens {
+      val wc: WCount? = vocab.get(word)
+      val wordCount: Int = if wc == null {
+        0
+      } else {
+        if forSpam { wc.spam() } else { wc.ham() }
+      }
+      // Laplace smoothing: (count + 1) / (total + vocabSize)
+      score = score + Math::log(((wordCount + 1) as Double) / ((totalWords + vocabSize) as Double))
+    }
+    return score
+  }
+}
+
+// ── Classification result ─────────────────────────────────────────────────────
+
+record ClassifyResult(text: String, actual: Label, predicted: Label, confidence: Double) {
+public:
+  def correct(): Boolean = actual == predicted
+  def mark(): String = if actual == predicted { "✓" } else { "✗" }
+}
+
+// ── Report printer ────────────────────────────────────────────────────────────
+
+class Report {
+  var results: ArrayList[ClassifyResult] = new ArrayList[ClassifyResult]()
+
+public:
+  def add(r: ClassifyResult): void {
+    results.add(r)
+  }
+
+  def accuracy(): Double {
+    val correct: Int = results.filter { r -> r.correct() }.size
+    return (correct as Double) / (results.size as Double)
+  }
+
+  def print(): void {
+    IO::println("=== Classification Report ===")
+    foreach r: ClassifyResult in results {
+      val confStr: String = r.confidence().asPercent()
+      IO::println("#{r.mark()} [#{r.actual().display()}→#{r.predicted().display()}] (#{confStr}) #{r.text()}")
+    }
+    val correct: Int = results.filter { r -> r.correct() }.size
+    IO::println("")
+    IO::println("Accuracy: #{correct}/#{results.size} = #{accuracy().asPercent()}")
+  }
+}
+
+// ── Training data ─────────────────────────────────────────────────────────────
+
+def trainingData(): ArrayList[TrainingExample] {
+  val data: ArrayList[TrainingExample] = new ArrayList[TrainingExample]()
+  // Spam examples
+  data.add(new TrainingExample("win free money now click here", Label::Spam))
+  data.add(new TrainingExample("congratulations you won a prize claim now", Label::Spam))
+  data.add(new TrainingExample("buy cheap medication online free shipping", Label::Spam))
+  data.add(new TrainingExample("urgent limited offer free gift card click", Label::Spam))
+  data.add(new TrainingExample("make money fast work from home earn cash", Label::Spam))
+  data.add(new TrainingExample("free casino bonus win big jackpot now", Label::Spam))
+  data.add(new TrainingExample("hot singles in your area click here now", Label::Spam))
+  data.add(new TrainingExample("lose weight fast miracle pill free trial", Label::Spam))
+  // Ham examples
+  data.add(new TrainingExample("meeting tomorrow at 10am please confirm", Label::Ham))
+  data.add(new TrainingExample("the project report is ready for review", Label::Ham))
+  data.add(new TrainingExample("can we reschedule our call to friday", Label::Ham))
+  data.add(new TrainingExample("thanks for your help with the presentation", Label::Ham))
+  data.add(new TrainingExample("please find attached the invoice for last month", Label::Ham))
+  data.add(new TrainingExample("looking forward to meeting you at the conference", Label::Ham))
+  data.add(new TrainingExample("the team finished the sprint please review", Label::Ham))
+  data.add(new TrainingExample("happy birthday hope you have a great day", Label::Ham))
+  return data
+}
+
+// ── Test data ─────────────────────────────────────────────────────────────────
+
+def testData(): ArrayList[TrainingExample] {
+  val data: ArrayList[TrainingExample] = new ArrayList[TrainingExample]()
+  data.add(new TrainingExample("click here to claim your free prize now", Label::Spam))
+  data.add(new TrainingExample("earn money fast free click offer now", Label::Spam))
+  data.add(new TrainingExample("the quarterly review meeting is on monday", Label::Ham))
+  data.add(new TrainingExample("please review the attached report and confirm", Label::Ham))
+  data.add(new TrainingExample("win big free money click here urgent", Label::Spam))
+  data.add(new TrainingExample("thanks for joining our team call tomorrow", Label::Ham))
+  return data
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+val nb: NaiveBayes = new NaiveBayes()
+nb.train(trainingData())
+
+IO::println("Training complete: #{nb.spamDocs} spam, #{nb.hamDocs} ham documents")
+IO::println("Vocabulary size: #{nb.vocab.size()} unique words")
+IO::println("")
+
+val report: Report = new Report()
+foreach ex: TrainingExample in testData() {
+  val predicted: Label = nb.classify(ex.text())
+  val conf: Double = nb.confidence(ex.text())
+  report.add(new ClassifyResult(ex.text(), ex.label(), predicted, conf))
+}
+report.print()
+
+IO::println("")
+IO::println("=== Top Spam Indicators (spam count > 1) ===")
+val spamWords: ArrayList[String] = new ArrayList[String]()
+foreach (word, wc) in nb.vocab {
+  if wc.spam() > 1 {
+    spamWords.add(word)
+  }
+}
+val sorted: List[String] = spamWords.sortedBy { w -> 0 - nb.vocab.get(w).spam() }
+val limit: Int = if sorted.size < 8 { sorted.size } else { 8 }
+foreach i: Int in 0..<limit {
+  val w: String = sorted[i]
+  val wc: WCount? = nb.vocab.get(w)
+  if wc != null {
+    IO::println("  #{w}: #{wc.display()}")
+  }
+}

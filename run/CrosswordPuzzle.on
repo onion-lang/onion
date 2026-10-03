@@ -1,0 +1,383 @@
+// CrosswordPuzzle.on — a crossword generator and solver exercising records,
+// ADT enums, classes, inheritance, generics, collection pipelines, pattern
+// matching, nullable types, extension methods, closures, and recursion.
+
+// ─── Direction ────────────────────────────────────────────────────────────────
+enum Direction {
+  case Across
+  case Down
+}
+
+// ─── Cell state ───────────────────────────────────────────────────────────────
+enum Cell {
+  case Black
+  case White
+  case Filled(letter: String)
+}
+
+// ─── Word entry ───────────────────────────────────────────────────────────────
+record WordEntry(word: String, clue: String, row: Int, col: Int, dir: Direction)
+
+// ─── PlacementResult: outcome of trying to place a word ──────────────────────
+enum PlacementResult {
+  case Placed
+  case Conflict
+  case OutOfBounds
+}
+
+// ─── Extension: string helpers ───────────────────────────────────────────────
+extension String {
+  def letterAt(i: Int): String = self.substring(i, i + 1)
+  def rep(n: Int): String {
+    var s = ""
+    var i = 0
+    while i < n { s = s + self; i = i + 1 }
+    return s
+  }
+  def pad(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+}
+
+// ─── Grid ─────────────────────────────────────────────────────────────────────
+class Grid {
+  var rows: Int
+  var cols: Int
+  var cells: String[]
+
+public:
+  def this(r: Int, c: Int) {
+    rows = r
+    cols = c
+    cells = new String[r * c]
+    var i: Int = 0
+    while i < r * c {
+      cells[i] = "."
+      i = i + 1
+    }
+  }
+
+  def numRows(): Int = rows
+  def numCols(): Int = cols
+
+  def get(r: Int, c: Int): String = cells[r * cols + c]
+
+  def set(r: Int, c: Int, v: String): void {
+    cells[r * cols + c] = v
+  }
+
+  def inBounds(r: Int, c: Int): Boolean =
+    r >= 0 && r < rows && c >= 0 && c < cols
+
+  def tryPlace(word: String, startRow: Int, startCol: Int, dir: Direction): PlacementResult {
+    val len: Int = word.length()
+    foreach i: Int in 0..<len {
+      val r: Int = if (dir is Across) { startRow } else { startRow + i }
+      val c: Int = if (dir is Across) { startCol + i } else { startCol }
+      if !inBounds(r, c) { return new OutOfBounds() }
+      val existing: String = get(r, c)
+      val letter: String = word.letterAt(i)
+      if existing != "." && existing != letter { return new Conflict() }
+    }
+    return new Placed()
+  }
+
+  def placeWord(word: String, startRow: Int, startCol: Int, dir: Direction): void {
+    val len: Int = word.length()
+    foreach i: Int in 0..<len {
+      val r: Int = if (dir is Across) { startRow } else { startRow + i }
+      val c: Int = if (dir is Across) { startCol + i } else { startCol }
+      set(r, c, word.letterAt(i))
+    }
+  }
+
+  def display(): void {
+    var r: Int = 0
+    while r < rows {
+      var line: String = ""
+      var c: Int = 0
+      while c < cols {
+        val ch: String = get(r, c)
+        line = line + (if ch == "." { "#" } else { ch }) + " "
+        c = c + 1
+      }
+      IO::println(line)
+      r = r + 1
+    }
+  }
+
+  def displayMasked(): void {
+    var r: Int = 0
+    while r < rows {
+      var line: String = ""
+      var c: Int = 0
+      while c < cols {
+        val ch: String = get(r, c)
+        line = line + (if ch == "." { "#" } else { "_" }) + " "
+        c = c + 1
+      }
+      IO::println(line)
+      r = r + 1
+    }
+  }
+}
+
+// ─── Puzzle: manages a list of placed words on a grid ────────────────────────
+class Puzzle {
+  var grid: Grid
+  var entries: List[Object]
+
+public:
+  def this(rows: Int, cols: Int) {
+    grid = new Grid(rows, cols)
+    entries = []
+  }
+
+  def getGrid(): Grid = grid
+  def getEntries(): List[Object] = entries
+
+  def tryAddWord(word: String, clue: String, row: Int, col: Int, dir: Direction): Boolean {
+    select grid.tryPlace(word, row, col, dir) {
+      case p is Placed:
+        grid.placeWord(word, row, col, dir)
+        entries.add(new WordEntry(word, clue, row, col, dir))
+        return true
+      case c is Conflict:
+        return false
+      case o is OutOfBounds:
+        return false
+    }
+  }
+
+  def wordCount(): Int = entries.size
+
+  def score(): Int {
+    return entries.fold(0) { acc, e -> (acc as Int) + (e as WordEntry).word().length() }
+  }
+}
+
+// ─── Clue number assignment: number cells in reading order ──────────────────
+def assignNumbers(puzzle: Puzzle): Map[String, Object] {
+  val grid: Grid = puzzle.getGrid()
+  var nums: Map[String, Object] = [:]
+  var num: Int = 1
+  var r: Int = 0
+  while r < grid.numRows() {
+    var c: Int = 0
+    while c < grid.numCols() {
+      val ch: String = grid.get(r, c)
+      if ch != "." {
+        val startsAcross: Boolean = (c == 0 || grid.get(r, c - 1) == ".") &&
+          (c + 1 < grid.numCols() && grid.get(r, c + 1) != ".")
+        val startsDown: Boolean = (r == 0 || grid.get(r - 1, c) == ".") &&
+          (r + 1 < grid.numRows() && grid.get(r + 1, c) != ".")
+        if startsAcross || startsDown {
+          nums[r + "," + c] = num
+          num = num + 1
+        }
+      }
+      c = c + 1
+    }
+    r = r + 1
+  }
+  return nums
+}
+
+// ─── Statistics ───────────────────────────────────────────────────────────────
+def countFilled(grid: Grid): Int {
+  var total: Int = 0
+  var r: Int = 0
+  while r < grid.numRows() {
+    var c: Int = 0
+    while c < grid.numCols() {
+      if grid.get(r, c) != "." { total = total + 1 }
+      c = c + 1
+    }
+    r = r + 1
+  }
+  return total
+}
+
+def density(grid: Grid): Double {
+  val filled: Int = countFilled(grid)
+  val total: Int = grid.numRows() * grid.numCols()
+  return (filled as Double) / (total as Double)
+}
+
+// ─── Word bank ────────────────────────────────────────────────────────────────
+record WordDef(word: String, clue: String)
+
+val wordBank: List[Object] = [
+  new WordDef("ONION",   "A layered vegetable (or language)"),
+  new WordDef("SCALA",   "JVM language this compiler is written in"),
+  new WordDef("JAVA",    "Platform that runs JVM bytecode"),
+  new WordDef("CLASS",   "Blueprint for objects"),
+  new WordDef("RECORD",  "Immutable data container"),
+  new WordDef("ENUM",    "Sum type with named cases"),
+  new WordDef("TYPE",    "Category of values"),
+  new WordDef("LOOP",    "Repeated execution"),
+  new WordDef("MATCH",   "Pattern selector keyword"),
+  new WordDef("PARSE",   "Turn text into a structure"),
+  new WordDef("ASM",     "Bytecode library used by Onion"),
+  new WordDef("NODE",    "Element of a tree"),
+  new WordDef("LIST",    "Ordered collection"),
+  new WordDef("MAP",     "Key-value store"),
+  new WordDef("FOLD",    "Reduce a collection to one value"),
+  new WordDef("CAST",    "Type conversion operator"),
+  new WordDef("NULL",    "Absence of a value"),
+  new WordDef("STACK",   "LIFO data structure"),
+  new WordDef("HEAP",    "Memory region for objects"),
+  new WordDef("SCOPE",   "Region of name visibility"),
+  new WordDef("BLOCK",   "Sequence of statements"),
+  new WordDef("CALL",    "Invoke a method"),
+  new WordDef("OPEN",    "Expose for extension"),
+  new WordDef("CLOSE",   "Seal from extension"),
+  new WordDef("LAMBDA",  "Anonymous function"),
+  new WordDef("TRAIT",   "Interface with defaults"),
+  new WordDef("INFER",   "Deduce a type automatically"),
+  new WordDef("LINT",    "Style and correctness checker"),
+  new WordDef("SBT",     "Scala build tool"),
+  new WordDef("JVM",     "Java Virtual Machine")
+]
+
+// ─── Greedy placer: tries all words in all valid positions ──────────────────
+// Words at even positions try ACROSS first; odd positions try DOWN first,
+// producing a genuine crossword with intersections.
+def buildPuzzle(rows: Int, cols: Int): Puzzle {
+  val puzzle: Puzzle = new Puzzle(rows, cols)
+  var idx: Int = 0
+
+  foreach wd: WordDef in wordBank {
+    var placed: Boolean = false
+    val primary: Direction = if (idx % 2 == 0) { new Across() } else { new Down() }
+    val secondary: Direction = if (idx % 2 == 0) { new Down() } else { new Across() }
+    val dirs: List[Object] = [primary, secondary]
+
+    foreach dir: Direction in dirs {
+      if placed { continue }
+      var r: Int = 0
+      while r < rows && !placed {
+        var c: Int = 0
+        while c < cols && !placed {
+          if puzzle.tryAddWord(wd.word(), wd.clue(), r, c, dir) {
+            placed = true
+          }
+          c = c + 1
+        }
+        r = r + 1
+      }
+    }
+    idx = idx + 1
+  }
+  return puzzle
+}
+
+// ─── Clue printer ─────────────────────────────────────────────────────────────
+def printClues(puzzle: Puzzle, nums: Map[String, Object]): void {
+  val acrossEntries: List[Object] = puzzle.getEntries()
+    .filter { e -> (e as WordEntry).dir() is Across }
+    .sortedBy { e -> (e as WordEntry).row() * 100 + (e as WordEntry).col() }
+  val downEntries: List[Object] = puzzle.getEntries()
+    .filter { e -> (e as WordEntry).dir() is Down }
+    .sortedBy { e -> (e as WordEntry).col() * 100 + (e as WordEntry).row() }
+
+  IO::println("ACROSS:")
+  foreach e: WordEntry in acrossEntries {
+    val key: String = e.row() + "," + e.col()
+    val num: Object? = nums[key]
+    if num != null {
+      IO::println("  " + num + ". " + e.clue() + " (" + e.word().length() + " letters)")
+    }
+  }
+  IO::println("DOWN:")
+  foreach e: WordEntry in downEntries {
+    val key: String = e.row() + "," + e.col()
+    val num: Object? = nums[key]
+    if num != null {
+      IO::println("  " + num + ". " + e.clue() + " (" + e.word().length() + " letters)")
+    }
+  }
+}
+
+// ─── Main driver ──────────────────────────────────────────────────────────────
+IO::println("=== CROSSWORD PUZZLE GENERATOR ===")
+IO::println("")
+
+val puzzle: Puzzle = buildPuzzle(15, 15)
+val grid: Grid = puzzle.getGrid()
+val nums: Map[String, Object] = assignNumbers(puzzle)
+val placed: Int = puzzle.wordCount()
+val total: Int = wordBank.size
+val letters: Int = countFilled(grid)
+val pct: Int = (density(grid) * 100.0) as Int
+
+IO::println("Grid (15×15) — placed " + placed + "/" + total + " words, " +
+  letters + " letters, " + pct + "% density")
+IO::println("")
+IO::println("── SOLUTION ──")
+grid.display()
+IO::println("")
+IO::println("── BLANK PUZZLE ──")
+grid.displayMasked()
+IO::println("")
+printClues(puzzle, nums)
+IO::println("")
+
+// ─── Verify: all placed words are readable on the grid ───────────────────────
+IO::println("── VERIFICATION ──")
+var ok: Int = 0
+var fail: Int = 0
+foreach e: WordEntry in puzzle.getEntries() {
+  var read: String = ""
+  val len: Int = e.word().length()
+  foreach i: Int in 0..<len {
+    val r: Int = if (e.dir() is Across) { e.row() } else { e.row() + i }
+    val c: Int = if (e.dir() is Across) { e.col() + i } else { e.col() }
+    read = read + grid.get(r, c)
+  }
+  if read == e.word() {
+    ok = ok + 1
+  } else {
+    IO::println("FAIL: " + e.word() + " read back as " + read)
+    fail = fail + 1
+  }
+}
+IO::println("Verified: " + ok + " words OK, " + fail + " failures")
+
+// ─── Longest and shortest placed word ────────────────────────────────────────
+val sortedByLen: List[Object] = puzzle.getEntries()
+  .sortedBy { e -> 0 - (e as WordEntry).word().length() }
+if sortedByLen.size > 0 {
+  val longest: WordEntry = sortedByLen[0] as WordEntry
+  val shortest: WordEntry = sortedByLen[sortedByLen.size - 1] as WordEntry
+  IO::println("Longest:  " + longest.word() + " (" + longest.word().length() + ")")
+  IO::println("Shortest: " + shortest.word() + " (" + shortest.word().length() + ")")
+}
+
+// ─── Letter frequency ─────────────────────────────────────────────────────────
+IO::println("")
+IO::println("── LETTER FREQUENCY (top 5) ──")
+var freqMap: Map[String, Object] = [:]
+foreach e: WordEntry in puzzle.getEntries() {
+  foreach i: Int in 0..<e.word().length() {
+    val ch: String = e.word().letterAt(i)
+    val prev: Object? = freqMap[ch]
+    if prev == null {
+      freqMap[ch] = 1
+    } else {
+      freqMap[ch] = (prev as Int) + 1
+    }
+  }
+}
+val freqKeys: List[String] = freqMap.keys()
+  .sortedBy { k -> 0 - (freqMap[k] as Int) }
+var shown: Int = 0
+foreach k: String in freqKeys {
+  if shown >= 5 { break }
+  IO::println("  " + k + ": " + freqMap[k])
+  shown = shown + 1
+}
+IO::println("")
+IO::println("Done.")

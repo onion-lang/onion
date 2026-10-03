@@ -3,7 +3,7 @@ package onion.compiler.typing
 import onion.compiler.{Location, SemanticError, Typing}
 import onion.compiler.toolbox.Message
 import onion.compiler.TypedAST._
-import onion.compiler.effects.{Effect, EffectInference}
+import onion.compiler.effects.{Effect, EffectInference, EffectTable, StaticOperands}
 
 /**
  * Pass 5 of typing (issue #357): the capability boundary.
@@ -42,15 +42,69 @@ final class CapabilityCheckPass(typing: Typing) {
     } yield md
     if (tools.isEmpty) return
 
-    val (_, unitEffects) = EffectInference.inferUnits(classes)
+    val table = typing.effectTable
+    val (units, unitEffects) = EffectInference.inferUnits(classes, table)
 
     for (tool <- tools) {
       val declared = declaredCapabilities(tool)
       if (tool.getBlock != null) {
-        checkUndeclared(tool, declared, classes, unitEffects)
+        checkUndeclared(tool, declared, classes, unitEffects, table)
         checkUnused(tool, declared, unitEffects)
       }
     }
+
+    recordStaticOperands(tools, units.keySet, classes, table)
+  }
+
+  /**
+   * FRICTION F11: adds each tool's statically known operands (literal hosts, commands,
+   * env-var names, paths — see [[StaticOperands]]) to the contract the synthesized
+   * `main` hands to `onion.ToolCli.dispatch`, so `--plan` can print them. The contract
+   * is a string literal Rewriting built before any typing; this is the first point
+   * where the operands are known, so the literal is replaced in place. The addition is
+   * one extra key per tool, present only when something is known.
+   */
+  private def recordStaticOperands(tools: Seq[MethodDefinition],
+                                   units: collection.Set[EffectInference.Unit0],
+                                   classes: Seq[ClassDefinition],
+                                   table: EffectTable.Table): Unit = {
+    val fragments = tools.filter(_.getBlock != null).flatMap { tool =>
+      StaticOperands.contractFragment(StaticOperands.forTool(tool, units, classes, table)).map(tool.name -> _)
+    }
+    if (fragments.isEmpty) return
+    val toolClasses = tools.map(_.classType.name).toSet
+    for {
+      cd <- classes if toolClasses.contains(cd.name)
+      m  <- cd.methods.toSeq
+      md <- Some(m).collect { case md: MethodDefinition if md.name == "main" && md.getBlock != null => md }
+      call <- findDispatch(md.getBlock)
+    } {
+      call.parameters(1) match {
+        case sv: StringValue if sv.value != null && sv.value.startsWith("[{\"tool\":") =>
+          val augmented = fragments.foldLeft(sv.value) { case (json, (name, fragment)) =>
+            StaticOperands.insertIntoContract(json, name, fragment)
+          }
+          call.parameters(1) = new StringValue(sv.location, augmented, sv.`type`)
+        case _ =>
+      }
+    }
+  }
+
+  /** The synthesized `onion.ToolCli.dispatch(args, contract)` call in a `main` body. */
+  private def findDispatch(s: ActionStatement): Option[CallStatic] = s match {
+    case b: StatementBlock            => b.statements.iterator.flatMap(findDispatch).nextOption()
+    case e: ExpressionActionStatement => findDispatchTerm(e.term)
+    case _                            => None
+  }
+
+  private def findDispatchTerm(t: Term): Option[CallStatic] = t match {
+    case c: CallStatic if c.method != null && c.method.name == "dispatch"
+        && c.method.affiliation != null && c.method.affiliation.name == "onion.ToolCli"
+        && c.parameters.length == 2 => Some(c)
+    case s: SetLocal      => findDispatchTerm(s.value)
+    case b: Begin         => b.terms.iterator.flatMap(findDispatchTerm).nextOption()
+    case s: StatementTerm => findDispatch(s.statement)
+    case _                => None
   }
 
   /** Parses and validates the requires clause; invalid entries report E0079 and are
@@ -84,9 +138,10 @@ final class CapabilityCheckPass(typing: Typing) {
   /** E0077 per effect, at the first call site that introduces it. */
   private def checkUndeclared(tool: MethodDefinition, declared: Set[Effect],
                               classes: Seq[ClassDefinition],
-                              unitEffects: Map[EffectInference.Unit0, Set[Effect]]): Unit = {
+                              unitEffects: Map[EffectInference.Unit0, Set[Effect]],
+                              table: EffectTable.Table): Unit = {
     val reported = scala.collection.mutable.Set[Effect]()
-    for (site <- EffectInference.callSites(tool.getBlock, classes, unitEffects)) {
+    for (site <- EffectInference.callSites(tool.getBlock, classes, unitEffects, table)) {
       val missing = (site.effects -- declared) -- reported
       for (effect <- missing.toSeq.sorted) {
         reported += effect

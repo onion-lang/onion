@@ -1,5 +1,6 @@
 // ShellPipeline — process execution and file pipeline example.
 // Uses the Proc module to run shell commands and build a small data pipeline.
+// Needs a POSIX shell and coreutils (sh, wc, sort, head, echo), so it does not run on plain Windows.
 
 import {
   java.io.File;

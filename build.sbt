@@ -195,6 +195,40 @@ lazy val onionSettings = Seq(
 // cost a few seconds and make the signal trustworthy.
 Test / parallelExecution := false
 
+// ---- batteries ------------------------------------------------------------------
+//
+// A battery is an optional library shipped as its own Maven artifact, next to (never
+// inside) onion.jar: a script pulls it in with `//> using dep`, a project with
+// `[dependencies]`. The root project neither aggregates nor depends on a battery, so
+// `sbt assembly`/`dist`/`test` and the size of onion.jar are exactly what they were;
+// build or test one by name (`sbt llm/test`, `sbt llm/publishM2`).
+//
+// The Onion runtime (onion.Result, onion.Shape, ...) is a *provided* dependency: every
+// Onion script already runs with onion.jar on its classpath, so the battery's POM must
+// not drag a second copy (or the Scala library) in.
+lazy val llm = (project in file("batteries/llm"))
+  .dependsOn(onion % "provided")
+  .settings(
+    name := "onion-llm",
+    organization := "org.onion_lang",
+    description := "Onion battery: Claude (Anthropic Messages API) with Shape-typed structured output",
+    scalaVersion := "3.3.7",
+    // A Java library: no _3 suffix on the artifact, no Scala library in its POM.
+    crossPaths := false,
+    autoScalaLibrary := false,
+    compile / javacOptions ++= Seq("--release", "17", "-Xlint:unchecked", "-encoding", "UTF-8"),
+    // Javadoc runs on the published -javadoc.jar; keep it from failing on doc lint.
+    doc / javacOptions := Seq("-Xdoclint:none", "-quiet", "-encoding", "UTF-8"),
+    libraryDependencies ++= Seq(
+      "com.anthropic" % "anthropic-java" % "2.68.0",
+      // The tests are ScalaTest specs like the root project's; the Scala library comes
+      // from the provided Onion dependency at compile time and is pinned here for tests.
+      "org.scala-lang" % "scala3-library_3" % "3.3.7" % Test,
+      "org.scalatest" %% "scalatest" % "3.2.19" % Test
+    ),
+    Test / parallelExecution := false
+  )
+
 run / fork := true
 run / connectInput := true
 repl / fork := true

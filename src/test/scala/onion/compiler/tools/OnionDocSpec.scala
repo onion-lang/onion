@@ -106,5 +106,41 @@ class OnionDocSpec extends AnyFunSpec {
       assert(new File(outDir, "index.html").exists())
       assert(new File(outDir, "Greeter.html").exists())
     }
+
+    it("returns exit code 1 (not an exception) when a source file does not exist") {
+      val outDir = Files.createTempDirectory("oniondoc-out").toFile
+      val missing = new File(outDir, "DoesNotExist.on").getAbsolutePath
+      val code = OnionDoc.run(Array("-d", outDir.getAbsolutePath, missing))
+      assert(code == 1)
+    }
+
+    it("returns exit code 1 (not an exception) when a source file fails to parse") {
+      // A truncated \\uXXXX escape makes the lexer throw java.lang.Error before any
+      // recovery machinery runs (see Parsing.scala's own catch for the same case);
+      // DocModel.fromSource has no such guard, so OnionDoc.run must catch it itself.
+      val srcDir = Files.createTempDirectory("oniondoc-src").toFile
+      val srcFile = new File(srcDir, "Bad.on")
+      Files.write(srcFile.toPath, "\\u12".getBytes(StandardCharsets.UTF_8))
+      val outDir = Files.createTempDirectory("oniondoc-out").toFile
+
+      val code = OnionDoc.run(Array("-d", outDir.getAbsolutePath, srcFile.getAbsolutePath))
+      assert(code == 1)
+    }
+
+    it("returns exit code 1 for an unknown option") {
+      assert(OnionDoc.run(Array("--bogus")) == 1)
+    }
+
+    it("returns exit code 1 when no source files are given") {
+      assert(OnionDoc.run(Array()) == 1)
+    }
+
+    it("returns exit code 1 when -d is missing its argument") {
+      assert(OnionDoc.run(Array("-d")) == 1)
+    }
+
+    it("returns exit code 0 for --help without requiring a source file") {
+      assert(OnionDoc.run(Array("--help")) == 0)
+    }
   }
 }

@@ -45,6 +45,17 @@ class EffectTableSpec extends AnyFunSpec {
       assert(of("onion.HttpResource", "read") == Set(Net))
       assert(of("onion.HttpResource", "url").isEmpty)
     }
+    it("keeps the Http request builder pure until send") {
+      assert(of("onion.Http", "request").isEmpty)
+      for (m <- Seq("header", "headers", "body", "timeoutSeconds", "timeoutMillis", "method", "url"))
+        assert(of("onion.Http$Request", m).isEmpty, m)
+      assert(of("onion.Http$Request", "send") == Set(Net))
+      assert(of("onion.Http$Request", "sendOrThrow") == Set(Net))
+      for (m <- Seq("kind", "method", "url", "message", "cause", "isTimeout", "isConnect"))
+        assert(of("onion.Http$HttpFailure", m).isEmpty, m)
+      assert(of("onion.Http", "getResponse") == Set(Net))
+      assert(of("onion.Http", "postResponse") == Set(Net))
+    }
     it("marks IO console except the pure formatter") {
       assert(of("onion.IO", "println") == Set(Console))
       assert(of("onion.IO", "readLine") == Set(Console))
@@ -90,6 +101,26 @@ class EffectTableSpec extends AnyFunSpec {
       assert(of("java.lang.Runtime", "exec") == Set(Exec))
       assert(of("java.lang.Thread", "sleep") == Set(Clock))
       assert(of("java.io.PrintStream", "println") == Set(Console))
+    }
+    it("classifies JDK file I/O: the class that opens a file, java.io.File, java.nio.file") {
+      // A tool writing through `new FileOutputStream(dst)` could not declare `write(dst)`
+      // (E0078) before these rows: the constructor was `unknown`, not `write`.
+      assert(of("java.io.FileOutputStream", "<init>") == Set(Write))
+      assert(of("java.io.FileWriter", "write") == Set(Write))
+      assert(of("java.io.FileInputStream", "<init>") == Set(Read))
+      assert(of("java.io.RandomAccessFile", "<init>") == Set(Read, Write))
+      assert(of("java.io.ByteArrayOutputStream", "write").isEmpty)
+      assert(of("java.io.File", "<init>").isEmpty)
+      assert(of("java.io.File", "exists") == Set(Read))
+      assert(of("java.io.File", "mkdirs") == Set(Write))
+      assert(of("java.io.File", "getAbsolutePath") == Set(Env))
+      assert(of("java.nio.file.Files", "readString") == Set(Read))
+      assert(of("java.nio.file.Files", "writeString") == Set(Write))
+      assert(of("java.nio.file.Files", "copy") == Set(Read, Write))
+      assert(of("java.nio.file.Paths", "get").isEmpty)
+      assert(of("java.nio.file.Path", "toAbsolutePath") == Set(Env))
+      // Wrappers stay unclassified: they may wrap System.in or a socket.
+      assert(of("java.io.BufferedReader", "readLine") == Set(Unknown))
     }
     it("reads the clock only through java.time's now, and treats the rest as values") {
       for (cls <- Seq("java.time.LocalDate", "java.time.LocalDateTime", "java.time.Instant",

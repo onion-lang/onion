@@ -122,7 +122,19 @@ object EntryPointDiscovery:
         }
       else None
 
-    explicit.orElse(conventional).map { location =>
+    // A source whose top level declares `tool`s, and has neither a `main` nor a top-level
+    // statement, is a CLI: the compiler synthesizes a `main(String[])` that dispatches
+    // through `onion.ToolCli` (`--help`, `--contract`, `--plan`). This mirrors the
+    // condition under which `Rewriting.appendToolCliMain` synthesizes that `main`, so a
+    // source counts as a tool entrypoint exactly when running its class runs the tools.
+    val tool =
+      if sourceUnit.unit.toplevels.exists(_.isInstanceOf[AST.BlockElement]) then None
+      else
+        sourceUnit.unit.toplevels.collectFirst {
+          case function: AST.FunctionDeclaration if isTool(function) => function.location
+        }
+
+    explicit.orElse(conventional).orElse(tool).map { location =>
       EntryPoint(
         sourceUnit.className,
         sourceUnit.source,
@@ -130,6 +142,10 @@ object EntryPointDiscovery:
         location.column
       )
     }
+
+  /** The marker the parser attaches to a `tool` declaration (see `Rewriting.appendToolCliMain`). */
+  private def isTool(function: AST.FunctionDeclaration): Boolean =
+    function.annotations.exists(_.name == "onion.tool")
 
   private def entryPointKey(entryPoint: EntryPoint): (String, Int, Int, String) =
     (entryPoint.source, entryPoint.line, entryPoint.column, entryPoint.className)

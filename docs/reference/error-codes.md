@@ -248,6 +248,14 @@ public:
 
 No method matches the call.  If a method with the same name exists but the argument types differ, the compiler lists the available signatures.
 
+A top-level function is named on its own (`a function applicable for helper(Int, Int) is
+not found`), never through the file's synthetic container class. A "did you mean"
+suggestion names only a member the call could reach — not a library class's private
+member, and one that takes that many arguments — and prefers one whose parameters also
+take the argument types. When no such member is close by name, it falls back to the
+closest-named member that takes a different number of arguments (`Strings::trimm(s, 1)`
+suggests `trim`), still never a library class's private member.
+
 ### `E0006` — Ambiguous method
 
 Two overloads are equally applicable to the call and neither is more specific than
@@ -661,12 +669,27 @@ record Inner(x: Int)
 record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner is not a supported component type
 ```
 
-A `shape name = ...` clause (regex, `json`, `yaml` or `config`) reads its components the
-same way, so the same restriction applies; the message names the clause that could not
-produce the component (`shape doc = json`, `from re"..."`).
+A `shape name = ...` clause (regex, `yaml` or `config`) reads its components the same
+way, so the same restriction applies; the message names the clause that could not
+produce the component (`shape line = re"..."`, `from re"..."`).
 
-Fix: keep every component in the supported scalar set, or parse the field
-manually after a plain `from re"..."` match on the rest.
+A `shape name = json` clause reads more: besides the scalars, `List[S]` of a scalar, a
+record `R` that declares a json shape of its own, `List[R]`, and `T?` of any of these.
+Anything else is still E0061 for it — a `Map`, an array, `List[List[S]]`, `List[S?]`, a
+record with no json shape, or a type alias standing for one of the accepted types:
+
+```onion
+record Inner(x: Int)                                   // no json shape
+record R(a: String, b: Inner) { shape doc = json }     // E0061: shape doc = json cannot read Inner
+```
+
+Every shape of a record reads the same components, so a record whose json shape reads a
+`List[String]` but which also declares `shape line = re"..."` is E0061 naming the regex
+clause.
+
+Fix: keep every component in the supported scalar set (or, for a json shape, in the
+extended set above — give a nested record its own `shape doc = json`), or parse the
+field manually after a plain `from re"..."` match on the rest.
 
 ### `E0062` — Record component type unsupported by `derive!`
 
@@ -965,6 +988,22 @@ tool same(a: Int): Int requires { console } { IO::println("A"); return 0 }
 tool same(b: String): Int requires { console } { IO::println("B"); return 0 }
 // E0082: duplicate tool name `same`.
 ```
+
+### `E0093` — Two parameters answer to the same command-line flag
+
+A flag parameter of a `def main` auto-CLI or a `tool` is accepted both under its own
+name and in kebab-case (`makeSample` answers to `--makeSample` and `--make-sample`).
+When two flag parameters share a spelling, one of them could never be set, so the
+second one is reported at compile time instead of being resolved silently at run time.
+
+```onion
+def main(parseURL: Int = 1, parseUrl: Int = 2): void { IO::println(parseURL + parseUrl) }
+// E0093: parameters `parseURL` and `parseUrl` of `main` would both answer to the
+//        command-line flag `--parse-url`.
+```
+
+Rename one of them. Positional parameters (those without a default) have no flag and
+are not checked.
 
 ## Try/catch errors
 
@@ -1525,6 +1564,8 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0014` | top-level statements ignored because a main is defined |
 | `W0015` | boxed platform value implicitly unboxed to a non-null primitive |
 | `W0016` | `@TailRecursive` annotation present but its mutual-recursion group could not be optimized |
+| `W0017` | a library jar's `META-INF/onion/effect-table.txt` is malformed and was ignored whole (reported at the jar and line) |
+| `W0018` | a library jar's effect table names classes outside the jar; those entries were ignored |
 
 ## Every diagnostic code
 
@@ -1625,6 +1666,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0090` | `this` is used in a constructor's delegation arguments before the object of … exists |
 | `E0091` | … is a class, not a variable |
 | `E0092` | cannot instantiate primitive type … with `new` |
+| `E0093` | parameters `…` and `…` of `…` would both answer to the command-line flag `--…` |
 
 ## See also
 

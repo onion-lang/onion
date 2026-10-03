@@ -18,3 +18,13 @@
 # Linguist's language list and cannot be overridden per repository, so they stay plain on
 # github.com. The documentation site highlights them properly via tools/pygments-onion.
 *.on linguist-language=Scala linguist-detectable=false
+
+# Scala sources are always checked out with LF line endings.
+#
+# A Scala multi-line string literal takes its line breaks from the file it is written in
+# (unlike a Java text block, which normalizes them), so under `core.autocrlf=true` -- the
+# Git for Windows default -- every `"""...""".stripMargin` in a spec silently became a
+# CRLF string and compared unequal to output the code builds with "\n". The specs then
+# failed only on Windows checkouts. An existing checkout picks this up after
+# `git rm --cached -r -q . && git reset --hard` (or a fresh clone).
+*.scala text eol=lf

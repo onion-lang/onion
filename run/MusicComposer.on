@@ -1,0 +1,451 @@
+// MusicComposer.on — a musical composition system.
+// Exercises: homogeneous enums with methods (Pitch, Duration, ChordQuality,
+// ScaleMode); records with methods (Note, Chord, Scale, Measure, Melody);
+// collection pipelines (map/filter/fold/find); foreach (k,v) over Map;
+// |> pipeline; select/pattern match on enums and ints; closures; string
+// interpolation; nullable; while/foreach; static methods.
+
+import {
+  java.util.LinkedHashMap as LMap
+}
+
+// ── Pitch (chromatic scale, 0–11) ────────────────────────────────────────
+
+enum Pitch { C, CS, D, DS, E, F, FS, G, GS, A, AS, B
+public:
+  def semitone(): Int = select this {
+    case Pitch::C:  0
+    case Pitch::CS: 1
+    case Pitch::D:  2
+    case Pitch::DS: 3
+    case Pitch::E:  4
+    case Pitch::F:  5
+    case Pitch::FS: 6
+    case Pitch::G:  7
+    case Pitch::GS: 8
+    case Pitch::A:  9
+    case Pitch::AS: 10
+    case Pitch::B:  11
+  }
+  def label(): String = select this {
+    case Pitch::C:  "C"
+    case Pitch::CS: "C#"
+    case Pitch::D:  "D"
+    case Pitch::DS: "D#"
+    case Pitch::E:  "E"
+    case Pitch::F:  "F"
+    case Pitch::FS: "F#"
+    case Pitch::G:  "G"
+    case Pitch::GS: "G#"
+    case Pitch::A:  "A"
+    case Pitch::AS: "A#"
+    case Pitch::B:  "B"
+  }
+  static def fromSemitone(n: Int): Pitch = {
+    val m: Int = ((n % 12) + 12) % 12
+    select m {
+      case 0:  Pitch::C
+      case 1:  Pitch::CS
+      case 2:  Pitch::D
+      case 3:  Pitch::DS
+      case 4:  Pitch::E
+      case 5:  Pitch::F
+      case 6:  Pitch::FS
+      case 7:  Pitch::G
+      case 8:  Pitch::GS
+      case 9:  Pitch::A
+      case 10: Pitch::AS
+      case 11: Pitch::B
+      else:    Pitch::C
+    }
+  }
+}
+
+// ── Duration ─────────────────────────────────────────────────────────────
+
+enum Duration { WHOLE, HALF, QUARTER, EIGHTH, SIXTEENTH
+public:
+  def beats(): Double = select this {
+    case Duration::WHOLE:     4.0
+    case Duration::HALF:      2.0
+    case Duration::QUARTER:   1.0
+    case Duration::EIGHTH:    0.5
+    case Duration::SIXTEENTH: 0.25
+  }
+  def label(): String = select this {
+    case Duration::WHOLE:     "whole"
+    case Duration::HALF:      "half"
+    case Duration::QUARTER:   "quarter"
+    case Duration::EIGHTH:    "eighth"
+    case Duration::SIXTEENTH: "sixteenth"
+  }
+}
+
+// ── Chord quality ─────────────────────────────────────────────────────────
+
+enum ChordQuality { MAJ, MIN, DIM, AUG, DOM7
+public:
+  def intervals(): List[Int] = select this {
+    case ChordQuality::MAJ:  [0, 4, 7]
+    case ChordQuality::MIN:  [0, 3, 7]
+    case ChordQuality::DIM:  [0, 3, 6]
+    case ChordQuality::AUG:  [0, 4, 8]
+    case ChordQuality::DOM7: [0, 4, 7, 10]
+  }
+  def symbol(): String = select this {
+    case ChordQuality::MAJ:  ""
+    case ChordQuality::MIN:  "m"
+    case ChordQuality::DIM:  "dim"
+    case ChordQuality::AUG:  "aug"
+    case ChordQuality::DOM7: "7"
+  }
+}
+
+// ── Scale mode ────────────────────────────────────────────────────────────
+
+enum ScaleMode { IONIAN, DORIAN, PHRYGIAN, LYDIAN, MIXOLYDIAN, AEOLIAN, LOCRIAN
+public:
+  def steps(): List[Int] = select this {
+    case ScaleMode::IONIAN:     [2, 2, 1, 2, 2, 2, 1]
+    case ScaleMode::DORIAN:     [2, 1, 2, 2, 2, 1, 2]
+    case ScaleMode::PHRYGIAN:   [1, 2, 2, 2, 1, 2, 2]
+    case ScaleMode::LYDIAN:     [2, 2, 2, 1, 2, 2, 1]
+    case ScaleMode::MIXOLYDIAN: [2, 2, 1, 2, 2, 1, 2]
+    case ScaleMode::AEOLIAN:    [2, 1, 2, 2, 1, 2, 2]
+    case ScaleMode::LOCRIAN:    [1, 2, 2, 1, 2, 2, 2]
+  }
+  def label(): String = select this {
+    case ScaleMode::IONIAN:     "Ionian (major)"
+    case ScaleMode::DORIAN:     "Dorian"
+    case ScaleMode::PHRYGIAN:   "Phrygian"
+    case ScaleMode::LYDIAN:     "Lydian"
+    case ScaleMode::MIXOLYDIAN: "Mixolydian"
+    case ScaleMode::AEOLIAN:    "Aeolian (minor)"
+    case ScaleMode::LOCRIAN:    "Locrian"
+  }
+}
+
+// ── Note ─────────────────────────────────────────────────────────────────
+
+record Note(pitch: Pitch, octave: Int, duration: Duration) {
+public:
+  def midiNumber(): Int = (octave() + 1) * 12 + pitch().semitone()
+  def display(): String = pitch().label() + "" + octave()
+  def withDuration(d: Duration): Note = new Note(pitch(), octave(), d)
+  def transpose(semitones: Int): Note = {
+    val newMidi: Int = midiNumber() + semitones
+    val newOctave: Int = newMidi / 12 - 1
+    val newPitch: Pitch = Pitch::fromSemitone(newMidi % 12)
+    new Note(newPitch, newOctave, duration())
+  }
+}
+
+// ── Chord ────────────────────────────────────────────────────────────────
+
+record Chord(root: Pitch, quality: ChordQuality, octave: Int) {
+public:
+  def notes(): List[Note] =
+    quality().intervals().map { interval ->
+      new Note(Pitch::fromSemitone(root().semitone() + interval), octave(), Duration::QUARTER)
+    }
+  def label(): String = root().label() + quality().symbol()
+  def display(): String = {
+    val labels: List[String] = notes().map { n -> n.display() }
+    val joined: String = labels.fold("") { acc, s -> if acc == "" { s } else { acc + "-" + s } }
+    "#{label()}[#{joined}]"
+  }
+}
+
+// ── Scale ────────────────────────────────────────────────────────────────
+
+record Scale(tonic: Pitch, mode: ScaleMode) {
+public:
+  def pitches(): List[Pitch] = {
+    val steps: List[Int] = mode().steps()
+    val result: List[Pitch] = [tonic()]
+    var current: Int = tonic().semitone()
+    foreach step: Int in steps {
+      current = current + step
+      result.add(Pitch::fromSemitone(current))
+    }
+    result
+  }
+  def label(): String = tonic().label() + " " + mode().label()
+  def degreeChords(): List[Chord] = {
+    val ps: List[Pitch] = pitches()
+    val qualities: List[ChordQuality] = select mode() {
+      case ScaleMode::IONIAN:  [ChordQuality::MAJ, ChordQuality::MIN, ChordQuality::MIN,
+                                ChordQuality::MAJ, ChordQuality::MAJ, ChordQuality::MIN,
+                                ChordQuality::DIM]
+      case ScaleMode::AEOLIAN: [ChordQuality::MIN, ChordQuality::DIM, ChordQuality::MAJ,
+                                ChordQuality::MIN, ChordQuality::MIN, ChordQuality::MAJ,
+                                ChordQuality::MAJ]
+      else:                    [ChordQuality::MAJ, ChordQuality::MIN, ChordQuality::MIN,
+                                ChordQuality::MAJ, ChordQuality::MAJ, ChordQuality::MIN,
+                                ChordQuality::DIM]
+    }
+    var i: Int = 0
+    val chords: List[Chord] = []
+    while i < 7 {
+      chords.add(new Chord(ps[i], qualities[i], 4))
+      i++
+    }
+    chords
+  }
+  def contains(p: Pitch): Boolean =
+    pitches().find { x -> x.semitone() == p.semitone() } != null
+}
+
+// ── Measure ──────────────────────────────────────────────────────────────
+
+record Measure(notes: List[Note], timeSigNum: Int, timeSigDen: Int) {
+public:
+  def totalBeats(): Double = notes().fold(0.0) { acc, n -> acc + n.duration().beats() }
+  def isComplete(): Boolean = totalBeats() == timeSigNum() * (4.0 / timeSigDen())
+  def display(): String = {
+    val parts: List[String] = notes().map { n -> n.display() + "(" + n.duration().label() + ")" }
+    val joined: String = parts.fold("") { acc, s -> if acc == "" { s } else { acc + " " + s } }
+    "|#{joined}|"
+  }
+}
+
+// ── Melody ───────────────────────────────────────────────────────────────
+
+record Melody(title: String, measures: List[Measure], bpm: Int) {
+public:
+  def allNotes(): List[Note] = {
+    val combined: List[Note] = []
+    foreach m: Measure in measures() {
+      foreach n: Note in m.notes() {
+        combined.add(n)
+      }
+    }
+    combined
+  }
+  def durationSeconds(): Double = {
+    val totalBeats: Double = allNotes().fold(0.0) { acc, n -> acc + n.duration().beats() }
+    totalBeats * 60.0 / bpm()
+  }
+  def transpose(semitones: Int): Melody = {
+    val newMeasures: List[Measure] = measures().map { m ->
+      new Measure(m.notes().map { n -> n.transpose(semitones) }, m.timeSigNum(), m.timeSigDen())
+    }
+    new Melody(title() + " (transposed +" + semitones + ")", newMeasures, bpm())
+  }
+  def noteHistogram(): LMap[String, Int] = {
+    val hist: LMap[String, Int] = new LMap()
+    foreach n: Note in allNotes() {
+      val key: String = n.pitch().label()
+      val prev: Int? = hist.get(key)
+      hist.put(key, if prev == null { 1 } else { prev + 1 })
+    }
+    hist
+  }
+  def display(): String = {
+    val lines: List[String] = measures().map { m -> m.display() }
+    val joined: String = lines.fold("") { acc, s -> if acc == "" { s } else { acc + " " + s } }
+    "\"#{title()}\" @#{bpm()} BPM: #{joined}"
+  }
+}
+
+// ── Note builders ─────────────────────────────────────────────────────
+
+def q(p: Pitch): Note = new Note(p, 4, Duration::QUARTER)
+def h(p: Pitch): Note = new Note(p, 4, Duration::HALF)
+def e(p: Pitch): Note = new Note(p, 4, Duration::EIGHTH)
+def measure44(a: Note, b: Note, c: Note, d: Note): Measure =
+  new Measure([a, b, c, d], 4, 4)
+
+// ── Scale analysis ─────────────────────────────────────────────────────
+
+def analyzeScale(scale: Scale): void {
+  IO::println("Scale: " + scale.label())
+  val names: List[String] = scale.pitches().map { p -> p.label() }
+  val pitchLine: String = names.fold("") { acc, s -> if acc == "" { s } else { acc + "  " + s } }
+  IO::println("  Pitches: " + pitchLine)
+  IO::println("  Diatonic chords:")
+  var degree: Int = 1
+  foreach c: Chord in scale.degreeChords() {
+    IO::println("    " + degree + ": " + c.display())
+    degree++
+  }
+}
+
+// ── Chord analysis ─────────────────────────────────────────────────────
+
+def analyzeChord(chord: Chord): void {
+  IO::println("Chord " + chord.label() + ": " + chord.display())
+  val midis: List[String] = chord.notes().map { n -> "" + n.midiNumber() }
+  val midiLine: String = midis.fold("") { acc, s -> if acc == "" { s } else { acc + ", " + s } }
+  IO::println("  MIDI numbers: " + midiLine)
+}
+
+// ── Melody report ──────────────────────────────────────────────────────
+
+def melodyReport(melody: Melody): void {
+  IO::println("\n=== Melody: " + melody.title() + " ===")
+  IO::println(melody.display())
+  val notes: List[Note] = melody.allNotes()
+  IO::println("Notes: #{notes.size}  |  Duration: #{melody.durationSeconds()}s at #{melody.bpm()} BPM")
+  IO::println("Note histogram:")
+  foreach (k, v) in melody.noteHistogram() {
+    IO::println("  " + k + ": " + v)
+  }
+  val highest: Note? = notes.fold(null) { acc, n ->
+    if acc == null { n } else { if n.midiNumber() > acc.midiNumber() { n } else { acc } }
+  }
+  val lowest: Note? = notes.fold(null) { acc, n ->
+    if acc == null { n } else { if n.midiNumber() < acc.midiNumber() { n } else { acc } }
+  }
+  if highest != null { IO::println("Highest: " + highest.display() + " (MIDI " + highest.midiNumber() + ")") }
+  if lowest  != null { IO::println("Lowest:  " + lowest.display()  + " (MIDI " + lowest.midiNumber()  + ")") }
+}
+
+// ── Interval name ─────────────────────────────────────────────────────
+
+def intervalName(semitones: Int): String = select semitones {
+  case 0:  "unison"
+  case 1:  "m2"
+  case 2:  "M2"
+  case 3:  "m3"
+  case 4:  "M3"
+  case 5:  "P4"
+  case 6:  "tritone"
+  case 7:  "P5"
+  case 8:  "m6"
+  case 9:  "M6"
+  case 10: "m7"
+  case 11: "M7"
+  case 12: "octave"
+  else:    "compound"
+}
+
+def melodicIntervals(melody: Melody): void {
+  IO::println("Melodic intervals in \"" + melody.title() + "\":")
+  val notes: List[Note] = melody.allNotes()
+  var i: Int = 0
+  while i < notes.size - 1 {
+    val a: Note = notes[i]
+    val b: Note = notes[i + 1]
+    val diff: Int = b.midiNumber() - a.midiNumber()
+    val absDiff: Int = if diff < 0 { -diff } else { diff }
+    val dir: String = if diff > 0 { "up" } else { if diff < 0 { "down" } else { "same" } }
+    IO::println("  " + a.display() + " -> " + b.display() + " [" + dir + " " + intervalName(absDiff) + "]")
+    i++
+  }
+}
+
+// ── Scale fit ─────────────────────────────────────────────────────────
+
+def scaleFit(melody: Melody, scale: Scale): Int =
+  melody.allNotes().filter { n -> scale.contains(n.pitch()) }.size
+
+def findBestScale(melody: Melody, candidates: List[Scale]): Scale? = {
+  var best: Scale? = null
+  var bestScore: Int = -1
+  foreach scale: Scale in candidates {
+    val score: Int = scaleFit(melody, scale)
+    if score > bestScore {
+      best = scale
+      bestScore = score
+    }
+  }
+  best
+}
+
+// ── Unique-pitches helper ─────────────────────────────────────────────
+
+def joinByComma(lst: List[String]): String =
+  lst.fold("") { acc, s -> if acc == "" { s } else { acc + ", " + s } }
+
+// ── Main ─────────────────────────────────────────────────────────────────
+
+IO::println("=== Music Composer ===\n")
+
+// Scale analysis
+IO::println("--- Scale Analysis ---")
+analyzeScale(new Scale(Pitch::C, ScaleMode::IONIAN))
+IO::println("")
+analyzeScale(new Scale(Pitch::D, ScaleMode::AEOLIAN))
+IO::println("")
+
+// Chord analysis
+IO::println("--- Chord Analysis ---")
+analyzeChord(new Chord(Pitch::C, ChordQuality::MAJ, 4))
+analyzeChord(new Chord(Pitch::G, ChordQuality::DOM7, 4))
+analyzeChord(new Chord(Pitch::A, ChordQuality::MIN, 4))
+IO::println("")
+
+// "Ode to Joy" (simplified, 4 measures in C major, 4/4)
+val odeToJoy: Melody = new Melody("Ode to Joy (simplified)", [
+  measure44(q(Pitch::E), q(Pitch::E), q(Pitch::F), q(Pitch::G)),
+  measure44(q(Pitch::G), q(Pitch::F), q(Pitch::E), q(Pitch::D)),
+  measure44(q(Pitch::C), q(Pitch::C), q(Pitch::D), q(Pitch::E)),
+  new Measure([new Note(Pitch::E, 4, Duration::HALF), new Note(Pitch::D, 4, Duration::HALF)], 4, 4)
+], 120)
+
+melodyReport(odeToJoy)
+IO::println("")
+melodicIntervals(odeToJoy)
+
+// Transposed up a perfect fourth (5 semitones)
+IO::println("")
+melodyReport(odeToJoy.transpose(5))
+
+// Scale fit analysis
+IO::println("\n--- Scale Fit Analysis ---")
+val candidates: List[Scale] = [
+  new Scale(Pitch::C,  ScaleMode::IONIAN),
+  new Scale(Pitch::A,  ScaleMode::IONIAN),
+  new Scale(Pitch::D,  ScaleMode::AEOLIAN),
+  new Scale(Pitch::G,  ScaleMode::IONIAN),
+  new Scale(Pitch::F,  ScaleMode::IONIAN),
+  new Scale(Pitch::E,  ScaleMode::AEOLIAN)
+]
+val best: Scale? = findBestScale(odeToJoy, candidates)
+if best != null {
+  val score: Int = scaleFit(odeToJoy, best)
+  val total: Int = odeToJoy.allNotes().size
+  IO::println("Best scale for Ode to Joy: " + best.label())
+  IO::println("Fit: #{score}/#{total} notes in scale")
+}
+
+// Unique pitches from the melody
+val seen: LMap[String, Boolean] = new LMap()
+val uniquePitches: List[String] = []
+foreach n: Note in odeToJoy.allNotes() {
+  val s: String = n.pitch().label()
+  if seen.get(s) == null {
+    seen.put(s, true)
+    uniquePitches.add(s)
+  }
+}
+IO::println("\nUnique pitches: " + uniquePitches.fold("") { acc, s -> if acc == "" { s } else { acc + " " + s } })
+
+// Duration stats
+IO::println("\n--- Duration Stats ---")
+val durHist: LMap[String, Int] = new LMap()
+foreach n: Note in odeToJoy.allNotes() {
+  val k: String = n.duration().label()
+  val prev: Int? = durHist.get(k)
+  durHist.put(k, if prev == null { 1 } else { prev + 1 })
+}
+foreach (durName, count) in durHist {
+  IO::println("  " + durName + ": " + count)
+}
+
+// |> pipeline: note displays joined by comma
+val notesSummary: String =
+  odeToJoy.allNotes().map { n -> n.display() } |> joinByComma
+IO::println("\nAll notes: " + notesSummary)
+
+// Measure completeness
+IO::println("\n--- Measure Completeness ---")
+var mIdx: Int = 0
+foreach m: Measure in odeToJoy.measures() {
+  val status: String = if m.isComplete() { "complete" } else { "incomplete" }
+  IO::println("  Measure " + (mIdx + 1) + ": " + m.totalBeats() + " beats (" + status + ")")
+  mIdx++
+}
+
+IO::println("\n=== Done ===")

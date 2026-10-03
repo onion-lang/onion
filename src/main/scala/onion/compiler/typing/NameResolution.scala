@@ -216,28 +216,46 @@ class NameResolver(private val context: NameResolutionContext) {
 
   /**
    * Resolve dotted names that denote nested classes: Map.Entry becomes
-   * java.util.Map$Entry (resolving the head through imports), and
-   * a.b.C.D tries a.b.C$D and deeper $-joined variants.
-   */
-  /**
-   * a.b.C.D -> a.b.C$D, a.b$C$D, ... -- but only under an outer class that exists. The
+   * java.util.Map$Entry (resolving the head through imports, see forNestedName), and
+   * a.b.C.D tries a.b.C$D, then a.b$C$D -- the longest package prefix first, as Java does,
+   * and only under an outer class that exists (ClassTable.loadDottedOrNull). The
    * unconditional form turned every miss into a fan of misses: `onion.Object` (absent)
    * became `onion$Object`, which went back through the import scan as an unqualified
    * name and produced eight more classpath probes, for every name in every unit.
    */
-  private def forDollarNested(name: String): ClassType = {
-    if (!name.contains(".")) return null
+  private def forDollarNested(name: String): ClassType =
+    if (!name.contains(".")) null else context.table.loadDottedOrNull(name)
+
+  /**
+   * "Did you mean" candidates for a type that did not resolve. For a dotted name whose
+   * outer part is a class (`Result.Okk`, `onion.Result.Okk`) these are that class's member
+   * classes in the same spelling (`Result.Ok`, `Result.Err`), so a misspelt nested name gets
+   * a suggestion; otherwise the simple class names in scope.
+   */
+  def getCandidateClassNames(desc: AST.TypeDescriptor): Array[String] = {
+    val dotted = desc match {
+      case AST.ReferenceType(name, _) => name
+      case AST.ParameterizedType(AST.ReferenceType(name, _), _) => name
+      case AST.NullableType(AST.ReferenceType(name, _)) => name
+      case _ => ""
+    }
+    val nested = if (dotted.contains(".")) nestedCandidates(dotted) else Nil
+    if (nested.nonEmpty) nested.toArray else getCandidateClassNames
+  }
+
+  private def nestedCandidates(name: String): Seq[String] = {
     val parts = name.split('.')
     var i = parts.length - 1
     while (i >= 1) {
-      val outer = parts.take(i).mkString(".")
-      if (context.table.loadOrNull(outer) != null) {
-        val found = context.table.loadOrNull(outer + "$" + parts.drop(i).mkString("$"))
-        if (found != null) return found
+      val prefix = parts.take(i).mkString(".")
+      forName(prefix, qualified = prefix.contains(".")) match {
+        case _: TypeVariableType =>
+        case null =>
+        case outer => return context.table.memberClassCandidates(outer, prefix)
       }
       i -= 1
     }
-    null
+    Nil
   }
 
   private def forNestedName(name: String): ClassType = {

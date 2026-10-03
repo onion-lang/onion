@@ -1,0 +1,413 @@
+// MiniIR.on — A tiny intermediate representation with constant folding, dead-code
+// elimination, and copy propagation. Models a three-address code IR for a simple
+// imperative language, then applies three classic optimisation passes.
+//
+// Exercises: ADT case-enums (Value, Instr); records; classes with mutable state;
+// generic collection pipelines (map/filter/groupBy/sortedBy/fold/find/distinct);
+// select + exhaustive type-pattern matching; closures; string interpolation;
+// nullable types; foreach over ranges and map (k,v); while loops; extension
+// methods on String and Int; recursion; try/catch.
+
+import {
+  java.util.HashMap;
+  java.util.LinkedHashMap;
+  java.lang.Integer as JInt;
+}
+
+// ─── Value ADT ───────────────────────────────────────────────────────────────
+
+enum Value {
+  case Const(n: Int)
+  case Var(name: String)
+  case BinOp(op: String, left: Value, right: Value)
+public:
+  def eval(env: HashMap[String, Int]): Int? {
+    return select this {
+      case c is Const: c.n()
+      case v is Var: {
+        val boxed = env.get(v.name())
+        if boxed == null { return null }
+        (boxed as JInt).intValue()
+      }
+      case b is BinOp: {
+        val l = b.left().eval(env)
+        val r = b.right().eval(env)
+        if l == null || r == null { return null }
+        select b.op() {
+          case "+": l + r
+          case "-": l - r
+          case "*": l * r
+          case "/": if r == 0 { return null } else { l / r }
+          else: null
+        }
+      }
+    }
+  }
+
+  def show(): String = select this {
+    case c is Const: "" + c.n()
+    case v is Var:   v.name()
+    case b is BinOp: "(" + b.left().show() + " " + b.op() + " " + b.right().show() + ")"
+  }
+
+  def vars(): List[String] = select this {
+    case c is Const: []
+    case v is Var:   [v.name()]
+    case b is BinOp: Colls::concat(b.left().vars(), b.right().vars()).distinct()
+  }
+
+  def isConst(): Boolean = select this {
+    case c is Const: true
+    else: false
+  }
+
+  def constVal(): Int? = select this {
+    case c is Const: c.n()
+    else: null
+  }
+}
+
+// ─── Instructions ─────────────────────────────────────────────────────────────
+
+enum Instr {
+  case Assign(dest: String, src: Value)
+  case Branch(cond: Value, thenLabel: String, elseLabel: String)
+  case Jump(label: String)
+  case Return(value: Value)
+  case Label(name: String)
+  case Nop
+public:
+  def show(): String = select this {
+    case a is Assign: "  " + a.dest() + " = " + a.src().show()
+    case b is Branch: "  branch " + b.cond().show() + " ? " + b.thenLabel() + " : " + b.elseLabel()
+    case j is Jump:   "  jump " + j.label()
+    case r is Return: "  return " + r.value().show()
+    case l is Label:  l.name() + ":"
+    case n is Nop:    "  nop"
+  }
+
+  def defs(): String? = select this {
+    case a is Assign: a.dest()
+    else: null
+  }
+
+  def uses(): List[String] = select this {
+    case a is Assign: a.src().vars()
+    case b is Branch: b.cond().vars()
+    case r is Return: r.value().vars()
+    else: []
+  }
+
+  def isDead(): Boolean = select this {
+    case n is Nop: true
+    else: false
+  }
+}
+
+// ─── Basic Block ──────────────────────────────────────────────────────────────
+
+class BasicBlock {
+  var _label: String
+  var _instrs: List[Instr]
+
+public:
+  def this(lbl: String, body: List[Instr]) {
+    _label = lbl
+    _instrs = body
+  }
+
+  def label: String = _label
+  def instrs: List[Instr] = _instrs
+
+  def show(): String {
+    var s: String = _label + ":\n"
+    foreach i: Instr in _instrs {
+      s = s + i.show() + "\n"
+    }
+    return s
+  }
+
+  def defs(): List[String] =
+    _instrs.map { i -> i.defs() }.filter { d -> d != null }.map { d -> (d as String) }
+
+  def uses(): List[String] =
+    _instrs.flatMap { i -> i.uses() }.distinct()
+}
+
+
+// ─── Optimisation Passes ──────────────────────────────────────────────────────
+
+// 1. Constant Folding: replace BinOp(Const, Const) with Const
+class ConstantFolder {
+public:
+  def foldValue(v: Value): Value = select v {
+    case b is BinOp: {
+      val fl: Value = foldValue(b.left())
+      val fr: Value = foldValue(b.right())
+      val lc: Int? = fl.constVal()
+      val rc: Int? = fr.constVal()
+      if lc != null && rc != null {
+        val result: Int? = select b.op() {
+          case "+": lc + rc
+          case "-": lc - rc
+          case "*": lc * rc
+          case "/": if rc == 0 { null } else { lc / rc }
+          else: null
+        }
+        if result != null { return new Const(result) }
+      }
+      new BinOp(b.op(), fl, fr)
+    }
+    else: v
+  }
+
+  def foldInstr(i: Instr): Instr = select i {
+    case a is Assign: new Assign(a.dest(), foldValue(a.src()))
+    case b is Branch: new Branch(foldValue(b.cond()), b.thenLabel(), b.elseLabel())
+    case r is Return: new Return(foldValue(r.value()))
+    else: i
+  }
+
+  def fold(block: BasicBlock): BasicBlock =
+    new BasicBlock(block.label, block.instrs.map { i -> foldInstr(i as Instr) } as List[Instr])
+}
+
+// 2. Copy Propagation: if we have `x = y` (Var), substitute x -> y in later instrs
+class CopyPropagator {
+  var copies: HashMap[String, String]
+
+public:
+  def this() { copies = new HashMap[String, String]() }
+
+  def propagateValue(v: Value): Value = select v {
+    case vr is Var: {
+      val mapped = copies.get(vr.name())
+      if mapped != null { new Var(mapped as String) } else { v }
+    }
+    case b is BinOp:
+      new BinOp(b.op(), propagateValue(b.left()), propagateValue(b.right()))
+    else: v
+  }
+
+  def propagateInstr(i: Instr): Instr = select i {
+    case a is Assign: {
+      val newSrc = propagateValue(a.src())
+      select newSrc {
+        case vr is Var: {
+          copies.put(a.dest(), vr.name())
+          new Assign(a.dest(), newSrc)
+        }
+        else: {
+          copies.remove(a.dest())
+          new Assign(a.dest(), newSrc)
+        }
+      }
+    }
+    case b is Branch: new Branch(propagateValue(b.cond()), b.thenLabel(), b.elseLabel())
+    case r is Return: new Return(propagateValue(r.value()))
+    else: i
+  }
+
+  def propagate(block: BasicBlock): BasicBlock {
+    copies = new HashMap[String, String]()
+    return new BasicBlock(block.label, block.instrs.map { i -> propagateInstr(i as Instr) } as List[Instr])
+  }
+}
+
+// 3. Dead Code Elimination: remove Assign instrs whose dest is never used after
+class DeadCodeEliminator {
+public:
+  def eliminate(block: BasicBlock): BasicBlock {
+    val instrs = block.instrs
+    val n: Int = instrs.size
+    var live: List[String] = []
+
+    // Collect all variables used (to the right of =), including final uses
+    foreach i: Instr in instrs {
+      live = Colls::concat(live, i.uses())
+    }
+    live = live.distinct()
+
+    // Remove assigns whose dest is never in any use
+    val kept: List[Instr] = instrs.filter { raw ->
+      val i: Instr = raw as Instr
+      val d: String? = i.defs()
+      if d == null { true }
+      else { live.find { u -> (u as String) == d } != null }
+    } as List[Instr]
+
+    return new BasicBlock(block.label, kept)
+  }
+}
+
+// ─── Extension methods on String ─────────────────────────────────────────────
+
+extension String {
+  def center(width: Int): String {
+    val pad: Int = width - self.length()
+    if pad <= 0 { return self }
+    val left: Int = pad / 2
+    val right: Int = pad - left
+    var s: String = ""
+    foreach i: Int in 0..<left { s = s + " " }
+    s = s + self
+    foreach i: Int in 0..<right { s = s + " " }
+    return s
+  }
+  def bar(n: Int, ch: String): String {
+    var s: String = ""
+    foreach i: Int in 0..<n { s = s + ch }
+    return s
+  }
+}
+
+// ─── Program (list of blocks) ─────────────────────────────────────────────────
+
+class Program {
+  var _name: String
+  var _blocks: List[BasicBlock]
+
+public:
+  def this(n: String, bs: List[BasicBlock]) { _name = n; _blocks = bs }
+
+  def name: String = _name
+  def blocks: List[BasicBlock] = _blocks
+
+  def show(): String {
+    var s: String = "== Program: " + _name + " ==\n"
+    foreach b: BasicBlock in _blocks { s = s + b.show() }
+    return s
+  }
+
+  def stats(): String {
+    val totalInstrs: Int = _blocks.map { b -> (b as BasicBlock).instrs.size }.fold(0) { acc, n -> acc + (n as Int) }
+    val nonNop: Int = _blocks.flatMap { b -> (b as BasicBlock).instrs }
+      .filter { i -> !(i as Instr).isDead() }
+      .size
+    return "  blocks: #{_blocks.size}  instrs: #{totalInstrs}  non-nop: #{nonNop}"
+  }
+
+  def applyConstFold(): Program {
+    val cf = new ConstantFolder()
+    return new Program(_name, _blocks.map { b -> cf.fold(b as BasicBlock) } as List[BasicBlock])
+  }
+
+  def applyCopyProp(): Program {
+    val cp = new CopyPropagator()
+    return new Program(_name, _blocks.map { b -> cp.propagate(b as BasicBlock) } as List[BasicBlock])
+  }
+
+  def applyDCE(): Program {
+    val dce = new DeadCodeEliminator()
+    return new Program(_name, _blocks.map { b -> dce.eliminate(b as BasicBlock) } as List[BasicBlock])
+  }
+
+  def optimise(): Program {
+    var p: Program = self
+    foreach pass: Int in 0..<3 {
+      p = p.applyConstFold()
+      p = p.applyCopyProp()
+      p = p.applyDCE()
+    }
+    return p
+  }
+}
+
+// ─── Factory helpers ─────────────────────────────────────────────────────────
+
+def v(name: String): Value = new Var(name)
+def c(n: Int): Value = new Const(n)
+def add(l: Value, r: Value): Value = new BinOp("+", l, r)
+def sub(l: Value, r: Value): Value = new BinOp("-", l, r)
+def mul(l: Value, r: Value): Value = new BinOp("*", l, r)
+def div(l: Value, r: Value): Value = new BinOp("/", l, r)
+def assign(d: String, s: Value): Instr = new Assign(d, s)
+def retInstr(s: Value): Instr = new Return(s)
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+def main(args: String[]): void {
+  val sep: String = "─".bar(60, "─")
+
+  // ── Program 1: constant folding opportunity
+  //   tmp1 = 3 + 4        → 7
+  //   tmp2 = tmp1 * 2     → 14
+  //   result = tmp2 - 1   → 13
+  //   return result
+  val p1 = new Program("sum_const", [
+    new BasicBlock("entry", [
+      assign("tmp1", add(c(3), c(4))),
+      assign("tmp2", mul(v("tmp1"), c(2))),
+      assign("result", sub(v("tmp2"), c(1))),
+      retInstr(v("result"))
+    ])
+  ])
+
+  IO::println(sep)
+  IO::println("BEFORE optimisation:")
+  IO::println(p1.show())
+  IO::println(p1.stats())
+
+  val p1opt = p1.optimise()
+  IO::println("\nAFTER optimisation:")
+  IO::println(p1opt.show())
+  IO::println(p1opt.stats())
+
+  // ── Program 2: copy propagation
+  //   a = x        (copy: a -> x)
+  //   b = a + 1    (propagated: b = x + 1)
+  //   c = b        (copy: c -> b)
+  //   return c     (propagated: return b)
+  val p2 = new Program("copy_prop", [
+    new BasicBlock("entry", [
+      assign("a", v("x")),
+      assign("b", add(v("a"), c(1))),
+      assign("c2", v("b")),
+      retInstr(v("c2"))
+    ])
+  ])
+
+  IO::println(sep)
+  IO::println("BEFORE optimisation:")
+  IO::println(p2.show())
+
+  val p2opt = p2.optimise()
+  IO::println("AFTER optimisation:")
+  IO::println(p2opt.show())
+
+  // ── Program 3: dead-code elimination + constant folding
+  //   dead = 10 * 20   (dead: never used)
+  //   live = 5 + 7     (folded to 12)
+  //   return live
+  val p3 = new Program("dce_test", [
+    new BasicBlock("entry", [
+      assign("dead", mul(c(10), c(20))),
+      assign("live", add(c(5), c(7))),
+      retInstr(v("live"))
+    ])
+  ])
+
+  IO::println(sep)
+  IO::println("BEFORE optimisation:")
+  IO::println(p3.show())
+
+  val p3opt = p3.optimise()
+  IO::println("AFTER optimisation:")
+  IO::println(p3opt.show())
+
+  // ── Summary: count total instrs reduced across all three programs
+  val programs: List[Program] = [p1, p2, p3]
+  val before: Int = programs.map { prog ->
+    val p: Program = prog as Program
+    p.blocks.map { b -> (b as BasicBlock).instrs.size }.fold(0) { acc, n -> acc + (n as Int) }
+  }.fold(0) { acc, n -> acc + (n as Int) }
+
+  val optimised: List[Program] = [p1opt, p2opt, p3opt]
+  val after: Int = optimised.map { prog ->
+    val p: Program = prog as Program
+    p.blocks.map { b -> (b as BasicBlock).instrs.size }.fold(0) { acc, n -> acc + (n as Int) }
+  }.fold(0) { acc, n -> acc + (n as Int) }
+
+  IO::println(sep)
+  IO::println("Total instructions: before=#{before}  after=#{after}  reduced by #{before - after}")
+}

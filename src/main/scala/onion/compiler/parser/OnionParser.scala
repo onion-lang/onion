@@ -1309,7 +1309,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     if (kind(1) != K.DOT || kind(2) != K.ID) return false
     kind(3) match {
       case K.DOT | K.LBRACKET | K.RBRACKET | K.ASSIGN | K.RPAREN | K.LPAREN | K.COMMA | K.SEMI | K.GT |
-           K.LBRACE | K.QUESTION | K.ID | K.EOL | K.EOF => true
+           K.LBRACE | K.QUESTION | K.ID | K.EOL | K.EOF |
+           // Mirrors raw_type's follow set in JJOnionParser.jj: `case o is Result.Ok:`,
+           // a `when` guard, `&&`/`||`, `->`, `}`, a vararg `...` and `?[`.
+           K.COLON | K.K_WHEN | K.AND | K.OR | K.ARROW | K.RBRACE | K.ELLIPSIS | K.SAFE_INDEX => true
       case _ => false
     }
   }
@@ -1450,7 +1453,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def functionTypeTail(arg: AST.TypeNode): AST.TypeNode = {
     expect(K.ARROW)
     eols()
-    val r = typ()
+    val r = returnType()
     AST.TypeNode(arg.location, AST.FunctionType(List(arg.desc), r.desc), arg.isRelaxed)
   }
 

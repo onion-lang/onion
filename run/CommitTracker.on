@@ -1,0 +1,433 @@
+// CommitTracker.on — Three-tool Conventional-Commits log auditor and reporter.
+//
+// Tools:
+//   check  <log> [--strict]              flag bad / non-Conventional-Commits messages
+//   stats  <log> [--since <date>]        type / author / scope breakdown
+//   report <log> <out> [--html]          write a full quality report
+//
+// Exercises:
+//   record ... from re"..."              structured commit-log line parsing
+//   ADT enum (CommitType, Severity)      type tagging + method dispatch
+//   shape doc = json                     structured JSON report output
+//   do[Option]                           nullable chain in scope extraction
+//   collection pipelines                 groupBy/map/filter/fold/sortedBy/
+//                                        find/partition/count/distinct/any
+//   multiple tool declarations           each with its own requires clause
+//   extension methods on Int/String      formatting utilities
+//   foreach (k, v) in map               category breakdowns
+//   select / pattern matching            type dispatch
+//   string interpolation                 report bodies
+//   try/catch                            resilient line handling
+//   recursive helpers                    tree-style severity aggregation
+
+import {
+  java.lang.StringBuilder;
+}
+
+// ─── Extension methods ────────────────────────────────────────────────────────
+
+extension Int {
+  def pct(total: Int): String {
+    if total == 0 { return "0%" }
+    val p = (self * 100) / total
+    return "#{p}%"
+  }
+  def bar(width: Int): String {
+    var s = ""
+    var i: Int = 0
+    while i < width { s = s + "#"; i++ }
+    return s
+  }
+  def pad(n: Int): String {
+    val s = "#{self}"
+    var r = s
+    while r.length() < n { r = " " + r }
+    return r
+  }
+}
+
+extension String {
+  def trim2(): String {
+    var s = self
+    while s.length() > 0 && s.charAt(0) == ' ' { s = s.substring(1) }
+    while s.length() > 0 && s.charAt(s.length() - 1) == ' ' {
+      s = s.substring(0, s.length() - 1)
+    }
+    return s
+  }
+  def truncate(n: Int): String {
+    if self.length() <= n { return self }
+    return self.substring(0, n - 3) + "..."
+  }
+  def padRight(n: Int): String {
+    var s = self
+    while s.length() < n { s = s + " " }
+    return s
+  }
+  def startsWith2(prefix: String): Boolean {
+    if self.length() < prefix.length() { return false }
+    return self.substring(0, prefix.length()) == prefix
+  }
+}
+
+// ─── CommitType ADT ───────────────────────────────────────────────────────────
+
+enum CommitType {
+  case Feat
+  case Fix
+  case Docs
+  case Chore
+  case Refactor
+  case Test
+  case Build
+  case Ci
+  case Style
+  case Perf
+  case Unknown
+public:
+  def label(): String = select this {
+    case x is Feat:     "feat    "
+    case x is Fix:      "fix     "
+    case x is Docs:     "docs    "
+    case x is Chore:    "chore   "
+    case x is Refactor: "refactor"
+    case x is Test:     "test    "
+    case x is Build:    "build   "
+    case x is Ci:       "ci      "
+    case x is Style:    "style   "
+    case x is Perf:     "perf    "
+    case x is Unknown:  "?       "
+  }
+  def isBump(): Boolean = select this {
+    case x is Feat: true
+    case x is Fix:  true
+    case x is Perf: true
+    else: false
+  }
+  static def of(s: String): CommitType = select s {
+    case "feat":     new Feat()
+    case "fix":      new Fix()
+    case "docs":     new Docs()
+    case "chore":    new Chore()
+    case "refactor": new Refactor()
+    case "test":     new Test()
+    case "build":    new Build()
+    case "ci":       new Ci()
+    case "style":    new Style()
+    case "perf":     new Perf()
+    else:            new Unknown()
+  }
+}
+
+// ─── Severity ADT ─────────────────────────────────────────────────────────────
+
+enum Severity {
+  case Info
+  case Warn
+  case Error
+public:
+  def symbol(): String = select this {
+    case x is Info:  "[INFO] "
+    case x is Warn:  "[WARN] "
+    case x is Error: "[ERROR]"
+  }
+  def rank(): Int = select this {
+    case x is Info:  0
+    case x is Warn:  1
+    case x is Error: 2
+  }
+}
+
+// ─── Records ──────────────────────────────────────────────────────────────────
+
+// Raw line from a `git log --oneline` format extended with author/date:
+//   abcdef1 2026-01-15 Alice <alice@example.com> fix(parser): handle empty input
+record RawLine(hash: String, date: String, author: String, msg: String)
+  from re"([0-9a-f]{5,12}) (\d{4}-\d{2}-\d{2}) ([^<>]+?) <[^>]+> (.*)"
+
+// Fully decoded commit with extracted type/scope/summary.
+record Commit(raw: RawLine, kind: CommitType, scope: String?, summary: String, breaking: Boolean) {
+public:
+  def shortHash(): String = raw().hash().substring(0, 7)
+  def date(): String = raw().date()
+  def author(): String = raw().author().trim2()
+  def isConventional(): Boolean = !(kind() is Unknown)
+  def display(): String = "#{shortHash()} #{date()} #{kind().label()} #{summary().truncate(60)}"
+}
+
+// A flagged violation carrying the commit that caused it.
+record Flag(commit: Commit, severity: Severity, reason: String)
+
+// Summary record used for JSON report output.
+record CommitSummary(total: Int, conventional: Int, breaking: Int, features: Int, fixes: Int, badCount: Int) {
+  shape doc = json
+}
+
+// Per-author stats line.
+record AuthorStats(author: String, commits: Int, features: Int, fixes: Int)
+
+// ─── Parsing ──────────────────────────────────────────────────────────────────
+
+// Conventional-Commits header: type(scope)!: summary
+//   Captures: [type][scope?][!?][summary]
+record ConvHeader(kind: String, scope: String?, breaking: Boolean, summary: String)
+
+class CommitParser {
+public:
+  static def parseHeader(msg: String): ConvHeader? {
+    val excl = msg.contains("!")
+    val colon = msg.indexOf(":")
+    if colon < 0 { return null }
+    val lhs = msg.substring(0, colon)
+    var summary = msg.substring(colon + 1)
+    if summary.length() > 0 && summary.charAt(0) == ' ' {
+      summary = summary.substring(1)
+    }
+    val cleanLhs = if excl { lhs.replace("!", "") } else { lhs }
+    val paren = cleanLhs.indexOf("(")
+    val paren2 = cleanLhs.indexOf(")")
+    var typeStr = cleanLhs
+    var scope: String? = null
+    if paren >= 0 && paren2 > paren {
+      typeStr = cleanLhs.substring(0, paren)
+      scope = cleanLhs.substring(paren + 1, paren2)
+    }
+    return new ConvHeader(typeStr.trim2(), scope, excl, summary.trim2())
+  }
+
+  static def parseCommit(raw: RawLine): Commit {
+    val header = parseHeader(raw.msg())
+    if header == null {
+      return new Commit(raw, new Unknown(), null, raw.msg(), false)
+    }
+    val kind = CommitType::of(header.kind())
+    return new Commit(raw, kind, header.scope(), header.summary(), header.breaking())
+  }
+
+  static def parseAll(text: String): List[Commit] {
+    val rawLines = RawLine::parseAll(text) as List[RawLine]
+    return rawLines.map { r -> parseCommit(r) }
+  }
+}
+
+// ─── Policy checker ──────────────────────────────────────────────────────────
+
+class PolicyChecker {
+public:
+  static def check(c: Commit, strict: Boolean): List[Flag] {
+    val flags = new java.util.ArrayList[Flag]()
+    if !c.isConventional() {
+      flags.add(new Flag(c, new Error(), "non-Conventional-Commits message: \"#{c.raw().msg().truncate(50)}\""))
+    }
+    if c.summary().length() == 0 {
+      flags.add(new Flag(c, new Error(), "empty summary after type prefix"))
+    }
+    if c.summary().length() > 72 {
+      flags.add(new Flag(c, new Warn(), "summary longer than 72 chars (#{c.summary().length()})"))
+    }
+    if strict && c.summary().length() > 0 {
+      val first = c.summary().charAt(0)
+      if first >= 'A' && first <= 'Z' {
+        flags.add(new Flag(c, new Warn(), "summary starts with uppercase (use lowercase)"))
+      }
+    }
+    return flags as List[Flag]
+  }
+
+  static def checkAll(commits: List[Commit], strict: Boolean): List[Flag] {
+    val out = new java.util.ArrayList[Flag]()
+    foreach c: Commit in commits {
+      foreach f: Flag in check(c, strict) {
+        out.add(f)
+      }
+    }
+    return out as List[Flag]
+  }
+}
+
+// ─── Statistics ───────────────────────────────────────────────────────────────
+
+class CommitStats {
+public:
+  static def byType(commits: List[Commit]): Map[String, Int] {
+    val groups = commits.groupBy { c -> c.kind().label().trim2() }
+    val out: Map[String, Int] = [:]
+    foreach (k, v) in groups {
+      out[k as String] = (v as List).size
+    }
+    return out
+  }
+
+  static def byAuthor(commits: List[Commit]): List[AuthorStats] {
+    val groups = commits.groupBy { c -> c.author() }
+    val out = new java.util.ArrayList[AuthorStats]()
+    foreach (k, v) in groups {
+      val author = k as String
+      val cs = v as List[Object]
+      val feats = cs.filter { x -> (x as Commit).kind() is Feat }.size
+      val fixes = cs.filter { x -> (x as Commit).kind() is Fix }.size
+      out.add(new AuthorStats(author, cs.size, feats, fixes))
+    }
+    return (out as List[AuthorStats]).sortedBy { a -> -a.commits() }
+  }
+
+  static def byScope(commits: List[Commit]): Map[String, Int] {
+    val scoped = commits.filter { c -> c.scope() != null }
+    val groups = scoped.groupBy { c -> c.scope() as String }
+    val out: Map[String, Int] = [:]
+    foreach (k, v) in groups {
+      out[k as String] = (v as List).size
+    }
+    return out
+  }
+
+  static def summary(commits: List[Commit], flags: List[Flag]): CommitSummary {
+    val total = commits.size
+    val conv = commits.filter { c -> c.isConventional() }.size
+    val brk = commits.filter { c -> c.breaking() }.size
+    val feats = commits.filter { c -> c.kind() is Feat }.size
+    val fixes = commits.filter { c -> c.kind() is Fix }.size
+    val bad = flags.filter { f -> f.severity() is Error }.size
+    return new CommitSummary(total, conv, brk, feats, fixes, bad)
+  }
+}
+
+// ─── Report builder ───────────────────────────────────────────────────────────
+
+class ReportBuilder {
+public:
+  static def buildText(commits: List[Commit], flags: List[Flag]): String {
+    val sb = new StringBuilder()
+    val s = CommitStats::summary(commits, flags)
+
+    sb.append("commit quality report\n")
+    sb.append("=====================\n")
+    sb.append("total commits  : #{s.total()}\n")
+    sb.append("conventional   : #{s.conventional()} (#{s.conventional().pct(s.total())})\n")
+    sb.append("breaking       : #{s.breaking()}\n")
+    sb.append("features       : #{s.features()}\n")
+    sb.append("fixes          : #{s.fixes()}\n")
+    sb.append("policy errors  : #{s.badCount()}\n\n")
+
+    sb.append("by type:\n")
+    val typeMap = CommitStats::byType(commits)
+    foreach (k, v) in typeMap {
+      val cnt = v as Int
+      val pct = cnt.pct(s.total())
+      sb.append("  #{(k as String).padRight(10)} #{cnt.pad(4)}  #{pct}\n")
+    }
+
+    sb.append("\ntop authors:\n")
+    val authors = CommitStats::byAuthor(commits)
+    var shown = 0
+    foreach a: AuthorStats in authors {
+      if shown >= 5 { break }
+      sb.append("  #{a.author().truncate(24).padRight(26)} #{a.commits().pad(4)} commits")
+      if a.features() > 0 { sb.append("  feat=#{a.features()}") }
+      if a.fixes() > 0 { sb.append("  fix=#{a.fixes()}") }
+      sb.append("\n")
+      shown++
+    }
+
+    if flags.size > 0 {
+      sb.append("\npolicy violations (#{flags.size}):\n")
+      foreach f: Flag in flags {
+        sb.append("  #{f.severity().symbol()} #{f.commit().shortHash()} #{f.reason()}\n")
+      }
+    } else {
+      sb.append("\nno policy violations\n")
+    }
+
+    return sb.toString()
+  }
+
+  static def buildHtml(commits: List[Commit], flags: List[Flag]): String {
+    val s = CommitStats::summary(commits, flags)
+    val sb = new StringBuilder()
+    sb.append("<!DOCTYPE html>\n<html><head><title>Commit Report</title></head><body>\n")
+    sb.append("<h1>Commit Quality Report</h1>\n")
+    sb.append("<table border=\"1\"><tr><th>Metric</th><th>Value</th></tr>\n")
+    sb.append("<tr><td>Total</td><td>#{s.total()}</td></tr>\n")
+    sb.append("<tr><td>Conventional</td><td>#{s.conventional()} (#{s.conventional().pct(s.total())})</td></tr>\n")
+    sb.append("<tr><td>Breaking</td><td>#{s.breaking()}</td></tr>\n")
+    sb.append("<tr><td>Features</td><td>#{s.features()}</td></tr>\n")
+    sb.append("<tr><td>Fixes</td><td>#{s.fixes()}</td></tr>\n")
+    sb.append("<tr><td>Policy Errors</td><td>#{s.badCount()}</td></tr>\n")
+    sb.append("</table>\n")
+    if flags.size > 0 {
+      sb.append("<h2>Violations</h2><ul>\n")
+      foreach f: Flag in flags {
+        sb.append("<li>#{f.severity().symbol()} #{f.commit().shortHash()}: #{f.reason()}</li>\n")
+      }
+      sb.append("</ul>\n")
+    }
+    sb.append("</body></html>\n")
+    return sb.toString()
+  }
+}
+
+// ─── Tools ────────────────────────────────────────────────────────────────────
+
+// check: flag any commit messages that violate the policy.
+tool check(log: String, strict: Boolean = false): Int
+  requires { read(log), console }
+{
+  val text = Files::readText(log)
+  val commits = CommitParser::parseAll(text)
+  val flags = PolicyChecker::checkAll(commits, strict)
+  val errors = flags.filter { f -> f.severity() is Error }
+  val warns = flags.filter { f -> f.severity() is Warn }
+  IO::println("check: #{commits.size} commits, #{errors.size} errors, #{warns.size} warnings")
+  foreach f: Flag in flags {
+    IO::println("  #{f.severity().symbol()} #{f.commit().shortHash()} #{f.reason()}")
+  }
+  return if errors.size > 0 { 1 } else { 0 }
+}
+
+// stats: type / author / scope breakdown.
+tool stats(log: String, since: String = "", top: Int = 5): Int
+  requires { read(log), console }
+{
+  val text = Files::readText(log)
+  var commits = CommitParser::parseAll(text)
+  if since != "" {
+    commits = commits.filter { c -> c.date().compareTo(since) >= 0 } as List[Commit]
+  }
+  IO::println("stats: #{commits.size} commits#{if since != "" { " since #{since}" } else { "" }}\n")
+  IO::println("by type:")
+  val typeMap = CommitStats::byType(commits)
+  foreach (k, v) in typeMap {
+    IO::println("  #{(k as String).padRight(10)} #{v}")
+  }
+  IO::println("\ntop authors:")
+  val authors = CommitStats::byAuthor(commits)
+  var shown = 0
+  foreach a: AuthorStats in authors {
+    if shown >= top { break }
+    IO::println("  #{a.author().truncate(28).padRight(30)} #{a.commits()} commits")
+    shown++
+  }
+  val scopes = CommitStats::byScope(commits)
+  if scopes.size > 0 {
+    IO::println("\nby scope:")
+    foreach (k, v) in scopes {
+      IO::println("  #{(k as String).padRight(20)} #{v}")
+    }
+  }
+  return 0
+}
+
+// report: write a full quality report to a file.
+tool report(log: String, out: String, html: Boolean = false): Int
+  requires { read(log), write(out), console }
+{
+  val text = Files::readText(log)
+  val commits = CommitParser::parseAll(text)
+  val flags = PolicyChecker::checkAll(commits, false)
+  val body = if html { ReportBuilder::buildHtml(commits, flags) }
+             else    { ReportBuilder::buildText(commits, flags) }
+  Files::writeText(out, body)
+  val s = CommitStats::summary(commits, flags)
+  IO::println("report: #{commits.size} commits analysed, #{s.badCount()} errors, report written to #{out}")
+  return 0
+}

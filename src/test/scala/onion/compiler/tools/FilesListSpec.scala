@@ -9,7 +9,8 @@ import onion.tools.Shell
  */
 class FilesListSpec extends AbstractShellSpec {
   it("lists directory entries as a sorted List of names") {
-    val dir = System.getProperty("java.io.tmpdir") + "/onion-files-list-test"
+    // Forward slashes: a Windows `\` would start an escape inside the Onion string literal.
+    val dir = (System.getProperty("java.io.tmpdir") + "/onion-files-list-test").replace('\\', '/')
     val result = shell.run(
       s"""
         |class Test {

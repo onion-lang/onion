@@ -49,7 +49,8 @@ class ControlFlowDocLabeledLoopSpec extends AbstractShellSpec {
       try shell.run(src, "doc-sample.on", Array())
       finally System.setOut(originalOut)
     assert(!result.isInstanceOf[Shell.Failure], s"doc sample failed to compile/run:\n$src")
-    buffer.toString("UTF-8")
+    // `println` ends lines with the platform separator; the documented Output block uses "\n".
+    buffer.toString("UTF-8").replace(System.lineSeparator, "\n")
   }
 
   describe("docs/guide/control-flow.md Labeled Break and Continue section") {

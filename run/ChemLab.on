@@ -1,0 +1,341 @@
+// ChemLab.on — Periodic table explorer, compound analyzer, and reaction calculator
+// Exercises: homogeneous enums with methods, records with methods, class hierarchy,
+// collection pipelines (map/filter/groupBy/sortedBy/reduce/find/partition),
+// select/pattern matching, string interpolation, closures, foreach (map k,v),
+// nullable checks, statistics, while loops, extension methods.
+
+import {
+  java.util.*
+}
+
+// ─── Element Categories ──────────────────────────────────────────────────────
+
+enum ElemCategory {
+  ALKALI_METAL, ALKALINE_EARTH, TRANSITION_METAL, POST_TRANSITION,
+  METALLOID, NONMETAL, NOBLE_GAS, HALOGEN, LANTHANIDE, ACTINIDE
+public:
+  def label(): String = select this {
+    case ElemCategory::ALKALI_METAL:     "Alkali Metal"
+    case ElemCategory::ALKALINE_EARTH:   "Alkaline Earth"
+    case ElemCategory::TRANSITION_METAL: "Transition Metal"
+    case ElemCategory::POST_TRANSITION:  "Post-transition Metal"
+    case ElemCategory::METALLOID:        "Metalloid"
+    case ElemCategory::NONMETAL:         "Nonmetal"
+    case ElemCategory::NOBLE_GAS:        "Noble Gas"
+    case ElemCategory::HALOGEN:          "Halogen"
+    case ElemCategory::LANTHANIDE:       "Lanthanide"
+    case ElemCategory::ACTINIDE:         "Actinide"
+  }
+  def isMetal(): Boolean = select this {
+    case ElemCategory::ALKALI_METAL:     true
+    case ElemCategory::ALKALINE_EARTH:   true
+    case ElemCategory::TRANSITION_METAL: true
+    case ElemCategory::POST_TRANSITION:  true
+    case ElemCategory::LANTHANIDE:       true
+    case ElemCategory::ACTINIDE:         true
+    else:                                false
+  }
+}
+
+// ─── Element Record ──────────────────────────────────────────────────────────
+
+record Element(
+  number: Int,
+  symbol: String,
+  name:   String,
+  mass:   Double,
+  period: Int,
+  group:  Int,
+  category: ElemCategory
+) {
+public:
+  def display(): String =
+    "[#{number()}] #{symbol()} #{name()} #{mass()} g/mol — #{category().label()}"
+  def isMetal(): Boolean = category().isMetal()
+  def isGas(): Boolean   = category() == ElemCategory::NOBLE_GAS || category() == ElemCategory::HALOGEN
+}
+
+// ─── Extension on Double ─────────────────────────────────────────────────────
+
+extension Double {
+  def rounded2(): Double = (self * 100.0d + 0.5d) as Long as Double / 100.0d
+}
+
+// ─── Element Table ───────────────────────────────────────────────────────────
+
+val ELEMENTS: List[Element] = [
+  new Element(1,  "H",  "Hydrogen",    1.008,  1, 1,  ElemCategory::NONMETAL),
+  new Element(2,  "He", "Helium",      4.003,  1, 18, ElemCategory::NOBLE_GAS),
+  new Element(3,  "Li", "Lithium",     6.941,  2, 1,  ElemCategory::ALKALI_METAL),
+  new Element(4,  "Be", "Beryllium",   9.012,  2, 2,  ElemCategory::ALKALINE_EARTH),
+  new Element(5,  "B",  "Boron",      10.811,  2, 13, ElemCategory::METALLOID),
+  new Element(6,  "C",  "Carbon",     12.011,  2, 14, ElemCategory::NONMETAL),
+  new Element(7,  "N",  "Nitrogen",   14.007,  2, 15, ElemCategory::NONMETAL),
+  new Element(8,  "O",  "Oxygen",     15.999,  2, 16, ElemCategory::NONMETAL),
+  new Element(9,  "F",  "Fluorine",   18.998,  2, 17, ElemCategory::HALOGEN),
+  new Element(10, "Ne", "Neon",       20.180,  2, 18, ElemCategory::NOBLE_GAS),
+  new Element(11, "Na", "Sodium",     22.990,  3, 1,  ElemCategory::ALKALI_METAL),
+  new Element(12, "Mg", "Magnesium",  24.305,  3, 2,  ElemCategory::ALKALINE_EARTH),
+  new Element(13, "Al", "Aluminum",   26.982,  3, 13, ElemCategory::POST_TRANSITION),
+  new Element(14, "Si", "Silicon",    28.086,  3, 14, ElemCategory::METALLOID),
+  new Element(15, "P",  "Phosphorus", 30.974,  3, 15, ElemCategory::NONMETAL),
+  new Element(16, "S",  "Sulfur",     32.065,  3, 16, ElemCategory::NONMETAL),
+  new Element(17, "Cl", "Chlorine",   35.453,  3, 17, ElemCategory::HALOGEN),
+  new Element(18, "Ar", "Argon",      39.948,  3, 18, ElemCategory::NOBLE_GAS),
+  new Element(19, "K",  "Potassium",  39.098,  4, 1,  ElemCategory::ALKALI_METAL),
+  new Element(20, "Ca", "Calcium",    40.078,  4, 2,  ElemCategory::ALKALINE_EARTH),
+  new Element(26, "Fe", "Iron",       55.845,  4, 8,  ElemCategory::TRANSITION_METAL),
+  new Element(29, "Cu", "Copper",     63.546,  4, 11, ElemCategory::TRANSITION_METAL),
+  new Element(30, "Zn", "Zinc",       65.38,   4, 12, ElemCategory::TRANSITION_METAL),
+  new Element(47, "Ag", "Silver",    107.868,  5, 11, ElemCategory::TRANSITION_METAL),
+  new Element(79, "Au", "Gold",      196.967,  6, 11, ElemCategory::TRANSITION_METAL),
+  new Element(80, "Hg", "Mercury",   200.590,  6, 12, ElemCategory::TRANSITION_METAL)
+]
+
+def findElement(symbol: String): Element? =
+  ELEMENTS.find { e -> (e as Element).symbol() == symbol } as Element?
+
+// ─── Compound Record ─────────────────────────────────────────────────────────
+
+record Compound(
+  formula:    String,
+  name:       String,
+  components: Map[String, Int],
+  molarMass:  Double
+) {
+public:
+  def display(): String =
+    "#{formula()} [#{name()}]  M = #{molarMass()} g/mol"
+
+  def molesIn(grams: Double): Double  = grams / molarMass()
+  def gramsFor(moles: Double): Double = moles * molarMass()
+
+  def percentOfElement(symbol: String): Double {
+    val count: Int? = components().get(symbol) as Int?
+    if count == null { return 0.0d }
+    val elem: Element? = findElement(symbol)
+    if elem == null { return 0.0d }
+    return (count as Int) * elem.mass() / molarMass() * 100.0d
+  }
+
+  def elementCount(): Int = components().size
+
+  def containsCarbon(): Boolean = components().containsKey("C")
+}
+
+// ─── Compound Library ────────────────────────────────────────────────────────
+
+val COMPOUNDS: List[Compound] = [
+  new Compound("H2O",    "Water",              ["H": 2, "O": 1],            18.015),
+  new Compound("CO2",    "Carbon Dioxide",      ["C": 1, "O": 2],           44.010),
+  new Compound("NaCl",   "Sodium Chloride",     ["Na": 1, "Cl": 1],         58.443),
+  new Compound("HCl",    "Hydrochloric Acid",   ["H": 1, "Cl": 1],          36.461),
+  new Compound("H2SO4",  "Sulfuric Acid",       ["H": 2, "S": 1, "O": 4],   98.079),
+  new Compound("NaOH",   "Sodium Hydroxide",    ["Na": 1, "O": 1, "H": 1],  39.997),
+  new Compound("NH3",    "Ammonia",             ["N": 1, "H": 3],           17.031),
+  new Compound("CH4",    "Methane",             ["C": 1, "H": 4],           16.043),
+  new Compound("C2H5OH", "Ethanol",             ["C": 2, "H": 6, "O": 1],   46.068),
+  new Compound("C6H12O6","Glucose",             ["C": 6, "H": 12, "O": 6], 180.156),
+  new Compound("C12H22O11","Sucrose",           ["C": 12,"H": 22, "O": 11], 342.297),
+  new Compound("CaCO3",  "Calcium Carbonate",   ["Ca": 1, "C": 1, "O": 3], 100.087),
+  new Compound("Fe2O3",  "Iron(III) Oxide",     ["Fe": 2, "O": 3],         159.690),
+  new Compound("NaHCO3", "Sodium Bicarbonate",  ["Na": 1, "H": 1, "C": 1, "O": 3], 84.007)
+]
+
+// ─── Reaction Record ─────────────────────────────────────────────────────────
+
+record Reaction(
+  name:      String,
+  equation:  String,
+  reactants: List[Compound],
+  products:  List[Compound],
+  stoich:    List[Int]
+) {
+public:
+  def display(): String = "#{name()}: #{equation()}"
+
+  def massOfProduct(reactantGrams: Double, reactantIdx: Int, productIdx: Int): Double {
+    if reactantIdx < 0 || reactantIdx >= reactants().size { return 0.0d }
+    if productIdx  < 0 || productIdx  >= products().size  { return 0.0d }
+    val rCompound: Compound = reactants().get(reactantIdx) as Compound
+    val pCompound: Compound = products().get(productIdx)  as Compound
+    val rStoich: Int = stoich().get(reactantIdx) as Int
+    val pStoich: Int = stoich().get(reactants().size + productIdx) as Int
+    val molesReactant: Double = rCompound.molesIn(reactantGrams)
+    val molesProd: Double     = molesReactant * (pStoich as Double) / (rStoich as Double)
+    return pCompound.gramsFor(molesProd)
+  }
+}
+
+def makeReactions(): List[Reaction] {
+  val water = COMPOUNDS.find { c -> (c as Compound).formula() == "H2O" }    as Compound
+  val co2   = COMPOUNDS.find { c -> (c as Compound).formula() == "CO2" }    as Compound
+  val hcl   = COMPOUNDS.find { c -> (c as Compound).formula() == "HCl" }    as Compound
+  val nacl  = COMPOUNDS.find { c -> (c as Compound).formula() == "NaCl" }   as Compound
+  val naoh  = COMPOUNDS.find { c -> (c as Compound).formula() == "NaOH" }   as Compound
+  val caco3 = COMPOUNDS.find { c -> (c as Compound).formula() == "CaCO3" }  as Compound
+  val ch4   = COMPOUNDS.find { c -> (c as Compound).formula() == "CH4" }    as Compound
+  val o2comp = new Compound("O2", "Oxygen Gas", ["O": 2], 31.998)
+
+  return [
+    new Reaction(
+      "Neutralisation",
+      "HCl + NaOH → NaCl + H2O",
+      [hcl, naoh],
+      [nacl, water],
+      [1, 1, 1, 1]
+    ),
+    new Reaction(
+      "Methane Combustion",
+      "CH4 + 2 O2 → CO2 + 2 H2O",
+      [ch4, o2comp],
+      [co2, water],
+      [1, 2, 1, 2]
+    ),
+    new Reaction(
+      "Limestone Decomposition",
+      "CaCO3 → CaO + CO2",
+      [caco3],
+      [new Compound("CaO", "Calcium Oxide", ["Ca": 1, "O": 1], 56.077), co2],
+      [1, 1, 1]
+    )
+  ]
+}
+
+// ─── Statistics Helpers ──────────────────────────────────────────────────────
+
+def avg(values: List[Double]): Double {
+  if values.size == 0 { return 0.0d }
+  val total: Double = values.reduce(0.0d) { acc, v -> (acc as Double) + (v as Double) } as Double
+  return total / (values.size as Double)
+}
+
+def stddev(values: List[Double]): Double {
+  if values.size < 2 { return 0.0d }
+  val mean: Double = avg(values)
+  val variance: Double = values.reduce(0.0d) { acc, v ->
+    val diff: Double = (v as Double) - mean
+    (acc as Double) + diff * diff
+  } as Double / (values.size as Double)
+  var x: Double = variance
+  var prev: Double = 0.0d
+  while (x - prev) * (x - prev) > 0.0000001d {
+    prev = x
+    x = (x + variance / x) / 2.0d
+  }
+  return x
+}
+
+// ─── Main Report ─────────────────────────────────────────────────────────────
+
+IO::println("╔══════════════════════════════════════════════════╗")
+IO::println("║         ChemLab — Chemical Data Explorer         ║")
+IO::println("╚══════════════════════════════════════════════════╝")
+
+// 1. Element overview by category
+IO::println("\n── Elements by Category ──────────────────────────")
+val byCategory = ELEMENTS.groupBy { e -> (e as Element).category().label() }
+foreach (cat, elems) in byCategory {
+  val syms: List[String] = (elems as List[Element]).map { e -> (e as Element).symbol() }
+  IO::println("  #{cat}: #{syms.toString()}")
+}
+
+// 2. Heaviest elements
+IO::println("\n── Top-5 Heaviest Elements ───────────────────────")
+val heaviest = ELEMENTS.sortedBy { e -> -(e as Element).mass() }
+var i: Int = 0
+foreach e: Element in heaviest {
+  if i < 5 {
+    IO::println("  #{e.display()}")
+    i++
+  }
+}
+
+// 3. Metals vs Non-Metals
+val metals:    List[Element] = ELEMENTS.filter { e -> (e as Element).isMetal() }
+val nonmetals: List[Element] = ELEMENTS.filter { e -> !(e as Element).isMetal() }
+IO::println("\n── Metal vs Non-Metal Count ──────────────────────")
+IO::println("  Metals:     #{metals.size}")
+IO::println("  Non-metals: #{nonmetals.size}")
+
+val metalMasses:    List[Double] = metals.map    { e -> (e as Element).mass() }
+val nonmetalMasses: List[Double] = nonmetals.map { e -> (e as Element).mass() }
+IO::println("  Avg metal mass:     #{avg(metalMasses).rounded2()} g/mol")
+IO::println("  Avg non-metal mass: #{avg(nonmetalMasses).rounded2()} g/mol")
+
+// 4. Period distribution
+IO::println("\n── Period Distribution ───────────────────────────")
+val byPeriod = ELEMENTS.groupBy { e -> (e as Element).period() }
+foreach (period, elems) in byPeriod {
+  IO::println("  Period #{period}: #{(elems as List[Element]).size} elements")
+}
+
+// 5. Compound analysis
+IO::println("\n── Compound Library ──────────────────────────────")
+foreach c: Compound in COMPOUNDS {
+  IO::println("  #{c.display()}")
+}
+
+// 6. Organic vs Inorganic
+val organics:   List[Compound] = COMPOUNDS.filter { c -> (c as Compound).containsCarbon() }
+val inorganics: List[Compound] = COMPOUNDS.filter { c -> !(c as Compound).containsCarbon() }
+IO::println("\n── Organic vs Inorganic ──────────────────────────")
+IO::println("  Organic compounds:   #{organics.size}")
+IO::println("  Inorganic compounds: #{inorganics.size}")
+
+// 7. Moles calculation for 1 gram
+IO::println("\n── Moles per 1 g Sample ──────────────────────────")
+foreach c: Compound in COMPOUNDS {
+  val m: Double = c.molesIn(1.0d)
+  IO::println("  1g #{c.formula()} = #{m.rounded2()} mol")
+}
+
+// 8. Element percentages in water
+IO::println("\n── Elemental Composition of H2O ──────────────────")
+val h2o: Compound = COMPOUNDS.find { c -> (c as Compound).formula() == "H2O" } as Compound
+IO::println("  H:  #{h2o.percentOfElement("H").rounded2()}%")
+IO::println("  O:  #{h2o.percentOfElement("O").rounded2()}%")
+
+// 9. Elemental composition of glucose
+IO::println("\n── Elemental Composition of Glucose (C6H12O6) ────")
+val glucose: Compound = COMPOUNDS.find { c -> (c as Compound).formula() == "C6H12O6" } as Compound
+foreach (sym, cnt) in glucose.components() {
+  val pct: Double = glucose.percentOfElement(sym as String)
+  IO::println("  #{sym}: count=#{cnt}, #{pct.rounded2()}%")
+}
+
+// 10. Reaction stoichiometry
+IO::println("\n── Reaction Stoichiometry ────────────────────────")
+val reactions: List[Reaction] = makeReactions()
+foreach rxn: Reaction in reactions {
+  IO::println("  #{rxn.display()}")
+}
+
+IO::println("\n  Neutralisation: 36.46g HCl + NaOH → ? g NaCl")
+val rxn1: Reaction = reactions.get(0) as Reaction
+val naclGrams: Double = rxn1.massOfProduct(36.461d, 0, 0)
+IO::println("  → #{naclGrams.rounded2()} g NaCl produced")
+
+IO::println("\n  Combustion: 16.04g CH4 burned → ? g CO2")
+val rxn2: Reaction = reactions.get(1) as Reaction
+val co2Grams: Double = rxn2.massOfProduct(16.043d, 0, 0)
+IO::println("  → #{co2Grams.rounded2()} g CO2 produced")
+
+// 11. Statistics on molar masses
+IO::println("\n── Compound Molar Mass Statistics ────────────────")
+val masses: List[Double] = COMPOUNDS.map { c -> (c as Compound).molarMass() }
+IO::println("  Min:    #{masses.min} g/mol")
+IO::println("  Max:    #{masses.max} g/mol")
+IO::println("  Avg:    #{avg(masses).rounded2()} g/mol")
+IO::println("  StdDev: #{stddev(masses).rounded2()} g/mol")
+
+// 12. Heavy compounds (M > 100)
+val heavy: List[Compound] = COMPOUNDS.filter { c -> (c as Compound).molarMass() > 100.0d }
+IO::println("\n── Heavy Compounds (M > 100 g/mol) ──────────────")
+foreach c: Compound in heavy.sortedBy { c -> (c as Compound).molarMass() } {
+  IO::println("  #{c.display()}")
+}
+
+IO::println("\n╔══════════════════════════════════════════════════╗")
+IO::println("║                  Analysis Complete               ║")
+IO::println("╚══════════════════════════════════════════════════╝")

@@ -60,6 +60,21 @@ changed feature, at most one a day.
 - `status:ready|in-progress|blocked|needs-kota`
 - `P0` (`develop` broken or release blocked), `P1` (real task blocked), `P2` (friction), `P3` (nice to have)
 - `approved` (Kota's approval), `meta` (changes to the loop itself), `evolution:pause`
+- `kota:look` (Kota points the loop at something; it comes first after `P0`)
+
+## Memory and self
+
+Issues are the public record. The loop also keeps a private memory,
+[`onion-lang/evolution-memory`](https://github.com/onion-lang/evolution-memory):
+- **Episodes:** every run writes one at its end, with what happened and how it felt.
+- **Insights:** the weekly Strategist consolidates the episodes into hunches.
+- **Self:** `self.md` is the agent's own description of itself, which it rewrites as it
+  learns, including a name it chooses for itself.
+
+Insights that keep holding are promoted into this runbook's Known pitfalls through a `meta` PR.
+Every run also practises two social habits (RUNBOOK §0):
+- **Joint attention:** notice what Kota is looking at, and point him at what matters.
+- **Perspective taking:** read each output as a newcomer, as Kota, and as the next run would.
 
 ## Changing the loop
 

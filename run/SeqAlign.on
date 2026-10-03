@@ -1,0 +1,248 @@
+// SeqAlign.on — Pairwise DNA/protein sequence alignment (~170 lines)
+// Implements Needleman-Wunsch (global) and Smith-Waterman (local) algorithms.
+// Exercises: 2D arrays, records, closures, foreach (ranges), string
+// interpolation, collection pipelines (map/filter/fold), while loops, select.
+
+// ─── Scoring scheme ──────────────────────────────────────────────────────────
+
+record ScoringScheme(match_: Int, mismatch: Int, gap: Int) {
+public:
+  def score(a: String, b: String, i: Int, j: Int): Int =
+    if a.charAt(i) == b.charAt(j) { match_ } else { mismatch }
+}
+
+// ─── Alignment result ────────────────────────────────────────────────────────
+
+record AlignResult(seqA: String, seqB: String, score: Int, identity: Double) {
+public:
+  def middleLine(): String {
+    var mid: String = ""
+    foreach i: Int in 0..<seqA.length() {
+      if seqA.charAt(i) == seqB.charAt(i) && seqA.charAt(i) != '-' {
+        mid = mid + "|"
+      } else if seqA.charAt(i) == '-' || seqB.charAt(i) == '-' {
+        mid = mid + " "
+      } else {
+        mid = mid + "."
+      }
+    }
+    return mid
+  }
+
+  def print_(): void {
+    IO::println("  Alignment:")
+    IO::println("    #{seqA()}")
+    IO::println("    #{middleLine()}")
+    IO::println("    #{seqB()}")
+    IO::println("  Score:    #{score()}")
+    IO::println("  Identity: #{Format::percent(identity(), 1)}")
+  }
+}
+
+// ─── Needleman-Wunsch global alignment ───────────────────────────────────────
+
+def needlemanWunsch(a: String, b: String, scheme: ScoringScheme): AlignResult {
+  val m: Int = a.length()
+  val n: Int = b.length()
+  val dp: Int[][] = new Int[m + 1][n + 1]
+  // "D"=diagonal "U"=up "L"=left "S"=start
+  val tr: String[][] = new String[m + 1][n + 1]
+
+  // Initialize borders
+  foreach i: Int in 0..m {
+    dp[i][0] = i * scheme.gap()
+    tr[i][0] = if i == 0 { "S" } else { "U" }
+  }
+  foreach j: Int in 0..n {
+    dp[0][j] = j * scheme.gap()
+    tr[0][j] = if j == 0 { "S" } else { "L" }
+  }
+
+  // Fill DP table
+  foreach i: Int in 1..m {
+    foreach j: Int in 1..n {
+      val diag: Int = dp[i - 1][j - 1] + scheme.score(a, b, i - 1, j - 1)
+      val up: Int   = dp[i - 1][j] + scheme.gap()
+      val left: Int = dp[i][j - 1] + scheme.gap()
+      if diag >= up && diag >= left {
+        dp[i][j] = diag
+        tr[i][j] = "D"
+      } else if up >= left {
+        dp[i][j] = up
+        tr[i][j] = "U"
+      } else {
+        dp[i][j] = left
+        tr[i][j] = "L"
+      }
+    }
+  }
+
+  // Traceback
+  var alnA: String = ""
+  var alnB: String = ""
+  var i: Int = m
+  var j: Int = n
+  while i > 0 || j > 0 {
+    select tr[i][j] {
+      case "D":
+        alnA = "" + a.charAt(i - 1) + alnA
+        alnB = "" + b.charAt(j - 1) + alnB
+        i--
+        j--
+      case "U":
+        alnA = "" + a.charAt(i - 1) + alnA
+        alnB = "-" + alnB
+        i--
+      else:
+        alnA = "-" + alnA
+        alnB = "" + b.charAt(j - 1) + alnB
+        j--
+    }
+  }
+
+  val alnLen: Int = alnA.length()
+  val matches: Int = Colls::range(0, alnLen)
+    .filter { k -> alnA.charAt(k) == alnB.charAt(k) && alnA.charAt(k) != '-' }
+    .size
+  val identity: Double = (matches as Double) / (alnLen as Double)
+  return new AlignResult(alnA, alnB, dp[m][n], identity)
+}
+
+// ─── Smith-Waterman local alignment ──────────────────────────────────────────
+
+def smithWaterman(a: String, b: String, scheme: ScoringScheme): AlignResult {
+  val m: Int = a.length()
+  val n: Int = b.length()
+  val dp: Int[][] = new Int[m + 1][n + 1]
+  val tr: String[][] = new String[m + 1][n + 1]
+
+  var bestScore: Int = 0
+  var bestI: Int = 0
+  var bestJ: Int = 0
+
+  foreach i: Int in 1..m {
+    foreach j: Int in 1..n {
+      val diag: Int = dp[i - 1][j - 1] + scheme.score(a, b, i - 1, j - 1)
+      val up: Int   = dp[i - 1][j] + scheme.gap()
+      val left: Int = dp[i][j - 1] + scheme.gap()
+      var best: Int = 0
+      if diag > best { best = diag }
+      if up   > best { best = up   }
+      if left > best { best = left }
+      dp[i][j] = best
+      if best == 0 {
+        tr[i][j] = "S"
+      } else if best == diag {
+        tr[i][j] = "D"
+      } else if best == up {
+        tr[i][j] = "U"
+      } else {
+        tr[i][j] = "L"
+      }
+      if best > bestScore {
+        bestScore = best
+        bestI = i
+        bestJ = j
+      }
+    }
+  }
+
+  // Traceback from best cell until score = 0
+  var alnA: String = ""
+  var alnB: String = ""
+  var i: Int = bestI
+  var j: Int = bestJ
+  while dp[i][j] != 0 {
+    select tr[i][j] {
+      case "D":
+        alnA = "" + a.charAt(i - 1) + alnA
+        alnB = "" + b.charAt(j - 1) + alnB
+        i--
+        j--
+      case "U":
+        alnA = "" + a.charAt(i - 1) + alnA
+        alnB = "-" + alnB
+        i--
+      else:
+        alnA = "-" + alnA
+        alnB = "" + b.charAt(j - 1) + alnB
+        j--
+    }
+  }
+
+  val alnLen: Int = alnA.length()
+  val matches: Int = Colls::range(0, alnLen)
+    .filter { k -> alnA.charAt(k) == alnB.charAt(k) && alnA.charAt(k) != '-' }
+    .size
+  val identity: Double = if alnLen == 0 { 0.0 } else {
+    (matches as Double) / (alnLen as Double)
+  }
+  return new AlignResult(alnA, alnB, bestScore, identity)
+}
+
+// ─── Statistics over multiple alignments ─────────────────────────────────────
+
+record AlignSummary(label: String, results: List[AlignResult]) {
+public:
+  def avgScore(): Double {
+    var total: Int = 0
+    foreach r: AlignResult in results() { total = total + r.score() }
+    return (total as Double) / (results().size as Double)
+  }
+
+  def avgIdentity(): Double {
+    var total: Double = 0.0
+    foreach r: AlignResult in results() { total = total + r.identity() }
+    return total / (results().size as Double)
+  }
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main(): void {
+  val dnaScheme: ScoringScheme = new ScoringScheme(2, -1, -2)
+  val protScheme: ScoringScheme = new ScoringScheme(3, -1, -2)
+
+  IO::println("╔══════════════════════════════════════════════╗")
+  IO::println("║   Sequence Alignment — Global & Local        ║")
+  IO::println("╚══════════════════════════════════════════════╝")
+  IO::println("")
+
+  IO::println("─── Needleman-Wunsch Global Alignment (match=2, mismatch=-1, gap=-2) ───")
+  IO::println("")
+  val globalInputs: List[List[String]] = [
+    ["GATTACA",  "GCATGCU"],
+    ["ACGTACGT", "AGTACG"],
+    ["ATCGATCG", "ATGATCG"]
+  ]
+  val globalResults: List[AlignResult] = globalInputs.map { pair ->
+    val r: AlignResult = needlemanWunsch(pair[0], pair[1], dnaScheme)
+    IO::println("#{pair[0]} vs #{pair[1]}")
+    r.print_()
+    IO::println("")
+    r
+  }
+
+  IO::println("─── Smith-Waterman Local Alignment (match=3, mismatch=-1, gap=-2) ───")
+  IO::println("")
+  val localInputs: List[List[String]] = [
+    ["TGTTACGG", "GGTTGACTA"],
+    ["ACACACTA",  "AGCACACA"],
+    ["GCCTTTGC",  "GCAAAGCC"]
+  ]
+  val localResults: List[AlignResult] = localInputs.map { pair ->
+    val r: AlignResult = smithWaterman(pair[0], pair[1], protScheme)
+    IO::println("#{pair[0]} vs #{pair[1]}")
+    r.print_()
+    IO::println("")
+    r
+  }
+
+  // Summary statistics
+  IO::println("─── Summary ────────────────────────────────────────────────────────────")
+  val globalSummary: AlignSummary = new AlignSummary("Global (NW)", globalResults)
+  val localSummary:  AlignSummary = new AlignSummary("Local (SW)",  localResults)
+  foreach s: AlignSummary in [globalSummary, localSummary] {
+    IO::println("#{s.label()}: avg score = #{Format::number(s.avgScore(), 2)}, avg identity = #{Format::percent(s.avgIdentity(), 1)}")
+  }
+}

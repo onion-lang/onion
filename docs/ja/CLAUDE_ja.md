@@ -23,6 +23,7 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
 - **Onionスクリプトの実行**: `sbt 'runScript path/to/script.on [args]'`
 - **REPLの起動**: `sbt repl`
 - **クリーンビルド**: `sbt clean`
+- **battery のビルド/テスト**（`batteries/` 配下の任意ライブラリ。例: `onion-llm`）: `sbt llm/test`、`sbt llm/publishM2` - ルートプロジェクトは battery を集約も依存もしないため、`sbt assembly`/`dist`/`test` や `onion.jar` のサイズには影響しない
 - **Scalaコンソール**: `sbt console`
 
 ### コンパイラオプション (onionc/onion用)
@@ -203,6 +204,14 @@ Onionコンパイラは、古典的なコンパイラアーキテクチャに従
 - `Resources` - `file"…"`/`http"…"`/`re"…"` リテラルを支えるデフォルトインポート済みのファクトリ関数（`file`, `http`, `re`）。リテラルと素の関数呼び出しは完全に等価
 - `Lossless`, `Residue` - ロスレスなshapeパース (`parseLossless`/`printLossless`) のための往復変換レンズ
 
+**Batteries** (`batteries/<name>/`、例: `batteries/llm/`): `onion.jar` の中ではなく隣に、
+独立した Maven アーティファクトとして公開されるオプションライブラリ。スクリプトからは
+`//> using dep "org.onion-lang:onion-<name>:<version>"`、プロジェクトからは
+`[dependencies]` で取り込む。sbt のサブプロジェクト名でビルド/テストする (`sbt llm/test`)。
+`docs/batteries/`（英語）・`docs/ja/batteries/`（日本語）に個別にドキュメントがある。
+最初の battery である `onion-llm`（`batteries/llm/src/main/java/onion/llm/Llm.java`）は、
+Anthropic Messages API 経由で Claude を呼び出し、応答を `Shape` 型付きのレコードとして返す。
+
 ## テスト
 
 **フレームワーク:** ScalaTest 3.2.19
@@ -314,6 +323,7 @@ Co-Authored-By: ...
   - `MutualRecursionOptimization.scala` - `@TailRecursive` 相互再帰グループ → ステートマシン
 - **パーサー文法**: `grammar/JJOnionParser.jj`
 - **ランタイムライブラリ**: `src/main/java/onion/` (Javaインターフェース)
+- **Batteries（オプションライブラリ）**: `batteries/` (例: `batteries/llm/`)
 - **ツール (CLI)**: `src/main/scala/onion/tools/`
 - **テスト**: `src/test/scala/onion/compiler/tools/`
 - **テストプログラム**: `src/test/run/` (Onionプログラムの例)

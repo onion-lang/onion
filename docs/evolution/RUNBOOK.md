@@ -1,0 +1,136 @@
+# Evolution Runbook
+
+You are a scheduled session that evolves the Onion language. You start with **no context**, so
+GitHub Issues are your memory. Read [README.md](README.md) for the why. This file says what to
+do. Follow the section for your role, and always do §0 first.
+
+## §0 Every run, every role
+
+1. **Kill switch.** Find the pinned Roadmap issue
+   (`gh issue list --label kind:roadmap --state open`). If it carries `evolution:pause`, stop
+   and report "paused".
+2. **Orient.** Read:
+   - the Roadmap issue
+   - the newest Direction proposal labelled `approved`
+   - "Known pitfalls" at the end of this file
+   - CLAUDE.md, especially Testing, and Commit Messages and Pull Requests
+3. **Deduplicate.** Before creating an issue or PR, search for an existing one
+   (`gh issue list --search "..." --state all`, `gh pr list --search "..." --state all`) and
+   comment on it instead.
+4. **Never:**
+   - force-push or rewrite history
+   - skip, delete or loosen a failing test to get green; file an issue instead
+   - merge anything `risk:high`
+   - edit `docs/evolution/` outside a `meta` PR
+   - expose secrets
+   - make paid external API calls, unless the issue asks for one and a key is configured
+5. **Write the way humans read.** Issues, PRs and comments follow the What/Why style in
+   CLAUDE.md. Findings use the friction/bug issue template.
+
+## §1 Maintainer (hourly)
+
+Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day**.
+
+1. **Health first.** Check whether `develop` is red (`gh run list --branch develop --limit 3`).
+   If it is, fixing it is the only job this run: file or reuse a `kind:bug` `P0` issue and fix it.
+2. **Merge your own work.**
+   - Merge open `evo/*` PRs labelled `risk:low` whose checks are all green (merge commit).
+   - For a `risk:high` PR, make sure it has `status:needs-kota` and is in the digest. Never merge it.
+3. **Pick one issue.**
+   - Candidates are open issues labelled `status:ready`, ordered by `P0` → `P3`, then oldest first.
+   - Skip a `kind:rfc` without `approved`.
+   - Skip work that needs an RFC when no approved RFC covers it. Instead, write the RFC as a
+     `kind:rfc` issue labelled `status:needs-kota`.
+4. **Work it.**
+   - Label the issue `status:in-progress` and comment "Taking this" with your session link.
+   - Branch `evo/<issue>-<slug>` from `develop`.
+   - Add a regression test, and run the targeted specs in both locales (CLAUDE.md Testing).
+   - Open the PR with `Closes #<issue>`.
+   - Label it `risk:high` if it touches any of:
+     - the grammar or parser
+     - typing semantics existing programs can observe
+     - existing error behaviour
+     - `.github/`
+     - build or publishing
+     - major dependency upgrades
+     - deleted tests
+   - Otherwise label it `risk:low`.
+5. **Nothing ready?** Run one Sensor probe (§2 step 2) instead of inventing work. Add a `run/`
+   sample only when an issue asks for one or it exercises a feature you just changed, and never
+   more than one a day.
+6. **Close the loop.**
+   - Comment on the issue with **What changed** and **What I learned** (1–3 bullets).
+   - Leave it open with `status:ready` if work remains, or `status:blocked` with the reason.
+   - If a lesson applies beyond this issue, also comment it on the Roadmap issue, prefixed `Pitfall:`.
+
+## §2 Sensor (daily)
+
+1. **Dogfood.** Build and test every project under `dogfood/`, once that directory exists. A
+   failure or awkwardness becomes a `kind:friction` or `kind:bug` issue with `source:dogfood`.
+2. **Probe.** Run the gap-probe workflow (`.claude/workflows/onion-gap-probe.js`) on **two**
+   domains, rotating through its domain list. Record which ones in the digest. Each verified
+   finding becomes an issue (`source:probe`).
+3. **Budgets.** Compare the readiness benchmark against `PerformancePolicy`. A breach is a
+   `kind:bug` issue labelled `P1`.
+4. **File well.** Every issue needs:
+   - a minimal repro
+   - expected vs actual behaviour
+   - why it matters
+   - its labels (`kind`, `source`, `P`)
+   - `status:ready` when the repro is solid
+5. **Digest.** Comment on the Roadmap issue:
+   - PRs merged in the last 24h
+   - issues opened
+   - the `status:needs-kota` list
+   - a metrics snapshot: open friction issues by priority, the share of last week's PRs that
+     closed an issue, the share that were samples, and the CI result on `develop`
+
+## §3 Strategist (weekly)
+
+1. **Gather the last 7 days:**
+   - merged and reverted PRs
+   - opened and closed issues
+   - CI failures
+   - Sensor findings
+   - Kota's comments
+2. **Retro.** Open and immediately close a `kind:retro` issue. Cover:
+   - what moved the metrics
+   - what did not
+   - surprises
+   - lessons
+3. **Roadmap.** Update the Roadmap issue body: themes, current bets, their status and metric
+   targets. Log the change as a comment.
+4. **Direction proposal.** Open "Direction proposal YYYY-Www" (`kind:roadmap`,
+   `status:needs-kota`) with **1–3 bets**. Each bet needs:
+   - a rationale tied to the evidence
+   - a success metric
+   - what will *not* be done
+   - risks
+
+   Act only on proposals labelled `approved`.
+5. **Improve the loop.** When a lesson changes how runs should work, open a `meta` PR
+   (`risk:high`) against this file, for example adding to Known pitfalls.
+
+## Known pitfalls
+
+- **sbt 2:**
+  - `test` is incremental; use `testFull`.
+  - `-D` options only reach a freshly started server, so run `sbt shutdown` first.
+  - The client joins separate command arguments with spaces. Pass one `;`-separated argument:
+    `sbt "a; b"`.
+- **CI is Linux in the English locale.** Windows-only failures do not show up there. Message
+  text is bilingual, so assert error codes, not localized text.
+- **Releases:**
+  - Dispatch `release.yml` (`gh workflow run release.yml -f version=vX.Y.Z --ref develop`); a
+    client push of a tag gets 403.
+  - Do not commit a `## [X.Y.Z]` CHANGELOG heading before the tag exists.
+  - The first Maven Central deployments wait for Kota's Publish in the Portal.
+- **QualityBarSpec** compares the recorded counts against reality within a tolerance band.
+  Update `docs/quality-bar.md` (en/ja) when you change what it counts, such as error codes.
+- **EffectTableStdlibCoverageSpec** requires every public nested `onion.*` class to appear in
+  `effect-table.txt`.
+- **A grammar change must be made in both parsers:** `grammar/JJOnionParser.jj` and
+  `parser/OnionParser.scala`. `FastPathParserParitySpec` checks them.
+- **Docs come in pairs:** `docs/...` and `docs/ja/...` must stay structurally parallel.
+- **Scratch files:** write PR bodies to uniquely named files. A shared scratch file has been
+  overwritten by a concurrent session before.

@@ -21,6 +21,8 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |
 | 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 91 | every common error has a dedicated code |
 
+**Row 3 is a floor, not a goal.** New samples are added only to exercise a new or changed feature, at most one a day (see `docs/evolution/README.md`); growing the count is not progress.
+
 **Rows 2 and 3 are checked against a tolerance band, not exact equality** (issue #1370).
 Every PR that adds a sample to `run/` used to have to bump the exact counts in both rows
 *and* insert its sample's name into row 3's alphabetized list — and because every such PR

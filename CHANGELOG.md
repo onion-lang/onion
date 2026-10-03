@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`run/DataPipeline.on`** — a 327-line async ETL pipeline sample, a new domain for the `run/` corpus exercising async/pipeline features previously underrepresented (only two prior files used `do[Future]`): `Future::all` parallel fan-out across four regions; a `do[Future]` sequential transform chain; a `do[Option]` chained nullable lookup; an ADT case-enum `StageResult` (`Ok`/`Err`); homogeneous enums `Region`/`ProductTier`; records with `example` clauses (`Sale`, `RegionStats`, `BatchSummary`); extension methods on `String`/`Double`/`Int`; collection pipelines `groupBy`/`filter`/`map`/`fold`/`sortedBy`/`partition` — producing a six-phase deterministic report (merged via #1904).
+
 ## [0.136.0] - 2026-10-03
 
 ### Fixed

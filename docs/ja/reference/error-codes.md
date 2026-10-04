@@ -996,6 +996,38 @@ def main(parseURL: Int = 1, parseUrl: Int = 2): void { IO::println(parseURL + pa
 どちらかを改名してください。位置パラメータ（デフォルト値のないもの）はフラグを持たない
 ので対象外です。
 
+### `E0094` — `main` のパラメータの型をコマンドラインから読み取れない
+
+トップレベルの自動 CLI `main` のパラメータの型が、対応するスカラー型（`String`、`Int`、
+`Long`、`Double`、`Float`、`Boolean`、`Short`、`Byte`）でも、最後のパラメータとしての
+`String[]` rest collector でもありません。
+
+```onion
+def main(name: String, count: Int = 3, tags: List[String] = []): Int {
+  return 0
+}
+// E0094: `main` はコマンドラインを導出できません: パラメータ `tags` の型
+//        List[String] は引数から読み取れません。
+```
+
+スカラー型を使うか、繰り返し・末尾引数を集めたいなら最後のパラメータを `String[]` にして
+ください（例: `def main(cmd: String, files: String[])`）。
+
+### `E0095` — `main` の `String[]` パラメータが未対応の位置にある
+
+トップレベルの自動 CLI `main` に `String[]` パラメータがありますが、その位置が未対応です
+（単独の引数でも、最後のパラメータでもありません）。
+
+```onion
+def main(args: String[], flag: Boolean = false): void {
+  IO::println("BODY RAN")
+}
+// E0095: `main` のパラメータ `args` (String[]) は未対応の位置にあります。
+```
+
+`String[]` パラメータは単独のパラメータ（raw argv）か、デフォルト値のない最後のパラメータ
+（それより前はすべて必須のスカラー）のいずれかでなければなりません。
+
 ## try/catch エラー
 
 ### `E0083` — 到達不能な catch 節
@@ -1653,6 +1685,8 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0091` | … is a class, not a variable |
 | `E0092` | cannot instantiate primitive type … with `new` |
 | `E0093` | parameters `…` and `…` of `…` would both answer to the command-line flag `--…` |
+| `E0094` | `main` parameter `…` has type … which cannot be read from an argument |
+| `E0095` | `main` has a String[] parameter, `…`, that is not in a supported position |
 
 ## 関連項目
 

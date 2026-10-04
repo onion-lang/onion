@@ -19,7 +19,7 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 | 4 | Feature coverage | checklist below demonstrated inside the large samples | complete | every item ✓ |
 | 5 | Known usability bugs | implemented-but-unreachable / broken features still open | 0 | 0 |
 | 6 | Docs parity | `docs/guide` vs `docs/ja/guide` count + every code block compiles | 15 / 15 | parity + all blocks verified |
-| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 91 | every common error has a dedicated code |
+| 7 | Diagnostics | distinct `E00xx` codes with EN+JA messages | 93 | every common error has a dedicated code |
 
 **Row 3 is a floor, not a goal.** New samples are added only to exercise a new or changed feature, at most one a day (see `docs/evolution/README.md`); growing the count is not progress.
 

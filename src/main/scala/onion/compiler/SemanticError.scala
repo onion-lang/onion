@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0093) for identification
+ * type checking. Each error has a unique code (E0000-E0095) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -76,10 +76,11 @@ package onion.compiler
  * '''Law and Example Errors (E0064-E0065, E0074-E0075)'''
  *   - LAW_VIOLATION, EXAMPLE_FAILED, LAW_PARAMETER_NOT_GENERATABLE, LAW_CLASS_NOT_LOADABLE
  *
- * '''Shape and Tool Errors (E0076-E0082, E0093)'''
+ * '''Shape and Tool Errors (E0076-E0082, E0093-E0095)'''
  *   - SHAPE_FORMAT_UNKNOWN, TOOL_UNDECLARED_EFFECT, TOOL_UNUSED_CAPABILITY
  *   - TOOL_BAD_CAPABILITY, SHAPE_INSTANCE_WITHOUT_LAW, TOOL_PARAMETER_NOT_CLI_CONVERTIBLE
- *   - DUPLICATE_TOOL_NAME, CLI_FLAG_SPELLING_COLLISION
+ *   - DUPLICATE_TOOL_NAME, CLI_FLAG_SPELLING_COLLISION, MAIN_PARAMETER_NOT_CLI_CONVERTIBLE
+ *   - MAIN_PARAMETER_MISPLACED_ARRAY
  *
  * '''Constructor Errors (E0087-E0090)'''
  *   - SECONDARY_CONSTRUCTOR_MUST_DELEGATE, CONSTRUCTOR_DELEGATION_CYCLE
@@ -241,6 +242,23 @@ object SemanticError {
    * second parameter. Positionals have no flag and are not checked.
    */
   case object CLI_FLAG_SPELLING_COLLISION extends SemanticError(93)
+  /**
+   * A top-level auto-CLI `main` parameter whose type cannot be read from the
+   * command line (e.g. `List[String]`, reached for by anyone wanting a repeated
+   * `--tag a --tag b` option): it is neither one of the supported scalars nor,
+   * in the last position, a `String[]` rest collector. Mirrors
+   * TOOL_PARAMETER_NOT_CLI_CONVERTIBLE (E0081) but for `main` itself, which also
+   * accepts the `String[]` shapes a `tool` does not. Reported at the offending
+   * parameter (issue #1998).
+   */
+  case object MAIN_PARAMETER_NOT_CLI_CONVERTIBLE extends SemanticError(94)
+  /**
+   * A top-level auto-CLI `main` has a `String[]` parameter that is not in a
+   * supported position: not the only parameter (raw argv) and not the last
+   * parameter (a rest collector preceded only by required scalars). Reported at
+   * the offending `String[]` parameter rather than at the `def` (issue #1998).
+   */
+  case object MAIN_PARAMETER_MISPLACED_ARRAY extends SemanticError(95)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

@@ -88,6 +88,11 @@ class JsonShapeComponentSpec extends AnyFunSpec {
       assert(msgs.size == 1 && msgs.head.contains("shape y = yaml"), msgs.mkString("\n"))
     }
 
+    it("a yaml shape accepts a nullable scalar (#1969)") {
+      val errs = errors(program("a: String?", "  shape y = yaml"))
+      assert(errs.isEmpty, errs.map(e => s"${e.errorCode}: ${e.message}").mkString("\n"))
+    }
+
     it("a config shape rejects a nullable scalar") {
       val msgs = e0061(program("a: String?", "  shape c = config"))
       assert(msgs.size == 1 && msgs.head.contains("shape c = config"), msgs.mkString("\n"))

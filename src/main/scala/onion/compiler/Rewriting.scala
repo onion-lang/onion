@@ -721,14 +721,22 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case Some(f) => f
       case None    => return None // typing reports the unknown format
     }
-    // A json shape also reads lists, nested records and absent keys (JsonShapeComponents);
-    // every other format keeps to the scalars. Typing reports what cannot be read (E0061).
+    // A json shape also reads lists, nested records and absent keys (JsonShapeComponents).
+    // A yaml shape reads a nullable (`T?`) scalar the same way json does -- a missing key
+    // becomes `null` -- since both go through `MappedShape` (#1969). `config` keeps to the
+    // non-nullable scalars; its runtime doesn't give an absent key a real `null` yet.
+    // Typing reports what cannot be read (E0061).
     val kinds =
       if (JsonShapeComponents.isJsonFormat(format)) declaration.args.map(a => JsonShapeComponents.tagOfAst(a.typeRef))
+      else if (format.equalsIgnoreCase("yaml")) declaration.args.map(a => scalarShapeTag(a.typeRef))
       else declaration.args.map(a => ScalarConversions.ofAst(a.typeRef).map(_.tag))
     if (kinds.exists(_.isEmpty)) return None
     val tags = kinds.map(_.get)
-    val structured = !tags.forall(JsonShapeComponents.isPlainScalar)
+    // A trailing "?" marks nullability, not structure: strip it before asking whether the
+    // component is a plain scalar, so a nullable scalar (yaml, json) does not wrongly look
+    // "structured" and reach for the nested-shape list that only `Shapes.json`'s extra
+    // overload accepts (`Shapes.yaml` has none).
+    val structured = !tags.forall(t => JsonShapeComponents.isPlainScalar(if (t.endsWith("?")) t.dropRight(1) else t))
     // explode: { __v => [__v.c0(), __v.c1(), ...] }  (boxing is automatic into the list)
     val exploded = AST.ListLiteral(loc, declaration.args.map(a => AST.MethodCall(loc, AST.Id(loc, "__v"), a.name, Nil)))
     val explodeLambda = AST.ClosureExpression(loc,

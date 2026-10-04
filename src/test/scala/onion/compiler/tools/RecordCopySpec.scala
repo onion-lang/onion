@@ -90,5 +90,26 @@ class RecordCopySpec extends AbstractShellSpec {
       )
       assert(Shell.Failure(-1) == result)
     }
+
+    it("accepts a non-null value for a nullable component (#1993)") {
+      val result = shell.run(
+        """
+          |record Cfg(host: String, port: Int?, tag: String?)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val v = new Cfg("h", null, null)
+          |    val a = v.copy(port = 8080)
+          |    val b = a.copy(tag = "t")
+          |    val c = b.copy(port = null)
+          |    return a.port() + "," + b.tag() + "," + c.port() + "," + c.host()
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableCopy.on",
+        Array()
+      )
+      assert(Shell.Success("8080,t,null,h") == result)
+    }
   }
 }

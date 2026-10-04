@@ -1173,6 +1173,10 @@ m.put("x", 1)
 val text = Json::stringify(m)                           // {"x":1}
 val pretty = Json::stringifyPretty(m)                   // インデント付きで整形
 val a = Json::array()                                   // 空の List（JSON 配列値の構築に使う）
+
+// 非有限の Double/Float（NaN, +/-Infinity）は JSON リテラル null としてシリアライズされる
+// -- JSON にはそれを表すトークンが無く、Json::parse も非有限の値を生成できないため
+Json::stringify(0.0d / 0.0d)                            // "null"
 ```
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。

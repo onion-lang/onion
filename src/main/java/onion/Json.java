@@ -569,6 +569,16 @@ public final class Json {
         } else if (obj instanceof Boolean) {
             return obj.toString();
         } else if (obj instanceof Number) {
+            // JSON (RFC 8259) has no token for a non-finite number -- Json::parse can
+            // never produce NaN or +/-Infinity, so neither should stringify emit one.
+            // JSON.stringify's well-known JS convention (write `null`) keeps the result
+            // parseable instead of producing a bare word no conformant parser accepts.
+            if (obj instanceof Double d && (d.isNaN() || d.isInfinite())) {
+                return "null";
+            }
+            if (obj instanceof Float f && (f.isNaN() || f.isInfinite())) {
+                return "null";
+            }
             return obj.toString();
         } else if (obj instanceof Map) {
             return stringifyObject((Map<?, ?>) obj, depth, pretty);

@@ -173,6 +173,87 @@ class RecordFromRegexSpec extends AbstractShellSpec {
       assert(result.isInstanceOf[Shell.Failure])
     }
 
+    it("still rejects a nullable component whose inner type is unsupported (E0061)") {
+      val result = shell.run(
+        """
+          |record Inner(x: Int);
+          |record R(a: String, b: Inner?) from re"(\S+) (\S+)"
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "x" }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("accepts a nullable (T?) component and gives null for an unmatched optional group (#1967)") {
+      val result = shell.run(
+        """
+          |record C(kind: String, scope: String?, subject: String)
+          |  from re"(\w+)(?:\(([^)]*)\))?: (.*)"
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val noScope: C? = C::parse("fix: no scope here")
+          |    val withScope: C? = C::parse("fix(api): change api")
+          |    val emptyScope: C? = C::parse("fix(): empty but present")
+          |    if noScope == null || withScope == null || emptyScope == null { return "FAIL" }
+          |    return (noScope.scope() == null) + "|" + withScope.scope() + "|" + (emptyScope.scope() == "")
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      // unmatched optional group -> real null; matched group still converts normally,
+      // including a present-but-empty capture, which stays "" rather than becoming null
+      assert(Shell.Success("true|api|true") == result)
+    }
+
+    it("still gives \"\" (not null) for a non-nullable String component's unmatched optional group") {
+      val result = shell.run(
+        """
+          |record C(kind: String, scope: String, subject: String)
+          |  from re"(\w+)(?:\(([^)]*)\))?: (.*)"
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val c: C? = C::parse("fix: no scope here")
+          |    if c == null { return "FAIL" }
+          |    return "[" + c.scope() + "]"
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("[]") == result)
+    }
+
+    it("accepts a nullable Int? component and gives null for an unmatched optional group") {
+      val result = shell.run(
+        """
+          |record Entry(name: String, retries: Int?)
+          |  from re"(\w+)(?: retries=(\d+))?"
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val withRetries: Entry? = Entry::parse("task retries=3")
+          |    val withoutRetries: Entry? = Entry::parse("task")
+          |    if withRetries == null || withoutRetries == null { return "FAIL" }
+          |    return withRetries.retries() + "|" + (withoutRetries.retries() == null)
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("3|true") == result)
+    }
+
     it("still allows `from` as an ordinary identifier") {
       val result = shell.run(
         """

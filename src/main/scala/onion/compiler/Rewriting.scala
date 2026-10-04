@@ -939,20 +939,48 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // --- parse(s: String): Name? ---
     val groupNames = declaration.args.indices.map(i => s"__g$i").toList
     val regexPattern = AST.RegexPattern(loc, pattern, groupNames)
-    val ctorArgs = declaration.args.zip(groupNames).map { case (arg, gName) =>
-      val raw = AST.Id(loc, gName)
-      cliKindOf(arg.typeRef) match {
-        case Some(kind) => convertCapturedValue(loc, kind, raw)
-        case None       => raw // unsupported component type; typing reports the error
+    val regexClassType = AST.TypeNode(loc, AST.ReferenceType("onion.Regex", true), false)
+    val nullableStringType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType("String", false)), false)
+    // A nullable component (`T?`) cannot read its value off the `__gN` binding: that
+    // binding comes from `Regex::matchGroups`, which turns an unmatched group into the
+    // non-null sentinel `""` for the unrelated `case re"..." (a, b):` select pattern, which
+    // needs non-null String bindings. `Regex::captureGroup` re-runs the (cached) anchored
+    // match to read the same group without that substitution, so `T?` gets a real `null`.
+    val nullableDecls = Buffer.empty[AST.LocalVariableDeclaration]
+    val ctorArgs = declaration.args.zip(groupNames).zipWithIndex.map { case ((arg, gName), idx) =>
+      arg.typeRef.desc match {
+        case AST.NullableType(inner) =>
+          val innerTypeRef = AST.TypeNode(arg.typeRef.location, inner, arg.typeRef.isRelaxed)
+          val declName = s"__opt$idx"
+          val captured = AST.StaticMethodCall(loc, regexClassType, "captureGroup",
+            List(AST.Id(loc, "__s"), AST.StringLiteral(loc, pattern), AST.IntegerLiteral(loc, idx + 1)))
+          nullableDecls += AST.LocalVariableDeclaration(loc, AST.M_FINAL, declName, nullableStringType, captured)
+          val declRef = AST.Id(loc, declName)
+          val convertedNonNull = cliKindOf(innerTypeRef) match {
+            case Some(kind) => convertCapturedValue(loc, kind, declRef)
+            case None       => declRef // unsupported inner type; typing reports the error
+          }
+          AST.IfExpression(
+            loc, AST.NotEqual(loc, declRef, AST.NullLiteral(loc)),
+            AST.BlockExpression(loc, List(convertedNonNull)),
+            AST.BlockExpression(loc, List(AST.NullLiteral(loc)))
+          )
+        case _ =>
+          val raw = AST.Id(loc, gName)
+          cliKindOf(arg.typeRef) match {
+            case Some(kind) => convertCapturedValue(loc, kind, raw)
+            case None       => raw // unsupported component type; typing reports the error
+          }
       }
     }
     // Build to Name? so the select unifies cleanly with the `else: null` branch
     // (avoids a spurious "null assigned where non-nullable" warning at synthesis).
     val buildExpr = AST.Cast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)
+    val matchedCaseBody = AST.BlockExpression(loc, nullableDecls.toList :+ buildExpr)
     val selectExpr = AST.SelectExpression(
       loc,
       AST.Id(loc, "__s"),
-      List((List(regexPattern), AST.BlockExpression(loc, List(buildExpr)))),
+      List((List(regexPattern), matchedCaseBody)),
       AST.BlockExpression(loc, List(AST.NullLiteral(loc)))
     )
     val tryBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, selectExpr)))

@@ -229,16 +229,12 @@ def run(): void {
   val wallStart = Timing::millis()
 
   // Run all fetches in parallel via mapAll
-  val worker: Function1[Object, Object] = (res: Object) -> fetchResource(res as Resource, hits, misses, bytesAcc)
-  val rawResults = pool.mapAll(resources, worker)
+  val worker: Function1[Resource, FetchResult] = (res: Resource) -> fetchResource(res, hits, misses, bytesAcc)
+  val results: List[FetchResult] = pool.mapAll(resources, worker)
 
   val wallMs = Timing::elapsedMillis(wallStart)
   pool.awaitClose(5000L)
   pool.close()
-
-  // Collect typed results
-  val results: List[FetchResult] = []
-  foreach r: Object in rawResults { results.add(r as FetchResult) }
 
   // Print all report sections
   printSummary(results, hits, misses, bytesAcc, wallMs)

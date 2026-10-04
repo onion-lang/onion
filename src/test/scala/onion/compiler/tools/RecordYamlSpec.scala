@@ -87,6 +87,27 @@ class RecordYamlSpec extends AbstractShellSpec {
       assert(Shell.Success("null") == result)
     }
 
+    it("fromYaml returns null when a String key is missing") {
+      // The numeric case above fails via an unboxing NPE that fromMap's try/catch already
+      // catches. A missing String key has no such NPE -- Json::getString (shared by the
+      // Yaml path too) just returns Java null -- so fromMap must check for it explicitly.
+      val result = shell.run(
+        """
+          |record Pt(name: String, x: Int) derive!(Yaml)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val p = Pt::fromYaml("x: 1")
+          |    if p == null { return "null" } else { return "got" }
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("null") == result)
+    }
+
     it("keeps number-looking and bool-looking strings as String (quote round-trip)") {
       val result = shell.run(
         """
@@ -198,6 +219,24 @@ class RecordYamlSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success("1") == result)
+    }
+
+    it("fromYamlList skips an element missing a String key, not just a numeric one") {
+      val result = shell.run(
+        """
+          |record Item(name: String, qty: Int) derive!(Yaml)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val items = Item::fromYamlList("- name: apple\n  qty: 3\n- qty: 5\n- name: plum\n  qty: 2\n")
+          |    return "" + items.size
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("2") == result)
     }
 
     it("fromYamlList returns an empty List on malformed YAML or a non-sequence top level") {

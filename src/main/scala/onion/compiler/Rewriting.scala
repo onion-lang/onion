@@ -1137,12 +1137,32 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     )
 
     // --- fromMap(m: Object): Name? ---  (shared Map intermediate -> record)
+    // A missing/wrong-typed key's getter returns null either way, but only a reference-
+    // typed component (String -- the one scalar tag that isn't a boxed primitive) lets
+    // that null reach the constructor uncaught: every other tag auto-unboxes into a
+    // primitive parameter, so a missing numeric/boolean key already fails via the
+    // unboxing NPE the catch below catches. A String component needs its own explicit
+    // null check first, or a record's non-nullable `String` field silently ends up
+    // holding Java null instead of fromMap reporting "doesn't convert" (null).
+    val stringType = AST.TypeNode(loc, AST.ReferenceType("String", false), false)
+    var nextTmp = 0
+    val getterStmts = scala.collection.mutable.ListBuffer[AST.BlockElement]()
     val ctorArgs: List[AST.Expression] = declaration.args.map { arg =>
-      val getter = cliKindOf(arg.typeRef).map(jsonGetterOf).getOrElse("getString")
-      AST.StaticMethodCall(loc, jsonType, getter, List(AST.Id(loc, "__m"), AST.StringLiteral(loc, arg.name)))
+      val tag = cliKindOf(arg.typeRef)
+      val getter = tag.map(jsonGetterOf).getOrElse("getString")
+      val getCall = AST.StaticMethodCall(loc, jsonType, getter, List(AST.Id(loc, "__m"), AST.StringLiteral(loc, arg.name)))
+      if (tag.contains("String")) {
+        val tmp = s"__f${nextTmp}"; nextTmp += 1
+        getterStmts += AST.LocalVariableDeclaration(loc, AST.M_FINAL, tmp, stringType, getCall)
+        getterStmts += AST.IfExpression(loc, AST.Equal(loc, AST.Id(loc, tmp), AST.NullLiteral(loc)),
+          AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc)))), null)
+        AST.Id(loc, tmp)
+      } else {
+        getCall
+      }
     }
     val buildExpr = AST.Cast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)
-    val tryBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, buildExpr)))
+    val tryBody = AST.BlockExpression(loc, getterStmts.toList :+ AST.ReturnExpression(loc, buildExpr))
     val catchArg = AST.Argument(loc, "__e", AST.TypeNode(loc, AST.ReferenceType("Exception", false), false))
     val catchBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc))))
     val fromMapTry = AST.TryExpression(loc, Nil, tryBody, List((catchArg, catchBody)), null)

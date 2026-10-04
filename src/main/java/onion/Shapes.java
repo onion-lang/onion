@@ -38,6 +38,24 @@ public final class Shapes {
     }
 
     /**
+     * A read-only shape, for a pattern with no unique rendering: same as the five-argument
+     * {@link #regex(String, List, List, Function1, Function1)} with a {@code null} printer,
+     * without a caller needing to write that {@code null} itself. The {@code shape ... =
+     * re"..."} declaration uses this overload for a non-invertible pattern, so that the
+     * compile-time-non-nullable {@code printer} parameter never has to see a literal
+     * {@code null} written in Onion source, which would otherwise trip the W0012
+     * null-to-non-nullable warning onto the shape clause for code the user never wrote.
+     */
+    public static <T> Shape<T> regex(
+        String pattern,
+        List<String> names,
+        List<String> tags,
+        Function1<List<Object>, T> build
+    ) {
+        return regex(pattern, names, tags, build, null);
+    }
+
+    /**
      * A shape over a JSON document: one key per component, looked up by name.
      *
      * @param names   component names, used both as document keys and as defect paths

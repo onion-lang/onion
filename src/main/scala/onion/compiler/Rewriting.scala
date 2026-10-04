@@ -837,8 +837,14 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val tags = kinds.map(_.get)
     val buildLambda = shapeBuildLambda(loc, declaration, recordType, tags)
 
-    // printer: { __v => "" + lit + __v.c0() + lit + ... }, only when invertible.
-    val printerExpr: AST.Expression = formatSegments(pattern) match {
+    // printer: { __v => "" + lit + __v.c0() + lit + ... }, only when invertible. A
+    // non-invertible pattern omits the argument rather than passing a literal `null`:
+    // `Shapes.regex`'s own doc sanctions `null` there for "no unique rendering", but a
+    // `null` written into the synthesized call is ours, not the user's, and it would trip
+    // the W0012 null-to-non-nullable warning onto the user's `shape` clause for code they
+    // never wrote. The four-argument `Shapes.regex` overload supplies that `null` from
+    // Java instead, where it is unremarkable.
+    val printerExpr: Option[AST.Expression] = formatSegments(pattern) match {
       case Some(segs) if segs.count(_.isEmpty) == declaration.args.length =>
         var slot = 0
         val parts: List[AST.Expression] = segs.map {
@@ -849,10 +855,10 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         }
         val chain = (AST.StringLiteral(loc, "") :: parts).reduceLeft((a, b) => AST.Addition(loc, a, b))
         val body = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, chain)))
-        AST.ClosureExpression(loc,
+        Some(AST.ClosureExpression(loc,
           AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true), "call",
-          List(AST.Argument(loc, "__v", recordType)), null, body)
-      case _ => AST.NullLiteral(loc)
+          List(AST.Argument(loc, "__v", recordType)), null, body))
+      case _ => None
     }
 
     val call = AST.StaticMethodCall(loc,
@@ -861,9 +867,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         AST.StringLiteral(loc, pattern),
         shapeStringList(loc, declaration.args.map(_.name)),
         shapeStringList(loc, tags),
-        buildLambda,
-        printerExpr
-      ))
+        buildLambda
+      ) ++ printerExpr)
     Some(AST.MethodDeclaration(loc, AST.M_PUBLIC | AST.M_STATIC, clause.name, Nil, shapeType,
       AST.BlockExpression(loc, List(AST.ReturnExpression(loc, call)))))
   }

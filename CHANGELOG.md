@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `shape name = re"..."` declaration on a non-invertible pattern (one with no unique rendering, e.g. `re"(-?\d+)\s+(-?\d+)"`) spuriously warned `[W0012] null assigned where non-nullable 'onion.Function1[R, String]' is expected` on the `shape` clause itself**, even though the user wrote no `null` anywhere -- the synthesized `Shapes::regex(...)` call passed a literal `null` for the read-only shape's printer, the same `null` the `printer` parameter's own doc already sanctions, and that generic-argument `null` tripped the same W0012 check user code gets for a genuine null-safety risk. A new four-argument `Shapes.regex` overload (no `printer`) lets the synthesized call omit the argument entirely, so no `null` ever reaches Onion's type checker for this case.
+
 ## [0.138.0] - 2026-10-04
 
 ### Added

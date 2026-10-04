@@ -78,6 +78,28 @@ class ToolCapabilitySpec extends AbstractShellSpec {
       assert(out.contains(":4:"), out)
     }
 
+    it("points the caret at the call, not its last argument (issue #1980)") {
+      val (r, out) = runCapturing(
+        """tool save(dst: String): Int
+          |  requires { console }
+          |{
+          |  Files::writeText(dst, "hello")
+          |  return 0
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int { return 0 }
+          |}
+          |""".stripMargin)
+      assert(r.isInstanceOf[Shell.Failure], s"expected failure, got $r")
+      assert(out.contains("E0077"), out)
+      // `writeText` (the callee) starts at column 10; the last argument, "hello",
+      // starts at column 25. The caret belongs under the call, not under an
+      // arbitrary argument.
+      assert(out.contains(":4:10:"), out)
+      assert(!out.contains(":4:25:"), out)
+    }
+
     it("catches an effect hidden behind an ordinary function") {
       val (r, out) = runCapturing(
         """def leak(): void { IO::println("boo") }

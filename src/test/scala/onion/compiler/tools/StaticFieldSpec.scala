@@ -100,6 +100,27 @@ class StaticFieldSpec extends AbstractShellSpec {
       )
       assert(result == Shell.Failure(-1))
     }
+    it("calls a zero-arg static method via :: with parentheses omitted") {
+      val result = shell.run(
+        """
+          |class Box {
+          |public:
+          |  static def value: Int = 42
+          |  def this {}
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    return Box::value
+          |  }
+          |}
+          |""".stripMargin,
+        "StaticZeroArgMethodNoParens.on",
+        Array()
+      )
+      assert(Shell.Success(42) == result)
+    }
+
     it("rejects calling a private method from outside at compile time") {
       val result = shell.run(
         """

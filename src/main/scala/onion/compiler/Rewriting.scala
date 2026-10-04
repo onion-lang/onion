@@ -802,6 +802,19 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NewObject(loc, recordType, ctorArgs)))))
   }
 
+  /**
+   * The scalar tag for a regex shape component: the plain tag, or tag+"?" for a
+   * nullable scalar (`String?`, `Int?`, ...). `partTypeNodeFor` already understands the
+   * "?" suffix (it strips it to find the boxed part type), and `RegexShape.parse` reads
+   * it to give a real `null` for an unmatched optional group (#1969).
+   */
+  private def scalarShapeTag(typeRef: AST.TypeNode): Option[String] = typeRef.desc match {
+    case AST.NullableType(inner) =>
+      ScalarConversions.ofAst(AST.TypeNode(typeRef.location, inner, typeRef.isRelaxed)).map(_.tag + "?")
+    case _ =>
+      ScalarConversions.ofAst(typeRef).map(_.tag)
+  }
+
   private def synthesizeRegexShape(declaration: AST.RecordDeclaration, clause: AST.ShapeClause, pattern: String): Option[AST.MethodDeclaration] = {
     val loc = clause.location
     val recordName = declaration.name
@@ -809,9 +822,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
       AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(recordName, false))), false)
 
-    // Every component must be a known scalar; typing reports the ones that are not, the
-    // same way it does for `from` (E0061).
-    val kinds = declaration.args.map(a => ScalarConversions.ofAst(a.typeRef).map(_.tag))
+    // Every component must be a known scalar, or `T?` of one; typing reports the ones
+    // that are not, the same way it does for `from` (E0061). A nullable tag carries a
+    // trailing "?", read by RegexShape.parse as "give null for an unmatched group"
+    // instead of converting the non-null "" sentinel (#1969, mirroring #1967's `from`).
+    val kinds = declaration.args.map(a => scalarShapeTag(a.typeRef))
     if (kinds.exists(_.isEmpty)) return None
     val tags = kinds.map(_.get)
     val buildLambda = shapeBuildLambda(loc, declaration, recordType, tags)

@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`derive!(Json)` records now get `R::fromJsonList(s: String): List[R]`**, reading a top-level JSON array into a `List[R]` and skipping (rather than failing on) any element that isn't a JSON object or doesn't convert — the same "skip what doesn't fit" contract `from re"..."`'s `parseAll` already has. Malformed JSON or a non-array top level yields an empty list, never `null`. `Yaml::parse` only supports a flat block mapping (no sequences), so there is no `fromYamlList` counterpart yet (#1975).
+- **`derive!(Json)` records now get `R::fromJsonList(s: String): List[R]`**, reading a top-level JSON array into a `List[R]` and skipping (rather than failing on) any element that isn't a JSON object or doesn't convert — the same "skip what doesn't fit" contract `from re"..."`'s `parseAll` already has. Malformed JSON or a non-array top level yields an empty list, never `null` (#1975).
+- **`Yaml::parse`/`Yaml::stringify` now also handle a top-level YAML block sequence of flat mappings** (`- key: value` items), not just a single flat mapping; `Yaml::parseOrNull(text)` joins `Json::parseOrNull` as the non-throwing variant. `derive!(Yaml)` records get the `fromYamlList` counterpart to `fromJsonList` this unlocks: `R::fromYamlList(s: String): List[R]` reads a top-level YAML sequence with the same "skip what doesn't fit" contract (#1978).
 
 ### Fixed
 

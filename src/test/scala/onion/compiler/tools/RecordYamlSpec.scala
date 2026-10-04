@@ -160,5 +160,63 @@ class RecordYamlSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("ok") == result)
     }
+
+    it("fromYamlList parses a YAML sequence of flat mappings into a List[R]") {
+      val result = shell.run(
+        """
+          |record Pt(x: Int, y: Int) derive!(Yaml)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val pts = Pt::fromYamlList("- x: 1\n  y: 2\n- x: 3\n  y: 4\n")
+          |    if pts.size != 2 { return "size=" + pts.size }
+          |    val p0: Pt = pts[0]
+          |    val p1: Pt = pts[1]
+          |    return "" + (p0.x() + p0.y() + p1.x() + p1.y())
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("10") == result)
+    }
+
+    it("fromYamlList skips elements that don't fit, rather than failing the whole sequence") {
+      val result = shell.run(
+        """
+          |record Pt(x: Int, y: Int) derive!(Yaml)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val pts = Pt::fromYamlList("- x: 1\n  y: 2\n- x: 1\n- name: not a point\n")
+          |    return "" + pts.size
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("1") == result)
+    }
+
+    it("fromYamlList returns an empty List on malformed YAML or a non-sequence top level") {
+      val result = shell.run(
+        """
+          |record Pt(x: Int, y: Int) derive!(Yaml)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val a = Pt::fromYamlList("x: 1\ny: 2\n")
+          |    val b = Pt::fromYamlList("no colon here")
+          |    return "" + a.size + "," + b.size
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("0,0") == result)
+    }
   }
 }

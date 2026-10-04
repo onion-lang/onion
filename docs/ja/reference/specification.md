@@ -336,6 +336,13 @@ record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json, Yaml)
 | `Json` | `R::fromJson(s: String): R?` | `R::toJson(v: R): String` |
 | `Yaml` | `R::fromYaml(s: String): R?` | `R::toYaml(v: R): String` |
 
+`Json` はさらに `R::fromJsonList(s: String): List[R]` を合成します。トップレベルの JSON 配列を
+読み、各要素を `fromJson` と同じ規則で変換します — JSON オブジェクトでない要素や変換に失敗した
+要素は失敗ではなく読み飛ばします。これは `from re"..."` の `parseAll` が持つ「合わないものは
+読み飛ばす」という契約と同じです。JSON が壊れている場合やトップレベルが配列でない場合は
+`null` ではなく空の list を返します。`Yaml::parse` はフラットなブロックマッピングしか読めない
+ため（シーケンス未対応）、`fromYamlList` は現時点ではありません。
+
 4つの形式はすべて、単一の内部 `toMap` / `fromMap` コアを共有します。`toJson` と `toYaml` は
 両方とも `toMap` を呼び出し、結果の `Map` を `Json::stringify` または `Yaml::stringify` に
 渡します。`fromJson` と `fromYaml` はテキストを中間 `Map` にパースし（`Json::parse` または

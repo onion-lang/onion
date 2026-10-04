@@ -1607,6 +1607,10 @@ m.put("x", 1)
 Json::stringify(m)                     // {"x":1}
 val a = Json::array()                  // empty List, for JSON array values
 
+// A non-finite Double/Float (NaN, +/-Infinity) stringifies as the JSON literal `null` --
+// JSON has no token for one, and Json::parse can never produce one either
+Json::stringify(0.0d / 0.0d)           // "null"
+
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
 v["users"][0]["name"].asString()

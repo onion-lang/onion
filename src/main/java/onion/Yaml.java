@@ -1,16 +1,20 @@
 package onion;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Lightweight YAML serializer and parser for Onion programs.
  * No external dependencies - completely self-contained.
  *
- * Scope: flat block mapping only (no nested maps, no sequences, no anchors).
+ * Scope: a flat block mapping, or a top-level block sequence of flat mappings
+ * (no nested maps/sequences within an element, no anchors).
  *
  * YAML values share the same intermediate representation as Json:
  * - YAML mapping:  LinkedHashMap&lt;String, Object&gt;
+ * - YAML sequence: ArrayList&lt;Object&gt; (top-level only, elements are mappings)
  * - scalar string: String
  * - scalar integer: Long
  * - scalar float:  Double
@@ -48,14 +52,15 @@ public final class Yaml {
     // ========== Core API ==========
 
     /**
-     * Convert a Java object (Map or scalar) to YAML flat block mapping text.
-     * Each map entry is rendered as {@code key: value\n}. Keys go through the same
-     * quoting rule as string values ({@link #needsQuoting}), so a key containing
-     * {@code :}, {@code #}, whitespace at either end, or a newline round-trips
-     * through {@link #parse} instead of colliding with the {@code key: value}
-     * separator.
+     * Convert a Java object (List, Map, or scalar) to YAML text. A {@code Map} renders
+     * as a flat block mapping, {@code key: value\n} per entry; a {@code List} renders as
+     * a top-level block sequence, {@code - key: value\n} per element (a non-Map element
+     * renders as a bare {@code - scalar}). Keys go through the same quoting rule as
+     * string values ({@link #needsQuoting}), so a key containing {@code :}, {@code #},
+     * whitespace at either end, or a newline round-trips through {@link #parse} instead
+     * of colliding with the {@code key: value} separator.
      *
-     * @param obj Object to serialize. Must be a Map&lt;?,?&gt; or a scalar
+     * @param obj Object to serialize. Must be a List&lt;?&gt;, a Map&lt;?,?&gt;, or a scalar
      *            (String/Long/Double/Float/Integer/Short/Byte/Boolean/null).
      * @return YAML text
      */
@@ -63,14 +68,17 @@ public final class Yaml {
         if (obj == null) {
             return "null\n";
         }
+        if (obj instanceof List<?> list) {
+            StringBuilder sb = new StringBuilder();
+            for (Object item : list) {
+                sb.append(renderSequenceItem(item));
+            }
+            return sb.toString();
+        }
         if (obj instanceof Map<?, ?> map) {
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<?, ?> entry : map.entrySet()) {
-                String key = renderString(entry.getKey().toString());
-                sb.append(key);
-                sb.append(": ");
-                sb.append(renderScalar(entry.getValue()));
-                sb.append('\n');
+                sb.append(renderMappingLine(entry.getKey(), entry.getValue()));
             }
             return sb.toString();
         }
@@ -78,11 +86,38 @@ public final class Yaml {
         return renderScalar(obj) + "\n";
     }
 
+    /** Render one `key: value\n` line, shared by the top-level mapping and sequence-item cases. */
+    private static String renderMappingLine(Object key, Object value) {
+        return renderString(key.toString()) + ": " + renderScalar(value) + "\n";
+    }
+
     /**
-     * Parse a YAML flat block mapping string into a LinkedHashMap.
+     * Render one sequence element: a flat `Map` becomes a `- key: value` block (first
+     * entry carries the `- `, later entries are indented two spaces to align under it);
+     * any other value is rendered as a bare `- scalar` item.
+     */
+    private static String renderSequenceItem(Object item) {
+        if (item instanceof Map<?, ?> map) {
+            if (map.isEmpty()) {
+                return "- {}\n";
+            }
+            StringBuilder sb = new StringBuilder();
+            boolean first = true;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                sb.append(first ? "- " : "  ").append(renderMappingLine(entry.getKey(), entry.getValue()));
+                first = false;
+            }
+            return sb.toString();
+        }
+        return "- " + renderScalar(item) + "\n";
+    }
+
+    /**
+     * Parse a YAML flat block mapping, or a top-level block sequence of flat mappings,
+     * into a LinkedHashMap or an ArrayList respectively.
      *
-     * @param text YAML text (key: value lines)
-     * @return Parsed LinkedHashMap&lt;String,Object&gt;
+     * @param text YAML text (`key: value` lines, or `- key: value` sequence items)
+     * @return Parsed LinkedHashMap&lt;String,Object&gt;, or ArrayList&lt;Object&gt; for a sequence
      * @throws YamlParseException if any line cannot be parsed
      */
     public static Object parse(String text) throws YamlParseException {
@@ -90,36 +125,94 @@ public final class Yaml {
             return new LinkedHashMap<String, Object>();
         }
 
-        LinkedHashMap<String, Object> result = new LinkedHashMap<>();
         String[] rawLines = text.split("\r\n|\r|\n", -1);
+        for (String rawLine : rawLines) {
+            if (!rawLine.trim().isEmpty()) {
+                return isSequenceItem(rawLine.trim()) ? parseSequence(rawLines) : parseMapping(rawLines);
+            }
+        }
+        return new LinkedHashMap<String, Object>();
+    }
+
+    /**
+     * Parse a YAML string, returning null on error instead of throwing.
+     * @param text YAML text to parse
+     * @return Parsed object, or null if parsing fails
+     */
+    public static Object parseOrNull(String text) {
+        try {
+            return parse(text);
+        } catch (YamlParseException e) {
+            return null;
+        }
+    }
+
+    private static boolean isSequenceItem(String trimmedLine) {
+        return trimmedLine.equals("-") || trimmedLine.startsWith("- ");
+    }
+
+    private static LinkedHashMap<String, Object> parseMapping(String[] rawLines) throws YamlParseException {
+        LinkedHashMap<String, Object> result = new LinkedHashMap<>();
         int lineNumber = 0;
         for (String rawLine : rawLines) {
             lineNumber++;
-            // Skip blank / all-whitespace lines
             if (rawLine.trim().isEmpty()) {
                 continue;
             }
+            parseKeyValueLine(rawLine.trim(), lineNumber, result);
+        }
+        return result;
+    }
 
-            // Find the first ": " separator outside of any quoted region,
-            // or a trailing ":" (value is empty → null).
-            int sep = findKeySeparator(rawLine);
-            if (sep < 0) {
-                throw new YamlParseException("Expected 'key: value' but found no colon: " + rawLine, lineNumber);
+    /**
+     * Parse a top-level block sequence: each line starting with `-` (`isSequenceItem`)
+     * opens a new flat-mapping element, and every following non-`-` line adds another
+     * `key: value` entry to that same element until the next `-` line or end of input.
+     */
+    private static List<Object> parseSequence(String[] rawLines) throws YamlParseException {
+        List<Object> result = new ArrayList<>();
+        LinkedHashMap<String, Object> current = null;
+        int lineNumber = 0;
+        for (String rawLine : rawLines) {
+            lineNumber++;
+            String trimmed = rawLine.trim();
+            if (trimmed.isEmpty()) {
+                continue;
             }
+            if (isSequenceItem(trimmed)) {
+                current = new LinkedHashMap<>();
+                result.add(current);
+                String rest = trimmed.equals("-") ? "" : trimmed.substring(2).trim();
+                if (!rest.isEmpty()) {
+                    parseKeyValueLine(rest, lineNumber, current);
+                }
+            } else {
+                if (current == null) {
+                    throw new YamlParseException("Expected a sequence item ('- ...') but found: " + rawLine, lineNumber);
+                }
+                parseKeyValueLine(trimmed, lineNumber, current);
+            }
+        }
+        return result;
+    }
 
-            String rawKey = rawLine.substring(0, sep).trim();
-            String key = rawKey.startsWith("\"") ? unquote(rawKey, lineNumber) : rawKey;
-
-            // Value: everything after the separator (": " = 2 chars, or ":" alone at end = 1 char)
-            int valueStart = sep + (sep == rawLine.length() - 1 ? 1 : 2);
-            String rawValue = valueStart <= rawLine.length() ? rawLine.substring(valueStart) : "";
-            rawValue = rawValue.trim();
-
-            Object value = parseScalar(rawValue, lineNumber);
-            result.put(key, value);
+    /** Parse one already-trimmed `key: value` line and put it into `target`. */
+    private static void parseKeyValueLine(String trimmedLine, int lineNumber, LinkedHashMap<String, Object> target)
+            throws YamlParseException {
+        int sep = findKeySeparator(trimmedLine);
+        if (sep < 0) {
+            throw new YamlParseException("Expected 'key: value' but found no colon: " + trimmedLine, lineNumber);
         }
 
-        return result;
+        String rawKey = trimmedLine.substring(0, sep).trim();
+        String key = rawKey.startsWith("\"") ? unquote(rawKey, lineNumber) : rawKey;
+
+        // Value: everything after the separator (": " = 2 chars, or ":" alone at end = 1 char)
+        int valueStart = sep + (sep == trimmedLine.length() - 1 ? 1 : 2);
+        String rawValue = valueStart <= trimmedLine.length() ? trimmedLine.substring(valueStart) : "";
+        rawValue = rawValue.trim();
+
+        target.put(key, parseScalar(rawValue, lineNumber));
     }
 
     // ========== Internal helpers ==========

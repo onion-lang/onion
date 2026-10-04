@@ -144,6 +144,25 @@ class FormatShapeSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Success(true) == r)
     }
+
+    it("accepts a nullable (T?) scalar component, reading an absent key as null (#1969)") {
+      val r = shell.run(
+        """
+          |record Cfg(host: String, port: Int?) {
+          |  shape doc = yaml
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s = Cfg::doc()
+          |    val withPort = s.parse("host: example.com\nport: 8080").get()
+          |    val withoutPort = s.parse("host: example.com").get()
+          |    return withPort.port() + "|" + (withoutPort.port() == null)
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("8080|true") == r)
+    }
   }
 
   describe("several shapes, several formats, one record") {

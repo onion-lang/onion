@@ -112,18 +112,18 @@ public final class Concurrent {
          * Any failure is rethrown once every task has settled, so a single bad element
          * cannot leave workers running behind a caller that has already given up.
          */
-        public List mapAll(List items, Function1 function) {
+        public <T, R> List<R> mapAll(List<T> items, Function1<T, R> function) {
             if (items == null) throw new IllegalArgumentException("Concurrent: items must not be null");
             if (function == null) throw new IllegalArgumentException("Concurrent: function must not be null");
 
-            List<java.util.concurrent.CompletableFuture<Object>> pending = new ArrayList<>();
-            for (Object item : items) {
+            List<java.util.concurrent.CompletableFuture<R>> pending = new ArrayList<>();
+            for (T item : items) {
                 pending.add(java.util.concurrent.CompletableFuture.supplyAsync(
                     () -> function.call(item), executor));
             }
-            List<Object> results = new ArrayList<>(pending.size());
+            List<R> results = new ArrayList<>(pending.size());
             RuntimeException failure = null;
-            for (java.util.concurrent.CompletableFuture<Object> task : pending) {
+            for (java.util.concurrent.CompletableFuture<R> task : pending) {
                 try {
                     results.add(task.join());
                 } catch (RuntimeException e) {

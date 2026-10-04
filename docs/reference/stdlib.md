@@ -1662,12 +1662,13 @@ val tags = Json::asArray(Json::get(obj, "tags"))   // List, or null if "tags" wa
 
 ## Yaml Module
 
-YAML serialization and parsing for flat block-mapping documents
-(`onion.Yaml`). Shares the same intermediate representation as `Json` —
-scalars map to the same Java types — so `derive!(Yaml)` builds on exactly
-the same `toMap` / `fromMap` core as `derive!(Json)`.
+YAML serialization and parsing for flat block-mapping documents, and a top-level
+block sequence of them (`onion.Yaml`). Shares the same intermediate representation
+as `Json` — scalars map to the same Java types — so `derive!(Yaml)` builds on
+exactly the same `toMap` / `fromMap` core as `derive!(Json)`.
 
-Scope: flat block mapping only (no nested maps, no sequences, no anchors).
+Scope: a flat block mapping, or a top-level block sequence of flat mappings (no
+nested maps/sequences within an element, no anchors).
 
 ### Yaml::parse
 
@@ -1676,6 +1677,15 @@ Parse a YAML flat block-mapping string into a `LinkedHashMap`:
 ```onion
 val data = Yaml::parse("name: Alice\nage: 30\n")
 // data is a LinkedHashMap; scalars follow the same type inference as Json::parse
+```
+
+A top-level block sequence (`- key: value` items) parses into an `ArrayList` of
+`LinkedHashMap`s instead — which format a text is detected from its first
+non-blank line, a `-` item marker or a `key:` pair:
+
+```onion
+val rows = Yaml::parse("- name: Alice\n  age: 30\n- name: Bob\n  age: 25\n")
+// rows is an ArrayList of two LinkedHashMaps
 ```
 
 Scalar type inference rules (identical to `Json`):
@@ -1688,6 +1698,11 @@ Scalar type inference rules (identical to `Json`):
 
 Throws `Yaml.YamlParseException` on malformed input; `derive!(Yaml)`'s
 `fromYaml` catches this and returns `null` instead.
+
+`Yaml::parseOrNull(text)` behaves like `Yaml::parse(text)` but returns `null` on
+malformed input instead of throwing `Yaml.YamlParseException` — the same
+"absent" convenience `Json::parseOrNull` gives JSON, and what `fromYamlList`
+(below) uses internally.
 
 When you do want to handle a malformed-input failure, `Yaml.YamlParseException` carries
 `getLine()` — the 1-based line number where parsing gave up — in addition to the usual
@@ -1711,6 +1726,16 @@ val yaml = Yaml::stringify(m)
 // "name: Alice\nage: 30\n"
 ```
 
+A top-level `List` of `Map`s serializes to a block sequence instead, mirroring
+`Yaml::parse`'s own format detection:
+
+```onion
+val rows: List[Object] = Json::array()
+rows.add(m)
+Yaml::stringify(rows)
+// "- name: Alice\n  age: 30\n"
+```
+
 String values that would be misread on parse-back (those containing `:`,
 `#`, newlines, or that look like numbers or booleans) are automatically
 double-quoted. Numbers and booleans are rendered verbatim. Map **keys** are
@@ -1721,15 +1746,19 @@ separator on parse-back.
 ### Round-trip guarantee
 
 For any `Map` produced by `Yaml::parse`, `Yaml::parse(Yaml::stringify(m))`
-returns an equal map. Equivalently, for any record annotated with
-`derive!(Yaml)`, `fromYaml(toYaml(v)) == v` holds for all scalar-component
-values.
+returns an equal map (and likewise for a top-level sequence `List`).
+Equivalently, for any record annotated with `derive!(Yaml)`,
+`fromYaml(toYaml(v)) == v` holds for all scalar-component values.
 
 ### Usage with `derive!(Yaml)`
 
 `derive!(Yaml)` synthesizes `fromYaml` and `toYaml` on any scalar-component
-record; see [Records — derive!](specification.md#derive-record-serde-derivation)
-for the full contract.
+record, plus `fromYamlList(s: String): List[R]` reading a top-level YAML
+sequence the same way `derive!(Json)`'s `fromJsonList` reads a JSON array —
+skipping (not failing on) any element that isn't a mapping or doesn't convert,
+with malformed input or a non-sequence top level yielding an empty list; see
+[Records — derive!](specification.md#derive-record-serde-derivation) for the
+full contract.
 
 ```onion
 record ServerConfig(host: String, port: Int, debug: Boolean) derive!(Yaml)

@@ -332,7 +332,16 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
               // The runtime reads what Rewriting classified from the written type; accept
               // the component only when that agrees with the resolved type.
               val jsonReadable = resolved.isDefined && resolved == JsonShapeComponents.tagOfAst(arg.typeRef)
-              node.shapes.find(sc => !(jsonReadable && isJsonClause(sc))).map(sc => (arg, argType, sc))
+              // A nullable scalar (`T?`) is also readable by a regex shape clause: an
+              // unmatched optional capture group becomes a real `null`, the same as
+              // `from re"..."` (#1967, #1969).
+              val regexReadable = isFromReDerivableType(argType)
+              // ...and by a yaml shape clause: a missing key already reads as `null` for a
+              // nullable component (`MappedShape.readComponent`, shared with json). `config`
+              // keeps the non-nullable check -- its runtime doesn't give an absent key a
+              // real `null` yet (#1969).
+              val yamlReadable = isFromReDerivableType(argType)
+              node.shapes.find(sc => !((jsonReadable && isJsonClause(sc)) || (regexReadable && isRegexClause(sc)) || (yamlReadable && isYamlClause(sc)))).map(sc => (arg, argType, sc))
             }
           } else Nil
         // Name the clause the user wrote, not `from`: a `shape doc = json` record has no `from`.
@@ -394,6 +403,14 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     case AST.FormatSource(format) => JsonShapeComponents.isJsonFormat(format)
     case AST.RegexSource(_)       => false
 
+  private def isRegexClause(sc: AST.ShapeClause): Boolean = sc.source match
+    case AST.RegexSource(_)  => true
+    case AST.FormatSource(_) => false
+
+  private def isYamlClause(sc: AST.ShapeClause): Boolean = sc.source match
+    case AST.FormatSource(format) => format.equalsIgnoreCase("yaml")
+    case AST.RegexSource(_)       => false
+
   /**
    * Whether a class is a record a json shape can nest: one that declares a json shape of
    * its own (and so gets the hidden `onion$$jsonShape()`), without type parameters. A
@@ -414,10 +431,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   private def isFromDerivableType(tp: Type): Boolean = ScalarConversions.isDerivable(tp)
 
   /**
-   * Same as `isFromDerivableType`, but also accepts `T?` of a supported scalar: an
-   * unmatched optional capture group becomes `null` instead of the non-null `""`
-   * sentinel. Only `from re"..."` accepts this; `shape ... = re"..."` and `derive!`
-   * keep the non-nullable check above (#1967).
+   * Same as `isFromDerivableType`, but also accepts `T?` of a supported scalar. `from
+   * re"..."` and a regex `shape` clause read it from an unmatched optional capture group
+   * (#1967, #1969); a yaml `shape` clause reads it from an absent document key, the same
+   * as json's (#1969). `derive!` and a `config` shape clause keep the non-nullable check
+   * above -- their runtimes don't yet give a nullable component real null.
    */
   private def isFromReDerivableType(tp: Type): Boolean = ScalarConversions.isDerivableOrNullable(tp)
 

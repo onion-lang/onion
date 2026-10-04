@@ -88,6 +88,28 @@ class ConcurrentSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("reported") == result)
     }
+
+    it("infers a numeric lambda parameter's type from the list, like Colls.map does") {
+      // mapAll's own class doc shows `pool.mapAll(urls) { url -> Http::get(url) }` with no
+      // param annotation; that compiles today only because `+` tolerates Object. A numeric
+      // operator does not, so an untyped lambda param must infer as the list's element type.
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val pool = Concurrent::pool(2)
+          |    val out: List[Int] = pool.mapAll([1, 2, 3], (x) -> x * x)
+          |    pool.close()
+          |    return "" + out[0] + "," + out[1] + "," + out[2]
+          |  }
+          |}
+          |""".stripMargin,
+        "ConcurrentMapAllInference.on",
+        Array()
+      )
+      assert(Shell.Success("1,4,9") == result)
+    }
   }
 
   describe("Concurrent.Counter") {

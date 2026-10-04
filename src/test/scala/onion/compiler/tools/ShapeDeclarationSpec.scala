@@ -184,6 +184,79 @@ class ShapeDeclarationSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a nullable (T?) component (#1969)") {
+    it("accepts a nullable String component and gives null for an unmatched optional group") {
+      val r = shell.run(
+        """
+          |record C(kind: String, scope: String?, subject: String) {
+          |  shape line = re"(\w+)(?:\(([^)]*)\))?: (.*)"
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s = C::line()
+          |    val noScope = s.parse("fix: no scope here").get()
+          |    val withScope = s.parse("fix(api): change api").get()
+          |    val emptyScope = s.parse("fix(): empty but present").get()
+          |    return (noScope.scope() == null) + "|" + withScope.scope() + "|" + (emptyScope.scope() == "")
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("true|api|true") == r)
+    }
+
+    it("accepts a nullable Int? component and gives null for an unmatched optional group") {
+      val r = shell.run(
+        """
+          |record Entry(name: String, retries: Int?) {
+          |  shape line = re"(\w+)(?: retries=(\d+))?"
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s = Entry::line()
+          |    val withRetries = s.parse("task retries=3").get()
+          |    val withoutRetries = s.parse("task").get()
+          |    return withRetries.retries() + "|" + (withoutRetries.retries() == null)
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("3|true") == r)
+    }
+
+    it("still gives \"\" (not null) for a non-nullable String component's unmatched optional group") {
+      val r = shell.run(
+        """
+          |record C(kind: String, scope: String, subject: String) {
+          |  shape line = re"(\w+)(?:\(([^)]*)\))?: (.*)"
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val c = C::line().parse("fix: no scope here").get()
+          |    return "[" + c.scope() + "]"
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("[]") == r)
+    }
+
+    it("still rejects a nullable component whose inner type is unsupported (E0061)") {
+      val r = shell.run(
+        """
+          |record Inner(x: Int);
+          |record R(a: String, b: Inner?) {
+          |  shape line = re"(\S+) (\S+)"
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "x" }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(r.isInstanceOf[Shell.Failure])
+    }
+  }
+
   describe("`shape` stays an ordinary identifier") {
     it("does not become a reserved word") {
       val r = shell.run(

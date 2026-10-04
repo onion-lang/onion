@@ -1231,12 +1231,13 @@ val tags = Json::asArray(Json::get(obj, "tags"))   // List。"tags" が配列で
 
 ## Yaml モジュール
 
-flat block mapping ドキュメント限定の YAML パースとシリアライズ（`onion.Yaml`）。
-Json と同じ中間表現を共有しており（scalar は同じ Java 型にマップされる）、
-`derive!(Yaml)` は `derive!(Json)` とまったく同じ `toMap` / `fromMap` の土台の上に
-構築されています。
+flat block mapping ドキュメント、およびそれらのトップレベル block シーケンスに
+対応した YAML パースとシリアライズ（`onion.Yaml`）。Json と同じ中間表現を
+共有しており（scalar は同じ Java 型にマップされる）、`derive!(Yaml)` は
+`derive!(Json)` とまったく同じ `toMap` / `fromMap` の土台の上に構築されています。
 
-対象範囲: flat block mapping のみ（ネストした map、シーケンス、アンカーは非対応）。
+対象範囲: flat block mapping、またはそれらのトップレベル block シーケンス
+（要素内のネストした map/シーケンスやアンカーは非対応）。
 
 ### Yaml::parse
 
@@ -1245,6 +1246,15 @@ YAML の flat block-mapping 文字列を `LinkedHashMap` にパースします:
 ```onion
 val data = Yaml::parse("name: Alice\nage: 30\n")
 // data は LinkedHashMap；scalar の型推論は Json::parse と同じ
+```
+
+トップレベルの block シーケンス（`- key: value` 要素）は代わりに `LinkedHashMap`
+の `ArrayList` にパースされます — どちらの形式かはテキストの最初の空白以外の行
+（`-` の要素マーカーか `key:` のペアか）で判定されます:
+
+```onion
+val rows = Yaml::parse("- name: Alice\n  age: 30\n- name: Bob\n  age: 25\n")
+// rows は 2 つの LinkedHashMap を持つ ArrayList
 ```
 
 scalar の型推論規則（Json と同一）:
@@ -1257,6 +1267,11 @@ scalar の型推論規則（Json と同一）:
 
 不正な入力に対しては `Yaml.YamlParseException` を投げます。`derive!(Yaml)` の
 `fromYaml` はこれを捕捉して代わりに `null` を返します。
+
+`Yaml::parseOrNull(text)` は `Yaml::parse(text)` と同様に動作しますが、不正な
+入力に対して `Yaml.YamlParseException` を投げる代わりに `null` を返します —
+`Json::parseOrNull` が JSON に対して提供する同じ「absent」用の便宜であり、
+（後述の）`fromYamlList` が内部で使っているものです。
 
 不正入力の失敗をその場で処理したい場合、`Yaml.YamlParseException` は通常の `message()` に加えて
 `getLine()`（パースを諦めた行番号、1始まり）を持っています:
@@ -1279,6 +1294,16 @@ val yaml = Yaml::stringify(m)
 // "name: Alice\nage: 30\n"
 ```
 
+トップレベルが `Map` の `List` の場合は、`Yaml::parse` と同じ形式判定に対応する
+block シーケンスとしてシリアライズされます:
+
+```onion
+val rows: List[Object] = Json::array()
+rows.add(m)
+Yaml::stringify(rows)
+// "- name: Alice\n  age: 30\n"
+```
+
 パースし直したときに誤読される可能性のある文字列値（`:`、`#`、改行を含む、または
 数値・真偽値に見えるもの）は自動的にダブルクォートされます。数値と真偽値はそのまま
 出力されます。Map の**キー**も同じ規則でクォートされます — `:` や前後の空白を含む
@@ -1287,13 +1312,18 @@ val yaml = Yaml::stringify(m)
 ### round-trip の保証
 
 `Yaml::parse` が生成した任意の `Map` について、`Yaml::parse(Yaml::stringify(m))` は
-等しい map を返します。同様に、`derive!(Yaml)` を付けたレコードでは、scalar 成分の
-みを持つすべての値について `fromYaml(toYaml(v)) == v` が成り立ちます。
+等しい map を返します（トップレベルのシーケンス `List` でも同様）。同様に、
+`derive!(Yaml)` を付けたレコードでは、scalar 成分のみを持つすべての値について
+`fromYaml(toYaml(v)) == v` が成り立ちます。
 
 ### `derive!(Yaml)` の利用
 
 `derive!(Yaml)` は scalar 成分のみを持つ任意のレコードに対して `fromYaml` と
-`toYaml` を合成します。
+`toYaml` に加えて、`fromYamlList(s: String): List[R]` を合成します。これは
+`derive!(Json)` の `fromJsonList` が JSON 配列を読むのと同じ方法でトップレベルの
+YAML シーケンスを読みます — マッピングでない要素や変換に失敗した要素は読み飛ばし
+（失敗とはしません）、不正な入力やトップレベルがシーケンスでない場合は空の list
+を返します。
 
 ```onion
 record ServerConfig(host: String, port: Int, debug: Boolean) derive!(Yaml)

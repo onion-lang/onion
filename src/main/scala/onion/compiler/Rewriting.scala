@@ -652,8 +652,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // Format-agnostic core (toMap/fromMap) synthesized once when any data format is
     // requested, then thin per-format sugar layered on top.
     val dataMethods = if ((hasJson || hasYaml) && derivable) synthesizeDataMethods(declaration) else Nil
-    val jsonMethods = if (hasJson && derivable) synthesizeFormatMethods(declaration, "Json", "Json") :+ synthesizeJsonListMethod(declaration) else Nil
-    val yamlMethods = if (hasYaml && derivable) synthesizeFormatMethods(declaration, "Yaml", "Yaml") else Nil
+    val jsonMethods = if (hasJson && derivable) synthesizeFormatMethods(declaration, "Json", "Json") :+ synthesizeFromListMethod(declaration, "fromJsonList", "Json") else Nil
+    val yamlMethods = if (hasYaml && derivable) synthesizeFormatMethods(declaration, "Yaml", "Yaml") :+ synthesizeFromListMethod(declaration, "fromYamlList", "Yaml") else Nil
     // law/example clauses (B3): each becomes a boolean static method the compiler runs at
     // build time (LawCheckPhase). No `derivable` guard — a componentless record can still
     // carry laws/examples (the law's own params drive generation).
@@ -721,14 +721,22 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case Some(f) => f
       case None    => return None // typing reports the unknown format
     }
-    // A json shape also reads lists, nested records and absent keys (JsonShapeComponents);
-    // every other format keeps to the scalars. Typing reports what cannot be read (E0061).
+    // A json shape also reads lists, nested records and absent keys (JsonShapeComponents).
+    // A yaml shape reads a nullable (`T?`) scalar the same way json does -- a missing key
+    // becomes `null` -- since both go through `MappedShape` (#1969). `config` keeps to the
+    // non-nullable scalars; its runtime doesn't give an absent key a real `null` yet.
+    // Typing reports what cannot be read (E0061).
     val kinds =
       if (JsonShapeComponents.isJsonFormat(format)) declaration.args.map(a => JsonShapeComponents.tagOfAst(a.typeRef))
+      else if (format.equalsIgnoreCase("yaml")) declaration.args.map(a => scalarShapeTag(a.typeRef))
       else declaration.args.map(a => ScalarConversions.ofAst(a.typeRef).map(_.tag))
     if (kinds.exists(_.isEmpty)) return None
     val tags = kinds.map(_.get)
-    val structured = !tags.forall(JsonShapeComponents.isPlainScalar)
+    // A trailing "?" marks nullability, not structure: strip it before asking whether the
+    // component is a plain scalar, so a nullable scalar (yaml, json) does not wrongly look
+    // "structured" and reach for the nested-shape list that only `Shapes.json`'s extra
+    // overload accepts (`Shapes.yaml` has none).
+    val structured = !tags.forall(t => JsonShapeComponents.isPlainScalar(if (t.endsWith("?")) t.dropRight(1) else t))
     // explode: { __v => [__v.c0(), __v.c1(), ...] }  (boxing is automatic into the list)
     val exploded = AST.ListLiteral(loc, declaration.args.map(a => AST.MethodCall(loc, AST.Id(loc, "__v"), a.name, Nil)))
     val explodeLambda = AST.ClosureExpression(loc,
@@ -802,6 +810,19 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NewObject(loc, recordType, ctorArgs)))))
   }
 
+  /**
+   * The scalar tag for a regex shape component: the plain tag, or tag+"?" for a
+   * nullable scalar (`String?`, `Int?`, ...). `partTypeNodeFor` already understands the
+   * "?" suffix (it strips it to find the boxed part type), and `RegexShape.parse` reads
+   * it to give a real `null` for an unmatched optional group (#1969).
+   */
+  private def scalarShapeTag(typeRef: AST.TypeNode): Option[String] = typeRef.desc match {
+    case AST.NullableType(inner) =>
+      ScalarConversions.ofAst(AST.TypeNode(typeRef.location, inner, typeRef.isRelaxed)).map(_.tag + "?")
+    case _ =>
+      ScalarConversions.ofAst(typeRef).map(_.tag)
+  }
+
   private def synthesizeRegexShape(declaration: AST.RecordDeclaration, clause: AST.ShapeClause, pattern: String): Option[AST.MethodDeclaration] = {
     val loc = clause.location
     val recordName = declaration.name
@@ -809,9 +830,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
       AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(recordName, false))), false)
 
-    // Every component must be a known scalar; typing reports the ones that are not, the
-    // same way it does for `from` (E0061).
-    val kinds = declaration.args.map(a => ScalarConversions.ofAst(a.typeRef).map(_.tag))
+    // Every component must be a known scalar, or `T?` of one; typing reports the ones
+    // that are not, the same way it does for `from` (E0061). A nullable tag carries a
+    // trailing "?", read by RegexShape.parse as "give null for an unmatched group"
+    // instead of converting the non-null "" sentinel (#1969, mirroring #1967's `from`).
+    val kinds = declaration.args.map(a => scalarShapeTag(a.typeRef))
     if (kinds.exists(_.isEmpty)) return None
     val tags = kinds.map(_.get)
     val buildLambda = shapeBuildLambda(loc, declaration, recordType, tags)
@@ -1172,11 +1195,16 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   /**
-   * `derive!(Json)` only: `R::fromJsonList(s: String): List[R]` reads a top-level JSON
-   * array, converting each element through the already-synthesized `fromMap` and
-   * skipping (rather than failing on) any element that isn't a JSON object or doesn't
-   * convert -- the same "skip what doesn't fit" contract `from re"..."`'s `parseAll` has.
-   * Malformed JSON or a non-array top level yields an empty list, never a failure.
+   * `derive!(Json)`/`derive!(Yaml)`: `R::fromJsonList(s: String): List[R]` and
+   * `R::fromYamlList(s: String): List[R]` each read a top-level sequence (a JSON array,
+   * or a YAML block sequence of flat mappings), converting each element through the
+   * already-synthesized `fromMap` and skipping (rather than failing on) any element that
+   * isn't an object/mapping or doesn't convert -- the same "skip what doesn't fit"
+   * contract `from re"..."`'s `parseAll` has. Malformed input or a non-sequence top level
+   * yields an empty list, never a failure. `methodName` is `fromJsonList`/`fromYamlList`,
+   * `parseTypeName` the stdlib type whose `parseOrNull` reads the text (`Json`/`Yaml`);
+   * the cast to a `List` afterwards always goes through `Json::asArray`, a format-agnostic
+   * check against the shared `List` intermediate both formats parse into.
    *
    *   static def fromJsonList(__s: String): List[R] {
    *     val __acc: List[R] = new ArrayList[R]() as List[R]
@@ -1189,11 +1217,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    *     }
    *     return __acc
    *   }
-   *
-   * `Yaml::parse` only ever returns a flat block mapping (no sequence support), so there
-   * is no `fromYamlList` counterpart yet -- see issue #1975's follow-up.
    */
-  private def synthesizeJsonListMethod(declaration: AST.RecordDeclaration): AST.MethodDeclaration = {
+  private def synthesizeFromListMethod(declaration: AST.RecordDeclaration, methodName: String, parseTypeName: String): AST.MethodDeclaration = {
     val loc = declaration.location
     val recordName = declaration.name
     val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
@@ -1201,13 +1226,14 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val objectType = AST.TypeNode(loc, AST.ReferenceType("Object", false), false)
     val stringType = AST.TypeNode(loc, AST.ReferenceType("String", false), false)
     val jsonType = AST.TypeNode(loc, AST.ReferenceType("Json", false), false)
+    val parseType = AST.TypeNode(loc, AST.ReferenceType(parseTypeName, false), false)
     val listType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(AST.ReferenceType(recordName, false))), false)
     val arrayListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("ArrayList", false), List(AST.ReferenceType(recordName, false))), false)
     val objectListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(AST.ReferenceType("Object", false))), false)
 
     val accInit = AST.Cast(loc, AST.NewObject(loc, arrayListType, Nil), listType)
     val accDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__acc", listType, accInit)
-    val parseOrNullCall = AST.StaticMethodCall(loc, jsonType, "parseOrNull", List(AST.Id(loc, "__s")))
+    val parseOrNullCall = AST.StaticMethodCall(loc, parseType, "parseOrNull", List(AST.Id(loc, "__s")))
     val asArrayCall = AST.StaticMethodCall(loc, jsonType, "asArray", List(parseOrNullCall))
     val arrDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__arr", objectListType, asArrayCall)
 
@@ -1230,7 +1256,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     )
     val body = AST.BlockExpression(loc, List(accDecl, arrDecl, guardedForeach, AST.ReturnExpression(loc, AST.Id(loc, "__acc"))))
     AST.MethodDeclaration(
-      loc, AST.M_PUBLIC | AST.M_STATIC, "fromJsonList",
+      loc, AST.M_PUBLIC | AST.M_STATIC, methodName,
       List(AST.Argument(loc, "__s", stringType)), listType, body
     )
   }

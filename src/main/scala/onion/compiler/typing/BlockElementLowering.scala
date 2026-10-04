@@ -193,6 +193,35 @@ final class BlockElementLowering(
             typed(expression, context).map(termToStatement(expression, _)).getOrElse(new NOP(node.location))
           case _: AST.ForInitEmpty => new NOP(node.location)
         }
+        // A closure created in the body that reads the loop's own induction
+        // variable (e.g. `fns.add(() -> i)` inside `for var i = 0; i < n; i++`)
+        // must see THAT iteration's value, not a cell shared across the whole
+        // loop (issue #1971). `i` is reassigned by the loop's own `i++` update,
+        // so it is boxed for closure capture; but the box is only freshly
+        // allocated where codegen first sees a `SetLocal` for that slot -- the
+        // for-init, which runs once -- and every later `i++` just mutates that
+        // one box in place. `foreach` does not have this problem because its
+        // element variable is assigned exactly once, lexically inside the loop
+        // body, so a fresh box is allocated every iteration automatically.
+        // Mirroring that: when the induction variable is boxed and never itself
+        // reassigned in the body (the common case this bug actually hits), copy
+        // it into a body-scoped shadow of the same name at the top of each
+        // iteration. The shadow's own `SetLocal` lives lexically inside the
+        // loop, so it gets a fresh box every iteration, and ordinary name
+        // shadowing makes every reference inside the body -- closures included
+        // -- resolve to it instead of the shared induction-variable cell. A
+        // variable the body itself reassigns is left exactly as before: its
+        // mutation needs to reach the next iteration's `i++`, which a copy
+        // taken only at body entry would not reliably preserve across
+        // `break`/`continue`.
+        val loopVarShadow: Option[(String, ClosureLocalBinding)] = node.init match {
+          case AST.ForInitDeclaration(declaration) =>
+            val binding = context.lookupOnlyCurrentScope(declaration.name)
+            if (binding != null && binding.isBoxed && !bodyContext.assignedNames(node.block).contains(declaration.name))
+              Some((declaration.name, binding))
+            else None
+          case _ => None
+        }
         val condition = Option(node.condition).map { c =>
           val cond = ensureBooleanCondition(c, typed(c, context))
           if (cond != null) cond else new BoolValue(node.location, true)
@@ -224,7 +253,16 @@ final class BlockElementLowering(
               .foreach { case (name, tp) => context.addFlowNarrowing(name, tp) }
           }
 
-          val result = translate(node.block, context)
+          val result = context.openScope {
+            loopVarShadow match {
+              case Some((name, outerBinding)) =>
+                context.add(name, outerBinding.tp, isMutable = false)
+                val shadowBinding = context.lookupOnlyCurrentScope(name)
+                new StatementBlock(assign(shadowBinding, ref(outerBinding)), translate(node.block, context))
+              case None =>
+                translate(node.block, context)
+            }
+          }
           context.restoreNarrowings(savedNarrowings)
           result
         }

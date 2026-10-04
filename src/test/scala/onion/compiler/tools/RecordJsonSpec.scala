@@ -222,6 +222,64 @@ class RecordJsonSpec extends AbstractShellSpec {
       assert(Shell.Success("ok") == result)
     }
 
+    it("fromJsonList parses a JSON array into a List[R]") {
+      val result = shell.run(
+        """
+          |record Pt(x: Int, y: Int) derive!(Json)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val pts = Pt::fromJsonList("[{\"x\": 1, \"y\": 2}, {\"x\": 3, \"y\": 4}]")
+          |    if pts.size != 2 { return "size=" + pts.size }
+          |    val p0: Pt = pts[0]
+          |    val p1: Pt = pts[1]
+          |    return "" + (p0.x() + p0.y() + p1.x() + p1.y())
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("10") == result)
+    }
+
+    it("fromJsonList skips elements that don't fit, rather than failing the whole array") {
+      val result = shell.run(
+        """
+          |record Pt(x: Int, y: Int) derive!(Json)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val pts = Pt::fromJsonList("[{\"x\": 1, \"y\": 2}, {\"x\": 1}, \"not an object\"]")
+          |    return "" + pts.size
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("1") == result)
+    }
+
+    it("fromJsonList returns an empty List on malformed JSON or a non-array top level") {
+      val result = shell.run(
+        """
+          |record Pt(x: Int, y: Int) derive!(Json)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val a = Pt::fromJsonList("not json at all")
+          |    val b = Pt::fromJsonList("{\"x\": 1, \"y\": 2}")
+          |    return "" + a.size + "," + b.size
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("0,0") == result)
+    }
+
     it("keeps `derive` usable as an ordinary identifier") {
       val result = shell.run(
         """

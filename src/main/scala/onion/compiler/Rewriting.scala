@@ -652,7 +652,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // Format-agnostic core (toMap/fromMap) synthesized once when any data format is
     // requested, then thin per-format sugar layered on top.
     val dataMethods = if ((hasJson || hasYaml) && derivable) synthesizeDataMethods(declaration) else Nil
-    val jsonMethods = if (hasJson && derivable) synthesizeFormatMethods(declaration, "Json", "Json") else Nil
+    val jsonMethods = if (hasJson && derivable) synthesizeFormatMethods(declaration, "Json", "Json") :+ synthesizeJsonListMethod(declaration) else Nil
     val yamlMethods = if (hasYaml && derivable) synthesizeFormatMethods(declaration, "Yaml", "Yaml") else Nil
     // law/example clauses (B3): each becomes a boolean static method the compiler runs at
     // build time (LawCheckPhase). No `derivable` guard — a componentless record can still
@@ -1169,6 +1169,70 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     )
 
     List(fromMethod, toMethod)
+  }
+
+  /**
+   * `derive!(Json)` only: `R::fromJsonList(s: String): List[R]` reads a top-level JSON
+   * array, converting each element through the already-synthesized `fromMap` and
+   * skipping (rather than failing on) any element that isn't a JSON object or doesn't
+   * convert -- the same "skip what doesn't fit" contract `from re"..."`'s `parseAll` has.
+   * Malformed JSON or a non-array top level yields an empty list, never a failure.
+   *
+   *   static def fromJsonList(__s: String): List[R] {
+   *     val __acc: List[R] = new ArrayList[R]() as List[R]
+   *     val __arr: List[Object] = Json::asArray(Json::parseOrNull(__s))
+   *     if __arr != null {
+   *       foreach __elem: Object in __arr {
+   *         val __r: R? = R::fromMap(__elem)
+   *         if __r != null { __acc.add(__r) }
+   *       }
+   *     }
+   *     return __acc
+   *   }
+   *
+   * `Yaml::parse` only ever returns a flat block mapping (no sequence support), so there
+   * is no `fromYamlList` counterpart yet -- see issue #1975's follow-up.
+   */
+  private def synthesizeJsonListMethod(declaration: AST.RecordDeclaration): AST.MethodDeclaration = {
+    val loc = declaration.location
+    val recordName = declaration.name
+    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
+    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType(recordName, false)), false)
+    val objectType = AST.TypeNode(loc, AST.ReferenceType("Object", false), false)
+    val stringType = AST.TypeNode(loc, AST.ReferenceType("String", false), false)
+    val jsonType = AST.TypeNode(loc, AST.ReferenceType("Json", false), false)
+    val listType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(AST.ReferenceType(recordName, false))), false)
+    val arrayListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("ArrayList", false), List(AST.ReferenceType(recordName, false))), false)
+    val objectListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(AST.ReferenceType("Object", false))), false)
+
+    val accInit = AST.Cast(loc, AST.NewObject(loc, arrayListType, Nil), listType)
+    val accDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__acc", listType, accInit)
+    val parseOrNullCall = AST.StaticMethodCall(loc, jsonType, "parseOrNull", List(AST.Id(loc, "__s")))
+    val asArrayCall = AST.StaticMethodCall(loc, jsonType, "asArray", List(parseOrNullCall))
+    val arrDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__arr", objectListType, asArrayCall)
+
+    val fromMapCall = AST.StaticMethodCall(loc, recordType, "fromMap", List(AST.Id(loc, "__elem")))
+    val rDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__r", nullableRecordType, fromMapCall)
+    val addCall = AST.MethodCall(loc, AST.Id(loc, "__acc"), "add", List(AST.Id(loc, "__r")))
+    val guardedAdd = AST.IfExpression(
+      loc,
+      AST.NotEqual(loc, AST.Id(loc, "__r"), AST.NullLiteral(loc)),
+      AST.BlockExpression(loc, List(addCall)),
+      null
+    )
+    val foreachBody = AST.BlockExpression(loc, List(rDecl, guardedAdd))
+    val foreach = AST.ForeachExpression(loc, AST.Argument(loc, "__elem", objectType), AST.Id(loc, "__arr"), foreachBody)
+    val guardedForeach = AST.IfExpression(
+      loc,
+      AST.NotEqual(loc, AST.Id(loc, "__arr"), AST.NullLiteral(loc)),
+      AST.BlockExpression(loc, List(foreach)),
+      null
+    )
+    val body = AST.BlockExpression(loc, List(accDecl, arrDecl, guardedForeach, AST.ReturnExpression(loc, AST.Id(loc, "__acc"))))
+    AST.MethodDeclaration(
+      loc, AST.M_PUBLIC | AST.M_STATIC, "fromJsonList",
+      List(AST.Argument(loc, "__s", stringType)), listType, body
+    )
   }
 
   /**

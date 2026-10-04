@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`derive!(Json)` records now get `R::fromJsonList(s: String): List[R]`**, reading a top-level JSON array into a `List[R]` and skipping (rather than failing on) any element that isn't a JSON object or doesn't convert — the same "skip what doesn't fit" contract `from re"..."`'s `parseAll` already has. Malformed JSON or a non-array top level yields an empty list, never `null`. `Yaml::parse` only supports a flat block mapping (no sequences), so there is no `fromYamlList` counterpart yet (#1975).
+
 ### Fixed
 
 - **A lambda whose declared type carried an unrelated wildcard type argument (`Function1[Int, ?]`) was wrongly rejected with a confusing E0000 when its body called a nested generic method/lambda** (e.g. a `withLock`/`withT`-style helper taking a `Function0[T]`). The wildcard's collapsed bound (`Object`) leaked into the nested call's own type-parameter inference, conflicting with the type that inference had already (correctly) bound from the nested call's own argument, and the reported "expected" type never named `?` or `Object` so there was no way to connect the error to its real cause. An expected return type that collapses to plain `Object` is not a real constraint (`Object` accepts anything), so it no longer overrides a type parameter a generic call already inferred from its own arguments (#1972).

@@ -411,10 +411,19 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case f: AST.FunctionDeclaration if f.name == "main" && f.args.nonEmpty &&
         !singleStringArray(f) && !allScalar(f) && !restPattern(f) => f
     }.foreach { f =>
-      throw new CompilationException(Seq(CompileError("", f.location,
-        "main has an unsupported parameter list: a String[] parameter must be either the only " +
-        "parameter (raw argv) or the last parameter (rest collector); every other parameter must " +
-        "be a scalar parsed from the command line.")))
+      // Point at the first parameter that cannot be a command-line value, so the
+      // author sees which one to change (e.g. `tags: List[String]`).
+      val last = f.args.length - 1
+      val culprit = f.args.zipWithIndex.collectFirst {
+        case (a, i) if cliKindOf(a.typeRef).isEmpty && !(i == last && isStringArrayParam(a.typeRef)) => a
+      }.orElse(f.args.find(a => isStringArrayParam(a.typeRef)))
+      val where = culprit.map(a => s"parameter '${a.name}' is not allowed here. ").getOrElse("")
+      val loc = culprit.map(_.location).filter(_ != null).getOrElse(f.location)
+      throw new CompilationException(Seq(CompileError("", loc,
+        "main has an unsupported parameter list: " + where +
+        "every parameter must be a scalar (String, Int, Long, Double, Boolean, ...) parsed from the " +
+        "command line, except that one String[] may be the only parameter (raw argv) or the last " +
+        "required parameter (rest collector); List[String] is not supported, use String[].")))
     }
 
     val restMatch = toplevels.collectFirst {

@@ -43,6 +43,15 @@ final class ClosureTyping(
       val hasReturn = containsReturn(node.body)
       val useExpressionBody = !hasReturn
 
+      // A result of exactly `Object` or an unbounded `?` carries no constraint,
+      // so the body's own type is inferred (issue #1972): typed against the
+      // collapsed `Object`, a nested generic call would pin its type argument to
+      // Object and then reject the body's real type.
+      def isObjectResult(t: Type): Boolean = t == bodyContext.rootClass || (t match {
+        case w: WildcardType => w.lowerBound.isEmpty && w.upperBound == bodyContext.rootClass
+        case _ => false
+      })
+
       // Check if inferredTarget has a return type that needs inference
       // This happens when the expected type is like Function1<String, Object> where U was bound to Object
       // or Function1<String, Future<U>> where U is a type variable inside a complex type
@@ -50,7 +59,7 @@ final class ClosureTyping(
         case applied: AppliedClassType =>
           // Check if the last type argument (return type for FunctionN) contains type variables
           applied.typeArguments.lastOption.exists { lastArg =>
-            lastArg == bodyContext.rootClass || containsTypeVariable(lastArg)
+            isObjectResult(lastArg) || containsTypeVariable(lastArg)
           }
         case _ => false
       }
@@ -129,7 +138,7 @@ final class ClosureTyping(
       val staticType: ClassType = inferredTarget match {
         case applied: AppliedClassType
           if inferredReturnType.isDefined &&
-             applied.typeArguments.lastOption.contains(bodyContext.rootClass) =>
+             applied.typeArguments.lastOption.exists(isObjectResult) =>
           applied
         case _ => typeRef
       }

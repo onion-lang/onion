@@ -180,6 +180,87 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a nullable (T?) scalar component (#1969)") {
+    val nullableDecl =
+      """record Cfg(host: String, port: Int?) {
+        |  shape cfg = config
+        |}
+        |""".stripMargin
+
+    it("parse reads an absent key as null instead of a defect") {
+      val r = shell.run(nullableDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s = Cfg::cfg()
+          |    val withPort = s.parse("host = example.com\nport = 8080\n").get()
+          |    val withoutPort = s.parse("host = example.com\n").get()
+          |    return withPort.port() + "|" + (withoutPort.port() == null)
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("8080|true") == r, r.toString)
+    }
+
+    it("print omits the line for a null component, and round-trips through parse") {
+      val r = shell.run(nullableDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val s = Cfg::cfg()
+          |    val v = new Cfg("example.com", null)
+          |    return s.print(v) == "host = example.com\n" && s.parse(s.print(v)).get() == v
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(true) == r, r.toString)
+    }
+
+    it("printLossless deletes the line when an edit sets a present component to null") {
+      val r = shell.run(nullableDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val text = "host = example.com\nport = 8080\n"
+          |    val got = Cfg::cfg().parseLossless(text).get()
+          |    val edited = got.value().copy(port = null)
+          |    return Cfg::cfg().printLossless(edited, got.residue())
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("host = example.com\n") == r, r.toString)
+    }
+
+    it("printLossless appends a line when an edit sets an absent component to non-null") {
+      val r = shell.run(nullableDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val text = "host = example.com\n"
+          |    val got = Cfg::cfg().parseLossless(text).get()
+          |    val edited = new Cfg(got.value().host(), 8080)
+          |    return Cfg::cfg().printLossless(edited, got.residue())
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("host = example.com\nport = 8080\n") == r, r.toString)
+    }
+
+    it("printLossless is a no-op when an absent component stays null") {
+      val r = shell.run(nullableDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val text = "host = example.com\n"
+          |    val got = Cfg::cfg().parseLossless(text).get()
+          |    return Cfg::cfg().printLossless(got.value(), got.residue())
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("host = example.com\n") == r, r.toString)
+    }
+  }
+
   describe("losslessness is a claim, not a default") {
     it("a lossy shape refuses parseLossless instead of pretending") {
       val r = shell.run(

@@ -150,10 +150,24 @@ public final class Shapes {
             List<Object> parts = new ArrayList<>(tags.size());
             List<Defect> problems = new ArrayList<>();
             for (int i = 0; i < tags.size(); i++) {
-                String raw = i < groups.size() ? groups.get(i) : "";
+                String tag = tags.get(i);
                 String name = i < names.size() ? names.get(i) : String.valueOf(i);
-                Outcome<Object> read = Scalars.read(tags.get(i), raw, origin, name);
-                if (read.isOk()) parts.add(read.get()); else problems.addAll(read.defects());
+                // A nullable component ("Int?", ...) cannot read its value off `groups`:
+                // that list comes from Regex.matchGroups, which substitutes the non-null
+                // sentinel "" for an unmatched group -- correct for the (non-nullable)
+                // `case re"..." (a, b):` bindings it was built for, wrong for a component
+                // that should read "absent" as null. Regex.captureGroup re-runs the same
+                // (cached) anchored match to read the group without that substitution.
+                if (tag.endsWith("?")) {
+                    String raw = Regex.captureGroup(text, pattern, i + 1);
+                    if (raw == null) { parts.add(null); continue; }
+                    Outcome<Object> read = Scalars.read(tag.substring(0, tag.length() - 1), raw, origin, name);
+                    if (read.isOk()) parts.add(read.get()); else problems.addAll(read.defects());
+                } else {
+                    String raw = i < groups.size() ? groups.get(i) : "";
+                    Outcome<Object> read = Scalars.read(tag, raw, origin, name);
+                    if (read.isOk()) parts.add(read.get()); else problems.addAll(read.defects());
+                }
             }
             if (!problems.isEmpty()) return Outcome.bad(problems);
             return Outcome.ok(build.call(parts));

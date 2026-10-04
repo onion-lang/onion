@@ -1005,6 +1005,40 @@ def main(parseURL: Int = 1, parseUrl: Int = 2): void { IO::println(parseURL + pa
 Rename one of them. Positional parameters (those without a default) have no flag and
 are not checked.
 
+### `E0094` — `main` parameter has a type auto-CLI cannot read
+
+A top-level auto-CLI `main` parameter's type is neither a supported scalar (`String`,
+`Int`, `Long`, `Double`, `Float`, `Boolean`, `Short`, `Byte`) nor, as the last
+parameter, a `String[]` rest collector.
+
+```onion
+def main(name: String, count: Int = 3, tags: List[String] = []): Int {
+  return 0
+}
+// E0094: `main` cannot derive a command line: parameter `tags` has type
+//        List[String], which cannot be read from an argument.
+```
+
+Use a scalar, or `String[]` as the last parameter to collect repeated/trailing
+arguments (e.g. `def main(cmd: String, files: String[])`).
+
+### `E0095` — `main`'s `String[]` parameter is misplaced
+
+A top-level auto-CLI `main` has a `String[]` parameter that is not in a supported
+position: not the only parameter (raw argv) and not the last parameter (a rest
+collector preceded only by required scalars).
+
+```onion
+def main(args: String[], flag: Boolean = false): void {
+  IO::println("BODY RAN")
+}
+// E0095: `main` has a String[] parameter, `args`, that is not in a supported
+//        position.
+```
+
+A `String[]` parameter must be either the only parameter, or the last parameter
+with no default value, preceded only by required (no-default) scalar parameters.
+
 ## Try/catch errors
 
 ### `E0083` — Unreachable catch clause
@@ -1668,6 +1702,8 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0091` | … is a class, not a variable |
 | `E0092` | cannot instantiate primitive type … with `new` |
 | `E0093` | parameters `…` and `…` of `…` would both answer to the command-line flag `--…` |
+| `E0094` | `main` parameter `…` has type … which cannot be read from an argument |
+| `E0095` | `main` has a String[] parameter, `…`, that is not in a supported position |
 
 ## See also
 

@@ -411,10 +411,31 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case f: AST.FunctionDeclaration if f.name == "main" && f.args.nonEmpty &&
         !singleStringArray(f) && !allScalar(f) && !restPattern(f) => f
     }.foreach { f =>
-      throw new CompilationException(Seq(CompileError("", f.location,
-        "main has an unsupported parameter list: a String[] parameter must be either the only " +
-        "parameter (raw argv) or the last parameter (rest collector); every other parameter must " +
-        "be a scalar parsed from the command line.")))
+      // Diagnose at the specific offending parameter, not at the `def`. Prefer
+      // naming a parameter whose type auto-CLI simply cannot read (e.g. a
+      // `List[String]` reached for instead of a rest collector, issue #1998) --
+      // that is what the author actually got wrong. Only once every parameter's
+      // type is individually supported (scalar, or String[]) do we fall back to
+      // diagnosing the shape: a String[] that isn't alone or last.
+      val badType = f.args.zipWithIndex.collectFirst {
+        case (a, _) if cliKindOf(a.typeRef).isEmpty && !isStringArrayParam(a.typeRef) => a
+      }
+      badType match {
+        case Some(a) =>
+          throw new CompilationException(Seq(CompileError("", a.location,
+            Message("error.semantic.mainParameterNotCliConvertible",
+              Array[Any](a.name, if (a.typeRef == null) "(none)" else a.typeRef.desc.toString,
+                ScalarConversions.supportedNames)),
+            Some(MAIN_PARAMETER_NOT_CLI_CONVERTIBLE.errorCode))))
+        case None =>
+          val lastIdx = f.args.length - 1
+          val culprit = f.args.zipWithIndex.collectFirst {
+            case (a, i) if isStringArrayParam(a.typeRef) && i != lastIdx => a
+          }.getOrElse(f.args.last)
+          throw new CompilationException(Seq(CompileError("", culprit.location,
+            Message("error.semantic.mainParameterMisplacedArray", Array[Any](culprit.name)),
+            Some(MAIN_PARAMETER_MISPLACED_ARRAY.errorCode))))
+      }
     }
 
     val restMatch = toplevels.collectFirst {

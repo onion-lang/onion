@@ -307,14 +307,18 @@ object EffectInference {
         effects += Effect.Unknown; unsitedEffects += Effect.Unknown
     }}
 
-    def term(t: Term): scala.Unit = { if (t != null) noteLoc(t.location); t match {
+    def term(t: Term): scala.Unit = { if (t != null) noteLoc(t.location)
+      // A call usually has no location of its own; pin it to the nearest located node seen
+      // BEFORE its operands are walked, or the argument visited last would claim the site.
+      val entry = currentLoc
+      t match {
       case null => ()
-      case c: Call          => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location), c.target, c.parameters)
-      case c: SafeCall      => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location), c.target, c.parameters)
-      case c: SafeStaticExtensionCall => term(c.target); c.parameters.foreach(term); method(c.method, here(c.location), null, Array.empty)
-      case c: CallStatic    => c.parameters.foreach(term); method(c.method, here(c.location), null, c.parameters)
-      case c: CallSuper     => term(c.target); c.params.foreach(term); method(c.method, here(c.location), null, Array.empty)
-      case n: NewObject     => n.parameters.foreach(term); constructor(n.constructor, here(n.location), n.parameters)
+      case c: Call          => term(c.target); c.parameters.foreach(term); method(c.method, entry, c.target, c.parameters)
+      case c: SafeCall      => term(c.target); c.parameters.foreach(term); method(c.method, entry, c.target, c.parameters)
+      case c: SafeStaticExtensionCall => term(c.target); c.parameters.foreach(term); method(c.method, entry, null, Array.empty)
+      case c: CallStatic    => c.parameters.foreach(term); method(c.method, entry, null, c.parameters)
+      case c: CallSuper     => term(c.target); c.params.foreach(term); method(c.method, entry, null, Array.empty)
+      case n: NewObject     => n.parameters.foreach(term); constructor(n.constructor, entry, n.parameters)
       case n: NewClosure    =>
         // Absorbed at the creation site. The closure body is one frame deeper, which
         // is what `depth` tracks for the local-write bookkeeping below.

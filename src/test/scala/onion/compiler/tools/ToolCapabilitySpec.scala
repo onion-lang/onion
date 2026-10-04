@@ -78,6 +78,24 @@ class ToolCapabilitySpec extends AbstractShellSpec {
       assert(out.contains(":4:"), out)
     }
 
+    it("reports the call's own line, not the line of its last argument (#1980)") {
+      val (r, out) = runCapturing(
+        """tool save(dst: String): Int requires { console } {
+          |  Files::writeText(
+          |    dst,
+          |    "hello")
+          |  return 0
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int { return 0 }
+          |}
+          |""".stripMargin)
+      assert(r.isInstanceOf[Shell.Failure], s"expected failure, got $r")
+      val line = """:(\d+):\d+: \[E0077\]""".r.findFirstMatchIn(out).map(_.group(1))
+      assert(line.contains("2"), out)
+    }
+
     it("catches an effect hidden behind an ordinary function") {
       val (r, out) = runCapturing(
         """def leak(): void { IO::println("boo") }

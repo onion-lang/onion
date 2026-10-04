@@ -228,7 +228,7 @@ private[typing] object GenericMethodTypeArguments {
           else lowerConstraints += name -> rootClass
     }
 
-    def unify(formal: Type, actual: Type, position: AST.Node): Unit = {
+    def unify(formal: Type, actual: Type, position: AST.Node, returnContext: Boolean = false): Unit = {
       if (actual.isNullType) return
       formal match
         case w: TypedAST.WildcardType =>
@@ -238,13 +238,13 @@ private[typing] object GenericMethodTypeArguments {
                 case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
                   addUpper(tv.name, actual, position)
                 case _ =>
-                  unify(lb, actual, position)
+                  unify(lb, actual, position, returnContext)
             case None =>
               w.upperBound match
                 case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
                   addLower(tv.name, actual)
                 case _ =>
-                  unify(w.upperBound, actual, position)
+                  unify(w.upperBound, actual, position, returnContext)
         case tv: TypedAST.TypeVariableType if paramNames.contains(tv.name) =>
           // Type arguments are reference types: box primitives (Future::async
           // of an Int-returning lambda is a Future[Integer], not Future[int])
@@ -260,7 +260,19 @@ private[typing] object GenericMethodTypeArguments {
               if (!(prev eq bound)) {
                 val merged = mergeNullability(prev, bound)
                 if (merged != null) inferred += tv.name -> merged
-                else reportError(position, INCOMPATIBLE_TYPE, prev, bound)
+                else if (returnContext && (bound eq rootClass)) {
+                  // This unification comes from the call's expected RETURN type,
+                  // and it collapsed to plain Object -- either a caller-side
+                  // wildcard target (`Function1[Int, ?]`)'s irrelevant result
+                  // position collapsing to Object, or an explicit `Object`
+                  // return slot. Either way it is not a real constraint (Object
+                  // accepts anything), so it must not conflict with a concrete
+                  // binding this same call already inferred from its own
+                  // arguments (issue #1972).
+                  ()
+                } else {
+                  reportError(position, INCOMPATIBLE_TYPE, prev, bound)
+                }
               }
             case None =>
               inferred += tv.name -> bound
@@ -275,10 +287,10 @@ private[typing] object GenericMethodTypeArguments {
             case an: TypedAST.NullableType => an.innerType
             case _ => actual
           }
-          unify(fn.innerType, innerActual, position)
+          unify(fn.innerType, innerActual, position, returnContext)
         case af: TypedAST.ArrayType =>
           actual match {
-            case aa: TypedAST.ArrayType => unify(af.base, aa.base, position)
+            case aa: TypedAST.ArrayType => unify(af.base, aa.base, position, returnContext)
             case _ =>
           }
         case apf: TypedAST.AppliedClassType =>
@@ -288,7 +300,7 @@ private[typing] object GenericMethodTypeArguments {
 
           def unifyWithApplied(apa: TypedAST.AppliedClassType): Unit =
             if sameRawClass(apf.raw, apa.raw) && apf.typeArguments.length == apa.typeArguments.length then
-              apf.typeArguments.zip(apa.typeArguments).foreach { (f, a) => unify(f, a, position) }
+              apf.typeArguments.zip(apa.typeArguments).foreach { (f, a) => unify(f, a, position, returnContext) }
 
           actual match
             case apa: TypedAST.AppliedClassType =>
@@ -350,7 +362,7 @@ private[typing] object GenericMethodTypeArguments {
         // revert to the arg-side binding; the outer assignment handles the nullable
         // promotion without invalidating the receiver type (List[Shape] vs List[Shape?]).
         val inferredBeforeReturn = inferred.toMap
-        unify(formalReturn, expectedReturn, callNode)
+        unify(formalReturn, expectedReturn, callNode, returnContext = true)
         for ((name, before) <- inferredBeforeReturn) {
           inferred.get(name).foreach { after =>
             if ((after ne before) && (mergeNullability(before, after) eq after))

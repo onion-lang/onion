@@ -59,9 +59,17 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
               case Some(term) =>
                 // Box primitives against reference-typed components so the
                 // raw signature (copy(A, B)) still matches: copy(second = 42)
-                fullParams(i) =
+                val boxed =
                   if (!expectedType.isBasicType && term.isBasicType) onion.compiler.toolbox.Boxing.boxing(calls.typing.table_, term)
                   else term
+                // A nullable component (`port: Int?`) is declared `T?` in the raw
+                // signature; a non-null argument must be viewed as `T?` to match it
+                // (copy(port = 8080) -- #1993). null and `T?` terms already match.
+                fullParams(i) = expectedType match {
+                  case _: NullableType if !boxed.`type`.isNullable && !boxed.`type`.isNullType =>
+                    TypeSubst.withCast(boxed, expectedType)
+                  case _ => boxed
+                }
               case None => break(None)
             }
           case None =>

@@ -151,6 +151,28 @@ class RecordJsonSpec extends AbstractShellSpec {
       assert(Shell.Success("null") == result)
     }
 
+    it("fromJson returns null when a String key is missing") {
+      // The numeric case above fails via an unboxing NPE that fromMap's try/catch already
+      // catches. A missing String key has no such NPE -- Json::getString just returns Java
+      // null -- so fromMap must check for it explicitly, or a record declared with a
+      // non-nullable `String` component silently ends up holding a null field.
+      val result = shell.run(
+        """
+          |record Pt(name: String, x: Int) derive!(Json)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val p = Pt::fromJson("{\"x\": 1}")
+          |    if p == null { return "null" } else { return "got" }
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("null") == result)
+    }
+
     it("rejects an unsupported component type (E0062)") {
       val result = shell.run(
         """
@@ -259,6 +281,24 @@ class RecordJsonSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success("1") == result)
+    }
+
+    it("fromJsonList skips an element missing a String key, not just a numeric one") {
+      val result = shell.run(
+        """
+          |record Item(name: String, qty: Int) derive!(Json)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val items = Item::fromJsonList("[{\"name\": \"apple\", \"qty\": 3}, {\"qty\": 5}, {\"name\": \"plum\", \"qty\": 2}]")
+          |    return "" + items.size
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("2") == result)
     }
 
     it("fromJsonList returns an empty List on malformed JSON or a non-array top level") {

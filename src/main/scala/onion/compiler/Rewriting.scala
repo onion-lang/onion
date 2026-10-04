@@ -722,14 +722,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case None    => return None // typing reports the unknown format
     }
     // A json shape also reads lists, nested records and absent keys (JsonShapeComponents).
-    // A yaml shape reads a nullable (`T?`) scalar the same way json does -- a missing key
-    // becomes `null` -- since both go through `MappedShape` (#1969). `config` keeps to the
-    // non-nullable scalars; its runtime doesn't give an absent key a real `null` yet.
-    // Typing reports what cannot be read (E0061).
+    // A yaml or config shape reads a nullable (`T?`) scalar too -- a missing key becomes
+    // `null` -- now that `MappedShape` (yaml, shared with json) and `ConfigShape` both
+    // give an absent key a real `null` (#1969). Typing reports what cannot be read (E0061).
     val kinds =
       if (JsonShapeComponents.isJsonFormat(format)) declaration.args.map(a => JsonShapeComponents.tagOfAst(a.typeRef))
-      else if (format.equalsIgnoreCase("yaml")) declaration.args.map(a => scalarShapeTag(a.typeRef))
-      else declaration.args.map(a => ScalarConversions.ofAst(a.typeRef).map(_.tag))
+      else declaration.args.map(a => scalarShapeTag(a.typeRef))
     if (kinds.exists(_.isEmpty)) return None
     val tags = kinds.map(_.get)
     // A trailing "?" marks nullability, not structure: strip it before asking whether the

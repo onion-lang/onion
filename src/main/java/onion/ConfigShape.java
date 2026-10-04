@@ -1,9 +1,11 @@
 package onion;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A lossless shape over a commented {@code key = value} config document (issue #362).
@@ -115,13 +117,20 @@ public final class ConfigShape<T> implements Shape<T> {
     @Override
     public boolean canPrint() { return true; }
 
-    /** Canonical rendering: declaration order, `key = value`, newline-terminated. */
+    /**
+     * Canonical rendering: declaration order, `key = value`, newline-terminated. A
+     * nullable (`T?`) component holding `null` has no value to write — the format has no
+     * null literal distinct from the text `"null"` — so its line is omitted entirely,
+     * matching how an absent key parses back to `null` (#1969).
+     */
     @Override
     public String print(T value) {
         List<Object> parts = explode.call(value);
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < names.size(); i++) {
-            String rendered = render(parts.get(i));
+            Object v = parts.get(i);
+            if (v == null) continue;
+            String rendered = render(v);
             requireRenderable(names.get(i), rendered);
             sb.append(names.get(i)).append(" = ").append(rendered).append('\n');
         }
@@ -181,15 +190,21 @@ public final class ConfigShape<T> implements Shape<T> {
         List<Object> values = new ArrayList<>();
         for (int c = 0; c < names.size(); c++) {
             String name = names.get(c);
+            String tag = tags.get(c);
+            // A trailing "?" marks a nullable (`T?`) component: an absent key reads as a
+            // real `null` instead of a defect, the same semantics json/yaml already have
+            // (#1969). `Scalars.read` only knows the bare tag, so it is stripped before use.
+            boolean nullable = tag.endsWith("?");
+            String baseTag = nullable ? tag.substring(0, tag.length() - 1) : tag;
             Integer at = keyToLine.get(name);
             if (at == null) {
-                defects.add(Defect.at(origin, name, tags.get(c), "absent"));
+                if (!nullable) defects.add(Defect.at(origin, name, tag, "absent"));
                 values.add(null);
                 continue;
             }
             entryLines.put(name, at);
             Outcome<Object> read = Scalars.read(
-                tags.get(c), lines.get(at).valueRaw.trim(), Origin.atLine(source, at + 1), name);
+                baseTag, lines.get(at).valueRaw.trim(), Origin.atLine(source, at + 1), name);
             if (read.isBad()) {
                 defects.addAll(read.defects());
                 values.add(null);
@@ -219,14 +234,30 @@ public final class ConfigShape<T> implements Shape<T> {
 
         List<Object> parts = explode.call(value);
         // component name -> replacement text, only where the typed value actually changed;
-        // an unchanged component keeps its original spelling ("007" stays "007").
+        // an unchanged component keeps its original spelling ("007" stays "007"). A
+        // nullable (`T?`) component edited to `null` has no line to replace -- it is
+        // deleted -- and one edited from absent to non-null has none to find -- it is
+        // appended -- since the format has no null literal distinct from the text
+        // "null" (#1969).
         Map<Integer, String> replacements = new LinkedHashMap<>();
+        Set<Integer> deletions = new HashSet<>();
+        List<String> insertions = new ArrayList<>();
         for (int c = 0; c < names.size(); c++) {
             Integer at = r.entryLines.get(names.get(c));
-            if (at == null) continue;
             Object now = parts.get(c);
+            if (at == null) {
+                if (now != null) {
+                    String rendered = render(now);
+                    requireRenderable(names.get(c), rendered);
+                    insertions.add(names.get(c) + " = " + rendered);
+                }
+                continue;
+            }
             Object was = r.parsedValues.get(c);
-            if (!java.util.Objects.equals(now, was)) {
+            if (java.util.Objects.equals(now, was)) continue;
+            if (now == null) {
+                deletions.add(at);
+            } else {
                 String rendered = render(now);
                 requireRenderable(names.get(c), rendered);
                 replacements.put(at, rendered);
@@ -234,9 +265,12 @@ public final class ConfigShape<T> implements Shape<T> {
         }
 
         StringBuilder sb = new StringBuilder();
+        boolean firstOut = true;
         for (int i = 0; i < r.lines.size(); i++) {
+            if (deletions.contains(i)) continue;
             Line line = r.lines.get(i);
-            if (i > 0) sb.append('\n');
+            if (!firstOut) sb.append('\n');
+            firstOut = false;
             String replacement = replacements.get(i);
             if (replacement == null) sb.append(line.raw);
             else {
@@ -245,6 +279,11 @@ public final class ConfigShape<T> implements Shape<T> {
                 // line must keep its terminator style too.
                 if (line.valueRaw.endsWith("\r")) sb.append('\r');
             }
+        }
+        for (String inserted : insertions) {
+            if (!firstOut) sb.append('\n');
+            firstOut = false;
+            sb.append(inserted);
         }
         if (r.trailingNewline) sb.append('\n');
         return sb.toString();

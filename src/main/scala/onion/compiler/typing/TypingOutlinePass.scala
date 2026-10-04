@@ -336,7 +336,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
               // unmatched optional capture group becomes a real `null`, the same as
               // `from re"..."` (#1967, #1969).
               val regexReadable = isFromReDerivableType(argType)
-              node.shapes.find(sc => !((jsonReadable && isJsonClause(sc)) || (regexReadable && isRegexClause(sc)))).map(sc => (arg, argType, sc))
+              // ...and by a yaml shape clause: a missing key already reads as `null` for a
+              // nullable component (`MappedShape.readComponent`, shared with json). `config`
+              // keeps the non-nullable check -- its runtime doesn't give an absent key a
+              // real `null` yet (#1969).
+              val yamlReadable = isFromReDerivableType(argType)
+              node.shapes.find(sc => !((jsonReadable && isJsonClause(sc)) || (regexReadable && isRegexClause(sc)) || (yamlReadable && isYamlClause(sc)))).map(sc => (arg, argType, sc))
             }
           } else Nil
         // Name the clause the user wrote, not `from`: a `shape doc = json` record has no `from`.
@@ -402,6 +407,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     case AST.RegexSource(_)  => true
     case AST.FormatSource(_) => false
 
+  private def isYamlClause(sc: AST.ShapeClause): Boolean = sc.source match
+    case AST.FormatSource(format) => format.equalsIgnoreCase("yaml")
+    case AST.RegexSource(_)       => false
+
   /**
    * Whether a class is a record a json shape can nest: one that declares a json shape of
    * its own (and so gets the hidden `onion$$jsonShape()`), without type parameters. A
@@ -422,11 +431,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   private def isFromDerivableType(tp: Type): Boolean = ScalarConversions.isDerivable(tp)
 
   /**
-   * Same as `isFromDerivableType`, but also accepts `T?` of a supported scalar: an
-   * unmatched optional capture group becomes `null` instead of the non-null `""`
-   * sentinel. `from re"..."` and a regex `shape` clause both accept this (#1967, #1969);
-   * `derive!` and a non-regex `shape` clause (`yaml`/`config`) keep the non-nullable
-   * check above -- their runtimes don't yet give a nullable component real null.
+   * Same as `isFromDerivableType`, but also accepts `T?` of a supported scalar. `from
+   * re"..."` and a regex `shape` clause read it from an unmatched optional capture group
+   * (#1967, #1969); a yaml `shape` clause reads it from an absent document key, the same
+   * as json's (#1969). `derive!` and a `config` shape clause keep the non-nullable check
+   * above -- their runtimes don't yet give a nullable component real null.
    */
   private def isFromReDerivableType(tp: Type): Boolean = ScalarConversions.isDerivableOrNullable(tp)
 

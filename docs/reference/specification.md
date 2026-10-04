@@ -357,12 +357,13 @@ record:
 | `Json` | `R::fromJson(s: String): R?` | `R::toJson(v: R): String` |
 | `Yaml` | `R::fromYaml(s: String): R?` | `R::toYaml(v: R): String` |
 
-`Json` additionally synthesizes `R::fromJsonList(s: String): List[R]`, which reads a
-top-level JSON array and converts each element through the same rule `fromJson` uses —
-skipping (not failing on) any element that isn't a JSON object or doesn't convert, the
-same "skip what doesn't fit" contract `from re"..."`'s `parseAll` has. Malformed JSON or
-a non-array top level yields an empty list, never `null`. `Yaml::parse` only reads a flat
-block mapping (no sequence support), so there is no `fromYamlList` yet.
+`Json` additionally synthesizes `R::fromJsonList(s: String): List[R]`, and `Yaml`
+`R::fromYamlList(s: String): List[R]`, each reading a top-level sequence (a JSON array,
+or a YAML block sequence of flat mappings) and converting each element through the same
+rule `fromJson`/`fromYaml` uses — skipping (not failing on) any element that isn't an
+object/mapping or doesn't convert, the same "skip what doesn't fit" contract
+`from re"..."`'s `parseAll` has. Malformed input or a non-sequence top level yields an
+empty list, never `null`.
 
 All four formats share a single internal `toMap` / `fromMap` core: `toJson`
 and `toYaml` both call `toMap` and forward the resulting `Map` to

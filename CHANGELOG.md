@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.138.0] - 2026-10-04
+
 ### Added
 
 - **`derive!(Json)` records now get `R::fromJsonList(s: String): List[R]`**, reading a top-level JSON array into a `List[R]` and skipping (rather than failing on) any element that isn't a JSON object or doesn't convert — the same "skip what doesn't fit" contract `from re"..."`'s `parseAll` already has. Malformed JSON or a non-array top level yields an empty list, never `null` (#1975).

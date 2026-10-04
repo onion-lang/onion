@@ -27,13 +27,28 @@ private[compiler] final class StaticMethodCallSupport(
   def typeStaticMemberSelection(node: AST.StaticMemberSelection): Option[Term] =
     classTypeOf(node.typeRef).flatMap { typeRef =>
       val field = MemberAccess.findField(typeRef, node.name)
-      if (field == null) {
-        typing.report(FIELD_NOT_FOUND, node, typeRef, node.name)
-        None
-      } else {
+      if (field != null) {
         Some(new RefStaticField(typeRef, field))
+      } else {
+        // `Box::value` where `value` is `static def value: Int = ...`: a zero-arg
+        // static method accessed in property style (no parens), mirroring the
+        // instance `obj.method` fallback in MemberSelectionResolutionSupport.
+        zeroArgStaticMethod(typeRef, node.name) match {
+          case Some(method) =>
+            if (ensureStaticMethodAccessible(node, method)) Some(new CallStatic(typeRef, method, Array.empty))
+            else None
+          case None =>
+            typing.report(FIELD_NOT_FOUND, node, typeRef, node.name)
+            None
+        }
       }
     }
+
+  private def zeroArgStaticMethod(typeRef: ClassType, name: String): Option[Method] = {
+    val candidates = new JTreeSet[Method](new MethodComparator)
+    calls.collectMethodsMatching(typeRef, name, candidates, calls.isStaticMethod)
+    candidates.asScala.find(_.arguments.isEmpty)
+  }
 
   def typeStaticMethodCall(node: AST.StaticMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
     // `::` is for static members. `s::m()` where `s` is a local variable is almost always an

@@ -105,6 +105,22 @@ private[compiler] object TypeSubstitution {
   }
 
   /**
+   * The type an uninstantiated variable collapses to. An F-bounded variable
+   * (`[T extends Comparable[T]]`) collapses to its erased bound: the literal
+   * bound `Comparable[T]` mentions the very variable being dropped, so no
+   * actual argument (`Comparable[Thing]`) could satisfy it.
+   */
+  private def collapsedBound(tv: TypedAST.TypeVariableType): Type =
+    tv.upperBound match {
+      case applied: TypedAST.AppliedClassType
+        if applied.typeArguments.exists {
+          case a: TypedAST.TypeVariableType => a.name == tv.name
+          case _ => false
+        } => applied.raw
+      case bound => bound
+    }
+
+  /**
    * Applies type substitution to a type, replacing type variables with their mapped types.
    *
    * This method recursively traverses the type structure, substituting type variables
@@ -130,7 +146,7 @@ private[compiler] object TypeSubstitution {
     def lookup(name: String): Option[Type] = methodSubst.get(name).orElse(classSubst.get(name))
     tp match {
       case tv: TypedAST.TypeVariableType =>
-        lookup(tv.name).getOrElse(if (defaultToBound) tv.upperBound else tv)
+        lookup(tv.name).getOrElse(if (defaultToBound) collapsedBound(tv) else tv)
       case applied: TypedAST.AppliedClassType =>
         val newArgs = applied.typeArguments.map(arg => substituteType(arg, classSubst, methodSubst, defaultToBound))(using onion.compiler.TypedAST.typeTag)
         if (newArgs.sameElements(applied.typeArguments)) applied

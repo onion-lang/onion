@@ -189,23 +189,83 @@ class RecordJsonSpec extends AbstractShellSpec {
       assert(result.isInstanceOf[Shell.Failure])
     }
 
-    it("rejects a nullable scalar component (String?) (E0062)") {
-      // ScalarConversions.isDerivable only matches the exact non-null scalar types, so a
-      // nullable wrapper around an otherwise-supported type (String? vs String) is rejected
-      // the same way a wholly-unsupported component type (a nested record) is above. Docs
-      // say "scalar components only"; this locks in that nullability is part of that bar.
+    it("round-trips a present nullable scalar component (String?) (#1969)") {
       val result = shell.run(
         """
           |record Person(name: String, nickname: String?) derive!(Json)
           |class Test {
           |public:
-          |  static def main(args: String[]): String { return "x" }
+          |  static def main(args: String[]): String {
+          |    val v = new Person("Ko", "ko-chan")
+          |    val v2 = Person::fromJson(Person::toJson(v))
+          |    if v2 == null { return "null" }
+          |    if v2 == v { return "ok" } else { return "mismatch" }
+          |  }
           |}
           |""".stripMargin,
         "None",
         Array()
       )
-      assert(result.isInstanceOf[Shell.Failure])
+      assert(Shell.Success("ok") == result)
+    }
+
+    it("round-trips a nullable scalar component that is null, as a real JSON null (#1969)") {
+      val result = shell.run(
+        """
+          |record Person(name: String, nickname: String?) derive!(Json)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val v = new Person("Ko", null)
+          |    val j = Person::toJson(v)
+          |    if !j.contains("\"nickname\":null") { return "not-null-literal: " + j }
+          |    val v2 = Person::fromJson(j)
+          |    if v2 == null { return "null" }
+          |    if v2 == v { return "ok" } else { return "mismatch" }
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("ok") == result)
+    }
+
+    it("reads an absent key as null for a nullable scalar component (#1969)") {
+      val result = shell.run(
+        """
+          |record Person(name: String, nickname: String?) derive!(Json)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val v = Person::fromJson("{\"name\": \"Ko\"}")
+          |    if v == null { return "null" }
+          |    if v.nickname() == null { return "ok" } else { return "not-null: " + v.nickname() }
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("ok") == result)
+    }
+
+    it("a nullable Int? component present with the wrong JSON type still fails the whole record (#1969)") {
+      val result = shell.run(
+        """
+          |record Person(name: String, age: Int?) derive!(Json)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val v = Person::fromJson("{\"name\": \"Ko\", \"age\": \"not-a-number\"}")
+          |    if v == null { return "null" } else { return "built" }
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("null") == result)
     }
 
     it("rejects an unknown derive! marker (E0063)") {

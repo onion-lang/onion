@@ -178,7 +178,9 @@ too — E0061 names the clause that cannot read the component.
 A regex, `yaml` or `config` shape does accept `T?` of a scalar, the same as `json`: an
 absent key, or a capture group that did not participate in the match, reads as `null`
 instead of the non-null sentinel a missing non-nullable component gets (`""` for a
-`String`). `derive!(Json, Yaml)` does not accept `T?` yet.
+`String`). `derive!(Json, Yaml)` accepts `T?` too: a missing/JSON-null key reads as
+`null`, and a `null` component writes back as a real JSON/YAML `null`, not an omitted
+key. A present key with the wrong type still fails the whole record either way.
 
 ### A JSON Schema for structured output
 

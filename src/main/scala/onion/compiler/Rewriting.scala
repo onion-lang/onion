@@ -1136,6 +1136,13 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    * exception. Both collapse to null (same "failure -> null" contract as parse()). A new
    * format needs only an stdlib type with parse/stringify over the Map — no macro change.
    * Unsupported component types are reported (E0062) at typing time, skipping registration.
+   *
+   * A nullable component (`T?`) gets `__m.put("nickname", __v.nickname())` in toMap
+   * unchanged (a null value serializes as a real JSON/YAML null, not an omitted key --
+   * `Json`/`Yaml`'s own writers already support that), and a dedicated branch in fromMap's
+   * `ctorArgs` build (#1969): the raw value is read once to tell "absent/null" (ok, the
+   * component is `null`) apart from "present with the wrong type" (still fails the whole
+   * record, via a thrown `IllegalArgumentException` the catch above converts to `null`).
    */
   private def synthesizeDataMethods(declaration: AST.RecordDeclaration): List[AST.MethodDeclaration] = {
     val loc = declaration.location
@@ -1169,20 +1176,47 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // null check first, or a record's non-nullable `String` field silently ends up
     // holding Java null instead of fromMap reporting "doesn't convert" (null).
     val stringType = AST.TypeNode(loc, AST.ReferenceType("String", false), false)
+    val illegalArgType = AST.TypeNode(loc, AST.ReferenceType("IllegalArgumentException", false), false)
     var nextTmp = 0
     val getterStmts = scala.collection.mutable.ListBuffer[AST.BlockElement]()
     val ctorArgs: List[AST.Expression] = declaration.args.map { arg =>
-      val tag = cliKindOf(arg.typeRef)
-      val getter = tag.map(jsonGetterOf).getOrElse("getString")
-      val getCall = AST.StaticMethodCall(loc, jsonType, getter, List(AST.Id(loc, "__m"), AST.StringLiteral(loc, arg.name)))
-      if (tag.contains("String")) {
-        val tmp = s"__f${nextTmp}"; nextTmp += 1
-        getterStmts += AST.LocalVariableDeclaration(loc, AST.M_FINAL, tmp, stringType, getCall)
-        getterStmts += AST.IfExpression(loc, AST.Equal(loc, AST.Id(loc, tmp), AST.NullLiteral(loc)),
-          AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc)))), null)
-        AST.Id(loc, tmp)
-      } else {
-        getCall
+      arg.typeRef.desc match {
+        case AST.NullableType(inner) =>
+          // A nullable component's missing/JSON-null key is a valid value -- `null` --
+          // the same as `shape`/`from re"..."`'s nullable support (#1969); a key that is
+          // *present* with the wrong type must still fail the whole record, same as a
+          // non-nullable component. The typed getter below returns null for both
+          // "absent/null" and "wrong type" alike, so the raw value is read separately
+          // first, only to tell the two apart.
+          val innerTypeRef = AST.TypeNode(arg.typeRef.location, inner, arg.typeRef.isRelaxed)
+          val getter = cliKindOf(innerTypeRef).map(jsonGetterOf).getOrElse("getString")
+          val rawCall = AST.StaticMethodCall(loc, jsonType, "get", List(AST.Id(loc, "__m"), AST.StringLiteral(loc, arg.name)))
+          val getCall = AST.StaticMethodCall(loc, jsonType, getter, List(AST.Id(loc, "__m"), AST.StringLiteral(loc, arg.name)))
+          val rawTmp = s"__raw${nextTmp}"
+          val gotTmp = s"__got${nextTmp}"
+          nextTmp += 1
+          getterStmts += AST.LocalVariableDeclaration(loc, AST.M_FINAL, rawTmp, objectType, rawCall)
+          getterStmts += AST.LocalVariableDeclaration(loc, AST.M_FINAL, gotTmp, arg.typeRef, getCall)
+          val wrongType = AST.LogicalAnd(loc,
+            AST.NotEqual(loc, AST.Id(loc, rawTmp), AST.NullLiteral(loc)),
+            AST.Equal(loc, AST.Id(loc, gotTmp), AST.NullLiteral(loc)))
+          val throwStmt = AST.ThrowExpression(loc, AST.NewObject(loc, illegalArgType,
+            List(AST.StringLiteral(loc, s"${arg.name}: wrong type"))))
+          getterStmts += AST.IfExpression(loc, wrongType, AST.BlockExpression(loc, List(throwStmt)), null)
+          AST.Id(loc, gotTmp)
+        case _ =>
+          val tag = cliKindOf(arg.typeRef)
+          val getter = tag.map(jsonGetterOf).getOrElse("getString")
+          val getCall = AST.StaticMethodCall(loc, jsonType, getter, List(AST.Id(loc, "__m"), AST.StringLiteral(loc, arg.name)))
+          if (tag.contains("String")) {
+            val tmp = s"__f${nextTmp}"; nextTmp += 1
+            getterStmts += AST.LocalVariableDeclaration(loc, AST.M_FINAL, tmp, stringType, getCall)
+            getterStmts += AST.IfExpression(loc, AST.Equal(loc, AST.Id(loc, tmp), AST.NullLiteral(loc)),
+              AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc)))), null)
+            AST.Id(loc, tmp)
+          } else {
+            getCall
+          }
       }
     }
     val buildExpr = AST.Cast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)

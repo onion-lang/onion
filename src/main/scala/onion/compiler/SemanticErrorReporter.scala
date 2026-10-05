@@ -1114,6 +1114,10 @@ object SemanticErrorReporter {
       "error.semantic.staticMethodWithoutBody",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.PRIVATE_ABSTRACT_METHOD -> ErrorDef(
+      "error.semantic.privateAbstractMethod",
+      Seq(items => asString(items(0)))
+    ),
     SemanticError.DUPLICATE_RECORD_COMPONENT -> ErrorDef(
       "error.semantic.duplicateRecordComponent",
       Seq(items => typeName(items(0)), items => asString(items(1)))

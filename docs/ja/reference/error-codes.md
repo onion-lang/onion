@@ -1277,6 +1277,22 @@ public:
 対処: 本体を追加するか、`static` を外して通常の abstract インスタンスメソッドとして
 宣言してください。
 
+### `E0096` — private な abstract メソッド
+
+abstract メソッド（本体のない `def`）が private になっています。`public:`/`protected:`
+節より前に宣言されたメンバーや `private:` 節の下のメンバーは private で、private
+メソッドはオーバーライドできないため、どのサブクラスも実装できません。JVM は
+`ACC_PRIVATE|ACC_ABSTRACT` の組み合わせを拒否します。
+
+```onion
+abstract class Shape {
+  abstract def area(): Double
+  // E0096: abstract method area cannot be private ...
+}
+```
+
+対処: `public:` または `protected:` の下に宣言してください。
+
 ### `E0069` — ローカル val に初期化子が必要
 
 ローカル `val` が初期化子（`= expr`）なしで宣言されました。`var` と異なり `val` は
@@ -1707,6 +1723,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0093` | parameters `…` and `…` of `…` would both answer to the command-line flag `--…` |
 | `E0094` | `main` parameter `…` has type … which cannot be read from an argument |
 | `E0095` | `main` has a String[] parameter, `…`, that is not in a supported position |
+| `E0096` | abstract method … cannot be private |
 
 ## 関連項目
 

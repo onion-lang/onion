@@ -677,8 +677,8 @@ produce the component (`shape line = re"..."`, `from re"..."`).
 scalars — the capture group (or key) may be absent, and the component is then `null`
 instead of the non-null sentinel (`""` for `String`) a missing non-nullable component
 still gets. `T?` is only accepted when the inner type `T` is itself a supported scalar;
-`Inner?` for an unsupported `Inner` is still E0061. `derive!(Json, Yaml)` does not accept
-`T?` yet — see E0062.
+`Inner?` for an unsupported `Inner` is still E0061. `derive!(Json, Yaml)` accepts `T?`
+too, with the same null-for-absent semantics — see E0062.
 
 A `shape name = json` clause reads more: besides the scalars, `List[S]` of a scalar, a
 record `R` that declares a json shape of its own, `List[R]`, and `T?` of any of these.
@@ -704,14 +704,25 @@ field manually after a plain `from re"..."` match on the rest.
 mapping each component to a scalar — they share the same `toMap`/`fromMap`
 core, so the restriction is identical for both. Only `String`, `Int`, `Long`,
 `Double`, `Float`, `Boolean`, `Short`, and `Byte` components are supported —
-the same set as `from re"..."`.
+the same set as `from re"..."` — plus `T?` of any of them (#1969).
 
 ```onion
 record Inner(z: Int)
 record Bad(a: String, b: Inner) derive!(Json)   // E0062: Inner cannot be serialized
 ```
 
-Fix: keep every component in the supported scalar set.
+A nullable component reads a missing key or a JSON/YAML `null` as `null`, and writes a
+`null` value back as a real JSON/YAML `null` (not an omitted key). A present key whose
+value is the wrong type still fails the whole record, same as a missing non-nullable one
+does — nullability only makes *absence* a value, not a wrong type:
+
+```onion
+record Person(name: String, nickname: String?) derive!(Json)
+Person::fromJson("{\"name\": \"Ko\"}")                 // ok: nickname() is null
+Person::fromJson("{\"name\": \"Ko\", \"nickname\": 5}") // null: nickname present as a number
+```
+
+Fix: keep every component in the supported scalar set (`T` or `T?` of one).
 
 ### `E0063` — Unknown `derive!` marker
 

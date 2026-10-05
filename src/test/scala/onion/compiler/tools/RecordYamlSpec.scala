@@ -147,19 +147,28 @@ class RecordYamlSpec extends AbstractShellSpec {
       assert(result.isInstanceOf[Shell.Failure])
     }
 
-    it("rejects a nullable scalar component (String?) (E0062)") {
+    it("round-trips a nullable scalar component (String?), present and null (#1969)") {
       val result = shell.run(
         """
           |record Person(name: String, nickname: String?) derive!(Yaml)
           |class Test {
           |public:
-          |  static def main(args: String[]): String { return "x" }
+          |  static def main(args: String[]): String {
+          |    val v1 = new Person("Ko", "ko-chan")
+          |    val v1b = Person::fromYaml(Person::toYaml(v1))
+          |    if v1b == null || v1b != v1 { return "present-mismatch" }
+          |    val v2 = new Person("Ko", null)
+          |    val v2b = Person::fromYaml(Person::toYaml(v2))
+          |    if v2b == null || v2b != v2 { return "null-mismatch" }
+          |    if v2b.nickname() != null { return "not-null: " + v2b.nickname() }
+          |    return "ok"
+          |  }
           |}
           |""".stripMargin,
         "None",
         Array()
       )
-      assert(result.isInstanceOf[Shell.Failure])
+      assert(Shell.Success("ok") == result)
     }
 
     it("coexists with derive!(Json) — all four methods on one record") {

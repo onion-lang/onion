@@ -96,8 +96,9 @@ private[compiler] object ScalarConversions {
   /**
    * Whether a checked type can be read out of text, itself or as `T?` of such a type --
    * for `from re"..."`, where an unmatched optional group becomes `null` rather than the
-   * non-null sentinel `""`. Kept separate from `isDerivable` so callers that must stay
-   * nullable-free (`derive!`'s JSON/YAML serialization) are unaffected.
+   * non-null sentinel `""`, and for `derive!(Json, Yaml)`, where a missing/JSON-null key
+   * becomes `null` the same way (#1969). Kept separate from `isDerivable` so a caller that
+   * must stay nullable-free (none currently) can opt out.
    */
   def isDerivableOrNullable(tp: TypedAST.Type): Boolean = tp match {
     case nt: TypedAST.NullableType => isDerivable(nt.innerType)

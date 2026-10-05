@@ -438,8 +438,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
    * Same as `isFromDerivableType`, but also accepts `T?` of a supported scalar. `from
    * re"..."` and a regex `shape` clause read it from an unmatched optional capture group
    * (#1967, #1969); a yaml or config `shape` clause reads it from an absent document key
-   * or config key, the same as json's (#1969). `derive!` keeps the non-nullable check
-   * above -- its runtime doesn't yet give a nullable component real null.
+   * or config key, the same as json's (#1969); `derive!(Json, Yaml)` reads it from an
+   * absent/JSON-null key the same way, and writes a null component as a real JSON/YAML
+   * null rather than omitting it (#1969).
    */
   private def isFromReDerivableType(tp: Type): Boolean = ScalarConversions.isDerivableOrNullable(tp)
 
@@ -472,8 +473,13 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       }
   }
 
-  /** Component types `derive!` (see `DeriveMarkers`) can serialize — the same scalar set as `from`. */
-  private def isDataDerivableType(tp: Type): Boolean = isFromDerivableType(tp)
+  /**
+   * Component types `derive!` (see `DeriveMarkers`) can serialize — the same scalar set as
+   * `from`, plus `T?` of any of them (#1969): a missing/JSON-null key reads as `null`
+   * rather than failing the whole record, mirroring the `shape`/`from` formats' nullable
+   * support above.
+   */
+  private def isDataDerivableType(tp: Type): Boolean = isFromReDerivableType(tp)
 
   private def processEnumDeclaration(node: AST.EnumDeclaration): Unit = typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
     unitContext.currentDefinition = definition

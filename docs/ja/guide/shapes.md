@@ -176,7 +176,9 @@ Summary::doc().parse("{\"title\": \"t\", \"decisions\": [\"a\", 3], \"actions\":
 正規表現・`yaml`・`config` の shape も、`json` と同様にスカラーの `T?` を受け付けます
 —— キーが欠けている、またはマッチに参加しなかったキャプチャグループは、非 null の成分が
 欠けたときの代替値（`String` なら `""`）ではなく `null` になります。`derive!(Json, Yaml)`
-はまだ `T?` を受け付けません。
+も `T?` を受け付けます —— キーが欠けている、または JSON/YAML の `null` は `null` として
+読まれ、`null` の成分はキーを省略せず実際の JSON/YAML `null` として書き戻されます。
+キーが存在していても型が違う場合は、どちらにせよレコード全体が失敗します。
 
 ### 構造化出力のための JSON Schema
 

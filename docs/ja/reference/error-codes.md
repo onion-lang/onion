@@ -671,7 +671,8 @@ record R(a: String, b: Inner) from re"(\S+) (\S+)"   // E0061: Inner はサポ�
 —— キャプチャグループ（またはキー）が欠けていてもよく、その場合は成分が非 null の代替値
 （`String` なら `""`）ではなく `null` になります。`T?` が受け付けられるのは内側の型 `T` 自体が
 サポートされるスカラーの場合だけで、サポートされない `Inner` に対する `Inner?` は依然 E0061
-です。`derive!(Json, Yaml)` はまだ `T?` を受け付けません —— E0062 を参照してください。
+です。`derive!(Json, Yaml)` も同じ「欠けていれば null」という意味論で `T?` を受け付けます
+—— 詳細は E0062 を参照してください。
 
 `shape name = json` 句はそれより多くを読みます。スカラーに加えて、スカラーの `List[S]`、
 自身も json shape を宣言したレコード `R`、`List[R]`、およびこれらすべての `T?` です。
@@ -695,14 +696,27 @@ record R(a: String, b: Inner) { shape doc = json }     // E0061: shape doc = jso
 `derive!(Json)` と `derive!(Yaml)` はどちらも、各成分をスカラー値にマッピングする
 ことで `fromX`/`toX` の対を生成します。両者は同じ `toMap`/`fromMap` コアを共有して
 いるため、この制約はどちらでも同一です。サポートされる成分型は `from re"..."` と
-同じ、`String`、`Int`、`Long`、`Double`、`Float`、`Boolean`、`Short`、`Byte` です。
+同じ、`String`、`Int`、`Long`、`Double`、`Float`、`Boolean`、`Short`、`Byte`、
+そしてそれらの `T?` です（#1969）。
 
 ```onion
 record Inner(z: Int)
 record Bad(a: String, b: Inner) derive!(Json)   // E0062: Inner はシリアライズできない
 ```
 
-対処: すべての成分をサポートされているスカラー型にとどめてください。
+nullable な成分は、キーが欠けている場合や JSON/YAML の `null` を `null` として読み、
+`null` を書き戻すときも（キーを省略せず）実際の JSON/YAML `null` として書きます。
+キーが存在していても型が違う場合は、非 nullable な成分が欠けている場合と同様に
+レコード全体が失敗します —— nullable が意味を持つのは「値が無いこと」だけで、
+「型が違うこと」には効きません:
+
+```onion
+record Person(name: String, nickname: String?) derive!(Json)
+Person::fromJson("{\"name\": \"Ko\"}")                 // ok: nickname() は null
+Person::fromJson("{\"name\": \"Ko\", \"nickname\": 5}") // null: nickname が数値で存在している
+```
+
+対処: すべての成分をサポートされているスカラー型（`T` またはその `T?`）にとどめてください。
 
 ### `E0063` — 未知の `derive!` マーカー
 

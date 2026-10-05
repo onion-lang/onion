@@ -1126,6 +1126,7 @@ f1.race(f2)
 
 // すべての完了を待つ
 Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
+Future::all([f1, f2, f3])  // 同じ結果。実行時に組み立てた List[Future[T]] も渡せる
 
 // 最初に完了したもの
 Future::first(f1, f2, f3)

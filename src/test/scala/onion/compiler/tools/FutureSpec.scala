@@ -642,6 +642,25 @@ class FutureSpec extends AbstractShellSpec {
         assert(result == Shell.Success("[1, 2, 3]"))
       }
 
+      it("all accepts a dynamically built List[Future[T]], not just varargs") {
+        val result = shell.run(
+          """
+            |import { onion.Future; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val fs: List[Future[Int]] = [Future::successful[Int](1), Future::successful[Int](2), Future::successful[Int](3)];
+            |    val combined = Future::all(fs);
+            |    return combined.await().toString()
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success("[1, 2, 3]"))
+      }
+
       it("first returns the value shared by both completed futures") {
         val result = shell.run(
           """

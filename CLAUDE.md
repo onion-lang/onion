@@ -462,7 +462,7 @@ select request {
 record Access(time: String, method: String, path: String, status: Int)
   from re"(\S+) (\w+) (\S+) (\d+)"
 val a: Access? = Access::parse("127.0.0.1 GET /index 200")  // ANCHORED; null on no-match/convert-fail
-val rows: List = Access::parseAll(logText)                  // per-line parse, nulls dropped
+val rows: List[Access] = Access::parseAll(logText)           // per-line parse, nulls dropped
 
 // |> pipeline: e |> f is f(e); e |> f(a) is f(e, a); newline before |> continues
 xs.map { x -> x * 2 } |> println

@@ -49,10 +49,12 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
     val loader = new OnionClassLoader(classLoader, classpath, classes)
     withContextClassLoader(loader) {
       try {
-        val main = findFirstMainMethod(loader, classes)
-        main match {
-          case Some(method) => Shell.Success(method.invoke(null, args))
-          case None =>
+        findFirstMainMethod(loader, classes) match {
+          case Right(method) => Shell.Success(method.invoke(null, args))
+          case Left(Some(nonPublicClassName)) =>
+            System.err.println(Message("error.command.noEntryPoint.notPublic", nonPublicClassName))
+            Shell.Failure(-1)
+          case Left(None) =>
             val classNames = classes.map(_.className).mkString(", ")
             System.err.println(Message("error.command.noEntryPoint", classNames))
             Shell.Failure(-1)
@@ -64,8 +66,13 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
     }
   }
 
-  private def findFirstMainMethod(loader: OnionClassLoader, classes: Seq[CompiledClass]): Option[Method] = {
-    classes.view.flatMap { compiled =>
+  /** `Right` the public static entry point if one exists. Otherwise `Left`:
+   *  `Some(className)` naming a class whose `main(String[])` exists but is not
+   *  public (so the generic "no entry point found" message can be replaced with
+   *  one that names the actual cause), or `None` if no class declares `main`
+   *  at all. */
+  private def findFirstMainMethod(loader: OnionClassLoader, classes: Seq[CompiledClass]): Either[Option[String], Method] = {
+    val publicMain = classes.view.flatMap { compiled =>
       val clazz = Class.forName(compiled.className, true, loader)
       try {
         val main = clazz.getMethod("main", classOf[Array[String]])
@@ -75,6 +82,21 @@ class Shell (val classLoader: ClassLoader, val classpath: Seq[String]) {
         case _: NoSuchMethodException => None
       }
     }.headOption
+    publicMain match {
+      case Some(method) => Right(method)
+      case None =>
+        val nonPublicStaticMain = classes.view.flatMap { compiled =>
+          val clazz = Class.forName(compiled.className, true, loader)
+          try {
+            val main = clazz.getDeclaredMethod("main", classOf[Array[String]])
+            val modifier = main.getModifiers
+            if ((modifier & Modifier.STATIC) != 0 && (modifier & Modifier.PUBLIC) == 0) Some(compiled.className) else None
+          } catch {
+            case _: NoSuchMethodException => None
+          }
+        }.headOption
+        Left(nonPublicStaticMain)
+    }
   }
 
   private def withContextClassLoader[T](loader: ClassLoader)(body: => T): T = {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A top-level `static def main(args: String[]): void` written with no preceding `public:` section compiled cleanly but could never run** -- members default to private, so the method silently fails the entry-point search, and the old `no entry point found` message quoted back the user's already-correct `main` signature with no mention of visibility and no hint toward the fix. The entry-point search now distinguishes "no `main(String[])` anywhere" from "a `main(String[])` exists but isn't public", and reports the latter with the class name and a one-line fix: move it under a `public:` section. Found while probing the compiler for gaps.
+
 ## [0.139.0] - 2026-10-05
 
 ### Fixed

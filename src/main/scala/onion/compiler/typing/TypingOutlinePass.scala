@@ -741,6 +741,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           // when something loaded the class (e.g. LawCheckPhase).
           if ((node.modifiers & AST.M_STATIC) != 0) {
             report(SemanticError.STATIC_METHOD_WITHOUT_BODY, node, node.name)
+          } else if ((modifier & AST.M_PRIVATE) != 0) {
+            // ACC_PRIVATE|ACC_ABSTRACT is likewise a ClassFormatError at load time.
+            report(SemanticError.PRIVATE_ABSTRACT_METHOD, node, node.name)
           } else {
             modifier |= AST.M_ABSTRACT
           }

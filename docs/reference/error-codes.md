@@ -1285,6 +1285,22 @@ public:
 
 Fix: add a body, or drop `static` to declare an ordinary abstract instance method.
 
+### `E0096` — Private abstract method
+
+An abstract method (a bodyless `def`) is private. A member declared before any
+`public:`/`protected:` section is private, as is anything under `private:`, and a private
+method cannot be overridden, so no subclass could ever implement it. The JVM rejects the
+combination `ACC_PRIVATE|ACC_ABSTRACT`.
+
+```onion
+abstract class Shape {
+  abstract def area(): Double
+  // E0096: abstract method area cannot be private ...
+}
+```
+
+Fix: declare it under `public:` or `protected:`.
+
 ### `E0069` — Local val requires an initializer
 
 A local `val` was declared without an initializer (no `= expr`). Unlike a
@@ -1722,6 +1738,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0093` | parameters `…` and `…` of `…` would both answer to the command-line flag `--…` |
 | `E0094` | `main` parameter `…` has type … which cannot be read from an argument |
 | `E0095` | `main` has a String[] parameter, `…`, that is not in a supported position |
+| `E0096` | abstract method … cannot be private |
 
 ## See also
 

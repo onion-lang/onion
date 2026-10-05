@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.139.0] - 2026-10-05
+
 ### Fixed
 
 - **A bare, receiver-less, parens-less reference to another no-arg method of the same class failed with `[E0002] local variable ... is not found`** (`def wrap: String = greet` inside the same class as `def greet: String = ...`), breaking the template-method / default-method idiom (an abstract or concrete method calling a sibling method by bare name, e.g. `"area=" + area` next to `abstract def area: Double`). `self.greet`/`greet()` both already worked, so this was a resolution gap, not a syntax error: the bare-name fallback chain tried a local, then a field, then gave up, without ever trying a zero-arg method the way an explicit receiver (`obj.method`) already does. A bare name with no local/field now also resolves against a zero-arg method of the enclosing instance before being reported as not found (#2013).

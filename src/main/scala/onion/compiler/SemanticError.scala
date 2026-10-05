@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0095) for identification
+ * type checking. Each error has a unique code (E0000-E0096) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -45,10 +45,10 @@ package onion.compiler
  *   - INVALID_METHOD_CALL_TARGET, STATIC_CALL_ON_INSTANCE, CLASS_USED_AS_VALUE
  *   - CANNOT_INSTANTIATE_PRIMITIVE_TYPE
  *
- * '''Assignment and Declaration Errors (E0028, E0036, E0051-E0052, E0055, E0069, E0085)'''
+ * '''Assignment and Declaration Errors (E0028, E0036, E0051-E0052, E0055, E0069, E0085, E0096)'''
  *   - LVALUE_REQUIRED, CANNOT_ASSIGN_TO_VAL, RETURN_TYPE_REQUIRED
  *   - LAMBDA_PARAM_TYPE_REQUIRED, FUNCTION_BODY_REQUIRED, VAL_REQUIRES_INITIALIZER
- *   - STATIC_METHOD_WITHOUT_BODY
+ *   - STATIC_METHOD_WITHOUT_BODY, PRIVATE_ABSTRACT_METHOD
  *
  * '''Generic Type Errors (E0030-E0035, E0057, E0066)'''
  *   - TYPE_NOT_GENERIC, TYPE_ARGUMENT_ARITY_MISMATCH, TYPE_ARGUMENT_MUST_BE_REFERENCE
@@ -259,6 +259,14 @@ object SemanticError {
    * the offending `String[]` parameter rather than at the `def` (issue #1998).
    */
   case object MAIN_PARAMETER_MISPLACED_ARRAY extends SemanticError(95)
+  /**
+   * An abstract method (a bodyless `def`) whose access is private: either it sits
+   * above the first `public:`/`protected:` section (a member with no section is
+   * private) or under `private:`. A private method cannot be overridden, so it can
+   * never be implemented, and the JVM rejects ACC_PRIVATE|ACC_ABSTRACT with a raw
+   * ClassFormatError at class-load time (issue #2012).
+   */
+  case object PRIVATE_ABSTRACT_METHOD extends SemanticError(96)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

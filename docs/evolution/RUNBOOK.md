@@ -9,8 +9,9 @@ do. Follow the section for your role, and always do §0 first.
 1. **Kill switch.** The Roadmap issue is the open issue titled "Roadmap: Onion evolution" (`kind:roadmap`); Direction proposals share the label, so match the title:
    `gh issue list --label kind:roadmap --state open --search "Roadmap: Onion evolution in:title"`.
    If it carries `evolution:pause`, stop and report "paused".
-2. **Orient.** The newest `approved` Direction proposal is the active direction; issues it
-   names, or that serve its bets, are in scope. If none is approved yet, work only on `P0`/`P1`
+2. **Orient.** The newest `approved` Direction proposal is the active direction, whatever its
+   state (#1928 was closed by a no-op PR and is still the direction), so list with `state=all`;
+   issues it names, or that serve its bets, are in scope. If none is approved yet, work only on `P0`/`P1`
    bugs. Read:
    - the Roadmap issue
    - the newest Direction proposal labelled `approved`
@@ -21,8 +22,9 @@ do. Follow the section for your role, and always do §0 first.
    `gh repo clone onion-lang/evolution-memory ../evolution-memory`). Read its `self.md` and
    `insights.md`. Once you know what you are about to work on, recall related episodes from
    its root: `onion tools/memory.on recall "<issue keywords>"`, with the jar you build for the
-   work anyway (`sbt -batch assembly`). Act on what past runs learned; do not repeat their
-   mistakes.
+   work anyway (`sbt -batch assembly`; in a cloud checkout `sbt` is at
+   `/root/.local/sbt-launcher/bin`, not on PATH). Act on what past runs learned; do not repeat
+   their mistakes.
 4. **Joint attention.** Notice what Kota is looking at before choosing what to look at
    yourself: issues and PRs labelled `kota:look`, and anything he commented on or reacted to in
    the last 7 days. After `P0`, these come first. To point Kota at something, put it under
@@ -67,8 +69,10 @@ do. Follow the section for your role, and always do §0 first.
     `onion tools/memory.on remember <role> "<what happened, one line>" --body "..." --feeling <word> --refs "#.." --importance <1-5>`.
     The body says what you tried, what surprised you, and what you would do differently. The
     feeling is honest (`proud`, `frustrated`, `bored`, `curious`, `uneasy`, ...); where
-    frustration piles up is where Onion hurts. Then commit and push the memory repo
-    (`git pull --rebase` and retry if the push is rejected). A run that failed has the most to
+    frustration piles up is where Onion hurts. Then commit and push the memory repo with
+    `git push origin HEAD:main` (`git pull --rebase` and retry if the push is rejected). A
+    cloud session's plain `git push` lands on a `claude/*` branch, where no run will ever
+    read it: 35 episodes were stranded that way in W40. A run that failed has the most to
     remember.
 
 ## §1 Maintainer (hourly)
@@ -86,7 +90,11 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    - Candidates are open issues labelled `status:ready`, ordered by `P0` → `P3`, then oldest first.
    - Skip a `kind:rfc` without `approved`.
    - Skip work that needs an RFC when no approved RFC covers it. Instead, write the RFC as a
-     `kind:rfc` issue labelled `status:needs-kota`.
+     `kind:rfc` issue labelled `status:needs-kota`. When its recommended option is small and
+     reversible (about 200 lines, no grammar change), also open that option as a draft PR
+     (`risk:high`, `status:needs-kota`) and link the two: Kota decides on a diff within a day
+     and on prose rarely (W40: four `risk:high` PRs merged in a day, five RFCs unanswered,
+     #1973 settled by his own #1974).
 4. **Work it.**
    - Label the issue `status:in-progress` and comment "Taking this" with your session link.
    - Branch `evo/<issue>-<slug>` from `develop`.
@@ -104,8 +112,11 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      only a forecast, and the PR's diff decides.
    - A `risk:high` PR gets `status:needs-kota` too (on the PR); leave the issue `status:in-progress`.
    - Bugs you find along the way: file them as issues (template, labels, repro) instead of
-     fixing them in the same PR.
-5. **Nothing ready?** Run one Sensor probe (§2 step 2) instead of inventing work. Add a `run/`
+     fixing them in the same PR, and label them `status:ready` when the repro is verified,
+     whoever files them. An unlabelled verified bug is invisible to the next run (#1972).
+5. **Nothing ready?** Run one Sensor probe (§2 step 2) instead of inventing work. Before that,
+   look for an open verified bug or user-filed friction that only lacks `status:ready`, label it
+   and take it. 24 of the first 41 runs changed nothing; most of them had such an issue open. Add a `run/`
    sample only when an issue asks for one or it exercises a feature you just changed, and never
    more than one a day.
 6. **Close the loop.**
@@ -120,27 +131,44 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    once that directory exists. A
    failure or awkwardness becomes a `kind:friction` or `kind:bug` issue with `source:dogfood`.
 2. **Probe.** Run the gap-probe workflow (`.claude/workflows/onion-gap-probe.js`) on **two**
-   domains, rotating through its domain list. Record which ones in the digest. Each verified
-   finding becomes an issue (`source:probe`).
+   domains, rotating through its domain list. A scheduled session cannot use the `Workflow`
+   tool it needs; then write the probe scripts by hand for the two domains (about eight short
+   programs each). Before calling a failure a bug, read the stdlib's Java source: in W40 most
+   probe "failures" were the probe's own wrong API names. Record which domains in the digest.
+   Each verified finding becomes an issue (`source:probe`, `status:ready`).
 3. **Budgets.** Compare the readiness benchmark against `PerformancePolicy`. A breach is a
-   `kind:bug` issue labelled `P1`.
+   `kind:bug` issue labelled `P1`. This needs the jar built from source (sbt's path is in
+   Known pitfalls); fall back to the release jar only after a real Maven 429, and say so.
 4. **File well.** Every issue needs:
    - a minimal repro
    - expected vs actual behaviour
    - why it matters
    - its labels (`kind`, `source`, `P`)
    - `status:ready` when the repro is solid
+   An issue filed by a person using Onion for real work (not by a run; W40: Shiori's eight)
+   gets `source:user`, a first response within 24 hours, and comes right after `P0` and
+   `kota:look` in the Maintainer's order: that channel found more than the probes did.
 5. **Digest.** Comment on the Roadmap issue:
    - PRs merged in the last 24h
    - issues opened
    - the `status:needs-kota` list
    - a metrics snapshot: the dogfood result, open friction issues by priority, the share of
      last week's PRs that closed an issue, the share that were samples, and the CI result on
-     `develop`
+     `develop`. The PR shares are one REST call (replace the date with 7 days ago):
+     ```bash
+     gh api 'repos/onion-lang/onion/pulls?state=closed&sort=updated&direction=desc&per_page=100' \
+       --jq '[.[] | select(.merged_at != null and .merged_at >= "2026-09-28")]
+             | "merged=\(length) closes_issue=\([.[] | select((.body // "") | test("(close[sd]?|fix(e[sd])?|resolve[sd]?) #[0-9]+"; "i"))] | length) samples=\([.[] | select(.title | test("^(feat|samples)\\((run|corpus|samples)\\)"))] | length)"'
+     ```
+     "Not computed" is not a value; if the call fails, say what failed.
 
 ## §3 Strategist (weekly)
 
 1. **Gather the last 7 days:**
+   - the routines themselves: which prompts actually fire and whether their last run succeeded
+     (the Claude Code `list_triggers` tool). A stale prompt is the loop's worst failure: in W40
+     the hourly routine was still the July "release gate" prompt, and the episodes in the
+     memory repo are the only place that showed it
    - merged and reverted PRs
    - opened and closed issues
    - CI failures
@@ -212,3 +240,12 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
   new workflows should run on `pull_request` plus `push` to `develop` only.
 - **Scratch files:** write PR bodies to uniquely named files. A shared scratch file has been
   overwritten by a concurrent session before.
+- **GitHub from a cloud session is REST only.** `gh issue list`, `gh pr list`, `gh issue create`
+  and `gh api search/...` fail (GraphQL 403), and `gh api --paginate` fails on the second page.
+  Use `gh api repos/onion-lang/onion/...` with `page=N` by hand, or the GitHub MCP tools.
+  Dedupe by listing issues with `state=all&since=<date>` and grepping, since search is blocked.
+- **sbt in a cloud checkout** is at `/root/.local/sbt-launcher/bin`, not on PATH; `assembly`
+  takes about 40 s warm. "No sbt" cost the Sensor its budgets and a quarter of the dogfood
+  suite twice in W40.
+- **Memory pushes:** `git push origin HEAD:main` in `../evolution-memory`; a plain push from a
+  cloud session goes to a `claude/*` branch.

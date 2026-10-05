@@ -55,7 +55,7 @@ changed feature, at most one a day.
 ## Labels
 
 - `kind:friction|bug|feature|rfc|research|retro|roadmap`
-- `source:dogfood|probe|fuzz|ci|agent|kota`
+- `source:dogfood|probe|fuzz|ci|agent|kota|user` (`user`: filed by a person using Onion for real work)
 - `risk:low|high`
 - `status:ready|in-progress|blocked|needs-kota`
 - `P0` (`develop` broken or release blocked), `P1` (real task blocked), `P2` (friction), `P3` (nice to have)

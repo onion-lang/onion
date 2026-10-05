@@ -175,6 +175,34 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       }
     }
 
+    it("recognizes a Java/Kotlin/C#-style access modifier written directly before `def`") {
+      val cases = Seq(
+        "private def secret(): Int { return 1 }" -> ("private", "secret"),
+        "public def secret(): Int { return 1 }" -> ("public", "secret"),
+        "protected def helper(x: Int): Int { return x }" -> ("protected", "helper")
+      )
+
+      cases.foreach { case (sourceLine, (modifier, name)) =>
+        val hint = classify(
+          found = "def",
+          expected = "\":\"",
+          sourceLine = sourceLine
+        )
+
+        hint.messageKey shouldBe "error.parsing.hint.modifier_before_def"
+        hint.arguments shouldBe Seq(modifier, name)
+      }
+    }
+
+    it("does not misread `private`/`public`/`protected` as a modifier-before-def prefix when def isn't next") {
+      SyntaxHintClassifier.classify(
+        found = "def",
+        expected = "\":\"",
+        context = "",
+        sourceLine = "private val x: Int"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.modifier_before_def")
+    }
+
     it("recognizes an old arrow in a parenthesized trailing lambda") {
       val hint = classify(
         found = "{",

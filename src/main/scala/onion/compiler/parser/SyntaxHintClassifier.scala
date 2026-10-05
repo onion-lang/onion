@@ -116,6 +116,16 @@ private[compiler] object SyntaxHintClassifier {
   private val JsStyleConstructorDeclaration = """^\s*constructor\s*\(""".r
   private val JavaStyleMethodDeclaration =
     """^\s*(?:public|private|protected)?\s*(?!public\b|private\b|protected\b|def\b)[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
+  // A Java/Kotlin/C#-style access modifier written directly before `def`, e.g.
+  // `private def foo(): Int { ... }`. Onion's `public`/`private`/`protected` are
+  // section labels (`public:` on its own line), never per-member prefixes, so each
+  // parses as the start of an access-section header, and the grammar then wants
+  // that header's `:` right where `def` sits. JavaStyleMethodDeclaration above
+  // deliberately excludes this `modifier def` shape (its own `(?!...|def\b)`
+  // lookahead), since a declaration with `def` is never the Java-style "Type
+  // name(...)" mistake it catches -- so this is the one case it never reaches.
+  private val ModifierBeforeDefDeclaration =
+    """^\s*(public|private|protected)\s+def\s+([A-Za-z_]\w*)""".r
   private val MissingParameterType =
     """\bdef\s+[A-Za-z_]\w*(?:\[[^\]]*\])?\s*\(\s*(?:(?:val|var)\s+)?([A-Za-z_]\w*)\s*[,)]""".r
   private val JavaStyleFieldDeclaration =
@@ -363,6 +373,9 @@ private[compiler] object SyntaxHintClassifier {
       case "=" if expected == "\".\"" && JavaStyleImportAlias.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleImportAlias.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_import_alias", matched.group(2), matched.group(1))
+      case "def" if expected == "\":\"" && ModifierBeforeDefDeclaration.findFirstMatchIn(sourceLine).isDefined =>
+        val matched = ModifierBeforeDefDeclaration.findFirstMatchIn(sourceLine).get
+        hint("error.parsing.hint.modifier_before_def", matched.group(1), matched.group(2))
       case _ if (expected == "\":\"" || expected.contains("\"def\"")) && JavaStyleMethodDeclaration.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.java_style_method")
       case "constructor" if expected.contains("\"def\"") && JsStyleConstructorDeclaration.findFirstMatchIn(sourceLine).isDefined =>

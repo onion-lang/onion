@@ -127,7 +127,7 @@ val l: Long? = IO::tryReadLong("L: ")
 ### 行単位の入出力
 
 ```onion
-val lines: List = IO::readLines()          // 入力の終端まで読み取り
+val lines: List[String] = IO::readLines()  // 入力の終端まで読み取り
 IO::eachLine { line -> IO::println(line) } // 残りの各行にコールバックを適用
 IO::printLines(["a", "b", "c"])            // 1項目1行で出力
 IO::printAll("a", "b", "c")                // printLines の可変長引数版

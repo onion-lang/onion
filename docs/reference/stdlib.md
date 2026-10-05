@@ -128,7 +128,7 @@ val l: Long? = IO::tryReadLong("L: ")
 ### Line-Oriented I/O
 
 ```onion
-val lines: List = IO::readLines()          // reads until end of input
+val lines: List[String] = IO::readLines()  // reads until end of input
 IO::eachLine { line -> IO::println(line) } // applies a callback to each remaining line
 IO::printLines(["a", "b", "c"])            // one item per line
 IO::printAll("a", "b", "c")                // varargs form of printLines

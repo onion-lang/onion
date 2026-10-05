@@ -443,7 +443,7 @@ select request {
 record Access(time: String, method: String, path: String, status: Int)
   from re"(\S+) (\w+) (\S+) (\d+)"
 val a: Access? = Access::parse("127.0.0.1 GET /index 200")  // ANCHORED；マッチ失敗・変換失敗時は null
-val rows: List = Access::parseAll(logText)                  // 1行ずつパースし、null は除外される
+val rows: List[Access] = Access::parseAll(logText)           // 1行ずつパースし、null は除外される
 
 // |> パイプライン: e |> f は f(e)、e |> f(a) は f(e, a)。改行してから |> を書いても継続扱い
 xs.map { x -> x * 2 } |> println

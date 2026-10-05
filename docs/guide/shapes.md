@@ -175,6 +175,11 @@ Only `json` reaches this far. A regex, `yaml` or `config` shape keeps to the sca
 because every shape of a record reads the same components, a record that mixes them does
 too — E0061 names the clause that cannot read the component.
 
+A regex, `yaml` or `config` shape does accept `T?` of a scalar, the same as `json`: an
+absent key, or a capture group that did not participate in the match, reads as `null`
+instead of the non-null sentinel a missing non-nullable component gets (`""` for a
+`String`). `derive!(Json, Yaml)` does not accept `T?` yet.
+
 ### A JSON Schema for structured output
 
 A json shape can describe the documents it reads as a JSON Schema — the form an LLM's

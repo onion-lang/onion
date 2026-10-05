@@ -1149,6 +1149,7 @@ f1.race(f2)
 
 // Wait for all
 Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
+Future::all([f1, f2, f3])  // same, but takes a List[Future[T]] built at runtime
 
 // First to complete
 Future::first(f1, f2, f3)

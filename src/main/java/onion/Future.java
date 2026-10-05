@@ -348,6 +348,18 @@ public final class Future<T> {
     }
 
     /**
+     * Creates a Future that completes when every Future in the given list completes.
+     * Returns the results as a list, in order. Unlike the varargs {@link #all(Future[])},
+     * this accepts a {@code List[Future[T]]} built at runtime (e.g. from a loop or a map),
+     * matching the rest of the standard library's list-first convention.
+     */
+    public static <T> Future<java.util.List<Object>> all(java.util.List<Future<T>> futures) {
+        @SuppressWarnings("unchecked")
+        Future<T>[] array = futures.toArray(new Future[0]);
+        return all(array);
+    }
+
+    /**
      * Creates a Future that completes when the first of the given Futures completes.
      */
     @SafeVarargs

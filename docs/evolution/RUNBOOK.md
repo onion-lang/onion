@@ -160,6 +160,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
        --jq '[.[] | select(.merged_at != null and .merged_at >= "2026-09-28")]
              | "merged=\(length) closes_issue=\([.[] | select((.body // "") | test("(close[sd]?|fix(e[sd])?|resolve[sd]?) #[0-9]+"; "i"))] | length) samples=\([.[] | select(.title | test("^(feat|samples)\\((run|corpus|samples)\\)"))] | length)"'
      ```
+     One page covers a loop-era week (W40: 37 PRs); if it reports `merged=100`, add `&page=2`.
      "Not computed" is not a value; if the call fails, say what failed.
 
 ## §3 Strategist (weekly)

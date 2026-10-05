@@ -17,8 +17,14 @@ workaround, becomes a `kind:friction` or `kind:bug` issue labelled `source:dogfo
 ```bash
 dogfood/run.sh                 # builds onion and onion-llm with sbt, then every project
 dogfood/run.sh gh-digest       # only some projects
-dogfood/run.sh --prebuilt      # reuse the last `sbt assembly` and published battery
+dogfood/run.sh --prebuilt      # reuse the last `sbt assembly`; no sbt needed
 ```
+
+Which `onion-llm` a project gets: the default mode builds it from this checkout and publishes
+it locally as `0.0.0-dogfood`. `--prebuilt` uses that local copy if it exists, and otherwise
+resolves `onion-llm` from Maven Central at the jar's own version (the latest release when the
+jar is a development build; `LLM_VERSION=x.y.z` overrides), so all four projects run with a
+release jar and no sbt.
 
 CI runs the same script (`.github/workflows/dogfood.yml`). On Windows, where `sbt` is
 `sbt.bat`, build first from PowerShell and then use `--prebuilt` from Git Bash:

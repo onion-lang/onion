@@ -33,7 +33,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     bodyContext,
     typed(_, _, _),
     typeMemberSelection(_, _),
-    typeAssignment(_, _)
+    typeAssignment(_, _),
+    trySelfMethodQuiet(_, _)
   )
   private val declarationBodySupport = new DeclarationBodySupport(
     typing,
@@ -260,6 +261,20 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
 
   def typeMemberSelection(node: AST.MemberSelection, context: LocalContext): Option[Term] =
     methodCallTyping.typeMemberSelection(node, context)
+
+  /**
+   * A bare identifier that isn't a local/field falls back to a zero-arg
+   * method of the enclosing instance (`greet` resolving like `self.greet`),
+   * mirroring the parens-optional convention an explicit receiver already
+   * gets (#2013). Static context has no implicit receiver to probe, so it's
+   * left to the existing static-field/top-level fallback.
+   */
+  private def trySelfMethodQuiet(node: AST.Id, context: LocalContext): Option[Term] =
+    if (context.isStatic) None
+    else methodCallTyping.tryMemberSelectionQuiet(
+      AST.MemberSelection(node.location, AST.CurrentInstance(node.location), node.name),
+      context
+    )
 
   def typeMethodCall(node: AST.MethodCall, context: LocalContext, expected: Type = null): Option[Term] =
     methodCallTyping.typeMethodCall(node, context, expected)

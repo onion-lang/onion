@@ -20,7 +20,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
   bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
   typeMemberSelection: (AST.MemberSelection, LocalContext) => Option[Term],
-  typeAssignment: (AST.Assignment, LocalContext) => Option[Term]
+  typeAssignment: (AST.Assignment, LocalContext) => Option[Term],
+  trySelfMethodQuiet: (AST.Id, LocalContext) => Option[Term]
 ) {
   def typeSimple(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
     node match {
@@ -389,7 +390,11 @@ private[compiler] final class SimpleExpressionTypingSupport(
    */
   private def resolveImplicitField(node: AST.Id, context: LocalContext): Option[Term] = {
     val field = bodyContext.definition.findField(node.name)
-    if (field == null) None
+    if (field == null)
+      // No field by that name -- try a zero-arg method of the enclosing class
+      // next (a bare, receiver-less, parens-less call resolving like
+      // `self.<name>`), before this bare name is reported as not found (#2013).
+      trySelfMethodQuiet(node, context)
     else if ((field.modifier & AST.M_STATIC) != 0)
       Some(new RefStaticField(node.location, bodyContext.definition, field))
     else if (!context.isStatic)

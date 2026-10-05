@@ -291,6 +291,10 @@ final class MethodCallTyping(
   def typeMemberSelection(node: AST.MemberSelection, context: LocalContext): Option[Term] =
     memberSelectionTypingSupport.typeMemberSelection(node, context)
 
+  /** Quiet probe variant of [[typeMemberSelection]]; see its doc for why. */
+  private[typing] def tryMemberSelectionQuiet(node: AST.MemberSelection, context: LocalContext): Option[Term] =
+    memberSelectionTypingSupport.tryMemberSelectionQuiet(node, context)
+
   def typeMethodCall(node: AST.MethodCall, context: LocalContext, expected: Type = null): Option[Term] =
     instanceMethodCallSupport.typeMethodCall(node, context, expected)
 

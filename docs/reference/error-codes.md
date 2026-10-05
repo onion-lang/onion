@@ -673,6 +673,13 @@ A `shape name = ...` clause (regex, `yaml` or `config`) reads its components the
 way, so the same restriction applies; the message names the clause that could not
 produce the component (`shape line = re"..."`, `from re"..."`).
 
+`from re"..."` and a regex/`yaml`/`config` shape also accept `T?` of any of those
+scalars — the capture group (or key) may be absent, and the component is then `null`
+instead of the non-null sentinel (`""` for `String`) a missing non-nullable component
+still gets. `T?` is only accepted when the inner type `T` is itself a supported scalar;
+`Inner?` for an unsupported `Inner` is still E0061. `derive!(Json, Yaml)` does not accept
+`T?` yet — see E0062.
+
 A `shape name = json` clause reads more: besides the scalars, `List[S]` of a scalar, a
 record `R` that declares a json shape of its own, `List[R]`, and `T?` of any of these.
 Anything else is still E0061 for it — a `Map`, an array, `List[List[S]]`, `List[S?]`, a

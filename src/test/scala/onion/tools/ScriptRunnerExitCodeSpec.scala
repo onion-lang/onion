@@ -119,3 +119,23 @@ class ScriptRunnerExitCodeSpec extends AnyFunSuite with Matchers:
     // Locale-independent: the class name is never translated, unlike the rest
     // of the message (bilingual, see errorMessage.properties/errorMessage_ja.properties).
     out should include("Foo")
+
+  test("a static main(String[]) written before any public: section exits non-zero with a hint about visibility"):
+    // `static def main` with no preceding `public:` section is private by default
+    // (members default to private), so it compiles cleanly but can never be found
+    // as an entry point. The generic "no entry point found" message used to quote
+    // back this exact, already-correct signature as if it didn't exist, with no
+    // mention of visibility and no hint toward the one-word fix (`public:`).
+    val path = writeScript(
+      """class Main {
+        |  static def main(args: String[]): void {
+        |    IO::println("hi")
+        |  }
+        |}
+        |""".stripMargin)
+
+    val (exitCode, out) = captureOut(new ScriptRunner().run(Array(path)))
+
+    exitCode shouldBe -1
+    out should include("Main")
+    out should include("public:")

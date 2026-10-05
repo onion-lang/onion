@@ -72,6 +72,20 @@ class LawGeneratorCoverageSpec extends AnyFunSpec {
       )
       assert(codes.contains("E0074"))
     }
+
+    it("reports E0074 for a generic record's own type parameter, instead of crashing or skipping silently") {
+      // A law is checked once per generic record definition, with no reified type argument
+      // to sample from -- `T` erases to Object, which ArgGenerator cannot generate for any
+      // more than an interface or an array component type can. This must land on the same
+      // diagnostic path as the other ungeneratable-parameter cases above, not a compiler crash.
+      val codes = errorCodes(
+        s"""|record Wrap[T](v: T) {
+            |  law roundtrip(x: T) { new Wrap[T](x).v() == x }
+            |}
+            |$main""".stripMargin
+      )
+      assert(codes.contains("E0074"), s"expected E0074, got: $codes")
+    }
   }
 
   describe("laws that can be generated are unaffected") {

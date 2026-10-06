@@ -42,4 +42,20 @@ class ReservedWordIdentifierHintI18nSpec extends AnyFunSpec with Diagrams {
     // assertion holds regardless of the JVM's default locale.
     assert(msgs.contains("`class`"), s"expected the hint's backtick-escaped `class`, got: $msgs")
   }
+
+  it("hints at merging for a second top-level import block, not at backticks") {
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    val src =
+      """import { java.lang.Thread }
+        |import { java.lang.Runnable }
+        |IO::println("x")
+        |""".stripMargin
+    val msgs = new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
+      case _ => ""
+    }
+    assert(msgs.contains(en.getString("error.parsing.hint.duplicate_import_block")) ||
+      msgs.contains(ja.getString("error.parsing.hint.duplicate_import_block")), s"got: $msgs")
+    assert(!msgs.contains("`import`"), s"backtick hint leaked: $msgs")
+  }
 }

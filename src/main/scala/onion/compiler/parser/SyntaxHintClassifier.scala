@@ -438,6 +438,11 @@ private[compiler] object SyntaxHintClassifier {
       case "{" if ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).isDefined =>
         val params = ParenthesizedTrailingLambdaHead.findFirstMatchIn(context).get.group(1).trim
         hint("error.parsing.hint.trailing_lambda_parens", params)
+      // A compilation unit has one `import { ... }` block; a second one is rejected at
+      // the `import` keyword, which the generic reserved-word rule below would
+      // misread as an identifier slot.
+      case "import" if sourceLine.trim.startsWith("import") =>
+        hint("error.parsing.hint.duplicate_import_block")
       case word if ReservedWords.contains(word) && (expected.contains("<ID>") || expected.contains("<QUOTED_ID>")) =>
         hint("error.parsing.hint.reserved_word_identifier", word)
       case _ if expected.contains("{") && NotOperatorCondition.findFirstMatchIn(sourceLine).isDefined =>

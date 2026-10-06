@@ -157,7 +157,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
           expected,
           sourceContext.context,
           sourceContext.sourceLine,
-          expectedAll
+          expectedAll,
+          error.column
         )
       )
     }
@@ -184,7 +185,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
           error.expected,
           sourceContext.context,
           sourceContext.sourceLine,
-          error.expectedAll
+          error.expectedAll,
+          error.column
         )
       )
     }
@@ -216,7 +218,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
           expected,
           sourceContext.context,
           sourceContext.sourceLine,
-          expectedAll
+          expectedAll,
+          error.beginColumn
         )
       )
     }
@@ -228,12 +231,15 @@ class Parsing(config: CompilerConfig) extends AnyRef
    * STRING/CHARACTER token, never leaving the quote behind as its own token;
    * report it as such instead of listing unrelated expected tokens.
    */
-  private def syntaxErrorMessage(found: String, expected: String, context: String, sourceLine: String, expectedAll: String): String = {
+  private def syntaxErrorMessage(found: String, expected: String, context: String, sourceLine: String, expectedAll: String, column: Int): String = {
     // At EOF the expected-token list is a large, unhelpful dump; report the real
     // problem (an unclosed block/paren) instead.
     if (found == null || found.isEmpty) return Message("error.parsing.unexpected_eof")
     val base =
-      if (found == "\"") Message("error.parsing.unterminated_string")
+      if (found == "\"")
+        invalidEscapeColumn(sourceLine, column)
+          .map(c => Message("error.parsing.invalid_escape", c))
+          .getOrElse(Message("error.parsing.unterminated_string"))
       else if (found == "'") Message("error.parsing.unterminated_char")
       else if (found == OnionParser.UnclosedInterpolationMarker) Message("error.parsing.unclosed_interpolation")
       else if (found == OnionParser.TooDeepInterpolationMarker) Message("error.parsing.interpolation_too_deep", OnionLexer.MaxInterpBraceDepth)
@@ -243,6 +249,29 @@ class Parsing(config: CompilerConfig) extends AnyRef
       .map(renderSyntaxHint)
       .getOrElse("")
     if (hint.isEmpty) base else base + " " + hint
+  }
+
+  /**
+   * For a lone `"` at 1-based `column`: when the line closes the string after an escape the
+   * lexer does not accept (`\d`), the 1-based column of that escape. The quote is then not
+   * missing; the escape is what stopped the STRING token from matching.
+   */
+  private def invalidEscapeColumn(sourceLine: String, column: Int): Option[Int] = {
+    if (sourceLine == null || column < 1 || column > sourceLine.length || sourceLine.charAt(column - 1) != '"') return None
+    var i = column
+    var bad = -1
+    while (i < sourceLine.length) {
+      sourceLine.charAt(i) match {
+        case '"' => return if (bad >= 0) Some(bad + 1) else None
+        case '\\' if i + 1 < sourceLine.length =>
+          val c = sourceLine.charAt(i + 1)
+          if (bad < 0 && "ntbrf\\'\"#01234567".indexOf(c) < 0) bad = i
+          i += 1
+        case _ =>
+      }
+      i += 1
+    }
+    None
   }
 
   private def renderSyntaxHint(hint: SyntaxHint): String =

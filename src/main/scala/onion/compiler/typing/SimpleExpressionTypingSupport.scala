@@ -408,11 +408,31 @@ private[compiler] final class SimpleExpressionTypingSupport(
    */
   private def fieldQualificationHint(name: String, context: LocalContext): Option[String] = {
     val field = bodyContext.definition.findField(name)
-    if (field == null) None
-    else if ((field.modifier & AST.M_STATIC) != 0) Some(s"${bodyContext.definition.name}::$name")
-    else if (!context.isStatic) Some(s"this.$name")
-    else None
+    if (field != null) {
+      if ((field.modifier & AST.M_STATIC) != 0) Some(s"${bodyContext.definition.name}::$name")
+      else if (!context.isStatic) Some(s"this.$name")
+      else None
+    } else extensionReceiverMemberHint(name, context)
   }
+
+  /**
+   * Inside an `extension` block, the receiver is bound as an ordinary local named
+   * `this` (`MethodBodySupport.prepareExtensionContext`), not the enclosing class --
+   * the synthetic extension container carries no fields and isn't the receiver's
+   * type, so `bodyContext.definition.findField` and the zero-arg-method fallback
+   * (#2013, gated on `!context.isStatic`, which an extension method always is)
+   * both miss even though the explicit `self.<name>`/`this.<name>` form already
+   * resolves against that very binding. Detect it here and hint the explicit form,
+   * the same way an instance field unreachable from a static context is hinted.
+   */
+  private def extensionReceiverMemberHint(name: String, context: LocalContext): Option[String] =
+    if (context.lookup("this") == null) None
+    else context.getEffectiveType("this") match {
+      case receiver: ObjectType =>
+        val hasMember = receiver.field(name) != null || receiver.findMethod(name, Array.empty).nonEmpty
+        if (hasMember) Some(s"self.$name") else None
+      case _ => None
+    }
 
   /**
    * True when a bare name that failed ordinary variable/field lookup is actually a

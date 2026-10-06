@@ -146,10 +146,22 @@ class SemanticErrorReporter(threshold: Int) {
     val sameName = targetType match
       case obj: TypedAST.ObjectType => obj.methods.filter(_.name == name).toSeq
       case _ => Seq.empty
+    // Set only for a bare call inside an `extension` block (UnqualifiedMethodCallSupport):
+    // the receiver `self`/`this` is bound to, which `targetType` -- the synthetic
+    // extension container, never the receiver -- cannot itself name a method on.
+    val extensionReceiverCandidates =
+      if (items.length > 4 && items(4) != null)
+        items(4).asInstanceOf[TypedAST.ObjectType].methods.filter(_.name == name).toSeq
+      else Seq.empty
     val suggestion =
       if (sameName.nonEmpty) {
         val signatures = sameName.take(3).map { m =>
           s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
+        }
+        Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
+      } else if (extensionReceiverCandidates.nonEmpty) {
+        val signatures = extensionReceiverCandidates.take(3).map { m =>
+          s"self.${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
         Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
       } else if (name == "f" && args == "String") {

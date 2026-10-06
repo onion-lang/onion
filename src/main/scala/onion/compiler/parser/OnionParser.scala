@@ -52,6 +52,14 @@ object OnionParser {
    *  rather than (wrongly) as unclosed (issue #1966): the body IS balanced, just too deep. */
   val TooDeepInterpolationMarker: String = "#{..}"
 
+  /** Sentinel `found` image for a STRING literal that failed to tokenize because of an
+   *  escape sequence the `<STRING>` grammar doesn't support (e.g. `\d`), so it is reported
+   *  with its own message instead of being mistaken for an unterminated string (issue
+   *  #2023): a lone `"` token normally only comes from a string that never closed, but an
+   *  unsupported escape produces that same lone `"` even when the closing quote is right
+   *  there on the same line. */
+  val InvalidStringEscapeMarker: String = "\\<esc>"
+
   private val theFail = new Fail(null)
   private val debug = java.lang.Boolean.getBoolean("onion.parser.debug")
 

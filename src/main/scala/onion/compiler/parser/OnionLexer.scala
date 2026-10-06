@@ -239,6 +239,20 @@ final class OnionLexer(text: String)
       t.beginLine = 0; t.beginColumn = 0; t.endLine = 0; t.endColumn = 0
     t
 
+  /**
+   * An ERROR token carrying a sentinel `image` rather than the source text at `at` -- for a
+   * failure the lexer itself diagnosed (e.g. an unsupported string escape) that needs a
+   * `found` value `Parsing.syntaxErrorMessage` can recognize, distinct from any real token
+   * spelling. Positioned at the single character `at`, like the one-character ERROR tokens
+   * `emit` produces for every other case.
+   */
+  private def errorToken(image: String, at: Int): Token =
+    pos = at + 1
+    val t = Token.newToken(K.ERROR, image)
+    t.beginLine = lineAt(at); t.beginColumn = columnAt(at)
+    t.endLine = t.beginLine; t.endColumn = t.beginColumn
+    t
+
   /** A token covering `[start, end)` of the decoded input. */
   private def make(kind: Int, start: Int, end: Int): Token =
     // Keywords and operators have one spelling; their image is the shared constant.
@@ -306,7 +320,11 @@ final class OnionLexer(text: String)
           emit(K.STRING, start, start + 2)
       else
         val end = stringEnd(start + 1)
-        if end >= 0 then emit(K.STRING, start, end) else emit(K.ERROR, start, start + 1)
+        if end >= 0 then emit(K.STRING, start, end)
+        else
+          val escapeAt = invalidStringEscapeAt(start + 1)
+          if escapeAt >= 0 then errorToken(OnionParser.InvalidStringEscapeMarker, escapeAt)
+          else emit(K.ERROR, start, start + 1)
     else if c == '\'' then
       val end = characterEnd(start + 1)
       if end >= 0 then emit(K.CHARACTER, start, end) else emit(K.ERROR, start, start + 1)
@@ -391,6 +409,34 @@ final class OnionLexer(text: String)
             val viaPlain = stringEnd(i + 1)
             return math.max(viaInterp, viaPlain)
           i += 1
+        case _ => i += 1
+    -1
+
+  /**
+   * Called only after `stringEnd` has already failed on the STRING body starting at `from`:
+   * the index of the backslash that caused it, when the cause was an escape sequence the
+   * grammar doesn't support (e.g. `\d`) -- distinct from a line that ends, or input that runs
+   * out, before any closing quote (genuinely unterminated). A dangling backslash with nothing
+   * after it is treated as the latter, not as this case, since there is no escape to name.
+   */
+  private def invalidStringEscapeAt(from: Int): Int =
+    var i = from
+    while i < n do
+      val c = chars(i)
+      c match
+        case '"' => return -1
+        case '\n' | '\r' => return -1
+        case '\\' =>
+          if i + 1 >= n then return -1
+          val next = escapeEnd(i, allowHash = true)
+          if next < 0 then return i
+          i = next
+        case '#' =>
+          if i + 1 < n && chars(i + 1) == '{' then
+            val bodyEnd = interpBodyEnd(i + 2)
+            if bodyEnd < 0 then return -1
+            i = bodyEnd
+          else i += 1
         case _ => i += 1
     -1
 

@@ -227,6 +227,74 @@ class DidYouMeanSpec extends AbstractShellSpec {
       }
     }
 
+    describe("for bare receiver-member references inside an extension method body") {
+      // `self`/`this` is bound to the receiver inside an `extension` block (the
+      // explicit `self.x`/`this.x` forms already resolve it), but a bare,
+      // receiver-less reference to the same field or method -- the form every
+      // ordinary instance method body accepts -- has no local/field on the
+      // synthetic extension container to fall back to, so it reports plain
+      // "not found" with no connection back to the receiver it's actually
+      // sitting inside. Hint the explicit form instead of saying nothing.
+      it("hints self.<field> for a bare field reference") {
+        failsWithSuggestion(
+          """
+            |class Box {
+            |  val value: Int
+            |public:
+            |  def this(v: Int) { this.value = v }
+            |}
+            |
+            |extension Box {
+            |  def doubledField: Int = value * 2
+            |}
+            |
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int = new Box(5).doubledField
+            |}
+            |""".stripMargin,
+          "E0002", "self.value"
+        )
+      }
+
+      it("hints self.<method> for a bare parens-less zero-arg method reference") {
+        failsWithSuggestion(
+          """
+            |abstract class Shape2 {
+            |public:
+            |  abstract def area: Double
+            |}
+            |
+            |extension Shape2 {
+            |  def doubled: Double = area * 2.0
+            |}
+            |
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String = "ok"
+            |}
+            |""".stripMargin,
+          "E0002", "self.area"
+        )
+      }
+
+      it("hints self.<method>(...) for a bare parens'd method call") {
+        failsWithSuggestion(
+          """
+            |extension String {
+            |  def shout(): String = toUpperCase() + "!"
+            |}
+            |
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String = "hi".shout()
+            |}
+            |""".stripMargin,
+          "E0005", "self.toUpperCase"
+        )
+      }
+    }
+
     describe("for named-argument names") {
       // The typo ("kount") shares no substring with the real name ("count"),
       // so matching on "count" in the output can only be the suggestion --

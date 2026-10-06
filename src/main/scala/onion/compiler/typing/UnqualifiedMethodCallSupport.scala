@@ -103,7 +103,10 @@ private[compiler] final class UnqualifiedMethodCallSupport(
               resolveTopLevelStaticCall(node, params, expected) match {
                 case Some(term) => Some(term)
                 case None =>
-                  calls.reportMethodNotFound(node, targetType, node.name, calls.types(params), isUnqualifiedCall = true)
+                  calls.reportMethodNotFound(
+                    node, targetType, node.name, calls.types(params),
+                    isUnqualifiedCall = true, extensionReceiverHint = extensionReceiverHintType(context)
+                  )
                   None
               }
           }
@@ -195,12 +198,30 @@ private[compiler] final class UnqualifiedMethodCallSupport(
               case MethodFallbackLookup.Found(term) => Some(term)
               case MethodFallbackLookup.Error => None
               case MethodFallbackLookup.NotFound =>
-                calls.reportMethodNotFound(node, targetType, name, calls.types(params0), isUnqualifiedCall = true)
+                calls.reportMethodNotFound(
+                  node, targetType, name, calls.types(params0),
+                  isUnqualifiedCall = true, extensionReceiverHint = extensionReceiverHintType(context)
+                )
                 None
             }
         }
     }
   }
+
+  /**
+   * Inside an `extension` block, a bare, receiver-less call (`toUpperCase()`) is
+   * resolved against `bodyContext.definition`, the synthetic extension container --
+   * never the receiver type that `self.<name>(...)` already reaches through the
+   * `this` local `prepareExtensionContext` binds. Surfaced here so the not-found
+   * report can hint the explicit form instead of naming the container as if it
+   * were a real type the method was expected on.
+   */
+  private def extensionReceiverHintType(context: LocalContext): ObjectType =
+    if (context.lookup("this") == null) null
+    else context.getEffectiveType("this") match {
+      case receiver: ObjectType => receiver
+      case _ => null
+    }
 
   /**
    * An unqualified call to an instance method needs 'this'; in a static

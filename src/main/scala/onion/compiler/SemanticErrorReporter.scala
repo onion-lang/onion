@@ -506,6 +506,28 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   /**
+   * Handles METHOD_NOT_ACCESSIBLE (also covers constructors, reported as method `new`)
+   * with a hint that an unmarked -- or explicitly `private:` -- member needs a
+   * `public:`/`protected:` section to be reachable from outside its class. Without
+   * it, "is not accessible" reads as a deliberate restriction rather than a missing
+   * section a newcomer forgot to write.
+   */
+  private def reportMethodNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
+    val baseMessage = format(message("error.semantic.methodNotAccessible"),
+      Seq(objectTypeName(items(0)), asString(items(1)), typeNames(asTypeArray(items(2))), classTypeName(items(3))))
+    problem(position, appendSuggestion(baseMessage, Some(message("suggestion.privateAccessHint"))))
+  }
+
+  /**
+   * Handles FIELD_NOT_ACCESSIBLE with the same hint as [[reportMethodNotAccessible]].
+   */
+  private def reportFieldNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
+    val baseMessage = format(message("error.semantic.fieldNotAccessible"),
+      Seq(classTypeName(items(0)), asString(items(1)), classTypeName(items(2))))
+    problem(position, appendSuggestion(baseMessage, Some(message("suggestion.privateAccessHint"))))
+  }
+
+  /**
    * Handles MISSING_RETURN with a hint when the declared return type is the
    * capitalized `Void` class rather than Onion's value-less `void`.
    */
@@ -610,6 +632,10 @@ class SemanticErrorReporter(threshold: Int) {
         reportLvalueRequired(position, items)
       case SemanticError.NULLABLE_MEMBER_ACCESS =>
         reportNullableMemberAccess(position, items)
+      case SemanticError.METHOD_NOT_ACCESSIBLE =>
+        reportMethodNotAccessible(position, items)
+      case SemanticError.FIELD_NOT_ACCESSIBLE =>
+        reportFieldNotAccessible(position, items)
 
       // Data-driven cases
       case _ =>

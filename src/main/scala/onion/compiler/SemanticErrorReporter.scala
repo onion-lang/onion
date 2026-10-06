@@ -179,14 +179,17 @@ class SemanticErrorReporter(threshold: Int) {
         // FormerDefaultImportLookup below, so a real method named `puts` on some other
         // type is unaffected.
         Some(message("suggestion.rubyPuts"))
-      } else if (fieldNamed(targetType, name) || isArrayLengthProperty(targetType, name)) {
+      } else if ((fieldNamed(targetType, name) && !inaccessibleFieldNamed(items)) || isArrayLengthProperty(targetType, name)) {
         // `p.name()` where `name` is a field, not a method -- a common mix-up
         // with record component accessors (which really are methods). A
         // name-similarity hint would uselessly suggest the same spelling, so
         // point at the parentheses instead. `arr.length()`/`arr.size()` hits
         // the same mix-up, but arrays carry no real `length` field entry for
         // fieldNamed to match (their length is resolved specially, not as a
-        // TypedAST field), so it needs its own check.
+        // TypedAST field), so it needs its own check. A same-named field that
+        // exists but isn't accessible from the caller (e.g. Concurrent.Lock's
+        // private `lock`) is excluded: pointing at it would just trade this
+        // error for an equally unhelpful FIELD_NOT_ACCESSIBLE.
         Some(format(message("suggestion.fieldNotMethod"), Seq(name)))
       } else if (isUnqualifiedCall && FormerDefaultImportLookup.find(name, argTypes.length).isDefined) {
         // A bare call to a method that used to be default-imported (v0.10 narrowed the
@@ -338,6 +341,13 @@ class SemanticErrorReporter(threshold: Int) {
     targetType match
       case obj: TypedAST.ObjectType => obj.fields.exists(_.name == name)
       case _ => false
+
+  // Set by MethodCallReportingSupport.reportMethodNotFound (the sole producer of
+  // METHOD_NOT_FOUND that routes through accessibility-aware code in the typing
+  // package); absent (items.length <= 5) for the handful of direct `bodyContext.report`
+  // call sites that report METHOD_NOT_FOUND without it, which keep the old behavior.
+  private def inaccessibleFieldNamed(items: Array[AnyRef]): Boolean =
+    items.length > 5 && items(5) == java.lang.Boolean.TRUE
 
   private def isArrayLengthProperty(targetType: TypedAST.Type, name: String): Boolean =
     targetType.isArrayType && (name == "length" || name == "size")

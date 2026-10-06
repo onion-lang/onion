@@ -15,8 +15,22 @@ private[compiler] final class MethodCallReportingSupport(
     argTypes: Array[Type],
     isUnqualifiedCall: Boolean = false,
     extensionReceiverHint: ObjectType = null
-  ): Unit =
-    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint)
+  ): Unit = {
+    // A same-named field that exists but isn't accessible from here (e.g. Concurrent.Lock's
+    // private `lock`) is not a usable fix for "method not found" -- the paren-less-field hint
+    // in SemanticErrorReporter would just steer the user into a second, equally unhelpful
+    // FIELD_NOT_ACCESSIBLE. Resolve accessibility here, where MemberAccess (typing-package
+    // private) and bodyContext.definition (the calling class) are both in scope.
+    val inaccessibleFieldNamed: java.lang.Boolean = targetType match {
+      case obj: ObjectType =>
+        obj.fields.find(_.name == name) match {
+          case Some(f) => java.lang.Boolean.valueOf(!MemberAccess.isMemberAccessible(f, bodyContext.definition))
+          case None => java.lang.Boolean.FALSE
+        }
+      case _ => java.lang.Boolean.FALSE
+    }
+    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed)
+  }
 
   def reportAmbiguousMethods(
     node: AST.Node,

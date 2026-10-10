@@ -47,13 +47,38 @@ private[compiler] final class TopLevelTypingSupport(
     // boxed before their bindings are added, mirroring markCapturedVariables in
     // MethodBodySupport. `args` is a real parameter slot, so it is excluded.
     val blockElements = unit.toplevels.collect { case be: AST.BlockElement => be }
-    context.markAsBoxed(CapturedVariableScanner.scanElements(blockElements, Set("args")))
+    // A user-declared top-level `val`/`var args` shadows/wins over the implicit
+    // CLI-args binding instead of colliding with it (issue #2039): without this,
+    // `val args = ...` misreported E0007 ("duplicated local variable") against a
+    // binding with no source location to point at, and `var args = ...` silently
+    // compiled but every read of `args` kept resolving to the invisible CLI-args
+    // binding instead of the user's own field. The implicit binding still has to
+    // occupy frame index 0 under SOME name -- `startMethod` is always declared
+    // with one `argsType` parameter, and codegen reserves that physical JVM slot
+    // with `argsType`'s JVM type regardless of which binding typing attaches to
+    // it (`LocalVarContext.withParameters`, driven by the method's declared
+    // argument types, not by binding names) -- so simply not calling `add` at
+    // all would let the user's binding claim slot 0 under its own (possibly
+    // unrelated) type and desync from the slot's real JVM type. Registering it
+    // under a name no Onion source can ever spell (`#` cannot appear in an
+    // identifier, same trick `SymbolGenerator` uses) keeps the slot/type intact
+    // while making it permanently unreachable by ordinary lookup.
+    val argsBindingName = if (blockElements.exists {
+      case decl: AST.LocalVariableDeclaration => decl.name == "args"
+      case _ => false
+    }) "args#cli" else "args"
+    // A closure that captures a top-level `var`/`val` must share the same cell
+    // as the enclosing scope (like inside a function), otherwise it captures a
+    // disconnected copy and outer mutations are lost. Mark such variables as
+    // boxed before their bindings are added, mirroring markCapturedVariables in
+    // MethodBodySupport. `args` is a real parameter slot, so it is excluded.
+    context.markAsBoxed(CapturedVariableScanner.scanElements(blockElements, Set(argsBindingName)))
     // A top-level `var` never reassigned across the script body is effectively
     // final and can be smart-cast like a `val` (issue #273).
     context.setReassignedNames(
       if (unit.topLevelAssignedNames != null) unit.topLevelAssignedNames // recorded by the parser
       else blockElements.flatMap(AssignedVariableScanner.scan).toSet)
-    context.add("args", argsType)
+    context.add(argsBindingName, argsType)
     PreparedUnit(context, statements, fieldInitStatements, klass, argsType, startMethod)
   }
 

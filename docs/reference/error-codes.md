@@ -979,6 +979,23 @@ public:
 Fix: use `?.` / `?[` to access it safely, `?:` to supply a default, `!!` to
 assert non-null, or check for null first (`if x != null { ... }`).
 
+**Special case — a top-level script `var`:** unlike a top-level `val` or a
+method-local `var`, a top-level script `var` is never narrowed by a null
+check, because it is promoted to a mutable field rather than a local
+variable:
+
+```onion
+var s: String? = "hi"
+if s != null {
+  IO::println(s.length)   // E0070, even though the check right above is exactly the fix
+}
+```
+
+The diagnostic adds a hint naming the actual workaround -- copy the value to
+a local first: `val t = s`, then use `t`. Whether this case should be
+narrowed like the others is an open design question (#2026, #2031); this is
+a diagnostics-only fix, not a semantics change.
+
 ### `E0081` — Tool parameter cannot be read from the command line
 
 A `tool`'s parameters must all be readable from a command-line argument, since the CLI

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A bare top-level script (no explicit `main`/`tool`) could not declare its own `val`/`var` named `args`.** `val args: Int = 5` misreported `[E0007] duplicated local variable definition args` against the script's invisible, compiler-injected CLI-args binding, and `var args: Int = 5` compiled with no error but silently printed the (empty, in that case) CLI-args array instead of the user's own value on every read. A user-declared top-level `args` now shadows the implicit CLI-args binding instead of colliding with it (#2039).
 - **A lambda with explicitly typed parameters (e.g. `(x: Int) -> ...`) passed directly as a call argument to a top-level function failed to SAM-convert to a Java functional interface parameter, even though the identical lambda already worked for a static or instance call** (`useOp((x: Int) -> x * 2)` failed with `[E0005] a method applicable for useOp(Function1[Int, Int]) is not found`, while dropping the type annotation, or assigning the lambda to an explicit `val` of the interface type first, both worked). The unqualified-call path now retries bidirectionally against the resolved parameter's type, the same retry the static/instance call paths already had (#2034).
 
 ## [0.140.0] - 2026-10-10

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A lambda with explicitly typed parameters (e.g. `(x: Int) -> ...`) passed directly as a call argument to a top-level function failed to SAM-convert to a Java functional interface parameter, even though the identical lambda already worked for a static or instance call** (`useOp((x: Int) -> x * 2)` failed with `[E0005] a method applicable for useOp(Function1[Int, Int]) is not found`, while dropping the type annotation, or assigning the lambda to an explicit `val` of the interface type first, both worked). The unqualified-call path now retries bidirectionally against the resolved parameter's type, the same retry the static/instance call paths already had (#2034).
+
 ## [0.140.0] - 2026-10-10
 
 ### Added

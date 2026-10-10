@@ -599,7 +599,14 @@ class SemanticErrorReporter(threshold: Int) {
       else if (items.length > 1 && items(1) == "catchType") "error.semantic.nullableCatchType"
       else if (items.length > 1 && items(1) == "synchronized") "error.semantic.nullableSynchronizedLock"
       else "error.semantic.nullableMemberAccess"
-    problem(position, format(message(key), Seq(typeName)))
+    // A top-level script `var` is never flow-narrowed by a null check (#2026, RFC
+    // #2031 still open on whether it should be); the generic "...or check for null
+    // first" advice in the base message is actively misleading there. Add a hint
+    // naming the actual workaround instead (RFC #2031 "option 1").
+    val hint =
+      if (items.length > 1 && items(1) == "topLevelVar") Some(message("suggestion.topLevelVarNotNarrowed"))
+      else None
+    problem(position, appendSuggestion(format(message(key), Seq(typeName)), hint))
   }
 
   // ========== Main report method ==========

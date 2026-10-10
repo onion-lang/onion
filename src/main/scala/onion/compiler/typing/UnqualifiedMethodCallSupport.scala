@@ -87,6 +87,20 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       } else (params0, methods0)
 
     if (methods.length == 0) {
+      // The eager path above commits every closure argument to its default
+      // onion.FunctionN type regardless of the callee, even when every
+      // parameter is explicitly typed (hasUntypedParams is false, so the
+      // early bidirectional-inference check at the top of this method never
+      // fires). When that default type is why no method matched, retry
+      // through the same bidirectional core the untyped-parameter path uses,
+      // mirroring the closure retry already present in
+      // InstanceMethodCallSupport and StaticMethodCallSupport (issue #2034).
+      val closureIndices = node.args.zipWithIndex.collect {
+        case (expr, i) if expr.isInstanceOf[AST.ClosureExpression] => i
+      }.toSet
+      if (closureIndices.nonEmpty) {
+        return typeUnqualifiedCallWithClosures(node, context, expected, closureIndices)
+      }
       staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected) match {
         case MethodFallbackLookup.Found(term) =>
           checkRegexLiteral(node, term)

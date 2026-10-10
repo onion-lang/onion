@@ -278,6 +278,25 @@ class SamConversionSpec extends AbstractShellSpec {
       assert(Shell.Success(-1) == result)
     }
 
+    it("SAM-converts an explicit-typed lambda passed directly to a top-level function (issue #2034)") {
+      val result = shell.run(
+        """
+          |import { java.util.function.IntUnaryOperator }
+          |def useOp(f: IntUnaryOperator): Int = f.applyAsInt(5)
+          |
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    return useOp((x: Int) -> x * 2)
+          |  }
+          |}
+          |""".stripMargin,
+        "SamTopLevelFunctionArg.on",
+        Array()
+      )
+      assert(Shell.Success(10) == result)
+    }
+
     it("implements Function1[Int, Int] with primitive parameter and return") {
       val result = shell.run(
         """

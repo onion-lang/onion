@@ -131,7 +131,22 @@ private[compiler] final class MemberSelectionResolutionSupport(
         // null-safety error pointing at `?.`/`?:`/`!!`/a null check, mirroring the
         // method-call path — not the misleading INCOMPATIBLE_TYPE ("Object expected")
         // the generic fallback below used to produce for field access.
-        bodyContext.report(NULLABLE_MEMBER_ACCESS, targetNode, nullable.displayName)
+        //
+        // A top-level script `var` is never flow-narrowed by a null check (#2026):
+        // it is promoted to a mutable field (TypingBodyPass.processTopLevelVarDeclaration),
+        // so it has neither a LocalBinding (the local-narrowing path) nor a final field
+        // (the field-narrowing path in ControlExpressionTyping.fieldNullNarrow). The
+        // generic "...or check for null first" advice is actively misleading there, since
+        // the user already wrote that exact check; add a hint naming the real workaround
+        // (RFC #2031 option 1) instead of changing the diagnostic's error code or severity.
+        val extraTag: Seq[AnyRef] =
+          target match {
+            case ref: RefStaticField
+                if !Modifier.isFinal(ref.field.modifier) && bodyContext.topLevelClass.contains(ref.field.affiliation) =>
+              Seq("topLevelVar")
+            case _ => Seq.empty
+          }
+        bodyContext.report(NULLABLE_MEMBER_ACCESS, targetNode, (Seq[AnyRef](nullable.displayName) ++ extraTag)*)
         None
       case _ =>
         bodyContext.report(INCOMPATIBLE_TYPE, targetNode, bodyContext.rootClass, targetType)

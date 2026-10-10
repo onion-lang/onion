@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.140.0] - 2026-10-10
+
 ### Added
 
 - **`Future::all` now also accepts a `List[Future[T]]`, not just varargs.** The existing `Future::all(f1, f2, f3)` keeps working, but building the list at runtime (e.g. from a loop or `.map`) had no way to reach it short of hand-rolling a typed array -- the one stdlib function whose input broke the "List everywhere, arrays only at the Java boundary" convention. `Future::all(fs)` where `fs: List[Future[T]]` now works the same way. Found while probing the compiler for gaps.

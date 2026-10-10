@@ -86,7 +86,15 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         }
       } else (params0, methods0)
 
-    if (methods.length == 0) {
+    if (methods.length == 0 && declaresCallee(node.name) && node.args.exists(_.isInstanceOf[AST.ClosureExpression])) {
+      // A closure with explicitly typed parameters types eagerly as FunctionN, which a
+      // Java functional-interface parameter does not accept; retry bidirectionally so the
+      // resolved parameter type decides (SAM conversion), as the static/instance paths do.
+      val closureIndices = node.args.zipWithIndex.collect {
+        case (expr, i) if expr.isInstanceOf[AST.ClosureExpression] => i
+      }.toSet
+      typeUnqualifiedCallWithClosures(node, context, expected, closureIndices)
+    } else if (methods.length == 0) {
       staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected) match {
         case MethodFallbackLookup.Found(term) =>
           checkRegexLiteral(node, term)
@@ -123,6 +131,12 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         finalParams => rawUnqualifiedCall(targetType, method, finalParams, context)
       )
     }
+  }
+
+  private def declaresCallee(name: String): Boolean = {
+    val targetType = bodyContext.definition
+    hasNamedMethod(targetType, name, _ => true) ||
+      bodyContext.topLevelClass.exists(top => !(top eq targetType) && hasNamedMethod(top, name, calls.isStaticMethod))
   }
 
   private def hasNamedMethod(targetType: ClassType, name: String, filter: Method => Boolean): Boolean =

@@ -15,6 +15,9 @@ import java.util.concurrent.TimeoutException;
  * @param <T> the type of the eventual value
  */
 public final class Future<T> {
+    private static final int MAX_SYNC_DEPTH = 128;
+    private static final ThreadLocal<int[]> SYNC_DEPTH = ThreadLocal.withInitial(() -> new int[1]);
+
     private final CompletableFuture<T> delegate;
 
     private Future(CompletableFuture<T> delegate) {
@@ -85,7 +88,19 @@ public final class Future<T> {
      * Allows chaining async operations without nesting.
      */
     public <U> Future<U> flatMap(Function1<T, Future<U>> f) {
-        return new Future<>(delegate.thenCompose(value -> f.call(value).delegate));
+        // On an already-completed Future, thenCompose runs the callback on the caller's stack, so a
+        // recursive chain nests one frame cycle per level. Past MAX_SYNC_DEPTH levels, hop onto the
+        // default executor (a fresh stack); the chain is then bounded by heap, not by stack.
+        int[] depth = SYNC_DEPTH.get();
+        java.util.function.Function<T, java.util.concurrent.CompletionStage<U>> step = value -> {
+            depth[0]++;
+            try {
+                return f.call(value).delegate;
+            } finally {
+                depth[0]--;
+            }
+        };
+        return new Future<>(depth[0] >= MAX_SYNC_DEPTH ? delegate.thenComposeAsync(step) : delegate.thenCompose(step));
     }
 
     /**

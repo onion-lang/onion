@@ -62,9 +62,24 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       return typeUnqualifiedCallWithClosures(node, context, expected, untypedClosureIndices)
     }
 
+    val targetType = bodyContext.definition
+
+    // Zero-arg record copy is a full clone: copy() (bare, implicit self receiver).
+    // Mirrors InstanceMethodCallSupport's `target.copy()` special case -- the
+    // synthesized copy method's arity (one argument per component) never matches
+    // a zero-arg call through ordinary resolution.
+    if (node.name == "copy" && node.args.isEmpty && !context.isStatic) {
+      val receiver: Term = if (context.isClosure) new OuterThis(targetType) else new This(targetType)
+      calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, receiver, targetType) {
+        (method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
+      } match {
+        case some @ Some(_) => return some
+        case None =>
+      }
+    }
+
     val params0 = calls.typedTerms(node.args.toArray, context)
     if (params0 == null) return None
-    val targetType = bodyContext.definition
     val methods0 = MethodResolution.findMethods(targetType, node.name, params0, bodyContext.table)
 
     // When no method applies, an argument that is a generic call (e.g.
@@ -308,6 +323,15 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     expected: Type
   ): Option[Term] = {
     val targetType = bodyContext.definition
+
+    if (node.name == "copy" && !context.isStatic) {
+      val receiver: Term = if (context.isClosure) new OuterThis(targetType) else new This(targetType)
+      val recordCopy = calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, receiver, targetType) {
+        (method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
+      }
+      if (recordCopy.isDefined) return recordCopy
+    }
+
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(targetType, node.name, candidates, _ => true)
     if (candidates.isEmpty) {

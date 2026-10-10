@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.141.0] - 2026-10-10
-
 ### Fixed
 
 - **A deeply recursive `Future::flatMap`/`do[Future]` chain on an already-completed `Future` crashed with `StackOverflowError`** after a few thousand levels, since each synchronous continuation nested another JVM stack frame with no bound. `flatMap` now hops to the default executor once a chain reaches 128 levels deep instead of nesting indefinitely; a 200,000-level recursive chain now completes (#2040).

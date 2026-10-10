@@ -69,9 +69,18 @@ private[compiler] final class MemberSelectionTypingSupport(
             }
           case _ => ref
         }
-      TypeSubst.withCastOpt(narrowedRef, TypeSubst.withClassOnly(narrowedRef.`type`, resolved.term.`type`))
+      TypeSubst.withCastOpt(narrowedRef, inheritedType(narrowedRef.`type`, resolved.term.`type`, field.affiliation))
     case ResolvedGetterSelection(method) =>
       val call = new Call(resolved.term, method, Array.empty)
-      TypeSubst.withCastOpt(call, TypeSubst.withClassOnly(method.returnType, resolved.term.`type`))
+      TypeSubst.withCastOpt(call, inheritedType(method.returnType, resolved.term.`type`, method.affiliation))
   }
+
+  // The member may be declared on an ancestor (`IntBox extends Box[Int]`), so
+  // substitute through the extends-clause chain, not just the receiver's own
+  // type arguments (#2033).
+  private def inheritedType(typ: Type, receiver: Type, declaring: ClassType): Type =
+    {
+      val classSubst = TypeSubstitution.hierarchySubstitution(receiver, declaring)
+      TypeSubst.result(typ, classSubst, Map.empty)
+    }
 }

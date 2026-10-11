@@ -1,7 +1,8 @@
 package onion.compiler.rewrite
 
-import onion.compiler.{AST, CompileError}
+import onion.compiler.{AST, CompileError, SemanticError}
 import onion.compiler.exceptions.CompilationException
+import onion.compiler.toolbox.Message
 
 /** Declaration construction only; the caller owns selection and body rewriting. */
 private[compiler] object AdtEnumLowering {
@@ -35,7 +36,8 @@ private[compiler] object AdtEnumLowering {
     // shared params mixed with `case` cases is a separate feature.
     if (enumDecl.params.nonEmpty) {
       throw new CompilationException(Seq(CompileError("", loc,
-        s"enum $enumName mixes shared parameters with `case` cases; ADT enums carry per-case fields only")))
+        Message("error.semantic.adtEnumMixesSharedParams", Array[Any](enumName)),
+        Some(SemanticError.ADT_ENUM_MIXES_SHARED_PARAMS.errorCode))))
     }
 
     // A generic ADT enum (`enum Opt[T] { case Some(value: T); case Nothing }`)

@@ -2,6 +2,7 @@ package onion.compiler
 
 import onion.compiler.AST.*
 import onion.compiler.exceptions.CompilationException
+import onion.compiler.toolbox.Message
 import org.scalatest.funsuite.AnyFunSuite
 
 /** Full-AST characterization of the ADT expansion and its position in Rewriting. */
@@ -89,7 +90,8 @@ class AdtEnumRewritingSpec extends AnyFunSuite {
     val input = unit(List(declaration.copy(params = List(field))))
     val rewriter = TestSupport.createRewriting
     val expected = CompileError("", loc,
-      "enum Choice mixes shared parameters with `case` cases; ADT enums carry per-case fields only")
+      Message("error.semantic.adtEnumMixesSharedParams", Array[Any]("Choice")),
+      Some(SemanticError.ADT_ENUM_MIXES_SHARED_PARAMS.errorCode))
     val direct = intercept[CompilationException](rewriter.rewrite(input))
     assert(direct.problems.toList == List(expected))
     val processed = intercept[CompilationException](

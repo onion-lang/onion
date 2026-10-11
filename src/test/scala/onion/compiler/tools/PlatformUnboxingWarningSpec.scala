@@ -37,6 +37,19 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
       assert(w15.length == 1, s"expected 1 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
     }
 
+    it("does not warn when the boxed value is the left operand of ?: with a non-null fallback") {
+      val result = compileWarnings(
+        """
+          |def g(x: Int?): Int = x ?: 0
+          |def f(s: String?): Int = s?.length ?: -1
+          |println(g(null))
+          |println(f("abc"))
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
+    }
+
     it("does not warn for the defaulted accessor (already primitive)") {
       val result = compileWarnings(
         """

@@ -114,7 +114,14 @@ private[compiler] final class AssignabilitySupport(
         // nullability; unboxing it to a non-null primitive crashes with a raw
         // NPE if the value is actually null (#318). Mirrors the W0012
         // null-to-non-nullable trade-off above: warn rather than block.
-        bodyContext.warningReporter.platformUnboxing(node.location, actual.`type`.displayName, targetBasicType.displayName)
+        // An elvis already handled null: with a non-null fallback its (boxed)
+        // result can never be null, so there is nothing to warn about.
+        val isElvis = actual match {
+          case b: BinaryTerm => b.kind == BinaryTerm.Kind.ELVIS
+          case _ => false
+        }
+        if (!isElvis)
+          bodyContext.warningReporter.platformUnboxing(node.location, actual.`type`.displayName, targetBasicType.displayName)
         return Boxing.unboxing(bodyContext.table, actual, targetBasicType)
       }
     }

@@ -22,6 +22,63 @@ final class TypingTypeSupport(private val typing: Typing) {
   def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
     mapFrom(typeNode, mapper, banRaw = false)
 
+  def mapFromExtensionReceiver(typeNode: AST.TypeNode): Option[Type] =
+    mapFromExtensionReceiver(typeNode, typing.mapper_)
+
+  /**
+   * Resolves an `extension` block's receiver type, same as `mapFrom`, but with a
+   * dedicated hint for the common mistake of writing `extension List[T] { ... }`
+   * as if `T` were a fresh type parameter (mirroring `class Box[T]`/`record R[T]`
+   * syntax). `extension_decl` (grammar/JJOnionParser.jj) has no leading `[T]`
+   * parameter list of its own, so `T` resolves as an ordinary (here,
+   * unresolvable) type reference, and the receiver as a whole then fails with
+   * only the generic "type List[T] is not found. Check spelling or add an
+   * import." -- actively misleading, since `List` plainly exists. When the
+   * receiver is exactly that shape (a parameterized type over an otherwise-known
+   * generic class, with an unresolvable bare type argument), reports
+   * CLASS_NOT_FOUND with an extra hint naming the two real options: a raw
+   * `extension List { ... }` (every instantiation, erasure-based) or a concrete
+   * `extension List[Int] { ... }` (one specific instantiation).
+   *
+   * Shared by `TypingOutlinePass` and `DeclarationBodySupport`, which both
+   * independently resolve the same receiver type, so both reports carry the hint.
+   */
+  def mapFromExtensionReceiver(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] = {
+    val looksLikeFreshTypeParam = typeNode.desc match {
+      case AST.ParameterizedType(base, params) =>
+        val hasUnresolvedBareArg = params.exists {
+          case ref: AST.ReferenceType if !ref.qualified => mapper.map(ref) == null
+          case _ => false
+        }
+        hasUnresolvedBareArg && (mapper.map(base) match {
+          case ct: ClassType => ct.typeParameters.nonEmpty
+          case _ => false
+        })
+      case _ => false
+    }
+    if (!looksLikeFreshTypeParam) {
+      mapFrom(typeNode, mapper)
+    } else {
+      val mappedType = mapper.resolveNode(typeNode)
+      if (mappedType != null) Some(mappedType)
+      else {
+        val baseSimpleName = typeNode.desc match {
+          case AST.ParameterizedType(AST.ReferenceType(name, _), _) => name
+          case _ => typeNode.desc.toString
+        }
+        typing.report(
+          CLASS_NOT_FOUND,
+          typeNode,
+          typeNode.desc.toString,
+          mapper.getCandidateClassNames(typeNode.desc),
+          "extensionTypeParam",
+          baseSimpleName
+        )
+        None
+      }
+    }
+  }
+
   /**
    * Resolves a type node. When `banRaw` is set, a reference to a generic type
    * that omits its type arguments (a raw type such as `List` or `ArrayList`) is

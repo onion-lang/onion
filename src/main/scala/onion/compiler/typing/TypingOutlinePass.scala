@@ -561,8 +561,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     // Resolve the receiver type (the type being extended). An extension on a
     // generic type applies across all instantiations under erasure, so the
     // receiver is a raw-exempt position (like `is`/`as`); use the lenient
-    // resolver rather than the declared (raw-banning) one.
-    typing.mapFrom(node.receiverType).foreach { receiverType =>
+    // resolver rather than the declared (raw-banning) one. `mapFromExtensionReceiver`
+    // (rather than plain `mapFrom`) adds a dedicated hint for `extension List[T] { ... }`,
+    // where `T` is meant as a fresh type parameter -- `extension` has no such syntax.
+    typing.mapFromExtensionReceiver(node.receiverType).foreach { receiverType =>
       // Get the FQCN for the receiver type (for extension method lookup).
       // Primitive receivers are registered under their boxed class name because
       // method-call targets are boxed before extension resolution.

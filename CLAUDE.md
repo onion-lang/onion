@@ -540,6 +540,7 @@ These are frequently confused with other languages. **Always check these:**
 | `def method(): T { }` | `def method: T { }` - parentheses optional if no params |
 | `@Override void method()` | `override def method(): void` - keyword not annotation |
 | `fun String.twice()` (Kotlin) | `extension String { def twice() { } }` - extension block |
+| `extension List[T] { ... }` (T meant as a fresh type parameter) | not supported - `extension` has no `[T]` parameter list of its own (unlike `class Box[T]`); write `extension List { ... }` to extend every instantiation (erasure-based), or `extension List[Int] { ... }` for one concrete instantiation (also `extension List[String]` alongside it, E0003 otherwise) |
 | `this.field = value` in constructor | ✓ correct - `this.`/`self.` works; also optional (bare `field` resolves to the field via implicit access) |
 | `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long |
 | `System.out` | `System::out` - `::` for static fields too |

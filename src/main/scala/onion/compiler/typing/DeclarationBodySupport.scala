@@ -110,7 +110,7 @@ private[compiler] final class DeclarationBodySupport(
     unitContext.currentDefinition = definition
     typing.find(definition.name).foreach(unitContext.currentMapper = _)
 
-    typing.mapFrom(node.receiverType).foreach { receiverType =>
+    typing.mapFromExtensionReceiver(node.receiverType).foreach { receiverType =>
       for (methodNode <- node.methods) {
         methodBodySupport.processExtensionMethodDeclaration(methodNode, receiverType, definition)
       }

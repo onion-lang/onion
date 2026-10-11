@@ -397,7 +397,16 @@ class SemanticErrorReporter(threshold: Int) {
       toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
     } else None
 
-    problem(position, appendSuggestion(baseMessage, suggestion))
+    // `extension List[T] { ... }` (TypingTypeSupport.mapFromExtensionReceiver):
+    // `T` was meant as a fresh type parameter, mirroring `class Box[T]` syntax,
+    // but `extension` has none -- the base type (`List`) plainly exists, so the
+    // generic "check spelling or add an import" advice above is beside the point.
+    val extensionHint =
+      if (items.length > 3 && items(2) == "extensionTypeParam")
+        Some(format(message("suggestion.extensionReceiverTypeParameter"), Seq(asString(items(3)))))
+      else None
+
+    problem(position, appendSuggestion(appendSuggestion(baseMessage, suggestion), extensionHint))
   }
 
   /**

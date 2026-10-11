@@ -345,6 +345,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def mapFrom(typeNode: AST.TypeNode, mapper: NameResolver): Option[Type] =
     typeSupport.mapFrom(typeNode, mapper)
 
+  /** Like [[mapFrom]] but for an `extension` block's receiver type specifically: adds a
+    * dedicated hint when the receiver looks like `List[T]` with `T` meant as a fresh type
+    * parameter (`extension` has no such syntax). See `TypingTypeSupport.mapFromExtensionReceiver`. */
+  private[compiler] def mapFromExtensionReceiver(typeNode: AST.TypeNode): Option[Type] =
+    typeSupport.mapFromExtensionReceiver(typeNode)
+
   /** Like [[mapFrom]] but forbids raw generic types (declared/created positions). */
   private[compiler] def mapFromDeclared(typeNode: AST.TypeNode): Option[Type] =
     typeSupport.mapFrom(typeNode, mapper_, banRaw = true)

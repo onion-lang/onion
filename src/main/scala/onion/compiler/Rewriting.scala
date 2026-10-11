@@ -1887,16 +1887,17 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       // Intermediate expression (side effect): e; rest => e.bind((_) -> { rest })
       case (expr: AST.Expression) :: rest =>
         val rewrittenExpr = rewriteExpression(expr)
-        val restExpr = desugarDoStatements(loc, monadType, rest)
+        val exprLoc = expr.location
+        val restExpr = desugarDoStatements(exprLoc, monadType, rest)
 
         // Create closure: (_) -> { restExpr }
-        val arg = AST.Argument(loc, "_unused", null, null, false)
-        val closureBody = AST.BlockExpression(loc, List(restExpr))
-        val closureType = AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true)
-        val closure = AST.ClosureExpression(loc, closureType, "call", List(arg), null, closureBody)
+        val arg = AST.Argument(exprLoc, "_unused", null, null, false)
+        val closureBody = AST.BlockExpression(exprLoc, List(restExpr))
+        val closureType = AST.TypeNode(exprLoc, AST.ReferenceType("onion.Function1", true), true)
+        val closure = AST.ClosureExpression(exprLoc, closureType, "call", List(arg), null, closureBody)
 
         // expr.bind(closure)
-        AST.MethodCall(loc, rewrittenExpr, "bind", List(closure))
+        AST.MethodCall(exprLoc, rewrittenExpr, "bind", List(closure))
 
       case _ =>
         throw new CompilationException(Seq(

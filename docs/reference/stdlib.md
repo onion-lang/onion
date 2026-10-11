@@ -986,6 +986,20 @@ xs.reduce(0, (acc, x) -> acc + x)                    // 6  (onion.Colls::reduce,
 Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
 ```
 
+**`fold`/`reduce`/`foldl` warn on their own most idiomatic use**: `Colls::fold`
+and `Colls::reduce`'s 3-arg form (likewise `Iterables::foldl`) are Java
+generic methods (`<T, R> R fold(List<T>, R, Function2<R, T, R>)`); their
+*declared* return type is the type variable `R` itself -- a boxed reference
+with no Onion-tracked nullability -- regardless of what the call site's own
+arguments pin `R` to. So `xs.fold(0) { a, b -> a + b }` / `xs.reduce(0, (acc,
+x) -> acc + x)` on a `List[Int]`, with a literal zero and an `Int`-returning
+combiner, still unboxes the result through `[W0015]` when assigned to a
+non-null `Int` -- the same warning `Json::getInt` on a possibly-missing key
+gets, even though nothing here can actually be null. There is no
+Onion-native, warning-free alternative for a non-`Double` running total
+(`Stats::sum`/`sumBy` return `Double`); suppress the warning with `--Wno
+platform-unboxing` if the call is intentional.
+
 **`first`/`last` are shadowed too, but harmlessly**: `onion.Colls` also
 declares `first(List)`/`last(List)` extensions with the same erased
 signature as `onion.Iterables`'s, so `xs.first()`/`xs.last()` always reach

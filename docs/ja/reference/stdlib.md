@@ -2010,6 +2010,20 @@ xs.reduce(0, (acc, x) -> acc + x)                    // 6  （onion.Colls::reduc
 Iterables::reduce(xs, 0, (acc, x) -> acc + x)         // [E0001] operator + is not applicable for type Object, Int
 ```
 
+**`fold`/`reduce`/`foldl` は最も素朴な使い方自体で警告が出ます**: `Colls::fold`
+と `Colls::reduce` の3引数版（`Iterables::foldl` も同様）はいずれも Java の
+ジェネリックメソッド（`<T, R> R fold(List<T>, R, Function2<R, T, R>)`）であり、
+*宣言された*戻り値の型は型変数 `R` そのもの -- Onion が null 許容性を追跡でき
+ないボックス化された参照型 -- で、呼び出し側の引数が `R` を何に確定させよう
+としても関係ありません。そのため `List[Int]` に対する `xs.fold(0) { a, b ->
+a + b }` / `xs.reduce(0, (acc, x) -> acc + x)` のように、リテラルのゼロと
+`Int` を返すコンビネータだけを使った、最も素直な書き方でも、non-null な `Int`
+へ代入する際に `[W0015]` の形でアンボックスされます -- 実際には何も null に
+なり得ないにもかかわらず、`Json::getInt` がキー欠落時に出す警告と同じもの
+です。`Double` ではない合計値を得る Onion ネイティブな、警告の出ない代替手段
+は無く（`Stats::sum`/`sumBy` は `Double` を返す）、意図した呼び出しであれば
+`--Wno platform-unboxing` で警告を抑制してください。
+
 **`first`/`last` もシャドーイングされますが、無害です**: `onion.Colls` にも
 消去後シグネチャが同じ `first(List)`/`last(List)` 拡張メソッドがあり、
 `xs.first()`/`xs.last()` は常に *`onion.Colls`* 側に到達します --

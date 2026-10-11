@@ -78,8 +78,36 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       }
     }
 
-    val params0 = calls.typedTerms(node.args.toArray, context)
-    if (params0 == null) return None
+    // A malleable argument (a generic static/unqualified/new-object call, or a
+    // collection literal) can fail outright when typed with no expected type,
+    // e.g. `new Leaf()` for a zero-field generic case with nothing of its own
+    // to pin its type parameter from -- that failure reports E0066 and makes
+    // typedTerms fail the whole array, which previously skipped the
+    // expected-type retry below entirely (retypeArgumentsForExpected only
+    // recovers an argument that typed to the *wrong* type, not one that
+    // failed to type at all). Suppress reporting for the initial attempt when
+    // a malleable argument is present, and fall back to resolveArgsAfterFailure
+    // -- which types the other arguments first, narrows to a unique candidate,
+    // and retypes the malleable ones against its resolved parameter types --
+    // before giving up and re-running unsuppressed to report the real error.
+    val hasMalleable = calls.hasMalleableArgs(node.args)
+    val params0 = {
+      val eager =
+        if (hasMalleable) calls.typing.withSuppressedReporting(calls.typedTerms(node.args.toArray, context))
+        else calls.typedTerms(node.args.toArray, context)
+      if (eager != null || !hasMalleable) eager
+      else {
+        val topLevel = bodyContext.topLevelClass.filter(t => !(t eq targetType))
+        calls.resolveArgsAfterFailure(targetType, node.name, node.args, context, _ => true)
+          .orElse(topLevel.flatMap(top =>
+            calls.resolveArgsAfterFailure(top, node.name, node.args, context, m => (m.modifier & AST.M_STATIC) != 0)))
+          .getOrElse(null)
+      }
+    }
+    if (params0 == null) {
+      if (hasMalleable) calls.typedTerms(node.args.toArray, context) // re-type unsuppressed to report the real diagnostic
+      return None
+    }
     val methods0 = MethodResolution.findMethods(targetType, node.name, params0, bodyContext.table)
 
     // When no method applies, an argument that is a generic call (e.g.

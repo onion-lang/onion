@@ -44,6 +44,25 @@ final class MethodCallTyping(
   ): Option[Array[Term]] =
     argumentRetyping.retypeArguments(sourceType, name, args, params, context, filter, receiverType)
 
+  /** Whether any of `args` is "malleable" -- see [[ArgumentExpectedTypeRetyping.isMalleable]]. */
+  private[typing] def hasMalleableArgs(args: Seq[AST.Expression]): Boolean =
+    args.exists(argumentRetyping.isMalleable)
+
+  /**
+   * Recover from a malleable argument that failed outright with no expected
+   * type (e.g. a bare generic `new X()`) -- see
+   * [[ArgumentExpectedTypeRetyping.resolveArgsAfterFailure]].
+   */
+  private[typing] def resolveArgsAfterFailure(
+    sourceType: ObjectType,
+    name: String,
+    args: Seq[AST.Expression],
+    context: LocalContext,
+    filter: Method => Boolean,
+    receiverType: Type = null
+  ): Option[Array[Term]] =
+    argumentRetyping.resolveArgsAfterFailure(sourceType, name, args, context, filter, receiverType)
+
   /** Select a single method, reporting errors if none found or ambiguous */
   private[typing] def selectSingleMethod(
     node: AST.Node,

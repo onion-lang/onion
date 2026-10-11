@@ -6,6 +6,8 @@ import onion.compiler.TypedAST.*
 import java.util.{TreeSet => JTreeSet}
 
 import scala.jdk.CollectionConverters.*
+import scala.util.boundary
+import scala.util.boundary.break
 
 /**
  * Re-types "malleable" call arguments against a resolved parameter's expected
@@ -99,6 +101,66 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     if (changed) Some(updated) else None
   }
 
+  /**
+   * Recover from a malleable argument that failed outright (not merely typed
+   * to the wrong type) with no expected type -- e.g. `new Leaf()` for a
+   * zero-field generic case with nothing of its own to pin its type parameter
+   * from, which reports E0066 and makes the whole argument list fail to type
+   * before [[retypeArguments]] ever gets a chance to run. Types the
+   * non-malleable arguments first (suppressed), narrows to a single
+   * name/arity-matched candidate, then retypes every malleable argument
+   * against that candidate's resolved parameter types. Returns None when a
+   * non-malleable argument itself fails to type, no candidate uniquely
+   * matches, or a malleable argument still fails against its resolved
+   * expected type -- the caller then re-runs the original eager typing
+   * unsuppressed to report the real diagnostic. Mirrors
+   * `ConstructionTyping.resolveConstructorForMalleableArgs` for a method call.
+   */
+  def resolveArgsAfterFailure(
+    sourceType: ObjectType,
+    name: String,
+    args: Seq[AST.Expression],
+    context: LocalContext,
+    filter: Method => Boolean,
+    receiverType: Type = null
+  ): Option[Array[Term]] = boundary {
+    val argsArr = args.toArray
+    val malleableIndices = argsArr.zipWithIndex.collect { case (e, i) if isMalleable(e) => i }.toSet
+    if (malleableIndices.isEmpty) break(None)
+
+    val prelim = new Array[Term](argsArr.length)
+    for (i <- argsArr.indices if !malleableIndices.contains(i)) {
+      retypeArgument(argsArr(i), context, null) match {
+        case Some(t) => prelim(i) = t
+        case None => break(None)
+      }
+    }
+
+    val candidate = uniqueCandidate(sourceType, name, argsArr.length, filter) match {
+      case Some(c) => c
+      case None => break(None)
+    }
+
+    val classSubst =
+      if (receiverType != null) TypeSubstitution.classSubstitution(receiverType)
+      else TypeSubstitution.classSubstitution(sourceType)
+    val expectedArgTypes = candidate.arguments.map { argType =>
+      TypeSubstitution.substituteType(argType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
+    }
+    if (expectedArgTypes.length != argsArr.length) break(None)
+
+    val updated = prelim.clone()
+    for (i <- malleableIndices) {
+      val expectedType = expectedArgTypes(i)
+      if (expectedType == null) break(None)
+      retypeArgument(argsArr(i), context, expectedType) match {
+        case Some(t) => updated(i) = t
+        case None => break(None)
+      }
+    }
+    Some(updated)
+  }
+
   /** A single method (by name) whose arity accepts `argCount` arguments, else None. */
   private def uniqueCandidate(
     sourceType: ObjectType,
@@ -137,7 +199,7 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
    * literal (whose element/entry types are target-typed). Non-generic arguments
    * and already-fixed values are left untouched.
    */
-  private def isMalleable(expr: AST.Expression): Boolean = expr match {
+  private[typing] def isMalleable(expr: AST.Expression): Boolean = expr match {
     case _: AST.StaticMethodCall => true
     case _: AST.UnqualifiedMethodCall => true
     case _: AST.NewObject => true

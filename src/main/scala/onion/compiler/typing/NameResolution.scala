@@ -193,7 +193,15 @@ class NameResolver(private val context: NameResolutionContext) {
           scanMemo.get(name) match {
             case Some((found, gen)) if found != null || gen == generation => found
             case _ =>
-              val found = imports.iterator
+              // An explicit import (named, with or without `as`) must shadow a
+              // same-named class a default on-demand import (java.lang.*,
+              // java.util.*, javax.swing.*, ...) would otherwise resolve the name
+              // to -- the same priority Java itself gives a single-type import
+              // over an on-demand one. Without this, `import { java.util.List as
+              // JList; }` silently resolved `JList` to the unrelated
+              // `javax.swing.JList` instead of the user's own alias (#2025).
+              val (explicitImports, onDemandImports) = imports.partition(!_.isOnDemand)
+              val found = (explicitImports.iterator ++ onDemandImports.iterator)
                 .flatMap(_.matches(name))
                 .map(fqcn => {
                   // A candidate the imports produced is already qualified: it is a class,

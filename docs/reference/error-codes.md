@@ -230,6 +230,20 @@ A type name could not be resolved.  Check spelling and imports.
 val xs = new ArrayLst[String]()   // E0003, suggests ArrayList
 ```
 
+An `extension` block's receiver type has no `[T]` type-parameter list of its own
+(unlike `class Box[T]`/`record R[T]`), so a bare identifier written there is resolved
+as an ordinary type reference, not declared as a fresh type parameter:
+
+```onion
+extension List[T] {               // E0003: T is not a type, not "List[T]" misspelled
+  def second: Object? = ...
+}
+```
+
+The diagnostic adds a hint naming the two real options: `extension List { ... }`
+extends every instantiation of `List` (erasure-based), and `extension List[Int] { ... }`
+extends one concrete instantiation.
+
 ### `E0004` — Field not found
 
 No field with that name exists on the target type.  Check spelling and field visibility.

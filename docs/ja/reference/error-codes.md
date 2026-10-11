@@ -229,6 +229,20 @@ println(usrName)   // E0002、userName を提案
 val xs = new ArrayLst[String]()   // E0003、ArrayList を提案
 ```
 
+`extension` ブロックの受け取り型（receiver type）は `class Box[T]`/`record R[T]` と違い、
+自前の `[T]` 型パラメータリストを持ちません。そのためここに書いた識別子は新しい型パラメータとして
+宣言されるのではなく、通常の型参照として解決されます:
+
+```onion
+extension List[T] {               // E0003: T は型ではない（"List[T]" の綴り間違いではない）
+  def second: Object? = ...
+}
+```
+
+診断には、本当に使える2つの選択肢を示すヒントが付きます: `extension List { ... }` は
+`List` のすべての具体化を対象にします（型消去ベース）。`extension List[Int] { ... }` は
+1つの具体的な型だけを対象にします。
+
 ### `E0004` — フィールドが見つからない
 
 対象の型にその名前のフィールドが存在しません。スペルとフィールドの可視性を確認してください。

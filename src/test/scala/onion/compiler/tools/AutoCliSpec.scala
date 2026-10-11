@@ -54,5 +54,20 @@ class AutoCliSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(2) == result)
     }
+
+    it("treats a leading -- as the end-of-options marker, not an unknown flag (#437's ToolCli fix, mirrored here)") {
+      val result = shell.run(
+        """
+          |var captured = ""
+          |def main(name: String): void {
+          |  captured = name
+          |}
+          |IO::println(captured)
+          |""".stripMargin,
+        "None",
+        Array("--", "--not-a-flag")
+      )
+      assert(result.isInstanceOf[Shell.Success])
+    }
   }
 }

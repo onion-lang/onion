@@ -81,4 +81,27 @@ class CliTryParseSpec extends AnyFunSpec {
       assert(viaTry == viaParse)
     }
   }
+
+  describe("the `--` end-of-options marker (#437's ToolCli fix, mirrored here)") {
+    it("takes a positional value that itself looks like a flag") {
+      assert(parsed(Array("--", "--weird"), "name") == List("--weird"))
+    }
+
+    it("stops --help from being recognized once past the marker") {
+      assert(parsed(Array("--", "--help"), "name") == List("--help"))
+    }
+
+    it("still parses flags and switches before the marker") {
+      assert(parsed(Array("--count", "3", "--", "--loud"), "count=,name") ==
+        List("3", "--loud"))
+    }
+
+    it("consumes the marker itself, not as a positional") {
+      assert(parsed(Array("a", "--", "b"), "first,second") == List("a", "b"))
+    }
+
+    it("accepts a trailing marker with nothing after it") {
+      assert(parsed(Array("a", "--"), "only") == List("a"))
+    }
+  }
 }

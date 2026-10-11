@@ -88,9 +88,16 @@ public final class Cli {
         }
         String[] result = new String[specs.length];
         List<String> positionals = new ArrayList<>();
-        int i = 0;
         int argCount = args == null ? 0 : args.length;
-        while (i < argCount) {
+        // A bare `--` is the POSIX end-of-options marker: everything after it is a
+        // literal positional value, however it is spelled (even `--help`), mirroring
+        // the same convention ToolCli already has for a `tool` CLI (issue #437).
+        int endOfOptions = argCount;
+        for (int k = 0; k < argCount; k++) {
+            if (args[k].equals("--")) { endOfOptions = k; break; }
+        }
+        int i = 0;
+        while (i < endOfOptions) {
             String a = args[i];
             if (a.equals("--help") || a.equals("-h")) {
                 return Outcome.bad(Defect.of("--help", "arguments", usageString(names, kinds)));
@@ -112,7 +119,7 @@ public final class Cli {
                     result[idx] = inlineValue;
                     i++;
                 } else {
-                    if (i + 1 >= argCount) return Outcome.bad(Defect.of(a, "a value", "nothing"));
+                    if (i + 1 >= endOfOptions) return Outcome.bad(Defect.of(a, "a value", "nothing"));
                     result[idx] = args[i + 1];
                     i += 2;
                 }
@@ -120,6 +127,9 @@ public final class Cli {
                 positionals.add(a);
                 i++;
             }
+        }
+        for (int k = endOfOptions + 1; k < argCount; k++) {
+            positionals.add(args[k]);
         }
         int p = 0;
         List<Defect> problems = new ArrayList<>();
@@ -154,9 +164,16 @@ public final class Cli {
         }
         String[] result = new String[specs.length];
         List<String> positionals = new ArrayList<>();
-        int i = 0;
         int argCount = args == null ? 0 : args.length;
-        while (i < argCount) {
+        // A bare `--` is the POSIX end-of-options marker: everything after it is a
+        // literal positional value, however it is spelled (even `--help`), mirroring
+        // the same convention ToolCli already has for a `tool` CLI (issue #437).
+        int endOfOptions = argCount;
+        for (int k = 0; k < argCount; k++) {
+            if (args[k].equals("--")) { endOfOptions = k; break; }
+        }
+        int i = 0;
+        while (i < endOfOptions) {
             String a = args[i];
             if (a.equals("--help") || a.equals("-h")) {
                 System.out.println(usageString(names, kinds));
@@ -187,7 +204,7 @@ public final class Cli {
                     result[idx] = inlineValue;
                     i++;
                 } else {
-                    if (i + 1 >= argCount) die(names, kinds, "missing value for " + a);
+                    if (i + 1 >= endOfOptions) die(names, kinds, "missing value for " + a);
                     result[idx] = args[i + 1];
                     i += 2;
                 }
@@ -195,6 +212,9 @@ public final class Cli {
                 positionals.add(a);
                 i++;
             }
+        }
+        for (int k = endOfOptions + 1; k < argCount; k++) {
+            positionals.add(args[k]);
         }
         int p = 0;
         for (int j = 0; j < names.length; j++) {

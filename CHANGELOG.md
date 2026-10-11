@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.141.0] - 2026-10-11
+
 ### Fixed
 
 - **An unannotated closure with no expected type to infer against (e.g. a lambda inside a list literal that is itself an argument to a generic extension method like `.concat(...)`) built its own `FunctionN[...]` type with an unboxed primitive type argument** (`Function0[Int]` as literally the primitive `int`, not boxed `Integer`), which then failed generic type-argument matching against the boxed `Function0[Int]` a declared annotation produces -- generics are invariant, so `[E0000] type Function0[Int] is expected, but type Function0[Int] is used` named the same-looking type on both sides with no way to tell them apart. The same unboxed-primitive gap existed on the declared side too: an arrow-sugar function type (`Int -> Int`) skipped the boxing step `Function1[Int, Int]` (bracket syntax for the identical type, per CLAUDE.md) already had, so the two spellings of the same type disagreed internally. Both now box a primitive argument/result the same way, so `Int -> Int` and `Function1[Int, Int]` are genuinely the same type, and a self-inferred closure's type matches a declared one.

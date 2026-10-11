@@ -34,5 +34,10 @@ class CliParseSpec extends AnyFunSpec {
       val r = onion.Cli.parse(Array("--expr=a=b"), "expr=")
       assert(r.toSeq == Seq("a=b"))
     }
+
+    it("treats a bare -- as the end-of-options marker, mirroring ToolCli (#437)") {
+      val r = onion.Cli.parse(Array("--", "--not-a-flag"), "name")
+      assert(r.toSeq == Seq("--not-a-flag"))
+    }
   }
 }

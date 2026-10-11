@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.141.0] - 2026-10-11
+
 ### Fixed
 
 - **Three compile errors bypassed the compiler's bilingual diagnostics system entirely: a duplicate `instance` for the same `(trait, type)`, an ADT enum mixing shared constructor parameters with `case` cases, and a homogeneous enum declaring type parameters.** All three were raised as a raw, hardcoded English `CompileError` with no error code, so a build log showed a bare message with no `[E0XXX]` to look up, and running under `-Duser.language=ja` still printed English. They now carry dedicated codes (`E0097`, `E0098`, `E0099` respectively) and resolve through the same `Message(...)`/`errorMessage*.properties` lookup every other diagnostic uses, so both languages work and the reference docs can list them. Found while probing the compiler for gaps.

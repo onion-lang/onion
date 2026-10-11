@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`[W0015]` (platform unboxing) fired on `x ?: 0` and `s?.length ?: -1` -- the Elvis operator's own idiom for handling a nullable value -- even though `?:` had already proven the result can't be null (#2059).** `def g(x: Int?): Int = x ?: 0` warned "boxed value of type 'java.lang.Integer' is implicitly unboxed to non-null 'Int'; ... this throws a NullPointerException at runtime", despite the output being correct and the NPE being impossible. The warning no longer fires when the boxed value being unboxed is the result of an Elvis expression; unboxing a genuinely untracked boxed platform value (`Json::getInt`, a generic fold accumulator) still warns as before.
+
 ### Documentation
 
 - **The stdlib reference (en/ja) didn't mention that `.fold`/`.reduce`'s 3-arg form/`Iterables::foldl` emit `[W0015]` on their own most idiomatic use** -- `xs.fold(0) { a, b -> a + b }` on a `List[Int]`, with a literal zero and an `Int`-returning combiner, still unboxes through the platform-unboxing warning when assigned to a non-null `Int`, since the Java generic method's declared return type is the type variable itself (a boxed reference with no Onion-tracked nullability) regardless of what the call site pins it to. This is intentional (same trade-off as `Json::getInt`, #318), but was undocumented; the reference now explains it and names `--Wno platform-unboxing` for suppressing it. A regression test locks in the current, intentional behavior.

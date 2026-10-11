@@ -16,8 +16,25 @@ final class TypingBodyContext(
   private val reportNode: (SemanticError, AST.Node, Seq[AnyRef]) => Unit,
   val warningReporter: WarningReporter,
   private val topLevelClassProvider: () => Option[ClassType] = () => None,
-  private val problemCountProvider: () => Int = () => 0
+  private val problemCountProvider: () => Int = () => 0,
+  private val unitProvider: () => AST.CompilationUnit = () => null
 ) {
+  /**
+   * Names assigned by code that can run at an arbitrary point of the script: every top-level
+   * `def`, every class/record/enum/extension body, and every lambda anywhere in the unit.
+   * A top-level `var` outside this set is only ever written by the script's own straight-line
+   * statements, so a null check on it can be flow-narrowed like a local (RFC #2031 option 2).
+   */
+  lazy val deferredAssignedNames: Set[String] = {
+    val unit = unitProvider()
+    if (unit == null) Set.empty
+    else {
+      val fromDeclarations = unit.toplevels.filterNot(_.isInstanceOf[AST.BlockElement])
+        .foldLeft(Set.empty[String])((acc, t) => acc ++ AssignedVariableScanner.scan(t))
+      fromDeclarations ++ AssignedVariableScanner.assignedInLambdas(unit.toplevels.collect { case b: AST.BlockElement => b })
+    }
+  }
+
   /** Typed `Try` nodes created so far in this unit; bracketing a body typing tells whether it made one. */
   var tryCount: Int = 0
 
@@ -68,6 +85,7 @@ object TypingBodyContext {
       reportNode = (error, node, items) => typing.report(error, node, items*),
       warningReporter = typing.warningReporter_,
       topLevelClassProvider = () => typing.loadTopClass,
-      problemCountProvider = () => typing.problemCount
+      problemCountProvider = () => typing.problemCount,
+      unitProvider = () => unitContext.unit
     )
 }

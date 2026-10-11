@@ -67,6 +67,25 @@ private[typing] object TypeNarrowingAnalysis {
         }
         NarrowingInfo.empty
 
+      // self/this is SomeType -> narrow self/this to SomeType in then-branch.
+      // `self`/`this` is bound as an ordinary immutable local inside an
+      // `extension T { ... }` method (the receiver parameter), so a type-pattern
+      // check on it should narrow the same way it already does for any other
+      // local -- mirroring the null-check narrowing `NullCheckTarget` already
+      // gives a bare `self`/`this` below. Outside an extension method `this` has
+      // no such local binding (`context.lookup("this")` is null there), so this
+      // case is a no-op and never affects an ordinary instance method.
+      case AST.IsInstance(_, AST.CurrentInstance(_), typeRef) =>
+        val binding = context.lookup("this")
+        if (binding != null && !binding.isMutable) {
+          typeResolver(typeRef) match {
+            case Some(targetType) =>
+              return NarrowingInfo(Map("this" -> targetType), Map.empty)
+            case None => ()
+          }
+        }
+        NarrowingInfo.empty
+
       // x != null -> narrow x from T? to T in then-branch
       case AST.NotEqual(_, NullCheckTarget(name, isField), AST.NullLiteral(_)) =>
         extractNullCheckNarrowing(name, context, positive = true, fieldNarrow, isField)

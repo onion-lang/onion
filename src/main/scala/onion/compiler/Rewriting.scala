@@ -189,8 +189,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         // not allow to be generic. The grammar accepts the type parameters so
         // this can say why instead of failing as a bare syntax error (#311).
         throw new CompilationException(Seq(CompileError("", declaration.location,
-          s"enum ${declaration.name} cannot take type parameters; only an ADT enum (one with `case` cases) is generic, " +
-            "because a plain enum becomes a java.lang.Enum and the JVM forbids a generic enum")))
+          Message("error.semantic.homogeneousEnumWithTypeParameters", Array[Any](declaration.name)),
+          Some(HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS.errorCode))))
       case ex: AST.TopLevelExample =>
         // Top-level `example [name] { expr }` (issue #364): the same lowering a record
         // example gets — a static boolean check method the LawCheckPhase runs at build
@@ -596,7 +596,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         val key = mangleInstanceClassName(inst.traitType.desc)
         if (seen.contains(key)) {
           throw new CompilationException(Seq(CompileError("", inst.location,
-            s"instance ${inst.traitType.desc} is already defined (at most one instance is allowed per (trait, type))")))
+            Message("error.semantic.duplicateTraitInstance", Array[Any](inst.traitType.desc)),
+            Some(DUPLICATE_TRAIT_INSTANCE.errorCode))))
         }
         seen(key) = inst
       case _ =>

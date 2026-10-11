@@ -1323,6 +1323,55 @@ abstract class Shape {
 
 対処: `public:` または `protected:` の下に宣言してください。
 
+### `E0097` — 同じ (trait, type) に対する `instance` の重複
+
+同じトレイト適用（例: `Numeric[Integer]`）に対する `instance` 宣言が、1つの
+コンパイル単位の中に2つ以上あります。(trait, type) の組み合わせごとに
+instance は1つまでです — どちらも同じマングル化されたクラス名に変換されるためです。
+
+```onion
+trait Numeric[T] { def zero(): T }
+instance Numeric[Integer] { def zero(): Integer = 0 }
+instance Numeric[Integer] { def zero(): Integer = 1 }
+// E0097: instance Numeric[Integer] is already defined ...
+```
+
+対処: 重複を削除するかまとめてください。プリミティブ型とそのボックス型（`Int` と
+`Integer` など）は消去後に同じ instance になるため、これらも衝突します。
+
+### `E0098` — ADT enum が共有パラメータと `case` ケースを混在させている
+
+Scala 3 風の ADT enum（`case` ケースを持つ enum）が、自身の共有コンストラクタ
+パラメータも宣言しています。ADT enum はケースごとに生成されるレコードを通じて
+ケースごとのフィールドのみを持てます。enum レベルの共有パラメータと `case`
+ケースの混在は別の（未実装の）機能です。
+
+```onion
+enum Mixed(tag: String) {
+  case A(x: Int)
+  case B
+}
+// E0098: enum Mixed mixes shared parameters with `case` cases ...
+```
+
+対処: 共有データを各ケース自身のフィールドに移すか、`case` ケースをやめて
+データを持つ通常の enum（`enum Mixed(tag: String) { A, B }`）にしてください。
+
+### `E0099` — 型パラメータを持つ通常の enum
+
+`case` ケースを持たない通常の enum が型パラメータを宣言しています。通常の
+enum は `java.lang.Enum` にコンパイルされ、JVM はジェネリックな enum を許可
+しません。ジェネリックにできるのは `case` ケースを持つ ADT enum（sealed
+interface + レコード群に展開されるもの）のみです。
+
+```onion
+enum Color[T] { RED, GREEN }
+// E0099: enum Color cannot take type parameters ...
+```
+
+対処: 型パラメータを外すか、各ケースが本当に自分の型引数を必要とするなら
+ADT（`case`）enum として再構成してください。
+
 ### `E0069` — ローカル val に初期化子が必要
 
 ローカル `val` が初期化子（`= expr`）なしで宣言されました。`var` と異なり `val` は
@@ -1754,6 +1803,9 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0094` | `main` parameter `…` has type … which cannot be read from an argument |
 | `E0095` | `main` has a String[] parameter, `…`, that is not in a supported position |
 | `E0096` | abstract method … cannot be private |
+| `E0097` | instance … is already defined (at most one instance is allowed per (trait, type)) |
+| `E0098` | enum … mixes shared parameters with `case` cases |
+| `E0099` | enum … cannot take type parameters |
 
 ## 関連項目
 

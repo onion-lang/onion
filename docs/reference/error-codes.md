@@ -1332,6 +1332,55 @@ abstract class Shape {
 
 Fix: declare it under `public:` or `protected:`.
 
+### `E0097` — Duplicate `instance` for the same (trait, type)
+
+Two `instance` declarations for the same trait application (e.g. `Numeric[Integer]`
+declared twice) appear in one compilation unit. At most one instance per
+(trait, type) is allowed — both would lower to the same mangled class name.
+
+```onion
+trait Numeric[T] { def zero(): T }
+instance Numeric[Integer] { def zero(): Integer = 0 }
+instance Numeric[Integer] { def zero(): Integer = 1 }
+// E0097: instance Numeric[Integer] is already defined ...
+```
+
+Fix: remove or merge the duplicate. A primitive and its boxed type (e.g. `Int`
+and `Integer`) are the same erased instance, so they collide too.
+
+### `E0098` — ADT enum mixes shared parameters with `case` cases
+
+A Scala-3-style ADT enum (one with `case` cases) also declares its own shared
+constructor parameters. ADT enums carry fields per case only, via the
+generated record for each case; enum-level shared parameters mixed with
+`case` cases is a separate, unimplemented feature.
+
+```onion
+enum Mixed(tag: String) {
+  case A(x: Int)
+  case B
+}
+// E0098: enum Mixed mixes shared parameters with `case` cases ...
+```
+
+Fix: move the shared data into each case's own fields, or drop the `case`
+cases in favor of a homogeneous, data-carrying enum (`enum Mixed(tag: String) { A, B }`).
+
+### `E0099` — Homogeneous enum with type parameters
+
+A homogeneous enum (no `case` cases) declares type parameters. A homogeneous
+enum compiles to a `java.lang.Enum`, which the JVM does not allow to be
+generic; only an ADT enum (one with `case` cases, desugared to a sealed
+interface + records) can be generic.
+
+```onion
+enum Color[T] { RED, GREEN }
+// E0099: enum Color cannot take type parameters ...
+```
+
+Fix: drop the type parameters, or restructure as an ADT (`case`) enum if each
+case genuinely needs its own type argument.
+
 ### `E0069` — Local val requires an initializer
 
 A local `val` was declared without an initializer (no `= expr`). Unlike a
@@ -1770,6 +1819,9 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0094` | `main` parameter `…` has type … which cannot be read from an argument |
 | `E0095` | `main` has a String[] parameter, `…`, that is not in a supported position |
 | `E0096` | abstract method … cannot be private |
+| `E0097` | instance … is already defined (at most one instance is allowed per (trait, type)) |
+| `E0098` | enum … mixes shared parameters with `case` cases |
+| `E0099` | enum … cannot take type parameters |
 
 ## See also
 

@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0096) for identification
+ * type checking. Each error has a unique code (E0000-E0099) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -25,11 +25,11 @@ package onion.compiler
  *   - VARIABLE_NOT_FOUND, CLASS_NOT_FOUND, FIELD_NOT_FOUND, METHOD_NOT_FOUND
  *   - CONSTRUCTOR_NOT_FOUND, AMBIGUOUS_METHOD, AMBIGUOUS_CONSTRUCTOR
  *
- * '''Duplication Errors (E0007-E0012, E0025-E0026, E0029, E0053-E0054, E0084)'''
+ * '''Duplication Errors (E0007-E0012, E0025-E0026, E0029, E0053-E0054, E0084, E0097)'''
  *   - DUPLICATE_LOCAL_VARIABLE, DUPLICATE_CLASS, DUPLICATE_FIELD, DUPLICATE_METHOD
  *   - DUPLICATE_GLOBAL_VARIABLE, DUPLICATE_FUNCTION, DUPLICATE_CONSTRUCTOR
  *   - DUPLICATE_GENERATED_METHOD, DUPLICATE_TYPE_PARAMETER, CYCLIC_TYPE_ALIAS
- *   - DUPLICATE_TYPE_ALIAS, DUPLICATE_EXTENSION_METHOD
+ *   - DUPLICATE_TYPE_ALIAS, DUPLICATE_EXTENSION_METHOD, DUPLICATE_TRAIT_INSTANCE
  *
  * '''Access Errors (E0013-E0015)'''
  *   - METHOD_NOT_ACCESSIBLE, FIELD_NOT_ACCESSIBLE, CLASS_NOT_ACCESSIBLE
@@ -85,6 +85,9 @@ package onion.compiler
  * '''Constructor Errors (E0087-E0090)'''
  *   - SECONDARY_CONSTRUCTOR_MUST_DELEGATE, CONSTRUCTOR_DELEGATION_CYCLE
  *   - CONSTRUCTOR_IN_RECORD_OR_ENUM, THIS_BEFORE_CONSTRUCTOR_DELEGATION
+ *
+ * '''Enum Errors (E0098-E0099)'''
+ *   - ADT_ENUM_MIXES_SHARED_PARAMS, HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS
  *
  * == Error Message Lookup ==
  *
@@ -267,6 +270,31 @@ object SemanticError {
    * ClassFormatError at class-load time (issue #2012).
    */
   case object PRIVATE_ABSTRACT_METHOD extends SemanticError(96)
+  /**
+   * Two `instance` declarations for the same (trait, type) pair within one
+   * compilation unit: both would lower to the same mangled class name, so the
+   * second one is rejected here with a clear message instead of surfacing
+   * later as an opaque duplicate-class error. Reported during rewriting, at
+   * the second `instance` declaration. Cross-unit duplicates still surface as
+   * a duplicate-class error, since they redefine the same class.
+   */
+  case object DUPLICATE_TRAIT_INSTANCE extends SemanticError(97)
+  /**
+   * A Scala-3-style ADT enum (one with `case` cases) also declares its own
+   * shared constructor parameters (`enum Mixed(tag: String) { case A(x: Int) }`).
+   * ADT enums carry fields per case only, via the generated record for each
+   * case; enum-level shared parameters mixed with `case` cases is a separate,
+   * unimplemented feature, not an oversight to silently ignore.
+   */
+  case object ADT_ENUM_MIXES_SHARED_PARAMS extends SemanticError(98)
+  /**
+   * A homogeneous enum (no `case` cases) declares type parameters
+   * (`enum Color[T] { RED, GREEN }`). A homogeneous enum compiles to a
+   * `java.lang.Enum`, which the JVM does not allow to be generic; only an ADT
+   * enum (one with `case` cases, desugared to a sealed interface + records) can
+   * be generic. Reported during rewriting (#311).
+   */
+  case object HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS extends SemanticError(99)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

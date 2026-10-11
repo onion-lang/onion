@@ -24,11 +24,17 @@ class TypeClassCoherenceSpec extends AbstractShellSpec {
       assert(Shell.Failure(-1) == shell.run(
         "trait Numeric[T] { def zero(): T }\ninstance Numeric[Integer] { def zero(): Integer = 0 }\ninstance Numeric[Integer] { def zero(): Integer = 1 }\ndef main(args: String[]): void { IO::println(\"x\") }", "None", Array()))
     }
-    it("reports the duplicate-instance message in English regardless of JVM locale") {
+    it("reports the duplicate-instance message, bilingual, carrying E0097 (#2026-adjacent diagnostics cleanup)") {
+      // The message now goes through the same Message(...)/errorMessage.properties
+      // lookup every other diagnostic uses, so it renders in whichever locale the
+      // JVM default locale selects -- this asserts against that same lookup rather
+      // than hardcoding one language's text (see CLAUDE.md's locale-independence
+      // testing note).
+      val expected = onion.compiler.toolbox.Message(
+        "error.semantic.duplicateTraitInstance", Array[Any]("Numeric[Integer]"))
       val messages = errorMessages(
         "trait Numeric[T] { def zero(): T }\ninstance Numeric[Integer] { def zero(): Integer = 0 }\ninstance Numeric[Integer] { def zero(): Integer = 1 }\ndef main(args: String[]): void { IO::println(\"x\") }")
-      assert(messages.exists(_.toLowerCase.contains("already defined")))
-      assert(!messages.exists(_.contains("は既に定義されています")))
+      assert(messages.exists(_.contains(expected)), s"expected a message containing '$expected', got: $messages")
     }
     it("allows distinct type arguments of the same trait") {
       assert(Shell.Success("ok") == shell.run(

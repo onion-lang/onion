@@ -199,6 +199,17 @@ class SemanticErrorReporter(threshold: Int) {
         // already failed, so a name+arity match here can only be this stdlib method.
         val className = FormerDefaultImportLookup.find(name, argTypes.length).get
         Some(format(message("suggestion.stdlibNoLongerDefaultImported"), Seq(className, name)))
+      } else if (name == "fold") {
+        // `List` has the pipeline method `fold` (onion.Colls::fold(List, ...)), but every
+        // other Iterable (Map::values(), a Set, ...) only has `foldl` (onion.Iterables::
+        // foldl) -- the one pipeline method where map/filter's List-and-Iterable symmetry
+        // breaks (#2053). Reaching METHOD_NOT_FOUND for "fold" already means it isn't
+        // resolvable on this receiver, so a bare name-similarity guess would otherwise
+        // pick an unrelated same-receiver method (e.g. Collection.add) instead of the one
+        // rename that actually fixes the call. (argTypes can't be trusted to carry the
+        // real arity here: an untyped trailing-closure call like `.fold(0) { a, x -> ... }`
+        // reports with an empty array via the bidirectional-inference fallback.)
+        Some(format(message("suggestion.didYouMean"), Seq("foldl")))
       } else {
         targetType match
           case obj: TypedAST.ObjectType => toolbox.Suggestions.formatSuggestion(name, rankedCallCandidates(obj, name, argTypes))

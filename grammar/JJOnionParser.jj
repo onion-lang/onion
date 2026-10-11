@@ -668,6 +668,17 @@ public class JJOnionParser implements Parser {
   }
 
   /*
+   * `def f(): void = voidExpr` must desugar to a bare statement (`{ voidExpr }`), not
+   * `{ return voidExpr }` -- a `void` method already tolerates a trailing non-return
+   * statement in its block-bodied form, and an explicit `return <void-expr>;` is a
+   * distinct, deliberately rejected shape (E0020) that this sugar must not trigger.
+   */
+  private static boolean isVoidReturnType(AST.TypeNode ty) {
+    return ty != null && ty.desc() instanceof AST.PrimitiveType
+      && ((AST.PrimitiveType) ty.desc()).kind() == AST.K_VOID();
+  }
+
+  /*
    * convenience method to create a Location
    *
    * The token's extent becomes the location's span, so a diagnostic anchored here
@@ -1605,9 +1616,12 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
        return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, tparams, throwsTypes, anns);
      }
   |  ({enterSection();} "=" eols() {enterAssignScope();} e=term() eos()) {
+       List<AST.BlockElement> bodyElems = isVoidReturnType(ty)
+         ? asList((AST.BlockElement) e)
+         : asList((AST.BlockElement) new AST.ReturnExpression(p(t1), e));
        return new AST.FunctionDeclaration(
          p(t1), modifiers, c(t2), args, ty,
-         new AST.BlockExpression(p(t1), asList(new AST.ReturnExpression(p(t1), e)), leaveAssignScope()),
+         new AST.BlockExpression(p(t1), bodyElems, leaveAssignScope()),
          tparams, throwsTypes, anns
        );
      }
@@ -2064,9 +2078,12 @@ AST.MethodDeclaration method_decl(int mset) : {
 }{
   anns=annotations() {enterSection();} "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
   (  "=" eols() {enterAssignScope();} e=term() eos_or_block_end() {
+       List<AST.BlockElement> bodyElems = isVoidReturnType(ty)
+         ? asList((AST.BlockElement) e)
+         : asList((AST.BlockElement) new AST.ReturnExpression(p(t), e));
        return new AST.MethodDeclaration(
          p(t), mset, c(t), args, ty,
-         new AST.BlockExpression(p(t), asList(new AST.ReturnExpression(p(t), e)), leaveAssignScope()),
+         new AST.BlockExpression(p(t), bodyElems, leaveAssignScope()),
          tparams, throwsTypes, anns
        );
      }
@@ -2094,9 +2111,12 @@ AST.MethodDeclaration interface_method_decl() : {
   {enterSection();}
   "def" n=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
   (  "=" eols() {enterAssignScope();} e=term() eos_or_block_end() {
+       List<AST.BlockElement> bodyElems = isVoidReturnType(ty)
+         ? asList((AST.BlockElement) e)
+         : asList((AST.BlockElement) new AST.ReturnExpression(p(n), e));
        return new AST.MethodDeclaration(
          p(n), AST.M_PUBLIC(), c(n), args, ty,
-         new AST.BlockExpression(p(n), asList(new AST.ReturnExpression(p(n), e)), leaveAssignScope()),
+         new AST.BlockExpression(p(n), bodyElems, leaveAssignScope()),
          tparams, throwsTypes
        );
      }

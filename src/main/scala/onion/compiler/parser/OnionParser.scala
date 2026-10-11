@@ -831,8 +831,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         enterAssignScope()
         val e = term()
         eos()
+        val bodyElems: List[AST.BlockElement] =
+          if (isVoidReturnType(ty)) List(e) else List(AST.ReturnExpression(p(t1), e))
         AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty,
-          AST.BlockExpression(p(t1), List(AST.ReturnExpression(p(t1), e)), leaveAssignScope()), tparams, throwsTypes, anns)
+          AST.BlockExpression(p(t1), bodyElems, leaveAssignScope()), tparams, throwsTypes, anns)
       case _ =>
         enterSection()
         eos()
@@ -1276,8 +1278,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         enterAssignScope()
         val e = term()
         eosOrBlockEnd()
+        val bodyElems: List[AST.BlockElement] =
+          if (isVoidReturnType(ty)) List(e) else List(AST.ReturnExpression(p(t), e))
         AST.MethodDeclaration(p(t), mset, c(t), args, ty,
-          AST.BlockExpression(p(t), List(AST.ReturnExpression(p(t), e)), leaveAssignScope()), tparams, throwsTypes, anns)
+          AST.BlockExpression(p(t), bodyElems, leaveAssignScope()), tparams, throwsTypes, anns)
       case K.LBRACE =>
         leaveSection()
         val b = block()
@@ -1448,6 +1452,15 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def returnType(): AST.TypeNode =
     if (kind(1) == K.K_VOID) { val t = next(); AST.TypeNode(p(t), AST.PrimitiveType(AST.KVoid), false) } else typ()
+
+  /** `def f(): void = voidExpr` must desugar to a bare statement (`{ voidExpr }`), not
+   *  `{ return voidExpr }` -- a `void` method already tolerates a trailing non-return
+   *  statement in its block-bodied form, and an explicit `return <void-expr>;` is a
+   *  distinct, deliberately rejected shape (E0020) that this sugar must not trigger. */
+  private def isVoidReturnType(ty: AST.TypeNode): Boolean = ty match {
+    case AST.TypeNode(_, AST.PrimitiveType(AST.KVoid), _) => true
+    case _ => false
+  }
 
   private def argument(): AST.Argument = {
     val t = id()

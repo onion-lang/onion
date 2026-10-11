@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **The stdlib reference (en/ja) didn't mention that `.fold`/`.reduce`'s 3-arg form/`Iterables::foldl` emit `[W0015]` on their own most idiomatic use** -- `xs.fold(0) { a, b -> a + b }` on a `List[Int]`, with a literal zero and an `Int`-returning combiner, still unboxes through the platform-unboxing warning when assigned to a non-null `Int`, since the Java generic method's declared return type is the type variable itself (a boxed reference with no Onion-tracked nullability) regardless of what the call site pins it to. This is intentional (same trade-off as `Json::getInt`, #318), but was undocumented; the reference now explains it and names `--Wno platform-unboxing` for suppressing it. A regression test locks in the current, intentional behavior.
+
 ## [0.141.0] - 2026-10-11
 
 ### Fixed

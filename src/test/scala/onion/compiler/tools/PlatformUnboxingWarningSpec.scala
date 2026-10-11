@@ -53,6 +53,46 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
       assert(result.diagnostics.warnings.filter(_.category.code == "W0015").isEmpty)
     }
 
+    it("warns for List::fold's accumulator even when every argument is a non-null Int") {
+      // onion.Colls::fold<T, R> is a Java generic method: its declared return
+      // type is the type variable R, a boxed reference with no Onion-tracked
+      // nullability, regardless of what the call site's own arguments pin R
+      // to. So the single most idiomatic numeric fold -- a literal `0` zero
+      // and an Int-returning combiner -- still unboxes through this warning
+      // (see docs/reference/stdlib.md's Colls Module section).
+      val result = compileWarnings(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val xs: List[Int] = [1, 2, 3]
+          |    val total: Int = xs.fold(0) { a, b -> a + b }
+          |    return total
+          |  }
+          |}
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.length == 1, s"expected 1 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
+    }
+
+    it("warns for List::reduce's 3-arg accumulator the same way, despite its concretely-typed signature") {
+      val result = compileWarnings(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val xs: List[Int] = [1, 2, 3]
+          |    val total: Int = xs.reduce(0, (acc, x) -> acc + x)
+          |    return total
+          |  }
+          |}
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.length == 1, s"expected 1 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
+    }
+
     it("fails compilation under warnings-as-errors") {
       val result = compileWarnings(
         """

@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.TypedAST.BinaryTerm.Kind.ELVIS
 import onion.compiler.toolbox.Boxing
 import onion.compiler.typing.session.TypingBodyContext
 
@@ -109,12 +110,26 @@ private[compiler] final class AssignabilitySupport(
       }
       val boxedType = Boxing.boxedType(bodyContext.table, targetBasicType)
       if (TypeRules.isAssignable(boxedType, actual.`type`)) {
-        // The source is a boxed reference (typically a Java-interop platform
-        // value, e.g. Json::getInt's Integer) with no Onion-tracked
-        // nullability; unboxing it to a non-null primitive crashes with a raw
-        // NPE if the value is actually null (#318). Mirrors the W0012
-        // null-to-non-nullable trade-off above: warn rather than block.
-        bodyContext.warningReporter.platformUnboxing(node.location, actual.`type`.displayName, targetBasicType.displayName)
+        // `x ?: 0` / `s?.length ?: -1`: typeElvis only gives the Elvis term a
+        // bare boxed type (rather than keeping it NullableType) once it has
+        // already proven -- from the fallback's own non-nullability -- that
+        // the result can't be null (#2059). Unlike a genuine boxed platform
+        // value (Json::getInt, a generic fold accumulator) whose nullability
+        // Onion never tracked, this boxed value's non-null-ness is already
+        // established, so unboxing it here is not the same risk the warning
+        // below exists to flag.
+        val provenNonNullByElvis = actual match {
+          case b: BinaryTerm => b.kind == ELVIS
+          case _ => false
+        }
+        if (!provenNonNullByElvis) {
+          // The source is a boxed reference (typically a Java-interop platform
+          // value, e.g. Json::getInt's Integer) with no Onion-tracked
+          // nullability; unboxing it to a non-null primitive crashes with a raw
+          // NPE if the value is actually null (#318). Mirrors the W0012
+          // null-to-non-nullable trade-off above: warn rather than block.
+          bodyContext.warningReporter.platformUnboxing(node.location, actual.`type`.displayName, targetBasicType.displayName)
+        }
         return Boxing.unboxing(bodyContext.table, actual, targetBasicType)
       }
     }

@@ -491,7 +491,20 @@ final class ClosureTyping(
       // void cannot instantiate a type parameter; a side-effect-only body
       // becomes FunctionN[..., Object] and the block returns null
       val ret = inferredReturnType.filter(_ != BasicType.VOID).getOrElse(bodyContext.rootClass)
-      AppliedClassType(baseType, (argTypes.toIndexedSeq :+ ret).toList)
+      // A generic type argument must be a reference type; box a primitive
+      // param/result (e.g. the `2` in `() -> 2`, or an explicit `(x: Int) ->
+      // ...`) before using it as one. Left unboxed, the resulting
+      // Function0[Int] prints identically to a declared Function0[Int] but
+      // is a different type -- generics are invariant, so passing this
+      // closure anywhere a boxed Function0[Int] is expected (e.g. as a
+      // List[Function0[Int]] element reaching a generic extension method
+      // like concat) failed with a message naming the same type on both
+      // sides of "expected ... but ... is used".
+      def boxed(t: Type): Type = t match {
+        case bt: BasicType if bt != BasicType.VOID => onion.compiler.toolbox.Boxing.boxedType(bodyContext.table, bt)
+        case other => other
+      }
+      AppliedClassType(baseType, (argTypes.toIndexedSeq.map(boxed) :+ boxed(ret)).toList)
     } else {
       rawType
     }

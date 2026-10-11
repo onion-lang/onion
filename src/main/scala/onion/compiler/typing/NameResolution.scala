@@ -149,7 +149,11 @@ class NameResolver(private val context: NameResolutionContext) {
       val arity = mappedParams.length
       val functionType = context.table.loadOrNull(s"onion.Function$arity")
       if (functionType == null) return null
-      TypedAST.AppliedClassType(functionType, (mappedParams :+ mappedResult).toList)
+      // FunctionN's type parameters are reference types; box a primitive param/
+      // result the same way AST.ParameterizedType's generic arguments already
+      // are, so `Int -> Int` is really `Function1[Int, Int]` as CLAUDE.md
+      // documents, not a distinct (unboxed) type that happens to print the same.
+      TypedAST.AppliedClassType(functionType, (mappedParams.map(boxTypeArgument) :+ boxTypeArgument(mappedResult)).toList)
     case AST.ArrayType(component) =>
       val (base, dimension) = context.splitDescriptor(descriptor)
       val mappedBase = map(base)

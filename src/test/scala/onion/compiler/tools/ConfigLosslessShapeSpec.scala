@@ -261,6 +261,22 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
     }
   }
 
+  describe("comments are whole lines, not a trailing syntax") {
+    it("reads a '#' after a value on the same line as part of the value, not a stripped comment") {
+      val r = shell.run(decl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val text = "host = example.com  # primary\nport = 1\ndebug = true\n"
+          |    val got = Server::cfg().parse(text).get()
+          |    return got.host()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("example.com  # primary") == r, r.toString)
+    }
+  }
+
   describe("losslessness is a claim, not a default") {
     it("a lossy shape refuses parseLossless instead of pretending") {
       val r = shell.run(

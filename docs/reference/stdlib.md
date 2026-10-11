@@ -571,6 +571,13 @@ val out = r.edit { v -> v.copy(port = 9090) }.render()
 behind `shape name = config` / `shape name = yaml` -- all four for when you want the
 `Shape[T]` value directly instead of the sugar.
 
+The `config` format is line-based: each line is `key = value` (the first `=` splits,
+spacing around it is free), a line whose trimmed text starts with `#` is a whole-line
+comment, and a blank line is ignored. There is no inline-comment syntax -- a `#` after
+a value on the same line is read as part of that value, not stripped (`host =
+example.com  # primary` parses `host` as `"example.com  # primary"`). Put a comment on
+its own line instead.
+
 ### Structured JSON and JSON Schema
 
 A json shape's components may also be `List[S]` of a scalar, a nested record that

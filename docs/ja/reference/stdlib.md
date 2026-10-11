@@ -511,6 +511,12 @@ val out = r.edit { v -> v.copy(port = 9090) }.render()
 `shape name = yaml` の糖衣構文の裏にある lossless shape を、それぞれ `Shape[T]` の値として
 直接組み立てます。
 
+`config` 形式は行単位です:各行は `key = value`(最初の `=` で分割し、周りの空白は
+自由)、trim した先頭が `#` の行は行全体がコメント、空行は無視されます。行内コメントの
+構文はありません——値と同じ行の `#` 以降もその値の一部として読まれ、取り除かれません
+(`host = example.com  # primary` は `host` を `"example.com  # primary"` と解釈します)。
+コメントは必ず別の行に書いてください。
+
 ### 構造化 JSON と JSON Schema
 
 json shape の成分には、スカラーの `List[S]`、json shape を宣言した入れ子のレコード、

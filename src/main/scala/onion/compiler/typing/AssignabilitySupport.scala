@@ -120,7 +120,29 @@ private[compiler] final class AssignabilitySupport(
           case b: BinaryTerm => b.kind == BinaryTerm.Kind.ELVIS
           case _ => false
         }
-        if (!isElvis)
+        // A direct call through a FunctionN value (`f(x)`, desugared to
+        // `f.call(x)`) whose declared return type argument is a concrete,
+        // non-nullable type (not `T?`) can never actually produce null:
+        // every implementation autoboxes exactly that declared type on
+        // return. Unlike a true Java generic method (Colls::fold, whose type
+        // variable R is unified per call site and could be bound to
+        // anything, including a genuinely nullable type), a FunctionN's
+        // return type argument is fixed by the function's own Onion type, so
+        // the compiler already knows the result can't be null here.
+        val isNonNullFunctionCall = actual match {
+          case cast: AsInstanceOf =>
+            cast.target match {
+              case call: Call if call.method.name == "call" =>
+                call.target.`type` match {
+                  case applied: AppliedClassType if applied.raw.name.startsWith("onion.Function") =>
+                    !applied.typeArguments.last.isNullable
+                  case _ => false
+                }
+              case _ => false
+            }
+          case _ => false
+        }
+        if (!isElvis && !isNonNullFunctionCall)
           bodyContext.warningReporter.platformUnboxing(node.location, actual.`type`.displayName, targetBasicType.displayName)
         return Boxing.unboxing(bodyContext.table, actual, targetBasicType)
       }

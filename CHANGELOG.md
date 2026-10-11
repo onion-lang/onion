@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`[W0015]` (platform unboxing) fired on `x ?: 0` and `s?.length ?: -1` -- the Elvis operator's own idiom for handling a nullable value -- even though `?:` had already proven the result can't be null (#2059).** `def g(x: Int?): Int = x ?: 0` warned "boxed value of type 'java.lang.Integer' is implicitly unboxed to non-null 'Int'; ... this throws a NullPointerException at runtime", despite the output being correct and the NPE being impossible. The warning no longer fires when the boxed value being unboxed is the result of an Elvis expression; unboxing a genuinely untracked boxed platform value (`Json::getInt`, a generic fold accumulator) still warns as before.
+- **`[W0015]` also fired on the ordinary result of calling any typed function value directly** -- `val f: Int -> Int = (x) -> x * 2; val r: Int = f(3)` warned the same boxed-unboxing NPE risk as `Json::getInt`, even though `f`'s own declared type (`Function1[Int, Int]`) already guarantees the result is a non-null `Int`: every implementation autoboxes exactly that primitive on return, unlike a true Java generic method (`Colls::fold`'s type variable `R`, still unified per call site and still warned) whose result type isn't pinned down until the call site. Calling a `FunctionN` value whose return type argument is a concrete non-nullable type no longer warns. Found while probing the compiler for gaps.
 
 ### Documentation
 

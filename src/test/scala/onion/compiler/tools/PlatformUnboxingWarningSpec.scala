@@ -50,6 +50,27 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
       assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
     }
 
+    it("does not warn when directly calling a FunctionN value whose return type is a non-nullable primitive") {
+      // f's static type is onion.Function1[Integer, Integer] (Int boxed, not
+      // Int?): every implementation must autobox a genuine Int on return, so
+      // the result of calling it can never actually be null, unlike
+      // Colls::fold's truly generic, call-site-bound type variable R.
+      val result = compileWarnings(
+        """
+          |val f: Int -> Int = (x) -> x * 2
+          |val r: Int = f(3)
+          |val isEven: Int -> Boolean = (x) -> x % 2 == 0
+          |val b: Boolean = isEven(4)
+          |def apply2(g: (Int, Int) -> Int, y: Int): Int = g(y, y)
+          |println(r)
+          |println(b)
+          |println(apply2((x, y) -> x + y, 5))
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
+    }
+
     it("does not warn for the defaulted accessor (already primitive)") {
       val result = compileWarnings(
         """

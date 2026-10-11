@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.141.0] - 2026-10-11
+
 ### Fixed
 
 - **A top-level `def main(...)` auto-CLI script rejected a bare `--` with `error: unknown option: --`, even though the sibling `tool`-declaration CLI already treats `--` as the conventional end-of-options marker (#437).** `script.on -- --looks-like-a-flag` worked for a `tool`, where everything after `--` is taken as a literal value however it is spelled, but failed outright for `def main(name: String)`, so a `main`-based script had no way to pass a positional argument that happens to start with `-`. `onion.Cli.parse`/`tryParse` now stop treating `--`-prefixed tokens (`--help` included) as options once a bare `--` is seen, mirroring `ToolCli`. Found while probing the compiler for gaps.

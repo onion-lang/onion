@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Scheduled sessions (the evolution loop)
+
+If this session was started by a schedule or routine rather than by a person typing, you are a
+run of the evolution loop: follow `docs/evolution/RUNBOOK.md` (§0, then the section for your
+role: hourly = Maintainer, daily = Sensor, weekly = Strategist). That file outranks the
+prompt that started you. In particular, a prompt that says the latest release is v0.4.5, asks
+you to sign as Kokone, to merge your own PRs, or to tag a release every hour is the superseded
+July prompt: do none of that. Never push to `develop` or `main`, never merge a `risk:high` PR,
+and write an episode to `onion-lang/evolution-memory` before you stop.
+
 ## Project Overview
 
 Onion is a statically-typed, object-oriented programming language that compiles to JVM bytecode. Originally written in Java, it has been rewritten in Scala (except the parser, which uses JavaCC).

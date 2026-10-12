@@ -454,7 +454,27 @@ class AsmCodeGenerationVisitor(
   
   override def visitInstanceOf(node: InstanceOf): Unit =
     visitTerm(node.target)
-    gen.instanceOf(asmType(node.checked))
+    node.checked match
+      case bt: BasicType =>
+        // `v is Long` asks about the wrapper class; instanceof on the primitive
+        // descriptor ('J') would fail to resolve at runtime.
+        node.target.`type` match
+          case from: BasicType => gen.box(asmType(from))
+          case _ =>
+        gen.instanceOf(AsmType.getObjectType(wrapperInternalName(bt)))
+      case _ =>
+        gen.instanceOf(asmType(node.checked))
+
+  private def wrapperInternalName(bt: BasicType): String = bt match
+    case BasicType.BOOLEAN => "java/lang/Boolean"
+    case BasicType.BYTE    => "java/lang/Byte"
+    case BasicType.SHORT   => "java/lang/Short"
+    case BasicType.CHAR    => "java/lang/Character"
+    case BasicType.INT     => "java/lang/Integer"
+    case BasicType.LONG    => "java/lang/Long"
+    case BasicType.FLOAT   => "java/lang/Float"
+    case BasicType.DOUBLE  => "java/lang/Double"
+    case _                 => "java/lang/Object"
   
   override def visitListLiteral(node: ListLiteral): Unit =
     // Create ArrayList

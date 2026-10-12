@@ -1714,13 +1714,19 @@ val rows = Yaml::parse("- name: Alice\n  age: 30\n- name: Bob\n  age: 25\n")
 // rows is an ArrayList of two LinkedHashMaps
 ```
 
-Scalar type inference rules (identical to `Json`):
-- `""` or `null` → `null`
+Scalar type inference rules (identical to `Json`, plus two YAML-only cases):
+- `""`, `null`, or `~` → `null`
 - `true` / `false` → `Boolean`
 - Bare integer (matches `-?\d+`) → `Long`
 - Floating-point pattern or number containing `.`/`e`/`E` → `Double`
-- Quoted `"..."` → `String` (unescaped, no further coercion)
+- Double-quoted `"..."` → `String` (backslash-unescaped, no further coercion)
+- Single-quoted `'...'` → `String` (`''` is a literal `'`, no backslash escapes, no further coercion)
 - Anything else → `String`
+
+A trailing ` #...` comment (a `#` at the start of the value, or preceded by whitespace) is
+stripped before this inference runs, unless it is inside a `"..."` or `'...'` quoted value:
+`a: 1 # note` parses `a` as the `Long` `1`, and `b: 'q # no'` keeps the `#` as part of the
+string `q # no`.
 
 Throws `Yaml.YamlParseException` on malformed input; `derive!(Yaml)`'s
 `fromYaml` catches this and returns `null` instead.

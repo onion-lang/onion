@@ -2785,10 +2785,10 @@ API 一覧:
 - `lock.isHeld()` - ロックが現在保持されているか
 - `Concurrent::channel(capacity)`
 - `chan.send(item)` / `chan.trySend(item)` - 満杯ならブロック / 満杯なら false を返す
-- `chan.receive()` / `chan.receiveTimeout(timeoutMillis)` - 何か届くまでブロック /
-  タイムアウト後は null を返す
+- `chan.receive()` / `chan.receiveTimeout(timeoutMillis)` - 何か届くまでブロック
+  (クローズ済みで空になったら null) / タイムアウト後は null を返す
 - `chan.size()` / `chan.isEmpty()`
-- `chan.close()` / `chan.isClosed()` - 以降の送信を拒否する。既にキューにあるものは受信できる
+- `chan.close()` / `chan.isClosed()` - 以降の送信を拒否する。既にキューにあるものは受信でき、その後 `receive()` は null を返す
 - `chan.drain()` - 現在キューにあるもの全てを取り出し、チャネルを空にする
 
 ---

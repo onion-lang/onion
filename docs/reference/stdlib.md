@@ -2626,10 +2626,10 @@ Full API:
 - `Concurrent::channel(capacity)`
 - `chan.send(item)` / `chan.trySend(item)` - blocks while full vs. returns false instead
 - `chan.receive()` / `chan.receiveTimeout(timeoutMillis)` - blocks until something arrives
-  vs. returns null after the timeout
+  (null once the channel is closed and drained) vs. returns null after the timeout
 - `chan.size()` / `chan.isEmpty()`
 - `chan.close()` / `chan.isClosed()` - refuses further sends; what is already queued can
-  still be received
+  still be received, then `receive()` returns null
 - `chan.drain()` - everything queued right now, leaving the channel empty
 
 ---

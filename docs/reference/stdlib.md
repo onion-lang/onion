@@ -600,6 +600,12 @@ val schema = Json::parse(summaryShape.jsonSchema())   // embed in a request body
 Any other shape's `jsonSchema()` throws `UnsupportedOperationException`, as does a
 recursive record's, which has no finite inline schema.
 
+`describe(component, text)` returns a shape whose JSON Schema carries `text` as
+`component`'s `"description"`; parsing, printing and every other component are unchanged,
+and calls chain (`s.describe("owner", "...").describe("task", "...")`). It throws the same
+`UnsupportedOperationException` as `jsonSchema()` when `hasJsonSchema()` is false, and
+`IllegalArgumentException` for a component the shape does not have (RFC #1960, option 3).
+
 ### Combinators
 
 - `eachLine(text[, origin])` — one `Outcome[T]` per line, keeping both the lines that

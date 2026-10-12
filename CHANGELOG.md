@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`Shape::describe(component, text)` attaches a JSON Schema `"description"` to one component, with no language change.** A json shape's `jsonSchema()` had no way to carry the field guidance a hand-written schema has, which `shape doc = json` was meant to make unnecessary (#1934). `Summary::doc().describe("risk", "1 (low) to 5 (high)").jsonSchema()` now includes it; parsing, printing and the other components are unchanged, and calls chain. Implements option 3 of RFC #1960 (no new syntax).
+
 ### Fixed
 
 - **A typo of `String` (`Sting`, `Strnig`) got no "did you mean" suggestion, or an unrelated one.** `String` is resolved only through the default on-demand `java.lang.*` import, so it never entered the `[E0003]` class-not-found suggestion pool the way a local or explicitly-imported class does -- a dropped letter (`Sting`) got the unrelated `did you mean: Int` (closer by sheer edit-distance coincidence among the 8 primitive names), and a transposition (`Strnig`) got no suggestion at all. `String` is now a suggestion candidate. Found while probing the compiler for gaps.

@@ -207,6 +207,21 @@ Summary::doc().jsonSchema()
 自分自身を含むレコードには有限のインライン スキーマがないので、その `jsonSchema()` も
 例外を投げます。
 
+`describe(component, text)` は成分 1 つに `"description"` を付けます。手書きのスキーマが
+持っている項目ごとの説明で、構造化出力の質はそれに左右されます。言語を変える必要は
+ありません。
+
+```onion
+val schema = Summary::doc()
+  .describe("title", "a one-line summary of the decision")
+  .describe("risk", "1 (low) to 5 (high)")
+  .jsonSchema()
+```
+
+新しい shape を返すだけで、読み書きは変わりません。呼び出しは連鎖できます。
+`jsonSchema()` が投げる場合と同じく `UnsupportedOperationException` を、その shape に無い
+成分名を渡すと `IllegalArgumentException` を投げます。
+
 ## ファイルと URL
 
 ```onion

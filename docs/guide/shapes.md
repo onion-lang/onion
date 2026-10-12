@@ -208,6 +208,21 @@ into a map to embed in a request body.
 other shape's `jsonSchema()` throws rather than describe documents it does not read. A
 record that contains itself has no finite inline schema, so its `jsonSchema()` throws too.
 
+`describe(component, text)` attaches a `"description"` to one component, for the field
+guidance a hand-written schema carries — structured-output quality depends on it, and this
+needs no language change:
+
+```onion
+val schema = Summary::doc()
+  .describe("title", "a one-line summary of the decision")
+  .describe("risk", "1 (low) to 5 (high)")
+  .jsonSchema()
+```
+
+It returns a new shape; parsing and printing are unchanged, and calls chain. It throws
+`UnsupportedOperationException` where `jsonSchema()` would, and `IllegalArgumentException`
+for a component name the shape does not have.
+
 ## Files and URLs
 
 ```onion

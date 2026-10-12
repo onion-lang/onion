@@ -32,6 +32,14 @@ object NameResolver {
     * Delegates to the shared `onion.compiler.PrimitiveTypeNames` -- see its doc
     * comment for the other call site this must stay in sync with. */
   private[compiler] val PrimitiveTypeNames: Seq[String] = onion.compiler.PrimitiveTypeNames.all
+
+  /** `String` resolves only through the default on-demand `java.lang.*` import
+    * (`TypingHeaderPass.buildImports`), so unlike a local class or an explicitly
+    * imported one, it never lands in `getCandidateClassNames`'s candidate pool.
+    * A typo of it then gets no suggestion at all, or, worse, an unrelated
+    * primitive name that happens to be closer in edit distance to the eight
+    * entries in `PrimitiveTypeNames` than to the correct answer. */
+  private[compiler] val CommonDefaultImportNames: Seq[String] = Seq("String")
 }
 
 class NameResolver(private val context: NameResolutionContext) {
@@ -71,7 +79,7 @@ class NameResolver(private val context: NameResolutionContext) {
   def getCandidateClassNames: Array[String] = {
     val localClasses = context.table.classes.values.map(_.name).toSeq
     val importedClasses = imports.filterNot(_.isOnDemand).map(_.simpleName)
-    (localClasses ++ importedClasses ++ NameResolver.PrimitiveTypeNames).distinct.toArray
+    (localClasses ++ importedClasses ++ NameResolver.PrimitiveTypeNames ++ NameResolver.CommonDefaultImportNames).distinct.toArray
   }
 
   def map(descriptor: AST.TypeDescriptor): Type = descriptor match {

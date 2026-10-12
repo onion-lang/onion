@@ -155,6 +155,40 @@ class DidYouMeanSpec extends AbstractShellSpec {
           "E0003", "MyClass"
         )
       }
+
+      it("suggests String for a typo of the default-on-demand-imported java.lang.String") {
+        // String is never explicitly imported (it comes from the default
+        // on-demand `java.lang.*` import), so it must not fall out of the
+        // did-you-mean candidate pool the way a local or explicitly-imported
+        // class doesn't.
+        failsWithSuggestion(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    var x: Sting = "hello";
+            |    return x;
+            |  }
+            |}
+            |""".stripMargin,
+          "E0003", "String"
+        )
+      }
+
+      it("suggests String for a transposition typo, not an unrelated primitive name") {
+        failsWithSuggestion(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    var x: Strnig = "hello";
+            |    return x;
+            |  }
+            |}
+            |""".stripMargin,
+          "E0003", "String"
+        )
+      }
     }
 
     describe("for primitive type names") {

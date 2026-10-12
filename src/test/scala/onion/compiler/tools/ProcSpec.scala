@@ -4,6 +4,9 @@ import onion.tools.Shell
 
 import java.io.File
 import java.nio.file.{Files, Path}
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  * Tests for the onion.Proc scripting stdlib (issue #123).
@@ -141,6 +144,31 @@ class ProcSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success(s"5:$workDir") == result)
+    }
+
+    it("does not hang when the child reads stdin to EOF (#2087)") {
+      val future = Future {
+        shell.run(
+          s"""
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val r = Proc::capture(${script("cat", "more")})
+            |    return r.status()
+            |  }
+            |}
+            |""".stripMargin,
+          "ProcCaptureStdinEof.on",
+          Array()
+        )
+      }
+      val result =
+        try Await.result(future, 10.seconds)
+        catch {
+          case _: java.util.concurrent.TimeoutException =>
+            fail("Proc::capture hung for over 10s on a child that reads stdin to EOF (#2087)")
+        }
+      assert(Shell.Success(0) == result)
     }
 
     it("returns the exit status from exec in a given working directory") {

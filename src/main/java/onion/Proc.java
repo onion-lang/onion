@@ -61,6 +61,9 @@ public final class Proc {
             ProcessBuilder builder = new ProcessBuilder(command);
             if (dir != null) builder.directory(new File(dir));
             Process process = builder.start();
+            // Nothing writes to the child's stdin; close it right away so a child that
+            // reads stdin to EOF (e.g. `cat`, `sort`) does not block forever.
+            process.getOutputStream().close();
             // Drain stderr on a separate thread so a full pipe buffer on either
             // stream cannot deadlock the child process
             final InputStream errStream = process.getErrorStream();

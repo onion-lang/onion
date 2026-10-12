@@ -127,7 +127,7 @@ public final class Yaml {
 
         String[] rawLines = text.split("\r\n|\r|\n", -1);
         for (String rawLine : rawLines) {
-            if (!rawLine.trim().isEmpty()) {
+            if (!isBlankOrComment(rawLine)) {
                 return isSequenceItem(rawLine.trim()) ? parseSequence(rawLines) : parseMapping(rawLines);
             }
         }
@@ -147,6 +147,12 @@ public final class Yaml {
         }
     }
 
+    /** A blank line, or a whole-line {@code # comment}, carries no data. */
+    private static boolean isBlankOrComment(String rawLine) {
+        String t = rawLine.trim();
+        return t.isEmpty() || t.charAt(0) == '#';
+    }
+
     private static boolean isSequenceItem(String trimmedLine) {
         return trimmedLine.equals("-") || trimmedLine.startsWith("- ");
     }
@@ -156,7 +162,7 @@ public final class Yaml {
         int lineNumber = 0;
         for (String rawLine : rawLines) {
             lineNumber++;
-            if (rawLine.trim().isEmpty()) {
+            if (isBlankOrComment(rawLine)) {
                 continue;
             }
             parseKeyValueLine(rawLine.trim(), lineNumber, result);
@@ -176,7 +182,7 @@ public final class Yaml {
         for (String rawLine : rawLines) {
             lineNumber++;
             String trimmed = rawLine.trim();
-            if (trimmed.isEmpty()) {
+            if (isBlankOrComment(rawLine)) {
                 continue;
             }
             if (isSequenceItem(trimmed)) {

@@ -248,21 +248,30 @@ private[compiler] object DuplicationChecks {
     // Parent classes may already provide concrete implementations for abstract methods
     val implByNameAndArity = mutable.HashMap[(String, Int), mutable.ArrayBuffer[Array[String]]]()
 
-    def registerImplementation(m: Method): Unit = {
-      val candidates = implByNameAndArity.getOrElseUpdate((m.name, m.arguments.length), mutable.ArrayBuffer.empty)
-      candidates += m.arguments.map(arg => Erasure.asmType(arg).getDescriptor)
+    def registerImplementation(name: String, arguments: Array[Type]): Unit = {
+      val candidates = implByNameAndArity.getOrElseUpdate((name, arguments.length), mutable.ArrayBuffer.empty)
+      candidates += arguments.map(arg => Erasure.asmType(arg).getDescriptor).toArray
     }
 
     // Add this class's own methods
     for m <- clazz.methods do
       if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
-        registerImplementation(m)
+        registerImplementation(m.name, m.arguments)
 
-    // Also add concrete methods from parent classes (not just interfaces)
+    // Also add concrete methods from parent classes (not just interfaces). Each ancestor's own
+    // type parameters must be substituted with its type arguments as seen from `clazz` first
+    // (Base[T]'s apply(T) seen through "Concrete extends Base[String]" is apply(String)), the
+    // same substitution already applied to abstract contracts below — otherwise an inherited
+    // concrete method's unsubstituted type-variable argument erases to its bound (Object)
+    // instead of the actual type argument, and never matches the contract it satisfies.
     for view <- views.values do
+      val viewSubst: scala.collection.immutable.Map[String, Type] =
+        view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
       for m <- view.raw.methods do
         if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
-          registerImplementation(m)
+          val specializedArgs =
+            m.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
+          registerImplementation(m.name, specializedArgs)
 
     // Check all abstract methods from superclasses and interfaces
     for (view <- views.values) {

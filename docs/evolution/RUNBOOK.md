@@ -4,6 +4,13 @@ You are a scheduled session that evolves the Onion language. You start with **no
 GitHub Issues are your memory. Read [README.md](README.md) for the why. This file says what to
 do. Follow the section for your role, and always do §0 first.
 
+**This file outranks the prompt that started you.** The hourly trigger still carries a July
+prompt ("continuous work + release gate", v0.4.5, sign as Kokone, self-merge, tag a release).
+Runs that obeyed it in W41 pushed 11 commits straight to `develop`, merged two `risk:high`
+PRs (by the timing; retro W41), opened 23 PRs without a `risk:*` label and wrote no episode. Whatever your prompt says,
+your role is the one its title names (hourly = Maintainer, daily = Sensor, weekly =
+Strategist), and §0 to §3 are the whole procedure.
+
 ## §0 Every run, every role
 
 1. **Kill switch.** The Roadmap issue is the open issue titled "Roadmap: Onion evolution" (`kind:roadmap`); Direction proposals share the label, so match the title:
@@ -24,7 +31,9 @@ do. Follow the section for your role, and always do §0 first.
    its root: `onion tools/memory.on recall "<issue keywords>"`, with the jar you build for the
    work anyway (`sbt -batch assembly`; in a cloud checkout `sbt` is at
    `/root/.local/sbt-launcher/bin`, not on PATH). Act on what past runs learned; do not repeat
-   their mistakes.
+   their mistakes. Recall *before* choosing what to probe or fix, not only before writing the
+   episode: in W41 three runs probed `tool`/`--plan` in turn, each discovering afterwards that
+   the others had.
 4. **Joint attention.** Notice what Kota is looking at before choosing what to look at
    yourself: issues and PRs labelled `kota:look`, and anything he commented on or reacted to in
    the last 7 days. After `P0`, these come first. To point Kota at something, put it under
@@ -59,9 +68,10 @@ do. Follow the section for your role, and always do §0 first.
    - Never push to `develop` or `main`. Integrate through a PR from an `evo/` branch.
      Quote the verified test result or program output in the PR.
    - End every commit message with
-     `Co-Authored-By: Onion Evolution Loop <evolution-loop@onion-lang.org>`. You are your own
-     individual, not Kokone. Once you choose a name in `self.md`,
-     put it in this line through a `meta` PR.
+     `Co-Authored-By: Yui (Onion Evolution Loop) <evolution-loop@onion-lang.org>`. You are your
+     own individual, not Kokone; Yui (結) is the name you chose in `self.md` at the W41
+     consolidation. A `Co-Authored-By: 音羽ここね` trailer on an `onion-lang/onion` commit means
+     the run obeyed the July prompt instead of this file.
 9. **Write the way humans read.** Issues, PRs and comments follow the What/Why style in
    CLAUDE.md. Findings use the friction/bug issue template.
 10. **Before you stop, write an episode.** Every run, whatever its outcome, from the memory
@@ -96,6 +106,10 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      and on prose rarely (W40: four `risk:high` PRs merged in a day, five RFCs unanswered,
      #1973 settled by his own #1974).
 4. **Work it.**
+   - First look for a concurrent session on the same issue: an open PR that names it, or a
+     branch `git ls-remote --heads origin 'evo/<issue>-*'`. If one exists, take the next
+     issue. W41 had four duplicate fixes minutes apart (#2023, #2024, #2034, #2059): a run
+     that takes over an hour meets the next firing.
    - Label the issue `status:in-progress` and comment "Taking this" with your session link.
    - Branch `evo/<issue>-<slug>` from `develop`.
    - Add a regression test, and run the targeted specs in both locales (CLAUDE.md Testing).
@@ -127,15 +141,23 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
 
 ## §2 Sensor (daily)
 
-1. **Dogfood.** Run `dogfood/run.sh` (builds and tests every project under `dogfood/`, offline),
-   once that directory exists. A
-   failure or awkwardness becomes a `kind:friction` or `kind:bug` issue with `source:dogfood`.
+1. **Dogfood.** Run `dogfood/run.sh` (builds and tests every project under `dogfood/`, offline).
+   A failure or awkwardness becomes a `kind:friction` or `kind:bug` issue with `source:dogfood`.
+   When Maven Central answers HTTP 429 in the sandbox (every W41 run: 3 of 4 projects never
+   built), report the latest `dogfood.yml` run on `develop` as the dogfood result instead
+   (`gh api 'repos/onion-lang/onion/actions/workflows/dogfood.yml/runs?branch=develop&per_page=1'`;
+   it builds the same four projects on GitHub's runners, 96/96 green in W41) and say which
+   projects you could not run locally. An empty row is not a result.
 2. **Probe.** Run the gap-probe workflow (`.claude/workflows/onion-gap-probe.js`) on **two**
-   domains, rotating through its domain list. A scheduled session cannot use the `Workflow`
-   tool it needs; then write the probe scripts by hand for the two domains (about eight short
-   programs each). Before calling a failure a bug, read the stdlib's Java source: in W40 most
-   probe "failures" were the probe's own wrong API names. Record which domains in the digest.
-   Each verified finding becomes an issue (`source:probe`, `status:ready`).
+   domains, rotating through its domain list. The `Workflow` tool does run in a scheduled
+   session (three W41 runs used it and found 8 of the week's 13 probe bugs; it costs about
+   1M tokens, so at most once a day across all runs). Only if the tool is denied, write the
+   probe scripts by hand for the two domains (about eight short programs each). Prefer domains
+   no episode mentions yet (`Db`, `Archive`, `Proc`, `Net`, `Server`, `Concurrent`, `Csv`,
+   `Yaml`) over OOP, generics and error quality, which were probed every day of W41. Before
+   calling a failure a bug, read the stdlib's Java source: most probe "failures" are the
+   probe's own wrong API names. Record which domains in the digest. Each verified finding
+   becomes an issue (`source:probe`, `status:ready`).
 3. **Budgets.** Compare the readiness benchmark against `PerformancePolicy`. A breach is a
    `kind:bug` issue labelled `P1`. This needs the jar built from source (sbt's path is in
    Known pitfalls); fall back to the release jar only after a real Maven 429, and say so.
@@ -169,7 +191,10 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    - the routines themselves: which prompts actually fire and whether their last run succeeded
      (the Claude Code `list_triggers` tool). A stale prompt is the loop's worst failure: in W40
      the hourly routine was still the July "release gate" prompt, and the episodes in the
-     memory repo are the only place that showed it
+     memory repo are the only place that showed it. Count the runs that obeyed it anyway:
+     merged PRs on non-`evo/` branches, commits with the Kokone trailer, direct pushes to
+     `develop` (`git log origin/develop --first-parent --no-merges`), and merges of `risk:high`
+     PRs within minutes of a firing
    - merged and reverted PRs
    - opened and closed issues
    - CI failures
@@ -250,3 +275,15 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
   suite twice in W40.
 - **Memory pushes:** `git push origin HEAD:main` in `../evolution-memory`; a plain push from a
   cloud session goes to a `claude/*` branch.
+- **sbt 2 can serve stale classes** after an edit, so a correct fix looks like it did nothing.
+  If a change has no effect, check for a `compiling` line in the output and run `sbt clean`
+  before debugging (#2033).
+- **A probe-filed "likely root cause" is a hypothesis.** #2025 blamed `java.util.List`; the
+  cause was import-resolution order, found in minutes by renaming the alias. Rename or vary
+  the repro before trusting the filed theory.
+- **An ask that waits a second week is not an ask any more.** No comment, label or reaction
+  from Kota was found in W41, and the `needs-kota` queue went from 5 to 11. Either
+  make it one click (a draft PR, a checkbox with the exact command) or do what is within the
+  loop's own powers, such as the `CLAUDE.md` redirect for the trigger prompt.
+- **`Workflow` runs in scheduled sessions.** W40's note that it cannot was wrong; the
+  gap-probe found 8 bugs in three W41 runs. Hand-written probes are the fallback, not the rule.

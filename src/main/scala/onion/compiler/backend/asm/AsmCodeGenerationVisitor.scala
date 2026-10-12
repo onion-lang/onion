@@ -26,6 +26,7 @@ class AsmCodeGenerationVisitor(
 
   // Helper method to convert TypedAST types to ASM types
   private def asmType(tp: TypedAST.Type): AsmType = asmCodeGen.asmType(tp)
+  private def boxedAsmType(bt: BasicType): AsmType = asmCodeGen.boxedAsmType(bt)
 
   // A call site's argument types, descriptor and owner depend only on the Method, and a
   // program calls the same few methods over and over; building the descriptor string and
@@ -454,7 +455,14 @@ class AsmCodeGenerationVisitor(
   
   override def visitInstanceOf(node: InstanceOf): Unit =
     visitTerm(node.target)
-    gen.instanceOf(asmType(node.checked))
+    node.checked match
+      case bt: BasicType =>
+        // A bare primitive checked type has no runtime representation of its own
+        // (asmType(LONG) is the descriptor letter "J"); the receiver, being checkable
+        // by instanceof at all, is boxed, so check against the boxed wrapper class.
+        gen.instanceOf(boxedAsmType(bt))
+      case other =>
+        gen.instanceOf(asmType(other))
   
   override def visitListLiteral(node: ListLiteral): Unit =
     // Create ArrayList

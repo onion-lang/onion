@@ -29,6 +29,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   def asmType(tp: TypedAST.Type): AsmType = AsmCodeGeneration.asmType(tp)
   def boxClassName(tp: TypedAST.Type): String = AsmCodeGeneration.boxClassName(tp)
   def boxAsmType(tp: TypedAST.Type): AsmType = AsmCodeGeneration.boxAsmType(tp)
+  def boxedAsmType(bt: TypedAST.BasicType): AsmType = AsmCodeGeneration.boxedAsmType(bt)
 
   private def boxedValueType(tp: TypedAST.Type): AsmType = tp match
     case BasicType.INT | BasicType.BOOLEAN | BasicType.BYTE | BasicType.SHORT | BasicType.CHAR =>
@@ -1024,15 +1025,7 @@ object AsmCodeGeneration:
     case nt: NullableType     =>
       // NullableType at runtime uses the boxed form for primitives, same type for objects
       nt.innerType match
-        case BasicType.VOID    => AsmUtil.objectType(AsmUtil.JavaLangObject)
-        case BasicType.BOOLEAN => AsmUtil.objectType("java.lang.Boolean")
-        case BasicType.BYTE    => AsmUtil.objectType("java.lang.Byte")
-        case BasicType.SHORT   => AsmUtil.objectType("java.lang.Short")
-        case BasicType.CHAR    => AsmUtil.objectType("java.lang.Character")
-        case BasicType.INT     => AsmUtil.objectType("java.lang.Integer")
-        case BasicType.LONG    => AsmUtil.objectType("java.lang.Long")
-        case BasicType.FLOAT   => AsmUtil.objectType("java.lang.Float")
-        case BasicType.DOUBLE  => AsmUtil.objectType("java.lang.Double")
+        case bt: BasicType => boxedAsmType(bt)
         case other => asmType(other)
     case ct: ClassType     =>
       val cached = ct.asmTypeCache
@@ -1056,6 +1049,23 @@ object AsmCodeGeneration:
       // Defensive fallback: unknown types should not reach codegen, but emitting
       // java.lang.Object keeps the compiler from crashing with an internal error.
       AsmUtil.objectType(AsmUtil.JavaLangObject)
+
+  /**
+   * The java.lang wrapper type a primitive autoboxes to (e.g. LONG -> java.lang.Long).
+   * Used wherever a primitive must be checked or stored as a reference, such as a
+   * NullableType's runtime representation or an `instanceof`-style check.
+   */
+  def boxedAsmType(bt: TypedAST.BasicType): AsmType = bt match
+    case BasicType.VOID    => AsmUtil.objectType(AsmUtil.JavaLangObject)
+    case BasicType.BOOLEAN => AsmUtil.objectType("java.lang.Boolean")
+    case BasicType.BYTE    => AsmUtil.objectType("java.lang.Byte")
+    case BasicType.SHORT   => AsmUtil.objectType("java.lang.Short")
+    case BasicType.CHAR    => AsmUtil.objectType("java.lang.Character")
+    case BasicType.INT     => AsmUtil.objectType("java.lang.Integer")
+    case BasicType.LONG    => AsmUtil.objectType("java.lang.Long")
+    case BasicType.FLOAT   => AsmUtil.objectType("java.lang.Float")
+    case BasicType.DOUBLE  => AsmUtil.objectType("java.lang.Double")
+    case _                 => AsmUtil.objectType(AsmUtil.JavaLangObject)
 
   /**
    * Get the box class name for a given type (for boxed mutable variables)

@@ -1184,6 +1184,11 @@ val a = Json::array()                                   // 空の List（JSON �
 // 非有限の Double/Float（NaN, +/-Infinity）は JSON リテラル null としてシリアライズされる
 // -- JSON にはそれを表すトークンが無く、Json::parse も非有限の値を生成できないため
 Json::stringify(0.0d / 0.0d)                            // "null"
+
+// record は宣言順のコンポーネントを持つ JSON オブジェクトとしてシリアライズされる
+// (ネストした record / List / Map も Map の値と同様に再帰的に処理される)
+record Point(x: Int, y: Int)
+Json::stringify(new Point(1, 2))                        // {"x":1,"y":2}
 ```
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。

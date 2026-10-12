@@ -157,7 +157,12 @@ class CompilerFrontend {
     }
 
   private def generateFiles(binaries: Seq[CompiledClass]): Boolean =
-    CompiledClassWriter.writeAll(binaries).isRight
+    CompiledClassWriter.writeAll(binaries) match {
+      case Right(_) => true
+      case Left(error) =>
+        System.err.println(error.message)
+        false
+    }
 
   protected def printUsage(): Unit = {
     println(

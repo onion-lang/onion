@@ -131,5 +131,16 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         " Double::toString(Stats::stddev(xs))",
         Shell.Success("0.0|0.0|0.0|0.0|0.0|0.0|0.0"))
     }
+
+    it("sumInt / sumLong throw on overflow instead of wrapping") {
+      runStr(
+        "import { onion.Stats }",
+        "var a: String = \"none\"\n" +
+        "var b: String = \"none\"\n" +
+        "try { Stats::sumInt([2147483647, 1]); a = \"wrapped\" } catch e: ArithmeticException { a = \"overflow\" }\n" +
+        "try { Stats::sumLong([9223372036854775807L, 1L]); b = \"wrapped\" } catch e: ArithmeticException { b = \"overflow\" }\n" +
+        "return a + \"|\" + b",
+        Shell.Success("overflow|overflow"))
+    }
   }
 }

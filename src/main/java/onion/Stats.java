@@ -28,23 +28,23 @@ public final class Stats {
         return total;
     }
 
-    /** Exact integer sum of an `List[Int]`. */
+    /** Exact integer sum of a `List[Int]`; throws `ArithmeticException` on overflow. */
     public static int sumInt(List<Integer> nums) {
         int total = 0;
         if (nums != null) {
             for (Integer n : nums) {
-                if (n != null) total += n;
+                if (n != null) total = Math.addExact(total, n);
             }
         }
         return total;
     }
 
-    /** Exact long sum of an `List[Long]`. */
+    /** Exact long sum of a `List[Long]`; throws `ArithmeticException` on overflow. */
     public static long sumLong(List<Long> nums) {
         long total = 0L;
         if (nums != null) {
             for (Long n : nums) {
-                if (n != null) total += n;
+                if (n != null) total = Math.addExact(total, n);
             }
         }
         return total;

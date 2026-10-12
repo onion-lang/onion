@@ -215,6 +215,35 @@ class ConcurrentSpec extends AbstractShellSpec {
       assert(Shell.Success("timed out") == result)
     }
 
+    it("receive returns null once a closed channel is drained, so a consumer loop ends") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val chan = Concurrent::channel(4)
+          |    val producer: Thread = new Thread(() -> {
+          |      for var i: Int = 0; i < 5; i++ { chan.send(i) }
+          |      chan.close()
+          |    })
+          |    producer.start()
+          |    var total: Int = 0
+          |    while true {
+          |      val item = chan.receive()
+          |      if item == null { break }
+          |      total = total + (item as Int)
+          |    }
+          |    producer.join()
+          |    return "total=" + total + " after=" + chan.receive()
+          |  }
+          |}
+          |""".stripMargin,
+        "ConcurrentChannelClose.on",
+        Array()
+      )
+      assert(Shell.Success("total=10 after=null") == result)
+    }
+
     it("refuses null, which would be indistinguishable from an empty receive") {
       val result = shell.run(
         """

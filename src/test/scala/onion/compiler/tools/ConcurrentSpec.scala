@@ -89,6 +89,52 @@ class ConcurrentSpec extends AbstractShellSpec {
       assert(Shell.Success("reported") == result)
     }
 
+    it("submit after close reports a Concurrent message, not a raw JDK RejectedExecutionException") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val pool = Concurrent::pool(1)
+          |    pool.close()
+          |    try {
+          |      pool.submit(() -> 1)
+          |      return "no failure surfaced"
+          |    } catch e: Exception {
+          |      return e.getMessage()
+          |    }
+          |  }
+          |}
+          |""".stripMargin,
+        "ConcurrentSubmitAfterClose.on",
+        Array()
+      )
+      assert(Shell.Success("Concurrent: the pool is closed") == result)
+    }
+
+    it("mapAll after close reports a Concurrent message, not a raw JDK RejectedExecutionException") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val pool = Concurrent::pool(1)
+          |    pool.close()
+          |    try {
+          |      pool.mapAll([1, 2, 3], (n) -> n)
+          |      return "no failure surfaced"
+          |    } catch e: Exception {
+          |      return e.getMessage()
+          |    }
+          |  }
+          |}
+          |""".stripMargin,
+        "ConcurrentMapAllAfterClose.on",
+        Array()
+      )
+      assert(Shell.Success("Concurrent: the pool is closed") == result)
+    }
+
     it("infers a numeric lambda parameter's type from the list, like Colls.map does") {
       // mapAll's own class doc shows `pool.mapAll(urls) { url -> Http::get(url) }` with no
       // param annotation; that compiles today only because `+` tolerates Object. A numeric

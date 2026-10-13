@@ -399,5 +399,30 @@ class DidYouMeanSpec extends AbstractShellSpec {
         )
       }
     }
+
+    describe("call kind") {
+      it("does not suggest a static factory for a failed instance call") {
+        val buf = new java.io.ByteArrayOutputStream()
+        val ps = new java.io.PrintStream(buf, true, "UTF-8")
+        val (o, e) = (System.out, System.err)
+        val r =
+          try {
+            System.setOut(ps); System.setErr(ps)
+            Console.withOut(ps) { Console.withErr(ps) {
+              shell.run(
+                """import { onion.Option }
+                  |val a: Option[Int] = Option::some(1)
+                  |val b: Option[String] = Option::some("x")
+                  |val z = a.zip(b)
+                  |""".stripMargin, "None", Array())
+            } }
+          } finally { System.setOut(o); System.setErr(e) }
+        val out = new String(buf.toByteArray, "UTF-8")
+        assert(r.isInstanceOf[Shell.Failure], s"expected a compile failure, got $r\n$out")
+        assert(out.contains("E0005"), out)
+        // `Option::of` cannot be called as `a.of(b)`, so it is never a valid suggestion.
+        assert(!out.matches("(?s).*[:：]\\s*of\\s*(\\r?\\n.*)?$") && !out.contains(": of\n"), out)
+      }
+    }
   }
 }

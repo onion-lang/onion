@@ -135,6 +135,12 @@ class SemanticErrorReporter(threshold: Int) {
     // Set only by an actually-unqualified call (UnqualifiedMethodCallSupport); every
     // other report site omits it, defaulting to false -- see FormerDefaultImportLookup.
     val isUnqualifiedCall = items.length > 3 && items(3) == java.lang.Boolean.TRUE
+    // Set only by a `Type::name(...)` call (StaticMethodCallSupport); every instance-,
+    // super- and unqualified-call site omits it, defaulting to false. Lets the suggestion
+    // ranker tell a static member from an instance one, so a failed `a.zip(b)` is never
+    // steered to a same-named-receiver static factory like `Option::of`, which
+    // `a.zip(...)` syntax could not call even if the name were right.
+    val calledStatically = items.length > 6 && items(6) == java.lang.Boolean.TRUE
     // A top-level function lives on the file's synthetic `<file>Main` class; name the
     // function alone rather than leak that owner (`mainMain.helper(Int, Int)`).
     val baseMessage =
@@ -212,7 +218,7 @@ class SemanticErrorReporter(threshold: Int) {
         Some(format(message("suggestion.didYouMean"), Seq("foldl")))
       } else {
         targetType match
-          case obj: TypedAST.ObjectType => toolbox.Suggestions.formatSuggestion(name, rankedCallCandidates(obj, name, argTypes))
+          case obj: TypedAST.ObjectType => toolbox.Suggestions.formatSuggestion(name, rankedCallCandidates(obj, name, argTypes, if (isUnqualifiedCall) None else Some(calledStatically)))
           case _ => None
       }
     problem(position, appendSuggestion(baseMessage, suggestion))
@@ -227,25 +233,32 @@ class SemanticErrorReporter(threshold: Int) {
    * second group, as they were before. Private members of a class compiled elsewhere are
    * left out: the program cannot call them.
    *
+   * `calledStatically` excludes the other kind of member up front: a failed instance call
+   * (`a.zip(b)`) never suggests a static method (`Option::of`), and a failed static call
+   * never suggests an instance one (an unqualified call, `None`, may reach either, as a
+   * top-level function is a static member) -- neither spelling could ever call the other kind, so
+   * naming one is actively misleading, not merely a worse guess.
+   *
    * The result is a single tier: the first tier with a name close enough to suggest. When
    * neither of those tiers has one, the methods that take no overload of that many
    * arguments form a last tier: `Strings::trimm(s, 1)` is a misspelled `trim` called with
    * one argument too many, and naming `trim` beats saying nothing. Library privates stay out of every tier.
    */
-  private def rankedCallCandidates(obj: TypedAST.ObjectType, name: String, argTypes: Array[TypedAST.Type]): Seq[String] = {
+  private def rankedCallCandidates(obj: TypedAST.ObjectType, name: String, argTypes: Array[TypedAST.Type], calledStatically: Option[Boolean]): Seq[String] = {
     val argc = argTypes.length
     // A private member of a class compiled elsewhere (`Format.group`) can never be called
     // from the program, so it is no suggestion; a source class's own privates may be.
     val fromSource = obj.isInstanceOf[TypedAST.ClassDefinition]
     def visible(m: TypedAST.MemberRef): Boolean = fromSource || !Modifier.isPrivate(m.modifier)
-    val byName = obj.methods.toSeq.filter(visible).groupBy(_.name)
+    def sameCallKind(m: TypedAST.MemberRef): Boolean = calledStatically.forall(Modifier.isStatic(m.modifier) == _)
+    val byName = obj.methods.toSeq.filter(visible).filter(sameCallKind).groupBy(_.name)
     val applicable = byName.collect {
       case (n, ms) if ms.exists(m => acceptsArity(m, argc) && acceptsTypes(m, argTypes)) => n
     }.toSeq
     val countOnly = byName.collect {
       case (n, ms) if !applicable.contains(n) && ms.exists(m => acceptsArity(m, argc)) => n
     }.toSeq
-    val fields = obj.fields.toSeq.filter(visible).map(_.name).filterNot(byName.contains)
+    val fields = obj.fields.toSeq.filter(visible).filter(sameCallKind).map(_.name).filterNot(byName.contains)
     // Arity misfits come last: only a fallback when nothing that fits is close by name.
     val arityMisfits = byName.keys.filterNot(n => applicable.contains(n) || countOnly.contains(n)).toSeq
     // findSimilar applies the distance cut-off; the first tier with a close name wins.

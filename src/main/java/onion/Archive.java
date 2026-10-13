@@ -174,7 +174,7 @@ public final class Archive {
         try (GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(data))) {
             return in.readAllBytes();
         } catch (IOException e) {
-            throw new RuntimeException("Archive: could not gunzip (" + e.getMessage() + ")", e);
+            throw new RuntimeException("Archive: could not gunzip (" + gunzipReason(e) + ")", e);
         }
     }
 
@@ -196,11 +196,19 @@ public final class Archive {
             transfer(in, out);
         } catch (IOException e) {
             throw new RuntimeException("Archive: could not gunzip " + source
-                + " (" + e.getMessage() + ")", e);
+                + " (" + gunzipReason(e) + ")", e);
         }
     }
 
     // ========== Internals ==========
+
+    /** An empty or header-short input makes the JDK throw an EOFException with no message. */
+    private static String gunzipReason(IOException e) {
+        if (e.getMessage() == null && e instanceof java.io.EOFException) {
+            return "truncated or empty gzip data";
+        }
+        return e.getMessage();
+    }
 
     private static void writeEntry(ZipOutputStream out, String name, Path source)
             throws IOException {

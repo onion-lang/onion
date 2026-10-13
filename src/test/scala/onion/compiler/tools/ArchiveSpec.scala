@@ -168,5 +168,20 @@ class ArchiveSpec extends AbstractShellSpec {
       assert(thrown.getMessage.contains("escaped.txt"))
       assert(!Files.exists(escaped), s"the entry escaped the target directory to $escaped")
     }
+
+    it("reports empty or too-short gzip input with a real reason, not (null)") {
+      val bytes = intercept[RuntimeException] { onion.Archive.gunzip(new Array[Byte](0)) }
+      assert(!bytes.getMessage.contains("null"), bytes.getMessage)
+      assert(bytes.getMessage.contains("empty"), bytes.getMessage)
+
+      val work = Files.createTempDirectory("onion-gunzip-empty")
+      val src = work.resolve("empty.bin")
+      Files.write(src, new Array[Byte](0))
+      val file = intercept[RuntimeException] {
+        onion.Archive.gunzipFile(src.toString, work.resolve("out.bin").toString)
+      }
+      assert(!file.getMessage.contains("null"), file.getMessage)
+      assert(file.getMessage.contains("empty.bin"), file.getMessage)
+    }
   }
 }

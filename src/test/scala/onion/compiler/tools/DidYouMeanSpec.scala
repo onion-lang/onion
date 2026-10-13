@@ -24,6 +24,19 @@ class DidYouMeanSpec extends AbstractShellSpec {
   }
 
   describe("Error messages with suggestions") {
+    describe("for a cast to a generic nested Java case") {
+      it("points at select/case-is when `as` leaves the type variable unresolved") {
+        failsWithSuggestion(
+          """
+            |import { onion.Outcome; }
+            |val r: Outcome[String] = Outcome::ok("a")
+            |val v: String = (r as Outcome.Ok).value()
+            |""".stripMargin,
+          "E0000", "case o is Generic.Case"
+        )
+      }
+    }
+
     describe("for method names") {
       it("reports error for typo in method name") {
         val result = shell.run(

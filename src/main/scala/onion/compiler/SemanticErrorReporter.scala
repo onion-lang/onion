@@ -531,6 +531,10 @@ class SemanticErrorReporter(threshold: Int) {
     val hint =
       if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
+      } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
+        // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
+        // nested class does not restore the scrutinee's type arguments, a pattern does.
+        Some(format(message("suggestion.castLosesTypeArguments"), Seq(typeName(actual))))
       } else None
     problem(position, appendSuggestion(baseMessage, hint))
   }

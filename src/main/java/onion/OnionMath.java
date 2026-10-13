@@ -333,8 +333,12 @@ public final class OnionMath {
      * @param min the minimum value (inclusive)
      * @param max the maximum value (inclusive)
      * @return a random integer in the range [min, max]
+     * @throws IllegalArgumentException if max is less than min
      */
     public static int randomInt(int min, int max) {
+        if (max < min) {
+            throw new IllegalArgumentException("OnionMath::randomInt: max (" + max + ") must be >= min (" + min + ")");
+        }
         return min + (int)(java.lang.Math.random() * (max - min + 1));
     }
 

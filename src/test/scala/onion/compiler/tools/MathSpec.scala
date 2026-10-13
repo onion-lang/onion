@@ -723,6 +723,27 @@ class MathSpec extends AbstractShellSpec {
         )
         assert(result == Shell.Success(true))
       }
+
+      it("throws instead of silently returning min when max < min") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      val x = OnionMath::randomInt(5, 3);
+            |      return "no-throw:" + x;
+            |    } catch e: IllegalArgumentException {
+            |      return "threw";
+            |    }
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success("threw"))
+      }
     }
 
     describe("constants") {

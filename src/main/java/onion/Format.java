@@ -18,12 +18,14 @@ public final class Format {
      * {@link #number(double, int)} groups a {@code double} with fixed decimals.
      */
     public static String integer(long value) {
-        return group(Long.toString(Math.abs(value)), value < 0);
+        String text = Long.toString(value);
+        return value < 0 ? group(text.substring(1), true) : group(text, false);
     }
 
     /** Formats with comma grouping and a fixed number of decimals: (1234.5678, 2) -> "1,234.57". */
     public static String number(double value, int decimals) {
         String fixed = fixed(value, decimals);
+        if (Double.isNaN(value) || Double.isInfinite(value)) return fixed;
         boolean negative = fixed.startsWith("-");
         String body = negative ? fixed.substring(1) : fixed;
         int dot = body.indexOf('.');
@@ -62,11 +64,13 @@ public final class Format {
     /** Human-readable duration from seconds: 3661 -> "1h 1m 1s", 0 -> "0s". */
     public static String duration(long totalSeconds) {
         boolean negative = totalSeconds < 0;
-        long s = Math.abs(totalSeconds);
-        long days = s / 86400;
-        long hours = (s % 86400) / 3600;
-        long minutes = (s % 3600) / 60;
-        long seconds = s % 60;
+        // -Long.MIN_VALUE overflows to itself; read it as the unsigned magnitude 2^63
+        long s = negative ? -totalSeconds : totalSeconds;
+        long days = Long.divideUnsigned(s, 86400);
+        long rem = Long.remainderUnsigned(s, 86400);
+        long hours = rem / 3600;
+        long minutes = (rem % 3600) / 60;
+        long seconds = rem % 60;
         StringBuilder sb = new StringBuilder();
         if (days > 0) sb.append(days).append("d ");
         if (hours > 0) sb.append(hours).append("h ");

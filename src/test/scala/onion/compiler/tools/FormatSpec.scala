@@ -41,6 +41,12 @@ class FormatSpec extends AbstractShellSpec {
         Shell.Success("1h 1m 1s|1d 1h 1m 1s|0s"))
     }
 
+    it("keeps non-finite numbers and Long.MIN_VALUE well formed") {
+      runStr(
+        "return Format::number(1.0 / 0.0, 2) + \"|\" + Format::number(-1.0 / 0.0, 2) + \"|\" + Format::number(0.0 / 0.0, 2) + \"|\" + Format::integer(Long::MIN_VALUE) + \"|\" + Format::duration(Long::MIN_VALUE)",
+        Shell.Success("Infinity|-Infinity|NaN|-9,223,372,036,854,775,808|-106751991167300d 15h 30m 8s"))
+    }
+
     it("produces English ordinals with the teens exception") {
       runStr(
         "return Format::ordinal(1L) + \" \" + Format::ordinal(2L) + \" \" + Format::ordinal(3L) + \" \" + Format::ordinal(11L) + \" \" + Format::ordinal(21L)",

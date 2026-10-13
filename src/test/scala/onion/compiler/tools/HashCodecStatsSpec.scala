@@ -53,6 +53,17 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         Shell.Success("4869|Hi"))
     }
 
+    it("hexDecode rejects odd length and non-hex characters") {
+      runStr(
+        "import { onion.Codec }",
+        """var odd: String = "none"
+          |var bad: String = "none"
+          |try { Codec::hexDecode("abc") } catch e: IllegalArgumentException { odd = "rejected" }
+          |try { Codec::hexDecode("zz") } catch e: IllegalArgumentException { bad = "rejected" }
+          |return odd + "|" + bad + "|" + Codec::hexDecode("").length()""".stripMargin,
+        Shell.Success("rejected|rejected|0"))
+    }
+
     it("url encoding round-trips a reserved character") {
       runStr(
         "import { onion.Codec }",

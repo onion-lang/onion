@@ -1633,6 +1633,11 @@ val a = Json::array()                  // empty List, for JSON array values
 // JSON has no token for one, and Json::parse can never produce one either
 Json::stringify(0.0d / 0.0d)           // "null"
 
+// A record serializes as a JSON object of its components, in declaration order,
+// recursing into nested records/Lists/Maps the same way a Map's values already do.
+record Point(x: Int, y: Int)
+Json::stringify(new Point(1, 2))       // {"x":1,"y":2}
+
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
 v["users"][0]["name"].asString()

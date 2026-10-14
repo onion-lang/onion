@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.142.0] - 2026-10-14
+
 ### Fixed
 
 - **`onionc` on a class-less top-level script exited 255 with no output at all, when the source file's base name wasn't by itself a valid Java identifier** (contained a hyphen, started with a digit, ...), e.g. `onionc daily-report.on` (#2095). The synthesized container class name (`<filename>Main`) came out invalid, the write step correctly rejected it, but `onionc` discarded that error message instead of printing it. `onionc` now reports the write error to stderr.

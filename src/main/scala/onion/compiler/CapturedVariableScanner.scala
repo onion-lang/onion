@@ -121,6 +121,26 @@ object CapturedVariableScanner {
           if (localVar.init != null) visit(localVar.init)
           return
 
+        case tryExpr: AST.TryExpression =>
+          // A try-with-resources binding and a catch-clause argument are both
+          // fresh locals of this same scope (not a new closure frame), exactly
+          // like a LocalVariableDeclaration -- the generic ASTWalk case for
+          // TryExpression discards their names and walks straight into the
+          // catch bodies, which previously made a catch variable's own uses
+          // (e.g. `e.getMessage()`) look like a reference to an outer-scope
+          // variable of the same name (#2159).
+          tryExpr.resources.foreach { resource =>
+            locallyDeclared += resource.name
+            if (resource.init != null) visit(resource.init)
+          }
+          visit(tryExpr.tryBlock)
+          tryExpr.recClauses.foreach { case (argument, block) =>
+            locallyDeclared += argument.name
+            visit(block)
+          }
+          if (tryExpr.finBlock != null) visit(tryExpr.finBlock)
+          return
+
         case _ =>
       }
       ASTWalk.visitChildren(n)(visitF)

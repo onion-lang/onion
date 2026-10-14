@@ -40,7 +40,19 @@ public final class Format {
     /** Rounds to a fixed number of decimals (no grouping): (3.14159, 2) -> "3.14". */
     public static String fixed(double value, int decimals) {
         int d = Math.max(0, decimals);
-        return String.format(Locale.ROOT, "%." + d + "f", value);
+        String s = String.format(Locale.ROOT, "%." + d + "f", value);
+        if (Double.isFinite(value) && s.startsWith("-") && isAllZeroDigits(s)) {
+            return s.substring(1);
+        }
+        return s;
+    }
+
+    private static boolean isAllZeroDigits(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= '1' && c <= '9') return false;
+        }
+        return true;
     }
 
     /** Formats a 0..1 ratio as a percentage: (0.756, 1) -> "75.6%". */

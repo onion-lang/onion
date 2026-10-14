@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Format::number`/`fixed`/`percent` printed a negative zero (`-0`, `-0.00`, `-0.0%`) for a small negative value that rounds to zero** (#2155), e.g. `Format::percent(-0.0001, 1)` returned `"-0.0%"` instead of `"0.0%"`. `Format::fixed` now drops the sign when the rounded result has no non-zero digit; a genuinely negative non-finite value (`-Infinity`) is unaffected.
+
 ## [0.142.0] - 2026-10-14
 
 ### Fixed

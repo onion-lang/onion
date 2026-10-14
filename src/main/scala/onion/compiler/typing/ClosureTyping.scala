@@ -318,8 +318,15 @@ final class ClosureTyping(
       }
       None
     } else {
-      expectedMethodArgs(inferredTarget, implementedMethodName(inferredTarget, node.mname, args.length), args.length) match {
+      val implName = implementedMethodName(inferredTarget, node.mname, args.length)
+      expectedMethodArgs(inferredTarget, implName, args.length) match {
         case None =>
+          // No method of that arity: the lambda has the wrong parameter count for the
+          // target. Say so (as the typed-parameter form does) instead of returning
+          // silently, which let the closure through to a VerifyError or a no-op (#2069).
+          val placeholders = new Array[Type](args.length)
+          java.util.Arrays.fill(placeholders.asInstanceOf[Array[AnyRef]], bodyContext.rootClass)
+          bodyContext.report(METHOD_NOT_FOUND, node, inferredTarget, implName, placeholders)
           None
         case Some(expectedArgs) =>
           i = 0

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `catch` variable read inside a lambda (`Thread`, `Future::async`, any closure) crashed the script with `VerifyError: Bad type on operand stack ... is not assignable to 'onion/runtime/ObjectBox'` at class load (#2159).** The closure-capture scanner had no case for `try`/`catch`, so a direct use of the catch variable inside the closure looked identical to capturing an outer-scope variable of the same name; because capture is tracked by name for the whole method, this also silently boxed any unrelated local sharing that name, including a separate top-level `catch e:` elsewhere in the same method. Catch-clause arguments and try-with-resources bindings are now recognized as locals of their own scope, the same way an ordinary local variable declaration already was.
+
 ## [0.142.0] - 2026-10-14
 
 ### Fixed

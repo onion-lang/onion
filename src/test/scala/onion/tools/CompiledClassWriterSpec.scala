@@ -1,5 +1,7 @@
 package onion.tools
 
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -13,6 +15,17 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 class CompiledClassWriterSpec extends AnyFunSuite with Matchers:
+  private def captureErr(body: => Int): (Int, String) =
+    val buf = new ByteArrayOutputStream()
+    val ps = new PrintStream(buf, true, "UTF-8")
+    val saved = System.err
+    val exitCode =
+      try
+        System.setErr(ps)
+        Console.withErr(ps)(body)
+      finally System.setErr(saved)
+    (exitCode, new String(buf.toByteArray, StandardCharsets.UTF_8))
+
   private def binary(root: Path, className: String, bytes: Byte*): CompiledClass =
     CompiledClass(className, root.toString, bytes.toArray)
 
@@ -222,3 +235,16 @@ class CompiledClassWriterSpec extends AnyFunSuite with Matchers:
     new CompilerFrontend().run(Array("-d", output.toString, source.toString)) shouldBe -1
 
     Files.notExists(external.resolve("App.class")) shouldBe true
+
+  test("CompilerFrontend reports the write error instead of failing silently when a class-less " +
+    "script's filename is not a valid Java identifier"):
+    val output = Files.createTempDirectory("onion-compiler-frontend")
+    val source = Files.createTempFile("onion-probe-min-", ".on")
+    Files.writeString(source, "IO::println(\"hello\")\n", StandardCharsets.UTF_8)
+
+    val (exitCode, err) = captureErr:
+      new CompilerFrontend().run(Array("-d", output.toString, source.toString))
+
+    exitCode shouldBe -1
+    err should not be empty
+    err should include("Invalid compiled class name")

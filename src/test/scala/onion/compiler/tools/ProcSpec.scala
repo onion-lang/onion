@@ -160,5 +160,27 @@ class ProcSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(0) == result)
     }
+
+    it("gives the child an empty stdin, so a command that reads it does not hang (#2087)") {
+      val reader = if (windows) "sort" else "cat"
+      // A regression would block forever, so the run is bounded and fails instead of hanging.
+      val run = scala.concurrent.Future {
+        shell.run(
+          s"""
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val r = Proc::capture("$reader")
+            |    return r.status() + ":[" + r.stdout() + "]"
+            |  }
+            |}
+            |""".stripMargin,
+          "ProcEmptyStdin.on",
+          Array()
+        )
+      }(scala.concurrent.ExecutionContext.global)
+      val result = scala.concurrent.Await.result(run, scala.concurrent.duration.Duration(30, "s"))
+      assert(Shell.Success("0:[]") == result)
+    }
   }
 }

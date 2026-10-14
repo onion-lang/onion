@@ -127,7 +127,7 @@ public final class Yaml {
 
         String[] rawLines = text.split("\r\n|\r|\n", -1);
         for (String rawLine : rawLines) {
-            if (!rawLine.trim().isEmpty()) {
+            if (!isBlankOrComment(rawLine)) {
                 return isSequenceItem(rawLine.trim()) ? parseSequence(rawLines) : parseMapping(rawLines);
             }
         }
@@ -147,6 +147,12 @@ public final class Yaml {
         }
     }
 
+    /** A blank line, or a whole-line {@code # comment}, carries no data. */
+    private static boolean isBlankOrComment(String rawLine) {
+        String t = rawLine.trim();
+        return t.isEmpty() || t.charAt(0) == '#';
+    }
+
     private static boolean isSequenceItem(String trimmedLine) {
         return trimmedLine.equals("-") || trimmedLine.startsWith("- ");
     }
@@ -156,7 +162,7 @@ public final class Yaml {
         int lineNumber = 0;
         for (String rawLine : rawLines) {
             lineNumber++;
-            if (rawLine.trim().isEmpty()) {
+            if (isBlankOrComment(rawLine)) {
                 continue;
             }
             parseKeyValueLine(rawLine.trim(), lineNumber, result);
@@ -176,7 +182,7 @@ public final class Yaml {
         for (String rawLine : rawLines) {
             lineNumber++;
             String trimmed = rawLine.trim();
-            if (trimmed.isEmpty()) {
+            if (isBlankOrComment(rawLine)) {
                 continue;
             }
             if (isSequenceItem(trimmed)) {
@@ -210,7 +216,7 @@ public final class Yaml {
         // Value: everything after the separator (": " = 2 chars, or ":" alone at end = 1 char)
         int valueStart = sep + (sep == trimmedLine.length() - 1 ? 1 : 2);
         String rawValue = valueStart <= trimmedLine.length() ? trimmedLine.substring(valueStart) : "";
-        rawValue = rawValue.trim();
+        rawValue = stripComment(rawValue).trim();
 
         target.put(key, parseScalar(rawValue, lineNumber));
     }
@@ -258,12 +264,14 @@ public final class Yaml {
     private static boolean needsQuoting(String s) {
         if (s.isEmpty()) return true;
         if (s.charAt(0) == ' ' || s.charAt(s.length() - 1) == ' ') return true;
+        // A leading ' would be read back as a single-quoted scalar, not a literal quote char
+        if (s.charAt(0) == '\'') return true;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == ':' || c == '#' || c == '\n' || c == '\r' || c == '\t') return true;
         }
         // Would be mis-parsed as a Boolean or null
-        if (s.equals("true") || s.equals("false") || s.equals("null")) return true;
+        if (s.equals("true") || s.equals("false") || s.equals("null") || s.equals("~")) return true;
         // Would be mis-parsed as a number
         if (looksLikeNumber(s)) return true;
         return false;
@@ -302,6 +310,38 @@ public final class Yaml {
     }
 
     /**
+     * Strip a trailing {@code #...} comment from a raw scalar value, respecting both
+     * double- and single-quoted regions (a {@code #} inside either kind of quote is
+     * just a character). Per YAML, {@code #} starts a comment only when it begins the
+     * value or is preceded by whitespace, so {@code tag: a#b} keeps its {@code #}.
+     */
+    private static String stripComment(String raw) {
+        boolean inDouble = false;
+        boolean inSingle = false;
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (inDouble) {
+                if (c == '\\') { i++; continue; } // skip escaped char
+                if (c == '"') { inDouble = false; }
+                continue;
+            }
+            if (inSingle) {
+                if (c == '\'') {
+                    if (i + 1 < raw.length() && raw.charAt(i + 1) == '\'') { i++; continue; } // '' escape
+                    inSingle = false;
+                }
+                continue;
+            }
+            if (c == '"') { inDouble = true; continue; }
+            if (c == '\'') { inSingle = true; continue; }
+            if (c == '#' && (i == 0 || raw.charAt(i - 1) == ' ' || raw.charAt(i - 1) == '\t')) {
+                return raw.substring(0, i);
+            }
+        }
+        return raw;
+    }
+
+    /**
      * Find the index of the ':' that terminates a YAML key in rawLine.
      * We look for ": " (colon + space) or ":" at the very end of the line.
      * Respects double-quoted keys (skips content inside "...").
@@ -331,21 +371,27 @@ public final class Yaml {
      * Parse a scalar value string from a YAML value field.
      *
      * Rules (same type inferences as Json.parse):
-     *   ""   or "null"       → null
+     *   ""   or "null" or "~" → null
      *   "true" / "false"     → Boolean
      *   -?\d+                → Long
      *   contains '.' or e/E  → Double
      *   "..." (quoted)        → String (unescaped, no further type inference)
+     *   '...' (quoted)        → String ('' is a literal ', no other escapes, no type inference)
      *   other                 → String as-is
      */
     private static Object parseScalar(String raw, int lineNumber) throws YamlParseException {
-        if (raw.isEmpty() || raw.equals("null")) return null;
+        if (raw.isEmpty() || raw.equals("null") || raw.equals("~")) return null;
         if (raw.equals("true"))  return Boolean.TRUE;
         if (raw.equals("false")) return Boolean.FALSE;
 
-        // Quoted string – unescape and return as String (no type coercion)
+        // Double-quoted string – unescape and return as String (no type coercion)
         if (raw.startsWith("\"")) {
             return unquote(raw, lineNumber);
+        }
+
+        // Single-quoted string – only '' -> ' is special, no other escapes, no type coercion
+        if (raw.startsWith("'")) {
+            return unquoteSingle(raw, lineNumber);
         }
 
         // Integer?
@@ -397,6 +443,29 @@ public final class Yaml {
                     default:
                         throw new YamlParseException("Unknown escape \\" + next + " in: " + raw, lineNumber);
                 }
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Remove surrounding single-quotes from a YAML single-quoted scalar. YAML single-quoted
+     * scalars support only one escape -- a doubled {@code ''} for one literal {@code '} --
+     * and no backslash escapes at all, unlike {@link #unquote}.
+     */
+    private static String unquoteSingle(String raw, int lineNumber) throws YamlParseException {
+        if (!raw.startsWith("'") || !raw.endsWith("'") || raw.length() < 2) {
+            throw new YamlParseException("Malformed single-quoted string: " + raw, lineNumber);
+        }
+        String inner = raw.substring(1, raw.length() - 1);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < inner.length(); i++) {
+            char c = inner.charAt(i);
+            if (c == '\'' && i + 1 < inner.length() && inner.charAt(i + 1) == '\'') {
+                sb.append('\'');
+                i++;
             } else {
                 sb.append(c);
             }

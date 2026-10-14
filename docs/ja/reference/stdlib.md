@@ -1137,7 +1137,7 @@ f1.zip(f2)  // Future[List[Object]] = [1, 2]
 f1.race(f2)
 
 // すべての完了を待つ
-Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
+Future::all(f1, f2, f3)  // Future[List[Int]] = [1, 2, 3]
 Future::all([f1, f2, f3])  // 同じ結果。実行時に組み立てた List[Future[T]] も渡せる
 
 // 最初に完了したもの
@@ -1190,6 +1190,11 @@ val a = Json::array()                                   // 空の List（JSON �
 // 非有限の Double/Float（NaN, +/-Infinity）は JSON リテラル null としてシリアライズされる
 // -- JSON にはそれを表すトークンが無く、Json::parse も非有限の値を生成できないため
 Json::stringify(0.0d / 0.0d)                            // "null"
+
+// record は宣言順のコンポーネントを持つ JSON オブジェクトとしてシリアライズされる
+// (ネストした record / List / Map も Map の値と同様に再帰的に処理される)
+record Point(x: Int, y: Int)
+Json::stringify(new Point(1, 2))                        // {"x":1,"y":2}
 ```
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。
@@ -1274,13 +1279,19 @@ val rows = Yaml::parse("- name: Alice\n  age: 30\n- name: Bob\n  age: 25\n")
 // rows は 2 つの LinkedHashMap を持つ ArrayList
 ```
 
-scalar の型推論規則（Json と同一）:
-- `""` または `null` → `null`
+scalar の型推論規則（Json と同一、ただし YAML 独自の2項目を追加）:
+- `""`、`null`、`~` → `null`
 - `true` / `false` → `Boolean`
 - 整数リテラル（`-?\d+` にマッチ）→ `Long`
 - 浮動小数点パターンや `.`/`e`/`E` を含む数値 → `Double`
-- クォートされた `"..."` → `String`（エスケープ解除のみ、それ以上の変換なし）
+- ダブルクォートされた `"..."` → `String`（バックスラッシュのエスケープ解除のみ、それ以上の変換なし）
+- シングルクォートされた `'...'` → `String`（`''` はリテラルの `'` 一文字、バックスラッシュのエスケープはなし、それ以上の変換なし）
 - それ以外 → `String`
+
+末尾の ` #...` コメント（値の先頭にある、または空白の後に続く `#`）は、この型推論の前に
+取り除かれます。ただし `"..."` または `'...'` でクォートされた値の内側は対象外です:
+`a: 1 # note` は `a` を `Long` の `1` としてパースし、`b: 'q # no'` は `#` を含む文字列
+`q # no` のまま保持します。
 
 不正な入力に対しては `Yaml.YamlParseException` を投げます。`derive!(Yaml)` の
 `fromYaml` はこれを捕捉して代わりに `null` を返します。
@@ -2811,10 +2822,10 @@ API 一覧:
 - `lock.isHeld()` - ロックが現在保持されているか
 - `Concurrent::channel(capacity)`
 - `chan.send(item)` / `chan.trySend(item)` - 満杯ならブロック / 満杯なら false を返す
-- `chan.receive()` / `chan.receiveTimeout(timeoutMillis)` - 何か届くまでブロック /
-  タイムアウト後は null を返す
+- `chan.receive()` / `chan.receiveTimeout(timeoutMillis)` - 何か届くまでブロック
+  (クローズ済みで空になったら null) / タイムアウト後は null を返す
 - `chan.size()` / `chan.isEmpty()`
-- `chan.close()` / `chan.isClosed()` - 以降の送信を拒否する。既にキューにあるものは受信できる
+- `chan.close()` / `chan.isClosed()` - 以降の送信を拒否する。既にキューにあるものは受信でき、その後 `receive()` は null を返す
 - `chan.drain()` - 現在キューにあるもの全てを取り出し、チャネルを空にする
 
 ---
@@ -2886,6 +2897,17 @@ Regex::groupsAll(input, pattern): List[List[String]]  // 全マッチのグル�
 ```
 Regex::replace(input, pattern, replacement): String
 Regex::replaceFirst(input, pattern, replacement): String
+```
+
+`replacement` は素のテキストではなく `java.util.regex.Matcher` の置換文字列構文に
+従う: `$1`、`$2`、... はキャプチャグループに置き換わり、リテラルな `$` は Java に
+`\$` として渡す必要がある。Onion の文字列リテラルではそのバックスラッシュ自体を
+エスケープするため `\\$` と書く（`"\$"` だけではサポート外のエスケープとして
+コンパイルエラーになる）。
+
+```
+Regex::replace("2024-05", "(\\d+)-(\\d+)", "$2/$1")   // "05/2024"
+Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- リテラルの $
 ```
 
 ### 分割

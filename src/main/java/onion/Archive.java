@@ -70,10 +70,13 @@ public final class Archive {
         if (!Files.isDirectory(root)) {
             throw new IllegalArgumentException("Archive: not a directory: " + directory);
         }
-        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(Paths.get(zipPath)))) {
+        Path zipFile = Paths.get(zipPath);
+        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zipFile))) {
             List<Path> sources = new ArrayList<>();
             try (java.util.stream.Stream<Path> walk = Files.walk(root)) {
-                walk.filter(Files::isRegularFile).sorted().forEach(sources::add);
+                walk.filter(Files::isRegularFile)
+                    .filter(p -> !isSameFileQuietly(p, zipFile))
+                    .sorted().forEach(sources::add);
             }
             for (Path source : sources) {
                 // Always '/' — a zip written on Windows with backslashes is unreadable
@@ -84,6 +87,15 @@ public final class Archive {
         } catch (IOException e) {
             throw new RuntimeException("Archive: could not write " + zipPath
                 + " (" + e.getMessage() + ")", e);
+        }
+    }
+
+    /** The archive being written is never one of its own entries. */
+    private static boolean isSameFileQuietly(Path a, Path b) {
+        try {
+            return Files.isSameFile(a, b);
+        } catch (IOException e) {
+            return false;
         }
     }
 
@@ -162,7 +174,7 @@ public final class Archive {
         try (GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(data))) {
             return in.readAllBytes();
         } catch (IOException e) {
-            throw new RuntimeException("Archive: could not gunzip (" + e.getMessage() + ")", e);
+            throw new RuntimeException("Archive: could not gunzip (" + gunzipReason(e) + ")", e);
         }
     }
 
@@ -184,11 +196,19 @@ public final class Archive {
             transfer(in, out);
         } catch (IOException e) {
             throw new RuntimeException("Archive: could not gunzip " + source
-                + " (" + e.getMessage() + ")", e);
+                + " (" + gunzipReason(e) + ")", e);
         }
     }
 
     // ========== Internals ==========
+
+    /** An empty or header-short input makes the JDK throw an EOFException with no message. */
+    private static String gunzipReason(IOException e) {
+        if (e.getMessage() == null && e instanceof java.io.EOFException) {
+            return "truncated or empty gzip data";
+        }
+        return e.getMessage();
+    }
 
     private static void writeEntry(ZipOutputStream out, String name, Path source)
             throws IOException {

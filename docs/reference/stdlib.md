@@ -2731,6 +2731,16 @@ Regex::replace(input, pattern, replacement): String
 Regex::replaceFirst(input, pattern, replacement): String
 ```
 
+`replacement` follows `java.util.regex.Matcher`'s replacement syntax, not plain
+text: `$1`, `$2`, ... insert capture groups, and a literal `$` must reach Java as
+`\$`. In an Onion string literal that backslash itself needs escaping, so write
+`\\$`. (A bare `"\$"` is a compile error: `\$` is not a supported escape.)
+
+```
+Regex::replace("2024-05", "(\\d+)-(\\d+)", "$2/$1")   // "05/2024"
+Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- literal dollar signs
+```
+
 ### Splitting
 
 ```

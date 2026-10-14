@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`Shape::describe(component, text)` attaches a JSON Schema `"description"` to one component, with no language change.** A json shape's `jsonSchema()` had no way to carry the field guidance a hand-written schema has, which `shape doc = json` was meant to make unnecessary (#1934). `Summary::doc().describe("risk", "1 (low) to 5 (high)").jsonSchema()` now includes it; parsing, printing and the other components are unchanged, and calls chain. Implements option 3 of RFC #1960 (no new syntax).
+
+### Fixed
+
+- **A `catch` variable or a try-with-resources binding read inside a lambda (`Thread`, `Future::async`, any closure) crashed the script with `VerifyError: Bad type on operand stack ... is not assignable to 'onion/runtime/ObjectBox'` at class load (#2159, #2164).** The closure-capture scanner had no case recognizing either as a local of its own scope, so a direct use inside the closure looked identical to capturing an outer-scope variable of the same name; because capture is tracked by name for the whole method, this also silently boxed any unrelated local sharing that name, including a separate top-level `catch e:`/`try (val r = ...)` elsewhere in the same method. Both are now recognized as locals of their own scope, the same way an ordinary local variable declaration already was.
+
 ## [0.142.0] - 2026-10-14
 
 ### Fixed

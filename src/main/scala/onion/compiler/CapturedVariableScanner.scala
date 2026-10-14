@@ -124,6 +124,13 @@ object CapturedVariableScanner {
         case tryExpr: AST.TryExpression =>
           // A catch-clause binding is local to the closure body, like a declaration.
           tryExpr.recClauses.foreach { case (arg, _) => locallyDeclared += arg.name }
+          // So is a try-with-resources binding (#2164): ASTWalk's generic
+          // TryExpression case never visits `resources` at all, so each one's
+          // init needs visiting here explicitly, not just its name recording.
+          tryExpr.resources.foreach { resource =>
+            locallyDeclared += resource.name
+            if (resource.init != null) visit(resource.init)
+          }
 
         case _ =>
       }

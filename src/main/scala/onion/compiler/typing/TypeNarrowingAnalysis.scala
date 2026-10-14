@@ -52,7 +52,8 @@ private[typing] object TypeNarrowingAnalysis {
     condition: AST.Expression,
     context: LocalContext,
     typeResolver: AST.TypeNode => Option[Type],
-    fieldNarrow: String => Option[Type] = _ => None
+    fieldNarrow: String => Option[Type] = _ => None,
+    fieldFlowNarrow: String => Option[Type] = _ => None
   ): NarrowingInfo = {
     condition match {
       // x is SomeType -> narrow x to SomeType in then-branch
@@ -88,20 +89,20 @@ private[typing] object TypeNarrowingAnalysis {
 
       // x != null -> narrow x from T? to T in then-branch
       case AST.NotEqual(_, NullCheckTarget(name, isField), AST.NullLiteral(_)) =>
-        extractNullCheckNarrowing(name, context, positive = true, fieldNarrow, isField)
+        extractNullCheckNarrowing(name, context, positive = true, fieldNarrow, fieldFlowNarrow, isField)
       case AST.NotEqual(_, AST.NullLiteral(_), NullCheckTarget(name, isField)) =>
-        extractNullCheckNarrowing(name, context, positive = true, fieldNarrow, isField)
+        extractNullCheckNarrowing(name, context, positive = true, fieldNarrow, fieldFlowNarrow, isField)
 
       // x == null -> narrow x from T? to T in else-branch
       case AST.Equal(_, NullCheckTarget(name, isField), AST.NullLiteral(_)) =>
-        extractNullCheckNarrowing(name, context, positive = false, fieldNarrow, isField)
+        extractNullCheckNarrowing(name, context, positive = false, fieldNarrow, fieldFlowNarrow, isField)
       case AST.Equal(_, AST.NullLiteral(_), NullCheckTarget(name, isField)) =>
-        extractNullCheckNarrowing(name, context, positive = false, fieldNarrow, isField)
+        extractNullCheckNarrowing(name, context, positive = false, fieldNarrow, fieldFlowNarrow, isField)
 
       // cond1 && cond2 -> both narrowings apply in then-branch
       case AST.LogicalAnd(_, left, right) =>
-        val leftNarrowing = extractNarrowing(left, context, typeResolver, fieldNarrow)
-        val rightNarrowing = extractNarrowing(right, context, typeResolver, fieldNarrow)
+        val leftNarrowing = extractNarrowing(left, context, typeResolver, fieldNarrow, fieldFlowNarrow)
+        val rightNarrowing = extractNarrowing(right, context, typeResolver, fieldNarrow, fieldFlowNarrow)
         NarrowingInfo(
           leftNarrowing.positive ++ rightNarrowing.positive, Map.empty,
           leftNarrowing.mutablePositive ++ rightNarrowing.mutablePositive, Map.empty
@@ -114,8 +115,8 @@ private[typing] object TypeNarrowingAnalysis {
       // `if x == null || x.isEmpty() { return } ; x.foo()` narrow x on the
       // fall-through (#302), mirroring the && then-branch narrowing (#294).
       case AST.LogicalOr(_, left, right) =>
-        val leftNarrowing = extractNarrowing(left, context, typeResolver, fieldNarrow)
-        val rightNarrowing = extractNarrowing(right, context, typeResolver, fieldNarrow)
+        val leftNarrowing = extractNarrowing(left, context, typeResolver, fieldNarrow, fieldFlowNarrow)
+        val rightNarrowing = extractNarrowing(right, context, typeResolver, fieldNarrow, fieldFlowNarrow)
         NarrowingInfo(
           Map.empty, leftNarrowing.negative ++ rightNarrowing.negative,
           Map.empty, leftNarrowing.mutableNegative ++ rightNarrowing.mutableNegative
@@ -123,7 +124,7 @@ private[typing] object TypeNarrowingAnalysis {
 
       // !cond -> swap polarity: if !(o is String) narrows o in the else branch
       case AST.Not(_, inner) =>
-        val innerNarrowing = extractNarrowing(inner, context, typeResolver, fieldNarrow)
+        val innerNarrowing = extractNarrowing(inner, context, typeResolver, fieldNarrow, fieldFlowNarrow)
         NarrowingInfo(
           innerNarrowing.negative, innerNarrowing.positive,
           innerNarrowing.mutableNegative, innerNarrowing.mutablePositive
@@ -160,7 +161,7 @@ private[typing] object TypeNarrowingAnalysis {
    */
   private def extractNullCheckNarrowing(
     name: String, context: LocalContext, positive: Boolean, fieldNarrow: String => Option[Type],
-    fieldOnly: Boolean
+    fieldFlowNarrow: String => Option[Type], fieldOnly: Boolean
   ): NarrowingInfo = {
     val binding = if (fieldOnly) null else context.lookup(name)
     // The non-null view of a nullable local/field type, or None if not nullable.
@@ -189,7 +190,14 @@ private[typing] object TypeNarrowingAnalysis {
           // which is immutable and so safe to narrow.
           fieldNarrow(name)
         }
+      // A mutable field that only the script's own straight-line code writes (a top-level
+      // `var`, RFC #2031 option 2) narrows flow-sensitively, like a `var` local: the caller
+      // gates it on the guarded region not reassigning it.
+      lazy val flowNarrowed: Option[Type] = if (binding == null && !fieldOnly) fieldFlowNarrow(name) else None
       narrowed match {
+        case None if flowNarrowed.isDefined =>
+          if (positive) NarrowingInfo(Map.empty, Map.empty, Map(name -> flowNarrowed.get), Map.empty)
+          else NarrowingInfo(Map.empty, Map.empty, Map.empty, Map(name -> flowNarrowed.get))
         case Some(t) => if (positive) NarrowingInfo(Map(name -> t), Map.empty) else NarrowingInfo(Map.empty, Map(name -> t))
         case None => NarrowingInfo.empty
       }

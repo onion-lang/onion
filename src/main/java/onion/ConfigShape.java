@@ -280,12 +280,21 @@ public final class ConfigShape<T> implements Shape<T> {
                 if (line.valueRaw.endsWith("\r")) sb.append('\r');
             }
         }
+        // A CRLF document keeps its terminator style on appended lines too (#2130).
+        boolean crlf = false;
+        for (Line line : r.lines) if (line.raw.endsWith("\r")) { crlf = true; break; }
         for (String inserted : insertions) {
-            if (!firstOut) sb.append('\n');
+            if (!firstOut) {
+                if (crlf && (sb.length() == 0 || sb.charAt(sb.length() - 1) != '\r')) sb.append('\r');
+                sb.append('\n');
+            }
             firstOut = false;
             sb.append(inserted);
         }
-        if (r.trailingNewline) sb.append('\n');
+        if (r.trailingNewline) {
+            if (crlf && !insertions.isEmpty()) sb.append('\r');
+            sb.append('\n');
+        }
         return sb.toString();
     }
 

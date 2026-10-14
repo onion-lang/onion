@@ -254,6 +254,7 @@ onion.Maps#*=pure
 onion.Option#*=pure
 onion.Option$Some#*=pure
 onion.Option$None#*=pure
+onion.OnionRecordMarker#*=pure
 onion.OrElseShape#*=pure
 onion.Origin#*=pure
 onion.Outcome#*=pure

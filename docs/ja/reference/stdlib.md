@@ -2888,6 +2888,17 @@ Regex::replace(input, pattern, replacement): String
 Regex::replaceFirst(input, pattern, replacement): String
 ```
 
+`replacement` は素のテキストではなく `java.util.regex.Matcher` の置換文字列構文に
+従う: `$1`、`$2`、... はキャプチャグループに置き換わり、リテラルな `$` は Java に
+`\$` として渡す必要がある。Onion の文字列リテラルではそのバックスラッシュ自体を
+エスケープするため `\\$` と書く（`"\$"` だけではサポート外のエスケープとして
+コンパイルエラーになる）。
+
+```
+Regex::replace("2024-05", "(\\d+)-(\\d+)", "$2/$1")   // "05/2024"
+Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- リテラルの $
+```
+
 ### 分割
 
 ```

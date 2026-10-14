@@ -121,6 +121,10 @@ object CapturedVariableScanner {
           if (localVar.init != null) visit(localVar.init)
           return
 
+        case tryExpr: AST.TryExpression =>
+          // A catch-clause binding is local to the closure body, like a declaration.
+          tryExpr.recClauses.foreach { case (arg, _) => locallyDeclared += arg.name }
+
         case _ =>
       }
       ASTWalk.visitChildren(n)(visitF)

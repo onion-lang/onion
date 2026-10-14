@@ -23,6 +23,26 @@ class CsvEnrichedSpec extends AbstractShellSpec {
     assert(expect == shell.run(src, "CsvEnrichedStr.on", Array()))
   }
 
+  describe("Csv::parse unterminated quote") {
+    it("throws naming the line where the quote was opened") {
+      runStr(
+        "try {\n" +
+        "  Csv::parse(\"id,note\\n1,\\\"oops\\n2,fine\\n\")\n" +
+        "  return \"no error\"\n" +
+        "} catch e: IllegalArgumentException {\n" +
+        "  return e.getMessage()\n" +
+        "}",
+        Shell.Success("Csv: unterminated quoted field starting at line 2"))
+    }
+
+    it("still accepts a closed quoted field spanning lines") {
+      runInt(
+        "val rows = Csv::parse(\"a,\\\"x\\ny\\\"\\nb,c\\n\")\n" +
+        "return rows.size()",
+        Shell.Success(2))
+    }
+  }
+
   describe("enriched Csv") {
     it("columnByName extracts a header-keyed column") {
       runStr(

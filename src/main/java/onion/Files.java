@@ -35,16 +35,7 @@ public final class Files {
     }
 
     public static String readText(File file, Charset charset) throws IOException {
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(file), charset))) {
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (sb.length() > 0) sb.append(System.lineSeparator());
-                sb.append(line);
-            }
-            return sb.toString();
-        }
+        return new String(java.nio.file.Files.readAllBytes(file.toPath()), charset);
     }
 
     public static List<String> readLines(String path) throws IOException {

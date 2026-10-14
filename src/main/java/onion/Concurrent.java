@@ -259,10 +259,15 @@ public final class Concurrent {
             return queue.offer(item);
         }
 
-        /** Blocks until something arrives. */
+        /** Blocks until something arrives; returns null once the channel is closed and drained. */
         public Object receive() {
             try {
-                return queue.take();
+                while (true) {
+                    Object item = queue.poll(25, TimeUnit.MILLISECONDS);
+                    if (item != null) return item;
+                    // Read the flag first: anything sent before close() is already queued by now.
+                    if (closed) return queue.poll();
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Concurrent: interrupted while receiving", e);
@@ -283,7 +288,7 @@ public final class Concurrent {
 
         public boolean isEmpty() { return queue.isEmpty(); }
 
-        /** Refuses further sends. What is already queued can still be received. */
+        /** Refuses further sends. What is already queued can still be received; then receive() returns null. */
         public void close() { closed = true; }
 
         public boolean isClosed() { return closed; }

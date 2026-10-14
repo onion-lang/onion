@@ -1633,6 +1633,11 @@ val a = Json::array()                  // empty List, for JSON array values
 // JSON has no token for one, and Json::parse can never produce one either
 Json::stringify(0.0d / 0.0d)           // "null"
 
+// A record serializes as a JSON object of its components, in declaration order,
+// recursing into nested records/Lists/Maps the same way a Map's values already do.
+record Point(x: Int, y: Int)
+Json::stringify(new Point(1, 2))       // {"x":1,"y":2}
+
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
 v["users"][0]["name"].asString()
@@ -1714,13 +1719,19 @@ val rows = Yaml::parse("- name: Alice\n  age: 30\n- name: Bob\n  age: 25\n")
 // rows is an ArrayList of two LinkedHashMaps
 ```
 
-Scalar type inference rules (identical to `Json`):
-- `""` or `null` → `null`
+Scalar type inference rules (identical to `Json`, plus two YAML-only cases):
+- `""`, `null`, or `~` → `null`
 - `true` / `false` → `Boolean`
 - Bare integer (matches `-?\d+`) → `Long`
 - Floating-point pattern or number containing `.`/`e`/`E` → `Double`
-- Quoted `"..."` → `String` (unescaped, no further coercion)
+- Double-quoted `"..."` → `String` (backslash-unescaped, no further coercion)
+- Single-quoted `'...'` → `String` (`''` is a literal `'`, no backslash escapes, no further coercion)
 - Anything else → `String`
+
+A trailing ` #...` comment (a `#` at the start of the value, or preceded by whitespace) is
+stripped before this inference runs, unless it is inside a `"..."` or `'...'` quoted value:
+`a: 1 # note` parses `a` as the `Long` `1`, and `b: 'q # no'` keeps the `#` as part of the
+string `q # no`.
 
 Throws `Yaml.YamlParseException` on malformed input; `derive!(Yaml)`'s
 `fromYaml` catches this and returns `null` instead.
@@ -2647,10 +2658,10 @@ Full API:
 - `Concurrent::channel(capacity)`
 - `chan.send(item)` / `chan.trySend(item)` - blocks while full vs. returns false instead
 - `chan.receive()` / `chan.receiveTimeout(timeoutMillis)` - blocks until something arrives
-  vs. returns null after the timeout
+  (null once the channel is closed and drained) vs. returns null after the timeout
 - `chan.size()` / `chan.isEmpty()`
 - `chan.close()` / `chan.isClosed()` - refuses further sends; what is already queued can
-  still be received
+  still be received, then `receive()` returns null
 - `chan.drain()` - everything queued right now, leaving the channel empty
 
 ---
@@ -2723,6 +2734,16 @@ Regex::groupsAll(input, pattern): List[List[String]]  // All matches groups
 ```
 Regex::replace(input, pattern, replacement): String
 Regex::replaceFirst(input, pattern, replacement): String
+```
+
+`replacement` follows `java.util.regex.Matcher`'s replacement syntax, not plain
+text: `$1`, `$2`, ... insert capture groups, and a literal `$` must reach Java as
+`\$`. In an Onion string literal that backslash itself needs escaping, so write
+`\\$`. (A bare `"\$"` is a compile error: `\$` is not a supported escape.)
+
+```
+Regex::replace("2024-05", "(\\d+)-(\\d+)", "$2/$1")   // "05/2024"
+Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- literal dollar signs
 ```
 
 ### Splitting

@@ -97,4 +97,28 @@ object AssignedVariableScanner {
 
     visitNode(node)
   }
+
+  /**
+   * Names assigned inside any lambda (or nested declaration) found under `nodes`. A lambda can
+   * be stored and invoked at any later point, so such an assignment is not tied to its position
+   * in the straight-line code around it.
+   */
+  def assignedInLambdas(nodes: Iterable[AST.Node]): Set[String] = {
+    var acc: Set[String] = Set.empty
+    def walk(any: Any): Unit = any match {
+      case c: AST.ClosureExpression => acc = acc ++ scan(c.body)
+      case d: AST.TypeDeclaration => acc = acc ++ scan(d)
+      case f: AST.FunctionDeclaration => acc = acc ++ scan(f)
+      case _: String | _: java.lang.Number | _: java.lang.Boolean | _: Location | null =>
+      case it: Iterable[_] => it.foreach(walk)
+      case a: Array[_] => a.foreach(walk)
+      case p: Product =>
+        val n = p.productArity
+        var i = 0
+        while (i < n) { walk(p.productElement(i)); i += 1 }
+      case _ =>
+    }
+    nodes.foreach(walk)
+    acc
+  }
 }

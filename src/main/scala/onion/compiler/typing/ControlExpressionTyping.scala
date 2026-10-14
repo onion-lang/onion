@@ -29,7 +29,7 @@ final class ControlExpressionTyping(
    * Delegates to TypeNarrowingAnalysis with the type resolver.
    */
   private[typing] def extractNarrowing(condition: AST.Expression, context: LocalContext): NarrowingInfo =
-    TypeNarrowingAnalysis.extractNarrowing(condition, context, typing.mapFrom, fieldNullNarrow)
+    TypeNarrowingAnalysis.extractNarrowing(condition, context, typing.mapFrom, fieldNullNarrow, topLevelVarNullNarrow)
 
   /** The non-null type of an immutable (`val`) nullable field of the current
     * class, for smart-casting an implicitly-accessed field after a null check.
@@ -43,6 +43,20 @@ final class ControlExpressionTyping(
       }
     } else None
   }
+
+  /** The non-null type of a top-level script `var` that no `def`, class or lambda assigns, so a
+    * null check on it can be flow-narrowed (RFC #2031 option 2). The caller still requires that
+    * the guarded region does not reassign it. */
+  private def topLevelVarNullNarrow(name: String): Option[TypedAST.Type] =
+    bodyContext.topLevelClass.flatMap { tc =>
+      val field = tc.field(name)
+      if (field == null || Modifier.isFinal(field.modifier) || (field.modifier & AST.M_STATIC) == 0
+          || bodyContext.deferredAssignedNames.contains(name)) None
+      else field.`type` match {
+        case n: TypedAST.NullableType => Some(n.innerType)
+        case _ => None
+      }
+    }
 
   def typeBlockExpression(node: AST.BlockExpression, context: LocalContext, expected: Type = null): Option[Term] =
     context.openScope {

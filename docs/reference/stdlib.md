@@ -1169,7 +1169,7 @@ f1.zip(f2)  // Future[List[Object]] = [1, 2]
 f1.race(f2)
 
 // Wait for all
-Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
+Future::all(f1, f2, f3)  // Future[List[Int]] = [1, 2, 3]
 Future::all([f1, f2, f3])  // same, but takes a List[Future[T]] built at runtime
 
 // First to complete
@@ -1632,6 +1632,11 @@ val a = Json::array()                  // empty List, for JSON array values
 // A non-finite Double/Float (NaN, +/-Infinity) stringifies as the JSON literal `null` --
 // JSON has no token for one, and Json::parse can never produce one either
 Json::stringify(0.0d / 0.0d)           // "null"
+
+// A record serializes as a JSON object of its components, in declaration order,
+// recursing into nested records/Lists/Maps the same way a Map's values already do.
+record Point(x: Int, y: Int)
+Json::stringify(new Point(1, 2))       // {"x":1,"y":2}
 
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)

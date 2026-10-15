@@ -1,9 +1,7 @@
 package onion;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -103,20 +101,32 @@ public final class Net {
     /** One end of an open TCP connection. */
     public static final class Conn {
         private final Socket socket;
-        private final BufferedReader reader;
+        private final java.io.BufferedInputStream input;
         private final OutputStream output;
 
         Conn(Socket socket) throws IOException {
             this.socket = socket;
-            this.reader = new BufferedReader(
-                new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+            // One buffered byte source for readLine/readAll/readBytes, so bytes a line read
+            // pulled ahead are still there for a later binary read.
+            this.input = new java.io.BufferedInputStream(socket.getInputStream(), BUFFER);
             this.output = socket.getOutputStream();
         }
 
         /** The next line, or null at end of stream. The line terminator is not included. */
         public String readLine() {
             try {
-                return reader.readLine();
+                java.io.ByteArrayOutputStream line = new java.io.ByteArrayOutputStream();
+                int c = input.read();
+                if (c == -1) return null;
+                while (c != -1 && c != '\n' && c != '\r') {
+                    line.write(c);
+                    c = input.read();
+                }
+                if (c == '\r') {
+                    input.mark(1);
+                    if (input.read() != '\n') input.reset();
+                }
+                return new String(line.toByteArray(), StandardCharsets.UTF_8);
             } catch (IOException e) {
                 throw new RuntimeException("Net: read failed on " + remoteAddress()
                     + " (" + e.getMessage() + ")", e);
@@ -125,18 +135,7 @@ public final class Net {
 
         /** Everything until the peer closes, decoded as UTF-8. */
         public String readAll() {
-            StringBuilder out = new StringBuilder();
-            char[] buffer = new char[BUFFER];
-            try {
-                int read;
-                while ((read = reader.read(buffer)) != -1) {
-                    out.append(buffer, 0, read);
-                }
-            } catch (IOException e) {
-                throw new RuntimeException("Net: read failed on " + remoteAddress()
-                    + " (" + e.getMessage() + ")", e);
-            }
-            return out.toString();
+            return new String(readBytes(), StandardCharsets.UTF_8);
         }
 
         /**
@@ -148,7 +147,7 @@ public final class Net {
          */
         public byte[] readBytes() {
             try {
-                InputStream in = socket.getInputStream();
+                InputStream in = input;
                 java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
                 byte[] buffer = new byte[BUFFER];
                 int read;

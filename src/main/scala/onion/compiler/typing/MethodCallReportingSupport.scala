@@ -14,7 +14,8 @@ private[compiler] final class MethodCallReportingSupport(
     name: String,
     argTypes: Array[Type],
     isUnqualifiedCall: Boolean = false,
-    extensionReceiverHint: ObjectType = null
+    extensionReceiverHint: ObjectType = null,
+    calledStatically: Boolean = false
   ): Unit = {
     // A same-named field that exists but isn't accessible from here (e.g. Concurrent.Lock's
     // private `lock`) is not a usable fix for "method not found" -- the paren-less-field hint
@@ -29,7 +30,7 @@ private[compiler] final class MethodCallReportingSupport(
         }
       case _ => java.lang.Boolean.FALSE
     }
-    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed)
+    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed, java.lang.Boolean.valueOf(calledStatically))
   }
 
   def reportAmbiguousMethods(

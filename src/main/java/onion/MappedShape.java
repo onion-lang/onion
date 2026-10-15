@@ -88,6 +88,8 @@ final class MappedShape<T> implements Shape<T> {
     private final Function1<T, List<Object>> explode;
     /** Resolved nested shapes, by component index; each resolved once, on first use. */
     private final Object[] resolved;
+    /** Per-component JSON Schema descriptions, attached by {@link #describe}; empty by default. */
+    private final Map<String, String> descriptions;
 
     MappedShape(Codec codec, List<String> names, List<String> tags,
                 Function1<List<Object>, T> build, Function1<T, List<Object>> explode) {
@@ -109,6 +111,18 @@ final class MappedShape<T> implements Shape<T> {
         this.build = build;
         this.explode = explode;
         this.resolved = new Object[ts.size()];
+        this.descriptions = Collections.emptyMap();
+    }
+
+    /** Copies {@code base}, replacing only its component descriptions. */
+    private MappedShape(MappedShape<T> base, Map<String, String> descriptions) {
+        this.codec = base.codec;
+        this.names = base.names;
+        this.kinds = base.kinds;
+        this.build = base.build;
+        this.explode = base.explode;
+        this.resolved = base.resolved;
+        this.descriptions = descriptions;
     }
 
     @Override
@@ -281,6 +295,20 @@ final class MappedShape<T> implements Shape<T> {
         return "JSON".equals(codec.name());
     }
 
+    @Override
+    public Shape<T> describe(String component, String text) {
+        if (!hasJsonSchema()) {
+            throw new UnsupportedOperationException(
+                "shape " + describe() + " has no JSON Schema, so its components cannot be described");
+        }
+        if (!names.contains(component)) {
+            throw new IllegalArgumentException("no component named " + component + " in " + describe());
+        }
+        Map<String, String> updated = new LinkedHashMap<>(descriptions);
+        updated.put(component, text);
+        return new MappedShape<>(this, updated);
+    }
+
     /** The record schemas a recursive shape's {@code $ref}s point at, assigned on first cycle. */
     private static final class SchemaDefs {
         final Map<String, Object> defs = new LinkedHashMap<>();
@@ -340,19 +368,25 @@ final class MappedShape<T> implements Shape<T> {
         } else {
             schema = element;
         }
-        if (!kind.nullable) return schema;
-        if (!kind.list && kind.isNested()) {
-            // An object schema carries properties/required alongside its type; widening the
-            // type to ["object", "null"] would leave them describing a null. anyOf keeps the
-            // object schema whole.
-            Map<String, Object> nullSchema = new LinkedHashMap<>();
-            nullSchema.put("type", "null");
-            Map<String, Object> any = new LinkedHashMap<>();
-            any.put("anyOf", List.of(schema, nullSchema));
-            return any;
+        if (kind.nullable) {
+            if (!kind.list && kind.isNested()) {
+                // An object schema carries properties/required alongside its type; widening
+                // the type to ["object", "null"] would leave them describing a null. anyOf
+                // keeps the object schema whole.
+                Map<String, Object> nullSchema = new LinkedHashMap<>();
+                nullSchema.put("type", "null");
+                Map<String, Object> any = new LinkedHashMap<>();
+                any.put("anyOf", List.of(schema, nullSchema));
+                schema = any;
+            } else {
+                schema.put("type", List.of(schema.get("type"), "null"));
+            }
         }
-        schema.put("type", List.of(schema.get("type"), "null"));
-        return schema;
+        String description = descriptions.get(names.get(index));
+        if (description == null) return schema;
+        Map<String, Object> described = new LinkedHashMap<>(schema);
+        described.put("description", description);
+        return described;
     }
 
     @SuppressWarnings("unchecked")

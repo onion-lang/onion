@@ -258,9 +258,10 @@ final class MethodCallTyping(
     name: String,
     argTypes: Array[Type],
     isUnqualifiedCall: Boolean = false,
-    extensionReceiverHint: ObjectType = null
+    extensionReceiverHint: ObjectType = null,
+    calledStatically: Boolean = false
   ): Unit =
-    methodCallReportingSupport.reportMethodNotFound(node, targetType, name, argTypes, isUnqualifiedCall, extensionReceiverHint)
+    methodCallReportingSupport.reportMethodNotFound(node, targetType, name, argTypes, isUnqualifiedCall, extensionReceiverHint, calledStatically)
 
   /** Error count so far; a checkpoint before typing a trailing-closure body and a
    *  comparison after tells whether the body itself reported an error, so a

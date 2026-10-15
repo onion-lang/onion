@@ -11,8 +11,8 @@ import onion.tools.Shell
  * reachable by extension-call syntax at all, even though docs/reference/stdlib.md
  * (and its Japanese translation) show them as if they were plain `Iterables`
  * chaining examples. The two implementations disagree on edge cases:
- *   - a negative `n`: `Colls::take`/`drop` clamp to an empty/unchanged result,
- *     `Iterables::take`/`drop` throw (`subList` rejects the negative index)
+ *   - a negative `n`: both clamp to an empty/unchanged result (`Iterables` copies,
+ *     `Colls` returns the same reference for `drop`)
  *   - `n` at or past the list's size: `Colls::take`/`drop` return the very
  *     same list reference, not a copy; `Iterables::take`/`drop` always copy
  *   - `reverse`: `Colls::reverse` returns an unmodifiable list; `Iterables::reverse`
@@ -40,16 +40,11 @@ class IterablesTakeDropReverseShadowingSpec extends AbstractShellSpec {
         Shell.Success(true))
     }
 
-    it("Iterables::take(xs, -1) throws instead, unlike the shadowing extension call") {
+    it("Iterables::take(xs, -1) also returns an empty list, as the extension call does") {
       runBool(
         """
           |val xs: List[Int] = [1, 2, 3]
-          |try {
-          |  Iterables::take(xs, -1)
-          |  return false
-          |} catch e: RuntimeException {
-          |  return true
-          |}
+          |return Iterables::take(xs, -1) == []
           |""".stripMargin,
         Shell.Success(true))
     }
@@ -63,16 +58,12 @@ class IterablesTakeDropReverseShadowingSpec extends AbstractShellSpec {
         Shell.Success(true))
     }
 
-    it("Iterables::drop(xs, -1) throws instead, unlike the shadowing extension call") {
+    it("Iterables::drop(xs, -1) returns an equal copy, not the same reference") {
       runBool(
         """
           |val xs: List[Int] = [1, 2, 3]
-          |try {
-          |  Iterables::drop(xs, -1)
-          |  return false
-          |} catch e: RuntimeException {
-          |  return true
-          |}
+          |val d: List[Int] = Iterables::drop(xs, -1)
+          |return d == xs && !(d === xs)
           |""".stripMargin,
         Shell.Success(true))
     }

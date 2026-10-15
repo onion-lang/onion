@@ -143,12 +143,14 @@ public class Iterables {
 
   // Take first n elements
   public static <T> List<T> take(List<T> list, int n) {
+    if (n <= 0) return new ArrayList<>();
     if (n >= list.size()) return new ArrayList<>(list);
     return new ArrayList<>(list.subList(0, n));
   }
 
   // Drop first n elements
   public static <T> List<T> drop(List<T> list, int n) {
+    if (n <= 0) return new ArrayList<>(list);
     if (n >= list.size()) return new ArrayList<>();
     return new ArrayList<>(list.subList(n, list.size()));
   }

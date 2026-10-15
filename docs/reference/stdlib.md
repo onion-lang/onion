@@ -948,8 +948,9 @@ versions, never `onion.Iterables`'s. The two disagree on edge cases:
 - `xs.filter(p)` calls `p` and auto-unboxes its `Boolean` result, throwing
   **`NullPointerException`** if `p` returns `null`; `Iterables::filter` treats
   a `null` result as "not kept" instead of throwing
-- a negative `n` -- `xs.take(-1)` / `xs.drop(-1)` return an empty/unchanged
-  result; `Iterables::take`/`Iterables::drop` throw instead
+- a negative `n` -- both clamp (`take` gives an empty list, `drop` leaves the
+  list unchanged); `xs.drop(-1)` returns the same reference,
+  `Iterables::drop(xs, -1)` a copy
 - `n` at or past the list's size -- `xs.take(n)` / `xs.drop(n)` return the
   **very same list reference**, not a copy; `Iterables::take`/`Iterables::drop`
   always copy
@@ -969,7 +970,7 @@ Iterables::filter(xs, (x) -> null)       // []  (onion.Iterables::filter, null i
 xs.take(-1)                    // []      (onion.Colls::take, clamps instead of throwing)
 xs.take(xs.size() + 1) === xs  // true    (onion.Colls::take, same list reference)
 xs.reverse().add(4)            // throws UnsupportedOperationException (onion.Colls::reverse)
-Iterables::take(xs, -1)        // throws  (onion.Iterables::take, no clamping)
+Iterables::take(xs, -1)        // []      (onion.Iterables::take, clamps too)
 ```
 
 **`reduce` is shadowed too, but at compile time, not just runtime**: `onion.Colls`

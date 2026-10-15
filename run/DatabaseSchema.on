@@ -43,7 +43,9 @@ public:
     case d is BlobType:   "BLOB"
   }
   def isNumeric(): Boolean = select this {
-    case d is IntType, d is BigIntType, d is Decimal: true
+    case d is IntType: true
+    case d is BigIntType: true
+    case d is Decimal: true
     else: false
   }
 }

@@ -231,7 +231,14 @@ public final class DateTime {
      * Returns the difference in days (time1 - time2).
      */
     public static int diffDays(long time1, long time2) {
-        return (int) ((time1 - time2) / (24 * 60 * 60 * 1000));
+        return diffDays(time1, time2, LOCAL);
+    }
+
+    // Whole calendar days in the given zone, so a 23- or 25-hour DST day still counts as one.
+    static int diffDays(long time1, long time2, ZoneId zone) {
+        LocalDateTime a = LocalDateTime.ofInstant(Instant.ofEpochMilli(time1), zone);
+        LocalDateTime b = LocalDateTime.ofInstant(Instant.ofEpochMilli(time2), zone);
+        return (int) java.time.temporal.ChronoUnit.DAYS.between(b, a);
     }
 
     /**

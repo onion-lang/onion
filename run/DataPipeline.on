@@ -211,12 +211,12 @@ val fApac:  Future[StageResult] = extractRegion(Region::APAC)
 val fEmea:  Future[StageResult] = extractRegion(Region::EMEA)
 val fAmer:  Future[StageResult] = extractRegion(Region::AMER)
 val fLatam: Future[StageResult] = extractRegion(Region::LATAM)
-val defaultRaw: List[Object] = []
-val allRaw: List[Object] = Future::all(fApac, fEmea, fAmer, fLatam).getOrElse(defaultRaw)
+val defaultRaw: List[StageResult] = []
+val allRaw: List[StageResult] = Future::all(fApac, fEmea, fAmer, fLatam).getOrElse(defaultRaw)
 IO::println("  received #{allRaw.size} result(s)")
 
 // Unpack stage results
-val stageResults: List[StageResult] = allRaw.map { r -> r as StageResult } as List[StageResult]
+val stageResults: List[StageResult] = allRaw
 IO::println("")
 
 // Phase 2 — sequential transform via do[Future]

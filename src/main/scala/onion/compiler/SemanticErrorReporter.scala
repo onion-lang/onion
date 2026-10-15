@@ -1229,6 +1229,10 @@ object SemanticErrorReporter {
     SemanticError.DUPLICATE_TYPE_ALIAS -> ErrorDef(
       "error.semantic.duplicateTypeAlias",
       Seq(items => asString(items(0)))
+    ),
+    SemanticError.MULTIPLE_BINDING_PATTERNS_IN_CASE -> ErrorDef(
+      "error.semantic.multipleBindingPatternsInCase",
+      Seq()
     )
   )
 

@@ -246,6 +246,21 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
       assert(Shell.Success("host = example.com\nport = 8080\n") == r, r.toString)
     }
 
+    it("printLossless appends a CRLF line to a CRLF document (#2130)") {
+      val r = shell.run(nullableDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val text = "host = example.com\r\nextra = 1\r\n"
+          |    val got = Cfg::cfg().parseLossless(text).get()
+          |    val edited = new Cfg(got.value().host(), 8080)
+          |    return Cfg::cfg().printLossless(edited, got.residue())
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("host = example.com\r\nextra = 1\r\nport = 8080\r\n") == r, r.toString)
+    }
+
     it("printLossless is a no-op when an absent component stays null") {
       val r = shell.run(nullableDecl +
         """class Test {

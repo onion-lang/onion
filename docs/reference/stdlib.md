@@ -3109,13 +3109,11 @@ Function1)` extension method with the same erased signature as
 `onion.Sets`'s, and `Iterables` is registered ahead of `Sets` in the builtin
 extension container list, so `a.map(f)` always reaches *`onion.Iterables`*'s
 `map` -- `onion.Sets`'s `map` is never reachable by extension-call syntax at
-all. The two disagree on order and on `null`: `Iterables::map` collects into
-a plain `HashSet` (iteration order unspecified, breaking this module's
-insertion-order promise above) and throws `NullPointerException` for a
-`null` set, while `Sets::map` collects into a `LinkedHashSet` (insertion
-order preserved) and returns an empty set for a `null` one. Call
-`Sets::map(...)` directly (not `a.map(...)`) to get `onion.Sets`'s
-order-preserving, null-safe result.
+all. Both collect into a `LinkedHashSet` (insertion order preserved, as
+promised above), so they only disagree on `null`: `Iterables::map` throws
+`NullPointerException` for a `null` set, while `Sets::map` returns an empty
+set. Call `Sets::map(...)` directly (not `a.map(...)`) to get `onion.Sets`'s
+null-safe result.
 
 **`forEach` is shadowed too, but by the JDK, not another onion module**:
 `Set` conforms to `java.lang.Iterable`, which already declares a default

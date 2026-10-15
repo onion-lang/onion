@@ -1687,12 +1687,11 @@ a.count(p) / a.any(p) / a.all(p)
 シグネチャで `map` 拡張メソッドを宣言しており、組み込み拡張コンテナリストで
 `Iterables` が `Sets` より先に登録されているため、`a.map(f)` は常に
 *`onion.Iterables`* 側の `map` に到達し、`onion.Sets` 側の `map` には拡張呼び出し
-構文からは一切到達できません。両者は順序と `null` の扱いが異なります:
-`Iterables::map` は結果を通常の `HashSet` に集約する（反復順序は不定で、上記の
-「挿入順を保持する」という約束が破れる）うえ `null` の Set に対して
-`NullPointerException` を投げますが、`Sets::map` は `LinkedHashSet`（挿入順保持）
-に集約し、`null` の Set には空の Set を返します。挿入順が保たれた null 安全な
-結果が必要な場合は `a.map(...)` ではなく `Sets::map(...)` を直接呼んでください。
+構文からは一切到達できません。どちらも結果を `LinkedHashSet`（挿入順保持）に
+集約するため、違いは `null` の扱いだけです: `Iterables::map` は `null` の Set に
+対して `NullPointerException` を投げ、`Sets::map` は空の Set を返します。
+null 安全な結果が必要な場合は `a.map(...)` ではなく `Sets::map(...)` を直接
+呼んでください。
 
 **`forEach` は他の onion モジュールではなく JDK にシャドーイングされます**:
 `Set` は `java.lang.Iterable` にも適合しており、`Iterable` はすでに default

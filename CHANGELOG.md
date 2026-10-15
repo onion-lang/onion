@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yaml::stringify` left a String starting with a double quote unquoted, so it parsed back with its quotes stripped or not at all** (#2187). `{k: "\"dq\""}` came back as `dq`, and `"\"open"` made the whole document unreadable. Such values are now quoted, like those starting with `'`.
 - **`Format::number`/`fixed`/`percent` printed a negative zero (`-0`, `-0.00`, `-0.0%`) for a small negative value that rounds to zero** (#2155), e.g. `Format::percent(-0.0001, 1)` returned `"-0.0%"` instead of `"0.0%"`. `Format::fixed` now drops the sign when the rounded result has no non-zero digit; a genuinely negative non-finite value (`-Infinity`) is unaffected.
 - **A `Server` route handler that threw a plain `Error` (`StackOverflowError`, `OutOfMemoryError`, ...), not a `RuntimeException`, left the client hanging until its own timeout instead of getting a `500` (#2168).** `dispatch` caught only `RuntimeException`; an `Error` escaped uncaught, so `send` was never called. It now also catches `Error`, still answers `500 Internal Server Error`, and rethrows a `VirtualMachineError` afterward so the JVM still hears about it.
 - **A range ending at `Int.MAX_VALUE` keeps its last value, and `size` of a very wide range is no longer negative.** `2147483646..2147483647` produced one element instead of two, and `-2000000000..2000000000` reported a size of `-294967295` (#2172).

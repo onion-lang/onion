@@ -310,18 +310,26 @@ public final class Server {
 
         private void dispatch(HttpExchange exchange) throws IOException {
             Response response;
+            Error fatal = null;
             try {
                 Request request = new Request(exchange, readBody(exchange));
                 Handler handler = route(request.path());
                 response = handler == null ? notFound() : handler.handle(request);
                 if (response == null) response = notFound();
-            } catch (RuntimeException e) {
-                // A handler that throws must not take the server down or leave the client
-                // hanging on a socket that never answers.
+            } catch (VirtualMachineError e) {
+                // A handler that throws - including a VirtualMachineError such as
+                // StackOverflowError or OutOfMemoryError - must not take the server down
+                // or leave the client hanging on a socket that never answers. Answer 500
+                // first, then rethrow so the JVM still hears about it.
+                response = status(500, "Internal Server Error");
+                e.printStackTrace();
+                fatal = e;
+            } catch (Throwable e) {
                 response = status(500, "Internal Server Error");
                 e.printStackTrace();
             }
             send(exchange, response);
+            if (fatal != null) throw fatal;
         }
 
         private Handler route(String path) {

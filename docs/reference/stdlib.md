@@ -1872,7 +1872,8 @@ Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
 
 Self-contained RFC 4180 CSV parsing and serialization (`onion.Csv`,
 auto-imported) — quoted fields, embedded commas/newlines, and doubled quotes
-are handled.
+are handled. An unterminated quoted field throws `IllegalArgumentException`
+naming the line where the quote was opened, rather than swallowing the rest of the input.
 
 ```onion
 val rows = Csv::parse(text)                  // List of List of String

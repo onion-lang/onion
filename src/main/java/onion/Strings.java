@@ -276,11 +276,17 @@ public final class Strings {
         }
     }
 
-    /** Parses a double, or returns null if {@code str} is not a valid number. */
+    /**
+     * Parses a double, or returns null if {@code str} is not a plain decimal or
+     * scientific-notation number. Java literal forms ({@code 1d}, {@code 1f},
+     * {@code 0x1p3}, {@code NaN}, {@code Infinity}) are rejected, like {@link Scalars#read}.
+     */
     public static Double toDoubleOrNull(String str) {
         if (str == null) return null;
+        String trimmed = str.trim();
+        if (!Scalars.isStrictDecimal(trimmed)) return null;
         try {
-            return Double.valueOf(str.trim());
+            return Double.valueOf(trimmed);
         } catch (NumberFormatException e) {
             return null;
         }

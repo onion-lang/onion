@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Colls::range(5, 0)` threw `IllegalArgumentException: Illegal Capacity: -5` instead of returning an empty list (#2107).** An end below the start now gives `[]`, like `range(3, 3)`, `rangeWithStep` and `5..<0`.
 - **`Codec::hexDecode` silently turned invalid or odd-length hex into garbage (#2103).** `hexDecode("zz")` returned U+FFFD and `hexDecode("abc")` dropped the last digit, while `base64Decode`/`urlDecode` threw. It now throws `IllegalArgumentException` for an odd length or a non-hex character.
 - **`Future::all` returned `Future[List[Object]]` whatever its futures held, so `val r: Future[List[Int]] = Future::all(fs)` was rejected (#2044).** Both overloads (varargs and `List[Future[T]]`) now return `Future[List[T]]`. **Breaking for code that spelled the old type**: a `List[Object]` annotation on the result must become `List[T]` (the shipped `run/` samples are updated); casting each element back out is no longer needed.
 - **`onionc` on a class-less top-level script exited 255 with no output at all, when the source file's base name wasn't by itself a valid Java identifier** (contained a hyphen, started with a digit, ...), e.g. `onionc daily-report.on` (#2095). The synthesized container class name (`<filename>Main`) came out invalid, the write step correctly rejected it, but `onionc` discarded that error message instead of printing it. `onionc` now reports the write error to stderr.

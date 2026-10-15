@@ -36,14 +36,21 @@ public final class Codec {
         return sb.toString();
     }
 
-    /** Decodes a hex string (even length, case-insensitive) back to text (UTF-8). */
+    /** Decodes a hex string (even length, case-insensitive) back to text (UTF-8).
+     *  @throws IllegalArgumentException on odd length or a non-hex character */
     public static String hexDecode(String hex) {
         if (hex == null || hex.isEmpty()) return "";
         int len = hex.length();
+        if (len % 2 != 0) {
+            throw new IllegalArgumentException("hex string has odd length: " + len);
+        }
         byte[] bytes = new byte[len / 2];
         for (int i = 0; i + 1 < len; i += 2) {
             int hi = Character.digit(hex.charAt(i), 16);
             int lo = Character.digit(hex.charAt(i + 1), 16);
+            if (hi < 0 || lo < 0) {
+                throw new IllegalArgumentException("invalid hex digit near index " + i + ": \"" + hex.substring(i, i + 2) + "\"");
+            }
             bytes[i / 2] = (byte) ((hi << 4) + lo);
         }
         return new String(bytes, StandardCharsets.UTF_8);

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Server` dispatch only caught `RuntimeException`, so a handler that threw an `Error` (`StackOverflowError` from deep recursion, `OutOfMemoryError`) left the client hanging on a socket that never answers instead of getting a 500 (#2168).** The doc comment on `dispatch` already promised a throwing handler "must not ... leave the client hanging"; it now catches `Throwable`, matching that promise for `Error` the same way it already did for `RuntimeException`.
 - **A `catch` variable or a try-with-resources binding read inside a lambda (`Thread`, `Future::async`, any closure) crashed the script with `VerifyError: Bad type on operand stack ... is not assignable to 'onion/runtime/ObjectBox'` at class load (#2159, #2164).** The closure-capture scanner had no case recognizing either as a local of its own scope, so a direct use inside the closure looked identical to capturing an outer-scope variable of the same name; because capture is tracked by name for the whole method, this also silently boxed any unrelated local sharing that name, including a separate top-level `catch e:`/`try (val r = ...)` elsewhere in the same method. Both are now recognized as locals of their own scope, the same way an ordinary local variable declaration already was.
 
 ## [0.142.0] - 2026-10-14

@@ -315,9 +315,10 @@ public final class Server {
                 Handler handler = route(request.path());
                 response = handler == null ? notFound() : handler.handle(request);
                 if (response == null) response = notFound();
-            } catch (RuntimeException e) {
-                // A handler that throws must not take the server down or leave the client
-                // hanging on a socket that never answers.
+            } catch (Throwable e) {
+                // A handler that throws -- a RuntimeException, or an Error such as
+                // StackOverflowError from deep recursion -- must not take the server down
+                // or leave the client hanging on a socket that never answers.
                 response = status(500, "Internal Server Error");
                 e.printStackTrace();
             }

@@ -158,6 +158,34 @@ class NetServerSpec extends AbstractShellSpec {
       assert(Shell.Success("handled") == result)
     }
 
+    it("answers 500 instead of hanging when a handler throws an Error, not just a RuntimeException") {
+      // dispatch must not catch RuntimeException only: a handler that overflows the stack
+      // or otherwise throws an Error is the realistic case the doc comment on dispatch
+      // already promises to cover ("must not ... leave the client hanging").
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val server = Server::start("localhost", 0)
+          |    server.handle("/boom", (req) -> throw new StackOverflowError())
+          |    val conn = Net::connect("localhost", server.port())
+          |    conn.writeLine("GET /boom HTTP/1.0")
+          |    conn.writeLine("")
+          |    val text = conn.readAll()
+          |    conn.close()
+          |    server.stop()
+          |    if text.contains("500") { return "handled" }
+          |    return text
+          |  }
+          |}
+          |""".stripMargin,
+        "ServerHandlerThrowsError.on",
+        Array()
+      )
+      assert(Shell.Success("handled") == result)
+    }
+
     it("starts its internal dispatcher thread as a daemon, so forgetting stop() doesn't hang the JVM") {
       // Server.start's own doc comment claims its daemon handler pool is why a script
       // that never calls stop() still exits. That is only half true: the JDK's built-in

@@ -1372,6 +1372,43 @@ enum Color[T] { RED, GREEN }
 対処: 型パラメータを外すか、各ケースが本当に自分の型引数を必要とするなら
 ADT（`case`）enum として再構成してください。
 
+### `E0100` — 1つの `case` に複数の束縛パターンを `,` で結合している
+
+`select` の1つの `case` の `,` 区切りパターンリストに、型パターン・分解パ
+ターン・正規表現パターン・無条件束縛パターンのうち2つ以上が含まれていま
+す。生成されるコードはそのうち1つのバインディング/キャストしか使えないた
+め、実際に実行時に一致した側の別の代替パターン ── もう一つの型パターン、
+あるいは記録されたバインディングの型に関係なく一致する無条件のワイルドカ
+ード（`_`）さえも ── が、その1つの代替パターンの型に誤ってキャストされ
+てしまいます。
+
+```onion
+enum Shape { case Circle(radius: Double); case Square(side: Double); case Triangle(base: Double, height: Double) }
+def isRound(sh: Shape): Boolean {
+  return select sh {
+    case c is Circle: true
+    case s is Square, t is Triangle: false   // E0100: Triangle側のバインディングしか残らない
+    else: false
+  }
+}
+isRound(new Square(2.0))   // 本来: class Square cannot be cast to class Triangle で例外になる
+```
+
+対処: それぞれの代替パターンを個別の `case` 節として書いてください:
+
+```onion
+def isRound(sh: Shape): Boolean {
+  return select sh {
+    case c is Circle: true
+    case s is Square: false
+    case t is Triangle: false
+  }
+}
+```
+
+通常の値パターンだけの `,` リスト（`case 1, 2, 3:`）は対象外です。型・分
+解・正規表現・無条件束縛パターンのいずれかが含まれる場合のみ検出されます。
+
 ### `E0069` — ローカル val に初期化子が必要
 
 ローカル `val` が初期化子（`= expr`）なしで宣言されました。`var` と異なり `val` は
@@ -1806,6 +1843,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0097` | instance … is already defined (at most one instance is allowed per (trait, type)) |
 | `E0098` | enum … mixes shared parameters with `case` cases |
 | `E0099` | enum … cannot take type parameters |
+| `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
 
 ## 関連項目
 

@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0099) for identification
+ * type checking. Each error has a unique code (E0000-E0100) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -88,6 +88,9 @@ package onion.compiler
  *
  * '''Enum Errors (E0098-E0099)'''
  *   - ADT_ENUM_MIXES_SHARED_PARAMS, HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS
+ *
+ * '''Pattern Matching Errors, continued (E0100)'''
+ *   - MULTIPLE_BINDING_PATTERNS_IN_CASE
  *
  * == Error Message Lookup ==
  *
@@ -295,6 +298,15 @@ object SemanticError {
    * be generic. Reported during rewriting (#311).
    */
   case object HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS extends SemanticError(99)
+  /**
+   * A `select` case's comma-joined pattern list has 2+ alternatives where at
+   * least one is a type pattern, destructuring pattern, regex pattern, or bare
+   * binding pattern. Each of those introduces its own binding/cast; the generated
+   * code can only use one, so whichever alternative wasn't recorded could match
+   * at runtime and then be miscast to the recorded one's type (#2105). Write
+   * each such alternative as its own `case` clause instead.
+   */
+  case object MULTIPLE_BINDING_PATTERNS_IN_CASE extends SemanticError(100)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

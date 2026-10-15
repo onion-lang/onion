@@ -122,6 +122,10 @@ public final class Shapes {
 
     private static final MappedShape.Codec JSON = new MappedShape.Codec() {
         public Object read(String text) throws Exception { return Json.parse(text); }
+        public Object read(String text, java.util.IdentityHashMap<Object, java.util.Map<Object, Integer>> positions)
+                throws Exception {
+            return Json.parse(text, positions);
+        }
         public String write(java.util.Map<String, Object> fields) { return Json.stringify(fields); }
         public int offsetOf(Exception e) {
             return (e instanceof Json.JsonParseException) ? ((Json.JsonParseException) e).getPosition() : -1;

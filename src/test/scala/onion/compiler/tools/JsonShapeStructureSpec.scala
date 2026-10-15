@@ -111,6 +111,19 @@ class JsonShapeStructureSpec extends AbstractShellSpec {
     }
   }
 
+  describe("origins") {
+    it("names the line each defective field sits on, nested and in lists") {
+      val r = run(
+        """    val text = "{\n  \"title\": \"T\",\n  \"decisions\": [],\n  \"actions\": [\n    {\"owner\": \"a\", \"task\": \"t\"},\n    {\"owner\": 1, \"task\": \"t\"}\n  ],\n  \"risk\": \"x\"\n}"
+          |    val o = Summary::doc().parse(text, Origin::atLine("reply.json", 1))
+          |    var out = ""
+          |    foreach d: Defect in o.defects() { out = out + d.path() + "@" + d.origin().describe() + ";" }
+          |    return out
+          |""".stripMargin, "String")
+      assert(Shell.Success("actions[1].owner@reply.json:6;risk@reply.json:8;") == r)
+    }
+  }
+
   describe("printing") {
     it("round-trips lists, nested records and nulls: parse(print(v)) == Ok(v)") {
       val r = run(

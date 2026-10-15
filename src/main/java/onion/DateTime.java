@@ -38,7 +38,7 @@ public final class DateTime {
      */
     public static String nowString(String pattern) {
         if (pattern == null) return nowString();
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern(pattern));
+        return LocalDateTime.now().format(DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH));
     }
 
     // ========== Parsing ==========
@@ -74,7 +74,7 @@ public final class DateTime {
         if (pattern == null) return parse(dateTime);
         DateTimeFormatter formatter;
         try {
-            formatter = DateTimeFormatter.ofPattern(pattern);
+            formatter = DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("invalid date-time pattern \"" + pattern + "\"", e);
         }
@@ -107,7 +107,7 @@ public final class DateTime {
     public static String format(long epochMillis, String pattern) {
         if (pattern == null) return format(epochMillis);
         LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), LOCAL);
-        return ldt.format(DateTimeFormatter.ofPattern(pattern));
+        return ldt.format(DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH));
     }
 
     // ========== Components ==========

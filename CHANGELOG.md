@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `Server` route handler that threw a plain `Error` (`StackOverflowError`, `OutOfMemoryError`, ...), not a `RuntimeException`, left the client hanging until its own timeout instead of getting a `500` (#2168).** `dispatch` caught only `RuntimeException`; an `Error` escaped uncaught, so `send` was never called. It now also catches `Error`, still answers `500 Internal Server Error`, and rethrows a `VirtualMachineError` afterward so the JVM still hears about it.
 - **A range ending at `Int.MAX_VALUE` keeps its last value, and `size` of a very wide range is no longer negative.** `2147483646..2147483647` produced one element instead of two, and `-2000000000..2000000000` reported a size of `-294967295` (#2172).
 - **A `catch` variable or a try-with-resources binding read inside a lambda (`Thread`, `Future::async`, any closure) crashed the script with `VerifyError: Bad type on operand stack ... is not assignable to 'onion/runtime/ObjectBox'` at class load (#2159, #2164).** The closure-capture scanner had no case recognizing either as a local of its own scope, so a direct use inside the closure looked identical to capturing an outer-scope variable of the same name; because capture is tracked by name for the whole method, this also silently boxed any unrelated local sharing that name, including a separate top-level `catch e:`/`try (val r = ...)` elsewhere in the same method. Both are now recognized as locals of their own scope, the same way an ordinary local variable declaration already was.
 
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Colls::range(5, 0)` threw `IllegalArgumentException: Illegal Capacity: -5` instead of returning an empty list (#2107).** An end below the start now gives `[]`, like `range(3, 3)`, `rangeWithStep` and `5..<0`.
 - **`Codec::hexDecode` silently turned invalid or odd-length hex into garbage (#2103).** `hexDecode("zz")` returned U+FFFD and `hexDecode("abc")` dropped the last digit, while `base64Decode`/`urlDecode` threw. It now throws `IllegalArgumentException` for an odd length or a non-hex character.
 - **`Future::all` returned `Future[List[Object]]` whatever its futures held, so `val r: Future[List[Int]] = Future::all(fs)` was rejected (#2044).** Both overloads (varargs and `List[Future[T]]`) now return `Future[List[T]]`. **Breaking for code that spelled the old type**: a `List[Object]` annotation on the result must become `List[T]` (the shipped `run/` samples are updated); casting each element back out is no longer needed.
 - **`onionc` on a class-less top-level script exited 255 with no output at all, when the source file's base name wasn't by itself a valid Java identifier** (contained a hyphen, started with a digit, ...), e.g. `onionc daily-report.on` (#2095). The synthesized container class name (`<filename>Main`) came out invalid, the write step correctly rejected it, but `onionc` discarded that error message instead of printing it. `onionc` now reports the write error to stderr.

@@ -88,10 +88,11 @@ public final class Colls {
      * Creates a list containing a range of integers from start (inclusive) to end (exclusive).
      * @param start the starting value (inclusive)
      * @param end the ending value (exclusive)
-     * @return a list containing integers from start to end-1
+     * @return a list containing integers from start to end-1; empty when {@code end <= start}
      */
     public static List<Integer> range(int start, int end) {
-        List<Integer> result = new ArrayList<>(end - start);
+        if (end <= start) return List.of();
+        List<Integer> result = new ArrayList<>((int) Math.min((long) end - start, 1024L));
         for (int i = start; i < end; i++) {
             result.add(i);
         }

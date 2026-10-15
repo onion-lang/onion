@@ -46,6 +46,22 @@ class CollectionsSpec extends AbstractShellSpec {
         assert(result == Shell.Success(4))
       }
 
+      it("returns an empty list when the end is below the start") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    return Colls::range(5, 0).size() + Colls::range(3, 3).size()
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(0))
+      }
+
       it("accesses range elements") {
         val result = shell.run(
           """

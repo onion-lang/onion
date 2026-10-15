@@ -376,9 +376,15 @@ public final class Future<T> {
 
     /**
      * Creates a Future that completes when the first of the given Futures completes.
+     *
+     * @throws IllegalArgumentException if no Futures are given: {@code anyOf} of nothing
+     *         never completes, so this fails fast instead of hanging forever
      */
     @SafeVarargs
     public static <T> Future<T> first(Future<T>... futures) {
+        if (futures.length == 0) {
+            throw new IllegalArgumentException("Future.first: requires at least one future");
+        }
         CompletableFuture<?>[] cfs = new CompletableFuture<?>[futures.length];
         for (int i = 0; i < futures.length; i++) {
             cfs[i] = futures[i].delegate;

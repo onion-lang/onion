@@ -700,6 +700,28 @@ class FutureSpec extends AbstractShellSpec {
         )
         assert(result == Shell.Success(42))
       }
+
+      it("first with no futures reports an error instead of hanging forever") {
+        val result = shell.run(
+          """
+            |import { onion.Future; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      val f: Future[Int] = Future::first();
+            |      return f.awaitTimeout(2000L).toString()
+            |    } catch e: Exception {
+            |      return "rejected: " + e.message()
+            |    }
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success("rejected: Future.first: requires at least one future"))
+      }
     }
   }
 }

@@ -80,6 +80,7 @@ public final class Concurrent {
     public static final class Pool {
         private final ExecutorService executor;
         private final int size;
+        private volatile boolean closed;
 
         Pool(int size) {
             this.size = size;
@@ -99,6 +100,7 @@ public final class Concurrent {
             if (operation == null) {
                 throw new IllegalArgumentException("Concurrent: operation must not be null");
             }
+            requireOpen();
             java.util.concurrent.CompletableFuture<T> completable =
                 java.util.concurrent.CompletableFuture.supplyAsync(operation::call, executor);
             return Future.fromCompletableFuture(completable);
@@ -115,6 +117,7 @@ public final class Concurrent {
         public <T, R> List<R> mapAll(List<T> items, Function1<T, R> function) {
             if (items == null) throw new IllegalArgumentException("Concurrent: items must not be null");
             if (function == null) throw new IllegalArgumentException("Concurrent: function must not be null");
+            requireOpen();
 
             List<java.util.concurrent.CompletableFuture<R>> pending = new ArrayList<>();
             for (T item : items) {
@@ -141,6 +144,7 @@ public final class Concurrent {
 
         /** Stops accepting work and interrupts what is running. Idempotent. */
         public void close() {
+            closed = true;
             executor.shutdownNow();
         }
 
@@ -150,6 +154,7 @@ public final class Concurrent {
          * @return true when everything finished within the timeout.
          */
         public boolean awaitClose(long timeoutMillis) {
+            closed = true;
             executor.shutdown();
             try {
                 return executor.awaitTermination(Math.max(0, timeoutMillis), TimeUnit.MILLISECONDS);
@@ -157,6 +162,10 @@ public final class Concurrent {
                 Thread.currentThread().interrupt();
                 return false;
             }
+        }
+
+        private void requireOpen() {
+            if (closed) throw new IllegalStateException("Concurrent: the pool is closed");
         }
 
         private static String rootMessage(Throwable error) {

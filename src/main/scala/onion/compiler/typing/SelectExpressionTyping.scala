@@ -466,6 +466,26 @@ final class SelectExpressionTyping(
     var hasWildcard = false
     var guardInfo: Option[GuardInfo] = None
 
+    // A comma-joined case with 2+ alternatives where at least one is a type,
+    // destructuring, regex, or bare-binding pattern is unsafe to accept: below,
+    // each such alternative *overwrites* the single `bindingInfo` the case body
+    // and the exhaustiveness check use, so only the last one's type survives.
+    // A sibling alternative that actually matches at runtime -- another type
+    // pattern, or even a bare wildcard, which matches regardless of the
+    // recorded binding's type -- then gets miscast to that one type (#2105).
+    def introducesBinding(p: AST.Pattern): Boolean = p match {
+      case _: AST.TypePattern => true
+      case _: AST.DestructuringPattern => true
+      case _: AST.RegexPattern => true
+      case _: AST.BindingPattern => true
+      case AST.GuardedPattern(_, inner, _) => introducesBinding(inner)
+      case _ => false
+    }
+    if (patterns.length > 1 && patterns.exists(introducesBinding)) {
+      bodyContext.report(MULTIPLE_BINDING_PATTERNS_IN_CASE, patterns.find(introducesBinding).get)
+      break((null, NoBindings, false, None))
+    }
+
     // Process each pattern and combine with OR
     val conditions = patterns.map {
       case AST.WildcardPattern(loc) =>

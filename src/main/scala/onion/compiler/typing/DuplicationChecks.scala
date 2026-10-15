@@ -259,10 +259,18 @@ private[compiler] object DuplicationChecks {
         registerImplementation(m)
 
     // Also add concrete methods from parent classes (not just interfaces)
+    // Also register each under the view's type arguments: `Base[String]`'s `apply(T)` implements
+    // an inherited `Foo[String].apply(String)` even though it erases to `apply(Object)`.
     for view <- views.values do
+      val implSubst: scala.collection.immutable.Map[String, Type] =
+        view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
       for m <- view.raw.methods do
         if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
           registerImplementation(m)
+          if implSubst.nonEmpty then
+            val candidates = implByNameAndArity.getOrElseUpdate((m.name, m.arguments.length), mutable.ArrayBuffer.empty)
+            candidates += m.arguments.map(arg =>
+              Erasure.asmType(TypeSubstitution.substituteType(arg, implSubst, emptyMethodSubst, defaultToBound = true)).getDescriptor)
 
     // Check all abstract methods from superclasses and interfaces
     for (view <- views.values) {

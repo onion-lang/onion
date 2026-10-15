@@ -54,5 +54,12 @@ class TextSpec extends AbstractShellSpec {
         "return Text::table(rows)",
         Shell.Success("Name   Dept\nAlice  Eng\nBob    Sales"))
     }
+
+    it("table counts full-width characters as two columns") {
+      runStr(
+        "val rows = [[\"name\", \"age\"], [\"\u5c71\u7530\u592a\u90ce\", \"30\"], [\"Bob\", \"5\"]]\n" +
+        "return Text::table(rows)",
+        Shell.Success("name      age\n\u5c71\u7530\u592a\u90ce  30\nBob       5"))
+    }
   }
 }

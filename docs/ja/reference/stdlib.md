@@ -539,6 +539,12 @@ val schema = Json::parse(summaryShape.jsonSchema())   // リクエスト本文�
 ほかの shape の `jsonSchema()` は `UnsupportedOperationException` を投げます。有限の
 インライン スキーマを持たない再帰的なレコードの場合も同様です。
 
+`describe(component, text)` は、JSON Schema で `component` の `"description"` に `text` を
+持つ shape を返します。読み書きも他の成分も変わらず、呼び出しは連鎖できます
+（`s.describe("owner", "...").describe("task", "...")`）。`hasJsonSchema()` が false のとき
+`jsonSchema()` と同じ `UnsupportedOperationException` を、その shape に無い成分名には
+`IllegalArgumentException` を投げます（RFC #1960 のオプション 3）。
+
 ### コンビネータ
 
 - `eachLine(text[, origin])` — 1行ごとに `Outcome[T]` を返し、読めた行と読めなかった
@@ -2164,7 +2170,7 @@ val results: List[Outcome[Row]] = file"data.log".eachLine(shape)
 
 ## Csv モジュール
 
-RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（`onion.Csv`、自動インポート済み）——引用フィールド・カンマ/改行を含む値・二重引用符に対応。
+RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（`onion.Csv`、自動インポート済み）——引用フィールド・カンマ/改行を含む値・二重引用符に対応。閉じられていない引用フィールドは、入力の残りを飲み込まず、引用が始まった行を示す `IllegalArgumentException` を投げる。
 
 ```onion
 val rows = Csv::parse(text)                  // List of List of String

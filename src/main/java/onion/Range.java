@@ -14,19 +14,20 @@ import java.util.NoSuchElementException;
  */
 public final class Range implements Iterable<Integer> {
     private final int start;
-    private final int endExclusive;
+    private final long endExclusive;
 
     public Range(int start, int end, boolean inclusive) {
         this.start = start;
-        long e = inclusive ? (long) end + 1 : end;
-        // Clamp instead of overflowing when end == Integer.MAX_VALUE inclusive
-        this.endExclusive = (int) Math.min(e, Integer.MAX_VALUE);
+        // Kept as a long so an inclusive end of Integer.MAX_VALUE is still produced
+        this.endExclusive = inclusive ? (long) end + 1 : end;
     }
 
     public int start() { return start; }
-    public int endExclusive() { return endExclusive; }
+    /** The exclusive end, clamped to {@code Integer.MAX_VALUE} for an inclusive range ending there. */
+    public int endExclusive() { return (int) Math.min(endExclusive, Integer.MAX_VALUE); }
     public boolean isEmpty() { return start >= endExclusive; }
-    public int size() { return isEmpty() ? 0 : endExclusive - start; }
+    /** The number of values, clamped to {@code Integer.MAX_VALUE} (as {@code Collection.size()} is). */
+    public int size() { return isEmpty() ? 0 : (int) Math.min(endExclusive - start, Integer.MAX_VALUE); }
 
     public boolean contains(int value) {
         return value >= start && value < endExclusive;
@@ -35,7 +36,7 @@ public final class Range implements Iterable<Integer> {
     @Override
     public Iterator<Integer> iterator() {
         return new Iterator<Integer>() {
-            private int next = start;
+            private long next = start;
 
             @Override
             public boolean hasNext() {
@@ -45,7 +46,7 @@ public final class Range implements Iterable<Integer> {
             @Override
             public Integer next() {
                 if (!hasNext()) throw new NoSuchElementException();
-                return next++;
+                return (int) next++;
             }
         };
     }

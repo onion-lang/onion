@@ -134,4 +134,40 @@ class RangeSpec extends AbstractShellSpec {
       assert(Shell.Success("true") == result)
     }
   }
+
+  describe("ranges at the Int limits") {
+    it("keeps the last value of an inclusive range ending at Int.MAX_VALUE") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val r = 2147483646..2147483647
+          |    return "" + r.size + " " + Iterables::toList(r)
+          |  }
+          |}
+          |""".stripMargin,
+        "RangeIntMax.on",
+        Array()
+      )
+      assert(Shell.Success("2 [2147483646, 2147483647]") == result)
+    }
+
+    it("never reports a negative size for a range wider than Int.MAX_VALUE") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val r = -2000000000..2000000000
+          |    return r.size > 0 && !r.isEmpty
+          |  }
+          |}
+          |""".stripMargin,
+        "RangeWide.on",
+        Array()
+      )
+      assert(Shell.Success(true) == result)
+    }
+  }
 }

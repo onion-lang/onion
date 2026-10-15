@@ -239,6 +239,19 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
   - "Both locales" applies to changes that touch messages or docs; a change with no Scala,
     message or doc impact only needs what it touches.
   - Raise `-Xmx` for the full suite (CI uses 10G), or `MutationFuzzSpec` can run out of memory.
+- **Maven Central 429s the Maintainer's own `sbt compile`/`assembly`/`test`, not just the
+  Sensor's dogfood builds.** It is transient per-artifact throttling, not an outage: a plain
+  `curl` to the failing `https://repo1.maven.org/...` URL (grepped out of sbt's own error
+  output) succeeds within seconds even while sbt/coursier itself keeps failing. Drop that
+  response straight into coursier's cache
+  (`~/.cache/coursier/v1/https/repo1.maven.org/maven2/<group>/<artifact>/<version>/<file>`,
+  creating the directory as needed; no checksum sidecar needed, coursier recomputes it) and
+  re-run the sbt command. Repeat for each newly-exposed artifact (sbt's own plugin graph
+  first, then project deps, then test-scope deps) — it can take ~10 rounds but converges
+  completely (#1408, 2026-10-13: 8478 passed, 0 failed after convergence). The fallback
+  mirrors sbt's launcher tries automatically (`repo.scala-sbt.org`, `repo.typesafe.com`) are
+  genuinely dead (proxy 403, not 429) — ignore that part of the error output, it is not this
+  problem.
 - **Check that a bug still exists before chasing it.** The original routine's prompt named an
   `extension Int` bug that had long been fixed (it printed `10`).
 - **sbt 2:**

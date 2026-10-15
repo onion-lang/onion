@@ -723,6 +723,45 @@ class MathSpec extends AbstractShellSpec {
         )
         assert(result == Shell.Success(true))
       }
+
+      it("throws instead of silently returning min when max < min") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Boolean {
+            |    try {
+            |      OnionMath::randomInt(5, 3)
+            |      return false
+            |    } catch e: IllegalArgumentException {
+            |      return true
+            |    }
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(true))
+      }
+
+      it("accepts min == max and the full Int range") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Boolean {
+            |    val a = OnionMath::randomInt(7, 7)
+            |    val b = OnionMath::randomInt(-2147483648, 2147483647)
+            |    return a == 7
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(true))
+      }
     }
 
     describe("constants") {

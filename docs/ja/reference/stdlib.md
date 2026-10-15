@@ -539,6 +539,12 @@ val schema = Json::parse(summaryShape.jsonSchema())   // リクエスト本文�
 ほかの shape の `jsonSchema()` は `UnsupportedOperationException` を投げます。有限の
 インライン スキーマを持たない再帰的なレコードの場合も同様です。
 
+`describe(component, text)` は、JSON Schema で `component` の `"description"` に `text` を
+持つ shape を返します。読み書きも他の成分も変わらず、呼び出しは連鎖できます
+（`s.describe("owner", "...").describe("task", "...")`）。`hasJsonSchema()` が false のとき
+`jsonSchema()` と同じ `UnsupportedOperationException` を、その shape に無い成分名には
+`IllegalArgumentException` を投げます（RFC #1960 のオプション 3）。
+
 ### コンビネータ
 
 - `eachLine(text[, origin])` — 1行ごとに `Outcome[T]` を返し、読めた行と読めなかった
@@ -1131,7 +1137,7 @@ f1.zip(f2)  // Future[List[Object]] = [1, 2]
 f1.race(f2)
 
 // すべての完了を待つ
-Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
+Future::all(f1, f2, f3)  // Future[List[Int]] = [1, 2, 3]
 Future::all([f1, f2, f3])  // 同じ結果。実行時に組み立てた List[Future[T]] も渡せる
 
 // 最初に完了したもの
@@ -1184,6 +1190,11 @@ val a = Json::array()                                   // 空の List（JSON �
 // 非有限の Double/Float（NaN, +/-Infinity）は JSON リテラル null としてシリアライズされる
 // -- JSON にはそれを表すトークンが無く、Json::parse も非有限の値を生成できないため
 Json::stringify(0.0d / 0.0d)                            // "null"
+
+// record は宣言順のコンポーネントを持つ JSON オブジェクトとしてシリアライズされる
+// (ネストした record / List / Map も Map の値と同様に再帰的に処理される)
+record Point(x: Int, y: Int)
+Json::stringify(new Point(1, 2))                        // {"x":1,"y":2}
 ```
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。
@@ -2159,7 +2170,7 @@ val results: List[Outcome[Row]] = file"data.log".eachLine(shape)
 
 ## Csv モジュール
 
-RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（`onion.Csv`、自動インポート済み）——引用フィールド・カンマ/改行を含む値・二重引用符に対応。
+RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（`onion.Csv`、自動インポート済み）——引用フィールド・カンマ/改行を含む値・二重引用符に対応。閉じられていない引用フィールドは、入力の残りを飲み込まず、引用が始まった行を示す `IllegalArgumentException` を投げる。
 
 ```onion
 val rows = Csv::parse(text)                  // List of List of String
@@ -2886,6 +2897,17 @@ Regex::groupsAll(input, pattern): List[List[String]]  // 全マッチのグル�
 ```
 Regex::replace(input, pattern, replacement): String
 Regex::replaceFirst(input, pattern, replacement): String
+```
+
+`replacement` は素のテキストではなく `java.util.regex.Matcher` の置換文字列構文に
+従う: `$1`、`$2`、... はキャプチャグループに置き換わり、リテラルな `$` は Java に
+`\$` として渡す必要がある。Onion の文字列リテラルではそのバックスラッシュ自体を
+エスケープするため `\\$` と書く（`"\$"` だけではサポート外のエスケープとして
+コンパイルエラーになる）。
+
+```
+Regex::replace("2024-05", "(\\d+)-(\\d+)", "$2/$1")   // "05/2024"
+Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- リテラルの $
 ```
 
 ### 分割

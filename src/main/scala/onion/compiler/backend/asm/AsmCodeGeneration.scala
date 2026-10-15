@@ -169,6 +169,24 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     cw.visit(Opcodes.V17, access, name, classSignature, superName, interfaces)
     cw.visitSource(sourceFileName(classDef), null)
 
+    // Tag every record with its component names, in declaration order, via a runtime
+    // annotation rather than an interface: onion.Json::stringify (and other reflection-
+    // based runtime code) needs a reliable way to recognize a record value from a plain
+    // Object and read its fields by name, but adding a marker *interface* to every record
+    // class made it a second candidate supertype alongside a case-enum record's own sealed
+    // interface, so two case records' common-ancestor LUB (`if b { North } else { South }`)
+    // became ambiguous and silently fell back to Object instead of the sealed interface
+    // (#2072's draft attempt, caught by SampleCompilesSpec). An annotation carries the same
+    // information without touching the class's supertype hierarchy at all.
+    if classDef.isRecord then
+      val annotationVisitor = cw.visitAnnotation("Lonion/OnionRecordMarker;", true)
+      val namesVisitor = annotationVisitor.visitArray("value")
+      classDef.recordComponents.foreach(_.foreach { case (componentName, _) =>
+        namesVisitor.visit(null, componentName)
+      })
+      namesVisitor.visitEnd()
+      annotationVisitor.visitEnd()
+
     // Generate fields (enum constants carry ACC_ENUM)
     val classIsEnum = Modifier.isEnum(classDef.modifier)
     for field <- classDef.fields do

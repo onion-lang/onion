@@ -600,6 +600,12 @@ val schema = Json::parse(summaryShape.jsonSchema())   // embed in a request body
 Any other shape's `jsonSchema()` throws `UnsupportedOperationException`, as does a
 recursive record's, which has no finite inline schema.
 
+`describe(component, text)` returns a shape whose JSON Schema carries `text` as
+`component`'s `"description"`; parsing, printing and every other component are unchanged,
+and calls chain (`s.describe("owner", "...").describe("task", "...")`). It throws the same
+`UnsupportedOperationException` as `jsonSchema()` when `hasJsonSchema()` is false, and
+`IllegalArgumentException` for a component the shape does not have (RFC #1960, option 3).
+
 ### Combinators
 
 - `eachLine(text[, origin])` — one `Outcome[T]` per line, keeping both the lines that
@@ -1169,7 +1175,7 @@ f1.zip(f2)  // Future[List[Object]] = [1, 2]
 f1.race(f2)
 
 // Wait for all
-Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
+Future::all(f1, f2, f3)  // Future[List[Int]] = [1, 2, 3]
 Future::all([f1, f2, f3])  // same, but takes a List[Future[T]] built at runtime
 
 // First to complete
@@ -1633,6 +1639,11 @@ val a = Json::array()                  // empty List, for JSON array values
 // JSON has no token for one, and Json::parse can never produce one either
 Json::stringify(0.0d / 0.0d)           // "null"
 
+// A record serializes as a JSON object of its components, in declaration order,
+// recursing into nested records/Lists/Maps the same way a Map's values already do.
+record Point(x: Int, y: Int)
+Json::stringify(new Point(1, 2))       // {"x":1,"y":2}
+
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
 v["users"][0]["name"].asString()
@@ -1861,7 +1872,8 @@ Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
 
 Self-contained RFC 4180 CSV parsing and serialization (`onion.Csv`,
 auto-imported) — quoted fields, embedded commas/newlines, and doubled quotes
-are handled.
+are handled. An unterminated quoted field throws `IllegalArgumentException`
+naming the line where the quote was opened, rather than swallowing the rest of the input.
 
 ```onion
 val rows = Csv::parse(text)                  // List of List of String
@@ -2729,6 +2741,16 @@ Regex::groupsAll(input, pattern): List[List[String]]  // All matches groups
 ```
 Regex::replace(input, pattern, replacement): String
 Regex::replaceFirst(input, pattern, replacement): String
+```
+
+`replacement` follows `java.util.regex.Matcher`'s replacement syntax, not plain
+text: `$1`, `$2`, ... insert capture groups, and a literal `$` must reach Java as
+`\$`. In an Onion string literal that backslash itself needs escaping, so write
+`\\$`. (A bare `"\$"` is a compile error: `\$` is not a supported escape.)
+
+```
+Regex::replace("2024-05", "(\\d+)-(\\d+)", "$2/$1")   // "05/2024"
+Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- literal dollar signs
 ```
 
 ### Splitting

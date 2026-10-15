@@ -703,6 +703,25 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
     }
   }
 
+  describe("pattern matching") {
+    it("E0100 multiple binding patterns comma-joined in one case") {
+      failsWith("E0100",
+        """enum Shape { case Circle(radius: Double); case Square(side: Double) }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val sh: Shape = new Circle(1.0)
+          |    select sh {
+          |      case c is Circle, s is Square: IO::println("x")
+          |      else: IO::println("y")
+          |    }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin)
+    }
+  }
+
   describe("drift guard: the dead-code registry") {
     it("codes listed as dead have no report site; every other code has one") {
       val srcDir = java.nio.file.Path.of("src/main/scala")

@@ -43,6 +43,37 @@ class CsvEnrichedSpec extends AbstractShellSpec {
     }
   }
 
+  describe("Csv::parse blank-line handling") {
+    it("a single trailing newline does not add a phantom extra row") {
+      runInt(
+        "val rows = Csv::parse(\"a,b\\n1,2\\n\")\n" +
+        "return rows.size()",
+        Shell.Success(2))
+    }
+
+    it("a genuinely blank trailing line becomes its own one-field row, not dropped") {
+      runInt(
+        "val rows = Csv::parse(\"a,b\\n1,2\\n\\n\")\n" +
+        "return rows.size()",
+        Shell.Success(3))
+    }
+
+    it("the row for a blank trailing line holds one empty-string field") {
+      runInt(
+        "val rows = Csv::parse(\"a,b\\n1,2\\n\\n\")\n" +
+        "val last = rows.get(2)\n" +
+        "return last.size()",
+        Shell.Success(1))
+    }
+
+    it("a blank line in the middle of the data is parsed the same way") {
+      runInt(
+        "val rows = Csv::parse(\"a,b\\n\\n1,2\\n\")\n" +
+        "return rows.size()",
+        Shell.Success(3))
+    }
+  }
+
   describe("enriched Csv") {
     it("columnByName extracts a header-keyed column") {
       runStr(

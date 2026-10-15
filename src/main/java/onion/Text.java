@@ -82,7 +82,8 @@ public final class Text {
     /**
      * Renders rows of cells as a left-justified text table: each column is padded
      * to its widest cell and columns are separated by two spaces. Ragged rows are
-     * padded with empty cells.
+     * padded with empty cells. Widths are measured in terminal columns, so
+     * full-width (CJK) characters count as two and combining marks as zero.
      */
     public static String table(List<List<String>> rows) {
         if (rows == null || rows.isEmpty()) return "";
@@ -95,7 +96,7 @@ public final class Text {
             if (row == null) continue;
             for (int c = 0; c < row.size(); c++) {
                 String cell = row.get(c) == null ? "" : row.get(c);
-                widths[c] = Math.max(widths[c], cell.length());
+                widths[c] = Math.max(widths[c], displayWidth(cell));
             }
         }
         StringBuilder sb = new StringBuilder();
@@ -106,11 +107,38 @@ public final class Text {
                 String cell = row != null && c < row.size() && row.get(c) != null ? row.get(c) : "";
                 sb.append(cell);
                 if (c < cols - 1) {
-                    for (int p = cell.length(); p < widths[c]; p++) sb.append(' ');
+                    for (int p = displayWidth(cell); p < widths[c]; p++) sb.append(' ');
                     sb.append("  ");
                 }
             }
         }
         return sb.toString();
+    }
+
+    /** Terminal columns a string occupies: 2 per full-width character, 0 per combining mark, else 1. */
+    private static int displayWidth(String s) {
+        int w = 0;
+        for (int i = 0; i < s.length(); ) {
+            int cp = s.codePointAt(i);
+            i += Character.charCount(cp);
+            int type = Character.getType(cp);
+            if (type == Character.NON_SPACING_MARK || type == Character.ENCLOSING_MARK
+                    || type == Character.FORMAT) continue;
+            w += isWide(cp) ? 2 : 1;
+        }
+        return w;
+    }
+
+    private static boolean isWide(int cp) {
+        return (cp >= 0x1100 && cp <= 0x115F)
+            || (cp >= 0x2E80 && cp <= 0xA4CF && cp != 0x303F)
+            || (cp >= 0xAC00 && cp <= 0xD7A3)
+            || (cp >= 0xF900 && cp <= 0xFAFF)
+            || (cp >= 0xFE30 && cp <= 0xFE6F)
+            || (cp >= 0xFF00 && cp <= 0xFF60)
+            || (cp >= 0xFFE0 && cp <= 0xFFE6)
+            || (cp >= 0x1F300 && cp <= 0x1F64F)
+            || (cp >= 0x1F900 && cp <= 0x1F9FF)
+            || (cp >= 0x20000 && cp <= 0x3FFFD);
     }
 }

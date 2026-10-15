@@ -35,6 +35,18 @@ class FormatSpec extends AbstractShellSpec {
         Shell.Success("1,234.57|3.14|75.6%"))
     }
 
+    it("drops the sign when a small negative value rounds to zero") {
+      runStr(
+        "return Format::number(-0.4, 0) + \"|\" + Format::fixed(-0.001, 2) + \"|\" + Format::percent(-0.0001, 1)",
+        Shell.Success("0|0.00|0.0%"))
+    }
+
+    it("keeps the sign of a genuinely negative non-finite value when rounding to zero would not apply") {
+      runStr(
+        "return Format::fixed(-1.0 / 0.0, 2) + \"|\" + Format::fixed(0.0 / 0.0, 2)",
+        Shell.Success("-Infinity|NaN"))
+    }
+
     it("leaves non-finite values ungrouped instead of garbling their digits") {
       runStr(
         "return Format::number(1.0 / 0.0, 2) + \"|\" + Format::number(-1.0 / 0.0, 2) + \"|\" + Format::number(0.0 / 0.0, 2)",

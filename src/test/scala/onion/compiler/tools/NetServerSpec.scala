@@ -17,6 +17,38 @@ import onion.tools.Shell
  */
 class NetServerSpec extends AbstractShellSpec {
 
+  describe("Net.Conn") {
+    it("readBytes sees the bytes a preceding readLine had buffered") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val l = Net::listen(0)
+          |    val port = l.port()
+          |    val t = new Thread(() -> {
+          |      val c = l.accept()
+          |      c.write("HEADER\nBODYBYTES-1234567890")
+          |      c.close()
+          |    })
+          |    t.start()
+          |    val c = Net::connect("127.0.0.1", port)
+          |    val first = c.readLine()
+          |    val rest = c.readBytes().length
+          |    c.close()
+          |    l.close()
+          |    t.join()
+          |    return first + ":" + rest
+          |  }
+          |}
+          |""".stripMargin,
+        "NetReadBytesAfterLine.on",
+        Array()
+      )
+      assert(Shell.Success("HEADER:20") == result)
+    }
+  }
+
   describe("Server") {
     it("answers a request sent over a raw socket") {
       val result = shell.run(

@@ -705,7 +705,10 @@ public final class Colls {
         int size = java.lang.Math.min(list1.size(), list2.size());
         List<List<Object>> result = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            result.add(List.of(list1.get(i), list2.get(i)));
+            List<Object> pair = new ArrayList<>(2);
+            pair.add(list1.get(i));
+            pair.add(list2.get(i));
+            result.add(java.util.Collections.unmodifiableList(pair));
         }
         return java.util.Collections.unmodifiableList(result);
     }

@@ -134,6 +134,20 @@ public interface Shape<T> {
             "shape " + describe() + " has no JSON Schema; only a json shape does");
     }
 
+    /**
+     * This shape's JSON Schema, with {@code text} attached as {@code component}'s
+     * {@code "description"} — the field guidance a hand-written schema carries, without a
+     * language change (RFC #1960, option 3). Parsing and printing are unaffected; chainable,
+     * e.g. {@code s.describe("owner", "who is responsible").describe("task", "what to do")}.
+     *
+     * @throws UnsupportedOperationException when {@link #hasJsonSchema()} is false
+     * @throws IllegalArgumentException when no component of this shape is named {@code component}
+     */
+    default Shape<T> describe(String component, String text) {
+        throw new UnsupportedOperationException(
+            "shape " + describe() + " has no JSON Schema, so its components cannot be described");
+    }
+
     // ------------------------------------------------------------- combinators
 
     /**

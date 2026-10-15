@@ -21,11 +21,130 @@ class TopLevelVarNullableMemberAccessSpec extends AbstractShellSpec {
     }
   }
 
-  it("hints to copy a top-level var to a local, in addition to reporting E0070") {
-    val msgs = messages(
+  // RFC #2031 option 2: a top-level `var` that no def, class or lambda assigns is only written by
+  // the script's own straight-line code, so a null check narrows it flow-sensitively like a local.
+  private def e0070(src: String) = messages(src).exists(_.startsWith("E0070"))
+
+  it("narrows a top-level var after a null check when only straight-line code assigns it") {
+    assert(!e0070(
       """
         |var s: String? = "hi"
         |if s != null {
+        |  IO::println(s.length)
+        |}
+        |""".stripMargin))
+  }
+
+  it("narrows a top-level var through && short-circuit") {
+    assert(!e0070(
+      """
+        |var s: String? = "hi"
+        |if s != null && s.length > 0 { IO::println(s.length) }
+        |""".stripMargin))
+  }
+
+  it("narrows a top-level var in the else branch of == null") {
+    assert(!e0070(
+      """
+        |var s: String? = "hi"
+        |if s == null { IO::println("none") } else { IO::println(s.length) }
+        |""".stripMargin))
+  }
+
+  it("does not leak the narrowing onto a same-named field of a class") {
+    assert(e0070(
+      """
+        |var s: String? = "hi"
+        |class Box {
+        |  var s: String?
+        |public:
+        |  def this { s = null }
+        |  def len(): Int {
+        |    if s != null { return s.length }
+        |    return 0
+        |  }
+        |}
+        |""".stripMargin))
+  }
+
+  it("runs: the narrowed read sees the current value") {
+    val result = shell.run(
+      """
+        |var s: String? = "hello"
+        |var out: Int = -1
+        |if s != null { out = s.length }
+        |s = null
+        |IO::println(out)
+        |""".stripMargin, "None", Array())
+    assert(result.isInstanceOf[onion.tools.Shell.Success])
+  }
+
+  it("does not narrow outside the guarded branch") {
+    assert(e0070(
+      """
+        |var s: String? = "hi"
+        |if s != null { IO::println(s.length) }
+        |IO::println(s.length)
+        |""".stripMargin))
+  }
+
+  it("does not narrow when the branch reassigns the var before the use") {
+    assert(e0070(
+      """
+        |var s: String? = "hi"
+        |if s != null {
+        |  s = null
+        |  IO::println(s.length)
+        |}
+        |""".stripMargin))
+  }
+
+  it("does not narrow when a top-level def assigns the var") {
+    assert(e0070(
+      """
+        |var s: String? = "hi"
+        |def clear(): void { s = null }
+        |if s != null {
+        |  clear()
+        |  IO::println(s.length)
+        |}
+        |""".stripMargin))
+  }
+
+  it("does not narrow when a lambda assigns the var") {
+    assert(e0070(
+      """
+        |var s: String? = "hi"
+        |val clear: () -> void = () -> { s = null }
+        |if s != null {
+        |  clear()
+        |  IO::println(s.length)
+        |}
+        |""".stripMargin))
+  }
+
+  it("does not narrow when a class method assigns the var") {
+    assert(e0070(
+      """
+        |var s: String? = "hi"
+        |class Clearer {
+        |public:
+        |  def clear(): void { s = null }
+        |}
+        |if s != null {
+        |  new Clearer().clear()
+        |  IO::println(s.length)
+        |}
+        |""".stripMargin))
+  }
+
+  it("keeps the top-level-var hint where the var is still not narrowable") {
+    val msgs = messages(
+      """
+        |var s: String? = "hi"
+        |def clear(): void { s = null }
+        |if s != null {
+        |  clear()
         |  IO::println(s.length)
         |}
         |""".stripMargin

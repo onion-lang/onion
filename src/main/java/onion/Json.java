@@ -584,10 +584,33 @@ public final class Json {
             return stringifyObject((Map<?, ?>) obj, depth, pretty);
         } else if (obj instanceof List) {
             return stringifyArray((List<?>) obj, depth, pretty);
+        } else if (obj.getClass().getAnnotation(OnionRecordMarker.class) != null) {
+            return stringifyObject(recordToMap(obj), depth, pretty);
         } else {
             // Fallback for unknown types - convert to string
             return stringifyString(obj.toString());
         }
+    }
+
+    /**
+     * Reads an Onion record's components, in declaration order, into a Map suitable for
+     * {@link #stringifyObject}. An Onion record is not a {@code java.lang.Record} (it is a
+     * plain class with private final fields and public accessor methods), so the compiler-
+     * applied {@link OnionRecordMarker} annotation is the only reliable source of both the
+     * component names and their declaration order; each name has a matching public no-arg
+     * accessor method.
+     */
+    private static Map<String, Object> recordToMap(Object rec) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        for (String name : rec.getClass().getAnnotation(OnionRecordMarker.class).value()) {
+            try {
+                map.put(name, rec.getClass().getMethod(name).invoke(rec));
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(
+                    "onion.Json: record component accessor " + name + "() is missing or inaccessible", e);
+            }
+        }
+        return map;
     }
 
     private static String stringifyObject(Map<?, ?> map, int depth, boolean pretty) {

@@ -1983,8 +1983,8 @@ xs.sort() / xs.sort(comparator)
 - `xs.filter(p)` は `p` を呼び出した後にその `Boolean` 結果をアンボックスする
   ため、`p` が `null` を返すと **`NullPointerException`** を投げる。
   `Iterables::filter` は `null` を「保持しない」として扱い、例外を投げない
-- `n` が負の場合 -- `xs.take(-1)` / `xs.drop(-1)` は空/変更なしの結果を返す
-  が、`Iterables::take`/`Iterables::drop` は例外を投げる
+- `n` が負の場合 -- どちらもクランプする（`take` は空リスト、`drop` は変更なし）。
+  `xs.drop(-1)` は同じ参照を返し、`Iterables::drop(xs, -1)` はコピーを返す
 - `n` がリストのサイズ以上の場合 -- `xs.take(n)` / `xs.drop(n)` はコピーで
   はなく**同じリスト参照そのもの**を返す。`Iterables::take`/`Iterables::drop`
   は必ずコピーする
@@ -2004,7 +2004,7 @@ Iterables::filter(xs, (x) -> null)       // []（onion.Iterables::filter。null 
 xs.take(-1)                    // []      （onion.Colls::take。例外ではなく空リストにクランプ）
 xs.take(xs.size() + 1) === xs  // true    （onion.Colls::take。同じリスト参照）
 xs.reverse().add(4)            // UnsupportedOperationException を投げる（onion.Colls::reverse）
-Iterables::take(xs, -1)        // 例外を投げる（onion.Iterables::take。クランプしない）
+Iterables::take(xs, -1)        // []      （onion.Iterables::take。こちらもクランプ）
 ```
 
 **`reduce` もシャドーイングされますが、実行時ではなくコンパイル時に現れます**:

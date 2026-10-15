@@ -363,6 +363,9 @@ class LocalContext {
    */
   def getFieldNarrowing(name: String): Option[TypedAST.Type] = narrowings.get(name)
 
+  /** The flow narrowing recorded for a name, if any (a top-level `var` field has no binding). */
+  def getFlowNarrowing(name: String): Option[TypedAST.Type] = flowNarrowings.get(name)
+
   /**
    * Adds a type narrowing for a variable.
    * Used when an is-check or null-check narrows the type.

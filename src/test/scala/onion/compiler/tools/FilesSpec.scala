@@ -29,6 +29,51 @@ class FilesSpec extends AbstractShellSpec {
         assert(Shell.Success("hello onion") == result)
       }
 
+      it("preserves a trailing newline (round-trips exactly, like the file's own bytes)") {
+        val tmpFile = JFiles.createTempFile("onion-test-", ".txt").toFile
+        tmpFile.deleteOnExit()
+        val path = tmpFile.getAbsolutePath.replace("\\", "\\\\")
+        JFiles.writeString(tmpFile.toPath, "line1\nline2\n")
+
+        val result = shell.run(
+          s"""
+            |import { onion.Files; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val content: String = Files::readText("$path");
+            |    return content.length.toString();
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("12") == result)
+      }
+
+      it("preserves CRLF line endings instead of normalizing them") {
+        val tmpFile = JFiles.createTempFile("onion-test-", ".txt").toFile
+        tmpFile.deleteOnExit()
+        val path = tmpFile.getAbsolutePath.replace("\\", "\\\\")
+        JFiles.write(tmpFile.toPath, "a\r\nb".getBytes("UTF-8"))
+
+        val result = shell.run(
+          s"""
+            |import { onion.Files; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    return Files::readText("$path");
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("a\r\nb") == result)
+      }
+
       it("reads lines from file") {
         val tmpFile = JFiles.createTempFile("onion-test-", ".txt").toFile
         tmpFile.deleteOnExit()

@@ -3,6 +3,7 @@ package onion;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -36,11 +37,11 @@ public final class Strings {
     }
 
     public static String upper(String str) {
-        return str == null ? "" : str.toUpperCase();
+        return str == null ? "" : str.toUpperCase(Locale.ROOT);
     }
 
     public static String lower(String str) {
-        return str == null ? "" : str.toLowerCase();
+        return str == null ? "" : str.toLowerCase(Locale.ROOT);
     }
 
     public static String replace(String str, String target, String replacement) {
@@ -174,7 +175,7 @@ public final class Strings {
 
     public static boolean containsIgnoreCase(String str, String substring) {
         if (str == null || substring == null) return false;
-        return str.toLowerCase().contains(substring.toLowerCase());
+        return str.toLowerCase(Locale.ROOT).contains(substring.toLowerCase(Locale.ROOT));
     }
 
     /** Counts non-overlapping occurrences of {@code substring} in {@code str}. */

@@ -226,12 +226,12 @@ def main(): void {
   val fa: Future[List[MetricSample]] = collectSource(apiLines)
   val fb: Future[List[MetricSample]] = collectSource(dbLines)
   val fc: Future[List[MetricSample]] = collectSource(cacheLines)
-  val defaultRaw: List[Object] = []
-  val allRaw: List[Object] = Future::all(fa, fb, fc).getOrElse(defaultRaw)
+  val defaultRaw: List[List[MetricSample]] = []
+  val allRaw: List[List[MetricSample]] = Future::all(fa, fb, fc).getOrElse(defaultRaw)
   val parState: PipelineState = if allRaw.size == 3 {
-    val aS: List[MetricSample] = allRaw[0] as List[MetricSample]
-    val bS: List[MetricSample] = allRaw[1] as List[MetricSample]
-    val cS: List[MetricSample] = allRaw[2] as List[MetricSample]
+    val aS: List[MetricSample] = allRaw[0]
+    val bS: List[MetricSample] = allRaw[1]
+    val cS: List[MetricSample] = allRaw[2]
     new Done(buildStats(combineAll(aS, bS, cS)), 0)
   } else {
     new Failed("parallel collection: only " + allRaw.size + "/3 results")

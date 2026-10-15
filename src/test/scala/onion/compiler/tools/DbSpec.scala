@@ -123,6 +123,41 @@ class DbSpec extends AbstractShellSpec {
       assert(Shell.Success("rolled back") == result)
     }
 
+    it("rolls back a nested transaction's own work when the outer body fails after it") {
+      // The inner transaction must not commit early: only the outermost call owns
+      // commit/rollback, so an outer failure after an inner success still rolls everything back.
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val db = Db::connect("jdbc:h2:mem:nested;DB_CLOSE_DELAY=-1")
+          |    db.update("CREATE TABLE t (n INT)")
+          |    var raised: String = "none"
+          |    try {
+          |      db.transaction((outer) -> {
+          |        outer.update("INSERT INTO t VALUES (?)", 1)
+          |        outer.transaction((inner) -> {
+          |          inner.update("INSERT INTO t VALUES (?)", 2)
+          |        })
+          |        throw new RuntimeException("outer fails after inner ok")
+          |      })
+          |    } catch e: Exception {
+          |      raised = e.getMessage()
+          |    }
+          |    val count = db.queryValue("SELECT COUNT(*) FROM t")
+          |    db.close()
+          |    if ("" + count) == "0" && raised.contains("outer fails") { return "rolled back" }
+          |    return count + "/" + raised
+          |  }
+          |}
+          |""".stripMargin,
+        "DbNestedTransaction.on",
+        Array()
+      )
+      assert(Shell.Success("rolled back") == result)
+    }
+
     it("returns null from queryOne when nothing matches, rather than an empty row") {
       val result = shell.run(
         """

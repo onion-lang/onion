@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,7 +23,7 @@ public class Iterables {
     return result;
   }
   public static <A, B> Set<B> map(Set<A> set, Function1<A, B> f) {
-    Set<B> result = new HashSet<B>();
+    Set<B> result = new java.util.LinkedHashSet<B>();
     _map(set, f, result);
     return result;
   }

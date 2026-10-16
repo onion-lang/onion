@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A top-level script `var` was never narrowed by a null check, unlike a top-level `val` or a method-local `var` (#2026).** `var s: String? = "hi"; if s != null { IO::println(s.length) }` failed with `[E0070]`, on the very check the error's own hint recommends. A top-level `var` now narrows the same way a method-local one does, as long as no top-level function or closure assigns it (RFC #2031 option 2); a `var` reassigned by a function or lambda is unaffected and still needs the existing "copy it to a local" workaround.
 - **`Colls::range(5, 0)` threw `IllegalArgumentException: Illegal Capacity: -5` instead of returning an empty list (#2107).** An end below the start now gives `[]`, like `range(3, 3)`, `rangeWithStep` and `5..<0`.
 - **`Codec::hexDecode` silently turned invalid or odd-length hex into garbage (#2103).** `hexDecode("zz")` returned U+FFFD and `hexDecode("abc")` dropped the last digit, while `base64Decode`/`urlDecode` threw. It now throws `IllegalArgumentException` for an odd length or a non-hex character.
 - **`Future::all` returned `Future[List[Object]]` whatever its futures held, so `val r: Future[List[Int]] = Future::all(fs)` was rejected (#2044).** Both overloads (varargs and `List[Future[T]]`) now return `Future[List[T]]`. **Breaking for code that spelled the old type**: a `List[Object]` annotation on the result must become `List[T]` (the shipped `run/` samples are updated); casting each element back out is no longer needed.

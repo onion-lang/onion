@@ -135,8 +135,13 @@ public final class Scalars {
     private static final java.util.regex.Pattern STRICT_DECIMAL =
         java.util.regex.Pattern.compile("[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?");
 
+    /** True when {@code text} is a plain decimal or scientific-notation number (see above). */
+    static boolean isStrictDecimal(String text) {
+        return text != null && STRICT_DECIMAL.matcher(text).matches();
+    }
+
     private static String toStrictDecimal(String text) {
-        if (text == null || !STRICT_DECIMAL.matcher(text).matches()) {
+        if (!isStrictDecimal(text)) {
             throw new IllegalArgumentException("not a decimal number: " + text);
         }
         return text;

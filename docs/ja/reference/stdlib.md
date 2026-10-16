@@ -1449,6 +1449,8 @@ Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrN
 Strings::toIntOr("nope", 0)              // 0
 ```
 
+`toDoubleOrNull` が受け付けるのは通常の小数・指数表記(`3.14`、`-2.5e10`)だけです。`1d`、`0x1p3`、`NaN`、`Infinity` のような Java リテラル形式は `null` になります。
+
 `Strings` の大半のメソッド（`upper`、`lower`、`capitalize`、`reverse`
 など）は拡張メソッドのメソッドチェーン（`s.upper()`、`s.reverse()`
 など）としても静的呼び出しと同じ挙動で使えます。**例外は

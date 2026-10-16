@@ -26,4 +26,12 @@ class TimingLocaleSpec extends AnyFunSpec {
       assert(onion.Timing.formatMillis(2500L) == "2.50s")
     }
   }
+
+  it("formatNanos/formatMillis move to the next unit instead of printing 1000.00 / 60.00") {
+    assert(onion.Timing.formatNanos(999994L) == "999.99us")
+    assert(onion.Timing.formatNanos(999999L) == "1.00ms")
+    assert(onion.Timing.formatNanos(999999999L) == "1.00s")
+    assert(onion.Timing.formatMillis(59994L) == "59.99s")
+    assert(onion.Timing.formatMillis(59999L) == "1m0s")
+  }
 }

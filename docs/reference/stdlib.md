@@ -1436,6 +1436,8 @@ Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
 Strings::toIntOr("nope", 0)              // 0
 ```
 
+`toDoubleOrNull` accepts only a plain decimal or scientific-notation number (`3.14`, `-2.5e10`); Java literal forms such as `1d`, `0x1p3`, `NaN` and `Infinity` give `null`.
+
 Most `Strings` methods (`upper`, `lower`, `capitalize`, `reverse`, ...) also
 work as extension-call method chains (`s.upper()`, `s.reverse()`, ...) with
 identical behavior to the static form. **`split`, `substring`, `lines`,

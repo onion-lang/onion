@@ -103,6 +103,25 @@ class OutcomeSpec extends AbstractShellSpec {
             |""".stripMargin, "None", Array())
       assert(Shell.Success("3/1/true") == r)
     }
+
+    it("rejects an empty defects list, instead of silently reporting a reasonless failure") {
+      val r = shell.run(
+        s"""|$imports
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val empty: List[Defect] = []
+            |    try {
+            |      Outcome::bad(empty)
+            |      return "no failure surfaced"
+            |    } catch e: Exception {
+            |      return e.getMessage()
+            |    }
+            |  }
+            |}
+            |""".stripMargin, "None", Array())
+      assert(Shell.Success("Outcome.Bad: defects must not be empty (use Outcome.ok(...) for success)") == r)
+    }
   }
 
   describe("zip accumulates — the reason this type exists") {

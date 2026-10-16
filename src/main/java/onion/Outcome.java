@@ -45,7 +45,11 @@ public sealed interface Outcome<T> permits Outcome.Ok, Outcome.Bad {
     /** Every reason the value could not be read. Never empty. */
     record Bad<T>(List<Defect> defects) implements Outcome<T> {
         public Bad {
-            defects = defects == null ? Collections.emptyList() : List.copyOf(defects);
+            if (defects == null || defects.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "Outcome.Bad: defects must not be empty (use Outcome.ok(...) for success)");
+            }
+            defects = List.copyOf(defects);
         }
         @Override public boolean isOk() { return false; }
         @Override

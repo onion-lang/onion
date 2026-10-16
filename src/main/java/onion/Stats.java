@@ -50,10 +50,14 @@ public final class Stats {
         return total;
     }
 
-    /** Arithmetic mean, or 0.0 for an empty list. */
+    /** Arithmetic mean of the non-null values, or 0.0 for an empty list. */
     public static <T extends Number> double average(List<T> nums) {
         if (nums == null || nums.isEmpty()) return 0.0;
-        return sum(nums) / nums.size();
+        int count = 0;
+        for (T n : nums) {
+            if (n != null) count++;
+        }
+        return count == 0 ? 0.0 : sum(nums) / count;
     }
 
     /** Smallest value, or 0.0 for an empty list. */

@@ -143,6 +143,14 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         Shell.Success("0.0|0.0|0.0|0.0|0.0|0.0|0.0"))
     }
 
+    it("average and variance skip null elements the way sum, median and min/max do") {
+      runStr(
+        "import { onion.Stats }",
+        "val xs: List[JInteger] = [1, null, 3]\n" +
+        "return Double::toString(Stats::average(xs)) + \"|\" + Double::toString(Stats::variance(xs))",
+        Shell.Success("2.0|1.0"))
+    }
+
     it("sumInt / sumLong throw on overflow instead of wrapping") {
       runStr(
         "import { onion.Stats }",

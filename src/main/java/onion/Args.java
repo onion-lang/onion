@@ -17,7 +17,9 @@ import java.util.Map;
  * Recognized forms:
  *   --name           boolean flag
  *   --name=value     option with value
- *   --name value     option with value (when the next token is not an option)
+ *   --name value     option with value (when the next token is not an option;
+ *                    a negative number like -5 or -3.14 counts as a value,
+ *                    not an option, so --count -5 works)
  *   -abc             short flags a, b, c (each registered under its own
  *                    single-character name, e.g. flag("a"); NOT an alias for
  *                    any same-named long flag, e.g. -v does not satisfy
@@ -45,7 +47,7 @@ public final class Args {
                 int eq = body.indexOf('=');
                 if (eq >= 0) {
                     options.put(body.substring(0, eq), body.substring(eq + 1));
-                } else if (i + 1 < argv.length && !argv[i + 1].startsWith("-")) {
+                } else if (i + 1 < argv.length && isValue(argv[i + 1])) {
                     options.put(body, argv[i + 1]);
                     i++;
                 } else {
@@ -61,6 +63,16 @@ public final class Args {
             i++;
         }
         return new Parsed(options, flags, positional);
+    }
+
+    /**
+     * Whether {@code token} can fill a {@code --name} value slot: anything that is not
+     * itself an option, plus a negative number ({@code -5}, {@code -3.14}), which would
+     * otherwise be mistaken for a new flag/short-flag cluster.
+     */
+    private static boolean isValue(String token) {
+        return !token.startsWith("-")
+            || (token.length() > 1 && Character.isDigit(token.charAt(1)));
     }
 
     public static final class Parsed {

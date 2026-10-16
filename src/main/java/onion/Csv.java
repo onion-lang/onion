@@ -24,7 +24,10 @@ public final class Csv {
     /**
      * Parses CSV text into rows of fields. Handles RFC 4180 quoting:
      * fields may be wrapped in double quotes, inside which commas, CR/LF and
-     * doubled quotes ("") are literal. Empty trailing line is ignored.
+     * doubled quotes ("") are literal. A single newline at the very end of the
+     * text does not add a phantom extra row; a genuinely blank line -- including
+     * one at the end -- is parsed like any other line and becomes a row with one
+     * empty-string field, not dropped.
      *
      * @throws IllegalArgumentException if a quoted field is never closed
      */

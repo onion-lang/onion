@@ -65,9 +65,9 @@ public final class Timing {
     public static String formatNanos(long nanos) {
         if (nanos < 1_000) {
             return nanos + "ns";
-        } else if (nanos < 1_000_000) {
+        } else if (Math.round(nanos / 10.0) < 100_000) {
             return String.format(java.util.Locale.ROOT, "%.2fus", nanos / 1_000.0);
-        } else if (nanos < 1_000_000_000) {
+        } else if (Math.round(nanos / 10_000.0) < 100_000) {
             return String.format(java.util.Locale.ROOT, "%.2fms", nanos / 1_000_000.0);
         } else {
             return String.format(java.util.Locale.ROOT, "%.2fs", nanos / 1_000_000_000.0);
@@ -81,9 +81,10 @@ public final class Timing {
     public static String formatMillis(long millis) {
         if (millis < 1_000) {
             return millis + "ms";
-        } else if (millis < 60_000) {
+        } else if (Math.round(millis / 10.0) < 6_000) {
             return String.format(java.util.Locale.ROOT, "%.2fs", millis / 1_000.0);
         } else {
+            millis = Math.max(millis, 60_000); // 59.995s+ would print "60.00s"; show 1m0s
             long mins = millis / 60_000;
             long secs = (millis % 60_000) / 1_000;
             return mins + "m" + secs + "s";

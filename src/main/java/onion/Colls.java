@@ -110,12 +110,12 @@ public final class Colls {
         if (step == 0) throw new IllegalArgumentException("Step cannot be zero");
         List<Integer> result = new ArrayList<>();
         if (step > 0) {
-            for (int i = start; i < end; i += step) {
-                result.add(i);
+            for (long i = start; i < end; i += step) {
+                result.add((int) i);
             }
         } else {
-            for (int i = start; i > end; i += step) {
-                result.add(i);
+            for (long i = start; i > end; i += step) {
+                result.add((int) i);
             }
         }
         return java.util.Collections.unmodifiableList(result);

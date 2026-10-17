@@ -257,6 +257,14 @@ private[compiler] object SyntaxHintClassifier {
       // never applies here since a declaration keyword isn't `<ID>`.
       case ("public" | "private" | "protected") if expected.contains("\"class\"") =>
         hint("error.parsing.hint.access_modifier_before_declaration", found)
+      // An `extension`/`instance` body is a flat list of `def` members
+      // (extension_decl/instance_decl: `([modifiers()] method_decl(mset))*`), unlike a
+      // class/record/enum body, which always has an `access_section()` alternative the
+      // parser falls back to instead of ever reaching this error. So whenever `expected`
+      // lands on exactly `def` for one of these three words, we're inside one of those
+      // two flat bodies -- never a class/record/enum, which never fails this way.
+      case ("public" | "private" | "protected") if expected.contains("\"def\"") =>
+        hint("error.parsing.hint.extension_instance_no_access_section", found)
       case _ if JavaStyleImplements.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleImplements.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_implements", matched.group(1), matched.group(2).trim)

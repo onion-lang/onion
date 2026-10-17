@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **New warning `W0020`: an `extension` method whose name and arity exactly match an existing member (own or inherited) on its receiver type.** The existing member always wins at the call site, so such an extension method silently compiled clean and was never called -- no diagnostic at compile time or runtime (#2205). `extension List { def size(): Int = 999 }` now warns instead of compiling to dead code.
 - **`Shape::describe(component, text)` attaches a JSON Schema `"description"` to one component, with no language change.** A json shape's `jsonSchema()` had no way to carry the field guidance a hand-written schema has, which `shape doc = json` was meant to make unnecessary (#1934). `Summary::doc().describe("risk", "1 (low) to 5 (high)").jsonSchema()` now includes it; parsing, printing and the other components are unchanged, and calls chain. Implements option 3 of RFC #1960 (no new syntax).
 
 ### Fixed

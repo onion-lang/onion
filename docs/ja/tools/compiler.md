@@ -148,6 +148,7 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0017` | `malformed-effect-table` | ライブラリ jar の効果表が壊れていて無視された |
 | `W0018` | `foreign-effect-entry` | ライブラリ jar の効果表が jar の外のクラスを名指しており、それらのエントリは無視された |
 | `W0019` | `discarded-builder-result` | イミュータブルなビルダーのメソッドの結果が捨てられており、呼び出しが何も行わない |
+| `W0020` | `extension-method-shadowed` | `extension` メソッドの名前とアリティが既存のメンバーと完全に一致しており、その extension メソッドは呼び出されない |
 
 ### `--no-check-laws`
 

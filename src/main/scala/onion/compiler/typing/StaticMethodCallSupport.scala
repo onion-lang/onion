@@ -318,7 +318,7 @@ private[compiler] final class StaticMethodCallSupport(
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
         calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs),
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
             finalParams => new CallStatic(typeRef, method, finalParams)
           )
         }

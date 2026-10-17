@@ -290,6 +290,10 @@ object AsmRefs {
   }
 
   class AsmMethodRef(method: MethodNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.Method {
+    // Loaded straight from a .class file by name/descriptor, with no Onion source behind
+    // it in this compilation -- the JDK and every hand-written src/main/java/onion/* stdlib
+    // class arrive this way. See RFC #2117 / issue #2116.
+    override val isJavaOrigin: Boolean = true
     override val modifier: Int = toOnionModifier(method.access)
     override val name: String = method.name
     override val isVararg: Boolean = (method.access & Opcodes.ACC_VARARGS) != 0

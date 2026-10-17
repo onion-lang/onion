@@ -454,6 +454,9 @@ val body = http"https://api.example.com/x".get()
 // ANY identifier prefix works, not just re/file/http: `prefix"raw"` desugars to
 // `prefix("raw")`, so define a function of that name to make your own (sql"...",
 // money"..."). Keyword-safe: `return"x"` (no space) stays `return "x"`, not a call.
+// No space allowed: the identifier and the string fuse into one token, so
+// `sql "SELECT 1"` (space) is a syntax error, not `sql("SELECT 1")` — unlike a
+// trailing lambda, where whitespace before `{` is fine.
 def sql(q: String): String = "[SQL] " + q.trim()
 val query = sql"SELECT * FROM t"             // -> sql("SELECT * FROM t")
 

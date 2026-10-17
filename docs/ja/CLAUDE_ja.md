@@ -425,6 +425,9 @@ val body = http"https://api.example.com/x".get()
 // `prefix("raw")` に展開されるので、その名前の関数を定義するだけで自作できる（sql"..."、
 // money"... など）。キーワードセーフ: `return"x"`（スペースなし）は `return "x"` のままで、
 // 呼び出しにはならない。
+// スペースは不可: 識別子と文字列は1つのトークンとして結合するため、
+// `sql "SELECT 1"`（スペースあり）は `sql("SELECT 1")` にはならず構文エラーになる —
+// `{` の前の空白を許容する末尾ラムダとは異なる。
 def sql(q: String): String = "[SQL] " + q.trim()
 val query = sql"SELECT * FROM t"             // -> sql("SELECT * FROM t")
 

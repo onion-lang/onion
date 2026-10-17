@@ -1118,6 +1118,25 @@ extension Double {
 対処: 重複を削除するかリネームしてください。名前は同じでもパラメータ型が異なる
 extension メソッド同士は影響を受けません — 通常のオーバーロードです。
 
+### `E0101` — 同じ受け取り型に対する `extension` ブロックの重複
+
+同じ受け取り型に対する `extension` ブロックが1つのファイル内に2つ存在しています
+— 同じ具体的なインスタンス化を2回書いた場合も、同じ非ジェネリック型を関心ごとに
+2つのブロックへ分けて書いた場合も対象です。いずれも同じ生成コンテナクラスへ
+下げられるため、このチェックがなければ2番目のブロックは内部的なマングル名
+（`Extension$List_int`）を名乗る汎用的な重複クラスエラーとして後から衝突し、
+2番目のブロックが宣言したメソッドはすべて静かに到達不能になり、呼び出し箇所で
+無関係な「メソッドが見つからない」エラーとして（報告されるとしても）現れていました。
+
+```onion
+extension List[Int] { def foo(): Int = 1 }
+extension List[Int] { def bar(): Int = 2 }   // E0101: List[Int] 用の extension ブロックは既に存在する
+```
+
+対処: メソッドを最初のブロックにまとめてください。同じジェネリックな受け取り型の
+異なる具体的インスタンス化は衝突しません（`extension List[Int]` と
+`extension List[String]` は共存できます）。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -1845,6 +1864,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0098` | enum … mixes shared parameters with `case` cases |
 | `E0099` | enum … cannot take type parameters |
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
+| `E0101` | an extension block for … already exists (combine the methods for the same type into one block) |
 
 ## 関連項目
 

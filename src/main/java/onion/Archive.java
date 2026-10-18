@@ -118,6 +118,10 @@ public final class Archive {
     /**
      * Extracts a zip into a directory and returns the paths written, sorted.
      *
+     * <p>Returned paths are always absolute, regardless of whether {@code targetDir} was
+     * given as a relative or absolute path: {@code targetDir} is resolved against the
+     * current directory and normalized before any entry is written.
+     *
      * <p>An entry whose name would land outside {@code targetDir} is refused. That is not
      * hypothetical caution: a zip entry named {@code ../../.ssh/authorized_keys} is the
      * standard "zip slip" attack, and an extractor that resolves entry names naively

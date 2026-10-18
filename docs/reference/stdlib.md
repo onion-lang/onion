@@ -2594,6 +2594,10 @@ val bytes = Archive::gunzip(Archive::gzip(text.getBytes()))
 resolves entry names naively writes exactly where it is told; this throws instead, naming
 the entry.
 
+**`unzip` always returns absolute paths**, even when `targetDir` was given as a relative
+path: it is resolved against the current directory and normalized before any entry is
+written.
+
 Entries are written with a fixed timestamp, so zipping the same inputs twice produces the
 same bytes — an artefact that differs run to run cannot be checksummed or cached.
 

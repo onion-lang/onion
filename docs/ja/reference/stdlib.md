@@ -1744,6 +1744,14 @@ Hash::md5(text) / Hash::sha1(text)   // チェックサム・互換用（衝突�
 "x".base64Encode().sha256().substring(0, 8)   // 下の Codec とチェーン可能
 ```
 
+どの関数も引数は `String?` ではなく `String` です。内部の Java 実装は `null` を
+`""` として扱いますが、Onion には「この Java 側パラメータだけ null 安全で、他は
+デフォルトで non-null」という区別を表す仕組みがまだなく、nullable な値（`Map`
+のルックアップや `Option` から来た値など）をハッシュ化する前には
+`Hash::md5(maybe ?: "")` のように書く必要があります
+（[#2180](https://github.com/onion-lang/onion/issues/2180)、
+[#2213](https://github.com/onion-lang/onion/issues/2213) で追跡）。
+
 ## Codec モジュール
 
 テキストのエンコード・デコード（`onion.Codec`）: Base64・hex・URL/パーセント形式。

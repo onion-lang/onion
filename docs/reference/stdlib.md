@@ -2037,6 +2037,10 @@ Proc::runIn("/tmp", "ls")               // like run, but in the given working di
 Proc::execIn("/tmp", "make", "build")   // like exec, but in the given working directory
 ```
 
+Each command runs directly, with no shell: a single string containing pipes, redirection
+or `&&` is passed to the OS literally, not interpreted. For shell syntax, run a shell
+explicitly: `Proc::capture("sh", "-c", "ls | wc -l")`.
+
 ## Args Module
 
 Command-line argument parsing (`onion.Args`):

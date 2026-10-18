@@ -1847,9 +1847,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any]): AST.Expression = {
     statements match {
       // Final expression: ret e => M::successful(e)
-      case List(AST.RetStatement(_, expr)) =>
+      // The synthesized call is anchored at ret's own location, not the caller-supplied
+      // `loc` (the enclosing do[M] { line), so a type mismatch in `e` is reported where
+      // `ret` actually is.
+      case List(AST.RetStatement(retLoc, expr)) =>
         val rewritten = rewriteExpression(expr)
-        AST.StaticMethodCall(loc, monadType, "successful", List(rewritten))
+        AST.StaticMethodCall(retLoc, monadType, "successful", List(rewritten))
 
       // Final expression without ret: e => M::successful(e)
       case List(expr: AST.Expression) =>
@@ -1861,11 +1864,13 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       // a monad only needs map/bind instance (or extension) methods — no
       // static successful — which is what lets do[List] work over plain
       // java.util.List via the Colls extension methods.
-      case (binding: AST.DoBinding) :: List(AST.RetStatement(_, retExpr)) =>
+      case (binding: AST.DoBinding) :: List(AST.RetStatement(retLoc, retExpr)) =>
         val bindExpr = rewriteExpression(binding.expr)
         val rewrittenRet = rewriteExpression(retExpr)
         val arg = AST.Argument(binding.location, binding.name, null, null, false)
-        val closureBody = AST.BlockExpression(binding.location, List(rewrittenRet))
+        // The closure body is anchored at ret's own location, not the preceding binding's,
+        // so a type mismatch in `retExpr` is reported at `ret`, not at `x <- e1`.
+        val closureBody = AST.BlockExpression(retLoc, List(rewrittenRet))
         val closureType = AST.TypeNode(binding.location, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(binding.location, closureType, "call", List(arg), null, closureBody)
         AST.MethodCall(binding.location, bindExpr, "map", List(closure))

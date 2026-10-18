@@ -1908,6 +1908,13 @@ method chain instead of a static call:
 "x".base64Encode().sha256().substring(0, 8)   // chains with Codec below
 ```
 
+Every parameter is `String`, not `String?`: a value from a nullable boundary (a `Map`
+lookup, an `Option`) needs `Hash::md5(maybe ?: "")` before hashing, even though the
+underlying Java code already treats `null` as `""` internally — Onion has no mechanism
+yet for a Java-declared parameter that is null-safe while every other one stays non-null
+by default (tracked in [#2180](https://github.com/onion-lang/onion/issues/2180) and
+[#2213](https://github.com/onion-lang/onion/issues/2213)).
+
 ## Codec Module
 
 Text encoding and decoding (`onion.Codec`): Base64, hex, and URL/percent form.

@@ -2391,6 +2391,17 @@ an exception:
 val results: List[Outcome[Row]] = http"https://api.example.com/feed".eachLine(shape)
 ```
 
+`request(method)` escalates to `Http::request`'s full builder, seeded with this resource's
+own URL, for anything the fixed verb methods above don't cover — a header, a timeout, a body
+on any method, or the response status:
+
+```onion
+val res = http"https://api.example.com/x".request("GET")
+  .header("Authorization", "Bearer t")
+  .timeoutSeconds(5)
+  .send()                                // Result[Http.Response, Http.HttpFailure]
+```
+
 ---
 
 ## DateTime

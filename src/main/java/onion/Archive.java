@@ -106,6 +106,9 @@ public final class Archive {
             zip.stream().filter(entry -> !entry.isDirectory())
                 .map(ZipEntry::getName).sorted().forEach(names::add);
         } catch (IOException e) {
+            if (isMissingFile(e)) {
+                throw new RuntimeException("Archive: no such file: " + zipPath, e);
+            }
             throw new RuntimeException("Archive: could not read " + zipPath
                 + " (" + e.getMessage() + ")", e);
         }
@@ -147,6 +150,9 @@ public final class Archive {
                 }
             }
         } catch (IOException e) {
+            if (isMissingFile(e)) {
+                throw new RuntimeException("Archive: no such file: " + zipPath, e);
+            }
             throw new RuntimeException("Archive: could not extract " + zipPath
                 + " (" + e.getMessage() + ")", e);
         }
@@ -208,6 +214,16 @@ public final class Archive {
             return "truncated or empty gzip data";
         }
         return e.getMessage();
+    }
+
+    /**
+     * A missing zip surfaces as {@link java.nio.file.NoSuchFileException} on the JDK's
+     * NIO-backed {@link ZipFile}, or {@link java.io.FileNotFoundException} on JDKs that still
+     * route through the old File API.
+     */
+    private static boolean isMissingFile(IOException e) {
+        return e instanceof java.nio.file.NoSuchFileException
+            || e instanceof java.io.FileNotFoundException;
     }
 
     private static void writeEntry(ZipOutputStream out, String name, Path source)

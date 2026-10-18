@@ -183,5 +183,20 @@ class ArchiveSpec extends AbstractShellSpec {
       assert(!file.getMessage.contains("null"), file.getMessage)
       assert(file.getMessage.contains("empty.bin"), file.getMessage)
     }
+
+    it("reports a missing zip file with a clear reason, not the raw IOException message") {
+      val work = Files.createTempDirectory("onion-archive-missing")
+      val missing = work.resolve("does-not-exist.zip").toString
+
+      val entriesError = intercept[RuntimeException] { onion.Archive.entries(missing) }
+      assert(entriesError.getMessage.contains("no such file"), entriesError.getMessage)
+      assert(entriesError.getMessage.contains(missing), entriesError.getMessage)
+
+      val unzipError = intercept[RuntimeException] {
+        onion.Archive.unzip(missing, work.resolve("out").toString)
+      }
+      assert(unzipError.getMessage.contains("no such file"), unzipError.getMessage)
+      assert(unzipError.getMessage.contains(missing), unzipError.getMessage)
+    }
   }
 }

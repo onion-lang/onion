@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.143.0] - 2026-10-18
+
 ### Added
 
 - **New warning `W0020`: an `extension` method whose name and arity exactly match an existing member (own or inherited) on its receiver type.** The existing member always wins at the call site, so such an extension method silently compiled clean and was never called -- no diagnostic at compile time or runtime (#2205). `extension List { def size(): Int = 999 }` now warns instead of compiling to dead code.

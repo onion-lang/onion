@@ -10,7 +10,12 @@ import java.util.Map;
  * No external dependencies - completely self-contained.
  *
  * Scope: a flat block mapping, or a top-level block sequence of flat mappings
- * (no nested maps/sequences within an element, no anchors).
+ * (no nested maps/sequences within an element, no anchors, no flow collections).
+ * A construct outside that scope raises an error rather than silently losing data:
+ * {@link #stringify} throws {@code IllegalArgumentException} on a nested Map/List
+ * value, and {@link #parse} throws {@link YamlParseException} on an indented
+ * (nested) mapping line, a flow collection ({@code [...]}/{@code {...}}) value, or
+ * an anchor/alias ({@code &name}/{@code *name}) value.
  *
  * YAML values share the same intermediate representation as Json:
  * - YAML mapping:  LinkedHashMap&lt;String, Object&gt;
@@ -165,6 +170,11 @@ public final class Yaml {
             if (isBlankOrComment(rawLine)) {
                 continue;
             }
+            if (rawLine.charAt(0) == ' ' || rawLine.charAt(0) == '\t') {
+                throw new YamlParseException(
+                    "Indented line found in a flat mapping; a nested mapping is out of scope: "
+                        + rawLine.trim(), lineNumber);
+            }
             parseKeyValueLine(rawLine.trim(), lineNumber, result);
         }
         return result;
@@ -240,6 +250,11 @@ public final class Yaml {
         }
         if (value instanceof String s) {
             return renderString(s);
+        }
+        if (value instanceof Map<?, ?> || value instanceof List<?>) {
+            throw new IllegalArgumentException(
+                "Yaml::stringify supports only flat mappings/sequences: a nested Map/List value "
+                    + "is out of scope (no nested maps/sequences within an element)");
         }
         // Fallback – unknown type, quote to be safe
         return renderString(value.toString());
@@ -392,6 +407,18 @@ public final class Yaml {
         // Single-quoted string – only '' -> ' is special, no other escapes, no type coercion
         if (raw.startsWith("'")) {
             return unquoteSingle(raw, lineNumber);
+        }
+
+        // Flow collections ([...]/{...}) are out of scope: without this check they would
+        // come back as a literal, misleading String instead of the list/map they denote.
+        if (raw.charAt(0) == '[' || raw.charAt(0) == '{') {
+            throw new YamlParseException("Flow collections are out of scope: " + raw, lineNumber);
+        }
+
+        // Anchors (&name) and aliases (*name) are out of scope: without this check the
+        // anchor/alias marker would come back as part of a literal String value.
+        if (raw.charAt(0) == '&' || raw.charAt(0) == '*') {
+            throw new YamlParseException("Anchors/aliases are out of scope: " + raw, lineNumber);
         }
 
         // Integer?

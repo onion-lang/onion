@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yaml::stringify`/`Yaml::parse` silently mangled data outside the documented flat-only scope instead of raising an error (#2239).** A nested `Map`/`List` value stringified as Java's `toString()` (`c: {d=1}`), which does not parse back to the original data; parsing an indented child mapping flattened it and hoisted the child's keys to the top level with no error; a flow collection (`[1, 2]`) or an anchor/alias (`&x`/`*x`) value came back as a literal `String`. `Yaml::stringify` now throws `IllegalArgumentException` on a nested Map/List value, and `Yaml::parse` now throws `Yaml.YamlParseException` naming the unsupported construct in each of these cases.
 - **A `W0012`/`W0015` warning (null to non-nullable, or implicit unboxing of a boxed platform value) printed no source file name, `[W0012] :1:17: ...` instead of `[W0012] w6.on:1:17: ...`, when it was the very first warning of the compilation (#2238).** Both warnings are reported straight from the assignability check, which relied on an earlier, unrelated diagnostic having already told the reporter the current file; with no such diagnostic yet, the file name was still empty. Both call sites now set it themselves first, like the other warnings already do.
 
 ## [0.143.0] - 2026-10-18

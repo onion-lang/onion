@@ -292,6 +292,87 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a String value with leading/trailing whitespace (#2229)") {
+    val strDecl =
+      """record Note(text: String) {
+        |  shape doc = config
+        |}
+        |""".stripMargin
+
+    it("satisfies L1 through the canonical printer, padded with spaces on both sides") {
+      val r = shell.run(strDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val s = Note::doc()
+          |    val v = new Note("  x  ")
+          |    return s.parse(s.print(v)).get() == v
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(true) == r, r.toString)
+    }
+
+    it("quotes a padded value on print, and keeps an unpadded one unquoted") {
+      val r = shell.run(strDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return Note::doc().print(new Note("  x  ")) + "|" + Note::doc().print(new Note("x"))
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("text = \"  x  \"\n|text = x\n") == r, r.toString)
+    }
+
+    it("escapes a literal quote and backslash inside a padded value, and reads them back") {
+      val r = shell.run(strDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val s = Note::doc()
+          |    val v = new Note(" a\"b\\c ")
+          |    return s.parse(s.print(v)).get() == v
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(true) == r, r.toString)
+    }
+
+    it("printLossless quotes only the edited, now-padded value; other lines are untouched") {
+      val r = shell.run(strDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val text = "# n\ntext = hello\n"
+          |    val got = Note::doc().parseLossless(text).get()
+          |    val edited = got.value().copy(text = "  hi  ")
+          |    return Note::doc().printLossless(edited, got.residue())
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("# n\ntext = \"  hi  \"\n") == r, r.toString)
+    }
+
+    it("printLossless keeps an unchanged quoted value's original spelling verbatim") {
+      val r = shell.run(
+        """record Pair(a: String, b: String) {
+          |  shape doc = config
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val text = "a = \"  x  \"\nb = y\n"
+          |    val got = Pair::doc().parseLossless(text).get()
+          |    val edited = got.value().copy(b = "z")
+          |    return Pair::doc().printLossless(edited, got.residue())
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("a = \"  x  \"\nb = z\n") == r, r.toString)
+    }
+  }
+
   describe("losslessness is a claim, not a default") {
     it("a lossy shape refuses parseLossless instead of pretending") {
       val r = shell.run(

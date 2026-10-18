@@ -851,9 +851,11 @@ record Pt(x: Int, y: Int) {
 ### `E0080` — 自作の `Shape` に law がない
 
 `onion.Shape[T]` を（`shape`/`from re"..."` による導出ではなく）直接実装した具象クラスは、
-そのファイル内で機械検査される `law` か `example` を最低1つ主張しなければなりません。
+そのファイル内で機械検査される `law` か `example` を最低1つ、しかも実際にそのクラスに
+触れるもの——構築する、メンバーを呼ぶ/読む、型テストする——を主張しなければなりません。
 導出された shape は round-trip が構造的に保証されますが、手書きのものは**主張するだけ**
-なので、その主張を検査する必要があります。
+なので、その主張を検査する必要があります。そのクラスに一度も触れない `law`/`example` は、
+そのクラスについて何も検査していません。
 
 ```onion
 class FixedWidth conforms Shape[Person] {
@@ -864,11 +866,11 @@ public:
   def print(v: Person): String { ... }
   def describe(): String = "fixed-width Person"
 }
-// E0080: FixedWidth の law を主張している箇所がこのファイルにない
+// E0080: FixedWidth に触れる law を主張している箇所がこのファイルにない
 ```
 
-対処: トップレベルの `example`（またはクラス自身の `law`）を追加してください——代表的な
-主張は round-trip `s.parse(s.print(v)).get() == v` です。
+対処: `FixedWidth` を構築または呼び出すトップレベルの `example`（またはクラス自身の
+`law`）を追加してください——代表的な主張は round-trip `s.parse(s.print(v)).get() == v` です。
 
 ```onion
 example fixedWidthL1 {
@@ -1824,7 +1826,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0077` | tool `…` performs `…` here (calling …) but does not declare it |
 | `E0078` | tool `…` declares capability `…` but nothing in its body can perform it |
 | `E0079` | tool `…` has an invalid capability `…`: … |
-| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law |
+| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law that exercises it |
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |

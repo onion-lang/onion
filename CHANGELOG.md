@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **A `W0012`/`W0015` warning (null to non-nullable, or implicit unboxing of a boxed platform value) printed no source file name, `[W0012] :1:17: ...` instead of `[W0012] w6.on:1:17: ...`, when it was the very first warning of the compilation (#2238).** Both warnings are reported straight from the assignability check, which relied on an earlier, unrelated diagnostic having already told the reporter the current file; with no such diagnostic yet, the file name was still empty. Both call sites now set it themselves first, like the other warnings already do.
+- **A multi-`tool` file's `--help` ran the shared `--plan`/`--contract`/`--help` lines straight into the last declared tool's own option list, with no visual break, so they read as that tool's options rather than global flags (#2252).** Each tool's usage block now ends with a blank line when the file declares more than one, setting the global flags apart; single-tool output is unchanged.
 
 ## [0.143.0] - 2026-10-18
 

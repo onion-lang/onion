@@ -397,6 +397,7 @@ public final class ToolCli {
                 for (Object c : caps) rendered.add(String.valueOf(c));
                 sb.append("  requires: ").append(String.join(", ", rendered)).append('\n');
             }
+            if (sub) sb.append('\n');
         }
         sb.append("  ").append(pad("--plan", 24)).append("show what a run would do, without doing it\n");
         sb.append("  ").append(pad("--contract", 24)).append("print the machine-readable contract\n");

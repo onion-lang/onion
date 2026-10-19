@@ -117,13 +117,23 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    - Label it `risk:high` if it touches any of:
      - the grammar or parser
      - typing semantics existing programs can observe
-     - existing error behaviour
+     - the compiler's diagnostics as programs and tests observe them: an error code's meaning,
+       a removed or renamed message, a change in what compiles. A new hint, a clearer message
+       text, a corrected location or a new warning code is `risk:low`
+     - a stdlib result that a dogfood project, a `run/` sample or an existing test relies on,
+       a changed default, or new or removed public API (`feat`)
      - `.github/`
      - build or publishing
      - major dependency upgrades
      - deleted tests
+   - A stdlib bug fix is `risk:low` when it has a regression test and the old behaviour was a
+     crash, a hang, a wrong value, a raw JDK exception, or a documented-contract violation (the
+     javadoc, `docs/stdlib.md` or a `law` said otherwise); README's "bug fixes with a regression
+     test" row always meant this. W42: Kota merged 28 `risk:high` PRs, 16 of them such stdlib
+     fixes, with no review comment, change or revert, while 105 of 209 hourly runs stood down
+     for lack of a mergeable PR.
    - Otherwise label it `risk:low`. `risk:*` describes a PR, not an issue; an issue's label is
-     only a forecast, and the PR's diff decides.
+     only a forecast, and the PR's diff decides. When in doubt, `risk:high`.
    - A `risk:high` PR gets `status:needs-kota` too (on the PR); leave the issue `status:in-progress`.
    - Bugs you find along the way: file them as issues (template, labels, repro) instead of
      fixing them in the same PR, and label them `status:ready` when the repro is verified,

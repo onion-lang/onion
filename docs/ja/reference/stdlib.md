@@ -2103,7 +2103,7 @@ Files::mkdirs(path)                    // ディレクトリと不足する親�
 Files::size(path)                      // Long。バイト数（存在しなければ0）
 Files::copy(src, dst)                  // dst が既にあれば置き換える
 Files::move(src, dst)                  // 移動（リネーム）。dst が既にあれば置き換える
-Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー
+Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー（dst が src の内部/同一なら拒否）
 ```
 
 パス操作ヘルパー——ファイル名・親ディレクトリ・結合・拡張子:

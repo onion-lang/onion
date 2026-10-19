@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A bare, parens-less reference to a *static* sibling method (`greet` instead of `greet()`/`self.greet()`) crashed with `java.lang.IncompatibleClassChangeError` instead of calling it** (#2248). Reproduced for any top-level script function too, since every top-level `def` compiles as a static member of the synthesized Main class: `def work: String = "hi"; val f = work` crashed the same way. The call site built an instance call for a method the codegen had already emitted `static`; it now checks the method's modifier and calls static methods the static way, matching what the explicit-parens form already did correctly.
 - **A `W0012`/`W0015` warning (null to non-nullable, or implicit unboxing of a boxed platform value) printed no source file name, `[W0012] :1:17: ...` instead of `[W0012] w6.on:1:17: ...`, when it was the very first warning of the compilation (#2238).** Both warnings are reported straight from the assignability check, which relied on an earlier, unrelated diagnostic having already told the reporter the current file; with no such diagnostic yet, the file name was still empty. Both call sites now set it themselves first, like the other warnings already do.
 
 ## [0.143.0] - 2026-10-18

@@ -71,7 +71,15 @@ private[compiler] final class MemberSelectionTypingSupport(
         }
       TypeSubst.withCastOpt(narrowedRef, inheritedType(narrowedRef.`type`, resolved.term.`type`, field.affiliation))
     case ResolvedGetterSelection(method) =>
-      val call = new Call(resolved.term, method, Array.empty)
+      // The resolved method may be static (a bare name falling back to a
+      // zero-arg sibling, #2013, can land on one -- e.g. a top-level script's
+      // own `def`s, which compile as static members of the synthesized Main
+      // class). Building an instance Call for it emits invokevirtual on a
+      // method the codegen declared static, which the JVM rejects at link
+      // time with IncompatibleClassChangeError (#2251).
+      val call: Term =
+        if (Modifier.isStatic(method.modifier)) new CallStatic(method.affiliation, method, Array.empty)
+        else new Call(resolved.term, method, Array.empty)
       TypeSubst.withCastOpt(call, inheritedType(method.returnType, resolved.term.`type`, method.affiliation))
   }
 

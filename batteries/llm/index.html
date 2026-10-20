@@ -2038,6 +2038,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../ja/migration/pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0 への移行
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -2054,10 +2082,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7_8" >
         
           
-          <label class="md-nav__link" for="__nav_2_7_7" id="__nav_2_7_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_7_8" id="__nav_2_7_8_label" tabindex="0">
             
   
   
@@ -2075,8 +2103,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_7_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_7_7">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_7_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3757,6 +3785,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Install">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-unreleased-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An unreleased build
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4086,6 +4131,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../migration/pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating to 1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -4102,10 +4175,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_8" >
         
           
-          <label class="md-nav__link" for="__nav_8_7" id="__nav_8_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8_8" id="__nav_8_8_label" tabindex="0">
             
   
   
@@ -4123,8 +4196,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_7">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4670,6 +4743,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Install">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-unreleased-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An unreleased build
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4780,42 +4870,42 @@
 Maven artifact next to <code>onion.jar</code> rather than inside it. It calls Claude through the
 Anthropic Messages API and reads the answer back as a typed record, through the same
 <code>Shape</code> that already reads your JSON files:</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">//&gt; using dep "org.onion_lang:onion-llm:&lt;version&gt;"</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1">//&gt; using repository "file:///C:/Users/you/.m2/repository"   // local install, for now</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">llm</span><span class="p">.</span><span class="nc">Llm</span><span class="p">;</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">llm</span><span class="p">.</span><span class="nc">LlmError</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Action</span><span class="p">(</span><span class="n">owner</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">task</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Summary</span><span class="p">(</span><span class="n">title</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">actions</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Action</span><span class="p">],</span><span class="w"> </span><span class="n">risk</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">?)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">claude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Llm</span><span class="o">::</span><span class="nf">claude</span><span class="p">().</span><span class="nf">effort</span><span class="p">(</span><span class="s2">"low"</span><span class="p">).</span><span class="nf">system</span><span class="p">(</span><span class="s2">"You summarize meetings."</span><span class="p">)</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="nb">Result</span><span class="p">[</span><span class="nc">Summary</span><span class="p">,</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">claude</span><span class="p">.</span><span class="nf">ask</span><span class="p">(</span><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">(),</span><span class="w"> </span><span class="s2">"Summarize: "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">notes</span><span class="p">)</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="k">select</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">ok</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nb">Result</span><span class="p">.</span><span class="nc">Ok</span><span class="p">:</span><span class="w">   </span><span class="nf">println</span><span class="p">(</span><span class="n">ok</span><span class="p">.</span><span class="nf">value</span><span class="p">().</span><span class="nf">title</span><span class="p">())</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">err</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nb">Result</span><span class="p">.</span><span class="nc">Err</span><span class="p">:</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="k">select</span><span class="w"> </span><span class="n">err</span><span class="p">.</span><span class="nf">error</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">.</span><span class="nc">Refusal</span><span class="p">:</span><span class="w">   </span><span class="nf">println</span><span class="p">(</span><span class="s2">"declined: "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="nf">category</span><span class="p">())</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">.</span><span class="nc">Invalid</span><span class="p">:</span><span class="w">   </span><span class="k">foreach</span><span class="w"> </span><span class="n">d</span><span class="p">:</span><span class="w"> </span><span class="nb">Defect</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="nf">defects</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="n">d</span><span class="p">.</span><span class="nf">describe</span><span class="p">())</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">.</span><span class="nc">Truncated</span><span class="p">:</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"output cut at max_tokens"</span><span class="p">)</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">.</span><span class="nc">Api</span><span class="p">:</span><span class="w">       </span><span class="nf">println</span><span class="p">(</span><span class="s2">"api "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="nf">status</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s2">": "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="nf">message</span><span class="p">())</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">.</span><span class="nc">Transport</span><span class="p">:</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"network: "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="nf">message</span><span class="p">())</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p">}</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="kd">val</span><span class="w"> </span><span class="n">t</span><span class="p">:</span><span class="w"> </span><span class="nb">Result</span><span class="p">[</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">claude</span><span class="p">.</span><span class="nf">text</span><span class="p">(</span><span class="s2">"Say hi in Japanese"</span><span class="p">)</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">//&gt; using dep "org.onion-lang:onion-llm:&lt;version&gt;"</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">llm</span><span class="p">.</span><span class="nc">Llm</span><span class="p">;</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">llm</span><span class="p">.</span><span class="nc">LlmError</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Action</span><span class="p">(</span><span class="n">owner</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">task</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Summary</span><span class="p">(</span><span class="n">title</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">actions</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Action</span><span class="p">],</span><span class="w"> </span><span class="n">risk</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">?)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">claude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Llm</span><span class="o">::</span><span class="nf">claude</span><span class="p">().</span><span class="nf">effort</span><span class="p">(</span><span class="s2">"low"</span><span class="p">).</span><span class="nf">system</span><span class="p">(</span><span class="s2">"You summarize meetings."</span><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="nb">Result</span><span class="p">[</span><span class="nc">Summary</span><span class="p">,</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">claude</span><span class="p">.</span><span class="nf">ask</span><span class="p">(</span><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">(),</span><span class="w"> </span><span class="s2">"Summarize: "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">notes</span><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="k">select</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">ok</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nb">Result</span><span class="p">.</span><span class="nc">Ok</span><span class="p">:</span><span class="w">   </span><span class="nf">println</span><span class="p">(</span><span class="n">ok</span><span class="p">.</span><span class="nf">value</span><span class="p">().</span><span class="nf">title</span><span class="p">())</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">err</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nb">Result</span><span class="p">.</span><span class="nc">Err</span><span class="p">:</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="k">select</span><span class="w"> </span><span class="n">err</span><span class="p">.</span><span class="nf">error</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">.</span><span class="nc">Refusal</span><span class="p">:</span><span class="w">   </span><span class="nf">println</span><span class="p">(</span><span class="s2">"declined: "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="nf">category</span><span class="p">())</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">.</span><span class="nc">Invalid</span><span class="p">:</span><span class="w">   </span><span class="k">foreach</span><span class="w"> </span><span class="n">d</span><span class="p">:</span><span class="w"> </span><span class="nb">Defect</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="nf">defects</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="n">d</span><span class="p">.</span><span class="nf">describe</span><span class="p">())</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">.</span><span class="nc">Truncated</span><span class="p">:</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"output cut at max_tokens"</span><span class="p">)</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">.</span><span class="nc">Api</span><span class="p">:</span><span class="w">       </span><span class="nf">println</span><span class="p">(</span><span class="s2">"api "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="nf">status</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s2">": "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="nf">message</span><span class="p">())</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">is</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">.</span><span class="nc">Transport</span><span class="p">:</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"network: "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="nf">message</span><span class="p">())</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="p">}</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="kd">val</span><span class="w"> </span><span class="n">t</span><span class="p">:</span><span class="w"> </span><span class="nb">Result</span><span class="p">[</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">claude</span><span class="p">.</span><span class="nf">text</span><span class="p">(</span><span class="s2">"Say hi in Japanese"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>The record is the single description of the answer. <code>Summary::doc().jsonSchema()</code> is
 sent as the structured-output format, so the model is constrained to that shape, and
 <code>Summary::doc().parse(...)</code> reads the reply, so anything that still does not fit comes
 back as defects with paths such as <code>actions[1].owner</code>, not as an exception.</p>
 <h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
-<p>The battery is not published to a public repository yet. Install it into your local
-Maven repository from an Onion checkout:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sbt<span class="w"> </span>llm/publishM2
+<p>Releases are published to Maven Central as <code>org.onion-lang:onion-llm</code>, at the same
+version as Onion itself (from the first release made after Central publishing was set
+up; see <a href="../../RELEASING/#publishing-to-maven-central">Releasing</a>). A script needs only
+the <code>//&gt; using dep</code> line (see the <a href="../../tools/script-runner/">script runner</a>):</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">//&gt; using dep "org.onion-lang:onion-llm:&lt;version&gt;"</span>
 </span></code></pre></div>
-<p>The version is the Onion build's version (<code>sbt "print llm/version"</code>); on a release tag
-that is the release, for example <code>0.135.0</code>. From a working tree sbt-dynver adds a commit
-and date suffix, so pin something easier to type when you install for local use:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sbt<span class="w"> </span><span class="s1">'set llm / version := "0.135.0-local"'</span><span class="w"> </span>llm/publishM2
+<p>A project lists it in <code>onion.toml</code>:</p>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[dependencies]</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="s2">"org.onion-lang:onion-llm"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;version&gt;"</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -4827,7 +4917,7 @@ and date suffix, so pin something easier to type when you install for local use:
 <tbody>
 <tr>
 <td>Coordinates</td>
-<td><code>org.onion_lang:onion-llm:&lt;version&gt;</code></td>
+<td><code>org.onion-lang:onion-llm:&lt;version&gt;</code></td>
 </tr>
 <tr>
 <td>Package</td>
@@ -4839,21 +4929,35 @@ and date suffix, so pin something easier to type when you install for local use:
 </tr>
 <tr>
 <td>Onion runtime</td>
-<td><code>provided</code>: scripts already run with <code>onion.jar</code>, so the battery does not bring a second copy</td>
+<td><code>org.onion-lang:onion</code>, <code>provided</code>: scripts already run with <code>onion.jar</code>, so the battery does not bring a second copy</td>
 </tr>
 </tbody>
 </table>
-<p>A script names it with <code>//&gt; using dep</code> and the local repository with
-<code>//&gt; using repository</code> (see the <a href="../../tools/script-runner/">script runner</a>):</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">//&gt; using dep "org.onion_lang:onion-llm:0.135.0-local"</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1">//&gt; using repository "file:///C:/Users/you/.m2/repository"</span>
+<p>The Onion runtime is <code>provided</code> on purpose. <code>//&gt; using dep</code> and <code>[dependencies]</code> put the
+whole transitive set on the classpath, so a normal dependency would load a second
+compiler (and its ASM, JLine and LSP4J), possibly at another version, next to the one
+running the script. A Java, Scala or Kotlin program that uses the battery directly
+declares <code>org.onion-lang:onion</code> itself, at the same version.</p>
+<h3 id="an-unreleased-build">An unreleased build<a class="headerlink" href="#an-unreleased-build" title="Permanent link">&para;</a></h3>
+<p>To try a battery that has not been released yet, install it into your local Maven
+repository from an Onion checkout:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sbt<span class="w"> </span>llm/publishM2
 </span></code></pre></div>
-<p>A project lists it in <code>onion.toml</code>:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">[dependencies]</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="s2">"org.onion_lang:onion-llm"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.135.0-local"</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">[[repositories]]</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"file:///C:/Users/you/.m2/repository"</span>
+<p>The version is the Onion build's version (<code>sbt "print llm/version"</code>); on a release tag
+that is the release, for example <code>0.135.0</code>. From a working tree sbt-dynver adds a commit
+and date suffix, so pin something easier to type when you install for local use:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sbt<span class="w"> </span><span class="s1">'set llm / version := "0.135.0-local"'</span><span class="w"> </span>llm/publishM2
+</span></code></pre></div>
+<p>Then name the local repository next to the dependency, with <code>//&gt; using repository</code> in a
+script or <code>[[repositories]]</code> in <code>onion.toml</code>:</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">//&gt; using dep "org.onion-lang:onion-llm:0.135.0-local"</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1">//&gt; using repository "file:///C:/Users/you/.m2/repository"</span>
+</span></code></pre></div>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">[dependencies]</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="s2">"org.onion-lang:onion-llm"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.135.0-local"</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">[[repositories]]</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"file:///C:/Users/you/.m2/repository"</span>
 </span></code></pre></div>
 <p><code>onion.jar</code> itself does not change: the battery and the SDK are only on the classpath of
 the scripts and projects that ask for them.</p>
@@ -5036,11 +5140,11 @@ exceptions are the programming errors above (<code>IllegalArgumentException</cod
 interrupted thread.</p>
 <h2 id="effects-and-plan">Effects and <code>--plan</code><a class="headerlink" href="#effects-and-plan" title="Permanent link">&para;</a></h2>
 <p>The battery jar ships an effect table at <code>META-INF/onion/effect-table.txt</code>:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>onion.llm.Llm#*=pure
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>onion.llm.Claude#*=pure
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>onion.llm.Claude#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>onion.llm.Claude#text=net:api.anthropic.com,env:ANTHROPIC_API_KEY
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>onion.llm.LlmError#*=pure
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>onion.llm.Llm#*=pure
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>onion.llm.Claude#*=pure
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>onion.llm.Claude#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>onion.llm.Claude#text=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>onion.llm.LlmError#*=pure
 </span></code></pre></div>
 <p>Building a client is <code>pure</code>. <code>ask</code> and <code>text</code> are <code>net</code> (to <code>api.anthropic.com</code>) and
 <code>env</code> (they read <code>ANTHROPIC_API_KEY</code>). The error values are <code>pure</code>.</p>
@@ -5051,9 +5155,9 @@ syntax above, once the <em>library effect tables</em> change (branch
 <code>feat/library-effect-tables</code>) is merged. Until then the compiler does not see this
 table, so a call into the battery is <code>unknown</code> (see the
 <a href="../../reference/effects/">effects reference</a>), and a <code>tool</code> that uses it must say so:</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">tool</span><span class="w"> </span><span class="nf">summarize</span><span class="p">(</span><span class="n">notes</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">out</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="k">requires</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">read</span><span class="p">(</span><span class="n">notes</span><span class="p">),</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="n">out</span><span class="p">),</span><span class="w"> </span><span class="n">console</span><span class="p">,</span><span class="w"> </span><span class="n">unknown</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kd">tool</span><span class="w"> </span><span class="nf">summarize</span><span class="p">(</span><span class="n">notes</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">out</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="k">requires</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">read</span><span class="p">(</span><span class="n">notes</span><span class="p">),</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="n">out</span><span class="p">),</span><span class="w"> </span><span class="n">console</span><span class="p">,</span><span class="w"> </span><span class="n">unknown</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
 </span></code></pre></div>
 <p>With the table loaded, the same tool declares <code>requires { read(notes), write(out),
 net, env, console }</code>, and <code>--plan</code> lists <code>net api.anthropic.com</code> and
@@ -5063,20 +5167,20 @@ net, env, console }</code>, and <code>--plan</code> lists <code>net api.anthropi
 <p>Point the client at a local server that answers like the Messages API. <code>baseUrl</code> and
 <code>apiKey</code> exist for this. A test that should never reach the network can start an
 <code>onion.Server</code>, serve a canned response, and stop it afterwards:</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">llm</span><span class="p">.</span><span class="nc">Llm</span><span class="p">;</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">llm</span><span class="p">.</span><span class="nc">Claude</span><span class="p">;</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">llm</span><span class="p">.</span><span class="nc">LlmError</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="kd">def</span><span class="w"> </span><span class="nf">summarizeAgainst</span><span class="p">(</span><span class="n">fixture</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">):</span><span class="w"> </span><span class="nb">Result</span><span class="p">[</span><span class="nc">Summary</span><span class="p">,</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Files</span><span class="o">::</span><span class="nf">readText</span><span class="p">(</span><span class="s2">"tests/fixtures/"</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">fixture</span><span class="p">)</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">server</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Server</span><span class="o">::</span><span class="nf">start</span><span class="p">(</span><span class="s2">"127.0.0.1"</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">).</span><span class="n">handleAll</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">req</span><span class="w"> </span><span class="o">-&gt;</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="nc">Server</span><span class="o">::</span><span class="nf">status</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="p">).</span><span class="nf">withHeader</span><span class="p">(</span><span class="s2">"Content-Type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"application/json"</span><span class="p">)</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">claude</span><span class="p">:</span><span class="w"> </span><span class="nc">Claude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Llm</span><span class="o">::</span><span class="nf">claude</span><span class="p">().</span><span class="nf">baseUrl</span><span class="p">(</span><span class="s2">"http://127.0.0.1:"</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">server</span><span class="p">.</span><span class="nf">port</span><span class="p">()).</span><span class="nf">apiKey</span><span class="p">(</span><span class="s2">"test-key"</span><span class="p">)</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">claude</span><span class="p">.</span><span class="nf">ask</span><span class="p">(</span><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">(),</span><span class="w"> </span><span class="s2">"notes"</span><span class="p">)</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">finally</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="n">server</span><span class="p">.</span><span class="nf">stop</span><span class="p">()</span><span class="w">   </span><span class="c1">// the JDK's HTTP dispatcher thread is not a daemon</span>
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">llm</span><span class="p">.</span><span class="nc">Llm</span><span class="p">;</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">llm</span><span class="p">.</span><span class="nc">Claude</span><span class="p">;</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">llm</span><span class="p">.</span><span class="nc">LlmError</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="kd">def</span><span class="w"> </span><span class="nf">summarizeAgainst</span><span class="p">(</span><span class="n">fixture</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">):</span><span class="w"> </span><span class="nb">Result</span><span class="p">[</span><span class="nc">Summary</span><span class="p">,</span><span class="w"> </span><span class="nc">LlmError</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Files</span><span class="o">::</span><span class="nf">readText</span><span class="p">(</span><span class="s2">"tests/fixtures/"</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">fixture</span><span class="p">)</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">server</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Server</span><span class="o">::</span><span class="nf">start</span><span class="p">(</span><span class="s2">"127.0.0.1"</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">).</span><span class="n">handleAll</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">req</span><span class="w"> </span><span class="o">-&gt;</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="nc">Server</span><span class="o">::</span><span class="nf">status</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="p">).</span><span class="nf">withHeader</span><span class="p">(</span><span class="s2">"Content-Type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"application/json"</span><span class="p">)</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">claude</span><span class="p">:</span><span class="w"> </span><span class="nc">Claude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Llm</span><span class="o">::</span><span class="nf">claude</span><span class="p">().</span><span class="nf">baseUrl</span><span class="p">(</span><span class="s2">"http://127.0.0.1:"</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">server</span><span class="p">.</span><span class="nf">port</span><span class="p">()).</span><span class="nf">apiKey</span><span class="p">(</span><span class="s2">"test-key"</span><span class="p">)</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">claude</span><span class="p">.</span><span class="nf">ask</span><span class="p">(</span><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">(),</span><span class="w"> </span><span class="s2">"notes"</span><span class="p">)</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">finally</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">    </span><span class="n">server</span><span class="p">.</span><span class="nf">stop</span><span class="p">()</span><span class="w">   </span><span class="c1">// the JDK's HTTP dispatcher thread is not a daemon</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>A canned response has the Messages API's shape: <code>content</code> with a thinking block and
 then a text block, and a <code>stop_reason</code>. For a refusal, <code>content</code> is empty,
@@ -5086,9 +5190,9 @@ then a text block, and a <code>stop_reason</code>. For a refusal, <code>content<
 <p>The battery is the sbt subproject <code>llm</code> (<code>batteries/llm</code>). The root project neither
 aggregates it nor depends on it, so <code>sbt test</code>, <code>sbt assembly</code> and <code>sbt dist</code> are
 unchanged. Work on it by name:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sbt<span class="w"> </span>llm/test<span class="w">          </span><span class="c1"># Java API and Onion-script tests against a local fake API</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>sbt<span class="w"> </span>llm/package<span class="w">       </span><span class="c1"># target/out/jvm/u/onion-llm/onion-llm-&lt;version&gt;.jar</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>sbt<span class="w"> </span>llm/publishM2<span class="w">     </span><span class="c1"># install into ~/.m2/repository</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sbt<span class="w"> </span>llm/test<span class="w">          </span><span class="c1"># Java API and Onion-script tests against a local fake API</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>sbt<span class="w"> </span>llm/package<span class="w">       </span><span class="c1"># target/out/jvm/u/onion-llm/onion-llm-&lt;version&gt;.jar</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>sbt<span class="w"> </span>llm/publishM2<span class="w">     </span><span class="c1"># install into ~/.m2/repository</span>
 </span></code></pre></div>
 <p>The tests never reach the network. They point the client at a local
 <code>com.sun.net.httpserver.HttpServer</code> that returns canned Messages API JSON and records

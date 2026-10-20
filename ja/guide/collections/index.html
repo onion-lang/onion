@@ -2194,6 +2194,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../migration/pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0 への移行
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -2210,10 +2238,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7_8" >
         
           
-          <label class="md-nav__link" for="__nav_2_7_7" id="__nav_2_7_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_7_8" id="__nav_2_7_8_label" tabindex="0">
             
   
   
@@ -2231,8 +2259,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_7_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_7_7">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_7_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4104,6 +4132,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../../migration/pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating to 1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -4120,10 +4176,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_8" >
         
           
-          <label class="md-nav__link" for="__nav_8_7" id="__nav_8_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8_8" id="__nav_8_8_label" tabindex="0">
             
   
   
@@ -4141,8 +4197,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_7">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4818,7 +4874,7 @@
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="nf">size</span><span class="p">([])</span><span class="w">      </span><span class="c1">// 0  - [] は List[String] のパラメータ型を受け取る</span>
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="nf">count</span><span class="p">([:])</span><span class="w">    </span><span class="c1">// 0  - [:] は Map[String, Integer] のパラメータ型を受け取る</span>
 </span></code></pre></div>
-<p>期待型は<strong>分岐やオペランドの位置</strong>にも伝わります。<code>if</code>/<code>else</code> や <code>select</code> の分岐、<code>try</code>/<code>catch</code> の分岐、<code>?:</code> の右オペランド、<code>do</code> ブロックの <code>ret</code> にある空リテラルも、エラーにならず要素型を推論します：</p>
+<p>期待型は<strong>分岐やオペランドの位置</strong>にも伝わります。<code>if</code>/<code>else</code> や <code>select</code> の分岐、<code>try</code>/<code>catch</code> の分岐、<code>?:</code> の右オペランド、<code>do</code> ブロックの <code>yield</code> にある空リテラルも、エラーにならず要素型を推論します：</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">pick</span><span class="p">(</span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="p">):</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">[]</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// [] は List[Int]</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">orEmpty</span><span class="p">(</span><span class="n">o</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="kt">Int</span><span class="p">]?):</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">o</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="p">[]</span><span class="w">              </span><span class="c1">// [] は List[Int]</span>
 </span></code></pre></div>

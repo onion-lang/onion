@@ -2627,6 +2627,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../migration/pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0 への移行
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -2643,10 +2671,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7_8" >
         
           
-          <label class="md-nav__link" for="__nav_2_7_7" id="__nav_2_7_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_7_8" id="__nav_2_7_8_label" tabindex="0">
             
   
   
@@ -2664,8 +2692,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_7_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_7_7">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_7_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4537,6 +4565,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../../migration/pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating to 1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -4553,10 +4609,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_8" >
         
           
-          <label class="md-nav__link" for="__nav_8_7" id="__nav_8_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8_8" id="__nav_8_8_label" tabindex="0">
             
   
   
@@ -4574,8 +4630,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_7">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -5781,7 +5837,7 @@
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">expr</span><span class="w">     </span><span class="c1">// 不変</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">var</span><span class="w"> </span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">expr</span><span class="w">     </span><span class="c1">// 可変</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">inferred</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">expr</span><span class="w">       </span><span class="c1">// ローカル型推論</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kd">val</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">recordValue</span><span class="w">  </span><span class="c1">// 分解（records / Map.Entry）</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kd">val</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">recordValue</span><span class="w">  </span><span class="c1">// 分解（records / Map.Entry / List は添字順）</span>
 </span></code></pre></div>
 <h3 id="_12">関数<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="n">param</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="p">,</span><span class="w"> </span><span class="n">opt</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">default</span><span class="p">):</span><span class="w"> </span><span class="nc">ReturnType</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">body</span><span class="w"> </span><span class="p">}</span>
@@ -5947,6 +6003,13 @@
 </tr>
 </tbody>
 </table>
+<p><code>Json</code> はさらに <code>R::fromJsonList(s: String): List[R]</code> を、<code>Yaml</code> は
+<code>R::fromYamlList(s: String): List[R]</code> を合成します。それぞれトップレベルのシーケンス
+（JSON 配列、または flat mapping の YAML block シーケンス）を読み、各要素を
+<code>fromJson</code>/<code>fromYaml</code> と同じ規則で変換します — オブジェクト/マッピングでない要素や
+変換に失敗した要素は失敗ではなく読み飛ばします。これは <code>from re"..."</code> の <code>parseAll</code> が
+持つ「合わないものは読み飛ばす」という契約と同じです。入力が壊れている場合やトップ
+レベルがシーケンスでない場合は <code>null</code> ではなく空の list を返します。</p>
 <p>4つの形式はすべて、単一の内部 <code>toMap</code> / <code>fromMap</code> コアを共有します。<code>toJson</code> と <code>toYaml</code> は
 両方とも <code>toMap</code> を呼び出し、結果の <code>Map</code> を <code>Json::stringify</code> または <code>Yaml::stringify</code> に
 渡します。<code>fromJson</code> と <code>fromYaml</code> はテキストを中間 <code>Map</code> にパースし（<code>Json::parse</code> または
@@ -6057,10 +6120,11 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="k">while</span><span class="w"> </span><span class="n">cond</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
 </span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="n">cond</span><span class="w">                  </span><span class="c1">// 本体優先</span>
 </span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="k">for</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="k">foreach</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">collection</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="k">foreach</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">0</span><span class="o">..&lt;</span><span class="n">n</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="k">foreach</span><span class="w"> </span><span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="k">break</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">continue</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="k">foreach</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">collection</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span><span class="w">        </span><span class="c1">// 型はコレクションから推論</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="k">foreach</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">collection</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="k">foreach</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">0</span><span class="o">..&lt;</span><span class="n">n</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="k">foreach</span><span class="w"> </span><span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="k">break</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">continue</span>
 </span></code></pre></div>
 <h3 id="select">Select（パターンマッチング）<a class="headerlink" href="#select" title="Permanent link">&para;</a></h3>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="k">select</span><span class="w"> </span><span class="n">expr</span><span class="w"> </span><span class="p">{</span>
@@ -6098,11 +6162,11 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 </span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="nc">Runnable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"hi"</span><span class="p">)</span><span class="w">   </span><span class="c1">// SAM 変換</span>
 </span></code></pre></div>
 <h3 id="do">Do 記法<a class="headerlink" href="#do" title="Permanent link">&para;</a></h3>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="k">do</span><span class="p">[</span><span class="nb">Option</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">getA</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">getB</span><span class="p">();</span><span class="w"> </span><span class="k">ret</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="k">do</span><span class="p">[</span><span class="nb">Future</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">fetch</span><span class="p">();</span><span class="w"> </span><span class="k">ret</span><span class="w"> </span><span class="n">x</span><span class="p">.</span><span class="nf">size</span><span class="p">()</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="k">do</span><span class="p">[</span><span class="nc">List</span><span class="p">]</span><span class="w">   </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">];</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="p">[</span><span class="s2">"a"</span><span class="p">,</span><span class="w"> </span><span class="s2">"b"</span><span class="p">];</span><span class="w"> </span><span class="k">ret</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// 内包表記</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="k">do</span><span class="p">[</span><span class="nb">Option</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">getA</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">getB</span><span class="p">();</span><span class="w"> </span><span class="k">yield</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="k">do</span><span class="p">[</span><span class="nb">Future</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">fetch</span><span class="p">();</span><span class="w"> </span><span class="k">yield</span><span class="w"> </span><span class="n">x</span><span class="p">.</span><span class="nf">size</span><span class="p">()</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="k">do</span><span class="p">[</span><span class="nc">List</span><span class="p">]</span><span class="w">   </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">];</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="p">[</span><span class="s2">"a"</span><span class="p">,</span><span class="w"> </span><span class="s2">"b"</span><span class="p">];</span><span class="w"> </span><span class="k">yield</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// 内包表記</span>
 </span></code></pre></div>
-<p><code>x &lt;- e; rest</code> は <code>e.bind((x) -&gt; rest)</code> に脱糖されます。<code>ret e2</code> の直前の束縛は
+<p><code>x &lt;- e; rest</code> は <code>e.bind((x) -&gt; rest)</code> に脱糖されます。<code>yield e2</code> の直前の束縛は
 <code>e.map((x) -&gt; e2)</code> になります。<code>bind</code>/<code>map</code> を持つ（インスタンスまたは拡張メソッド）
 任意の型が do 記法で使えます: <code>Option</code>、<code>Result</code>、<code>Future</code>、<code>List</code>（内包表記）、
 およびユーザー型。スクリプトのトップレベルでも動作します。</p>
@@ -6171,6 +6235,8 @@ enum は sealed 階層であり <code>java.lang.Enum</code> ではないので�
 <p>各行はその下の行より強く結合します。<code>6 | 1 &amp; 2</code> は <code>(6 | 1) &amp; 2</code> ではなく
 <code>6 | (1 &amp; 2)</code>、<code>a || b &amp;&amp; c</code> は <code>(a || b) &amp;&amp; c</code> ではなく <code>a || (b &amp;&amp; c)</code> です。</p>
 <p>オブジェクトの <code>==</code> は値の等価性（<code>equals</code>）。<code>===</code> は参照を比較します。
+null でない <code>Comparable</code>（String、BigDecimal、LocalDate、<code>Comparable</code> に適合するクラス）に対する
+<code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code> は <code>a.compareTo(b) &lt; 0</code> などを意味します。
 オペランドのいずれかが <code>String</code> の場合、<code>+</code> は文字列連結を行います。</p>
 <h2 id="_26">インポートとモジュール<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h2>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="kn">module</span><span class="w"> </span><span class="n">my</span><span class="p">.</span><span class="n">pkg</span>

@@ -2038,6 +2038,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../ja/migration/pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0 への移行
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -2054,10 +2082,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7_8" >
         
           
-          <label class="md-nav__link" for="__nav_2_7_7" id="__nav_2_7_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_7_8" id="__nav_2_7_8_label" tabindex="0">
             
   
   
@@ -2075,8 +2103,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_7_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_7_7">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_7_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -4513,6 +4541,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../migration/pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating to 1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
     
@@ -4532,10 +4588,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_8" >
         
           
-          <label class="md-nav__link" for="__nav_8_7" id="__nav_8_7_label" tabindex="">
+          <label class="md-nav__link" for="__nav_8_8" id="__nav_8_8_label" tabindex="">
             
   
   
@@ -4553,8 +4609,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_7">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -5766,7 +5822,7 @@ automatic. Narrowing requires <code>as</code> (or the legacy <code>$</code>):</p
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">expr</span><span class="w">     </span><span class="c1">// immutable</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">var</span><span class="w"> </span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">expr</span><span class="w">     </span><span class="c1">// mutable</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">inferred</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">expr</span><span class="w">       </span><span class="c1">// local type inference</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kd">val</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">recordValue</span><span class="w">  </span><span class="c1">// destructuring (records / Map.Entry)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kd">val</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">recordValue</span><span class="w">  </span><span class="c1">// destructuring (records / Map.Entry / a List by index)</span>
 </span></code></pre></div>
 <h3 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">&para;</a></h3>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="n">param</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="p">,</span><span class="w"> </span><span class="n">opt</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">default</span><span class="p">):</span><span class="w"> </span><span class="nc">ReturnType</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">body</span><span class="w"> </span><span class="p">}</span>
@@ -5947,6 +6003,13 @@ record:</p>
 </tr>
 </tbody>
 </table>
+<p><code>Json</code> additionally synthesizes <code>R::fromJsonList(s: String): List[R]</code>, and <code>Yaml</code>
+<code>R::fromYamlList(s: String): List[R]</code>, each reading a top-level sequence (a JSON array,
+or a YAML block sequence of flat mappings) and converting each element through the same
+rule <code>fromJson</code>/<code>fromYaml</code> uses — skipping (not failing on) any element that isn't an
+object/mapping or doesn't convert, the same "skip what doesn't fit" contract
+<code>from re"..."</code>'s <code>parseAll</code> has. Malformed input or a non-sequence top level yields an
+empty list, never <code>null</code>.</p>
 <p>All four formats share a single internal <code>toMap</code> / <code>fromMap</code> core: <code>toJson</code>
 and <code>toYaml</code> both call <code>toMap</code> and forward the resulting <code>Map</code> to
 <code>Json::stringify</code> or <code>Yaml::stringify</code>; <code>fromJson</code> and <code>fromYaml</code> parse the
@@ -6064,10 +6127,11 @@ and <code>return</code>/<code>throw</code>/<code>break</code>/<code>continue</co
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="k">while</span><span class="w"> </span><span class="n">cond</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
 </span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="n">cond</span><span class="w">                  </span><span class="c1">// body-first</span>
 </span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="k">for</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="k">foreach</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">collection</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="k">foreach</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">0</span><span class="o">..&lt;</span><span class="n">n</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="k">foreach</span><span class="w"> </span><span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="k">break</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">continue</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="k">foreach</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">collection</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span><span class="w">        </span><span class="c1">// type inferred from the collection</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="k">foreach</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">Type</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">collection</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="k">foreach</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">0</span><span class="o">..&lt;</span><span class="n">n</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="k">foreach</span><span class="w"> </span><span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="k">break</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">continue</span>
 </span></code></pre></div>
 <h3 id="select-pattern-matching">Select (Pattern Matching)<a class="headerlink" href="#select-pattern-matching" title="Permanent link">&para;</a></h3>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="k">select</span><span class="w"> </span><span class="n">expr</span><span class="w"> </span><span class="p">{</span>
@@ -6106,12 +6170,12 @@ capture-group / binding count mismatch is E0060.</p>
 </span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="nc">Runnable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"hi"</span><span class="p">)</span><span class="w">   </span><span class="c1">// SAM conversion</span>
 </span></code></pre></div>
 <h3 id="do-notation">Do Notation<a class="headerlink" href="#do-notation" title="Permanent link">&para;</a></h3>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="k">do</span><span class="p">[</span><span class="nb">Option</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">getA</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">getB</span><span class="p">();</span><span class="w"> </span><span class="k">ret</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="k">do</span><span class="p">[</span><span class="nb">Future</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">fetch</span><span class="p">();</span><span class="w"> </span><span class="k">ret</span><span class="w"> </span><span class="n">x</span><span class="p">.</span><span class="nf">size</span><span class="p">()</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="k">do</span><span class="p">[</span><span class="nc">List</span><span class="p">]</span><span class="w">   </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">];</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="p">[</span><span class="s2">"a"</span><span class="p">,</span><span class="w"> </span><span class="s2">"b"</span><span class="p">];</span><span class="w"> </span><span class="k">ret</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// comprehension</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="k">do</span><span class="p">[</span><span class="nb">Option</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">getA</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">getB</span><span class="p">();</span><span class="w"> </span><span class="k">yield</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="k">do</span><span class="p">[</span><span class="nb">Future</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nf">fetch</span><span class="p">();</span><span class="w"> </span><span class="k">yield</span><span class="w"> </span><span class="n">x</span><span class="p">.</span><span class="nf">size</span><span class="p">()</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="k">do</span><span class="p">[</span><span class="nc">List</span><span class="p">]</span><span class="w">   </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">];</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="p">[</span><span class="s2">"a"</span><span class="p">,</span><span class="w"> </span><span class="s2">"b"</span><span class="p">];</span><span class="w"> </span><span class="k">yield</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// comprehension</span>
 </span></code></pre></div>
 <p><code>x &lt;- e; rest</code> desugars to <code>e.bind((x) -&gt; rest)</code>; a binding followed
-directly by the final <code>ret e2</code> becomes <code>e.map((x) -&gt; e2)</code>. Any type with
+directly by the final <code>yield e2</code> becomes <code>e.map((x) -&gt; e2)</code>. Any type with
 <code>bind</code>/<code>map</code> (instance or extension methods) is do-able: <code>Option</code>,
 <code>Result</code>, <code>Future</code>, <code>List</code> (comprehension), and user types. Works at the
 script top level too.</p>
@@ -6183,6 +6247,8 @@ between assignment and <code>||</code> in precedence.</p>
 <p>Each row binds tighter than the one below it — <code>6 | 1 &amp; 2</code> is <code>6 | (1 &amp; 2)</code>,
 not <code>(6 | 1) &amp; 2</code>, and <code>a || b &amp;&amp; c</code> is <code>a || (b &amp;&amp; c)</code>, not <code>(a || b) &amp;&amp; c</code>.</p>
 <p><code>==</code> on objects is value equality (<code>equals</code>); <code>===</code> compares references.
+<code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code> on a non-null <code>Comparable</code> (String, BigDecimal, LocalDate, a class
+conforming to <code>Comparable</code>) mean <code>a.compareTo(b) &lt; 0</code> etc.
 <code>+</code> performs string concatenation when either operand is a <code>String</code>.</p>
 <h2 id="imports-and-modules">Imports and Modules<a class="headerlink" href="#imports-and-modules" title="Permanent link">&para;</a></h2>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="kn">module</span><span class="w"> </span><span class="n">my</span><span class="p">.</span><span class="n">pkg</span>

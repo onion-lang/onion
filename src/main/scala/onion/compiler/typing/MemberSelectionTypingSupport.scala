@@ -14,7 +14,7 @@ private[compiler] final class MemberSelectionTypingSupport(
       resolveQuiet(node, resolved, context).orElse {
         // Neither found: let resolveMemberSelection emit the appropriate diagnostic.
         calls.resolveMemberSelection(node, resolved.targetType, node.name, reportErrorIfMissing = true)
-          .flatMap(buildResolved(node, resolved, context, _))
+          .flatMap(buildResolved(node, resolved, context, _, report = true))
       }
     }
   }
@@ -42,7 +42,7 @@ private[compiler] final class MemberSelectionTypingSupport(
     // come AFTER regular members so that a built-in like List.size() is not
     // shadowed by a Colls/Iterables extension of the same name.
     calls.resolveMemberSelection(node, resolved.targetType, node.name, reportErrorIfMissing = false) match {
-      case Some(r) => buildResolved(node, resolved, context, r)
+      case Some(r) => buildResolved(node, resolved, context, r, report = false)
       case None => calls.tryZeroArgExtensionAccess(node, node.name, resolved.term, resolved.targetType, null)
     }
 
@@ -50,7 +50,8 @@ private[compiler] final class MemberSelectionTypingSupport(
     node: AST.MemberSelection,
     resolved: ResolvedMemberSelectionTarget,
     context: LocalContext,
-    r: ResolvedMemberSelection
+    r: ResolvedMemberSelection,
+    report: Boolean
   ): Option[Term] = r match {
     case ResolvedArrayLengthSelection =>
       Some(new ArrayLength(resolved.term))
@@ -70,16 +71,28 @@ private[compiler] final class MemberSelectionTypingSupport(
           case _ => ref
         }
       TypeSubst.withCastOpt(narrowedRef, inheritedType(narrowedRef.`type`, resolved.term.`type`, field.affiliation))
+    case ResolvedGetterSelection(method) if Modifier.isStatic(method.modifier) =>
+      node.target match {
+        case _: AST.CurrentInstance =>
+          // A bare name falling back to a zero-arg sibling (#2013) can land on
+          // a static one -- e.g. a top-level script's own `def`s, which compile
+          // as static members of the synthesized Main class. Call it the static
+          // way; building an instance Call emits invokevirtual on a method the
+          // codegen declared static, which the JVM rejects at link time with
+          // IncompatibleClassChangeError (#2248).
+          val call: Term = new CallStatic(method.affiliation, method, Array.empty)
+          TypeSubst.withCastOpt(call, inheritedType(method.returnType, resolved.term.`type`, method.affiliation))
+        case _ =>
+          // An explicit non-self receiver (`expr.staticMethod`, no parens):
+          // calling a static method through an instance is illegal, same as
+          // the explicit-parens form (`expr.staticMethod()`) already reports.
+          // Reusing the #2013 fallback here would silently drop the receiver's
+          // evaluation -- and its side effects -- instead (found reviewing #2249).
+          if (report) calls.reportIllegalMethodCall(node, method, node.name)
+          None
+      }
     case ResolvedGetterSelection(method) =>
-      // The resolved method may be static (a bare name falling back to a
-      // zero-arg sibling, #2013, can land on one -- e.g. a top-level script's
-      // own `def`s, which compile as static members of the synthesized Main
-      // class). Building an instance Call for it emits invokevirtual on a
-      // method the codegen declared static, which the JVM rejects at link
-      // time with IncompatibleClassChangeError (#2251).
-      val call: Term =
-        if (Modifier.isStatic(method.modifier)) new CallStatic(method.affiliation, method, Array.empty)
-        else new Call(resolved.term, method, Array.empty)
+      val call: Term = new Call(resolved.term, method, Array.empty)
       TypeSubst.withCastOpt(call, inheritedType(method.returnType, resolved.term.`type`, method.affiliation))
   }
 

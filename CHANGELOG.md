@@ -35,7 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A bare, parens-less reference to a *static* sibling method (`greet` instead of `greet()`/`self.greet()`) crashed with `java.lang.IncompatibleClassChangeError` instead of calling it** (#2248). Reproduced for any top-level script function too, since every top-level `def` compiles as a static member of the synthesized Main class: `def work: String = "hi"; val f = work` crashed the same way. The call site built an instance call for a method the codegen had already emitted `static`; it now checks the method's modifier and calls static methods the static way, matching what the explicit-parens form already did correctly.
+- **Naming a static method without parens calls it instead of crashing (#2248).**
+  - Before: `def work: String = "hi"; val f = work` (or bare `greet` for a static sibling inside a class) failed at run time with `IncompatibleClassChangeError`.
+  - Now: it calls the method, just as `work()` does. An explicit non-self receiver (`expr.staticMethod`, no parens) still reports `E0019`, same as `expr.staticMethod()`.
+
 - **A List-style call on a Java Stream says to convert it first.** `s.lines()`/`s.chars()` are Java's String methods and return a Stream, so `s.lines().size`, `.first()`, `.join(",")` or `[0]` got a misleading guess (`min`, `limit`, `map`). They now say `did you mean: toList().size` (`boxed().toList()...` for an IntStream).
 
 - **A static call on a nested class names the enclosing class's method.** `Response::json(body)` (the helpers live on `Server`, not `Server.Response`) said `did you mean: of`; it now says `did you mean: Server::json`. Applies whenever the enclosing class has a static method of that name and arity.

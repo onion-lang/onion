@@ -304,9 +304,10 @@ author: never review a PR whose session link is your own session.
    3. **Diagnostics and UX:** what a newcomer sees, in en and ja.
    4. **Compatibility:** what existing programs (`run/`, `dogfood/`, docs samples) do now. In
       `consolidation` mode a break is allowed only with the §5 migration package.
-3. **Verdict.** Post one comment starting `<!-- panel v1 sha=<head sha> -->` with a table:
-   lens, APPROVE or BLOCK, evidence. Label the PR `panel:approved` only if all four approve;
-   otherwise `panel:changes`.
+3. **Verdict.** Post one comment starting `<!-- panel v1 sha=<head sha> -->` with a table
+   (lens, APPROVE or BLOCK, evidence) and, on its own line, `verdict: APPROVED` if all four
+   approve or `verdict: BLOCKED` otherwise. The `evolution/risk-gate` check reads that line;
+   it updates the `panel:*` labels itself.
    - A block backed by a reproduction stands until the code changes.
    - Any other block gets one rebuttal round: when the author replies with a `/rebuttal`
      comment (§1.2), the next Reviewer run starts a fifth fresh subagent, which reads the

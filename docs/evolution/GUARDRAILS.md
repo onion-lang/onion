@@ -82,18 +82,18 @@ Four fresh reviewers, each seeing only the diff, the linked issue or RFC, and PR
 until the code changes; any other block gets one rebuttal round, then a fifth reviewer decides.
 
 **Only the verdict comment counts.** Approval is a comment starting
-`<!-- panel v1 sha=<head sha> -->` whose table approves all four lenses, for the PR's current
-head SHA. The `panel:approved` label is a display aid; the gate ignores it. A push makes every
+`<!-- panel v1 sha=<head sha> -->` that contains the line `verdict: APPROVED`, for the PR's
+current head SHA; the newest such comment for that head decides. The `panel:approved` label is a display aid; the gate ignores it. A push makes every
 earlier verdict stale automatically.
 
 ## Required checks
 
 On `develop`, sourced from GitHub Actions only:
 
-- `onion/test` (the full suite, English locale)
-- `onion/test-ja` (the full suite, Japanese locale)
+- `test` (the full suite, English locale; workflow `onion`)
+- `test-ja` (the full suite, Japanese locale; workflow `onion`)
 - `dogfood`
-- `evolution/risk-gate`
-- `evolution/veto-window`
+- `evolution/risk-gate` (`.github/workflows/evolution-risk-gate.yml`)
+- `evolution/veto-window` (`.github/workflows/evolution-veto-window.yml`)
 
 Removing one, or skipping a spec, is `risk:ultrahigh`.

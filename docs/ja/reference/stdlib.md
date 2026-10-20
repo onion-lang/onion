@@ -2093,6 +2093,7 @@ Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // エントリ名の List
 Files::listFiles("dir")                // java.io.File エントリの List
 Files::glob("dir", "*.on")             // glob にマッチしたエントリ名
+Files::walk("dir")                     // dir 以下の全ファイルを再帰的に（相対パス、ソート済み）
 Files::delete(path) / Files::exists(path)
 Files::isFile(path) / Files::isDirectory(path)
 Files::mkdirs(path)                    // ディレクトリと不足する親ディレクトリを作成
@@ -2293,6 +2294,9 @@ xs + ys                           // concat と同じ（xs.plus(ys)、xs += ys �
 xs.associateBy { x -> key(x) }    // キー -> 要素 の Map。同じキーなら後の要素が残る
 xs.indexOfFirst { x -> x > 6 }    // 条件に合う最初の位置。無ければ -1
 xs.maxOrNull() / xs.minOrNull()   // max()/min() と同じだが、空の List では null
+foreach (i, x) in xs.withIndex() { ... }   // withIndex(): 添字 -> 要素 の順序付き Map
+xs.mapIndexed { i, x -> x + i }   // 添字付きの map
+xs.forEachIndexed { i, x -> ... } // 添字付きの forEach
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - ネストを1段階解消
 xs.flatMap { x -> [x, x] }        // 各要素をリストに写してから1段階平坦化する
                                    // （bind はその別名で、do[List] { x <- xs; ... } が使う）
@@ -2624,6 +2628,7 @@ DateTime::monthName(epochMillis): String  // "March"
 ```
 DateTime::of(year, month, day): Long
 DateTime::of(year, month, day, hour, minute, second): Long
+DateTime::today(): Long                 // = startOfDay(now())
 DateTime::startOfDay(epochMillis): Long
 DateTime::endOfDay(epochMillis): Long
 ```

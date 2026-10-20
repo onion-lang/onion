@@ -18,7 +18,10 @@ Strategist), and §0 to §3 are the whole procedure.
    If it carries `evolution:pause`, stop and report "paused".
 2. **Orient.** The newest `approved` Direction proposal is the active direction, whatever its
    state (#1928 was closed by a no-op PR and is still the direction), so list with `state=all`;
-   issues it names, or that serve its bets, are in scope. If none is approved yet, work only on `P0`/`P1`
+   issues it names, or that serve its bets, are in scope. A proposal is approved by the
+   `approved` label, or by Kota merging the `meta` PR that carries its bets (the Strategist
+   then adds the label): in W40–W42 every diff he was given merged within days and no prose
+   proposal or RFC was ever answered. If none is approved yet, work only on `P0`/`P1`
    bugs. Read:
    - the Roadmap issue
    - the newest Direction proposal labelled `approved`
@@ -39,6 +42,12 @@ Strategist), and §0 to §3 are the whole procedure.
    the last 7 days. After `P0`, these come first. To point Kota at something, put it under
    **Look here** at the top of the digest (at most 3 items, one line each saying why). If he
    responds to one, that is a signal about what he cares about; remember it.
+   Kota reads his phone, not GitHub comments: in W42 two `PushNotification`s were each followed
+   by a merge session within 5–13 hours, and about fifteen "queue saturated" comments on the
+   Roadmap by nothing. The Sensor may send **one** notification a day, carrying the digest's
+   Look here, and only when the `needs-kota` queue holds an item older than 3 days or a P0/P1
+   is open; the Strategist sends one with the Direction proposal. No other run notifies, except
+   for a P0 or a mistake that touched shared state. Never a status ping, never placeholder text.
 5. **Perspective taking.** Before you publish anything a person will read (a PR, an issue, an
    error message, a doc, a digest), read it once as each of:
    - someone writing their first Onion script, who knows Java or Python but not Onion
@@ -55,6 +64,9 @@ Strategist), and §0 to §3 are the whole procedure.
    - skip, delete or loosen a failing test to get green; file an issue instead
    - merge anything `risk:high`
    - edit `docs/evolution/` outside a `meta` PR
+   - write the Roadmap issue's body. Only the Strategist does, once a week. `issue_write update`
+     with a `body` *replaces* it: two W42 runs erased the roadmap that way (10-14, 10-18) meaning
+     to post an hourly note. Notes are comments (`add_issue_comment`).
    - expose secrets
    - make paid external API calls, unless the issue asks for one and a key is configured
 8. **Discipline (carried over from the original hourly routine).**
@@ -96,6 +108,12 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
 2. **Merge your own work.**
    - Merge open `evo/*` PRs (and older `kokone/*` ones) labelled `risk:low` whose checks are all green (merge commit).
    - For a `risk:high` PR, make sure it has `status:needs-kota` and is in the digest. Never merge it.
+   - **Release** when all three hold: `CHANGELOG.md`'s `[Unreleased]` has a user-visible entry,
+     the newest tag is older than 24 hours, and `develop` is green. Then dispatch `release.yml`
+     now (next minor version, see Known pitfalls) and open the changelog-cut PR (`risk:low`).
+     If any of the three is false, no release. Do not defer a due release to "a run that can
+     focus on it" and do not re-derive the rule: on 10-14 two runs read the old sentence
+     oppositely from the same facts.
 3. **Pick one issue.**
    - Candidates are open issues labelled `status:ready`, ordered by `P0` → `P3`, then oldest first.
    - Skip a `kind:rfc` without `approved`.
@@ -106,12 +124,20 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      and on prose rarely (W40: four `risk:high` PRs merged in a day, five RFCs unanswered,
      #1973 settled by his own #1974).
 4. **Work it.**
-   - First look for a concurrent session on the same issue: an open PR that names it, or a
-     branch `git ls-remote --heads origin 'evo/<issue>-*'`. If one exists, take the next
-     issue. W41 had four duplicate fixes minutes apart (#2023, #2024, #2034, #2059): a run
-     that takes over an hour meets the next firing.
-   - Label the issue `status:in-progress` and comment "Taking this" with your session link.
+   - First look for a concurrent session on the same issue: a "Taking this" comment or a
+     `status:in-progress` label on the issue, an open PR that names it, a branch
+     `git ls-remote --heads origin 'evo/<issue>-*'`, and the newest episodes in the memory
+     checkout (`ls episodes/*/ | tail -5`), which name what a run took minutes ago. If any
+     exists, take the next issue. W41 had four duplicate fixes, W42 seven (#2076 #2086 #2089
+     #2139 #2141 #2163 #2170), 3 to 57 minutes apart: a run that takes over an hour meets the
+     next firing, and a branch check made before a 25-minute build is stale by the time you
+     push. The claim is the label and the comment, which exist before any branch does.
+   - Claim before you build: label the issue `status:in-progress` and comment "Taking this"
+     with your session link **first**, then branch. A `status:in-progress` label older than
+     24 hours with no PR is a stale claim: take the issue and say so in your comment.
    - Branch `evo/<issue>-<slug>` from `develop`.
+   - Right before `git push`, re-read the issue's comments and re-run the `ls-remote`. If a
+     sibling claimed it or a PR appeared, do not push; comment once on the issue and stop.
    - Add a regression test, and run the targeted specs in both locales (CLAUDE.md Testing).
    - Open the PR with `Closes #<issue>`.
    - Label it `risk:high` if it touches any of:
@@ -138,6 +164,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      your session (cloud runs have a claude.ai/code/session link; a local run says "local").
    - Leave it open with `status:ready` if work remains, or `status:blocked` with the reason.
    - If a lesson applies beyond this issue, also comment it on the Roadmap issue, prefixed `Pitfall:`.
+     A comment, never a body update (§0.7).
 
 ## §2 Sensor (daily)
 
@@ -151,8 +178,10 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
 2. **Probe.** Run the gap-probe workflow (`.claude/workflows/onion-gap-probe.js`) on **two**
    domains, rotating through its domain list. The `Workflow` tool does run in a scheduled
    session (three W41 runs used it and found 8 of the week's 13 probe bugs; it costs about
-   1M tokens, so at most once a day across all runs). Only if the tool is denied, write the
-   probe scripts by hand for the two domains (about eight short programs each). Prefer domains
+   1M tokens, so at most once a day across all runs). The daily trigger's runs have declined it
+   as needing an explicit opt-in while the hourly trigger's runs use it (W42); until the Sensor
+   prompt says "use a workflow", or if the tool is denied, write the probe scripts by hand for
+   the two domains (about eight short programs each). Prefer domains
    no episode mentions yet (`Db`, `Archive`, `Proc`, `Net`, `Server`, `Concurrent`, `Csv`,
    `Yaml`) over OOP, generics and error quality, which were probed every day of W41. Before
    calling a failure a bug, read the stdlib's Java source: most probe "failures" are the
@@ -183,7 +212,10 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
              | "merged=\(length) closes_issue=\([.[] | select((.body // "") | test("(close[sd]?|fix(e[sd])?|resolve[sd]?) #[0-9]+"; "i"))] | length) samples=\([.[] | select(.title | test("^(feat|samples)\\((run|corpus|samples)\\)"))] | length)"'
      ```
      One page covers a loop-era week (W40: 37 PRs); if it reports `merged=100`, add `&page=2`.
-     "Not computed" is not a value; if the call fails, say what failed.
+     "Not computed" is not a value; if the call fails, say what failed. A digest with an empty
+     metric row is not a digest (W42: 2 of 6 digests had the PR-share row).
+   - Then, if the `needs-kota` queue holds an item older than 3 days or a P0/P1 is open, send
+     the one daily `PushNotification` (§0.4): the Look here lines, with issue numbers.
 
 ## §3 Strategist (weekly)
 
@@ -195,11 +227,16 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      merged PRs on non-`evo/` branches, commits with the Kokone trailer, direct pushes to
      `develop` (`git log origin/develop --first-parent --no-merges`), and merges of `risk:high`
      PRs within minutes of a firing
-   - merged and reverted PRs
+   - merged and reverted PRs, and the duplicates: closed unmerged `evo/` PRs whose issue has a
+     merged PR
    - opened and closed issues
    - CI failures
    - Sensor findings
-   - Kota's comments
+   - Kota's comments and merges. His comments have no Claude footer; his merges show as bursts
+     of `merged_by: kmizu` with `kota:look` labels nearby (REST `pulls/<n>`), since every merge
+     carries his token
+   - the Roadmap issue's body. If it is not the roadmap (themes, bets, metrics table), a run
+     overwrote it (§0.7); rewrite it from the newest "Roadmap update" comment and this week
 2. **Retro.** Open and immediately close a `kind:retro` issue. Cover:
    - what moved the metrics
    - what did not
@@ -214,7 +251,10 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    - what will *not* be done
    - risks
 
-   Act only on proposals labelled `approved`.
+   Act only on proposals labelled `approved`. Open any bet that changes this file as its own
+   `meta` PR in the same run and link it from the proposal: Kota approves by merging (§0.2).
+   Put the one-click list at the top of the proposal, and end the run with one
+   `PushNotification` that carries it (§0.4).
 5. **Consolidate (sleep).** Read the week's episodes in the memory repo.
    - Update `insights.md`: add, sharpen or retire hunches, each citing its episodes.
    - Move episodes that no longer matter to `archive/`. Never delete one.
@@ -298,5 +338,22 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
   from Kota was found in W41, and the `needs-kota` queue went from 5 to 11. Either
   make it one click (a draft PR, a checkbox with the exact command) or do what is within the
   loop's own powers, such as the `CLAUDE.md` redirect for the trigger prompt.
-- **`Workflow` runs in scheduled sessions.** W40's note that it cannot was wrong; the
-  gap-probe found 8 bugs in three W41 runs. Hand-written probes are the fallback, not the rule.
+- **`Workflow` runs in scheduled sessions, on the hourly trigger.** W40's note that it cannot
+  was wrong; the gap-probe found 8 bugs in three W41 runs and about ten more in W42. The daily
+  Sensor's runs decline it as needing an opt-in; for them, hand-written probes are the rule
+  until the Sensor prompt says "use a workflow".
+- **`issue_write update` with `body` replaces the issue body.** Two W42 runs erased the Roadmap
+  that way. Hourly notes go in `add_issue_comment`; only the Strategist writes the body.
+- **Kota reads the phone.** W42: two `PushNotification`s, two merge sessions within 5–13
+  hours; fifteen Roadmap comments about the same queue, no response. One a day, from the
+  Sensor's digest, real content only (§0.4).
+- **The claim is the label and the comment, not the branch.** Seven W42 duplicates came from
+  runs that checked branches before a long build and never read the issue (§1.4).
+- **The release rule is a trigger, not a judgment** (§1.2). Two 10-14 runs read the old
+  sentence oppositely from the same facts.
+- **The permission classifier may deny release-adjacent commands** (a `curl` poll of the
+  Actions API, `sleep`, a heredoc `git commit`, the first `git push`; 10-18). Poll with the
+  GitHub MCP tools, use `send_later` instead of `sleep`, commit with a one-line `-m` then
+  `--amend -F <file>`, and retry the push once unchanged.
+- **A stop-hook may demand a commit before the suite finishes** (five times by W42). Do not
+  comply; read the real exit code first.

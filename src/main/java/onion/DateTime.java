@@ -275,6 +275,13 @@ public final class DateTime {
     // ========== Utility ==========
 
     /**
+     * Returns the start of today (00:00:00), i.e. {@code startOfDay(now())}.
+     */
+    public static long today() {
+        return startOfDay(now());
+    }
+
+    /**
      * Returns the start of the day (00:00:00) for the given time.
      */
     public static long startOfDay(long epochMillis) {

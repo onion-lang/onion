@@ -50,7 +50,7 @@ def evaluate(pr):
     closes = ev.parse_time(approval["created_at"]) + WINDOW
     if ev.now() >= closes:
         ev.set_status(head, CONTEXT, "success", f"veto window closed {closes:%Y-%m-%d %H:%M} UTC with no veto")
-        if not ev.DRY_RUN and not still_unvetoed(number):
+        if not ev.DRY_RUN and not (still_unvetoed(number) and ev.still_approved(number)):
             ev.set_status(head, CONTEXT, "pending", "vetoed: only Kota clears a veto, by closing the PR")
             print(f"#{number}: vetoed while closing the window")
             return

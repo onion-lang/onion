@@ -265,6 +265,12 @@ def vetoed(pr, pr_comments, events=()):
     return veto_comment(pr_comments) is not None
 
 
+def still_approved(number):
+    """Re-read the PR right after writing success: a newer BLOCKED verdict or a new push wins."""
+    pr = get(f"/repos/{REPO}/pulls/{number}")
+    return panel_approval(pr, comments(number)) is not None
+
+
 def parse_time(text):
     return datetime.fromisoformat(text.replace("Z", "+00:00"))
 

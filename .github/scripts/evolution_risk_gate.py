@@ -25,8 +25,12 @@ def evaluate(pr):
         return
     approval = ev.panel_approval(pr, ev.comments(number))
     if approval:
-        ev.set_labels(pr, add=["panel:approved"], remove=["panel:changes"])
         ev.set_status(head, "evolution/risk-gate", "success", f"risk:{tier}: panel approved {head[:7]}")
+        if not ev.DRY_RUN and not ev.still_approved(number):
+            ev.set_status(head, "evolution/risk-gate", "pending",
+                          f"risk:{tier}: the panel verdict changed while approving {head[:7]}")
+            return
+        ev.set_labels(pr, add=["panel:approved"], remove=["panel:changes"])
     else:
         ev.set_labels(pr, remove=["panel:approved"])
         ev.set_status(head, "evolution/risk-gate", "pending",

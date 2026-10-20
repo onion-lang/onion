@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Passing a positional parameter as a flag says it is positional.** `greet --name kota` for `tool greet(name: String)` (or `--src a` for `def main(src: String)`) said only `unknown option`; it now adds ``name` is positional: pass the value without `--name``. The kebab-case spelling is recognized too.
+
 - **A failed call names a sibling method that takes those arguments.** `Csv::stringify(rows)` on header-mapped rows (what `csvRows()` returns) listed only `available: stringify(List[List[String]])`; it now says `did you mean: stringifyWithHeader(List[Map[String, String]])`. Applies whenever a same-kind method whose name extends the called one accepts the arguments.
 
 - **A boxed value passed to an `int`/`Object` overload picks `Object`, as Java does.** `sb.append(xs[0])` or `foreach i in 1..3 { sb.append(i) }` (a `List[Int]` element is a boxed `Integer`) failed with `E0006 applicable for both StringBuilder.append(Int) and StringBuilder.append(Object)`. Java takes the overload reached without unboxing; so does Onion now. A primitive `Int` argument still takes `append(int)`.

@@ -81,6 +81,78 @@ class CastValidationSpec extends AbstractShellSpec {
       assert(Shell.Success(5) == result)
     }
 
+    it("rejects casting a List[String] to a String[]") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val list: List[String] = ["a", "b"]
+          |    val arr = (list as String[])
+          |    return arr.length
+          |  }
+          |}
+          |""".stripMargin,
+        "ListAsStringArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects casting a String[] to a List[String]") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val arr: String[] = new String[2]
+          |    val list = (arr as List[String])
+          |    return list.size
+          |  }
+          |}
+          |""".stripMargin,
+        "StringArrayAsList.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("still allows casting Object to an array type") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val o: Object = new String[2]
+          |    val arr: String[] = (o as String[])
+          |    return arr.length
+          |  }
+          |}
+          |""".stripMargin,
+        "ObjectAsStringArray.on",
+        Array()
+      )
+      assert(Shell.Success(2) == result)
+    }
+
+    it("still allows casting an array to Object") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val arr: String[] = new String[2]
+          |    val o = (arr as Object)
+          |    return (o as String[]).length
+          |  }
+          |}
+          |""".stripMargin,
+        "StringArrayAsObject.on",
+        Array()
+      )
+      assert(Shell.Success(2) == result)
+    }
+
     it("allows casting along the class hierarchy") {
       val result = shell.run(
         """

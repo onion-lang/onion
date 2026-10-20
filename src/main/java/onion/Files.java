@@ -225,10 +225,18 @@ public final class Files {
     /**
      * Recursively copies the directory tree rooted at {@code src} into {@code dst}.
      * {@code dst} is created if it does not exist; existing files are replaced.
+     *
+     * @throws IllegalArgumentException if {@code dst} is {@code src} or lies inside it;
+     *         nothing is written in that case
      */
     public static void copyDir(String src, String dst) throws IOException {
         final java.nio.file.Path srcPath = java.nio.file.Paths.get(src);
         final java.nio.file.Path dstPath = java.nio.file.Paths.get(dst);
+        final java.nio.file.Path srcAbs = srcPath.toAbsolutePath().normalize();
+        final java.nio.file.Path dstAbs = dstPath.toAbsolutePath().normalize();
+        if (dstAbs.equals(srcAbs) || dstAbs.startsWith(srcAbs)) {
+            throw new IllegalArgumentException("cannot copy a directory into itself: " + src + " -> " + dst);
+        }
         java.nio.file.Files.walkFileTree(srcPath, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
             @Override
             public java.nio.file.FileVisitResult preVisitDirectory(

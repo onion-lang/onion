@@ -1444,6 +1444,8 @@ Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
 Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / "el"
 Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
+// 不正な入力で NumberFormatException（"not an integer: \"abc\""）を投げるパース。規則は下の null 安全版と同じ。"42".toInt() とも書ける
+Strings::toInt("42") / Strings::toLong("100") / Strings::toDouble("3.14")
 // null 安全なパース（例外を投げずに null/フォールバックを返す）
 Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
 Strings::toIntOr("nope", 0)              // 0

@@ -1428,6 +1428,12 @@ Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / 
 Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
 ```
 
+Parsing that throws `NumberFormatException` (`"not an integer: \"abc\""`) on bad input, by the same rules as the null-safe forms below; also callable as `"42".toInt()`:
+
+```onion
+Strings::toInt("42") / Strings::toLong("100") / Strings::toDouble("3.14")
+```
+
 Null-safe parsing (return `null`/fallback instead of throwing):
 
 ```onion

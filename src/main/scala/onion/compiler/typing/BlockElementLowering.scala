@@ -664,6 +664,9 @@ final class BlockElementLowering(
   private def addForeachElement(arg: AST.Argument, collection: Term, context: LocalContext, isMutable: Boolean): Unit = {
     if (context.lookupOnlyCurrentScope(arg.name) != null) {
       bodyContext.report(DUPLICATE_LOCAL_VARIABLE, arg, arg.name)
+    } else if (arg.typeRef == null) {
+      // `foreach x in xs`: no annotation, so x takes the collection's element type.
+      if (collection != null) context.add(arg.name, inferredElementType(collection.`type`), isMutable)
     } else typing.mapFrom(arg.typeRef) match { // raw-exempt: `foreach (k,v)` desugars to a raw Map$Entry placeholder that refineElementType restores
       case Some(annotated) =>
         val elementType = if (collection == null) annotated else refineElementType(annotated, collection.`type`)
@@ -685,6 +688,16 @@ final class BlockElementLowering(
         case _ => annotated
       }
     case _ => annotated
+  }
+
+  /** The type an unannotated foreach variable takes: an array's component type, an
+   *  Iterable's element type, else Object (a raw collection, or a non-iterable one
+   *  whose own error the loop reports). */
+  private def inferredElementType(collectionType: Type): Type = collectionType match {
+    case at: ArrayType =>
+      if (at.dimension == 1) at.component else bodyContext.table.loadArray(at.component, at.dimension - 1)
+    case _ =>
+      iterableElementType(collectionType).map(TypeCheckingHelpers.effectiveType).getOrElse(bodyContext.rootClass)
   }
 
   /** The element type of a collection, via its java.lang.Iterable view. */

@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A List-style call on a Java Stream says to convert it first.** `s.lines()`/`s.chars()` are Java's String methods and return a Stream, so `s.lines().size`, `.first()`, `.join(",")` or `[0]` got a misleading guess (`min`, `limit`, `map`). They now say `did you mean: toList().size` (`boxed().toList()...` for an IntStream).
+
 - **A static call on a nested class names the enclosing class's method.** `Response::json(body)` (the helpers live on `Server`, not `Server.Response`) said `did you mean: of`; it now says `did you mean: Server::json`. Applies whenever the enclosing class has a static method of that name and arity.
 
 - **Calling a String method by another language's name now names Onion's.** `s.reversed()`, `padStart`/`padEnd`, `trimStart`/`trimEnd`, `splitlines`, `title`, `find`, `includes`, `len`, `toUpper`, `splitWhitespace` and `format` gave no hint or a wrong one (`padEnd` -> `indent`, `find` -> `lines`); each now says `did you mean: reverse` (`padLeft`/`padRight`, `stripLeading`/`stripTrailing`, `lines`, `capitalizeWords`, `indexOf`, `contains`, `length`, `upper`, `words`, `formatted`).

@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A boxed value passed to an `int`/`Object` overload picks `Object`, as Java does.** `sb.append(xs[0])` or `foreach i in 1..3 { sb.append(i) }` (a `List[Int]` element is a boxed `Integer`) failed with `E0006 applicable for both StringBuilder.append(Int) and StringBuilder.append(Object)`. Java takes the overload reached without unboxing; so does Onion now. A primitive `Int` argument still takes `append(int)`.
+
 - **`aSet.toList()` compiles.** On any `Set` (`keySet()`, `entrySet()`, `Colls::toSet(...)`) it failed with `E0006 method call is applicable for both Colls.toList() and Iterables.toList()` plus a stray `E0005`. The more specific `toList(Set)` now wins over `toList(Iterable)`, as Java overload resolution would; the result is `Colls::toList`'s unmodifiable list.
 
 - **Calling a `List` method by the name another language gives it now names Onion's spelling.** `xs.sortBy { ... }` suggested `sort`, `xs.forall { ... }` suggested `addAll`, `xs.each { ... }` suggested `add`, and `joinToString`/`foldLeft`/`inject`/`sumOf`/`unique`/`nonEmpty`/`collect`/`sortByDescending` suggested nothing. Each now says `did you mean: sortedBy` (`all`, `forEach`, `join`, `fold`, `sumBy`, `distinct`, `isNotEmpty`, `map`, `sortedByDescending`).

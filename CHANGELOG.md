@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The `List` pipeline works on an array of references, so `line.split(" ").distinct()` needs no `.toList()`.** An array (`String.split`'s result, `main`'s `args`) had only `map`/`filter`/`toList`; `distinct`, `groupBy`, `sortedBy`, `join`, `take`, `first`, `count` and the rest were E0005. Each now applies to the elements as a `List` and returns what the `List` method returns. Arrays of primitives (`new Int[n]`) are unchanged.
+
 ### Fixed
 
 - **Calling a `List` method by the name another language gives it now names Onion's spelling.** `xs.sortBy { ... }` suggested `sort`, `xs.forall { ... }` suggested `addAll`, `xs.each { ... }` suggested `add`, and `joinToString`/`foldLeft`/`inject`/`sumOf`/`unique`/`nonEmpty`/`collect`/`sortByDescending` suggested nothing. Each now says `did you mean: sortedBy` (`all`, `forEach`, `join`, `fold`, `sumBy`, `distinct`, `isNotEmpty`, `map`, `sortedByDescending`).

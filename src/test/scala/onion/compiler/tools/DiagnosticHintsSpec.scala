@@ -103,6 +103,55 @@ class DiagnosticHintsSpec extends AnyFunSpec {
       assert(errors.exists(_.contains("Colls::toList(xs)")), s"expected a Colls::toList hint, got: $errors")
     }
 
+    it("suppresses the toArray hint for a primitive-component List[Int] as Int[] cast, since toArray has no such overload") {
+      val errors = compile(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val xs: List[Int] = [1, 2]
+          |    val a = (xs as Int[])
+          |    return a.length
+          |  }
+          |}
+        """.stripMargin
+      )
+      assert(errors.forall(!_.contains("toArray")), s"did not expect a toArray hint for a primitive array, got: $errors")
+      assert(errors.forall(!_.contains("Consider a cast")), s"did not expect a misleading 'consider a cast' here, got: $errors")
+    }
+
+    it("suppresses the Colls::toList hint for a primitive-component Int[] as List[Int] cast, since toList has no such overload") {
+      val errors = compile(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val arr: Int[] = new Int[2]
+          |    val list = (arr as List[Int])
+          |    return list.size
+          |  }
+          |}
+        """.stripMargin
+      )
+      assert(errors.forall(!_.contains("Colls::toList")), s"did not expect a Colls::toList hint for a primitive array, got: $errors")
+    }
+
+    it("hints at a fully-dimensioned array literal for a List[Int[]] as Int[][] cast") {
+      val errors = compile(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val xs: List[Int[]] = [new Int[1], new Int[2]]
+          |    val a = (xs as Int[][])
+          |    return a.length
+          |  }
+          |}
+        """.stripMargin
+      )
+      assert(errors.exists(_.contains("toArray(new Int[0][0])")), s"expected a fully-dimensioned toArray hint, got: $errors")
+    }
+
     it("does not add the List/array hint for an ordinary incompatible cast") {
       val errors = compile(
         """

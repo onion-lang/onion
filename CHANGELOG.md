@@ -35,7 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`(aList as String[])` (any `List[T] as T[]` cast, and the reverse) now gets a compile-time error naming the real conversion, instead of a runtime crash (#2258).** Before: the cast type-checked, then threw a raw `java.lang.ClassCastException` at runtime. Now: `[E0000]` at compile time, with a hint -- `xs.toArray(new String[0])` (array to List: `Colls::toList(xs)`). `(arr as Object)` and `(obj as String[])` (`obj: Object`) are unaffected and keep working.
+- **`(aList as String[])` (any `List[T] as T[]` cast, and the reverse) is now a compile-time error, not a runtime crash (#2258).**
+  - Before: the cast type-checked, then threw a raw `ClassCastException` at runtime.
+  - Now: `[E0000]` at compile time, with a hint naming the real conversion -- `xs.toArray(new String[0])` (array to List: `Colls::toList(xs)`). A primitive element type (`Int[]`) has no such hint, since neither call has an overload for it. `(arr as Object)` and `(obj as String[])` keep working.
 - **A List-style call on a Java Stream says to convert it first.** `s.lines()`/`s.chars()` are Java's String methods and return a Stream, so `s.lines().size`, `.first()`, `.join(",")` or `[0]` got a misleading guess (`min`, `limit`, `map`). They now say `did you mean: toList().size` (`boxed().toList()...` for an IntStream).
 - **A static call on a nested class names the enclosing class's method.** `Response::json(body)` (the helpers live on `Server`, not `Server.Response`) said `did you mean: of`; it now says `did you mean: Server::json`. Applies whenever the enclosing class has a static method of that name and arity.
 

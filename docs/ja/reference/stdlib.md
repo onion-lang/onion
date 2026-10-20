@@ -1613,7 +1613,8 @@ Maps::mapValues(m, (v: Int) -> v * 2) / Maps::mapKeys(m, (k: String) -> k.toUppe
 Maps::filterValues(m, (v: Int) -> v > 0) / Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
 Maps::filter(m, (k: String, v: Int) -> v > 0) // キー+値の述語
 Maps::invert(m)                               // キーと値を入れ替え
-Maps::toList(m, (k: String, v: Int) -> k + "=" + v)  // エントリ -> List
+Maps::map(m, (k: String, v: Int) -> k + "=" + v)     // エントリ -> List。m.map { k, v -> ... } とも書ける
+Maps::toList(m, (k: String, v: Int) -> k + "=" + v)  // エントリ -> List（map と同じ）
 Maps::forEach(m, (k: String, v: Int) -> println(k))
 Maps::count(m, p) / Maps::anyEntry(m, p) / Maps::allEntries(m, p)
 Maps::groupBy(items, keyOf)                   // Map[K, List]

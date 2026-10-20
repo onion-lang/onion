@@ -245,6 +245,15 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.js_style_const")
       case "$" =>
         hint("error.parsing.hint.dollar_sigil")
+      // `law`/`example` parse only directly inside a record's own body (the
+      // `record_body` grammar production). Anywhere else -- a class/enum body,
+      // top level, ... -- they are ordinary identifiers that the current
+      // declaration-start production doesn't accept, so without this case
+      // `law name(...) { ... }` fell through to the unrelated Java-style-method
+      // fallback below (it has the same `Type name(...)` shape) and a bare
+      // `example { ... }` got no hint at all.
+      case "law" | "example" =>
+        hint("error.parsing.hint.law_example_outside_record", found)
       case "instanceof" if InstanceofExpression.findFirstMatchIn(sourceLine).isDefined =>
         val matched = InstanceofExpression.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.instanceof_not_supported", matched.group(1), matched.group(2))

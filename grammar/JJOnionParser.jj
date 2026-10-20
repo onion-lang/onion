@@ -2651,6 +2651,11 @@ AST.ForeachExpression foreach_expression() :{Token t, k = null, v = null; AST.Ar
     "(" k=id() "," v=id() ")" (LOOKAHEAD({la("in")}) id()) {enterCondition();} e=term() {leaveCondition();} b=block() {
       return desugarMapForeach(p(t), c(k), c(v), e, b);
     }
+  | LOOKAHEAD({getToken(2).image.equals("in")})
+    k=id() id() {enterCondition();} e=term() {leaveCondition();} b=block() {
+      // `foreach x in xs`: no annotation; typing infers x from the collection's type.
+      return new AST.ForeachExpression(p(t), new AST.Argument(p(k), c(k), null, null, false), e, b);
+    }
   | a=argument() (LOOKAHEAD({la("in")}) id()) {enterCondition();} e=term() {leaveCondition();} b=block() {
       return new AST.ForeachExpression(p(t), a, e, b);
     }

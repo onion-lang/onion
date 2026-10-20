@@ -1417,6 +1417,20 @@ def isRound(sh: Shape): Boolean {
 A comma-joined list of plain value patterns (`case 1, 2, 3:`) is unaffected —
 only a type, destructuring, regex, or bare binding pattern triggers this.
 
+### `E0101` — Lambda has the wrong number of parameters
+
+A lambda's parameter count differs from that of the function type expected for
+it. The message gives both counts and the expected type.
+
+```onion
+val m = ["a": 1, "b": 2]
+m.filter { e -> e.getValue() > 0 }      // E0101: Map's filter takes (key, value)
+[1, 2].fold(0) { acc -> acc }           // E0101: fold's function takes (acc, element)
+```
+
+Fix: write the lambda with the parameters the function type takes —
+`m.filter { k, v -> v > 0 }`, `[1, 2].fold(0) { acc, x -> acc + x }`.
+
 ### `E0069` — Local val requires an initializer
 
 A local `val` was declared without an initializer (no `= expr`). Unlike a
@@ -1860,6 +1874,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0098` | enum … mixes shared parameters with `case` cases |
 | `E0099` | enum … cannot take type parameters |
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
+| `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
 
 ## See also
 

@@ -1,6 +1,7 @@
 package onion;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,10 +55,22 @@ public final class Json {
      * @throws JsonParseException if the JSON is invalid
      */
     public static Object parse(String json) throws JsonParseException {
+        return parse(json, null);
+    }
+
+    /**
+     * Parses like {@link #parse(String)}, and records where each value of every object and
+     * array starts: {@code positions} maps a parsed Map or List (by identity) to a table from
+     * its keys (or indexes) to the character offset of the value. Package-private: this is
+     * what lets a shape point a defect at the field's own line.
+     */
+    static Object parse(String json, java.util.IdentityHashMap<Object, Map<Object, Integer>> positions)
+            throws JsonParseException {
         if (json == null) {
             throw new JsonParseException("JSON string is null", 0);
         }
         JsonParser parser = new JsonParser(json);
+        parser.positions = positions;
         Object result = parser.parseValue();
         parser.skipWhitespace();
         if (!parser.isEOF()) {
@@ -270,6 +283,7 @@ public final class Json {
     private static class JsonParser {
         private final String json;
         private int position = 0;
+        java.util.IdentityHashMap<Object, Map<Object, Integer>> positions;
 
         JsonParser(String json) {
             this.json = json;
@@ -303,6 +317,13 @@ public final class Json {
             }
         }
 
+        private Map<Object, Integer> track(Object container) {
+            if (positions == null) return null;
+            Map<Object, Integer> at = new HashMap<>();
+            positions.put(container, at);
+            return at;
+        }
+
         Object parseValue() throws JsonParseException {
             skipWhitespace();
             if (isEOF()) {
@@ -334,6 +355,7 @@ public final class Json {
 
         Map<String, Object> parseObject() throws JsonParseException {
             Map<String, Object> result = new LinkedHashMap<>();
+            Map<Object, Integer> at = track(result);
             consume(); // consume '{'
             skipWhitespace();
 
@@ -363,6 +385,7 @@ public final class Json {
                 skipWhitespace();
 
                 // Parse value
+                if (at != null) at.put(key, position);
                 Object value = parseValue();
                 result.put(key, value);
 
@@ -384,6 +407,7 @@ public final class Json {
 
         List<Object> parseArray() throws JsonParseException {
             List<Object> result = new ArrayList<>();
+            Map<Object, Integer> at = track(result);
             consume(); // consume '['
             skipWhitespace();
 
@@ -395,6 +419,7 @@ public final class Json {
 
             while (true) {
                 skipWhitespace();
+                if (at != null) at.put(result.size(), position);
                 Object value = parseValue();
                 result.add(value);
 

@@ -1547,6 +1547,7 @@ Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // List of entry names
 Files::listFiles("dir")                // List of java.io.File entries
 Files::glob("dir", "*.on")             // glob-matched names
+Files::walk("dir")                     // every file under dir, recursively: relative paths, sorted
 Files::delete(path) / Files::exists(path)
 Files::isFile(path) / Files::isDirectory(path)
 Files::mkdirs(path)                    // creates dir + missing parents
@@ -2147,6 +2148,9 @@ xs + ys                           // same as concat (also xs.plus(ys), xs += ys)
 xs.associateBy { x -> key(x) }    // Map key -> element; a later element wins a shared key
 xs.indexOfFirst { x -> x > 6 }    // index of the first match, or -1
 xs.maxOrNull() / xs.minOrNull()   // like max()/min(), but null for an empty list
+foreach (i, x) in xs.withIndex() { ... }   // withIndex(): ordered Map index -> element
+xs.mapIndexed { i, x -> x + i }   // map with each element's index
+xs.forEachIndexed { i, x -> ... } // forEach with each element's index
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - one level of nesting removed
 xs.flatMap { x -> [x, x] }        // maps each element to a list, then flattens one level
                                    // (bind is an alias, used by do[List] { x <- xs; ... })
@@ -2477,6 +2481,7 @@ DateTime::monthName(epochMillis): String  // "March"
 ```
 DateTime::of(year, month, day): Long
 DateTime::of(year, month, day, hour, minute, second): Long
+DateTime::today(): Long                 // = startOfDay(now())
 DateTime::startOfDay(epochMillis): Long
 DateTime::endOfDay(epochMillis): Long
 ```

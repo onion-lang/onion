@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`<`, `<=`, `>`, `>=` compare any `Comparable`: `"abc" < "abd"`, two `LocalDate`s, `BigDecimal`s.** They accepted only numbers (`E0001 operator < is not applicable for type String, String`). On a non-null operand with `compareTo` they now mean `a.compareTo(b) < 0` etc., as in Kotlin; numeric comparison is unchanged.
+
+- **`DateTime::today()` returns the start of today**, as `DateTime::startOfDay(DateTime::now())` does. It was `E0005` (`did you mean: day`).
+- **`Files::walk(dir)` lists every file under a directory, recursively.** It was `E0005`; the recursive listing existed only as `Files::glob(dir, "**")`, which also returns directories. `walk` returns the regular files as `/`-separated paths relative to `dir`, sorted (empty for a non-directory).
+
+- **Indexed iteration: `foreach (i, x) in xs.withIndex()`, `xs.mapIndexed { i, x -> ... }`, `xs.forEachIndexed { i, x -> ... }`.** Walking a list with indices needed a C-style `for var i` loop; `withIndex`/`zipWithIndex`/`indexed`/`mapIndexed` were all `E0005`. `withIndex()` returns an ordered index -> element Map, which the existing `(k, v)` foreach form walks; `zipWithIndex`/`indexed` hint at it.
+
 - **`Http.Response` has `status()`, `body()` and `headers()` methods.** Only the fields existed, so `res.status()` -- the spelling `Server.Response.status()`, `HttpFailure.kind()` and record accessors use -- was `E0005`. The fields keep working.
 
 - **`xs.associateBy { ... }`, `xs.indexOfFirst { ... }`, `xs.maxOrNull()`, `xs.minOrNull()`.** Index a list by a key (later element wins), find the first matching index (-1 if none), and take a max/min that is null for an empty list (`max()`/`min()` throw). `firstOrNull`/`lastOrNull` now hint at `first`/`last`, which already return null on an empty list.
@@ -29,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`Yaml::stringify`/`Yaml::parse` silently mangled data outside the documented flat-only scope instead of raising an error (#2239).** A nested `Map`/`List` value stringified as Java's `toString()` (`c: {d=1}`), which does not parse back to the original data; parsing an indented child mapping flattened it and hoisted the child's keys to the top level with no error; a flow collection (`[1, 2]`) or an anchor/alias (`&x`/`*x`) value came back as a literal `String`. `Yaml::stringify` now throws `IllegalArgumentException` on a nested Map/List value, and `Yaml::parse` now throws `Yaml.YamlParseException` naming the unsupported construct in each of these cases.
+- **A List-style call on a Java Stream says to convert it first.** `s.lines()`/`s.chars()` are Java's String methods and return a Stream, so `s.lines().size`, `.first()`, `.join(",")` or `[0]` got a misleading guess (`min`, `limit`, `map`). They now say `did you mean: toList().size` (`boxed().toList()...` for an IntStream).
+
 - **A static call on a nested class names the enclosing class's method.** `Response::json(body)` (the helpers live on `Server`, not `Server.Response`) said `did you mean: of`; it now says `did you mean: Server::json`. Applies whenever the enclosing class has a static method of that name and arity.
 
 - **Calling a String method by another language's name now names Onion's.** `s.reversed()`, `padStart`/`padEnd`, `trimStart`/`trimEnd`, `splitlines`, `title`, `find`, `includes`, `len`, `toUpper`, `splitWhitespace` and `format` gave no hint or a wrong one (`padEnd` -> `indent`, `find` -> `lines`); each now says `did you mean: reverse` (`padLeft`/`padRight`, `stripLeading`/`stripTrailing`, `lines`, `capitalizeWords`, `indexOf`, `contains`, `length`, `upper`, `words`, `formatted`).
@@ -57,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`private:`/`public:`/`protected:` written inside an `extension`/`instance` block now gets a hint explaining the block has no access sections, instead of a bare "Encountered \"private\", but expecting \"def\"" (#2206).** Both block kinds are a flat list of `def` members with no access-section alternative, unlike a class/record/enum body, which always succeeds via one instead of ever reaching this error.
 - **`law`/`example` written outside a record's own body now says so, instead of a wrong or missing hint** (#2202). `law name(...) { ... }` in a `class`/`enum` body got the unrelated "write `def method(): void { ... }`" advice (it has the same `Ident Ident(...)` shape as a genuine Java-style method mistake), and a bare `example { ... }` got no hint at all. Both now point at the one place the clause actually parses: directly inside a record's body.
 - **`set.map { ... }` now keeps insertion order, like `Sets::map`.** The pipeline form resolved to `Iterables::map`, which collected into a plain `HashSet`, so the same operation reordered results depending on call syntax (#2178). `null` handling still differs (`a.map` throws, `Sets::map` returns an empty set).
 - **`Outcome::bad([])` silently built a `Bad` with no defects, breaking the type's own documented "Never empty" invariant** (#2177). `bad.isBad()` was `true` while `bad.defects().size` was `0` and `bad.describe()` returned `""` -- a failure that reported no reason at all. `Outcome.Bad`'s constructor now rejects a null or empty defects list with `IllegalArgumentException`; every internal caller already guards against this, so only direct misuse from Onion code is affected.

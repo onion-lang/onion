@@ -686,7 +686,13 @@ class SemanticErrorReporter(threshold: Int) {
 
   // ========== Main report method ==========
 
+  /** Lambdas already reported as LAMBDA_ARITY_MISMATCH. Overload resolution can type
+   *  the same lambda once per candidate (`map(List)` and `map(Iterable)`), and its
+   *  parameter count is wrong against every one of them alike, so one report is enough. */
+  private val arityMismatchPositions = scala.collection.mutable.Set.empty[Location]
+
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
+    if (error == SemanticError.LAMBDA_ARITY_MISMATCH && position != null && !arityMismatchPositions.add(position)) return
     errorCount += 1
     currentError = error
 
@@ -1288,6 +1294,10 @@ object SemanticErrorReporter {
     SemanticError.MULTIPLE_BINDING_PATTERNS_IN_CASE -> ErrorDef(
       "error.semantic.multipleBindingPatternsInCase",
       Seq()
+    ),
+    SemanticError.LAMBDA_ARITY_MISMATCH -> ErrorDef(
+      "error.semantic.lambdaArityMismatch",
+      Seq(items => items(0).toString, items => typeName(items(1).asInstanceOf[TypedAST.Type]), items => items(2).toString)
     )
   )
 

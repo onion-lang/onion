@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A lambda with the wrong number of parameters is now `E0101`, naming both counts.** `m.filter { e -> ... }` on a Map, `xs.map { a, b -> ... }` or `xs.fold(0) { acc -> ... }` reported `E0005: a method applicable for Function2[String, Int, Boolean].call(Object) is not found` (twice for `map`), pointing at the function interface's internal `call` method. It now says `this lambda takes 1 parameter(s), but the expected function type Function2[String, Int, Boolean] takes 2.`, once.
+
 - **`"42".toInt()`, `.toLong()` and `.toDouble()` read a number, throwing on bad input.** These were E0005 (`did you mean: trim`), leaving `Integer::parseInt` or the null-returning `toIntOrNull`. They follow the `OrNull` forms' rules (surrounding spaces allowed; `toDouble` rejects `1d`/`NaN`/`Infinity`) and throw `NumberFormatException: not an integer: "abc"` (or `not a number: ...`). Also `Strings::toInt(s)`.
 - **The `List` pipeline works on an array of references, so `line.split(" ").distinct()` needs no `.toList()`.** An array (`String.split`'s result, `main`'s `args`) had only `map`/`filter`/`toList`; `distinct`, `groupBy`, `sortedBy`, `join`, `take`, `first`, `count` and the rest were E0005. Each now applies to the elements as a `List` and returns what the `List` method returns. Arrays of primitives (`new Int[n]`) are unchanged.
 

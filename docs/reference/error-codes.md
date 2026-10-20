@@ -858,8 +858,10 @@ For an inline pattern, write `shape name = re"..."`.
 
 A concrete class implementing `onion.Shape[T]` directly (rather than deriving one via
 `shape`/`from re"..."`) must assert at least one machine-checked `law` or `example` in
-its file. A derived shape's round-trip is guaranteed by construction; a hand-written
-one only *claims* it, so the claim must be checked.
+its file that actually exercises it — constructs it, calls or reads one of its members, or
+type-tests against it. A derived shape's round-trip is guaranteed by construction; a
+hand-written one only *claims* it, so the claim must be checked, and a `law`/`example` that
+never touches the class doesn't check anything about it.
 
 ```onion
 class FixedWidth conforms Shape[Person] {
@@ -870,11 +872,11 @@ public:
   def print(v: Person): String { ... }
   def describe(): String = "fixed-width Person"
 }
-// E0080: nothing in this file asserts a law for FixedWidth
+// E0080: nothing in this file asserts a law that exercises FixedWidth
 ```
 
-Fix: add a top-level `example` (or the class's own `law`) — the canonical claim is the
-round-trip `s.parse(s.print(v)).get() == v`:
+Fix: add a top-level `example` (or the class's own `law`) that constructs or calls
+`FixedWidth` — the canonical claim is the round-trip `s.parse(s.print(v)).get() == v`:
 
 ```onion
 example fixedWidthL1 {
@@ -1874,7 +1876,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0077` | tool `…` performs `…` here (calling …) but does not declare it |
 | `E0078` | tool `…` declares capability `…` but nothing in its body can perform it |
 | `E0079` | tool `…` has an invalid capability `…`: … |
-| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law |
+| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law that exercises it |
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |

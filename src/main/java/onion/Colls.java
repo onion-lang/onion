@@ -774,6 +774,14 @@ public final class Colls {
     }
 
     /**
+     * The {@code +} operator on two lists: {@code [1, 2] + [3]} is {@code [1, 2, 3]}.
+     * Same as {@link #concat(List, List)}; neither operand is changed.
+     */
+    public static <T> List<T> plus(List<T> list1, List<T> list2) {
+        return concat(list1, list2);
+    }
+
+    /**
      * Returns the size of a collection.
      * @param collection the collection
      * @param <T> the element type

@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`String::format("%s", null)` and `c.update(sql, 1, null)` no longer warn W0012.**
   - Before: a `null` into any parameter of a Java method warned, with a fix (`T?`) the caller cannot apply.
   - Now: a Java parameter's nullness is unknown, so it does not warn. An Onion method (also one compiled separately) and a receiver's own type argument (`xs.add(null)` on a `List[String]`) still warn.
+- **`var x: Long = 99999999999` names the problem: the literal is out of range for `Int`.**
+  - Before: `Syntax error. Encountered "\n", but expecting valid token`, at the next token.
+  - Now: `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal`, at the literal. Long, Byte and Short literals get their own message (#2257).
 
 ## [0.144.0] - 2026-10-20
 

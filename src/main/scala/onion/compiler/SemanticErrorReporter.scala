@@ -160,7 +160,13 @@ class SemanticErrorReporter(threshold: Int) {
         items(4).asInstanceOf[TypedAST.ObjectType].methods.filter(_.name == name).toSeq
       else Seq.empty
     val suggestion =
-      if (sameName.nonEmpty) {
+      if (!calledStatically && ForeignStringNames.contains(name) && isStringType(targetType)) {
+        // The String counterpart of ForeignCollectionNames: Kotlin `reversed`/`padStart`, Python
+        // `splitlines`/`title`/`find`, JavaScript `includes`/`trimStart` -- same operation, Onion's
+        // name. Ahead of the same-name branch, which would otherwise answer `s.format(3)` with
+        // the static `String.format` an instance call cannot reach.
+        Some(format(message("suggestion.didYouMean"), Seq(ForeignStringNames(name))))
+      } else if (sameName.nonEmpty) {
         val signatures = sameName.take(3).map { m =>
           s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
@@ -350,6 +356,28 @@ class SemanticErrorReporter(threshold: Int) {
     "firstOrNull" -> "first",
     "lastOrNull" -> "last"
   )
+
+  /** Other languages' names for a String operation -> Onion's name for it. */
+  private val ForeignStringNames: Map[String, String] = Map(
+    "reversed" -> "reverse",
+    "format" -> "formatted",
+    "padStart" -> "padLeft",
+    "padEnd" -> "padRight",
+    "toUpper" -> "upper",
+    "splitWhitespace" -> "words",
+    "trimStart" -> "stripLeading",
+    "trimEnd" -> "stripTrailing",
+    "splitlines" -> "lines",
+    "len" -> "length",
+    "find" -> "indexOf",
+    "includes" -> "contains",
+    "title" -> "capitalizeWords"
+  )
+
+  private def isStringType(t: TypedAST.Type): Boolean = t match
+    case n: TypedAST.NullableType => isStringType(n.innerType)
+    case ct: TypedAST.ClassType => rawOf(ct).name == "java.lang.String"
+    case _ => false
 
   /** Whether `t` is `java.util.List` or a class implementing it. */
   private def isListType(t: TypedAST.Type): Boolean = {

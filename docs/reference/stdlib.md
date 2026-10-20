@@ -2988,7 +2988,8 @@ Maps::filterValues(m, (v: Int) -> v > 0)
 Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
 Maps::filter(m, (k: String, v: Int) -> v > 0)        // key+value predicate
 Maps::invert(m)                                       // swap keys and values
-Maps::toList(m, (k: String, v: Int) -> k + "=" + v)   // entries -> List
+Maps::map(m, (k: String, v: Int) -> k + "=" + v)      // entries -> List; m.map { k, v -> ... }
+Maps::toList(m, (k: String, v: Int) -> k + "=" + v)   // entries -> List (same as map)
 Maps::forEach(m, (k: String, v: Int) -> println(k))
 ```
 

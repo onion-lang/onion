@@ -139,7 +139,7 @@ val i: Int = (3.14 as Int)
 val name: Type = expr     // 不変
 var name: Type = expr     // 可変
 val inferred = expr       // ローカル型推論
-val (a, b) = recordValue  // 分解（records / Map.Entry）
+val (a, b) = recordValue  // 分解（records / Map.Entry / List は添字順）
 ```
 
 ### 関数

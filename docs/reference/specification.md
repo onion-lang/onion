@@ -145,7 +145,7 @@ val i: Int = (3.14 as Int)
 val name: Type = expr     // immutable
 var name: Type = expr     // mutable
 val inferred = expr       // local type inference
-val (a, b) = recordValue  // destructuring (records / Map.Entry)
+val (a, b) = recordValue  // destructuring (records / Map.Entry / a List by index)
 ```
 
 ### Functions

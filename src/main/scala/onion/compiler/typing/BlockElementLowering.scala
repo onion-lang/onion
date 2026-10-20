@@ -758,6 +758,51 @@ final class BlockElementLowering(
       new ExpressionActionStatement(node.location, term)
   }
 
+  /** `List.get(int)` when `tp` is a `java.util.List`, for positional destructuring. */
+  private def listGet(tp: Type): Option[Method] = tp match {
+    case ct: ClassType =>
+      bodyContext.table.load("java.util.List") match {
+        case Some(listType) if TypeRules.isSuperType(listType, ct) =>
+          ct.methods("get").find(m => m.arguments.length == 1 && m.arguments(0) == BasicType.INT && !Modifier.isStatic(m.modifier))
+        case _ => None
+      }
+    case _ => None
+  }
+
+  /**
+   * `val (a, b) = aList` binds the i-th name to `aList.get(i)`, typed as the List's
+   * element type. The count is unknown statically: a shorter list throws
+   * IndexOutOfBoundsException at `get`, and extra elements are ignored.
+   */
+  private def destructureList(
+    node: AST.DestructuringDeclaration,
+    context: LocalContext,
+    initTerm: Term,
+    initType: Type,
+    get: Method
+  ): ActionStatement = {
+    val elementType = iterableElementType(initType).map(TypeCheckingHelpers.effectiveType).getOrElse(bodyContext.rootClass)
+    val statements = Buffer[ActionStatement]()
+    val tmpIndex = context.add(context.newName, initType, isMutable = false)
+    statements += new ExpressionActionStatement(new SetLocal(node.location, 0, tmpIndex, initType, initTerm))
+    var i = 0
+    while (i < node.names.length) {
+      val name = node.names(i)
+      if (context.lookupOnlyCurrentScope(name) != null) {
+        bodyContext.report(DUPLICATE_LOCAL_VARIABLE, node, name)
+        return new NOP(node.location)
+      }
+      typing.checkAndReportShadowing(name, node.location, context)
+      val index = context.add(name, elementType, isMutable = !Modifier.isFinal(node.modifiers))
+      context.recordDeclaration(name, node.location)
+      val call = new Call(new RefLocal(0, tmpIndex, initType), get, Array[Term](new IntValue(i)))
+      statements += new ExpressionActionStatement(
+        new SetLocal(node.location, 0, index, elementType, TypeSubst.withCast(call, elementType)))
+      i += 1
+    }
+    new StatementBlock(statements.toIndexedSeq*)
+  }
+
   /**
    * val (a, b) = expr — evaluates expr once into a synthetic local, then
    * binds each name to the corresponding positional component (record
@@ -809,6 +854,11 @@ final class BlockElementLowering(
         bodyContext.report(NULLABLE_MEMBER_ACCESS, node.init, nullable.displayName)
         return new NOP(node.location)
       case _ =>
+    }
+
+    listGet(initType) match {
+      case Some(get) => return destructureList(node, context, initTerm, initType, get)
+      case None =>
     }
 
     accessors(initType) match {

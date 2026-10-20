@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`String::format("%s", null)` and `c.update(sql, 1, null)` no longer warn W0012.**
+  - Before: a `null` into any parameter of a Java method warned, with a fix (`T?`) the caller cannot apply.
+  - Now: a Java parameter's nullness is unknown, so it does not warn. An Onion method (also one compiled separately) and a receiver's own type argument (`xs.add(null)` on a `List[String]`) still warn.
+
 ## [0.144.0] - 2026-10-20
 
 ### Breaking
@@ -74,9 +80,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`String::format("%s", null)` and `c.update(sql, 1, null)` no longer warn W0012.**
-  - Before: a `null` into any parameter of a Java method warned, with a fix (`T?`) the caller cannot apply.
-  - Now: a Java parameter's nullness is unknown, so it does not warn. An Onion method (also one compiled separately) and a receiver's own type argument (`xs.add(null)` on a `List[String]`) still warn.
 - **`private:`/`public:`/`protected:` written inside an `extension`/`instance` block now gets a hint explaining the block has no access sections, instead of a bare "Encountered \"private\", but expecting \"def\"" (#2206).** Both block kinds are a flat list of `def` members with no access-section alternative, unlike a class/record/enum body, which always succeeds via one instead of ever reaching this error.
 - **`law`/`example` written outside a record's own body now says so, instead of a wrong or missing hint** (#2202). `law name(...) { ... }` in a `class`/`enum` body got the unrelated "write `def method(): void { ... }`" advice (it has the same `Ident Ident(...)` shape as a genuine Java-style method mistake), and a bare `example { ... }` got no hint at all. Both now point at the one place the clause actually parses: directly inside a record's body.
 - **`set.map { ... }` now keeps insertion order, like `Sets::map`.** The pipeline form resolved to `Iterables::map`, which collected into a plain `HashSet`, so the same operation reordered results depending on call syntax (#2178). `null` handling still differs (`a.map` throws, `Sets::map` returns an empty set).

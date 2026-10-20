@@ -32,7 +32,7 @@ Java の API は検査しません。コンパイラはその null 許容性を�
 
 - Java メソッドの戻り値。
 - Java メソッドへの `null` 引数。`String::format("%s", null)` や `Http::encodeUrl(null)` は警告しません。
-- ただし、引数の型がレシーバの型引数そのものなら警告します。`List[String]` への `xs.add(null)` は、`String` を選んだのが自分だからです。
+- ただし、引数の型がレシーバの型引数そのものなら警告します。`List[String]` への `xs.add(null)` は警告されます。`String` を選んだのが自分だからです。
 
 Onion で書いたメソッドは警告します。別にコンパイルしたもの（プロジェクトの `tests/` から `src/` を呼ぶ場合や、Onion ライブラリの jar）も同じです。
 

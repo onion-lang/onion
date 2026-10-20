@@ -1,7 +1,7 @@
 package onion.compiler.environment
 
 import onion.compiler.{TypedAST, Modifier, OnionTypeConversion, MultiTable, OrderedTable, ClassTable}
-import org.objectweb.asm.{ClassReader, Opcodes, Type}
+import org.objectweb.asm.{ClassReader, ClassVisitor, Opcodes, Type}
 import org.objectweb.asm.signature.{SignatureReader, SignatureVisitor}
 import org.objectweb.asm.tree.{ClassNode, MethodNode, FieldNode}
 import scala.collection.mutable
@@ -289,11 +289,12 @@ object AsmRefs {
     }
   }
 
-  class AsmMethodRef(method: MethodNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.Method {
-    // Loaded straight from a .class file by name/descriptor, with no Onion source behind
-    // it in this compilation -- the JDK and every hand-written src/main/java/onion/* stdlib
-    // class arrive this way. See RFC #2117 / issue #2116.
-    override val isJavaOrigin: Boolean = true
+  class AsmMethodRef(method: MethodNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType], onionCompiled: Boolean = false) extends TypedAST.Method {
+    // A class file that javac (or any non-Onion compiler) wrote -- the JDK and every
+    // hand-written src/main/java/onion/* stdlib class. A separately compiled Onion class
+    // records its parameters' nullness (NullabilityMetadata), so it is not Java origin.
+    // See RFC #2117 / issue #2116.
+    override val isJavaOrigin: Boolean = !onionCompiled
     override val modifier: Int = toOnionModifier(method.access)
     override val name: String = method.name
     override val isVararg: Boolean = (method.access & Opcodes.ACC_VARARGS) != 0
@@ -355,6 +356,16 @@ object AsmRefs {
       n
     }
 
+    // Whether an Onion compilation wrote this class: its SourceFile attribute names a `.on`
+    // file (codegen always emits one). SKIP_DEBUG above drops that attribute, so read it alone.
+    private val onionCompiled: Boolean = {
+      var source: String = null
+      new ClassReader(classBytes).accept(new ClassVisitor(Opcodes.ASM9) {
+        override def visitSource(file: String, debug: String): Unit = source = file
+      }, ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES)
+      source != null && source.endsWith(".on")
+    }
+
     private val modifier_ = toOnionModifier(node.access)
     private def root: TypedAST.ClassType = if (node.name == "java/lang/Object") this else table.loadRequired("java.lang.Object")
     private val genericMapper = new SignatureTypeMapper(table, Map.empty, () => root)
@@ -374,7 +385,7 @@ object AsmRefs {
       val m = new MultiTable[TypedAST.Method]
       import scala.jdk.CollectionConverters._
       for (method <- node.methods.asInstanceOf[java.util.List[MethodNode]].asScala if method.name != CONSTRUCTOR_NAME) {
-        m.add(new AsmMethodRef(method, this, table, classEnv))
+        m.add(new AsmMethodRef(method, this, table, classEnv, onionCompiled))
       }
       m
     }

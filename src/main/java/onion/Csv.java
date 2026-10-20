@@ -27,7 +27,9 @@ public final class Csv {
      * doubled quotes ("") are literal. A single newline at the very end of the
      * text does not add a phantom extra row; a genuinely blank line -- including
      * one at the end -- is parsed like any other line and becomes a row with one
-     * empty-string field, not dropped.
+     * empty-string field, not dropped. A single leading UTF-8 byte-order mark
+     * (U+FEFF, as written by Excel's "CSV UTF-8") is an encoding marker and is
+     * skipped, so it never becomes part of the first field.
      *
      * @throws IllegalArgumentException if a quoted field is never closed
      */
@@ -40,7 +42,7 @@ public final class Csv {
         boolean fieldStarted = false;
         int line = 1;
         int quoteStartLine = -1;
-        int i = 0;
+        int i = text.charAt(0) == '\uFEFF' ? 1 : 0;
         int n = text.length();
         while (i < n) {
             char c = text.charAt(i);

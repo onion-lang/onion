@@ -2289,6 +2289,7 @@ Colls::emptyMap()                       // 空の Map
 
 ```onion
 xs.concat(ys)                     // xs の要素に続けて ys の要素
+xs + ys                           // concat と同じ（xs.plus(ys)、xs += ys も可）。新しい List
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - ネストを1段階解消
 xs.flatMap { x -> [x, x] }        // 各要素をリストに写してから1段階平坦化する
                                    // （bind はその別名で、do[List] { x <- xs; ... } が使う）

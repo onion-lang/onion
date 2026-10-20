@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`[1, 2] + [3]` concatenates two Lists.** It was `E0001 operator + is not applicable for type List[Int], List[Int]`. `xs + ys` (also `xs.plus(ys)`, `xs += ys`) returns a new List, as `Colls::concat` does. Generic operator extensions now infer their type arguments, so this keeps the element type.
+
 - **`val (yes, no) = xs.partition { ... }`: a List destructures by index.** It was `E0047 ... is not a record type` (plus an `E0002` for every name). The i-th name binds element i, typed as the List's element type; a shorter list throws `IndexOutOfBoundsException`, extra elements are ignored.
 
 - **`foreach x in xs { ... }` needs no type annotation.** It was a syntax error (`expecting ":"`, with a hint about `for x in xs`). The loop variable now takes the collection's element type: an array's component type, an `Iterable`'s element type (`List[Order]` gives `Order`, so `x.total()` resolves), or `Object` for a raw collection. `foreach x: T in xs` is unchanged.

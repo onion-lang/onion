@@ -2138,6 +2138,7 @@ into a pipeline like the rest of `Colls`:
 
 ```onion
 xs.concat(ys)                     // elements of xs followed by elements of ys
+xs + ys                           // same as concat (also xs.plus(ys), xs += ys); a new List
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - one level of nesting removed
 xs.flatMap { x -> [x, x] }        // maps each element to a list, then flattens one level
                                    // (bind is an alias, used by do[List] { x <- xs; ... })

@@ -67,7 +67,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         containerClass.findMethod(name, staticArgs) match {
           case Array(staticMethod) =>
             val classSubst = TypeSubstitution.classSubstitution(containerClass)
-            val methodSubst = scala.collection.immutable.Map.empty[String, Type]
+            // Infer a generic operator's type arguments (`plus[T](List[T], List[T])` on two
+            // List[Int]s binds T = Int) instead of defaulting T to its Object bound, which made
+            // List[Int] fail against List[Object]. Silent: a miss falls back like any other.
+            val methodSubst = GenericMethodTypeArguments.infer(
+              typing, node, staticMethod, staticArgs, classSubst, expected, reportErrors = false)
             val expectedArgs = TypeSubst.args(staticMethod, classSubst, methodSubst)
             calls.processParamsWithExpected(node, staticArgs, expectedArgs).map { finalParams =>
               val call = new CallStatic(containerClass, staticMethod, finalParams)

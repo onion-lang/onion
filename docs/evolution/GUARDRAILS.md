@@ -68,9 +68,11 @@ and semantics, diagnostics, stdlib API, `meta` changes to the RUNBOOK and README
 
 ### Veto
 
-Any `veto` label or `/veto` comment on an ultrahigh PR, **from any author**, freezes it. Only
-Kota clears a veto, by closing the PR. Every actor uses the same GitHub account today, so a
-veto is built to fail safe: a mistaken veto only stops a merge.
+A `veto` label, or a `/veto` comment from the repository's own account, freezes an ultrahigh
+PR for good: a veto seen once stays in force even if the label or comment is later removed.
+Only Kota clears a veto, by closing the PR. Every actor uses the same GitHub account today, so
+a veto is built to fail safe: a mistaken veto only stops a merge. Comments from outside
+accounts can neither veto nor approve.
 
 The `evolution/veto-window` check runs every hour on a schedule, so a window that closes with
 no veto turns green without anyone re-triggering it.

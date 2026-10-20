@@ -702,6 +702,8 @@ final class BlockElementLowering(
 
   /** The element type of a collection, via its java.lang.Iterable view. */
   private def iterableElementType(tp: Type): Option[Type] = tp match {
+    // `[T extends Iterable[Int]]`: the bound carries the element type.
+    case tv: TypeVariableType => iterableElementType(tv.upperBound)
     case ct: ClassType =>
       bodyContext.table.appliedViewsOf(ct)(AppliedTypeViews.collectAppliedViewsFrom(ct)).collectFirst {
         case (raw, applied) if raw.name == "java.lang.Iterable" && applied.typeArguments.nonEmpty =>

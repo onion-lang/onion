@@ -13,10 +13,7 @@ import evolution_lib as ev
 
 def evaluate(pr):
     number, head = pr["number"], pr["head"]["sha"]
-    files = ev.get_all(f"/repos/{ev.REPO}/pulls/{number}/files")
-    computed, reasons = ev.classify(files)
-    current = ev.labelled_tier(pr)
-    tier = computed if current is None else max(current, computed, key=ev.TIERS.index)
+    tier, computed, current, reasons = ev.effective_tier(pr, ev.pr_files(number))
 
     ev.set_labels(pr, add=[f"risk:{tier}"], remove=[f"risk:{t}" for t in ev.TIERS if t != tier])
     print(f"#{number}: tier={tier} (computed {computed}, labelled {current}); " + "; ".join(reasons[:5]))

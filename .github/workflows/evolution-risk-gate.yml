@@ -29,9 +29,12 @@ permissions:
   issues: write
   statuses: write
 
+# One run at a time, per-PR events and the sweep alike, so a run working from an older
+# snapshot can never overwrite a newer status. Queued duplicates collapse; the hourly
+# sweep re-evaluates anything a collapsed event missed.
 concurrency:
-  group: risk-gate-${{ github.event.pull_request.number || github.event.issue.number || 'sweep' }}
-  cancel-in-progress: true
+  group: evolution-risk-gate
+  cancel-in-progress: false
 
 jobs:
   risk-gate:

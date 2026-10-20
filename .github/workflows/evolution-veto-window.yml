@@ -31,9 +31,10 @@ permissions:
   issues: write
   statuses: write
 
+# One run at a time (see evolution-risk-gate.yml): a sweep must not overwrite a veto.
 concurrency:
-  group: veto-window-${{ github.event.pull_request.number || github.event.issue.number || 'sweep' }}
-  cancel-in-progress: true
+  group: evolution-veto-window
+  cancel-in-progress: false
 
 jobs:
   veto-window:

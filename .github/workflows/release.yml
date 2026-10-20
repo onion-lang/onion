@@ -34,9 +34,11 @@ jobs:
     steps:
       - name: Resolve release tag
         id: tag
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.version }}"
+            TAG="$INPUT_VERSION"
           else
             TAG="${GITHUB_REF_NAME}"
           fi
@@ -60,6 +62,25 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
           cache: 'sbt'
+      - name: Release only what develop already contains
+        # A manual run can start from any branch. Only a commit reachable from `develop`
+        # (which only merged, gated PRs reach) may be released, tagged, or become `main`.
+        run: |
+          git fetch --no-tags origin develop
+          git merge-base --is-ancestor HEAD FETCH_HEAD || {
+            echo "::error::$(git rev-parse --short HEAD) is not on develop; release from develop only"; exit 1; }
+      - name: Require the release note for 1.0 and new majors
+        # v1.0.0 and every new major version are risk:ultrahigh (docs/evolution/GUARDRAILS.md):
+        # their release note can only reach this ref through a merged ultrahigh PR.
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VER="${TAG#v}"
+          MAJOR="${VER%%.*}"
+          REST="${VER#*.}"
+          if [ "$MAJOR" -ge 1 ] && [ "${REST%%[!0-9.]*}" = "0.0" ]; then
+            NOTE="docs/releases/${MAJOR}.0.0.md"
+            test -f "$NOTE" || { echo "::error::$TAG needs $NOTE, added by a merged risk:ultrahigh PR"; exit 1; }
+          fi
       - name: Create the tag for a manual run
         if: github.event_name == 'workflow_dispatch'
         env:
@@ -98,18 +119,6 @@ jobs:
           if [ "$TAG_VERSION" != "$VERSION" ]; then
             echo "Tag version ($TAG_VERSION) does not match build version ($VERSION)" >&2
             exit 1
-          fi
-      - name: Require the release note for 1.0 and new majors
-        # v1.0.0 and every new major version are risk:ultrahigh (docs/evolution/GUARDRAILS.md):
-        # their release note can only reach this ref through a merged ultrahigh PR.
-        run: |
-          TAG="${{ steps.tag.outputs.tag }}"
-          VER="${TAG#v}"
-          MAJOR="${VER%%.*}"
-          REST="${VER#*.}"
-          if [ "$MAJOR" -ge 1 ] && [ "${REST%%[!0-9.]*}" = "0.0" ]; then
-            NOTE="docs/releases/${MAJOR}.0.0.md"
-            test -f "$NOTE" || { echo "::error::$TAG needs $NOTE, added by a merged risk:ultrahigh PR"; exit 1; }
           fi
       - name: Test
         env:

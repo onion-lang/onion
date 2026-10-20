@@ -18,13 +18,19 @@ CONTEXT = "evolution/veto-window"
 
 def evaluate(pr):
     number, head = pr["number"], pr["head"]["sha"]
-    if ev.labelled_tier(pr) != "ultrahigh":
+    # The diff, not just the label: removing `risk:ultrahigh` must not skip the window.
+    tier, _, _, _ = ev.effective_tier(pr, ev.pr_files(number))
+    if tier != "ultrahigh":
         ev.set_status(head, CONTEXT, "success", "not risk:ultrahigh: no veto window")
         ev.set_labels(pr, remove=["veto-window:open"])
         print(f"#{number}: not ultrahigh")
         return
     pr_comments = ev.comments(number)
-    if ev.vetoed(pr, pr_comments):
+    if ev.vetoed(pr, pr_comments, ev.timeline(number)):
+        # Record a comment veto as a label too: the timeline keeps a `labeled` event even if
+        # the label or the comment is later removed, so the veto stays permanent.
+        if ev.veto_comment(pr_comments):
+            ev.set_labels(pr, add=["veto"])
         ev.set_status(head, CONTEXT, "pending", "vetoed: only Kota clears a veto, by closing the PR")
         print(f"#{number}: vetoed")
         return

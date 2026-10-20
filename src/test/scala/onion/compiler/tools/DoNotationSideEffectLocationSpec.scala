@@ -35,7 +35,7 @@ class DoNotationSideEffectLocationSpec extends AnyFunSpec {
           |  val sums = do[List] {
           |    p <- pairs
           |    IO::println("processing")
-          |    ret p.a() + p.b()
+          |    yield p.a() + p.b()
           |  }
           |}
           |""".stripMargin

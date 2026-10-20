@@ -171,7 +171,7 @@
         },
         {
           "name": "keyword.control.monad.onion",
-          "match": "\\b(ret)\\b"
+          "match": "\\b(yield)\\b"
         },
         {
           "name": "keyword.other.import.onion",

@@ -287,11 +287,11 @@ if err != null { IO::println("ERROR: " + err) }
 
 // Return some books
 val f1: Int = lib.returnBook("L3", today)   // Bob returns B002 (due 85+21=106, fine=0)
-IO::println("Fine L3 (B002/Bob, due 106, ret 100): " + f1 + " yen")
+IO::println("Fine L3 (B002/Bob, due 106, yield 100): " + f1 + " yen")
 val f2: Int = lib.returnBook("L1", today)   // Alice returns B001 (due 70+30=100, fine=0)
-IO::println("Fine L1 (B001/Alice, due 100, ret 100): " + f2 + " yen")
+IO::println("Fine L1 (B001/Alice, due 100, yield 100): " + f2 + " yen")
 val f3: Int = lib.returnBook("L9", today)   // Bob returns B005 (due 60+21=81, overdue 19)
-IO::println("Fine L9 (B005/Bob, due 81, ret 100): " + f3 + " yen")
+IO::println("Fine L9 (B005/Bob, due 81, yield 100): " + f3 + " yen")
 
 // ─── REPORTS ──────────────────────────────────────────────────────────────────
 

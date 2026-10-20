@@ -348,7 +348,7 @@ IO::println("dot[1,2,3].[4,5,6]: " + dotProduct)
 val pairs: List[String] = do[List] {
   x <- [1, 2, 3]
   y <- [10, 20]
-  ret "(" + x + "," + y + ")"
+  yield "(" + x + "," + y + ")"
 }
 val pairsFL: FList[String] = FL::fromJavaList[String](pairs)
 IO::println("pairs     : " + FListOps::mkString[String](pairsFL, " "))

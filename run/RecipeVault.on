@@ -336,7 +336,7 @@ def main(): void {
   val plans: List[String] = do[List] {
     b <- vault.byMealType(MealType::BREAKFAST).take(3)
     s <- vault.byMealType(MealType::SNACK)
-    ret "#{b.name()} + #{s.name()} = #{b.kcalPerServing() + s.kcalPerServing()} kcal"
+    yield "#{b.name()} + #{s.name()} = #{b.kcalPerServing() + s.kcalPerServing()} kcal"
   }
   foreach plan: String in plans {
     IO::println("  " + plan)

@@ -132,7 +132,7 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
         body.controlExpressionTyping.typeTryExpression(node, context, expected)
       case node: AST.WhileExpression =>
         body.controlExpressionTyping.typeWhileExpression(node, context)
-      case _: AST.RetStatement | _: AST.DoExpression =>
+      case _: AST.YieldStatement | _: AST.DoExpression =>
         None
       case node =>
         body.typeSimpleExpression(node, context, expected)

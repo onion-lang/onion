@@ -20,7 +20,6 @@ val maybeName: String? = null    // nullable: OK
 `null` と分かっている以上エラーのほうが厳しくて良さそうに見えますが、同じ検査が
 かかる場所には `null` が**正当な値**であるケースが含まれるためです。
 
-- null を受け付けて正しく処理する Java API（`Http::encodeUrl(null)` は `""` を返します）
 - `val anything: Object = null`（ごく普通の JVM コード）
 - 型変数 `T` の値。インスタンスなしに得られる値が `null` だけの場合があります（issue #283）
 
@@ -28,6 +27,14 @@ val maybeName: String? = null    // nullable: OK
 ほとんどが潜在的な NPE ではなく上記のような正当な用途でした。自分のコードにこう
 した事情が無いなら、`--warn error` でビルド単位で厳格にできます（`--Wno
 null-to-non-nullable` で抑制も可能）。
+
+Java の API は検査しません。コンパイラはその null 許容性を知らないためです。
+
+- Java メソッドの戻り値。
+- Java メソッドへの `null` 引数。`String::format("%s", null)` や `Http::encodeUrl(null)` は警告しません。
+- ただし、引数の型がレシーバの型引数そのものなら警告します。`List[String]` への `xs.add(null)` は警告されます。`String` を選んだのが自分だからです。
+
+Onion で書いたメソッドは警告します。別にコンパイルしたもの（プロジェクトの `tests/` から `src/` を呼ぶ場合や、Onion ライブラリの jar）も同じです。
 
 厳しくするなら、まず**宣言**（`val s: String = null`）で `null` を避けるのが
 効果的です。後から NPE として表面化するのはこの形だからです。

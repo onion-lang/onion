@@ -345,7 +345,7 @@ val fLabels: List[Object] = fs1.map { fk -> (fk as ForceKind).label() }
 val interactions = do[List] {
   pid  <- ids
   flbl <- fLabels
-  ret "  P#{pid as Int} × [#{flbl as String}]"
+  yield "  P#{pid as Int} × [#{flbl as String}]"
 }
 
 foreach row: Object in interactions {

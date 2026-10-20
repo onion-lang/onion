@@ -219,7 +219,7 @@ def findStudent(name: String): Option[Student] {
 def lookupGPA(name: String): Option[Double] {
   return do[Option] {
     s <- findStudent(name)
-    ret s.score().toGPA()
+    yield s.score().toGPA()
   }
 }
 

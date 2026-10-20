@@ -117,6 +117,15 @@ public final class Maps {
 
     /**
      * Maps each (key, value) pair to a value, collecting the results into a list
+     * in iteration order: {@code m.map { k, v -> k + "=" + v }}. Same as
+     * {@link #toList(Map, Function2)}, under the name other languages give it.
+     */
+    public static <K, V, R> List<R> map(Map<K, V> map, Function2<K, V, R> mapper) {
+        return toList(map, mapper);
+    }
+
+    /**
+     * Maps each (key, value) pair to a value, collecting the results into a list
      * in iteration order.
      */
     public static <K, V, R> List<R> toList(Map<K, V> map, Function2<K, V, R> mapper) {

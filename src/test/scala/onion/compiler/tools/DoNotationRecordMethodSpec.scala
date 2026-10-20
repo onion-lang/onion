@@ -15,7 +15,7 @@ import java.io.StringReader
  * and a `java.lang.VerifyError: Bad local variable type` at class-load time instead.
  *
  * Fixed by having `rewriteRecordDeclaration` also rewrite `declaration.sections`, mirroring
- * `rewriteClassDeclaration`. A class already rejects `do[Option] { s <- v(); ret s }` over a
+ * `rewriteClassDeclaration`. A class already rejects `do[Option] { s <- v(); yield s }` over a
  * nullable `v(): String?` receiver with E0070 (dereferencing a nullable value directly,
  * since the desugared `v().map(...)` is a plain method call on a `String?`); a record method
  * must report the exact same E0070, not silently corrupt its bytecode.
@@ -36,7 +36,7 @@ class DoNotationRecordMethodSpec extends AbstractShellSpec {
           |record R(v: String?) {
           |  public:
           |    def f(): String {
-          |      val x: String = do[Option] { s <- v(); ret s } ?: "default"
+          |      val x: String = do[Option] { s <- v(); yield s } ?: "default"
           |      return "result: #{x}"
           |    }
           |}
@@ -53,7 +53,7 @@ class DoNotationRecordMethodSpec extends AbstractShellSpec {
           |record R(v: Int) {
           |  public:
           |    def f(): Int {
-          |      val r = do[Option] { a <- Option::some(v()); b <- Option::some(2); ret (a as Int) + (b as Int) }
+          |      val r = do[Option] { a <- Option::some(v()); b <- Option::some(2); yield (a as Int) + (b as Int) }
           |      return (r.get() as Int)
           |    }
           |}

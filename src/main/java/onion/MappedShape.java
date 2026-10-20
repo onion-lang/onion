@@ -42,6 +42,14 @@ final class MappedShape<T> implements Shape<T> {
     interface Codec {
         /** Parses to a map, or throws with a character offset in the text. */
         Object read(String text) throws Exception;
+        /**
+         * Parses like {@link #read(String)}; a format that tracks positions also fills
+         * {@code positions} (container, by identity, to key-or-index to character offset).
+         */
+        default Object read(String text, IdentityHashMap<Object, Map<Object, Integer>> positions)
+                throws Exception {
+            return read(text);
+        }
         String write(Map<String, Object> fields);
         /** A character offset from a parse failure, or -1 when the format does not report one. */
         int offsetOf(Exception e);
@@ -79,6 +87,30 @@ final class MappedShape<T> implements Shape<T> {
 
         /** What the whole component must be, for a defect's {@code expected}. */
         String expected() { return list ? "List[" + elementExpected() + "]" : elementExpected(); }
+    }
+
+    /**
+     * Where a parsed value sits in its text, so a defect can name the field's own line. With
+     * no position table (a format that keeps none) every value is attributed to the origin
+     * the caller gave.
+     */
+    private static final class Where {
+        final String text;
+        final Origin origin;
+        final IdentityHashMap<Object, Map<Object, Integer>> positions;
+
+        Where(String text, Origin origin, IdentityHashMap<Object, Map<Object, Integer>> positions) {
+            this.text = text;
+            this.origin = origin;
+            this.positions = positions;
+        }
+
+        /** The origin of {@code container[key]}, or the caller's origin when it is unknown. */
+        Origin of(Object container, Object key) {
+            Map<Object, Integer> at = positions.get(container);
+            Integer offset = at == null ? null : at.get(key);
+            return offset == null ? origin : lineOf(text, offset, origin);
+        }
     }
 
     private final Codec codec;
@@ -128,8 +160,9 @@ final class MappedShape<T> implements Shape<T> {
     @Override
     public Outcome<T> parse(String text, Origin origin) {
         Object doc;
+        IdentityHashMap<Object, Map<Object, Integer>> positions = new IdentityHashMap<>();
         try {
-            doc = codec.read(text);
+            doc = codec.read(text, positions);
         } catch (Exception e) {
             // The parser knows where it gave up; the derive! path threw that away.
             Origin at = positionOf(text, codec.offsetOf(e), origin);
@@ -138,28 +171,29 @@ final class MappedShape<T> implements Shape<T> {
         if (doc == null) {
             return Outcome.bad(Defect.at(origin, "", "valid " + codec.name(), "nothing"));
         }
-        return readFields(doc, origin, "");
+        return readFields(doc, new Where(text, origin, positions), "");
     }
 
     /**
      * Reads every component out of an already-parsed document, prefixing each defect's
      * path with {@code path} (empty at the top level).
      */
-    Outcome<T> readFields(Object doc, Origin origin, String path) {
+    Outcome<T> readFields(Object doc, Where where, String path) {
         List<Object> parts = new ArrayList<>(kinds.size());
         List<Defect> problems = new ArrayList<>();
         for (int i = 0; i < kinds.size(); i++) {
             String name = names.get(i);
             Object raw = Json.get(doc, name);
             String at = path.isEmpty() ? name : path + "." + name;
-            Outcome<Object> read = readComponent(i, kinds.get(i), raw, origin, at);
+            Outcome<Object> read = readComponent(i, kinds.get(i), raw, where, where.of(doc, name), at);
             if (read.isOk()) parts.add(read.get()); else problems.addAll(read.defects());
         }
         if (!problems.isEmpty()) return Outcome.bad(problems);
         return Outcome.ok(build.call(parts));
     }
 
-    private Outcome<Object> readComponent(int index, Kind kind, Object raw, Origin origin, String path) {
+    private Outcome<Object> readComponent(int index, Kind kind, Object raw, Where where, Origin origin,
+                                          String path) {
         if (raw == null) {
             // A missing key used to produce a *successfully constructed* record with a
             // null non-nullable field, which is worse than an error (issue #352). A
@@ -167,7 +201,7 @@ final class MappedShape<T> implements Shape<T> {
             if (kind.nullable) return Outcome.ok(null);
             return Outcome.bad(Defect.at(origin, path, kind.expected(), "absent"));
         }
-        if (!kind.list) return readElement(index, kind, raw, origin, path);
+        if (!kind.list) return readElement(index, kind, raw, where, origin, path);
         if (!(raw instanceof List)) {
             return Outcome.bad(Defect.at(origin, path, kind.expected(), describe(raw)));
         }
@@ -177,12 +211,13 @@ final class MappedShape<T> implements Shape<T> {
         for (int j = 0; j < items.size(); j++) {
             String at = path + "[" + j + "]";
             Object item = items.get(j);
+            Origin itemOrigin = where.of(items, j);
             if (item == null) {
-                problems.add(Defect.at(origin, at, kind.elementExpected(), "null"));
+                problems.add(Defect.at(itemOrigin, at, kind.elementExpected(), "null"));
                 continue;
             }
             // Keep reading after a bad element: one bad element must not hide the others.
-            Outcome<Object> read = readElement(index, kind, item, origin, at);
+            Outcome<Object> read = readElement(index, kind, item, where, itemOrigin, at);
             if (read.isOk()) values.add(read.get()); else problems.addAll(read.defects());
         }
         if (!problems.isEmpty()) return Outcome.bad(problems);
@@ -190,14 +225,15 @@ final class MappedShape<T> implements Shape<T> {
     }
 
     @SuppressWarnings("unchecked")
-    private Outcome<Object> readElement(int index, Kind kind, Object raw, Origin origin, String path) {
+    private Outcome<Object> readElement(int index, Kind kind, Object raw, Where where, Origin origin,
+                                        String path) {
         if (!kind.isNested()) return Scalars.coerce(kind.scalar, raw, origin, path);
         if (!(raw instanceof Map)) {
             return Outcome.bad(Defect.at(origin, path, "object", describe(raw)));
         }
         Shape<Object> inner = nestedShape(index);
         if (inner instanceof MappedShape) {
-            return ((MappedShape<Object>) inner).readFields(raw, origin, path);
+            return ((MappedShape<Object>) inner).readFields(raw, where, path);
         }
         // Not a document shape we can walk into: hand it the subtree as text, and move its
         // defects under this component's path.
@@ -423,6 +459,16 @@ final class MappedShape<T> implements Shape<T> {
         if (value instanceof Map) return "an object";
         if (value instanceof List) return "an array";
         return String.valueOf(value);
+    }
+
+    /** The line a character offset falls on, as ConfigShape names an entry's line. */
+    private static Origin lineOf(String text, int offset, Origin origin) {
+        String source = origin == null ? "<input>" : origin.source();
+        int line = 1;
+        for (int i = 0; i < offset && i < text.length(); i++) {
+            if (text.charAt(i) == '\n') line++;
+        }
+        return Origin.atLine(source, line);
     }
 
     /** Turns a character offset into a line and column, so a failure points somewhere. */

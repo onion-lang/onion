@@ -674,6 +674,12 @@ class SemanticErrorReporter(threshold: Int) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
         // nested class does not restore the scrutinee's type arguments, a pattern does.
         Some(format(message("suggestion.castLosesTypeArguments"), Seq(typeName(actual))))
+      } else if (expected.isInstanceOf[TypedAST.ArrayType] && isListType(actual)) {
+        // `(list as String[])`: a List can never be an array at runtime (#2258), unlike
+        // the generic message's "consider a cast", which reads as if some cast would work.
+        Some(format(message("suggestion.listAsArrayCast"), Seq(typeName(expected.asInstanceOf[TypedAST.ArrayType].component))))
+      } else if (isListType(expected) && actual.isInstanceOf[TypedAST.ArrayType]) {
+        Some(message("suggestion.arrayAsListCast"))
       } else None
     problem(position, appendSuggestion(baseMessage, hint))
   }

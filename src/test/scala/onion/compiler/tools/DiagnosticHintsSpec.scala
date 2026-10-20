@@ -69,4 +69,53 @@ class DiagnosticHintsSpec extends AnyFunSpec {
       assert(errors.exists(_.contains("userName")), s"expected did-you-mean hint, got: $errors")
     }
   }
+
+  describe("List/array cast hint (#2258)") {
+    it("hints at toArray for a List[T] as T[] cast") {
+      val errors = compile(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val list: List[String] = ["a", "b"]
+          |    val arr = (list as String[])
+          |    return arr.length
+          |  }
+          |}
+        """.stripMargin
+      )
+      assert(errors.exists(_.contains("toArray(new String[0])")), s"expected a toArray hint, got: $errors")
+    }
+
+    it("hints at Colls::toList for a T[] as List[T] cast") {
+      val errors = compile(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val arr: String[] = new String[2]
+          |    val list = (arr as List[String])
+          |    return list.size
+          |  }
+          |}
+        """.stripMargin
+      )
+      assert(errors.exists(_.contains("Colls::toList(xs)")), s"expected a Colls::toList hint, got: $errors")
+    }
+
+    it("does not add the List/array hint for an ordinary incompatible cast") {
+      val errors = compile(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val s: String = "42"
+          |    return s as Int
+          |  }
+          |}
+        """.stripMargin
+      )
+      assert(errors.forall(e => !e.contains("toArray") && !e.contains("Colls::toList")), s"did not expect a List/array hint, got: $errors")
+    }
+  }
 }

@@ -3044,26 +3044,18 @@ val c = Sets::fromList([1, 1, 2, 3])   // distinct, first-seen order
 Sets::toList(a)                        // back to a List
 ```
 
-**`toList` doesn't compile as `a.toList()` at all -- not even a shadowing
-case**: `onion.Colls` also declares a `toList(Set)` extension with the same
-erased signature as `onion.Sets`'s, which would ordinarily just shadow it
-the way `union`/`intersection`/`difference`/`map` are shadowed below. But
-`Set` also conforms to `Iterable`, and `onion.Iterables` separately declares
-a `toList(Iterable)` extension -- a genuinely different erased signature
-that is *also* applicable to a `Set` argument. That makes `a.toList()`
-**ambiguous** between `onion.Colls`'s and `onion.Iterables`'s versions, so
-it fails to compile with `E0006` ("method call is applicable for both
-Colls.toList() and Iterables.toList()") instead of silently picking one --
-unlike every other method this module documents as "also a builtin
-extension method." The static forms disagree with each other on top of
-that: `Colls::toList` wraps its copy in `Collections.unmodifiableList` and
-throws `NullPointerException` for a `null` set; `Sets::toList` returns a
-plain mutable `ArrayList` and treats `null` as empty. Always call
-`Sets::toList(a)` (or `Colls::toList(a)` for the unmodifiable, throwing
-variant) explicitly -- `a.toList()` never compiles for a `Set` receiver.
+**`a.toList()` on a `Set` is `onion.Colls`'s `toList(Set)`**: it and
+`onion.Iterables`'s `toList(Iterable)` both accept a `Set`, and the more
+specific receiver wins (before this, the call failed with `E0006` as
+ambiguous). `onion.Sets`'s `toList(Set)` has the same erased signature as
+`Colls`'s and is shadowed by it. The two static forms differ:
+`Colls::toList` wraps its copy in `Collections.unmodifiableList` and throws
+`NullPointerException` for a `null` set; `Sets::toList` returns a plain
+mutable `ArrayList` and treats `null` as empty. Call `Sets::toList(a)` when
+you need the mutable, null-safe copy.
 
 ```onion
-a.toList()                             // [E0006] ambiguous: Colls.toList() vs Iterables.toList()
+a.toList()                             // = Colls::toList(a): unmodifiable
 Sets::toList(a)                        // mutable; null-safe (empty list for null)
 Colls::toList(a)                       // unmodifiable; throws NullPointerException for null
 ```

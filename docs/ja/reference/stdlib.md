@@ -1648,24 +1648,17 @@ Set ユーティリティ（`onion.Sets`）。結果 Set は挿入順を保持�
 直接呼んだ `Sets::union`/`intersection`/`difference` は通常の **変更可能**な `LinkedHashSet` を
 返します。変更可能な結果が必要な場合は `Sets::` 形式を使ってください。
 
-**`toList` は `a.toList()` としては一切コンパイルできません -- シャドーイングでさえない**:
-`onion.Colls` も同じ `(Set)` 消去シグネチャで `toList` 拡張メソッドを宣言しており、本来なら
-下記の `union`/`intersection`/`difference`/`map` と同様に単純にシャドーイングされるだけの
-はずです。ところが `Set` は `Iterable` にも適合しており、`onion.Iterables` は別途
-`toList(Iterable)` 拡張メソッドを宣言しています -- これは消去シグネチャとして本当に異なる
-ものですが、`Set` 型の引数にも同じく適用可能です。そのため `a.toList()` は
-`onion.Colls` 側と `onion.Iterables` 側のどちらにも解釈できてしまい **曖昧**となり、
-どちらかへ黙って解決される代わりに `E0006`（"method call is applicable for both
-Colls.toList() and Iterables.toList()"）でコンパイルエラーになります -- このモジュールで
-「組み込み拡張メソッドとしても使える」と説明している他のすべてのメソッドとは異なります。
-さらに静的呼び出し形どうしも挙動が異なります: `Colls::toList` はコピーを
+**`Set` に対する `a.toList()` は `onion.Colls` の `toList(Set)` です**: これと
+`onion.Iterables` の `toList(Iterable)` はどちらも `Set` を受け取れますが、レシーバの型が
+より具体的な方が選ばれます（以前は `E0006` の曖昧エラーでした）。`onion.Sets` の
+`toList(Set)` は `Colls` と同じ消去シグネチャなので、`Colls` 側にシャドーイングされます。
+静的呼び出し形どうしは挙動が異なります: `Colls::toList` はコピーを
 `Collections.unmodifiableList` でラップし、`null` の Set には `NullPointerException` を
 投げますが、`Sets::toList` は通常の変更可能な `ArrayList` を返し、`null` は空として扱います。
-必ず `Sets::toList(a)`（変更不可・例外を投げる版が必要なら `Colls::toList(a)`）を明示的に
-呼び出してください -- `a.toList()` は `Set` レシーバに対しては絶対にコンパイルできません。
+変更可能で null 安全なコピーが必要なときは `Sets::toList(a)` を呼んでください。
 
 ```onion
-a.toList()                             // [E0006] 曖昧: Colls.toList() vs Iterables.toList()
+a.toList()                             // = Colls::toList(a): 変更不可
 Sets::toList(a)                        // 変更可能; null 安全（null には空リスト）
 Colls::toList(a)                       // 変更不可; null には NullPointerException
 ```

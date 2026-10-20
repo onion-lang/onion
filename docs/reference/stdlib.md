@@ -2139,6 +2139,9 @@ into a pipeline like the rest of `Colls`:
 ```onion
 xs.concat(ys)                     // elements of xs followed by elements of ys
 xs + ys                           // same as concat (also xs.plus(ys), xs += ys); a new List
+xs.associateBy { x -> key(x) }    // Map key -> element; a later element wins a shared key
+xs.indexOfFirst { x -> x > 6 }    // index of the first match, or -1
+xs.maxOrNull() / xs.minOrNull()   // like max()/min(), but null for an empty list
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - one level of nesting removed
 xs.flatMap { x -> [x, x] }        // maps each element to a list, then flattens one level
                                    // (bind is an alias, used by do[List] { x <- xs; ... })

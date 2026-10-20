@@ -1129,6 +1129,27 @@ extension Double {
 Fix: remove or rename the duplicate. Two extension methods with the same name but
 different parameter types are unaffected — that's ordinary overloading.
 
+### `E0102` — Duplicate `extension` block for the same receiver type
+
+Two `extension` blocks for the exact same receiver type appear in one file —
+whether the identical concrete instantiation written twice, or the same
+non-generic type split across two blocks (e.g. one per concern, for
+readability). Both would lower to the same generated container class, so
+without this check the second block collided later as a generic
+duplicate-class error naming the internal mangled class
+(`Extension$List_int`), and every method the second block declared was then
+silently unreachable — reported, if at all, through an unrelated "method not
+found" at the call site.
+
+```onion
+extension List[Int] { def foo(): Int = 1 }
+extension List[Int] { def bar(): Int = 2 }   // E0102: an extension block for List[int] is already defined
+```
+
+Fix: combine the methods into the first block. Distinct concrete
+instantiations of the same generic receiver do not collide
+(`extension List[Int]` and `extension List[String]` can coexist).
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -1875,6 +1896,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0099` | enum … cannot take type parameters |
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
 | `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
+| `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 
 ## See also
 

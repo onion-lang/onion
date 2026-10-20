@@ -165,6 +165,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   def rewrite(unit: AST.CompilationUnit): AST.CompilationUnit = {
     bodyRewriteNeeded = unit.needsBodyRewrite
     checkInstanceCoherence(unit.toplevels)
+    checkExtensionCoherence(unit.toplevels)
     val newToplevels = Buffer.empty[AST.Toplevel]
     for (top <- unit.toplevels) top match {
       case declaration: AST.ClassDeclaration =>
@@ -602,6 +603,43 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         seen(key) = inst
       case _ =>
     }
+  }
+
+  /**
+   * Two `extension` blocks for the same receiver type within a compilation
+   * unit would lower to the same mangled container class name
+   * (`registerExtension` in TypingHeaderPass); catching it here gives a clear
+   * message instead of leaking the internal mangled name via a
+   * duplicate-class error, and avoids the misleading "method not found" that
+   * follows once the second block's own methods are silently dropped
+   * (issue #2204). (Cross-unit duplicates are still caught later, since they
+   * redefine the same class.)
+   */
+  private def checkExtensionCoherence(toplevels: List[AST.Toplevel]): Unit = {
+    val seen = scala.collection.mutable.Map.empty[String, AST.ExtensionDeclaration]
+    toplevels.foreach {
+      case ext: AST.ExtensionDeclaration =>
+        val key = mangleExtensionClassName(ext.receiverType.desc)
+        if (seen.contains(key)) {
+          throw new CompilationException(Seq(CompileError("", ext.location,
+            Message("error.semantic.duplicateExtensionBlock", Array[Any](ext.receiverType.desc)),
+            Some(DUPLICATE_EXTENSION_BLOCK.errorCode))))
+        }
+        seen(key) = ext
+      case _ =>
+    }
+  }
+
+  /** Mirrors TypingHeaderPass.registerExtension's own container-class naming,
+    * so this pre-check flags exactly the cases that would otherwise collide
+    * there as a generic DUPLICATE_CLASS -- no more, no less. */
+  private def mangleExtensionClassName(desc: AST.TypeDescriptor): String = desc match {
+    case AST.ReferenceType(name, _) => name.replace(".", "_")
+    case AST.ParameterizedType(component, params) =>
+      mangleExtensionClassName(component) + "_" + params.map(mangleExtensionClassName).mkString("_")
+    case AST.ArrayType(component) => mangleExtensionClassName(component) + "_Array"
+    case AST.PrimitiveType(kind) => kind.toString
+    case _ => "Unknown"
   }
 
   private def lowerInstanceDeclaration(declaration: AST.InstanceDeclaration): AST.ClassDeclaration = {

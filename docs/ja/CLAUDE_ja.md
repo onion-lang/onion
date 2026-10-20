@@ -411,8 +411,8 @@ Type::methodName
 
 **モナド合成のためのdo記法:**
 ```onion
-do[Future] { x <- asyncOp(); ret x + 1 }
-do[Option] { a <- getA(); b <- getB(); ret a + b }
+do[Future] { x <- asyncOp(); yield x + 1 }
+do[Option] { a <- getA(); b <- getB(); yield a + b }
 ```
 
 **シェイプファーストスクリプティング（スキームリテラル、正規表現パターン、パイプライン、auto-CLI）:**

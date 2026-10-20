@@ -117,6 +117,10 @@ class SemanticErrorReporter(threshold: Int) {
         Some(message("suggestion.jsTemplateLiteral"))
       } else if (name == ConsoleObjectName) {
         Some(message("suggestion.jsConsoleLog"))
+      } else if (name == "ret") {
+        // The pre-1.0 do-notation keyword: `ret e` now reads as an unknown variable `ret`
+        // followed by `e`, so name the new spelling instead of a similar-name guess.
+        Some(message("suggestion.retRenamedToYield"))
       } else if (items.length > 2 && items(2) != null) {
         Some(format(message("suggestion.didYouMean"), Seq(asString(items(2)))))
       } else if (items.length > 1) {

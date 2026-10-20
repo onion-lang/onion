@@ -36,7 +36,7 @@ def validateDo(input: UserInput): Result[UserInput, String] {
     nameOpt <- optionToResult(nonEmpty(input.name()), "name is required")
     age <- parseAge(input.age())
     email <- validateEmail(input.email())
-    ret new UserInput(nameOpt, "" + age, email)
+    yield new UserInput(nameOpt, "" + age, email)
   }
 }
 

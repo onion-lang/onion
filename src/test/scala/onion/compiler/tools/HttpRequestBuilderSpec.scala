@@ -131,7 +131,7 @@ class HttpRequestBuilderSpec extends AbstractShellSpec {
              |    val st = do[Result] {
              |      a <- Http::request("GET", "$base/a").send()
              |      b <- Http::request("GET", "$base/missing").send()
-             |      ret a.status + b.status
+             |      yield a.status + b.status
              |    }
              |    return folded + "|" + body.get() + "|" + st.get()""".stripMargin)
         assert(Shell.Success("status 404|PUT:v|604") == result)

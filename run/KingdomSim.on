@@ -416,7 +416,7 @@ def tradePairs(provinces: List[Object]): List[Object] {
   val all: List[Object] = do[List] {
     a <- provinces
     b <- provinces
-    ret new Trade((a as Province).id(), (b as Province).id(), ResourceType::Gold, 10)
+    yield new Trade((a as Province).id(), (b as Province).id(), ResourceType::Gold, 10)
   }
   return all.filter { ev ->
     val e: KingdomEvent = ev as KingdomEvent

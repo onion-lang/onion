@@ -294,7 +294,7 @@ def solveSummary(contest: Contest, handle: String, pid: String): Option[String] 
   return do[Option] {
     c    <- findContestant(contest, handle)
     acT  <- c.firstAcAt(pid)
-    ret "#{handle} solved #{pid} at #{acT as Int} min (#{c.wrongsBefore(pid, acT as Int)} wrong before)"
+    yield "#{handle} solved #{pid} at #{acT as Int} min (#{c.wrongsBefore(pid, acT as Int)} wrong before)"
   }
 }
 
@@ -428,7 +428,7 @@ IO::println("")
 val diffPairs: List[Object] = do[List] {
   p  <- contest.problems()
   d  <- ["easy", "medium", "hard", "very hard", "extreme"]
-  ret "#{(p as Problem).id()}/#{d}"
+  yield "#{(p as Problem).id()}/#{d}"
 }
 val hardOnly = diffPairs.filter { pair ->
   val s = pair as String

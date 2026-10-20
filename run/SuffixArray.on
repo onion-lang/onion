@@ -379,7 +379,7 @@ def chainedLookup(sa1: SuffixArray, sa2: SuffixArray, pattern: String): Option[S
   do[Option] {
     pos1 <- positionsOpt(sa1, pattern)
     pos2 <- positionsOpt(sa2, pattern)
-    ret new SearchResult(pattern, (pos1 as List[Int]).size + (pos2 as List[Int]).size,
+    yield new SearchResult(pattern, (pos1 as List[Int]).size + (pos2 as List[Int]).size,
                          pos1 as List[Int])
   }
 

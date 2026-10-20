@@ -406,7 +406,7 @@ val cityList   = census.cities()
 val crossRows  = do[List] {
   thresh <- thresholds
   city   <- cityList
-  ret "  under #{thresh as Int} in #{city as String}: " +
+  yield "  under #{thresh as Int} in #{city as String}: " +
         census.byCity(city as String)
              .filter { r -> (r as Person).age() < thresh as Int }
              .size

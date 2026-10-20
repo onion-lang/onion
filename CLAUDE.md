@@ -483,9 +483,9 @@ Type::methodName
 
 **Do Notation for Monadic Composition:**
 ```onion
-do[Future] { x <- asyncOp(); ret x + 1 }
-do[Option] { a <- getA(); b <- getB(); ret a + b }
-do[List]   { x <- [1, 2]; y <- ["a", "b"]; ret x + y }  // list comprehension: [1a, 1b, 2a, 2b]
+do[Future] { x <- asyncOp(); yield x + 1 }
+do[Option] { a <- getA(); b <- getB(); yield a + b }
+do[List]   { x <- [1, 2]; y <- ["a", "b"]; yield x + y }  // list comprehension: [1a, 1b, 2a, 2b]
 ```
 
 **Shape-First Scripting (scheme literals, regex patterns, pipeline, auto-CLI):**

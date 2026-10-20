@@ -330,14 +330,14 @@ println("── do[Option] lookup chains ─────────────
 val found1: Option[String] = do[Option] {
   s  <- storyOpt(analyzer.findById("SP-001"))
   tag <- stringOpt(s.tags().find { t -> t.length() > 3 })
-  ret "SP-001 first long tag: " + tag
+  yield "SP-001 first long tag: " + tag
 }
 println(if found1 == null { "not found" } else { found1.get() })
 
 val found2: Option[String] = do[Option] {
   s <- storyOpt(analyzer.findById("SP-007"))
   t <- storyOpt(analyzer.findByTag("security").find { x -> x.priorityScore() > 10 })
-  ret "security+critical story: " + t.id()
+  yield "security+critical story: " + t.id()
 }
 println(if found2 == null { "not found" } else { found2.get() })
 

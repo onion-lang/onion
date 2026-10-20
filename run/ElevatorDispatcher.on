@@ -212,7 +212,7 @@ def pairStatus(b: Building, id1: Int, id2: Int): Option[String] {
   return do[Option] {
     c1 <- b.findCar(id1)
     c2 <- b.findCar(id2)
-    ret "#{c1.status()} | #{c2.status()}"
+    yield "#{c1.status()} | #{c2.status()}"
   }
 }
 

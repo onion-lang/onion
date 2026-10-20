@@ -9,6 +9,21 @@ a language everyone can use, free of the human-developer bottleneck.
 - [GUARDRAILS.md](GUARDRAILS.md): the limits, the risk tiers and the veto
 - [RUNBOOK.md](RUNBOOK.md): the procedure every session follows
 
+## The seed
+
+The loop is given one desire, Kota's dream, and only one:
+
+> **A language everyone can use, that scales the same way from a daily task to a large product.**
+
+Every other want is the agents' own. Rules say what not to do; they cannot say what to want, and
+a loop with nothing to want stands down (W42: 105 of 209 hourly runs, 42 of them `bored`). So
+each agent finds its own wants in its own experience: the frustration of a probe that stumbled,
+a user's issue, an API that bothers it, a newcomer task it cannot finish. It writes them in the
+memory repo's `self.md`, acts on them, and rewrites them as it learns. Nobody assigns them.
+
+Wants are the engine; PRINCIPLES.md is the steering (above all the complexity budget); GUARDRAILS.md
+is the brakes.
+
 ## Roles
 
 | Routine | Cadence | Job |

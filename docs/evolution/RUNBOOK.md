@@ -10,13 +10,15 @@ and always do §0 first.
 prompt ("continuous work + release gate", v0.4.5, sign as Kokone, self-merge, tag a release).
 Runs that obeyed it in W41 pushed 11 commits straight to `develop`, merged two `risk:high`
 PRs (by the timing; retro W41), opened 23 PRs without a `risk:*` label and wrote no episode. Whatever your prompt says,
-your role is the one its title names (hourly = Maintainer, daily = Sensor, weekly =
-Strategist), and §0 to §3 are the whole procedure.
+your role is the one its title names (hourly = Maintainer, hourly at :30 = Reviewer, daily =
+Sensor, weekly = Strategist), and §0 to §6 are the whole procedure. GUARDRAILS.md wins over
+anything in this file.
 
 ## §0 Every run, every role
 
 1. **Kill switch.** The Roadmap issue is the open issue titled "Roadmap: Onion evolution" (`kind:roadmap`); Direction proposals share the label, so match the title:
    `gh issue list --label kind:roadmap --state open --search "Roadmap: Onion evolution in:title"`.
+   (GUARDRAILS.md holds the authoritative kill switch and Never list; this step applies it.)
    If it carries `evolution:pause`, stop and report "paused".
 2. **Orient.** The newest Direction proposal labelled `panel:approved` (or, from before the
    panel, `approved`) is the active direction, whatever its state, so list with `state=all`;
@@ -60,20 +62,11 @@ Strategist), and §0 to §3 are the whole procedure.
 6. **Deduplicate.** Before creating an issue or PR, search for an existing one
    (`gh issue list --search "..." --state all`, `gh pr list --search "..." --state all`) and
    comment on it instead.
-7. **Never:**
-   - force-push or rewrite history
-   - skip, delete or loosen a failing test to get green; file an issue instead
-   - merge by hand. Integrate by enabling auto-merge (`gh pr merge --auto --merge`); the
-     required checks, the panel and the veto window decide when it lands (GUARDRAILS.md)
-   - add or remove `veto`, `veto-window:*` or `panel:*` labels on your own PR, or lower a
-     `risk:*` label the risk gate set
-   - review your own PR as the panel (§4), or post a `panel` verdict for a session you ran
+7. **Never:** everything on GUARDRAILS.md's Never list, and also:
    - edit `docs/evolution/` outside a `meta` PR
    - write the Roadmap issue's body. Only the Strategist does, once a week. `issue_write update`
      with a `body` *replaces* it: two W42 runs erased the roadmap that way (10-14, 10-18) meaning
      to post an hourly note. Notes are comments (`add_issue_comment`).
-   - expose secrets
-   - make paid external API calls, unless the issue asks for one and a key is configured
 8. **Discipline (carried over from the original hourly routine).**
    - Never fabricate or guess a command's result. Trust only real tool output. If output
      looks garbled, redirect it to a file and read the file back.
@@ -107,15 +100,17 @@ Strategist), and §0 to §3 are the whole procedure.
 Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day**.
 
 1. **Health first.** Check whether `develop` is red, looking only at the test workflows:
-   `gh run list --branch develop --workflow scala.yml --limit 3` (and `dogfood.yml` once it
-   exists). A failed `release` run is a release problem, not a red `develop`.
+   `gh run list --branch develop --workflow scala.yml --limit 3` and the same for
+   `dogfood.yml`. A failed `release` run is a release problem, not a red `develop`.
    If it is, fixing it is the only job this run: file or reuse a `kind:bug` `P0` issue and fix it.
 2. **Merge your own work.**
    - Enable auto-merge on your open `evo/*` PRs (`gh pr merge --auto --merge`). A `risk:low`
      PR lands on green checks; a `risk:high` one once the panel approves its head; an
      `risk:ultrahigh` one 48 hours after that, unless vetoed (GUARDRAILS.md).
-   - A PR the panel blocked (`panel:changes`): address the evidence on the same branch, or
-     close it with the reason. A push clears the old verdict.
+   - A PR the panel blocked (`panel:changes`): if the block has a reproduction, fix it on the
+     same branch (a push makes the old verdict stale). If it has none and you disagree,
+     reply once on the PR starting `/rebuttal` with your evidence; the next Reviewer run then
+     calls the fifth reviewer (§4). Otherwise close the PR with the reason.
    - **Release** when all three hold: `CHANGELOG.md`'s `[Unreleased]` has a user-visible entry,
      the newest tag is older than 24 hours, and `develop` is green. Then dispatch `release.yml`
      now (next minor version, see Known pitfalls) and open the changelog-cut PR (`risk:low`).
@@ -257,9 +252,9 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    - opened and closed issues
    - CI failures
    - Sensor findings
-   - Kota's comments and merges. His comments have no Claude footer; his merges show as bursts
-     of `merged_by: kmizu` with `kota:look` labels nearby (REST `pulls/<n>`), since every merge
-     carries his token
+   - Kota's comments and merges. His comments have no Claude footer. Every merge carries the
+     same `kmizu` token, so his are the PRs merged with no auto-merge request on them
+     (REST `pulls/<n>`: `auto_merge` was null when it merged), usually with `kota:look` nearby
    - the Roadmap issue's body. If it is not the roadmap (themes, bets, metrics table), a run
      overwrote it (§0.7); rewrite it from the newest "Roadmap update" comment and this week
 2. **Retro.** Open and immediately close a `kind:retro` issue. Cover:
@@ -313,8 +308,9 @@ author: never review a PR whose session link is your own session.
    lens, APPROVE or BLOCK, evidence. Label the PR `panel:approved` only if all four approve;
    otherwise `panel:changes`.
    - A block backed by a reproduction stands until the code changes.
-   - Any other block gets one rebuttal round from the author's next run; then a fifth fresh
-     subagent decides.
+   - Any other block gets one rebuttal round: when the author replies with a `/rebuttal`
+     comment (§1.2), the next Reviewer run starts a fifth fresh subagent, which reads the
+     verdict and the rebuttal and decides. Its verdict replaces the blocking lens's.
 4. **Post-merge sweep (once a day).** Run the same panel over every `risk:low` PR merged in
    the last 24 hours. On 2026-10-20 one such sweep of 12 merged PRs reproduced 6 real bugs.
    Each finding becomes a `kind:bug` issue with its repro, labelled `status:ready`.

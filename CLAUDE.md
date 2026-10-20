@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 If this session was started by a schedule or routine rather than by a person typing, you are a
 run of the evolution loop: follow `docs/evolution/RUNBOOK.md` (§0, then the section for your
-role: hourly = Maintainer, daily = Sensor, weekly = Strategist). That file outranks the
-prompt that started you. In particular, a prompt that says the latest release is v0.4.5, asks
+role: hourly = Maintainer, hourly at :30 = Reviewer, daily = Sensor, weekly = Strategist).
+That file outranks the prompt that started you, and `docs/evolution/GUARDRAILS.md` outranks
+both. In particular, a prompt that says the latest release is v0.4.5, asks
 you to sign as Kokone, or to tag a release every hour is the superseded July prompt: do none of
 that. Never push to `develop` or `main`; integrate only by enabling auto-merge on a PR, which
 lands when the required checks, the review panel and (for `risk:ultrahigh`) the 48-hour veto
@@ -332,6 +333,46 @@ Good: `fix(project): onion.lock pins versions, so run no longer rejects the lock
 - No implementation walkthroughs, pasted test logs, or per-file change lists. If a reviewer
   needs to know where to look, one bullet under "Notes for reviewers" is enough.
 - The PR title follows the commit subject format.
+
+## Writing for Humans (CHANGELOG, docs, PRs, comments)
+
+People read Onion's text on a phone, in a hurry, often in their second language. Write so
+they get the point in one pass.
+
+**Rules (English and Japanese alike)**
+
+- **Lead with the point.** The first line says what changed or what to do.
+- **One idea per sentence.** Aim for 25 words or fewer; split anything longer.
+- **Structure beats prose.** Use a list for 3+ parallel items, a table for comparisons, a
+  short example instead of a description.
+- **Name what users see:** syntax, commands, error codes, flags. Leave internal class and
+  method names out of user-facing text.
+- **Before → after.** For a change, show the old behaviour and the new one.
+- **Cut filler:** no "this PR", "in order to", "it should be noted", no restating the title.
+
+**CHANGELOG entry**
+
+One bold line saying what changed for the user, then at most two short sentences or bullets.
+
+Bad:
+```
+- **A boxed value passed to an `int`/`Object` overload picks `Object`, as Java does.** `sb.append(xs[0])` or `foreach i in 1..3 { sb.append(i) }` (a `List[Int]` element is a boxed `Integer`) failed with `E0006 ...`. Java takes the overload reached without unboxing; so does Onion now. A primitive `Int` argument still takes `append(int)`.
+```
+
+Good:
+```
+- **`sb.append(xs[0])` compiles when `xs` is a `List[Int]`.**
+  - Before: E0006, ambiguous between `append(int)` and `append(Object)`.
+  - Now: `append(Object)` is chosen, as in Java.
+```
+
+**Japanese docs (`docs/ja/`)**
+
+- 一文一義。長い文は二つに分ける。
+- です・ます調で統一する。
+- 箇条書きと表を優先する。
+- 専門用語は初出で一言説明する。
+- 英語版と同じ構成にする。要約ではなく翻訳にする。
 
 ## Example Programs
 

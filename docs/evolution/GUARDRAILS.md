@@ -3,6 +3,9 @@
 The limits the evolution loop works within. **Changing this file is `risk:ultrahigh`.**
 Everything outside these limits the loop decides and merges by itself (README.md, RUNBOOK.md).
 
+**This file wins.** If RUNBOOK.md, README.md or CLAUDE.md say anything that contradicts it,
+follow this file. A `risk:high` change elsewhere cannot loosen what is written here.
+
 ## Mode
 
 `mode: consolidation`
@@ -17,6 +20,21 @@ The switch from `consolidation` to `stable` is one `risk:ultrahigh` PR.
 ## Kill switch
 
 The `evolution:pause` label on the Roadmap issue stops every run (RUNBOOK §0.1).
+
+## Never
+
+No run, in any role, ever:
+
+- pushes to `develop` or `main`, force-pushes, or rewrites history
+- merges by hand; integration is only by enabling auto-merge on a PR
+- deletes a branch other than its own merged `evo/*` branch, deletes a tag or a repository,
+  or edits the ruleset or repository settings
+- adds or removes `veto`, `veto-window:*` or `panel:*` labels on its own PR, or lowers a
+  `risk:*` label
+- posts a panel verdict on its own PR. "Its own PR" means a PR whose body or commits carry
+  the run's session link, or that the run opened.
+- skips, deletes or loosens a failing test to get green
+- exposes a secret, or makes a paid external API call no issue asked for
 
 ## Risk tiers
 
@@ -36,11 +54,13 @@ Any one of these makes a PR ultrahigh:
 | Trigger | Why only a human veto is enough |
 |---|---|
 | Releasing `v1.0.0` or a new major version: a PR that adds `docs/releases/<major>.0.0.md` | A public compatibility promise cannot be taken back |
-| `.github/workflows/release.yml`, the publishing or signing settings in `build.sbt`, anything that reads `secrets.*` | A Maven Central release can never be deleted; leaked credentials cannot be un-leaked |
+| `.github/workflows/release.yml`; a `build.sbt` line mentioning `publish`, `pgp`, `sonatype`, `central`, `credentials` or `signing`; anything that reads `secrets.*` | A Maven Central release can never be deleted; leaked credentials cannot be un-leaked |
 | A workflow diff that touches `permissions:`, `on:` or `pull_request_target` | It can grant the loop power, or quietly switch a gate off |
-| This file, `PRINCIPLES.md`, `.github/workflows/evolution-*.yml`, `CODEOWNERS`, removing a required check, or skipping or excluding a spec in CI | The loop would be rewriting its own limits |
+| This file, `PRINCIPLES.md`, `.github/workflows/evolution-*.yml`, `.github/scripts/**`, `CODEOWNERS`, removing a required check, deleting a spec file, or skipping or excluding a spec in CI | The loop would be rewriting its own limits |
 | `LICENSE`, or headers that change copyright | A legal change the loop has no authority to make |
-| Deleting a branch, tag or repository, or editing the ruleset | Cannot be undone |
+
+Deleting branches, tags or repositories and editing the ruleset leave no diff, so they are on
+the Never list above instead of here.
 
 Everything else that used to wait for Kota is `risk:high`, and merges autonomously: grammar
 and semantics, diagnostics, stdlib API, `meta` changes to the RUNBOOK and README, and
@@ -49,15 +69,22 @@ and semantics, diagnostics, stdlib API, `meta` changes to the RUNBOOK and README
 ### Veto
 
 Any `veto` label or `/veto` comment on an ultrahigh PR, **from any author**, freezes it. Only
-Kota clears a veto, by closing the PR. A run never adds or removes `veto`, `veto-window:*` or
-`panel:*` labels on its own PR. Every actor uses the same GitHub account today, so a veto is
-built to fail safe: a mistaken veto only stops a merge.
+Kota clears a veto, by closing the PR. Every actor uses the same GitHub account today, so a
+veto is built to fail safe: a mistaken veto only stops a merge.
+
+The `evolution/veto-window` check runs every hour on a schedule, so a window that closes with
+no veto turns green without anyone re-triggering it.
 
 ## Review panel
 
 Four fresh reviewers, each seeing only the diff, the linked issue or RFC, and PRINCIPLES.md
 (RUNBOOK §4). All four must approve the current head. A block backed by a reproduction stands
 until the code changes; any other block gets one rebuttal round, then a fifth reviewer decides.
+
+**Only the verdict comment counts.** Approval is a comment starting
+`<!-- panel v1 sha=<head sha> -->` whose table approves all four lenses, for the PR's current
+head SHA. The `panel:approved` label is a display aid; the gate ignores it. A push makes every
+earlier verdict stale automatically.
 
 ## Required checks
 

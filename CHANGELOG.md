@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A static call on a nested class names the enclosing class's method.** `Response::json(body)` (the helpers live on `Server`, not `Server.Response`) said `did you mean: of`; it now says `did you mean: Server::json`. Applies whenever the enclosing class has a static method of that name and arity.
+
 - **Calling a String method by another language's name now names Onion's.** `s.reversed()`, `padStart`/`padEnd`, `trimStart`/`trimEnd`, `splitlines`, `title`, `find`, `includes`, `len`, `toUpper`, `splitWhitespace` and `format` gave no hint or a wrong one (`padEnd` -> `indent`, `find` -> `lines`); each now says `did you mean: reverse` (`padLeft`/`padRight`, `stripLeading`/`stripTrailing`, `lines`, `capitalizeWords`, `indexOf`, `contains`, `length`, `upper`, `words`, `formatted`).
 
 - **A boxed argument picks the `Object` overload for static calls too, and `foreach x in t` reads a type variable's bound.** `String::valueOf(boxedInt)` or a user's `static def f(x: Object)`/`f(x: Int)` called with a boxed value was still `E0006`, as only instance calls had the rule; and an unannotated `foreach v in t` with `t: T` where `[T extends Iterable[Int]]` bound `v` as `Object`.

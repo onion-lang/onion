@@ -1447,6 +1447,8 @@ Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
 Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / "el"
 Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
+// 不正な入力で NumberFormatException（"not an integer: \"abc\""）を投げるパース。規則は下の null 安全版と同じ。"42".toInt() とも書ける
+Strings::toInt("42") / Strings::toLong("100") / Strings::toDouble("3.14")
 // null 安全なパース（例外を投げずに null/フォールバックを返す）
 Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
 Strings::toIntOr("nope", 0)              // 0
@@ -1614,7 +1616,8 @@ Maps::mapValues(m, (v: Int) -> v * 2) / Maps::mapKeys(m, (k: String) -> k.toUppe
 Maps::filterValues(m, (v: Int) -> v > 0) / Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
 Maps::filter(m, (k: String, v: Int) -> v > 0) // キー+値の述語
 Maps::invert(m)                               // キーと値を入れ替え
-Maps::toList(m, (k: String, v: Int) -> k + "=" + v)  // エントリ -> List
+Maps::map(m, (k: String, v: Int) -> k + "=" + v)     // エントリ -> List。m.map { k, v -> ... } とも書ける
+Maps::toList(m, (k: String, v: Int) -> k + "=" + v)  // エントリ -> List（map と同じ）
 Maps::forEach(m, (k: String, v: Int) -> println(k))
 Maps::count(m, p) / Maps::anyEntry(m, p) / Maps::allEntries(m, p)
 Maps::groupBy(items, keyOf)                   // Map[K, List]
@@ -1648,24 +1651,17 @@ Set ユーティリティ（`onion.Sets`）。結果 Set は挿入順を保持�
 直接呼んだ `Sets::union`/`intersection`/`difference` は通常の **変更可能**な `LinkedHashSet` を
 返します。変更可能な結果が必要な場合は `Sets::` 形式を使ってください。
 
-**`toList` は `a.toList()` としては一切コンパイルできません -- シャドーイングでさえない**:
-`onion.Colls` も同じ `(Set)` 消去シグネチャで `toList` 拡張メソッドを宣言しており、本来なら
-下記の `union`/`intersection`/`difference`/`map` と同様に単純にシャドーイングされるだけの
-はずです。ところが `Set` は `Iterable` にも適合しており、`onion.Iterables` は別途
-`toList(Iterable)` 拡張メソッドを宣言しています -- これは消去シグネチャとして本当に異なる
-ものですが、`Set` 型の引数にも同じく適用可能です。そのため `a.toList()` は
-`onion.Colls` 側と `onion.Iterables` 側のどちらにも解釈できてしまい **曖昧**となり、
-どちらかへ黙って解決される代わりに `E0006`（"method call is applicable for both
-Colls.toList() and Iterables.toList()"）でコンパイルエラーになります -- このモジュールで
-「組み込み拡張メソッドとしても使える」と説明している他のすべてのメソッドとは異なります。
-さらに静的呼び出し形どうしも挙動が異なります: `Colls::toList` はコピーを
+**`Set` に対する `a.toList()` は `onion.Colls` の `toList(Set)` です**: これと
+`onion.Iterables` の `toList(Iterable)` はどちらも `Set` を受け取れますが、レシーバの型が
+より具体的な方が選ばれます（以前は `E0006` の曖昧エラーでした）。`onion.Sets` の
+`toList(Set)` は `Colls` と同じ消去シグネチャなので、`Colls` 側にシャドーイングされます。
+静的呼び出し形どうしは挙動が異なります: `Colls::toList` はコピーを
 `Collections.unmodifiableList` でラップし、`null` の Set には `NullPointerException` を
 投げますが、`Sets::toList` は通常の変更可能な `ArrayList` を返し、`null` は空として扱います。
-必ず `Sets::toList(a)`（変更不可・例外を投げる版が必要なら `Colls::toList(a)`）を明示的に
-呼び出してください -- `a.toList()` は `Set` レシーバに対しては絶対にコンパイルできません。
+変更可能で null 安全なコピーが必要なときは `Sets::toList(a)` を呼んでください。
 
 ```onion
-a.toList()                             // [E0006] 曖昧: Colls.toList() vs Iterables.toList()
+a.toList()                             // = Colls::toList(a): 変更不可
 Sets::toList(a)                        // 変更可能; null 安全（null には空リスト）
 Colls::toList(a)                       // 変更不可; null には NullPointerException
 ```
@@ -2296,6 +2292,10 @@ Colls::emptyMap()                       // 空の Map
 
 ```onion
 xs.concat(ys)                     // xs の要素に続けて ys の要素
+xs + ys                           // concat と同じ（xs.plus(ys)、xs += ys も可）。新しい List
+xs.associateBy { x -> key(x) }    // キー -> 要素 の Map。同じキーなら後の要素が残る
+xs.indexOfFirst { x -> x > 6 }    // 条件に合う最初の位置。無ければ -1
+xs.maxOrNull() / xs.minOrNull()   // max()/min() と同じだが、空の List では null
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - ネストを1段階解消
 xs.flatMap { x -> [x, x] }        // 各要素をリストに写してから1段階平坦化する
                                    // （bind はその別名で、do[List] { x <- xs; ... } が使う）

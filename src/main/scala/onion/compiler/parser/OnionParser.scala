@@ -1894,6 +1894,13 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       val e = inConditionOf(term())
       val b = block()
       desugarMapForeach(p(t), c(k), c(v), e, b)
+    } else if (image(2) == "in") {
+      // `foreach x in xs`: no annotation; typing infers x from the collection's type.
+      val k = id()
+      id()
+      val e = inConditionOf(term())
+      val b = block()
+      AST.ForeachExpression(p(t), AST.Argument(p(k), c(k), null, null, false), e, b)
     } else {
       val a = argument()
       if (la("in")) id()

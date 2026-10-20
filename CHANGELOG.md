@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Indexed iteration: `foreach (i, x) in xs.withIndex()`, `xs.mapIndexed { i, x -> ... }`, `xs.forEachIndexed { i, x -> ... }`.** Walking a list with indices needed a C-style `for var i` loop; `withIndex`/`zipWithIndex`/`indexed`/`mapIndexed` were all `E0005`. `withIndex()` returns an ordered index -> element Map, which the existing `(k, v)` foreach form walks; `zipWithIndex`/`indexed` hint at it.
+
 - **`Http.Response` has `status()`, `body()` and `headers()` methods.** Only the fields existed, so `res.status()` -- the spelling `Server.Response.status()`, `HttpFailure.kind()` and record accessors use -- was `E0005`. The fields keep working.
 
 - **`xs.associateBy { ... }`, `xs.indexOfFirst { ... }`, `xs.maxOrNull()`, `xs.minOrNull()`.** Index a list by a key (later element wins), find the first matching index (-1 if none), and take a max/min that is null for an empty list (`max()`/`min()` throw). `firstOrNull`/`lastOrNull` now hint at `first`/`last`, which already return null on an empty list.

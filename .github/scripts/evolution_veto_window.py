@@ -1,0 +1,63 @@
+"""The `evolution/veto-window` check (docs/evolution/GUARDRAILS.md, "Veto").
+
+For each PR (PR_NUMBER, or every open PR):
+- not `risk:ultrahigh`: success at once;
+- vetoed (a `veto` label or a `/veto` comment, from anyone): pending forever;
+- no approving panel verdict for the current head: pending;
+- otherwise success once WINDOW_HOURS (default 48) have passed since that verdict.
+"""
+import os
+import sys
+from datetime import timedelta
+
+import evolution_lib as ev
+
+WINDOW = timedelta(hours=float(os.environ.get("WINDOW_HOURS") or 48))
+CONTEXT = "evolution/veto-window"
+
+
+def evaluate(pr):
+    number, head = pr["number"], pr["head"]["sha"]
+    if ev.labelled_tier(pr) != "ultrahigh":
+        ev.set_status(head, CONTEXT, "success", "not risk:ultrahigh: no veto window")
+        ev.set_labels(pr, remove=["veto-window:open"])
+        print(f"#{number}: not ultrahigh")
+        return
+    pr_comments = ev.comments(number)
+    if ev.vetoed(pr, pr_comments):
+        ev.set_status(head, CONTEXT, "pending", "vetoed: only Kota clears a veto, by closing the PR")
+        print(f"#{number}: vetoed")
+        return
+    approval = ev.panel_approval(pr, pr_comments)
+    if approval is None:
+        ev.set_status(head, CONTEXT, "pending", f"waiting for a panel approval of {head[:7]}")
+        print(f"#{number}: no panel approval yet")
+        return
+    closes = ev.parse_time(approval["created_at"]) + WINDOW
+    if ev.now() >= closes:
+        ev.set_status(head, CONTEXT, "success", f"veto window closed {closes:%Y-%m-%d %H:%M} UTC with no veto")
+        ev.set_labels(pr, remove=["veto-window:open"])
+        print(f"#{number}: window closed, no veto")
+    else:
+        ev.set_status(head, CONTEXT, "pending", f"veto window open until {closes:%Y-%m-%d %H:%M} UTC")
+        ev.set_labels(pr, add=["veto-window:open"])
+        print(f"#{number}: window open until {closes:%Y-%m-%d %H:%M} UTC")
+
+
+def main():
+    number = os.environ.get("PR_NUMBER", "").strip()
+    prs = [ev.get(f"/repos/{ev.REPO}/pulls/{number}")] if number else ev.open_prs()
+    failures = 0
+    for pr in prs:
+        if pr.get("state") != "open":
+            continue
+        try:
+            evaluate(pr)
+        except Exception as e:
+            failures += 1
+            print(f"#{pr['number']}: error {e}", file=sys.stderr)
+    sys.exit(1 if failures else 0)
+
+
+if __name__ == "__main__":
+    main()

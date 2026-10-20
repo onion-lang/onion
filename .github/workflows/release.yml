@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   release:
@@ -98,6 +99,18 @@ jobs:
             echo "Tag version ($TAG_VERSION) does not match build version ($VERSION)" >&2
             exit 1
           fi
+      - name: Require the release note for 1.0 and new majors
+        # v1.0.0 and every new major version are risk:ultrahigh (docs/evolution/GUARDRAILS.md):
+        # their release note can only reach this ref through a merged ultrahigh PR.
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VER="${TAG#v}"
+          MAJOR="${VER%%.*}"
+          REST="${VER#*.}"
+          if [ "$MAJOR" -ge 1 ] && [ "${REST%%[!0-9.]*}" = "0.0" ]; then
+            NOTE="docs/releases/${MAJOR}.0.0.md"
+            test -f "$NOTE" || { echo "::error::$TAG needs $NOTE, added by a merged risk:ultrahigh PR"; exit 1; }
+          fi
       - name: Test
         env:
           SBT_OPTS: "-Xmx10G -XX:+UseG1GC -Xss16m"
@@ -140,6 +153,19 @@ jobs:
             release-artifacts/onion-${VERSION}.jar \
             release-artifacts/onion-dist-${VERSION}.zip \
             release-artifacts/checksums.txt
+      - name: Move main to the release and redeploy the docs
+        # `main` is the latest release; the docs site deploys from it. A fast-forward only:
+        # if `main` has diverged, warn instead of overwriting it.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          SHA=$(git rev-list -n 1 "$TAG")
+          if gh api -X PATCH "repos/${{ github.repository }}/git/refs/heads/main" -f sha="$SHA" -F force=false; then
+            gh workflow run docs.yml --ref main --repo "${{ github.repository }}"
+          else
+            echo "::warning::main could not be fast-forwarded to $TAG; docs not redeployed"
+          fi
 
   # Maven Central: org.onion-lang:onion and org.onion-lang:onion-llm, signed, uploaded to
   # the Central Portal as one deployment. A separate job, after the GitHub Release, so a

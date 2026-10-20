@@ -40,3 +40,26 @@ jobs:
       env:
         SBT_OPTS: "-Xmx4G -XX:+UseG1GC -Xss16m"
       run: sbt -v "onion/packageDoc; onion/packageSrc; onion/makePom; llm/packageDoc; llm/packageSrc; llm/makePom"
+
+  # The same suite in the Japanese locale. Error messages are bilingual, and a test that
+  # asserts localized text passes in one locale and fails in the other (CLAUDE.md Testing).
+  test-ja:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+    - name: Install sbt
+      uses: sbt/setup-sbt@v1
+      with:
+        disk-cache: false
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+        cache: 'sbt'
+    - name: Build and Test (ja)
+      env:
+        SBT_OPTS: "-Xmx10G -XX:+UseG1GC -Xss16m -Duser.language=ja -Duser.country=JP"
+      run: sbt -v +test

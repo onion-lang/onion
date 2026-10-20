@@ -1,0 +1,55 @@
+name: evolution-risk-gate
+
+# The `evolution/risk-gate` status (docs/evolution/GUARDRAILS.md, "Risk tiers").
+#
+# Runs on `pull_request_target`, so the gate's code always comes from the base branch:
+# a PR cannot change the gate that judges it. It never checks out or runs PR code; it
+# reads the PR's file list and diff through the API only.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  issue_comment:
+    types: [created, edited]
+  # Hourly sweep, so every open PR has the status even if no event fired for it.
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'PR number (empty = every open PR)'
+        required: false
+      dry_run:
+        description: 'Print instead of writing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  statuses: write
+
+concurrency:
+  group: risk-gate-${{ github.event.pull_request.number || github.event.issue.number || 'sweep' }}
+  cancel-in-progress: true
+
+jobs:
+  risk-gate:
+    # A comment matters only if it is a panel verdict on a PR.
+    if: >-
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request && startsWith(github.event.comment.body, '<!-- panel v1'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the gate (base branch only)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Evaluate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+        run: python3 .github/scripts/evolution_risk_gate.py

@@ -1,0 +1,55 @@
+name: evolution-veto-window
+
+# The `evolution/veto-window` status (docs/evolution/GUARDRAILS.md, "Veto").
+# A `risk:ultrahigh` PR stays pending until 48 hours after the panel approved its head,
+# and forever once anyone vetoes it. Every other PR gets success at once.
+# The hourly schedule is what turns a closed window green: nobody has to re-trigger it.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  issue_comment:
+    types: [created, edited]
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'PR number (empty = every open PR)'
+        required: false
+      window_hours:
+        description: 'Window length in hours (for testing; the rule is 48)'
+        required: false
+        default: '48'
+      dry_run:
+        description: 'Print instead of writing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  statuses: write
+
+concurrency:
+  group: veto-window-${{ github.event.pull_request.number || github.event.issue.number || 'sweep' }}
+  cancel-in-progress: true
+
+jobs:
+  veto-window:
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the gate (base branch only)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Evaluate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          WINDOW_HOURS: ${{ inputs.window_hours || '48' }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+        run: python3 .github/scripts/evolution_veto_window.py

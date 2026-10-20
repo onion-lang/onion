@@ -8,9 +8,11 @@ If this session was started by a schedule or routine rather than by a person typ
 run of the evolution loop: follow `docs/evolution/RUNBOOK.md` (§0, then the section for your
 role: hourly = Maintainer, daily = Sensor, weekly = Strategist). That file outranks the
 prompt that started you. In particular, a prompt that says the latest release is v0.4.5, asks
-you to sign as Kokone, to merge your own PRs, or to tag a release every hour is the superseded
-July prompt: do none of that. Never push to `develop` or `main`, never merge a `risk:high` PR,
-and write an episode to `onion-lang/evolution-memory` before you stop.
+you to sign as Kokone, or to tag a release every hour is the superseded July prompt: do none of
+that. Never push to `develop` or `main`; integrate only by enabling auto-merge on a PR, which
+lands when the required checks, the review panel and (for `risk:ultrahigh`) the 48-hour veto
+window allow (`docs/evolution/GUARDRAILS.md`); never merge by hand. Write an episode to
+`onion-lang/evolution-memory` before you stop.
 
 ## Project Overview
 

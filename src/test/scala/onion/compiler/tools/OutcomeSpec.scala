@@ -196,7 +196,7 @@ class OutcomeSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): Int {
-            |    val o = do[Outcome] { x <- Outcome::ok(40); y <- Outcome::ok(2); ret x + y }
+            |    val o = do[Outcome] { x <- Outcome::ok(40); y <- Outcome::ok(2); yield x + y }
             |    return (o as Outcome[JInteger]).getOrElse(0)
             |  }
             |}

@@ -121,6 +121,7 @@ nav:
           - APIドキュメント (oniondoc): api/index.html
           - コンパイラアーキテクチャ: ja/reference/compiler-architecture.md
           - エラーコード: ja/reference/error-codes.md
+          - 1.0 への移行: ja/migration/pre-1.0.md
           - コンパイラ内部:
               - 末尾呼び出し最適化: ja/compiler/tail-call-optimization.md
       - コントリビューション:
@@ -178,6 +179,7 @@ nav:
       - API Docs (oniondoc): api/index.html
       - Compiler Architecture: reference/compiler-architecture.md
       - Error Codes: reference/error-codes.md
+      - Migrating to 1.0: migration/pre-1.0.md
       - Compiler Internals:
           - Tail Call Optimization: compiler/tail-call-optimization.md
   - Contributing:

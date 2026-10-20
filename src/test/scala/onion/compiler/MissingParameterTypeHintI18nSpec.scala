@@ -42,13 +42,13 @@ class MissingParameterTypeHintI18nSpec extends AnyFunSpec with Diagrams {
   }
 
   it("hints at a missing parameter type, not a Java-style method, for `def foo(x): Int`") {
-    val msgs = messages("def foo(x): Int { ret x }\n")
+    val msgs = messages("def foo(x): Int { yield x }\n")
     assert(msgs.contains("x"), s"expected the hint to name the untyped parameter, got: $msgs")
     assert(!msgs.contains("public void method"), s"should not fire the Java-style-method hint, got: $msgs")
   }
 
   it("does not fire when every parameter already has a type") {
-    val msgs = messages("def foo(x: Int): Int { ret x }\n")
+    val msgs = messages("def foo(x: Int): Int { yield x }\n")
     assert(!msgs.contains("needs an explicit type"), s"hint should not fire for a fully-typed parameter list, got: $msgs")
   }
 }

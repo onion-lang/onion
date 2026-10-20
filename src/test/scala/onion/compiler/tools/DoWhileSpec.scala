@@ -74,7 +74,7 @@ class DoWhileSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    val r = do[Option] { a <- Option::some(1); ret a + 1 }
+          |    val r = do[Option] { a <- Option::some(1); yield a + 1 }
           |    return "" + r.get()
           |  }
           |}

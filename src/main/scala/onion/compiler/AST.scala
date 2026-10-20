@@ -235,13 +235,13 @@ object AST {
   case class XOR(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^")
   case class XorAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("^=")
 
-  // Do notation for monadic operations: do[M] { x <- e1; y <- e2; ret e3 }
+  // Do notation for monadic operations: do[M] { x <- e1; y <- e2; yield e3 }
   /** Binding statement in do notation: x <- expr */
   case class DoBinding(location: Location, name: String, expr: Expression) extends Node
-  /** Return statement in do notation: ret expr */
-  case class RetStatement(location: Location, expr: Expression) extends Expression
+  /** The final value of a do block: yield expr */
+  case class YieldStatement(location: Location, expr: Expression) extends Expression
   /** Do expression: do[M] { statements }
-   *  statements is a List of DoBinding or Expression (including RetStatement) */
+   *  statements is a List of DoBinding or Expression (including YieldStatement) */
   case class DoExpression(location: Location, monadType: TypeNode, statements: List[Any]) extends Expression
 
   // Patterns for select/case

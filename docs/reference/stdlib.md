@@ -1205,7 +1205,7 @@ Future works with do notation for sequential async composition:
 val result: Future[Int] = do[Future] {
   x <- Future::async { fetchA() }
   y <- Future::async { fetchB(x) }
-  ret x + y
+  yield x + y
 }
 ```
 
@@ -1547,13 +1547,14 @@ Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // List of entry names
 Files::listFiles("dir")                // List of java.io.File entries
 Files::glob("dir", "*.on")             // glob-matched names
+Files::walk("dir")                     // every file under dir, recursively: relative paths, sorted
 Files::delete(path) / Files::exists(path)
 Files::isFile(path) / Files::isDirectory(path)
 Files::mkdirs(path)                    // creates dir + missing parents
 Files::size(path)                      // Long, size in bytes (0 if missing)
 Files::copy(src, dst)                  // replaces dst if it exists
 Files::move(src, dst)                  // rename; replaces dst if it exists
-Files::copyDir(src, dst)               // recursive directory copy
+Files::copyDir(src, dst)               // recursive directory copy; rejects dst inside/equal to src
 ```
 
 Path helpers — file names, parents, joining, and extensions:
@@ -2297,7 +2298,7 @@ val body = r.map { res -> res.body }.getOrElse("")
 val both = do[Result] {
   a <- Http::request("GET", urlA).send()
   b <- Http::request("GET", urlB).send()
-  ret a.status + b.status
+  yield a.status + b.status
 }
 ```
 
@@ -2475,6 +2476,7 @@ DateTime::monthName(epochMillis): String  // "March"
 ```
 DateTime::of(year, month, day): Long
 DateTime::of(year, month, day, hour, minute, second): Long
+DateTime::today(): Long                 // = startOfDay(now())
 DateTime::startOfDay(epochMillis): Long
 DateTime::endOfDay(epochMillis): Long
 ```

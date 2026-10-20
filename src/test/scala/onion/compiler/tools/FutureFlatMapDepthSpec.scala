@@ -33,7 +33,7 @@ class FutureFlatMapDepthSpec extends AbstractShellSpec {
           |public:
           |  static def chain(n: Int): Future[Int] {
           |    if n <= 0 { return Future::successful(0) }
-          |    return do[Future] { x <- Future::successful(1); y <- Test::chain(n - 1); ret x + y }
+          |    return do[Future] { x <- Future::successful(1); y <- Test::chain(n - 1); yield x + y }
           |  }
           |  static def main(args: String[]): Int {
           |    return Test::chain(200000).await()

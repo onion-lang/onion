@@ -551,12 +551,12 @@ val r: Runnable = () -> println("hi")   // SAM 変換
 ### Do 記法
 
 ```onion
-do[Option] { a <- getA(); b <- getB(); ret a + b }
-do[Future] { x <- fetch(); ret x.size() }
-do[List]   { x <- [1, 2]; y <- ["a", "b"]; ret x + y }   // 内包表記
+do[Option] { a <- getA(); b <- getB(); yield a + b }
+do[Future] { x <- fetch(); yield x.size() }
+do[List]   { x <- [1, 2]; y <- ["a", "b"]; yield x + y }   // 内包表記
 ```
 
-`x <- e; rest` は `e.bind((x) -> rest)` に脱糖されます。`ret e2` の直前の束縛は
+`x <- e; rest` は `e.bind((x) -> rest)` に脱糖されます。`yield e2` の直前の束縛は
 `e.map((x) -> e2)` になります。`bind`/`map` を持つ（インスタンスまたは拡張メソッド）
 任意の型が do 記法で使えます: `Option`、`Result`、`Future`、`List`（内包表記）、
 およびユーザー型。スクリプトのトップレベルでも動作します。
@@ -643,6 +643,8 @@ xs.map { x -> x * 2 }
 `6 | (1 & 2)`、`a || b && c` は `(a || b) && c` ではなく `a || (b && c)` です。
 
 オブジェクトの `==` は値の等価性（`equals`）。`===` は参照を比較します。
+null でない `Comparable`（String、BigDecimal、LocalDate、`Comparable` に適合するクラス）に対する
+`<` `<=` `>` `>=` は `a.compareTo(b) < 0` などを意味します。
 オペランドのいずれかが `String` の場合、`+` は文字列連結を行います。
 
 ## インポートとモジュール

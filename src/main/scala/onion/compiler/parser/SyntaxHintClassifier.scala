@@ -177,10 +177,10 @@ private[compiler] object SyntaxHintClassifier {
     "const", "continue", "def", "do", "Double", "else", "enum", "extends", "extension",
     "false", "final", "finally", "Float", "for", "foreach", "forward", "goto", "if",
     "import", "instance", "interface", "internal", "Int", "is", "Long", "module", "new",
-    "null", "or", "override", "private", "protected", "public", "record", "ret", "return",
+    "null", "or", "override", "private", "protected", "public", "record", "return",
     "select", "self", "Short", "static", "super", "sealed", "synchronized", "this", "throw",
     "throws", "trait", "true", "try", "type", "Unit", "val", "var", "void", "volatile",
-    "when", "while"
+    "when", "while", "yield"
   )
   private val NullableUnionType =
     """:\s*([A-Za-z_][\w.\[\]]*)\s*\|\s*null\b""".r

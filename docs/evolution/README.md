@@ -13,7 +13,7 @@ a language everyone can use, free of the human-developer bottleneck.
 
 | Routine | Cadence | Job |
 |---|---|---|
-| **Maintainer** | hourly | Keeps `develop` green, works the top `status:ready` issue (at most 2 PRs per run), enables auto-merge on its PRs, and comments what it learned |
+| **Maintainer** | hourly | Keeps `main` green, works the top `status:ready` issue (at most 2 PRs per run), enables auto-merge on its PRs, and comments what it learned |
 | **Sensor** | daily | Runs the dogfood scenarios, gap probes and performance budgets, files issues with minimal repros (deduplicated), and posts the daily digest |
 | **Reviewer** | hourly | The AI review panel: four independent reviewers decide `risk:high`/`risk:ultrahigh` PRs, RFCs and Direction proposals, and sweep the day's `risk:low` merges |
 | **Strategist** | weekly | Writes a retro, updates the Roadmap issue, opens a **Direction proposal** for the panel, runs the pre-1.0 consolidation audit, cuts releases, and opens `meta` PRs that improve the runbook |
@@ -69,8 +69,8 @@ changed feature, at most one a day.
 - `panel:approved|changes` (the review panel's verdict on the current head)
 - `veto`, `veto-window:open` (only on `risk:ultrahigh` PRs)
 - `breaking`, `phase:consolidation`, `kind:epic` (the pre-1.0 consolidation)
-- `revert-candidate` (a merge that turned `develop` red)
-- `P0` (`develop` broken or release blocked), `P1` (real task blocked), `P2` (friction), `P3` (nice to have)
+- `revert-candidate` (a merge that turned `main` red)
+- `P0` (`main` broken or release blocked), `P1` (real task blocked), `P2` (friction), `P3` (nice to have)
 - `approved` (Kota's approval, from before the panel), `meta` (changes to the loop itself), `evolution:pause`
 - `kota:look` (Kota points the loop at something; it comes first after `P0`)
 

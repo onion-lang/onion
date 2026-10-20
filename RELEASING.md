@@ -6,7 +6,7 @@ is no manual `version := ...` line to update in `build.sbt`.
 
 ## Release checklist
 
-1. **Make sure `develop` is green — in both locales.**
+1. **Make sure `main` is green — in both locales.**
    ```bash
    sbt shutdown && sbt -Duser.language=en testFull
    sbt shutdown && sbt -Duser.language=ja testFull
@@ -39,22 +39,22 @@ is no manual `version := ...` line to update in `build.sbt`.
    token instead of relying on a client-side push:
 
    ```bash
-   gh workflow run release.yml -f version=v0.2.0 --ref develop
+   gh workflow run release.yml -f version=v0.2.0 --ref main
    gh run watch "$(gh run list --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
    ```
 
    Without the `gh` CLI (e.g. a session with only the GitHub API/MCP tools), the
    same `workflow_dispatch` event is `POST
    /repos/{owner}/{repo}/actions/workflows/release.yml/dispatches` with
-   `{"ref": "develop", "inputs": {"version": "v0.2.0"}}` — a GitHub MCP server
+   `{"ref": "main", "inputs": {"version": "v0.2.0"}}` — a GitHub MCP server
    typically exposes this as an "run workflow" action taking `workflow_id:
-   "release.yml"`, `ref: "develop"`, `inputs: {version: "v0.2.0"}`.
+   "release.yml"`, `ref: "main"`, `inputs: {version: "v0.2.0"}`.
 
    The tag-push path still works for anyone whose credentials are allowed to
    create `v*` refs:
 
    ```bash
-   git checkout develop
+   git checkout main
    git pull
    git tag -a v0.2.0 -m "Release v0.2.0"
    git push origin v0.2.0
@@ -171,7 +171,7 @@ checksums. Only the Maven groupId is `org.onion-lang`; the packages stay `onion.
    ```
 7. **Run the first release** the usual way (step 4 above): push the tag `vX.Y.Z`, or,
    where a client tag push is rejected with HTTP 403, start the workflow with
-   `gh workflow run release.yml -f version=vX.Y.Z --ref develop`. When
+   `gh workflow run release.yml -f version=vX.Y.Z --ref main`. When
    `publish-central` is green, open <https://central.sonatype.com/publishing/deployments>,
    check that the deployment holds `onion` and `onion-llm` (jar, sources, javadoc, pom,
    each signed) and press **Publish**. The files reach `repo1.maven.org` within about

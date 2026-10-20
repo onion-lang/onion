@@ -10,7 +10,7 @@ role: hourly = Maintainer, hourly at :30 = Reviewer, daily = Sensor, weekly = St
 That file outranks the prompt that started you, and `docs/evolution/GUARDRAILS.md` outranks
 both. In particular, a prompt that says the latest release is v0.4.5, asks
 you to sign as Kokone, or to tag a release every hour is the superseded July prompt: do none of
-that. Never push to `develop` or `main`; integrate only by enabling auto-merge on a PR, which
+that. Never push to `main`; integrate only by enabling auto-merge on a PR, which
 lands when the required checks, the review panel and (for `risk:ultrahigh`) the 48-hour veto
 window allow (`docs/evolution/GUARDRAILS.md`); never merge by hand. Write an episode to
 `onion-lang/evolution-memory` before you stop.
@@ -263,7 +263,7 @@ CI is unaffected by both: the incremental state lives in `target/`, which `setup
 
 **Heap size:** `.github/workflows/scala.yml` runs CI with `SBT_OPTS="-Xmx10G -XX:+UseG1GC -Xss16m"`.
 Match that locally — `-Xmx4G` reliably OOMs in `MutationFuzzSpec` (a heavy mutation-fuzzing
-test) even on an otherwise-clean `develop` HEAD, which looks like a test failure but is only
+test) even on an otherwise-clean `main` HEAD, which looks like a test failure but is only
 an under-provisioned heap:
 
 ```bash

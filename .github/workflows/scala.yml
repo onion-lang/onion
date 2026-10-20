@@ -1,11 +1,11 @@
 name: onion
 
-# Pushes to develop only: a pushed PR branch is already covered by `pull_request`, and
+# Pushes to main only: a pushed PR branch is already covered by `pull_request`, and
 # running both would build everything twice (#2004).
 on:
   pull_request:
   push:
-    branches: [develop]
+    branches: [main]
 jobs:
   test:
     runs-on: ubuntu-latest

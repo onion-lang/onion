@@ -25,7 +25,7 @@ The `evolution:pause` label on the Roadmap issue stops every run (RUNBOOK §0.1)
 
 No run, in any role, ever:
 
-- pushes to `develop` or `main`, force-pushes, or rewrites history
+- pushes to `main`, force-pushes, or rewrites history
 - merges by hand; integration is only by enabling auto-merge on a PR
 - deletes a branch other than its own merged `evo/*` branch, deletes a tag or a repository,
   or edits the ruleset or repository settings
@@ -90,7 +90,7 @@ earlier verdict stale automatically.
 
 ## Required checks
 
-On `develop`, sourced from GitHub Actions only:
+On `main`, sourced from GitHub Actions only:
 
 - `test` (the full suite, English locale; workflow `onion`)
 - `test-ja` (the full suite, Japanese locale; workflow `onion`)

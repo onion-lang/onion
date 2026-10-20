@@ -17,6 +17,15 @@ follow this file. A `risk:high` change elsewhere cannot loosen what is written h
 
 The switch from `consolidation` to `stable` is one `risk:ultrahigh` PR.
 
+## Identities
+
+| Account | Who | May |
+|---|---|---|
+| `onion-yui` | the evolution loop, every role | push branches, open PRs, post panel verdicts, enable auto-merge; no workflow changes, no ruleset bypass |
+| `kmizu` | Kota | veto, redirect, bypass the ruleset in an emergency |
+
+A panel verdict counts only from `onion-yui`; a `/veto` comment counts only from `kmizu`.
+
 ## Kill switch
 
 The `evolution:pause` label on the Roadmap issue stops every run (RUNBOOK §0.1).
@@ -68,11 +77,10 @@ and semantics, diagnostics, stdlib API, `meta` changes to the RUNBOOK and README
 
 ### Veto
 
-A `veto` label, or a `/veto` comment from the repository's own account, freezes an ultrahigh
-PR for good: a veto seen once stays in force even if the label or comment is later removed.
-Only Kota clears a veto, by closing the PR. Every actor uses the same GitHub account today, so
-a veto is built to fail safe: a mistaken veto only stops a merge. Comments from outside
-accounts can neither veto nor approve.
+A `veto` label, or a `/veto` comment from Kota (`kmizu`), freezes an ultrahigh PR for good: a
+veto seen once stays in force even if the label or comment is later removed. Only Kota clears a
+veto, by closing the PR. A mistaken veto only stops a merge, so the label fails safe from any
+account. Comments from any other account can neither veto nor approve.
 
 The `evolution/veto-window` check runs every hour on a schedule, so a window that closes with
 no veto turns green without anyone re-triggering it.

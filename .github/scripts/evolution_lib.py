@@ -21,8 +21,10 @@ REPO = os.environ.get("REPO", "onion-lang/onion")
 DRY_RUN = os.environ.get("DRY_RUN", "") not in ("", "0", "false")
 TIERS = ["low", "high", "ultrahigh"]
 
-# Who may post a panel verdict or a /veto comment. Every actor uses this account today.
-TRUSTED_AUTHORS = set(os.environ.get("PANEL_AUTHORS", "kmizu").split(","))
+# The loop acts as onion-yui and Kota as kmizu (GUARDRAILS.md, "Identities"):
+# a panel verdict counts only from the loop's account, a /veto only from Kota's.
+PANEL_AUTHORS = set(os.environ.get("PANEL_AUTHORS", "onion-yui").split(","))
+VETO_AUTHORS = set(os.environ.get("VETO_AUTHORS", "kmizu").split(","))
 TRUSTED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 
 # The files API returns at most this many files; beyond it the diff cannot be judged.
@@ -218,9 +220,19 @@ PANEL_MARK = re.compile(r"^<!-- panel v1 sha=([0-9a-f]{40}) -->")
 VERDICT = re.compile(r"^verdict:\s*(APPROVED|BLOCKED)\s*$", re.M)
 
 
-def trusted(comment):
+def _written_by(comment, authors):
     user = (comment.get("user") or {}).get("login")
-    return user in TRUSTED_AUTHORS and comment.get("author_association") in TRUSTED_ASSOCIATIONS
+    return user in authors and comment.get("author_association") in TRUSTED_ASSOCIATIONS
+
+
+def trusted(comment):
+    """A panel verdict's author: the loop's own account."""
+    return _written_by(comment, PANEL_AUTHORS)
+
+
+def from_kota(comment):
+    """A `/veto` comment's author: Kota's account."""
+    return _written_by(comment, VETO_AUTHORS)
 
 
 def unedited(comment):
@@ -251,8 +263,8 @@ VETO_COMMENT = re.compile(r"^/veto\b", re.M)
 
 
 def veto_comment(pr_comments):
-    """A trusted `/veto` comment, if any."""
-    return next((c for c in pr_comments if trusted(c) and VETO_COMMENT.search(c.get("body") or "")), None)
+    """A `/veto` comment from Kota, if any."""
+    return next((c for c in pr_comments if from_kota(c) and VETO_COMMENT.search(c.get("body") or "")), None)
 
 
 def vetoed(pr, pr_comments, events=()):

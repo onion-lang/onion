@@ -73,7 +73,7 @@ class TierTest(unittest.TestCase):
         self.assertEqual(ev.effective_tier(pr, [f("CHANGELOG.md")])[0], "high")
 
 
-def comment(body, login="kmizu", assoc="OWNER", created="2026-10-21T00:00:00Z", updated=None):
+def comment(body, login="onion-yui", assoc="MEMBER", created="2026-10-21T00:00:00Z", updated=None):
     return {"body": body, "user": {"login": login}, "author_association": assoc,
             "created_at": created, "updated_at": updated or created}
 
@@ -93,6 +93,9 @@ class PanelTest(unittest.TestCase):
     def test_an_outsider_cannot_approve(self):
         self.assertIsNone(ev.panel_approval(self.pr, [comment(self.ok_body, login="stranger", assoc="NONE")]))
         self.assertIsNone(ev.panel_approval(self.pr, [comment(self.ok_body, assoc="CONTRIBUTOR")]))
+
+    def test_kota_does_not_approve_as_the_panel(self):
+        self.assertIsNone(ev.panel_approval(self.pr, [comment(self.ok_body, login="kmizu", assoc="OWNER")]))
 
     def test_an_edited_comment_does_not_count(self):
         edited = comment(self.ok_body, created="2026-10-01T00:00:00Z", updated="2026-10-21T00:00:00Z")
@@ -117,10 +120,14 @@ class PanelTest(unittest.TestCase):
 class VetoTest(unittest.TestCase):
     pr = {"head": {"sha": HEAD}, "labels": []}
 
-    def test_veto_by_label_or_trusted_comment(self):
+    def test_veto_by_label_or_kotas_comment(self):
+        kota = dict(login="kmizu", assoc="OWNER")
         self.assertTrue(ev.vetoed(dict(self.pr, labels=[{"name": "veto"}]), []))
-        self.assertTrue(ev.vetoed(self.pr, [comment("I object.\n/veto")]))
-        self.assertFalse(ev.vetoed(self.pr, [comment("no veto here, see /vetoes")]))
+        self.assertTrue(ev.vetoed(self.pr, [comment("I object.\n/veto", **kota)]))
+        self.assertFalse(ev.vetoed(self.pr, [comment("no veto here, see /vetoes", **kota)]))
+
+    def test_the_loop_cannot_veto_by_comment(self):
+        self.assertFalse(ev.vetoed(self.pr, [comment("/veto")]))
 
     def test_an_outsider_cannot_veto_by_comment(self):
         self.assertFalse(ev.vetoed(self.pr, [comment("/veto", login="stranger", assoc="NONE")]))

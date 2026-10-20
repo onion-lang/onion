@@ -16,6 +16,10 @@ anything in this file.
 
 ## §0 Every run, every role
 
+0. **Act as Yui.** You are `onion-yui` on GitHub (GUARDRAILS.md, "Identities"). If `GH_TOKEN`
+   is set, run `gh auth setup-git` and
+   `git config --global user.name onion-yui; git config --global user.email 345448452+onion-yui@users.noreply.github.com`.
+   Check with `gh api user --jq .login`; if it does not say `onion-yui`, say so in your episode.
 1. **Kill switch.** The Roadmap issue is the open issue titled "Roadmap: Onion evolution" (`kind:roadmap`); Direction proposals share the label, so match the title:
    `gh issue list --label kind:roadmap --state open --search "Roadmap: Onion evolution in:title"`.
    (GUARDRAILS.md holds the authoritative kill switch and Never list; this step applies it.)
@@ -252,9 +256,8 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    - opened and closed issues
    - CI failures
    - Sensor findings
-   - Kota's comments and merges. His comments have no Claude footer. Every merge carries the
-     same `kmizu` token, so his are the PRs merged with no auto-merge request on them
-     (REST `pulls/<n>`: `auto_merge` was null when it merged), usually with `kota:look` nearby
+   - Kota's comments and merges: everything authored or merged by `kmizu` is his, since the
+     loop acts as `onion-yui`
    - the Roadmap issue's body. If it is not the roadmap (themes, bets, metrics table), a run
      overwrote it (§0.7); rewrite it from the newest "Roadmap update" comment and this week
 2. **Retro.** Open and immediately close a `kind:retro` issue. Cover:

@@ -164,7 +164,22 @@ class SemanticErrorReporter(threshold: Int) {
         val signatures = sameName.take(3).map { m =>
           s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
-        Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
+        // A sibling whose name extends this one and takes these very arguments
+        // (`Csv::stringify(mapRows)` -> `stringifyWithHeader`) is the likelier fix.
+        val sibling = targetType match
+          case obj: TypedAST.ObjectType =>
+            obj.methods.find { m =>
+              m.name != name && m.name.startsWith(name) &&
+                Modifier.isStatic(m.modifier) == Modifier.isStatic(sameName.head.modifier) &&
+                m.arguments.length == argTypes.length &&
+                m.arguments.zip(argTypes).forall { case (p, a) => argPassable(p, a) }
+            }
+          case _ => None
+        sibling match
+          case Some(m) =>
+            Some(format(message("suggestion.didYouMean"), Seq(s"${m.name}(${m.arguments.map(typeName).mkString(", ")})")))
+          case None =>
+            Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
       } else if (extensionReceiverCandidates.nonEmpty) {
         val signatures = extensionReceiverCandidates.take(3).map { m =>
           s"self.${m.name}(${m.arguments.map(typeName).mkString(", ")})"

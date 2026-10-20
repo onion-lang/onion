@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`foreach x in xs { ... }` needs no type annotation.** It was a syntax error (`expecting ":"`, with a hint about `for x in xs`). The loop variable now takes the collection's element type: an array's component type, an `Iterable`'s element type (`List[Order]` gives `Order`, so `x.total()` resolves), or `Object` for a raw collection. `foreach x: T in xs` is unchanged.
+
 - **`m.map { k, v -> ... }` on a Map returns a List of the results, as in Kotlin.** It was E0005 (`did you mean: get`); the operation existed only as `Maps::toList(m, mapper)`. Also `Maps::map(m, mapper)`.
 
 - **A lambda with the wrong number of parameters is now `E0101`, naming both counts.** `m.filter { e -> ... }` on a Map, `xs.map { a, b -> ... }` or `xs.fold(0) { acc -> ... }` reported `E0005: a method applicable for Function2[String, Int, Boolean].call(Object) is not found` (twice for `map`), pointing at the function interface's internal `call` method. It now says `this lambda takes 1 parameter(s), but the expected function type Function2[String, Int, Boolean] takes 2.`, once.

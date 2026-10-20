@@ -522,6 +522,7 @@ Assignment inside a parenthesized condition is allowed:
 while cond { ... }
 do { ... } while cond                  // body-first
 for var i = 0; i < n; i += 1 { ... }
+foreach x in collection { ... }        // type inferred from the collection
 foreach x: Type in collection { ... }
 foreach i: Int in 0..<n { ... }
 foreach (k, v) in map { ... }

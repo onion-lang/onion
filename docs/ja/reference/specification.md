@@ -494,6 +494,7 @@ val label = if ok { "yes" } else { "no" }
 while cond { ... }
 do { ... } while cond                  // 本体優先
 for var i = 0; i < n; i += 1 { ... }
+foreach x in collection { ... }        // 型はコレクションから推論
 foreach x: Type in collection { ... }
 foreach i: Int in 0..<n { ... }
 foreach (k, v) in map { ... }

@@ -405,7 +405,7 @@ while condition { ... }
 for var i: Int = 0; i < 10; i++ { ... }
 
 // foreach
-foreach item: Type in collection { ... }
+foreach item in collection { ... }   // or `foreach item: Type in ...`; the type is inferred when omitted
 
 // select (pattern matching on values)
 select value {
@@ -535,7 +535,7 @@ These are frequently confused with other languages. **Always check these:**
 | `case Add(l, n is Num):` nested type pattern? | ✓ correct - type patterns nest inside destructuring, and the binding is usable at the narrowed type; also works for a non-record component (`case Wrap(s is String)`) |
 | `case Circle(r):` unsupported? | ✓ correct - record destructuring patterns work, also `case x when guard:` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
-| `for i in 0..10` (other langs) | `foreach i: Int in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive |
+| `for i in 0..10` (other langs) | `foreach i in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive; the element type is inferred (`foreach i: Int in ...` also works) |
 | `for (const x of arr) { }` (JS/TS) | `foreach x: Type in arr { }` - no `for (... of ...)` |
 | `i += 1`, `i -= 1`, `i++` | ✓ correct - compound assignment and `++`/`--` work as statements |
 | `while (x = read()) != null` | ✓ correct - assignment in condition with parens |

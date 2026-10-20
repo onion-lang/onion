@@ -682,6 +682,7 @@ These are frequently confused with other languages. **Always check these:**
 | `a ?? b` nullish coalescing (JS) | `a ?: b` - use the Elvis operator instead |
 | `typeof x` (JS/Python) | `x is Type` - check a value's type with the `is` operator instead |
 | `operator fun plus` (Kotlin) | `def plus(o: T): T` - `+ - * / %` map to plus/minus/times/div/rem on the left operand |
+| `a.compareTo(b) < 0` for Strings/dates | `a < b` - `<` `<=` `>` `>=` work on any non-null `Comparable` via `compareTo` |
 | String templates `$var` or `${expr}` | `"text #{expr}"` - use `#{}` syntax |
 | `this` only | `self` also works - both refer to current instance |
 | Reserved word as identifier | `` `class` `` - use backticks to escape keywords |

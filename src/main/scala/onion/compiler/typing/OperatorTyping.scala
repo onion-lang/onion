@@ -148,7 +148,11 @@ final class OperatorTyping(
     val leftRaw = typed(node.lhs, context).getOrElse(null)
     val rightRaw = typed(node.rhs, context).getOrElse(null)
     if (leftRaw == null || rightRaw == null) return null
+    processComparableTerms(node, leftRaw, rightRaw)
+  }
 
+  /** The numeric operands of `<`/`<=`/`>`/`>=` from already-typed sides, or null (reported). */
+  private def processComparableTerms(node: AST.BinaryExpression, leftRaw: Term, rightRaw: Term): Array[Term] = {
     // Try to unbox wrapper types to numeric primitives
     val left = Boxing.tryUnboxToNumeric(bodyContext.table, leftRaw, numericTypes.contains)
     val right = Boxing.tryUnboxToNumeric(bodyContext.table, rightRaw, numericTypes.contains)
@@ -351,8 +355,36 @@ final class OperatorTyping(
   }
 
   def typeComparableBinary(node: AST.BinaryExpression, kind: BinaryKind, context: LocalContext): Option[Term] = {
-    val ops = processComparableExpression(node, context)
-    if (ops == null) None else Some(new BinaryTerm(kind, BasicType.BOOLEAN, ops(0), ops(1)))
+    val leftRaw = typed(node.lhs, context).getOrElse(null)
+    val rightRaw = typed(node.rhs, context).getOrElse(null)
+    if (leftRaw == null || rightRaw == null) return None
+    comparableCall(leftRaw, rightRaw) match {
+      // `a < b` on a Comparable (String, BigDecimal, LocalDate, ...) is `a.compareTo(b) < 0`, as in Kotlin.
+      case Some(call) => Some(new BinaryTerm(kind, BasicType.BOOLEAN, call, new IntValue(0)))
+      case None =>
+        val ops = processComparableTerms(node, leftRaw, rightRaw)
+        if (ops == null) None else Some(new BinaryTerm(kind, BasicType.BOOLEAN, ops(0), ops(1)))
+    }
+  }
+
+  /**
+   * `left.compareTo(right)` when the operands are not both numeric and `left` is a non-null
+   * reference with exactly one `compareTo` returning int that accepts `right`; else None, and
+   * the numeric path reports the operand error as before (a nullable left still gets E0070).
+   */
+  private def comparableCall(left: Term, right: Term): Option[Term] = {
+    val bothNumeric =
+      numeric(Boxing.tryUnboxToNumeric(bodyContext.table, left, numericTypes.contains).`type`) &&
+        numeric(Boxing.tryUnboxToNumeric(bodyContext.table, right, numericTypes.contains).`type`)
+    left.`type` match {
+      case target: ObjectType if !bothNumeric && !right.isBasicType && !right.isNullType =>
+        MethodResolution.findMethods(target, "compareTo", Array(right), bodyContext.table) match {
+          case Array(method) if method.returnType == BasicType.INT && !Modifier.isStatic(method.modifier) =>
+            Some(new Call(left, method, Array(right)))
+          case _ => None
+        }
+      case _ => None
+    }
   }
 
   def typeUnaryNumeric(node: AST.UnaryExpression, symbol: String, kind: UnaryKind, context: LocalContext): Option[Term] =

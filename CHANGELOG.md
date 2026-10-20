@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.144.0] - 2026-10-20
+
 ### Breaking
 
 - **A `do` block's final value is written `yield`, not `ret`.**

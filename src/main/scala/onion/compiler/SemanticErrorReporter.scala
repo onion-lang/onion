@@ -346,7 +346,9 @@ class SemanticErrorReporter(threshold: Int) {
     "unique" -> "distinct",
     "nonEmpty" -> "isNotEmpty",
     "each" -> "forEach",
-    "collect" -> "map"
+    "collect" -> "map",
+    "firstOrNull" -> "first",
+    "lastOrNull" -> "last"
   )
 
   /** Whether `t` is `java.util.List` or a class implementing it. */

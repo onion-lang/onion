@@ -620,6 +620,39 @@ public final class Colls {
     }
 
     /** The largest element of a non-empty list of comparable elements. */
+    /** The largest element, or null for an empty list (where {@link #max} throws). */
+    public static <T extends Comparable<T>> T maxOrNull(List<T> list) {
+        return list.isEmpty() ? null : java.util.Collections.max(list);
+    }
+
+    /** The smallest element, or null for an empty list (where {@link #min} throws). */
+    public static <T extends Comparable<T>> T minOrNull(List<T> list) {
+        return list.isEmpty() ? null : java.util.Collections.min(list);
+    }
+
+    /**
+     * Indexes the elements by a key: {@code ["apple", "cat"].associateBy { w -> w.length() }}
+     * is {@code {5=apple, 3=cat}}. A later element replaces an earlier one with the same
+     * key; keys keep first-seen order. The result is unmodifiable.
+     */
+    public static <T, K> Map<K, T> associateBy(List<T> list, Function1<T, K> keySelector) {
+        Map<K, T> result = new LinkedHashMap<>();
+        for (T element : list) {
+            result.put(keySelector.call(element), element);
+        }
+        return java.util.Collections.unmodifiableMap(result);
+    }
+
+    /** The index of the first element matching the predicate, or -1 if none does. */
+    public static <T> int indexOfFirst(List<T> list, Function1<T, Boolean> predicate) {
+        int i = 0;
+        for (T element : list) {
+            if (predicate.call(element)) return i;
+            i++;
+        }
+        return -1;
+    }
+
     public static <T extends Comparable<T>> T max(List<T> list) {
         if (list.isEmpty()) throw new NoSuchElementException("max of empty list");
         return java.util.Collections.max(list);

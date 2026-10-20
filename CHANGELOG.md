@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`xs.associateBy { ... }`, `xs.indexOfFirst { ... }`, `xs.maxOrNull()`, `xs.minOrNull()`.** Index a list by a key (later element wins), find the first matching index (-1 if none), and take a max/min that is null for an empty list (`max()`/`min()` throw). `firstOrNull`/`lastOrNull` now hint at `first`/`last`, which already return null on an empty list.
+
 - **`[1, 2] + [3]` concatenates two Lists.** It was `E0001 operator + is not applicable for type List[Int], List[Int]`. `xs + ys` (also `xs.plus(ys)`, `xs += ys`) returns a new List, as `Colls::concat` does. Generic operator extensions now infer their type arguments, so this keeps the element type.
 
 - **`val (yes, no) = xs.partition { ... }`: a List destructures by index.** It was `E0047 ... is not a record type` (plus an `E0002` for every name). The i-th name binds element i, typed as the List's element type; a shorter list throws `IndexOutOfBoundsException`, extra elements are ignored.

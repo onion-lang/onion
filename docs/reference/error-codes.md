@@ -1143,7 +1143,7 @@ found" at the call site.
 
 ```onion
 extension List[Int] { def foo(): Int = 1 }
-extension List[Int] { def bar(): Int = 2 }   // E0102: an extension block for List[Int] already exists
+extension List[Int] { def bar(): Int = 2 }   // E0102: an extension block for List[int] is already defined
 ```
 
 Fix: combine the methods into the first block. Distinct concrete
@@ -1896,7 +1896,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0099` | enum … cannot take type parameters |
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
 | `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
-| `E0102` | an extension block for … already exists (combine the methods for the same type into one block) |
+| `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 
 ## See also
 

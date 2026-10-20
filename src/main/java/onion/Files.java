@@ -225,6 +225,9 @@ public final class Files {
     /**
      * Recursively copies the directory tree rooted at {@code src} into {@code dst}.
      * {@code dst} is created if it does not exist; existing files are replaced.
+     *
+     * @throws IllegalArgumentException if {@code dst} is {@code src} or lies inside it;
+     *         nothing is written in that case
      */
     public static void copyDir(String src, String dst) throws IOException {
         final java.nio.file.Path srcPath = java.nio.file.Paths.get(src);

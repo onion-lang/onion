@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Files::copyDir(src, dst)` fails up front when `dst` is `src` or inside it (#2255).**
+  - Before: it recursed until "File name too long" and left a deep `src/dst/dst/...` tree; `copyDir(x, x)` was a silent no-op.
+  - Now: `IllegalArgumentException: cannot copy a directory into itself`, and nothing is written.
 - **`String::format("%s", null)` and `c.update(sql, 1, null)` no longer warn W0012.**
   - Before: a `null` into any parameter of a Java method warned, with a fix (`T?`) the caller cannot apply.
   - Now: a Java parameter's nullness is unknown, so it does not warn. An Onion method (also one compiled separately) and a receiver's own type argument (`xs.add(null)` on a `List[String]`) still warn.

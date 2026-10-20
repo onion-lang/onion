@@ -113,6 +113,31 @@ class IntegerLiteralOutOfRangeDiagnosticSpec extends AnyFunSpec {
     }
   }
 
+  describe("an out-of-range literal inside a string interpolation") {
+    it("is reported on the line it is written on") {
+      // The panel's repro on #2261: the interpolation's line offset was added twice, so
+      // this 7-line program reported line 11.
+      val result = compile(
+        """def main: void {
+          |  val a = 1
+          |  val b = 2
+          |  val c = 3
+          |  val d = 4
+          |  println("v=#{99999999999}")
+          |}
+          |""".stripMargin
+      )
+      assert(result.hasErrors)
+      val expected = Message("error.parsing.int_literal_out_of_range")
+      val errors = result.allErrors.filter(_.message.contains(expected))
+      assert(errors.nonEmpty, s"expected '$expected', got: ${result.allErrors.map(_.message)}")
+      assert(
+        errors.forall(e => e.location != null && e.location.line == 6 && e.location.column == 16),
+        s"expected 6:16, got: ${errors.map(e => Option(e.location).map(l => s"${l.line}:${l.column}"))}"
+      )
+    }
+  }
+
   describe("an in-range literal with an L suffix") {
     it("still compiles (no false positive)") {
       val result = compile(

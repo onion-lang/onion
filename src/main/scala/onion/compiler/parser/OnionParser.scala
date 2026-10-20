@@ -2753,7 +2753,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           else if (s.endsWith("S")) ShortLiteralOutOfRangeMarker
           else if (s.endsWith("L")) LongLiteralOutOfRangeMarker
           else IntLiteralOutOfRangeMarker
-        adoptFailure(p(t), marker, noKinds)
+        // adoptFailure takes the token's own (unshifted) position: deepestFailure() adds
+        // lineBase/colBase itself, so p(t) here would shift an interpolation's line twice.
+        adoptFailure(Location(t.beginLine, t.beginColumn), marker, noKinds)
         throw fail
     }
   }

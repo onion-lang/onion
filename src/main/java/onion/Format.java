@@ -18,11 +18,16 @@ public final class Format {
      * {@link #number(double, int)} groups a {@code double} with fixed decimals.
      */
     public static String integer(long value) {
-        return group(Long.toString(Math.abs(value)), value < 0);
+        boolean negative = value < 0;
+        String s = Long.toString(value);
+        return group(negative ? s.substring(1) : s, negative);
     }
 
     /** Formats with comma grouping and a fixed number of decimals: (1234.5678, 2) -> "1,234.57". */
     public static String number(double value, int decimals) {
+        if (!Double.isFinite(value)) {
+            return fixed(value, decimals);
+        }
         String fixed = fixed(value, decimals);
         boolean negative = fixed.startsWith("-");
         String body = negative ? fixed.substring(1) : fixed;
@@ -35,7 +40,19 @@ public final class Format {
     /** Rounds to a fixed number of decimals (no grouping): (3.14159, 2) -> "3.14". */
     public static String fixed(double value, int decimals) {
         int d = Math.max(0, decimals);
-        return String.format(Locale.ROOT, "%." + d + "f", value);
+        String s = String.format(Locale.ROOT, "%." + d + "f", value);
+        if (Double.isFinite(value) && s.startsWith("-") && isAllZeroDigits(s)) {
+            return s.substring(1);
+        }
+        return s;
+    }
+
+    private static boolean isAllZeroDigits(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= '1' && c <= '9') return false;
+        }
+        return true;
     }
 
     /** Formats a 0..1 ratio as a percentage: (0.756, 1) -> "75.6%". */
@@ -62,11 +79,14 @@ public final class Format {
     /** Human-readable duration from seconds: 3661 -> "1h 1m 1s", 0 -> "0s". */
     public static String duration(long totalSeconds) {
         boolean negative = totalSeconds < 0;
-        long s = Math.abs(totalSeconds);
-        long days = s / 86400;
-        long hours = (s % 86400) / 3600;
-        long minutes = (s % 3600) / 60;
-        long seconds = s % 60;
+        // totalSeconds == Long.MIN_VALUE has no positive long counterpart; its magnitude
+        // (2^63) is exactly its own bit pattern read as unsigned, so unsigned div/rem on
+        // the (possibly negative) magnitude handles every value, MIN_VALUE included.
+        long magnitude = negative ? (totalSeconds == Long.MIN_VALUE ? totalSeconds : -totalSeconds) : totalSeconds;
+        long days = Long.divideUnsigned(magnitude, 86400);
+        long hours = Long.divideUnsigned(Long.remainderUnsigned(magnitude, 86400), 3600);
+        long minutes = Long.divideUnsigned(Long.remainderUnsigned(magnitude, 3600), 60);
+        long seconds = Long.remainderUnsigned(magnitude, 60);
         StringBuilder sb = new StringBuilder();
         if (days > 0) sb.append(days).append("d ");
         if (hours > 0) sb.append(hours).append("h ");

@@ -212,7 +212,7 @@ tool inspect(db: String = "db.conf",
   val summary: Option[String] = do[Option] {
     dbHost  <- dbHostOpt
     srvPort <- srvPortOpt
-    ret "summary: db=#{dbHost} srv=:#{srvPort}"
+    yield "summary: db=#{dbHost} srv=:#{srvPort}"
   }
   if summary != null { IO::println(summary.get()) }
 

@@ -3,6 +3,7 @@ package onion;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -36,11 +37,11 @@ public final class Strings {
     }
 
     public static String upper(String str) {
-        return str == null ? "" : str.toUpperCase();
+        return str == null ? "" : str.toUpperCase(Locale.ROOT);
     }
 
     public static String lower(String str) {
-        return str == null ? "" : str.toLowerCase();
+        return str == null ? "" : str.toLowerCase(Locale.ROOT);
     }
 
     public static String replace(String str, String target, String replacement) {
@@ -174,7 +175,7 @@ public final class Strings {
 
     public static boolean containsIgnoreCase(String str, String substring) {
         if (str == null || substring == null) return false;
-        return str.toLowerCase().contains(substring.toLowerCase());
+        return str.toLowerCase(Locale.ROOT).contains(substring.toLowerCase(Locale.ROOT));
     }
 
     /** Counts non-overlapping occurrences of {@code substring} in {@code str}. */
@@ -275,14 +276,51 @@ public final class Strings {
         }
     }
 
-    /** Parses a double, or returns null if {@code str} is not a valid number. */
+    /**
+     * Parses a double, or returns null if {@code str} is not a plain decimal or
+     * scientific-notation number. Java literal forms ({@code 1d}, {@code 1f},
+     * {@code 0x1p3}, {@code NaN}, {@code Infinity}) are rejected, like {@link Scalars#read}.
+     */
     public static Double toDoubleOrNull(String str) {
         if (str == null) return null;
+        String trimmed = str.trim();
+        if (!Scalars.isStrictDecimal(trimmed)) return null;
         try {
-            return Double.valueOf(str.trim());
+            return Double.valueOf(trimmed);
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /**
+     * Parses an int by the rules of {@link #toIntOrNull}, throwing
+     * {@code NumberFormatException("not an integer: \"...\"")} when {@code str} is not one.
+     */
+    public static int toInt(String str) {
+        Integer v = toIntOrNull(str);
+        if (v == null) throw new NumberFormatException("not an integer: " + quoted(str));
+        return v;
+    }
+
+    /** Parses a long by the rules of {@link #toLongOrNull}, throwing like {@link #toInt}. */
+    public static long toLong(String str) {
+        Long v = toLongOrNull(str);
+        if (v == null) throw new NumberFormatException("not an integer: " + quoted(str));
+        return v;
+    }
+
+    /**
+     * Parses a double by the rules of {@link #toDoubleOrNull}, throwing
+     * {@code NumberFormatException("not a number: \"...\"")} when {@code str} is not one.
+     */
+    public static double toDouble(String str) {
+        Double v = toDoubleOrNull(str);
+        if (v == null) throw new NumberFormatException("not a number: " + quoted(str));
+        return v;
+    }
+
+    private static String quoted(String str) {
+        return str == null ? "null" : "\"" + str + "\"";
     }
 
     /** Parses an int, or returns {@code fallback} if {@code str} is not a valid integer. */

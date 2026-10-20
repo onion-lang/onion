@@ -50,8 +50,8 @@ public final class Scalars {
                 case "String":  return Outcome.ok((Object) text);
                 case "Int":     return Outcome.ok((Object) Integer.valueOf(text));
                 case "Long":    return Outcome.ok((Object) Long.valueOf(text));
-                case "Double":  return Outcome.ok((Object) Double.valueOf(text));
-                case "Float":   return Outcome.ok((Object) Float.valueOf(text));
+                case "Double":  return Outcome.ok((Object) Double.valueOf(toStrictDecimal(text)));
+                case "Float":   return Outcome.ok((Object) Float.valueOf(toStrictDecimal(text)));
                 case "Boolean": return Outcome.ok((Object) Boolean.valueOf(toBoolean(text)));
                 case "Short":   return Outcome.ok((Object) Short.valueOf(text));
                 case "Byte":    return Outcome.ok((Object) Byte.valueOf(text));
@@ -120,5 +120,30 @@ public final class Scalars {
     /** Whether {@code value} is a boolean spelling {@link #toBoolean} accepts. */
     public static boolean isBoolean(String value) {
         return value != null && (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false"));
+    }
+
+    /**
+     * A plain decimal or scientific-notation number: optional sign, digits with an
+     * optional fraction, optional exponent. Nothing else.
+     *
+     * <p>{@code Double.valueOf}/{@code Float.valueOf} also accept {@code NaN},
+     * {@code Infinity}/{@code -Infinity}, a trailing {@code d}/{@code D}/{@code f}/
+     * {@code F} type suffix, and hex floating-point literals (e.g. {@code 0x1.8p3}) --
+     * all meaningful in Java source, none of them something a user typed into a form
+     * field, a CSV cell, or a config value (issue #2147).
+     */
+    private static final java.util.regex.Pattern STRICT_DECIMAL =
+        java.util.regex.Pattern.compile("[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?");
+
+    /** True when {@code text} is a plain decimal or scientific-notation number (see above). */
+    static boolean isStrictDecimal(String text) {
+        return text != null && STRICT_DECIMAL.matcher(text).matches();
+    }
+
+    private static String toStrictDecimal(String text) {
+        if (!isStrictDecimal(text)) {
+            throw new IllegalArgumentException("not a decimal number: " + text);
+        }
+        return text;
     }
 }

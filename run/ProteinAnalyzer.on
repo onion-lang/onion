@@ -402,7 +402,7 @@ def main(): void {
   foreach code: String in lookups {
     val opt: Option[AminoAcid] = do[Option] {
       aa <- lookupAa(code, table)
-      ret aa
+      yield aa
     }
     val result: String = opt.map { aa ->
       val a: AminoAcid = aa as AminoAcid

@@ -600,6 +600,12 @@ val schema = Json::parse(summaryShape.jsonSchema())   // embed in a request body
 Any other shape's `jsonSchema()` throws `UnsupportedOperationException`, as does a
 recursive record's, which has no finite inline schema.
 
+`describe(component, text)` returns a shape whose JSON Schema carries `text` as
+`component`'s `"description"`; parsing, printing and every other component are unchanged,
+and calls chain (`s.describe("owner", "...").describe("task", "...")`). It throws the same
+`UnsupportedOperationException` as `jsonSchema()` when `hasJsonSchema()` is false, and
+`IllegalArgumentException` for a component the shape does not have (RFC #1960, option 3).
+
 ### Combinators
 
 - `eachLine(text[, origin])` — one `Outcome[T]` per line, keeping both the lines that
@@ -942,8 +948,9 @@ versions, never `onion.Iterables`'s. The two disagree on edge cases:
 - `xs.filter(p)` calls `p` and auto-unboxes its `Boolean` result, throwing
   **`NullPointerException`** if `p` returns `null`; `Iterables::filter` treats
   a `null` result as "not kept" instead of throwing
-- a negative `n` -- `xs.take(-1)` / `xs.drop(-1)` return an empty/unchanged
-  result; `Iterables::take`/`Iterables::drop` throw instead
+- a negative `n` -- both clamp (`take` gives an empty list, `drop` leaves the
+  list unchanged); `xs.drop(-1)` returns the same reference,
+  `Iterables::drop(xs, -1)` a copy
 - `n` at or past the list's size -- `xs.take(n)` / `xs.drop(n)` return the
   **very same list reference**, not a copy; `Iterables::take`/`Iterables::drop`
   always copy
@@ -963,7 +970,7 @@ Iterables::filter(xs, (x) -> null)       // []  (onion.Iterables::filter, null i
 xs.take(-1)                    // []      (onion.Colls::take, clamps instead of throwing)
 xs.take(xs.size() + 1) === xs  // true    (onion.Colls::take, same list reference)
 xs.reverse().add(4)            // throws UnsupportedOperationException (onion.Colls::reverse)
-Iterables::take(xs, -1)        // throws  (onion.Iterables::take, no clamping)
+Iterables::take(xs, -1)        // []      (onion.Iterables::take, clamps too)
 ```
 
 **`reduce` is shadowed too, but at compile time, not just runtime**: `onion.Colls`
@@ -1169,7 +1176,7 @@ f1.zip(f2)  // Future[List[Object]] = [1, 2]
 f1.race(f2)
 
 // Wait for all
-Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
+Future::all(f1, f2, f3)  // Future[List[Int]] = [1, 2, 3]
 Future::all([f1, f2, f3])  // same, but takes a List[Future[T]] built at runtime
 
 // First to complete
@@ -1198,7 +1205,7 @@ Future works with do notation for sequential async composition:
 val result: Future[Int] = do[Future] {
   x <- Future::async { fetchA() }
   y <- Future::async { fetchB(x) }
-  ret x + y
+  yield x + y
 }
 ```
 
@@ -1421,6 +1428,12 @@ Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / 
 Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
 ```
 
+Parsing that throws `NumberFormatException` (`"not an integer: \"abc\""`) on bad input, by the same rules as the null-safe forms below; also callable as `"42".toInt()`:
+
+```onion
+Strings::toInt("42") / Strings::toLong("100") / Strings::toDouble("3.14")
+```
+
 Null-safe parsing (return `null`/fallback instead of throwing):
 
 ```onion
@@ -1428,6 +1441,8 @@ Strings::toIntOrNull("42")               // 42, or null if not an int
 Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
 Strings::toIntOr("nope", 0)              // 0
 ```
+
+`toDoubleOrNull` accepts only a plain decimal or scientific-notation number (`3.14`, `-2.5e10`); Java literal forms such as `1d`, `0x1p3`, `NaN` and `Infinity` give `null`.
 
 Most `Strings` methods (`upper`, `lower`, `capitalize`, `reverse`, ...) also
 work as extension-call method chains (`s.upper()`, `s.reverse()`, ...) with
@@ -1532,6 +1547,7 @@ Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // List of entry names
 Files::listFiles("dir")                // List of java.io.File entries
 Files::glob("dir", "*.on")             // glob-matched names
+Files::walk("dir")                     // every file under dir, recursively: relative paths, sorted
 Files::delete(path) / Files::exists(path)
 Files::isFile(path) / Files::isDirectory(path)
 Files::mkdirs(path)                    // creates dir + missing parents
@@ -1632,6 +1648,11 @@ val a = Json::array()                  // empty List, for JSON array values
 // A non-finite Double/Float (NaN, +/-Infinity) stringifies as the JSON literal `null` --
 // JSON has no token for one, and Json::parse can never produce one either
 Json::stringify(0.0d / 0.0d)           // "null"
+
+// A record serializes as a JSON object of its components, in declaration order,
+// recursing into nested records/Lists/Maps the same way a Map's values already do.
+record Point(x: Int, y: Int)
+Json::stringify(new Point(1, 2))       // {"x":1,"y":2}
 
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
@@ -1861,7 +1882,8 @@ Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
 
 Self-contained RFC 4180 CSV parsing and serialization (`onion.Csv`,
 auto-imported) — quoted fields, embedded commas/newlines, and doubled quotes
-are handled.
+are handled. An unterminated quoted field throws `IllegalArgumentException`
+naming the line where the quote was opened, rather than swallowing the rest of the input.
 
 ```onion
 val rows = Csv::parse(text)                  // List of List of String
@@ -1892,6 +1914,13 @@ method chain instead of a static call:
 "password".sha256()        // same as Hash::sha256("password")
 "x".base64Encode().sha256().substring(0, 8)   // chains with Codec below
 ```
+
+Every parameter is `String`, not `String?`: a value from a nullable boundary (a `Map`
+lookup, an `Option`) needs `Hash::md5(maybe ?: "")` before hashing, even though the
+underlying Java code already treats `null` as `""` internally — Onion has no mechanism
+yet for a Java-declared parameter that is null-safe while every other one stays non-null
+by default (tracked in [#2180](https://github.com/onion-lang/onion/issues/2180) and
+[#2213](https://github.com/onion-lang/onion/issues/2213)).
 
 ## Codec Module
 
@@ -2022,6 +2051,10 @@ Proc::runIn("/tmp", "ls")               // like run, but in the given working di
 Proc::execIn("/tmp", "make", "build")   // like exec, but in the given working directory
 ```
 
+Each command runs directly, with no shell: a single string containing pipes, redirection
+or `&&` is passed to the OS literally, not interpreted. For shell syntax, run a shell
+explicitly: `Proc::capture("sh", "-c", "ls | wc -l")`.
+
 ## Args Module
 
 Command-line argument parsing (`onion.Args`):
@@ -2106,6 +2139,13 @@ into a pipeline like the rest of `Colls`:
 
 ```onion
 xs.concat(ys)                     // elements of xs followed by elements of ys
+xs + ys                           // same as concat (also xs.plus(ys), xs += ys); a new List
+xs.associateBy { x -> key(x) }    // Map key -> element; a later element wins a shared key
+xs.indexOfFirst { x -> x > 6 }    // index of the first match, or -1
+xs.maxOrNull() / xs.minOrNull()   // like max()/min(), but null for an empty list
+foreach (i, x) in xs.withIndex() { ... }   // withIndex(): ordered Map index -> element
+xs.mapIndexed { i, x -> x + i }   // map with each element's index
+xs.forEachIndexed { i, x -> ... } // forEach with each element's index
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - one level of nesting removed
 xs.flatMap { x -> [x, x] }        // maps each element to a list, then flattens one level
                                    // (bind is an alias, used by do[List] { x <- xs; ... })
@@ -2258,7 +2298,7 @@ val body = r.map { res -> res.body }.getOrElse("")
 val both = do[Result] {
   a <- Http::request("GET", urlA).send()
   b <- Http::request("GET", urlB).send()
-  ret a.status + b.status
+  yield a.status + b.status
 }
 ```
 
@@ -2436,6 +2476,7 @@ DateTime::monthName(epochMillis): String  // "March"
 ```
 DateTime::of(year, month, day): Long
 DateTime::of(year, month, day, hour, minute, second): Long
+DateTime::today(): Long                 // = startOfDay(now())
 DateTime::startOfDay(epochMillis): Long
 DateTime::endOfDay(epochMillis): Long
 ```
@@ -2578,6 +2619,10 @@ val bytes = Archive::gunzip(Archive::gzip(text.getBytes()))
 `../../.ssh/authorized_keys` is the standard "zip slip" attack, and an extractor that
 resolves entry names naively writes exactly where it is told; this throws instead, naming
 the entry.
+
+**`unzip` always returns absolute paths**, even when `targetDir` was given as a relative
+path: it is resolved against the current directory and normalized before any entry is
+written.
 
 Entries are written with a fixed timestamp, so zipping the same inputs twice produces the
 same bytes — an artefact that differs run to run cannot be checksummed or cached.
@@ -2729,6 +2774,16 @@ Regex::groupsAll(input, pattern): List[List[String]]  // All matches groups
 ```
 Regex::replace(input, pattern, replacement): String
 Regex::replaceFirst(input, pattern, replacement): String
+```
+
+`replacement` follows `java.util.regex.Matcher`'s replacement syntax, not plain
+text: `$1`, `$2`, ... insert capture groups, and a literal `$` must reach Java as
+`\$`. In an Onion string literal that backslash itself needs escaping, so write
+`\\$`. (A bare `"\$"` is a compile error: `\$` is not a supported escape.)
+
+```
+Regex::replace("2024-05", "(\\d+)-(\\d+)", "$2/$1")   // "05/2024"
+Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- literal dollar signs
 ```
 
 ### Splitting
@@ -2942,7 +2997,8 @@ Maps::filterValues(m, (v: Int) -> v > 0)
 Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
 Maps::filter(m, (k: String, v: Int) -> v > 0)        // key+value predicate
 Maps::invert(m)                                       // swap keys and values
-Maps::toList(m, (k: String, v: Int) -> k + "=" + v)   // entries -> List
+Maps::map(m, (k: String, v: Int) -> k + "=" + v)      // entries -> List; m.map { k, v -> ... }
+Maps::toList(m, (k: String, v: Int) -> k + "=" + v)   // entries -> List (same as map)
 Maps::forEach(m, (k: String, v: Int) -> println(k))
 ```
 
@@ -2997,26 +3053,18 @@ val c = Sets::fromList([1, 1, 2, 3])   // distinct, first-seen order
 Sets::toList(a)                        // back to a List
 ```
 
-**`toList` doesn't compile as `a.toList()` at all -- not even a shadowing
-case**: `onion.Colls` also declares a `toList(Set)` extension with the same
-erased signature as `onion.Sets`'s, which would ordinarily just shadow it
-the way `union`/`intersection`/`difference`/`map` are shadowed below. But
-`Set` also conforms to `Iterable`, and `onion.Iterables` separately declares
-a `toList(Iterable)` extension -- a genuinely different erased signature
-that is *also* applicable to a `Set` argument. That makes `a.toList()`
-**ambiguous** between `onion.Colls`'s and `onion.Iterables`'s versions, so
-it fails to compile with `E0006` ("method call is applicable for both
-Colls.toList() and Iterables.toList()") instead of silently picking one --
-unlike every other method this module documents as "also a builtin
-extension method." The static forms disagree with each other on top of
-that: `Colls::toList` wraps its copy in `Collections.unmodifiableList` and
-throws `NullPointerException` for a `null` set; `Sets::toList` returns a
-plain mutable `ArrayList` and treats `null` as empty. Always call
-`Sets::toList(a)` (or `Colls::toList(a)` for the unmodifiable, throwing
-variant) explicitly -- `a.toList()` never compiles for a `Set` receiver.
+**`a.toList()` on a `Set` is `onion.Colls`'s `toList(Set)`**: it and
+`onion.Iterables`'s `toList(Iterable)` both accept a `Set`, and the more
+specific receiver wins (before this, the call failed with `E0006` as
+ambiguous). `onion.Sets`'s `toList(Set)` has the same erased signature as
+`Colls`'s and is shadowed by it. The two static forms differ:
+`Colls::toList` wraps its copy in `Collections.unmodifiableList` and throws
+`NullPointerException` for a `null` set; `Sets::toList` returns a plain
+mutable `ArrayList` and treats `null` as empty. Call `Sets::toList(a)` when
+you need the mutable, null-safe copy.
 
 ```onion
-a.toList()                             // [E0006] ambiguous: Colls.toList() vs Iterables.toList()
+a.toList()                             // = Colls::toList(a): unmodifiable
 Sets::toList(a)                        // mutable; null-safe (empty list for null)
 Colls::toList(a)                       // unmodifiable; throws NullPointerException for null
 ```
@@ -3086,13 +3134,11 @@ Function1)` extension method with the same erased signature as
 `onion.Sets`'s, and `Iterables` is registered ahead of `Sets` in the builtin
 extension container list, so `a.map(f)` always reaches *`onion.Iterables`*'s
 `map` -- `onion.Sets`'s `map` is never reachable by extension-call syntax at
-all. The two disagree on order and on `null`: `Iterables::map` collects into
-a plain `HashSet` (iteration order unspecified, breaking this module's
-insertion-order promise above) and throws `NullPointerException` for a
-`null` set, while `Sets::map` collects into a `LinkedHashSet` (insertion
-order preserved) and returns an empty set for a `null` one. Call
-`Sets::map(...)` directly (not `a.map(...)`) to get `onion.Sets`'s
-order-preserving, null-safe result.
+all. Both collect into a `LinkedHashSet` (insertion order preserved, as
+promised above), so they only disagree on `null`: `Iterables::map` throws
+`NullPointerException` for a `null` set, while `Sets::map` returns an empty
+set. Call `Sets::map(...)` directly (not `a.map(...)`) to get `onion.Sets`'s
+null-safe result.
 
 **`forEach` is shadowed too, but by the JDK, not another onion module**:
 `Set` conforms to `java.lang.Iterable`, which already declares a default

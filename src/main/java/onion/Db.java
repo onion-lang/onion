@@ -97,6 +97,7 @@ public final class Db {
     public static final class Conn {
         private final Connection connection;
         private final String url;
+        private int transactionDepth = 0;
 
         Conn(Connection connection, String url) {
             this.connection = connection;
@@ -150,9 +151,23 @@ public final class Db {
          * There is no `begin`/`commit` pair to forget. A body that throws between a manual
          * pair leaves the connection holding an open transaction, and the next unrelated
          * statement joins it.
+         *
+         * Nested calls (a body that calls `transaction` again on the same `Conn`) join the
+         * outermost transaction instead of committing early: only the outermost call touches
+         * autocommit or issues `commit`/`rollback`, so a failure anywhere in the nest rolls
+         * back everything, including work an inner call already returned from.
          */
         public void transaction(Work work) {
             if (work == null) throw new IllegalArgumentException("Db: work must not be null");
+            if (transactionDepth > 0) {
+                transactionDepth++;
+                try {
+                    work.run(this);
+                } finally {
+                    transactionDepth--;
+                }
+                return;
+            }
             boolean previous;
             try {
                 previous = connection.getAutoCommit();
@@ -161,6 +176,7 @@ public final class Db {
                 throw new RuntimeException("Db: could not begin a transaction on " + url
                     + " (" + e.getMessage() + ")", e);
             }
+            transactionDepth = 1;
             try {
                 work.run(this);
                 connection.commit();
@@ -176,6 +192,7 @@ public final class Db {
                 throw new RuntimeException("Db: transaction failed on " + url
                     + " (" + failure.getMessage() + ")", failure);
             } finally {
+                transactionDepth = 0;
                 try {
                     connection.setAutoCommit(previous);
                 } catch (SQLException ignored) {

@@ -214,7 +214,7 @@ def main(): void {
     apiS   <- collectSource(apiLines)
     dbS    <- collectSource(dbLines)
     cacheS <- collectSource(cacheLines)
-    ret new Done(buildStats(combineAll(apiS, dbS, cacheS)), 0)
+    yield new Done(buildStats(combineAll(apiS, dbS, cacheS)), 0)
   }
   val seqResult: PipelineState = seqFuture.getOrElse(new Failed("sequential failed"))
   printState("do[Future] sequential pipeline", seqResult)
@@ -226,12 +226,12 @@ def main(): void {
   val fa: Future[List[MetricSample]] = collectSource(apiLines)
   val fb: Future[List[MetricSample]] = collectSource(dbLines)
   val fc: Future[List[MetricSample]] = collectSource(cacheLines)
-  val defaultRaw: List[Object] = []
-  val allRaw: List[Object] = Future::all(fa, fb, fc).getOrElse(defaultRaw)
+  val defaultRaw: List[List[MetricSample]] = []
+  val allRaw: List[List[MetricSample]] = Future::all(fa, fb, fc).getOrElse(defaultRaw)
   val parState: PipelineState = if allRaw.size == 3 {
-    val aS: List[MetricSample] = allRaw[0] as List[MetricSample]
-    val bS: List[MetricSample] = allRaw[1] as List[MetricSample]
-    val cS: List[MetricSample] = allRaw[2] as List[MetricSample]
+    val aS: List[MetricSample] = allRaw[0]
+    val bS: List[MetricSample] = allRaw[1]
+    val cS: List[MetricSample] = allRaw[2]
     new Done(buildStats(combineAll(aS, bS, cS)), 0)
   } else {
     new Failed("parallel collection: only " + allRaw.size + "/3 results")
@@ -263,11 +263,11 @@ def main(): void {
   ]
   val dbResult: Option[Double] = do[Option] {
     m <- toOpt(directSamples.find { s: MetricSample -> s.service() == "db" && s.name() == "queryTime" })
-    ret m.value()
+    yield m.value()
   }
   val missingResult: Option[Double] = do[Option] {
     m <- toOpt(directSamples.find { s: MetricSample -> s.service() == "redis" })
-    ret m.value()
+    yield m.value()
   }
   IO::println("── do[Option] lookup")
   IO::println("   db.queryTime     = " + dbResult.getOrElse(-1.0).fmtMs())

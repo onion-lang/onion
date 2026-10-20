@@ -24,7 +24,14 @@ public final class Csv {
     /**
      * Parses CSV text into rows of fields. Handles RFC 4180 quoting:
      * fields may be wrapped in double quotes, inside which commas, CR/LF and
-     * doubled quotes ("") are literal. Empty trailing line is ignored.
+     * doubled quotes ("") are literal. A single newline at the very end of the
+     * text does not add a phantom extra row; a genuinely blank line -- including
+     * one at the end -- is parsed like any other line and becomes a row with one
+     * empty-string field, not dropped. A single leading UTF-8 byte-order mark
+     * (U+FEFF, as written by Excel's "CSV UTF-8") is an encoding marker and is
+     * skipped, so it never becomes part of the first field.
+     *
+     * @throws IllegalArgumentException if a quoted field is never closed
      */
     public static List<List<String>> parse(String text) {
         List<List<String>> rows = new ArrayList<>();
@@ -33,7 +40,9 @@ public final class Csv {
         StringBuilder field = new StringBuilder();
         boolean inQuotes = false;
         boolean fieldStarted = false;
-        int i = 0;
+        int line = 1;
+        int quoteStartLine = -1;
+        int i = text.charAt(0) == '\uFEFF' ? 1 : 0;
         int n = text.length();
         while (i < n) {
             char c = text.charAt(i);
@@ -47,12 +56,14 @@ public final class Csv {
                         i++;
                     }
                 } else {
+                    if (c == '\n') line++;
                     field.append(c);
                     i++;
                 }
             } else if (c == '"' && field.length() == 0) {
                 inQuotes = true;
                 fieldStarted = true;
+                quoteStartLine = line;
                 i++;
             } else if (c == ',') {
                 row.add(field.toString());
@@ -63,6 +74,7 @@ public final class Csv {
                 // End of record. Swallow a CRLF pair as one terminator.
                 if (c == '\r' && i + 1 < n && text.charAt(i + 1) == '\n') i++;
                 i++;
+                line++;
                 row.add(field.toString());
                 field.setLength(0);
                 fieldStarted = false;
@@ -72,6 +84,9 @@ public final class Csv {
                 field.append(c);
                 i++;
             }
+        }
+        if (inQuotes) {
+            throw new IllegalArgumentException("Csv: unterminated quoted field starting at line " + quoteStartLine);
         }
         if (field.length() > 0 || fieldStarted || !row.isEmpty()) {
             row.add(field.toString());

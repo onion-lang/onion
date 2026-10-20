@@ -38,7 +38,7 @@ public final class DateTime {
      */
     public static String nowString(String pattern) {
         if (pattern == null) return nowString();
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern(pattern));
+        return LocalDateTime.now().format(DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH));
     }
 
     // ========== Parsing ==========
@@ -74,7 +74,7 @@ public final class DateTime {
         if (pattern == null) return parse(dateTime);
         DateTimeFormatter formatter;
         try {
-            formatter = DateTimeFormatter.ofPattern(pattern);
+            formatter = DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("invalid date-time pattern \"" + pattern + "\"", e);
         }
@@ -107,7 +107,7 @@ public final class DateTime {
     public static String format(long epochMillis, String pattern) {
         if (pattern == null) return format(epochMillis);
         LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), LOCAL);
-        return ldt.format(DateTimeFormatter.ofPattern(pattern));
+        return ldt.format(DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH));
     }
 
     // ========== Components ==========
@@ -231,7 +231,14 @@ public final class DateTime {
      * Returns the difference in days (time1 - time2).
      */
     public static int diffDays(long time1, long time2) {
-        return (int) ((time1 - time2) / (24 * 60 * 60 * 1000));
+        return diffDays(time1, time2, LOCAL);
+    }
+
+    // Whole calendar days in the given zone, so a 23- or 25-hour DST day still counts as one.
+    static int diffDays(long time1, long time2, ZoneId zone) {
+        LocalDateTime a = LocalDateTime.ofInstant(Instant.ofEpochMilli(time1), zone);
+        LocalDateTime b = LocalDateTime.ofInstant(Instant.ofEpochMilli(time2), zone);
+        return (int) java.time.temporal.ChronoUnit.DAYS.between(b, a);
     }
 
     /**
@@ -266,6 +273,13 @@ public final class DateTime {
     }
 
     // ========== Utility ==========
+
+    /**
+     * Returns the start of today (00:00:00), i.e. {@code startOfDay(now())}.
+     */
+    public static long today() {
+        return startOfDay(now());
+    }
 
     /**
      * Returns the start of the day (00:00:00) for the given time.

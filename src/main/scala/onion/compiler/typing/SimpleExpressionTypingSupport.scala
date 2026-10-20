@@ -334,6 +334,14 @@ private[compiler] final class SimpleExpressionTypingSupport(
     }
   }
 
+  /** The flow narrowing of `name` when `term` really is the top-level script's static field of that
+    * name (a same-named field of another class must not pick up the narrowing). */
+  private def topLevelVarFlowNarrowing(term: Term, name: String, context: LocalContext): Option[Type] =
+    term match {
+      case ref: RefStaticField if bodyContext.topLevelClass.contains(ref.field.affiliation) => context.getFlowNarrowing(name)
+      case _ => None
+    }
+
   private def typeIdentifier(node: AST.Id, context: LocalContext): Option[Term] = {
     val bind = context.lookup(node.name)
     if (bind != null) {
@@ -348,7 +356,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
       resolveImplicitField(node, context) match {
         case Some(term) =>
           // Smart-cast an implicitly-accessed val field narrowed by a null check.
-          context.getFieldNarrowing(node.name) match {
+          context.getFieldNarrowing(node.name).orElse(topLevelVarFlowNarrowing(term, node.name, context)) match {
             case Some(nt) if nt != term.`type` => Some(new AsInstanceOf(term, nt))
             case _ => Some(term)
           }
@@ -362,7 +370,12 @@ private[compiler] final class SimpleExpressionTypingSupport(
             else None
           }
           topStatic match {
-            case Some(term) => Some(term)
+            case Some(term) =>
+              // A top-level `var` flow-narrowed by a null check (RFC #2031 option 2).
+              topLevelVarFlowNarrowing(term, node.name, context) match {
+                case Some(nt) if nt != term.`type` => Some(new AsInstanceOf(term, nt))
+                case _ => Some(term)
+              }
             case None =>
               // Fields that can't be reached this way (e.g. an instance field from
               // a static method) still suggest the qualified form to use.

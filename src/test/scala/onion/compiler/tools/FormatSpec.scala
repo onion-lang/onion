@@ -23,10 +23,34 @@ class FormatSpec extends AbstractShellSpec {
         Shell.Success("1,234,567|-98,765"))
     }
 
+    it("groups Long::MIN_VALUE without doubling the minus sign") {
+      runStr(
+        "return Format::integer(Long::MIN_VALUE)",
+        Shell.Success("-9,223,372,036,854,775,808"))
+    }
+
     it("formats grouped decimals, fixed decimals and percentages") {
       runStr(
         "return Format::number(1234.5678, 2) + \"|\" + Format::fixed(3.14159, 2) + \"|\" + Format::percent(0.756, 1)",
         Shell.Success("1,234.57|3.14|75.6%"))
+    }
+
+    it("drops the sign when a small negative value rounds to zero") {
+      runStr(
+        "return Format::number(-0.4, 0) + \"|\" + Format::fixed(-0.001, 2) + \"|\" + Format::percent(-0.0001, 1)",
+        Shell.Success("0|0.00|0.0%"))
+    }
+
+    it("keeps the sign of a genuinely negative non-finite value when rounding to zero would not apply") {
+      runStr(
+        "return Format::fixed(-1.0 / 0.0, 2) + \"|\" + Format::fixed(0.0 / 0.0, 2)",
+        Shell.Success("-Infinity|NaN"))
+    }
+
+    it("leaves non-finite values ungrouped instead of garbling their digits") {
+      runStr(
+        "return Format::number(1.0 / 0.0, 2) + \"|\" + Format::number(-1.0 / 0.0, 2) + \"|\" + Format::number(0.0 / 0.0, 2)",
+        Shell.Success("Infinity|-Infinity|NaN"))
     }
 
     it("renders human-readable byte sizes (1024-based)") {
@@ -39,6 +63,12 @@ class FormatSpec extends AbstractShellSpec {
       runStr(
         "return Format::duration(3661L) + \"|\" + Format::duration(90061L) + \"|\" + Format::duration(0L)",
         Shell.Success("1h 1m 1s|1d 1h 1m 1s|0s"))
+    }
+
+    it("renders a sane negative duration for Long::MIN_VALUE instead of a doubled minus") {
+      runStr(
+        "return Format::duration(Long::MIN_VALUE)",
+        Shell.Success("-106751991167300d 15h 30m 8s"))
     }
 
     it("produces English ordinals with the teens exception") {

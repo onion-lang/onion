@@ -48,6 +48,6 @@ class ForeachParensHintI18nSpec extends AnyFunSpec with Diagrams {
     }
     // The example code shown in the hint is literal, identical in both bundles,
     // so this assertion holds regardless of the JVM's default locale.
-    assert(msgs.contains("foreach x: Type in xs"), s"expected the hint's foreach example, got: $msgs")
+    assert(msgs.contains("foreach x in xs { ... }"), s"expected the hint's foreach example, got: $msgs")
   }
 }

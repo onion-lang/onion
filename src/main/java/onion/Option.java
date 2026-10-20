@@ -120,7 +120,7 @@ public sealed interface Option<T> permits Option.Some, Option.None {
      * Creates a Some containing the given non-null value.
      */
     /**
-     * Monadic unit used by do-notation's 'ret'.
+     * Monadic unit used by do-notation's 'yield'.
      */
     static <T> Option<T> successful(T value) {
         return some(value);

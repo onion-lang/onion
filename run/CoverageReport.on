@@ -312,7 +312,7 @@ def findModule(name: String): Option[Module] {
 }
 val coreMsg: Option[String] = do[Option] {
   m  <- findModule("core")
-  ret "core: " + m.pct().fmtPct() + "  tests: " + m.passedTests() + "/" + m.testsList().size
+  yield "core: " + m.pct().fmtPct() + "  tests: " + m.passedTests() + "/" + m.testsList().size
 }
 IO::println(if coreMsg == null { "core not found" } else { coreMsg.get() })
 

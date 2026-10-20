@@ -11,10 +11,10 @@ import onion.tools.Shell
  * all, even though docs/reference/stdlib.md (and its Japanese translation)
  * list `map` among the Sets Module's "Functional operations" as if
  * `a.map(...)` reached `onion.Sets::map`. The two implementations disagree:
- *   - order: `Sets::map` collects into a `LinkedHashSet` (insertion-order
- *     preserved, matching the Sets Module's documented promise that "result
- *     sets preserve insertion order"); `Iterables::map` collects into a
- *     plain `HashSet`, so the result's iteration order is unspecified
+ *   - order: both collect into a `LinkedHashSet` (insertion-order preserved,
+ *     matching the Sets Module's documented promise that "result sets
+ *     preserve insertion order"); #2178 fixed `Iterables::map`, which used a
+ *     plain `HashSet`
  *   - null: `Sets::map` treats a `null` set as empty; `Iterables::map`
  *     iterates its argument directly and throws `NullPointerException`
  * This locks in that shadowing (via the resulting `Set` implementation's
@@ -33,16 +33,25 @@ class SetsMapExtensionCallShadowingSpec extends AbstractShellSpec {
   }
 
   describe("extension-call syntax for map() on a Set[Int] shadows onion.Sets") {
-    it("a.map(f) collects into a plain HashSet (Iterables's behavior), not a LinkedHashSet") {
+    it("a.map(f) preserves insertion order too (a LinkedHashSet, like Sets::map)") {
       runBool(
         """
           |val a = onion.Sets::of(1, 2, 3)
-          |return a.map((x: Int) -> x * 2).getClass().getName() == "java.util.HashSet"
+          |return a.map((x: Int) -> x * 2).getClass().getName() == "java.util.LinkedHashSet"
           |""".stripMargin,
         Shell.Success(true))
     }
 
-    it("onion.Sets::map(a, f) collects into a LinkedHashSet, unlike the shadowing extension call") {
+    it("a.map(f) keeps the source set's insertion order") {
+      runBool(
+        """
+          |val a = onion.Sets::of(1, 2, 3, 4)
+          |return "" + a.map((x: Int) -> x * 10) == "[10, 20, 30, 40]"
+          |""".stripMargin,
+        Shell.Success(true))
+    }
+
+    it("onion.Sets::map(a, f) collects into a LinkedHashSet") {
       runBool(
         """
           |val a = onion.Sets::of(1, 2, 3)

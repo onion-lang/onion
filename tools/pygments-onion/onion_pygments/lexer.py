@@ -44,7 +44,7 @@ MODIFIER_KEYWORDS = (
 
 CONTROL_KEYWORDS = (
     "break", "case", "catch", "continue", "do", "else", "finally", "for", "foreach",
-    "goto", "if", "in", "is", "ret", "return", "select", "throw", "throws", "try",
+    "goto", "if", "in", "is", "yield", "return", "select", "throw", "throws", "try",
     "when", "while",
 )
 

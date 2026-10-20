@@ -361,7 +361,7 @@ Do notation provides a clean syntax for chaining operations on monadic types lik
 do[MonadType] {
   x <- expr1   // Bind: extract value from monad
   y <- expr2   // Chain multiple bindings
-  ret result   // Return: wrap result in monad
+  yield result   // Return: wrap result in monad
 }
 ```
 
@@ -376,7 +376,7 @@ def getEmail(user: User): Option[String] { /* ... */ }
 val email: Option[String] = do[Option] {
   user <- findUser(42)
   email <- getEmail(user)
-  ret email
+  yield email
 }
 
 // Equivalent to:
@@ -395,7 +395,7 @@ val result: Result[Int, String] = do[Result] {
   x <- parseNumber("10")
   y <- parseNumber("2")
   z <- divide(x, y)
-  ret z
+  yield z
 }
 ```
 
@@ -410,7 +410,7 @@ def fetchPosts(user: User): Future[List[String]] { /* ... */ }
 val posts: Future[List[String]] = do[Future] {
   user <- fetchUser(42)
   posts <- fetchPosts(user)
-  ret posts
+  yield posts
 }
 ```
 
@@ -423,7 +423,7 @@ comprehension:
 val pairs = do[List] {
   x <- [1, 2]
   y <- ["a", "b"]
-  ret x + y
+  yield x + y
 }
 // [1a, 1b, 2a, 2b]
 ```
@@ -438,7 +438,7 @@ val result: Option[Int] = do[Option] {
   val doubled = x * 2        // Local declaration
   y <- validateRange(doubled)
   println("Valid: " + y) // Side effect
-  ret y
+  yield y
 }
 ```
 
@@ -451,7 +451,7 @@ val result: Option[Int] = do[Option] {
   x <- Option::some(10)    // Success
   y <- Option::none()      // Fails here - short circuits
   z <- Option::some(30)    // Never executed
-  ret x + y + z
+  yield x + y + z
 }
 // result is Option::none()
 ```

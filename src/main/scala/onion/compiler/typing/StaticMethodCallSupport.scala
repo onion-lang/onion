@@ -94,7 +94,7 @@ private[compiler] final class StaticMethodCallSupport(
       val candidates = new JTreeSet[Method](new MethodComparator)
       calls.collectMethodsMatching(typeRef, node.name, candidates, calls.isStaticMethod)
       if (candidates.isEmpty) {
-        calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters0))
+        calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters0), calledStatically = true)
         return None
       }
 
@@ -136,17 +136,17 @@ private[compiler] final class StaticMethodCallSupport(
         if (closureIndices.nonEmpty) {
           return typeStaticCallWithBidirectionalInference(node, typeRef, context, expected, closureIndices)
         }
-        calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters))
+        calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters), calledStatically = true)
         None
       } else {
-        overloadSupport.selectMostSpecificApplicable(applicable) match {
+        overloadSupport.selectMostSpecificApplicable(applicable, argTypes = calls.types(parameters)) match {
           case CandidateSelection.Selected(selected) =>
             finalizeSelection(selected)
           case CandidateSelection.Ambiguous(first, second) =>
             calls.reportAmbiguousMethod(node, first.method, second.method, node.name)
             None
           case CandidateSelection.NoMatch =>
-            calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters))
+            calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters), calledStatically = true)
             None
         }
       }
@@ -191,7 +191,7 @@ private[compiler] final class StaticMethodCallSupport(
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(typeRef, name, candidates, calls.isStaticMethod)
     if (candidates.isEmpty) {
-      calls.reportMethodNotFound(node, typeRef, name, Array[Type]())
+      calls.reportMethodNotFound(node, typeRef, name, Array[Type](), calledStatically = true)
       return None
     }
 
@@ -207,7 +207,7 @@ private[compiler] final class StaticMethodCallSupport(
       expected
     )
     if (applicableMethods.isEmpty) {
-      calls.reportMethodNotFound(node, typeRef, name, nonClosureTypes.values.toArray)
+      calls.reportMethodNotFound(node, typeRef, name, nonClosureTypes.values.toArray, calledStatically = true)
       return None
     }
 
@@ -226,7 +226,7 @@ private[compiler] final class StaticMethodCallSupport(
         calls.reportAmbiguousMethod(node, first.method, second.method, name)
         return None
       case CandidateSelection.NoMatch =>
-        calls.reportMethodNotFound(node, typeRef, name, nonClosureTypes.values.toArray)
+        calls.reportMethodNotFound(node, typeRef, name, nonClosureTypes.values.toArray, calledStatically = true)
         return None
     }
     if (!ensureStaticMethodAccessible(node, method)) return None
@@ -297,7 +297,7 @@ private[compiler] final class StaticMethodCallSupport(
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(typeRef, node.name, candidates, calls.isStaticMethod)
     if (candidates.isEmpty) {
-      calls.reportMethodNotFound(node, typeRef, node.name, Array[Type]())
+      calls.reportMethodNotFound(node, typeRef, node.name, Array[Type](), calledStatically = true)
       return None
     }
 
@@ -307,7 +307,7 @@ private[compiler] final class StaticMethodCallSupport(
           case Some(named) =>
             typing.report(UNKNOWN_PARAMETER_NAME, named, named.name,
               ArgumentHelpers.parameterNameCandidates(candidates.asScala))
-          case None => calls.reportMethodNotFound(node, typeRef, node.name, Array[Type]())
+          case None => calls.reportMethodNotFound(node, typeRef, node.name, Array[Type](), calledStatically = true)
         }
         None
       case CandidateSelection.Ambiguous(first, second) =>

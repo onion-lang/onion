@@ -106,6 +106,9 @@ public final class Archive {
             zip.stream().filter(entry -> !entry.isDirectory())
                 .map(ZipEntry::getName).sorted().forEach(names::add);
         } catch (IOException e) {
+            if (isMissingFile(e)) {
+                throw new RuntimeException("Archive: no such file: " + zipPath, e);
+            }
             throw new RuntimeException("Archive: could not read " + zipPath
                 + " (" + e.getMessage() + ")", e);
         }
@@ -114,6 +117,10 @@ public final class Archive {
 
     /**
      * Extracts a zip into a directory and returns the paths written, sorted.
+     *
+     * <p>Returned paths are always absolute, regardless of whether {@code targetDir} was
+     * given as a relative or absolute path: {@code targetDir} is resolved against the
+     * current directory and normalized before any entry is written.
      *
      * <p>An entry whose name would land outside {@code targetDir} is refused. That is not
      * hypothetical caution: a zip entry named {@code ../../.ssh/authorized_keys} is the
@@ -147,6 +154,9 @@ public final class Archive {
                 }
             }
         } catch (IOException e) {
+            if (isMissingFile(e)) {
+                throw new RuntimeException("Archive: no such file: " + zipPath, e);
+            }
             throw new RuntimeException("Archive: could not extract " + zipPath
                 + " (" + e.getMessage() + ")", e);
         }
@@ -174,7 +184,7 @@ public final class Archive {
         try (GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(data))) {
             return in.readAllBytes();
         } catch (IOException e) {
-            throw new RuntimeException("Archive: could not gunzip (" + e.getMessage() + ")", e);
+            throw new RuntimeException("Archive: could not gunzip (" + gunzipReason(e) + ")", e);
         }
     }
 
@@ -196,11 +206,29 @@ public final class Archive {
             transfer(in, out);
         } catch (IOException e) {
             throw new RuntimeException("Archive: could not gunzip " + source
-                + " (" + e.getMessage() + ")", e);
+                + " (" + gunzipReason(e) + ")", e);
         }
     }
 
     // ========== Internals ==========
+
+    /** An empty or header-short input makes the JDK throw an EOFException with no message. */
+    private static String gunzipReason(IOException e) {
+        if (e.getMessage() == null && e instanceof java.io.EOFException) {
+            return "truncated or empty gzip data";
+        }
+        return e.getMessage();
+    }
+
+    /**
+     * A missing zip surfaces as {@link java.nio.file.NoSuchFileException} on the JDK's
+     * NIO-backed {@link ZipFile}, or {@link java.io.FileNotFoundException} on JDKs that still
+     * route through the old File API.
+     */
+    private static boolean isMissingFile(IOException e) {
+        return e instanceof java.nio.file.NoSuchFileException
+            || e instanceof java.io.FileNotFoundException;
+    }
 
     private static void writeEntry(ZipOutputStream out, String name, Path source)
             throws IOException {

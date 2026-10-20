@@ -27,10 +27,10 @@ val f1 = fetchPage("a", 50L)
 val f2 = fetchPage("b", 30L)
 val f3 = fetchPage("c", 40L)
 
-Future::all(f1, f2, f3).onSuccess((results: List[Object]) -> {
+Future::all(f1, f2, f3).onSuccess((results: List[String]) -> {
   println("Downloaded " + results.size + " pages")
-  foreach r: Object in results {
-    println("  " + (r as String))
+  foreach r: String in results {
+    println("  " + r)
   }
 })
 ```
@@ -43,7 +43,7 @@ Chain futures with `do[Future]`.
 val combined: Future[String] = do[Future] {
   a <- fetchPage("page-a", 20L)
   b <- fetchPage("page-b", 20L)
-  ret a.length() + ":" + b.length()
+  yield a.length() + ":" + b.length()
 }
 
 println(combined.getOrElse("failed"))
@@ -90,14 +90,14 @@ val f1 = fetchPage(urls[0] as String, 50L)
 val f2 = fetchPage(urls[1] as String, 30L)
 val f3 = fetchPage(urls[2] as String, 40L)
 
-Future::all(f1, f2, f3).onSuccess((results: List[Object]) -> {
+Future::all(f1, f2, f3).onSuccess((results: List[String]) -> {
   println("Downloaded " + results.size + " pages")
 })
 
 val combined: Future[String] = do[Future] {
   a <- fetchPage("page-a", 20L)
   b <- fetchPage("page-b", 20L)
-  ret a.length() + ":" + b.length()
+  yield a.length() + ":" + b.length()
 }
 
 println(combined.getOrElse("failed"))

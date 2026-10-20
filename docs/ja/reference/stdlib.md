@@ -539,6 +539,12 @@ val schema = Json::parse(summaryShape.jsonSchema())   // リクエスト本文�
 ほかの shape の `jsonSchema()` は `UnsupportedOperationException` を投げます。有限の
 インライン スキーマを持たない再帰的なレコードの場合も同様です。
 
+`describe(component, text)` は、JSON Schema で `component` の `"description"` に `text` を
+持つ shape を返します。読み書きも他の成分も変わらず、呼び出しは連鎖できます
+（`s.describe("owner", "...").describe("task", "...")`）。`hasJsonSchema()` が false のとき
+`jsonSchema()` と同じ `UnsupportedOperationException` を、その shape に無い成分名には
+`IllegalArgumentException` を投げます（RFC #1960 のオプション 3）。
+
 ### コンビネータ
 
 - `eachLine(text[, origin])` — 1行ごとに `Outcome[T]` を返し、読めた行と読めなかった
@@ -1131,7 +1137,7 @@ f1.zip(f2)  // Future[List[Object]] = [1, 2]
 f1.race(f2)
 
 // すべての完了を待つ
-Future::all(f1, f2, f3)  // Future[List[Object]] = [1, 2, 3]
+Future::all(f1, f2, f3)  // Future[List[Int]] = [1, 2, 3]
 Future::all([f1, f2, f3])  // 同じ結果。実行時に組み立てた List[Future[T]] も渡せる
 
 // 最初に完了したもの
@@ -1160,7 +1166,7 @@ Futureは順次非同期合成のためのdo記法で動作：
 val result: Future[Int] = do[Future] {
   x <- Future::async { fetchA() }
   y <- Future::async { fetchB(x) }
-  ret x + y
+  yield x + y
 }
 ```
 
@@ -1184,6 +1190,11 @@ val a = Json::array()                                   // 空の List（JSON �
 // 非有限の Double/Float（NaN, +/-Infinity）は JSON リテラル null としてシリアライズされる
 // -- JSON にはそれを表すトークンが無く、Json::parse も非有限の値を生成できないため
 Json::stringify(0.0d / 0.0d)                            // "null"
+
+// record は宣言順のコンポーネントを持つ JSON オブジェクトとしてシリアライズされる
+// (ネストした record / List / Map も Map の値と同様に再帰的に処理される)
+record Point(x: Int, y: Int)
+Json::stringify(new Point(1, 2))                        // {"x":1,"y":2}
 ```
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。
@@ -1433,10 +1444,14 @@ Strings::words("  a  b  c ")             // List[String] ["a","b","c"]
 Strings::chars("abc")                    // List ["a","b","c"]
 Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / "el"
 Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
+// 不正な入力で NumberFormatException（"not an integer: \"abc\""）を投げるパース。規則は下の null 安全版と同じ。"42".toInt() とも書ける
+Strings::toInt("42") / Strings::toLong("100") / Strings::toDouble("3.14")
 // null 安全なパース（例外を投げずに null/フォールバックを返す）
 Strings::toIntOrNull("42") / Strings::toLongOrNull("100") / Strings::toDoubleOrNull("3.14")
 Strings::toIntOr("nope", 0)              // 0
 ```
+
+`toDoubleOrNull` が受け付けるのは通常の小数・指数表記(`3.14`、`-2.5e10`)だけです。`1d`、`0x1p3`、`NaN`、`Infinity` のような Java リテラル形式は `null` になります。
 
 `Strings` の大半のメソッド（`upper`、`lower`、`capitalize`、`reverse`
 など）は拡張メソッドのメソッドチェーン（`s.upper()`、`s.reverse()`
@@ -1598,7 +1613,8 @@ Maps::mapValues(m, (v: Int) -> v * 2) / Maps::mapKeys(m, (k: String) -> k.toUppe
 Maps::filterValues(m, (v: Int) -> v > 0) / Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
 Maps::filter(m, (k: String, v: Int) -> v > 0) // キー+値の述語
 Maps::invert(m)                               // キーと値を入れ替え
-Maps::toList(m, (k: String, v: Int) -> k + "=" + v)  // エントリ -> List
+Maps::map(m, (k: String, v: Int) -> k + "=" + v)     // エントリ -> List。m.map { k, v -> ... } とも書ける
+Maps::toList(m, (k: String, v: Int) -> k + "=" + v)  // エントリ -> List（map と同じ）
 Maps::forEach(m, (k: String, v: Int) -> println(k))
 Maps::count(m, p) / Maps::anyEntry(m, p) / Maps::allEntries(m, p)
 Maps::groupBy(items, keyOf)                   // Map[K, List]
@@ -1632,24 +1648,17 @@ Set ユーティリティ（`onion.Sets`）。結果 Set は挿入順を保持�
 直接呼んだ `Sets::union`/`intersection`/`difference` は通常の **変更可能**な `LinkedHashSet` を
 返します。変更可能な結果が必要な場合は `Sets::` 形式を使ってください。
 
-**`toList` は `a.toList()` としては一切コンパイルできません -- シャドーイングでさえない**:
-`onion.Colls` も同じ `(Set)` 消去シグネチャで `toList` 拡張メソッドを宣言しており、本来なら
-下記の `union`/`intersection`/`difference`/`map` と同様に単純にシャドーイングされるだけの
-はずです。ところが `Set` は `Iterable` にも適合しており、`onion.Iterables` は別途
-`toList(Iterable)` 拡張メソッドを宣言しています -- これは消去シグネチャとして本当に異なる
-ものですが、`Set` 型の引数にも同じく適用可能です。そのため `a.toList()` は
-`onion.Colls` 側と `onion.Iterables` 側のどちらにも解釈できてしまい **曖昧**となり、
-どちらかへ黙って解決される代わりに `E0006`（"method call is applicable for both
-Colls.toList() and Iterables.toList()"）でコンパイルエラーになります -- このモジュールで
-「組み込み拡張メソッドとしても使える」と説明している他のすべてのメソッドとは異なります。
-さらに静的呼び出し形どうしも挙動が異なります: `Colls::toList` はコピーを
+**`Set` に対する `a.toList()` は `onion.Colls` の `toList(Set)` です**: これと
+`onion.Iterables` の `toList(Iterable)` はどちらも `Set` を受け取れますが、レシーバの型が
+より具体的な方が選ばれます（以前は `E0006` の曖昧エラーでした）。`onion.Sets` の
+`toList(Set)` は `Colls` と同じ消去シグネチャなので、`Colls` 側にシャドーイングされます。
+静的呼び出し形どうしは挙動が異なります: `Colls::toList` はコピーを
 `Collections.unmodifiableList` でラップし、`null` の Set には `NullPointerException` を
 投げますが、`Sets::toList` は通常の変更可能な `ArrayList` を返し、`null` は空として扱います。
-必ず `Sets::toList(a)`（変更不可・例外を投げる版が必要なら `Colls::toList(a)`）を明示的に
-呼び出してください -- `a.toList()` は `Set` レシーバに対しては絶対にコンパイルできません。
+変更可能で null 安全なコピーが必要なときは `Sets::toList(a)` を呼んでください。
 
 ```onion
-a.toList()                             // [E0006] 曖昧: Colls.toList() vs Iterables.toList()
+a.toList()                             // = Colls::toList(a): 変更不可
 Sets::toList(a)                        // 変更可能; null 安全（null には空リスト）
 Colls::toList(a)                       // 変更不可; null には NullPointerException
 ```
@@ -1676,12 +1685,11 @@ a.count(p) / a.any(p) / a.all(p)
 シグネチャで `map` 拡張メソッドを宣言しており、組み込み拡張コンテナリストで
 `Iterables` が `Sets` より先に登録されているため、`a.map(f)` は常に
 *`onion.Iterables`* 側の `map` に到達し、`onion.Sets` 側の `map` には拡張呼び出し
-構文からは一切到達できません。両者は順序と `null` の扱いが異なります:
-`Iterables::map` は結果を通常の `HashSet` に集約する（反復順序は不定で、上記の
-「挿入順を保持する」という約束が破れる）うえ `null` の Set に対して
-`NullPointerException` を投げますが、`Sets::map` は `LinkedHashSet`（挿入順保持）
-に集約し、`null` の Set には空の Set を返します。挿入順が保たれた null 安全な
-結果が必要な場合は `a.map(...)` ではなく `Sets::map(...)` を直接呼んでください。
+構文からは一切到達できません。どちらも結果を `LinkedHashSet`（挿入順保持）に
+集約するため、違いは `null` の扱いだけです: `Iterables::map` は `null` の Set に
+対して `NullPointerException` を投げ、`Sets::map` は空の Set を返します。
+null 安全な結果が必要な場合は `a.map(...)` ではなく `Sets::map(...)` を直接
+呼んでください。
 
 **`forEach` は他の onion モジュールではなく JDK にシャドーイングされます**:
 `Set` は `java.lang.Iterable` にも適合しており、`Iterable` はすでに default
@@ -1731,6 +1739,14 @@ Hash::md5(text) / Hash::sha1(text)   // チェックサム・互換用（衝突�
 "password".sha256()        // Hash::sha256("password") と同じ
 "x".base64Encode().sha256().substring(0, 8)   // 下の Codec とチェーン可能
 ```
+
+どの関数も引数は `String?` ではなく `String` です。内部の Java 実装は `null` を
+`""` として扱いますが、Onion には「この Java 側パラメータだけ null 安全で、他は
+デフォルトで non-null」という区別を表す仕組みがまだなく、nullable な値（`Map`
+のルックアップや `Option` から来た値など）をハッシュ化する前には
+`Hash::md5(maybe ?: "")` のように書く必要があります
+（[#2180](https://github.com/onion-lang/onion/issues/2180)、
+[#2213](https://github.com/onion-lang/onion/issues/2213) で追跡）。
 
 ## Codec モジュール
 
@@ -1972,8 +1988,8 @@ xs.sort() / xs.sort(comparator)
 - `xs.filter(p)` は `p` を呼び出した後にその `Boolean` 結果をアンボックスする
   ため、`p` が `null` を返すと **`NullPointerException`** を投げる。
   `Iterables::filter` は `null` を「保持しない」として扱い、例外を投げない
-- `n` が負の場合 -- `xs.take(-1)` / `xs.drop(-1)` は空/変更なしの結果を返す
-  が、`Iterables::take`/`Iterables::drop` は例外を投げる
+- `n` が負の場合 -- どちらもクランプする（`take` は空リスト、`drop` は変更なし）。
+  `xs.drop(-1)` は同じ参照を返し、`Iterables::drop(xs, -1)` はコピーを返す
 - `n` がリストのサイズ以上の場合 -- `xs.take(n)` / `xs.drop(n)` はコピーで
   はなく**同じリスト参照そのもの**を返す。`Iterables::take`/`Iterables::drop`
   は必ずコピーする
@@ -1993,7 +2009,7 @@ Iterables::filter(xs, (x) -> null)       // []（onion.Iterables::filter。null 
 xs.take(-1)                    // []      （onion.Colls::take。例外ではなく空リストにクランプ）
 xs.take(xs.size() + 1) === xs  // true    （onion.Colls::take。同じリスト参照）
 xs.reverse().add(4)            // UnsupportedOperationException を投げる（onion.Colls::reverse）
-Iterables::take(xs, -1)        // 例外を投げる（onion.Iterables::take。クランプしない）
+Iterables::take(xs, -1)        // []      （onion.Iterables::take。こちらもクランプ）
 ```
 
 **`reduce` もシャドーイングされますが、実行時ではなくコンパイル時に現れます**:
@@ -2077,6 +2093,7 @@ Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // エントリ名の List
 Files::listFiles("dir")                // java.io.File エントリの List
 Files::glob("dir", "*.on")             // glob にマッチしたエントリ名
+Files::walk("dir")                     // dir 以下の全ファイルを再帰的に（相対パス、ソート済み）
 Files::delete(path) / Files::exists(path)
 Files::isFile(path) / Files::isDirectory(path)
 Files::mkdirs(path)                    // ディレクトリと不足する親ディレクトリを作成
@@ -2159,7 +2176,7 @@ val results: List[Outcome[Row]] = file"data.log".eachLine(shape)
 
 ## Csv モジュール
 
-RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（`onion.Csv`、自動インポート済み）——引用フィールド・カンマ/改行を含む値・二重引用符に対応。
+RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（`onion.Csv`、自動インポート済み）——引用フィールド・カンマ/改行を含む値・二重引用符に対応。閉じられていない引用フィールドは、入力の残りを飲み込まず、引用が始まった行を示す `IllegalArgumentException` を投げる。
 
 ```onion
 val rows = Csv::parse(text)                  // List of List of String
@@ -2184,6 +2201,10 @@ Proc::captureIn("/tmp", "ls")           // ...In 系は作業ディレクトリ�
 Proc::runIn("/tmp", "ls")               // run と同様だが、指定した作業ディレクトリで実行
 Proc::execIn("/tmp", "make", "build")   // exec と同様だが、指定した作業ディレクトリで実行
 ```
+
+各コマンドはシェルを介さず直接実行される。パイプ・リダイレクト・`&&` を含む1つの文字列は、
+OS にそのままリテラルな1引数として渡され、シェルには解釈されない。シェル構文を使うには、
+シェルを明示的に起動する: `Proc::capture("sh", "-c", "ls | wc -l")`.
 
 ## Args モジュール
 
@@ -2269,6 +2290,13 @@ Colls::emptyMap()                       // 空の Map
 
 ```onion
 xs.concat(ys)                     // xs の要素に続けて ys の要素
+xs + ys                           // concat と同じ（xs.plus(ys)、xs += ys も可）。新しい List
+xs.associateBy { x -> key(x) }    // キー -> 要素 の Map。同じキーなら後の要素が残る
+xs.indexOfFirst { x -> x > 6 }    // 条件に合う最初の位置。無ければ -1
+xs.maxOrNull() / xs.minOrNull()   // max()/min() と同じだが、空の List では null
+foreach (i, x) in xs.withIndex() { ... }   // withIndex(): 添字 -> 要素 の順序付き Map
+xs.mapIndexed { i, x -> x + i }   // 添字付きの map
+xs.forEachIndexed { i, x -> ... } // 添字付きの forEach
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - ネストを1段階解消
 xs.flatMap { x -> [x, x] }        // 各要素をリストに写してから1段階平坦化する
                                    // （bind はその別名で、do[List] { x <- xs; ... } が使う）
@@ -2423,7 +2451,7 @@ val body = r.map { res -> res.body }.getOrElse("")
 val both = do[Result] {
   a <- Http::request("GET", urlA).send()
   b <- Http::request("GET", urlB).send()
-  ret a.status + b.status
+  yield a.status + b.status
 }
 ```
 
@@ -2600,6 +2628,7 @@ DateTime::monthName(epochMillis): String  // "March"
 ```
 DateTime::of(year, month, day): Long
 DateTime::of(year, month, day, hour, minute, second): Long
+DateTime::today(): Long                 // = startOfDay(now())
 DateTime::startOfDay(epochMillis): Long
 DateTime::endOfDay(epochMillis): Long
 ```
@@ -2738,6 +2767,9 @@ val bytes = Archive::gunzip(Archive::gzip(text.getBytes()))
 **展開は、対象ディレクトリの外に書き出すことを拒否します。** `../../.ssh/authorized_keys` という
 名前のエントリは「zip slip」と呼ばれる古典的な攻撃で、エントリ名を素直に解決する展開処理は
 言われたとおりの場所に書き込んでしまいます。ここではエントリ名を示して例外を投げます。
+
+**`unzip` は常に絶対パスを返します。** `targetDir` に相対パスを渡した場合でも、エントリを
+書き込む前にカレントディレクトリを基準に解決・正規化されるためです。
 
 エントリのタイムスタンプは固定値で書き込むので、同じ入力を 2 回 zip すると同じバイト列になります。
 実行のたびに変わる成果物はチェックサムもキャッシュもできません。
@@ -2886,6 +2918,17 @@ Regex::groupsAll(input, pattern): List[List[String]]  // 全マッチのグル�
 ```
 Regex::replace(input, pattern, replacement): String
 Regex::replaceFirst(input, pattern, replacement): String
+```
+
+`replacement` は素のテキストではなく `java.util.regex.Matcher` の置換文字列構文に
+従う: `$1`、`$2`、... はキャプチャグループに置き換わり、リテラルな `$` は Java に
+`\$` として渡す必要がある。Onion の文字列リテラルではそのバックスラッシュ自体を
+エスケープするため `\\$` と書く（`"\$"` だけではサポート外のエスケープとして
+コンパイルエラーになる）。
+
+```
+Regex::replace("2024-05", "(\\d+)-(\\d+)", "$2/$1")   // "05/2024"
+Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- リテラルの $
 ```
 
 ### 分割

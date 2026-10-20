@@ -53,6 +53,17 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         Shell.Success("4869|Hi"))
     }
 
+    it("hexDecode rejects odd length and non-hex characters") {
+      runStr(
+        "import { onion.Codec }",
+        """var odd: String = "none"
+          |var bad: String = "none"
+          |try { Codec::hexDecode("abc") } catch e: IllegalArgumentException { odd = "rejected" }
+          |try { Codec::hexDecode("zz") } catch e: IllegalArgumentException { bad = "rejected" }
+          |return odd + "|" + bad + "|" + Codec::hexDecode("").length()""".stripMargin,
+        Shell.Success("rejected|rejected|0"))
+    }
+
     it("url encoding round-trips a reserved character") {
       runStr(
         "import { onion.Codec }",
@@ -130,6 +141,25 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         " Double::toString(Stats::variance(xs)) + \"|\" +" +
         " Double::toString(Stats::stddev(xs))",
         Shell.Success("0.0|0.0|0.0|0.0|0.0|0.0|0.0"))
+    }
+
+    it("average and variance skip null elements the way sum, median and min/max do") {
+      runStr(
+        "import { onion.Stats }",
+        "val xs: List[JInteger] = [1, null, 3]\n" +
+        "return Double::toString(Stats::average(xs)) + \"|\" + Double::toString(Stats::variance(xs))",
+        Shell.Success("2.0|1.0"))
+    }
+
+    it("sumInt / sumLong throw on overflow instead of wrapping") {
+      runStr(
+        "import { onion.Stats }",
+        "var a: String = \"none\"\n" +
+        "var b: String = \"none\"\n" +
+        "try { Stats::sumInt([2147483647, 1]); a = \"wrapped\" } catch e: ArithmeticException { a = \"overflow\" }\n" +
+        "try { Stats::sumLong([9223372036854775807L, 1L]); b = \"wrapped\" } catch e: ArithmeticException { b = \"overflow\" }\n" +
+        "return a + \"|\" + b",
+        Shell.Success("overflow|overflow"))
     }
   }
 }

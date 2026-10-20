@@ -111,6 +111,19 @@ class JsonShapeStructureSpec extends AbstractShellSpec {
     }
   }
 
+  describe("origins") {
+    it("names the line each defective field sits on, nested and in lists") {
+      val r = run(
+        """    val text = "{\n  \"title\": \"T\",\n  \"decisions\": [],\n  \"actions\": [\n    {\"owner\": \"a\", \"task\": \"t\"},\n    {\"owner\": 1, \"task\": \"t\"}\n  ],\n  \"risk\": \"x\"\n}"
+          |    val o = Summary::doc().parse(text, Origin::atLine("reply.json", 1))
+          |    var out = ""
+          |    foreach d: Defect in o.defects() { out = out + d.path() + "@" + d.origin().describe() + ";" }
+          |    return out
+          |""".stripMargin, "String")
+      assert(Shell.Success("actions[1].owner@reply.json:6;risk@reply.json:8;") == r)
+    }
+  }
+
   describe("printing") {
     it("round-trips lists, nested records and nulls: parse(print(v)) == Ok(v)") {
       val r = run(
@@ -291,6 +304,52 @@ class JsonShapeStructureSpec extends AbstractShellSpec {
           assert(defs.containsKey(ref.stripPrefix("#/$defs/")))
         case other => fail(s"expected a schema, got $other")
       }
+    }
+
+    it("adds a per-component description via describe(name, text), leaving others alone") {
+      val actual = schemaOf(records, """Action::doc().describe("owner", "who is responsible").jsonSchema()""")
+      val props = actual.asInstanceOf[java.util.Map[String, Any]].get("properties").asInstanceOf[java.util.Map[String, Any]]
+      val owner = props.get("owner").asInstanceOf[java.util.Map[String, Any]]
+      val task = props.get("task").asInstanceOf[java.util.Map[String, Any]]
+      assert(owner.get("description") == "who is responsible")
+      assert(!task.containsKey("description"))
+    }
+
+    it("chains describe calls and leaves parsing/printing unaffected") {
+      val r = run(
+        """    val s = Action::doc().describe("owner", "who").describe("task", "what")
+          |    val v = new Action("sato", "x")
+          |    return s.parse(s.print(v)).get() == v
+          |""".stripMargin, "Boolean")
+      assert(Shell.Success(true) == r)
+    }
+
+    it("refuses an unknown component name") {
+      val r = run(
+        """    var bad = false
+          |    try { Action::doc().describe("nope", "x") } catch e: IllegalArgumentException { bad = true }
+          |    return bad
+          |""".stripMargin, "Boolean")
+      assert(Shell.Success(true) == r)
+    }
+
+    it("refuses describe when the shape has no JSON Schema") {
+      val r = shell.run(
+        """
+          |record Pt(x: Int, y: Int) {
+          |  shape doc = json
+          |  shape text = re"(-?\d+),(-?\d+)"
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    var refused = false
+          |    try { Pt::text().describe("x", "horizontal") } catch e: UnsupportedOperationException { refused = true }
+          |    return refused
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(true) == r)
     }
 
     it("describes a mutually-recursive pair of shapes via $defs/$ref") {

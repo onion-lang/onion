@@ -68,6 +68,54 @@ class RandomSpec extends AbstractShellSpec {
         )
         assert(Shell.Success("true") == result)
       }
+
+      it("reports a non-positive bound with an Rand::nextInt-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Rand::nextInt(0);
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Rand::nextInt:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports max <= min with an Rand::nextInt-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Rand::nextInt(5, 1);
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Rand::nextInt:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
     }
 
     describe("double random") {
@@ -115,6 +163,54 @@ class RandomSpec extends AbstractShellSpec {
           Array()
         )
         assert(Shell.Success("true") == result)
+      }
+
+      it("reports a non-positive double bound with an Rand::nextDouble-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Rand::nextDouble(0.0);
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Rand::nextDouble:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports max <= min for a double range with an Rand::nextDouble-prefixed message") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Rand::nextDouble(5.0, 1.0);
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Rand::nextDouble:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
       }
     }
 
@@ -318,6 +414,30 @@ class RandomSpec extends AbstractShellSpec {
           Array()
         )
         assert(Shell.Success("true") == result)
+      }
+
+      it("reports a non-positive long bound with an Rand::nextLong-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Rand::nextLong(0L);
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Rand::nextLong:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
       }
     }
   }

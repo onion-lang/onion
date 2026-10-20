@@ -114,6 +114,12 @@ class WarningReporter(
         s"(use the returned value, e.g. 'val r = x.$methodName(...)')")
   }
 
+  def extensionMethodShadowed(location: Location, receiverName: String, methodName: String, arity: Int): Unit = {
+    report(WarningCategory.ExtensionMethodShadowed, location,
+      s"extension method '$methodName' ($arity-arg) on '$receiverName' has the same name and arity as an existing " +
+        s"member, which always wins; this extension method is never called")
+  }
+
   /** A library jar's `META-INF/onion/effect-table.txt` does not parse; it was ignored. */
   def libraryEffectTableMalformed(source: String, location: Location, message: String): Unit = {
     report(WarningCategory.LibraryEffectTableMalformed, location, message, source)

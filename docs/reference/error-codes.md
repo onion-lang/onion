@@ -1381,6 +1381,56 @@ enum Color[T] { RED, GREEN }
 Fix: drop the type parameters, or restructure as an ADT (`case`) enum if each
 case genuinely needs its own type argument.
 
+### `E0100` — Multiple binding patterns comma-joined in one `case`
+
+A `select` case's comma-joined pattern list has 2+ alternatives where at least
+one is a type pattern, destructuring pattern, regex pattern, or bare binding
+pattern. The generated code can only use one alternative's binding/cast, so a
+sibling alternative that actually matches at runtime — another type pattern,
+or even a bare wildcard (`_`), which matches regardless of the recorded
+binding's type — gets miscast to that one alternative's type.
+
+```onion
+enum Shape { case Circle(radius: Double); case Square(side: Double); case Triangle(base: Double, height: Double) }
+def isRound(sh: Shape): Boolean {
+  return select sh {
+    case c is Circle: true
+    case s is Square, t is Triangle: false   // E0100: only Triangle's binding survives
+    else: false
+  }
+}
+isRound(new Square(2.0))   // would throw: class Square cannot be cast to class Triangle
+```
+
+Fix: write each such alternative as its own `case` clause instead:
+
+```onion
+def isRound(sh: Shape): Boolean {
+  return select sh {
+    case c is Circle: true
+    case s is Square: false
+    case t is Triangle: false
+  }
+}
+```
+
+A comma-joined list of plain value patterns (`case 1, 2, 3:`) is unaffected —
+only a type, destructuring, regex, or bare binding pattern triggers this.
+
+### `E0101` — Lambda has the wrong number of parameters
+
+A lambda's parameter count differs from that of the function type expected for
+it. The message gives both counts and the expected type.
+
+```onion
+val m = ["a": 1, "b": 2]
+m.filter { e -> e.getValue() > 0 }      // E0101: Map's filter takes (key, value)
+[1, 2].fold(0) { acc -> acc }           // E0101: fold's function takes (acc, element)
+```
+
+Fix: write the lambda with the parameters the function type takes —
+`m.filter { k, v -> v > 0 }`, `[1, 2].fold(0) { acc, x -> acc + x }`.
+
 ### `E0069` — Local val requires an initializer
 
 A local `val` was declared without an initializer (no `= expr`). Unlike a
@@ -1715,6 +1765,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0017` | a library jar's `META-INF/onion/effect-table.txt` is malformed and was ignored whole (reported at the jar and line) |
 | `W0018` | a library jar's effect table names classes outside the jar; those entries were ignored |
 | `W0019` | the result of an immutable builder method (`Http.Request.header`, ...) is discarded as a statement, so the call does nothing |
+| `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
 
 ## Every diagnostic code
 
@@ -1822,6 +1873,8 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0097` | instance … is already defined (at most one instance is allowed per (trait, type)) |
 | `E0098` | enum … mixes shared parameters with `case` cases |
 | `E0099` | enum … cannot take type parameters |
+| `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
+| `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
 
 ## See also
 

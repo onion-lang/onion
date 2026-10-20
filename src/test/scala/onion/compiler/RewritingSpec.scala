@@ -32,13 +32,13 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       }.getOrElse(fail("Could not find do expression in rewritten AST"))
     }
 
-    it("desugars a single ret statement to M::successful(e)") {
-      // do[Future] { ret 42 } => Future::successful(42)
+    it("desugars a single yield statement to M::successful(e)") {
+      // do[Future] { yield 42 } => Future::successful(42)
       val source =
         """class Test {
           |public:
           |  def test(): Object {
-          |    val result = do[Future] { ret 42 };
+          |    val result = do[Future] { yield 42 };
           |    return result
           |  }
           |}""".stripMargin
@@ -72,15 +72,15 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       }
     }
 
-    it("desugars a binding followed by ret to a single map call") {
-      // do[Future] { x <- getX(); ret x }
+    it("desugars a binding followed by yield to a single map call") {
+      // do[Future] { x <- getX(); yield x }
       // => getX().map((x) -> { x })   — map instead of bind+successful, so a
       // monad only needs map/bind (which is what lets do[List] work)
       val source =
         """class Test {
           |public:
           |  def test(): Object {
-          |    val result = do[Future] { x <- getX(); ret x };
+          |    val result = do[Future] { x <- getX(); yield x };
           |    return result
           |  }
           |}""".stripMargin
@@ -95,13 +95,13 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
     }
 
     it("desugars multiple bindings to bind with a final map") {
-      // do[Future] { x <- getX(); y <- getY(); ret x + y }
+      // do[Future] { x <- getX(); y <- getY(); yield x + y }
       // => getX().bind((x) -> { getY().map((y) -> { x + y }) })
       val source =
         """class Test {
           |public:
           |  def test(): Object {
-          |    val result = do[Future] { x <- getX(); y <- getY(); ret x + y };
+          |    val result = do[Future] { x <- getX(); y <- getY(); yield x + y };
           |    return result
           |  }
           |}""".stripMargin
@@ -122,13 +122,13 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
     }
 
     it("desugars intermediate expression as side-effect bind") {
-      // do[Future] { sideEffect(); ret 42 }
+      // do[Future] { sideEffect(); yield 42 }
       // => sideEffect().bind((_unused) -> { Future::successful(42) })
       val source =
         """class Test {
           |public:
           |  def test(): Object {
-          |    val result = do[Future] { sideEffect(); ret 42 };
+          |    val result = do[Future] { sideEffect(); yield 42 };
           |    return result
           |  }
           |}""".stripMargin
@@ -591,7 +591,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
           |    while (i < 10) {
           |      i = i + 1
           |    }
-          |    return do[Future] { ret i }
+          |    return do[Future] { yield i }
           |  }
           |}
           |""".stripMargin

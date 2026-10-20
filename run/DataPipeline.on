@@ -211,12 +211,12 @@ val fApac:  Future[StageResult] = extractRegion(Region::APAC)
 val fEmea:  Future[StageResult] = extractRegion(Region::EMEA)
 val fAmer:  Future[StageResult] = extractRegion(Region::AMER)
 val fLatam: Future[StageResult] = extractRegion(Region::LATAM)
-val defaultRaw: List[Object] = []
-val allRaw: List[Object] = Future::all(fApac, fEmea, fAmer, fLatam).getOrElse(defaultRaw)
+val defaultRaw: List[StageResult] = []
+val allRaw: List[StageResult] = Future::all(fApac, fEmea, fAmer, fLatam).getOrElse(defaultRaw)
 IO::println("  received #{allRaw.size} result(s)")
 
 // Unpack stage results
-val stageResults: List[StageResult] = allRaw.map { r -> r as StageResult } as List[StageResult]
+val stageResults: List[StageResult] = allRaw
 IO::println("")
 
 // Phase 2 — sequential transform via do[Future]
@@ -226,7 +226,7 @@ val fAllStats: Future[List[RegionStats?]] = do[Future] {
   s1 <- processResult(stageResults[1])
   s2 <- processResult(stageResults[2])
   s3 <- processResult(stageResults[3])
-  ret [s0, s1, s2, s3]
+  yield [s0, s1, s2, s3]
 }
 val rawStats: List[RegionStats?] = fAllStats.getOrElse([])
 val statsList: List[RegionStats] = rawStats
@@ -306,7 +306,7 @@ val amerOpt: Option[RegionStats?] = Option::of(amerStats)
 val combined: String = do[Option] {
   e <- emeaOpt
   a <- amerOpt
-  ret "EMEA+AMER total = #{Format::fixed((e as RegionStats).total() + (a as RegionStats).total(), 2)}"
+  yield "EMEA+AMER total = #{Format::fixed((e as RegionStats).total() + (a as RegionStats).total(), 2)}"
 } .getOrElse("one or both regions missing")
 IO::println("  " + combined)
 IO::println("")

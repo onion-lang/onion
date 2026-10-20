@@ -33,7 +33,7 @@ import scala.collection.mutable.Buffer
  * do[Future] {
  *   x <- readFile("a.txt")
  *   y <- readFile("b.txt")
- *   ret x + y
+ *   yield x + y
  * }
  *
  * // Desugared form
@@ -47,7 +47,7 @@ import scala.collection.mutable.Buffer
  * == Desugaring Rules ==
  *
  *   - `do[M] { x <- e1; rest }` → `e1.bind((x) -> { do[M] { rest } })`
- *   - `do[M] { ret e }` → `M::successful(e)`
+ *   - `do[M] { yield e }` → `M::successful(e)`
  *   - `do[M] { e }` (final) → `M::successful(e)`
  *
  * == Phase Position in Pipeline ==
@@ -1490,7 +1490,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   def rewriteExpression(expr: AST.Expression): AST.Expression = if (!bodyRewriteNeeded) expr else expr match {
     // Do notation desugaring - the main transformation
     case doExpr: AST.DoExpression => desugarDoExpression(doExpr)
-    case AST.RetStatement(loc, e) => AST.RetStatement(loc, rewriteExpression(e))
+    case AST.YieldStatement(loc, e) => AST.YieldStatement(loc, rewriteExpression(e))
     case b: AST.BlockExpression => rewriteBlockExpression(b)
     case _: AST.BreakExpression | _: AST.ContinueExpression => expr
     case AST.ForeachExpression(loc, arg, collection, statement) =>
@@ -1628,7 +1628,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    *
    * {{{
    * do[M] { x <- e1; rest }  =>  e1.bind((x) -> { do[M] { rest } })
-   * do[M] { ret e }          =>  M::successful(e)
+   * do[M] { yield e }        =>  M::successful(e)
    * do[M] { e }              =>  M::successful(e)  (final expression)
    * }}}
    *
@@ -1655,15 +1655,15 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       ))
     }
 
-    // `ret` yields the do-block's final value and must be the last statement.
-    // A `ret` in any earlier position (e.g. two `ret`s) is malformed and would
+    // `yield` gives the do-block's final value and must be the last statement.
+    // A `yield` in any earlier position (e.g. two `yield`s) is malformed and would
     // otherwise desugar into invalid bytecode, so reject it up front.
     val strayRet = statements.dropRight(1).collectFirst {
-      case r: AST.RetStatement => r
+      case r: AST.YieldStatement => r
     }
     strayRet.foreach { r =>
       throw new CompilationException(Seq(
-        CompileError("", r.location, "ret must be the final statement of a do block")
+        CompileError("", r.location, "yield must be the final statement of a do block")
       ))
     }
 
@@ -1846,31 +1846,31 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
   private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any]): AST.Expression = {
     statements match {
-      // Final expression: ret e => M::successful(e)
-      // The synthesized call is anchored at ret's own location, not the caller-supplied
+      // Final expression: yield e => M::successful(e)
+      // The synthesized call is anchored at yield's own location, not the caller-supplied
       // `loc` (the enclosing do[M] { line), so a type mismatch in `e` is reported where
-      // `ret` actually is.
-      case List(AST.RetStatement(retLoc, expr)) =>
+      // `yield` actually is.
+      case List(AST.YieldStatement(yieldLoc, expr)) =>
         val rewritten = rewriteExpression(expr)
-        AST.StaticMethodCall(retLoc, monadType, "successful", List(rewritten))
+        AST.StaticMethodCall(yieldLoc, monadType, "successful", List(rewritten))
 
-      // Final expression without ret: e => M::successful(e)
+      // Final expression without yield: e => M::successful(e)
       case List(expr: AST.Expression) =>
         val rewritten = rewriteExpression(expr)
         AST.StaticMethodCall(loc, monadType, "successful", List(rewritten))
 
-      // Binding followed directly by the final ret: x <- e1; ret e2
+      // Binding followed directly by the final yield: x <- e1; yield e2
       // => e1.map((x) -> e2). Using map instead of bind+M::successful means
       // a monad only needs map/bind instance (or extension) methods — no
       // static successful — which is what lets do[List] work over plain
       // java.util.List via the Colls extension methods.
-      case (binding: AST.DoBinding) :: List(AST.RetStatement(retLoc, retExpr)) =>
+      case (binding: AST.DoBinding) :: List(AST.YieldStatement(yieldLoc, retExpr)) =>
         val bindExpr = rewriteExpression(binding.expr)
         val rewrittenRet = rewriteExpression(retExpr)
         val arg = AST.Argument(binding.location, binding.name, null, null, false)
         // The closure body is anchored at ret's own location, not the preceding binding's,
         // so a type mismatch in `retExpr` is reported at `ret`, not at `x <- e1`.
-        val closureBody = AST.BlockExpression(retLoc, List(rewrittenRet))
+        val closureBody = AST.BlockExpression(yieldLoc, List(rewrittenRet))
         val closureType = AST.TypeNode(binding.location, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(binding.location, closureType, "call", List(arg), null, closureBody)
         AST.MethodCall(binding.location, bindExpr, "map", List(closure))

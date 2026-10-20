@@ -23,6 +23,66 @@ class CsvEnrichedSpec extends AbstractShellSpec {
     assert(expect == shell.run(src, "CsvEnrichedStr.on", Array()))
   }
 
+  describe("Csv::parse leading UTF-8 BOM") {
+    it("treats a leading U+FEFF as an encoding marker, not part of the first header") {
+      runStr(
+        "val rows = Csv::parseWithHeader(\"\\uFEFFname,age\\nann,3\\n\")\n" +
+        "return \"\" + rows[0].containsKey(\"name\") + \" \" + rows[0][\"name\"]",
+        Shell.Success("true ann"))
+    }
+  }
+
+  describe("Csv::parse unterminated quote") {
+    it("throws naming the line where the quote was opened") {
+      runStr(
+        "try {\n" +
+        "  Csv::parse(\"id,note\\n1,\\\"oops\\n2,fine\\n\")\n" +
+        "  return \"no error\"\n" +
+        "} catch e: IllegalArgumentException {\n" +
+        "  return e.getMessage()\n" +
+        "}",
+        Shell.Success("Csv: unterminated quoted field starting at line 2"))
+    }
+
+    it("still accepts a closed quoted field spanning lines") {
+      runInt(
+        "val rows = Csv::parse(\"a,\\\"x\\ny\\\"\\nb,c\\n\")\n" +
+        "return rows.size()",
+        Shell.Success(2))
+    }
+  }
+
+  describe("Csv::parse blank-line handling") {
+    it("a single trailing newline does not add a phantom extra row") {
+      runInt(
+        "val rows = Csv::parse(\"a,b\\n1,2\\n\")\n" +
+        "return rows.size()",
+        Shell.Success(2))
+    }
+
+    it("a genuinely blank trailing line becomes its own one-field row, not dropped") {
+      runInt(
+        "val rows = Csv::parse(\"a,b\\n1,2\\n\\n\")\n" +
+        "return rows.size()",
+        Shell.Success(3))
+    }
+
+    it("the row for a blank trailing line holds one empty-string field") {
+      runInt(
+        "val rows = Csv::parse(\"a,b\\n1,2\\n\\n\")\n" +
+        "val last = rows.get(2)\n" +
+        "return last.size()",
+        Shell.Success(1))
+    }
+
+    it("a blank line in the middle of the data is parsed the same way") {
+      runInt(
+        "val rows = Csv::parse(\"a,b\\n\\n1,2\\n\")\n" +
+        "return rows.size()",
+        Shell.Success(3))
+    }
+  }
+
   describe("enriched Csv") {
     it("columnByName extracts a header-keyed column") {
       runStr(

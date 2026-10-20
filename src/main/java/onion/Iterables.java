@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,7 +23,7 @@ public class Iterables {
     return result;
   }
   public static <A, B> Set<B> map(Set<A> set, Function1<A, B> f) {
-    Set<B> result = new HashSet<B>();
+    Set<B> result = new java.util.LinkedHashSet<B>();
     _map(set, f, result);
     return result;
   }
@@ -143,12 +142,14 @@ public class Iterables {
 
   // Take first n elements
   public static <T> List<T> take(List<T> list, int n) {
+    if (n <= 0) return new ArrayList<>();
     if (n >= list.size()) return new ArrayList<>(list);
     return new ArrayList<>(list.subList(0, n));
   }
 
   // Drop first n elements
   public static <T> List<T> drop(List<T> list, int n) {
+    if (n <= 0) return new ArrayList<>(list);
     if (n >= list.size()) return new ArrayList<>();
     return new ArrayList<>(list.subList(n, list.size()));
   }

@@ -193,7 +193,7 @@ public:
 def describeEq(eco: EcoSystem): Option[String] {
   return do[Option] {
     snap <- eco.findEquilibrium(4.0, 1.5)
-    ret "Equilibrium at " + snap.summary()
+    yield "Equilibrium at " + snap.summary()
   }
 }
 

@@ -88,10 +88,11 @@ public final class Colls {
      * Creates a list containing a range of integers from start (inclusive) to end (exclusive).
      * @param start the starting value (inclusive)
      * @param end the ending value (exclusive)
-     * @return a list containing integers from start to end-1
+     * @return a list containing integers from start to end-1; empty when {@code end <= start}
      */
     public static List<Integer> range(int start, int end) {
-        List<Integer> result = new ArrayList<>(end - start);
+        if (end <= start) return List.of();
+        List<Integer> result = new ArrayList<>((int) Math.min((long) end - start, 1024L));
         for (int i = start; i < end; i++) {
             result.add(i);
         }
@@ -109,12 +110,12 @@ public final class Colls {
         if (step == 0) throw new IllegalArgumentException("Step cannot be zero");
         List<Integer> result = new ArrayList<>();
         if (step > 0) {
-            for (int i = start; i < end; i += step) {
-                result.add(i);
+            for (long i = start; i < end; i += step) {
+                result.add((int) i);
             }
         } else {
-            for (int i = start; i > end; i += step) {
-                result.add(i);
+            for (long i = start; i > end; i += step) {
+                result.add((int) i);
             }
         }
         return java.util.Collections.unmodifiableList(result);
@@ -619,6 +620,71 @@ public final class Colls {
     }
 
     /** The largest element of a non-empty list of comparable elements. */
+    /**
+     * The elements keyed by index, in order: {@code ["a", "b"].withIndex()} is
+     * {@code {0=a, 1=b}}, so {@code foreach (i, x) in xs.withIndex() { ... }} walks each
+     * index with its element. The result is unmodifiable.
+     */
+    public static <T> Map<Integer, T> withIndex(List<T> list) {
+        Map<Integer, T> result = new LinkedHashMap<>();
+        int i = 0;
+        for (T element : list) {
+            result.put(i++, element);
+        }
+        return java.util.Collections.unmodifiableMap(result);
+    }
+
+    /** Like map, with each element's index: {@code xs.mapIndexed { i, x -> x + i }}. */
+    public static <T, R> List<R> mapIndexed(List<T> list, Function2<Integer, T, R> mapper) {
+        List<R> result = new ArrayList<>(list.size());
+        int i = 0;
+        for (T element : list) {
+            result.add(mapper.call(i++, element));
+        }
+        return java.util.Collections.unmodifiableList(result);
+    }
+
+    /** Calls {@code action} with each index and element, in order. */
+    public static <T> void forEachIndexed(List<T> list, Function2<Integer, T, ?> action) {
+        int i = 0;
+        for (T element : list) {
+            action.call(i++, element);
+        }
+    }
+
+    /** The largest element, or null for an empty list (where {@link #max} throws). */
+    public static <T extends Comparable<T>> T maxOrNull(List<T> list) {
+        return list.isEmpty() ? null : java.util.Collections.max(list);
+    }
+
+    /** The smallest element, or null for an empty list (where {@link #min} throws). */
+    public static <T extends Comparable<T>> T minOrNull(List<T> list) {
+        return list.isEmpty() ? null : java.util.Collections.min(list);
+    }
+
+    /**
+     * Indexes the elements by a key: {@code ["apple", "cat"].associateBy { w -> w.length() }}
+     * is {@code {5=apple, 3=cat}}. A later element replaces an earlier one with the same
+     * key; keys keep first-seen order. The result is unmodifiable.
+     */
+    public static <T, K> Map<K, T> associateBy(List<T> list, Function1<T, K> keySelector) {
+        Map<K, T> result = new LinkedHashMap<>();
+        for (T element : list) {
+            result.put(keySelector.call(element), element);
+        }
+        return java.util.Collections.unmodifiableMap(result);
+    }
+
+    /** The index of the first element matching the predicate, or -1 if none does. */
+    public static <T> int indexOfFirst(List<T> list, Function1<T, Boolean> predicate) {
+        int i = 0;
+        for (T element : list) {
+            if (predicate.call(element)) return i;
+            i++;
+        }
+        return -1;
+    }
+
     public static <T extends Comparable<T>> T max(List<T> list) {
         if (list.isEmpty()) throw new NoSuchElementException("max of empty list");
         return java.util.Collections.max(list);
@@ -770,6 +836,14 @@ public final class Colls {
         result.addAll(list1);
         result.addAll(list2);
         return java.util.Collections.unmodifiableList(result);
+    }
+
+    /**
+     * The {@code +} operator on two lists: {@code [1, 2] + [3]} is {@code [1, 2, 3]}.
+     * Same as {@link #concat(List, List)}; neither operand is changed.
+     */
+    public static <T> List<T> plus(List<T> list1, List<T> list2) {
+        return concat(list1, list2);
     }
 
     /**

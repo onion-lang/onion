@@ -235,7 +235,7 @@ val categories: List[String] = entries.map { e -> e.path().pathCategory() }.dist
 val catPairs: List[String] = do[List] {
   cat <- categories
   method <- ["GET", "POST"]
-  ret "#{cat}:#{method}"
+  yield "#{cat}:#{method}"
 }
 println("\n── Category×Method Combinations (do[List]) ─────────")
 foreach pair: String in catPairs.filter { p -> entries.any { e -> e.path().pathCategory() + ":" + e.method() == p } } {

@@ -117,6 +117,10 @@ class SemanticErrorReporter(threshold: Int) {
         Some(message("suggestion.jsTemplateLiteral"))
       } else if (name == ConsoleObjectName) {
         Some(message("suggestion.jsConsoleLog"))
+      } else if (name == "ret") {
+        // The pre-1.0 do-notation keyword: `ret e` now reads as an unknown variable `ret`
+        // followed by `e`, so name the new spelling instead of a similar-name guess.
+        Some(message("suggestion.retRenamedToYield"))
       } else if (items.length > 2 && items(2) != null) {
         Some(format(message("suggestion.didYouMean"), Seq(asString(items(2)))))
       } else if (items.length > 1) {
@@ -135,6 +139,15 @@ class SemanticErrorReporter(threshold: Int) {
     // Set only by an actually-unqualified call (UnqualifiedMethodCallSupport); every
     // other report site omits it, defaulting to false -- see FormerDefaultImportLookup.
     val isUnqualifiedCall = items.length > 3 && items(3) == java.lang.Boolean.TRUE
+    // Set only by a `Type::name(...)` call (StaticMethodCallSupport); every instance-,
+    // super- and unqualified-call site omits it, defaulting to false. Lets the suggestion
+    // ranker tell a static member from an instance one, so a failed `a.zip(b)` is never
+    // steered to a same-named-receiver static factory like `Option::of`, which
+    // `a.zip(...)` syntax could not call even if the name were right.
+    val calledStatically = items.length > 6 && items(6) == java.lang.Boolean.TRUE
+    // Set only for a static call on a nested class whose enclosing class has a static method
+    // of this name and arity (MethodCallReportingSupport): that class's simple name.
+    val enclosingStaticOwner = if (items.length > 7 && items(7) != null) asString(items(7)) else null
     // A top-level function lives on the file's synthetic `<file>Main` class; name the
     // function alone rather than leak that owner (`mainMain.helper(Int, Int)`).
     val baseMessage =
@@ -154,11 +167,36 @@ class SemanticErrorReporter(threshold: Int) {
         items(4).asInstanceOf[TypedAST.ObjectType].methods.filter(_.name == name).toSeq
       else Seq.empty
     val suggestion =
-      if (sameName.nonEmpty) {
+      if (streamToListHint(targetType, name).isDefined) {
+        streamToListHint(targetType, name)
+      } else if (enclosingStaticOwner != null) {
+        Some(format(message("suggestion.didYouMean"), Seq(s"$enclosingStaticOwner::$name")))
+      } else if (!calledStatically && ForeignStringNames.contains(name) && isStringType(targetType)) {
+        // The String counterpart of ForeignCollectionNames: Kotlin `reversed`/`padStart`, Python
+        // `splitlines`/`title`/`find`, JavaScript `includes`/`trimStart` -- same operation, Onion's
+        // name. Ahead of the same-name branch, which would otherwise answer `s.format(3)` with
+        // the static `String.format` an instance call cannot reach.
+        Some(format(message("suggestion.didYouMean"), Seq(ForeignStringNames(name))))
+      } else if (sameName.nonEmpty) {
         val signatures = sameName.take(3).map { m =>
           s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
-        Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
+        // A sibling whose name extends this one and takes these very arguments
+        // (`Csv::stringify(mapRows)` -> `stringifyWithHeader`) is the likelier fix.
+        val sibling = targetType match
+          case obj: TypedAST.ObjectType =>
+            obj.methods.find { m =>
+              m.name != name && m.name.startsWith(name) && !Modifier.isPrivate(m.modifier) &&
+                Modifier.isStatic(m.modifier) == Modifier.isStatic(sameName.head.modifier) &&
+                m.arguments.length == argTypes.length &&
+                m.arguments.zip(argTypes).forall { case (p, a) => argPassable(p, a) }
+            }
+          case _ => None
+        sibling match
+          case Some(m) =>
+            Some(format(message("suggestion.didYouMean"), Seq(s"${m.name}(${m.arguments.map(typeName).mkString(", ")})")))
+          case None =>
+            Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
       } else if (extensionReceiverCandidates.nonEmpty) {
         val signatures = extensionReceiverCandidates.take(3).map { m =>
           s"self.${m.name}(${m.arguments.map(typeName).mkString(", ")})"
@@ -199,6 +237,12 @@ class SemanticErrorReporter(threshold: Int) {
         // already failed, so a name+arity match here can only be this stdlib method.
         val className = FormerDefaultImportLookup.find(name, argTypes.length).get
         Some(format(message("suggestion.stdlibNoLongerDefaultImported"), Seq(className, name)))
+      } else if (ForeignCollectionNames.contains(name) && isListType(targetType)) {
+        // The name another language gives a List operation Onion also has, under its own
+        // name (Scala `sortBy`/`foldLeft`/`forall`, Kotlin `joinToString`/`sumOf`, Ruby
+        // `each`/`inject`/`collect`). Name similarity misses these or picks a wrong one
+        // (`sortBy` -> `sort`, `forall` -> `addAll`), so name the real one.
+        Some(format(message("suggestion.didYouMean"), Seq(ForeignCollectionNames(name))))
       } else if (name == "fold") {
         // `List` has the pipeline method `fold` (onion.Colls::fold(List, ...)), but every
         // other Iterable (Map::values(), a Set, ...) only has `foldl` (onion.Iterables::
@@ -212,7 +256,7 @@ class SemanticErrorReporter(threshold: Int) {
         Some(format(message("suggestion.didYouMean"), Seq("foldl")))
       } else {
         targetType match
-          case obj: TypedAST.ObjectType => toolbox.Suggestions.formatSuggestion(name, rankedCallCandidates(obj, name, argTypes))
+          case obj: TypedAST.ObjectType => toolbox.Suggestions.formatSuggestion(name, rankedCallCandidates(obj, name, argTypes, if (isUnqualifiedCall) None else Some(calledStatically)))
           case _ => None
       }
     problem(position, appendSuggestion(baseMessage, suggestion))
@@ -227,25 +271,32 @@ class SemanticErrorReporter(threshold: Int) {
    * second group, as they were before. Private members of a class compiled elsewhere are
    * left out: the program cannot call them.
    *
+   * `calledStatically` excludes the other kind of member up front: a failed instance call
+   * (`a.zip(b)`) never suggests a static method (`Option::of`), and a failed static call
+   * never suggests an instance one (an unqualified call, `None`, may reach either, as a
+   * top-level function is a static member) -- neither spelling could ever call the other kind, so
+   * naming one is actively misleading, not merely a worse guess.
+   *
    * The result is a single tier: the first tier with a name close enough to suggest. When
    * neither of those tiers has one, the methods that take no overload of that many
    * arguments form a last tier: `Strings::trimm(s, 1)` is a misspelled `trim` called with
    * one argument too many, and naming `trim` beats saying nothing. Library privates stay out of every tier.
    */
-  private def rankedCallCandidates(obj: TypedAST.ObjectType, name: String, argTypes: Array[TypedAST.Type]): Seq[String] = {
+  private def rankedCallCandidates(obj: TypedAST.ObjectType, name: String, argTypes: Array[TypedAST.Type], calledStatically: Option[Boolean]): Seq[String] = {
     val argc = argTypes.length
     // A private member of a class compiled elsewhere (`Format.group`) can never be called
     // from the program, so it is no suggestion; a source class's own privates may be.
     val fromSource = obj.isInstanceOf[TypedAST.ClassDefinition]
     def visible(m: TypedAST.MemberRef): Boolean = fromSource || !Modifier.isPrivate(m.modifier)
-    val byName = obj.methods.toSeq.filter(visible).groupBy(_.name)
+    def sameCallKind(m: TypedAST.MemberRef): Boolean = calledStatically.forall(Modifier.isStatic(m.modifier) == _)
+    val byName = obj.methods.toSeq.filter(visible).filter(sameCallKind).groupBy(_.name)
     val applicable = byName.collect {
       case (n, ms) if ms.exists(m => acceptsArity(m, argc) && acceptsTypes(m, argTypes)) => n
     }.toSeq
     val countOnly = byName.collect {
       case (n, ms) if !applicable.contains(n) && ms.exists(m => acceptsArity(m, argc)) => n
     }.toSeq
-    val fields = obj.fields.toSeq.filter(visible).map(_.name).filterNot(byName.contains)
+    val fields = obj.fields.toSeq.filter(visible).filter(sameCallKind).map(_.name).filterNot(byName.contains)
     // Arity misfits come last: only a fallback when nothing that fits is close by name.
     val arityMisfits = byName.keys.filterNot(n => applicable.contains(n) || countOnly.contains(n)).toSeq
     // findSimilar applies the distance cut-off; the first tier with a close name wins.
@@ -298,6 +349,98 @@ class SemanticErrorReporter(threshold: Int) {
       case (pc: TypedAST.ClassType, ac: TypedAST.ClassType) =>
         TypedAST.TypeRules.isSuperType(pc, ac) || TypedAST.TypeRules.isSuperType(rawOf(pc), rawOf(ac))
       case _ => TypedAST.TypeRules.isSuperType(p, a)
+  }
+
+  /** Other languages' names for a `List` pipeline method -> Onion's name for it. */
+  private val ForeignCollectionNames: Map[String, String] = Map(
+    "sortBy" -> "sortedBy",
+    "sortByDescending" -> "sortedByDescending",
+    "forall" -> "all",
+    "joinToString" -> "join",
+    "foldLeft" -> "fold",
+    "inject" -> "fold",
+    "sumOf" -> "sumBy",
+    "unique" -> "distinct",
+    "nonEmpty" -> "isNotEmpty",
+    "each" -> "forEach",
+    "collect" -> "map",
+    "firstOrNull" -> "first",
+    "lastOrNull" -> "last",
+    "zipWithIndex" -> "withIndex",
+    "indexed" -> "withIndex"
+  )
+
+  /** Other languages' names for a String operation -> Onion's name for it. */
+  private val ForeignStringNames: Map[String, String] = Map(
+    "reversed" -> "reverse",
+    "format" -> "formatted",
+    "padStart" -> "padLeft",
+    "padEnd" -> "padRight",
+    "toUpper" -> "upper",
+    "splitWhitespace" -> "words",
+    "trimStart" -> "stripLeading",
+    "trimEnd" -> "stripTrailing",
+    "splitlines" -> "lines",
+    "len" -> "length",
+    "find" -> "indexOf",
+    "includes" -> "contains",
+    "title" -> "capitalizeWords"
+  )
+
+  private def isStringType(t: TypedAST.Type): Boolean = t match
+    case n: TypedAST.NullableType => isStringType(n.innerType)
+    case ct: TypedAST.ClassType => rawOf(ct).name == "java.lang.String"
+    case _ => false
+
+  /** List operations a Java Stream lacks, so `s.lines().size` means the user wanted a List. */
+  private val ListOnlyNames: Set[String] = Set(
+    "size", "first", "last", "join", "get", "isEmpty", "contains", "indexOf", "sortedBy",
+    "sortedByDescending", "groupBy", "partition", "sumBy", "maxBy", "minBy", "take", "drop",
+    "chunked", "windowed", "reversed", "withIndex", "mapIndexed", "associateBy", "fold"
+  )
+
+  /**
+   * `s.lines()`/`s.chars()` are Java's String methods and return a Stream, not a List: a
+   * List-style name on one says to convert first (`toList()`, or `boxed().toList()` for a
+   * primitive stream), instead of a name-similarity guess such as `min` or `limit`.
+   */
+  private def streamToListHint(t: TypedAST.Type, name: String): Option[String] =
+    if (!ListOnlyNames.contains(name)) None
+    else t match
+      case ct: TypedAST.ClassType if implementsType(ct, "java.util.stream.BaseStream") =>
+        val primitive = Set("java.util.stream.IntStream", "java.util.stream.LongStream", "java.util.stream.DoubleStream")
+          .exists(n => implementsType(ct, n))
+        val conversion = if (primitive) "boxed().toList()" else "toList()"
+        Some(format(message("suggestion.didYouMean"), Seq(s"$conversion.$name")))
+      case _ => None
+
+  private def implementsType(ct: TypedAST.ClassType, target: String): Boolean = {
+    def loop(c: TypedAST.ClassType, seen: Set[String]): Boolean =
+      if (c == null) false
+      else {
+        val raw = rawOf(c)
+        if (raw.name == target) true
+        else if (seen.contains(raw.name)) false
+        else (Option(raw.superClass).toSeq ++ raw.interfaces).exists(loop(_, seen + raw.name))
+      }
+    loop(ct, Set.empty)
+  }
+
+  /** Whether `t` is `java.util.List` or a class implementing it. */
+  private def isListType(t: TypedAST.Type): Boolean = {
+    def loop(ct: TypedAST.ClassType, seen: Set[String]): Boolean =
+      if (ct == null) false
+      else {
+        val raw = rawOf(ct)
+        val name = raw.name
+        if (name == "java.util.List") true
+        else if (seen.contains(name)) false
+        else (Option(raw.superClass).toSeq ++ raw.interfaces).exists(loop(_, seen + name))
+      }
+    t match
+      case n: TypedAST.NullableType => isListType(n.innerType)
+      case ct: TypedAST.ClassType => loop(ct, Set.empty)
+      case _ => false
   }
 
   private def rawOf(ct: TypedAST.ClassType): TypedAST.ClassType = ct match
@@ -376,7 +519,7 @@ class SemanticErrorReporter(threshold: Int) {
       case obj: TypedAST.ObjectType =>
         (obj.fields.map(_.name) ++ obj.methods.filter(_.arguments.isEmpty).map(_.name)).distinct.toSeq
       case _ => Seq.empty
-    val suggestion = toolbox.Suggestions.formatSuggestion(name, candidates)
+    val suggestion = streamToListHint(targetType, name).orElse(toolbox.Suggestions.formatSuggestion(name, candidates))
     problem(position, appendSuggestion(baseMessage, suggestion))
   }
 
@@ -531,6 +674,10 @@ class SemanticErrorReporter(threshold: Int) {
     val hint =
       if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
+      } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
+        // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
+        // nested class does not restore the scrutinee's type arguments, a pattern does.
+        Some(format(message("suggestion.castLosesTypeArguments"), Seq(typeName(actual))))
       } else None
     problem(position, appendSuggestion(baseMessage, hint))
   }
@@ -631,7 +778,13 @@ class SemanticErrorReporter(threshold: Int) {
 
   // ========== Main report method ==========
 
+  /** Lambdas already reported as LAMBDA_ARITY_MISMATCH. Overload resolution can type
+   *  the same lambda once per candidate (`map(List)` and `map(Iterable)`), and its
+   *  parameter count is wrong against every one of them alike, so one report is enough. */
+  private val arityMismatchPositions = scala.collection.mutable.Set.empty[(String, Location)]
+
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
+    if (error == SemanticError.LAMBDA_ARITY_MISMATCH && position != null && !arityMismatchPositions.add((sourceFile, position))) return
     errorCount += 1
     currentError = error
 
@@ -1229,6 +1382,14 @@ object SemanticErrorReporter {
     SemanticError.DUPLICATE_TYPE_ALIAS -> ErrorDef(
       "error.semantic.duplicateTypeAlias",
       Seq(items => asString(items(0)))
+    ),
+    SemanticError.MULTIPLE_BINDING_PATTERNS_IN_CASE -> ErrorDef(
+      "error.semantic.multipleBindingPatternsInCase",
+      Seq()
+    ),
+    SemanticError.LAMBDA_ARITY_MISMATCH -> ErrorDef(
+      "error.semantic.lambdaArityMismatch",
+      Seq(items => items(0).toString, items => typeName(items(1).asInstanceOf[TypedAST.Type]), items => items(2).toString)
     )
   )
 

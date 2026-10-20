@@ -17,6 +17,38 @@ import onion.tools.Shell
  */
 class NetServerSpec extends AbstractShellSpec {
 
+  describe("Net.Conn") {
+    it("readBytes sees the bytes a preceding readLine had buffered") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val l = Net::listen(0)
+          |    val port = l.port()
+          |    val t = new Thread(() -> {
+          |      val c = l.accept()
+          |      c.write("HEADER\nBODYBYTES-1234567890")
+          |      c.close()
+          |    })
+          |    t.start()
+          |    val c = Net::connect("127.0.0.1", port)
+          |    val first = c.readLine()
+          |    val rest = c.readBytes().length
+          |    c.close()
+          |    l.close()
+          |    t.join()
+          |    return first + ":" + rest
+          |  }
+          |}
+          |""".stripMargin,
+        "NetReadBytesAfterLine.on",
+        Array()
+      )
+      assert(Shell.Success("HEADER:20") == result)
+    }
+  }
+
   describe("Server") {
     it("answers a request sent over a raw socket") {
       val result = shell.run(
@@ -124,6 +156,35 @@ class NetServerSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success("handled") == result)
+    }
+
+    it("answers 500 instead of hanging when a handler throws an Error, not just a RuntimeException") {
+      // dispatch() used to catch only RuntimeException, so a handler throwing a plain
+      // Error (StackOverflowError, OutOfMemoryError, ...) left send() never called and
+      // the client hanging until its own timeout (#2168). Use Http::request's own bounded
+      // timeout rather than a raw socket read, so a regression fails fast instead of
+      // hanging this test run.
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val server = Server::start("localhost", 0)
+          |    server.handle("/boom", (req) -> throw new StackOverflowError())
+          |    val r = Http::request("GET", "http://localhost:" + server.port() + "/boom")
+          |      .timeoutSeconds(5).send()
+          |    server.stop()
+          |    return select r {
+          |      case o is Result.Ok: "status " + o.value().status
+          |      case e is Result.Err: "err " + e.error().kind()
+          |    }
+          |  }
+          |}
+          |""".stripMargin,
+        "ServerHandlerThrowsError.on",
+        Array()
+      )
+      assert(Shell.Success("status 500") == result)
     }
 
     it("starts its internal dispatcher thread as a daemon, so forgetting stop() doesn't hang the JVM") {

@@ -41,6 +41,42 @@ class ArgsSpec extends AbstractShellSpec {
       assert(Shell.Success("true:true:[--not-a-flag]") == result)
     }
 
+    it("accepts a negative number as a --name value instead of misreading it as a new flag") {
+      // --count -5 used to leave "count" as a bare flag (no value) and split "-5" into
+      // single-character short flags "5", silently losing the negative value.
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    return o.option("count") + ":" + o.intOption("count", -999) + ":" + o.flag("5")
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsNegativeValue.on",
+        Array("--count", "-5")
+      )
+      assert(Shell.Success("-5:-5:false") == result)
+    }
+
+    it("accepts a negative decimal as a --name value") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    return o.option("threshold")
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsNegativeDecimalValue.on",
+        Array("--threshold", "-3.14")
+      )
+      assert(Shell.Success("-3.14") == result)
+    }
+
     it("does not alias a short flag to a long flag's name") {
       // Args.java's class Javadoc used to read "--verbose / -v style" next to the
       // flag("verbose") example, which reads as though -v sets flag("verbose").

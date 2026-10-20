@@ -127,6 +127,18 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
       assert(w15.length == 1, s"expected 1 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
     }
 
+    it("names the source file even when it is the very first warning of the compilation (#2238)") {
+      val result = compileWarnings(
+        """
+          |val obj = Json::parse("{}")
+          |val n: Int = Json::getInt(obj, "missing")
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.length == 1, s"expected 1 W0015, got: ${result.diagnostics.warnings.map(_.message)}")
+      assert(w15.head.sourceFile == "W.on", s"expected sourceFile 'W.on', got '${w15.head.sourceFile}'")
+    }
+
     it("fails compilation under warnings-as-errors") {
       val result = compileWarnings(
         """

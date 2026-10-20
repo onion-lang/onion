@@ -348,13 +348,13 @@ public final class Future<T> {
      * Returns the results as a list, in order.
      */
     @SafeVarargs
-    public static <T> Future<java.util.List<Object>> all(Future<T>... futures) {
+    public static <T> Future<java.util.List<T>> all(Future<T>... futures) {
         CompletableFuture<?>[] cfs = new CompletableFuture<?>[futures.length];
         for (int i = 0; i < futures.length; i++) {
             cfs[i] = futures[i].delegate;
         }
         return new Future<>(CompletableFuture.allOf(cfs).thenApply(v -> {
-            java.util.List<Object> results = new java.util.ArrayList<Object>();
+            java.util.List<T> results = new java.util.ArrayList<T>();
             for (int i = 0; i < futures.length; i++) {
                 results.add(futures[i].delegate.join());
             }
@@ -368,7 +368,7 @@ public final class Future<T> {
      * this accepts a {@code List[Future[T]]} built at runtime (e.g. from a loop or a map),
      * matching the rest of the standard library's list-first convention.
      */
-    public static <T> Future<java.util.List<Object>> all(java.util.List<Future<T>> futures) {
+    public static <T> Future<java.util.List<T>> all(java.util.List<Future<T>> futures) {
         @SuppressWarnings("unchecked")
         Future<T>[] array = futures.toArray(new Future[0]);
         return all(array);
@@ -376,9 +376,15 @@ public final class Future<T> {
 
     /**
      * Creates a Future that completes when the first of the given Futures completes.
+     *
+     * @throws IllegalArgumentException if no Futures are given: {@code anyOf} of nothing
+     *         never completes, so this fails fast instead of hanging forever
      */
     @SafeVarargs
     public static <T> Future<T> first(Future<T>... futures) {
+        if (futures.length == 0) {
+            throw new IllegalArgumentException("Future.first: requires at least one future");
+        }
         CompletableFuture<?>[] cfs = new CompletableFuture<?>[futures.length];
         for (int i = 0; i < futures.length; i++) {
             cfs[i] = futures[i].delegate;

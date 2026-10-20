@@ -264,8 +264,8 @@ public final class Yaml {
     private static boolean needsQuoting(String s) {
         if (s.isEmpty()) return true;
         if (s.charAt(0) == ' ' || s.charAt(s.length() - 1) == ' ') return true;
-        // A leading ' would be read back as a single-quoted scalar, not a literal quote char
-        if (s.charAt(0) == '\'') return true;
+        // A leading ' or " would be read back as a quoted scalar, not a literal quote char
+        if (s.charAt(0) == '\'' || s.charAt(0) == '"') return true;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == ':' || c == '#' || c == '\n' || c == '\r' || c == '\t') return true;

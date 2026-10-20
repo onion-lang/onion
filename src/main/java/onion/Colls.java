@@ -620,6 +620,38 @@ public final class Colls {
     }
 
     /** The largest element of a non-empty list of comparable elements. */
+    /**
+     * The elements keyed by index, in order: {@code ["a", "b"].withIndex()} is
+     * {@code {0=a, 1=b}}, so {@code foreach (i, x) in xs.withIndex() { ... }} walks each
+     * index with its element. The result is unmodifiable.
+     */
+    public static <T> Map<Integer, T> withIndex(List<T> list) {
+        Map<Integer, T> result = new LinkedHashMap<>();
+        int i = 0;
+        for (T element : list) {
+            result.put(i++, element);
+        }
+        return java.util.Collections.unmodifiableMap(result);
+    }
+
+    /** Like map, with each element's index: {@code xs.mapIndexed { i, x -> x + i }}. */
+    public static <T, R> List<R> mapIndexed(List<T> list, Function2<Integer, T, R> mapper) {
+        List<R> result = new ArrayList<>(list.size());
+        int i = 0;
+        for (T element : list) {
+            result.add(mapper.call(i++, element));
+        }
+        return java.util.Collections.unmodifiableList(result);
+    }
+
+    /** Calls {@code action} with each index and element, in order. */
+    public static <T> void forEachIndexed(List<T> list, Function2<Integer, T, ?> action) {
+        int i = 0;
+        for (T element : list) {
+            action.call(i++, element);
+        }
+    }
+
     /** The largest element, or null for an empty list (where {@link #max} throws). */
     public static <T extends Comparable<T>> T maxOrNull(List<T> list) {
         return list.isEmpty() ? null : java.util.Collections.max(list);

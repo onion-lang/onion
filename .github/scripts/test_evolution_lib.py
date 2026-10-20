@@ -104,6 +104,12 @@ class PanelTest(unittest.TestCase):
         self.assertIsNone(ev.panel_approval(self.pr, [approve, block]))
         self.assertIs(ev.panel_approval(self.pr, [block, approve]), approve)
 
+    def test_editing_a_newer_block_does_not_revive_an_older_approval(self):
+        approve = comment(self.ok_body, created="2026-10-20T00:00:00Z")
+        block = comment(f"<!-- panel v1 sha={HEAD} -->\nverdict: BLOCKED",
+                        created="2026-10-21T00:00:00Z", updated="2026-10-21T01:00:00Z")
+        self.assertIsNone(ev.panel_approval(self.pr, [approve, block]))
+
     def test_label_alone_is_ignored(self):
         self.assertIsNone(ev.panel_approval(dict(self.pr, labels=[{"name": "panel:approved"}]), []))
 

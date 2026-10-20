@@ -31,9 +31,11 @@ permissions:
   issues: write
   statuses: write
 
-# One run at a time (see evolution-risk-gate.yml): a sweep must not overwrite a veto.
+# One run at a time per PR, and one for the sweep. Per-PR groups keep a queued veto or
+# verdict event from being replaced by another PR's event; each run re-reads the PR
+# before writing, and veto-window re-checks for a veto after writing success.
 concurrency:
-  group: evolution-veto-window
+  group: evolution-veto-window-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || 'sweep' }}
   cancel-in-progress: false
 
 jobs:

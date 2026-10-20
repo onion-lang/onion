@@ -29,11 +29,11 @@ permissions:
   issues: write
   statuses: write
 
-# One run at a time, per-PR events and the sweep alike, so a run working from an older
-# snapshot can never overwrite a newer status. Queued duplicates collapse; the hourly
-# sweep re-evaluates anything a collapsed event missed.
+# One run at a time per PR, and one for the sweep. Per-PR groups keep a queued veto or
+# verdict event from being replaced by another PR's event; each run re-reads the PR
+# before writing, and veto-window re-checks for a veto after writing success.
 concurrency:
-  group: evolution-risk-gate
+  group: evolution-risk-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || 'sweep' }}
   cancel-in-progress: false
 
 jobs:

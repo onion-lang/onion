@@ -237,9 +237,11 @@ def panel_approval(pr, pr_comments):
     newest = None
     for c in pr_comments:
         m = PANEL_MARK.match(c.get("body") or "")
-        if m and m.group(1) == head and trusted(c) and unedited(c):
+        if m and m.group(1) == head and trusted(c):
             newest = c
-    if newest is None:
+    # Pick the newest verdict first, then judge it: an edited or blocking newest verdict
+    # means no approval, so editing a BLOCKED verdict cannot revive an older APPROVED one.
+    if newest is None or not unedited(newest):
         return None
     v = VERDICT.search(newest["body"])
     return newest if v and v.group(1) == "APPROVED" else None

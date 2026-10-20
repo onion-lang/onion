@@ -69,18 +69,6 @@ jobs:
           git fetch --no-tags origin develop
           git merge-base --is-ancestor HEAD FETCH_HEAD || {
             echo "::error::$(git rev-parse --short HEAD) is not on develop; release from develop only"; exit 1; }
-      - name: Require the release note for 1.0 and new majors
-        # v1.0.0 and every new major version are risk:ultrahigh (docs/evolution/GUARDRAILS.md):
-        # their release note can only reach this ref through a merged ultrahigh PR.
-        run: |
-          TAG="${{ steps.tag.outputs.tag }}"
-          VER="${TAG#v}"
-          MAJOR="${VER%%.*}"
-          REST="${VER#*.}"
-          if [ "$MAJOR" -ge 1 ] && [ "${REST%%[!0-9.]*}" = "0.0" ]; then
-            NOTE="docs/releases/${MAJOR}.0.0.md"
-            test -f "$NOTE" || { echo "::error::$TAG needs $NOTE, added by a merged risk:ultrahigh PR"; exit 1; }
-          fi
       - name: Create the tag for a manual run
         if: github.event_name == 'workflow_dispatch'
         env:
@@ -100,6 +88,25 @@ jobs:
           # sbt-dynver reads the checked-out commit's tags, so point HEAD at
           # the tag we just created before resolving the version.
           git checkout -q "$TAG"
+      - name: Release only a tag that develop already contains
+        # Checked again after the checkout above: a manual run may name an existing tag, and a
+        # tag push starts from the tag, so the commit being released is HEAD only from here on.
+        run: |
+          git fetch --no-tags origin develop
+          git merge-base --is-ancestor HEAD FETCH_HEAD || {
+            echo "::error::tag ${{ steps.tag.outputs.tag }} ($(git rev-parse --short HEAD)) is not on develop"; exit 1; }
+      - name: Require the release note for 1.0 and new majors
+        # v1.0.0 and every new major version are risk:ultrahigh (docs/evolution/GUARDRAILS.md):
+        # their release note can only reach this ref through a merged ultrahigh PR.
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VER="${TAG#v}"
+          MAJOR="${VER%%.*}"
+          REST="${VER#*.}"
+          if [ "$MAJOR" -ge 1 ] && [ "${REST%%[!0-9.]*}" = "0.0" ]; then
+            NOTE="docs/releases/${MAJOR}.0.0.md"
+            test -f "$NOTE" || { echo "::error::$TAG needs $NOTE, added by a merged risk:ultrahigh PR"; exit 1; }
+          fi
       - name: Resolve version
         id: version
         run: |

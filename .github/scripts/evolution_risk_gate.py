@@ -12,6 +12,8 @@ import evolution_lib as ev
 
 
 def evaluate(pr):
+    # Fresh state for this PR: the sweep's list may be minutes old.
+    pr = ev.get(f"/repos/{ev.REPO}/pulls/{pr['number']}")
     number, head = pr["number"], pr["head"]["sha"]
     tier, computed, current, reasons = ev.effective_tier(pr, ev.pr_files(number))
 

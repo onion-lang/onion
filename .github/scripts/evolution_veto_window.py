@@ -16,7 +16,15 @@ WINDOW = timedelta(hours=float(os.environ.get("WINDOW_HOURS") or 48))
 CONTEXT = "evolution/veto-window"
 
 
+def still_unvetoed(number):
+    """Re-read the PR right after writing success: a veto that landed meanwhile wins."""
+    pr = ev.get(f"/repos/{ev.REPO}/pulls/{number}")
+    return not ev.vetoed(pr, ev.comments(number), ev.timeline(number))
+
+
 def evaluate(pr):
+    # Fresh state for this PR: the sweep's list may be minutes old.
+    pr = ev.get(f"/repos/{ev.REPO}/pulls/{pr['number']}")
     number, head = pr["number"], pr["head"]["sha"]
     # The diff, not just the label: removing `risk:ultrahigh` must not skip the window.
     tier, _, _, _ = ev.effective_tier(pr, ev.pr_files(number))
@@ -42,6 +50,10 @@ def evaluate(pr):
     closes = ev.parse_time(approval["created_at"]) + WINDOW
     if ev.now() >= closes:
         ev.set_status(head, CONTEXT, "success", f"veto window closed {closes:%Y-%m-%d %H:%M} UTC with no veto")
+        if not ev.DRY_RUN and not still_unvetoed(number):
+            ev.set_status(head, CONTEXT, "pending", "vetoed: only Kota clears a veto, by closing the PR")
+            print(f"#{number}: vetoed while closing the window")
+            return
         ev.set_labels(pr, remove=["veto-window:open"])
         print(f"#{number}: window closed, no veto")
     else:

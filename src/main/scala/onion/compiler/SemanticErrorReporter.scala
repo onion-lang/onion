@@ -141,6 +141,9 @@ class SemanticErrorReporter(threshold: Int) {
     // steered to a same-named-receiver static factory like `Option::of`, which
     // `a.zip(...)` syntax could not call even if the name were right.
     val calledStatically = items.length > 6 && items(6) == java.lang.Boolean.TRUE
+    // Set only for a static call on a nested class whose enclosing class has a static method
+    // of this name and arity (MethodCallReportingSupport): that class's simple name.
+    val enclosingStaticOwner = if (items.length > 7 && items(7) != null) asString(items(7)) else null
     // A top-level function lives on the file's synthetic `<file>Main` class; name the
     // function alone rather than leak that owner (`mainMain.helper(Int, Int)`).
     val baseMessage =
@@ -160,11 +163,34 @@ class SemanticErrorReporter(threshold: Int) {
         items(4).asInstanceOf[TypedAST.ObjectType].methods.filter(_.name == name).toSeq
       else Seq.empty
     val suggestion =
-      if (sameName.nonEmpty) {
+      if (enclosingStaticOwner != null) {
+        Some(format(message("suggestion.didYouMean"), Seq(s"$enclosingStaticOwner::$name")))
+      } else if (!calledStatically && ForeignStringNames.contains(name) && isStringType(targetType)) {
+        // The String counterpart of ForeignCollectionNames: Kotlin `reversed`/`padStart`, Python
+        // `splitlines`/`title`/`find`, JavaScript `includes`/`trimStart` -- same operation, Onion's
+        // name. Ahead of the same-name branch, which would otherwise answer `s.format(3)` with
+        // the static `String.format` an instance call cannot reach.
+        Some(format(message("suggestion.didYouMean"), Seq(ForeignStringNames(name))))
+      } else if (sameName.nonEmpty) {
         val signatures = sameName.take(3).map { m =>
           s"${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
-        Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
+        // A sibling whose name extends this one and takes these very arguments
+        // (`Csv::stringify(mapRows)` -> `stringifyWithHeader`) is the likelier fix.
+        val sibling = targetType match
+          case obj: TypedAST.ObjectType =>
+            obj.methods.find { m =>
+              m.name != name && m.name.startsWith(name) && !Modifier.isPrivate(m.modifier) &&
+                Modifier.isStatic(m.modifier) == Modifier.isStatic(sameName.head.modifier) &&
+                m.arguments.length == argTypes.length &&
+                m.arguments.zip(argTypes).forall { case (p, a) => argPassable(p, a) }
+            }
+          case _ => None
+        sibling match
+          case Some(m) =>
+            Some(format(message("suggestion.didYouMean"), Seq(s"${m.name}(${m.arguments.map(typeName).mkString(", ")})")))
+          case None =>
+            Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
       } else if (extensionReceiverCandidates.nonEmpty) {
         val signatures = extensionReceiverCandidates.take(3).map { m =>
           s"self.${m.name}(${m.arguments.map(typeName).mkString(", ")})"
@@ -205,6 +231,12 @@ class SemanticErrorReporter(threshold: Int) {
         // already failed, so a name+arity match here can only be this stdlib method.
         val className = FormerDefaultImportLookup.find(name, argTypes.length).get
         Some(format(message("suggestion.stdlibNoLongerDefaultImported"), Seq(className, name)))
+      } else if (ForeignCollectionNames.contains(name) && isListType(targetType)) {
+        // The name another language gives a List operation Onion also has, under its own
+        // name (Scala `sortBy`/`foldLeft`/`forall`, Kotlin `joinToString`/`sumOf`, Ruby
+        // `each`/`inject`/`collect`). Name similarity misses these or picks a wrong one
+        // (`sortBy` -> `sort`, `forall` -> `addAll`), so name the real one.
+        Some(format(message("suggestion.didYouMean"), Seq(ForeignCollectionNames(name))))
       } else if (name == "fold") {
         // `List` has the pipeline method `fold` (onion.Colls::fold(List, ...)), but every
         // other Iterable (Map::values(), a Set, ...) only has `foldl` (onion.Iterables::
@@ -311,6 +343,62 @@ class SemanticErrorReporter(threshold: Int) {
       case (pc: TypedAST.ClassType, ac: TypedAST.ClassType) =>
         TypedAST.TypeRules.isSuperType(pc, ac) || TypedAST.TypeRules.isSuperType(rawOf(pc), rawOf(ac))
       case _ => TypedAST.TypeRules.isSuperType(p, a)
+  }
+
+  /** Other languages' names for a `List` pipeline method -> Onion's name for it. */
+  private val ForeignCollectionNames: Map[String, String] = Map(
+    "sortBy" -> "sortedBy",
+    "sortByDescending" -> "sortedByDescending",
+    "forall" -> "all",
+    "joinToString" -> "join",
+    "foldLeft" -> "fold",
+    "inject" -> "fold",
+    "sumOf" -> "sumBy",
+    "unique" -> "distinct",
+    "nonEmpty" -> "isNotEmpty",
+    "each" -> "forEach",
+    "collect" -> "map",
+    "firstOrNull" -> "first",
+    "lastOrNull" -> "last"
+  )
+
+  /** Other languages' names for a String operation -> Onion's name for it. */
+  private val ForeignStringNames: Map[String, String] = Map(
+    "reversed" -> "reverse",
+    "format" -> "formatted",
+    "padStart" -> "padLeft",
+    "padEnd" -> "padRight",
+    "toUpper" -> "upper",
+    "splitWhitespace" -> "words",
+    "trimStart" -> "stripLeading",
+    "trimEnd" -> "stripTrailing",
+    "splitlines" -> "lines",
+    "len" -> "length",
+    "find" -> "indexOf",
+    "includes" -> "contains",
+    "title" -> "capitalizeWords"
+  )
+
+  private def isStringType(t: TypedAST.Type): Boolean = t match
+    case n: TypedAST.NullableType => isStringType(n.innerType)
+    case ct: TypedAST.ClassType => rawOf(ct).name == "java.lang.String"
+    case _ => false
+
+  /** Whether `t` is `java.util.List` or a class implementing it. */
+  private def isListType(t: TypedAST.Type): Boolean = {
+    def loop(ct: TypedAST.ClassType, seen: Set[String]): Boolean =
+      if (ct == null) false
+      else {
+        val raw = rawOf(ct)
+        val name = raw.name
+        if (name == "java.util.List") true
+        else if (seen.contains(name)) false
+        else (Option(raw.superClass).toSeq ++ raw.interfaces).exists(loop(_, seen + name))
+      }
+    t match
+      case n: TypedAST.NullableType => isListType(n.innerType)
+      case ct: TypedAST.ClassType => loop(ct, Set.empty)
+      case _ => false
   }
 
   private def rawOf(ct: TypedAST.ClassType): TypedAST.ClassType = ct match
@@ -648,7 +736,13 @@ class SemanticErrorReporter(threshold: Int) {
 
   // ========== Main report method ==========
 
+  /** Lambdas already reported as LAMBDA_ARITY_MISMATCH. Overload resolution can type
+   *  the same lambda once per candidate (`map(List)` and `map(Iterable)`), and its
+   *  parameter count is wrong against every one of them alike, so one report is enough. */
+  private val arityMismatchPositions = scala.collection.mutable.Set.empty[(String, Location)]
+
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
+    if (error == SemanticError.LAMBDA_ARITY_MISMATCH && position != null && !arityMismatchPositions.add((sourceFile, position))) return
     errorCount += 1
     currentError = error
 
@@ -1250,6 +1344,10 @@ object SemanticErrorReporter {
     SemanticError.MULTIPLE_BINDING_PATTERNS_IN_CASE -> ErrorDef(
       "error.semantic.multipleBindingPatternsInCase",
       Seq()
+    ),
+    SemanticError.LAMBDA_ARITY_MISMATCH -> ErrorDef(
+      "error.semantic.lambdaArityMismatch",
+      Seq(items => items(0).toString, items => typeName(items(1).asInstanceOf[TypedAST.Type]), items => items(2).toString)
     )
   )
 

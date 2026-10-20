@@ -278,6 +278,258 @@ class RegexSpec extends AbstractShellSpec {
       }
     }
 
+    describe("invalid pattern") {
+      it("reports an invalid pattern to matches with an Regex::matches-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::matches("abc", "[");
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::matches:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports an invalid pattern to find with an Regex::find-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::find("abc", "[");
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::find:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports an invalid pattern to findAll with an Regex::findAll-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::findAll("abc", "[");
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::findAll:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports an invalid pattern to findFirst with an Regex::findFirst-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::findFirst("abc", "[");
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::findFirst:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports an invalid pattern to groups with an Regex::groups-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::groups("abc", "[");
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::groups:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports an invalid pattern to groupsAll with an Regex::groupsAll-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::groupsAll("abc", "[");
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::groupsAll:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports an invalid pattern to replace with an Regex::replace-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::replace("abc", "[", "x");
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::replace:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports an invalid pattern to replaceFirst with an Regex::replaceFirst-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::replaceFirst("abc", "[", "x");
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::replaceFirst:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports an invalid pattern to split with an Regex::split-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::split("abc", "[");
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::split:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports an invalid pattern to split(limit) with an Regex::split-prefixed message, not the raw JDK one") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::split("abc", "[", 2);
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::split:"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+    }
+
     describe("utility") {
       it("quotes special characters") {
         val result = shell.run(

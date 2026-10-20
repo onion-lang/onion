@@ -94,8 +94,11 @@ private[compiler] final class AssignabilitySupport(
       // (Kotlin's platform-type dilemma — see issue #132). suppressNullWarning
       // is set by a call-argument path whose callee is Java-declared (#2116):
       // the parameter's own nullness is unknown, and it is not a signature the
-      // caller can edit.
+      // caller can edit. setSourceFile here (not only from TypingDiagnostics)
+      // because this can be the very first warning of the unit, before anything
+      // else has set it (#2238).
       if (!suppressNullWarning) {
+        bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
         bodyContext.warningReporter.nullToNonNullable(node.location, expected.displayName)
       }
     }
@@ -147,8 +150,12 @@ private[compiler] final class AssignabilitySupport(
             }
           case _ => false
         }
-        if (!isElvis && !isNonNullFunctionCall)
+        if (!isElvis && !isNonNullFunctionCall) {
+          // Same reason as the nullToNonNullable call above (#2238): this can
+          // be the first warning of the unit.
+          bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
           bodyContext.warningReporter.platformUnboxing(node.location, actual.`type`.displayName, targetBasicType.displayName)
+        }
         return Boxing.unboxing(bodyContext.table, actual, targetBasicType)
       }
     }

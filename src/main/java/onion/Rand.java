@@ -30,14 +30,24 @@ public class Rand {
      * Returns a random int value between 0 (inclusive) and bound (exclusive).
      */
     public static int nextInt(int bound) {
-        return ThreadLocalRandom.current().nextInt(bound);
+        try {
+            return ThreadLocalRandom.current().nextInt(bound);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "Rand::nextInt: bound must be positive, got " + bound, e);
+        }
     }
 
     /**
      * Returns a random int value between min (inclusive) and max (exclusive).
      */
     public static int nextInt(int min, int max) {
-        return ThreadLocalRandom.current().nextInt(min, max);
+        try {
+            return ThreadLocalRandom.current().nextInt(min, max);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "Rand::nextInt: max must be greater than min, got min=" + min + ", max=" + max, e);
+        }
     }
 
     // ========== Long Random ==========
@@ -53,7 +63,12 @@ public class Rand {
      * Returns a random long value between 0 (inclusive) and bound (exclusive).
      */
     public static long nextLong(long bound) {
-        return ThreadLocalRandom.current().nextLong(bound);
+        try {
+            return ThreadLocalRandom.current().nextLong(bound);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "Rand::nextLong: bound must be positive, got " + bound, e);
+        }
     }
 
     // ========== Double Random ==========
@@ -69,14 +84,24 @@ public class Rand {
      * Returns a random double value between 0.0 (inclusive) and bound (exclusive).
      */
     public static double nextDouble(double bound) {
-        return ThreadLocalRandom.current().nextDouble(bound);
+        try {
+            return ThreadLocalRandom.current().nextDouble(bound);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "Rand::nextDouble: bound must be finite and positive, got " + bound, e);
+        }
     }
 
     /**
      * Returns a random double value between min (inclusive) and max (exclusive).
      */
     public static double nextDouble(double min, double max) {
-        return ThreadLocalRandom.current().nextDouble(min, max);
+        try {
+            return ThreadLocalRandom.current().nextDouble(min, max);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "Rand::nextDouble: max must be greater than min, got min=" + min + ", max=" + max, e);
+        }
     }
 
     // ========== Boolean Random ==========

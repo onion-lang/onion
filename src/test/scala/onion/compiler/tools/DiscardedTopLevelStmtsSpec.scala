@@ -53,5 +53,17 @@ class DiscardedTopLevelStmtsSpec extends AnyFunSpec {
       assert(!result.hasErrors)
       assert(w14(result).isEmpty)
     }
+
+    it("names the source file even when it is the very first warning of the compilation (#2241)") {
+      val result = compile(
+        """
+          |IO::println("bare")
+          |def main(args: String[]): void { IO::println("main") }
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val warnings = w14(result)
+      assert(warnings.length == 1, s"warnings: ${result.diagnostics.warnings.map(_.message)}")
+      assert(warnings.head.sourceFile == "W.on", s"expected sourceFile 'W.on', got '${warnings.head.sourceFile}'")
+    }
   }
 }

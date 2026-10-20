@@ -67,6 +67,19 @@ public final class Cli {
     }
 
     /**
+     * The note for a flag spelled like a positional parameter (`--src` for a positional
+     * `src`): "; `src` is positional: pass the value without `--src`", or "" if none is.
+     */
+    static String positionalNote(String[] names, char[] kinds, String given) {
+        for (int j = 0; j < names.length; j++) {
+            if (kinds[j] == 'p' && flagMatches(names[j], given)) {
+                return "; `" + names[j] + "` is positional: pass the value without `--" + given + "`";
+            }
+        }
+        return "";
+    }
+
+    /**
      * The same parse as {@link #parse}, reporting problems instead of exiting.
      *
      * <p>Every failure path in this class used to call {@link System#exit}, which made a
@@ -111,7 +124,7 @@ public final class Cli {
                 for (int j = 0; j < names.length; j++) {
                     if (flagMatches(names[j], name) && kinds[j] != 'p') { idx = j; break; }
                 }
-                if (idx < 0) return Outcome.bad(Defect.of(a, "a known option", "unknown"));
+                if (idx < 0) return Outcome.bad(Defect.of(a, "a known option", "unknown" + positionalNote(names, kinds, name)));
                 if (kinds[idx] == 's') {
                     result[idx] = inlineValue != null ? inlineValue : "true";
                     i++;
@@ -195,7 +208,7 @@ public final class Cli {
                         break;
                     }
                 }
-                if (idx < 0) die(names, kinds, "unknown option: " + a);
+                if (idx < 0) die(names, kinds, "unknown option: " + a + positionalNote(names, kinds, name));
                 if (kinds[idx] == 's') {
                     // A switch is true when present; `--flag=false` may set it explicitly.
                     result[idx] = inlineValue != null ? inlineValue : "true";

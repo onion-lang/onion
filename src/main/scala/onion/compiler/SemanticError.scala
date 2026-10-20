@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0100) for identification
+ * type checking. Each error has a unique code (E0000-E0101) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -91,6 +91,9 @@ package onion.compiler
  *
  * '''Pattern Matching Errors, continued (E0100)'''
  *   - MULTIPLE_BINDING_PATTERNS_IN_CASE
+ *
+ * '''Lambda Errors, continued (E0101)'''
+ *   - LAMBDA_ARITY_MISMATCH
  *
  * == Error Message Lookup ==
  *
@@ -307,6 +310,13 @@ object SemanticError {
    * each such alternative as its own `case` clause instead.
    */
   case object MULTIPLE_BINDING_PATTERNS_IN_CASE extends SemanticError(100)
+
+  /**
+   * A lambda's parameter count differs from that of the function type expected for it
+   * (`m.filter { e -> ... }` where Map's filter takes a `(key, value)` function).
+   * Arguments: lambda parameter count, expected function type, its parameter count.
+   */
+  case object LAMBDA_ARITY_MISMATCH extends SemanticError(101)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

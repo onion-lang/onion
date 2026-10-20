@@ -11,6 +11,15 @@ import java.security.NoSuchAlgorithmException;
  *
  * <p>MD5 and SHA-1 are provided for checksums and interop with legacy systems;
  * prefer SHA-256 or SHA-512 for security-sensitive uses.
+ *
+ * <p>Every parameter here is {@code String} (non-null) to Onion callers, even though
+ * {@link #hexDigest} itself treats a Java {@code null} as {@code ""}: Onion has no general
+ * mechanism yet for marking one Java-declared parameter null-safe while every other
+ * Java-declared parameter stays non-null by default, so a value from a nullable boundary
+ * needs {@code Hash::md5(maybe ?: "")} at the call site. See
+ * https://github.com/onion-lang/onion/issues/2180 and
+ * https://github.com/onion-lang/onion/issues/2213 for the tracking issue and the design
+ * question of whether that mechanism is worth building.
  */
 public final class Hash {
     private Hash() {

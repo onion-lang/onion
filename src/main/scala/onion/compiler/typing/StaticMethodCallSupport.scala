@@ -139,7 +139,7 @@ private[compiler] final class StaticMethodCallSupport(
         calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters), calledStatically = true)
         None
       } else {
-        overloadSupport.selectMostSpecificApplicable(applicable) match {
+        overloadSupport.selectMostSpecificApplicable(applicable, argTypes = calls.types(parameters)) match {
           case CandidateSelection.Selected(selected) =>
             finalizeSelection(selected)
           case CandidateSelection.Ambiguous(first, second) =>

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Files::copyDir(src, dst)` fails up front when `dst` is `src` or inside it (#2255).**
+  - Before: it recursed until "File name too long" and left a deep `src/dst/dst/...` tree; `copyDir(x, x)` was a silent no-op.
+  - Now: `IllegalArgumentException: cannot copy a directory into itself`, and nothing is written.
+- **`String::format("%s", null)` and `c.update(sql, 1, null)` no longer warn W0012.**
+  - Before: a `null` into any parameter of a Java method warned, with a fix (`T?`) the caller cannot apply.
+  - Now: a Java parameter's nullness is unknown, so it does not warn. An Onion method (also one compiled separately) and a receiver's own type argument (`xs.add(null)` on a `List[String]`) still warn.
+- **`var x: Long = 99999999999` names the problem: the literal is out of range for `Int`.**
+  - Before: `Syntax error. Encountered "\n", but expecting valid token`, at the next token.
+  - Now: `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal`, at the literal. Long, Byte and Short literals get their own message (#2257).
+
+## [0.144.0] - 2026-10-20
+
 ### Breaking
 
 - **A `do` block's final value is written `yield`, not `ret`.**
@@ -45,6 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A `;` after a block's `}` says the `;` is the problem.**
   - Before: `while c { ... }; next()` gave `Encountered ";", but expecting "type", "interface", "trait", "class", ...`.
   - Now: the error adds a hint to drop the `;`; the next statement can follow the `}` directly or start on a new line.
+- **Naming a static method without parens calls it instead of crashing (#2248).**
+  - Before: `def work: String = "hi"; val f = work` (or bare `greet` for a static sibling inside a class) failed at run time with `IncompatibleClassChangeError`.
+  - Now: it calls the method, just as `work()` does. An explicit non-self receiver (`expr.staticMethod`, no parens) still reports `E0019`, same as `expr.staticMethod()`.
 
 - **A List-style call on a Java Stream says to convert it first.** `s.lines()`/`s.chars()` are Java's String methods and return a Stream, so `s.lines().size`, `.first()`, `.join(",")` or `[0]` got a misleading guess (`min`, `limit`, `map`). They now say `did you mean: toList().size` (`boxed().toList()...` for an IntStream).
 
@@ -66,6 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Calling a `List` method by the name another language gives it now names Onion's spelling.** `xs.sortBy { ... }` suggested `sort`, `xs.forall { ... }` suggested `addAll`, `xs.each { ... }` suggested `add`, and `joinToString`/`foldLeft`/`inject`/`sumOf`/`unique`/`nonEmpty`/`collect`/`sortByDescending` suggested nothing. Each now says `did you mean: sortedBy` (`all`, `forEach`, `join`, `fold`, `sumBy`, `distinct`, `isNotEmpty`, `map`, `sortedByDescending`).
 - **A `W0012`/`W0015` warning (null to non-nullable, or implicit unboxing of a boxed platform value) printed no source file name, `[W0012] :1:17: ...` instead of `[W0012] w6.on:1:17: ...`, when it was the very first warning of the compilation (#2238).** Both warnings are reported straight from the assignability check, which relied on an earlier, unrelated diagnostic having already told the reporter the current file; with no such diagnostic yet, the file name was still empty. Both call sites now set it themselves first, like the other warnings already do.
 - **A multi-`tool` file's `--help` ran the shared `--plan`/`--contract`/`--help` lines straight into the last declared tool's own option list, with no visual break, so they read as that tool's options rather than global flags (#2252).** Each tool's usage block now ends with a blank line when the file declares more than one, setting the global flags apart; single-tool output is unchanged.
+- **E0080 now checks that a user `Shape`'s `law`/`example` actually exercises that shape, not merely that one exists somewhere in the file (#2228).** `class Broken conforms Shape[Int] { ... }` with an unrelated `example trivial { 1 + 1 == 2 }` elsewhere in the file used to compile clean despite a broken `parse`/`print` round-trip -- any law or example anywhere in the file satisfied the gate for every `Shape` in it. A law/example now only counts for a given shape when its body constructs it, calls or reads one of its members, or type-tests against it.
+- **Two `extension` blocks for the same receiver type now get a dedicated `E0102` naming that type, instead of a generic duplicate-class error (#2204).** `extension List[Int] { ... }` declared twice (or `extension List { ... }` split across two blocks) used to fail with a cryptic internal class name and leave the second block's methods unreachable; a call to one of them now points at the real cause instead of an unrelated "method not found". Distinct concrete instantiations of the same generic receiver are unaffected.
 
 ## [0.143.0] - 2026-10-18
 

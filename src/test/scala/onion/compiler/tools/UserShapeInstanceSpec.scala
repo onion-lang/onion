@@ -124,6 +124,25 @@ class UserShapeInstanceSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, r.toString)
     }
 
+    it("an example that never touches this shape does not satisfy the gate (#2228)") {
+      val unrelatedOnly = fixedWidth.replace(
+        """example l1 {
+          |  val s = new FW()
+          |  val v = new P("KOTA", 42)
+          |  s.parse(s.print(v)).get() == v
+          |}
+          |""".stripMargin,
+        """example unrelatedButTrue { 1 + 1 == 2 }
+          |""".stripMargin)
+      val r = shell.run(unrelatedOnly +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int { return 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(r.isInstanceOf[Shell.Failure], s"expected E0080 failure, got $r")
+    }
+
     it("does not fire on interfaces or on classes unrelated to Shape") {
       val r = shell.run(
         """interface Marker { def m(): Int }

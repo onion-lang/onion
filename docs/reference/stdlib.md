@@ -1554,7 +1554,7 @@ Files::mkdirs(path)                    // creates dir + missing parents
 Files::size(path)                      // Long, size in bytes (0 if missing)
 Files::copy(src, dst)                  // replaces dst if it exists
 Files::move(src, dst)                  // rename; replaces dst if it exists
-Files::copyDir(src, dst)               // recursive directory copy
+Files::copyDir(src, dst)               // recursive directory copy; rejects dst inside/equal to src
 ```
 
 Path helpers — file names, parents, joining, and extensions:

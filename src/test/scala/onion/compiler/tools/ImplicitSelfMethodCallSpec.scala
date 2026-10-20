@@ -28,6 +28,22 @@ class ImplicitSelfMethodCallSpec extends AbstractShellSpec {
       assert(Shell.Success("hi") == result)
     }
 
+    it("calls a static sibling method by bare name from an instance method") {
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static def greet(): String = "hi"
+          |  def wrap: String = greet
+          |  static def main(args: String[]): String = new C().wrap
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("hi") == result)
+    }
+
     it("calls an abstract method by bare name from a concrete method (template method)") {
       val result = shell.run(
         """

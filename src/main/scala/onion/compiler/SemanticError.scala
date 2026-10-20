@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0101) for identification
+ * type checking. Each error has a unique code (E0000-E0102) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -25,11 +25,12 @@ package onion.compiler
  *   - VARIABLE_NOT_FOUND, CLASS_NOT_FOUND, FIELD_NOT_FOUND, METHOD_NOT_FOUND
  *   - CONSTRUCTOR_NOT_FOUND, AMBIGUOUS_METHOD, AMBIGUOUS_CONSTRUCTOR
  *
- * '''Duplication Errors (E0007-E0012, E0025-E0026, E0029, E0053-E0054, E0084, E0097)'''
+ * '''Duplication Errors (E0007-E0012, E0025-E0026, E0029, E0053-E0054, E0084, E0097, E0102)'''
  *   - DUPLICATE_LOCAL_VARIABLE, DUPLICATE_CLASS, DUPLICATE_FIELD, DUPLICATE_METHOD
  *   - DUPLICATE_GLOBAL_VARIABLE, DUPLICATE_FUNCTION, DUPLICATE_CONSTRUCTOR
  *   - DUPLICATE_GENERATED_METHOD, DUPLICATE_TYPE_PARAMETER, CYCLIC_TYPE_ALIAS
  *   - DUPLICATE_TYPE_ALIAS, DUPLICATE_EXTENSION_METHOD, DUPLICATE_TRAIT_INSTANCE
+ *   - DUPLICATE_EXTENSION_BLOCK
  *
  * '''Access Errors (E0013-E0015)'''
  *   - METHOD_NOT_ACCESSIBLE, FIELD_NOT_ACCESSIBLE, CLASS_NOT_ACCESSIBLE
@@ -94,6 +95,9 @@ package onion.compiler
  *
  * '''Lambda Errors, continued (E0101)'''
  *   - LAMBDA_ARITY_MISMATCH
+ *
+ * '''Duplication Errors, continued (E0102)'''
+ *   - DUPLICATE_EXTENSION_BLOCK
  *
  * == Error Message Lookup ==
  *
@@ -317,6 +321,21 @@ object SemanticError {
    * Arguments: lambda parameter count, expected function type, its parameter count.
    */
   case object LAMBDA_ARITY_MISMATCH extends SemanticError(101)
+
+  /**
+   * Two `extension` blocks for the same receiver type within one compilation
+   * unit (the exact same concrete instantiation, e.g. `List[Int]` twice, or
+   * the same non-generic type split across two blocks): both would lower to
+   * the same mangled container class name (`Extension$...`), so the second
+   * one is rejected here with a clear message naming the receiver type,
+   * instead of surfacing later as an opaque duplicate-class error followed by
+   * a misleading "method not found" on every member the rejected block
+   * declared (issue #2204). Reported during rewriting, mirroring
+   * DUPLICATE_TRAIT_INSTANCE's treatment of a duplicate `instance`.
+   * Cross-unit duplicates still surface as a duplicate-class error, since
+   * they redefine the same class.
+   */
+  case object DUPLICATE_EXTENSION_BLOCK extends SemanticError(102)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

@@ -165,6 +165,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   def rewrite(unit: AST.CompilationUnit): AST.CompilationUnit = {
     bodyRewriteNeeded = unit.needsBodyRewrite
     checkInstanceCoherence(unit.toplevels)
+    checkExtensionCoherence(unit.toplevels)
     val newToplevels = Buffer.empty[AST.Toplevel]
     for (top <- unit.toplevels) top match {
       case declaration: AST.ClassDeclaration =>
@@ -602,6 +603,43 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         seen(key) = inst
       case _ =>
     }
+  }
+
+  /**
+   * Two `extension` blocks for the same receiver type within a compilation
+   * unit would lower to the same mangled container class name
+   * (`registerExtension` in TypingHeaderPass); catching it here gives a clear
+   * message instead of leaking the internal mangled name via a
+   * duplicate-class error, and avoids the misleading "method not found" that
+   * follows once the second block's own methods are silently dropped
+   * (issue #2204). (Cross-unit duplicates are still caught later, since they
+   * redefine the same class.)
+   */
+  private def checkExtensionCoherence(toplevels: List[AST.Toplevel]): Unit = {
+    val seen = scala.collection.mutable.Map.empty[String, AST.ExtensionDeclaration]
+    toplevels.foreach {
+      case ext: AST.ExtensionDeclaration =>
+        val key = mangleExtensionClassName(ext.receiverType.desc)
+        if (seen.contains(key)) {
+          throw new CompilationException(Seq(CompileError("", ext.location,
+            Message("error.semantic.duplicateExtensionBlock", Array[Any](ext.receiverType.desc)),
+            Some(DUPLICATE_EXTENSION_BLOCK.errorCode))))
+        }
+        seen(key) = ext
+      case _ =>
+    }
+  }
+
+  /** Mirrors TypingHeaderPass.registerExtension's own container-class naming,
+    * so this pre-check flags exactly the cases that would otherwise collide
+    * there as a generic DUPLICATE_CLASS -- no more, no less. */
+  private def mangleExtensionClassName(desc: AST.TypeDescriptor): String = desc match {
+    case AST.ReferenceType(name, _) => name.replace(".", "_")
+    case AST.ParameterizedType(component, params) =>
+      mangleExtensionClassName(component) + "_" + params.map(mangleExtensionClassName).mkString("_")
+    case AST.ArrayType(component) => mangleExtensionClassName(component) + "_Array"
+    case AST.PrimitiveType(kind) => kind.toString
+    case _ => "Unknown"
   }
 
   private def lowerInstanceDeclaration(declaration: AST.InstanceDeclaration): AST.ClassDeclaration = {
@@ -1847,9 +1885,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any]): AST.Expression = {
     statements match {
       // Final expression: yield e => M::successful(e)
-      case List(AST.YieldStatement(_, expr)) =>
+      // The synthesized call is anchored at yield's own location, not the caller-supplied
+      // `loc` (the enclosing do[M] { line), so a type mismatch in `e` is reported where
+      // `yield` actually is.
+      case List(AST.YieldStatement(yieldLoc, expr)) =>
         val rewritten = rewriteExpression(expr)
-        AST.StaticMethodCall(loc, monadType, "successful", List(rewritten))
+        AST.StaticMethodCall(yieldLoc, monadType, "successful", List(rewritten))
 
       // Final expression without yield: e => M::successful(e)
       case List(expr: AST.Expression) =>
@@ -1861,11 +1902,13 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       // a monad only needs map/bind instance (or extension) methods — no
       // static successful — which is what lets do[List] work over plain
       // java.util.List via the Colls extension methods.
-      case (binding: AST.DoBinding) :: List(AST.YieldStatement(_, retExpr)) =>
+      case (binding: AST.DoBinding) :: List(AST.YieldStatement(yieldLoc, retExpr)) =>
         val bindExpr = rewriteExpression(binding.expr)
         val rewrittenRet = rewriteExpression(retExpr)
         val arg = AST.Argument(binding.location, binding.name, null, null, false)
-        val closureBody = AST.BlockExpression(binding.location, List(rewrittenRet))
+        // The closure body is anchored at ret's own location, not the preceding binding's,
+        // so a type mismatch in `retExpr` is reported at `ret`, not at `x <- e1`.
+        val closureBody = AST.BlockExpression(yieldLoc, List(rewrittenRet))
         val closureType = AST.TypeNode(binding.location, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(binding.location, closureType, "call", List(arg), null, closureBody)
         AST.MethodCall(binding.location, bindExpr, "map", List(closure))

@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * Regular expression utilities for Onion programs.
@@ -57,7 +58,11 @@ public final class Regex {
      */
     public static boolean matches(String input, String pattern) {
         if (input == null || pattern == null) return false;
-        return input.matches(pattern);
+        try {
+            return input.matches(pattern);
+        } catch (PatternSyntaxException e) {
+            throw invalidPattern("matches", pattern, e);
+        }
     }
 
     /**
@@ -65,7 +70,7 @@ public final class Regex {
      */
     public static boolean find(String input, String pattern) {
         if (input == null || pattern == null) return false;
-        return Pattern.compile(pattern).matcher(input).find();
+        return compile("find", pattern).matcher(input).find();
     }
 
     // ========== Extraction ==========
@@ -76,7 +81,7 @@ public final class Regex {
     public static List<String> findAll(String input, String pattern) {
         if (input == null || pattern == null) return new ArrayList<String>();
         List<String> matches = new ArrayList<>();
-        Matcher matcher = Pattern.compile(pattern).matcher(input);
+        Matcher matcher = compile("findAll", pattern).matcher(input);
         while (matcher.find()) {
             matches.add(matcher.group());
         }
@@ -88,7 +93,7 @@ public final class Regex {
      */
     public static String findFirst(String input, String pattern) {
         if (input == null || pattern == null) return "";
-        Matcher matcher = Pattern.compile(pattern).matcher(input);
+        Matcher matcher = compile("findFirst", pattern).matcher(input);
         if (matcher.find()) {
             return matcher.group();
         }
@@ -101,7 +106,7 @@ public final class Regex {
      */
     public static List<String> groups(String input, String pattern) {
         if (input == null || pattern == null) return new ArrayList<String>();
-        Matcher matcher = Pattern.compile(pattern).matcher(input);
+        Matcher matcher = compile("groups", pattern).matcher(input);
         if (matcher.find()) {
             List<String> result = new ArrayList<String>();
             for (int i = 0; i <= matcher.groupCount(); i++) {
@@ -120,7 +125,7 @@ public final class Regex {
     public static List<List<String>> groupsAll(String input, String pattern) {
         List<List<String>> allGroups = new ArrayList<List<String>>();
         if (input == null || pattern == null) return allGroups;
-        Matcher matcher = Pattern.compile(pattern).matcher(input);
+        Matcher matcher = compile("groupsAll", pattern).matcher(input);
         while (matcher.find()) {
             List<String> groups = new ArrayList<String>();
             for (int i = 0; i <= matcher.groupCount(); i++) {
@@ -140,7 +145,11 @@ public final class Regex {
     public static String replace(String input, String pattern, String replacement) {
         if (input == null) return "";
         if (pattern == null || replacement == null) return input;
-        return input.replaceAll(pattern, replacement);
+        try {
+            return input.replaceAll(pattern, replacement);
+        } catch (PatternSyntaxException e) {
+            throw invalidPattern("replace", pattern, e);
+        }
     }
 
     /**
@@ -149,7 +158,11 @@ public final class Regex {
     public static String replaceFirst(String input, String pattern, String replacement) {
         if (input == null) return "";
         if (pattern == null || replacement == null) return input;
-        return input.replaceFirst(pattern, replacement);
+        try {
+            return input.replaceFirst(pattern, replacement);
+        } catch (PatternSyntaxException e) {
+            throw invalidPattern("replaceFirst", pattern, e);
+        }
     }
 
     // ========== Splitting ==========
@@ -159,7 +172,11 @@ public final class Regex {
      */
     public static List<String> split(String input, String pattern) {
         if (input == null || pattern == null) return new ArrayList<String>();
-        return new ArrayList<String>(Arrays.asList(input.split(pattern)));
+        try {
+            return new ArrayList<String>(Arrays.asList(input.split(pattern)));
+        } catch (PatternSyntaxException e) {
+            throw invalidPattern("split", pattern, e);
+        }
     }
 
     /**
@@ -167,7 +184,11 @@ public final class Regex {
      */
     public static List<String> split(String input, String pattern, int limit) {
         if (input == null || pattern == null) return new ArrayList<String>();
-        return new ArrayList<String>(Arrays.asList(input.split(pattern, limit)));
+        try {
+            return new ArrayList<String>(Arrays.asList(input.split(pattern, limit)));
+        } catch (PatternSyntaxException e) {
+            throw invalidPattern("split", pattern, e);
+        }
     }
 
     // ========== Pattern overloads (interop with re"..." literals) ==========
@@ -258,6 +279,24 @@ public final class Regex {
     public static String quote(String literal) {
         if (literal == null) return "";
         return Pattern.quote(literal);
+    }
+
+    /**
+     * Compiles {@code pattern}, rethrowing a syntax error with an Onion-prefixed message
+     * (naming the {@code Regex::} call that produced it) instead of the JDK's bare,
+     * multi-line {@link PatternSyntaxException} text.
+     */
+    private static Pattern compile(String caller, String pattern) {
+        try {
+            return Pattern.compile(pattern);
+        } catch (PatternSyntaxException e) {
+            throw invalidPattern(caller, pattern, e);
+        }
+    }
+
+    private static IllegalArgumentException invalidPattern(String caller, String pattern, PatternSyntaxException e) {
+        return new IllegalArgumentException(
+            "Regex::" + caller + ": invalid pattern \"" + pattern + "\" (" + e.getDescription() + ")", e);
     }
 
     /**

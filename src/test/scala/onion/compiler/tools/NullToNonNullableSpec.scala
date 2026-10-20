@@ -68,5 +68,16 @@ class NullToNonNullableSpec extends AnyFunSpec {
       assert(!result.hasErrors)
       assert(result.diagnostics.warnings.exists(_.category.code == "W0012"))
     }
+
+    it("names the source file even when it is the very first warning of the compilation (#2238)") {
+      val result = compileWarnings(
+        """
+          |val a = String::format("%s", null)
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w12 = result.diagnostics.warnings.filter(_.category.code == "W0012")
+      assert(w12.length == 1, s"expected 1 W0012, got: ${result.diagnostics.warnings.map(_.message)}")
+      assert(w12.head.sourceFile == "W.on", s"expected sourceFile 'W.on', got '${w12.head.sourceFile}'")
+    }
   }
 }

@@ -405,7 +405,7 @@ while condition { ... }
 for var i: Int = 0; i < 10; i++ { ... }
 
 // foreach
-foreach item: Type in collection { ... }
+foreach item in collection { ... }   // or `foreach item: Type in ...`; the type is inferred when omitted
 
 // select (pattern matching on values)
 select value {
@@ -454,6 +454,9 @@ val body = http"https://api.example.com/x".get()
 // ANY identifier prefix works, not just re/file/http: `prefix"raw"` desugars to
 // `prefix("raw")`, so define a function of that name to make your own (sql"...",
 // money"..."). Keyword-safe: `return"x"` (no space) stays `return "x"`, not a call.
+// No space allowed: the identifier and the string fuse into one token, so
+// `sql "SELECT 1"` (space) is a syntax error, not `sql("SELECT 1")` — unlike a
+// trailing lambda, where whitespace before `{` is fine.
 def sql(q: String): String = "[SQL] " + q.trim()
 val query = sql"SELECT * FROM t"             // -> sql("SELECT * FROM t")
 
@@ -532,7 +535,7 @@ These are frequently confused with other languages. **Always check these:**
 | `case Add(l, n is Num):` nested type pattern? | ✓ correct - type patterns nest inside destructuring, and the binding is usable at the narrowed type; also works for a non-record component (`case Wrap(s is String)`) |
 | `case Circle(r):` unsupported? | ✓ correct - record destructuring patterns work, also `case x when guard:` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
-| `for i in 0..10` (other langs) | `foreach i: Int in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive |
+| `for i in 0..10` (other langs) | `foreach i in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive; the element type is inferred (`foreach i: Int in ...` also works) |
 | `for (const x of arr) { }` (JS/TS) | `foreach x: Type in arr { }` - no `for (... of ...)` |
 | `i += 1`, `i -= 1`, `i++` | ✓ correct - compound assignment and `++`/`--` work as statements |
 | `while (x = read()) != null` | ✓ correct - assignment in condition with parens |
@@ -579,7 +582,7 @@ These are frequently confused with other languages. **Always check these:**
 | stdlib returning an array? | No - the standard library takes and returns `List`, never arrays (`Strings::split`, `Regex::findAll`, `Files::readLines`, `Rand::shuffle`, `Http` headers/params, `Future::all`). Arrays appear only at the Java boundary: `main(args: String[])`, `byte[]` binary I/O, and varargs. Use `Colls::toList(args)` to cross over |
 | `foreach (x : list)` | `foreach x: Type in list { }` - different syntax |
 | `for (k, v) in map` | `foreach (k, v) in map { }` - map entry destructuring |
-| `val (a, b) = pair` unsupported? | ✓ correct - destructures records positionally (and Map.Entry); `var (x, y) = ...` for mutable |
+| `val (a, b) = pair` unsupported? | ✓ correct - destructures records positionally (and Map.Entry, and a List by index: `val (yes, no) = xs.partition { ... }`); `var (x, y) = ...` for mutable |
 
 ### Literals
 

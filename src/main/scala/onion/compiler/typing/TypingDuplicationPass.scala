@@ -246,7 +246,10 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     withKernel[ExtensionMethodDefinition](node) { method =>
       if (seenMethods.contains(method))
         typing.report(SemanticError.DUPLICATE_EXTENSION_METHOD, node, method.receiverType, method.name, method.arguments)
-      else seenMethods.add(method)
+      else {
+        seenMethods.add(method)
+        ExtensionShadowCheck.check(typing, node, method)
+      }
     }
 
   private def processInterfaceDeclaration(node: AST.InterfaceDeclaration): Unit =

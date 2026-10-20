@@ -78,6 +78,57 @@ class CollectionsSpec extends AbstractShellSpec {
         )
         assert(result == Shell.Success(12))
       }
+
+      it("creates range with step") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val list = Colls::rangeWithStep(0, 10, 2)
+            |    return list.size()
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(5))
+      }
+
+      it("stops rangeWithStep instead of wrapping past Int.MAX_VALUE") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val list = Colls::rangeWithStep(2147483600, 2147483647, 30)
+            |    return list.size()
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(2))
+      }
+
+      it("stops rangeWithStep instead of wrapping past Int.MIN_VALUE") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): Int {
+            |    val list = Colls::rangeWithStep(-2147483600, -2147483648, -30)
+            |    return list.size()
+            |  }
+            |}
+          """.stripMargin,
+          "None",
+          Array()
+        )
+        assert(result == Shell.Success(2))
+      }
     }
 
     describe("set creation") {

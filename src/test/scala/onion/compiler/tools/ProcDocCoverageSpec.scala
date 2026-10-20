@@ -57,4 +57,26 @@ class ProcDocCoverageSpec extends AnyFunSpec {
     val missing = actualNames -- documentedNames(read("docs/ja/reference/stdlib.md"), actualNames)
     assert(missing.isEmpty, s"docs/ja/reference/stdlib.md is missing Proc members: ${missing.toSeq.sorted.mkString(", ")}")
   }
+
+  it("onion.Proc's class Javadoc notes that shell syntax needs an explicit sh -c") {
+    val src = read("src/main/java/onion/Proc.java")
+    assert(src.contains("sh -c" ) || src.contains("sh\", \"-c\""),
+      "src/main/java/onion/Proc.java's class Javadoc should say that a single command " +
+        "string is passed to the OS literally, and shell syntax (pipes, redirection, &&) " +
+        "needs an explicit \"sh\", \"-c\", ...")
+  }
+
+  it("docs/reference/stdlib.md's Proc section notes the sh -c workaround for shell syntax") {
+    val doc = read("docs/reference/stdlib.md")
+    val procSection = doc.substring(doc.indexOf("## Proc Module"), doc.indexOf("## Args Module"))
+    assert(procSection.contains("sh") && procSection.contains("-c"),
+      "docs/reference/stdlib.md's Proc section should mention the sh -c workaround for shell syntax")
+  }
+
+  it("docs/ja/reference/stdlib.md's Proc section notes the sh -c workaround for shell syntax") {
+    val doc = read("docs/ja/reference/stdlib.md")
+    val procSection = doc.substring(doc.indexOf("## Proc モジュール"), doc.indexOf("## Args モジュール"))
+    assert(procSection.contains("sh") && procSection.contains("-c"),
+      "docs/ja/reference/stdlib.md's Proc section should mention the sh -c workaround for shell syntax")
+  }
 }

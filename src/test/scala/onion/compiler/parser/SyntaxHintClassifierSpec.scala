@@ -1242,6 +1242,28 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
         sourceLine = "private class Foo {"
       ).messageKey shouldBe "error.parsing.hint.access_modifier_before_declaration"
     }
+
+    it("recognizes `law` used outside a record body, instead of misreading it as a Java-style method") {
+      val hint = classify(
+        found = "law",
+        expected = "\":\"",
+        sourceLine = "law addComm(a: Point, b: Point) { a.plus(b) == b.plus(a) }"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.law_example_outside_record"
+      hint.arguments shouldBe Seq("law")
+    }
+
+    it("recognizes `example` used outside a record body, which otherwise gets no hint at all") {
+      val hint = classify(
+        found = "example",
+        expected = "\"val\", \"var\", \"forward\", \"def\"",
+        sourceLine = "example { 1 == 1 }"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.law_example_outside_record"
+      hint.arguments shouldBe Seq("example")
+    }
   }
 
   private def classify(

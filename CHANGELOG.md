@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Http.Response` has `status()`, `body()` and `headers()` methods.** Only the fields existed, so `res.status()` -- the spelling `Server.Response.status()`, `HttpFailure.kind()` and record accessors use -- was `E0005`. The fields keep working.
+
 - **`xs.associateBy { ... }`, `xs.indexOfFirst { ... }`, `xs.maxOrNull()`, `xs.minOrNull()`.** Index a list by a key (later element wins), find the first matching index (-1 if none), and take a max/min that is null for an empty list (`max()`/`min()` throw). `firstOrNull`/`lastOrNull` now hint at `first`/`last`, which already return null on an empty list.
 
 - **`[1, 2] + [3]` concatenates two Lists.** It was `E0001 operator + is not applicable for type List[Int], List[Int]`. `xs + ys` (also `xs.plus(ys)`, `xs += ys`) returns a new List, as `Colls::concat` does. Generic operator extensions now infer their type arguments, so this keeps the element type.

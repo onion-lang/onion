@@ -234,7 +234,7 @@ def safeComplexDiv(a: Complex, b: Complex): Option[Complex] {
 val chain: Option[Complex] = do[Option] {
   q1 <- safeComplexDiv(new Complex(10.0, 0.0), new Complex(2.0, 0.0))
   q2 <- safeComplexDiv((q1 as Complex), new Complex(1.0, 1.0))
-  ret q2
+  yield q2
 }
 if chain.isDefined() {
   IO::println("  10 / 2 / (1+i) = " + (chain.get() as Complex).fmt())
@@ -244,7 +244,7 @@ if chain.isDefined() {
 
 val failDiv: Option[Complex] = do[Option] {
   q <- safeComplexDiv(new Complex(1.0, 1.0), new Complex(0.0, 0.0))
-  ret q
+  yield q
 }
 IO::println("  1+i / 0 = " + (if failDiv.isDefined() { "some" } else { "none" }))
 

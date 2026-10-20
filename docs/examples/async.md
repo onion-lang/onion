@@ -43,7 +43,7 @@ Chain futures with `do[Future]`.
 val combined: Future[String] = do[Future] {
   a <- fetchPage("page-a", 20L)
   b <- fetchPage("page-b", 20L)
-  ret a.length() + ":" + b.length()
+  yield a.length() + ":" + b.length()
 }
 
 println(combined.getOrElse("failed"))
@@ -97,7 +97,7 @@ Future::all(f1, f2, f3).onSuccess((results: List[String]) -> {
 val combined: Future[String] = do[Future] {
   a <- fetchPage("page-a", 20L)
   b <- fetchPage("page-b", 20L)
-  ret a.length() + ":" + b.length()
+  yield a.length() + ":" + b.length()
 }
 
 println(combined.getOrElse("failed"))

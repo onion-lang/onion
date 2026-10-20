@@ -1169,7 +1169,7 @@ Futureは順次非同期合成のためのdo記法で動作：
 val result: Future[Int] = do[Future] {
   x <- Future::async { fetchA() }
   y <- Future::async { fetchB(x) }
-  ret x + y
+  yield x + y
 }
 ```
 
@@ -2096,13 +2096,14 @@ Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // エントリ名の List
 Files::listFiles("dir")                // java.io.File エントリの List
 Files::glob("dir", "*.on")             // glob にマッチしたエントリ名
+Files::walk("dir")                     // dir 以下の全ファイルを再帰的に（相対パス、ソート済み）
 Files::delete(path) / Files::exists(path)
 Files::isFile(path) / Files::isDirectory(path)
 Files::mkdirs(path)                    // ディレクトリと不足する親ディレクトリを作成
 Files::size(path)                      // Long。バイト数（存在しなければ0）
 Files::copy(src, dst)                  // dst が既にあれば置き換える
 Files::move(src, dst)                  // 移動（リネーム）。dst が既にあれば置き換える
-Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー
+Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー（dst が src の内部/同一なら拒否）
 ```
 
 パス操作ヘルパー——ファイル名・親ディレクトリ・結合・拡張子:
@@ -2296,6 +2297,9 @@ xs + ys                           // concat と同じ（xs.plus(ys)、xs += ys �
 xs.associateBy { x -> key(x) }    // キー -> 要素 の Map。同じキーなら後の要素が残る
 xs.indexOfFirst { x -> x > 6 }    // 条件に合う最初の位置。無ければ -1
 xs.maxOrNull() / xs.minOrNull()   // max()/min() と同じだが、空の List では null
+foreach (i, x) in xs.withIndex() { ... }   // withIndex(): 添字 -> 要素 の順序付き Map
+xs.mapIndexed { i, x -> x + i }   // 添字付きの map
+xs.forEachIndexed { i, x -> ... } // 添字付きの forEach
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - ネストを1段階解消
 xs.flatMap { x -> [x, x] }        // 各要素をリストに写してから1段階平坦化する
                                    // （bind はその別名で、do[List] { x <- xs; ... } が使う）
@@ -2450,7 +2454,7 @@ val body = r.map { res -> res.body }.getOrElse("")
 val both = do[Result] {
   a <- Http::request("GET", urlA).send()
   b <- Http::request("GET", urlB).send()
-  ret a.status + b.status
+  yield a.status + b.status
 }
 ```
 
@@ -2627,6 +2631,7 @@ DateTime::monthName(epochMillis): String  // "March"
 ```
 DateTime::of(year, month, day): Long
 DateTime::of(year, month, day, hour, minute, second): Long
+DateTime::today(): Long                 // = startOfDay(now())
 DateTime::startOfDay(epochMillis): Long
 DateTime::endOfDay(epochMillis): Long
 ```

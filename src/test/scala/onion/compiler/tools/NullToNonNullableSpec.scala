@@ -71,8 +71,11 @@ class NullToNonNullableSpec extends AnyFunSpec {
 
     it("names the source file even when it is the very first warning of the compilation (#2238)") {
       val result = compileWarnings(
+        // An Onion-declared callee: since #2116 a Java-declared parameter (String::format)
+        // no longer gets W0012 at all, so it cannot carry this check.
         """
-          |val a = String::format("%s", null)
+          |def f(s: String): String = s
+          |val a = f(null)
           |""".stripMargin)
       assert(!result.hasErrors)
       val w12 = result.diagnostics.warnings.filter(_.category.code == "W0012")

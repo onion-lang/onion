@@ -120,6 +120,8 @@ object ReflectionRefs {
   }
 
   private class ReflectMethodRef(method: Method, override val affiliation: TypedAST.ClassType, mapper: GenericTypeMapper, baseEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.Method {
+    // Loaded via java.lang.reflect, not from Onion source. See RFC #2117 / issue #2116.
+    override val isJavaOrigin: Boolean = true
     override val modifier: Int = toOnionModifier(method.getModifiers)
     override val name: String = method.getName
     override val isVararg: Boolean = method.isVarArgs

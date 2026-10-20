@@ -26,7 +26,7 @@ def main(top: Int = 3): void {
   val grid = do[List] {
     x <- [1, 2, 3]
     y <- [10, 20]
-    ret x * y
+    yield x * y
   }
   grid
     |> take(top)

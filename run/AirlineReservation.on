@@ -334,7 +334,7 @@ def upgradeInfoOpt(airline: Airline, ref: String): Option[String] {
   val econBk = airline.activeBookings().find { b -> b.ref() == ref && (b.seat().cabin() is Economy) }
   return do[Option] {
     bk <- toOptBooking(econBk)
-    ret "Upgrade #{bk.passenger().fullName()} from #{bk.seat().description()} to Business for $#{(bk.flight().priceFor(new Business()) - bk.price()).fmt2()}"
+    yield "Upgrade #{bk.passenger().fullName()} from #{bk.seat().description()} to Business for $#{(bk.flight().priceFor(new Business()) - bk.price()).fmt2()}"
   }
 }
 

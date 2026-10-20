@@ -288,7 +288,7 @@ val step1Opt: Option[String] = toOpt(predictNext(tokens, "the"))
 val step2Opt: Option[String] = do[Option] {
   w1 <- step1Opt
   w2 <- toOpt(predictNext(tokens, w1))
-  ret "the -> #{w1} -> #{w2}"
+  yield "the -> #{w1} -> #{w2}"
 }
 section("do[Option] two-step prediction from 'the'")
 val step2Msg: String = if step2Opt == null { "(no two-step chain)" } else { step2Opt.get() }

@@ -494,14 +494,14 @@ class FutureSpec extends AbstractShellSpec {
     }
 
     describe("do notation") {
-      it("desugars single ret to successful") {
+      it("desugars single yield to successful") {
         val result = shell.run(
           """
             |import { onion.Future; }
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    val f = do[Future] { ret "hello" };
+            |    val f = do[Future] { yield "hello" };
             |    return f.await()
             |  }
             |}
@@ -521,7 +521,7 @@ class FutureSpec extends AbstractShellSpec {
             |  static def main(args: String[]): String {
             |    val f = do[Future] {
             |      x <- Future::successful("hello");
-            |      ret x + " world"
+            |      yield x + " world"
             |    };
             |    return f.await()
             |  }
@@ -544,7 +544,7 @@ class FutureSpec extends AbstractShellSpec {
             |      x <- Future::successful(Integer::valueOf(10));
             |      y <- Future::successful(Integer::valueOf(20));
             |      z <- Future::successful(Integer::valueOf(12));
-            |      ret Integer::valueOf(x.intValue() + y.intValue() + z.intValue())
+            |      yield Integer::valueOf(x.intValue() + y.intValue() + z.intValue())
             |    };
             |    return f.await()
             |  }
@@ -556,7 +556,7 @@ class FutureSpec extends AbstractShellSpec {
         assert(result == Shell.Success(42))
       }
 
-      it("supports final expression without ret") {
+      it("supports final expression without yield") {
         val result = shell.run(
           """
             |import { onion.Future; }
@@ -587,7 +587,7 @@ class FutureSpec extends AbstractShellSpec {
             |    val f = do[Future] {
             |      x <- Future::successful("hi");
             |      y <- Future::successful(" there");
-            |      ret x + y
+            |      yield x + y
             |    };
             |    return f.await()
             |  }

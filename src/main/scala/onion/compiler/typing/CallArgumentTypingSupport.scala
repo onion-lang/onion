@@ -10,15 +10,41 @@ import ArgumentHelpers.fillDefaultArguments
 private[compiler] final class CallArgumentTypingSupport(
   bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
-  processAssignable: (AST.Node, Type, Term) => Term
+  processAssignable: (AST.Node, Type, Term) => Term,
+  processAssignableForJavaCallee: (AST.Node, Type, Term) => Term
 ) {
+  /** Routes to the Java-callee variant (no W0012 on a null argument, #2116) when
+   *  `method` is known and Java-declared and parameter `index` (the vararg array's
+   *  element when `element`) is declared as a concrete Java type; otherwise the
+   *  ordinary path. */
+  private def assign(node: AST.Node, expected: Type, actual: Term, method: Method, index: Int, element: Boolean = false): Term =
+    if (method != null && method.isJavaOrigin && !isClassTypeVariable(method, index, element))
+      processAssignableForJavaCallee(node, expected, actual)
+    else processAssignable(node, expected, actual)
+
+  /** Whether the callee declares parameter `index` as one of its class's type variables
+   *  (`E` in `List<E>.add(E)`). The caller chose that type as the receiver's type
+   *  argument (`List[String]`), so its nullness is known and W0012 still applies. */
+  private def isClassTypeVariable(method: Method, index: Int, element: Boolean): Boolean =
+    index >= 0 && index < method.argumentCount && {
+      val declared = method.argumentTypeAt(index) match {
+        case array: ArrayType if element => array.base
+        case other                       => other
+      }
+      declared match {
+        case tv: TypeVariableType => !method.typeParameters.exists(_.name == tv.name)
+        case _                    => false
+      }
+    }
+
   def processParamsWithExpected(
     node: AST.Node,
     params: Array[Term],
-    expectedArgs: Array[Type]
+    expectedArgs: Array[Type],
+    method: Method = null
   ): Option[Array[Term]] = {
     val results = params.zipWithIndex.map { case (param, i) =>
-      processAssignable(node, expectedArgs(i), param)
+      assign(node, expectedArgs(i), param, method, i)
     }
     if (results.contains(null)) None else Some(results)
   }
@@ -26,10 +52,11 @@ private[compiler] final class CallArgumentTypingSupport(
   def processParamsWithArgs(
     args: Seq[AST.Expression],
     params: Array[Term],
-    expectedArgs: Array[Type]
+    expectedArgs: Array[Type],
+    method: Method = null
   ): Option[Array[Term]] = {
     val results = params.zipWithIndex.map { case (param, i) =>
-      processAssignable(args(i), expectedArgs(i), param)
+      assign(args(i), expectedArgs(i), param, method, i)
     }
     if (results.contains(null)) None else Some(results)
   }
@@ -65,18 +92,18 @@ private[compiler] final class CallArgumentTypingSupport(
     expectedArgs: Array[Type]
   ): Option[Array[Term]] = {
     if (!method.isVararg || expectedArgs.isEmpty) {
-      return processParamsWithExpected(node, params, expectedArgs)
+      return processParamsWithExpected(node, params, expectedArgs, method)
     }
 
     val fixedArgCount = expectedArgs.length - 1
     if (!expectedArgs.last.isArrayType) {
-      return processParamsWithExpected(node, params, expectedArgs)
+      return processParamsWithExpected(node, params, expectedArgs, method)
     }
     val varargType = expectedArgs.last.asInstanceOf[ArrayType]
     val componentType = varargType.base
 
     val fixedResults = (0 until fixedArgCount).map { i =>
-      if (i < params.length) processAssignable(node, expectedArgs(i), params(i)) else null
+      if (i < params.length) assign(node, expectedArgs(i), params(i), method, i) else null
     }.toArray(using onion.compiler.TypedAST.termTag)
 
     if (fixedResults.contains(null)) return None
@@ -85,14 +112,14 @@ private[compiler] final class CallArgumentTypingSupport(
       val lastParam = params.last
       val lastParamType = lastParam.`type`
       if (lastParamType.isArrayType && TypeRules.isSuperType(varargType, lastParamType)) {
-        val processedLast = processAssignable(node, varargType, lastParam)
+        val processedLast = assign(node, varargType, lastParam, method, fixedArgCount)
         if (processedLast == null) return None
         return Some(fixedResults :+ processedLast)
       }
     }
 
     val varargElements = params.drop(fixedArgCount).map { param =>
-      processAssignable(node, componentType, param)
+      assign(node, componentType, param, method, fixedArgCount, element = true)
     }
     if (varargElements.contains(null)) return None
 
@@ -111,7 +138,7 @@ private[compiler] final class CallArgumentTypingSupport(
       if (method.isVararg) {
         processVarargParamsWithExpected(node, method, params, expectedArgs)
       } else {
-        processParamsWithArgs(args, params, expectedArgs)
+        processParamsWithArgs(args, params, expectedArgs, method)
       }
 
     processedOpt.flatMap { processedParams =>

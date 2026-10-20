@@ -185,7 +185,7 @@ def parseAmount(s: String): Option[Double] {
 def buildTx(id: String, card: String, amountStr: String, merchant: String, cat: String): Option[Transaction] {
   return do[Option] {
     amount <- parseAmount(amountStr)
-    ret new Transaction(id, card, amount, merchant, cat)
+    yield new Transaction(id, card, amount, merchant, cat)
   }
 }
 

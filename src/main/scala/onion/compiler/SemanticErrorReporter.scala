@@ -117,6 +117,10 @@ class SemanticErrorReporter(threshold: Int) {
         Some(message("suggestion.jsTemplateLiteral"))
       } else if (name == ConsoleObjectName) {
         Some(message("suggestion.jsConsoleLog"))
+      } else if (name == "ret") {
+        // The pre-1.0 do-notation keyword: `ret e` now reads as an unknown variable `ret`
+        // followed by `e`, so name the new spelling instead of a similar-name guess.
+        Some(message("suggestion.retRenamedToYield"))
       } else if (items.length > 2 && items(2) != null) {
         Some(format(message("suggestion.didYouMean"), Seq(asString(items(2)))))
       } else if (items.length > 1) {
@@ -163,7 +167,9 @@ class SemanticErrorReporter(threshold: Int) {
         items(4).asInstanceOf[TypedAST.ObjectType].methods.filter(_.name == name).toSeq
       else Seq.empty
     val suggestion =
-      if (enclosingStaticOwner != null) {
+      if (streamToListHint(targetType, name).isDefined) {
+        streamToListHint(targetType, name)
+      } else if (enclosingStaticOwner != null) {
         Some(format(message("suggestion.didYouMean"), Seq(s"$enclosingStaticOwner::$name")))
       } else if (!calledStatically && ForeignStringNames.contains(name) && isStringType(targetType)) {
         // The String counterpart of ForeignCollectionNames: Kotlin `reversed`/`padStart`, Python
@@ -359,7 +365,9 @@ class SemanticErrorReporter(threshold: Int) {
     "each" -> "forEach",
     "collect" -> "map",
     "firstOrNull" -> "first",
-    "lastOrNull" -> "last"
+    "lastOrNull" -> "last",
+    "zipWithIndex" -> "withIndex",
+    "indexed" -> "withIndex"
   )
 
   /** Other languages' names for a String operation -> Onion's name for it. */
@@ -383,6 +391,40 @@ class SemanticErrorReporter(threshold: Int) {
     case n: TypedAST.NullableType => isStringType(n.innerType)
     case ct: TypedAST.ClassType => rawOf(ct).name == "java.lang.String"
     case _ => false
+
+  /** List operations a Java Stream lacks, so `s.lines().size` means the user wanted a List. */
+  private val ListOnlyNames: Set[String] = Set(
+    "size", "first", "last", "join", "get", "isEmpty", "contains", "indexOf", "sortedBy",
+    "sortedByDescending", "groupBy", "partition", "sumBy", "maxBy", "minBy", "take", "drop",
+    "chunked", "windowed", "reversed", "withIndex", "mapIndexed", "associateBy", "fold"
+  )
+
+  /**
+   * `s.lines()`/`s.chars()` are Java's String methods and return a Stream, not a List: a
+   * List-style name on one says to convert first (`toList()`, or `boxed().toList()` for a
+   * primitive stream), instead of a name-similarity guess such as `min` or `limit`.
+   */
+  private def streamToListHint(t: TypedAST.Type, name: String): Option[String] =
+    if (!ListOnlyNames.contains(name)) None
+    else t match
+      case ct: TypedAST.ClassType if implementsType(ct, "java.util.stream.BaseStream") =>
+        val primitive = Set("java.util.stream.IntStream", "java.util.stream.LongStream", "java.util.stream.DoubleStream")
+          .exists(n => implementsType(ct, n))
+        val conversion = if (primitive) "boxed().toList()" else "toList()"
+        Some(format(message("suggestion.didYouMean"), Seq(s"$conversion.$name")))
+      case _ => None
+
+  private def implementsType(ct: TypedAST.ClassType, target: String): Boolean = {
+    def loop(c: TypedAST.ClassType, seen: Set[String]): Boolean =
+      if (c == null) false
+      else {
+        val raw = rawOf(c)
+        if (raw.name == target) true
+        else if (seen.contains(raw.name)) false
+        else (Option(raw.superClass).toSeq ++ raw.interfaces).exists(loop(_, seen + raw.name))
+      }
+    loop(ct, Set.empty)
+  }
 
   /** Whether `t` is `java.util.List` or a class implementing it. */
   private def isListType(t: TypedAST.Type): Boolean = {
@@ -477,7 +519,7 @@ class SemanticErrorReporter(threshold: Int) {
       case obj: TypedAST.ObjectType =>
         (obj.fields.map(_.name) ++ obj.methods.filter(_.arguments.isEmpty).map(_.name)).distinct.toSeq
       case _ => Seq.empty
-    val suggestion = toolbox.Suggestions.formatSuggestion(name, candidates)
+    val suggestion = streamToListHint(targetType, name).orElse(toolbox.Suggestions.formatSuggestion(name, candidates))
     problem(position, appendSuggestion(baseMessage, suggestion))
   }
 

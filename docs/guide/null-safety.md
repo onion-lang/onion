@@ -17,8 +17,8 @@ val anotherName: String? = "Bob"  // Also OK
 ```
 
 Assigning the `null` literal to a non-nullable type is a **warning**, not an
-error, so that `null` stays usable where a Java API genuinely accepts it
-(`encodeUrl(null)`) and for `val anything: Object = null`. The trade-off, and
+error, so that `null` stays usable where it is ordinary JVM code, such as
+`val anything: Object = null`. The trade-off, and
 how to turn it into an error for your own build, is described under
 [Null Literal Checking](#null-literal-checking-w0012).
 
@@ -351,8 +351,18 @@ val ok: String? = null   // fine
 
 The warning covers declarations, assignments, arguments and returns.
 Promote it to an error with `--warn error`, or suppress it with
-`--Wno null-to-non-nullable`. Values coming from Java APIs are not
-checked (their nullness is unknown to the compiler).
+`--Wno null-to-non-nullable`.
+
+Java APIs are not checked, because the compiler does not know their nullness:
+
+- A value returned from a Java method.
+- A `null` argument to a Java method: `String::format("%s", null)` and
+  `Http::encodeUrl(null)` do not warn.
+- Except when the parameter is the receiver's own type argument: `xs.add(null)`
+  on a `List[String]` warns, because you chose `String` there.
+
+A method written in Onion warns, also when it was compiled separately (a
+project's `tests/` calling `src/`, or an Onion library jar).
 
 ### Why a warning and not an error
 
@@ -361,7 +371,6 @@ dereference is a guaranteed `NullPointerException` — an error would seem
 strictly better. It is a warning because `null` is also a *legitimate* value in
 several places the same check covers:
 
-- Java APIs that accept and handle null (`Http::encodeUrl(null)` returns `""`).
 - `val anything: Object = null`, which is ordinary JVM code.
 - A field or local whose type is a bare type variable `T`, where `null` is the
   only value available without an instance (see issue #283).

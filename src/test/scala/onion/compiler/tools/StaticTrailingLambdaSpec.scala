@@ -58,7 +58,7 @@ class StaticTrailingLambdaSpec extends AbstractShellSpec {
           |      y <- Future::async { ->
           |        x + 1
           |      }
-          |      ret x + y
+          |      yield x + y
           |    }
           |    return r.await()
           |  }

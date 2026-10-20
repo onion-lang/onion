@@ -47,7 +47,7 @@ count([:])    // 0  - [:] takes the Map[String, Integer] parameter type
 
 The expected type also reaches into **branch and operand positions**, so an
 empty literal in an `if`/`else` or `select` branch, a `try`/`catch` branch, the
-right operand of `?:`, or a `do` block's `ret` infers its element type instead
+right operand of `?:`, or a `do` block's `yield` infers its element type instead
 of failing:
 
 ```onion

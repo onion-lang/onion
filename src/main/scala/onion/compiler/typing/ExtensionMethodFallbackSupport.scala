@@ -19,6 +19,9 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     reportIfNotFound: Boolean = true
   ): Option[Term] = {
     selectApplicableExtensionMethod(targetType, node.name, params) match {
+      case CandidateSelection.NoMatch if arrayAsList(node, target, targetType).isDefined =>
+        val (listTarget, listType) = arrayAsList(node, target, targetType).get
+        tryExtensionMethodCall(node, listTarget, listType, params, expected, reportIfNotFound)
       case CandidateSelection.NoMatch =>
         // reportIfNotFound is false when the caller has a further fallback to try
         // (e.g. a bean-property getter) and will report the error itself if that fails.
@@ -101,6 +104,27 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         else CandidateSelection.Selected(chosen.head)
       case _ =>
         CandidateSelection.NoMatch
+    }
+
+  /** A `List` pipeline call on an array of references (`line.split(" ").distinct()`):
+   *  the array as `toList()` and that `List` type, when the array has no extension of
+   *  the called name itself but `List` does. `map`/`filter` keep their own array
+   *  overloads; an array of primitives (`Int[]`) is left alone, as `toList` takes `T[]`. */
+  private def arrayAsList(node: AST.MethodCall, target: Term, targetType: ObjectType): Option[(Term, ObjectType)] =
+    targetType match {
+      case at: ArrayType if (at.dimension > 1 || !at.component.isBasicType) &&
+          collectExtensionMethods(targetType, node.name).isEmpty =>
+        selectApplicableExtensionMethod(targetType, "toList", Array.empty) match {
+          case CandidateSelection.Selected(toList) =>
+            val toListNode = node.copy(name = "toList", args = Nil, typeArgs = Nil)
+            buildExtensionCall(toListNode, target, targetType, Array.empty, null, toList).collect {
+              case term if term.`type`.isInstanceOf[ObjectType] &&
+                  collectExtensionMethods(term.`type`.asInstanceOf[ObjectType], node.name).nonEmpty =>
+                (term, term.`type`.asInstanceOf[ObjectType])
+            }
+          case _ => None
+        }
+      case _ => None
     }
 
   private def staticReceiver(target: Term, extMethod: ExtensionMethodDefinition): Term =
@@ -334,6 +358,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }
 
     val candidates = collectExtensionMethods(targetType, name).filter(_.arguments.length == args.length)
+    if (candidates.isEmpty) arrayAsList(node, target, targetType) match {
+      case Some((listTarget, listType)) =>
+        break(tryExtensionMethodCallBidirectional(node, listTarget, listType, context, expected, untypedClosureIndices))
+      case None =>
+    }
     candidates.iterator.flatMap { extMethod =>
       val container = extMethod.containerClass
       val receiverType = staticReceiver(target, extMethod).`type`

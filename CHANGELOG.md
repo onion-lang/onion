@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`DateTime::today()` returns the start of today**, as `DateTime::startOfDay(DateTime::now())` does. It was `E0005` (`did you mean: day`).
+- **`Files::walk(dir)` lists every file under a directory, recursively.** It was `E0005`; the recursive listing existed only as `Files::glob(dir, "**")`, which also returns directories. `walk` returns the regular files as `/`-separated paths relative to `dir`, sorted (empty for a non-directory).
 
 - **Indexed iteration: `foreach (i, x) in xs.withIndex()`, `xs.mapIndexed { i, x -> ... }`, `xs.forEachIndexed { i, x -> ... }`.** Walking a list with indices needed a C-style `for var i` loop; `withIndex`/`zipWithIndex`/`indexed`/`mapIndexed` were all `E0005`. `withIndex()` returns an ordered index -> element Map, which the existing `(k, v)` foreach form walks; `zipWithIndex`/`indexed` hint at it.
 
@@ -60,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`private:`/`public:`/`protected:` written inside an `extension`/`instance` block now gets a hint explaining the block has no access sections, instead of a bare "Encountered \"private\", but expecting \"def\"" (#2206).** Both block kinds are a flat list of `def` members with no access-section alternative, unlike a class/record/enum body, which always succeeds via one instead of ever reaching this error.
 - **`law`/`example` written outside a record's own body now says so, instead of a wrong or missing hint** (#2202). `law name(...) { ... }` in a `class`/`enum` body got the unrelated "write `def method(): void { ... }`" advice (it has the same `Ident Ident(...)` shape as a genuine Java-style method mistake), and a bare `example { ... }` got no hint at all. Both now point at the one place the clause actually parses: directly inside a record's body.
 - **`set.map { ... }` now keeps insertion order, like `Sets::map`.** The pipeline form resolved to `Iterables::map`, which collected into a plain `HashSet`, so the same operation reordered results depending on call syntax (#2178). `null` handling still differs (`a.map` throws, `Sets::map` returns an empty set).
 - **`Outcome::bad([])` silently built a `Bad` with no defects, breaking the type's own documented "Never empty" invariant** (#2177). `bad.isBad()` was `true` while `bad.defects().size` was `0` and `bad.describe()` returned `""` -- a failure that reported no reason at all. `Outcome.Bad`'s constructor now rejects a null or empty defects list with `IllegalArgumentException`; every internal caller already guards against this, so only direct misuse from Onion code is affected.

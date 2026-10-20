@@ -205,6 +205,12 @@ class SemanticErrorReporter(threshold: Int) {
         // already failed, so a name+arity match here can only be this stdlib method.
         val className = FormerDefaultImportLookup.find(name, argTypes.length).get
         Some(format(message("suggestion.stdlibNoLongerDefaultImported"), Seq(className, name)))
+      } else if (ForeignCollectionNames.contains(name) && isListType(targetType)) {
+        // The name another language gives a List operation Onion also has, under its own
+        // name (Scala `sortBy`/`foldLeft`/`forall`, Kotlin `joinToString`/`sumOf`, Ruby
+        // `each`/`inject`/`collect`). Name similarity misses these or picks a wrong one
+        // (`sortBy` -> `sort`, `forall` -> `addAll`), so name the real one.
+        Some(format(message("suggestion.didYouMean"), Seq(ForeignCollectionNames(name))))
       } else if (name == "fold") {
         // `List` has the pipeline method `fold` (onion.Colls::fold(List, ...)), but every
         // other Iterable (Map::values(), a Set, ...) only has `foldl` (onion.Iterables::
@@ -311,6 +317,38 @@ class SemanticErrorReporter(threshold: Int) {
       case (pc: TypedAST.ClassType, ac: TypedAST.ClassType) =>
         TypedAST.TypeRules.isSuperType(pc, ac) || TypedAST.TypeRules.isSuperType(rawOf(pc), rawOf(ac))
       case _ => TypedAST.TypeRules.isSuperType(p, a)
+  }
+
+  /** Other languages' names for a `List` pipeline method -> Onion's name for it. */
+  private val ForeignCollectionNames: Map[String, String] = Map(
+    "sortBy" -> "sortedBy",
+    "sortByDescending" -> "sortedByDescending",
+    "forall" -> "all",
+    "joinToString" -> "join",
+    "foldLeft" -> "fold",
+    "inject" -> "fold",
+    "sumOf" -> "sumBy",
+    "unique" -> "distinct",
+    "nonEmpty" -> "isNotEmpty",
+    "each" -> "forEach",
+    "collect" -> "map"
+  )
+
+  /** Whether `t` is `java.util.List` or a class implementing it. */
+  private def isListType(t: TypedAST.Type): Boolean = {
+    def loop(ct: TypedAST.ClassType, seen: Set[String]): Boolean =
+      if (ct == null) false
+      else {
+        val raw = rawOf(ct)
+        val name = raw.name
+        if (name == "java.util.List") true
+        else if (seen.contains(name)) false
+        else (Option(raw.superClass).toSeq ++ raw.interfaces).exists(loop(_, seen + name))
+      }
+    t match
+      case n: TypedAST.NullableType => isListType(n.innerType)
+      case ct: TypedAST.ClassType => loop(ct, Set.empty)
+      case _ => false
   }
 
   private def rawOf(ct: TypedAST.ClassType): TypedAST.ClassType = ct match

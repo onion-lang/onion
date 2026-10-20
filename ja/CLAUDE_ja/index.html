@@ -6035,6 +6035,14 @@ Anthropic Messages API 経由で Claude を呼び出し、応答を <code>Shape<
 <td><code>extension String { def twice() { } }</code> - extensionブロック</td>
 </tr>
 <tr>
+<td><code>extension List[T] { ... }</code> (Tを新しい型パラメータとして使うつもり)</td>
+<td>非サポート - <code>extension</code>は<code>class Box[T]</code>と違い独自の<code>[T]</code>パラメータリストを持たない。<code>T</code>は通常の型参照として解決されるので、これは「新しい型パラメータ」ではなくE0003「型が見つからない」になる。<code>List</code>のすべてのインスタンス化を拡張するには<code>extension List { ... }</code>、1つの具体的な型だけなら<code>extension List[Int] { ... }</code>と書く（<code>extension List[String]</code>を並べて書いても問題ない - 異なるインスタンス化同士は衝突しない）</td>
+</tr>
+<tr>
+<td><code>extension List[Int] { ... }</code>を2回、または<code>extension List { ... }</code>を2つのブロックに分けて書く</td>
+<td>E0102 - 1ファイルにつき、同じ受け取り型に対する<code>extension</code>ブロックは1つまで。メソッドは最初のブロックにまとめること</td>
+</tr>
+<tr>
 <td><code>this.field = value</code> コンストラクタ内</td>
 <td>✓ 正しい - <code>this.</code>/<code>self.</code>は使える。今は省略も可能（裸の<code>field</code>は暗黙アクセスでフィールドに解決される）</td>
 </tr>

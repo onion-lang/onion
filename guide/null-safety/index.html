@@ -5322,8 +5322,8 @@
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">anotherName</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Bob"</span><span class="w">  </span><span class="c1">// Also OK</span>
 </span></code></pre></div>
 <p>Assigning the <code>null</code> literal to a non-nullable type is a <strong>warning</strong>, not an
-error, so that <code>null</code> stays usable where a Java API genuinely accepts it
-(<code>encodeUrl(null)</code>) and for <code>val anything: Object = null</code>. The trade-off, and
+error, so that <code>null</code> stays usable where it is ordinary JVM code, such as
+<code>val anything: Object = null</code>. The trade-off, and
 how to turn it into an error for your own build, is described under
 <a href="#null-literal-checking-w0012">Null Literal Checking</a>.</p>
 <h3 id="type-compatibility">Type Compatibility<a class="headerlink" href="#type-compatibility" title="Permanent link">&para;</a></h3>
@@ -5616,15 +5616,23 @@ so an early-return guard leaves <code>x</code> non-null afterwards.</p>
 </span></code></pre></div>
 <p>The warning covers declarations, assignments, arguments and returns.
 Promote it to an error with <code>--warn error</code>, or suppress it with
-<code>--Wno null-to-non-nullable</code>. Values coming from Java APIs are not
-checked (their nullness is unknown to the compiler).</p>
+<code>--Wno null-to-non-nullable</code>.</p>
+<p>Java APIs are not checked, because the compiler does not know their nullness:</p>
+<ul>
+<li>A value returned from a Java method.</li>
+<li>A <code>null</code> argument to a Java method: <code>String::format("%s", null)</code> and
+  <code>Http::encodeUrl(null)</code> do not warn.</li>
+<li>Except when the parameter is the receiver's own type argument: <code>xs.add(null)</code>
+  on a <code>List[String]</code> warns, because you chose <code>String</code> there.</li>
+</ul>
+<p>A method written in Onion warns, also when it was compiled separately (a
+project's <code>tests/</code> calling <code>src/</code>, or an Onion library jar).</p>
 <h3 id="why-a-warning-and-not-an-error">Why a warning and not an error<a class="headerlink" href="#why-a-warning-and-not-an-error" title="Permanent link">&para;</a></h3>
 <p>The value written here is statically known to be <code>null</code>, so a later
 dereference is a guaranteed <code>NullPointerException</code> — an error would seem
 strictly better. It is a warning because <code>null</code> is also a <em>legitimate</em> value in
 several places the same check covers:</p>
 <ul>
-<li>Java APIs that accept and handle null (<code>Http::encodeUrl(null)</code> returns <code>""</code>).</li>
 <li><code>val anything: Object = null</code>, which is ordinary JVM code.</li>
 <li>A field or local whose type is a bare type variable <code>T</code>, where <code>null</code> is the
   only value available without an instance (see issue #283).</li>

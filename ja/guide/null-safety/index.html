@@ -5105,7 +5105,6 @@
 <code>null</code> と分かっている以上エラーのほうが厳しくて良さそうに見えますが、同じ検査が
 かかる場所には <code>null</code> が<strong>正当な値</strong>であるケースが含まれるためです。</p>
 <ul>
-<li>null を受け付けて正しく処理する Java API（<code>Http::encodeUrl(null)</code> は <code>""</code> を返します）</li>
 <li><code>val anything: Object = null</code>（ごく普通の JVM コード）</li>
 <li>型変数 <code>T</code> の値。インスタンスなしに得られる値が <code>null</code> だけの場合があります（issue #283）</li>
 </ul>
@@ -5113,6 +5112,13 @@
 ほとんどが潜在的な NPE ではなく上記のような正当な用途でした。自分のコードにこう
 した事情が無いなら、<code>--warn error</code> でビルド単位で厳格にできます（<code>--Wno
 null-to-non-nullable</code> で抑制も可能）。</p>
+<p>Java の API は検査しません。コンパイラはその null 許容性を知らないためです。</p>
+<ul>
+<li>Java メソッドの戻り値。</li>
+<li>Java メソッドへの <code>null</code> 引数。<code>String::format("%s", null)</code> や <code>Http::encodeUrl(null)</code> は警告しません。</li>
+<li>ただし、引数の型がレシーバの型引数そのものなら警告します。<code>List[String]</code> への <code>xs.add(null)</code> は警告されます。<code>String</code> を選んだのが自分だからです。</li>
+</ul>
+<p>Onion で書いたメソッドは警告します。別にコンパイルしたもの（プロジェクトの <code>tests/</code> から <code>src/</code> を呼ぶ場合や、Onion ライブラリの jar）も同じです。</p>
 <p>厳しくするなら、まず<strong>宣言</strong>（<code>val s: String = null</code>）で <code>null</code> を避けるのが
 効果的です。後から NPE として表面化するのはこの形だからです。</p>
 <h2 id="_1">セーフコール演算子 <code>?.</code><a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>

@@ -98,7 +98,16 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         // user extension expresses clear intent and should win rather than
         // collide as an ambiguity.
         val userDefined = applicable.filterNot(isBuiltinExtension)
-        val chosen = if (userDefined.nonEmpty) userDefined else applicable
+        val pool = if (userDefined.nonEmpty) userDefined else applicable
+        // As in Java overload resolution, a candidate whose receiver type is more specific
+        // than every other one's wins: `aSet.toList()` takes `toList(Set)`, not
+        // `toList(Iterable)`, instead of being reported as ambiguous.
+        val chosen = pool.filter { m =>
+          pool.forall(o => (o eq m) || isMoreSpecificReceiver(m.receiverType, o.receiverType))
+        } match {
+          case Seq(single) => Seq(single)
+          case _ => pool
+        }
         if (chosen.isEmpty) CandidateSelection.NoMatch
         else if (chosen.length > 1) CandidateSelection.Ambiguous(chosen(0), chosen(1))
         else CandidateSelection.Selected(chosen.head)
@@ -126,6 +135,20 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         }
       case _ => None
     }
+
+  /** `a` is a strict subtype of `b` (raw class comparison, so `Set[T]` is below `Iterable[T]`). */
+  private def isMoreSpecificReceiver(a: Type, b: Type): Boolean =
+    (a, b) match {
+      case (ac: ClassType, bc: ClassType) =>
+        val (ar, br) = (rawOf(ac), rawOf(bc))
+        ar.name != br.name && TypeRules.isSuperType(br, ar)
+      case _ => false
+    }
+
+  private def rawOf(ct: ClassType): ClassType = ct match {
+    case ap: AppliedClassType => ap.raw
+    case other => other
+  }
 
   private def staticReceiver(target: Term, extMethod: ExtensionMethodDefinition): Term =
     extMethod.receiverType match {

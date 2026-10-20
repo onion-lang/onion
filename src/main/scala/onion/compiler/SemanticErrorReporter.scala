@@ -169,7 +169,7 @@ class SemanticErrorReporter(threshold: Int) {
         val sibling = targetType match
           case obj: TypedAST.ObjectType =>
             obj.methods.find { m =>
-              m.name != name && m.name.startsWith(name) &&
+              m.name != name && m.name.startsWith(name) && !Modifier.isPrivate(m.modifier) &&
                 Modifier.isStatic(m.modifier) == Modifier.isStatic(sameName.head.modifier) &&
                 m.arguments.length == argTypes.length &&
                 m.arguments.zip(argTypes).forall { case (p, a) => argPassable(p, a) }
@@ -706,10 +706,10 @@ class SemanticErrorReporter(threshold: Int) {
   /** Lambdas already reported as LAMBDA_ARITY_MISMATCH. Overload resolution can type
    *  the same lambda once per candidate (`map(List)` and `map(Iterable)`), and its
    *  parameter count is wrong against every one of them alike, so one report is enough. */
-  private val arityMismatchPositions = scala.collection.mutable.Set.empty[Location]
+  private val arityMismatchPositions = scala.collection.mutable.Set.empty[(String, Location)]
 
   def report(error: SemanticError, position: Location, items: Array[AnyRef]): Unit = {
-    if (error == SemanticError.LAMBDA_ARITY_MISMATCH && position != null && !arityMismatchPositions.add(position)) return
+    if (error == SemanticError.LAMBDA_ARITY_MISMATCH && position != null && !arityMismatchPositions.add((sourceFile, position))) return
     errorCount += 1
     currentError = error
 

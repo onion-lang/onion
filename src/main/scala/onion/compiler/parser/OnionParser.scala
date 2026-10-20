@@ -2677,9 +2677,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   }
 
   private def doClause(): Any = {
-    if (kind(1) == K.K_RET) {
+    if (kind(1) == K.K_YIELD) {
       val t = next(); eols()
-      return AST.RetStatement(p(t), term())
+      return AST.YieldStatement(p(t), term())
     }
     if (isId(kind(1)) && looksLike { id(); eols(); expect(K.LARROW) }) {
       val t = id(); eols(); expect(K.LARROW); eols()

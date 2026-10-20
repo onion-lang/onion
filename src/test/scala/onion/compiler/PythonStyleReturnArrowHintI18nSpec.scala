@@ -30,7 +30,7 @@ class PythonStyleReturnArrowHintI18nSpec extends AnyFunSpec with Diagrams {
 
   it("fires for a `def bar(x: Int) -> Int { ... }` return-type arrow") {
     val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
-    val src = "def bar(x: Int) -> Int { ret x }\n"
+    val src = "def bar(x: Int) -> Int { yield x }\n"
     val msgs = new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
       case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
       case _ => ""

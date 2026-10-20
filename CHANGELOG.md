@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **A `do` block's final value is written `yield`, not `ret`.**
+  - Before: `do[Option] { a <- getA(); ret a + 1 }`
+  - Now: `do[Option] { a <- getA(); yield a + 1 }`
+  - `yield` is a reserved word (call a Java `yield` method as ``Thread::`yield`()``); `ret` is an ordinary identifier, and old code gets a hint naming `yield`. See [Migrating to 1.0](docs/migration/pre-1.0.md).
+
 ### Added
 
 - **`<`, `<=`, `>`, `>=` compare any `Comparable`: `"abc" < "abd"`, two `LocalDate`s, `BigDecimal`s.** They accepted only numbers (`E0001 operator < is not applicable for type String, String`). On a non-null operand with `compareTo` they now mean `a.compareTo(b) < 0` etc., as in Kotlin; numeric comparison is unchanged.

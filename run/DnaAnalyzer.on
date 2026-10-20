@@ -408,7 +408,7 @@ def main(): void {
   foreach lkId: String in lookups {
     val gcStr: String = do[Option] {
       s <- lib.findById(lkId)
-      ret "#{lkId} GC=#{s.gcContent()}%"
+      yield "#{lkId} GC=#{s.gcContent()}%"
     }.getOrElse("#{lkId}: not found")
     IO::println("  #{gcStr}")
   }

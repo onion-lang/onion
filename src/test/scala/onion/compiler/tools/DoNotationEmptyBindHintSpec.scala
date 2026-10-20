@@ -21,7 +21,7 @@ class DoNotationEmptyBindHintSpec extends AbstractShellSpec {
           |public:
           |  static def f(): Option[Int] = do[Option] {
           |    x <- Option::none()
-          |    ret x + 1
+          |    yield x + 1
           |  }
           |  static def main(args: String[]): Int {
           |    return f().getOrElse(-100)
@@ -42,7 +42,7 @@ class DoNotationEmptyBindHintSpec extends AbstractShellSpec {
           |  static def main(args: String[]): Int {
           |    val o: Option[Int] = do[Option] {
           |      x <- Option::none()
-          |      ret x + 1
+          |      yield x + 1
           |    }
           |    return o.getOrElse(-100)
           |  }
@@ -62,7 +62,7 @@ class DoNotationEmptyBindHintSpec extends AbstractShellSpec {
           |  static def main(args: String[]): Int {
           |    val o: Option[Int] = do[Option] {
           |      x <- Option::some(5)
-          |      ret x + 1
+          |      yield x + 1
           |    }
           |    return o.getOrElse(-100)
           |  }
@@ -82,7 +82,7 @@ class DoNotationEmptyBindHintSpec extends AbstractShellSpec {
           |  static def f(): Option[Int] = do[Option] {
           |    x <- Option::none()
           |    y <- Option::none()
-          |    ret x + y
+          |    yield x + y
           |  }
           |  static def main(args: String[]): Int {
           |    return f().getOrElse(-100)
@@ -103,7 +103,7 @@ class DoNotationEmptyBindHintSpec extends AbstractShellSpec {
           |  static def main(args: String[]): Int {
           |    val o: Option[Int] = do[Option] {
           |      x <- (Option::none() as Option[Int])
-          |      ret x + 1
+          |      yield x + 1
           |    }
           |    return o.getOrElse(-100)
           |  }
@@ -125,7 +125,7 @@ class DoNotationEmptyBindHintSpec extends AbstractShellSpec {
           |  static def g(): Future[Int] = do[Future] {
           |    x <- Future::successful(10)
           |    y <- Future::successful(20)
-          |    ret x + y
+          |    yield x + y
           |  }
           |  static def main(args: String[]): Int {
           |    return g().getOrElse(-100)

@@ -156,7 +156,7 @@ public sealed interface Result<T, E> permits Result.Ok, Result.Err {
      * Creates a successful result containing the given value.
      */
     /**
-     * Monadic unit used by do-notation's 'ret'.
+     * Monadic unit used by do-notation's 'yield'.
      */
     static <T, E> Result<T, E> successful(T value) {
         return ok(value);

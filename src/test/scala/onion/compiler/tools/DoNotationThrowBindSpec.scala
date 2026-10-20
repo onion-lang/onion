@@ -5,7 +5,7 @@ import onion.tools.Shell
 /**
  * Tests for issue #284: in `do[Future]`, a bind whose RHS is a throw-only lambda
  * (its body infers to bottom, widened to Object) used to leave the bound variable
- * typed Object, breaking `+` / `ret` on it. When the do block's result type is
+ * typed Object, breaking `+` / `yield` on it. When the do block's result type is
  * declared (`val r: Future[E] = do[Future] { ... }`), the element type `E` is now
  * threaded into the throw-only bind so the bound variable is typed `E`.
  *
@@ -22,7 +22,7 @@ class DoNotationThrowBindSpec extends AbstractShellSpec {
           |  static def main(args: String[]): Int {
           |    val r: Future[Int] = do[Future] {
           |      b <- Future::async(() -> { throw new RuntimeException("mid fail") })
-          |      ret b + 1
+          |      yield b + 1
           |    }
           |    return r.getOrElse(-100)
           |  }
@@ -34,7 +34,7 @@ class DoNotationThrowBindSpec extends AbstractShellSpec {
       assert(Shell.Success(-100) == result)
     }
 
-    it("types `ret b` alone against the declared element type") {
+    it("types `yield b` alone against the declared element type") {
       val result = shell.run(
         """
           |class Test {
@@ -42,7 +42,7 @@ class DoNotationThrowBindSpec extends AbstractShellSpec {
           |  static def main(args: String[]): Int {
           |    val r: Future[Int] = do[Future] {
           |      b <- Future::async(() -> { throw new RuntimeException("x") })
-          |      ret b
+          |      yield b
           |    }
           |    return r.getOrElse(-100)
           |  }
@@ -63,7 +63,7 @@ class DoNotationThrowBindSpec extends AbstractShellSpec {
           |    val r: Future[Int] = do[Future] {
           |      a <- Future::async(() -> 10)
           |      b <- Future::async(() -> { throw new RuntimeException("x") })
-          |      ret a + b
+          |      yield a + b
           |    }
           |    return r.getOrElse(-100)
           |  }
@@ -84,7 +84,7 @@ class DoNotationThrowBindSpec extends AbstractShellSpec {
           |    val r: Future[Int] = do[Future] {
           |      a <- Future::async(() -> 10)
           |      b <- Future::async(() -> 20)
-          |      ret a + b
+          |      yield a + b
           |    }
           |    return r.getOrElse(-100)
           |  }

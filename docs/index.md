@@ -64,7 +64,7 @@ select value {
 val result: Option[Int] = do[Option] {
   x <- parseNumber("42")
   y <- parseNumber("10")
-  ret x + y
+  yield x + y
 }
 
 // Async programming with Future

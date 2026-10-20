@@ -1547,6 +1547,7 @@ Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // List of entry names
 Files::listFiles("dir")                // List of java.io.File entries
 Files::glob("dir", "*.on")             // glob-matched names
+Files::walk("dir")                     // every file under dir, recursively: relative paths, sorted
 Files::delete(path) / Files::exists(path)
 Files::isFile(path) / Files::isDirectory(path)
 Files::mkdirs(path)                    // creates dir + missing parents

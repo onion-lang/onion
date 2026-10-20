@@ -2093,6 +2093,7 @@ Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // エントリ名の List
 Files::listFiles("dir")                // java.io.File エントリの List
 Files::glob("dir", "*.on")             // glob にマッチしたエントリ名
+Files::walk("dir")                     // dir 以下の全ファイルを再帰的に（相対パス、ソート済み）
 Files::delete(path) / Files::exists(path)
 Files::isFile(path) / Files::isDirectory(path)
 Files::mkdirs(path)                    // ディレクトリと不足する親ディレクトリを作成

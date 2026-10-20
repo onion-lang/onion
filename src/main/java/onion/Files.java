@@ -265,6 +265,36 @@ public final class Files {
     }
 
     /**
+     * Every regular file under a directory, recursively, as paths relative to it
+     * (using /), sorted -- like {@code find dir -type f}. Directories themselves are
+     * not listed (unlike {@code glob(dir, "**")}), unreadable entries are skipped,
+     * and a path that is not a directory gives an empty list.
+     *
+     * Usage:
+     *   foreach f in Files::walk("src") { ... }
+     */
+    public static java.util.List<String> walk(String dir) throws IOException {
+        java.nio.file.Path base = java.nio.file.Paths.get(dir);
+        java.util.ArrayList<String> result = new java.util.ArrayList<>();
+        if (!java.nio.file.Files.isDirectory(base)) return result;
+        java.nio.file.Files.walkFileTree(base, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
+            @Override
+            public java.nio.file.FileVisitResult visitFile(java.nio.file.Path p, java.nio.file.attribute.BasicFileAttributes attrs) {
+                if (attrs.isRegularFile()) {
+                    result.add(base.relativize(p).toString().replace(File.separatorChar, '/'));
+                }
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+            @Override
+            public java.nio.file.FileVisitResult visitFileFailed(java.nio.file.Path p, IOException e) {
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+        });
+        java.util.Collections.sort(result);
+        return result;
+    }
+
+    /**
      * Glob-matches files under a directory. The pattern uses standard glob
      * syntax: * (within a segment), ** (across directories), ? and ranges.
      *

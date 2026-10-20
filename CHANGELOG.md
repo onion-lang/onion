@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`val (yes, no) = xs.partition { ... }`: a List destructures by index.** It was `E0047 ... is not a record type` (plus an `E0002` for every name). The i-th name binds element i, typed as the List's element type; a shorter list throws `IndexOutOfBoundsException`, extra elements are ignored.
+
 - **`foreach x in xs { ... }` needs no type annotation.** It was a syntax error (`expecting ":"`, with a hint about `for x in xs`). The loop variable now takes the collection's element type: an array's component type, an `Iterable`'s element type (`List[Order]` gives `Order`, so `x.total()` resolves), or `Object` for a raw collection. `foreach x: T in xs` is unchanged.
 
 - **`m.map { k, v -> ... }` on a Map returns a List of the results, as in Kotlin.** It was E0005 (`did you mean: get`); the operation existed only as `Maps::toList(m, mapper)`. Also `Maps::map(m, mapper)`.

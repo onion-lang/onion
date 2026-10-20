@@ -73,7 +73,9 @@ private[compiler] final class ExtensionMethodFallbackSupport(
             val methodSubst = GenericMethodTypeArguments.infer(
               typing, node, staticMethod, staticArgs, classSubst, expected, reportErrors = false)
             val expectedArgs = TypeSubst.args(staticMethod, classSubst, methodSubst)
-            calls.processParamsWithExpected(node, staticArgs, expectedArgs).map { finalParams =>
+            // Silent, like the rest of this path: an argument that does not fit (`[1] + aStringList`)
+            // must fall back to the caller's own operator error, not add an E0000 of its own.
+            typing.withSuppressedReporting(calls.processParamsWithExpected(node, staticArgs, expectedArgs)).map { finalParams =>
               val call = new CallStatic(containerClass, staticMethod, finalParams)
               TypeSubst.withCast(call, TypeSubst.result(staticMethod.returnType, classSubst, methodSubst))
             }

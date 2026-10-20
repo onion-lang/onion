@@ -139,7 +139,7 @@ val i: Int = (3.14 as Int)
 val name: Type = expr     // 不変
 var name: Type = expr     // 可変
 val inferred = expr       // ローカル型推論
-val (a, b) = recordValue  // 分解（records / Map.Entry）
+val (a, b) = recordValue  // 分解（records / Map.Entry / List は添字順）
 ```
 
 ### 関数
@@ -494,6 +494,7 @@ val label = if ok { "yes" } else { "no" }
 while cond { ... }
 do { ... } while cond                  // 本体優先
 for var i = 0; i < n; i += 1 { ... }
+foreach x in collection { ... }        // 型はコレクションから推論
 foreach x: Type in collection { ... }
 foreach i: Int in 0..<n { ... }
 foreach (k, v) in map { ... }

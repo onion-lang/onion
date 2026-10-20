@@ -23,6 +23,15 @@ class CsvEnrichedSpec extends AbstractShellSpec {
     assert(expect == shell.run(src, "CsvEnrichedStr.on", Array()))
   }
 
+  describe("Csv::parse leading UTF-8 BOM") {
+    it("treats a leading U+FEFF as an encoding marker, not part of the first header") {
+      runStr(
+        "val rows = Csv::parseWithHeader(\"\\uFEFFname,age\\nann,3\\n\")\n" +
+        "return \"\" + rows[0].containsKey(\"name\") + \" \" + rows[0][\"name\"]",
+        Shell.Success("true ann"))
+    }
+  }
+
   describe("Csv::parse unterminated quote") {
     it("throws naming the line where the quote was opened") {
       runStr(

@@ -137,7 +137,8 @@ private[compiler] final class CallOverloadSupport(
 
   def selectMostSpecificApplicable(
     applicable0: List[ApplicableMethod],
-    relevantIndices: Seq[Int] = Nil
+    relevantIndices: Seq[Int] = Nil,
+    argTypes: Array[Type] = null
   ): CandidateSelection[ApplicableMethod] = {
     // Java-style phasing: varargs are only considered when no fixed-arity
     // method is applicable (List.of(1,2,3) prefers of(E,E,E) over of(E...))
@@ -150,7 +151,7 @@ private[compiler] final class CallOverloadSupport(
       def compareApplicable(a1: ApplicableMethod, a2: ApplicableMethod): Int =
         if isMoreSpecific(a1.expectedArgs, a2.expectedArgs, relevantIndices) then -1
         else if isMoreSpecific(a2.expectedArgs, a1.expectedArgs, relevantIndices) then 1
-        else 0
+        else boxingTiebreak(a1.expectedArgs, a2.expectedArgs, argTypes)
 
       val sorted = applicable.sortWith((a1, a2) => compareApplicable(a1, a2) < 0)
       if (sorted.length >= 2 && compareApplicable(sorted.head, sorted(1)) >= 0)
@@ -235,6 +236,31 @@ private[compiler] final class CallOverloadSupport(
         }
       }
     }
+
+  /**
+   * Java's phase-1 preference for incomparable int/reference overloads, by the actual
+   * argument types: a primitive argument favours the formal that is that same primitive,
+   * a boxed one the reference formal it reaches without unboxing (`valueOf(Object)` over
+   * `valueOf(int)` for an Integer). The instance-call path applies the same rule in
+   * MethodResolutionSupport. 0 when there are no argument types or the positions disagree.
+   */
+  private def boxingTiebreak(a1: Array[Type], a2: Array[Type], argTypes: Array[Type]): Int = {
+    if (argTypes == null || a1.length != argTypes.length || a2.length != argTypes.length) return 0
+    var oneBetter = false
+    var twoBetter = false
+    argTypes.indices.foreach { i =>
+      val actual = argTypes(i)
+      val (f1, f2) = (a1(i), a2(i))
+      if (actual != null && actual.isBasicType) {
+        if ((f1 eq actual) && !(f2 eq actual) && !f2.isBasicType) oneBetter = true
+        else if ((f2 eq actual) && !(f1 eq actual) && !f1.isBasicType) twoBetter = true
+      } else if (actual != null && !actual.isNullType && !actual.isBottomType) {
+        if (!f1.isBasicType && f2.isBasicType) oneBetter = true
+        else if (!f2.isBasicType && f1.isBasicType) twoBetter = true
+      }
+    }
+    if (oneBetter && !twoBetter) -1 else if (twoBetter && !oneBetter) 1 else 0
+  }
 
   private def isMoreSpecific(
     candidate: Array[Type],

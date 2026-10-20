@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **A `do` block's final value is written `yield`, not `ret`.**
+  - Before: `do[Option] { a <- getA(); ret a + 1 }`
+  - Now: `do[Option] { a <- getA(); yield a + 1 }`
+  - `yield` is a reserved word (call a Java `yield` method as ``Thread::`yield`()``); `ret` is an ordinary identifier, and old code gets a hint naming `yield`. See [Migrating to 1.0](docs/migration/pre-1.0.md).
+
 ### Added
 
 - **`<`, `<=`, `>`, `>=` compare any `Comparable`: `"abc" < "abd"`, two `LocalDate`s, `BigDecimal`s.** They accepted only numbers (`E0001 operator < is not applicable for type String, String`). On a non-null operand with `compareTo` they now mean `a.compareTo(b) < 0` etc., as in Kotlin; numeric comparison is unchanged.
@@ -34,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The `List` pipeline works on an array of references, so `line.split(" ").distinct()` needs no `.toList()`.** An array (`String.split`'s result, `main`'s `args`) had only `map`/`filter`/`toList`; `distinct`, `groupBy`, `sortedBy`, `join`, `take`, `first`, `count` and the rest were E0005. Each now applies to the elements as a `List` and returns what the `List` method returns. Arrays of primitives (`new Int[n]`) are unchanged.
 
 ### Fixed
+
+- **A List-style call on a Java Stream says to convert it first.** `s.lines()`/`s.chars()` are Java's String methods and return a Stream, so `s.lines().size`, `.first()`, `.join(",")` or `[0]` got a misleading guess (`min`, `limit`, `map`). They now say `did you mean: toList().size` (`boxed().toList()...` for an IntStream).
 
 - **A static call on a nested class names the enclosing class's method.** `Response::json(body)` (the helpers live on `Server`, not `Server.Response`) said `did you mean: of`; it now says `did you mean: Server::json`. Applies whenever the enclosing class has a static method of that name and arity.
 

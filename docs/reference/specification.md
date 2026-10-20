@@ -580,13 +580,13 @@ val r: Runnable = () -> println("hi")   // SAM conversion
 ### Do Notation
 
 ```onion
-do[Option] { a <- getA(); b <- getB(); ret a + b }
-do[Future] { x <- fetch(); ret x.size() }
-do[List]   { x <- [1, 2]; y <- ["a", "b"]; ret x + y }   // comprehension
+do[Option] { a <- getA(); b <- getB(); yield a + b }
+do[Future] { x <- fetch(); yield x.size() }
+do[List]   { x <- [1, 2]; y <- ["a", "b"]; yield x + y }   // comprehension
 ```
 
 `x <- e; rest` desugars to `e.bind((x) -> rest)`; a binding followed
-directly by the final `ret e2` becomes `e.map((x) -> e2)`. Any type with
+directly by the final `yield e2` becomes `e.map((x) -> e2)`. Any type with
 `bind`/`map` (instance or extension methods) is do-able: `Option`,
 `Result`, `Future`, `List` (comprehension), and user types. Works at the
 script top level too.

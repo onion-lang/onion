@@ -220,7 +220,7 @@ def bstNavigateTo(z: Zipper[Int], v: Int): Boolean {
 def safeLookup(t: BTree[Int], a: Int, b: Int): Option[Int] = do[Option] {
   a2 <- Trees::bstFind(t, a)
   b2 <- Trees::bstFind(t, b)
-  ret a2 + b2
+  yield a2 + b2
 }
 
 // ── Pretty printer ─────────────────────────────────────────────────────────

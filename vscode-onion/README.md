@@ -7,7 +7,7 @@ Language support for the [Onion programming language](https://github.com/onion-l
 - **Syntax Highlighting** — TextMate-based highlighting for Onion source files
   (`.on`): keywords, types, strings with `#{}` interpolation, numbers,
   operators (including `as`, `?.`, `?:`, `!!`, `|>`, ranges), `select`/`case
-  is`/`when`, `do`/`ret` notation, records, enums, traits and instances,
+  is`/`when`, `do`/`yield` notation, records, enums, traits and instances,
   backtick-quoted identifiers, and scheme-prefixed raw literals (`re"…"`,
   `file"…"`, `http"…"`, and any prefix you define) — with `re"…"` bodies
   highlighted as regular expressions.

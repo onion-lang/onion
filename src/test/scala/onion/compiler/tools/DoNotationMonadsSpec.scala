@@ -16,8 +16,8 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    val r = do[Option] { a <- Option::some(40); b <- Option::some(2); ret (a as Int) + (b as Int) }
-          |    val n = do[Option] { a <- Option::some(1); b <- Option::none(); ret a }
+          |    val r = do[Option] { a <- Option::some(40); b <- Option::some(2); yield (a as Int) + (b as Int) }
+          |    val n = do[Option] { a <- Option::some(1); b <- Option::none(); yield a }
           |    return r.get() + ":" + n.isEmpty()
           |  }
           |}
@@ -37,7 +37,7 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
           |    val r = do[Option] {
           |      a <- Option::some(10)
           |      b <- Option::some(20)
-          |      ret (a as Int) + (b as Int)
+          |      yield (a as Int) + (b as Int)
           |    }
           |    return (r.get() as Int)
           |  }
@@ -60,7 +60,7 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
           |    val r = do[Option] {
           |      a <- Option::some(3)
           |      b <- Option::none()
-          |      ret (a as Int) + (b as Int)
+          |      yield (a as Int) + (b as Int)
           |    }
           |    return r.isEmpty().toString()
           |  }
@@ -81,7 +81,7 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
           |    val r = do[Option] {
           |      b <- Option::none()
           |      a <- Option::some(7)
-          |      ret (a as Int) + (b as Int)
+          |      yield (a as Int) + (b as Int)
           |    }
           |    return r.isEmpty().toString()
           |  }
@@ -102,7 +102,7 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
           |    val r = do[Option] {
           |      a <- Option::some(5)
           |      b <- Option::none[Int]()
-          |      ret (a as Int) + (b as Int)
+          |      yield (a as Int) + (b as Int)
           |    }
           |    return r.isEmpty().toString()
           |  }
@@ -122,7 +122,7 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): Int {
-          |    val r = do[Result] { a <- Result::ok(20); b <- Result::ok(22); ret (a as Int) + (b as Int) }
+          |    val r = do[Result] { a <- Result::ok(20); b <- Result::ok(22); yield (a as Int) + (b as Int) }
           |    return (r.getOrThrow() as Int)
           |  }
           |}
@@ -144,7 +144,7 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
           |    val pairs = do[List] {
           |      x <- [1, 2]
           |      y <- ["a", "b"]
-          |      ret x + y
+          |      yield x + y
           |    }
           |    return pairs.toString()
           |  }
@@ -162,7 +162,7 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  static def main(args: String[]): String {
-          |    val sq = do[List] { x <- [1, 2, 3]; ret x * x }
+          |    val sq = do[List] { x <- [1, 2, 3]; yield x * x }
           |    return sq.toString()
           |  }
           |}
@@ -178,7 +178,7 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
     it("desugars top-level statements containing do expressions") {
       val result = shell.run(
         """
-          |val r = do[Option] { a <- Option::some(40); b <- Option::some(2); ret (a as Int) + (b as Int) }
+          |val r = do[Option] { a <- Option::some(40); b <- Option::some(2); yield (a as Int) + (b as Int) }
           |IO::println(r.get())
           |""".stripMargin,
         "DoTopLevel.on",

@@ -350,7 +350,7 @@ def lookupTask(board: TaskBoard, id: Int): void {
 def taskPriorityLabel(board: TaskBoard, id: Int): Option[String] {
   return do[Option] {
     t <- findTask(board, id)
-    ret t.priority().label().trim()
+    yield t.priority().label().trim()
   }
 }
 

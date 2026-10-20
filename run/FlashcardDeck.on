@@ -337,7 +337,7 @@ val lookups: List[Int] = [3, 7, 99]
 foreach id: Int in lookups {
   val msg: String = do[Option] {
     card <- deck.findCard(id)
-    ret "card #{id}: #{card.front()} = #{card.back()}"
+    yield "card #{id}: #{card.front()} = #{card.back()}"
   }.getOrElse("card #{id}: not found")
   IO::println("  #{msg}")
 }

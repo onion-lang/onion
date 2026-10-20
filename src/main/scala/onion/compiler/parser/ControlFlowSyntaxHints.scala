@@ -47,11 +47,9 @@ private[compiler] object ControlFlowSyntaxHints {
   // the generic missing-call-parens fallback (suggesting the nonsensical
   // `await(...)`); keep this ahead of that case.
   private val LeadingAwaitStatement = """^\s*await\s+(.+?)\s*$""".r
-  // A JavaScript/Python-style generator `yield expr` statement -- Onion has no
-  // generator/coroutine construct, so this reads as a bare `yield` identifier
-  // followed by another expression with nothing in between, which also matches
-  // the generic missing-call-parens fallback (suggesting the nonsensical
-  // `yield(...)`); keep this ahead of that case.
+  // A JavaScript/Python-style generator `yield expr` statement outside a do block --
+  // `yield` gives only a `do[M] { ... }` block's final value, and Onion has no
+  // generator/coroutine construct.
   private val LeadingYieldStatement = """^\s*yield\s+(.+?)\s*$""".r
   // A Go-style prefix `defer expr` statement -- Onion has no `defer`, so this
   // reads as a bare `defer` identifier followed by another expression with

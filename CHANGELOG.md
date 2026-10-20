@@ -7,9 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`Http.Response` has `status()`, `body()` and `headers()` methods.** Only the fields existed, so `res.status()` -- the spelling `Server.Response.status()`, `HttpFailure.kind()` and record accessors use -- was `E0005`. The fields keep working.
+
+- **`xs.associateBy { ... }`, `xs.indexOfFirst { ... }`, `xs.maxOrNull()`, `xs.minOrNull()`.** Index a list by a key (later element wins), find the first matching index (-1 if none), and take a max/min that is null for an empty list (`max()`/`min()` throw). `firstOrNull`/`lastOrNull` now hint at `first`/`last`, which already return null on an empty list.
+
+- **`[1, 2] + [3]` concatenates two Lists.** It was `E0001 operator + is not applicable for type List[Int], List[Int]`. `xs + ys` (also `xs.plus(ys)`, `xs += ys`) returns a new List, as `Colls::concat` does. Generic operator extensions now infer their type arguments, so this keeps the element type.
+
+- **`val (yes, no) = xs.partition { ... }`: a List destructures by index.** It was `E0047 ... is not a record type` (plus an `E0002` for every name). The i-th name binds element i, typed as the List's element type; a shorter list throws `IndexOutOfBoundsException`, extra elements are ignored.
+
+- **`foreach x in xs { ... }` needs no type annotation.** It was a syntax error (`expecting ":"`, with a hint about `for x in xs`). The loop variable now takes the collection's element type: an array's component type, an `Iterable`'s element type (`List[Order]` gives `Order`, so `x.total()` resolves), or `Object` for a raw collection. `foreach x: T in xs` is unchanged.
+
+- **`m.map { k, v -> ... }` on a Map returns a List of the results, as in Kotlin.** It was E0005 (`did you mean: get`); the operation existed only as `Maps::toList(m, mapper)`. Also `Maps::map(m, mapper)`.
+
+- **A lambda with the wrong number of parameters is now `E0101`, naming both counts.** `m.filter { e -> ... }` on a Map, `xs.map { a, b -> ... }` or `xs.fold(0) { acc -> ... }` reported `E0005: a method applicable for Function2[String, Int, Boolean].call(Object) is not found` (twice for `map`), pointing at the function interface's internal `call` method. It now says `this lambda takes 1 parameter(s), but the expected function type Function2[String, Int, Boolean] takes 2.`, once.
+
+- **`"42".toInt()`, `.toLong()` and `.toDouble()` read a number, throwing on bad input.** These were E0005 (`did you mean: trim`), leaving `Integer::parseInt` or the null-returning `toIntOrNull`. They follow the `OrNull` forms' rules (surrounding spaces allowed; `toDouble` rejects `1d`/`NaN`/`Infinity`) and throw `NumberFormatException: not an integer: "abc"` (or `not a number: ...`). Also `Strings::toInt(s)`.
+- **The `List` pipeline works on an array of references, so `line.split(" ").distinct()` needs no `.toList()`.** An array (`String.split`'s result, `main`'s `args`) had only `map`/`filter`/`toList`; `distinct`, `groupBy`, `sortedBy`, `join`, `take`, `first`, `count` and the rest were E0005. Each now applies to the elements as a `List` and returns what the `List` method returns. Arrays of primitives (`new Int[n]`) are unchanged.
+
 ### Fixed
 
 - **`(aList as String[])` (any `List[T] as T[]` cast, and the reverse) type-checked but always threw a raw `ClassCastException` at runtime (#2258).** `as` already rejects unrelated reference casts like `String as Int`, but fell through to "always valid" for a cast between a non-array class type and an array type, since arrays and ordinary classes never shared an `isValidCast` case. Such a cast is now rejected at compile time unless the class side is `Object`, `Serializable`, or `Cloneable` -- the only types a JVM array actually is one of -- so `(arr as Object)` and `(obj as String[])` (obj: Object) keep working.
+- **A static call on a nested class names the enclosing class's method.** `Response::json(body)` (the helpers live on `Server`, not `Server.Response`) said `did you mean: of`; it now says `did you mean: Server::json`. Applies whenever the enclosing class has a static method of that name and arity.
+
+- **Calling a String method by another language's name now names Onion's.** `s.reversed()`, `padStart`/`padEnd`, `trimStart`/`trimEnd`, `splitlines`, `title`, `find`, `includes`, `len`, `toUpper`, `splitWhitespace` and `format` gave no hint or a wrong one (`padEnd` -> `indent`, `find` -> `lines`); each now says `did you mean: reverse` (`padLeft`/`padRight`, `stripLeading`/`stripTrailing`, `lines`, `capitalizeWords`, `indexOf`, `contains`, `length`, `upper`, `words`, `formatted`).
+
+- **A boxed argument picks the `Object` overload for static calls too, and `foreach x in t` reads a type variable's bound.** `String::valueOf(boxedInt)` or a user's `static def f(x: Object)`/`f(x: Int)` called with a boxed value was still `E0006`, as only instance calls had the rule; and an unannotated `foreach v in t` with `t: T` where `[T extends Iterable[Int]]` bound `v` as `Object`.
+- **Three diagnostics introduced this cycle are tightened.** `E0101` is now reported in every file that has the mistake (a second file with the same line/column lost it); `[1, 2] + aStringList` reports only the operator error, without a spurious `E0000`; and the sibling-method hint no longer names a `private` method.
+
+- **Passing a positional parameter as a flag says it is positional.** `greet --name kota` for `tool greet(name: String)` (or `--src a` for `def main(src: String)`) said only `unknown option`; it now adds ``name` is positional: pass the value without `--name``. The kebab-case spelling is recognized too.
+
+- **A failed call names a sibling method that takes those arguments.** `Csv::stringify(rows)` on header-mapped rows (what `csvRows()` returns) listed only `available: stringify(List[List[String]])`; it now says `did you mean: stringifyWithHeader(List[Map[String, String]])`. Applies whenever a same-kind method whose name extends the called one accepts the arguments.
+
+- **A boxed value passed to an `int`/`Object` overload picks `Object`, as Java does.** `sb.append(xs[0])` or `foreach i in 1..3 { sb.append(i) }` (a `List[Int]` element is a boxed `Integer`) failed with `E0006 applicable for both StringBuilder.append(Int) and StringBuilder.append(Object)`. Java takes the overload reached without unboxing; so does Onion now. A primitive `Int` argument still takes `append(int)`.
+
+- **`aSet.toList()` compiles.** On any `Set` (`keySet()`, `entrySet()`, `Colls::toSet(...)`) it failed with `E0006 method call is applicable for both Colls.toList() and Iterables.toList()` plus a stray `E0005`. The more specific `toList(Set)` now wins over `toList(Iterable)`, as Java overload resolution would; the result is `Colls::toList`'s unmodifiable list.
+
+- **Calling a `List` method by the name another language gives it now names Onion's spelling.** `xs.sortBy { ... }` suggested `sort`, `xs.forall { ... }` suggested `addAll`, `xs.each { ... }` suggested `add`, and `joinToString`/`foldLeft`/`inject`/`sumOf`/`unique`/`nonEmpty`/`collect`/`sortByDescending` suggested nothing. Each now says `did you mean: sortedBy` (`all`, `forEach`, `join`, `fold`, `sumBy`, `distinct`, `isNotEmpty`, `map`, `sortedByDescending`).
 - **A `W0012`/`W0015` warning (null to non-nullable, or implicit unboxing of a boxed platform value) printed no source file name, `[W0012] :1:17: ...` instead of `[W0012] w6.on:1:17: ...`, when it was the very first warning of the compilation (#2238).** Both warnings are reported straight from the assignability check, which relied on an earlier, unrelated diagnostic having already told the reporter the current file; with no such diagnostic yet, the file name was still empty. Both call sites now set it themselves first, like the other warnings already do.
 - **A multi-`tool` file's `--help` ran the shared `--plan`/`--contract`/`--help` lines straight into the last declared tool's own option list, with no visual break, so they read as that tool's options rather than global flags (#2252).** Each tool's usage block now ends with a blank line when the file declares more than one, setting the global flags apart; single-tool output is unchanged.
 
@@ -22,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`law`/`example` written outside a record's own body now says so, instead of a wrong or missing hint** (#2202). `law name(...) { ... }` in a `class`/`enum` body got the unrelated "write `def method(): void { ... }`" advice (it has the same `Ident Ident(...)` shape as a genuine Java-style method mistake), and a bare `example { ... }` got no hint at all. Both now point at the one place the clause actually parses: directly inside a record's body.
 - **`set.map { ... }` now keeps insertion order, like `Sets::map`.** The pipeline form resolved to `Iterables::map`, which collected into a plain `HashSet`, so the same operation reordered results depending on call syntax (#2178). `null` handling still differs (`a.map` throws, `Sets::map` returns an empty set).
 - **`Outcome::bad([])` silently built a `Bad` with no defects, breaking the type's own documented "Never empty" invariant** (#2177). `bad.isBad()` was `true` while `bad.defects().size` was `0` and `bad.describe()` returned `""` -- a failure that reported no reason at all. `Outcome.Bad`'s constructor now rejects a null or empty defects list with `IllegalArgumentException`; every internal caller already guards against this, so only direct misuse from Onion code is affected.
 - **`Args::parse` silently dropped a negative-number value given as `--name -5` instead of `--name=-5`, reading `--name` as a bare flag and splitting `-5` into unrelated single-character short flags (#2194).** `option("count")` came back `null` and `intOption("count", default)` silently returned the default instead of `-5`. The token after `--name` now also counts as that option's value when it is a negative number (`-5`, `-3.14`), not just when it doesn't start with `-`; `--name=value` was already unaffected.

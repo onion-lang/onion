@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0101) for identification
+ * type checking. Each error has a unique code (E0000-E0102) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -25,7 +25,7 @@ package onion.compiler
  *   - VARIABLE_NOT_FOUND, CLASS_NOT_FOUND, FIELD_NOT_FOUND, METHOD_NOT_FOUND
  *   - CONSTRUCTOR_NOT_FOUND, AMBIGUOUS_METHOD, AMBIGUOUS_CONSTRUCTOR
  *
- * '''Duplication Errors (E0007-E0012, E0025-E0026, E0029, E0053-E0054, E0084, E0097, E0101)'''
+ * '''Duplication Errors (E0007-E0012, E0025-E0026, E0029, E0053-E0054, E0084, E0097, E0102)'''
  *   - DUPLICATE_LOCAL_VARIABLE, DUPLICATE_CLASS, DUPLICATE_FIELD, DUPLICATE_METHOD
  *   - DUPLICATE_GLOBAL_VARIABLE, DUPLICATE_FUNCTION, DUPLICATE_CONSTRUCTOR
  *   - DUPLICATE_GENERATED_METHOD, DUPLICATE_TYPE_PARAMETER, CYCLIC_TYPE_ALIAS
@@ -93,7 +93,10 @@ package onion.compiler
  * '''Pattern Matching Errors, continued (E0100)'''
  *   - MULTIPLE_BINDING_PATTERNS_IN_CASE
  *
- * '''Duplication Errors, continued (E0101)'''
+ * '''Lambda Errors, continued (E0101)'''
+ *   - LAMBDA_ARITY_MISMATCH
+ *
+ * '''Duplication Errors, continued (E0102)'''
  *   - DUPLICATE_EXTENSION_BLOCK
  *
  * == Error Message Lookup ==
@@ -311,6 +314,14 @@ object SemanticError {
    * each such alternative as its own `case` clause instead.
    */
   case object MULTIPLE_BINDING_PATTERNS_IN_CASE extends SemanticError(100)
+
+  /**
+   * A lambda's parameter count differs from that of the function type expected for it
+   * (`m.filter { e -> ... }` where Map's filter takes a `(key, value)` function).
+   * Arguments: lambda parameter count, expected function type, its parameter count.
+   */
+  case object LAMBDA_ARITY_MISMATCH extends SemanticError(101)
+
   /**
    * Two `extension` blocks for the same receiver type within one compilation
    * unit (the exact same concrete instantiation, e.g. `List[Int]` twice, or
@@ -324,7 +335,7 @@ object SemanticError {
    * Cross-unit duplicates still surface as a duplicate-class error, since
    * they redefine the same class.
    */
-  case object DUPLICATE_EXTENSION_BLOCK extends SemanticError(101)
+  case object DUPLICATE_EXTENSION_BLOCK extends SemanticError(102)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

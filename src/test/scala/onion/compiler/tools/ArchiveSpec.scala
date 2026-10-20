@@ -1,7 +1,7 @@
 package onion.compiler.tools
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import onion.tools.Shell
@@ -169,6 +169,30 @@ class ArchiveSpec extends AbstractShellSpec {
       assert(!Files.exists(escaped), s"the entry escaped the target directory to $escaped")
     }
 
+    it("returns absolute paths from unzip even when targetDir is given as relative") {
+      val work = Files.createTempDirectory("onion-archive-relzip")
+      val zip = work.resolve("rel.zip")
+      val stream = new ZipOutputStream(Files.newOutputStream(zip))
+      try {
+        stream.putNextEntry(new ZipEntry("a.txt"))
+        stream.write("hi".getBytes(UTF_8))
+        stream.closeEntry()
+      } finally stream.close()
+
+      val relative = "onion-archive-relzip-out-" + java.util.UUID.randomUUID()
+      val relativeDir = Paths.get(relative)
+      try {
+        val written = onion.Archive.unzip(zip.toString, relative)
+        assert(written.size == 1)
+        val path = written.get(0).asInstanceOf[String]
+        assert(Paths.get(path).isAbsolute, s"expected an absolute path, got $path")
+      } finally {
+        if (Files.exists(relativeDir)) {
+          Files.walk(relativeDir).sorted(java.util.Comparator.reverseOrder[Path]()).forEach(Files.delete(_))
+        }
+      }
+    }
+
     it("reports empty or too-short gzip input with a real reason, not (null)") {
       val bytes = intercept[RuntimeException] { onion.Archive.gunzip(new Array[Byte](0)) }
       assert(!bytes.getMessage.contains("null"), bytes.getMessage)
@@ -182,6 +206,21 @@ class ArchiveSpec extends AbstractShellSpec {
       }
       assert(!file.getMessage.contains("null"), file.getMessage)
       assert(file.getMessage.contains("empty.bin"), file.getMessage)
+    }
+
+    it("reports a missing zip file with a clear reason, not the raw IOException message") {
+      val work = Files.createTempDirectory("onion-archive-missing")
+      val missing = work.resolve("does-not-exist.zip").toString
+
+      val entriesError = intercept[RuntimeException] { onion.Archive.entries(missing) }
+      assert(entriesError.getMessage.contains("no such file"), entriesError.getMessage)
+      assert(entriesError.getMessage.contains(missing), entriesError.getMessage)
+
+      val unzipError = intercept[RuntimeException] {
+        onion.Archive.unzip(missing, work.resolve("out").toString)
+      }
+      assert(unzipError.getMessage.contains("no such file"), unzipError.getMessage)
+      assert(unzipError.getMessage.contains(missing), unzipError.getMessage)
     }
   }
 }

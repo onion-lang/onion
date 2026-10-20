@@ -9,7 +9,7 @@ import java.io.StringReader
  * collide as a generic duplicate-class error (E0008), naming the internal mangled container
  * class (`Extension$List_int`) rather than the type the user wrote, and leaving every method
  * the second block declared silently unreachable -- reported, if at all, through an unrelated
- * "method not found" at the call site (issue #2204). This asserts the dedicated E0101
+ * "method not found" at the call site (issue #2204). This asserts the dedicated E0102
  * diagnostic instead, mirroring TypeClassCoherenceSpec's treatment of a duplicate `instance`.
  */
 class ExtensionBlockCoherenceSpec extends AbstractShellSpec {
@@ -35,7 +35,7 @@ class ExtensionBlockCoherenceSpec extends AbstractShellSpec {
         "extension List[Int] { def foo(): Int = 1 }\nextension List[Int] { def bar(): Int = 2 }\ndef main(): void { val xs: List[Int] = [1,2,3]; IO::println(xs.bar()) }",
         "None", Array()))
     }
-    it("reports the duplicate-extension-block message, bilingual, carrying E0101 (#2204)") {
+    it("reports the duplicate-extension-block message, bilingual, carrying E0102 (#2204)") {
       // The receiver type renders the way the AST sees it pre-resolution -- a written
       // `Int` is the primitive descriptor's own JVM-style name ("int"), matching the
       // same pre-typing rendering used elsewhere (e.g. ExplicitTypeArgPrimitiveSpec).
@@ -50,10 +50,10 @@ class ExtensionBlockCoherenceSpec extends AbstractShellSpec {
         "extension List { def tagA(): String = \"A\" }\nextension List { def tagB(): String = \"B\" }\ndef main(): void { val xs: List[Int] = [1,2,3]; IO::println(xs.tagB()) }",
         "None", Array()))
     }
-    it("names the exact code E0101, not the generic duplicate-class E0008") {
+    it("names the exact code E0102, not the generic duplicate-class E0008") {
       val codes = errorCodes(
         "extension List { def tagA(): String = \"A\" }\nextension List { def tagB(): String = \"B\" }\ndef main(): void { val xs: List[Int] = [1,2,3]; IO::println(xs.tagB()) }")
-      assert(codes.contains("E0101"), s"expected E0101 in diagnostics, got: $codes")
+      assert(codes.contains("E0102"), s"expected E0102 in diagnostics, got: $codes")
       assert(!codes.contains("E0008"), s"E0008 should no longer leak for this case, got: $codes")
     }
     it("allows distinct concrete instantiations of the same generic receiver to coexist") {

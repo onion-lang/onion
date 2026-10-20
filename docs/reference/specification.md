@@ -145,7 +145,7 @@ val i: Int = (3.14 as Int)
 val name: Type = expr     // immutable
 var name: Type = expr     // mutable
 val inferred = expr       // local type inference
-val (a, b) = recordValue  // destructuring (records / Map.Entry)
+val (a, b) = recordValue  // destructuring (records / Map.Entry / a List by index)
 ```
 
 ### Functions
@@ -522,6 +522,7 @@ Assignment inside a parenthesized condition is allowed:
 while cond { ... }
 do { ... } while cond                  // body-first
 for var i = 0; i < n; i += 1 { ... }
+foreach x in collection { ... }        // type inferred from the collection
 foreach x: Type in collection { ... }
 foreach i: Int in 0..<n { ... }
 foreach (k, v) in map { ... }

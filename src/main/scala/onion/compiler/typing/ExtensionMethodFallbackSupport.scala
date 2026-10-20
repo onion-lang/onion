@@ -19,6 +19,9 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     reportIfNotFound: Boolean = true
   ): Option[Term] = {
     selectApplicableExtensionMethod(targetType, node.name, params) match {
+      case CandidateSelection.NoMatch if arrayAsList(node, target, targetType).isDefined =>
+        val (listTarget, listType) = arrayAsList(node, target, targetType).get
+        tryExtensionMethodCall(node, listTarget, listType, params, expected, reportIfNotFound)
       case CandidateSelection.NoMatch =>
         // reportIfNotFound is false when the caller has a further fallback to try
         // (e.g. a bean-property getter) and will report the error itself if that fails.
@@ -64,9 +67,15 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         containerClass.findMethod(name, staticArgs) match {
           case Array(staticMethod) =>
             val classSubst = TypeSubstitution.classSubstitution(containerClass)
-            val methodSubst = scala.collection.immutable.Map.empty[String, Type]
+            // Infer a generic operator's type arguments (`plus[T](List[T], List[T])` on two
+            // List[Int]s binds T = Int) instead of defaulting T to its Object bound, which made
+            // List[Int] fail against List[Object]. Silent: a miss falls back like any other.
+            val methodSubst = GenericMethodTypeArguments.infer(
+              typing, node, staticMethod, staticArgs, classSubst, expected, reportErrors = false)
             val expectedArgs = TypeSubst.args(staticMethod, classSubst, methodSubst)
-            calls.processParamsWithExpected(node, staticArgs, expectedArgs).map { finalParams =>
+            // Silent, like the rest of this path: an argument that does not fit (`[1] + aStringList`)
+            // must fall back to the caller's own operator error, not add an E0000 of its own.
+            typing.withSuppressedReporting(calls.processParamsWithExpected(node, staticArgs, expectedArgs)).map { finalParams =>
               val call = new CallStatic(containerClass, staticMethod, finalParams)
               TypeSubst.withCast(call, TypeSubst.result(staticMethod.returnType, classSubst, methodSubst))
             }
@@ -95,13 +104,57 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         // user extension expresses clear intent and should win rather than
         // collide as an ambiguity.
         val userDefined = applicable.filterNot(isBuiltinExtension)
-        val chosen = if (userDefined.nonEmpty) userDefined else applicable
+        val pool = if (userDefined.nonEmpty) userDefined else applicable
+        // As in Java overload resolution, a candidate whose receiver type is more specific
+        // than every other one's wins: `aSet.toList()` takes `toList(Set)`, not
+        // `toList(Iterable)`, instead of being reported as ambiguous.
+        val chosen = pool.filter { m =>
+          pool.forall(o => (o eq m) || isMoreSpecificReceiver(m.receiverType, o.receiverType))
+        } match {
+          case Seq(single) => Seq(single)
+          case _ => pool
+        }
         if (chosen.isEmpty) CandidateSelection.NoMatch
         else if (chosen.length > 1) CandidateSelection.Ambiguous(chosen(0), chosen(1))
         else CandidateSelection.Selected(chosen.head)
       case _ =>
         CandidateSelection.NoMatch
     }
+
+  /** A `List` pipeline call on an array of references (`line.split(" ").distinct()`):
+   *  the array as `toList()` and that `List` type, when the array has no extension of
+   *  the called name itself but `List` does. `map`/`filter` keep their own array
+   *  overloads; an array of primitives (`Int[]`) is left alone, as `toList` takes `T[]`. */
+  private def arrayAsList(node: AST.MethodCall, target: Term, targetType: ObjectType): Option[(Term, ObjectType)] =
+    targetType match {
+      case at: ArrayType if (at.dimension > 1 || !at.component.isBasicType) &&
+          collectExtensionMethods(targetType, node.name).isEmpty =>
+        selectApplicableExtensionMethod(targetType, "toList", Array.empty) match {
+          case CandidateSelection.Selected(toList) =>
+            val toListNode = node.copy(name = "toList", args = Nil, typeArgs = Nil)
+            buildExtensionCall(toListNode, target, targetType, Array.empty, null, toList).collect {
+              case term if term.`type`.isInstanceOf[ObjectType] &&
+                  collectExtensionMethods(term.`type`.asInstanceOf[ObjectType], node.name).nonEmpty =>
+                (term, term.`type`.asInstanceOf[ObjectType])
+            }
+          case _ => None
+        }
+      case _ => None
+    }
+
+  /** `a` is a strict subtype of `b` (raw class comparison, so `Set[T]` is below `Iterable[T]`). */
+  private def isMoreSpecificReceiver(a: Type, b: Type): Boolean =
+    (a, b) match {
+      case (ac: ClassType, bc: ClassType) =>
+        val (ar, br) = (rawOf(ac), rawOf(bc))
+        ar.name != br.name && TypeRules.isSuperType(br, ar)
+      case _ => false
+    }
+
+  private def rawOf(ct: ClassType): ClassType = ct match {
+    case ap: AppliedClassType => ap.raw
+    case other => other
+  }
 
   private def staticReceiver(target: Term, extMethod: ExtensionMethodDefinition): Term =
     extMethod.receiverType match {
@@ -334,6 +387,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }
 
     val candidates = collectExtensionMethods(targetType, name).filter(_.arguments.length == args.length)
+    if (candidates.isEmpty) arrayAsList(node, target, targetType) match {
+      case Some((listTarget, listType)) =>
+        break(tryExtensionMethodCallBidirectional(node, listTarget, listType, context, expected, untypedClosureIndices))
+      case None =>
+    }
     candidates.iterator.flatMap { extMethod =>
       val container = extMethod.containerClass
       val receiverType = staticReceiver(target, extMethod).`type`

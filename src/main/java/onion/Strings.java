@@ -292,6 +292,37 @@ public final class Strings {
         }
     }
 
+    /**
+     * Parses an int by the rules of {@link #toIntOrNull}, throwing
+     * {@code NumberFormatException("not an integer: \"...\"")} when {@code str} is not one.
+     */
+    public static int toInt(String str) {
+        Integer v = toIntOrNull(str);
+        if (v == null) throw new NumberFormatException("not an integer: " + quoted(str));
+        return v;
+    }
+
+    /** Parses a long by the rules of {@link #toLongOrNull}, throwing like {@link #toInt}. */
+    public static long toLong(String str) {
+        Long v = toLongOrNull(str);
+        if (v == null) throw new NumberFormatException("not an integer: " + quoted(str));
+        return v;
+    }
+
+    /**
+     * Parses a double by the rules of {@link #toDoubleOrNull}, throwing
+     * {@code NumberFormatException("not a number: \"...\"")} when {@code str} is not one.
+     */
+    public static double toDouble(String str) {
+        Double v = toDoubleOrNull(str);
+        if (v == null) throw new NumberFormatException("not a number: " + quoted(str));
+        return v;
+    }
+
+    private static String quoted(String str) {
+        return str == null ? "null" : "\"" + str + "\"";
+    }
+
     /** Parses an int, or returns {@code fallback} if {@code str} is not a valid integer. */
     public static int toIntOr(String str, int fallback) {
         Integer v = toIntOrNull(str);

@@ -1129,7 +1129,7 @@ extension Double {
 Fix: remove or rename the duplicate. Two extension methods with the same name but
 different parameter types are unaffected — that's ordinary overloading.
 
-### `E0101` — Duplicate `extension` block for the same receiver type
+### `E0102` — Duplicate `extension` block for the same receiver type
 
 Two `extension` blocks for the exact same receiver type appear in one file —
 whether the identical concrete instantiation written twice, or the same
@@ -1143,7 +1143,7 @@ found" at the call site.
 
 ```onion
 extension List[Int] { def foo(): Int = 1 }
-extension List[Int] { def bar(): Int = 2 }   // E0101: an extension block for List[Int] already exists
+extension List[Int] { def bar(): Int = 2 }   // E0102: an extension block for List[Int] already exists
 ```
 
 Fix: combine the methods into the first block. Distinct concrete
@@ -1437,6 +1437,20 @@ def isRound(sh: Shape): Boolean {
 
 A comma-joined list of plain value patterns (`case 1, 2, 3:`) is unaffected —
 only a type, destructuring, regex, or bare binding pattern triggers this.
+
+### `E0101` — Lambda has the wrong number of parameters
+
+A lambda's parameter count differs from that of the function type expected for
+it. The message gives both counts and the expected type.
+
+```onion
+val m = ["a": 1, "b": 2]
+m.filter { e -> e.getValue() > 0 }      // E0101: Map's filter takes (key, value)
+[1, 2].fold(0) { acc -> acc }           // E0101: fold's function takes (acc, element)
+```
+
+Fix: write the lambda with the parameters the function type takes —
+`m.filter { k, v -> v > 0 }`, `[1, 2].fold(0) { acc, x -> acc + x }`.
 
 ### `E0069` — Local val requires an initializer
 
@@ -1881,7 +1895,8 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0098` | enum … mixes shared parameters with `case` cases |
 | `E0099` | enum … cannot take type parameters |
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
-| `E0101` | an extension block for … already exists (combine the methods for the same type into one block) |
+| `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
+| `E0102` | an extension block for … already exists (combine the methods for the same type into one block) |
 
 ## See also
 

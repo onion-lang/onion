@@ -405,7 +405,7 @@ while condition { ... }
 for var i: Int = 0; i < 10; i++ { ... }
 
 // foreach
-foreach item: Type in collection { ... }
+foreach item in collection { ... }   // or `foreach item: Type in ...`; the type is inferred when omitted
 
 // select (pattern matching on values)
 select value {
@@ -535,7 +535,7 @@ These are frequently confused with other languages. **Always check these:**
 | `case Add(l, n is Num):` nested type pattern? | ✓ correct - type patterns nest inside destructuring, and the binding is usable at the narrowed type; also works for a non-record component (`case Wrap(s is String)`) |
 | `case Circle(r):` unsupported? | ✓ correct - record destructuring patterns work, also `case x when guard:` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
-| `for i in 0..10` (other langs) | `foreach i: Int in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive |
+| `for i in 0..10` (other langs) | `foreach i in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive; the element type is inferred (`foreach i: Int in ...` also works) |
 | `for (const x of arr) { }` (JS/TS) | `foreach x: Type in arr { }` - no `for (... of ...)` |
 | `i += 1`, `i -= 1`, `i++` | ✓ correct - compound assignment and `++`/`--` work as statements |
 | `while (x = read()) != null` | ✓ correct - assignment in condition with parens |
@@ -554,7 +554,7 @@ These are frequently confused with other languages. **Always check these:**
 | `@Override void method()` | `override def method(): void` - keyword not annotation |
 | `fun String.twice()` (Kotlin) | `extension String { def twice() { } }` - extension block |
 | `extension List[T] { ... }` (T meant as a fresh type parameter) | not supported - `extension` has no `[T]` parameter list of its own (unlike `class Box[T]`); `T` resolves as an ordinary type reference, so this is E0003 "type not found", not a fresh parameter. Write `extension List { ... }` to extend every instantiation (erasure-based), or `extension List[Int] { ... }` for one concrete instantiation (and `extension List[String]` alongside it is fine - distinct instantiations don't collide) |
-| `extension List[Int] { ... }` twice, or `extension List { ... }` split across two blocks | E0101 - at most one `extension` block per exact receiver type per file; combine the methods into the first block instead |
+| `extension List[Int] { ... }` twice, or `extension List { ... }` split across two blocks | E0102 - at most one `extension` block per exact receiver type per file; combine the methods into the first block instead |
 | `this.field = value` in constructor | ✓ correct - `this.`/`self.` works; also optional (bare `field` resolves to the field via implicit access) |
 | `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long |
 | `System.out` | `System::out` - `::` for static fields too |
@@ -583,7 +583,7 @@ These are frequently confused with other languages. **Always check these:**
 | stdlib returning an array? | No - the standard library takes and returns `List`, never arrays (`Strings::split`, `Regex::findAll`, `Files::readLines`, `Rand::shuffle`, `Http` headers/params, `Future::all`). Arrays appear only at the Java boundary: `main(args: String[])`, `byte[]` binary I/O, and varargs. Use `Colls::toList(args)` to cross over |
 | `foreach (x : list)` | `foreach x: Type in list { }` - different syntax |
 | `for (k, v) in map` | `foreach (k, v) in map { }` - map entry destructuring |
-| `val (a, b) = pair` unsupported? | ✓ correct - destructures records positionally (and Map.Entry); `var (x, y) = ...` for mutable |
+| `val (a, b) = pair` unsupported? | ✓ correct - destructures records positionally (and Map.Entry, and a List by index: `val (yes, no) = xs.partition { ... }`); `var (x, y) = ...` for mutable |
 
 ### Literals
 

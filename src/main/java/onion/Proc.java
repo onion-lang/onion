@@ -14,6 +14,11 @@ import java.util.Arrays;
  *   val code = Proc::exec("make", "build")            // inherit IO, exit code
  *   val r = Proc::capture("ls", "missing")            // status + stdout + stderr
  *   if r.failed() { IO::println(r.stderr()) }
+ *
+ * Each command runs directly via {@link ProcessBuilder}: a single string containing
+ * shell syntax (pipes, redirection, &&, ...) is passed to the OS as one literal argument,
+ * not interpreted by a shell. To use shell syntax, pass it explicitly:
+ * Proc::capture("sh", "-c", "ls | wc -l").
  */
 public final class Proc {
     private Proc() {} // Prevent instantiation

@@ -1118,7 +1118,7 @@ extension Double {
 対処: 重複を削除するかリネームしてください。名前は同じでもパラメータ型が異なる
 extension メソッド同士は影響を受けません — 通常のオーバーロードです。
 
-### `E0101` — 同じ受け取り型に対する `extension` ブロックの重複
+### `E0102` — 同じ受け取り型に対する `extension` ブロックの重複
 
 同じ受け取り型に対する `extension` ブロックが1つのファイル内に2つ存在しています
 — 同じ具体的なインスタンス化を2回書いた場合も、同じ非ジェネリック型を関心ごとに
@@ -1130,7 +1130,7 @@ extension メソッド同士は影響を受けません — 通常のオーバ�
 
 ```onion
 extension List[Int] { def foo(): Int = 1 }
-extension List[Int] { def bar(): Int = 2 }   // E0101: List[Int] 用の extension ブロックは既に存在する
+extension List[Int] { def bar(): Int = 2 }   // E0102: List[Int] 用の extension ブロックは既に存在する
 ```
 
 対処: メソッドを最初のブロックにまとめてください。同じジェネリックな受け取り型の
@@ -1427,6 +1427,19 @@ def isRound(sh: Shape): Boolean {
 
 通常の値パターンだけの `,` リスト（`case 1, 2, 3:`）は対象外です。型・分
 解・正規表現・無条件束縛パターンのいずれかが含まれる場合のみ検出されます。
+
+### `E0101` — ラムダの引数の数が合わない
+
+ラムダの引数の数が、そこで期待される関数型の引数の数と違います。メッセージには両方の数と、期待される型が出ます。
+
+```onion
+val m = ["a": 1, "b": 2]
+m.filter { e -> e.getValue() > 0 }      // E0101: Map の filter は (key, value) を取る
+[1, 2].fold(0) { acc -> acc }           // E0101: fold の関数は (acc, element) を取る
+```
+
+修正: 関数型が取る引数どおりにラムダを書きます。
+`m.filter { k, v -> v > 0 }`、`[1, 2].fold(0) { acc, x -> acc + x }`。
 
 ### `E0069` — ローカル val に初期化子が必要
 
@@ -1864,7 +1877,8 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0098` | enum … mixes shared parameters with `case` cases |
 | `E0099` | enum … cannot take type parameters |
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
-| `E0101` | an extension block for … already exists (combine the methods for the same type into one block) |
+| `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
+| `E0102` | an extension block for … already exists (combine the methods for the same type into one block) |
 
 ## 関連項目
 

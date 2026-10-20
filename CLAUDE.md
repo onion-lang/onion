@@ -483,9 +483,9 @@ Type::methodName
 
 **Do Notation for Monadic Composition:**
 ```onion
-do[Future] { x <- asyncOp(); ret x + 1 }
-do[Option] { a <- getA(); b <- getB(); ret a + b }
-do[List]   { x <- [1, 2]; y <- ["a", "b"]; ret x + y }  // list comprehension: [1a, 1b, 2a, 2b]
+do[Future] { x <- asyncOp(); yield x + 1 }
+do[Option] { a <- getA(); b <- getB(); yield a + b }
+do[List]   { x <- [1, 2]; y <- ["a", "b"]; yield x + y }  // list comprehension: [1a, 1b, 2a, 2b]
 ```
 
 **Shape-First Scripting (scheme literals, regex patterns, pipeline, auto-CLI):**
@@ -596,7 +596,8 @@ These are frequently confused with other languages. **Always check these:**
 | `def method(): T { }` | `def method: T { }` - parentheses optional if no params |
 | `@Override void method()` | `override def method(): void` - keyword not annotation |
 | `fun String.twice()` (Kotlin) | `extension String { def twice() { } }` - extension block |
-| `extension List[T] { ... }` (T meant as a fresh type parameter) | not supported - `extension` has no `[T]` parameter list of its own (unlike `class Box[T]`); write `extension List { ... }` to extend every instantiation (erasure-based), or `extension List[Int] { ... }` for one concrete instantiation (also `extension List[String]` alongside it, E0003 otherwise) |
+| `extension List[T] { ... }` (T meant as a fresh type parameter) | not supported - `extension` has no `[T]` parameter list of its own (unlike `class Box[T]`); `T` resolves as an ordinary type reference, so this is E0003 "type not found", not a fresh parameter. Write `extension List { ... }` to extend every instantiation (erasure-based), or `extension List[Int] { ... }` for one concrete instantiation (and `extension List[String]` alongside it is fine - distinct instantiations don't collide) |
+| `extension List[Int] { ... }` twice, or `extension List { ... }` split across two blocks | E0102 - at most one `extension` block per exact receiver type per file; combine the methods into the first block instead |
 | `this.field = value` in constructor | ✓ correct - `this.`/`self.` works; also optional (bare `field` resolves to the field via implicit access) |
 | `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long |
 | `System.out` | `System::out` - `::` for static fields too |

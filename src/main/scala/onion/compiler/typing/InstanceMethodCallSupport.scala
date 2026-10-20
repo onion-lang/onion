@@ -176,7 +176,7 @@ private[compiler] final class InstanceMethodCallSupport(
         val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation)
         calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs),
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
             finalParams => new Call(target, method, finalParams)
           )
         }

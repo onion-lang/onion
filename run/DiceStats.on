@@ -223,7 +223,7 @@ def peakAndValleyStr(table: List[FreqBucket]): Option[String] =
   do[Option] {
     peak   <- toOpt(findPeak(table))
     valley <- toOpt(findValley(table))
-    ret "   mode=#{peak.value()} (#{peak.count()} hits)  least=#{valley.value()} (#{valley.count()} hits)"
+    yield "   mode=#{peak.value()} (#{peak.count()} hits)  least=#{valley.value()} (#{valley.count()} hits)"
   }
 
 // ── Display ────────────────────────────────────────────────────────────────

@@ -643,6 +643,8 @@ xs.map { x -> x * 2 }
 `6 | (1 & 2)`、`a || b && c` は `(a || b) && c` ではなく `a || (b && c)` です。
 
 オブジェクトの `==` は値の等価性（`equals`）。`===` は参照を比較します。
+null でない `Comparable`（String、BigDecimal、LocalDate、`Comparable` に適合するクラス）に対する
+`<` `<=` `>` `>=` は `a.compareTo(b) < 0` などを意味します。
 オペランドのいずれかが `String` の場合、`+` は文字列連結を行います。
 
 ## インポートとモジュール

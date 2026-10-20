@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`<`, `<=`, `>`, `>=` compare any `Comparable`: `"abc" < "abd"`, two `LocalDate`s, `BigDecimal`s.** They accepted only numbers (`E0001 operator < is not applicable for type String, String`). On a non-null operand with `compareTo` they now mean `a.compareTo(b) < 0` etc., as in Kotlin; numeric comparison is unchanged.
+
 - **`DateTime::today()` returns the start of today**, as `DateTime::startOfDay(DateTime::now())` does. It was `E0005` (`did you mean: day`).
 - **`Files::walk(dir)` lists every file under a directory, recursively.** It was `E0005`; the recursive listing existed only as `Files::glob(dir, "**")`, which also returns directories. `walk` returns the regular files as `/`-separated paths relative to `dir`, sorted (empty for a non-directory).
 

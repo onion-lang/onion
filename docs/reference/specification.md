@@ -676,6 +676,8 @@ Each row binds tighter than the one below it — `6 | 1 & 2` is `6 | (1 & 2)`,
 not `(6 | 1) & 2`, and `a || b && c` is `a || (b && c)`, not `(a || b) && c`.
 
 `==` on objects is value equality (`equals`); `===` compares references.
+`<` `<=` `>` `>=` on a non-null `Comparable` (String, BigDecimal, LocalDate, a class
+conforming to `Comparable`) mean `a.compareTo(b) < 0` etc.
 `+` performs string concatenation when either operand is a `String`.
 
 ## Imports and Modules

@@ -141,6 +141,9 @@ class SemanticErrorReporter(threshold: Int) {
     // steered to a same-named-receiver static factory like `Option::of`, which
     // `a.zip(...)` syntax could not call even if the name were right.
     val calledStatically = items.length > 6 && items(6) == java.lang.Boolean.TRUE
+    // Set only for a static call on a nested class whose enclosing class has a static method
+    // of this name and arity (MethodCallReportingSupport): that class's simple name.
+    val enclosingStaticOwner = if (items.length > 7 && items(7) != null) asString(items(7)) else null
     // A top-level function lives on the file's synthetic `<file>Main` class; name the
     // function alone rather than leak that owner (`mainMain.helper(Int, Int)`).
     val baseMessage =
@@ -160,7 +163,9 @@ class SemanticErrorReporter(threshold: Int) {
         items(4).asInstanceOf[TypedAST.ObjectType].methods.filter(_.name == name).toSeq
       else Seq.empty
     val suggestion =
-      if (!calledStatically && ForeignStringNames.contains(name) && isStringType(targetType)) {
+      if (enclosingStaticOwner != null) {
+        Some(format(message("suggestion.didYouMean"), Seq(s"$enclosingStaticOwner::$name")))
+      } else if (!calledStatically && ForeignStringNames.contains(name) && isStringType(targetType)) {
         // The String counterpart of ForeignCollectionNames: Kotlin `reversed`/`padStart`, Python
         // `splitlines`/`title`/`find`, JavaScript `includes`/`trimStart` -- same operation, Onion's
         // name. Ahead of the same-name branch, which would otherwise answer `s.format(3)` with

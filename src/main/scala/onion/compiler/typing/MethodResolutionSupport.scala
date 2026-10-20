@@ -147,6 +147,13 @@ private[compiler] final class MethodResolutionSupport(
         // "loses" = the other formal is a reference type (not the same primitive)
         if f1Exact && !f2Exact && !f2.isBasicType then oneBetter = true
         else if f2Exact && !f1Exact && !f1.isBasicType then twoBetter = true
+      else if actual != null && !actual.isNullType && !actual.isBottomType then
+        // A boxed argument (an Integer read out of a List[Int]): Java's phase 1 takes the
+        // formal reached without unboxing -- `append(Object)` over `append(int)`.
+        val f1 = a1(i)
+        val f2 = a2(i)
+        if !f1.isBasicType && f2.isBasicType then oneBetter = true
+        else if !f2.isBasicType && f1.isBasicType then twoBetter = true
       i += 1
     if oneBetter && !twoBetter then -1
     else if twoBetter && !oneBetter then 1

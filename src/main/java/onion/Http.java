@@ -120,6 +120,21 @@ public final class Http {
             this.headers = headers;
         }
 
+        /** The status code; same as the {@code status} field, spelled like a record accessor. */
+        public int status() {
+            return status;
+        }
+
+        /** The response body; same as the {@code body} field. */
+        public String body() {
+            return body;
+        }
+
+        /** The raw header lines; same as the {@code headers} field. */
+        public List<String> headers() {
+            return headers;
+        }
+
         public boolean isOk() {
             return status >= 200 && status < 300;
         }

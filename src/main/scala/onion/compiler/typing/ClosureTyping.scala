@@ -165,6 +165,10 @@ final class ClosureTyping(
       val implName = implementedMethodName(typeRef, name, argTypes.length)
       val candidates = typeRef.methods.filter(m => m.name == implName && m.arguments.length == argTypes.length)
       candidates.find(m => sameTypesOrBoxed(substitutedArgs(m), argTypes)) match {
+        case None if candidates.isEmpty && arityMismatch(typeRef, implName, argTypes.length).isDefined =>
+          bodyContext.report(LAMBDA_ARITY_MISMATCH, node, Integer.valueOf(argTypes.length), typeRef,
+            Integer.valueOf(arityMismatch(typeRef, implName, argTypes.length).get))
+          None
         case None =>
           bodyContext.report(METHOD_NOT_FOUND, node, typeRef, implName, argTypes)
           None
@@ -324,9 +328,15 @@ final class ClosureTyping(
           // No method of that arity: the lambda has the wrong parameter count for the
           // target. Say so (as the typed-parameter form does) instead of returning
           // silently, which let the closure through to a VerifyError or a no-op (#2069).
-          val placeholders = new Array[Type](args.length)
-          java.util.Arrays.fill(placeholders.asInstanceOf[Array[AnyRef]], bodyContext.rootClass)
-          bodyContext.report(METHOD_NOT_FOUND, node, inferredTarget, implName, placeholders)
+          arityMismatch(inferredTarget, implName, args.length) match {
+            case Some(expectedArity) =>
+              bodyContext.report(LAMBDA_ARITY_MISMATCH, node, Integer.valueOf(args.length), inferredTarget,
+                Integer.valueOf(expectedArity))
+            case None =>
+              val placeholders = new Array[Type](args.length)
+              java.util.Arrays.fill(placeholders.asInstanceOf[Array[AnyRef]], bodyContext.rootClass)
+              bodyContext.report(METHOD_NOT_FOUND, node, inferredTarget, implName, placeholders)
+          }
           None
         case Some(expectedArgs) =>
           i = 0
@@ -363,6 +373,19 @@ final class ClosureTyping(
         case single :: Nil if abstracts.exists(_.arguments.length == arity) => single
         case _ => name
       }
+    }
+  }
+
+  /** The parameter count of `target`'s one functional method, when a lambda of `arity`
+   *  parameters cannot implement it because that count differs. */
+  private def arityMismatch(target: ClassType, name: String, arity: Int): Option[Int] = {
+    val named = target.methods.filter(m => m.name == name && Modifier.isAbstract(m.modifier))
+    val functional =
+      if (named.nonEmpty) named
+      else target.methods.filter(m => Modifier.isAbstract(m.modifier) && !isPublicObjectMethod(m))
+    functional.map(_.arguments.length).distinct.toList match {
+      case single :: Nil if single != arity => Some(single)
+      case _ => None
     }
   }
 

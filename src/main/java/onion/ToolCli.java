@@ -174,7 +174,14 @@ public final class ToolCli {
                 if (eq >= 0) { key = arg.substring(0, eq); inline = arg.substring(eq + 1); }
                 Integer idx = named.get(key);
                 if (idx == null) {
-                    System.err.println("unknown option `" + key + "` for tool `" + name(tool) + "`. Try --help.");
+                    String note = "";
+                    for (int pi : positionals) {
+                        String pname = str(params.get(pi), "name");
+                        if (Cli.flagMatches(pname, key.substring(2))) {
+                            note = " `" + pname + "` is positional: pass the value without `" + key + "`.";
+                        }
+                    }
+                    System.err.println("unknown option `" + key + "` for tool `" + name(tool) + "`." + note + " Try --help.");
                     return Result.exit(1);
                 }
                 Map<String, Object> p = params.get(idx);

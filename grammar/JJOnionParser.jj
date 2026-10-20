@@ -436,7 +436,7 @@ public class JJOnionParser implements Parser {
     KW.put("Char", K_CHAR);
     KW.put("class", K_CLASS);
     KW.put("record", K_RECORD);
-    KW.put("ret", K_RET);
+    KW.put("yield", K_YIELD);
     KW.put("const", K_CONST);
     KW.put("continue", K_CONTINUE);
     KW.put("def", K_DEF);
@@ -1170,7 +1170,7 @@ TOKEN:
 | <K_CHAR:         "Char"  >
 | <K_CLASS:        "class"        >
 | <K_RECORD:       "record"       >
-| <K_RET:          "ret"          >
+| <K_YIELD:        "yield"        >
 | <K_CONST:        "const"        >
 | <K_CONTINUE:     "continue"    >
 | <K_DEF:          "def"          >
@@ -2651,6 +2651,11 @@ AST.ForeachExpression foreach_expression() :{Token t, k = null, v = null; AST.Ar
     "(" k=id() "," v=id() ")" (LOOKAHEAD({la("in")}) id()) {enterCondition();} e=term() {leaveCondition();} b=block() {
       return desugarMapForeach(p(t), c(k), c(v), e, b);
     }
+  | LOOKAHEAD({getToken(2).image.equals("in")})
+    k=id() id() {enterCondition();} e=term() {leaveCondition();} b=block() {
+      // `foreach x in xs`: no annotation; typing infers x from the collection's type.
+      return new AST.ForeachExpression(p(t), new AST.Argument(p(k), c(k), null, null, false), e, b);
+    }
   | a=argument() (LOOKAHEAD({la("in")}) id()) {enterCondition();} e=term() {leaveCondition();} b=block() {
       return new AST.ForeachExpression(p(t), a, e, b);
     }
@@ -3135,7 +3140,7 @@ AST.ClosureExpression arrow_anonymous_function() :{
   )
 }
 
-// Do notation: do[M] { x <- e1; y <- e2; ret e3 }
+// Do notation: do[M] { x <- e1; y <- e2; yield e3 }
 AST.DoExpression do_expression() :{
   Token t;
   AST.TypeNode monadType;
@@ -3167,9 +3172,9 @@ Object do_clause() :{
   String name;
   AST.Expression e;
 }{
-  // ret expr (return statement in do notation)
-  LOOKAHEAD("ret")
-    t="ret" eols() e=term() { return new AST.RetStatement(p(t), e); }
+  // yield expr (the final value of a do block)
+  LOOKAHEAD("yield")
+    t="yield" eols() e=term() { return new AST.YieldStatement(p(t), e); }
   // x <- expr (binding)
 | LOOKAHEAD(id() eols() <LARROW>)
     t=id() eols() <LARROW> eols() e=term() { return new AST.DoBinding(p(t), c(t), e); }

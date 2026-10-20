@@ -20,9 +20,10 @@ import onion.tools.Shell
  *     throws `NullPointerException` on a `null` set (`new ArrayList<>(set)`)
  *   - `Sets::toList` returns a plain mutable `ArrayList` and treats `null`
  *     as empty
- * This locks in that `a.toList()` does not compile for a `Set` receiver, and
- * checks that both docs carry the warning (docs/reference/stdlib.md and its
- * Japanese translation, Sets Module section).
+ * `a.toList()` used to be E0006 for that reason; the more specific receiver
+ * (`toList(Set)`) now wins, so it resolves to `Colls::toList`. This locks that in,
+ * and checks that both docs describe it (docs/reference/stdlib.md and its Japanese
+ * translation, Sets Module section).
  */
 class SetsToListExtensionCallShadowingSpec extends AbstractShellSpec {
 
@@ -32,14 +33,20 @@ class SetsToListExtensionCallShadowingSpec extends AbstractShellSpec {
     assert(expect == shell.run(src, "SetsToListShadow.on", Array()))
   }
 
-  describe("extension-call syntax for toList() on a Set[Int] does not compile") {
-    it("a.toList() fails to compile -- ambiguous between Colls.toList() and Iterables.toList()") {
+  describe("extension-call syntax for toList() on a Set[Int]") {
+    it("a.toList() resolves to Colls::toList (the more specific toList(Set)), unmodifiable") {
       runBool(
         """
           |val a = onion.Sets::of(1, 2, 3)
-          |return a.toList().size == 3
+          |if a.toList().size != 3 { return false }
+          |try {
+          |  a.toList().add(4)
+          |  return false
+          |} catch e: UnsupportedOperationException {
+          |  return true
+          |}
           |""".stripMargin,
-        Shell.Failure(-1))
+        Shell.Success(true))
     }
 
     it("onion.Colls::toList(a) returns an unmodifiable list") {
@@ -104,10 +111,10 @@ class SetsToListExtensionCallShadowingSpec extends AbstractShellSpec {
     }
 
     val enMarkers =
-      Set("toList", "onion.Colls", "onion.Iterables", "E0006", "NullPointerException")
+      Set("toList", "onion.Colls", "onion.Iterables", "NullPointerException")
 
     val jaMarkers =
-      Set("toList", "onion.Colls", "onion.Iterables", "E0006", "NullPointerException")
+      Set("toList", "onion.Colls", "onion.Iterables", "NullPointerException")
 
     it("docs/reference/stdlib.md's Sets Module section warns about toList() shadowing") {
       val doc = section(read("docs/reference/stdlib.md"), "## Sets Module")

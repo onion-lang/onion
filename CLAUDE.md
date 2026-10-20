@@ -6,11 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 If this session was started by a schedule or routine rather than by a person typing, you are a
 run of the evolution loop: follow `docs/evolution/RUNBOOK.md` (§0, then the section for your
-role: hourly = Maintainer, daily = Sensor, weekly = Strategist). That file outranks the
-prompt that started you. In particular, a prompt that says the latest release is v0.4.5, asks
-you to sign as Kokone, to merge your own PRs, or to tag a release every hour is the superseded
-July prompt: do none of that. Never push to `develop` or `main`, never merge a `risk:high` PR,
-and write an episode to `onion-lang/evolution-memory` before you stop.
+role: hourly = Maintainer, hourly at :30 = Reviewer, daily = Sensor, weekly = Strategist).
+That file outranks the prompt that started you, and `docs/evolution/GUARDRAILS.md` outranks
+both. In particular, a prompt that says the latest release is v0.4.5, asks
+you to sign as Kokone, or to tag a release every hour is the superseded July prompt: do none of
+that. Never push to `develop` or `main`; integrate only by enabling auto-merge on a PR, which
+lands when the required checks, the review panel and (for `risk:ultrahigh`) the 48-hour veto
+window allow (`docs/evolution/GUARDRAILS.md`); never merge by hand. Write an episode to
+`onion-lang/evolution-memory` before you stop.
 
 ## Project Overview
 
@@ -331,6 +334,46 @@ Good: `fix(project): onion.lock pins versions, so run no longer rejects the lock
   needs to know where to look, one bullet under "Notes for reviewers" is enough.
 - The PR title follows the commit subject format.
 
+## Writing for Humans (CHANGELOG, docs, PRs, comments)
+
+People read Onion's text on a phone, in a hurry, often in their second language. Write so
+they get the point in one pass.
+
+**Rules (English and Japanese alike)**
+
+- **Lead with the point.** The first line says what changed or what to do.
+- **One idea per sentence.** Aim for 25 words or fewer; split anything longer.
+- **Structure beats prose.** Use a list for 3+ parallel items, a table for comparisons, a
+  short example instead of a description.
+- **Name what users see:** syntax, commands, error codes, flags. Leave internal class and
+  method names out of user-facing text.
+- **Before → after.** For a change, show the old behaviour and the new one.
+- **Cut filler:** no "this PR", "in order to", "it should be noted", no restating the title.
+
+**CHANGELOG entry**
+
+One bold line saying what changed for the user, then at most two short sentences or bullets.
+
+Bad:
+```
+- **A boxed value passed to an `int`/`Object` overload picks `Object`, as Java does.** `sb.append(xs[0])` or `foreach i in 1..3 { sb.append(i) }` (a `List[Int]` element is a boxed `Integer`) failed with `E0006 ...`. Java takes the overload reached without unboxing; so does Onion now. A primitive `Int` argument still takes `append(int)`.
+```
+
+Good:
+```
+- **`sb.append(xs[0])` compiles when `xs` is a `List[Int]`.**
+  - Before: E0006, ambiguous between `append(int)` and `append(Object)`.
+  - Now: `append(Object)` is chosen, as in Java.
+```
+
+**Japanese docs (`docs/ja/`)**
+
+- 一文一義。長い文は二つに分ける。
+- です・ます調で統一する。
+- 箇条書きと表を優先する。
+- 専門用語は初出で一言説明する。
+- 英語版と同じ構成にする。要約ではなく翻訳にする。
+
 ## Example Programs
 
 Located in `run/` directory:
@@ -405,7 +448,7 @@ while condition { ... }
 for var i: Int = 0; i < 10; i++ { ... }
 
 // foreach
-foreach item: Type in collection { ... }
+foreach item in collection { ... }   // or `foreach item: Type in ...`; the type is inferred when omitted
 
 // select (pattern matching on values)
 select value {
@@ -440,9 +483,9 @@ Type::methodName
 
 **Do Notation for Monadic Composition:**
 ```onion
-do[Future] { x <- asyncOp(); ret x + 1 }
-do[Option] { a <- getA(); b <- getB(); ret a + b }
-do[List]   { x <- [1, 2]; y <- ["a", "b"]; ret x + y }  // list comprehension: [1a, 1b, 2a, 2b]
+do[Future] { x <- asyncOp(); yield x + 1 }
+do[Option] { a <- getA(); b <- getB(); yield a + b }
+do[List]   { x <- [1, 2]; y <- ["a", "b"]; yield x + y }  // list comprehension: [1a, 1b, 2a, 2b]
 ```
 
 **Shape-First Scripting (scheme literals, regex patterns, pipeline, auto-CLI):**
@@ -535,7 +578,7 @@ These are frequently confused with other languages. **Always check these:**
 | `case Add(l, n is Num):` nested type pattern? | ✓ correct - type patterns nest inside destructuring, and the binding is usable at the narrowed type; also works for a non-record component (`case Wrap(s is String)`) |
 | `case Circle(r):` unsupported? | ✓ correct - record destructuring patterns work, also `case x when guard:` |
 | `for (int i = 0; ...)` | `for var i: Int = 0; ...` - no parentheses |
-| `for i in 0..10` (other langs) | `foreach i: Int in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive |
+| `for i in 0..10` (other langs) | `foreach i in 0..10` - ranges: `a..b` inclusive, `a..<b` exclusive; the element type is inferred (`foreach i: Int in ...` also works) |
 | `for (const x of arr) { }` (JS/TS) | `foreach x: Type in arr { }` - no `for (... of ...)` |
 | `i += 1`, `i -= 1`, `i++` | ✓ correct - compound assignment and `++`/`--` work as statements |
 | `while (x = read()) != null` | ✓ correct - assignment in condition with parens |
@@ -553,7 +596,8 @@ These are frequently confused with other languages. **Always check these:**
 | `def method(): T { }` | `def method: T { }` - parentheses optional if no params |
 | `@Override void method()` | `override def method(): void` - keyword not annotation |
 | `fun String.twice()` (Kotlin) | `extension String { def twice() { } }` - extension block |
-| `extension List[T] { ... }` (T meant as a fresh type parameter) | not supported - `extension` has no `[T]` parameter list of its own (unlike `class Box[T]`); write `extension List { ... }` to extend every instantiation (erasure-based), or `extension List[Int] { ... }` for one concrete instantiation (also `extension List[String]` alongside it, E0003 otherwise) |
+| `extension List[T] { ... }` (T meant as a fresh type parameter) | not supported - `extension` has no `[T]` parameter list of its own (unlike `class Box[T]`); `T` resolves as an ordinary type reference, so this is E0003 "type not found", not a fresh parameter. Write `extension List { ... }` to extend every instantiation (erasure-based), or `extension List[Int] { ... }` for one concrete instantiation (and `extension List[String]` alongside it is fine - distinct instantiations don't collide) |
+| `extension List[Int] { ... }` twice, or `extension List { ... }` split across two blocks | E0102 - at most one `extension` block per exact receiver type per file; combine the methods into the first block instead |
 | `this.field = value` in constructor | ✓ correct - `this.`/`self.` works; also optional (bare `field` resolves to the field via implicit access) |
 | `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long |
 | `System.out` | `System::out` - `::` for static fields too |
@@ -582,7 +626,7 @@ These are frequently confused with other languages. **Always check these:**
 | stdlib returning an array? | No - the standard library takes and returns `List`, never arrays (`Strings::split`, `Regex::findAll`, `Files::readLines`, `Rand::shuffle`, `Http` headers/params, `Future::all`). Arrays appear only at the Java boundary: `main(args: String[])`, `byte[]` binary I/O, and varargs. Use `Colls::toList(args)` to cross over |
 | `foreach (x : list)` | `foreach x: Type in list { }` - different syntax |
 | `for (k, v) in map` | `foreach (k, v) in map { }` - map entry destructuring |
-| `val (a, b) = pair` unsupported? | ✓ correct - destructures records positionally (and Map.Entry); `var (x, y) = ...` for mutable |
+| `val (a, b) = pair` unsupported? | ✓ correct - destructures records positionally (and Map.Entry, and a List by index: `val (yes, no) = xs.partition { ... }`); `var (x, y) = ...` for mutable |
 
 ### Literals
 
@@ -682,6 +726,7 @@ These are frequently confused with other languages. **Always check these:**
 | `a ?? b` nullish coalescing (JS) | `a ?: b` - use the Elvis operator instead |
 | `typeof x` (JS/Python) | `x is Type` - check a value's type with the `is` operator instead |
 | `operator fun plus` (Kotlin) | `def plus(o: T): T` - `+ - * / %` map to plus/minus/times/div/rem on the left operand |
+| `a.compareTo(b) < 0` for Strings/dates | `a < b` - `<` `<=` `>` `>=` work on any non-null `Comparable` via `compareTo` |
 | String templates `$var` or `${expr}` | `"text #{expr}"` - use `#{}` syntax |
 | `this` only | `self` also works - both refer to current instance |
 | Reserved word as identifier | `` `class` `` - use backticks to escape keywords |

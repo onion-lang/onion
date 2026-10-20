@@ -227,7 +227,7 @@ def validateBoth(rawRating: String, rawYesNo: String): Result[String, String] {
   return do[Result] {
     r <- validateRating("overall", rawRating, 1, 5)
     b <- validateYesNo("recommend", rawYesNo)
-    ret "rating=#{r}, recommend=#{b}"
+    yield "rating=#{r}, recommend=#{b}"
   }
 }
 

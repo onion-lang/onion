@@ -62,7 +62,7 @@ def validate(input: UserInput): Result[UserInput, String] {
     name <- optionToResult(nonEmpty(input.name()), "name is required")
     age <- parseAge(input.age())
     email <- validateEmail(input.email())
-    ret new UserInput(name, "" + age, email)
+    yield new UserInput(name, "" + age, email)
   }
 }
 ```
@@ -113,7 +113,7 @@ def validateDo(input: UserInput): Result[UserInput, String] {
     name <- optionToResult(nonEmpty(input.name()), "name is required")
     age <- parseAge(input.age())
     email <- validateEmail(input.email())
-    ret new UserInput(name, "" + age, email)
+    yield new UserInput(name, "" + age, email)
   }
 }
 

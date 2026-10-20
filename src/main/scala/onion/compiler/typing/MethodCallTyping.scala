@@ -12,7 +12,7 @@ final class MethodCallTyping(
   private val bodyContext: TypingBodyContext,
   private val body: TypingBodyPass
 ) {
-  private val callArgumentTypingSupport = new CallArgumentTypingSupport(bodyContext, typed(_, _, _), processAssignable)
+  private val callArgumentTypingSupport = new CallArgumentTypingSupport(bodyContext, typed(_, _, _), processAssignable, processAssignableForJavaCallee)
   private val methodInvocationBuilderSupport = new MethodInvocationBuilderSupport(typing, this)
   private val methodCallReportingSupport = new MethodCallReportingSupport(bodyContext)
   private val methodTargetTypingSupport = new MethodTargetTypingSupport(bodyContext)
@@ -157,21 +157,25 @@ final class MethodCallTyping(
   /** Information extracted from named arguments */
   // Named argument helpers delegated to ArgumentHelpers object
 
-  /** Process parameters with type checking, returns None on error */
+  /** Process parameters with type checking, returns None on error.
+   *  `method`, when given, is the resolved callee: its parameters' nullness is
+   *  trusted only when it is Onion-declared (#2116). */
   private[typing] def processParamsWithExpected(
     node: AST.Node,
     params: Array[Term],
-    expectedArgs: Array[Type]
+    expectedArgs: Array[Type],
+    method: Method = null
   ): Option[Array[Term]] =
-    callArgumentTypingSupport.processParamsWithExpected(node, params, expectedArgs)
+    callArgumentTypingSupport.processParamsWithExpected(node, params, expectedArgs, method)
 
   /** Process parameters with args and expected types, returns None on error */
   private[typing] def processParamsWithArgs(
     args: Seq[AST.Expression],
     params: Array[Term],
-    expectedArgs: Array[Type]
+    expectedArgs: Array[Type],
+    method: Method = null
   ): Option[Array[Term]] =
-    callArgumentTypingSupport.processParamsWithArgs(args, params, expectedArgs)
+    callArgumentTypingSupport.processParamsWithArgs(args, params, expectedArgs, method)
 
   /**
    * Wrap parameters for vararg method call.
@@ -355,6 +359,11 @@ final class MethodCallTyping(
 
   private[typing] def processAssignable(node: AST.Node, expected: Type, term: Term): Term =
     body.processAssignable(node, expected, term)
+
+  /** Like [[processAssignable]], but for an argument of a Java-declared method (#2116):
+   *  the parameter's nullness is unknown, so a null literal does not warn W0012. */
+  private[typing] def processAssignableForJavaCallee(node: AST.Node, expected: Type, term: Term): Term =
+    body.processAssignable(node, expected, term, suppressNullWarning = true)
 
   private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Boolean, Method] =
     body.tryFindMethod(node, target, name, params)

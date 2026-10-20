@@ -211,7 +211,7 @@ println("")
 println(ReportSection::COMBOS.title())
 val urgentSkus = ["E002", "F002", "T001"]
 val priorities = ["HIGH", "MED"]
-val restockCombos = do[List] { prio <- priorities; sku <- urgentSkus; ret prio + ":" + sku }
+val restockCombos = do[List] { prio <- priorities; sku <- urgentSkus; yield prio + ":" + sku }
 println("  combos: " + restockCombos.toString())
 
 // zip items with restock recommendations and print

@@ -23,7 +23,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   private[typing] val controlExpressionTyping = new ControlExpressionTyping(typing, bodyContext, this)
   private val additionTyping = new AdditionTyping(bodyContext, this)
   private val methodLookupSupport = new MethodLookupSupport(typing, bodyContext)
-  private val classInitializerSupport = new ClassInitializerSupport(typing, typed(_, _, _), processAssignable)
+  private val classInitializerSupport = new ClassInitializerSupport(typing, typed(_, _, _), processAssignable(_, _, _))
   private val methodBodySupport = new MethodBodySupport(typing, unitContext, bodyContext, typed(_, _, _), typedTerms, translate, addReturnNode)
   private val entryPointSupport = new EntryPointSupport(typing, addReturnNode)
   private val assignabilitySupport = new AssignabilitySupport(bodyContext)
@@ -71,8 +71,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def processNodes(nodes: Array[AST.Expression], typeRef: Type, bind: ClosureLocalBinding, context: LocalContext): Term =
     patternMatchSupport.processNodes(nodes, typeRef, bind, context)
 
-  def processAssignable(node: AST.Node, expected: Type, actual: Term): Term =
-    assignabilitySupport.processAssignable(node, expected, actual)
+  def processAssignable(node: AST.Node, expected: Type, actual: Term, suppressNullWarning: Boolean = false): Term =
+    assignabilitySupport.processAssignable(node, expected, actual, suppressNullWarning)
   def openClosure[A](context: LocalContext)(block: => A): A = {
     val wasInClosure = context.isClosure
     val savedMethodContext = context.saveMethodContext()

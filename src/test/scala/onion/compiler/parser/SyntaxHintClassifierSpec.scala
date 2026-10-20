@@ -1213,6 +1213,36 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).map(_.messageKey) should not be Some("error.parsing.hint.guard_else")
     }
 
+    it("recognizes `private:` where an extension/instance block's flat member list expects `def`") {
+      val hint = classify(
+        found = "private",
+        expected = "\"def\"",
+        sourceLine = "private:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.extension_instance_no_access_section"
+      hint.arguments shouldBe Seq("private")
+    }
+
+    it("recognizes `public:` where an extension/instance block's flat member list expects `def`") {
+      val hint = classify(
+        found = "public",
+        expected = "\"def\"",
+        sourceLine = "public:"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.extension_instance_no_access_section"
+      hint.arguments shouldBe Seq("public")
+    }
+
+    it("keeps the access-modifier-before-type-declaration advice when `class` is expected instead") {
+      classify(
+        found = "private",
+        expected = "\"class\"",
+        sourceLine = "private class Foo {"
+      ).messageKey shouldBe "error.parsing.hint.access_modifier_before_declaration"
+    }
+
     it("recognizes `law` used outside a record body, instead of misreading it as a Java-style method") {
       val hint = classify(
         found = "law",

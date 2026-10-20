@@ -359,7 +359,9 @@ class SemanticErrorReporter(threshold: Int) {
     "each" -> "forEach",
     "collect" -> "map",
     "firstOrNull" -> "first",
-    "lastOrNull" -> "last"
+    "lastOrNull" -> "last",
+    "zipWithIndex" -> "withIndex",
+    "indexed" -> "withIndex"
   )
 
   /** Other languages' names for a String operation -> Onion's name for it. */

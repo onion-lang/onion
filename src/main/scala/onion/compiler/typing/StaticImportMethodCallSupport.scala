@@ -110,7 +110,7 @@ private[compiler] final class StaticImportMethodCallSupport(
 
     if (applicable.isEmpty) return StaticImportNoMatch
 
-    overloadSupport.selectMostSpecificApplicable(applicable) match {
+    overloadSupport.selectMostSpecificApplicable(applicable, argTypes = params.map(_.`type`)) match {
       case CandidateSelection.Ambiguous(first, second) =>
         StaticImportAmbiguous(first.method, second.method)
       case CandidateSelection.Selected(chosen) =>

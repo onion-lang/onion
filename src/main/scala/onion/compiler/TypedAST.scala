@@ -1826,16 +1826,25 @@ object TypedAST {
         case _ => // continue with normal logic
       }
 
-      val l = left match {
-        case tv: TypedAST.TypeVariableType => tv.upperBound
-        case w: TypedAST.WildcardType => w.upperBound
-        case _ => left
+      // A type variable's own bound can itself be another type variable
+      // (`[B, T extends B]`), so unwrap the whole chain to its first
+      // non-type-variable bound, not just one level. Bounds are acyclic by
+      // construction, but a depth cap guards against a malformed one.
+      def resolveBound(t: TypedAST.Type): TypedAST.Type = {
+        var cur = t
+        var depth = 0
+        while (depth < 64 && (cur.isInstanceOf[TypedAST.TypeVariableType] || cur.isInstanceOf[TypedAST.WildcardType])) {
+          cur = cur match {
+            case tv: TypedAST.TypeVariableType => tv.upperBound
+            case w: TypedAST.WildcardType => w.upperBound
+            case other => other
+          }
+          depth += 1
+        }
+        cur
       }
-      val r = right match {
-        case tv: TypedAST.TypeVariableType => tv.upperBound
-        case w: TypedAST.WildcardType => w.upperBound
-        case _ => right
-      }
+      val l = resolveBound(left)
+      val r = resolveBound(right)
       if (l.isBasicType) {
         if (r.isBasicType) {
           return isSuperTypeForBasic(l.asInstanceOf[TypedAST.BasicType], r.asInstanceOf[TypedAST.BasicType])

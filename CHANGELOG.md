@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A `config` shape reads a `String` value in double quotes as quoted text (#2229, RFC #2233).**
   - Before: `name = "Alice"` read as `"Alice"`, quotes included; `name = "abc` read as `"abc`.
   - Now: it reads as `Alice`. Inside the quotes, `\"` and `\\` are the only escapes. A quoted value with no closing `"`, or a bare `"` inside, is a Defect. To keep literal quotes, write `name = "\"Alice\""`: see `docs/migration/pre-1.0.md`.
+- **A slot typed `T` accepts only a `T` (#2308).**
+  - Before: inside `class S[T, U]`, `t = u`, `item = someObject` or `item = "x"` compiled, then threw a `ClassCastException` on the next read.
+  - Now: `E0000 type T is expected, but type U is used`, as in Java. A `T`, a variable bounded by `T` (`[T, U extends T]`), and `null` are still accepted.
+  - To keep an unchecked store, cast: `t = (u as T)`. See [Migrating to 1.0](docs/migration/pre-1.0.md).
 
 ### Added
 
@@ -63,7 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A type parameter bounded by another type parameter of the same declaration now works** (#2259), including a chain of three (`[A, B extends A, T extends B]`).
   - Before: `class Holder[B, T extends B] { var item: T; def asB(): B { return item } }` failed with `[E0000] type B is expected, but type T is used`; member access through a real bound (`[B extends CharSequence, T extends B]`, `item.length()`) also failed.
   - Now: both compile and run. A sibling type parameter that merely shares the same bound (`[B, T extends B, U extends B]`) is correctly rejected wherever `T` is expected, whether by assignment, method call, or as a generic type argument (`List[T]` is not a `List[B]`) -- for a declaration with a chained bound. An instantiation with unrelated type-variable arguments (`new Holder[P, Q](q)` inside `class Mk[P, Q]`) is rejected too.
-  - This rejection is new only for a chained bound (`T extends B`, where `B` is itself a type parameter). Two sibling type parameters with no such bound (`class S[T, U]`) still accept `t = u` and crash at run time with a `ClassCastException` -- tracked separately as #2308, since fixing it means changing how every unbounded type variable compares, not just a chained one.
+  - This rejection is new only for a chained bound (`T extends B`, where `B` is itself a type parameter). Two sibling type parameters with no such bound (`class S[T, U]`) accepted `t = u` here; #2308 rejects that too (see Breaking).
 
 ## [0.144.0] - 2026-10-20
 

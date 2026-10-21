@@ -163,6 +163,20 @@ private[compiler] final class AssignabilitySupport(
     def containsTypeVariable(typeToCheck: Type): Boolean =
       TypeCheckingHelpers.containsTypeVariable(typeToCheck)
 
+    // A value fits a slot typed by an Onion-declared type variable `tv` only
+    // if it is a `tv`: the same variable (or its non-null view), or one whose
+    // bound chain reaches it. Fitting `tv`'s bound is not enough -- `t = u`
+    // between unrelated `T` and `U`, or `item = o` with `o: Object`, compiled
+    // and then threw a ClassCastException on the next read (#2308). A Java
+    // (platform) type variable keeps the loose rule: on a raw receiver it is
+    // never instantiated, and Java's own erasure accepts its bound there.
+    def isValueOf(tv: TypedAST.TypeVariableType, actual: Type): Boolean = actual match {
+      case rtv: TypedAST.TypeVariableType => (rtv.widen eq tv.widen) || isValueOf(tv, rtv.upperBound)
+      case w: TypedAST.WildcardType => isValueOf(tv, w.upperBound)
+      case n: NullableType => isValueOf(tv, n.innerType)
+      case _ => false
+    }
+
     def structurallyAssignable(expected: Type, actual: Type): Boolean = (expected, actual) match {
       case (_, nt) if nt.isNullType =>
         // The null literal is assignable to any reference (non-basic) target,
@@ -179,7 +193,7 @@ private[compiler] final class AssignabilitySupport(
         // bound chain passes through `tv`" apart from "both happen to
         // erase to the same root class" (#2259's unsoundness) -- erasing
         // `tv` here first would throw away exactly the identity it needs.
-        TypeRules.isSuperType(tv, actual)
+        TypeRules.isSuperType(tv, actual) && (tv.nullability == Nullability.Platform || isValueOf(tv, actual))
       case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
         def argsMatch(view: TypedAST.AppliedClassType): Boolean =
           ae.typeArguments.length == view.typeArguments.length &&

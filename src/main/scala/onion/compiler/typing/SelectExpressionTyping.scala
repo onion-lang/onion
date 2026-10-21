@@ -536,7 +536,7 @@ final class SelectExpressionTyping(
         // The *binding* can be more precise than the check: matching a
         // `Some` out of an `Opt[String]` binds `Some[String]`, recovered from
         // the scrutinee's type arguments (#311).
-        bindingInfo = SingleBinding(name, TypeSubst.specializeFromScrutinee(mappedType, conditionType))
+        bindingInfo = SingleBinding(name, TypeSubst.specializeFromScrutinee(mappedType, conditionType, typing))
 
         instanceOfCheck
 

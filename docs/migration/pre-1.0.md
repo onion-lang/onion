@@ -93,3 +93,30 @@ name = "\"Alice\""      # read as "Alice"  (to keep literal quotes)
   that start with `"`. A value with no closing `"`, or with a bare `"` inside it (`"a" and "b"`),
   is now a `Defect` naming the line.
 - **Only `String` components:** an `Int`, `Boolean` or other scalar is read exactly as before.
+
+## A slot typed `T` accepts only a `T`
+
+Inside a generic class, a field, local, parameter or return typed by a type parameter `T` now
+accepts only a value of type `T`, as in Java. It used to accept anything that fit `T`'s bound,
+and the program then threw a `ClassCastException` on the next read.
+
+```onion
+class S[T, U] {
+  var t: T
+  var u: U
+public:
+  def this(x: T, y: U) { t = x; u = y }
+
+  // Before: compiled, then `new S[String, Integer]("a", 1)` threw on the next read of t
+  def f(): void { t = u }
+
+  // Now: write the unchecked cast yourself, if the value really is a T
+  def g(): void { t = (u as T) }
+}
+```
+
+- **What changed:** a value of an unrelated type variable (`U`), of the bound (`Object`,
+  `CharSequence`), or of a concrete type (`"x"`) no longer fits a `T` slot.
+- **What you see:** `E0000 type T is expected, but type U is used.` at the value.
+- **Still fine:** a `T`; a variable bounded by `T` (`[T, U extends T]`, then `t = u`); `null`;
+  and a Java type variable reached through a raw Java type.

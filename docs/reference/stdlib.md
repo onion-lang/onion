@@ -576,10 +576,11 @@ spacing around it is free), a line whose trimmed text starts with `#` is a whole
 comment, and a blank line is ignored. There is no inline-comment syntax -- a `#` after
 a value on the same line is read as part of that value, not stripped (`host =
 example.com  # primary` parses `host` as `"example.com  # primary"`). Put a comment on
-its own line instead. A `String` component's value is otherwise trimmed like any other
-scalar; one with leading or trailing whitespace is quoted on print (`name = "  padded  "`,
-with `\` and `"` escaped) and unquoted on parse, the same convention `Yaml::stringify`
-uses -- a value that is not padded is never quoted.
+its own line instead. A `String` component's value is trimmed like any other scalar,
+unless it is in double quotes: `name = "  padded  "` reads as `  padded  `. `print`
+quotes a `String` value when it is padded or starts with `"`, and writes every other
+value unquoted. Inside the quotes only `\"` and `\\` are escapes, so `\n` stays two
+characters. A quoted value with no closing `"`, or a bare `"` inside, is a `Defect`.
 
 ### Structured JSON and JSON Schema
 

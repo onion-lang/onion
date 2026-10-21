@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
   - Before: anywhere else it silently became the minimum value. `val x: Int = 2147483648` printed `-2147483648`; `-2147483648 as Long` printed `2147483648`, because `as` binds tighter than `-`.
   - Now: the usual "out of range for Int/Long" error. `-2147483648`, `-9223372036854775808L` and `0x80000000` still compile. To migrate, add `L` or parentheses: see `docs/migration/pre-1.0.md`.
+- **A `config` shape reads a `String` value in double quotes as quoted text (#2229, RFC #2233).**
+  - Before: `name = "Alice"` read as `"Alice"`, quotes included; `name = "abc` read as `"abc`.
+  - Now: it reads as `Alice`. Inside the quotes, `\"` and `\\` are the only escapes. A quoted value with no closing `"`, or a bare `"` inside, is a Defect. To keep literal quotes, write `name = "\"Alice\""`: see `docs/migration/pre-1.0.md`.
 
 ### Added
 
@@ -20,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now: `http"url".request("GET").header(...).timeoutSeconds(...).send()` reaches the exact builder `Http::request` returns, seeded with the URL so it doesn't need retyping (#2146).
 
 ### Fixed
+
+- **A `config` shape keeps a `String` value's leading and trailing spaces (#2229).**
+  - Before: `print` wrote `text =   x  `, and `parse` read it back as `x`, so `parse(print(v)) == v` failed.
+  - Now: `print` quotes a value that is padded or starts with `"` (`text = "  x  "`); every other value is written as before.
 
 - **`-128B` and `-32768S` hold -128 and -32768 (#2297).**
   - Before: they widened to `128`/`32768`, and `println(-128B)` crashed in `Byte.valueOf`.
@@ -120,7 +127,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`shape doc = config` broke its own documented L1 round-trip law for a `String` component with leading or trailing whitespace** (#2229): `print(v)` wrote the padding, and the next `parse` trimmed it right back off, so `v` never came back equal to itself. A padded `String` value is now quoted on print (`name = "  padded  "`, `\` and `"` escaped) and unquoted on parse -- the same convention `Yaml::stringify` already uses (#2187) -- and every unpadded value is written exactly as before. Draft PR for RFC #2233; **known gap**: a config file already spelling a `String` value with a leading and trailing `"` of its own is now read with those quotes stripped, instead of as six literal characters.
 - **`private:`/`public:`/`protected:` written inside an `extension`/`instance` block now gets a hint explaining the block has no access sections, instead of a bare "Encountered \"private\", but expecting \"def\"" (#2206).** Both block kinds are a flat list of `def` members with no access-section alternative, unlike a class/record/enum body, which always succeeds via one instead of ever reaching this error.
 - **`law`/`example` written outside a record's own body now says so, instead of a wrong or missing hint** (#2202). `law name(...) { ... }` in a `class`/`enum` body got the unrelated "write `def method(): void { ... }`" advice (it has the same `Ident Ident(...)` shape as a genuine Java-style method mistake), and a bare `example { ... }` got no hint at all. Both now point at the one place the clause actually parses: directly inside a record's body.
 - **`set.map { ... }` now keeps insertion order, like `Sets::map`.** The pipeline form resolved to `Iterables::map`, which collected into a plain `HashSet`, so the same operation reordered results depending on call syntax (#2178). `null` handling still differs (`a.map` throws, `Sets::map` returns an empty set).

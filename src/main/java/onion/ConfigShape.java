@@ -19,15 +19,10 @@ import java.util.Set;
  * {@link Defect}, and {@link #print} renders a canonical document (L1).
  *
  * <p>A {@code String} component's value is read trimmed of surrounding whitespace, same
- * as every other scalar, which would otherwise break L1 for a value that actually has
- * leading or trailing whitespace: {@code print} would write it padded, and the next
- * {@code parse} would trim it right back off. Such a value is instead quoted on print
- * ({@code name = "  padded  "}, {@code \} and {@code "} escaped) and unquoted on parse,
- * the same convention {@link Yaml} already uses for a value that would otherwise be
- * misread (#2229). A value that is not padded is never quoted, so this is invisible to
- * every config file written before this existed — except one that already stored a
- * {@code String} spelled with a leading and trailing {@code "} of its own, which is now
- * read as that convention's quoted form instead of the literal two quote characters.
+ * as every other scalar, unless it is in double quotes (#2229): {@code print} quotes a
+ * value that is padded or starts with {@code "}, so L1 holds for every {@code String}.
+ * Inside the quotes only {@code \"} and {@code \\} are escapes; a quoted value with no
+ * closing quote, or a bare quote inside, is a {@link Defect}.
  *
  * <p>What earns the name lossless is the other pair. {@link #parseLossless} keeps a
  * {@link Residue} recording every line verbatim — comments, blank lines, unknown keys,
@@ -214,8 +209,14 @@ public final class ConfigShape<T> implements Shape<T> {
                 continue;
             }
             entryLines.put(name, at);
-            Outcome<Object> read = Scalars.read(
-                baseTag, valueForRead(baseTag, lines.get(at).valueRaw), Origin.atLine(source, at + 1), name);
+            Origin lineOrigin = Origin.atLine(source, at + 1);
+            Outcome<String> spelled = valueForRead(baseTag, lines.get(at).valueRaw, lineOrigin, name);
+            if (spelled.isBad()) {
+                defects.addAll(spelled.defects());
+                values.add(null);
+                continue;
+            }
+            Outcome<Object> read = Scalars.read(baseTag, spelled.get(), lineOrigin, name);
             if (read.isBad()) {
                 defects.addAll(read.defects());
                 values.add(null);
@@ -347,32 +348,31 @@ public final class ConfigShape<T> implements Shape<T> {
 
     /**
      * The text to hand {@link Scalars#read} for one component: trimmed exactly as before
-     * for every tag, except a {@code String} value that is itself quoted (starts and ends
-     * with {@code "}), which is unquoted and unescaped instead — the read side of the
-     * convention {@link #render} writes.
+     * for every tag, except a {@code String} value that starts with {@code "}, which is
+     * read as the quoted form {@link #render} writes (#2229). Inside the quotes only
+     * {@code \"} and {@code \\} are escapes; any other backslash is kept literally, so
+     * {@code \n} stays two characters. A quoted value with no closing {@code "}, or with
+     * an unescaped {@code "} before its end, is a positioned {@link Defect} rather than a
+     * guess at what was meant.
      */
-    private static String valueForRead(String baseTag, String rawValue) {
+    private static Outcome<String> valueForRead(String baseTag, String rawValue, Origin at, String name) {
         String trimmed = rawValue.trim();
-        if (!baseTag.equals("String")) return trimmed;
-        if (trimmed.length() >= 2 && trimmed.charAt(0) == '"' && trimmed.charAt(trimmed.length() - 1) == '"') {
-            return unescapeQuoted(trimmed);
-        }
-        return trimmed;
-    }
-
-    /** {@code trimmed} starts and ends with {@code "} (length &gt;= 2); strips both and unescapes {@code \"}/{@code \\}. */
-    private static String unescapeQuoted(String trimmed) {
-        StringBuilder sb = new StringBuilder(trimmed.length() - 2);
-        int end = trimmed.length() - 1;
-        for (int i = 1; i < end; i++) {
+        if (!baseTag.equals("String") || !trimmed.startsWith("\"")) return Outcome.ok(trimmed);
+        StringBuilder sb = new StringBuilder(trimmed.length());
+        for (int i = 1; i < trimmed.length(); i++) {
             char c = trimmed.charAt(i);
-            if (c == '\\' && i + 1 < end && (trimmed.charAt(i + 1) == '"' || trimmed.charAt(i + 1) == '\\')) {
-                sb.append(trimmed.charAt(i + 1));
-                i++;
+            if (c == '\\' && i + 1 < trimmed.length()
+                    && (trimmed.charAt(i + 1) == '"' || trimmed.charAt(i + 1) == '\\')) {
+                sb.append(trimmed.charAt(++i));
+            } else if (c == '"') {
+                if (i == trimmed.length() - 1) return Outcome.ok(sb.toString());
+                return Outcome.bad(Defect.at(at, name,
+                    "a quoted String with `\\\"` for each `\"` inside it", trimmed));
             } else {
                 sb.append(c);
             }
         }
-        return sb.toString();
+        return Outcome.bad(Defect.at(at, name,
+            "a closing `\"` (write `\\\\` for a backslash, `\\\"` for a quote)", trimmed));
     }
 }

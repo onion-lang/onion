@@ -55,7 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now: `[E0000]` at compile time, with a hint naming the real conversion -- `xs.toArray(new String[0])` for `List[T] as T[]`, `Colls::toList(xs)` for the reverse. A primitive element type (`Int[]`) gets no such hint, since neither call has an overload for it. `(arr as Object)` and `(obj as String[])` keep working.
 - **A type parameter bounded by another type parameter of the same declaration now works** (#2259), including a chain of three (`[A, B extends A, T extends B]`).
   - Before: `class Holder[B, T extends B] { var item: T; def asB(): B { return item } }` failed with `[E0000] type B is expected, but type T is used`; member access through a real bound (`[B extends CharSequence, T extends B]`, `item.length()`) also failed.
-  - Now: both compile and run. A sibling type parameter that merely shares the same bound (`[B, T extends B, U extends B]`) is still correctly rejected wherever `T` is expected, whether by assignment, method call, or as a generic type argument (`List[T]` is not a `List[B]`).
+  - Now: both compile and run. A sibling type parameter that merely shares the same bound (`[B, T extends B, U extends B]`) is correctly rejected wherever `T` is expected, whether by assignment, method call, or as a generic type argument (`List[T]` is not a `List[B]`) -- for a declaration with a chained bound. An instantiation with unrelated type-variable arguments (`new Holder[P, Q](q)` inside `class Mk[P, Q]`) is rejected too.
+  - This rejection is new only for a chained bound (`T extends B`, where `B` is itself a type parameter). Two sibling type parameters with no such bound (`class S[T, U]`) still accept `t = u` and crash at run time with a `ClassCastException` -- tracked separately as #2308, since fixing it means changing how every unbounded type variable compares, not just a chained one.
 
 ## [0.144.0] - 2026-10-20
 

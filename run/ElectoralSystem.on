@@ -68,7 +68,7 @@ public:
     val r = do[Option] {
       v <- Option::some(votesFor(id))
       t <- Option::some(totalVotes())
-      ret (v as Int)
+      yield (v as Int)
     }
     val v: Int = r.get() as Int
     if totalVotes() == 0 { return "#{v} (0%)" }

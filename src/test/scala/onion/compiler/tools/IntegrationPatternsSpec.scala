@@ -28,7 +28,7 @@ class IntegrationPatternsSpec extends AbstractShellSpec {
   it("short-circuits a do[Option] chain") {
     val src =
       "def parse(s: String): Option[Integer] { try { return Option::some(Integer::parseInt(s)) } catch e: Exception { return Option::none() } }\n" +
-      "def process(s: String): Option[Integer] { return do[Option] { n <- parse(s)\n ret n * 2 } }\n" +
+      "def process(s: String): Option[Integer] { return do[Option] { n <- parse(s)\n yield n * 2 } }\n" +
       "def main(args: String[]): String { return process(\"21\").getOrElse(-1) + \",\" + process(\"xx\").getOrElse(-1) }"
     assert(Shell.Success("42,-1") == shell.run(src, "None", Array()))
   }

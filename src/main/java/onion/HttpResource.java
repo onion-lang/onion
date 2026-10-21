@@ -99,6 +99,25 @@ public final class HttpResource {
         return Http.delete(url);
     }
 
+    /**
+     * Escalates to the full request builder, seeded with this resource's own URL, for
+     * anything {@code get}/{@code post}/{@code put}/{@code delete} don't cover: a header, a
+     * timeout, a body on any method, or the response status (#2146). Equivalent to
+     * {@code Http::request(method, this.url())}.
+     *
+     * <pre>
+     * val res = http"https://api.example.com/x".request("GET")
+     *   .header("Authorization", "Bearer t")
+     *   .timeoutSeconds(5)
+     *   .send()
+     * </pre>
+     *
+     * @throws IllegalArgumentException if the method is not a valid HTTP method token
+     */
+    public Http.Request request(String method) {
+        return Http.request(method, url);
+    }
+
     @Override
     public String toString() {
         return "http\"" + url + "\"";

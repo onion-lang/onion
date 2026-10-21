@@ -211,9 +211,9 @@ object TestSupport extends Assertions {
   def doBinding(name: String, expr: AST.Expression): AST.DoBinding =
     AST.DoBinding(defaultLoc, name, expr)
 
-  /** Create a ret statement: ret expr */
-  def retStmt(expr: AST.Expression): AST.RetStatement =
-    AST.RetStatement(defaultLoc, expr)
+  /** Create a yield statement: yield expr */
+  def yieldStmt(expr: AST.Expression): AST.YieldStatement =
+    AST.YieldStatement(defaultLoc, expr)
 
   /** Create a do expression */
   def doExpr(monadType: AST.TypeNode, statements: Any*): AST.DoExpression =

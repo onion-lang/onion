@@ -1493,6 +1493,13 @@ object TypedAST {
   trait Method extends MemberRef {
     def affiliation: TypedAST.ClassType
 
+    /** Whether this method is declared in a Java class (loaded from a class file or via
+     *  reflection), as opposed to an Onion-declared method. A Java method's parameter
+     *  nullness is unknown (the "platform type" dilemma, #132), so callers that rely on
+     *  this to decide whether a diagnostic applies should treat it the same way as a
+     *  Java type variable's `Nullability.Platform`. */
+    def isJavaOrigin: Boolean = false
+
     def arguments: Array[TypedAST.Type]
 
     /** Parameter count without requiring callers to request a defensive array copy. */

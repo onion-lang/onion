@@ -1,5 +1,6 @@
 package onion.compiler.tools
 
+import onion.compiler.exceptions.ScriptException
 import onion.tools.Shell
 import java.nio.file.{Files => JFiles}
 
@@ -136,6 +137,70 @@ class FilesCopyMoveSpec extends AbstractShellSpec {
       srcFile.delete()
       srcDir.delete()
       assert(Shell.Success("dir content") == result)
+    }
+
+    it("refuses to copy a directory into its own subdirectory, up front, instead of recursing until the OS path limit") {
+      val srcDir = JFiles.createTempDirectory("onion-copydir-self-").toFile
+      srcDir.deleteOnExit()
+      val srcFile = new java.io.File(srcDir, "a.txt")
+      JFiles.writeString(srcFile.toPath, "1")
+
+      val srcPath = srcDir.getAbsolutePath.replace('\\', '/')
+      val dstPath = srcPath + "/sub"
+
+      val thrown = intercept[ScriptException] {
+        shell.run(
+          s"""
+             |import { onion.Files; }
+             |class Test {
+             |public:
+             |  static def main(args: String[]): String {
+             |    Files::copyDir("$srcPath", "$dstPath")
+             |    return "no error"
+             |  }
+             |}
+             |""".stripMargin,
+          "FilesCopyDirIntoSubdir.on",
+          Array()
+        )
+      }
+      assert(thrown.getCause.isInstanceOf[IllegalArgumentException])
+      assert(!new java.io.File(dstPath).exists())
+
+      // Cleanup
+      srcFile.delete()
+      srcDir.delete()
+    }
+
+    it("refuses to copy a directory into itself (same path)") {
+      val srcDir = JFiles.createTempDirectory("onion-copydir-same-").toFile
+      srcDir.deleteOnExit()
+      val srcFile = new java.io.File(srcDir, "a.txt")
+      JFiles.writeString(srcFile.toPath, "1")
+
+      val srcPath = srcDir.getAbsolutePath.replace('\\', '/')
+
+      val thrown = intercept[ScriptException] {
+        shell.run(
+          s"""
+             |import { onion.Files; }
+             |class Test {
+             |public:
+             |  static def main(args: String[]): String {
+             |    Files::copyDir("$srcPath", "$srcPath")
+             |    return "no error"
+             |  }
+             |}
+             |""".stripMargin,
+          "FilesCopyDirSamePath.on",
+          Array()
+        )
+      }
+      assert(thrown.getCause.isInstanceOf[IllegalArgumentException])
+
+      // Cleanup
+      srcFile.delete()
+      srcDir.delete()
     }
   }
 }

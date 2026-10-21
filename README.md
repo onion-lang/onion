@@ -190,14 +190,14 @@ Onion supports Haskell-style do notation for composing monadic operations (Optio
 val result: Future[Int] = do[Future] {
   x <- Future::async { fetchUser() }
   y <- Future::async { fetchData(x) }
-  ret x + y
+  yield x + y
 }
 
 // Option chaining
 val user: Option[String] = do[Option] {
   id <- lookupId("alice")
   profile <- loadProfile(id)
-  ret profile.name
+  yield profile.name
 }
 ```
 

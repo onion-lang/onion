@@ -391,7 +391,7 @@ val result1: Option[Int] = parseNumber("10").flatMap((x: Int) -> {
 val result2: Option[Int] = do[Option] {
   x <- parseNumber("10")
   y <- parseNumber("20")
-  ret x + y
+  yield x + y
 }
 
 println(result2.getOrElse(0))  // 30
@@ -411,7 +411,7 @@ val calculation: Result[Int, String] = do[Result] {
   x <- divide(100, 1)    // 100
   y <- divide(x, 5)      // 20
   z <- divide(y, 4)      // 5
-  ret z * 2              // 10
+  yield z * 2              // 10
 }
 
 if calculation.isOk() {
@@ -428,9 +428,9 @@ val nested: Option[Int] = do[Option] {
   x <- Option::some(10)
   inner <- do[Option] {
     y <- Option::some(20)
-    ret y * 2
+    yield y * 2
   }
-  ret x + inner  // 10 + 40 = 50
+  yield x + inner  // 10 + 40 = 50
 }
 ```
 
@@ -556,7 +556,7 @@ def fetchProfile(name: String): Future[String] {
 val profile: Future[String] = do[Future] {
   user <- fetchUser(42)
   profile <- fetchProfile(user)
-  ret profile.toUpperCase()
+  yield profile.toUpperCase()
 }
 
 profile.onSuccess((p: String) -> { println(p); })
@@ -590,7 +590,7 @@ Future::all(api1, api2, api3).onSuccess((results: Object[]) -> {
 val combined: Future[String] = do[Future] {
   pair1 <- api1.zip(api2)
   data3 <- api3
-  ret pair1[0] as String + " | " + pair1[1] as String + " | " + data3
+  yield pair1[0] as String + " | " + pair1[1] as String + " | " + data3
 }
 ```
 

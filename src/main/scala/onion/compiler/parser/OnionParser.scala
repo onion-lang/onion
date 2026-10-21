@@ -2142,7 +2142,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     var going = true
     while (going) kind(1) match {
       case K.PLUS => next(); eols(); val e2 = unaryPrefix(); e1 = AST.Addition(span(e1, e2), e1, e2)
-      case K.MINUS => next(); eols(); val e2 = unaryPrefix(); e1 = AST.Subtraction(span(e1, e2), e1, e2)
+      case K.MINUS => unaryMinus = null; next(); eols(); val e2 = unaryPrefix(); e1 = AST.Subtraction(span(e1, e2), e1, e2)
       case _ => going = false
     }
     e1
@@ -2150,7 +2150,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def unaryPrefix(): AST.Expression = kind(1) match {
     case K.PLUS => val t = next(); AST.Posit(p(t), unaryPrefix())
-    case K.MINUS => val t = next(); AST.Negate(p(t), unaryPrefix())
+    case K.MINUS => val t = next(); unaryMinus = t; AST.Negate(p(t), requireBareMinMagnitude(t, unaryPrefix()))
     case K.NOT => val t = next(); AST.Not(p(t), unaryPrefix())
     case K.BN => val t = next(); AST.BitNot(p(t), unaryPrefix())
     case _ => multitive()
@@ -2170,7 +2170,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def mulOperand(): AST.Expression = kind(1) match {
     case K.PLUS => val t = next(); AST.Posit(p(t), mulOperand())
-    case K.MINUS => val t = next(); AST.Negate(p(t), mulOperand())
+    case K.MINUS => val t = next(); unaryMinus = t; AST.Negate(p(t), requireBareMinMagnitude(t, mulOperand()))
     case K.NOT => val t = next(); AST.Not(p(t), mulOperand())
     case K.BN => val t = next(); AST.BitNot(p(t), mulOperand())
     case _ => primarySuffix()
@@ -2742,8 +2742,32 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   // ---------------------------------------------------------------- literals
 
+  /** The `-` of the innermost unary minus parsed so far; see the grammar's `unaryMinus`. */
+  private var unaryMinus: Token = null
+
+  /** The minimum-value magnitude last accepted right after a `-`: that `-`, the literal's
+   *  token and the literal. See the grammar's `requireBareMinMagnitude`. */
+  private var minMagnitudeMinus: Token = null
+  private var minMagnitudeToken: Token = null
+  private var minMagnitudeLiteral: AST.Expression = null
+
+  /** The magnitude is only valid as the whole operand of the `-` before it. Postfix `as`,
+   *  `.m()` and `*`/`/`/`%` bind tighter than prefix `-`, so `-2147483648 as Long` would
+   *  negate a cast of the already-wrapped minimum value (#2296). */
+  private def requireBareMinMagnitude(minus: Token, operand: AST.Expression): AST.Expression = {
+    if ((minMagnitudeMinus eq minus) && !(operand eq minMagnitudeLiteral)) {
+      val t = minMagnitudeToken
+      val marker = if (t.image.endsWith("L")) LongLiteralOutOfRangeMarker else IntLiteralOutOfRangeMarker
+      adoptFailure(Location(t.beginLine, t.beginColumn), marker, new java.util.LinkedHashSet[Integer]())
+      throw fail
+    }
+    operand
+  }
+
   private def integerLiteral(): AST.Expression = {
+    val prev = last
     val t = expect(K.INTEGER)
+    val negated = unaryMinus != null && (prev eq unaryMinus)
     val s = t.image.replace("_", "")
     val noKinds = new java.util.LinkedHashSet[Integer]()
     try {
@@ -2755,8 +2779,19 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         val iv = parseIntLiteral(s.substring(0, s.length - 1))
         if (iv < -32768 || iv > 65535) throw theFail
         AST.ShortLiteral(p(t), iv.toShort)
-      } else if (s.endsWith("L")) AST.LongLiteral(p(t), parseLongLiteral(s.substring(0, s.length - 1)))
-      else AST.IntegerLiteral(p(t), parseIntLiteral(s))
+      } else if (s.endsWith("L")) {
+        val lv = parseLongLiteral(s.substring(0, s.length - 1))
+        if (lv == Long.MinValue && !s.startsWith("0") && !negated) throw theFail
+        val lit = AST.LongLiteral(p(t), lv)
+        if (lv == Long.MinValue && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeToken = t; minMagnitudeLiteral = lit }
+        lit
+      } else {
+        val iv = parseIntLiteral(s)
+        if (iv == Integer.MIN_VALUE && !s.startsWith("0") && !negated) throw theFail
+        val lit = AST.IntegerLiteral(p(t), iv)
+        if (iv == Integer.MIN_VALUE && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeToken = t; minMagnitudeLiteral = lit }
+        lit
+      }
     } catch {
       case _: Fail =>
         // The value didn't fit -- not a wrong token, so give the range check's own

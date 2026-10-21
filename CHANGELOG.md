@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
+  - Before: anywhere else it silently became the minimum value. `val x: Int = 2147483648` printed `-2147483648`; `-2147483648 as Long` printed `2147483648`, because `as` binds tighter than `-`.
+  - Now: the usual "out of range for Int/Long" error. `-2147483648`, `-9223372036854775808L` and `0x80000000` still compile. To migrate, add `L` or parentheses: see `docs/migration/pre-1.0.md`.
+
 ### Added
 
 - **`http"...".request(method)` escalates to `Http::request`'s full builder, seeded with the resource's own URL.**

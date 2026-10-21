@@ -2130,6 +2130,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#2147483648-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2147483648 の直前には - が必要になりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4669,6 +4680,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#2147483648-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2147483648 の直前には - が必要になりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4710,6 +4732,24 @@
   <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>grep<span class="w"> </span>-rl<span class="w"> </span><span class="s1">'\bret\b'</span><span class="w"> </span>--include<span class="o">=</span><span class="s1">'*.on'</span><span class="w"> </span>.<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>perl<span class="w"> </span>-pi<span class="w"> </span>-e<span class="w"> </span><span class="s1">'s/\bret\b/yield/g'</span>
 </span></code></pre></div>
   <code>ret</code> を変数名として使っている場合は、結果を確認してください。</li>
+</ul>
+<h2 id="2147483648-"><code>2147483648</code> の直前には <code>-</code> が必要になりました<a class="headerlink" href="#2147483648-" title="Permanent link">&para;</a></h2>
+<p>リテラル <code>2147483648</code>（と <code>9223372036854775808L</code>）は、<code>-2147483648</code> のように単項 <code>-</code> のオペランドそのものである場合だけ有効です。
+それ以外の場所では、以前は黙って最小値に化けていました。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// 以前: コンパイルでき、意外な値になっていた</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648</span><span class="w">          </span><span class="c1">// -2147483647（ラップアラウンドによる）</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Long</span><span class="w">     </span><span class="c1">// 2147483648: `as` は `-` より強く結合する</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">         </span><span class="c1">// 1073741824: `/` は `-` より強く結合する</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1">// 現在</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648L</span><span class="w">         </span><span class="c1">// または 1L - 2147483648L</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648L</span><span class="w">            </span><span class="c1">// または (-2147483648) as Long</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">-</span><span class="mi">2147483648</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">       </span><span class="c1">// -1073741824</span>
+</span></code></pre></div>
+<ul>
+<li><strong>変わったこと:</strong> 最小値の絶対値は、トークンではなく、それを符号反転する場所で検査します。</li>
+<li><strong>表示されるもの:</strong> リテラルの位置に「整数リテラルがIntの範囲(-2147483648..2147483647)を超えています -- Long型リテラルにするには末尾にLを付けてください。」と表示されます（<code>L</code> 付きなら Long の範囲のメッセージです）。</li>
+<li><strong>引き続き使えるもの:</strong> <code>-2147483648</code>、<code>x + -2147483648</code>、<code>3 * -2147483648</code>、<code>-9223372036854775808L</code>、<code>0x80000000</code> のような 16 進数・2 進数のビットパターン。</li>
 </ul>
 
 

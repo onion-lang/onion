@@ -4044,6 +4044,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#2147483648-needs-a-directly-in-front" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2147483648 needs a - directly in front
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4648,6 +4659,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#2147483648-needs-a-directly-in-front" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2147483648 needs a - directly in front
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4689,6 +4711,24 @@ compiling and means the same thing on later 1.x releases.</p>
   <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>grep<span class="w"> </span>-rl<span class="w"> </span><span class="s1">'\bret\b'</span><span class="w"> </span>--include<span class="o">=</span><span class="s1">'*.on'</span><span class="w"> </span>.<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>perl<span class="w"> </span>-pi<span class="w"> </span>-e<span class="w"> </span><span class="s1">'s/\bret\b/yield/g'</span>
 </span></code></pre></div>
   Check the result if you use <code>ret</code> as a variable name.</li>
+</ul>
+<h2 id="2147483648-needs-a-directly-in-front"><code>2147483648</code> needs a <code>-</code> directly in front<a class="headerlink" href="#2147483648-needs-a-directly-in-front" title="Permanent link">&para;</a></h2>
+<p>The literal <code>2147483648</code> (and <code>9223372036854775808L</code>) is valid only as the whole operand of a
+unary <code>-</code>, as in <code>-2147483648</code>. Anywhere else it used to wrap silently to the minimum value.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// Before: compiled, with a surprising value</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648</span><span class="w">          </span><span class="c1">// -2147483647, by wraparound</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Long</span><span class="w">     </span><span class="c1">// 2147483648: `as` binds tighter than `-`</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">         </span><span class="c1">// 1073741824: `/` binds tighter than `-`</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1">// Now</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648L</span><span class="w">         </span><span class="c1">// or 1L - 2147483648L</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648L</span><span class="w">            </span><span class="c1">// or (-2147483648) as Long</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">-</span><span class="mi">2147483648</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">       </span><span class="c1">// -1073741824</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What changed:</strong> the magnitude of the minimum value is checked where it is negated, not at the token.</li>
+<li><strong>What you see:</strong> <code>integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal.</code>, at the literal (<code>... for Long ...</code> with the <code>L</code> suffix).</li>
+<li><strong>Still fine:</strong> <code>-2147483648</code>, <code>x + -2147483648</code>, <code>3 * -2147483648</code>, <code>-9223372036854775808L</code>, and hex or binary bit patterns such as <code>0x80000000</code>.</li>
 </ul>
 
 

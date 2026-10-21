@@ -1,6 +1,6 @@
 package onion.compiler.parser
 
-private[compiler] final case class SourceContext(context: String, sourceLine: String)
+private[compiler] final case class SourceContext(context: String, sourceLine: String, precedingText: String = "")
 
 private[compiler] object SourceContext {
   private val ContextLimit = 200
@@ -10,7 +10,9 @@ private[compiler] object SourceContext {
    *
    * `context` starts at the reported column and may cross line boundaries, while
    * `sourceLine` contains the entire reported line. Context is bounded so syntax
-   * hint matching stays predictable for pathological input.
+   * hint matching stays predictable for pathological input. `precedingText` is
+   * everything before the reported line, for hints that name an enclosing
+   * declaration.
    */
   def at(sourceText: String, line: Int, column: Int): SourceContext = {
     val lineStart = lineStartOffset(sourceText, line)
@@ -25,7 +27,8 @@ private[compiler] object SourceContext {
         contextStart,
         math.min(sourceText.length, contextStart + ContextLimit)
       ),
-      sourceLine = sourceText.substring(lineStart, lineEnd)
+      sourceLine = sourceText.substring(lineStart, lineEnd),
+      precedingText = sourceText.substring(0, lineStart)
     )
   }
 

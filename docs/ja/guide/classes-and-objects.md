@@ -440,6 +440,35 @@ def describe(o: Opt[String]): String = select o {
 なります。定数形式の enum は型パラメータを取れません（`java.lang.Enum` になり、
 JVM がジェネリックな enum を許さないためです）。
 
+### 独自の節が必要な case
+
+`case` 行には本体も `derive!` も `from` も付けられません。ある case だけにメソッド、
+`law`/`example`、独自の JSON 変換、正規表現パーサが必要なときは、その case を削除します。
+代わりに、enum に `conforms` する `record` を enum の外で宣言してください。
+
+```onion
+enum Msg {
+  case Ping(id: Int)
+  case Pong(id: Int)
+}
+
+record Pang(id: Int) derive!(Json) conforms Msg {   // derive!/from は conforms の前
+  example { new Pang(3).id() == 3 }
+public:
+  def label(): String = "pang " + id()   // メソッドは public: の下に書きます
+}
+
+def kind(m: Msg): String = select m {
+  case p is Ping: "ping"
+  case p is Pong: "pong"
+  case p is Pang: Pang::toJson(p)   // この行を省くと select は E0042 になります
+}
+```
+
+この record も enum の sealed 集合に加わります。そのため `select` には引き続き列挙が必要です。
+ジェネリックな enum では、型パラメータを両側に書きます:
+`record Some[T](value: T) conforms Opt[T]`。
+
 ## ジェネリッククラス {: #generic-classes }
 
 クラスは `[]` で型パラメータを取れます。型パラメータは本体で通常の型として使えます：

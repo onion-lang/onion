@@ -184,7 +184,7 @@ private[compiler] final class MethodCallFallbackSupport(
         reportNotFound(nonClosureTypes.values.toArray)
         return None
     }
-    val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation)
+    val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, target.isInstanceOf[This])
     // Preserve positions of the resolved (non-closure) arguments — closure slots
     // stay null — so each unifies against its own formal parameter. Collapsing
     // them shifted a determining argument that follows a closure onto the wrong

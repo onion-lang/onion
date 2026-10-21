@@ -96,8 +96,9 @@ name = "\"Alice\""      # read as "Alice"  (to keep literal quotes)
 
 ## A slot typed `T` accepts only a `T`
 
-Inside a generic class, a field, local, parameter or return typed by a type parameter `T` now
-accepts only a value of type `T`, as in Java. It used to accept anything that fit `T`'s bound,
+Inside a generic class, assigning to a field, local or parameter typed by a type parameter `T`,
+initializing one, or returning from a method declared `: T` now accepts only a value of type `T`,
+as in Java. It used to accept anything that fit `T`'s bound,
 and the program then threw a `ClassCastException` on the next read.
 
 ```onion
@@ -120,3 +121,6 @@ public:
 - **What you see:** `E0000 type T is expected, but type U is used.` at the value.
 - **Still fine:** a `T`; a variable bounded by `T` (`[T, U extends T]`, then `t = u`); `null`;
   and a Java type variable reached through a raw Java type.
+- **Not covered yet:** a call argument (`put(u)` where `def put(x: T)`) and a `T?` slot still
+  accept a `U`, and still throw at run time (#2332). Cast there too, so the code keeps
+  compiling once they are checked.

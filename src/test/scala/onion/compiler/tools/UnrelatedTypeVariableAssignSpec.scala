@@ -164,6 +164,30 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Success(33) == r)
     }
+    it("leaves an inherited member on a raw receiver at its bound, as before") {
+      val r = shell.run(
+        """class Box[T] {
+          |  var value: T
+          |public:
+          |  def this(v: T) { value = v }
+          |  def get(): T { return value }
+          |  def set(v: T): void { value = v }
+          |}
+          |class Mid[U](v: U) extends Box[U](v) { }
+          |def touch(o: Object): String = select o {
+          |  case m is Mid: { m.set("new"); m.get().toString() }
+          |  case b is Box: { b.set("new"); "" + b.get() }
+          |  else: "?"
+          |}
+          |def main(args: String[]): Int {
+          |  val o: Object = new Mid[String]("old")
+          |  (o as Mid).set("cast")
+          |  val viaCast = (o as Mid).get().toString()
+          |  return touch(new Mid[String]("old")).length() * 100 + touch(new Box[String]("old")).length() * 10 + viaCast.length()
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(334) == r)
+    }
     it("is what a case of select this binds, in a generic ADT enum") {
       val r = shell.run(
         """enum Lookup[T] {

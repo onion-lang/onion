@@ -18,10 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A `config` shape reads a `String` value in double quotes as quoted text (#2229, RFC #2233).**
   - Before: `name = "Alice"` read as `"Alice"`, quotes included; `name = "abc` read as `"abc`.
   - Now: it reads as `Alice`. Inside the quotes, `\"` and `\\` are the only escapes. A quoted value with no closing `"`, or a bare `"` inside, is a Defect. To keep literal quotes, write `name = "\"Alice\""`: see `docs/migration/pre-1.0.md`.
-- **A slot typed `T` accepts only a `T` (#2308).**
+- **Assigning, initializing or returning into a `T` slot accepts only a `T` (#2308).**
   - Before: inside `class S[T, U]`, `t = u`, `item = someObject` or `item = "x"` compiled, then threw a `ClassCastException` on the next read.
   - Now: `E0000 type T is expected, but type U is used`, as in Java. A `T`, a variable bounded by `T` (`[T, U extends T]`), and `null` are still accepted.
   - To keep an unchecked store, cast: `t = (u as T)`. See [Migrating to 1.0](docs/migration/pre-1.0.md).
+  - Not covered yet: a call argument (`put(u)` with `def put(x: T)`) and a `T?` slot still accept a `U` (#2332).
 
 ### Added
 
@@ -31,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An inherited member called on `this` keeps the subclass's type argument (#2308).**
+  - Before: inside `class Mid[U] extends Box[U]`, `get()` or `this.get()` (declared on `Box` as `T`) was an `Object`; in a generic `enum Opt[T]`, `case s is Some` under `select this` bound a raw `Some`.
+  - Now: `get()` is a `U`, and the case binds `Some[T]`. A raw receiver (`case m is Mid`, `(o as Mid)`) is unchanged.
 - **`yield x` outside a `do` block gets the `do`-block hint wherever it appears (#2300).**
   - Before: in `def f(): Int { yield 1 }` or `{ x -> yield x }`, the hint said to escape `yield` with backticks, which still fails.
   - Now: the same hint as a `yield` at the start of a line: `yield` works only inside `do[M] { ... }`.

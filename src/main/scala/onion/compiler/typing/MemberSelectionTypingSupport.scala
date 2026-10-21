@@ -76,7 +76,7 @@ private[compiler] final class MemberSelectionTypingSupport(
             }
           case _ => ref
         }
-      TypeSubst.withCastOpt(narrowedRef, inheritedType(narrowedRef.`type`, resolved.term.`type`, field.affiliation))
+      TypeSubst.withCastOpt(narrowedRef, inheritedType(narrowedRef.`type`, resolved.term, field.affiliation))
     case ResolvedGetterSelection(method) if Modifier.isStatic(method.modifier) =>
       if (allowStaticSelf) {
         // A bare name falling back to a zero-arg sibling (#2013) can land on
@@ -89,7 +89,7 @@ private[compiler] final class MemberSelectionTypingSupport(
         // user-written `self.name`/`this.name` falls to the branch below,
         // same as any other explicit receiver (#2249 review, round 2).
         val call: Term = new CallStatic(method.affiliation, method, Array.empty)
-        TypeSubst.withCastOpt(call, inheritedType(method.returnType, resolved.term.`type`, method.affiliation))
+        TypeSubst.withCastOpt(call, inheritedType(method.returnType, resolved.term, method.affiliation))
       } else {
         // An explicit receiver, bare or not -- including a user-written
         // `self.staticMethod`/`this.staticMethod` -- selecting a static
@@ -102,15 +102,15 @@ private[compiler] final class MemberSelectionTypingSupport(
       }
     case ResolvedGetterSelection(method) =>
       val call: Term = new Call(resolved.term, method, Array.empty)
-      TypeSubst.withCastOpt(call, inheritedType(method.returnType, resolved.term.`type`, method.affiliation))
+      TypeSubst.withCastOpt(call, inheritedType(method.returnType, resolved.term, method.affiliation))
   }
 
   // The member may be declared on an ancestor (`IntBox extends Box[Int]`), so
   // substitute through the extends-clause chain, not just the receiver's own
   // type arguments (#2033).
-  private def inheritedType(typ: Type, receiver: Type, declaring: ClassType): Type =
+  private def inheritedType(typ: Type, receiver: Term, declaring: ClassType): Type =
     {
-      val classSubst = TypeSubstitution.hierarchySubstitution(receiver, declaring)
+      val classSubst = TypeSubstitution.hierarchySubstitution(receiver.`type`, declaring, receiver.isInstanceOf[This])
       TypeSubst.result(typ, classSubst, Map.empty)
     }
 }

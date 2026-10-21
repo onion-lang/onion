@@ -156,8 +156,21 @@ final class TypingTypeSupport(private val typing: Typing) {
     val placeholders = distinct.map { tp =>
       TypeParam(tp.name, new TypedAST.TypeVariableType(tp.name, typing.rootClass, Nullability.Platform), typing.rootClass)
     }.toSeq
-    // Phase 2: resolve each real bound with all the parameters in scope.
-    openTypeParams(typing.typeParams_ ++ placeholders) {
+    // Phase 2: resolve each real bound, one parameter at a time, growing the
+    // scope as we go. A bound referencing an earlier parameter in this same
+    // list (`[B extends CharSequence, T extends B]`) must see that
+    // parameter's just-resolved real bound, not its Phase 1 placeholder
+    // (whose bound is always the root class) -- otherwise `T` silently sees
+    // `B` as bounded by the root class instead of `CharSequence`, both in
+    // member lookup (`t.length()`) and in the Liskov checks that walk a type
+    // variable's bound chain. A later parameter still isn't visible to an
+    // earlier one's bound (ordinary declaration-order scoping); self- and
+    // mutually-F-bounded references still resolve via their Phase 1
+    // placeholder, exactly as before.
+    val outerScope = typing.typeParams_
+    var scope = outerScope ++ placeholders
+    typing.setTypeParams(scope)
+    try {
       distinct.map { tp =>
         // Nullability: bare [T] means T ranges over nullable types too;
         // an explicit non-null bound [T extends B] restricts T to non-null
@@ -193,8 +206,13 @@ final class TypingTypeSupport(private val typing: Typing) {
             case _ => None
           }
         }
-        TypeParam(tp.name, variableType, upper, constraintTypes)
+        val resolved = TypeParam(tp.name, variableType, upper, constraintTypes)
+        scope = scope ++ Seq(resolved)
+        typing.setTypeParams(scope)
+        resolved
       }.toSeq
+    } finally {
+      typing.setTypeParams(outerScope)
     }
   }
 
@@ -253,9 +271,37 @@ final class TypingTypeSupport(private val typing: Typing) {
     applied: TypedAST.AppliedClassType,
     rawParams: Array[TypedAST.TypeParameter]
   ): Unit = {
+            // A later parameter's declared bound can reference an earlier one
+            // (`[A, B extends A, T extends B]`): substitute THIS instantiation's
+            // own type arguments into each bound before checking it, so `T`'s
+            // bound reads as the real argument given for `B` (e.g. `String`),
+            // not the abstract, unsubstituted type-variable object named `B`.
+            // Without this, `C3[Object, String, String]` checked `String`
+            // against literal `B` and failed, even though `B` substitutes to
+            // exactly `String` at this instantiation (#2259 review repro).
+            val fullSubst: scala.collection.immutable.Map[String, TypedAST.Type] =
+              rawParams.indices.map(j => rawParams(j).name -> applied.typeArguments(j)).toMap
             rawParams.indices.foreach { i =>
               val param = rawParams(i)
-              val upper = param.upperBound.getOrElse(typing.rootClass)
+              val declaredUpper = param.upperBound.getOrElse(typing.rootClass)
+              // Exclude this parameter's OWN name from the substitution: an
+              // F-bounded self-reference (`T extends Comparable[T]`) is its
+              // own argument here (`Tree[T]` used inside `Tree`'s own body),
+              // and substituting it would swap the bound's internal `T`
+              // (frozen, by construction, to the Phase-1 placeholder used
+              // while every bound in the declaration was first resolved)
+              // for this argument's `T` (the class's real, final type
+              // variable) -- the two are different objects, so the swap
+              // made a self-bound compare against itself inconsistently
+              // and broke `class Tree[T extends Comparable[T]]` (caught by
+              // review). Any OTHER parameter's name still substitutes, so
+              // a genuine cross-reference to an earlier parameter is
+              // unaffected.
+              val selfSubst = fullSubst - param.name
+              val upper = TypeSubstitution.substituteType(declaredUpper, selfSubst, Map.empty, defaultToBound = false) match {
+                case ct: TypedAST.ClassType => ct
+                case _ => declaredUpper
+              }
               val arg = applied.typeArguments(i)
               if (arg eq BasicType.VOID) {
                 typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
@@ -283,7 +329,20 @@ final class TypingTypeSupport(private val typing: Typing) {
                     // for a self/forward reference like `class Ver conforms Comparable[Ver]`
                     // during the outline pass, and would wrongly reject it.
                     val satisfiesObjectBound = (upper eq typing.rootClass) && !checkedArg.isBasicType
-                    if (!satisfiesObjectBound && !TypeRules.isAssignable(upper, checkedArg)) {
+                    // `upper` can itself still be an unresolved type variable
+                    // after substitution -- an enclosing, not-yet-instantiated
+                    // parameter (`B` substitutes to `P` in `new Holder[P, Q](q)`
+                    // inside `class Mk[P, Q]`). The ordinary isAssignable falls
+                    // back to comparing erased classes there (both `P` and `Q`
+                    // widen to Object), wrongly accepting two unrelated
+                    // variables (#2259 review repro), so an abstract `upper`
+                    // uses only identity through the argument's own bound
+                    // chain -- never the lenient fallback -- to decide.
+                    val satisfied = upper match {
+                      case tv: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(tv, checkedArg)
+                      case _ => satisfiesObjectBound || TypeRules.isAssignable(upper, checkedArg)
+                    }
+                    if (!satisfied) {
                       typing.report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
                     }
                 }

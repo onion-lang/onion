@@ -173,11 +173,35 @@ private[compiler] final class AssignabilitySupport(
         // (TypeRelations.isAssignableWithBoxing) which accepts null here (#283).
         !expected.isBasicType
       case (tv: TypedAST.TypeVariableType, _) =>
-        TypeRules.isSuperType(tv.upperBound, actual)
+        // Pass `tv` itself, not its erased `upperBound`: when `actual` is
+        // itself a type variable (e.g. `T` in `[B, T extends B]`), only
+        // `isSuperType`'s own identity-aware chain walk can tell "T's
+        // bound chain passes through `tv`" apart from "both happen to
+        // erase to the same root class" (#2259's unsoundness) -- erasing
+        // `tv` here first would throw away exactly the identity it needs.
+        TypeRules.isSuperType(tv, actual)
       case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
         def argsMatch(view: TypedAST.AppliedClassType): Boolean =
           ae.typeArguments.length == view.typeArguments.length &&
-            ae.typeArguments.zip(view.typeArguments).forall { case (e, a) => structurallyAssignable(e, a) }
+            ae.typeArguments.zip(view.typeArguments).forall { case (e, a) =>
+              // Type arguments are invariant: List[T] is not a List[B] even
+              // when T extends B (a mutable List[B] view could then store
+              // something that only fits B, corrupting the underlying
+              // List[T]). Checking only one direction let a type-variable
+              // argument through covariantly via isSuperType's chain walk
+              // above (#2259 review repro: returning a `List[T]` field as
+              // `List[B]` compiled, then a `List[B].add` of a non-T value
+              // threw a ClassCastException on the real `List[T]`).
+              // Scoped to a plain type variable on either side -- a
+              // wildcard (`Function1[T, ?]`) already has its own,
+              // deliberately one-directional covariant/contravariant
+              // rules (handled elsewhere), and requiring both directions
+              // for it rejected ordinary covariant wildcard uses that
+              // never involved a chained bound at all.
+              val involvesTypeVariable = e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType]
+              if (involvesTypeVariable) structurallyAssignable(e, a) && structurallyAssignable(a, e)
+              else structurallyAssignable(e, a)
+            }
         if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
         else
           // Different raw classes: find aa's applied view of ae.raw in its

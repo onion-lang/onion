@@ -164,6 +164,7 @@ onion.HttpResource#getJson=net
 onion.HttpResource#postJson=net
 onion.HttpResource#read=net
 onion.HttpResource#eachLine=net
+onion.HttpResource#request=pure
 
 # ---- configuration ---------------------------------------------------------
 

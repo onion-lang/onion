@@ -156,8 +156,21 @@ final class TypingTypeSupport(private val typing: Typing) {
     val placeholders = distinct.map { tp =>
       TypeParam(tp.name, new TypedAST.TypeVariableType(tp.name, typing.rootClass, Nullability.Platform), typing.rootClass)
     }.toSeq
-    // Phase 2: resolve each real bound with all the parameters in scope.
-    openTypeParams(typing.typeParams_ ++ placeholders) {
+    // Phase 2: resolve each real bound, one parameter at a time, growing the
+    // scope as we go. A bound referencing an earlier parameter in this same
+    // list (`[B extends CharSequence, T extends B]`) must see that
+    // parameter's just-resolved real bound, not its Phase 1 placeholder
+    // (whose bound is always the root class) -- otherwise `T` silently sees
+    // `B` as bounded by the root class instead of `CharSequence`, both in
+    // member lookup (`t.length()`) and in the Liskov checks that walk a type
+    // variable's bound chain. A later parameter still isn't visible to an
+    // earlier one's bound (ordinary declaration-order scoping); self- and
+    // mutually-F-bounded references still resolve via their Phase 1
+    // placeholder, exactly as before.
+    val outerScope = typing.typeParams_
+    var scope = outerScope ++ placeholders
+    typing.setTypeParams(scope)
+    try {
       distinct.map { tp =>
         // Nullability: bare [T] means T ranges over nullable types too;
         // an explicit non-null bound [T extends B] restricts T to non-null
@@ -193,8 +206,13 @@ final class TypingTypeSupport(private val typing: Typing) {
             case _ => None
           }
         }
-        TypeParam(tp.name, variableType, upper, constraintTypes)
+        val resolved = TypeParam(tp.name, variableType, upper, constraintTypes)
+        scope = scope ++ Seq(resolved)
+        typing.setTypeParams(scope)
+        resolved
       }.toSeq
+    } finally {
+      typing.setTypeParams(outerScope)
     }
   }
 

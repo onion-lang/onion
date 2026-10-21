@@ -1827,24 +1827,38 @@ object TypedAST {
       }
 
       // A type variable's own bound can itself be another type variable
-      // (`[B, T extends B]`), so unwrap the whole chain to its first
-      // non-type-variable bound, not just one level. Bounds are acyclic by
-      // construction, but a depth cap guards against a malformed one.
-      def resolveBound(t: TypedAST.Type): TypedAST.Type = {
-        var cur = t
-        var depth = 0
-        while (depth < 64 && (cur.isInstanceOf[TypedAST.TypeVariableType] || cur.isInstanceOf[TypedAST.WildcardType])) {
-          cur = cur match {
-            case tv: TypedAST.TypeVariableType => tv.upperBound
-            case w: TypedAST.WildcardType => w.upperBound
-            case other => other
-          }
-          depth += 1
-        }
-        cur
+      // (`[B, T extends B]`) -- a genuine multi-level chain. Only THIS
+      // specific shape takes the identity-aware chain walk; an ordinary
+      // single-level type variable (whose own bound is already a concrete
+      // class/interface -- the overwhelming majority of type variables in
+      // the codebase, including every generic *method* type parameter
+      // used in extension-method overload resolution) falls straight
+      // through to the pre-existing one-level unwrap below, UNCHANGED.
+      // Widening this check to every type variable regressed Sets::map/
+      // filter chaining: two method type parameters are, correctly,
+      // distinct object instances per call site, so an identity match can
+      // never succeed for them, and the stricter rejection broke a case
+      // that was never about chained class bounds at all. Gating on
+      // "right's own immediate bound is itself a type variable" scopes
+      // the new behavior to exactly the shape #2259 is about, leaving
+      // every single-level case bit-for-bit as it was before this fix.
+      right match {
+        case rtv: TypedAST.TypeVariableType if rtv.upperBound.isInstanceOf[TypedAST.TypeVariableType] =>
+          return rightVariableChainAccepts(left, rtv)
+        case rw: TypedAST.WildcardType if rw.upperBound.isInstanceOf[TypedAST.TypeVariableType] =>
+          return rightVariableChainAccepts(left, rw.upperBound)
+        case _ => // an ordinary single-level variable, a wildcard, or already concrete; continue below
       }
-      val l = resolveBound(left)
-      val r = resolveBound(right)
+      val l = left match {
+        case tv: TypedAST.TypeVariableType => tv.upperBound
+        case w: TypedAST.WildcardType => w.upperBound
+        case _ => left
+      }
+      val r = right match {
+        case tv: TypedAST.TypeVariableType => tv.upperBound
+        case w: TypedAST.WildcardType => w.upperBound
+        case _ => right
+      }
       if (l.isBasicType) {
         if (r.isBasicType) {
           return isSuperTypeForBasic(l.asInstanceOf[TypedAST.BasicType], r.asInstanceOf[TypedAST.BasicType])
@@ -1876,6 +1890,33 @@ object TypedAST {
     }
 
     def isAssignable(left: TypedAST.Type, right: TypedAST.Type): Boolean = isSuperType(left, right)
+
+    /**
+     * Walks a type variable's own bound chain (the `right` side of
+     * isSuperType, which started out as a type variable) looking for a
+     * link that *is* `left` by identity. Bounds are acyclic by
+     * construction (`createTypeParams` builds this graph bottom-up, so it
+     * cannot cycle back on itself even for a mutually-referencing
+     * declaration), so this always terminates. Once the chain reaches a
+     * concrete type without ever matching `left`, `left` being itself
+     * still an unrelated, unresolved type variable must not be accepted
+     * just because its own erased bound happens to coincide with this
+     * chain's -- that erasure-equality shortcut is exactly #2259's
+     * unsoundness; `left` being concrete defers to the ordinary check.
+     */
+    private def rightVariableChainAccepts(left: TypedAST.Type, right: TypedAST.Type): Boolean = {
+      right match {
+        case rtv: TypedAST.TypeVariableType =>
+          (rtv eq left) || rightVariableChainAccepts(left, rtv.upperBound)
+        case rw: TypedAST.WildcardType =>
+          (rw eq left) || rightVariableChainAccepts(left, rw.upperBound)
+        case concrete =>
+          left match {
+            case _: TypedAST.TypeVariableType | _: TypedAST.WildcardType => false
+            case _ => isSuperType(left, concrete)
+          }
+      }
+    }
 
     private def isSuperTypeForArray(left: TypedAST.ArrayType, right: TypedAST.ArrayType): Boolean = {
       val lb = left.base

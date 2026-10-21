@@ -168,7 +168,13 @@ private[compiler] final class AssignabilitySupport(
         // (TypeRelations.isAssignableWithBoxing) which accepts null here (#283).
         !expected.isBasicType
       case (tv: TypedAST.TypeVariableType, _) =>
-        TypeRules.isSuperType(tv.upperBound, actual)
+        // Pass `tv` itself, not its erased `upperBound`: when `actual` is
+        // itself a type variable (e.g. `T` in `[B, T extends B]`), only
+        // `isSuperType`'s own identity-aware chain walk can tell "T's
+        // bound chain passes through `tv`" apart from "both happen to
+        // erase to the same root class" (#2259's unsoundness) -- erasing
+        // `tv` here first would throw away exactly the identity it needs.
+        TypeRules.isSuperType(tv, actual)
       case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
         def argsMatch(view: TypedAST.AppliedClassType): Boolean =
           ae.typeArguments.length == view.typeArguments.length &&

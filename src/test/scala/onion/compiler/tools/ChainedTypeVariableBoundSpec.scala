@@ -39,5 +39,60 @@ class ChainedTypeVariableBoundSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Success(2) == r)
     }
+    it("resolves a member through a real (non-root) bound, two levels up the chain") {
+      val r = shell.run(
+        """class Holder[B extends CharSequence, T extends B] {
+          |  var item: T
+          |public:
+          |  def this(v: T) { item = v }
+          |  def len(): Int { return item.length() }
+          |}
+          |def main(args: String[]): Int {
+          |  val h: Holder[String, String] = new Holder[String, String]("hello")
+          |  return h.len()
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(5) == r)
+    }
+  }
+  describe("an unrelated type variable must not be accepted via a shared erased bound") {
+    it("rejects returning a chained T as a third, unrelated type parameter A (#2259 review repro)") {
+      val r = shell.run(
+        """class Box[A, B, T extends B] {
+          |  var t: T
+          |public:
+          |  def this(v: T) { t = v }
+          |  def wrong(): A { return t }
+          |}
+          |def main(args: String[]): void { }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
+    it("rejects assigning U into a sibling T, both bounded by the same B") {
+      val r = shell.run(
+        """class Box3[B, T extends B, U extends B] {
+          |  var t: T
+          |  var u: U
+          |public:
+          |  def this(tv: T, uv: U) { t = tv; u = uv }
+          |  def bad(): void { t = u }
+          |}
+          |def main(args: String[]): void { }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
+    it("rejects adding a sibling U into a List[T] via a shared bound B") {
+      val r = shell.run(
+        """import { java.util.* }
+          |class Box4[B, T extends B, U extends B] {
+          |  var ts: List[T]
+          |public:
+          |  def this(v: T) { ts = new ArrayList[T](); ts.add(v) }
+          |  def poison(u: U): void { ts.add(u) }
+          |}
+          |def main(args: String[]): void { }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
   }
 }

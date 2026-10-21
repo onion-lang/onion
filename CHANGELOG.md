@@ -35,7 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A type parameter bounded by another type parameter of the same declaration (`[B, T extends B]`) was rejected everywhere its own bound was expected** (#2259), e.g. `class Holder[B, T extends B] { var item: T; def asB(): B { return item } }` failed with `[E0000] type B is expected, but type T is used`, even though the bound declares exactly that relationship. `isSuperType`'s type-variable unwrap only peeled one level of bound, so a bound that was itself still a type variable stayed unresolved; it now unwraps the whole chain.
+- **A type parameter bounded by another type parameter of the same declaration now works** (#2259).
+  - Before: `class Holder[B, T extends B] { var item: T; def asB(): B { return item } }` failed with `[E0000] type B is expected, but type T is used`, even on `[B extends CharSequence, T extends B]`, where member access through the chain (`item.length()`) also failed.
+  - Now: both compile and run, by identity through the declared bound chain rather than by comparing erased classes -- which also closes the gap where an unrelated third type parameter sharing the same erased bound was wrongly accepted (a real `ClassCastException` risk, caught in review).
 - **A List-style call on a Java Stream says to convert it first.** `s.lines()`/`s.chars()` are Java's String methods and return a Stream, so `s.lines().size`, `.first()`, `.join(",")` or `[0]` got a misleading guess (`min`, `limit`, `map`). They now say `did you mean: toList().size` (`boxed().toList()...` for an IntStream).
 
 - **A static call on a nested class names the enclosing class's method.** `Response::json(body)` (the helpers live on `Server`, not `Server.Response`) said `did you mean: of`; it now says `did you mean: Server::json`. Applies whenever the enclosing class has a static method of that name and arity.

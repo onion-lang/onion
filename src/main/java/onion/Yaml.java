@@ -184,6 +184,9 @@ public final class Yaml {
                 throw nestedLine(rawLine, lineNumber);
             }
             baseIndent = indent;
+            if (isSequenceItem(rawLine.trim())) {
+                throw nestedSequence(rawLine, lineNumber);
+            }
             parseKeyValueLine(rawLine.trim(), lineNumber, result);
         }
         return result;
@@ -204,6 +207,12 @@ public final class Yaml {
                 + rawLine.trim(), lineNumber);
     }
 
+    private static YamlParseException nestedSequence(String rawLine, int lineNumber) {
+        return new YamlParseException(
+            "Nested sequence is out of scope (Yaml reads flat data only; use Json for nested data): "
+                + rawLine.trim(), lineNumber);
+    }
+
     /**
      * Parse a top-level block sequence: each line starting with `-` (`isSequenceItem`)
      * opens a new flat-mapping element, and every following non-`-` line adds another
@@ -214,6 +223,8 @@ public final class Yaml {
         LinkedHashMap<String, Object> current = null;
         // Column of the current element's keys (the first key after `- `); a deeper line is nested.
         int keyColumn = 0;
+        // Column of the first item's `-`; an item at any other column is a nested sequence.
+        int itemColumn = -1;
         int lineNumber = 0;
         for (String rawLine : rawLines) {
             lineNumber++;
@@ -222,10 +233,15 @@ public final class Yaml {
                 continue;
             }
             if (isSequenceItem(trimmed)) {
+                int dashColumn = indentOf(rawLine);
+                if (itemColumn < 0) {
+                    itemColumn = dashColumn;
+                } else if (dashColumn != itemColumn) {
+                    throw nestedSequence(rawLine, lineNumber);
+                }
                 current = new LinkedHashMap<>();
                 result.add(current);
                 String rest = trimmed.equals("-") ? "" : trimmed.substring(2).trim();
-                int dashColumn = indentOf(rawLine);
                 keyColumn = rest.isEmpty() ? dashColumn + 2 : rawLine.indexOf(rest, dashColumn + 1);
                 if (!rest.isEmpty()) {
                     parseKeyValueLine(rest, lineNumber, current);

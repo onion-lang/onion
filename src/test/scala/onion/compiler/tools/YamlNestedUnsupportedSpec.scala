@@ -236,4 +236,60 @@ class YamlNestedUnsupportedSpec extends AbstractShellSpec {
       case _ => false
     })
   }
+
+  // Panel block on #2243 at 58ea2aa: a nested sequence was still flattened.
+  it("parse rejects a compact sequence under a key instead of reading `- k` as a key") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): Int {
+        |   try {
+        |     Yaml::parse("items:\n- k: v\n- k: w\n")
+        |     return -1
+        |   } catch e: Yaml.YamlParseException {
+        |     return e.getLine()
+        |   }
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success(2) == result)
+  }
+
+  it("parse rejects a sequence nested deeper inside a sequence element") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): Int {
+        |   try {
+        |     Yaml::parse("- name: a\n  tags:\n    - k: v\n")
+        |     return -1
+        |   } catch e: Yaml.YamlParseException {
+        |     return e.getLine()
+        |   }
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success(3) == result)
+  }
+
+  it("parse rejects a sequence nested at the element's key column") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): Int {
+        |   try {
+        |     Yaml::parse("- name: a\n  tags:\n  - k: v\n")
+        |     return -1
+        |   } catch e: Yaml.YamlParseException {
+        |     return e.getLine()
+        |   }
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success(3) == result)
+  }
+
+  it("still reads a quoted key that starts with a dash as a key") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): String {
+        |   return Yaml::parse("\"- x\": 1\n").toString()
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success("{- x=1}") == result)
+  }
 }

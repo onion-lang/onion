@@ -1726,6 +1726,8 @@ and `Yaml::parse` throws `Yaml.YamlParseException` on:
 
 - a nested mapping: a line indented deeper than its siblings, at the top level or
   inside a sequence element
+- a nested sequence: a `- ` item under a key, or at a different column from the
+  first item
 - a flow collection (`[...]`/`{...}`) value
 - an anchor/alias (`&name`/`*name`) value
 - a block scalar (`|`/`>`)

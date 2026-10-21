@@ -6250,6 +6250,10 @@ Anthropic Messages API 経由で Claude を呼び出し、応答を <code>Shape<
 <td><code>enum Opt[T] { case Some(value: T); case Nothing }</code> - 型パラメータは生成されるsealedインターフェースと各ケースのrecordに伝播する。型パターンはスクルーティニーの型引数を復元するので、<code>Opt[String]</code> から <code>Some</code> をマッチさせると <code>Some[String]</code> が束縛され、<code>s.value()</code> は <code>String</code> になる。<em>homogeneous</em>（データを持たない）enumは型パラメータを取れない（<code>java.lang.Enum</code>になるため）</td>
 </tr>
 <tr>
+<td><code>case Ping(id: Int) derive!(Json)</code> / <code>case Leaf { def f() ... }</code> / <code>case X(...) from re"..."</code></td>
+<td><code>case</code> には本体も節も付けられない（ヒント付きの構文エラー）。そのケースは enum の外で record として宣言する: <code>record Ping(id: Int) [from re"..."] [derive!(Json)] conforms Msg { public: def ... }</code>（<code>from</code>/<code>derive!</code> は <code>conforms</code> の前。メソッドは <code>public:</code> の下）。ジェネリックな enum では型パラメータを両側に書く: <code>record Some[T](value: T) conforms Opt[T]</code>。sealed集合に加わるので <code>select</code> には引き続き列挙が必要（E0042）</td>
+</tr>
+<tr>
 <td><code>onion.Result</code>/<code>Option</code>/<code>Outcome</code>をケースでマッチ？</td>
 <td><code>select r { case o is Result.Ok: o.value(); case e is Result.Err: e.error() }</code>（<code>Option.Some</code>/<code>Option.None</code>、<code>Outcome.Ok</code>/<code>Outcome.Bad</code>も同様） - sealedなJavaインターフェースにネストしたJavaレコード。型でマッチし（<code>Result.Ok(v)</code>の分解は不可）、スクルーティニーの型引数で束縛され、全ケースをそろえれば網羅的</td>
 </tr>

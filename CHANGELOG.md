@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `;` after a block's `}` says the `;` is the problem.**
+  - Before: `while c { ... }; next()` gave `Encountered ";", but expecting "type", "interface", "trait", "class", ...`.
+  - Now: the error adds a hint to drop the `;`; the next statement can follow the `}` directly or start on a new line.
 - **`Files::copyDir(src, dst)` fails up front when `dst` is `src` or inside it (#2255).**
   - Before: it recursed until "File name too long" and left a deep `src/dst/dst/...` tree; `copyDir(x, x)` was a silent no-op.
   - Now: `IllegalArgumentException: cannot copy a directory into itself`, and nothing is written.
@@ -56,9 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A `;` after a block's `}` says the `;` is the problem.**
-  - Before: `while c { ... }; next()` gave `Encountered ";", but expecting "type", "interface", "trait", "class", ...`.
-  - Now: the error adds a hint to drop the `;`; the next statement can follow the `}` directly or start on a new line.
 - **Naming a static method without parens calls it instead of crashing (#2248).**
   - Before: `def work: String = "hi"; val f = work` (or bare `greet` for a static sibling inside a class) failed at run time with `IncompatibleClassChangeError`.
   - Now: it calls the method, just as `work()` does. An explicit non-self receiver (`expr.staticMethod`, no parens) still reports `E0019`, same as `expr.staticMethod()`.

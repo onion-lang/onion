@@ -427,6 +427,35 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   /** Whether `t` is `java.util.List` or a class implementing it. */
+  /** Whether `toArray(new C[0])` can store every element of the List `list` into `arrayType`
+   *  (#2305): `List[Int]` into `String[]` compiles but throws ArrayStoreException. An element
+   *  type that cannot be determined gives the snippet the benefit of the doubt. */
+  private def listElementsFit(list: TypedAST.Type, arrayType: TypedAST.ArrayType): Boolean = {
+    val element: Option[TypedAST.Type] = list match
+      case n: TypedAST.NullableType => listElementType(n.innerType)
+      case other => listElementType(other)
+    element match
+      case None => true
+      case Some(e) if arrayType.dimension == 1 => argPassable(arrayType.component, e)
+      case Some(e) =>
+        def strip(t: TypedAST.Type): TypedAST.Type = t match
+          case n: TypedAST.NullableType => n.innerType
+          case other => other
+        strip(e) match
+          case ea: TypedAST.ArrayType if ea.dimension == arrayType.dimension - 1 =>
+            if (arrayType.component.isBasicType || ea.component.isBasicType) ea.component == arrayType.component
+            else TypedAST.TypeRules.isSuperType(arrayType.component, ea.component)
+          case _ => false
+  }
+
+  private def listElementType(t: TypedAST.Type): Option[TypedAST.Type] = t match
+    case ct: TypedAST.ClassType =>
+      onion.compiler.typing.AppliedTypeViews.collectAppliedViewsFrom(ct).collectFirst {
+        case (raw, applied) if raw.name == "java.util.List" && applied.typeArguments.length == 1 =>
+          applied.typeArguments.head
+      }
+    case _ => None
+
   private def isListType(t: TypedAST.Type): Boolean = {
     def loop(ct: TypedAST.ClassType, seen: Set[String]): Boolean =
       if (ct == null) false
@@ -697,6 +726,7 @@ class SemanticErrorReporter(threshold: Int) {
           // elements are themselves a reference type (arrays are objects), so only the
           // 1-D primitive case has no one-line fix.
           if (arrayType.dimension == 1 && arrayType.component.isBasicType) None
+          else if (isListToArray && !listElementsFit(actual, arrayType)) None
           else if (isListToArray) {
             // Onion has no jagged-array syntax (`new Int[0][]` is a syntax error); a fully
             // sized `new Int[0][0]` compiles and is just as empty, since the outer (size-0)

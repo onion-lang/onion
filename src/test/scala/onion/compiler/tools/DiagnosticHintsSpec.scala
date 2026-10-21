@@ -152,6 +152,44 @@ class DiagnosticHintsSpec extends AnyFunSpec {
       assert(errors.exists(_.contains("toArray(new Int[0][0])")), s"expected a fully-dimensioned toArray hint, got: $errors")
     }
 
+    // #2305: `toArray(new String[0])` on a `List[Int]` throws ArrayStoreException, so the
+    // snippet is offered only when the elements fit the array's component type.
+    def listCastErrors(listType: String, init: String, arrayType: String): Seq[String] = compile(
+      s"""
+        |class Test {
+        |public:
+        |  static def main(args: String[]): Int {
+        |    val xs: $listType = $init
+        |    val a = (xs as $arrayType)
+        |    return a.length
+        |  }
+        |}
+      """.stripMargin
+    )
+
+    it("gives no toArray snippet when the List's elements do not fit the array (List[Int] as String[])") {
+      val errors = listCastErrors("List[Int]", "[1, 2]", "String[]")
+      assert(errors.exists(_.contains("List[Int]")), s"expected the plain type mismatch, got: $errors")
+      assert(errors.forall(!_.contains("toArray")), s"did not expect a toArray hint, got: $errors")
+    }
+
+    it("gives no toArray snippet for a List[Object] as String[] cast, whose elements may not be Strings") {
+      val errors = listCastErrors("List[Object]", "[\"a\"]", "String[]")
+      assert(errors.forall(!_.contains("toArray")), s"did not expect a toArray hint, got: $errors")
+    }
+
+    it("gives no toArray snippet for a List[String] as String[][] cast") {
+      val errors = listCastErrors("List[String]", "[\"a\"]", "String[][]")
+      assert(errors.forall(!_.contains("toArray")), s"did not expect a toArray hint, got: $errors")
+    }
+
+    it("still hints at toArray when the elements widen to the component (List[String] as Object[], List[Int] as Number[])") {
+      val objects = listCastErrors("List[String]", "[\"a\"]", "Object[]")
+      assert(objects.exists(_.contains("toArray(new Object[0])")), s"expected a toArray hint, got: $objects")
+      val numbers = listCastErrors("List[Int]", "[1]", "Number[]")
+      assert(numbers.exists(_.contains("toArray(new Number[0])")), s"expected a toArray hint, got: $numbers")
+    }
+
     it("does not add the List/array hint for an ordinary incompatible cast") {
       val errors = compile(
         """

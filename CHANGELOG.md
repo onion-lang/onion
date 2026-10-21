@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`(xs as String[])` on a `List[Int]` no longer hints at `xs.toArray(new String[0])` (#2305).**
+  - Before: following the hint threw `ArrayStoreException` at run time.
+  - Now: the `toArray` hint appears only when the elements fit the array (`List[String]` as `Object[]`, `List[Int]` as `Number[]`); otherwise you see the plain type mismatch.
 - **A `;` after a block's `}` says the `;` is the problem.**
   - Before: `while c { ... }; next()` gave `Encountered ";", but expecting "type", "interface", "trait", "class", ...`.
   - Now: the error adds a hint to drop the `;`; the next statement can follow the `}` directly or start on a new line.

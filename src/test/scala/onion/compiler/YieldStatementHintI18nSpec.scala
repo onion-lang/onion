@@ -113,6 +113,25 @@ class YieldStatementHintI18nSpec extends AnyFunSpec with Diagrams {
     assertBacktickHint(compileErrors("val r = yield ^ 1\n"))
   }
 
+  // #2315 panel, third round: any keyword that cannot start an expression
+  // after `yield`, and `yield` named by a declaration.
+  it("keeps the backtick hint for `yield` before `extends`, `conforms` or `when`") {
+    assertBacktickHint(compileErrors("class yield extends Object {}\n"))
+    assertBacktickHint(compileErrors("class yield conforms Runnable { public: def run(): void {} }\n"))
+    assertBacktickHint(compileErrors("class B[yield extends Object] {}\n"))
+    assertBacktickHint(compileErrors("select 1 { case yield when true: println(1) }\n"))
+  }
+
+  it("keeps the backtick hint for `yield` right after a declaration keyword") {
+    assertBacktickHint(compileErrors("class yield Foo {}\n"))
+    assertBacktickHint(compileErrors("val yield x = 1\n"))
+  }
+
+  it("still gives the do-block hint for `yield` before an expression keyword") {
+    assertYieldHint(compileErrors("def f(): Object { yield new Object() }\n"))
+    assertYieldHint(compileErrors("def f(): Boolean { yield true }\n"))
+  }
+
   it("still gives the do-block hint for `yield -1` and `yield (1)`") {
     assertYieldHint(compileErrors("def f(): Int { yield -1 }\n"))
     assertYieldHint(compileErrors("def f(): Int { yield (1) }\n"))

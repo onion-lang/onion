@@ -185,12 +185,21 @@ private[compiler] object SyntaxHintClassifier {
   // `yield expr` past the start of its line (`def f(): Int { yield 1 }`,
   // `{ x -> yield x }`), which ControlFlowSyntaxHints' line-anchored rule misses.
   // `context` starts at `yield`. A line end, or a following `=`, `:`, `->`, `{`, `.`,
-  // closing token, infix operator or `as`/`is`/`in` (`val r = yield`, `val yield = 1`,
-  // `{ yield -> yield * 2 }`, `1 + yield + 2`, `yield as String`, `if yield {`) means
-  // `yield` was meant as a name, which the reserved-word hint below covers;
-  // `yield -1` (no space after `-`) is still an expression.
+  // closing token or infix operator (`val r = yield`, `val yield = 1`,
+  // `{ yield -> yield * 2 }`, `1 + yield + 2`, `if yield {`) means `yield` was meant
+  // as a name, which the reserved-word hint below covers; `yield -1` (no space after
+  // `-`) is still an expression. So is a following keyword unless it can start an
+  // expression (`yield as String`, `class yield extends`, `case yield when`), and so is
+  // a `yield` that a declaration names (`class yield Foo`, `class B[yield ...]`).
   private val YieldExpression =
-    """\Ayield[ \t]+(?!->|-\s|!=|(?:as|is|in)\b)[^\s=:)\],;{}.+*/%<>&|?^]""".r
+    """\Ayield[ \t]+(?!->|-\s|!=)[^\s=:)\],;{}.+*/%<>&|?^]""".r
+  private val WordAfterYield = """\Ayield[ \t]+([A-Za-z_]\w*)""".r
+  private val ExpressionKeywords = Set(
+    "Boolean", "Byte", "Char", "do", "Double", "false", "Float", "if", "Int", "Long", "new",
+    "null", "select", "self", "Short", "super", "this", "true", "try"
+  )
+  private val DeclarationBeforeYield =
+    """(?:\b(?:class|interface|record|enum|trait|case|def|val|var|foreach)|\w\[)\s*\z""".r
   private val NullableUnionType =
     """:\s*([A-Za-z_][\w.\[\]]*)\s*\|\s*null\b""".r
   private val CStyleCast =
@@ -489,7 +498,7 @@ private[compiler] object SyntaxHintClassifier {
       // misread as an identifier slot.
       case "import" if sourceLine.trim.startsWith("import") =>
         hint("error.parsing.hint.duplicate_import_block")
-      case "yield" if YieldExpression.findFirstMatchIn(context).isDefined =>
+      case "yield" if YieldExpression.findFirstMatchIn(context).isDefined && !yieldNamed(context, sourceLine) =>
         hint("error.parsing.hint.yield_not_supported")
       case word if ReservedWords.contains(word) && (expected.contains("<ID>") || expected.contains("<QUOTED_ID>")) =>
         hint("error.parsing.hint.reserved_word_identifier", word)
@@ -554,6 +563,11 @@ private[compiler] object SyntaxHintClassifier {
    * The part of `sourceLine` before the error token, recovered from `context`
    * (which starts at the token). Empty when `context` was truncated mid-line.
    */
+  private def yieldNamed(context: String, sourceLine: String): Boolean =
+    WordAfterYield.findFirstMatchIn(context).exists { m =>
+      ReservedWords.contains(m.group(1)) && !ExpressionKeywords.contains(m.group(1))
+    } || DeclarationBeforeYield.findFirstMatchIn(textBefore(context, sourceLine)).isDefined
+
   private def textBefore(context: String, sourceLine: String): String = {
     val rest = context.takeWhile(c => c != '\n' && c != '\r')
     if (sourceLine.stripSuffix("\r").endsWith(rest)) sourceLine.stripSuffix("\r").dropRight(rest.length)

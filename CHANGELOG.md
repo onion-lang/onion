@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`yield x` outside a `do` block gets the `do`-block hint wherever it appears (#2300).**
   - Before: in `def f(): Int { yield 1 }` or `{ x -> yield x }`, the hint said to escape `yield` with backticks, which still fails.
-  - Now: the same hint as a `yield` at the start of a line: `yield` works only inside `do[M] { ... }`. `yield` used as a name (`val yield = 1`, `val r = yield`, `{ yield -> yield * 2 }`, `1 + yield + 2`, `yield as String`) still gets the backtick hint.
+  - Now: the same hint as a `yield` at the start of a line: `yield` works only inside `do[M] { ... }`.
+  - Unchanged: `yield` used as a name (`val yield = 1`, `val r = yield`, `1 + yield + 2`, `yield as String`, `class yield extends Object`) still gets the backtick hint.
 - **A `config` shape keeps a `String` value's leading and trailing spaces (#2229).**
   - Before: `print` wrote `text =   x  `, and `parse` read it back as `x`, so `parse(print(v)) == v` failed.
   - Now: `print` quotes a value that is padded or starts with `"` (`text = "  x  "`); every other value is written as before.

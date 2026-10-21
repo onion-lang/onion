@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`-128B` and `-32768S` hold -128 and -32768 (#2297).**
+  - Before: they widened to `128`/`32768`, and `println(-128B)` crashed in `Byte.valueOf`.
+  - Now: unary minus on a `Byte`, `Short` or `Char` stays in that type's range, so `-c` for `'a'` is `65439` as a `Char`.
+
 - **`Files::copyDir(src, dst)` fails up front when `dst` is `src` or inside it (#2255).**
   - Before: it recursed until "File name too long" and left a deep `src/dst/dst/...` tree; `copyDir(x, x)` was a silent no-op.
   - Now: `IllegalArgumentException: cannot copy a directory into itself`, and nothing is written.

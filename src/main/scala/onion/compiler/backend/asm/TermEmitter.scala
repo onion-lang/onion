@@ -137,6 +137,13 @@ final class TermEmitter(
       case MINUS =>
         visitTerm(node.operand)
         gen.math(GeneratorAdapter.NEG, asmType(node.`type`))
+        // `-x` keeps a Byte/Short/Char operand's type, but `ineg` works on the whole int:
+        // narrow back, or `-(-128B)` leaves 128 in a Byte slot (#2297).
+        node.`type` match
+          case BasicType.BYTE => gen.visitInsn(Opcodes.I2B)
+          case BasicType.SHORT => gen.visitInsn(Opcodes.I2S)
+          case BasicType.CHAR => gen.visitInsn(Opcodes.I2C)
+          case _ =>
 
       case NOT =>
         visitTerm(node.operand)

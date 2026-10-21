@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
+  - Before: anywhere else it silently became the minimum value. `val x: Int = 2147483648` printed `-2147483648`; `-2147483648 as Long` printed `2147483648`, because `as` binds tighter than `-`.
+  - Now: the usual "out of range for Int/Long" error. `-2147483648`, `-9223372036854775808L` and `0x80000000` still compile. To migrate, add `L` or parentheses: see `docs/migration/pre-1.0.md`.
+
 ### Added
 
 - **`http"...".request(method)` escalates to `Http::request`'s full builder, seeded with the resource's own URL.**
@@ -15,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`(xs as String[])` on a `List[Int]` no longer hints at `xs.toArray(new String[0])` (#2305).**
+  - Before: following the hint threw `ArrayStoreException` at run time.
+  - Now: the `toArray` hint appears only when the elements fit the array (`List[String]` as `Object[]`, `List[Int]` as `Number[]`); otherwise you see the plain type mismatch.
+- **A `;` after a block's `}` says the `;` is the problem.**
+  - Before: `while c { ... }; next()` gave `Encountered ";", but expecting "type", "interface", "trait", "class", ...`.
+  - Now: the error adds a hint to drop the `;`; the next statement can follow the `}` directly or start on a new line.
 - **`Files::copyDir(src, dst)` fails up front when `dst` is `src` or inside it (#2255).**
   - Before: it recursed until "File name too long" and left a deep `src/dst/dst/...` tree; `copyDir(x, x)` was a silent no-op.
   - Now: `IllegalArgumentException: cannot copy a directory into itself`, and nothing is written.
@@ -24,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`var x: Long = 99999999999` names the problem: the literal is out of range for `Int`.**
   - Before: `Syntax error. Encountered "\n", but expecting valid token`, at the next token.
   - Now: `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal`, at the literal. Long, Byte and Short literals get their own message (#2257).
+- **`(aList as String[])` (any `List[T] as T[]` cast, and the reverse) is now a compile-time error, not a runtime crash (#2258).**
+  - Before: the cast type-checked, then crashed at runtime.
+  - Now: `[E0000]` at compile time, with a hint naming the real conversion -- `xs.toArray(new String[0])` for `List[T] as T[]`, `Colls::toList(xs)` for the reverse. A primitive element type (`Int[]`) gets no such hint, since neither call has an overload for it. `(arr as Object)` and `(obj as String[])` keep working.
 - **A type parameter bounded by another type parameter of the same declaration now works** (#2259), including a chain of three (`[A, B extends A, T extends B]`).
   - Before: `class Holder[B, T extends B] { var item: T; def asB(): B { return item } }` failed with `[E0000] type B is expected, but type T is used`; member access through a real bound (`[B extends CharSequence, T extends B]`, `item.length()`) also failed.
   - Now: both compile and run. A sibling type parameter that merely shares the same bound (`[B, T extends B, U extends B]`) is still correctly rejected wherever `T` is expected, whether by assignment, method call, or as a generic type argument (`List[T]` is not a `List[B]`).

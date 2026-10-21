@@ -48,6 +48,28 @@ val c = (-2147483648) / 2       // -1073741824
 - **What you see:** `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal.`, at the literal (`... for Long ...` with the `L` suffix).
 - **Still fine:** `-2147483648`, `x + -2147483648`, `3 * -2147483648`, `-9223372036854775808L`, and hex or binary bit patterns such as `0x80000000`.
 
+## A decimal `B`/`S` literal must fit the signed range
+
+A decimal `Byte` literal now takes -128..127 and a decimal `Short` literal -32768..32767,
+as in Java. Larger values used to wrap silently.
+
+```onion
+// Before: compiled, with a surprising value
+val mask: Byte = 255B           // -1
+val port: Short = 40000S        // -25536
+val n = -128B as Int            // 128: `as` binds tighter than `-`
+
+// Now
+val mask: Byte = 0b11111111B    // -1, written as a bit pattern
+val port: Int = 40000           // a Short cannot hold 40000
+val n = (-128B) as Int          // -128
+```
+
+- **What changed:** like `2147483648`, the magnitudes `128B` and `32768S` are valid only as the whole operand of a `-`.
+- **What you see:** `integer literal out of range for Byte (-128..127, or a bit pattern up to 0b11111111 or 0xFF) -- ...`, at the literal (`... for Short ...` with the `S` suffix).
+- **Still fine:** a binary or hex bit pattern, such as `0b11111111B`, `0xFFB` or `0xFFFFS`.
+- **Watch out:** a hex literal that ends in `B` is a `Byte`, even when you meant the hex digit `B`. `0xFFB` is the Byte -1 and `0xAB` is the Byte 10, not the Int 4091 or 171. For such an Int, write it in decimal (`4091`) or binary.
+
 ## A quoted `String` in a `config` file is read without its quotes
 
 A `shape name = config` record now reads a `String` value written in double quotes as quoted

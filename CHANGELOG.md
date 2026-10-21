@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A body, `derive!` or `from` after an enum `case` now gets a hint pointing at the record form (RFC #2250).**
+  - Before: `case Ping(id: Int) derive!(Json)` said only `Encountered "derive", but expecting "}"`.
+  - Now: the hint says to declare `record Ping(id: Int) derive!(...) conforms <enum>` beside the enum; it still counts for `select` exhaustiveness (E0042).
 - **A `config` shape keeps a `String` value's leading and trailing spaces (#2229).**
   - Before: `print` wrote `text =   x  `, and `parse` read it back as `x`, so `parse(print(v)) == v` failed.
   - Now: `print` quotes a value that is padded or starts with `"` (`text = "  x  "`); every other value is written as before.

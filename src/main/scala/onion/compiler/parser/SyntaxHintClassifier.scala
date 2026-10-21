@@ -222,6 +222,12 @@ private[compiler] object SyntaxHintClassifier {
   // (a bare identifier immediately followed by `(args)`).
   private val EnumConstantMissingComma =
     """^\s*([A-Za-z_]\w*)\s*\([^()]*\)\s*$""".r
+  // An ADT enum's `case Name(fields)` line takes nothing after its field list, so
+  // a `{ body }`, `derive!(...)` or `from re"..."` there fails with only "}"
+  // expected (RFC #2250). Matched against the text before the error token, so on
+  // a `;`-separated line the hint names the case the clause was attached to.
+  private val EnumCaseWithClause =
+    """(?:^|[;{])\s*case\s+([A-Za-z_]\w*)\s*(?:\(([^;]*)\))?\s*$""".r
 
   def classify(
     found: String,
@@ -448,6 +454,10 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.typescript_style_optional_annotation", matched.group(1), matched.group(2))
       case "?" if NullishCoalescing.findFirstMatchIn(context).isDefined =>
         hint("error.parsing.hint.nullish_coalescing")
+      case "{" | "derive" | "from"
+          if expected == "\"}\"" && EnumCaseWithClause.findFirstMatchIn(textBefore(context, sourceLine)).isDefined =>
+        val matched = EnumCaseWithClause.findFirstMatchIn(textBefore(context, sourceLine)).get
+        hint("error.parsing.hint.enum_case_body", matched.group(1), Option(matched.group(2)).getOrElse("").trim)
       case _ if expected == "\"}\"" && EnumConstantMissingComma.findFirstMatchIn(sourceLine).isDefined =>
         val matched = EnumConstantMissingComma.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.enum_constant_missing_comma", matched.group(1))

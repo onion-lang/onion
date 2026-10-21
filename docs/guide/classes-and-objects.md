@@ -535,3 +535,28 @@ type pattern recovers the scrutinee's type argument — matching `Some` out of a
 `Opt[String]` binds `Some[String]`, so `s.value()` is a `String` rather than the
 bare `T`. The plain constant form cannot take type parameters: it compiles to a
 `java.lang.Enum`, which the JVM does not allow to be generic.
+
+### A case that needs its own clauses
+
+A `case` line takes no body, `derive!` or `from` clause. When one case needs a
+method, a `law`/`example`, its own JSON encoding or a regex parser, declare it
+as a `record` beside the enum that `conforms` to it, and drop the `case`:
+
+```onion
+enum Msg {
+  case Ping(id: Int)
+  case Pong(id: Int)
+}
+
+record Pang(id: Int) derive!(Json) conforms Msg {   // derive!/from go before conforms
+  example { new Pang(3).id() == 3 }
+}
+
+def kind(m: Msg): String = select m {
+  case p is Ping: "ping"
+  case p is Pong: "pong"
+  case p is Pang: Pang::toJson(p)   // leave this out and select reports E0042
+}
+```
+
+The record joins the enum's sealed set, so `select` must still list it.

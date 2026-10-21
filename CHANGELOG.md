@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`yield x` outside a `do` block gets the `do`-block hint wherever it appears (#2300).**
+  - Before: in `def f(): Int { yield 1 }` or `{ x -> yield x }`, the hint said to escape `yield` with backticks, which still fails.
+  - Now: the same hint as a `yield` at the start of a line: `yield` works only inside `do[M] { ... }`. `val yield = 1` still gets the backtick hint.
 - **`(xs as String[])` on a `List[Int]` no longer hints at `xs.toArray(new String[0])` (#2305).**
   - Before: following the hint threw `ArrayStoreException` at run time.
   - Now: the `toArray` hint appears only when the elements fit the array (`List[String]` as `Object[]`, `List[Int]` as `Number[]`); otherwise you see the plain type mismatch.

@@ -182,6 +182,11 @@ private[compiler] object SyntaxHintClassifier {
     "throws", "trait", "true", "try", "type", "Unit", "val", "var", "void", "volatile",
     "when", "while", "yield"
   )
+  // `yield expr` past the start of its line (`def f(): Int { yield 1 }`,
+  // `{ x -> yield x }`), which ControlFlowSyntaxHints' line-anchored rule misses.
+  // `context` starts at `yield`; a following `=` or `:` (`val yield = 1`) means
+  // `yield` was meant as a name, which the reserved-word hint below covers.
+  private val YieldExpression = """\Ayield\s+[^\s=:]""".r
   private val NullableUnionType =
     """:\s*([A-Za-z_][\w.\[\]]*)\s*\|\s*null\b""".r
   private val CStyleCast =
@@ -480,6 +485,8 @@ private[compiler] object SyntaxHintClassifier {
       // misread as an identifier slot.
       case "import" if sourceLine.trim.startsWith("import") =>
         hint("error.parsing.hint.duplicate_import_block")
+      case "yield" if YieldExpression.findFirstMatchIn(context).isDefined =>
+        hint("error.parsing.hint.yield_not_supported")
       case word if ReservedWords.contains(word) && (expected.contains("<ID>") || expected.contains("<QUOTED_ID>")) =>
         hint("error.parsing.hint.reserved_word_identifier", word)
       case _ if expected.contains("{") && NotOperatorCondition.findFirstMatchIn(sourceLine).isDefined =>

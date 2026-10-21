@@ -29,8 +29,22 @@ class YieldStatementHintI18nSpec extends AnyFunSpec with Diagrams {
     assert(text != en.getString(key))
   }
 
-  it("fires for a JavaScript/Python-style prefix `yield expr` statement") {
+  private def compileErrors(src: String): String = {
     val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
+      case _ => ""
+    }
+  }
+
+  // Both bundles' yield hint spells `do[M]`; neither reserved-word hint does.
+  private def assertYieldHint(msgs: String): Unit = {
+    assert(msgs.contains("do[M]"), s"expected the do-block hint, got: $msgs")
+    assert(!msgs.contains("backticks") && !msgs.contains("バッククォート"),
+      s"`yield expr` must not be told to escape `yield` with backticks, got: $msgs")
+  }
+
+  it("fires for a JavaScript/Python-style prefix `yield expr` statement") {
     val src =
       """
         |class Main {
@@ -40,13 +54,25 @@ class YieldStatementHintI18nSpec extends AnyFunSpec with Diagrams {
         |  }
         |}
         |""".stripMargin
-    val msgs = new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
-      case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
-      case _ => ""
-    }
+    val msgs = compileErrors(src)
     // The hint text is identical in both bundles' relevant markers, so this
     // assertion holds regardless of the JVM's default locale.
     assert(msgs.contains("List"), s"expected the hint's `List` suggestion, got: $msgs")
     assert(!msgs.contains("yield(...)"), s"the misleading missing-call-parens fallback should not fire, got: $msgs")
+  }
+
+  // #2300: the hint used to need `yield` to start its source line.
+  it("fires for `yield expr` in a one-line block body") {
+    assertYieldHint(compileErrors("def f(): Int { yield 1 }\n"))
+  }
+
+  it("fires for `yield expr` in a trailing-lambda body") {
+    assertYieldHint(compileErrors("val xs = [1, 2].map { x -> yield x * 2 }\n"))
+  }
+
+  it("keeps the backtick hint for `yield` used as a name") {
+    val msgs = compileErrors("val yield = 1\n")
+    assert(msgs.contains("backticks") || msgs.contains("バッククォート"), s"expected the reserved-word hint, got: $msgs")
+    assert(!msgs.contains("do[M]"), s"a name is not a `yield expr` statement, got: $msgs")
   }
 }

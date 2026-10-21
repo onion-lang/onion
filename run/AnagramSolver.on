@@ -314,7 +314,7 @@ val firstAnagram: String? = {
 }
 val optResult: Option[String] = do[Option] {
   w <- toOptionStr(firstAnagram)
-  ret "Best anagram of 'listen': #{w} (#{w.scrabbleScore()} pts, #{w.scrabbleScore().stars()})"
+  yield "Best anagram of 'listen': #{w} (#{w.scrabbleScore()} pts, #{w.scrabbleScore().stars()})"
 }
 IO::println("  " + (if optResult == null { "not found" } else { optResult.get() }))
 

@@ -241,7 +241,7 @@ def main(): void {
   foreach k: String in targets {
     val opt: Option[String] = do[Option] {
       r <- lookupRecipe(k, catalog)
-      ret "#{r.rname()}: #{r.abv().fmt2()}% ABV, #{JMath::round(r.ibu())} IBU"
+      yield "#{r.rname()}: #{r.abv().fmt2()}% ABV, #{JMath::round(r.ibu())} IBU"
     }
     IO::println("    #{k}: #{opt.getOrElse("not in catalog")}")
   }

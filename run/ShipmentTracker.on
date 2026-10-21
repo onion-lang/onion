@@ -123,20 +123,20 @@ IO::println("=== Shipment Lookup (do[Option]) ===")
 
 val found: Option[Shipment] = do[Option] {
   s1 <- wh.findById("SH003")
-  ret s1
+  yield s1
 }
 IO::println("SH003: #{found.map { s -> (s as Shipment).id() + " " + (s as Shipment).carrier() + " -> " + (s as Shipment).dest() }.getOrElse("(not found)")}")
 
 val chained: Option[String] = do[Option] {
   s1 <- wh.findById("SH001")
   s2 <- wh.findById("SH004")
-  ret "route loop: #{(s1 as Shipment).origin()} -> #{(s1 as Shipment).dest()} -> #{(s2 as Shipment).dest()}"
+  yield "route loop: #{(s1 as Shipment).origin()} -> #{(s1 as Shipment).dest()} -> #{(s2 as Shipment).dest()}"
 }
 IO::println(chained.getOrElse("(none)"))
 
 val missing: Option[Shipment] = do[Option] {
   s <- wh.findById("SH999")
-  ret s
+  yield s
 }
 IO::println("SH999: #{missing.getOrElse(new Shipment("?","?","?","?",0.0)).id()}")
 

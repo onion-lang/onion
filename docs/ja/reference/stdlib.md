@@ -1166,7 +1166,7 @@ Futureは順次非同期合成のためのdo記法で動作：
 val result: Future[Int] = do[Future] {
   x <- Future::async { fetchA() }
   y <- Future::async { fetchB(x) }
-  ret x + y
+  yield x + y
 }
 ```
 
@@ -2100,7 +2100,7 @@ Files::mkdirs(path)                    // ディレクトリと不足する親�
 Files::size(path)                      // Long。バイト数（存在しなければ0）
 Files::copy(src, dst)                  // dst が既にあれば置き換える
 Files::move(src, dst)                  // 移動（リネーム）。dst が既にあれば置き換える
-Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー
+Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー（dst が src の内部/同一なら拒否）
 ```
 
 パス操作ヘルパー——ファイル名・親ディレクトリ・結合・拡張子:
@@ -2451,7 +2451,7 @@ val body = r.map { res -> res.body }.getOrElse("")
 val both = do[Result] {
   a <- Http::request("GET", urlA).send()
   b <- Http::request("GET", urlB).send()
-  ret a.status + b.status
+  yield a.status + b.status
 }
 ```
 

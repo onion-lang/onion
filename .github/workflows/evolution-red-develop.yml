@@ -1,0 +1,55 @@
+name: evolution-red-develop
+
+# When the test or dogfood workflow fails on `develop`: re-run the failed jobs once to rule
+# out a flaky failure; if it fails again, open (or update) a P0 issue naming the commit and
+# label it `revert-candidate`. The hourly Maintainer's health check (RUNBOOK §1.1) then opens
+# the revert PR. A PR created here with the Actions token would not get CI, so the revert
+# itself comes from an agent run.
+on:
+  workflow_run:
+    workflows: [onion, dogfood]
+    types: [completed]
+    branches: [develop]
+
+permissions:
+  actions: write
+  issues: write
+  contents: read
+
+jobs:
+  red-develop:
+    if: github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Re-run once, or file a P0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          if [ "$ATTEMPT" = "1" ]; then
+            echo "First failure of run $RUN_ID: re-running the failed jobs once."
+            gh run rerun "$RUN_ID" --failed --repo "$REPO"
+            exit 0
+          fi
+          short="${SHA:0:7}"
+          title="develop is red after ${short}"
+          pr=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[0].number // empty' || true)
+          body="The \`${WORKFLOW}\` workflow failed twice on \`develop\` at ${SHA}.
+
+          - Run: ${RUN_URL}
+          - Merged PR: ${pr:+#$pr}${pr:-unknown}
+
+          RUNBOOK §1.1: the next Maintainer run fixes \`develop\` or opens a revert PR for this merge."
+          existing=$(gh issue list --repo "$REPO" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" --body "Failed again: ${RUN_URL}"
+          else
+            gh issue create --repo "$REPO" --title "$title" --body "$body" \
+              --label P0 --label kind:bug --label revert-candidate --label status:ready
+          fi

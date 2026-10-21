@@ -411,8 +411,8 @@ Type::methodName
 
 **モナド合成のためのdo記法:**
 ```onion
-do[Future] { x <- asyncOp(); ret x + 1 }
-do[Option] { a <- getA(); b <- getB(); ret a + b }
+do[Future] { x <- asyncOp(); yield x + 1 }
+do[Option] { a <- getA(); b <- getB(); yield a + b }
 ```
 
 **シェイプファーストスクリプティング（スキームリテラル、正規表現パターン、パイプライン、auto-CLI）:**
@@ -522,6 +522,8 @@ try {
 | `def method(): T { }` | `def method: T { }` - 引数なしなら括弧省略可 |
 | `@Override void method()` | `override def method(): void` - アノテーションではなくキーワード |
 | `fun String.twice()` (Kotlin風) | `extension String { def twice() { } }` - extensionブロック |
+| `extension List[T] { ... }` (Tを新しい型パラメータとして使うつもり) | 非サポート - `extension`は`class Box[T]`と違い独自の`[T]`パラメータリストを持たない。`T`は通常の型参照として解決されるので、これは「新しい型パラメータ」ではなくE0003「型が見つからない」になる。`List`のすべてのインスタンス化を拡張するには`extension List { ... }`、1つの具体的な型だけなら`extension List[Int] { ... }`と書く（`extension List[String]`を並べて書いても問題ない - 異なるインスタンス化同士は衝突しない） |
+| `extension List[Int] { ... }`を2回、または`extension List { ... }`を2つのブロックに分けて書く | E0102 - 1ファイルにつき、同じ受け取り型に対する`extension`ブロックは1つまで。メソッドは最初のブロックにまとめること |
 | `this.field = value` コンストラクタ内 | ✓ 正しい - `this.`/`self.`は使える。今は省略も可能（裸の`field`は暗黙アクセスでフィールドに解決される） |
 | `Long.toString(0)` | `Long::toString(0L)` - 静的メソッドは`::`、longは`L`サフィックス |
 | `System.out` | `System::out` - 静的フィールドも`::` |

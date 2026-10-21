@@ -169,7 +169,7 @@ IO::println("── Action tally ───────────────�
 val allActions: List[ClimateAction] = do[List] {
   r <- readings
   cfg <- [thresholdsFor(r.zone(), thresholds)]
-  ret decideAction(r, cfg)
+  yield decideAction(r, cfg)
 }
 val tally: Map[String, Int] = [:]
 foreach a: ClimateAction in allActions {

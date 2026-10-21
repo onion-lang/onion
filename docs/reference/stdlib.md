@@ -1205,7 +1205,7 @@ Future works with do notation for sequential async composition:
 val result: Future[Int] = do[Future] {
   x <- Future::async { fetchA() }
   y <- Future::async { fetchB(x) }
-  ret x + y
+  yield x + y
 }
 ```
 
@@ -1554,7 +1554,7 @@ Files::mkdirs(path)                    // creates dir + missing parents
 Files::size(path)                      // Long, size in bytes (0 if missing)
 Files::copy(src, dst)                  // replaces dst if it exists
 Files::move(src, dst)                  // rename; replaces dst if it exists
-Files::copyDir(src, dst)               // recursive directory copy
+Files::copyDir(src, dst)               // recursive directory copy; rejects dst inside/equal to src
 ```
 
 Path helpers — file names, parents, joining, and extensions:
@@ -2298,7 +2298,7 @@ val body = r.map { res -> res.body }.getOrElse("")
 val both = do[Result] {
   a <- Http::request("GET", urlA).send()
   b <- Http::request("GET", urlB).send()
-  ret a.status + b.status
+  yield a.status + b.status
 }
 ```
 

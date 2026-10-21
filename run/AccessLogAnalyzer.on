@@ -295,7 +295,7 @@ headerLine("Most Active Client -- Last Error")
 val lastErrOpt: Option[String] = do[Option] {
   activeIp <- toOptionStr(analyzer.mostActiveIp())
   lastErr  <- toOptionEntry(analyzer.lastErrorFor(activeIp))
-  ret "Last error from #{activeIp}: #{lastErr.status()} #{lastErr.method()} #{lastErr.path()}"
+  yield "Last error from #{activeIp}: #{lastErr.status()} #{lastErr.method()} #{lastErr.path()}"
 }
 val lastErrMsg: String = if lastErrOpt == null { "No errors from most active client" } else { lastErrOpt.get() }
 IO::println("  #{lastErrMsg}")

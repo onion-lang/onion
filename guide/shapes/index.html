@@ -5196,6 +5196,33 @@ changed the port.</p>
 <p>Losslessness is a claim, not a default: <code>isLossless()</code> answers honestly, a lossy shape
 refuses <code>parseLossless</code> instead of pretending with an empty residue, and a residue is
 only accepted by the shape that produced it.</p>
+<p>A <code>String</code> value in a config file follows one rule: text in double quotes is taken
+literally, anything else is trimmed. <code>print</code> quotes a value only when it needs it (padded,
+or starting with <code>"</code>), so an L1 round trip never loses a space:</p>
+<table>
+<thead>
+<tr>
+<th>In the file</th>
+<th>Reads as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name = "Alice"</code></td>
+<td><code>Alice</code></td>
+</tr>
+<tr>
+<td><code>name =   Alice</code></td>
+<td><code>Alice</code></td>
+</tr>
+<tr>
+<td><code>name = "  Alice  "</code></td>
+<td><code>Alice</code></td>
+</tr>
+</tbody>
+</table>
+<p>Inside the quotes, <code>\"</code> is a quote and <code>\\</code> a backslash; any other backslash stays as it
+is. A quoted value with no closing <code>"</code>, or a bare <code>"</code> inside, is a <code>Defect</code> on its line.</p>
 <h3 id="editing-a-file-through-the-lens">Editing a file through the lens<a class="headerlink" href="#editing-a-file-through-the-lens" title="Permanent link">&para;</a></h3>
 <p><code>Lossless</code> is a lens: <code>edit</code> focuses an update on the value, <code>render</code> reassembles the
 text through the residue. With <code>file"..."</code> supplying a byte-faithful read, "change one

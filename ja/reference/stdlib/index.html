@@ -9361,7 +9361,12 @@ L1 のみで、どちらなのかを明言することが「可逆な言語」�
 自由)、trim した先頭が <code>#</code> の行は行全体がコメント、空行は無視されます。行内コメントの
 構文はありません——値と同じ行の <code>#</code> 以降もその値の一部として読まれ、取り除かれません
 (<code>host = example.com  # primary</code> は <code>host</code> を <code>"example.com  # primary"</code> と解釈します)。
-コメントは必ず別の行に書いてください。</p>
+コメントは必ず別の行に書いてください。<code>String</code> 成分の値も、ほかのスカラーと同様に
+trim されます。ただし二重引用符で囲まれた値は例外で、<code>name = "  padded  "</code> は
+<code>padded</code> と読みます。<code>print</code> は、前後に空白があるか <code>"</code> で始まる <code>String</code> の値を
+引用符で囲みます。それ以外の値は引用符なしで書きます。引用符の中のエスケープは <code>\"</code> と
+<code>\\</code> だけなので、<code>\n</code> は 2 文字のまま残ります。閉じる <code>"</code> のない値や、中に裸の <code>"</code> が
+ある値は <code>Defect</code> になります。</p>
 <h3 id="json-json-schema">構造化 JSON と JSON Schema<a class="headerlink" href="#json-json-schema" title="Permanent link">&para;</a></h3>
 <p>json shape の成分には、スカラーの <code>List[S]</code>、json shape を宣言した入れ子のレコード、
 そのようなレコードの <code>List[R]</code>、およびこれらすべての <code>T?</code>（キーが欠けても <code>null</code> でもよい）

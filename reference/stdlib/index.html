@@ -9567,7 +9567,11 @@ spacing around it is free), a line whose trimmed text starts with <code>#</code>
 comment, and a blank line is ignored. There is no inline-comment syntax -- a <code>#</code> after
 a value on the same line is read as part of that value, not stripped (<code>host =
 example.com  # primary</code> parses <code>host</code> as <code>"example.com  # primary"</code>). Put a comment on
-its own line instead.</p>
+its own line instead. A <code>String</code> component's value is trimmed like any other scalar,
+unless it is in double quotes: <code>name = "  padded  "</code> reads as <code>padded</code>. <code>print</code>
+quotes a <code>String</code> value when it is padded or starts with <code>"</code>, and writes every other
+value unquoted. Inside the quotes only <code>\"</code> and <code>\\</code> are escapes, so <code>\n</code> stays two
+characters. A quoted value with no closing <code>"</code>, or a bare <code>"</code> inside, is a <code>Defect</code>.</p>
 <h3 id="structured-json-and-json-schema">Structured JSON and JSON Schema<a class="headerlink" href="#structured-json-and-json-schema" title="Permanent link">&para;</a></h3>
 <p>A json shape's components may also be <code>List[S]</code> of a scalar, a nested record that
 declares a json shape, <code>List[R]</code> of such records, and <code>T?</code> of any of these (the key may be

@@ -4055,6 +4055,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-quoted-string-in-a-config-file-is-read-without-its-quotes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A quoted String in a config file is read without its quotes
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4670,6 +4681,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-quoted-string-in-a-config-file-is-read-without-its-quotes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A quoted String in a config file is read without its quotes
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4729,6 +4751,27 @@ unary <code>-</code>, as in <code>-2147483648</code>. Anywhere else it used to w
 <li><strong>What changed:</strong> the magnitude of the minimum value is checked where it is negated, not at the token.</li>
 <li><strong>What you see:</strong> <code>integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal.</code>, at the literal (<code>... for Long ...</code> with the <code>L</code> suffix).</li>
 <li><strong>Still fine:</strong> <code>-2147483648</code>, <code>x + -2147483648</code>, <code>3 * -2147483648</code>, <code>-9223372036854775808L</code>, and hex or binary bit patterns such as <code>0x80000000</code>.</li>
+</ul>
+<h2 id="a-quoted-string-in-a-config-file-is-read-without-its-quotes">A quoted <code>String</code> in a <code>config</code> file is read without its quotes<a class="headerlink" href="#a-quoted-string-in-a-config-file-is-read-without-its-quotes" title="Permanent link">&para;</a></h2>
+<p>A <code>shape name = config</code> record now reads a <code>String</code> value written in double quotes as quoted
+text. This lets a value keep leading or trailing spaces through <code>print</code> and <code>parse</code>.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># Before: the quotes were part of the value
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>name = "Alice"          # read as "Alice"  (7 characters)
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a># Now
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>name = "Alice"          # read as Alice    (5 characters)
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>name = "  Alice  "      # read as   Alice  (spaces kept)
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>name =   Alice          # read as Alice    (unquoted values are still trimmed)
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>name = "\"Alice\""      # read as "Alice"  (to keep literal quotes)
+</span></code></pre></div>
+<ul>
+<li><strong>What changed:</strong> inside the quotes, <code>\"</code> is a quote and <code>\\</code> is a backslash. Any other
+  backslash is kept as it is, so <code>"C:\temp"</code> reads as <code>C:\temp</code>.</li>
+<li><strong>What you see:</strong> a file that already relied on literal quotes still parses, so there is no
+  error or hint; the value just loses its outer quotes. Search your config files for values
+  that start with <code>"</code>. A value with no closing <code>"</code>, or with a bare <code>"</code> inside it (<code>"a" and "b"</code>),
+  is now a <code>Defect</code> naming the line.</li>
+<li><strong>Only <code>String</code> components:</strong> an <code>Int</code>, <code>Boolean</code> or other scalar is read exactly as before.</li>
 </ul>
 
 

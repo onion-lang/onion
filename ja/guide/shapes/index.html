@@ -5219,6 +5219,34 @@ shape の成分には次の型が使えます。</p>
 <p>losslessness は既定ではなく主張です：<code>isLossless()</code> は正直に答え、lossy な shape は
 空の residue でごまかす代わりに <code>parseLossless</code> を拒否し、residue はそれを生んだ shape
 だけが受け取ります。</p>
+<p>config ファイルの <code>String</code> の値には、規則が一つだけあります。
+二重引用符の中の文字列はそのまま読み、それ以外は前後の空白を取り除きます(trim)。
+<code>print</code> は必要なとき(前後に空白がある、または <code>"</code> で始まる)だけ値を引用符で囲みます。
+そのため、L1 の往復で空白が失われることはありません。</p>
+<table>
+<thead>
+<tr>
+<th>ファイルの記述</th>
+<th>読んだ値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name = "Alice"</code></td>
+<td><code>Alice</code></td>
+</tr>
+<tr>
+<td><code>name =   Alice</code></td>
+<td><code>Alice</code></td>
+</tr>
+<tr>
+<td><code>name = "  Alice  "</code></td>
+<td><code>Alice</code></td>
+</tr>
+</tbody>
+</table>
+<p>引用符の中では、<code>\"</code> が引用符、<code>\\</code> がバックスラッシュです。それ以外のバックスラッシュはそのまま残ります。
+閉じる <code>"</code> のない値や、中に裸の <code>"</code> がある値は、その行の <code>Defect</code> になります。</p>
 <h3 id="_7">レンズでファイルを編集する<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
 <p><code>Lossless</code> はレンズです。<code>edit</code> が値への更新を焦点に当て、<code>render</code> が residue を通して
 テキストを再組立てします。<code>file"..."</code> がバイト忠実な読み込みを提供するので、「設定の

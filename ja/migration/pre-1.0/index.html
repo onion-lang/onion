@@ -2141,6 +2141,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#config-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        config ファイルの引用符付き String は、引用符を外して読むようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4691,6 +4702,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#config-string" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        config ファイルの引用符付き String は、引用符を外して読むようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4750,6 +4772,27 @@
 <li><strong>変わったこと:</strong> 最小値の絶対値は、トークンではなく、それを符号反転する場所で検査します。</li>
 <li><strong>表示されるもの:</strong> リテラルの位置に「整数リテラルがIntの範囲(-2147483648..2147483647)を超えています -- Long型リテラルにするには末尾にLを付けてください。」と表示されます（<code>L</code> 付きなら Long の範囲のメッセージです）。</li>
 <li><strong>引き続き使えるもの:</strong> <code>-2147483648</code>、<code>x + -2147483648</code>、<code>3 * -2147483648</code>、<code>-9223372036854775808L</code>、<code>0x80000000</code> のような 16 進数・2 進数のビットパターン。</li>
+</ul>
+<h2 id="config-string"><code>config</code> ファイルの引用符付き <code>String</code> は、引用符を外して読むようになりました<a class="headerlink" href="#config-string" title="Permanent link">&para;</a></h2>
+<p><code>shape name = config</code> のレコードは、二重引用符で囲まれた <code>String</code> の値を、引用された文字列として読みます。
+これで、前後の空白を持つ値も <code>print</code> と <code>parse</code> を往復できます。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># 以前: 引用符も値の一部だった
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>name = "Alice"          # "Alice" と読む（7 文字）
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a># 現在
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>name = "Alice"          # Alice と読む（5 文字）
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>name = "  Alice  "      #   Alice   と読む（空白を保つ）
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>name =   Alice          # Alice と読む（引用符のない値はこれまでどおり trim）
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>name = "\"Alice\""      # "Alice" と読む（引用符を文字として残す書き方）
+</span></code></pre></div>
+<ul>
+<li><strong>変わったこと:</strong> 引用符の中では、<code>\"</code> が引用符、<code>\\</code> がバックスラッシュです。
+  それ以外のバックスラッシュはそのまま残るので、<code>"C:\temp"</code> は <code>C:\temp</code> と読みます。</li>
+<li><strong>表示されるもの:</strong> 引用符を文字として使っていたファイルもそのまま parse に成功します。
+  そのため、エラーもヒントも出ません。値の外側の引用符が消えるだけです。
+  設定ファイルの中から <code>"</code> で始まる値を探してください。
+  閉じる <code>"</code> のない値や、中に裸の <code>"</code> がある値（<code>"a" and "b"</code>）は、行番号付きの <code>Defect</code> になります。</li>
+<li><strong>対象は <code>String</code> 成分だけです:</strong> <code>Int</code> や <code>Boolean</code> などのスカラーは、これまでどおりに読みます。</li>
 </ul>
 
 

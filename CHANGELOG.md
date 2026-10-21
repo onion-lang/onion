@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
   - Before: anywhere else it silently became the minimum value. `val x: Int = 2147483648` printed `-2147483648`; `-2147483648 as Long` printed `2147483648`, because `as` binds tighter than `-`.
   - Now: the usual "out of range for Int/Long" error. `-2147483648`, `-9223372036854775808L` and `0x80000000` still compile. To migrate, add `L` or parentheses: see `docs/migration/pre-1.0.md`.
+- **A `config` shape reads a `String` value in double quotes as quoted text (#2229, RFC #2233).**
+  - Before: `name = "Alice"` read as `"Alice"`, quotes included; `name = "abc` read as `"abc`.
+  - Now: it reads as `Alice`. Inside the quotes, `\"` and `\\` are the only escapes. A quoted value with no closing `"`, or a bare `"` inside, is a Defect. To keep literal quotes, write `name = "\"Alice\""`: see `docs/migration/pre-1.0.md`.
 
 ### Added
 
@@ -20,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now: `http"url".request("GET").header(...).timeoutSeconds(...).send()` reaches the exact builder `Http::request` returns, seeded with the URL so it doesn't need retyping (#2146).
 
 ### Fixed
+
+- **A `config` shape keeps a `String` value's leading and trailing spaces (#2229).**
+  - Before: `print` wrote `text =   x  `, and `parse` read it back as `x`, so `parse(print(v)) == v` failed.
+  - Now: `print` quotes a value that is padded or starts with `"` (`text = "  x  "`); every other value is written as before.
+
+- **`-128B` and `-32768S` hold -128 and -32768 (#2297).**
+  - Before: they widened to `128`/`32768`, and `println(-128B)` crashed in `Byte.valueOf`.
+  - Now: unary minus on a `Byte` or `Short` stays in that type's range. `Char` negation is unchanged (`-c` for `'a'` is `-97`, as in Java).
 
 - **`(xs as String[])` on a `List[Int]` no longer hints at `xs.toArray(new String[0])` (#2305).**
   - Before: following the hint threw `ArrayStoreException` at run time.
@@ -36,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`var x: Long = 99999999999` names the problem: the literal is out of range for `Int`.**
   - Before: `Syntax error. Encountered "\n", but expecting valid token`, at the next token.
   - Now: `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal`, at the literal. Long, Byte and Short literals get their own message (#2257).
+- **A syntax error inside a nested `#{}` is reported on the line it is on.**
+  - Before: `"a #{"b #{1 +} c"} d"` on line 6 reported line 11, with no source excerpt; `{ (x) -> x }` inside `#{}` also lost its hint.
+  - Now: line 6 and the right column, with the excerpt and the same hint as outside a string (#2303, #2302).
 - **`(aList as String[])` (any `List[T] as T[]` cast, and the reverse) is now a compile-time error, not a runtime crash (#2258).**
   - Before: the cast type-checked, then crashed at runtime.
   - Now: `[E0000]` at compile time, with a hint naming the real conversion -- `xs.toArray(new String[0])` for `List[T] as T[]`, `Colls::toList(xs)` for the reverse. A primitive element type (`Int[]`) gets no such hint, since neither call has an overload for it. `(arr as Object)` and `(obj as String[])` keep working.

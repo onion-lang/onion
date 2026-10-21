@@ -292,6 +292,152 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a String value with leading/trailing whitespace (#2229)") {
+    val strDecl =
+      """record Note(text: String) {
+        |  shape doc = config
+        |}
+        |""".stripMargin
+
+    it("satisfies L1 through the canonical printer, padded with spaces on both sides") {
+      val r = shell.run(strDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val s = Note::doc()
+          |    val v = new Note("  x  ")
+          |    return s.parse(s.print(v)).get() == v
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(true) == r, r.toString)
+    }
+
+    it("quotes a padded value on print, and keeps an unpadded one unquoted") {
+      val r = shell.run(strDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return Note::doc().print(new Note("  x  ")) + "|" + Note::doc().print(new Note("x"))
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("text = \"  x  \"\n|text = x\n") == r, r.toString)
+    }
+
+    it("escapes a literal quote and backslash inside a padded value, and reads them back") {
+      val r = shell.run(strDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val s = Note::doc()
+          |    val v = new Note(" a\"b\\c ")
+          |    return s.parse(s.print(v)).get() == v
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(true) == r, r.toString)
+    }
+
+    it("printLossless quotes only the edited, now-padded value; other lines are untouched") {
+      val r = shell.run(strDecl +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val text = "# n\ntext = hello\n"
+          |    val got = Note::doc().parseLossless(text).get()
+          |    val edited = got.value().copy(text = "  hi  ")
+          |    return Note::doc().printLossless(edited, got.residue())
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("# n\ntext = \"  hi  \"\n") == r, r.toString)
+    }
+
+    it("printLossless keeps an unchanged quoted value's original spelling verbatim") {
+      val r = shell.run(
+        """record Pair(a: String, b: String) {
+          |  shape doc = config
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val text = "a = \"  x  \"\nb = y\n"
+          |    val got = Pair::doc().parseLossless(text).get()
+          |    val edited = got.value().copy(b = "z")
+          |    return Pair::doc().printLossless(edited, got.residue())
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("a = \"  x  \"\nb = z\n") == r, r.toString)
+    }
+  }
+
+  describe("reading a quoted String value by hand (#2229, RFC #2233)") {
+    // `value` is the text after `text = ` in the file, spelled as an Onion string literal.
+    def readBack(value: String): Shell.Result = shell.run(
+      """record Note(text: String) {
+        |  shape doc = config
+        |}
+        |class Test {
+        |public:
+        |  static def main(args: String[]): String {
+        |    val got = Note::doc().parse("text = VALUE\n")
+        |    if got.isBad() {
+        |      val d = got.defects()[0]
+        |      return "bad " + d.path() + " line " + d.origin().line()
+        |    }
+        |    return "ok [" + got.get().text() + "]"
+        |  }
+        |}
+        |""".stripMargin.replace("VALUE", value), "None", Array())
+
+    it("unquotes a quoted value and keeps the padding inside the quotes") {
+      assert(Shell.Success("ok [Alice]") == readBack("\\\"Alice\\\""))
+      assert(Shell.Success("ok [  Alice  ]") == readBack("\\\"  Alice  \\\""))
+      assert(Shell.Success("ok [Alice]") == readBack("  Alice  "))
+    }
+
+    it("treats only \\\" and \\\\ as escapes; any other backslash stays literal") {
+      assert(Shell.Success("ok [a\\b]") == readBack("\\\"a\\\\\\\\b\\\""))
+      assert(Shell.Success("ok [a\\nb]") == readBack("\\\"a\\\\nb\\\""))
+    }
+
+    it("reports a malformed quoted value as a positioned defect") {
+      val malformed = Seq(
+        "\\\"",                              // a lone "
+        "\\\"abc",                           // no closing "
+        "\\\"a\\\" and \\\"b\\\"",  // a stray " inside
+        "\\\"abc\\\\\\\""             // the closing " is escaped by a dangling \
+      )
+      malformed.foreach { v =>
+        assert(Shell.Success("bad text line 1") == readBack(v), v)
+      }
+    }
+
+    it("round-trips a value that itself starts with a quote, or is one") {
+      val r = shell.run(
+        """record Note(text: String) {
+          |  shape doc = config
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s = Note::doc()
+          |    var out = ""
+          |    foreach t in ["\"", "\"Alice\"", "\"a\\b"] {
+          |      val v = new Note(t)
+          |      out = out + s.print(v) + (s.parse(s.print(v)).get() == v) + ";"
+          |    }
+          |    return out
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(
+        "text = \"\\\"\"\ntrue;text = \"\\\"Alice\\\"\"\ntrue;text = \"\\\"a\\\\b\"\ntrue;") == r, r.toString)
+    }
+  }
+
   describe("losslessness is a claim, not a default") {
     it("a lossy shape refuses parseLossless instead of pretending") {
       val r = shell.run(

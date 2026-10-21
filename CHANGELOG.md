@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
+  - Before: anywhere else it silently became the minimum value. `val x: Int = 2147483648` printed `-2147483648`; `-2147483648 as Long` printed `2147483648`, because `as` binds tighter than `-`.
+  - Now: the usual "out of range for Int/Long" error. `-2147483648`, `-9223372036854775808L` and `0x80000000` still compile. To migrate, add `L` or parentheses: see `docs/migration/pre-1.0.md`.
+
 ### Added
 
 - **`http"...".request(method)` escalates to `Http::request`'s full builder, seeded with the resource's own URL.**
@@ -19,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Before: they widened to `128`/`32768`, and `println(-128B)` crashed in `Byte.valueOf`.
   - Now: unary minus on a `Byte`, `Short` or `Char` stays in that type's range, so `-c` for `'a'` is `65439` as a `Char`.
 
+- **`(xs as String[])` on a `List[Int]` no longer hints at `xs.toArray(new String[0])` (#2305).**
+  - Before: following the hint threw `ArrayStoreException` at run time.
+  - Now: the `toArray` hint appears only when the elements fit the array (`List[String]` as `Object[]`, `List[Int]` as `Number[]`); otherwise you see the plain type mismatch.
+- **A `;` after a block's `}` says the `;` is the problem.**
+  - Before: `while c { ... }; next()` gave `Encountered ";", but expecting "type", "interface", "trait", "class", ...`.
+  - Now: the error adds a hint to drop the `;`; the next statement can follow the `}` directly or start on a new line.
 - **`Files::copyDir(src, dst)` fails up front when `dst` is `src` or inside it (#2255).**
   - Before: it recursed until "File name too long" and left a deep `src/dst/dst/...` tree; `copyDir(x, x)` was a silent no-op.
   - Now: `IllegalArgumentException: cannot copy a directory into itself`, and nothing is written.
@@ -28,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`var x: Long = 99999999999` names the problem: the literal is out of range for `Int`.**
   - Before: `Syntax error. Encountered "\n", but expecting valid token`, at the next token.
   - Now: `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal`, at the literal. Long, Byte and Short literals get their own message (#2257).
+- **`(aList as String[])` (any `List[T] as T[]` cast, and the reverse) is now a compile-time error, not a runtime crash (#2258).**
+  - Before: the cast type-checked, then crashed at runtime.
+  - Now: `[E0000]` at compile time, with a hint naming the real conversion -- `xs.toArray(new String[0])` for `List[T] as T[]`, `Colls::toList(xs)` for the reverse. A primitive element type (`Int[]`) gets no such hint, since neither call has an overload for it. `(arr as Object)` and `(obj as String[])` keep working.
 
 ## [0.144.0] - 2026-10-20
 

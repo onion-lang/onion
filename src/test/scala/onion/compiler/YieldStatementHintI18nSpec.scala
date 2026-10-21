@@ -147,4 +147,23 @@ class YieldStatementHintI18nSpec extends AnyFunSpec with Diagrams {
     assertYieldHint(compileErrors("def f(): Int { yield -1 }\n"))
     assertYieldHint(compileErrors("def f(): Int { yield (1) }\n"))
   }
+
+  // #2315 panel (15:16): where no expression can start, `yield` cannot begin one.
+  it("keeps the backtick hint for `yield` in an import path") {
+    assertBacktickHint(compileErrors("import { java.util.yield (x) }\n"))
+    assertBacktickHint(compileErrors("import { java.util.yield 1 }\n"))
+  }
+
+  it("gives no do-block hint for `yield` where only `)` fits") {
+    for (src <- Seq(
+      "def f(yield x: Int): Int = 1\n",
+      "record R(yield x: Int)\n",
+      "record R(x: Int)\nselect new R(1) { case R(yield x): println(1) }\n",
+      "val f: (yield x) -> Int = null\n"
+    )) {
+      val msgs = compileErrors(src)
+      assert(msgs.nonEmpty, s"expected a syntax error for: $src")
+      assert(!msgs.contains("do[M]"), s"no expression can start here, got: $msgs")
+    }
+  }
 }

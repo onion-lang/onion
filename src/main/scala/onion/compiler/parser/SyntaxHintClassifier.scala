@@ -559,10 +559,12 @@ private[compiler] object SyntaxHintClassifier {
     }
   }
 
-  // Where the parser accepts only a name (after `.`, `::` or `new`: `k.yield ()`),
-  // `yield` is a name whatever follows it.
+  // Where no expression can start, `yield` cannot begin `yield expr` whatever follows
+  // it: a name slot (`k.yield ()`, `import { java.util.yield (x) }`) or a lone `)`
+  // (`def f(yield x: Int)`). Every expression start admits a literal, so `<INTEGER>`
+  // in the expected set marks one.
   private def yieldNamed(expected: String, context: String, sourceLine: String): Boolean =
-    expected.split(""",\s*|\s+or\s+""").forall(e => e == "<ID>" || e == "<QUOTED_ID>") ||
+    !expected.split(""",\s*|\s+or\s+""").contains("<INTEGER>") ||
     WordAfterYield.findFirstMatchIn(context).exists { m =>
       ReservedWords.contains(m.group(1)) && !ExpressionKeywords.contains(m.group(1))
     } || DeclarationBeforeYield.findFirstMatchIn(textBefore(context, sourceLine)).isDefined

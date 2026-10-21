@@ -195,5 +195,123 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(100000) == result)
     }
+  
+
+    // #2329: the loop read a stale parameter wherever the old rewrite did not reach.
+    it("reads the current parameter inside try/catch in a tail-recursive method") {
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static def d(n: Int, acc: String): String {
+          |    if n == 0 { return acc }
+          |    var s = acc
+          |    try { s = s + n } catch e: Exception { }
+          |    return d(n - 1, s)
+          |  }
+          |  static def main(args: String[]): String = d(3, "")
+          |}
+          |""".stripMargin,
+        "TcoTryParam.on",
+        Array()
+      )
+      assert(Shell.Success("321") == result)
+    }
+
+    it("reads the current parameter inside try/finally and try-with-resources") {
+      val result = shell.run(
+        """
+          |class R conforms AutoCloseable {
+          |  val name: String
+          |public:
+          |  def this(name: String) { this.name = name }
+          |  def get(): String = name
+          |  def close(): void { }
+          |}
+          |class C {
+          |public:
+          |  static def f(n: Int, acc: String): String {
+          |    if n == 0 { return acc }
+          |    var s = acc
+          |    try { s = s + n } finally { s = s + "." }
+          |    try (val r = new R("t" + n)) { s = s + r.get() }
+          |    return f(n - 1, s)
+          |  }
+          |  static def main(args: String[]): String = f(2, "")
+          |}
+          |""".stripMargin,
+        "TcoTryResourceParam.on",
+        Array()
+      )
+      assert(Shell.Success("2.t21.t1") == result)
+    }
+
+    it("lets a lambda capture the parameter value of its own iteration") {
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static def go(n: Int, fs: java.util.List[() -> Int]): Int {
+          |    if n == 0 { return 0 }
+          |    fs.add(() -> n)
+          |    return go(n - 1, fs)
+          |  }
+          |  static def main(args: String[]): String {
+          |    val fs = new java.util.ArrayList[() -> Int]()
+          |    go(3, fs)
+          |    var s = ""
+          |    foreach f in fs { s = s + f() }
+          |    return s
+          |  }
+          |}
+          |""".stripMargin,
+        "TcoLambdaParam.on",
+        Array()
+      )
+      assert(Shell.Success("321") == result)
+    }
+
+    it("reads the current parameter in a static-field assignment") {
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static var log: String = ""
+          |  static def g(n: Int): Int {
+          |    if n == 0 { return 0 }
+          |    log = log + n
+          |    return g(n - 1)
+          |  }
+          |  static def main(args: String[]): String {
+          |    g(3)
+          |    return log
+          |  }
+          |}
+          |""".stripMargin,
+        "TcoStaticFieldParam.on",
+        Array()
+      )
+      assert(Shell.Success("321") == result)
+    }
+
+    it("still loops (no stack overflow) when the body reads a parameter inside try") {
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static def count(n: Int, acc: Int): Int {
+          |    if n == 0 { return acc }
+          |    var step = 0
+          |    try { step = n - (n - 1) } catch e: Exception { }
+          |    return count(n - 1, acc + step)
+          |  }
+          |  static def main(args: String[]): Int = count(100000, 0)
+          |}
+          |""".stripMargin,
+        "TcoTryDeep.on",
+        Array()
+      )
+      assert(Shell.Success(100000) == result)
+    }
   }
 }

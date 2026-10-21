@@ -779,6 +779,20 @@ public class JJOnionParser implements Parser {
     return unaryMinus != null && unaryMinus.next == t;
   }
 
+  // The minimum-value magnitude last accepted right after a `-`, and that `-`.
+  private Token minMagnitudeMinus;
+  private AST.Expression minMagnitudeLiteral;
+
+  // The magnitude is only valid as the whole operand of the `-` before it. Postfix `as`,
+  // `.m()` and `*`/`/`/`%` bind tighter than prefix `-`, so `-2147483648 as Long` would
+  // negate a cast of the already-wrapped minimum value (#2296).
+  private void requireBareMinMagnitude(Token minus, AST.Expression operand) throws ParseException {
+    if (minMagnitudeMinus == minus && operand != minMagnitudeLiteral) {
+      String s = minus.next.image;
+      throw new ParseException((s.endsWith("L") ? "long literal out of range: " : "integer literal out of range for Int: ") + s);
+    }
+  }
+
   // Parse an int literal without ever throwing an unchecked exception (which would
   // surface as an I0000 internal error). Overflow becomes a clean ParseException.
   // Decimal accepts [Integer.MIN_VALUE, 2147483648]; the trailing 2147483648 is the
@@ -2828,7 +2842,7 @@ AST.Expression additive() :{Token t; AST.Expression e1, e2;}{
 
 AST.Expression unary_prefix() :{Token t; AST.Expression e;}{
 ( t="+" e=unary_prefix() {e = new AST.Posit(p(t), e);}
-| t="-" {unaryMinus = t;} e=unary_prefix() {e = new AST.Negate(p(t), e);}
+| t="-" {unaryMinus = t;} e=unary_prefix() {requireBareMinMagnitude(t, e); e = new AST.Negate(p(t), e);}
 | t="!" e=unary_prefix() {e = new AST.Not(p(t), e);}
 | t=<BN> e=unary_prefix() {e = new AST.BitNot(p(t), e);}
 | LOOKAHEAD({ true }) e=multitive()
@@ -2851,7 +2865,7 @@ AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
 // primary_suffix rather than recursing to multitive, keeping *, /, % left-associative.
 AST.Expression mul_operand() :{Token t; AST.Expression e;}{
 ( t="+" e=mul_operand() {e = new AST.Posit(p(t), e);}
-| t="-" {unaryMinus = t;} e=mul_operand() {e = new AST.Negate(p(t), e);}
+| t="-" {unaryMinus = t;} e=mul_operand() {requireBareMinMagnitude(t, e); e = new AST.Negate(p(t), e);}
 | t="!" e=mul_operand() {e = new AST.Not(p(t), e);}
 | t=<BN> e=mul_operand() {e = new AST.BitNot(p(t), e);}
 | e=primary_suffix()
@@ -3256,12 +3270,16 @@ AST.Expression integer_literal() :{Token t; String s;}{
       long lv = parseLongLiteral(chop(s));
       if (lv == Long.MIN_VALUE && !s.startsWith("0") && !followsUnaryMinus(t))
         throw new ParseException("long literal out of range: " + s);
-      return new AST.LongLiteral(p(t), lv);
+      AST.Expression lit = new AST.LongLiteral(p(t), lv);
+      if (lv == Long.MIN_VALUE && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeLiteral = lit; }
+      return lit;
     }else{
       int iv = parseIntLiteral(s);
       if (iv == Integer.MIN_VALUE && !s.startsWith("0") && !followsUnaryMinus(t))
         throw new ParseException("integer literal out of range for Int: " + s);
-      return new AST.IntegerLiteral(p(t), iv);
+      AST.Expression lit = new AST.IntegerLiteral(p(t), iv);
+      if (iv == Integer.MIN_VALUE && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeLiteral = lit; }
+      return lit;
     }
   }
 }

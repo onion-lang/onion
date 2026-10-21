@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
+  - Before: anywhere else it silently became the minimum value. `val x: Int = 2147483648` printed `-2147483648`; `-2147483648 as Long` printed `2147483648`, because `as` binds tighter than `-`.
+  - Now: the usual "out of range for Int/Long" error. `-2147483648`, `-9223372036854775808L` and `0x80000000` still compile. To migrate, add `L` or parentheses: see `docs/migration/pre-1.0.md`.
+
 ### Added
 
 - **`http"...".request(method)` escalates to `Http::request`'s full builder, seeded with the resource's own URL.**
@@ -15,9 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`2147483648` without a `-` in front is an out-of-range error, not `-2147483648` (#2296).**
-  - Before: `val x: Int = 2147483648` compiled and printed `-2147483648`; `9223372036854775808L` likewise became `Long.MIN_VALUE`.
-  - Now: the usual "out of range for Int/Long" error. `-2147483648`, `-9223372036854775808L` and `0x80000000` still compile.
 - **`Files::copyDir(src, dst)` fails up front when `dst` is `src` or inside it (#2255).**
   - Before: it recursed until "File name too long" and left a deep `src/dst/dst/...` tree; `copyDir(x, x)` was a silent no-op.
   - Now: `IllegalArgumentException: cannot copy a directory into itself`, and nothing is written.

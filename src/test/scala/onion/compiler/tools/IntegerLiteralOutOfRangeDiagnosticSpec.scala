@@ -148,7 +148,15 @@ class IntegerLiteralOutOfRangeDiagnosticSpec extends AnyFunSpec {
       "val x = 1 - 2147483648"            -> "error.parsing.int_literal_out_of_range",
       "val x = -(2147483648)"             -> "error.parsing.int_literal_out_of_range",
       "val x = 9223372036854775808L"      -> "error.parsing.long_literal_out_of_range",
-      "val x = 1L - 9223372036854775808L" -> "error.parsing.long_literal_out_of_range"
+      "val x = 1L - 9223372036854775808L" -> "error.parsing.long_literal_out_of_range",
+      // Postfix `as`, `.m()` and `*`/`/` bind tighter than prefix `-`, so in these the
+      // `-` negates something other than the bare magnitude, which had already wrapped
+      // to the minimum value (the panel's repro on #2307).
+      "val x = -2147483648 as Long"            -> "error.parsing.int_literal_out_of_range",
+      "val x = -9223372036854775808L as Double" -> "error.parsing.long_literal_out_of_range",
+      "val x = -2147483648.toString()"         -> "error.parsing.int_literal_out_of_range",
+      "val x = -2147483648 / 2"                -> "error.parsing.int_literal_out_of_range",
+      "val x = 3 * -2147483648.hashCode()"     -> "error.parsing.int_literal_out_of_range"
     )
     rejected.foreach { case (code, key) =>
       it(s"rejects `$code` as out of range") {
@@ -166,7 +174,9 @@ class IntegerLiteralOutOfRangeDiagnosticSpec extends AnyFunSpec {
 
     val accepted = Seq(
       "val x: Int = -2147483648",
-      "val x = -2147483648 * 2",
+      "val x = (-2147483648) * 2",
+      "val x = (-2147483648) as Long",
+      "val x = - -2147483648",
       "val x = 1 + -2147483648",
       "val x = 3 * -2147483648",
       "val x: Int = 0x80000000",

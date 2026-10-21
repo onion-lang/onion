@@ -127,6 +127,17 @@ class YieldStatementHintI18nSpec extends AnyFunSpec with Diagrams {
     assertBacktickHint(compileErrors("val yield x = 1\n"))
   }
 
+  // #2315 panel, fourth round: where only a name can follow (after `.`, `::` or
+  // `new`), `yield` is a name even when a space and `(` follow it.
+  it("keeps the backtick hint for `yield` after `.`, `::` or `new`") {
+    assertBacktickHint(compileErrors(
+      "class K { public: def this {}  def `yield`(): String = \"y\" }\nval k = new K()\nprintln(k.yield ())\n"))
+    assertBacktickHint(compileErrors(
+      "class K { public: static def `yield`(n: Int): Int = n + 1 }\nprintln(K::yield (1))\n"))
+    assertBacktickHint(compileErrors(
+      "class `yield` { public: def this {} }\nval y = new yield ()\n"))
+  }
+
   it("still gives the do-block hint for `yield` before an expression keyword") {
     assertYieldHint(compileErrors("def f(): Object { yield new Object() }\n"))
     assertYieldHint(compileErrors("def f(): Boolean { yield true }\n"))

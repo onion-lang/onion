@@ -498,7 +498,7 @@ private[compiler] object SyntaxHintClassifier {
       // misread as an identifier slot.
       case "import" if sourceLine.trim.startsWith("import") =>
         hint("error.parsing.hint.duplicate_import_block")
-      case "yield" if YieldExpression.findFirstMatchIn(context).isDefined && !yieldNamed(context, sourceLine) =>
+      case "yield" if YieldExpression.findFirstMatchIn(context).isDefined && !yieldNamed(expected, context, sourceLine) =>
         hint("error.parsing.hint.yield_not_supported")
       case word if ReservedWords.contains(word) && (expected.contains("<ID>") || expected.contains("<QUOTED_ID>")) =>
         hint("error.parsing.hint.reserved_word_identifier", word)
@@ -559,15 +559,18 @@ private[compiler] object SyntaxHintClassifier {
     }
   }
 
-  /**
-   * The part of `sourceLine` before the error token, recovered from `context`
-   * (which starts at the token). Empty when `context` was truncated mid-line.
-   */
-  private def yieldNamed(context: String, sourceLine: String): Boolean =
+  // Where the parser accepts only a name (after `.`, `::` or `new`: `k.yield ()`),
+  // `yield` is a name whatever follows it.
+  private def yieldNamed(expected: String, context: String, sourceLine: String): Boolean =
+    expected.split(""",\s*|\s+or\s+""").forall(e => e == "<ID>" || e == "<QUOTED_ID>") ||
     WordAfterYield.findFirstMatchIn(context).exists { m =>
       ReservedWords.contains(m.group(1)) && !ExpressionKeywords.contains(m.group(1))
     } || DeclarationBeforeYield.findFirstMatchIn(textBefore(context, sourceLine)).isDefined
 
+  /**
+   * The part of `sourceLine` before the error token, recovered from `context`
+   * (which starts at the token). Empty when `context` was truncated mid-line.
+   */
   private def textBefore(context: String, sourceLine: String): String = {
     val rest = context.takeWhile(c => c != '\n' && c != '\r')
     if (sourceLine.stripSuffix("\r").endsWith(rest)) sourceLine.stripSuffix("\r").dropRight(rest.length)

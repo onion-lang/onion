@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A body, `derive!` or `from` after an enum `case` now gets a hint pointing at the record form (RFC #2250).**
   - Before: `case Ping(id: Int) derive!(Json)` said only `Encountered "derive", but expecting "}"`.
   - Now: the hint says to declare `record Ping(id: Int) derive!(...) conforms <enum>` beside the enum; it still counts for `select` exhaustiveness (E0042).
+- **`yield x` outside a `do` block gets the `do`-block hint wherever it appears (#2300).**
+  - Before: in `def f(): Int { yield 1 }` or `{ x -> yield x }`, the hint said to escape `yield` with backticks, which still fails.
+  - Now: the same hint as a `yield` at the start of a line: `yield` works only inside `do[M] { ... }`.
+  - Unchanged: `yield` used as a name (`val yield = 1`, `val r = yield`, `1 + yield + 2`, `yield as String`, `class yield extends Object`, `k.yield ()`) still gets the backtick hint.
 - **A `config` shape keeps a `String` value's leading and trailing spaces (#2229).**
   - Before: `print` wrote `text =   x  `, and `parse` read it back as `x`, so `parse(print(v)) == v` failed.
   - Now: `print` quotes a value that is padded or starts with `"` (`text = "  x  "`); every other value is written as before.
@@ -101,6 +105,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yaml` raises an error on nested, flow, anchor and block-scalar data instead of silently mangling it (#2239).**
+  - Before: `Yaml::parse("c:\n  d: 1\n")` returned `{c=null, d=1}`, `[1, 2]` and `*x` came back as text, and `Yaml::stringify` wrote a nested Map as `c: {d=1}`.
+  - Now: `Yaml::parse` throws `Yaml.YamlParseException` naming the construct and its line, at the top level and inside a sequence element. A nested sequence (`items:\n- k: v`) is rejected too; it used to come back as a key named `- k`.
+  - `derive!(Yaml)`'s `fromYaml` returns `null` for such a document, as for any other parse error.
+  - `Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List, and quotes a string starting with `[ { & *` (and the other YAML indicators) or `- `, so `derive!(Yaml)` still round-trips it.
+  - Unchanged: a uniformly indented flat document still parses.
 - **Naming a static method without parens calls it instead of crashing (#2248).**
   - Before: `def work: String = "hi"; val f = work` (or bare `greet` for a static sibling inside a class) failed at run time with `IncompatibleClassChangeError`.
   - Now: it calls the method, just as `work()` does. An explicit non-self receiver (`expr.staticMethod`, no parens) still reports `E0019`, same as `expr.staticMethod()`.

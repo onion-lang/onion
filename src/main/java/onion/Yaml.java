@@ -10,7 +10,16 @@ import java.util.Map;
  * No external dependencies - completely self-contained.
  *
  * Scope: a flat block mapping, or a top-level block sequence of flat mappings
- * (no nested maps/sequences within an element, no anchors).
+ * (no nested maps/sequences within an element, no anchors, no flow collections).
+ * A construct outside that scope raises an error rather than silently losing data:
+ * {@link #stringify} throws {@code IllegalArgumentException} on a nested Map/List
+ * value, and {@link #parse} throws {@link YamlParseException} on a nested mapping
+ * (a line indented deeper than its siblings, also inside a sequence element), a
+ * flow collection ({@code [...]}/{@code {...}}) value, an anchor/alias
+ * ({@code &name}/{@code *name}) value, or a block scalar ({@code |}/{@code >}).
+ * A uniformly indented document is fine. {@link #stringify} quotes any string
+ * that starts with such an indicator (or with {@code - }/{@code ? }), so a flat
+ * Map, or a List of non-empty flat Maps, always parses back.
  *
  * YAML values share the same intermediate representation as Json:
  * - YAML mapping:  LinkedHashMap&lt;String, Object&gt;
@@ -157,17 +166,52 @@ public final class Yaml {
         return trimmedLine.equals("-") || trimmedLine.startsWith("- ");
     }
 
+    /**
+     * Parse a flat block mapping. The document may be uniformly indented; a line indented
+     * deeper than the shallowest line so far is a nested mapping (or a block scalar's
+     * body), which is out of scope.
+     */
     private static LinkedHashMap<String, Object> parseMapping(String[] rawLines) throws YamlParseException {
         LinkedHashMap<String, Object> result = new LinkedHashMap<>();
+        int baseIndent = Integer.MAX_VALUE;
         int lineNumber = 0;
         for (String rawLine : rawLines) {
             lineNumber++;
             if (isBlankOrComment(rawLine)) {
                 continue;
             }
+            int indent = indentOf(rawLine);
+            if (indent > baseIndent) {
+                throw nestedLine(rawLine, lineNumber);
+            }
+            baseIndent = indent;
+            if (isSequenceItem(rawLine.trim())) {
+                throw nestedSequence(rawLine, lineNumber);
+            }
             parseKeyValueLine(rawLine.trim(), lineNumber, result);
         }
         return result;
+    }
+
+    /** The number of leading spaces/tabs on a line. */
+    private static int indentOf(String rawLine) {
+        int i = 0;
+        while (i < rawLine.length() && (rawLine.charAt(i) == ' ' || rawLine.charAt(i) == '\t')) {
+            i++;
+        }
+        return i;
+    }
+
+    private static YamlParseException nestedLine(String rawLine, int lineNumber) {
+        return new YamlParseException(
+            "Nested mapping is out of scope (Yaml reads flat data only; use Json for nested data): "
+                + rawLine.trim(), lineNumber);
+    }
+
+    private static YamlParseException nestedSequence(String rawLine, int lineNumber) {
+        return new YamlParseException(
+            "Nested sequence is out of scope (Yaml reads flat data only; use Json for nested data): "
+                + rawLine.trim(), lineNumber);
     }
 
     /**
@@ -178,6 +222,11 @@ public final class Yaml {
     private static List<Object> parseSequence(String[] rawLines) throws YamlParseException {
         List<Object> result = new ArrayList<>();
         LinkedHashMap<String, Object> current = null;
+        // Column of the current element's keys (the first key after `- `, or after a bare `-`
+        // the first key line below it; -1 until that line is seen); a deeper line is nested.
+        int keyColumn = -1;
+        // Column of the first item's `-`; an item at any other column is a nested sequence.
+        int itemColumn = -1;
         int lineNumber = 0;
         for (String rawLine : rawLines) {
             lineNumber++;
@@ -186,15 +235,28 @@ public final class Yaml {
                 continue;
             }
             if (isSequenceItem(trimmed)) {
+                int dashColumn = indentOf(rawLine);
+                if (itemColumn < 0) {
+                    itemColumn = dashColumn;
+                } else if (dashColumn != itemColumn) {
+                    throw nestedSequence(rawLine, lineNumber);
+                }
                 current = new LinkedHashMap<>();
                 result.add(current);
                 String rest = trimmed.equals("-") ? "" : trimmed.substring(2).trim();
+                keyColumn = rest.isEmpty() ? -1 : rawLine.indexOf(rest, dashColumn + 1);
                 if (!rest.isEmpty()) {
                     parseKeyValueLine(rest, lineNumber, current);
                 }
             } else {
                 if (current == null) {
                     throw new YamlParseException("Expected a sequence item ('- ...') but found: " + rawLine, lineNumber);
+                }
+                int indent = indentOf(rawLine);
+                if (keyColumn < 0) {
+                    keyColumn = indent;
+                } else if (indent > keyColumn) {
+                    throw nestedLine(rawLine, lineNumber);
                 }
                 parseKeyValueLine(trimmed, lineNumber, current);
             }
@@ -241,6 +303,11 @@ public final class Yaml {
         if (value instanceof String s) {
             return renderString(s);
         }
+        if (value instanceof Map<?, ?> || value instanceof List<?>) {
+            throw new IllegalArgumentException(
+                "Yaml::stringify supports only flat mappings/sequences: a nested Map/List value "
+                    + "is out of scope (no nested maps/sequences within an element)");
+        }
         // Fallback – unknown type, quote to be safe
         return renderString(value.toString());
     }
@@ -250,6 +317,8 @@ public final class Yaml {
      * Quote if:
      *   - empty string
      *   - leading or trailing whitespace
+     *   - starts with a YAML indicator ([ ] { } & * ! | > % @ `)
+     *   - equals "-" or "?", or starts with "- " or "? "
      *   - contains ':', '#', newline, or tab
      *   - looks like a number (would be parsed back as Long or Double)
      *   - equals "true", "false", or "null" (would be parsed back as Boolean/null)
@@ -261,11 +330,19 @@ public final class Yaml {
         return s;
     }
 
+    /** Characters that start a non-plain YAML scalar (flow collection, anchor, alias, tag, block scalar, ...). */
+    private static final String INDICATORS = "[]{}&*!|>%@`";
+
     private static boolean needsQuoting(String s) {
         if (s.isEmpty()) return true;
         if (s.charAt(0) == ' ' || s.charAt(s.length() - 1) == ' ') return true;
         // A leading ' or " would be read back as a quoted scalar, not a literal quote char
         if (s.charAt(0) == '\'' || s.charAt(0) == '"') return true;
+        // A leading YAML indicator would be rejected by parse or misread by other YAML readers
+        if (INDICATORS.indexOf(s.charAt(0)) >= 0) return true;
+        // A key or item written as `- x`/`? x` (or a lone `-`/`?`) would read back as a
+        // sequence item or complex-key marker
+        if (s.equals("-") || s.equals("?") || s.startsWith("- ") || s.startsWith("? ")) return true;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == ':' || c == '#' || c == '\n' || c == '\r' || c == '\t') return true;
@@ -392,6 +469,28 @@ public final class Yaml {
         // Single-quoted string – only '' -> ' is special, no other escapes, no type coercion
         if (raw.startsWith("'")) {
             return unquoteSingle(raw, lineNumber);
+        }
+
+        // Flow collections ([...]/{...}) are out of scope: without this check they would
+        // come back as a literal, misleading String instead of the list/map they denote.
+        if (raw.charAt(0) == '[' || raw.charAt(0) == '{') {
+            throw new YamlParseException(
+                "Flow collections are out of scope (quote the value to keep it as text; use Json for lists and maps): "
+                    + raw, lineNumber);
+        }
+
+        // Block scalars (a `|`/`>` header, then indented lines) are out of scope.
+        if (raw.matches("[|>][-+0-9]*")) {
+            throw new YamlParseException(
+                "Block scalars are out of scope (write the text as one quoted value, with \\n for line breaks): "
+                    + raw, lineNumber);
+        }
+
+        // Anchors (&name) and aliases (*name) are out of scope: without this check the
+        // anchor/alias marker would come back as part of a literal String value.
+        if (raw.charAt(0) == '&' || raw.charAt(0) == '*') {
+            throw new YamlParseException(
+                "Anchors/aliases are out of scope (quote the value to keep it as text): " + raw, lineNumber);
         }
 
         // Integer?

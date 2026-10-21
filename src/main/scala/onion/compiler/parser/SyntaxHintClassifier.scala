@@ -182,6 +182,24 @@ private[compiler] object SyntaxHintClassifier {
     "throws", "trait", "true", "try", "type", "Unit", "val", "var", "void", "volatile",
     "when", "while", "yield"
   )
+  // `yield expr` past the start of its line (`def f(): Int { yield 1 }`,
+  // `{ x -> yield x }`), which ControlFlowSyntaxHints' line-anchored rule misses.
+  // `context` starts at `yield`. A line end, or a following `=`, `:`, `->`, `{`, `.`,
+  // closing token or infix operator (`val r = yield`, `val yield = 1`,
+  // `{ yield -> yield * 2 }`, `1 + yield + 2`, `if yield {`) means `yield` was meant
+  // as a name, which the reserved-word hint below covers; `yield -1` (no space after
+  // `-`) is still an expression. So is a following keyword unless it can start an
+  // expression (`yield as String`, `class yield extends`, `case yield when`), and so is
+  // a `yield` that a declaration names (`class yield Foo`, `class B[yield ...]`).
+  private val YieldExpression =
+    """\Ayield[ \t]+(?!->|-\s|!=)[^\s=:)\],;{}.+*/%<>&|?^]""".r
+  private val WordAfterYield = """\Ayield[ \t]+([A-Za-z_]\w*)""".r
+  private val ExpressionKeywords = Set(
+    "Boolean", "Byte", "Char", "do", "Double", "false", "Float", "if", "Int", "Long", "new",
+    "null", "select", "self", "Short", "super", "this", "true", "try"
+  )
+  private val DeclarationBeforeYield =
+    """(?:\b(?:class|interface|record|enum|trait|case|def|val|var|foreach)|\w\[)\s*\z""".r
   private val NullableUnionType =
     """:\s*([A-Za-z_][\w.\[\]]*)\s*\|\s*null\b""".r
   private val CStyleCast =
@@ -490,6 +508,8 @@ private[compiler] object SyntaxHintClassifier {
       // misread as an identifier slot.
       case "import" if sourceLine.trim.startsWith("import") =>
         hint("error.parsing.hint.duplicate_import_block")
+      case "yield" if YieldExpression.findFirstMatchIn(context).isDefined && !yieldNamed(expected, context, sourceLine) =>
+        hint("error.parsing.hint.yield_not_supported")
       case word if ReservedWords.contains(word) && (expected.contains("<ID>") || expected.contains("<QUOTED_ID>")) =>
         hint("error.parsing.hint.reserved_word_identifier", word)
       case _ if expected.contains("{") && NotOperatorCondition.findFirstMatchIn(sourceLine).isDefined =>
@@ -548,6 +568,16 @@ private[compiler] object SyntaxHintClassifier {
         None
     }
   }
+
+  // Where no expression can start, `yield` cannot begin `yield expr` whatever follows
+  // it: a name slot (`k.yield ()`, `import { java.util.yield (x) }`) or a lone `)`
+  // (`def f(yield x: Int)`). Every expression start admits a literal, so `<INTEGER>`
+  // in the expected set marks one.
+  private def yieldNamed(expected: String, context: String, sourceLine: String): Boolean =
+    !expected.split(""",\s*|\s+or\s+""").contains("<INTEGER>") ||
+    WordAfterYield.findFirstMatchIn(context).exists { m =>
+      ReservedWords.contains(m.group(1)) && !ExpressionKeywords.contains(m.group(1))
+    } || DeclarationBeforeYield.findFirstMatchIn(textBefore(context, sourceLine)).isDefined
 
   /**
    * The part of `sourceLine` before the error token, recovered from `context`

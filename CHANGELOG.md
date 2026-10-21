@@ -24,9 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`var x: Long = 99999999999` names the problem: the literal is out of range for `Int`.**
   - Before: `Syntax error. Encountered "\n", but expecting valid token`, at the next token.
   - Now: `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal`, at the literal. Long, Byte and Short literals get their own message (#2257).
-- **A type parameter bounded by another type parameter of the same declaration now works** (#2259).
-  - Before: `class Holder[B, T extends B] { var item: T; def asB(): B { return item } }` failed with `[E0000] type B is expected, but type T is used`, even on `[B extends CharSequence, T extends B]`, where member access through the chain (`item.length()`) also failed.
-  - Now: both compile and run, by identity through the declared bound chain rather than by comparing erased classes -- which also closes the gap where an unrelated third type parameter sharing the same erased bound was wrongly accepted (a real `ClassCastException` risk, caught in review).
+- **A type parameter bounded by another type parameter of the same declaration now works** (#2259), including a chain of three (`[A, B extends A, T extends B]`).
+  - Before: `class Holder[B, T extends B] { var item: T; def asB(): B { return item } }` failed with `[E0000] type B is expected, but type T is used`; member access through a real bound (`[B extends CharSequence, T extends B]`, `item.length()`) also failed.
+  - Now: both compile and run. A sibling type parameter that merely shares the same bound (`[B, T extends B, U extends B]`) is still correctly rejected wherever `T` is expected, whether by assignment, method call, or as a generic type argument (`List[T]` is not a `List[B]`).
 
 ## [0.144.0] - 2026-10-20
 

@@ -271,9 +271,23 @@ final class TypingTypeSupport(private val typing: Typing) {
     applied: TypedAST.AppliedClassType,
     rawParams: Array[TypedAST.TypeParameter]
   ): Unit = {
+            // A later parameter's declared bound can reference an earlier one
+            // (`[A, B extends A, T extends B]`): substitute THIS instantiation's
+            // own type arguments into each bound before checking it, so `T`'s
+            // bound reads as the real argument given for `B` (e.g. `String`),
+            // not the abstract, unsubstituted type-variable object named `B`.
+            // Without this, `C3[Object, String, String]` checked `String`
+            // against literal `B` and failed, even though `B` substitutes to
+            // exactly `String` at this instantiation (#2259 review repro).
+            val selfSubst: scala.collection.immutable.Map[String, TypedAST.Type] =
+              rawParams.indices.map(j => rawParams(j).name -> applied.typeArguments(j)).toMap
             rawParams.indices.foreach { i =>
               val param = rawParams(i)
-              val upper = param.upperBound.getOrElse(typing.rootClass)
+              val declaredUpper = param.upperBound.getOrElse(typing.rootClass)
+              val upper = TypeSubstitution.substituteType(declaredUpper, selfSubst, Map.empty, defaultToBound = false) match {
+                case ct: TypedAST.ClassType => ct
+                case _ => declaredUpper
+              }
               val arg = applied.typeArguments(i)
               if (arg eq BasicType.VOID) {
                 typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)

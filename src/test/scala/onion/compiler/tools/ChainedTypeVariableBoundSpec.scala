@@ -94,5 +94,48 @@ class ChainedTypeVariableBoundSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Failure(-1) == r)
     }
+    it("rejects passing a sibling U where a same-class call expects T (second review repro)") {
+      val r = shell.run(
+        """class Box3b[B, T extends B, U extends B] {
+          |  var t: T
+          |public:
+          |  def this(tv: T) { t = tv }
+          |  def set(v: T): void { t = v }
+          |  def bad(u: U): void { set(u) }
+          |}
+          |def main(args: String[]): void { }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
+    it("rejects returning a List[T] field as List[B] (type arguments are invariant)") {
+      val r = shell.run(
+        """import { java.util.* }
+          |class H[B, T extends B] {
+          |  var ts: List[T]
+          |public:
+          |  def this(l: List[T]) { ts = l }
+          |  def asBs(): List[B] { return ts }
+          |}
+          |def main(args: String[]): void { }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
+  }
+  describe("a later type parameter's bound can reference an earlier one") {
+    it("substitutes the instantiation's own type arguments into a chained bound (third review repro)") {
+      val r = shell.run(
+        """class C3[A, B extends A, T extends B] {
+          |  var t: T
+          |public:
+          |  def this(v: T) { t = v }
+          |  def get(): T { return t }
+          |}
+          |def main(args: String[]): Int {
+          |  val c = new C3[Object, String, String]("abc")
+          |  return c.get().length()
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(3) == r)
+    }
   }
 }

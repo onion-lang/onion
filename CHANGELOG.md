@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`yield x` outside a `do` block gets the `do`-block hint wherever it appears (#2300).**
   - Before: in `def f(): Int { yield 1 }` or `{ x -> yield x }`, the hint said to escape `yield` with backticks, which still fails.
-  - Now: the same hint as a `yield` at the start of a line: `yield` works only inside `do[M] { ... }`. `val yield = 1` still gets the backtick hint.
+  - Now: the same hint as a `yield` at the start of a line: `yield` works only inside `do[M] { ... }`. `yield` used as a name (`val yield = 1`, `{ yield -> yield * 2 }`, `1 + yield + 2`) still gets the backtick hint.
 - **`-128B` and `-32768S` hold -128 and -32768 (#2297).**
   - Before: they widened to `128`/`32768`, and `println(-128B)` crashed in `Byte.valueOf`.
   - Now: unary minus on a `Byte` or `Short` stays in that type's range. `Char` negation is unchanged (`-c` for `'a'` is `-97`, as in Java).

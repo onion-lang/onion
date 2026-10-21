@@ -75,4 +75,27 @@ class YieldStatementHintI18nSpec extends AnyFunSpec with Diagrams {
     assert(msgs.contains("backticks") || msgs.contains("バッククォート"), s"expected the reserved-word hint, got: $msgs")
     assert(!msgs.contains("do[M]"), s"a name is not a `yield expr` statement, got: $msgs")
   }
+
+  private def assertBacktickHint(msgs: String): Unit = {
+    assert(msgs.contains("backticks") || msgs.contains("バッククォート"), s"expected the reserved-word hint, got: $msgs")
+    assert(!msgs.contains("do[M]"), s"`yield` used as a name must not get the do-block hint, got: $msgs")
+  }
+
+  // #2315 panel: a name followed by `->`, a closing token or an infix operator.
+  it("keeps the backtick hint for `yield` as a lambda parameter") {
+    assertBacktickHint(compileErrors("val xs = [1, 2].map { yield -> yield * 2 }\n"))
+  }
+
+  it("keeps the backtick hint for `yield` as an operand") {
+    assertBacktickHint(compileErrors("val r = 1 + yield + 2\n"))
+  }
+
+  it("keeps the backtick hint for `yield` before a closing token") {
+    assertBacktickHint(compileErrors("def f(): Int { return yield }\n"))
+  }
+
+  it("still gives the do-block hint for `yield -1` and `yield (1)`") {
+    assertYieldHint(compileErrors("def f(): Int { yield -1 }\n"))
+    assertYieldHint(compileErrors("def f(): Int { yield (1) }\n"))
+  }
 }

@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`yield x` outside a `do` block gets the `do`-block hint wherever it appears (#2300).**
   - Before: in `def f(): Int { yield 1 }` or `{ x -> yield x }`, the hint said to escape `yield` with backticks, which still fails.
   - Now: the same hint as a `yield` at the start of a line: `yield` works only inside `do[M] { ... }`. `val yield = 1` still gets the backtick hint.
+- **`-128B` and `-32768S` hold -128 and -32768 (#2297).**
+  - Before: they widened to `128`/`32768`, and `println(-128B)` crashed in `Byte.valueOf`.
+  - Now: unary minus on a `Byte` or `Short` stays in that type's range. `Char` negation is unchanged (`-c` for `'a'` is `-97`, as in Java).
+
 - **`(xs as String[])` on a `List[Int]` no longer hints at `xs.toArray(new String[0])` (#2305).**
   - Before: following the hint threw `ArrayStoreException` at run time.
   - Now: the `toArray` hint appears only when the elements fit the array (`List[String]` as `Object[]`, `List[Int]` as `Number[]`); otherwise you see the plain type mismatch.
@@ -39,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`var x: Long = 99999999999` names the problem: the literal is out of range for `Int`.**
   - Before: `Syntax error. Encountered "\n", but expecting valid token`, at the next token.
   - Now: `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal`, at the literal. Long, Byte and Short literals get their own message (#2257).
+- **A syntax error inside a nested `#{}` is reported on the line it is on.**
+  - Before: `"a #{"b #{1 +} c"} d"` on line 6 reported line 11, with no source excerpt; `{ (x) -> x }` inside `#{}` also lost its hint.
+  - Now: line 6 and the right column, with the excerpt and the same hint as outside a string (#2303, #2302).
 - **`(aList as String[])` (any `List[T] as T[]` cast, and the reverse) is now a compile-time error, not a runtime crash (#2258).**
   - Before: the cast type-checked, then crashed at runtime.
   - Now: `[E0000]` at compile time, with a hint naming the real conversion -- `xs.toArray(new String[0])` for `List[T] as T[]`, `Colls::toList(xs)` for the reverse. A primitive element type (`Int[]`) gets no such hint, since neither call has an overload for it. `(arr as Object)` and `(obj as String[])` keep working.

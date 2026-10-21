@@ -234,6 +234,13 @@ private[compiler] object SyntaxHintClassifier {
     found match {
       case "<:" =>
         hint("error.parsing.hint.old_conforms")
+      // A block statement (`while c { ... }`, `if`, `foreach`, `def`) takes no `;`
+      // terminator, so `while c { ... }; next()` fails at the `;` with an
+      // expected-token list for whatever may start the next declaration. An
+      // expression ending in `}` (a trailing lambda, a map literal) does take
+      // one and never reaches here.
+      case ";" if textBefore(context, sourceLine).trim.endsWith("}") =>
+        hint("error.parsing.hint.semicolon_after_block")
       // A JS/TS `for (const x of arr)` fails right at `const` itself (`for (`
       // parses as the start of a C-style clause, which never accepts `const`),
       // so the generic const-declaration hint below would otherwise win before
@@ -530,6 +537,16 @@ private[compiler] object SyntaxHintClassifier {
       case _ =>
         None
     }
+  }
+
+  /**
+   * The part of `sourceLine` before the error token, recovered from `context`
+   * (which starts at the token). Empty when `context` was truncated mid-line.
+   */
+  private def textBefore(context: String, sourceLine: String): String = {
+    val rest = context.takeWhile(c => c != '\n' && c != '\r')
+    if (sourceLine.stripSuffix("\r").endsWith(rest)) sourceLine.stripSuffix("\r").dropRight(rest.length)
+    else ""
   }
 
   private def hint(messageKey: String, arguments: String*): Option[SyntaxHint] =

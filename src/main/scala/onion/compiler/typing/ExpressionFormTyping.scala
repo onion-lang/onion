@@ -205,9 +205,20 @@ final class ExpressionFormTyping(
           interfaceCastAllowed
       case (bt1: BasicType, bt2: BasicType) =>
         (bt1 eq bt2) || (isNumericBasic(bt1) && isNumericBasic(bt2))
+      case (ct: ClassType, _: ArrayType) =>
+        // A JVM array implements only Object, Serializable and Cloneable, so a cast
+        // between an array and any other reference type (e.g. `List[String] as
+        // String[]`) can never succeed. It used to fall through to the catch-all
+        // `true` below, compiling to a checkcast that always threw ClassCastException.
+        isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
+      case (_: ArrayType, ct: ClassType) =>
+        isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
       case _ => true
     }
   }
+
+  private def isArrayRelatedType(ct: ClassType): Boolean =
+    ct.name == "java.lang.Object" || ct.name == "java.io.Serializable" || ct.name == "java.lang.Cloneable"
 
   private def isNumericBasic(bt: BasicType): Boolean = bt match {
     case BasicType.INT | BasicType.LONG | BasicType.SHORT | BasicType.BYTE |

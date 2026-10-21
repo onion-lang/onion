@@ -670,7 +670,18 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportIncompatibleType(position: Location, items: Array[AnyRef]): Unit = {
     val expected = items(0).asInstanceOf[TypedAST.Type]
     val actual = items(1).asInstanceOf[TypedAST.Type]
-    val baseMessage = format(message("error.semantic.incompatibleType"), Seq(typeName(expected), typeName(actual)))
+    // `(list as String[])`/`(arr as List[String])`: a List can never be an array at
+    // runtime (#2258), so the generic message's "consider a cast" is actively wrong here.
+    val listArrayCast: Option[(TypedAST.ArrayType, Boolean)] =
+      if (expected.isInstanceOf[TypedAST.ArrayType] && isListType(actual))
+        Some((expected.asInstanceOf[TypedAST.ArrayType], true))
+      else if (isListType(expected) && actual.isInstanceOf[TypedAST.ArrayType])
+        Some((actual.asInstanceOf[TypedAST.ArrayType], false))
+      else None
+    val baseMessage = format(
+      message(if (listArrayCast.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      Seq(typeName(expected), typeName(actual))
+    )
     val hint =
       if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
@@ -678,7 +689,25 @@ class SemanticErrorReporter(threshold: Int) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
         // nested class does not restore the scrutinee's type arguments, a pattern does.
         Some(format(message("suggestion.castLosesTypeArguments"), Seq(typeName(actual))))
-      } else None
+      } else listArrayCast match {
+        case Some((arrayType, isListToArray)) =>
+          // `toArray`/`Colls::toList` are generic over a reference-typed array -- a true
+          // 1-D primitive array (`Int[]`) has no such overload, so naming either call
+          // would hand back a different error (#2260 review). An outer dimension's
+          // elements are themselves a reference type (arrays are objects), so only the
+          // 1-D primitive case has no one-line fix.
+          if (arrayType.dimension == 1 && arrayType.component.isBasicType) None
+          else if (isListToArray) {
+            // Onion has no jagged-array syntax (`new Int[0][]` is a syntax error); a fully
+            // sized `new Int[0][0]` compiles and is just as empty, since the outer (size-0)
+            // dimension is the only one that matters to `toArray`.
+            val emptyArrayLiteral = typeName(arrayType.component) + ("[0]" * arrayType.dimension)
+            Some(format(message("suggestion.listAsArrayCast"), Seq(emptyArrayLiteral)))
+          } else {
+            Some(message("suggestion.arrayAsListCast"))
+          }
+        case None => None
+      }
     problem(position, appendSuggestion(baseMessage, hint))
   }
 

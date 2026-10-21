@@ -2560,6 +2560,17 @@ val o: Outcome[Config] = http"https://api.example.com/config".read(shape)   // �
 val results: List[Outcome[Row]] = http"https://api.example.com/feed".eachLine(shape)
 ```
 
+`request(method)` は、この resource 自身の URL を引き継いだ状態で `Http::request` の
+フルビルダーへ切り替える——上の固定メソッドでは足りないもの（ヘッダー、タイムアウト、
+任意メソッドでのボディ、レスポンスのステータス）が必要になったとき用:
+
+```onion
+val res = http"https://api.example.com/x".request("GET")
+  .header("Authorization", "Bearer t")
+  .timeoutSeconds(5)
+  .send()                                // Result[Http.Response, Http.HttpFailure]
+```
+
 ---
 
 ## DateTime

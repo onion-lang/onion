@@ -12,6 +12,9 @@ import org.scalatest.funspec.AnyFunSpec
  * `file"…"` literal's `## FileResource` section. (`HttpResourceDocCoverageSpec` guards a
  * separate, narrower claim in `docs/reference/specification.md`'s fixed-menu paragraph;
  * this spec is about stdlib.md having no section for `HttpResource` at all.)
+ *
+ * `request` (#2146, RFC #2236) escalates to `Http::request`'s full builder, seeded with
+ * this resource's own URL.
  */
 class HttpResourceStdlibDocCoverageSpec extends AnyFunSpec {
 
@@ -19,7 +22,7 @@ class HttpResourceStdlibDocCoverageSpec extends AnyFunSpec {
     java.nio.file.Files.readString(java.nio.file.Path.of(p))
 
   private val members = Seq(
-    "url", "get", "getJson", "read", "eachLine", "post", "postJson", "put", "delete"
+    "url", "get", "getJson", "read", "eachLine", "post", "postJson", "put", "delete", "request"
   )
 
   it("actual onion.HttpResource exposes every documented-below member (sanity check)") {

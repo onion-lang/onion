@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`http"...".request(method)` escalates to `Http::request`'s full builder, seeded with the resource's own URL.**
+  - Before: `http"..."` had no way to set a header, a timeout, or read the response status -- only `get`/`post`/`put`/`delete`/`getJson`/`postJson`/`read(shape)`/`eachLine(shape)`.
+  - Now: `http"url".request("GET").header(...).timeoutSeconds(...).send()` reaches the exact builder `Http::request` returns, seeded with the URL so it doesn't need retyping (#2146).
+
 ### Fixed
 
 - **`2147483648` without a `-` in front is an out-of-range error, not `-2147483648` (#2296).**

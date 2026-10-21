@@ -18,7 +18,8 @@ import java.util.Map;
  * flow collection ({@code [...]}/{@code {...}}) value, an anchor/alias
  * ({@code &name}/{@code *name}) value, or a block scalar ({@code |}/{@code >}).
  * A uniformly indented document is fine. {@link #stringify} quotes any string
- * that starts with such an indicator, so its output always parses back.
+ * that starts with such an indicator (or with {@code - }/{@code ? }), so a flat
+ * Map, or a List of non-empty flat Maps, always parses back.
  *
  * YAML values share the same intermediate representation as Json:
  * - YAML mapping:  LinkedHashMap&lt;String, Object&gt;
@@ -221,8 +222,9 @@ public final class Yaml {
     private static List<Object> parseSequence(String[] rawLines) throws YamlParseException {
         List<Object> result = new ArrayList<>();
         LinkedHashMap<String, Object> current = null;
-        // Column of the current element's keys (the first key after `- `); a deeper line is nested.
-        int keyColumn = 0;
+        // Column of the current element's keys (the first key after `- `, or after a bare `-`
+        // the first key line below it; -1 until that line is seen); a deeper line is nested.
+        int keyColumn = -1;
         // Column of the first item's `-`; an item at any other column is a nested sequence.
         int itemColumn = -1;
         int lineNumber = 0;
@@ -242,7 +244,7 @@ public final class Yaml {
                 current = new LinkedHashMap<>();
                 result.add(current);
                 String rest = trimmed.equals("-") ? "" : trimmed.substring(2).trim();
-                keyColumn = rest.isEmpty() ? dashColumn + 2 : rawLine.indexOf(rest, dashColumn + 1);
+                keyColumn = rest.isEmpty() ? -1 : rawLine.indexOf(rest, dashColumn + 1);
                 if (!rest.isEmpty()) {
                     parseKeyValueLine(rest, lineNumber, current);
                 }
@@ -250,7 +252,10 @@ public final class Yaml {
                 if (current == null) {
                     throw new YamlParseException("Expected a sequence item ('- ...') but found: " + rawLine, lineNumber);
                 }
-                if (indentOf(rawLine) > keyColumn) {
+                int indent = indentOf(rawLine);
+                if (keyColumn < 0) {
+                    keyColumn = indent;
+                } else if (indent > keyColumn) {
                     throw nestedLine(rawLine, lineNumber);
                 }
                 parseKeyValueLine(trimmed, lineNumber, current);
@@ -313,6 +318,7 @@ public final class Yaml {
      *   - empty string
      *   - leading or trailing whitespace
      *   - starts with a YAML indicator ([ ] { } & * ! | > % @ `)
+     *   - equals "-" or "?", or starts with "- " or "? "
      *   - contains ':', '#', newline, or tab
      *   - looks like a number (would be parsed back as Long or Double)
      *   - equals "true", "false", or "null" (would be parsed back as Boolean/null)
@@ -334,6 +340,9 @@ public final class Yaml {
         if (s.charAt(0) == '\'' || s.charAt(0) == '"') return true;
         // A leading YAML indicator would be rejected by parse or misread by other YAML readers
         if (INDICATORS.indexOf(s.charAt(0)) >= 0) return true;
+        // A key or item written as `- x`/`? x` (or a lone `-`/`?`) would read back as a
+        // sequence item or complex-key marker
+        if (s.equals("-") || s.equals("?") || s.startsWith("- ") || s.startsWith("? ")) return true;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == ':' || c == '#' || c == '\n' || c == '\r' || c == '\t') return true;

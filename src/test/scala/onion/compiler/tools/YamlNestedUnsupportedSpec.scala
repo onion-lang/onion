@@ -292,4 +292,41 @@ class YamlNestedUnsupportedSpec extends AbstractShellSpec {
       """.stripMargin, "None", Array())
     assert(Shell.Success("{- x=1}") == result)
   }
+
+  // Panel block on #2243 at 6d5e040: two regressions against main.
+  it("reads a bare `-` whose keys are indented more than two columns") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): String {
+        |   return Yaml::parse("-\n    a: 1\n    b: 2\n").toString()
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success("[{a=1, b=2}]") == result)
+  }
+
+  it("still rejects a line nested deeper than a bare `-` element's first key") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): Int {
+        |   try {
+        |     Yaml::parse("-\n    a: 1\n      b: 2\n")
+        |     return -1
+        |   } catch e: Yaml.YamlParseException {
+        |     return e.getLine()
+        |   }
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success(3) == result)
+  }
+
+  it("stringify quotes a key or value that starts with `- ` or `? `, so it parses back") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): Boolean {
+        |   val m = ["a": 1L, "- x": 2L, "? y": "- z", "-": "?", "q": "- "]
+        |   return Yaml::parse(Yaml::stringify(m)) == m && Yaml::parse(Yaml::stringify([m])) == [m]
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success(true) == result)
+  }
 }

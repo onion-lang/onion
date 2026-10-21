@@ -1733,7 +1733,8 @@ and `Yaml::parse` throws `Yaml.YamlParseException` on:
 - a block scalar (`|`/`>`)
 
 A uniformly indented document is fine. `Yaml::stringify` quotes any string that
-starts with one of these indicators, so its output always parses back.
+starts with one of these indicators, or with `- ` or `? `, so a flat Map, or a
+List of non-empty flat Maps, always parses back.
 
 ### Yaml::parse
 

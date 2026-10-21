@@ -2758,7 +2758,8 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     if ((minMagnitudeMinus eq minus) && !(operand eq minMagnitudeLiteral)) {
       val t = minMagnitudeToken
       val marker = if (t.image.endsWith("L")) LongLiteralOutOfRangeMarker else IntLiteralOutOfRangeMarker
-      adoptFailure(Location(t.beginLine, t.beginColumn), marker, new java.util.LinkedHashSet[Integer]())
+      val at = p(t)
+      adoptFailure(Location(at.line, at.column), marker, new java.util.LinkedHashSet[Integer]())
       throw fail
     }
     operand

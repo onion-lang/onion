@@ -56,6 +56,24 @@ class InterpolationErrorLocationSpec extends AnyFunSpec {
       val locs = errors.map(e => Option(e.location).map(l => s"${l.line}:${l.column}").getOrElse("none"))
       assert(locs.forall(_ == "6:23"), s"got $locs")
     }
+
+    def minValueLocations(code: String): Seq[String] = {
+      val result = compile(code)
+      val expected = Message("error.parsing.int_literal_out_of_range")
+      val errors = result.allErrors.filter(_.message.contains(expected))
+      assert(errors.nonEmpty, s"expected '$expected', got: ${result.allErrors.map(_.message)}")
+      errors.map(e => Option(e.location).map(l => s"${l.line}:${l.column}").getOrElse("none"))
+    }
+
+    it("reports a minimum-value magnitude that is not the whole operand of `-` on its own line (one level)") {
+      val locs = minValueLocations(fivePrefixLines + "IO::println(\"a #{-2147483648 as Long} d\")\n")
+      assert(locs.forall(_ == "6:19"), s"got $locs")
+    }
+
+    it("reports a minimum-value magnitude that is not the whole operand of `-` on its own line (two levels)") {
+      val locs = minValueLocations(fivePrefixLines + "IO::println(\"a #{\"b #{-2147483648 as Long} c\"} d\")\n")
+      assert(locs.forall(_ == "6:24"), s"got $locs")
+    }
   }
 
   describe("a parenthesized trailing-lambda head inside #{}") {

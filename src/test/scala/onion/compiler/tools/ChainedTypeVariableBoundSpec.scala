@@ -163,5 +163,17 @@ class ChainedTypeVariableBoundSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Success(1) == r)
     }
+    it("does not substitute a parameter's own name when a method returns `this` as the self-bounded type") {
+      val r = shell.run(
+        """class Node[T extends Comparable[T]] {
+          |public:
+          |  var v: T
+          |  def this(x: T) { v = x }
+          |  def next(): Node[T] = this
+          |}
+          |def main(args: String[]): Int { return new Node[String]("hi").next().v.length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(2) == r)
+    }
   }
 }

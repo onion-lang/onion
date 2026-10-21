@@ -10433,7 +10433,22 @@ block sequence of them (<code>onion.Yaml</code>). Shares the same intermediate r
 as <code>Json</code> — scalars map to the same Java types — so <code>derive!(Yaml)</code> builds on
 exactly the same <code>toMap</code> / <code>fromMap</code> core as <code>derive!(Json)</code>.</p>
 <p>Scope: a flat block mapping, or a top-level block sequence of flat mappings (no
-nested maps/sequences within an element, no anchors).</p>
+nested maps/sequences within an element, no anchors, no flow collections). A
+construct outside that scope raises an error rather than silently losing data:
+<code>Yaml::stringify</code> throws <code>IllegalArgumentException</code> on a nested Map/List value,
+and <code>Yaml::parse</code> throws <code>Yaml.YamlParseException</code> on:</p>
+<ul>
+<li>a nested mapping: a line indented deeper than its siblings, at the top level or
+  inside a sequence element</li>
+<li>a nested sequence: a <code>-</code> item under a key, or at a different column from the
+  first item</li>
+<li>a flow collection (<code>[...]</code>/<code>{...}</code>) value</li>
+<li>an anchor/alias (<code>&amp;name</code>/<code>*name</code>) value</li>
+<li>a block scalar (<code>|</code>/<code>&gt;</code>)</li>
+</ul>
+<p>A uniformly indented document is fine. <code>Yaml::stringify</code> quotes any string that
+starts with one of these indicators, or with <code>-</code> or <code>?</code>, so a flat Map, or a
+List of non-empty flat Maps, always parses back.</p>
 <h3 id="yamlparse">Yaml::parse<a class="headerlink" href="#yamlparse" title="Permanent link">&para;</a></h3>
 <p>Parse a YAML flat block-mapping string into a <code>LinkedHashMap</code>:</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-115-1"><a id="__codelineno-115-1" name="__codelineno-115-1" href="#__codelineno-115-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Yaml</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="s2">"name: Alice</span><span class="se">\n</span><span class="s2">age: 30</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>

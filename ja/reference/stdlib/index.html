@@ -9896,7 +9896,21 @@ future は <code>isSuccess()</code> と <code>isFailure()</code> の両方が <c
 共有しており（scalar は同じ Java 型にマップされる）、<code>derive!(Yaml)</code> は
 <code>derive!(Json)</code> とまったく同じ <code>toMap</code> / <code>fromMap</code> の土台の上に構築されています。</p>
 <p>対象範囲: flat block mapping、またはそれらのトップレベル block シーケンス
-（要素内のネストした map/シーケンスやアンカーは非対応）。</p>
+（要素内のネストした map/シーケンス、アンカー、flow collection は非対応）。
+この範囲外の構文は、データを静かに失う代わりにエラーを発生させます:
+<code>Yaml::stringify</code> はネストした Map/List 値に対して <code>IllegalArgumentException</code> を
+投げます。<code>Yaml::parse</code> は次の場合に <code>Yaml.YamlParseException</code> を投げます:</p>
+<ul>
+<li>ネストした mapping: 兄弟の行より深くインデントされた行（トップレベルでも、
+  シーケンス要素の中でも）</li>
+<li>ネストしたシーケンス: キーの下の <code>-</code> 項目、または最初の項目と違う列にある項目</li>
+<li>flow collection（<code>[...]</code>/<code>{...}</code>）の値</li>
+<li>アンカー/エイリアス（<code>&amp;name</code>/<code>*name</code>）の値</li>
+<li>ブロックスカラー（<code>|</code>/<code>&gt;</code>。複数行テキストの書き方）</li>
+</ul>
+<p>全体が同じ幅でインデントされた文書は問題ありません。<code>Yaml::stringify</code> は
+これらの記号、または <code>-</code>・<code>?</code> で始まる文字列を引用符で囲みます。そのため、
+フラットな Map と、空でないフラットな Map の List は必ず読み戻せます。</p>
 <h3 id="yamlparse">Yaml::parse<a class="headerlink" href="#yamlparse" title="Permanent link">&para;</a></h3>
 <p>YAML の flat block-mapping 文字列を <code>LinkedHashMap</code> にパースします:</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-94-1"><a id="__codelineno-94-1" name="__codelineno-94-1" href="#__codelineno-94-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Yaml</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="s2">"name: Alice</span><span class="se">\n</span><span class="s2">age: 30</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>

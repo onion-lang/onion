@@ -194,6 +194,59 @@ class IntegerLiteralOutOfRangeDiagnosticSpec extends AnyFunSpec {
     }
   }
 
+  describe("a Byte or Short literal past its signed range (#2316)") {
+    // A decimal `B`/`S` literal must fit the signed range; only the minimum's magnitude
+    // (128B, 32768S) is accepted, and only as the whole operand of a `-`, as for Int. A
+    // binary or hex literal may still spell the full bit pattern, as `0xFFFFFFFF` does.
+    val rejected = Seq(
+      "val x: Byte = 128B"           -> "error.parsing.byte_literal_out_of_range",
+      "val x: Byte = 255B"           -> "error.parsing.byte_literal_out_of_range",
+      "val x: Byte = -129B"          -> "error.parsing.byte_literal_out_of_range",
+      "val x: Byte = 0200B"          -> "error.parsing.byte_literal_out_of_range",
+      "val x: Byte = 0b111111111B"   -> "error.parsing.byte_literal_out_of_range",
+      "val x: Short = 32768S"        -> "error.parsing.short_literal_out_of_range",
+      "val x: Short = 40000S"        -> "error.parsing.short_literal_out_of_range",
+      "val x: Short = -32769S"       -> "error.parsing.short_literal_out_of_range",
+      "val x: Short = 0x10000S"      -> "error.parsing.short_literal_out_of_range",
+      "val x = -128B as Int"         -> "error.parsing.byte_literal_out_of_range",
+      "val x = -(128B)"              -> "error.parsing.byte_literal_out_of_range",
+      "val x = -32768S.toString()"   -> "error.parsing.short_literal_out_of_range"
+    )
+    rejected.foreach { case (code, key) =>
+      it(s"rejects `$code` as out of range") {
+        val result = compile(code + "\n")
+        val expected = Message(key)
+        assert(
+          result.allErrors.exists(_.message.contains(expected)),
+          s"expected '$expected', got: ${result.allErrors.map(_.message)}"
+        )
+      }
+      it(s"rejects `$code` in the JavaCC parser too") {
+        assertThrows[ParseException](new JJOnionParser(new StringReader(code + "\n")).unit())
+      }
+    }
+
+    val accepted = Seq(
+      "val x: Byte = 127B",
+      "val x: Byte = -128B",
+      "val x: Byte = 0b11111111B",
+      "val x = (-128B) as Int",
+      "val x: Short = 32767S",
+      "val x: Short = -32768S",
+      "val x: Short = 0xFFFFS",
+      "val x: Short = 0b1000000000000000S"
+    )
+    accepted.foreach { code =>
+      it(s"still accepts `$code`, with the same AST in both parsers") {
+        val result = compile(code + "\n")
+        assert(!result.hasErrors, s"unexpected errors: ${result.allErrors.map(_.message)}")
+        val src = code + "\n"
+        val fast = try Some(OnionParser.parse(src)) catch { case _: OnionParser.Fail => None }
+        fast.foreach(f => assert(f == new JJOnionParser(new StringReader(src)).unit()))
+      }
+    }
+  }
+
   describe("an in-range literal with an L suffix") {
     it("still compiles (no false positive)") {
       val result = compile(

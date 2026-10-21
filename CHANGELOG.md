@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
   - Before: anywhere else it silently became the minimum value. `val x: Int = 2147483648` printed `-2147483648`; `-2147483648 as Long` printed `2147483648`, because `as` binds tighter than `-`.
   - Now: the usual "out of range for Int/Long" error. `-2147483648`, `-9223372036854775808L` and `0x80000000` still compile. To migrate, add `L` or parentheses: see `docs/migration/pre-1.0.md`.
+- **A decimal `B`/`S` literal must fit the signed range: `255B` and `40000S` are errors (#2316).**
+  - Before: `Byte` took -128..255 and `Short` -32768..65535, so `255B` was silently `-1` and `40000S` was `-25536`. `-128B as Int` printed `128`.
+  - Now: decimal literals take -128..127 and -32768..32767, with `128B`/`32768S` valid only as the whole operand of a `-`. For a bit pattern, write it in binary or hex (`0b11111111B`, `0xFFFFS`): see `docs/migration/pre-1.0.md`.
 - **A `config` shape reads a `String` value in double quotes as quoted text (#2229, RFC #2233).**
   - Before: `name = "Alice"` read as `"Alice"`, quotes included; `name = "abc` read as `"abc`.
   - Now: it reads as `Alice`. Inside the quotes, `\"` and `\\` are the only escapes. A quoted value with no closing `"`, or a bare `"` inside, is a Defect. To keep literal quotes, write `name = "\"Alice\""`: see `docs/migration/pre-1.0.md`.

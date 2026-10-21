@@ -2757,7 +2757,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def requireBareMinMagnitude(minus: Token, operand: AST.Expression): AST.Expression = {
     if ((minMagnitudeMinus eq minus) && !(operand eq minMagnitudeLiteral)) {
       val t = minMagnitudeToken
-      val marker = if (t.image.endsWith("L")) LongLiteralOutOfRangeMarker else IntLiteralOutOfRangeMarker
+      val marker =
+        if (t.image.endsWith("L")) LongLiteralOutOfRangeMarker
+        else if (t.image.endsWith("B")) ByteLiteralOutOfRangeMarker
+        else if (t.image.endsWith("S")) ShortLiteralOutOfRangeMarker
+        else IntLiteralOutOfRangeMarker
       val at = p(t)
       adoptFailure(Location(at.line, at.column), marker, new java.util.LinkedHashSet[Integer]())
       throw fail
@@ -2772,14 +2776,18 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val s = t.image.replace("_", "")
     val noKinds = new java.util.LinkedHashSet[Integer]()
     try {
-      if (s.endsWith("B")) {
+      if (s.endsWith("B") || s.endsWith("S")) {
+        // See the grammar's integer_literal: signed range for decimal, bit pattern for
+        // binary/hex, and the minimum's magnitude only as the bare operand of a `-` (#2316).
+        val isByte = s.endsWith("B")
+        val max = if (isByte) 127 else 32767
         val iv = parseIntLiteral(s.substring(0, s.length - 1))
-        if (iv < -128 || iv > 255) throw theFail
-        AST.ByteLiteral(p(t), iv.toByte)
-      } else if (s.endsWith("S")) {
-        val iv = parseIntLiteral(s.substring(0, s.length - 1))
-        if (iv < -32768 || iv > 65535) throw theFail
-        AST.ShortLiteral(p(t), iv.toShort)
+        val radix = s.startsWith("0x") || s.startsWith("0X") || s.startsWith("0b")
+        val minMagnitude = !radix && iv == max + 1
+        if (iv < 0 || iv > (if (radix) 2 * max + 1 else max + 1) || (minMagnitude && !negated)) throw theFail
+        val lit = if (isByte) AST.ByteLiteral(p(t), iv.toByte) else AST.ShortLiteral(p(t), iv.toShort)
+        if (minMagnitude) { minMagnitudeMinus = unaryMinus; minMagnitudeToken = t; minMagnitudeLiteral = lit }
+        lit
       } else if (s.endsWith("L")) {
         val lv = parseLongLiteral(s.substring(0, s.length - 1))
         if (lv == Long.MinValue && !s.startsWith("0") && !negated) throw theFail

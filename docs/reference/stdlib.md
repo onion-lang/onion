@@ -1719,7 +1719,22 @@ as `Json` — scalars map to the same Java types — so `derive!(Yaml)` builds o
 exactly the same `toMap` / `fromMap` core as `derive!(Json)`.
 
 Scope: a flat block mapping, or a top-level block sequence of flat mappings (no
-nested maps/sequences within an element, no anchors).
+nested maps/sequences within an element, no anchors, no flow collections). A
+construct outside that scope raises an error rather than silently losing data:
+`Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List value,
+and `Yaml::parse` throws `Yaml.YamlParseException` on:
+
+- a nested mapping: a line indented deeper than its siblings, at the top level or
+  inside a sequence element
+- a nested sequence: a `- ` item under a key, or at a different column from the
+  first item
+- a flow collection (`[...]`/`{...}`) value
+- an anchor/alias (`&name`/`*name`) value
+- a block scalar (`|`/`>`)
+
+A uniformly indented document is fine. `Yaml::stringify` quotes any string that
+starts with one of these indicators, or with `- ` or `? `, so a flat Map, or a
+List of non-empty flat Maps, always parses back.
 
 ### Yaml::parse
 

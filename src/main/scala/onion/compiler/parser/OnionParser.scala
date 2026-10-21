@@ -250,6 +250,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private var furthestPos = -1        // buffer index of the deepest failure seen so far
   private var furthestLine = -1       // beginLine/beginColumn/image of the token at furthestPos,
   private var furthestColumn = -1     // raw (un-adjusted by lineBase/colBase) -- see deepestFailure()
+  private var furthestAdjusted = false // furthestLine/Column already include lineBase/colBase (adoptFailure)
   private var furthestFoundImage: String = null
   private val expectedKinds = new java.util.LinkedHashSet[Integer]()
 
@@ -262,6 +263,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       furthestPos = pos
       furthestLine = t.beginLine
       furthestColumn = t.beginColumn
+      furthestAdjusted = false
       furthestFoundImage = t.image
       expectedKinds.clear()
       expectedKinds.add(k)
@@ -280,7 +282,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     if (furthestFoundImage == null) None
     else {
       val loc =
-        if (lineBase == 0 && colBase == 0) Location(furthestLine, furthestColumn)
+        if (furthestAdjusted || (lineBase == 0 && colBase == 0)) Location(furthestLine, furthestColumn)
         else {
           val bc = if (furthestLine == 1) furthestColumn + colBase else furthestColumn
           Location(furthestLine + lineBase, bc)
@@ -291,12 +293,16 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   /** Force a specific diagnostic as this parser's furthest failure, position comparison aside:
    *  the caller knows better than the deepest-reach heuristic — a string-interpolation
    *  sub-parser's own diagnostic, or a slip reported at an already-consumed token (the
-   *  no-arrow trailing-lambda cases are anchored to their `{`, as the grammar does). */
+   *  no-arrow trailing-lambda cases are anchored to their `{`, as the grammar does).
+   *  `loc` is a position in the enclosing file (already lineBase/colBase-adjusted, as `p()`
+   *  and a sub-parser's `deepestFailure()` give it), so `deepestFailure()` must not shift it
+   *  again: shifting it once per nesting level reported a line-6 error on line 11 (#2303). */
   private def adoptFailure(loc: Location, foundImage: String, kinds: java.util.LinkedHashSet[Integer]): Unit = {
     if (speculating > 0) return
     furthestPos = pos
     furthestLine = loc.line
     furthestColumn = loc.column
+    furthestAdjusted = true
     furthestFoundImage = foundImage
     expectedKinds.clear()
     expectedKinds.addAll(kinds)
@@ -340,6 +346,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     furthestPos = -1
     furthestLine = -1
     furthestColumn = -1
+    furthestAdjusted = false
     furthestFoundImage = null
     expectedKinds.clear()
   }
@@ -2760,9 +2767,8 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           else if (s.endsWith("S")) ShortLiteralOutOfRangeMarker
           else if (s.endsWith("L")) LongLiteralOutOfRangeMarker
           else IntLiteralOutOfRangeMarker
-        // adoptFailure takes the token's own (unshifted) position: deepestFailure() adds
-        // lineBase/colBase itself, so p(t) here would shift an interpolation's line twice.
-        adoptFailure(Location(t.beginLine, t.beginColumn), marker, noKinds)
+        val at = p(t)
+        adoptFailure(Location(at.line, at.column), marker, noKinds)
         throw fail
     }
   }

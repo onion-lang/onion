@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`var x: Long = 99999999999` names the problem: the literal is out of range for `Int`.**
   - Before: `Syntax error. Encountered "\n", but expecting valid token`, at the next token.
   - Now: `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal`, at the literal. Long, Byte and Short literals get their own message (#2257).
+- **A syntax error inside a nested `#{}` is reported on the line it is on.**
+  - Before: `"a #{"b #{1 +} c"} d"` on line 6 reported line 11, with no source excerpt; `{ (x) -> x }` inside `#{}` also lost its hint.
+  - Now: line 6 and the right column, with the excerpt and the same hint as outside a string (#2303, #2302).
 
 ## [0.144.0] - 2026-10-20
 

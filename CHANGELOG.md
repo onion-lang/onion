@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`var x: Long = 99999999999` names the problem: the literal is out of range for `Int`.**
   - Before: `Syntax error. Encountered "\n", but expecting valid token`, at the next token.
   - Now: `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal`, at the literal. Long, Byte and Short literals get their own message (#2257).
+- **`(aList as String[])` (any `List[T] as T[]` cast, and the reverse) is now a compile-time error, not a runtime crash (#2258).**
+  - Before: the cast type-checked, then crashed at runtime.
+  - Now: `[E0000]` at compile time, with a hint naming the real conversion -- `xs.toArray(new String[0])` for `List[T] as T[]`, `Colls::toList(xs)` for the reverse. A primitive element type (`Int[]`) gets no such hint, since neither call has an overload for it. `(arr as Object)` and `(obj as String[])` keep working.
 
 ## [0.144.0] - 2026-10-20
 
@@ -55,10 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The `List` pipeline works on an array of references, so `line.split(" ").distinct()` needs no `.toList()`.** An array (`String.split`'s result, `main`'s `args`) had only `map`/`filter`/`toList`; `distinct`, `groupBy`, `sortedBy`, `join`, `take`, `first`, `count` and the rest were E0005. Each now applies to the elements as a `List` and returns what the `List` method returns. Arrays of primitives (`new Int[n]`) are unchanged.
 
 ### Fixed
-
-- **`(aList as String[])` (any `List[T] as T[]` cast, and the reverse) is now a compile-time error, not a runtime crash (#2258).**
-  - Before: the cast type-checked, then threw a raw `ClassCastException` at runtime.
-  - Now: `[E0000]` at compile time, with a hint naming the real conversion -- `xs.toArray(new String[0])` (array to List: `Colls::toList(xs)`). A primitive element type (`Int[]`) has no such hint, since neither call has an overload for it. `(arr as Object)` and `(obj as String[])` keep working.
 
 - **Naming a static method without parens calls it instead of crashing (#2248).**
   - Before: `def work: String = "hi"; val f = work` (or bare `greet` for a static sibling inside a class) failed at run time with `IncompatibleClassChangeError`.

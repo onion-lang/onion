@@ -47,3 +47,27 @@ val c = (-2147483648) / 2       // -1073741824
 - **What changed:** the magnitude of the minimum value is checked where it is negated, not at the token.
 - **What you see:** `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal.`, at the literal (`... for Long ...` with the `L` suffix).
 - **Still fine:** `-2147483648`, `x + -2147483648`, `3 * -2147483648`, `-9223372036854775808L`, and hex or binary bit patterns such as `0x80000000`.
+
+## A quoted `String` in a `config` file is read without its quotes
+
+A `shape name = config` record now reads a `String` value written in double quotes as quoted
+text. This lets a value keep leading or trailing spaces through `print` and `parse`.
+
+```text
+# Before: the quotes were part of the value
+name = "Alice"          # read as "Alice"  (7 characters)
+
+# Now
+name = "Alice"          # read as Alice    (5 characters)
+name = "  Alice  "      # read as   Alice  (spaces kept)
+name =   Alice          # read as Alice    (unquoted values are still trimmed)
+name = "\"Alice\""      # read as "Alice"  (to keep literal quotes)
+```
+
+- **What changed:** inside the quotes, `\"` is a quote and `\\` is a backslash. Any other
+  backslash is kept as it is, so `"C:\temp"` reads as `C:\temp`.
+- **What you see:** a file that already relied on literal quotes still parses, so there is no
+  error or hint; the value just loses its outer quotes. Search your config files for values
+  that start with `"`. A value with no closing `"`, or with a bare `"` inside it (`"a" and "b"`),
+  is now a `Defect` naming the line.
+- **Only `String` components:** an `Int`, `Boolean` or other scalar is read exactly as before.

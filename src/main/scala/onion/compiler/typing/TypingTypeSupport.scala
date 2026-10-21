@@ -279,11 +279,25 @@ final class TypingTypeSupport(private val typing: Typing) {
             // Without this, `C3[Object, String, String]` checked `String`
             // against literal `B` and failed, even though `B` substitutes to
             // exactly `String` at this instantiation (#2259 review repro).
-            val selfSubst: scala.collection.immutable.Map[String, TypedAST.Type] =
+            val fullSubst: scala.collection.immutable.Map[String, TypedAST.Type] =
               rawParams.indices.map(j => rawParams(j).name -> applied.typeArguments(j)).toMap
             rawParams.indices.foreach { i =>
               val param = rawParams(i)
               val declaredUpper = param.upperBound.getOrElse(typing.rootClass)
+              // Exclude this parameter's OWN name from the substitution: an
+              // F-bounded self-reference (`T extends Comparable[T]`) is its
+              // own argument here (`Tree[T]` used inside `Tree`'s own body),
+              // and substituting it would swap the bound's internal `T`
+              // (frozen, by construction, to the Phase-1 placeholder used
+              // while every bound in the declaration was first resolved)
+              // for this argument's `T` (the class's real, final type
+              // variable) -- the two are different objects, so the swap
+              // made a self-bound compare against itself inconsistently
+              // and broke `class Tree[T extends Comparable[T]]` (caught by
+              // review). Any OTHER parameter's name still substitutes, so
+              // a genuine cross-reference to an earlier parameter is
+              // unaffected.
+              val selfSubst = fullSubst - param.name
               val upper = TypeSubstitution.substituteType(declaredUpper, selfSubst, Map.empty, defaultToBound = false) match {
                 case ct: TypedAST.ClassType => ct
                 case _ => declaredUpper
@@ -315,7 +329,20 @@ final class TypingTypeSupport(private val typing: Typing) {
                     // for a self/forward reference like `class Ver conforms Comparable[Ver]`
                     // during the outline pass, and would wrongly reject it.
                     val satisfiesObjectBound = (upper eq typing.rootClass) && !checkedArg.isBasicType
-                    if (!satisfiesObjectBound && !TypeRules.isAssignable(upper, checkedArg)) {
+                    // `upper` can itself still be an unresolved type variable
+                    // after substitution -- an enclosing, not-yet-instantiated
+                    // parameter (`B` substitutes to `P` in `new Holder[P, Q](q)`
+                    // inside `class Mk[P, Q]`). The ordinary isAssignable falls
+                    // back to comparing erased classes there (both `P` and `Q`
+                    // widen to Object), wrongly accepting two unrelated
+                    // variables (#2259 review repro), so an abstract `upper`
+                    // uses only identity through the argument's own bound
+                    // chain -- never the lenient fallback -- to decide.
+                    val satisfied = upper match {
+                      case tv: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(tv, checkedArg)
+                      case _ => satisfiesObjectBound || TypeRules.isAssignable(upper, checkedArg)
+                    }
+                    if (!satisfied) {
                       typing.report(INCOMPATIBLE_TYPE, typeNode, upper, arg)
                     }
                 }

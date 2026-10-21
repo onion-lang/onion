@@ -1899,6 +1899,22 @@ object TypedAST {
     def isAssignable(left: TypedAST.Type, right: TypedAST.Type): Boolean = isSuperType(left, right)
 
     /**
+     * Like isSuperType, but never falls back to comparing erased classes:
+     * for callers that already know `left` is still abstract (an
+     * unresolved type variable whose own value isn't fixed yet -- e.g. a
+     * bound substituted from an enclosing, not-yet-instantiated generic
+     * context, as in `new Holder[P, Q](q)` inside `class Mk[P, Q]`), only
+     * genuine identity through `right`'s own bound chain can prove the
+     * relationship; two otherwise-unrelated variables must not pass just
+     * because they erase to the same root class (#2259 review repro).
+     * `isSuperType`'s own chain walk already does this once `right`'s own
+     * bound is itself another type variable (a declared, multi-level
+     * chain); this is the same walk, usable directly when `right` may be
+     * an ordinary, single-level variable instead.
+     */
+    def isSuperTypeByIdentity(left: TypedAST.Type, right: TypedAST.Type): Boolean = rightVariableChainAccepts(left, right)
+
+    /**
      * Walks a type variable's own bound chain (the `right` side of
      * isSuperType, which started out as a type variable) looking for a
      * link that *is* `left` by identity. Bounds are acyclic by

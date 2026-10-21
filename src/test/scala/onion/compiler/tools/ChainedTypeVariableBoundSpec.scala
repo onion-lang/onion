@@ -120,6 +120,20 @@ class ChainedTypeVariableBoundSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Failure(-1) == r)
     }
+    it("rejects instantiating a chain with unrelated type-variable arguments (third review round)") {
+      val r = shell.run(
+        """class Holder[B, T extends B] { var item: T
+          |public:
+          |  def this(v: T) { item = v }
+          |  def asB(): B { return item } }
+          |class Mk[P, Q] {
+          |public:
+          |  def this { }
+          |  def f(q: Q): Holder[P, Q] { return new Holder[P, Q](q) } }
+          |def main(args: String[]): void { }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
   }
   describe("a later type parameter's bound can reference an earlier one") {
     it("substitutes the instantiation's own type arguments into a chained bound (third review repro)") {
@@ -136,6 +150,18 @@ class ChainedTypeVariableBoundSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "None", Array())
       assert(Shell.Success(3) == r)
+    }
+    it("does not substitute a parameter's own name into its own F-bounded self-reference") {
+      val r = shell.run(
+        """class Tree[T extends Comparable[T]] {
+          |public:
+          |  var left: Tree[T]?
+          |  var v: T
+          |  def this(x: T) { v = x; left = null }
+          |}
+          |def main(args: String[]): Int { return new Tree[String]("x").v.length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
     }
   }
 }

@@ -95,6 +95,79 @@ class EnumCaseBodyHintSpec extends AnyFunSpec with Diagrams {
     }
   }
 
+  describe("the suggested line, pasted as is") {
+    // The backticked `record ... conforms ...` snippet out of the hint, exactly.
+    def suggestion(msgs: String): String =
+      """`(record [^`]*conforms [^`]*)`""".r.findFirstMatchIn(msgs).map(_.group(1))
+        .getOrElse(fail(s"no record suggestion in:\n$msgs"))
+
+    it("names the enclosing enum after `conforms`") {
+      val msgs = errorsOf(
+        """enum Msg {
+          |  case Ping(id: Int) derive!(Json)
+          |}
+          |""".stripMargin)
+      assert(suggestion(msgs) == "record Ping(id: Int) conforms Msg", msgs)
+    }
+
+    it("carries a generic enum's type parameters to both sides") {
+      val msgs = errorsOf(
+        """enum Opt[T] {
+          |  case Some(value: T) derive!(Json)
+          |  case Nothing
+          |}
+          |""".stripMargin)
+      assert(suggestion(msgs) == "record Some[T](value: T) conforms Opt[T]", msgs)
+    }
+
+    it("keeps bounds on the record side and only names on the enum side") {
+      val msgs = errorsOf(
+        """enum Pair[K, V extends Comparable[V]] {
+          |  case Both(k: K, v: V) {
+          |  }
+          |}
+          |""".stripMargin)
+      assert(suggestion(msgs) == "record Both[K, V extends Comparable[V]](k: K, v: V) conforms Pair[K, V]", msgs)
+    }
+
+    it("says that methods in the body go under `public:`") {
+      val msgs = errorsOf(
+        """enum Tree {
+          |  case Leaf {
+          |    def f(): Int = 1
+          |  }
+          |}
+          |""".stripMargin)
+      assert(msgs.contains("public: def"), msgs)
+    }
+
+    it("compiles with a method body, for a plain enum") {
+      val msgs = errorsOf(
+        """enum Tree {
+          |  case Node(v: Int)
+          |  case Leaf {
+          |    def f(): Int = 1
+          |  }
+          |}
+          |""".stripMargin)
+      val src = "enum Tree {\n  case Node(v: Int)\n}\n" + suggestion(msgs) + " { public: def f(): Int = 1 }\n"
+      assert(compile(src) == Right(()), compile(src).left.getOrElse(""))
+    }
+
+    it("compiles with a method body, for a generic enum") {
+      val msgs = errorsOf(
+        """enum Opt[T] {
+          |  case Some(value: T) {
+          |    def get(): T = value()
+          |  }
+          |  case Nothing
+          |}
+          |""".stripMargin)
+      val src = "enum Opt[T] {\n  case Nothing\n}\n" + suggestion(msgs) + " { public: def get(): T = value() }\n"
+      assert(compile(src) == Right(()), compile(src).left.getOrElse(""))
+    }
+  }
+
   describe("the hint stays out of") {
     it("a homogeneous enum's missing comma") {
       val msgs = errorsOf(

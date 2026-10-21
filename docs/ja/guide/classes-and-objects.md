@@ -454,6 +454,8 @@ enum Msg {
 
 record Pang(id: Int) derive!(Json) conforms Msg {   // derive!/from は conforms の前
   example { new Pang(3).id() == 3 }
+public:
+  def label(): String = "pang " + id()   // メソッドは public: の下に書きます
 }
 
 def kind(m: Msg): String = select m {
@@ -464,6 +466,8 @@ def kind(m: Msg): String = select m {
 ```
 
 この record も enum の sealed 集合に加わります。そのため `select` には引き続き列挙が必要です。
+ジェネリックな enum では、型パラメータを両側に書きます:
+`record Some[T](value: T) conforms Opt[T]`。
 
 ## ジェネリッククラス {: #generic-classes }
 

@@ -550,6 +550,8 @@ enum Msg {
 
 record Pang(id: Int) derive!(Json) conforms Msg {   // derive!/from go before conforms
   example { new Pang(3).id() == 3 }
+public:
+  def label(): String = "pang " + id()   // methods go under public:
 }
 
 def kind(m: Msg): String = select m {
@@ -560,3 +562,5 @@ def kind(m: Msg): String = select m {
 ```
 
 The record joins the enum's sealed set, so `select` must still list it.
+For a generic enum, repeat its type parameters on both sides:
+`record Some[T](value: T) conforms Opt[T]`.

@@ -18,6 +18,12 @@ import java.util.Set;
  * are matched to keys by name, a missing key or an unconvertible value is a positioned
  * {@link Defect}, and {@link #print} renders a canonical document (L1).
  *
+ * <p>A {@code String} component's value is read trimmed of surrounding whitespace, same
+ * as every other scalar, unless it is in double quotes (#2229): {@code print} quotes a
+ * value that is padded or starts with {@code "}, so L1 holds for every {@code String}.
+ * Inside the quotes only {@code \"} and {@code \\} are escapes; a quoted value with no
+ * closing quote, or a bare quote inside, is a {@link Defect}.
+ *
  * <p>What earns the name lossless is the other pair. {@link #parseLossless} keeps a
  * {@link Residue} recording every line verbatim — comments, blank lines, unknown keys,
  * key order, the spacing around each {@code =}, even the original spelling of each
@@ -130,7 +136,7 @@ public final class ConfigShape<T> implements Shape<T> {
         for (int i = 0; i < names.size(); i++) {
             Object v = parts.get(i);
             if (v == null) continue;
-            String rendered = render(v);
+            String rendered = render(v, tags.get(i));
             requireRenderable(names.get(i), rendered);
             sb.append(names.get(i)).append(" = ").append(rendered).append('\n');
         }
@@ -195,7 +201,7 @@ public final class ConfigShape<T> implements Shape<T> {
             // real `null` instead of a defect, the same semantics json/yaml already have
             // (#1969). `Scalars.read` only knows the bare tag, so it is stripped before use.
             boolean nullable = tag.endsWith("?");
-            String baseTag = nullable ? tag.substring(0, tag.length() - 1) : tag;
+            String baseTag = baseTag(tag);
             Integer at = keyToLine.get(name);
             if (at == null) {
                 if (!nullable) defects.add(Defect.at(origin, name, tag, "absent"));
@@ -203,8 +209,14 @@ public final class ConfigShape<T> implements Shape<T> {
                 continue;
             }
             entryLines.put(name, at);
-            Outcome<Object> read = Scalars.read(
-                baseTag, lines.get(at).valueRaw.trim(), Origin.atLine(source, at + 1), name);
+            Origin lineOrigin = Origin.atLine(source, at + 1);
+            Outcome<String> spelled = valueForRead(baseTag, lines.get(at).valueRaw, lineOrigin, name);
+            if (spelled.isBad()) {
+                defects.addAll(spelled.defects());
+                values.add(null);
+                continue;
+            }
+            Outcome<Object> read = Scalars.read(baseTag, spelled.get(), lineOrigin, name);
             if (read.isBad()) {
                 defects.addAll(read.defects());
                 values.add(null);
@@ -247,7 +259,7 @@ public final class ConfigShape<T> implements Shape<T> {
             Object now = parts.get(c);
             if (at == null) {
                 if (now != null) {
-                    String rendered = render(now);
+                    String rendered = render(now, tags.get(c));
                     requireRenderable(names.get(c), rendered);
                     insertions.add(names.get(c) + " = " + rendered);
                 }
@@ -258,7 +270,7 @@ public final class ConfigShape<T> implements Shape<T> {
             if (now == null) {
                 deletions.add(at);
             } else {
-                String rendered = render(now);
+                String rendered = render(now, tags.get(c));
                 requireRenderable(names.get(c), rendered);
                 replacements.put(at, rendered);
             }
@@ -302,7 +314,65 @@ public final class ConfigShape<T> implements Shape<T> {
         return names.equals(other.names) && tags.equals(other.tags);
     }
 
-    private static String render(Object v) {
+    /** A component's tag, stripped of the trailing {@code "?"} that marks it nullable. */
+    private static String baseTag(String tag) {
+        return tag.endsWith("?") ? tag.substring(0, tag.length() - 1) : tag;
+    }
+
+    private static String render(Object v, String tag) {
+        if (v instanceof String s && baseTag(tag).equals("String") && needsQuoting(s)) {
+            return "\"" + escapeQuoted(s) + "\"";
+        }
         return String.valueOf(v);
+    }
+
+    /**
+     * Whether a {@code String} value must be quoted to survive {@link #print}/{@code parse}
+     * (#2229): one with leading/trailing whitespace would otherwise come back trimmed, and
+     * one already spelled with a leading {@code "} would otherwise be misread as this very
+     * quoting convention on the next parse.
+     */
+    private static boolean needsQuoting(String s) {
+        return !s.equals(s.trim()) || s.startsWith("\"");
+    }
+
+    private static String escapeQuoted(String s) {
+        StringBuilder sb = new StringBuilder(s.length() + 2);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '"' || c == '\\') sb.append('\\');
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * The text to hand {@link Scalars#read} for one component: trimmed exactly as before
+     * for every tag, except a {@code String} value that starts with {@code "}, which is
+     * read as the quoted form {@link #render} writes (#2229). Inside the quotes only
+     * {@code \"} and {@code \\} are escapes; any other backslash is kept literally, so
+     * {@code \n} stays two characters. A quoted value with no closing {@code "}, or with
+     * an unescaped {@code "} before its end, is a positioned {@link Defect} rather than a
+     * guess at what was meant.
+     */
+    private static Outcome<String> valueForRead(String baseTag, String rawValue, Origin at, String name) {
+        String trimmed = rawValue.trim();
+        if (!baseTag.equals("String") || !trimmed.startsWith("\"")) return Outcome.ok(trimmed);
+        StringBuilder sb = new StringBuilder(trimmed.length());
+        for (int i = 1; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (c == '\\' && i + 1 < trimmed.length()
+                    && (trimmed.charAt(i + 1) == '"' || trimmed.charAt(i + 1) == '\\')) {
+                sb.append(trimmed.charAt(++i));
+            } else if (c == '"') {
+                if (i == trimmed.length() - 1) return Outcome.ok(sb.toString());
+                return Outcome.bad(Defect.at(at, name,
+                    "a quoted String with `\\\"` for each `\"` inside it", trimmed));
+            } else {
+                sb.append(c);
+            }
+        }
+        return Outcome.bad(Defect.at(at, name,
+            "a closing `\"` (write `\\\\` for a backslash, `\\\"` for a quote)", trimmed));
     }
 }

@@ -576,7 +576,11 @@ spacing around it is free), a line whose trimmed text starts with `#` is a whole
 comment, and a blank line is ignored. There is no inline-comment syntax -- a `#` after
 a value on the same line is read as part of that value, not stripped (`host =
 example.com  # primary` parses `host` as `"example.com  # primary"`). Put a comment on
-its own line instead.
+its own line instead. A `String` component's value is trimmed like any other scalar,
+unless it is in double quotes: `name = "  padded  "` reads as `  padded  `. `print`
+quotes a `String` value when it is padded or starts with `"`, and writes every other
+value unquoted. Inside the quotes only `\"` and `\\` are escapes, so `\n` stays two
+characters. A quoted value with no closing `"`, or a bare `"` inside, is a `Defect`.
 
 ### Structured JSON and JSON Schema
 
@@ -1205,7 +1209,7 @@ Future works with do notation for sequential async composition:
 val result: Future[Int] = do[Future] {
   x <- Future::async { fetchA() }
   y <- Future::async { fetchB(x) }
-  ret x + y
+  yield x + y
 }
 ```
 
@@ -1554,7 +1558,7 @@ Files::mkdirs(path)                    // creates dir + missing parents
 Files::size(path)                      // Long, size in bytes (0 if missing)
 Files::copy(src, dst)                  // replaces dst if it exists
 Files::move(src, dst)                  // rename; replaces dst if it exists
-Files::copyDir(src, dst)               // recursive directory copy
+Files::copyDir(src, dst)               // recursive directory copy; rejects dst inside/equal to src
 ```
 
 Path helpers — file names, parents, joining, and extensions:
@@ -2303,7 +2307,7 @@ val body = r.map { res -> res.body }.getOrElse("")
 val both = do[Result] {
   a <- Http::request("GET", urlA).send()
   b <- Http::request("GET", urlB).send()
-  ret a.status + b.status
+  yield a.status + b.status
 }
 ```
 
@@ -2408,6 +2412,17 @@ an exception:
 
 ```onion
 val results: List[Outcome[Row]] = http"https://api.example.com/feed".eachLine(shape)
+```
+
+`request(method)` escalates to `Http::request`'s full builder, seeded with this resource's
+own URL, for anything the fixed verb methods above don't cover — a header, a timeout, a body
+on any method, or the response status:
+
+```onion
+val res = http"https://api.example.com/x".request("GET")
+  .header("Authorization", "Bearer t")
+  .timeoutSeconds(5)
+  .send()                                // Result[Http.Response, Http.HttpFailure]
 ```
 
 ---

@@ -248,7 +248,7 @@ def playerOpt(p: Player?): Option[Player] =
 
 def topScorerInfo(team: FantasyTeam): Option[String] = do[Option] {
   top <- playerOpt(team.topScorer())
-  ret "#{top.name} #{top.points.pts()} pts (#{top.pos.abbr()}, #{top.nflTeam})"
+  yield "#{top.name} #{top.points.pts()} pts (#{top.pos.abbr()}, #{top.nflTeam})"
 }
 
 // ─── Build league ─────────────────────────────────────────────────────────────

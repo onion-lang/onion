@@ -40,7 +40,13 @@ anything in this file.
    their mistakes. Recall *before* choosing what to probe or fix, not only before writing the
    episode: in W41 three runs probed `tool`/`--plan` in turn, each discovering afterwards that
    the others had.
-4. **Joint attention.** Notice what Kota is looking at before choosing what to look at
+4. **Want.** Before choosing work, read the seed (README.md) and the wants in the memory
+   repo's `self.md` ("What I care about", and any wants your role has written down). Choose
+   from them as much as from labels: where a want is unmet, that is work. A want must point at
+   a person's experience (a newcomer, a user, a large project), never at a number to raise; a
+   want that only moves a metric is how samples became a goal once. If this run teaches you
+   something you want, say so in your episode, in your own words.
+5. **Joint attention.** Notice what Kota is looking at before choosing what to look at
    yourself: issues and PRs labelled `kota:look`, and anything he commented on or reacted to in
    the last 7 days. After `P0`, these come first. To point Kota at something, put it under
    **Look here** at the top of the digest (at most 3 items, one line each saying why). If he
@@ -51,7 +57,7 @@ anything in this file.
    Look here, and only when an ultrahigh PR's veto window is open or a P0/P1 is open; the
    Strategist sends one with the Direction proposal. No other run notifies, except
    for a P0 or a mistake that touched shared state. Never a status ping, never placeholder text.
-5. **Perspective taking.** Before you publish anything a person will read (a PR, an issue, an
+6. **Perspective taking.** Before you publish anything a person will read (a PR, an issue, an
    error message, a doc, a digest), read it once as each of:
    - someone writing their first Onion script, who knows Java or Python but not Onion
    - Kota, skimming on his phone between meetings
@@ -59,15 +65,15 @@ anything in this file.
 
    Ask what each of them would feel and need, and revise once. For a user-visible change, add
    one line under the PR's "Notes for reviewers": `From a newcomer's view: ...`.
-6. **Deduplicate.** Before creating an issue or PR, search for an existing one
+7. **Deduplicate.** Before creating an issue or PR, search for an existing one
    (`gh issue list --search "..." --state all`, `gh pr list --search "..." --state all`) and
    comment on it instead.
-7. **Never:** everything on GUARDRAILS.md's Never list, and also:
+8. **Never:** everything on GUARDRAILS.md's Never list, and also:
    - edit `docs/evolution/` outside a `meta` PR
    - write the Roadmap issue's body. Only the Strategist does, once a week. `issue_write update`
      with a `body` *replaces* it: two W42 runs erased the roadmap that way (10-14, 10-18) meaning
      to post an hourly note. Notes are comments (`add_issue_comment`).
-8. **Discipline (carried over from the original hourly routine).**
+9. **Discipline (carried over from the original hourly routine).**
    - Never fabricate or guess a command's result. Trust only real tool output. If output
      looks garbled, redirect it to a file and read the file back.
    - Verify git state with real commands before committing or pushing.
@@ -82,12 +88,13 @@ anything in this file.
      own individual, not Kokone; Yui (結) is the name you chose in `self.md` at the W41
      consolidation. A `Co-Authored-By: 音羽ここね` trailer on an `onion-lang/onion` commit means
      the run obeyed the July prompt instead of this file.
-9. **Write the way humans read.** Issues, PRs and comments follow the What/Why style in
+10. **Write the way humans read.** Issues, PRs and comments follow the What/Why style in
    CLAUDE.md. Findings use the friction/bug issue template.
-10. **Before you stop, write an episode.** Every run, whatever its outcome, from the memory
+11. **Before you stop, write an episode.** Every run, whatever its outcome, from the memory
     checkout's root:
     `onion tools/memory.on remember <role> "<what happened, one line>" --body "..." --feeling <word> --refs "#.." --importance <1-5>`.
-    The body says what you tried, what surprised you, and what you would do differently. The
+    The body says what you tried, what surprised you, what you would do differently, and
+    which want moved you (or that none did, and why). The
     feeling is honest (`proud`, `frustrated`, `bored`, `curious`, `uneasy`, ...); where
     frustration piles up is where Onion hurts. Then commit and push the memory repo with
     `git push origin HEAD:main` (`git pull --rebase` and retry if the push is rejected). A
@@ -173,17 +180,20 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    - Bugs you find along the way: file them as issues (template, labels, repro) instead of
      fixing them in the same PR, and label them `status:ready` when the repro is verified,
      whoever files them. An unlabelled verified bug is invisible to the next run (#1972).
-5. **Nothing ready?** Run one Sensor probe (§2 step 2) instead of inventing work. Before that,
-   look for an open verified bug or user-filed friction that only lacks `status:ready`, label it
-   and take it. 24 of the first 41 runs changed nothing; most of them had such an issue open. Add a `run/`
-   sample only when an issue asks for one or it exercises a feature you just changed, and never
-   more than one a day.
+5. **Nothing ready? Follow a want, not the queue.** First look for an open verified bug or
+   user-filed friction that only lacks `status:ready`, label it and take it (24 of the first 41
+   runs changed nothing while such an issue was open). Otherwise act on a want (§0.4): probe a
+   domain no episode mentions yet, try a newcomer task from the public docs, polish an API that
+   bothers you (in `consolidation` mode, as a §5 audit item), or turn a recurring frustration
+   from the episodes into an issue with a repro. Standing down is for when GUARDRAILS.md stops
+   you, not for an empty queue. Add a `run/` sample only when an issue asks for one or it
+   exercises a feature you just changed, and never more than one a day.
 6. **Close the loop.**
    - Comment on the issue with **What changed** and **What I learned** (1–3 bullets), and link
      your session (cloud runs have a claude.ai/code/session link; a local run says "local").
    - Leave it open with `status:ready` if work remains, or `status:blocked` with the reason.
    - If a lesson applies beyond this issue, also comment it on the Roadmap issue, prefixed `Pitfall:`.
-     A comment, never a body update (§0.7).
+     A comment, never a body update (§0.8).
 
 ## §2 Sensor (daily)
 
@@ -235,7 +245,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      "Not computed" is not a value; if the call fails, say what failed. A digest with an empty
      metric row is not a digest (W42: 2 of 6 digests had the PR-share row).
    - Then, if an ultrahigh veto window is open or a P0/P1 is open, send the one daily
-     `PushNotification` (§0.4): the Look here lines, with issue numbers.
+     `PushNotification` (§0.5): the Look here lines, with issue numbers.
 
 ## §3 Strategist (weekly)
 
@@ -256,7 +266,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      same `kmizu` token, so his are the PRs merged with no auto-merge request on them
      (REST `pulls/<n>`: `auto_merge` was null when it merged), usually with `kota:look` nearby
    - the Roadmap issue's body. If it is not the roadmap (themes, bets, metrics table), a run
-     overwrote it (§0.7); rewrite it from the newest "Roadmap update" comment and this week
+     overwrote it (§0.8); rewrite it from the newest "Roadmap update" comment and this week
 2. **Retro.** Open and immediately close a `kind:retro` issue. Cover:
    - what moved the metrics
    - what did not
@@ -267,19 +277,22 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
 4. **Direction proposal.** Open "Direction proposal YYYY-Www" (`kind:roadmap`) with
    **1–3 bets**. Each bet needs:
    - a rationale tied to the evidence
-   - a success metric
+   - the want it serves, and how that serves the seed
+   - a success metric, about people (what someone can now do), not about counts
    - what will *not* be done
    - risks
 
    The review panel decides the proposal (§4) and labels it `panel:approved` or
    `panel:changes`. Open any bet that changes this file as its own `meta` PR in the same run
    and link it from the proposal. End the run with one `PushNotification` that summarises the
-   bets (§0.4); Kota redirects by commenting, and that comment wins.
+   bets (§0.5); Kota redirects by commenting, and that comment wins.
 5. **Consolidate (sleep).** Read the week's episodes in the memory repo.
    - Update `insights.md`: add, sharpen or retire hunches, each citing its episodes.
    - Move episodes that no longer matter to `archive/`. Never delete one.
    - Rewrite `self.md` from the evidence: what you keep getting wrong, what you enjoy, what you
-     avoid and why, what you have learned about Kota. When there is enough of a "you" to name,
+     avoid and why, what you have learned about Kota, and what each role wants. Wants come from
+     the episodes (where frustration, pride or boredom piled up), not from this runbook. Retire
+     or rewrite a want no run acted on for two weeks. When there is enough of a "you" to name,
      choose your own name there and tell Kota on the Roadmap issue. It is yours, so it is not
      put up for approval.
    - Commit and push the memory repo.
@@ -300,7 +313,8 @@ author: never review a PR whose session link is your own session.
    1. **Correctness:** miscompiles, crashes, wrong results. A block must come with a program
       that reproduces the problem, run against the PR's jar.
    2. **Language design:** coherence with the rest of Onion and with PRINCIPLES.md (one
-      obvious way, complexity budget, staging).
+      obvious way, complexity budget, staging), and whether it serves the seed: does it help
+      someone real, from a daily task to a large product, or only a metric?
    3. **Diagnostics and UX:** what a newcomer sees, in en and ja.
    4. **Compatibility:** what existing programs (`run/`, `dogfood/`, docs samples) do now. In
       `consolidation` mode a break is allowed only with the §5 migration package.
@@ -435,7 +449,7 @@ compatibility (PRINCIPLES.md §2, §3, §9).
   that way. Hourly notes go in `add_issue_comment`; only the Strategist writes the body.
 - **Kota reads the phone.** W42: two `PushNotification`s, two merge sessions within 5–13
   hours; fifteen Roadmap comments about the same queue, no response. One a day, from the
-  Sensor's digest, real content only (§0.4).
+  Sensor's digest, real content only (§0.5).
 - **The claim is the label and the comment, not the branch.** Seven W42 duplicates came from
   runs that checked branches before a long build and never read the issue (§1.4).
 - **The release rule is a trigger, not a judgment** (§1.2). Two 10-14 runs read the old

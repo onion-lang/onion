@@ -60,6 +60,17 @@ object OnionParser {
    *  there on the same line. */
   val InvalidStringEscapeMarker: String = "\\<esc>"
 
+  /** Sentinel `found` images for an integer literal whose value overflows the range its
+   *  suffix (or lack of one) selects (issue #2257): the range check threw the parser's bare
+   *  give-up signal with no expected-token information, so error recovery fell back to
+   *  whatever token followed the literal and reported a content-free "expecting valid
+   *  token" instead of naming the type and the fix (add/drop a suffix). One marker per
+   *  suffix, since each needs a different message. */
+  val IntLiteralOutOfRangeMarker: String = "<int-lit-range>"
+  val LongLiteralOutOfRangeMarker: String = "<long-lit-range>"
+  val ByteLiteralOutOfRangeMarker: String = "<byte-lit-range>"
+  val ShortLiteralOutOfRangeMarker: String = "<short-lit-range>"
+
   private val theFail = new Fail(null)
   private val debug = java.lang.Boolean.getBoolean("onion.parser.debug")
 
@@ -239,6 +250,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private var furthestPos = -1        // buffer index of the deepest failure seen so far
   private var furthestLine = -1       // beginLine/beginColumn/image of the token at furthestPos,
   private var furthestColumn = -1     // raw (un-adjusted by lineBase/colBase) -- see deepestFailure()
+  private var furthestAdjusted = false // furthestLine/Column already include lineBase/colBase (adoptFailure)
   private var furthestFoundImage: String = null
   private val expectedKinds = new java.util.LinkedHashSet[Integer]()
 
@@ -251,6 +263,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       furthestPos = pos
       furthestLine = t.beginLine
       furthestColumn = t.beginColumn
+      furthestAdjusted = false
       furthestFoundImage = t.image
       expectedKinds.clear()
       expectedKinds.add(k)
@@ -269,7 +282,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     if (furthestFoundImage == null) None
     else {
       val loc =
-        if (lineBase == 0 && colBase == 0) Location(furthestLine, furthestColumn)
+        if (furthestAdjusted || (lineBase == 0 && colBase == 0)) Location(furthestLine, furthestColumn)
         else {
           val bc = if (furthestLine == 1) furthestColumn + colBase else furthestColumn
           Location(furthestLine + lineBase, bc)
@@ -280,12 +293,16 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   /** Force a specific diagnostic as this parser's furthest failure, position comparison aside:
    *  the caller knows better than the deepest-reach heuristic — a string-interpolation
    *  sub-parser's own diagnostic, or a slip reported at an already-consumed token (the
-   *  no-arrow trailing-lambda cases are anchored to their `{`, as the grammar does). */
+   *  no-arrow trailing-lambda cases are anchored to their `{`, as the grammar does).
+   *  `loc` is a position in the enclosing file (already lineBase/colBase-adjusted, as `p()`
+   *  and a sub-parser's `deepestFailure()` give it), so `deepestFailure()` must not shift it
+   *  again: shifting it once per nesting level reported a line-6 error on line 11 (#2303). */
   private def adoptFailure(loc: Location, foundImage: String, kinds: java.util.LinkedHashSet[Integer]): Unit = {
     if (speculating > 0) return
     furthestPos = pos
     furthestLine = loc.line
     furthestColumn = loc.column
+    furthestAdjusted = true
     furthestFoundImage = foundImage
     expectedKinds.clear()
     expectedKinds.addAll(kinds)
@@ -329,6 +346,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     furthestPos = -1
     furthestLine = -1
     furthestColumn = -1
+    furthestAdjusted = false
     furthestFoundImage = null
     expectedKinds.clear()
   }
@@ -2124,7 +2142,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     var going = true
     while (going) kind(1) match {
       case K.PLUS => next(); eols(); val e2 = unaryPrefix(); e1 = AST.Addition(span(e1, e2), e1, e2)
-      case K.MINUS => next(); eols(); val e2 = unaryPrefix(); e1 = AST.Subtraction(span(e1, e2), e1, e2)
+      case K.MINUS => unaryMinus = null; next(); eols(); val e2 = unaryPrefix(); e1 = AST.Subtraction(span(e1, e2), e1, e2)
       case _ => going = false
     }
     e1
@@ -2132,7 +2150,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def unaryPrefix(): AST.Expression = kind(1) match {
     case K.PLUS => val t = next(); AST.Posit(p(t), unaryPrefix())
-    case K.MINUS => val t = next(); AST.Negate(p(t), unaryPrefix())
+    case K.MINUS => val t = next(); unaryMinus = t; AST.Negate(p(t), requireBareMinMagnitude(t, unaryPrefix()))
     case K.NOT => val t = next(); AST.Not(p(t), unaryPrefix())
     case K.BN => val t = next(); AST.BitNot(p(t), unaryPrefix())
     case _ => multitive()
@@ -2152,7 +2170,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def mulOperand(): AST.Expression = kind(1) match {
     case K.PLUS => val t = next(); AST.Posit(p(t), mulOperand())
-    case K.MINUS => val t = next(); AST.Negate(p(t), mulOperand())
+    case K.MINUS => val t = next(); unaryMinus = t; AST.Negate(p(t), requireBareMinMagnitude(t, mulOperand()))
     case K.NOT => val t = next(); AST.Not(p(t), mulOperand())
     case K.BN => val t = next(); AST.BitNot(p(t), mulOperand())
     case _ => primarySuffix()
@@ -2677,9 +2695,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   }
 
   private def doClause(): Any = {
-    if (kind(1) == K.K_RET) {
+    if (kind(1) == K.K_YIELD) {
       val t = next(); eols()
-      return AST.RetStatement(p(t), term())
+      return AST.YieldStatement(p(t), term())
     }
     if (isId(kind(1)) && looksLike { id(); eols(); expect(K.LARROW) }) {
       val t = id(); eols(); expect(K.LARROW); eols()
@@ -2724,19 +2742,79 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   // ---------------------------------------------------------------- literals
 
+  /** The `-` of the innermost unary minus parsed so far; see the grammar's `unaryMinus`. */
+  private var unaryMinus: Token = null
+
+  /** The minimum-value magnitude last accepted right after a `-`: that `-`, the literal's
+   *  token and the literal. See the grammar's `requireBareMinMagnitude`. */
+  private var minMagnitudeMinus: Token = null
+  private var minMagnitudeToken: Token = null
+  private var minMagnitudeLiteral: AST.Expression = null
+
+  /** The magnitude is only valid as the whole operand of the `-` before it. Postfix `as`,
+   *  `.m()` and `*`/`/`/`%` bind tighter than prefix `-`, so `-2147483648 as Long` would
+   *  negate a cast of the already-wrapped minimum value (#2296). */
+  private def requireBareMinMagnitude(minus: Token, operand: AST.Expression): AST.Expression = {
+    if ((minMagnitudeMinus eq minus) && !(operand eq minMagnitudeLiteral)) {
+      val t = minMagnitudeToken
+      val marker =
+        if (t.image.endsWith("L")) LongLiteralOutOfRangeMarker
+        else if (t.image.endsWith("B")) ByteLiteralOutOfRangeMarker
+        else if (t.image.endsWith("S")) ShortLiteralOutOfRangeMarker
+        else IntLiteralOutOfRangeMarker
+      val at = p(t)
+      adoptFailure(Location(at.line, at.column), marker, new java.util.LinkedHashSet[Integer]())
+      throw fail
+    }
+    operand
+  }
+
   private def integerLiteral(): AST.Expression = {
+    val prev = last
     val t = expect(K.INTEGER)
+    val negated = unaryMinus != null && (prev eq unaryMinus)
     val s = t.image.replace("_", "")
-    if (s.endsWith("B")) {
-      val iv = parseIntLiteral(s.substring(0, s.length - 1))
-      if (iv < -128 || iv > 255) throw fail
-      AST.ByteLiteral(p(t), iv.toByte)
-    } else if (s.endsWith("S")) {
-      val iv = parseIntLiteral(s.substring(0, s.length - 1))
-      if (iv < -32768 || iv > 65535) throw fail
-      AST.ShortLiteral(p(t), iv.toShort)
-    } else if (s.endsWith("L")) AST.LongLiteral(p(t), parseLongLiteral(s.substring(0, s.length - 1)))
-    else AST.IntegerLiteral(p(t), parseIntLiteral(s))
+    val noKinds = new java.util.LinkedHashSet[Integer]()
+    try {
+      if (s.endsWith("B") || s.endsWith("S")) {
+        // See the grammar's integer_literal: signed range for decimal, bit pattern for
+        // binary/hex, and the minimum's magnitude only as the bare operand of a `-` (#2316).
+        val isByte = s.endsWith("B")
+        val max = if (isByte) 127 else 32767
+        val iv = parseIntLiteral(s.substring(0, s.length - 1))
+        val radix = s.startsWith("0x") || s.startsWith("0X") || s.startsWith("0b")
+        val minMagnitude = !radix && iv == max + 1
+        if (iv < 0 || iv > (if (radix) 2 * max + 1 else max + 1) || (minMagnitude && !negated)) throw theFail
+        val lit = if (isByte) AST.ByteLiteral(p(t), iv.toByte) else AST.ShortLiteral(p(t), iv.toShort)
+        if (minMagnitude) { minMagnitudeMinus = unaryMinus; minMagnitudeToken = t; minMagnitudeLiteral = lit }
+        lit
+      } else if (s.endsWith("L")) {
+        val lv = parseLongLiteral(s.substring(0, s.length - 1))
+        if (lv == Long.MinValue && !s.startsWith("0") && !negated) throw theFail
+        val lit = AST.LongLiteral(p(t), lv)
+        if (lv == Long.MinValue && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeToken = t; minMagnitudeLiteral = lit }
+        lit
+      } else {
+        val iv = parseIntLiteral(s)
+        if (iv == Integer.MIN_VALUE && !s.startsWith("0") && !negated) throw theFail
+        val lit = AST.IntegerLiteral(p(t), iv)
+        if (iv == Integer.MIN_VALUE && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeToken = t; minMagnitudeLiteral = lit }
+        lit
+      }
+    } catch {
+      case _: Fail =>
+        // The value didn't fit -- not a wrong token, so give the range check's own
+        // diagnostic (naming the type and the fix) instead of the deepest-reach
+        // heuristic, which would otherwise blame whatever token follows the literal.
+        val marker =
+          if (s.endsWith("B")) ByteLiteralOutOfRangeMarker
+          else if (s.endsWith("S")) ShortLiteralOutOfRangeMarker
+          else if (s.endsWith("L")) LongLiteralOutOfRangeMarker
+          else IntLiteralOutOfRangeMarker
+        val at = p(t)
+        adoptFailure(Location(at.line, at.column), marker, noKinds)
+        throw fail
+    }
   }
 
   private def floatLiteral(): AST.Expression = {

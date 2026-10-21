@@ -9,7 +9,7 @@ def main(): void {
   val data: List[Object] = do[List] {
     x <- [1, 2]
     y <- [3, 4]
-    ret [x, y]
+    yield [x, y]
   }
   val r = data.filter { pair ->
     val x = (pair as List[Object])[0] as Int

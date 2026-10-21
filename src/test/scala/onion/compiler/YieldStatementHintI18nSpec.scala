@@ -29,8 +29,22 @@ class YieldStatementHintI18nSpec extends AnyFunSpec with Diagrams {
     assert(text != en.getString(key))
   }
 
-  it("fires for a JavaScript/Python-style prefix `yield expr` statement") {
+  private def compileErrors(src: String): String = {
     val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
+      case _ => ""
+    }
+  }
+
+  // Both bundles' yield hint spells `do[M]`; neither reserved-word hint does.
+  private def assertYieldHint(msgs: String): Unit = {
+    assert(msgs.contains("do[M]"), s"expected the do-block hint, got: $msgs")
+    assert(!msgs.contains("backticks") && !msgs.contains("バッククォート"),
+      s"`yield expr` must not be told to escape `yield` with backticks, got: $msgs")
+  }
+
+  it("fires for a JavaScript/Python-style prefix `yield expr` statement") {
     val src =
       """
         |class Main {
@@ -40,13 +54,116 @@ class YieldStatementHintI18nSpec extends AnyFunSpec with Diagrams {
         |  }
         |}
         |""".stripMargin
-    val msgs = new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
-      case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
-      case _ => ""
-    }
+    val msgs = compileErrors(src)
     // The hint text is identical in both bundles' relevant markers, so this
     // assertion holds regardless of the JVM's default locale.
     assert(msgs.contains("List"), s"expected the hint's `List` suggestion, got: $msgs")
     assert(!msgs.contains("yield(...)"), s"the misleading missing-call-parens fallback should not fire, got: $msgs")
+  }
+
+  // #2300: the hint used to need `yield` to start its source line.
+  it("fires for `yield expr` in a one-line block body") {
+    assertYieldHint(compileErrors("def f(): Int { yield 1 }\n"))
+  }
+
+  it("fires for `yield expr` in a trailing-lambda body") {
+    assertYieldHint(compileErrors("val xs = [1, 2].map { x -> yield x * 2 }\n"))
+  }
+
+  it("keeps the backtick hint for `yield` used as a name") {
+    val msgs = compileErrors("val yield = 1\n")
+    assert(msgs.contains("backticks") || msgs.contains("バッククォート"), s"expected the reserved-word hint, got: $msgs")
+    assert(!msgs.contains("do[M]"), s"a name is not a `yield expr` statement, got: $msgs")
+  }
+
+  private def assertBacktickHint(msgs: String): Unit = {
+    assert(msgs.contains("backticks") || msgs.contains("バッククォート"), s"expected the reserved-word hint, got: $msgs")
+    assert(!msgs.contains("do[M]"), s"`yield` used as a name must not get the do-block hint, got: $msgs")
+  }
+
+  // #2315 panel: a name followed by `->`, a closing token or an infix operator.
+  it("keeps the backtick hint for `yield` as a lambda parameter") {
+    assertBacktickHint(compileErrors("val xs = [1, 2].map { yield -> yield * 2 }\n"))
+  }
+
+  it("keeps the backtick hint for `yield` as an operand") {
+    assertBacktickHint(compileErrors("val r = 1 + yield + 2\n"))
+  }
+
+  it("keeps the backtick hint for `yield` before a closing token") {
+    assertBacktickHint(compileErrors("def f(): Int { return yield }\n"))
+  }
+
+  // #2315 panel, second round: a line-final name, a word operator, and a
+  // token that cannot start an expression after `yield`.
+  it("keeps the backtick hint for `yield` at the end of a line") {
+    assertBacktickHint(compileErrors("val r = yield\nprintln(r)\n"))
+  }
+
+  it("keeps the backtick hint for `yield` before `as`, `is` or `in`") {
+    assertBacktickHint(compileErrors("val c = yield as String\n"))
+    assertBacktickHint(compileErrors("val c = yield is String\n"))
+    assertBacktickHint(compileErrors("foreach yield in [1, 2] { println(yield) }\n"))
+  }
+
+  it("keeps the backtick hint for `yield` before `{`, `..` or `^`") {
+    assertBacktickHint(compileErrors("if yield { println(1) }\n"))
+    assertBacktickHint(compileErrors("select yield { else: println(1) }\n"))
+    assertBacktickHint(compileErrors("val r = yield .. 10\n"))
+    assertBacktickHint(compileErrors("val r = yield ^ 1\n"))
+  }
+
+  // #2315 panel, third round: any keyword that cannot start an expression
+  // after `yield`, and `yield` named by a declaration.
+  it("keeps the backtick hint for `yield` before `extends`, `conforms` or `when`") {
+    assertBacktickHint(compileErrors("class yield extends Object {}\n"))
+    assertBacktickHint(compileErrors("class yield conforms Runnable { public: def run(): void {} }\n"))
+    assertBacktickHint(compileErrors("class B[yield extends Object] {}\n"))
+    assertBacktickHint(compileErrors("select 1 { case yield when true: println(1) }\n"))
+  }
+
+  it("keeps the backtick hint for `yield` right after a declaration keyword") {
+    assertBacktickHint(compileErrors("class yield Foo {}\n"))
+    assertBacktickHint(compileErrors("val yield x = 1\n"))
+  }
+
+  // #2315 panel, fourth round: where only a name can follow (after `.`, `::` or
+  // `new`), `yield` is a name even when a space and `(` follow it.
+  it("keeps the backtick hint for `yield` after `.`, `::` or `new`") {
+    assertBacktickHint(compileErrors(
+      "class K { public: def this {}  def `yield`(): String = \"y\" }\nval k = new K()\nprintln(k.yield ())\n"))
+    assertBacktickHint(compileErrors(
+      "class K { public: static def `yield`(n: Int): Int = n + 1 }\nprintln(K::yield (1))\n"))
+    assertBacktickHint(compileErrors(
+      "class `yield` { public: def this {} }\nval y = new yield ()\n"))
+  }
+
+  it("still gives the do-block hint for `yield` before an expression keyword") {
+    assertYieldHint(compileErrors("def f(): Object { yield new Object() }\n"))
+    assertYieldHint(compileErrors("def f(): Boolean { yield true }\n"))
+  }
+
+  it("still gives the do-block hint for `yield -1` and `yield (1)`") {
+    assertYieldHint(compileErrors("def f(): Int { yield -1 }\n"))
+    assertYieldHint(compileErrors("def f(): Int { yield (1) }\n"))
+  }
+
+  // #2315 panel (15:16): where no expression can start, `yield` cannot begin one.
+  it("keeps the backtick hint for `yield` in an import path") {
+    assertBacktickHint(compileErrors("import { java.util.yield (x) }\n"))
+    assertBacktickHint(compileErrors("import { java.util.yield 1 }\n"))
+  }
+
+  it("gives no do-block hint for `yield` where only `)` fits") {
+    for (src <- Seq(
+      "def f(yield x: Int): Int = 1\n",
+      "record R(yield x: Int)\n",
+      "record R(x: Int)\nselect new R(1) { case R(yield x): println(1) }\n",
+      "val f: (yield x) -> Int = null\n"
+    )) {
+      val msgs = compileErrors(src)
+      assert(msgs.nonEmpty, s"expected a syntax error for: $src")
+      assert(!msgs.contains("do[M]"), s"no expression can start here, got: $msgs")
+    }
   }
 }

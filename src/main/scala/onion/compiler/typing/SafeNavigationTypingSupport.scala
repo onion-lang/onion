@@ -141,7 +141,7 @@ private[compiler] final class SafeNavigationTypingSupport(
         val classSubst = TypeSubstitution.hierarchySubstitution(targetType, method.affiliation)
         calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs),
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
             finalParams => new SafeCall(node.location, target, method, finalParams)
           )
         }

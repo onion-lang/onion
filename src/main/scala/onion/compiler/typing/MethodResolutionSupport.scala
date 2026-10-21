@@ -31,7 +31,19 @@ private[compiler] final class MethodResolutionSupport(
         val ownerSubst = ownerViewSubst(method)
         var i = 0
         while i < args.length do
-          substituted(i) = TypeSubstitution.substituteType(args(i), ownerSubst, emptySubst, defaultToBound = true)
+          // Leave a class type parameter with no concrete substitution (a
+          // same-class self-call, `ownerSubst` empty) as the variable itself
+          // rather than collapsing it to its declared bound. Collapsing made
+          // `set(v: T)` inside `[B, T extends B, U extends B]` effectively
+          // check the *bound* B against an argument's type, so a sibling
+          // `U extends B` -- never actually assignable to T -- matched by
+          // coincidentally sharing that same bound (#2259 review repro,
+          // reproduced at runtime as a ClassCastException). Matching against
+          // T itself lets isSuperType's identity-aware chain walk tell "the
+          // argument's chain passes through T" apart from "both happen to
+          // share a bound", exactly as it already does for a direct
+          // assignment or return.
+          substituted(i) = TypeSubstitution.substituteType(args(i), ownerSubst, emptySubst, defaultToBound = false)
           i += 1
         substituted
       }

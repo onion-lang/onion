@@ -191,7 +191,7 @@ def eloGapStr(ga: GameAnalytics, nameA: String, nameB: String): Option[String] =
   do[Option] {
     sa <- toOpt(ga.findStats(nameA))
     sb <- toOpt(ga.findStats(nameB))
-    ret "#{nameA} vs #{nameB}: gap = #{(sa.elo() - sb.elo()).fmt2()} ELO"
+    yield "#{nameA} vs #{nameB}: gap = #{(sa.elo() - sb.elo()).fmt2()} ELO"
   }
 
 // ─── Demo ─────────────────────────────────────────────────────────────────────

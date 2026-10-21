@@ -235,7 +235,7 @@ val weeks:    List[Int]    = [1, 2, 3]
 val assignments: List[String] = do[List] {
   proj <- projects
   week <- weeks
-  ret "Week " + week + " [" + proj + "]"
+  yield "Week " + week + " [" + proj + "]"
 }
 foreach a: String in assignments.take(6) {
   IO::println("  " + a)

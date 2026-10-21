@@ -1493,6 +1493,13 @@ object TypedAST {
   trait Method extends MemberRef {
     def affiliation: TypedAST.ClassType
 
+    /** Whether this method is declared in a Java class (loaded from a class file or via
+     *  reflection), as opposed to an Onion-declared method. A Java method's parameter
+     *  nullness is unknown (the "platform type" dilemma, #132), so callers that rely on
+     *  this to decide whether a diagnostic applies should treat it the same way as a
+     *  Java type variable's `Nullability.Platform`. */
+    def isJavaOrigin: Boolean = false
+
     def arguments: Array[TypedAST.Type]
 
     /** Parameter count without requiring callers to request a defensive array copy. */
@@ -1826,6 +1833,29 @@ object TypedAST {
         case _ => // continue with normal logic
       }
 
+      // A type variable's own bound can itself be another type variable
+      // (`[B, T extends B]`) -- a genuine multi-level chain. Only THIS
+      // specific shape takes the identity-aware chain walk; an ordinary
+      // single-level type variable (whose own bound is already a concrete
+      // class/interface -- the overwhelming majority of type variables in
+      // the codebase, including every generic *method* type parameter
+      // used in extension-method overload resolution) falls straight
+      // through to the pre-existing one-level unwrap below, UNCHANGED.
+      // Widening this check to every type variable regressed Sets::map/
+      // filter chaining: two method type parameters are, correctly,
+      // distinct object instances per call site, so an identity match can
+      // never succeed for them, and the stricter rejection broke a case
+      // that was never about chained class bounds at all. Gating on
+      // "right's own immediate bound is itself a type variable" scopes
+      // the new behavior to exactly the shape #2259 is about, leaving
+      // every single-level case bit-for-bit as it was before this fix.
+      right match {
+        case rtv: TypedAST.TypeVariableType if rtv.upperBound.isInstanceOf[TypedAST.TypeVariableType] =>
+          return rightVariableChainAccepts(left, rtv)
+        case rw: TypedAST.WildcardType if rw.upperBound.isInstanceOf[TypedAST.TypeVariableType] =>
+          return rightVariableChainAccepts(left, rw.upperBound)
+        case _ => // an ordinary single-level variable, a wildcard, or already concrete; continue below
+      }
       val l = left match {
         case tv: TypedAST.TypeVariableType => tv.upperBound
         case w: TypedAST.WildcardType => w.upperBound
@@ -1867,6 +1897,49 @@ object TypedAST {
     }
 
     def isAssignable(left: TypedAST.Type, right: TypedAST.Type): Boolean = isSuperType(left, right)
+
+    /**
+     * Like isSuperType, but never falls back to comparing erased classes:
+     * for callers that already know `left` is still abstract (an
+     * unresolved type variable whose own value isn't fixed yet -- e.g. a
+     * bound substituted from an enclosing, not-yet-instantiated generic
+     * context, as in `new Holder[P, Q](q)` inside `class Mk[P, Q]`), only
+     * genuine identity through `right`'s own bound chain can prove the
+     * relationship; two otherwise-unrelated variables must not pass just
+     * because they erase to the same root class (#2259 review repro).
+     * `isSuperType`'s own chain walk already does this once `right`'s own
+     * bound is itself another type variable (a declared, multi-level
+     * chain); this is the same walk, usable directly when `right` may be
+     * an ordinary, single-level variable instead.
+     */
+    def isSuperTypeByIdentity(left: TypedAST.Type, right: TypedAST.Type): Boolean = rightVariableChainAccepts(left, right)
+
+    /**
+     * Walks a type variable's own bound chain (the `right` side of
+     * isSuperType, which started out as a type variable) looking for a
+     * link that *is* `left` by identity. Bounds are acyclic by
+     * construction (`createTypeParams` builds this graph bottom-up, so it
+     * cannot cycle back on itself even for a mutually-referencing
+     * declaration), so this always terminates. Once the chain reaches a
+     * concrete type without ever matching `left`, `left` being itself
+     * still an unrelated, unresolved type variable must not be accepted
+     * just because its own erased bound happens to coincide with this
+     * chain's -- that erasure-equality shortcut is exactly #2259's
+     * unsoundness; `left` being concrete defers to the ordinary check.
+     */
+    private def rightVariableChainAccepts(left: TypedAST.Type, right: TypedAST.Type): Boolean = {
+      right match {
+        case rtv: TypedAST.TypeVariableType =>
+          (rtv eq left) || rightVariableChainAccepts(left, rtv.upperBound)
+        case rw: TypedAST.WildcardType =>
+          (rw eq left) || rightVariableChainAccepts(left, rw.upperBound)
+        case concrete =>
+          left match {
+            case _: TypedAST.TypeVariableType | _: TypedAST.WildcardType => false
+            case _ => isSuperType(left, concrete)
+          }
+      }
+    }
 
     private def isSuperTypeForArray(left: TypedAST.ArrayType, right: TypedAST.ArrayType): Boolean = {
       val lb = left.base

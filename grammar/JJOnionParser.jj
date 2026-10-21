@@ -436,7 +436,7 @@ public class JJOnionParser implements Parser {
     KW.put("Char", K_CHAR);
     KW.put("class", K_CLASS);
     KW.put("record", K_RECORD);
-    KW.put("ret", K_RET);
+    KW.put("yield", K_YIELD);
     KW.put("const", K_CONST);
     KW.put("continue", K_CONTINUE);
     KW.put("def", K_DEF);
@@ -768,6 +768,31 @@ public class JJOnionParser implements Parser {
    */
   private static String chop(String s) {
     return s.substring(0, s.length() - 1);
+  }
+
+  // The `-` token of the innermost unary minus parsed so far. 2147483648 (and
+  // 9223372036854775808L) is accepted only right after it: the magnitude of the minimum
+  // value, so `-2147483648` parses; anywhere else it would wrap to the minimum (#2296).
+  private Token unaryMinus;
+
+  private boolean followsUnaryMinus(Token t) {
+    return unaryMinus != null && unaryMinus.next == t;
+  }
+
+  // The minimum-value magnitude last accepted right after a `-`, and that `-`.
+  private Token minMagnitudeMinus;
+  private AST.Expression minMagnitudeLiteral;
+
+  // The magnitude is only valid as the whole operand of the `-` before it. Postfix `as`,
+  // `.m()` and `*`/`/`/`%` bind tighter than prefix `-`, so `-2147483648 as Long` would
+  // negate a cast of the already-wrapped minimum value (#2296).
+  private void requireBareMinMagnitude(Token minus, AST.Expression operand) throws ParseException {
+    if (minMagnitudeMinus == minus && operand != minMagnitudeLiteral) {
+      String s = minus.next.image;
+      String kind = s.endsWith("L") ? "long literal out of range: " : s.endsWith("B") ? "byte literal out of range: "
+        : s.endsWith("S") ? "short literal out of range: " : "integer literal out of range for Int: ";
+      throw new ParseException(kind + s);
+    }
   }
 
   // Parse an int literal without ever throwing an unchecked exception (which would
@@ -1170,7 +1195,7 @@ TOKEN:
 | <K_CHAR:         "Char"  >
 | <K_CLASS:        "class"        >
 | <K_RECORD:       "record"       >
-| <K_RET:          "ret"          >
+| <K_YIELD:        "yield"        >
 | <K_CONST:        "const"        >
 | <K_CONTINUE:     "continue"    >
 | <K_DEF:          "def"          >
@@ -2819,7 +2844,7 @@ AST.Expression additive() :{Token t; AST.Expression e1, e2;}{
 
 AST.Expression unary_prefix() :{Token t; AST.Expression e;}{
 ( t="+" e=unary_prefix() {e = new AST.Posit(p(t), e);}
-| t="-" e=unary_prefix() {e = new AST.Negate(p(t), e);}
+| t="-" {unaryMinus = t;} e=unary_prefix() {requireBareMinMagnitude(t, e); e = new AST.Negate(p(t), e);}
 | t="!" e=unary_prefix() {e = new AST.Not(p(t), e);}
 | t=<BN> e=unary_prefix() {e = new AST.BitNot(p(t), e);}
 | LOOKAHEAD({ true }) e=multitive()
@@ -2842,7 +2867,7 @@ AST.Expression multitive() :{Token t; AST.Expression e1, e2;}{
 // primary_suffix rather than recursing to multitive, keeping *, /, % left-associative.
 AST.Expression mul_operand() :{Token t; AST.Expression e;}{
 ( t="+" e=mul_operand() {e = new AST.Posit(p(t), e);}
-| t="-" e=mul_operand() {e = new AST.Negate(p(t), e);}
+| t="-" {unaryMinus = t;} e=mul_operand() {requireBareMinMagnitude(t, e); e = new AST.Negate(p(t), e);}
 | t="!" e=mul_operand() {e = new AST.Not(p(t), e);}
 | t=<BN> e=mul_operand() {e = new AST.BitNot(p(t), e);}
 | e=primary_suffix()
@@ -3140,7 +3165,7 @@ AST.ClosureExpression arrow_anonymous_function() :{
   )
 }
 
-// Do notation: do[M] { x <- e1; y <- e2; ret e3 }
+// Do notation: do[M] { x <- e1; y <- e2; yield e3 }
 AST.DoExpression do_expression() :{
   Token t;
   AST.TypeNode monadType;
@@ -3172,9 +3197,9 @@ Object do_clause() :{
   String name;
   AST.Expression e;
 }{
-  // ret expr (return statement in do notation)
-  LOOKAHEAD("ret")
-    t="ret" eols() e=term() { return new AST.RetStatement(p(t), e); }
+  // yield expr (the final value of a do block)
+  LOOKAHEAD("yield")
+    t="yield" eols() e=term() { return new AST.YieldStatement(p(t), e); }
   // x <- expr (binding)
 | LOOKAHEAD(id() eols() <LARROW>)
     t=id() eols() <LARROW> eols() e=term() { return new AST.DoBinding(p(t), c(t), e); }
@@ -3235,18 +3260,33 @@ AST.Expression null_literal() :{Token t;}{
 AST.Expression integer_literal() :{Token t; String s;}{
   t=<INTEGER> {
     s = t.image.replace("_", "");
-    if(s.endsWith("B")){
+    if(s.endsWith("B") || s.endsWith("S")){
+      // A decimal literal fits the signed range, its minimum's magnitude only right after
+      // a `-` (as for Int); a binary or hex one may spell the whole bit pattern (#2316).
+      boolean isByte = s.endsWith("B");
+      int max = isByte ? 127 : 32767;
       int iv = parseIntLiteral(chop(s));
-      if (iv < -128 || iv > 255) throw new ParseException("byte literal out of range: " + s);
-      return new AST.ByteLiteral(p(t), (byte) iv);
-    }else if(s.endsWith("S")){
-      int iv = parseIntLiteral(chop(s));
-      if (iv < -32768 || iv > 65535) throw new ParseException("short literal out of range: " + s);
-      return new AST.ShortLiteral(p(t), (short) iv);
+      boolean radix = s.startsWith("0x") || s.startsWith("0X") || s.startsWith("0b");
+      boolean minMagnitude = !radix && iv == max + 1;
+      if (iv < 0 || iv > (radix ? 2 * max + 1 : max + 1) || (minMagnitude && !followsUnaryMinus(t)))
+        throw new ParseException((isByte ? "byte" : "short") + " literal out of range: " + s);
+      AST.Expression lit = isByte ? new AST.ByteLiteral(p(t), (byte) iv) : new AST.ShortLiteral(p(t), (short) iv);
+      if (minMagnitude) { minMagnitudeMinus = unaryMinus; minMagnitudeLiteral = lit; }
+      return lit;
     }else if(s.endsWith("L")){
-      return new AST.LongLiteral(p(t), parseLongLiteral(chop(s)));
+      long lv = parseLongLiteral(chop(s));
+      if (lv == Long.MIN_VALUE && !s.startsWith("0") && !followsUnaryMinus(t))
+        throw new ParseException("long literal out of range: " + s);
+      AST.Expression lit = new AST.LongLiteral(p(t), lv);
+      if (lv == Long.MIN_VALUE && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeLiteral = lit; }
+      return lit;
     }else{
-      return new AST.IntegerLiteral(p(t), parseIntLiteral(s));
+      int iv = parseIntLiteral(s);
+      if (iv == Integer.MIN_VALUE && !s.startsWith("0") && !followsUnaryMinus(t))
+        throw new ParseException("integer literal out of range for Int: " + s);
+      AST.Expression lit = new AST.IntegerLiteral(p(t), iv);
+      if (iv == Integer.MIN_VALUE && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeLiteral = lit; }
+      return lit;
     }
   }
 }

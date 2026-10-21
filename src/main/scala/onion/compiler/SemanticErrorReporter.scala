@@ -117,6 +117,10 @@ class SemanticErrorReporter(threshold: Int) {
         Some(message("suggestion.jsTemplateLiteral"))
       } else if (name == ConsoleObjectName) {
         Some(message("suggestion.jsConsoleLog"))
+      } else if (name == "ret") {
+        // The pre-1.0 do-notation keyword: `ret e` now reads as an unknown variable `ret`
+        // followed by `e`, so name the new spelling instead of a similar-name guess.
+        Some(message("suggestion.retRenamedToYield"))
       } else if (items.length > 2 && items(2) != null) {
         Some(format(message("suggestion.didYouMean"), Seq(asString(items(2)))))
       } else if (items.length > 1) {
@@ -423,6 +427,35 @@ class SemanticErrorReporter(threshold: Int) {
   }
 
   /** Whether `t` is `java.util.List` or a class implementing it. */
+  /** Whether `toArray(new C[0])` can store every element of the List `list` into `arrayType`
+   *  (#2305): `List[Int]` into `String[]` compiles but throws ArrayStoreException. An element
+   *  type that cannot be determined gives the snippet the benefit of the doubt. */
+  private def listElementsFit(list: TypedAST.Type, arrayType: TypedAST.ArrayType): Boolean = {
+    val element: Option[TypedAST.Type] = list match
+      case n: TypedAST.NullableType => listElementType(n.innerType)
+      case other => listElementType(other)
+    element match
+      case None => true
+      case Some(e) if arrayType.dimension == 1 => argPassable(arrayType.component, e)
+      case Some(e) =>
+        def strip(t: TypedAST.Type): TypedAST.Type = t match
+          case n: TypedAST.NullableType => n.innerType
+          case other => other
+        strip(e) match
+          case ea: TypedAST.ArrayType if ea.dimension == arrayType.dimension - 1 =>
+            if (arrayType.component.isBasicType || ea.component.isBasicType) ea.component == arrayType.component
+            else TypedAST.TypeRules.isSuperType(arrayType.component, ea.component)
+          case _ => false
+  }
+
+  private def listElementType(t: TypedAST.Type): Option[TypedAST.Type] = t match
+    case ct: TypedAST.ClassType =>
+      onion.compiler.typing.AppliedTypeViews.collectAppliedViewsFrom(ct).collectFirst {
+        case (raw, applied) if raw.name == "java.util.List" && applied.typeArguments.length == 1 =>
+          applied.typeArguments.head
+      }
+    case _ => None
+
   private def isListType(t: TypedAST.Type): Boolean = {
     def loop(ct: TypedAST.ClassType, seen: Set[String]): Boolean =
       if (ct == null) false
@@ -666,7 +699,18 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportIncompatibleType(position: Location, items: Array[AnyRef]): Unit = {
     val expected = items(0).asInstanceOf[TypedAST.Type]
     val actual = items(1).asInstanceOf[TypedAST.Type]
-    val baseMessage = format(message("error.semantic.incompatibleType"), Seq(typeName(expected), typeName(actual)))
+    // `(list as String[])`/`(arr as List[String])`: a List can never be an array at
+    // runtime (#2258), so the generic message's "consider a cast" is actively wrong here.
+    val listArrayCast: Option[(TypedAST.ArrayType, Boolean)] =
+      if (expected.isInstanceOf[TypedAST.ArrayType] && isListType(actual))
+        Some((expected.asInstanceOf[TypedAST.ArrayType], true))
+      else if (isListType(expected) && actual.isInstanceOf[TypedAST.ArrayType])
+        Some((actual.asInstanceOf[TypedAST.ArrayType], false))
+      else None
+    val baseMessage = format(
+      message(if (listArrayCast.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      Seq(typeName(expected), typeName(actual))
+    )
     val hint =
       if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
@@ -674,7 +718,26 @@ class SemanticErrorReporter(threshold: Int) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
         // nested class does not restore the scrutinee's type arguments, a pattern does.
         Some(format(message("suggestion.castLosesTypeArguments"), Seq(typeName(actual))))
-      } else None
+      } else listArrayCast match {
+        case Some((arrayType, isListToArray)) =>
+          // `toArray`/`Colls::toList` are generic over a reference-typed array -- a true
+          // 1-D primitive array (`Int[]`) has no such overload, so naming either call
+          // would hand back a different error (#2260 review). An outer dimension's
+          // elements are themselves a reference type (arrays are objects), so only the
+          // 1-D primitive case has no one-line fix.
+          if (arrayType.dimension == 1 && arrayType.component.isBasicType) None
+          else if (isListToArray && !listElementsFit(actual, arrayType)) None
+          else if (isListToArray) {
+            // Onion has no jagged-array syntax (`new Int[0][]` is a syntax error); a fully
+            // sized `new Int[0][0]` compiles and is just as empty, since the outer (size-0)
+            // dimension is the only one that matters to `toArray`.
+            val emptyArrayLiteral = typeName(arrayType.component) + ("[0]" * arrayType.dimension)
+            Some(format(message("suggestion.listAsArrayCast"), Seq(emptyArrayLiteral)))
+          } else {
+            Some(message("suggestion.arrayAsListCast"))
+          }
+        case None => None
+      }
     problem(position, appendSuggestion(baseMessage, hint))
   }
 

@@ -271,6 +271,19 @@ Losslessness is a claim, not a default: `isLossless()` answers honestly, a lossy
 refuses `parseLossless` instead of pretending with an empty residue, and a residue is
 only accepted by the shape that produced it.
 
+A `String` value in a config file follows one rule: text in double quotes is taken
+literally, anything else is trimmed. `print` quotes a value only when it needs it (padded,
+or starting with `"`), so an L1 round trip never loses a space:
+
+| In the file | Reads as |
+|---|---|
+| `name = "Alice"` | `Alice` |
+| `name =   Alice  ` | `Alice` |
+| `name = "  Alice  "` | `  Alice  ` |
+
+Inside the quotes, `\"` is a quote and `\\` a backslash; any other backslash stays as it
+is. A quoted value with no closing `"`, or a bare `"` inside, is a `Defect` on its line.
+
 ### Editing a file through the lens
 
 `Lossless` is a lens: `edit` focuses an update on the value, `render` reassembles the

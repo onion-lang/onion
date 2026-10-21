@@ -38,13 +38,13 @@ private[compiler] final class AssignabilitySupport(
     }
   }
 
-  def processAssignable(node: AST.Node, expected: Type, actual: Term): Term = {
+  def processAssignable(node: AST.Node, expected: Type, actual: Term, suppressNullWarning: Boolean = false): Term = {
     if (actual == null) return null
     // Target-type an empty collection literal ([] / [:]) to the expected
     // collection type, then proceed normally (so `foo([])` binds [] to the
     // parameter's element type instead of the default Object).
     val retyped = retypeEmptyCollectionLiteral(expected, actual)
-    if (retyped ne actual) return processAssignable(node, expected, retyped)
+    if (retyped ne actual) return processAssignable(node, expected, retyped, suppressNullWarning)
     if (actual.`type`.isBottomType) {
       // A StatementTerm transfers control (return/throw/break/continue) on every
       // path and leaves nothing on the operand stack; unboxing it would generate
@@ -91,11 +91,16 @@ private[compiler] final class AssignabilitySupport(
     if (actual.`type`.isNullType && !expected.isBasicType && !expected.isNullable && !expected.isNullType) {
       // The null literal flowing into a non-nullable type is almost always a
       // bug waiting for an NPE; values coming from Java stay unchecked
-      // (Kotlin's platform-type dilemma — see issue #132). setSourceFile here
-      // (not only from TypingDiagnostics) because this can be the very first
-      // warning of the unit, before anything else has set it (#2238).
-      bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
-      bodyContext.warningReporter.nullToNonNullable(node.location, expected.displayName)
+      // (Kotlin's platform-type dilemma — see issue #132). suppressNullWarning
+      // is set by a call-argument path whose callee is Java-declared (#2116):
+      // the parameter's own nullness is unknown, and it is not a signature the
+      // caller can edit. setSourceFile here (not only from TypingDiagnostics)
+      // because this can be the very first warning of the unit, before anything
+      // else has set it (#2238).
+      if (!suppressNullWarning) {
+        bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
+        bodyContext.warningReporter.nullToNonNullable(node.location, expected.displayName)
+      }
     }
 
     if (expected.isBasicType && actual.`type`.isNullType) {
@@ -168,11 +173,35 @@ private[compiler] final class AssignabilitySupport(
         // (TypeRelations.isAssignableWithBoxing) which accepts null here (#283).
         !expected.isBasicType
       case (tv: TypedAST.TypeVariableType, _) =>
-        TypeRules.isSuperType(tv.upperBound, actual)
+        // Pass `tv` itself, not its erased `upperBound`: when `actual` is
+        // itself a type variable (e.g. `T` in `[B, T extends B]`), only
+        // `isSuperType`'s own identity-aware chain walk can tell "T's
+        // bound chain passes through `tv`" apart from "both happen to
+        // erase to the same root class" (#2259's unsoundness) -- erasing
+        // `tv` here first would throw away exactly the identity it needs.
+        TypeRules.isSuperType(tv, actual)
       case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
         def argsMatch(view: TypedAST.AppliedClassType): Boolean =
           ae.typeArguments.length == view.typeArguments.length &&
-            ae.typeArguments.zip(view.typeArguments).forall { case (e, a) => structurallyAssignable(e, a) }
+            ae.typeArguments.zip(view.typeArguments).forall { case (e, a) =>
+              // Type arguments are invariant: List[T] is not a List[B] even
+              // when T extends B (a mutable List[B] view could then store
+              // something that only fits B, corrupting the underlying
+              // List[T]). Checking only one direction let a type-variable
+              // argument through covariantly via isSuperType's chain walk
+              // above (#2259 review repro: returning a `List[T]` field as
+              // `List[B]` compiled, then a `List[B].add` of a non-T value
+              // threw a ClassCastException on the real `List[T]`).
+              // Scoped to a plain type variable on either side -- a
+              // wildcard (`Function1[T, ?]`) already has its own,
+              // deliberately one-directional covariant/contravariant
+              // rules (handled elsewhere), and requiring both directions
+              // for it rejected ordinary covariant wildcard uses that
+              // never involved a chained bound at all.
+              val involvesTypeVariable = e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType]
+              if (involvesTypeVariable) structurallyAssignable(e, a) && structurallyAssignable(a, e)
+              else structurallyAssignable(e, a)
+            }
         if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
         else
           // Different raw classes: find aa's applied view of ae.raw in its

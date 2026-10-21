@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
+  - Before: anywhere else it silently became the minimum value. `val x: Int = 2147483648` printed `-2147483648`; `-2147483648 as Long` printed `2147483648`, because `as` binds tighter than `-`.
+  - Now: the usual "out of range for Int/Long" error. `-2147483648`, `-9223372036854775808L` and `0x80000000` still compile. To migrate, add `L` or parentheses: see `docs/migration/pre-1.0.md`.
+- **A decimal `B`/`S` literal must fit the signed range: `255B` and `40000S` are errors (#2316).**
+  - Before: `Byte` took -128..255 and `Short` -32768..65535, so `255B` was silently `-1` and `40000S` was `-25536`. `-128B as Int` printed `128`.
+  - Now: decimal literals take -128..127 and -32768..32767, with `128B`/`32768S` valid only as the whole operand of a `-`. For a bit pattern, write it in binary or hex (`0b11111111B`, `0xFFFFS`): see `docs/migration/pre-1.0.md`.
+- **A `config` shape reads a `String` value in double quotes as quoted text (#2229, RFC #2233).**
+  - Before: `name = "Alice"` read as `"Alice"`, quotes included; `name = "abc` read as `"abc`.
+  - Now: it reads as `Alice`. Inside the quotes, `\"` and `\\` are the only escapes. A quoted value with no closing `"`, or a bare `"` inside, is a Defect. To keep literal quotes, write `name = "\"Alice\""`: see `docs/migration/pre-1.0.md`.
+
+### Added
+
+- **`http"...".request(method)` escalates to `Http::request`'s full builder, seeded with the resource's own URL.**
+  - Before: `http"..."` had no way to set a header, a timeout, or read the response status -- only `get`/`post`/`put`/`delete`/`getJson`/`postJson`/`read(shape)`/`eachLine(shape)`.
+  - Now: `http"url".request("GET").header(...).timeoutSeconds(...).send()` reaches the exact builder `Http::request` returns, seeded with the URL so it doesn't need retyping (#2146).
+
+### Fixed
+
+- **`yield x` outside a `do` block gets the `do`-block hint wherever it appears (#2300).**
+  - Before: in `def f(): Int { yield 1 }` or `{ x -> yield x }`, the hint said to escape `yield` with backticks, which still fails.
+  - Now: the same hint as a `yield` at the start of a line: `yield` works only inside `do[M] { ... }`.
+  - Unchanged: `yield` used as a name (`val yield = 1`, `val r = yield`, `1 + yield + 2`, `yield as String`, `class yield extends Object`, `k.yield ()`) still gets the backtick hint.
+- **A `config` shape keeps a `String` value's leading and trailing spaces (#2229).**
+  - Before: `print` wrote `text =   x  `, and `parse` read it back as `x`, so `parse(print(v)) == v` failed.
+  - Now: `print` quotes a value that is padded or starts with `"` (`text = "  x  "`); every other value is written as before.
+
+- **`-128B` and `-32768S` hold -128 and -32768 (#2297).**
+  - Before: they widened to `128`/`32768`, and `println(-128B)` crashed in `Byte.valueOf`.
+  - Now: unary minus on a `Byte` or `Short` stays in that type's range. `Char` negation is unchanged (`-c` for `'a'` is `-97`, as in Java).
+
+- **`(xs as String[])` on a `List[Int]` no longer hints at `xs.toArray(new String[0])` (#2305).**
+  - Before: following the hint threw `ArrayStoreException` at run time.
+  - Now: the `toArray` hint appears only when the elements fit the array (`List[String]` as `Object[]`, `List[Int]` as `Number[]`); otherwise you see the plain type mismatch.
+- **A `;` after a block's `}` says the `;` is the problem.**
+  - Before: `while c { ... }; next()` gave `Encountered ";", but expecting "type", "interface", "trait", "class", ...`.
+  - Now: the error adds a hint to drop the `;`; the next statement can follow the `}` directly or start on a new line.
+- **`Files::copyDir(src, dst)` fails up front when `dst` is `src` or inside it (#2255).**
+  - Before: it recursed until "File name too long" and left a deep `src/dst/dst/...` tree; `copyDir(x, x)` was a silent no-op.
+  - Now: `IllegalArgumentException: cannot copy a directory into itself`, and nothing is written.
+- **`String::format("%s", null)` and `c.update(sql, 1, null)` no longer warn W0012.**
+  - Before: a `null` into any parameter of a Java method warned, with a fix (`T?`) the caller cannot apply.
+  - Now: a Java parameter's nullness is unknown, so it does not warn. An Onion method (also one compiled separately) and a receiver's own type argument (`xs.add(null)` on a `List[String]`) still warn.
+- **`var x: Long = 99999999999` names the problem: the literal is out of range for `Int`.**
+  - Before: `Syntax error. Encountered "\n", but expecting valid token`, at the next token.
+  - Now: `integer literal out of range for Int (-2147483648..2147483647) -- add an L suffix to make it a Long literal`, at the literal. Long, Byte and Short literals get their own message (#2257).
+- **A syntax error inside a nested `#{}` is reported on the line it is on.**
+  - Before: `"a #{"b #{1 +} c"} d"` on line 6 reported line 11, with no source excerpt; `{ (x) -> x }` inside `#{}` also lost its hint.
+  - Now: line 6 and the right column, with the excerpt and the same hint as outside a string (#2303, #2302).
+- **`(aList as String[])` (any `List[T] as T[]` cast, and the reverse) is now a compile-time error, not a runtime crash (#2258).**
+  - Before: the cast type-checked, then crashed at runtime.
+  - Now: `[E0000]` at compile time, with a hint naming the real conversion -- `xs.toArray(new String[0])` for `List[T] as T[]`, `Colls::toList(xs)` for the reverse. A primitive element type (`Int[]`) gets no such hint, since neither call has an overload for it. `(arr as Object)` and `(obj as String[])` keep working.
+- **A type parameter bounded by another type parameter of the same declaration now works** (#2259), including a chain of three (`[A, B extends A, T extends B]`).
+  - Before: `class Holder[B, T extends B] { var item: T; def asB(): B { return item } }` failed with `[E0000] type B is expected, but type T is used`; member access through a real bound (`[B extends CharSequence, T extends B]`, `item.length()`) also failed.
+  - Now: both compile and run. A sibling type parameter that merely shares the same bound (`[B, T extends B, U extends B]`) is correctly rejected wherever `T` is expected, whether by assignment, method call, or as a generic type argument (`List[T]` is not a `List[B]`) -- for a declaration with a chained bound. An instantiation with unrelated type-variable arguments (`new Holder[P, Q](q)` inside `class Mk[P, Q]`) is rejected too.
+  - This rejection is new only for a chained bound (`T extends B`, where `B` is itself a type parameter). Two sibling type parameters with no such bound (`class S[T, U]`) still accept `t = u` and crash at run time with a `ClassCastException` -- tracked separately as #2308, since fixing it means changing how every unbounded type variable compares, not just a chained one.
+
+## [0.144.0] - 2026-10-20
+
+### Breaking
+
+- **A `do` block's final value is written `yield`, not `ret`.**
+  - Before: `do[Option] { a <- getA(); ret a + 1 }`
+  - Now: `do[Option] { a <- getA(); yield a + 1 }`
+  - `yield` is a reserved word (call a Java `yield` method as ``Thread::`yield`()``); `ret` is an ordinary identifier, and old code gets a hint naming `yield`. See [Migrating to 1.0](docs/migration/pre-1.0.md).
+
 ### Added
 
 - **`<`, `<=`, `>`, `>=` compare any `Comparable`: `"abc" < "abd"`, two `LocalDate`s, `BigDecimal`s.** They accepted only numbers (`E0001 operator < is not applicable for type String, String`). On a non-null operand with `compareTo` they now mean `a.compareTo(b) < 0` etc., as in Kotlin; numeric comparison is unchanged.
@@ -36,6 +103,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`Yaml::stringify`/`Yaml::parse` silently mangled data outside the documented flat-only scope instead of raising an error (#2239).** A nested `Map`/`List` value stringified as Java's `toString()` (`c: {d=1}`), which does not parse back to the original data; parsing an indented child mapping flattened it and hoisted the child's keys to the top level with no error; a flow collection (`[1, 2]`) or an anchor/alias (`&x`/`*x`) value came back as a literal `String`. `Yaml::stringify` now throws `IllegalArgumentException` on a nested Map/List value, and `Yaml::parse` now throws `Yaml.YamlParseException` naming the unsupported construct in each of these cases.
+- **Naming a static method without parens calls it instead of crashing (#2248).**
+  - Before: `def work: String = "hi"; val f = work` (or bare `greet` for a static sibling inside a class) failed at run time with `IncompatibleClassChangeError`.
+  - Now: it calls the method, just as `work()` does. An explicit non-self receiver (`expr.staticMethod`, no parens) still reports `E0019`, same as `expr.staticMethod()`.
+
 - **A List-style call on a Java Stream says to convert it first.** `s.lines()`/`s.chars()` are Java's String methods and return a Stream, so `s.lines().size`, `.first()`, `.join(",")` or `[0]` got a misleading guess (`min`, `limit`, `map`). They now say `did you mean: toList().size` (`boxed().toList()...` for an IntStream).
 
 - **A static call on a nested class names the enclosing class's method.** `Response::json(body)` (the helpers live on `Server`, not `Server.Response`) said `did you mean: of`; it now says `did you mean: Server::json`. Applies whenever the enclosing class has a static method of that name and arity.
@@ -56,6 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Calling a `List` method by the name another language gives it now names Onion's spelling.** `xs.sortBy { ... }` suggested `sort`, `xs.forall { ... }` suggested `addAll`, `xs.each { ... }` suggested `add`, and `joinToString`/`foldLeft`/`inject`/`sumOf`/`unique`/`nonEmpty`/`collect`/`sortByDescending` suggested nothing. Each now says `did you mean: sortedBy` (`all`, `forEach`, `join`, `fold`, `sumBy`, `distinct`, `isNotEmpty`, `map`, `sortedByDescending`).
 - **A `W0012`/`W0015` warning (null to non-nullable, or implicit unboxing of a boxed platform value) printed no source file name, `[W0012] :1:17: ...` instead of `[W0012] w6.on:1:17: ...`, when it was the very first warning of the compilation (#2238).** Both warnings are reported straight from the assignability check, which relied on an earlier, unrelated diagnostic having already told the reporter the current file; with no such diagnostic yet, the file name was still empty. Both call sites now set it themselves first, like the other warnings already do.
 - **A multi-`tool` file's `--help` ran the shared `--plan`/`--contract`/`--help` lines straight into the last declared tool's own option list, with no visual break, so they read as that tool's options rather than global flags (#2252).** Each tool's usage block now ends with a blank line when the file declares more than one, setting the global flags apart; single-tool output is unchanged.
+- **E0080 now checks that a user `Shape`'s `law`/`example` actually exercises that shape, not merely that one exists somewhere in the file (#2228).** `class Broken conforms Shape[Int] { ... }` with an unrelated `example trivial { 1 + 1 == 2 }` elsewhere in the file used to compile clean despite a broken `parse`/`print` round-trip -- any law or example anywhere in the file satisfied the gate for every `Shape` in it. A law/example now only counts for a given shape when its body constructs it, calls or reads one of its members, or type-tests against it.
+- **Two `extension` blocks for the same receiver type now get a dedicated `E0102` naming that type, instead of a generic duplicate-class error (#2204).** `extension List[Int] { ... }` declared twice (or `extension List { ... }` split across two blocks) used to fail with a cryptic internal class name and leave the second block's methods unreachable; a call to one of them now points at the real cause instead of an unrelated "method not found". Distinct concrete instantiations of the same generic receiver are unaffected.
 
 ## [0.143.0] - 2026-10-18
 

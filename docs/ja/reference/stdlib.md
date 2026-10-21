@@ -515,7 +515,12 @@ val out = r.edit { v -> v.copy(port = 9090) }.render()
 自由)、trim した先頭が `#` の行は行全体がコメント、空行は無視されます。行内コメントの
 構文はありません——値と同じ行の `#` 以降もその値の一部として読まれ、取り除かれません
 (`host = example.com  # primary` は `host` を `"example.com  # primary"` と解釈します)。
-コメントは必ず別の行に書いてください。
+コメントは必ず別の行に書いてください。`String` 成分の値も、ほかのスカラーと同様に
+trim されます。ただし二重引用符で囲まれた値は例外で、`name = "  padded  "` は
+`  padded  ` と読みます。`print` は、前後に空白があるか `"` で始まる `String` の値を
+引用符で囲みます。それ以外の値は引用符なしで書きます。引用符の中のエスケープは `\"` と
+`\\` だけなので、`\n` は 2 文字のまま残ります。閉じる `"` のない値や、中に裸の `"` が
+ある値は `Defect` になります。
 
 ### 構造化 JSON と JSON Schema
 
@@ -1166,7 +1171,7 @@ Futureは順次非同期合成のためのdo記法で動作：
 val result: Future[Int] = do[Future] {
   x <- Future::async { fetchA() }
   y <- Future::async { fetchB(x) }
-  ret x + y
+  yield x + y
 }
 ```
 
@@ -2105,7 +2110,7 @@ Files::mkdirs(path)                    // ディレクトリと不足する親�
 Files::size(path)                      // Long。バイト数（存在しなければ0）
 Files::copy(src, dst)                  // dst が既にあれば置き換える
 Files::move(src, dst)                  // 移動（リネーム）。dst が既にあれば置き換える
-Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー
+Files::copyDir(src, dst)               // ディレクトリを再帰的にコピー（dst が src の内部/同一なら拒否）
 ```
 
 パス操作ヘルパー——ファイル名・親ディレクトリ・結合・拡張子:
@@ -2456,7 +2461,7 @@ val body = r.map { res -> res.body }.getOrElse("")
 val both = do[Result] {
   a <- Http::request("GET", urlA).send()
   b <- Http::request("GET", urlB).send()
-  ret a.status + b.status
+  yield a.status + b.status
 }
 ```
 
@@ -2560,6 +2565,17 @@ val o: Outcome[Config] = http"https://api.example.com/config".read(shape)   // �
 
 ```onion
 val results: List[Outcome[Row]] = http"https://api.example.com/feed".eachLine(shape)
+```
+
+`request(method)` は、この resource 自身の URL を引き継いだ状態で `Http::request` の
+フルビルダーへ切り替える——上の固定メソッドでは足りないもの（ヘッダー、タイムアウト、
+任意メソッドでのボディ、レスポンスのステータス）が必要になったとき用:
+
+```onion
+val res = http"https://api.example.com/x".request("GET")
+  .header("Authorization", "Bearer t")
+  .timeoutSeconds(5)
+  .send()                                // Result[Http.Response, Http.HttpFailure]
 ```
 
 ---

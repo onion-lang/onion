@@ -94,6 +94,25 @@ class YieldStatementHintI18nSpec extends AnyFunSpec with Diagrams {
     assertBacktickHint(compileErrors("def f(): Int { return yield }\n"))
   }
 
+  // #2315 panel, second round: a line-final name, a word operator, and a
+  // token that cannot start an expression after `yield`.
+  it("keeps the backtick hint for `yield` at the end of a line") {
+    assertBacktickHint(compileErrors("val r = yield\nprintln(r)\n"))
+  }
+
+  it("keeps the backtick hint for `yield` before `as`, `is` or `in`") {
+    assertBacktickHint(compileErrors("val c = yield as String\n"))
+    assertBacktickHint(compileErrors("val c = yield is String\n"))
+    assertBacktickHint(compileErrors("foreach yield in [1, 2] { println(yield) }\n"))
+  }
+
+  it("keeps the backtick hint for `yield` before `{`, `..` or `^`") {
+    assertBacktickHint(compileErrors("if yield { println(1) }\n"))
+    assertBacktickHint(compileErrors("select yield { else: println(1) }\n"))
+    assertBacktickHint(compileErrors("val r = yield .. 10\n"))
+    assertBacktickHint(compileErrors("val r = yield ^ 1\n"))
+  }
+
   it("still gives the do-block hint for `yield -1` and `yield (1)`") {
     assertYieldHint(compileErrors("def f(): Int { yield -1 }\n"))
     assertYieldHint(compileErrors("def f(): Int { yield (1) }\n"))

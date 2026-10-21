@@ -184,11 +184,13 @@ private[compiler] object SyntaxHintClassifier {
   )
   // `yield expr` past the start of its line (`def f(): Int { yield 1 }`,
   // `{ x -> yield x }`), which ControlFlowSyntaxHints' line-anchored rule misses.
-  // `context` starts at `yield`. A following `=`, `:`, `->`, closing token or infix
-  // operator (`val yield = 1`, `{ yield -> yield * 2 }`, `1 + yield + 2`) means
+  // `context` starts at `yield`. A line end, or a following `=`, `:`, `->`, `{`, `.`,
+  // closing token, infix operator or `as`/`is`/`in` (`val r = yield`, `val yield = 1`,
+  // `{ yield -> yield * 2 }`, `1 + yield + 2`, `yield as String`, `if yield {`) means
   // `yield` was meant as a name, which the reserved-word hint below covers;
   // `yield -1` (no space after `-`) is still an expression.
-  private val YieldExpression = """\Ayield\s+(?!->|-\s|!=)[^\s=:)\],;}+*/%<>&|?]""".r
+  private val YieldExpression =
+    """\Ayield[ \t]+(?!->|-\s|!=|(?:as|is|in)\b)[^\s=:)\],;{}.+*/%<>&|?^]""".r
   private val NullableUnionType =
     """:\s*([A-Za-z_][\w.\[\]]*)\s*\|\s*null\b""".r
   private val CStyleCast =

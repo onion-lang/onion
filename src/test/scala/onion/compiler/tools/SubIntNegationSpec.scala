@@ -3,7 +3,7 @@ package onion.compiler.tools
 import onion.tools.Shell
 
 /**
- * Unary minus keeps a Byte/Short/Char operand's type, so its result must stay in that
+ * Unary minus keeps a Byte/Short operand's type, so its result must stay in that
  * type's range. `-128B` is `-(128B)`, and `128B` is already the byte -128; negating it
  * used to leave the int 128 in a Byte slot, which printed 128 and crashed boxing (#2297).
  */
@@ -32,8 +32,8 @@ class SubIntNegationSpec extends AbstractShellSpec {
   it("negating a runtime Short -32768 wraps to -32768") {
     assert(Shell.Success(-32768) == runInt("val s: Short = ((0 - 32768) as Short); val n: Short = -s; val i: Int = n; return i"))
   }
-  it("negating a Char stays in the Char range") {
-    assert(Shell.Success(65439) == runInt("val c: Char = 'a'; val n: Char = -c; val i: Int = n; return i"))
+  it("negating a Char gives the same Int as Java (-97 for 'a'), as before #2297") {
+    assert(Shell.Success(-97) == runInt("val c: Char = 'a'; val i: Int = -c; return i"))
   }
   it("ordinary Byte and Short negation is unchanged") {
     assert(Shell.Success(-5) == runInt("val b: Byte = 5B; val n: Byte = -b; val i: Int = n; return i"))

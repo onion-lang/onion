@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`-128B` and `-32768S` hold -128 and -32768 (#2297).**
   - Before: they widened to `128`/`32768`, and `println(-128B)` crashed in `Byte.valueOf`.
-  - Now: unary minus on a `Byte`, `Short` or `Char` stays in that type's range, so `-c` for `'a'` is `65439` as a `Char`.
+  - Now: unary minus on a `Byte` or `Short` stays in that type's range. `Char` negation is unchanged (`-c` for `'a'` is `-97`, as in Java).
 
 - **`(xs as String[])` on a `List[Int]` no longer hints at `xs.toArray(new String[0])` (#2305).**
   - Before: following the hint threw `ArrayStoreException` at run time.

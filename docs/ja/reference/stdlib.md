@@ -1267,9 +1267,16 @@ flat block mapping ドキュメント、およびそれらのトップレベル 
 （要素内のネストした map/シーケンス、アンカー、flow collection は非対応）。
 この範囲外の構文は、データを静かに失う代わりにエラーを発生させます:
 `Yaml::stringify` はネストした Map/List 値に対して `IllegalArgumentException` を
-投げ、`Yaml::parse` はインデントされた（ネストした）mapping 行、flow collection
-（`[...]`/`{...}`）の値、アンカー/エイリアス（`&name`/`*name`）の値に対して
-`Yaml.YamlParseException` を投げます。
+投げます。`Yaml::parse` は次の場合に `Yaml.YamlParseException` を投げます:
+
+- ネストした mapping: 兄弟の行より深くインデントされた行（トップレベルでも、
+  シーケンス要素の中でも）
+- flow collection（`[...]`/`{...}`）の値
+- アンカー/エイリアス（`&name`/`*name`）の値
+- ブロックスカラー（`|`/`>`。複数行テキストの書き方）
+
+全体が同じ幅でインデントされた文書は問題ありません。`Yaml::stringify` は
+これらの記号で始まる文字列を引用符で囲むので、出力は必ず読み戻せます。
 
 ### Yaml::parse
 

@@ -102,7 +102,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`Yaml::stringify`/`Yaml::parse` silently mangled data outside the documented flat-only scope instead of raising an error (#2239).** A nested `Map`/`List` value stringified as Java's `toString()` (`c: {d=1}`), which does not parse back to the original data; parsing an indented child mapping flattened it and hoisted the child's keys to the top level with no error; a flow collection (`[1, 2]`) or an anchor/alias (`&x`/`*x`) value came back as a literal `String`. `Yaml::stringify` now throws `IllegalArgumentException` on a nested Map/List value, and `Yaml::parse` now throws `Yaml.YamlParseException` naming the unsupported construct in each of these cases.
+- **`Yaml` raises an error on nested, flow, anchor and block-scalar data instead of silently mangling it (#2239).**
+  - Before: `Yaml::parse("c:\n  d: 1\n")` returned `{c=null, d=1}`, `[1, 2]` and `*x` came back as text, and `Yaml::stringify` wrote a nested Map as `c: {d=1}`.
+  - Now: `Yaml::parse` throws `Yaml.YamlParseException` naming the construct and its line, also inside a sequence element; `Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List and quotes a string starting with `[ { & *` (and the other YAML indicators), so `derive!(Yaml)` still round-trips it. A uniformly indented flat document still parses.
 - **Naming a static method without parens calls it instead of crashing (#2248).**
   - Before: `def work: String = "hi"; val f = work` (or bare `greet` for a static sibling inside a class) failed at run time with `IncompatibleClassChangeError`.
   - Now: it calls the method, just as `work()` does. An explicit non-self receiver (`expr.staticMethod`, no parens) still reports `E0019`, same as `expr.staticMethod()`.

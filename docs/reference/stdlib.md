@@ -1722,9 +1722,16 @@ Scope: a flat block mapping, or a top-level block sequence of flat mappings (no
 nested maps/sequences within an element, no anchors, no flow collections). A
 construct outside that scope raises an error rather than silently losing data:
 `Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List value,
-and `Yaml::parse` throws `Yaml.YamlParseException` on an indented (nested)
-mapping line, a flow collection (`[...]`/`{...}`) value, or an anchor/alias
-(`&name`/`*name`) value.
+and `Yaml::parse` throws `Yaml.YamlParseException` on:
+
+- a nested mapping: a line indented deeper than its siblings, at the top level or
+  inside a sequence element
+- a flow collection (`[...]`/`{...}`) value
+- an anchor/alias (`&name`/`*name`) value
+- a block scalar (`|`/`>`)
+
+A uniformly indented document is fine. `Yaml::stringify` quotes any string that
+starts with one of these indicators, so its output always parses back.
 
 ### Yaml::parse
 

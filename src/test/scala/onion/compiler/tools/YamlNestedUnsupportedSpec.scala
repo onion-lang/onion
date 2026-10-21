@@ -139,4 +139,101 @@ class YamlNestedUnsupportedSpec extends AbstractShellSpec {
       """.stripMargin, "None", Array())
     assert(Shell.Success(2) == result)
   }
+
+  // Panel block on #2243, repro 1: the writer must quote what the reader rejects.
+  it("round-trips a derive!(Yaml) record whose strings start with a YAML indicator") {
+    val result = shell.run(
+      """
+        |record Note(title: String, body: String) derive!(Yaml)
+        |class Test {
+        |public:
+        |  static def main(args: String[]): String {
+        |    val n = new Note("[draft] plan", "*important*")
+        |    return "" + (Note::fromYaml(Note::toYaml(n)) == n)
+        |  }
+        |}
+      """.stripMargin, "None", Array())
+    assert(Shell.Success("true") == result)
+  }
+
+  it("round-trips every string that starts with a YAML indicator through stringify and parse") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): String {
+        |   val m = ["a": "[x]", "b": "{y}", "c": "&z", "d": "*w", "e": "|", "f": ">-", "g": "!tag", "h": "%p", "i": "@q", "j": "`r", "k": "[ok"]
+        |   return "" + (Yaml::parse(Yaml::stringify(m)) == m)
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success("true") == result)
+  }
+
+  // Panel block on #2243, repro 2: nesting inside a sequence element was still flattened.
+  it("parse rejects a nested mapping inside a sequence element") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): Int {
+        |   try {
+        |     Yaml::parse("- name: a\n  meta:\n    k: v\n- name: b\n")
+        |     return -1
+        |   } catch e: Yaml.YamlParseException {
+        |     return e.getLine()
+        |   }
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success(3) == result)
+  }
+
+  it("still parses a sequence whose items are uniformly indented") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): String {
+        |   return Yaml::parse("  - name: a\n    age: 1\n  - name: b\n").toString()
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success("[{name=a, age=1}, {name=b}]") == result)
+  }
+
+  // Panel block on #2243: a uniformly indented flat document parsed before the PR.
+  it("still parses a uniformly indented flat mapping") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): String {
+        |   return Yaml::parse("  a: 1\n  b: 2\n").toString()
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success("{a=1, b=2}") == result)
+  }
+
+  it("parse rejects a nested mapping after a dedent in an indented document") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): Int {
+        |   try {
+        |     Yaml::parse("  a: 1\nb:\n  c: 1\n")
+        |     return -1
+        |   } catch e: Yaml.YamlParseException {
+        |     return e.getLine()
+        |   }
+        | }
+      """.stripMargin, "None", Array())
+    assert(Shell.Success(3) == result)
+  }
+
+  it("parse names a block scalar instead of calling it a nested mapping") {
+    val result = shell.run(
+      """
+        | static def main(args: String[]): String {
+        |   try {
+        |     Yaml::parse("a: |\n  text\n")
+        |     return "parsed"
+        |   } catch e: Yaml.YamlParseException {
+        |     return e.getMessage()
+        |   }
+        | }
+      """.stripMargin, "None", Array())
+    assert(result match {
+      case Shell.Success(s: String) => s.contains("Block scalar") && s.contains("line 1")
+      case _ => false
+    })
+  }
 }

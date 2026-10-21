@@ -38,13 +38,13 @@ private[compiler] final class AssignabilitySupport(
     }
   }
 
-  def processAssignable(node: AST.Node, expected: Type, actual: Term): Term = {
+  def processAssignable(node: AST.Node, expected: Type, actual: Term, suppressNullWarning: Boolean = false): Term = {
     if (actual == null) return null
     // Target-type an empty collection literal ([] / [:]) to the expected
     // collection type, then proceed normally (so `foo([])` binds [] to the
     // parameter's element type instead of the default Object).
     val retyped = retypeEmptyCollectionLiteral(expected, actual)
-    if (retyped ne actual) return processAssignable(node, expected, retyped)
+    if (retyped ne actual) return processAssignable(node, expected, retyped, suppressNullWarning)
     if (actual.`type`.isBottomType) {
       // A StatementTerm transfers control (return/throw/break/continue) on every
       // path and leaves nothing on the operand stack; unboxing it would generate
@@ -91,8 +91,16 @@ private[compiler] final class AssignabilitySupport(
     if (actual.`type`.isNullType && !expected.isBasicType && !expected.isNullable && !expected.isNullType) {
       // The null literal flowing into a non-nullable type is almost always a
       // bug waiting for an NPE; values coming from Java stay unchecked
-      // (Kotlin's platform-type dilemma — see issue #132)
-      bodyContext.warningReporter.nullToNonNullable(node.location, expected.displayName)
+      // (Kotlin's platform-type dilemma — see issue #132). suppressNullWarning
+      // is set by a call-argument path whose callee is Java-declared (#2116):
+      // the parameter's own nullness is unknown, and it is not a signature the
+      // caller can edit. setSourceFile here (not only from TypingDiagnostics)
+      // because this can be the very first warning of the unit, before anything
+      // else has set it (#2238).
+      if (!suppressNullWarning) {
+        bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
+        bodyContext.warningReporter.nullToNonNullable(node.location, expected.displayName)
+      }
     }
 
     if (expected.isBasicType && actual.`type`.isNullType) {
@@ -142,8 +150,12 @@ private[compiler] final class AssignabilitySupport(
             }
           case _ => false
         }
-        if (!isElvis && !isNonNullFunctionCall)
+        if (!isElvis && !isNonNullFunctionCall) {
+          // Same reason as the nullToNonNullable call above (#2238): this can
+          // be the first warning of the unit.
+          bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
           bodyContext.warningReporter.platformUnboxing(node.location, actual.`type`.displayName, targetBasicType.displayName)
+        }
         return Boxing.unboxing(bodyContext.table, actual, targetBasicType)
       }
     }

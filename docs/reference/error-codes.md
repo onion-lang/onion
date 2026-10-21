@@ -858,8 +858,10 @@ For an inline pattern, write `shape name = re"..."`.
 
 A concrete class implementing `onion.Shape[T]` directly (rather than deriving one via
 `shape`/`from re"..."`) must assert at least one machine-checked `law` or `example` in
-its file. A derived shape's round-trip is guaranteed by construction; a hand-written
-one only *claims* it, so the claim must be checked.
+its file that actually exercises it — constructs it, calls or reads one of its members, or
+type-tests against it. A derived shape's round-trip is guaranteed by construction; a
+hand-written one only *claims* it, so the claim must be checked, and a `law`/`example` that
+never touches the class doesn't check anything about it.
 
 ```onion
 class FixedWidth conforms Shape[Person] {
@@ -870,11 +872,11 @@ public:
   def print(v: Person): String { ... }
   def describe(): String = "fixed-width Person"
 }
-// E0080: nothing in this file asserts a law for FixedWidth
+// E0080: nothing in this file asserts a law that exercises FixedWidth
 ```
 
-Fix: add a top-level `example` (or the class's own `law`) — the canonical claim is the
-round-trip `s.parse(s.print(v)).get() == v`:
+Fix: add a top-level `example` (or the class's own `law`) that constructs or calls
+`FixedWidth` — the canonical claim is the round-trip `s.parse(s.print(v)).get() == v`:
 
 ```onion
 example fixedWidthL1 {
@@ -1128,6 +1130,27 @@ extension Double {
 
 Fix: remove or rename the duplicate. Two extension methods with the same name but
 different parameter types are unaffected — that's ordinary overloading.
+
+### `E0102` — Duplicate `extension` block for the same receiver type
+
+Two `extension` blocks for the exact same receiver type appear in one file —
+whether the identical concrete instantiation written twice, or the same
+non-generic type split across two blocks (e.g. one per concern, for
+readability). Both would lower to the same generated container class, so
+without this check the second block collided later as a generic
+duplicate-class error naming the internal mangled class
+(`Extension$List_int`), and every method the second block declared was then
+silently unreachable — reported, if at all, through an unrelated "method not
+found" at the call site.
+
+```onion
+extension List[Int] { def foo(): Int = 1 }
+extension List[Int] { def bar(): Int = 2 }   // E0102: an extension block for List[int] is already defined
+```
+
+Fix: combine the methods into the first block. Distinct concrete
+instantiations of the same generic receiver do not collide
+(`extension List[Int]` and `extension List[String]` can coexist).
 
 ## Declaration errors
 
@@ -1416,6 +1439,20 @@ def isRound(sh: Shape): Boolean {
 
 A comma-joined list of plain value patterns (`case 1, 2, 3:`) is unaffected —
 only a type, destructuring, regex, or bare binding pattern triggers this.
+
+### `E0101` — Lambda has the wrong number of parameters
+
+A lambda's parameter count differs from that of the function type expected for
+it. The message gives both counts and the expected type.
+
+```onion
+val m = ["a": 1, "b": 2]
+m.filter { e -> e.getValue() > 0 }      // E0101: Map's filter takes (key, value)
+[1, 2].fold(0) { acc -> acc }           // E0101: fold's function takes (acc, element)
+```
+
+Fix: write the lambda with the parameters the function type takes —
+`m.filter { k, v -> v > 0 }`, `[1, 2].fold(0) { acc, x -> acc + x }`.
 
 ### `E0069` — Local val requires an initializer
 
@@ -1839,7 +1876,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0077` | tool `…` performs `…` here (calling …) but does not declare it |
 | `E0078` | tool `…` declares capability `…` but nothing in its body can perform it |
 | `E0079` | tool `…` has an invalid capability `…`: … |
-| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law |
+| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law that exercises it |
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
@@ -1860,6 +1897,8 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0098` | enum … mixes shared parameters with `case` cases |
 | `E0099` | enum … cannot take type parameters |
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
+| `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
+| `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 
 ## See also
 

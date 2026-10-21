@@ -429,7 +429,7 @@ val eras: List[Object] = ["19th Century", "Early Modern", "Late Modern"]
 val crossRows = do[List] {
   nat <- nats
   era <- eras
-  ret "  #{nat as String} × #{era as String}: " +
+  yield "  #{nat as String} × #{era as String}: " +
       museum.artworksByNationality(nat as String)
             .filter { a -> (a as Artwork).era() == era as String }.size + " work(s)"
 }

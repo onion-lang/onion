@@ -60,6 +60,17 @@ object OnionParser {
    *  there on the same line. */
   val InvalidStringEscapeMarker: String = "\\<esc>"
 
+  /** Sentinel `found` images for an integer literal whose value overflows the range its
+   *  suffix (or lack of one) selects (issue #2257): the range check threw the parser's bare
+   *  give-up signal with no expected-token information, so error recovery fell back to
+   *  whatever token followed the literal and reported a content-free "expecting valid
+   *  token" instead of naming the type and the fix (add/drop a suffix). One marker per
+   *  suffix, since each needs a different message. */
+  val IntLiteralOutOfRangeMarker: String = "<int-lit-range>"
+  val LongLiteralOutOfRangeMarker: String = "<long-lit-range>"
+  val ByteLiteralOutOfRangeMarker: String = "<byte-lit-range>"
+  val ShortLiteralOutOfRangeMarker: String = "<short-lit-range>"
+
   private val theFail = new Fail(null)
   private val debug = java.lang.Boolean.getBoolean("onion.parser.debug")
 
@@ -1894,6 +1905,13 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       val e = inConditionOf(term())
       val b = block()
       desugarMapForeach(p(t), c(k), c(v), e, b)
+    } else if (image(2) == "in") {
+      // `foreach x in xs`: no annotation; typing infers x from the collection's type.
+      val k = id()
+      id()
+      val e = inConditionOf(term())
+      val b = block()
+      AST.ForeachExpression(p(t), AST.Argument(p(k), c(k), null, null, false), e, b)
     } else {
       val a = argument()
       if (la("in")) id()
@@ -2670,9 +2688,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   }
 
   private def doClause(): Any = {
-    if (kind(1) == K.K_RET) {
+    if (kind(1) == K.K_YIELD) {
       val t = next(); eols()
-      return AST.RetStatement(p(t), term())
+      return AST.YieldStatement(p(t), term())
     }
     if (isId(kind(1)) && looksLike { id(); eols(); expect(K.LARROW) }) {
       val t = id(); eols(); expect(K.LARROW); eols()
@@ -2720,16 +2738,33 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def integerLiteral(): AST.Expression = {
     val t = expect(K.INTEGER)
     val s = t.image.replace("_", "")
-    if (s.endsWith("B")) {
-      val iv = parseIntLiteral(s.substring(0, s.length - 1))
-      if (iv < -128 || iv > 255) throw fail
-      AST.ByteLiteral(p(t), iv.toByte)
-    } else if (s.endsWith("S")) {
-      val iv = parseIntLiteral(s.substring(0, s.length - 1))
-      if (iv < -32768 || iv > 65535) throw fail
-      AST.ShortLiteral(p(t), iv.toShort)
-    } else if (s.endsWith("L")) AST.LongLiteral(p(t), parseLongLiteral(s.substring(0, s.length - 1)))
-    else AST.IntegerLiteral(p(t), parseIntLiteral(s))
+    val noKinds = new java.util.LinkedHashSet[Integer]()
+    try {
+      if (s.endsWith("B")) {
+        val iv = parseIntLiteral(s.substring(0, s.length - 1))
+        if (iv < -128 || iv > 255) throw theFail
+        AST.ByteLiteral(p(t), iv.toByte)
+      } else if (s.endsWith("S")) {
+        val iv = parseIntLiteral(s.substring(0, s.length - 1))
+        if (iv < -32768 || iv > 65535) throw theFail
+        AST.ShortLiteral(p(t), iv.toShort)
+      } else if (s.endsWith("L")) AST.LongLiteral(p(t), parseLongLiteral(s.substring(0, s.length - 1)))
+      else AST.IntegerLiteral(p(t), parseIntLiteral(s))
+    } catch {
+      case _: Fail =>
+        // The value didn't fit -- not a wrong token, so give the range check's own
+        // diagnostic (naming the type and the fix) instead of the deepest-reach
+        // heuristic, which would otherwise blame whatever token follows the literal.
+        val marker =
+          if (s.endsWith("B")) ByteLiteralOutOfRangeMarker
+          else if (s.endsWith("S")) ShortLiteralOutOfRangeMarker
+          else if (s.endsWith("L")) LongLiteralOutOfRangeMarker
+          else IntLiteralOutOfRangeMarker
+        // adoptFailure takes the token's own (unshifted) position: deepestFailure() adds
+        // lineBase/colBase itself, so p(t) here would shift an interpolation's line twice.
+        adoptFailure(Location(t.beginLine, t.beginColumn), marker, noKinds)
+        throw fail
+    }
   }
 
   private def floatLiteral(): AST.Expression = {

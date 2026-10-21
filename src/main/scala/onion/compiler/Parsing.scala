@@ -238,6 +238,10 @@ class Parsing(config: CompilerConfig) extends AnyRef
       else if (found == OnionParser.UnclosedInterpolationMarker) Message("error.parsing.unclosed_interpolation")
       else if (found == OnionParser.TooDeepInterpolationMarker) Message("error.parsing.interpolation_too_deep", OnionLexer.MaxInterpBraceDepth)
       else if (found == OnionParser.InvalidStringEscapeMarker) Message("error.parsing.invalid_string_escape")
+      else if (found == OnionParser.IntLiteralOutOfRangeMarker) Message("error.parsing.int_literal_out_of_range")
+      else if (found == OnionParser.LongLiteralOutOfRangeMarker) Message("error.parsing.long_literal_out_of_range")
+      else if (found == OnionParser.ByteLiteralOutOfRangeMarker) Message("error.parsing.byte_literal_out_of_range")
+      else if (found == OnionParser.ShortLiteralOutOfRangeMarker) Message("error.parsing.short_literal_out_of_range")
       else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
     val hint = SyntaxHintClassifier
       .classify(found, if (expectedAll == null) expected else expectedAll, context, sourceLine)

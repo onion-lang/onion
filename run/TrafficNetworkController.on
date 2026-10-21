@@ -273,7 +273,7 @@ IO::println("── Network congestion tally ───────────�
 val allTiers: List[CongestionTier] = do[List] {
   r <- readings
   cfg <- [configs.get(r.intersection()) ?: new IntersectionConfig(r.intersection(), 15, 60, 5, false)]
-  ret classifyCount(r.count(), r.speed(), cfg.peakHour())
+  yield classifyCount(r.count(), r.speed(), cfg.peakHour())
 }
 val tierGroups: Map[String, List[CongestionTier]] = allTiers.groupBy { t -> t.label().trim() }
 val tierKeys: List[String] = []
@@ -338,7 +338,7 @@ val crossProduct: List[String] = do[List] {
                     .fold(0) { acc, r -> acc + r.count() }]
   ewVol <- [readings.filter { r -> r.intersection() == name && (r.dir() == "E" || r.dir() == "W") }
                     .fold(0) { acc, r -> acc + r.count() }]
-  ret (name + "/" + phase.axes() + "(ns=" + nsVol + ",ew=" + ewVol + ")")
+  yield (name + "/" + phase.axes() + "(ns=" + nsVol + ",ew=" + ewVol + ")")
 }
 foreach item: String in crossProduct {
   IO::println("  " + item)

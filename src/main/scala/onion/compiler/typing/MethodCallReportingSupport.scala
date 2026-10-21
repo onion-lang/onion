@@ -30,7 +30,19 @@ private[compiler] final class MethodCallReportingSupport(
         }
       case _ => java.lang.Boolean.FALSE
     }
-    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed, java.lang.Boolean.valueOf(calledStatically))
+    // `Response::json(...)` on a nested class whose enclosing class has that static method
+    // (`Server::json`): name the enclosing class so the hint can point there.
+    val enclosingStaticOwner: String = targetType match {
+      case ct: ClassType if calledStatically && ct.name.contains("$") =>
+        val outerName = ct.name.substring(0, ct.name.lastIndexOf('$'))
+        bodyContext.table.load(outerName) match {
+          case Some(outer) if outer.methods(name).exists(m => Modifier.isStatic(m.modifier) && m.arguments.length == argTypes.length) =>
+            outerName.substring(outerName.lastIndexOf('.') + 1)
+          case _ => null
+        }
+      case _ => null
+    }
+    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed, java.lang.Boolean.valueOf(calledStatically), enclosingStaticOwner)
   }
 
   def reportAmbiguousMethods(

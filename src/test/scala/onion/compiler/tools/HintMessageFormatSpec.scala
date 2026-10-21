@@ -99,7 +99,7 @@ class HintMessageFormatSpec extends AbstractShellSpec {
           |class Main {
           |public:
           |  def bar(x: Int) -> Int {
-          |    ret x
+          |    yield x
           |  }
           |}
           |""".stripMargin

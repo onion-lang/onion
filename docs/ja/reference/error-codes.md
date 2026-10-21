@@ -851,9 +851,11 @@ record Pt(x: Int, y: Int) {
 ### `E0080` — 自作の `Shape` に law がない
 
 `onion.Shape[T]` を（`shape`/`from re"..."` による導出ではなく）直接実装した具象クラスは、
-そのファイル内で機械検査される `law` か `example` を最低1つ主張しなければなりません。
+そのファイル内で機械検査される `law` か `example` を最低1つ、しかも実際にそのクラスに
+触れるもの——構築する、メンバーを呼ぶ/読む、型テストする——を主張しなければなりません。
 導出された shape は round-trip が構造的に保証されますが、手書きのものは**主張するだけ**
-なので、その主張を検査する必要があります。
+なので、その主張を検査する必要があります。そのクラスに一度も触れない `law`/`example` は、
+そのクラスについて何も検査していません。
 
 ```onion
 class FixedWidth conforms Shape[Person] {
@@ -864,11 +866,11 @@ public:
   def print(v: Person): String { ... }
   def describe(): String = "fixed-width Person"
 }
-// E0080: FixedWidth の law を主張している箇所がこのファイルにない
+// E0080: FixedWidth に触れる law を主張している箇所がこのファイルにない
 ```
 
-対処: トップレベルの `example`（またはクラス自身の `law`）を追加してください——代表的な
-主張は round-trip `s.parse(s.print(v)).get() == v` です。
+対処: `FixedWidth` を構築または呼び出すトップレベルの `example`（またはクラス自身の
+`law`）を追加してください——代表的な主張は round-trip `s.parse(s.print(v)).get() == v` です。
 
 ```onion
 example fixedWidthL1 {
@@ -1117,6 +1119,25 @@ extension Double {
 
 対処: 重複を削除するかリネームしてください。名前は同じでもパラメータ型が異なる
 extension メソッド同士は影響を受けません — 通常のオーバーロードです。
+
+### `E0102` — 同じ受け取り型に対する `extension` ブロックの重複
+
+同じ受け取り型に対する `extension` ブロックが1つのファイル内に2つ存在しています
+— 同じ具体的なインスタンス化を2回書いた場合も、同じ非ジェネリック型を関心ごとに
+2つのブロックへ分けて書いた場合も対象です。いずれも同じ生成コンテナクラスへ
+下げられるため、このチェックがなければ2番目のブロックは内部的なマングル名
+（`Extension$List_int`）を名乗る汎用的な重複クラスエラーとして後から衝突し、
+2番目のブロックが宣言したメソッドはすべて静かに到達不能になり、呼び出し箇所で
+無関係な「メソッドが見つからない」エラーとして（報告されるとしても）現れていました。
+
+```onion
+extension List[Int] { def foo(): Int = 1 }
+extension List[Int] { def bar(): Int = 2 }   // E0102: List[int] 用の extension ブロックは既に定義されている
+```
+
+対処: メソッドを最初のブロックにまとめてください。同じジェネリックな受け取り型の
+異なる具体的インスタンス化は衝突しません（`extension List[Int]` と
+`extension List[String]` は共存できます）。
 
 ## 宣言エラー
 
@@ -1408,6 +1429,19 @@ def isRound(sh: Shape): Boolean {
 
 通常の値パターンだけの `,` リスト（`case 1, 2, 3:`）は対象外です。型・分
 解・正規表現・無条件束縛パターンのいずれかが含まれる場合のみ検出されます。
+
+### `E0101` — ラムダの引数の数が合わない
+
+ラムダの引数の数が、そこで期待される関数型の引数の数と違います。メッセージには両方の数と、期待される型が出ます。
+
+```onion
+val m = ["a": 1, "b": 2]
+m.filter { e -> e.getValue() > 0 }      // E0101: Map の filter は (key, value) を取る
+[1, 2].fold(0) { acc -> acc }           // E0101: fold の関数は (acc, element) を取る
+```
+
+修正: 関数型が取る引数どおりにラムダを書きます。
+`m.filter { k, v -> v > 0 }`、`[1, 2].fold(0) { acc, x -> acc + x }`。
 
 ### `E0069` — ローカル val に初期化子が必要
 
@@ -1824,7 +1858,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0077` | tool `…` performs `…` here (calling …) but does not declare it |
 | `E0078` | tool `…` declares capability `…` but nothing in its body can perform it |
 | `E0079` | tool `…` has an invalid capability `…`: … |
-| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law |
+| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law that exercises it |
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |
@@ -1845,6 +1879,8 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0098` | enum … mixes shared parameters with `case` cases |
 | `E0099` | enum … cannot take type parameters |
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
+| `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
+| `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 
 ## 関連項目
 

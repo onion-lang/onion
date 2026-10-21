@@ -1205,7 +1205,7 @@ Future works with do notation for sequential async composition:
 val result: Future[Int] = do[Future] {
   x <- Future::async { fetchA() }
   y <- Future::async { fetchB(x) }
-  ret x + y
+  yield x + y
 }
 ```
 
@@ -1428,6 +1428,12 @@ Strings::substring("hello", 1) / Strings::substring("hello", 1, 3)  // "ello" / 
 Strings::indexOf("hello", "l") / Strings::lastIndexOf("hello", "l")   // 2 / 3
 ```
 
+Parsing that throws `NumberFormatException` (`"not an integer: \"abc\""`) on bad input, by the same rules as the null-safe forms below; also callable as `"42".toInt()`:
+
+```onion
+Strings::toInt("42") / Strings::toLong("100") / Strings::toDouble("3.14")
+```
+
 Null-safe parsing (return `null`/fallback instead of throwing):
 
 ```onion
@@ -1541,13 +1547,14 @@ Files::readBytes(path) / Files::writeBytes(path, bytes)
 Files::list("dir")                     // List of entry names
 Files::listFiles("dir")                // List of java.io.File entries
 Files::glob("dir", "*.on")             // glob-matched names
+Files::walk("dir")                     // every file under dir, recursively: relative paths, sorted
 Files::delete(path) / Files::exists(path)
 Files::isFile(path) / Files::isDirectory(path)
 Files::mkdirs(path)                    // creates dir + missing parents
 Files::size(path)                      // Long, size in bytes (0 if missing)
 Files::copy(src, dst)                  // replaces dst if it exists
 Files::move(src, dst)                  // rename; replaces dst if it exists
-Files::copyDir(src, dst)               // recursive directory copy
+Files::copyDir(src, dst)               // recursive directory copy; rejects dst inside/equal to src
 ```
 
 Path helpers — file names, parents, joining, and extensions:
@@ -2132,6 +2139,13 @@ into a pipeline like the rest of `Colls`:
 
 ```onion
 xs.concat(ys)                     // elements of xs followed by elements of ys
+xs + ys                           // same as concat (also xs.plus(ys), xs += ys); a new List
+xs.associateBy { x -> key(x) }    // Map key -> element; a later element wins a shared key
+xs.indexOfFirst { x -> x > 6 }    // index of the first match, or -1
+xs.maxOrNull() / xs.minOrNull()   // like max()/min(), but null for an empty list
+foreach (i, x) in xs.withIndex() { ... }   // withIndex(): ordered Map index -> element
+xs.mapIndexed { i, x -> x + i }   // map with each element's index
+xs.forEachIndexed { i, x -> ... } // forEach with each element's index
 [[1, 2], [3, 4]].flatten()        // [1, 2, 3, 4] - one level of nesting removed
 xs.flatMap { x -> [x, x] }        // maps each element to a list, then flattens one level
                                    // (bind is an alias, used by do[List] { x <- xs; ... })
@@ -2284,7 +2298,7 @@ val body = r.map { res -> res.body }.getOrElse("")
 val both = do[Result] {
   a <- Http::request("GET", urlA).send()
   b <- Http::request("GET", urlB).send()
-  ret a.status + b.status
+  yield a.status + b.status
 }
 ```
 
@@ -2473,6 +2487,7 @@ DateTime::monthName(epochMillis): String  // "March"
 ```
 DateTime::of(year, month, day): Long
 DateTime::of(year, month, day, hour, minute, second): Long
+DateTime::today(): Long                 // = startOfDay(now())
 DateTime::startOfDay(epochMillis): Long
 DateTime::endOfDay(epochMillis): Long
 ```
@@ -2993,7 +3008,8 @@ Maps::filterValues(m, (v: Int) -> v > 0)
 Maps::filterKeys(m, (k: String) -> k.startsWith("a"))
 Maps::filter(m, (k: String, v: Int) -> v > 0)        // key+value predicate
 Maps::invert(m)                                       // swap keys and values
-Maps::toList(m, (k: String, v: Int) -> k + "=" + v)   // entries -> List
+Maps::map(m, (k: String, v: Int) -> k + "=" + v)      // entries -> List; m.map { k, v -> ... }
+Maps::toList(m, (k: String, v: Int) -> k + "=" + v)   // entries -> List (same as map)
 Maps::forEach(m, (k: String, v: Int) -> println(k))
 ```
 
@@ -3048,26 +3064,18 @@ val c = Sets::fromList([1, 1, 2, 3])   // distinct, first-seen order
 Sets::toList(a)                        // back to a List
 ```
 
-**`toList` doesn't compile as `a.toList()` at all -- not even a shadowing
-case**: `onion.Colls` also declares a `toList(Set)` extension with the same
-erased signature as `onion.Sets`'s, which would ordinarily just shadow it
-the way `union`/`intersection`/`difference`/`map` are shadowed below. But
-`Set` also conforms to `Iterable`, and `onion.Iterables` separately declares
-a `toList(Iterable)` extension -- a genuinely different erased signature
-that is *also* applicable to a `Set` argument. That makes `a.toList()`
-**ambiguous** between `onion.Colls`'s and `onion.Iterables`'s versions, so
-it fails to compile with `E0006` ("method call is applicable for both
-Colls.toList() and Iterables.toList()") instead of silently picking one --
-unlike every other method this module documents as "also a builtin
-extension method." The static forms disagree with each other on top of
-that: `Colls::toList` wraps its copy in `Collections.unmodifiableList` and
-throws `NullPointerException` for a `null` set; `Sets::toList` returns a
-plain mutable `ArrayList` and treats `null` as empty. Always call
-`Sets::toList(a)` (or `Colls::toList(a)` for the unmodifiable, throwing
-variant) explicitly -- `a.toList()` never compiles for a `Set` receiver.
+**`a.toList()` on a `Set` is `onion.Colls`'s `toList(Set)`**: it and
+`onion.Iterables`'s `toList(Iterable)` both accept a `Set`, and the more
+specific receiver wins (before this, the call failed with `E0006` as
+ambiguous). `onion.Sets`'s `toList(Set)` has the same erased signature as
+`Colls`'s and is shadowed by it. The two static forms differ:
+`Colls::toList` wraps its copy in `Collections.unmodifiableList` and throws
+`NullPointerException` for a `null` set; `Sets::toList` returns a plain
+mutable `ArrayList` and treats `null` as empty. Call `Sets::toList(a)` when
+you need the mutable, null-safe copy.
 
 ```onion
-a.toList()                             // [E0006] ambiguous: Colls.toList() vs Iterables.toList()
+a.toList()                             // = Colls::toList(a): unmodifiable
 Sets::toList(a)                        // mutable; null-safe (empty list for null)
 Colls::toList(a)                       // unmodifiable; throws NullPointerException for null
 ```

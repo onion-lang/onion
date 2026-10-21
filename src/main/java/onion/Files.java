@@ -225,10 +225,18 @@ public final class Files {
     /**
      * Recursively copies the directory tree rooted at {@code src} into {@code dst}.
      * {@code dst} is created if it does not exist; existing files are replaced.
+     *
+     * @throws IllegalArgumentException if {@code dst} is {@code src} or lies inside it;
+     *         nothing is written in that case
      */
     public static void copyDir(String src, String dst) throws IOException {
         final java.nio.file.Path srcPath = java.nio.file.Paths.get(src);
         final java.nio.file.Path dstPath = java.nio.file.Paths.get(dst);
+        final java.nio.file.Path srcAbs = srcPath.toAbsolutePath().normalize();
+        final java.nio.file.Path dstAbs = dstPath.toAbsolutePath().normalize();
+        if (dstAbs.equals(srcAbs) || dstAbs.startsWith(srcAbs)) {
+            throw new IllegalArgumentException("cannot copy a directory into itself: " + src + " -> " + dst);
+        }
         java.nio.file.Files.walkFileTree(srcPath, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
             @Override
             public java.nio.file.FileVisitResult preVisitDirectory(
@@ -261,6 +269,36 @@ public final class Files {
             java.util.Arrays.sort(names);
             for (String n : names) result.add(n);
         }
+        return result;
+    }
+
+    /**
+     * Every regular file under a directory, recursively, as paths relative to it
+     * (using /), sorted -- like {@code find dir -type f}. Directories themselves are
+     * not listed (unlike {@code glob(dir, "**")}), unreadable entries are skipped,
+     * and a path that is not a directory gives an empty list.
+     *
+     * Usage:
+     *   foreach f in Files::walk("src") { ... }
+     */
+    public static java.util.List<String> walk(String dir) throws IOException {
+        java.nio.file.Path base = java.nio.file.Paths.get(dir);
+        java.util.ArrayList<String> result = new java.util.ArrayList<>();
+        if (!java.nio.file.Files.isDirectory(base)) return result;
+        java.nio.file.Files.walkFileTree(base, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
+            @Override
+            public java.nio.file.FileVisitResult visitFile(java.nio.file.Path p, java.nio.file.attribute.BasicFileAttributes attrs) {
+                if (attrs.isRegularFile()) {
+                    result.add(base.relativize(p).toString().replace(File.separatorChar, '/'));
+                }
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+            @Override
+            public java.nio.file.FileVisitResult visitFileFailed(java.nio.file.Path p, IOException e) {
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+        });
+        java.util.Collections.sort(result);
         return result;
     }
 

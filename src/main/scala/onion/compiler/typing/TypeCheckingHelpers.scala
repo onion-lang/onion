@@ -37,6 +37,36 @@ private[typing] object TypeCheckingHelpers {
     case _ => false
   }
 
+  // A value fits a slot typed by an Onion-declared type variable `tv` only
+  // if it is a `tv`: the same variable (or its non-null view), or one whose
+  // bound chain reaches it. Fitting `tv`'s bound is not enough -- `t = u`
+  // between unrelated `T` and `U`, or `item = o` with `o: Object`, compiled
+  // and then threw a ClassCastException on the next read (#2308). A Java
+  // (platform) type variable keeps the loose rule: on a raw receiver it is
+  // never instantiated, and Java's own erasure accepts its bound there.
+  def fitsTypeVariable(tv: TypeVariableType, actual: Type): Boolean =
+    tv.nullability == Nullability.Platform || isValueOf(tv, actual)
+
+  private def isValueOf(tv: TypeVariableType, actual: Type): Boolean = actual match {
+    case rtv: TypeVariableType => (rtv.widen eq tv.widen) || isValueOf(tv, rtv.upperBound)
+    case w: WildcardType => isValueOf(tv, w.upperBound)
+    case n: NullableType => isValueOf(tv, n.innerType)
+    case _ => false
+  }
+
+  // `isSuperType` alone, read through a type variable's bound, called `T` a
+  // supertype of `String`; a branch join then typed `if c { t } else { "s" }`
+  // as `T` and rejected its own else-branch, even under an `Object` target.
+  private def joinsInto(upper: Type, other: Type): Boolean =
+    TypeRules.isSuperType(upper, other) && (upper match {
+      case tv: TypeVariableType => fitsTypeVariable(tv, other)
+      case n: NullableType => n.innerType match {
+        case tv: TypeVariableType => fitsTypeVariable(tv, other)
+        case _ => true
+      }
+      case _ => true
+    })
+
   /**
    * Compute the least upper bound (LUB) of two types.
    *
@@ -76,8 +106,8 @@ private[typing] object TypeCheckingHelpers {
       reportError(node, left, right)
       return null
     }
-    if (TypeRules.isSuperType(left, right)) return left
-    if (TypeRules.isSuperType(right, left)) return right
+    if (joinsInto(left, right)) return left
+    if (joinsInto(right, left)) return right
     if (!left.isBasicType && !right.isBasicType) {
       // Neither reference type is a supertype of the other: walk the class
       // hierarchy to the nearest common ancestor instead of collapsing straight

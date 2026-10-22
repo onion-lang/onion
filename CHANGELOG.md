@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Before: inside `class S[T, U]`, `t = u`, `item = someObject` or `item = "x"` compiled, then threw a `ClassCastException` on the next read.
   - Now: `E0000 type T is expected, but type U is used`, as in Java. A `T`, a variable bounded by `T` (`[T, U extends T]`), and `null` are still accepted.
   - To keep an unchecked store, cast: `t = (u as T)`. See [Migrating to 1.0](docs/migration/pre-1.0.md).
-  - Not covered yet: a call argument (`put(u)` with `def put(x: T)`) and a `T?` slot still accept a `U` (#2332).
+  - A call argument is checked too when the method is inherited (`set(o)` inside `Mid[U] extends Box[U]`) or the receiver is typed with your variable (`xs.add(o)` with `xs: List[T]`).
+  - Not covered yet: a call to the class's own method (`put(u)` with `def put(x: T)`), a `T?` slot, `xs[0] = u`, `m["k"] = u` and `[u]` still accept a `U` (#2332).
 
 ### Added
 
@@ -34,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **An inherited member called on `this` keeps the subclass's type argument (#2308).**
   - Before: inside `class Mid[U] extends Box[U]`, `get()` or `this.get()` (declared on `Box` as `T`) was an `Object`; in a generic `enum Opt[T]`, `case s is Some` under `select this` bound a raw `Some`.
-  - Now: `get()` is a `U`, and the case binds `Some[T]`. A raw receiver (`case m is Mid`, `(o as Mid)`) is unchanged.
+  - Now: `get()` is a `U`, also inside a lambda, and the case binds `Some[T]`. A raw receiver (`case m is Mid`, `(o as Mid)`) is unchanged.
+  - `U` may be null, so `get().toString()` there is now E0057, as it already was inside `Box`. Write `get()?.toString()`, or bound it: `Mid[U extends Object]`.
 - **A tail-recursive function reads its current parameters inside `try`, lambdas and static-field assignments (#2329).**
   - Before: `def d(n: Int, acc: String): String { ...; try { s = s + n } ...; return d(n - 1, s) }` saw the first `n` on every round, so `d(3, "")` returned `333`, with no error.
   - Now: it returns `321`, as without the optimisation. Deep tail recursion still runs as a loop.

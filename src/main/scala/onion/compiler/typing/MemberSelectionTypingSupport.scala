@@ -110,7 +110,7 @@ private[compiler] final class MemberSelectionTypingSupport(
   // type arguments (#2033).
   private def inheritedType(typ: Type, receiver: Term, declaring: ClassType): Type =
     {
-      val classSubst = TypeSubstitution.hierarchySubstitution(receiver.`type`, declaring, receiver.isInstanceOf[This])
+      val classSubst = TypeSubstitution.hierarchySubstitution(receiver.`type`, declaring, TypeSubstitution.isSelfReceiver(receiver))
       TypeSubst.result(typ, classSubst, Map.empty)
     }
 }

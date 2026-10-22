@@ -66,6 +66,12 @@ private[compiler] object TypeSubstitution {
       scala.collection.immutable.Map.empty
   }
 
+  /** `this`, or `this`/`self` (and a bare member) reached from inside a closure. */
+  def isSelfReceiver(term: TypedAST.Term): Boolean = term match {
+    case _: TypedAST.This | _: TypedAST.OuterThis => true
+    case _ => false
+  }
+
   /**
    * Substitution for a member declared on `declaring`, as seen from
    * `receiver`: walks the inheritance chain composing extends-clause type

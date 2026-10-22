@@ -232,4 +232,114 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
       assert(Shell.Success(32) == r)
     }
   }
+
+  describe("this reached from inside a lambda (#2328 review)") {
+    val box =
+      """class Box[T] {
+        |protected:
+        |  var value: T
+        |public:
+        |  def this(v: T) { value = v }
+        |  def get(): T { return value }
+        |}
+        |""".stripMargin
+    it("types this.get() inside a lambda as the subclass's U") {
+      val r = shell.run(box +
+        """class Mid[U](v: U) extends Box[U](v) {
+          |public:
+          |  def lam(): U {
+          |    val f: () -> U = () -> this.get()
+          |    return f()
+          |  }
+          |}
+          |def main(args: String[]): Int { return new Mid[String]("hello").lam().length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(5) == r)
+    }
+    it("types self.get() inside a block lambda as the subclass's U") {
+      val r = shell.run(box +
+        """class Mid[U](v: U) extends Box[U](v) {
+          |public:
+          |  def lam(): U {
+          |    val f: () -> U = () -> { val x: U = self.get(); x }
+          |    return f()
+          |  }
+          |}
+          |def main(args: String[]): Int { return new Mid[String]("hello").lam().length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(5) == r)
+    }
+    it("types a bare inherited field and a bare inherited call inside a lambda as U") {
+      val r = shell.run(box +
+        """class Mid[U](v: U) extends Box[U](v) {
+          |public:
+          |  def lam(): U {
+          |    val f: () -> U = () -> value
+          |    return f()
+          |  }
+          |  def lam2(): U {
+          |    val f: () -> U = () -> get()
+          |    return f()
+          |  }
+          |}
+          |def main(args: String[]): Int { return new Mid[String]("hello").lam().length() * 10 + new Mid[String]("hi").lam2().length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(52) == r)
+    }
+  }
+
+  describe("an if/select with a T branch, under a wider target (#2328 review)") {
+    it("joins if c { t } else { \"...\" } to Object, not T") {
+      val r = shell.run(
+        """class Box[T] {
+          |  val t: T
+          |public:
+          |  def this(x: T) { t = x }
+          |  def show(full: Boolean): String {
+          |    val o: Object = if full { t } else { "..." }
+          |    return "" + o
+          |  }
+          |}
+          |def main(args: String[]): Int { return new Box[Integer](7).show(true).length() * 10 + new Box[Integer](7).show(false).length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(13) == r)
+    }
+    it("returns a nullable V or an Object fallback as Object") {
+      val r = shell.run(
+        """class Cache[K, V] {
+          |  val map: java.util.HashMap[K, V] = new java.util.HashMap[K, V]()
+          |public:
+          |  def lookup(k: K, fallback: Object): Object {
+          |    val v = map.get(k)
+          |    return if v != null { v } else { fallback }
+          |  }
+          |}
+          |def main(args: String[]): Int { val c = new Cache[String, String](); return ("" + c.lookup("k", "none")).length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(4) == r)
+    }
+    it("joins the cases of select this in a generic enum to Object") {
+      val r = shell.run(
+        """enum Opt[T] { case Some(value: T); case Nothing
+          |public:
+          |  def orElse(d: Object): Object = select this { case s is Some: s.value(); case n is Nothing: d }
+          |}
+          |def main(args: String[]): Int { return ("" + new Nothing[String]().orElse("dflt")).length() * 10 + ("" + new Some[String]("v").orElse("d")).length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(41) == r)
+    }
+    it("still rejects a joined value that is not a T, put into a T slot") {
+      val src =
+        """class Box[T, U] {
+          |  var t: T
+          |  var u: U
+          |public:
+          |  def this(a: T, b: U) { t = a; u = b }
+          |  def g1(c: Boolean, o: Object): T { return if c { t } else { o } }
+          |  def g2(c: Boolean): void { t = if c { t } else { u } }
+          |}
+          |""".stripMargin
+      assert(errorCodes(src) == Seq("E0000", "E0000"))
+    }
+  }
 }

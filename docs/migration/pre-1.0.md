@@ -121,6 +121,15 @@ public:
 - **What you see:** `E0000 type T is expected, but type U is used.` at the value.
 - **Still fine:** a `T`; a variable bounded by `T` (`[T, U extends T]`, then `t = u`); `null`;
   and a Java type variable reached through a raw Java type.
-- **Not covered yet:** a call argument (`put(u)` where `def put(x: T)`) and a `T?` slot still
-  accept a `U`, and still throw at run time (#2332). Cast there too, so the code keeps
-  compiling once they are checked.
+- **Calls:** an argument is checked when the method is inherited (`set(o)` inside
+  `Mid[U] extends Box[U]`) or the receiver is typed with your variable (`xs.add(o)` with
+  `xs: List[T]`, `b.set(o)` with `b: Box[T]`).
+- **Not covered yet:** a call to the class's own method (`put(u)` where `def put(x: T)`), a
+  `T?` slot, `xs[0] = u`, `m["k"] = u` and a literal `[u]` still accept a `U`, and still throw
+  at run time (#2332). Cast there too, so the code keeps compiling once they are checked.
+- **Inherited members are now `U`:** inside `class Mid[U] extends Box[U]`, an inherited
+  `get(): T` is a `U` (it was `Object`). `U` may be null, so `get().toString()` is now `E0057`,
+  as it already was inside `Box`. Write `get()?.toString()`, `get() ?: fallback`, or give `U` a
+  non-null bound: `class Mid[U extends Object]`.
+- **`val me = this` is a raw type:** `me.get()` is an `Object`. Write `val me: Mid[U] = this`
+  to keep `U`.

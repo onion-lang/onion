@@ -289,10 +289,9 @@ class MutualRecursionOptimization(config: CompilerConfig)
     }
 
     // Check 6: No member may declare a local variable beyond its parameter list.
-    // rewriteParameterReferences only redirects RefLocal/SetLocal references with
-    // index < paramCount to the merged state machine's loop-variable slots; a local
+    // The merged state machine keeps each parameter in its original slot; a local
     // declared in the body (e.g. `val next: Box = ...`) keeps its original slot index,
-    // which collides with the loop/state/temp variable slots the merged method
+    // which collides with the state/temp variable slots the merged method
     // introduces starting at exactly that index once every member's body is spliced
     // into one shared frame -- producing invalid bytecode (a JVM VerifyError at
     // class-load time) instead of either compiling correctly or failing to compile.
@@ -503,31 +502,18 @@ class MutualRecursionOptimization(config: CompilerConfig)
     val loc: Location = null
 
     // Local variable indices:
-    // 0..(paramCount-1): parameters
-    // paramCount: state parameter
-    // (paramCount+1)..(paramCount+paramCount): loop variables for parameters
-    // (paramCount+paramCount+1): loop variable for state
-    val stateParamIndex = paramCount
-    val loopVarOffset = paramCount + 1
-    val stateLoopVarIndex = paramCount + paramCount + 1
+    // 0..(paramCount-1): parameters, updated in place by each tail call
+    // paramCount: state parameter, likewise updated in place
+    // (paramCount+1)..: temporaries for a tail call's new argument values
+    // A tail call assigns the parameter slots themselves (the JVM allows it), so every
+    // read of a parameter -- in a `try`, a lambda's capture, anything -- sees the
+    // current round's value with no rewriting. Copying the parameters into separate
+    // loop variables and redirecting reads missed every node kind the rewrite did not
+    // list, and those reads kept the first call's value (#2334).
+    val loopVarOffset = 0
+    val stateLoopVarIndex = paramCount
 
-    // Step 1: Initialize loop variables
-    val initStatements = mutable.ArrayBuffer[ActionStatement]()
-
-    // Copy parameters to loop variables
-    for (i <- 0 until paramCount) {
-      val paramRef = new RefLocal(loc, 0, i, group.head.arguments(i))
-      val loopVarIndex = loopVarOffset + i
-      val assignment = new SetLocal(loc, 0, loopVarIndex, group.head.arguments(i), paramRef)
-      initStatements += new ExpressionActionStatement(loc, assignment)
-    }
-
-    // Copy state parameter to state loop variable
-    val stateParamRef = new RefLocal(loc, 0, stateParamIndex, TypedAST.BasicType.INT)
-    val stateLoopVarAssignment = new SetLocal(loc, 0, stateLoopVarIndex, TypedAST.BasicType.INT, stateParamRef)
-    initStatements += new ExpressionActionStatement(loc, stateLoopVarAssignment)
-
-    // Step 2: Create if-else chain for state dispatch
+    // Step 1: Create if-else chain for state dispatch
     val stateDispatch = createStateDispatch(
       group,
       stateIds,
@@ -537,13 +523,11 @@ class MutualRecursionOptimization(config: CompilerConfig)
       returnType
     )
 
-    // Step 3: Create infinite loop
+    // Step 2: Create infinite loop
     val trueValue = new BoolValue(loc, true)
     val loop = new ConditionalLoop(loc, trueValue, stateDispatch)
 
-    // Combine: init statements + loop
-    val allStatements = initStatements.toSeq :+ loop
-    new StatementBlock(loc, allStatements: _*)
+    new StatementBlock(loc, loop)
   }
 
   /**
@@ -794,11 +778,8 @@ class MutualRecursionOptimization(config: CompilerConfig)
       result
     }
 
-    // Rewrite parameter references to use loop variables
-    val rewrittenBody = rewriteParameterReferences(body, loopVarOffset, paramCount)
-
     // Transform statements, merging tail calls into if-else structure
-    val transformedStatements = transformStatementsInBlock(rewrittenBody.statements.toSeq)
+    val transformedStatements = transformStatementsInBlock(body.statements.toSeq)
     new StatementBlock(loc, transformedStatements: _*)
   }
 
@@ -849,172 +830,6 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
     // Return a block with all assignments + continue
     new StatementBlock(loc, assignments.toSeq: _*)
-  }
-
-  /**
-   * Rewrite parameter references to use loop variables
-   */
-  private def rewriteParameterReferences(
-    body: StatementBlock,
-    loopVarOffset: Int,
-    paramCount: Int
-  ): StatementBlock = {
-    val loc: Location = null
-
-    def rewriteTerm(term: Term): Term = {
-      term match {
-        case ref: RefLocal if ref.frame == 0 && ref.index < paramCount =>
-          // This references a parameter (NOT state parameter), redirect to loop variable
-          val newIndex = loopVarOffset + ref.index
-          new RefLocal(loc, 0, newIndex, ref.`type`)
-
-        case call: Call =>
-          val rewrittenTarget = rewriteTerm(call.target)
-          val rewrittenParams = call.parameters.map(rewriteTerm)
-          new Call(call.location, rewrittenTarget, call.method, rewrittenParams)
-
-        case call: CallStatic =>
-          val rewrittenParams = call.parameters.map(rewriteTerm)
-          new CallStatic(call.location, call.target, call.method, rewrittenParams)
-
-        case binTerm: BinaryTerm =>
-          val rewrittenLhs = rewriteTerm(binTerm.lhs)
-          val rewrittenRhs = rewriteTerm(binTerm.rhs)
-          new BinaryTerm(binTerm.location, binTerm.kind, binTerm.`type`, rewrittenLhs, rewrittenRhs)
-
-        case unTerm: UnaryTerm =>
-          val rewrittenOperand = rewriteTerm(unTerm.operand)
-          new UnaryTerm(unTerm.location, unTerm.kind, unTerm.`type`, rewrittenOperand)
-
-        case setLocal: SetLocal =>
-          val rewrittenValue = rewriteTerm(setLocal.value)
-          // If setting a parameter, redirect to loop variable
-          if (setLocal.frame == 0 && setLocal.index < paramCount) {
-            new SetLocal(loc, 0, loopVarOffset + setLocal.index, setLocal.`type`, rewrittenValue)
-          } else {
-            new SetLocal(setLocal.location, setLocal.frame, setLocal.index, setLocal.`type`, rewrittenValue)
-          }
-
-        // String concatenation wraps every operand in AsInstanceOf(term, Object) before
-        // passing it to String.valueOf — without this case those inner RefLocals are never
-        // rewritten, so side effects before a tail call always read the original parameter
-        // slot instead of the current loop-variable value.
-        case castTerm: AsInstanceOf =>
-          new AsInstanceOf(castTerm.location, rewriteTerm(castTerm.target), castTerm.destination)
-
-        case safeCall: SafeCall =>
-          val rewrittenTarget = rewriteTerm(safeCall.target)
-          val rewrittenParams = safeCall.parameters.map(rewriteTerm)
-          new SafeCall(safeCall.location, rewrittenTarget, safeCall.method, rewrittenParams)
-
-        case safeExt: SafeStaticExtensionCall =>
-          val rewrittenTarget = rewriteTerm(safeExt.target)
-          val rewrittenParams = safeExt.parameters.map(rewriteTerm)
-          new SafeStaticExtensionCall(safeExt.location, rewrittenTarget, safeExt.containerClass, safeExt.method, safeExt.receiverBasicType, rewrittenParams)
-
-        case callSuper: CallSuper =>
-          val rewrittenTarget = rewriteTerm(callSuper.target)
-          val rewrittenParams = callSuper.params.map(rewriteTerm)
-          new CallSuper(callSuper.location, rewrittenTarget, callSuper.method, rewrittenParams)
-
-        case begin: Begin =>
-          new Begin(begin.location, begin.terms.map(rewriteTerm))
-
-        case arrLen: ArrayLength =>
-          new ArrayLength(arrLen.location, rewriteTerm(arrLen.target))
-
-        case refArr: RefArray =>
-          new RefArray(refArr.location, rewriteTerm(refArr.target), rewriteTerm(refArr.index))
-
-        case nnAssert: NonNullAssert =>
-          new NonNullAssert(nnAssert.location, rewriteTerm(nnAssert.target), nnAssert.`type`)
-
-
-        case safeRefArr: SafeRefArray =>
-          new SafeRefArray(safeRefArr.location, rewriteTerm(safeRefArr.target), rewriteTerm(safeRefArr.index), safeRefArr.arrayType)
-
-        case setArr: SetArray =>
-          new SetArray(setArr.location, rewriteTerm(setArr.target), rewriteTerm(setArr.index), rewriteTerm(setArr.value))
-
-        case syncTerm: SynchronizedTerm =>
-          new SynchronizedTerm(syncTerm.location, rewriteTerm(syncTerm.lock), rewriteTerm(syncTerm.body))
-
-        case refField: RefField =>
-          new RefField(refField.location, rewriteTerm(refField.target), refField.field)
-
-        case safeField: SafeFieldAccess =>
-          new SafeFieldAccess(safeField.location, rewriteTerm(safeField.target), safeField.field)
-
-        case setField: SetField =>
-          new SetField(setField.location, rewriteTerm(setField.target), setField.field, rewriteTerm(setField.value))
-
-        case instOf: InstanceOf =>
-          new InstanceOf(instOf.location, rewriteTerm(instOf.target), instOf.checked)
-
-        case listLit: ListLiteral =>
-          new ListLiteral(listLit.location, listLit.elements.map(rewriteTerm), listLit.`type`)
-
-        case mapLit: MapLiteral =>
-          new MapLiteral(mapLit.location, mapLit.keys.map(rewriteTerm), mapLit.values.map(rewriteTerm), mapLit.`type`)
-
-
-        case newObj: NewObject =>
-          new NewObject(newObj.location, newObj.constructor, newObj.parameters.map(rewriteTerm))
-
-        case newArr: NewArray =>
-          new NewArray(newArr.location, newArr.arrayType, newArr.parameters.map(rewriteTerm))
-
-        case newArrVals: NewArrayWithValues =>
-          new NewArrayWithValues(newArrVals.location, newArrVals.arrayType, newArrVals.values.map(rewriteTerm))
-
-        case setStatic: SetStaticField =>
-          new SetStaticField(setStatic.location, setStatic.target, setStatic.field, rewriteTerm(setStatic.value))
-
-        case stmtTerm: StatementTerm =>
-          new StatementTerm(stmtTerm.location, rewriteStatement(stmtTerm.statement), stmtTerm.termType)
-
-        case _ =>
-          term
-      }
-    }
-
-    def rewriteStatement(stmt: ActionStatement): ActionStatement = {
-      stmt match {
-        case ret: Return if ret.term != null =>
-          new Return(ret.location, rewriteTerm(ret.term))
-
-        case block: StatementBlock =>
-          val rewritten = block.statements.map(rewriteStatement)
-          new StatementBlock(block.location, rewritten: _*)
-
-        case ifStmt: IfStatement =>
-          val rewrittenCond = rewriteTerm(ifStmt.condition)
-          val rewrittenThen = rewriteStatement(ifStmt.thenStatement)
-          val rewrittenElse = if (ifStmt.elseStatement != null) {
-            rewriteStatement(ifStmt.elseStatement)
-          } else null
-          new IfStatement(ifStmt.location, rewrittenCond, rewrittenThen, rewrittenElse)
-
-        case exprStmt: ExpressionActionStatement =>
-          new ExpressionActionStatement(exprStmt.location, rewriteTerm(exprStmt.term))
-
-        case loop: ConditionalLoop =>
-          val rewrittenCond = rewriteTerm(loop.condition)
-          val rewrittenStmt = rewriteStatement(loop.stmt)
-          val rewrittenUpdate = if (loop.update == null) null else rewriteStatement(loop.update)
-          new ConditionalLoop(loop.location, rewrittenCond, rewrittenStmt, loop.isPostTest, loop.label, rewrittenUpdate)
-
-        case _ =>
-          stmt
-      }
-    }
-
-    rewriteStatement(body) match {
-      case block: StatementBlock => block
-      case other =>
-        // Body should always be a StatementBlock; wrap defensively to avoid ClassCastException.
-        new StatementBlock(other.location, other)
-    }
   }
 
   /**

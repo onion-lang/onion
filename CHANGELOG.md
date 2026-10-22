@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`@TailRecursive` mutual recursion reads its current parameters inside lambdas and `try` (#2334).**
+  - Before: in `ev`/`od` calling each other, `fs.add(() -> n)` captured the first `n` every round, so the lambdas returned `4 4 4 4`, with no error.
+  - Now: they return `4 3 2 1`, as without the annotation. Deep mutual recursion still runs as a loop.
 - **A body, `derive!` or `from` after an enum `case` now gets a hint pointing at the record form (RFC #2250).**
   - Before: `case Ping(id: Int) derive!(Json)` said only `Encountered "derive", but expecting "}"`.
   - Now: the hint gives the line to paste beside the enum, `record Ping(id: Int) conforms Msg` (for `enum Opt[T]`: `record Some[T](value: T) conforms Opt[T]`), and says methods in its body go under `public:`.

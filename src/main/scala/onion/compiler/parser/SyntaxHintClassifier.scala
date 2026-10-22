@@ -240,12 +240,19 @@ private[compiler] object SyntaxHintClassifier {
   // (a bare identifier immediately followed by `(args)`).
   private val EnumConstantMissingComma =
     """^\s*([A-Za-z_]\w*)\s*\([^()]*\)\s*$""".r
+  // An ADT enum's `case Name(fields)` line takes nothing after its field list, so
+  // a `{ body }`, `derive!(...)` or `from re"..."` there fails with only "}"
+  // expected (RFC #2250). Matched against the text before the error token, so on
+  // a `;`-separated line the hint names the case the clause was attached to.
+  private val EnumCaseWithClause =
+    """(?:^|[;{])\s*case\s+([A-Za-z_]\w*)\s*(?:\(([^;]*)\))?\s*$""".r
 
   def classify(
     found: String,
     expected: String,
     context: String,
-    sourceLine: String
+    sourceLine: String,
+    precedingText: String = ""
   ): Option[SyntaxHint] = {
     lazy val controlFlowHint = ControlFlowSyntaxHints.classify(found, sourceLine)
 
@@ -466,6 +473,22 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.typescript_style_optional_annotation", matched.group(1), matched.group(2))
       case "?" if NullishCoalescing.findFirstMatchIn(context).isDefined =>
         hint("error.parsing.hint.nullish_coalescing")
+      case "{" | "derive" | "from"
+          if expected == "\"}\"" && EnumCaseWithClause.findFirstMatchIn(textBefore(context, sourceLine)).isDefined =>
+        val before = textBefore(context, sourceLine)
+        val matched = EnumCaseWithClause.findFirstMatchIn(before).get
+        val (enumName, typeParams) = enclosingEnum(precedingText + before).getOrElse(("<enum>", Nil))
+        val recordParams = if (typeParams.isEmpty) "" else typeParams.mkString("[", ", ", "]")
+        val enumRef =
+          if (typeParams.isEmpty) enumName
+          else typeParams.map(_.takeWhile(c => c.isLetterOrDigit || c == '_')).mkString(s"$enumName[", ", ", "]")
+        hint(
+          "error.parsing.hint.enum_case_body",
+          matched.group(1),
+          Option(matched.group(2)).getOrElse("").trim,
+          recordParams,
+          enumRef
+        )
       case _ if expected == "\"}\"" && EnumConstantMissingComma.findFirstMatchIn(sourceLine).isDefined =>
         val matched = EnumConstantMissingComma.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.enum_constant_missing_comma", matched.group(1))
@@ -573,6 +596,45 @@ private[compiler] object SyntaxHintClassifier {
    * The part of `sourceLine` before the error token, recovered from `context`
    * (which starts at the token). Empty when `context` was truncated mid-line.
    */
+  private val EnumHeader = """\benum\s+([A-Za-z_]\w*)\s*""".r
+
+  /**
+   * The name and type parameters (each with its bound, as written) of the last
+   * `enum` header in `text`, which for a `case` line is the enum it belongs to.
+   * The parameter list is split at top-level commas, so `[K, V extends Comparable[V]]`
+   * gives `K` and `V extends Comparable[V]`.
+   */
+  private def enclosingEnum(text: String): Option[(String, List[String])] =
+    EnumHeader.findAllMatchIn(text).toList.lastOption.map { m =>
+      val params =
+        if (m.end >= text.length || text.charAt(m.end) != '[') Nil
+        else {
+          val parts = scala.collection.mutable.ListBuffer[String]()
+          val current = new StringBuilder
+          var depth = 0
+          var i = m.end
+          var closed = false
+          while (i < text.length && !closed) {
+            val c = text.charAt(i)
+            c match {
+              case '[' =>
+                if (depth > 0) current += c
+                depth += 1
+              case ']' =>
+                depth -= 1
+                if (depth == 0) closed = true else current += c
+              case ',' if depth == 1 =>
+                parts += current.toString.trim
+                current.clear()
+              case _ => current += c
+            }
+            i += 1
+          }
+          if (closed) (parts += current.toString.trim).toList.filter(_.nonEmpty) else Nil
+        }
+      (m.group(1), params)
+    }
+
   private def textBefore(context: String, sourceLine: String): String = {
     val rest = context.takeWhile(c => c != '\n' && c != '\r')
     if (sourceLine.stripSuffix("\r").endsWith(rest)) sourceLine.stripSuffix("\r").dropRight(rest.length)

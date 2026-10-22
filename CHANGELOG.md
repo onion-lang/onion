@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A tail-recursive function reads its current parameters inside `try`, lambdas and static-field assignments (#2329).**
   - Before: `def d(n: Int, acc: String): String { ...; try { s = s + n } ...; return d(n - 1, s) }` saw the first `n` on every round, so `d(3, "")` returned `333`, with no error.
   - Now: it returns `321`, as without the optimisation. Deep tail recursion still runs as a loop.
+- **A body, `derive!` or `from` after an enum `case` now gets a hint pointing at the record form (RFC #2250).**
+  - Before: `case Ping(id: Int) derive!(Json)` said only `Encountered "derive", but expecting "}"`.
+  - Now: the hint gives the line to paste beside the enum, `record Ping(id: Int) conforms Msg` (for `enum Opt[T]`: `record Some[T](value: T) conforms Opt[T]`), and says methods in its body go under `public:`.
 - **`yield x` outside a `do` block gets the `do`-block hint wherever it appears (#2300).**
   - Before: in `def f(): Int { yield 1 }` or `{ x -> yield x }`, the hint said to escape `yield` with backticks, which still fails.
   - Now: the same hint as a `yield` at the start of a line: `yield` works only inside `do[M] { ... }`.

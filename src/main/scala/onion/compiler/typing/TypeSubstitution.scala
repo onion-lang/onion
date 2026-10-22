@@ -61,7 +61,11 @@ private[compiler] object TypeSubstitution {
   def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = receiverView(tp) match {
     case applied: TypedAST.AppliedClassType =>
       val rawParams = applied.raw.typeParameters
-      rawParams.map(_.name)(using onion.compiler.TypedAST.stringTag).zip(applied.typeArguments).toMap
+      val args = applied.typeArguments.map {
+        case tv: TypedAST.TypeVariableType => tv.resolvedView
+        case other => other
+      }(using onion.compiler.TypedAST.typeTag)
+      rawParams.map(_.name)(using onion.compiler.TypedAST.stringTag).zip(args).toMap
     case _ =>
       scala.collection.immutable.Map.empty
   }

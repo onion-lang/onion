@@ -1204,6 +1204,19 @@ object TypedAST {
       if (w.resolvedParameter == null) w else w.resolvedParameter.widen
     }
 
+    /**
+     * This variable with a placeholder replaced by the parameter it became,
+     * keeping a non-null view non-null. A member reached through the bound of
+     * `[A extends Animal[A]]` returns the placeholder; read as is, its bound is
+     * the root class, so a third `me()` in `me().me().me()` was not found.
+     */
+    def resolvedView: TypeVariableType = {
+      val w = widen
+      if (w.resolvedParameter == null) this
+      else if (this eq w) w.resolvedParameter
+      else w.resolvedParameter.widen.nonNullView
+    }
+
     def isInterface: Boolean = upperBound.isInterface
     def modifier: Int = upperBound.modifier
     def superClass: TypedAST.ClassType = upperBound.superClass

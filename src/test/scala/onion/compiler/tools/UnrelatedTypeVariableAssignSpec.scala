@@ -752,4 +752,107 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
       assert(es.head.message.contains("`[T]`"))
     }
   }
+
+  describe("a chain through an F-bound, and the hints on a T slot (#2328 review, round 8)") {
+    it("runs a fluent builder's named(\"x\").named(\"y\").get()") {
+      val r = shell.run(
+        """abstract class Builder[B extends Builder[B]] {
+          |  var name: String = ""
+          |public:
+          |  abstract def me(): B
+          |  def named(n: String): B { name = n; return me() }
+          |  def get(): String = name
+          |  def go(): String = named("x").named("y").get()
+          |}
+          |class PB extends Builder[PB] {
+          |public:
+          |  def me(): PB = this
+          |}
+          |def main(args: String[]): Int {
+          |  return if new PB().go() == "y" { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("runs me().me().me(), a.me().me() and a five-step chain") {
+      val r = shell.run(
+        """abstract class Animal[A extends Animal[A]] {
+          |public:
+          |  abstract def me(): A
+          |  def chain(): A = me().me().me()
+          |  def chain2(a: A): A = a.me().me()
+          |  def deep(): A = me().me().me().me().me()
+          |}
+          |class Cat extends Animal[Cat] {
+          |public:
+          |  def me(): Cat = this
+          |}
+          |def main(args: String[]): Int {
+          |  val c = new Cat()
+          |  return if c.chain() === c && c.chain2(c) === c && c.deep() === c { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("still rejects another F-bounded variable's value at the end of a chain") {
+      // Compared against the same class without `other`, so the bound errors
+      // a second class's `[A extends Animal[A]]` gets today do not count.
+      def holder(extra: String): String =
+        s"""abstract class Animal[A extends Animal[A]] {
+           |public:
+           |  abstract def me(): A
+           |}
+           |class Holder[A extends Animal[A], C extends Animal[C]] {
+           |public:
+           |  def same(a: A): A = a.me().me().me()
+           |  $extra
+           |}
+           |""".stripMargin
+      val base = errorCodes(holder(""))
+      assert(errorCodes(holder("def other(c: C): A = c.me().me().me()")) == base :+ "E0000")
+    }
+    it("does not suggest !! for an Object? or a T/U join put into a bare T slot") {
+      for (body <- Seq(
+        "def setMaybe(o: Object?): void { t = o }",
+        "def g(c: Boolean): T = if c { t } else { u }"
+      )) {
+        val src =
+          s"""class S[T, U] {
+             |  var t: T
+             |  var u: U
+             |public:
+             |  def this(a: T, b: U) { t = a; u = b }
+             |  $body
+             |}
+             |""".stripMargin
+        val es = errors(src)
+        assert(es.flatMap(_.errorCode) == Seq("E0000"), body)
+        assert(!es.head.message.contains("!!"), body)
+      }
+    }
+    it("still suggests !! (E0070) for a T? value put into a non-null T slot") {
+      val src =
+        """class N[T extends Object] {
+          |  var t: T
+          |public:
+          |  def this(a: T) { t = a }
+          |  def set(o: T?): void { t = o }
+          |}
+          |""".stripMargin
+      val es = errors(src)
+      assert(es.flatMap(_.errorCode) == Seq("E0070"))
+      assert(es.head.message.contains("!!"))
+    }
+    it("compiles the shadow hint's fix: dropping the method's [T]") {
+      val src =
+        """class K[T] {
+          |  var t: T
+          |public:
+          |  def this(x: T) { t = x }
+          |  def m(a: T): void { t = a }
+          |}
+          |""".stripMargin
+      assert(errorCodes(src).isEmpty)
+    }
+  }
 }

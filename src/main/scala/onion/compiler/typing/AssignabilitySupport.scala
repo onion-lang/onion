@@ -198,7 +198,9 @@ private[compiler] final class AssignabilitySupport(
               // rules (handled elsewhere), and requiring both directions
               // for it rejected ordinary covariant wildcard uses that
               // never involved a chained bound at all.
-              val involvesTypeVariable = e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType]
+              val involvesTypeVariable =
+                !e.isInstanceOf[TypedAST.WildcardType] &&
+                  (e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType])
               if (involvesTypeVariable) structurallyAssignable(e, a) && structurallyAssignable(a, e)
               else structurallyAssignable(e, a)
             }

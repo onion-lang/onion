@@ -48,6 +48,7 @@ private[typing] object TypeCheckingHelpers {
     tv.nullability == Nullability.Platform || isValueOf(tv, actual)
 
   private def isValueOf(tv: TypeVariableType, actual: Type): Boolean = actual match {
+    case nt if nt.isNullType => true
     case rtv: TypeVariableType => (rtv.widen eq tv.widen) || isValueOf(tv, rtv.upperBound)
     case w: WildcardType => isValueOf(tv, w.upperBound)
     case n: NullableType => isValueOf(tv, n.innerType)
@@ -66,6 +67,18 @@ private[typing] object TypeCheckingHelpers {
       }
       case _ => true
     })
+
+  // A branch that is a type variable but not a value of the other branch's
+  // type joins through its bound, as in Java: `if c { n } else { 3 }` with
+  // `N extends Number` is a `Number`, not `Serializable`.
+  private def boundOf(t: Type): Type = t match {
+    case tv: TypeVariableType => tv.upperBound
+    case n: NullableType => n.innerType match {
+      case tv: TypeVariableType => NullableType.of(tv.upperBound)
+      case _ => null
+    }
+    case _ => null
+  }
 
   /**
    * Compute the least upper bound (LUB) of two types.
@@ -108,6 +121,10 @@ private[typing] object TypeCheckingHelpers {
     }
     if (joinsInto(left, right)) return left
     if (joinsInto(right, left)) return right
+    val leftBound = boundOf(left)
+    if (leftBound != null) return leastUpperBound(table, node, leftBound, right, rootClass, reportError)
+    val rightBound = boundOf(right)
+    if (rightBound != null) return leastUpperBound(table, node, left, rightBound, rootClass, reportError)
     if (!left.isBasicType && !right.isBasicType) {
       // Neither reference type is a supertype of the other: walk the class
       // hierarchy to the nearest common ancestor instead of collapsing straight

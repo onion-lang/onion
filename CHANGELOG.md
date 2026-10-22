@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now: `E0000 type T is expected, but type U is used`, as in Java. A `T`, a variable bounded by `T` (`[T, U extends T]`), and `null` are still accepted.
   - To keep an unchecked store, cast: `t = (u as T)`. See [Migrating to 1.0](docs/migration/pre-1.0.md).
   - A call argument is checked too when the method is inherited (`set(o)` inside `Mid[U] extends Box[U]`) or the receiver is typed with your variable (`xs.add(o)` with `xs: List[T]`).
-  - Not covered yet: a call to the class's own method (`put(u)` with `def put(x: T)`), a `T?` slot, `xs[0] = u`, `m["k"] = u` and `[u]` still accept a `U` (#2332).
+  - Not covered yet: a call to the class's own method (`put(u)` with `def put(x: T)`), a constructor argument (`new Box[T](u)`), a `T?` slot, `xs[0] = u`, `m["k"] = u` and `[u]` still accept a `U` (#2332).
 
 ### Added
 

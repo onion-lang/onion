@@ -342,4 +342,89 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
       assert(errorCodes(src) == Seq("E0000", "E0000"))
     }
   }
+
+  describe("a bounded type variable joined with another branch (#2328 review, round 3)") {
+    it("joins if c { n } else { 3 } through N's bound, Number") {
+      val r = shell.run(
+        """class C[N extends Number] {
+          |  val n: N
+          |public:
+          |  def this(x: N) { n = x }
+          |  def pick(c: Boolean): Number = if c { n } else { 3 }
+          |  def pickD(c: Boolean): Number = if c { n } else { 2.5 }
+          |}
+          |def main(args: String[]): Int {
+          |  val c = new C[Integer](5)
+          |  return c.pick(true).intValue() * 100 + c.pick(false).intValue() * 10 + c.pickD(false).intValue()
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(532) == r)
+    }
+    it("keeps the bound's methods: (if c { s } else { \"abc\" }).length()") {
+      val r = shell.run(
+        """class C[S extends CharSequence] {
+          |  val s: S
+          |public:
+          |  def this(x: S) { s = x }
+          |  def len(c: Boolean): Int = (if c { s } else { "abc" }).length()
+          |}
+          |def main(args: String[]): Int { val c = new C[String]("hello"); return c.len(true) * 10 + c.len(false) }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(53) == r)
+    }
+    it("still rejects a bounded join put back into the type variable") {
+      val src =
+        """class C[N extends Number] {
+          |  val n: N
+          |public:
+          |  def this(x: N) { n = x }
+          |  def bad(c: Boolean): N = if c { n } else { 3 }
+          |}
+          |""".stripMargin
+      assert(errorCodes(src) == Seq("E0000"))
+    }
+    it("joins a nullable T with null to T?") {
+      val r = shell.run(
+        """class Box[T] {
+          |  var t: T?
+          |public:
+          |  def this(x: T) { t = x }
+          |  def j(c: Boolean): T? = if c { t } else { null }
+          |}
+          |def main(args: String[]): Int { val b = new Box[String]("ab"); return if b.j(false) == null { b.j(true)?.length() ?: 0 } else { 9 } }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(2) == r)
+    }
+  }
+
+  describe("a Comparator[T]/Consumer[T]/Predicate[T] passed to a JDK ? super T parameter (#2328 review, round 3)") {
+    it("accepts List.sort, forEach, removeIf and Collections::sort") {
+      val r = shell.run(
+        """import { java.util.*; java.util.function.* }
+          |class Bag[T] {
+          |  val xs: List[T] = new ArrayList[T]()
+          |public:
+          |  def add(x: T): void { xs.add(x) }
+          |  def sortBy(c: Comparator[T]): void { xs.sort(c) }
+          |  def each(k: Consumer[T]): void { xs.forEach(k) }
+          |  def drop(p: Predicate[T]): void { xs.removeIf(p) }
+          |  def sortAgain(c: Comparator[T]): void { Collections::sort(xs, c) }
+          |  def first(): T = xs.get(0)
+          |  def size(): Int = xs.size()
+          |}
+          |def main(args: String[]): Int {
+          |  val b = new Bag[String]()
+          |  b.add("b"); b.add("a"); b.add("cc")
+          |  b.sortBy((p, q) -> p.compareTo(q))
+          |  val sorted = b.first()
+          |  b.drop((s) -> s.length() > 1)
+          |  b.sortAgain((p, q) -> q.compareTo(p))
+          |  val sb = new StringBuilder()
+          |  b.each((s) -> { sb.append(s); return })
+          |  return if sorted == "a" && sb.toString() == "ba" { b.size() } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(2) == r)
+    }
+  }
 }

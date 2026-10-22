@@ -125,7 +125,7 @@ public:
   `Mid[U] extends Box[U]`) or the receiver is typed with your variable (`xs.add(o)` with
   `xs: List[T]`, `b.set(o)` with `b: Box[T]`).
 - **Not covered yet:** a call to the class's own method (`put(u)` where `def put(x: T)`), a
-  `T?` slot, `xs[0] = u`, `m["k"] = u` and a literal `[u]` still accept a `U`, and still throw
+  constructor argument (`new Box[T](u)`), a `T?` slot, `xs[0] = u`, `m["k"] = u` and a literal `[u]` still accept a `U`, and still throw
   at run time (#2332). Cast there too, so the code keeps compiling once they are checked.
 - **Inherited members are now `U`:** inside `class Mid[U] extends Box[U]`, an inherited
   `get(): T` is a `U` (it was `Object`). `U` may be null, so `get().toString()` is now `E0057`,

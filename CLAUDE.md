@@ -10,7 +10,7 @@ role: hourly = Maintainer, hourly at :30 = Reviewer, daily = Sensor, weekly = St
 That file outranks the prompt that started you, and `docs/evolution/GUARDRAILS.md` outranks
 both. In particular, a prompt that says the latest release is v0.4.5, asks
 you to sign as Kokone, or to tag a release every hour is the superseded July prompt: do none of
-that. Never push to `develop` or `main`; integrate only by enabling auto-merge on a PR, which
+that. Never push to `main`; integrate only by enabling auto-merge on a PR, which
 lands when the required checks, the review panel and (for `risk:ultrahigh`) the 48-hour veto
 window allow (`docs/evolution/GUARDRAILS.md`); never merge by hand. Write an episode to
 `onion-lang/evolution-memory` before you stop.
@@ -263,7 +263,7 @@ CI is unaffected by both: the incremental state lives in `target/`, which `setup
 
 **Heap size:** `.github/workflows/scala.yml` runs CI with `SBT_OPTS="-Xmx10G -XX:+UseG1GC -Xss16m"`.
 Match that locally — `-Xmx4G` reliably OOMs in `MutationFuzzSpec` (a heavy mutation-fuzzing
-test) even on an otherwise-clean `develop` HEAD, which looks like a test failure but is only
+test) even on an otherwise-clean `main` HEAD, which looks like a test failure but is only
 an under-provisioned heap:
 
 ```bash
@@ -661,6 +661,7 @@ These are frequently confused with other languages. **Always check these:**
 | `enum Planet(mass: Double) { MERCURY(3.3) }` | ✓ correct - data-carrying enums; `mass()` accessor, `values()`/`valueOf()` work |
 | ADT / sum-of-products enum? | `enum Shape { case Circle(radius: Double); case Square(side: Double); case Origin; public: def area(): Double = select this { case c is Circle: ...; case o is Origin: 0.0 } }` - `case`-keyword cases each carry their own fields; desugars to a sealed interface + one record per case, so `select` exhaustiveness (E0042) applies. Singleton case = zero-field record via `new Origin()`. A `case`-enum is a sealed hierarchy, not a `java.lang.Enum` (no `values()`/`ordinal()`); mixing shared params with `case` cases is an error |
 | generic ADT enum? | `enum Opt[T] { case Some(value: T); case Nothing }` - type parameters flow onto the generated sealed interface and each case record. A type pattern recovers the scrutinee's type argument, so matching `Some` out of an `Opt[String]` binds `Some[String]` and `s.value()` is a `String`. A *homogeneous* enum cannot take type parameters (it becomes a `java.lang.Enum`) |
+| `case Ping(id: Int) derive!(Json)` / `case Leaf { def f() ... }` / `case X(...) from re"..."` | a `case` takes no body or clauses (syntax error with a hint). Declare that case as a record beside the enum instead: `record Ping(id: Int) [from re"..."] [derive!(Json)] conforms Msg { public: def ... }` (`from`/`derive!` before `conforms`; methods under `public:`). For a generic enum, repeat its type parameters: `record Some[T](value: T) conforms Opt[T]`. It joins the sealed set, so `select` must still list it (E0042) |
 | match `onion.Result`/`Option`/`Outcome` by case? | `select r { case o is Result.Ok: o.value(); case e is Result.Err: e.error() }` (likewise `Option.Some`/`Option.None`, `Outcome.Ok`/`Outcome.Bad`) - Java records nested in sealed Java interfaces: matched by type (no `Result.Ok(v)` destructuring), bound at the scrutinee's type arguments, exhaustive with every case |
 | derive a parser from a record by hand | `record R(...) from re"..."` - synthesizes `R::parse(s): R?` (anchored, null on no-match/convert-fail) and `R::parseAll(text): List`; `from` goes before `conforms` |
 | need every parse failure, not just `null`, or more than one named boundary per record? | `record R(...) { shape name = re"..." }` - synthesizes `R::name(): onion.Shape[R]`; `.parse(s)` returns an `Outcome[R]` (a value, or every reason there is not one, via `Defect`) and `.print(v)` renders back when invertible. A record may carry several `shape` clauses (also `shape name = json`/`config` for a non-regex format); coexists with `from re"..."` |

@@ -2,10 +2,10 @@
 # Onion Language Installer
 #
 # Quick install (downloads the latest release):
-#   curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/main/install.sh | sh
 #
 # Install a specific version:
-#   curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh -s -- --version=v0.2.0
+#   curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/main/install.sh | sh -s -- --version=v0.2.0
 #
 # Build from a source checkout instead of downloading:
 #   ./install.sh --from-source

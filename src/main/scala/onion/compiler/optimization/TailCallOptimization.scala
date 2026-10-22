@@ -306,26 +306,32 @@ class TailCallOptimization(config: CompilerConfig)
   }
 
   /**
+   * Where a tail call writes: each parameter's own slot (`paramTypes(i)` is parameter i's
+   * type), and, for two or more parameters, the temp slots starting at `tempVarOffset`.
+   */
+  private final case class TcoSlots(paramTypes: IndexedSeq[Type], tempVarOffset: Int)
+
+  /**
    * Optimizes a tail-recursive method by converting it to a loop.
    */
   private def optimizeMethod(method: MethodDefinition): Unit = {
     val block = method.getBlock
     val paramCount = method.arguments.length
 
-    // In TypedAST, parameters always start at index 0, regardless of static/instance
-    // The 'this' reference is not part of the LocalFrame indexing
-    // JVM bytecode generation (LocalVarContext) handles the this/parameter slot mapping
-
-    // Loop variable indices must come after ALL locals already in the method's frame
-    // (parameters + any body-declared locals like `val x`, `val next`, …).
-    // Using just paramCount is incorrect when the body declares locals: those are
-    // allocated starting at index paramCount, so placing loop vars there collides
-    // with them and causes a bytecode-generation crash (slot conflict).
+    // A tail call stores the new arguments straight into the parameters' own slots
+    // (the JVM allows writing to a parameter slot), so every existing read of a
+    // parameter -- inside `try`, a lambda's capture, a static-field assignment, or any
+    // other node -- sees the current iteration's value without being rewritten.
+    // Copying the parameters into separate loop variables and rewriting the reads
+    // missed every node kind the rewrite did not list, and those reads kept the
+    // first call's value (#2329).
     //
-    // For regular class methods the LocalFrame is populated during type-checking and
-    // getFrame() returns it. For top-level (synthetic) functions the frame may be null;
-    // in that case we scan the method body AST to find the highest SetLocal/RefLocal
-    // index actually used.
+    // With two or more parameters, the new arguments are first evaluated into temp
+    // variables, so each one still sees the old parameter values (`f(n - 1, n * acc)`).
+    // Temp slots must come after ALL locals already in the method's frame (parameters
+    // + any body-declared locals like `val x`, `val next`, ...), or they collide with
+    // them. For regular class methods the LocalFrame is populated during type-checking;
+    // for top-level (synthetic) functions it may be null, so scan the body instead.
     val maxLocalIndex: Int =
       Option(method.getFrame).map(_.entries) match {
         case Some(entries) if entries.nonEmpty => entries.map(_.index).max
@@ -333,288 +339,24 @@ class TailCallOptimization(config: CompilerConfig)
           val bodyMax = findMaxLocalIndexInBody(block)
           Math.max(bodyMax, paramCount - 1)
       }
-    val loopVarOffset = maxLocalIndex + 1
-    val loopVarMapping = (0 until paramCount).map { i =>
-      val paramIndex = i
-      val loopVarIndex = loopVarOffset + i
-      val paramType = method.arguments(i)
-      (paramIndex, loopVarIndex, paramType)
-    }.toIndexedSeq
-
-    // For multiple parameters, create temp variables to preserve evaluation order
-    // Temp variables come after loop variables
-    val tempVarMapping = if (paramCount >= 2) {
-      val tempVarOffset = loopVarOffset + paramCount  // After loop variables
-      Some((0 until paramCount).map { i =>
-        val tempVarIndex = tempVarOffset + i
-        val paramType = method.arguments(i)
-        (i, tempVarIndex, paramType)
-      }.toIndexedSeq)
-    } else {
-      None
+    val slots = TcoSlots(method.arguments.toIndexedSeq, maxLocalIndex + 1)
+    if (paramCount >= 2) {
+      method.setTcoLoopVars((0 until paramCount).map { i =>
+        (slots.tempVarOffset + i, method.arguments(i))
+      })
+      trace(s"[TCO] Registered $paramCount temp variables for method ${method.name}")
     }
 
-    // Register loop variables + temp variables in MethodDefinition for bytecode generation
-    val allVarsForSlotAllocation = loopVarMapping.map { case (_, loopVarIndex, paramType) =>
-      (loopVarIndex, paramType)
-    } ++ tempVarMapping.getOrElse(Seq.empty).map { case (_, tempVarIndex, paramType) =>
-      (tempVarIndex, paramType)
-    }
-
-    method.setTcoLoopVars(allVarsForSlotAllocation)
-
-    trace(s"[TCO] Registered ${loopVarMapping.length} loop variables for method ${method.name}")
-    if (tempVarMapping.isDefined) {
-      trace(s"[TCO] Registered ${tempVarMapping.get.length} temp variables for method ${method.name}")
-    }
-
-    // Step 1: Create initialization statements (copy parameters to loop variables)
-    val initStatements = loopVarMapping.map { case (paramIndex, loopVarIndex, paramType) =>
-      val paramRef = new RefLocal(null, 0, paramIndex, paramType)
-      val loopVarAssignment = new SetLocal(null, 0, loopVarIndex, paramType, paramRef)
-      new ExpressionActionStatement(null, loopVarAssignment)
-    }
-
-    // Step 2: Rewrite all parameter references in the method body to use loop variables
-    trace(s"[TCO optimizeMethod] Step 2: Rewriting parameter references, original body has ${block.statements.length} statements")
-    val rewrittenBody = rewriteParameterReferences(
-      block.statements.toSeq,
-      loopVarMapping
-    )
-    trace(s"[TCO optimizeMethod] Step 2 complete: rewrittenBody has ${rewrittenBody.length} statements")
-    rewrittenBody.zipWithIndex.foreach { case (stmt, i) =>
-      trace(s"[TCO optimizeMethod]   rewrittenBody[$i]: ${stmt.getClass.getSimpleName}")
-      stmt match {
-        case block: StatementBlock =>
-          trace(s"[TCO optimizeMethod]     StatementBlock with ${block.statements.length} statements:")
-          block.statements.zipWithIndex.foreach { case (s, j) =>
-            trace(s"[TCO optimizeMethod]       stmt[$j]: ${s.getClass.getSimpleName}")
-          }
-        case ret: Return =>
-          val hasTailCall = if (ret.term != null) isSelfCall(ret.term, method) else false
-          trace(s"[TCO optimizeMethod]     Return: term=${if (ret.term != null) ret.term.getClass.getSimpleName else "null"}, hasTailCall=$hasTailCall")
-        case _ =>
-      }
-    }
-
-    // Step 3: Transform tail calls to loop variable updates
-    trace(s"[TCO optimizeMethod] Step 3: Transforming tail calls")
-    val transformedBody = transformStatements(
-      rewrittenBody,
-      method,
-      loopVarMapping
-    )
-    trace(s"[TCO optimizeMethod] Step 3 complete: transformedBody has ${transformedBody.length} statements")
-    transformedBody.zipWithIndex.foreach { case (stmt, i) =>
-      trace(s"[TCO optimizeMethod]   transformedBody[$i]: ${stmt.getClass.getSimpleName}")
-      stmt match {
-        case block: StatementBlock =>
-          trace(s"[TCO optimizeMethod]     StatementBlock with ${block.statements.length} statements:")
-          block.statements.zipWithIndex.foreach { case (s, j) =>
-            trace(s"[TCO optimizeMethod]       stmt[$j]: ${s.getClass.getSimpleName}")
-          }
-        case _ =>
-      }
-    }
+    val transformedBody = transformStatements(block.statements.toSeq, method, slots)
 
     // Remove unreachable return statements at the end
-    trace(s"[TCO optimizeMethod] Step 4: Removing trailing unreachable returns")
     val cleanedBody = removeTrailingUnreachableReturns(transformedBody)
-    trace(s"[TCO optimizeMethod] Step 4 complete: cleanedBody has ${cleanedBody.length} statements")
-    cleanedBody.zipWithIndex.foreach { case (stmt, i) =>
-      trace(s"[TCO optimizeMethod]   cleanedBody[$i]: ${stmt.getClass.getSimpleName}")
-    }
 
     // Wrap in infinite loop: while (true) { ... }
     val trueValue = new BoolValue(null, true)
     val loopBody = new StatementBlock(null, cleanedBody: _*)
     val loop = new ConditionalLoop(null, trueValue, loopBody)
-
-    // Update method body: init statements + loop
-    val newStatements = initStatements :+ loop
-    val newBlock = new StatementBlock(null, newStatements: _*)
-    method.setBlock(newBlock)
-  }
-
-  /**
-   * Rewrites all parameter references in the method body to use loop variables.
-   *
-   * This is necessary because JVM method parameters are read-only.
-   * We copy parameters to loop variables at method entry and use those throughout.
-   */
-  private def rewriteParameterReferences(
-    stmts: Seq[ActionStatement],
-    loopVarMapping: IndexedSeq[(Int, Int, Type)]
-  ): Seq[ActionStatement] = {
-    stmts.map(stmt => rewriteStatementRefs(stmt, loopVarMapping))
-  }
-
-  private def rewriteStatementRefs(
-    stmt: ActionStatement,
-    loopVarMapping: IndexedSeq[(Int, Int, Type)]
-  ): ActionStatement = {
-    stmt match {
-      case ret: Return if ret.term != null =>
-        new Return(ret.location, rewriteTermRefs(ret.term, loopVarMapping))
-
-      case block: StatementBlock =>
-        val rewritten = block.statements.toSeq.map(s => rewriteStatementRefs(s, loopVarMapping))
-        new StatementBlock(block.location, rewritten: _*)
-
-      case ifStmt: IfStatement =>
-        trace(s"[TCO rewriteStatementRefs] Rewriting IfStatement condition")
-        val rewrittenCond = rewriteTermRefs(ifStmt.condition, loopVarMapping)
-        trace(s"[TCO rewriteStatementRefs] IfStatement condition rewritten")
-        val rewrittenThen = rewriteStatementRefs(ifStmt.thenStatement, loopVarMapping)
-        val rewrittenElse = if (ifStmt.elseStatement != null) {
-          rewriteStatementRefs(ifStmt.elseStatement, loopVarMapping)
-        } else null
-        new IfStatement(ifStmt.location, rewrittenCond, rewrittenThen, rewrittenElse)
-
-      case exprStmt: ExpressionActionStatement =>
-        new ExpressionActionStatement(exprStmt.location, rewriteTermRefs(exprStmt.term, loopVarMapping))
-
-      case loop: ConditionalLoop =>
-        val rewrittenCond = rewriteTermRefs(loop.condition, loopVarMapping)
-        val rewrittenStmt = rewriteStatementRefs(loop.stmt, loopVarMapping)
-        val rewrittenUpdate = if (loop.update == null) null else rewriteStatementRefs(loop.update, loopVarMapping)
-        new ConditionalLoop(loop.location, rewrittenCond, rewrittenStmt, loop.isPostTest, loop.label, rewrittenUpdate)
-
-      case _ =>
-        // For other statement types, return as-is
-        stmt
-    }
-  }
-
-  private def rewriteTermRefs(
-    term: Term,
-    loopVarMapping: IndexedSeq[(Int, Int, Type)]
-  ): Term = {
-    term match {
-      case ref: RefLocal =>
-        // Check if this references a parameter
-        loopVarMapping.find(_._1 == ref.index) match {
-          case Some((_, loopVarIndex, paramType)) =>
-            trace(s"[TCO rewriteTermRefs] RefLocal: index=${ref.index} → loopVarIndex=$loopVarIndex")
-            // Replace with loop variable reference
-            new RefLocal(ref.location, ref.frame, loopVarIndex, paramType)
-          case None =>
-            trace(s"[TCO rewriteTermRefs] RefLocal: index=${ref.index}, not a parameter")
-            // Not a parameter, keep as-is
-            ref
-        }
-
-      case call: Call =>
-        val rewrittenTarget = rewriteTermRefs(call.target, loopVarMapping)
-        val rewrittenParams = call.parameters.map(p => rewriteTermRefs(p, loopVarMapping))
-        new Call(call.location, rewrittenTarget, call.method, rewrittenParams)
-
-      case call: CallStatic =>
-        val rewrittenParams = call.parameters.map(p => rewriteTermRefs(p, loopVarMapping))
-        new CallStatic(call.location, call.target, call.method, rewrittenParams)
-
-      case binTerm: BinaryTerm =>
-        val rewrittenLhs = rewriteTermRefs(binTerm.lhs, loopVarMapping)
-        val rewrittenRhs = rewriteTermRefs(binTerm.rhs, loopVarMapping)
-        new BinaryTerm(binTerm.location, binTerm.kind, binTerm.`type`, rewrittenLhs, rewrittenRhs)
-
-      case unTerm: UnaryTerm =>
-        val rewrittenOperand = rewriteTermRefs(unTerm.operand, loopVarMapping)
-        new UnaryTerm(unTerm.location, unTerm.kind, unTerm.`type`, rewrittenOperand)
-
-      case setLocal: SetLocal =>
-        val rewrittenValue = rewriteTermRefs(setLocal.value, loopVarMapping)
-        // Check if we're setting a parameter - if so, redirect to loop variable
-        loopVarMapping.find(_._1 == setLocal.index) match {
-          case Some((_, loopVarIndex, _)) =>
-            new SetLocal(setLocal.location, setLocal.frame, loopVarIndex, setLocal.`type`, rewrittenValue)
-          case None =>
-            new SetLocal(setLocal.location, setLocal.frame, setLocal.index, setLocal.`type`, rewrittenValue)
-        }
-
-      case begin: Begin =>
-        // Recursively rewrite all terms in the Begin block
-        trace(s"[TCO rewriteTermRefs] Begin with ${begin.terms.length} terms")
-        begin.terms.zipWithIndex.foreach { case (t, i) =>
-          trace(s"[TCO rewriteTermRefs]   Begin term[$i]: ${t.getClass.getSimpleName}")
-        }
-        val rewrittenTerms = begin.terms.map(t => rewriteTermRefs(t, loopVarMapping))
-        new Begin(begin.location, rewrittenTerms)
-
-      case stmtTerm: StatementTerm =>
-        // Rewrite the statement within StatementTerm
-        trace(s"[TCO rewriteTermRefs] StatementTerm with statement: ${stmtTerm.statement.getClass.getSimpleName}")
-        val rewrittenStmt = rewriteStatementRefs(stmtTerm.statement, loopVarMapping)
-        new StatementTerm(stmtTerm.location, rewrittenStmt, stmtTerm.termType)
-
-      case cast: AsInstanceOf =>
-        new AsInstanceOf(cast.location, rewriteTermRefs(cast.target, loopVarMapping), cast.destination)
-
-      case refArr: RefArray =>
-        new RefArray(refArr.location, rewriteTermRefs(refArr.target, loopVarMapping), rewriteTermRefs(refArr.index, loopVarMapping))
-
-      case safeArr: SafeRefArray =>
-        new SafeRefArray(safeArr.location, rewriteTermRefs(safeArr.target, loopVarMapping), rewriteTermRefs(safeArr.index, loopVarMapping), safeArr.arrayType)
-
-      case setArr: SetArray =>
-        new SetArray(setArr.location, rewriteTermRefs(setArr.target, loopVarMapping), rewriteTermRefs(setArr.index, loopVarMapping), rewriteTermRefs(setArr.value, loopVarMapping))
-
-      case refField: RefField =>
-        new RefField(refField.location, rewriteTermRefs(refField.target, loopVarMapping), refField.field)
-
-      case safeField: SafeFieldAccess =>
-        new SafeFieldAccess(safeField.location, rewriteTermRefs(safeField.target, loopVarMapping), safeField.field)
-
-      case setField: SetField =>
-        new SetField(setField.location, rewriteTermRefs(setField.target, loopVarMapping), setField.field, rewriteTermRefs(setField.value, loopVarMapping))
-
-      case safeCall: SafeCall =>
-        val rewrittenTarget = rewriteTermRefs(safeCall.target, loopVarMapping)
-        val rewrittenParams = safeCall.parameters.map(p => rewriteTermRefs(p, loopVarMapping))
-        new SafeCall(safeCall.location, rewrittenTarget, safeCall.method, rewrittenParams)
-
-      case safeExt: SafeStaticExtensionCall =>
-        val rewrittenTarget = rewriteTermRefs(safeExt.target, loopVarMapping)
-        val rewrittenParams = safeExt.parameters.map(p => rewriteTermRefs(p, loopVarMapping))
-        new SafeStaticExtensionCall(safeExt.location, rewrittenTarget, safeExt.containerClass, safeExt.method, safeExt.receiverBasicType, rewrittenParams)
-
-      case superCall: CallSuper =>
-        val rewrittenParams = superCall.params.map(p => rewriteTermRefs(p, loopVarMapping))
-        new CallSuper(superCall.location, superCall.target, superCall.method, rewrittenParams)
-
-      case newObj: NewObject =>
-        val rewrittenParams = newObj.parameters.map(p => rewriteTermRefs(p, loopVarMapping))
-        new NewObject(newObj.location, newObj.constructor, rewrittenParams)
-
-      case newArr: NewArray =>
-        val rewrittenParams = newArr.parameters.map(p => rewriteTermRefs(p, loopVarMapping))
-        new NewArray(newArr.location, newArr.arrayType, rewrittenParams)
-
-      case newArrVals: NewArrayWithValues =>
-        val rewrittenVals = newArrVals.values.map(v => rewriteTermRefs(v, loopVarMapping))
-        new NewArrayWithValues(newArrVals.location, newArrVals.arrayType, rewrittenVals)
-
-      case arrLen: ArrayLength =>
-        new ArrayLength(arrLen.location, rewriteTermRefs(arrLen.target, loopVarMapping))
-
-      case inst: InstanceOf =>
-        new InstanceOf(inst.location, rewriteTermRefs(inst.target, loopVarMapping), inst.checked)
-
-      case nonNull: NonNullAssert =>
-        new NonNullAssert(nonNull.location, rewriteTermRefs(nonNull.target, loopVarMapping), nonNull.`type`)
-
-      case listLit: ListLiteral =>
-        new ListLiteral(listLit.location, listLit.elements.map(e => rewriteTermRefs(e, loopVarMapping)), listLit.`type`)
-
-      case mapLit: MapLiteral =>
-        val rewrittenKeys = mapLit.keys.map(k => rewriteTermRefs(k, loopVarMapping))
-        val rewrittenVals = mapLit.values.map(v => rewriteTermRefs(v, loopVarMapping))
-        new MapLiteral(mapLit.location, rewrittenKeys, rewrittenVals, mapLit.`type`)
-
-      case _ =>
-        // Literals and other leaf terms (BoolValue, IntValue, RefThis, Null, etc.)
-        term
-    }
+    method.setBlock(new StatementBlock(null, Seq(loop): _*))
   }
 
   /**
@@ -646,10 +388,10 @@ class TailCallOptimization(config: CompilerConfig)
   private def transformStatements(
     stmts: Seq[ActionStatement],
     method: MethodDefinition,
-    paramTemps: IndexedSeq[(Int, Int, Type)]
+    slots: TcoSlots
   ): Seq[ActionStatement] = {
     stmts.map { stmt =>
-      transformStatement(stmt, method, paramTemps)
+      transformStatement(stmt, method, slots)
     }
   }
 
@@ -659,7 +401,7 @@ class TailCallOptimization(config: CompilerConfig)
   private def transformStatement(
     stmt: ActionStatement,
     method: MethodDefinition,
-    paramTemps: IndexedSeq[(Int, Int, Type)]
+    slots: TcoSlots
   ): ActionStatement = {
     stmt match {
       case ret: Return if ret.term != null && isSelfCall(ret.term, method) =>
@@ -726,9 +468,9 @@ class TailCallOptimization(config: CompilerConfig)
                   result
                 }
 
-                val transformedThen = ensureProperBranchEnd(transformStatement(ifStmt.thenStatement, method, paramTemps), "then")
+                val transformedThen = ensureProperBranchEnd(transformStatement(ifStmt.thenStatement, method, slots), "then")
                 val transformedElse = if (ifStmt.elseStatement != null) {
-                  ensureProperBranchEnd(transformStatement(ifStmt.elseStatement, method, paramTemps), "else")
+                  ensureProperBranchEnd(transformStatement(ifStmt.elseStatement, method, slots), "else")
                 } else null
 
                 // Return the transformed IfStatement directly
@@ -736,7 +478,7 @@ class TailCallOptimization(config: CompilerConfig)
               case None =>
                 trace(s"[TCO transformStatement] Return: No IfStatement found, calling transformTailCall")
                 // No IfStatement found, transform as direct call
-                transformTailCall(ret.term, paramTemps).getOrElse(ret)
+                transformTailCall(ret.term, slots).getOrElse(ret)
             }
           case stmtTerm: StatementTerm =>
             // Explicit return: Return(StatementTerm(IfStatement))
@@ -745,32 +487,32 @@ class TailCallOptimization(config: CompilerConfig)
               case ifStmt: IfStatement =>
                 trace(s"[TCO transformStatement] Return: Transforming explicit return IfStatement")
                 // IfStatementの両ブランチをtransformStatementで処理
-                val transformedThen = transformStatement(ifStmt.thenStatement, method, paramTemps)
+                val transformedThen = transformStatement(ifStmt.thenStatement, method, slots)
                 val transformedElse = if (ifStmt.elseStatement != null) {
-                  transformStatement(ifStmt.elseStatement, method, paramTemps)
+                  transformStatement(ifStmt.elseStatement, method, slots)
                 } else null
                 new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
               case _ =>
                 // Other StatementTerms: fallback to transformTailCall
-                transformTailCall(ret.term, paramTemps).getOrElse(ret)
+                transformTailCall(ret.term, slots).getOrElse(ret)
             }
 
           case _ =>
             trace(s"[TCO transformStatement] Return: Not Begin, calling transformTailCall")
             // Direct tail call (not in Begin)
-            transformTailCall(ret.term, paramTemps).getOrElse(ret)
+            transformTailCall(ret.term, slots).getOrElse(ret)
         }
 
       case block: StatementBlock =>
         // Recursively transform statements in block
-        val transformed = transformStatements(block.statements.toSeq, method, paramTemps)
+        val transformed = transformStatements(block.statements.toSeq, method, slots)
         new StatementBlock(block.location, transformed: _*)
 
       case ifStmt: IfStatement =>
         // Transform both branches
-        val transformedThen = transformStatement(ifStmt.thenStatement, method, paramTemps)
+        val transformedThen = transformStatement(ifStmt.thenStatement, method, slots)
         val transformedElse = if (ifStmt.elseStatement != null) {
-          transformStatement(ifStmt.elseStatement, method, paramTemps)
+          transformStatement(ifStmt.elseStatement, method, slots)
         } else null
 
         new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
@@ -791,11 +533,11 @@ class TailCallOptimization(config: CompilerConfig)
   }
 
   /**
-   * Transforms a tail call into loop variable assignments.
+   * Transforms a tail call into parameter assignments.
    *
    * For `return method(arg1, arg2, ...)`:
    * 1. temp1 = arg1; temp2 = arg2; ... (evaluate all new values first)
-   * 2. loopVar1 = temp1; loopVar2 = temp2; ... (update loop variables)
+   * 2. param1 = temp1; param2 = temp2; ... (update the parameters)
    * 3. (continue - loop restarts)
    *
    * We use temporary variables to ensure correct evaluation order.
@@ -803,7 +545,7 @@ class TailCallOptimization(config: CompilerConfig)
    */
   private def transformTailCall(
     term: Term,
-    loopVarMapping: IndexedSeq[(Int, Int, Type)]
+    slots: TcoSlots
   ): Option[ActionStatement] = {
     // Extract the actual Call from wrapped structures (Begin, StatementTerm, etc.)
     def extractCall(t: Term, depth: Int = 0): Option[Term] = {
@@ -869,46 +611,20 @@ class TailCallOptimization(config: CompilerConfig)
       trace(s"[TCO transformTailCall] Zero-argument tail call, emitting Continue")
       return Some(new Continue(null))
     } else if (newArgs.length == 1) {
-      // Single argument: can directly assign to loop variable (no temp needed)
-      val (_, loopVarIndex, paramType) = loopVarMapping(0)
-      val newValue = newArgs(0)
-
-      // loopVar = newValue
-      val loopVarAssignment = new SetLocal(null, 0, loopVarIndex, paramType, newValue)
-      assignments += new ExpressionActionStatement(null, loopVarAssignment)
-    } else if (newArgs.length > 1) {
-      // Multiple arguments: use temporary variables to preserve evaluation order
+      // Single argument: assign the parameter directly (no temp needed)
+      val paramType = slots.paramTypes(0)
+      assignments += new ExpressionActionStatement(null, new SetLocal(null, 0, 0, paramType, newArgs(0)))
+    } else {
+      // Multiple arguments: evaluate all of them into temps first, so each one sees the
+      // old parameter values, then copy the temps into the parameters.
       trace(s"[TCO transformTailCall] Multiple arguments: ${newArgs.length}")
-
-      // Temp variable indices come after loop variables
-      // For factorial(n: Int, acc: Int):
-      //   loopVarMapping(0) = (0, 2, Int)  // n -> n_loop
-      //   loopVarMapping(1) = (1, 3, Int)  // acc -> acc_loop
-      //   tempVarIndex(0) = 4  // temp0
-      //   tempVarIndex(1) = 5  // temp1
-      // Temp vars live immediately after the last loop variable, regardless of where
-      // loopVarOffset landed. Using 2*paramCount was only correct when loopVarOffset==paramCount;
-      // now that loopVarOffset accounts for body-declared locals the correct base is last_loop+1.
-      val tempVarOffset = loopVarMapping.last._2 + 1
-
-      // Step 1: Evaluate all arguments and assign to temp variables
-      // This ensures correct evaluation order (all args use old parameter values)
       newArgs.zipWithIndex.foreach { case (arg, i) =>
-        val (_, _, paramType) = loopVarMapping(i)
-        val tempVarIndex = tempVarOffset + i
-        trace(s"[TCO transformTailCall]   Step 1: Assign temp[$i]: tempVarIndex=$tempVarIndex")
-        val tempAssignment = new SetLocal(null, 0, tempVarIndex, paramType, arg)
+        val tempAssignment = new SetLocal(null, 0, slots.tempVarOffset + i, slots.paramTypes(i), arg)
         assignments += new ExpressionActionStatement(null, tempAssignment)
       }
-
-      // Step 2: Copy temp variables to loop variables
-      // This updates the loop variables atomically after all args are evaluated
-      loopVarMapping.zipWithIndex.foreach { case ((_, loopVarIndex, paramType), i) =>
-        val tempVarIndex = tempVarOffset + i
-        val tempRef = new RefLocal(null, 0, tempVarIndex, paramType)
-        trace(s"[TCO transformTailCall]   Step 2: Copy temp[$i] -> loopVar[$i]: loopVarIndex=$loopVarIndex")
-        val loopVarAssignment = new SetLocal(null, 0, loopVarIndex, paramType, tempRef)
-        assignments += new ExpressionActionStatement(null, loopVarAssignment)
+      slots.paramTypes.zipWithIndex.foreach { case (paramType, i) =>
+        val tempRef = new RefLocal(null, 0, slots.tempVarOffset + i, paramType)
+        assignments += new ExpressionActionStatement(null, new SetLocal(null, 0, i, paramType, tempRef))
       }
     }
 

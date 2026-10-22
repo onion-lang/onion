@@ -52,7 +52,7 @@ just read got corrected.
 Install the latest release with one command (requires Java 17+):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/develop/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/onion-lang/onion/main/install.sh | sh
 ```
 
 This downloads `onion.jar` from the latest GitHub Release and installs the

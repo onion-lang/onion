@@ -62,13 +62,13 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
           cache: 'sbt'
-      - name: Release only what develop already contains
-        # A manual run can start from any branch. Only a commit reachable from `develop`
-        # (which only merged, gated PRs reach) may be released, tagged, or become `main`.
+      - name: Release only what main already contains
+        # A manual run can start from any branch. Only a commit reachable from `main`
+        # (which only merged, gated PRs reach) may be released or tagged.
         run: |
-          git fetch --no-tags origin develop
+          git fetch --no-tags origin main
           git merge-base --is-ancestor HEAD FETCH_HEAD || {
-            echo "::error::$(git rev-parse --short HEAD) is not on develop; release from develop only"; exit 1; }
+            echo "::error::$(git rev-parse --short HEAD) is not on main; release from main only"; exit 1; }
       - name: Create the tag for a manual run
         if: github.event_name == 'workflow_dispatch'
         env:
@@ -88,13 +88,13 @@ jobs:
           # sbt-dynver reads the checked-out commit's tags, so point HEAD at
           # the tag we just created before resolving the version.
           git checkout -q "$TAG"
-      - name: Release only a tag that develop already contains
+      - name: Release only a tag that main already contains
         # Checked again after the checkout above: a manual run may name an existing tag, and a
         # tag push starts from the tag, so the commit being released is HEAD only from here on.
         run: |
-          git fetch --no-tags origin develop
+          git fetch --no-tags origin main
           git merge-base --is-ancestor HEAD FETCH_HEAD || {
-            echo "::error::tag ${{ steps.tag.outputs.tag }} ($(git rev-parse --short HEAD)) is not on develop"; exit 1; }
+            echo "::error::tag ${{ steps.tag.outputs.tag }} ($(git rev-parse --short HEAD)) is not on main"; exit 1; }
       - name: Require the release note for 1.0 and new majors
         # v1.0.0 and every new major version are risk:ultrahigh (docs/evolution/GUARDRAILS.md):
         # their release note can only reach this ref through a merged ultrahigh PR.
@@ -169,19 +169,12 @@ jobs:
             release-artifacts/onion-${VERSION}.jar \
             release-artifacts/onion-dist-${VERSION}.zip \
             release-artifacts/checksums.txt
-      - name: Move main to the release and redeploy the docs
-        # `main` is the latest release; the docs site deploys from it. A fast-forward only:
-        # if `main` has diverged, warn instead of overwriting it.
+      - name: Redeploy the docs from the release tag
+        # The docs site shows the latest release, not unreleased work on `main`. A release
+        # created with GITHUB_TOKEN does not fire `release: published`, so dispatch it here.
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="${{ steps.tag.outputs.tag }}"
-          SHA=$(git rev-list -n 1 "$TAG")
-          if gh api -X PATCH "repos/${{ github.repository }}/git/refs/heads/main" -f sha="$SHA" -F force=false; then
-            gh workflow run docs.yml --ref main --repo "${{ github.repository }}"
-          else
-            echo "::warning::main could not be fast-forwarded to $TAG; docs not redeployed"
-          fi
+        run: gh workflow run docs.yml --ref "${{ steps.tag.outputs.tag }}" --repo "${{ github.repository }}"
 
   # Maven Central: org.onion-lang:onion and org.onion-lang:onion-llm, signed, uploaded to
   # the Central Portal as one deployment. A separate job, after the GitHub Release, so a

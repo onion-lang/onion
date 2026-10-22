@@ -712,7 +712,11 @@ class SemanticErrorReporter(threshold: Int) {
       Seq(typeName(expected), typeName(actual))
     )
     val hint =
-      if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
+      if (sameNamedTypeVariables(expected, actual)) {
+        // `def m[T](a: T) { t = a }` inside `class K[T]`: two parameters named `T`,
+        // so "type T is expected, but type T is used" contradicts itself without this.
+        Some(format(message("suggestion.shadowedTypeParameter"), Seq(typeName(expected))))
+      } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
       } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
@@ -739,6 +743,17 @@ class SemanticErrorReporter(threshold: Int) {
         case None => None
       }
     problem(position, appendSuggestion(baseMessage, hint))
+  }
+
+  private def sameNamedTypeVariables(expected: TypedAST.Type, actual: TypedAST.Type): Boolean = {
+    def variable(t: TypedAST.Type): TypedAST.TypeVariableType = t match {
+      case tv: TypedAST.TypeVariableType => tv
+      case n: TypedAST.NullableType => variable(n.innerType)
+      case _ => null
+    }
+    val e = variable(expected)
+    val a = variable(actual)
+    e != null && a != null && e.name == a.name && (e.declared ne a.declared)
   }
 
   /**

@@ -120,7 +120,10 @@ public:
   `CharSequence`), or of a concrete type (`"x"`) no longer fits a `T` slot.
 - **What you see:** `E0000 type T is expected, but type U is used.` at the value.
 - **Still fine:** a `T`; a variable bounded by `T` (`[T, U extends T]`, then `t = u`); `null`;
-  and a Java type variable reached through a raw Java type.
+  and an argument to a Java method on a raw Java receiver (`(o as ArrayList).add(u)`). A value
+  read back through one (`t = (o as ArrayList).get(0)`) is not a `T`, so it needs a cast.
+- **Two parameters named `T`:** a method's `[T]` inside `class K[T]` is a different `T`. The
+  error then adds a hint saying so; rename one of them.
 - **Calls:** an argument is checked when the method is inherited (`set(o)` inside
   `Mid[U] extends Box[U]`) or the receiver is typed with your variable (`xs.add(o)` with
   `xs: List[T]`, `b.set(o)` with `b: Box[T]`).
@@ -134,3 +137,5 @@ public:
   `class MyList[T] extends ArrayList[T]`, `get(0).toString()` is now `E0057`.
 - **`val me = this` is a raw type:** `me.get()` is an `Object`. Write `val me: Mid[U] = this`
   to keep `U`.
+- **No `onion migrate` rule, on purpose:** the only mechanical rewrite is inserting
+  `(u as T)`, which would hide exactly the bugs this check finds. Read each error and decide.

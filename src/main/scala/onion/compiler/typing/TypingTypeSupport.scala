@@ -231,6 +231,11 @@ final class TypingTypeSupport(private val typing: Typing) {
         typing.setTypeParams(scope)
         tp.name -> resolved
       }.toMap
+      // A bound that names its own parameter (`A` in `[A extends Animal[A]]`)
+      // still holds the placeholder, so a member reached through that bound
+      // (`me().me()`) yields the placeholder, not `A`. Link it, so a `T` slot
+      // recognises it as the same parameter (#2308).
+      placeholders.foreach(ph => ph.variableType.resolvedParameter = resolvedByName(ph.name).variableType)
       distinct.map(tp => resolvedByName(tp.name)).toSeq
     } finally {
       typing.setTypeParams(outerScope)

@@ -20,6 +20,14 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
     }
   }
 
+  private def errors(src: String): Seq[onion.compiler.CompileError] = {
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors
+      case _ => Seq.empty
+    }
+  }
+
   describe("a value that is not a T, put into a T slot") {
     it("rejects assigning a sibling U to a T field (the issue's repro)") {
       val src =
@@ -667,6 +675,81 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
           |}
           |""".stripMargin
       assert(errorCodes(src).count(_ == "E0000") == 2)
+    }
+  }
+
+  describe("a self-referencing bound, a nullable join and a shadowing T (#2328 review, round 7)") {
+    val animal =
+      """abstract class Animal[A extends Animal[A]] {
+        |public:
+        |  abstract def me(): A
+        |  def chain(): A = me().me()
+        |  def chainVal(): A { val x: A = me(); return x.me() }
+        |}
+        |class Dog extends Animal[Dog] {
+        |public:
+        |  def me(): Dog = this
+        |}
+        |""".stripMargin
+    it("passes a member reached through an F-bound back as the class's own A") {
+      val r = shell.run(
+        animal +
+          """def main(args: String[]): Int {
+            |  val d = new Dog()
+            |  return if (d.chain() is Dog) && (d.chainVal() is Dog) { 1 } else { 0 }
+            |}
+            |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("still rejects another F-bounded variable's value in an A slot") {
+      val src =
+        """abstract class Animal[A extends Animal[A], B extends Animal[B]] {
+          |public:
+          |  abstract def me(): A
+          |  def f(b: B): A = b.me()
+          |}
+          |""".stripMargin
+      assert(errorCodes(src).contains("E0000"))
+    }
+    it("keeps a join through a bare T nullable, so dereferencing it is still rejected") {
+      for (body <- Seq(
+        "(if c { t } else { \"s\" }).toString()",
+        "(if c { \"s\" } else { t }).toString()",
+        "(select c {\n  case true: t\n  else: \"s\"\n  }).toString()"
+      )) {
+        val src =
+          s"""class J[T](val t: T) {
+             |public:
+             |  def k(c: Boolean): String = $body
+             |}
+             |""".stripMargin
+        assert(errorCodes(src).nonEmpty, body)
+      }
+    }
+    it("still joins a non-null T's bound without a null check") {
+      val r = shell.run(
+        """class J[T extends Object](val t: T) {
+          |public:
+          |  def k(c: Boolean): String = (if c { t } else { "s" }).toString()
+          |}
+          |def main(args: String[]): Int {
+          |  return if new J[String]("a").k(true) == "a" { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("explains two different type parameters that share a name") {
+      val src =
+        """class K[T] {
+          |  var t: T
+          |public:
+          |  def this(x: T) { t = x }
+          |  def m[T](a: T): void { t = a }
+          |}
+          |""".stripMargin
+      val es = errors(src)
+      assert(es.flatMap(_.errorCode) == Seq("E0000"))
+      assert(es.head.message.contains("`[T]`"))
     }
   }
 }

@@ -49,7 +49,7 @@ private[typing] object TypeCheckingHelpers {
 
   private def isValueOf(tv: TypeVariableType, actual: Type): Boolean = actual match {
     case nt if nt.isNullType => true
-    case rtv: TypeVariableType => (rtv.widen eq tv.widen) || isValueOf(tv, rtv.upperBound)
+    case rtv: TypeVariableType => (rtv.declared eq tv.declared) || isValueOf(tv, rtv.upperBound)
     case w: WildcardType => isValueOf(tv, w.upperBound)
     case n: NullableType => isValueOf(tv, n.innerType)
     case _ => false
@@ -75,8 +75,11 @@ private[typing] object TypeCheckingHelpers {
   // with `T extends Comparable[T]`, neither `t` nor `"s"` is accepted as a
   // `Comparable[T]`, so that join rejected both branches; `Comparable` takes
   // both, as on `main` before the retry existed.
+  // A bare `T` may hold null, so its bound joins as nullable: otherwise
+  // `(if c { t } else { "s" }).toString()` lost E0057 and threw at run time.
   private def boundOf(t: Type): Type = t match {
-    case tv: TypeVariableType => joinBound(tv)
+    case tv: TypeVariableType =>
+      if (tv.nullability == Nullability.Nullable) NullableType.of(joinBound(tv)) else joinBound(tv)
     case n: NullableType => n.innerType match {
       case tv: TypeVariableType => NullableType.of(joinBound(tv))
       case _ => null

@@ -252,7 +252,12 @@ private[compiler] final class AssignabilitySupport(
         // normalizeMethodCallTarget, MemberSelectionResolutionSupport.
         // normalizeMemberSelectionTarget), which already special-case
         // NullableType up front for their own (dereference-target) cases.
-        case nullable: NullableType =>
+        // A bare `T` slot takes null, so null is not why an `Object?` failed
+        // there; say that it is not a `T` (#2328 review).
+        case nullable: NullableType if !(expected match {
+          case tv: TypeVariableType => tv.acceptsNullable
+          case _ => false
+        }) =>
           bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "assignment")
         case _ =>
           bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)

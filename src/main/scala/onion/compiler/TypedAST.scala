@@ -1191,6 +1191,19 @@ object TypedAST {
     /** Inverse of [[nonNullView]]: the declared variable this view narrows. */
     def widen: TypeVariableType = if (widenTarget == null) this else widenTarget
 
+    /**
+     * For the placeholder that stands in for a parameter while its own bound is
+     * resolved (the `A` inside `[A extends Animal[A]]`), the parameter it became.
+     * Set once, right after that bound is resolved; null for any other variable.
+     */
+    private[compiler] var resolvedParameter: TypeVariableType = null
+
+    /** The declared parameter this variable denotes: itself, or what its placeholder became. */
+    def declared: TypeVariableType = {
+      val w = widen
+      if (w.resolvedParameter == null) w else w.resolvedParameter.widen
+    }
+
     def isInterface: Boolean = upperBound.isInterface
     def modifier: Int = upperBound.modifier
     def superClass: TypedAST.ClassType = upperBound.superClass
@@ -1831,6 +1844,14 @@ object TypedAST {
         case (_, _: TypedAST.NullableType) =>
           return false
         case _ => // continue with normal logic
+      }
+
+      // The same declared parameter, seen through its placeholder: inside
+      // `[A extends Animal[A]]`, `me()` reached through the bound yields the
+      // placeholder `A`, whose own bound is the root class (#2308).
+      (left, right) match {
+        case (l: TypedAST.TypeVariableType, r: TypedAST.TypeVariableType) if l.declared eq r.declared => return true
+        case _ =>
       }
 
       // A type variable's own bound can itself be another type variable

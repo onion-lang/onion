@@ -231,7 +231,13 @@ final class AssignmentTyping(
             AST.MemberSelection(node.location, AST.CurrentInstance(node.location), id.name), node.rhs)
           Option(processMemberAssign(rewritten, context))
         } else if (context.lookup(id.name) == null) {
-          resolveStaticFieldAssign(id, node, context).orElse(Option(processLocalAssign(node, context)))
+          // A static field of this class or a top-level var: once the name is found there, a
+          // failed assignment is that field's error alone, never a fallback to the local
+          // path, which would add a bogus "local variable is not found" (#2319).
+          implicitStaticField(id.name) match {
+            case Some((owner, field)) => Option(processImplicitStaticFieldAssign(owner, field, node, context))
+            case None => Option(processLocalAssign(node, context))
+          }
         } else {
           Option(processLocalAssign(node, context))
         }
@@ -277,20 +283,22 @@ final class AssignmentTyping(
    * SetStaticField so top-level functions, main, and other classes can reassign
    * top-level vars. None when no such static field exists (falls back to local).
    */
-  private def resolveStaticFieldAssign(id: AST.Id, node: AST.Assignment, context: LocalContext): Option[Term] = {
-    val ownerField: Option[(ClassType, FieldRef)] =
-      Option(bodyContext.definition.field(id.name)).map(f => (bodyContext.definition, f))
-        .orElse(bodyContext.topLevelClass.flatMap(tc => Option(tc.field(id.name)).map(f => (tc, f))))
-    ownerField match {
-      case Some((owner, field)) if (field.modifier & AST.M_STATIC) != 0 =>
-        val value = typed(node.rhs, context, field.`type`).getOrElse(null)
-        if (value == null) None
-        else if (value.`type`.isBottomType) Some(value)
-        else {
-          val term = processAssignable(node.rhs, field.`type`, value)
-          if (term == null) None else Some(new SetStaticField(owner, field, term))
-        }
-      case _ => None
+  /** The static field a bare name assigns through when it has no local binding: one of
+    * the current class, else a top-level var on the script's synthetic class. */
+  private[typing] def implicitStaticField(name: String): Option[(ClassType, FieldRef)] =
+    Option(bodyContext.definition.field(name)).map(f => (bodyContext.definition, f))
+      .orElse(bodyContext.topLevelClass.flatMap(tc => Option(tc.field(name)).map(f => (tc, f))))
+      .filter { case (_, field) => (field.modifier & AST.M_STATIC) != 0 }
+
+  private def processImplicitStaticFieldAssign(
+    owner: ClassType, field: FieldRef, node: AST.Assignment, context: LocalContext
+  ): Term = {
+    val value = typed(node.rhs, context, field.`type`).getOrElse(null)
+    if (value == null) null
+    else if (value.`type`.isBottomType) value
+    else {
+      val term = processAssignable(node.rhs, field.`type`, value)
+      if (term == null) null else new SetStaticField(owner, field, term)
     }
   }
 

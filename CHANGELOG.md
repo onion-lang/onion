@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A generic call that breaks a bound naming another type parameter is a compile error (#2325).**
+  - Before: with `def g[B, T extends B](v: T): B`, `val s: String = g(Integer::valueOf(1))` compiled, then threw a `ClassCastException`.
+  - Now: E0000 at the call, "type String is expected, but type Int is used". Calls where `T` fits `B` are unchanged.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

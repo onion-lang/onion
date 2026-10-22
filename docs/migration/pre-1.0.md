@@ -130,6 +130,7 @@ public:
 - **Inherited members are now `U`:** inside `class Mid[U] extends Box[U]`, an inherited
   `get(): T` is a `U` (it was `Object`). `U` may be null, so `get().toString()` is now `E0057`,
   as it already was inside `Box`. Write `get()?.toString()`, `get() ?: fallback`, or give `U` a
-  non-null bound: `class Mid[U extends Object]`.
+  non-null bound: `class Mid[U extends Object]`. A Java superclass is the same: inside
+  `class MyList[T] extends ArrayList[T]`, `get(0).toString()` is now `E0057`.
 - **`val me = this` is a raw type:** `me.get()` is an `Object`. Write `val me: Mid[U] = this`
   to keep `U`.

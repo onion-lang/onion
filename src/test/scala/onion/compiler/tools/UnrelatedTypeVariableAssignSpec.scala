@@ -545,4 +545,128 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
       assert(Shell.Success(1) == r)
     }
   }
+
+  // Round 6 (#2328 panel at d1ae17a): a member reached through `super` more
+  // than one level up, or through a receiver typed by a variable bounded by
+  // an applied type, must have its type variables substituted along the
+  // whole chain. On `main` the loose rule hid that this was missing.
+  describe("a member reached through several substitution steps (#2328 review, round 6)") {
+    it("types super.get() two levels up as the subclass's own variable") {
+      val r = shell.run(
+        """class Box[T](val x: T) {
+          |public:
+          |  def get(): T = x
+          |}
+          |class Mid[U](y: U) extends Box[U](y) {
+          |}
+          |class Leaf[V](z: V) extends Mid[V](z) {
+          |public:
+          |  override def get(): V = super.get()
+          |}
+          |def main(args: String[]): Int {
+          |  val s: String = new Leaf[String]("hi").get()
+          |  return if s == "hi" { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("types b.get() on b: B extends Box[T] as the holder's T") {
+      val r = shell.run(
+        """class Holder[T, B extends Box[T]] {
+          |  val b: B
+          |public:
+          |  def this(x: B) { b = x }
+          |  def get(): T = b.get()
+          |}
+          |class Box[T](val x: T) {
+          |public:
+          |  def get(): T = x
+          |}
+          |def main(args: String[]): Int {
+          |  return new Holder[String, Box[String]](new Box[String]("q")).get().length()
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("types l.get(0) on l: L extends List[T] as T") {
+      val r = shell.run(
+        """import { java.util.* }
+          |class LT[T, L extends List[T]] {
+          |  val l: L
+          |public:
+          |  def this(x: L) { l = x }
+          |  def head(): T = l.get(0)
+          |}
+          |def main(args: String[]): Int {
+          |  val xs = new ArrayList[Integer](); xs.add(7)
+          |  val h: Integer = new LT[Integer, ArrayList[Integer]](xs).head()
+          |  return h
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(7) == r)
+    }
+    it("accepts a static generic method reading through B extends Box[T]") {
+      val src =
+        """class Box[T](val x: T) {
+          |public:
+          |  def get(): T = x
+          |}
+          |class U {
+          |public:
+          |  static def unbox[T, B extends Box[T]](b: B): T = b.get()
+          |}
+          |""".stripMargin
+      assert(errorCodes(src).isEmpty)
+    }
+    it("passes and reads a T through a bounded receiver and through super") {
+      val r = shell.run(
+        """class Box[T] {
+          |  var x: T
+          |public:
+          |  def this(v: T) { x = v }
+          |  def get(): T = x
+          |  def set(v: T): void { x = v }
+          |}
+          |class Holder[T, B extends Box[T]] {
+          |  val b: B
+          |public:
+          |  def this(x: B) { b = x }
+          |  def put(t: T): T { b.set(t); return b.get() }
+          |}
+          |class Mid[U](y: U) extends Box[U](y) { }
+          |class Leaf[V](z: V) extends Mid[V](z) {
+          |public:
+          |  def put(v: V): V { super.set(v); return super.get() }
+          |}
+          |def main(args: String[]): Int {
+          |  val s = new Holder[String, Box[String]](new Box[String]("q")).put("r") + new Leaf[String]("a").put("b")
+          |  return if s == "rb" { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("still rejects a value that is not a T through those paths") {
+      val src =
+        """class Box[T] {
+          |  var x: T
+          |public:
+          |  def this(v: T) { x = v }
+          |  def get(): T = x
+          |  def set(v: T): void { x = v }
+          |}
+          |class Holder[T, U, B extends Box[T]] {
+          |  val b: B
+          |public:
+          |  def this(x: B) { b = x }
+          |  def bad(o: Object): U = b.get()
+          |}
+          |class Mid[U](y: U) extends Box[U](y) { }
+          |class Leaf[V, W](z: V) extends Mid[V](z) {
+          |public:
+          |  def bad(w: W): W = super.get()
+          |}
+          |""".stripMargin
+      assert(errorCodes(src).count(_ == "E0000") == 2)
+    }
+  }
 }

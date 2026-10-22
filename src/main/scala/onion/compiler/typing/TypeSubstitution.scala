@@ -58,12 +58,26 @@ private[compiler] object TypeSubstitution {
    * @param tp The type to extract substitution from
    * @return A map from type parameter names to their actual type arguments
    */
-  def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = tp match {
+  def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = receiverView(tp) match {
     case applied: TypedAST.AppliedClassType =>
       val rawParams = applied.raw.typeParameters
       rawParams.map(_.name)(using onion.compiler.TypedAST.stringTag).zip(applied.typeArguments).toMap
     case _ =>
       scala.collection.immutable.Map.empty
+  }
+
+  /**
+   * The type a member is looked up on. A receiver typed by a type variable
+   * (`b: B` with `B extends Box[T]`) is read through its bound, so `b.get()`
+   * is the holder's `T`; without this, Box's own `T` came back unsubstituted
+   * and failed the strict type-variable check ("type T is expected, but type
+   * T is used", #2308).
+   */
+  @scala.annotation.tailrec
+  private def receiverView(tp: Type, seen: Set[TypedAST.TypeVariableType] = Set.empty): Type = tp match {
+    case tv: TypedAST.TypeVariableType if tv.upperBound != null && !seen(tv.widen) =>
+      receiverView(tv.upperBound, seen + tv.widen)
+    case _ => tp
   }
 
   /** `this`, or `this`/`self` (and a bare member) reached from inside a closure. */
@@ -92,7 +106,7 @@ private[compiler] object TypeSubstitution {
     }
     val targetName = rawOf(declaring).name
     val direct = classSubstitution(receiver)
-    val receiverClass = receiver match {
+    val receiverClass = receiverView(receiver) match {
       case ct: TypedAST.ClassType => rawOf(ct)
       case _ => return direct
     }

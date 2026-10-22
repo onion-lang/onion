@@ -128,5 +128,6 @@ public:
 - **継承したメンバーは `U` になりました:** `class Mid[U] extends Box[U]` の中で、継承した `get(): T` は `U` です（以前は `Object`）。
   `U` は null になりうるので、`get().toString()` は `E0057` になります。`Box` の中では以前からそうでした。
   `get()?.toString()` や `get() ?: 代わりの値` と書くか、`class Mid[U extends Object]` のように null でない上限を付けてください。
+  Java のスーパークラスでも同じです。`class MyList[T] extends ArrayList[T]` の中の `get(0).toString()` も `E0057` になります。
 - **`val me = this` は raw 型です:** `me.get()` は `Object` になります。
   `U` を保つには `val me: Mid[U] = this` と書いてください。

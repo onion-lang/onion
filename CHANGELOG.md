@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - To keep an unchecked store, cast: `t = (u as T)`. See [Migrating to 1.0](docs/migration/pre-1.0.md).
   - A call argument is checked too when the method is inherited (`set(o)` inside `Mid[U] extends Box[U]`) or the receiver is typed with your variable (`xs.add(o)` with `xs: List[T]`).
   - Not covered yet: a call to the class's own method (`put(u)` with `def put(x: T)`), a constructor argument (`new Box[T](u)`), a `T?` slot, `xs[0] = u`, `m["k"] = u` and `[u]` still accept a `U` (#2332).
-- **Inside `Mid[U] extends Box[U]`, `get().toString()` is now E0057 (#2308).** An inherited `get()` is a `U`, which may be null; see the `this` entry under Fixed.
+- **Inside `Mid[U] extends Box[U]`, `get().toString()` is now E0057 (#2308).** An inherited `get()` is a `U`, which may be null; see the `this` entry under Fixed. A Java superclass is the same: inside `MyList[T] extends ArrayList[T]`, `get(0).toString()` is now E0057.
 
 ### Added
 

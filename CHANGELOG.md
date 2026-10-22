@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Before: inside `class Mid[U] extends Box[U]`, `get()` or `this.get()` (declared on `Box` as `T`) was an `Object`; in a generic `enum Opt[T]`, `case s is Some` under `select this` bound a raw `Some`.
   - Now: `get()` is a `U`, also inside a lambda, and the case binds `Some[T]`. A raw receiver (`case m is Mid`, `(o as Mid)`) is unchanged.
   - `U` may be null, so `get().toString()` there is now E0057, as it already was inside `Box`. Write `get()?.toString()`, or bound it: `Mid[U extends Object]`.
+- **`@TailRecursive` mutual recursion reads its current parameters inside lambdas and `try` (#2334).**
+  - Before: in `ev`/`od` calling each other, `fs.add(() -> n)` captured the first `n` every round, so the lambdas returned `4 4 4 4`, with no error.
+  - Now: they return `4 3 2 1`, as without the annotation. Deep mutual recursion still runs as a loop.
 - **A tail-recursive function reads its current parameters inside `try`, lambdas and static-field assignments (#2329).**
   - Before: `def d(n: Int, acc: String): String { ...; try { s = s + n } ...; return d(n - 1, s) }` saw the first `n` on every round, so `d(3, "")` returned `333`, with no error.
   - Now: it returns `321`, as without the optimisation. Deep tail recursion still runs as a loop.

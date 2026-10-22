@@ -135,7 +135,11 @@ public:
   as it already was inside `Box`. Write `get()?.toString()`, `get() ?: fallback`, or give `U` a
   non-null bound: `class Mid[U extends Object]`. A Java superclass is the same: inside
   `class MyList[T] extends ArrayList[T]`, `get(0).toString()` is now `E0057`.
-- **`val me = this` is a raw type:** `me.get()` is an `Object`. Write `val me: Mid[U] = this`
-  to keep `U`.
+- **`this` is a `Mid[U]`:** inside `class Mid[U]`, `this` keeps `U`, also through
+  `val me = this`, `id(this)`, `[this]` or `() -> this`. So `same(this)` fits an inherited
+  `same(o: Box[T])`, and `me.get()` is a `U` (it was raw `Mid`, so `me.get()` was an `Object`).
+- **Branches with different type arguments:** `if b { [t] } else { [u] }` is a raw `List`.
+  It compiles where an `Object` is expected; where a `List[T]` is expected, the `[u]` branch is
+  `E0000`.
 - **No `onion migrate` rule, on purpose:** the only mechanical rewrite is inserting
   `(u as T)`, which would hide exactly the bugs this check finds. Read each error and decide.

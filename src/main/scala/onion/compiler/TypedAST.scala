@@ -421,6 +421,21 @@ object TypedAST {
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =
       typeParameters_ = typeParameters
 
+    /**
+     * The variables this class's own type parameters denote in its body, in
+     * declaration order; empty for a non-generic class.
+     */
+    private[compiler] var ownTypeVariables: Array[TypedAST.TypeVariableType] = Array()
+
+    /**
+     * The type of `this` in this class's body: the class applied to its own
+     * type variables (`Mid[U]`), or the class itself when it is not generic.
+     * Read raw, an inherited `get(): T` on `id(this)` returned `Object`.
+     */
+    def selfType: TypedAST.ClassType =
+      if (ownTypeVariables.isEmpty || ownTypeVariables.length != typeParameters_.length) this
+      else TypedAST.AppliedClassType(this, ownTypeVariables.toList)
+
     def staticInitializers: Array[TypedAST.ActionStatement] = staticInitializers_
 
     def setStaticInitializers(initializers: Array[TypedAST.ActionStatement]): Unit =

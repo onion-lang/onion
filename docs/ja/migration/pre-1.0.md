@@ -132,7 +132,10 @@ public:
   `U` は null になりうるので、`get().toString()` は `E0057` になります。`Box` の中では以前からそうでした。
   `get()?.toString()` や `get() ?: 代わりの値` と書くか、`class Mid[U extends Object]` のように null でない上限を付けてください。
   Java のスーパークラスでも同じです。`class MyList[T] extends ArrayList[T]` の中の `get(0).toString()` も `E0057` になります。
-- **`val me = this` は raw 型です:** `me.get()` は `Object` になります。
-  `U` を保つには `val me: Mid[U] = this` と書いてください。
+- **`this` は `Mid[U]` です:** `class Mid[U]` の中の `this` は `U` を保ちます。
+  `val me = this`、`id(this)`、`[this]`、`() -> this` を通しても同じです。
+  そのため `same(this)` は継承した `same(o: Box[T])` に渡せ、`me.get()` は `U` です（以前は raw な `Mid` で、`me.get()` は `Object` でした）。
+- **型引数が異なる分岐:** `if b { [t] } else { [u] }` は raw な `List` になります。
+  `Object` が期待される場所ではコンパイルできます。`List[T]` が期待される場所では、`[u]` の分岐が `E0000` になります。
 - **`onion migrate` の書き換え規則はありません（意図的です）:** 機械的にできる書き換えは `(u as T)` の挿入だけです。
   それでは、この検査が見つけるバグをそのまま隠してしまいます。エラーを一つずつ読んで判断してください。

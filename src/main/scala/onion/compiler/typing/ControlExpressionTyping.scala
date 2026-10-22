@@ -155,6 +155,8 @@ final class ControlExpressionTyping(
           resultType = expected
         }
 
+        resultType = checkErasedJoinAgainst(expected, resultType, Seq(thenTerm.`type`, elseTerm.`type`))
+
         if (resultType.isBottomType || resultType == BasicType.VOID) {
           val thenStmt = termToStatement(node.thenBlock, thenTerm)
           val elseStmt = termToStatement(node.elseBlock, elseTerm)
@@ -233,6 +235,24 @@ final class ControlExpressionTyping(
       DiscardedBuilderResultCheck.check(typing, bodyContext, node, term)
       new ExpressionActionStatement(node.location, term)
   }
+
+  /**
+   * Branches whose type arguments differ join as their raw class (`[t]` and
+   * `[u]` join as `List`). A raw value passes any `List[T]` target, so a
+   * target that mentions a type variable checks each branch itself: `[u]`
+   * returned as a `List[T]` stays an error, at that branch.
+   */
+  private[typing] def checkErasedJoinAgainst(expected: Type, join: Type, branchTypes: Seq[Type]): Type =
+    (expected, join) match {
+      case (target: AppliedClassType, raw: ClassType)
+          if !raw.isInstanceOf[AppliedClassType] && raw.typeParameters.nonEmpty &&
+            TypeCheckingHelpers.containsTypeVariable(target) &&
+            branchTypes.exists {
+              case ap: AppliedClassType => TypeCheckingHelpers.containsTypeVariable(ap)
+              case _ => false
+            } => target
+      case _ => join
+    }
 
   private[typing] def assignBranch(node: AST.Node, term: Term, resultVar: ClosureLocalBinding, resultType: Type): ActionStatement =
     if (term.`type`.isBottomType) {

@@ -87,20 +87,43 @@ private[typing] object TypeCheckingHelpers {
     case _ => null
   }
 
-  // `this` is typed by its raw class. Inside `Mid[U]`, joining `this` with
-  // an `o: Mid[U]` took the raw `Mid` when `this` came first, so
-  // `(if c { this } else { o }).get()` was an `Object`, while the swapped
-  // order was a `U` (#2308). A raw class joined with that same class
-  // applied to its own type parameters is the applied one.
-  private def isSelfApplicationOf(applied: Type, raw: Type): Boolean = (applied, raw) match {
-    case (ap: AppliedClassType, ct: ClassType) if !ct.isInstanceOf[AppliedClassType] && (ap.raw eq ct) =>
-      val params = ct.typeParameters.toList
-      params.nonEmpty && params.length == ap.typeArguments.length &&
-        params.zip(ap.typeArguments).forall {
-          case (p, tv: TypeVariableType) => tv.name == p.name
-          case _ => false
-        }
-    case _ => false
+  // Type arguments are invariant, and a slot whose type mentions a type
+  // variable checks them strictly. A join must too: read loosely, `[t]` and
+  // `[u]` in `P[T, U]` joined as `List[T]`, and the `[u]` branch was then
+  // rejected even under an `Object` target (#2328 review). Arguments that
+  // mention no type variable keep the loose rule they always had.
+  private def argumentsFit(table: ClassTable, upper: Type, other: Type): Boolean = (upper, other) match {
+    case (n: NullableType, o: NullableType) => argumentsFit(table, n.innerType, o.innerType)
+    case (n: NullableType, o) => argumentsFit(table, n.innerType, o)
+    case (ap: AppliedClassType, o: AppliedClassType) if containsTypeVariable(ap) || containsTypeVariable(o) =>
+      val view =
+        if (TypeRelations.sameClass(ap.raw, o.raw)) Some(o)
+        else table.appliedViewsOf(o)(AppliedTypeViews.collectAppliedViewsFrom(o))
+          .collectFirst { case (raw, v) if TypeRelations.sameClass(raw, ap.raw) => v }
+      view.forall { v =>
+        v.typeArguments.length == ap.typeArguments.length &&
+          ap.typeArguments.zip(v.typeArguments).forall { case (e, a) => sameArgument(e, a) }
+      }
+    case _ => true
+  }
+
+  private def sameArgument(expected: Type, actual: Type): Boolean = (expected, actual) match {
+    case (_: WildcardType, _) => true
+    case (e: TypeVariableType, a: TypeVariableType) => e.declared eq a.declared
+    case (e: AppliedClassType, a: AppliedClassType) if TypeRelations.sameClass(e.raw, a.raw) =>
+      e.typeArguments.length == a.typeArguments.length &&
+        e.typeArguments.zip(a.typeArguments).forall { case (x, y) => sameArgument(x, y) }
+    case (e: NullableType, a: NullableType) => sameArgument(e.innerType, a.innerType)
+    case (e, a) => !containsTypeVariable(e) && !containsTypeVariable(a)
+  }
+
+  // Applied types whose arguments do not fit each other join as their
+  // common raw class, so both branches are accepted and nothing claims an
+  // argument that one branch does not have.
+  private def eraseIfArgumentsDiffer(table: ClassTable, join: Type, left: Type, right: Type): Type = join match {
+    case ap: AppliedClassType if containsTypeVariable(ap) &&
+        !(argumentsFit(table, ap, left) && argumentsFit(table, ap, right)) => ap.raw
+    case other => other
   }
 
   private def joinBound(tv: TypeVariableType): Type = tv.upperBound match {
@@ -147,10 +170,8 @@ private[typing] object TypeCheckingHelpers {
       reportError(node, left, right)
       return null
     }
-    if (isSelfApplicationOf(right, left)) return right
-    if (isSelfApplicationOf(left, right)) return left
-    if (joinsInto(left, right)) return left
-    if (joinsInto(right, left)) return right
+    if (joinsInto(left, right) && argumentsFit(table, left, right)) return left
+    if (joinsInto(right, left) && argumentsFit(table, right, left)) return right
     val leftBound = boundOf(left)
     if (leftBound != null) return leastUpperBound(table, node, leftBound, right, rootClass, reportError)
     val rightBound = boundOf(right)
@@ -162,8 +183,10 @@ private[typing] object TypeCheckingHelpers {
       // their shared superclass `Animal` (and, for interface-only siblings, the
       // single shared interface), so members declared there stay callable.
       (left, right) match {
+        case (la: AppliedClassType, ra: AppliedClassType) if TypeRelations.sameClass(la.raw, ra.raw) =>
+          return la.raw
         case (lc: ClassType, rc: ClassType) =>
-          return nearestCommonAncestor(lc, rc, rootClass)
+          return eraseIfArgumentsDiffer(table, nearestCommonAncestor(lc, rc, rootClass), lc, rc)
         case (la: ArrayType, ra: ArrayType) if la.dimension == ra.dimension =>
           // LUB of two array types is the array of their component LUB: JVM array
           // covariance makes `Dog[]`/`Cat[]` both assignable to `Animal[]`, so the

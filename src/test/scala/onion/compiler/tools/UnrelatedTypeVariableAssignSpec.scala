@@ -855,4 +855,120 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
       assert(errorCodes(src).isEmpty)
     }
   }
+
+  describe("this in a generic class, and joins of type-variable arguments (#2328 review, round 9)") {
+    it("types this as the class applied to its own parameters, so it fits an inherited Box[T] slot") {
+      val r = shell.run(
+        """class Box[T] {
+          |  var item: T
+          |public:
+          |  def this(v: T) { item = v }
+          |  def get(): T = item
+          |  def same(o: Box[T]): Boolean = o.get() == item
+          |}
+          |class Mid[U](v: U) extends Box[U](v) {
+          |public:
+          |  def selfSame(): Boolean = same(this)
+          |  def up(): Box[U] = this
+          |}
+          |def main(args: String[]): Int {
+          |  val m = new Mid[String]("abc")
+          |  return (if m.selfSame() { 10 } else { 0 }) + m.up().get().length()
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(13) == r)
+    }
+    it("keeps this's type arguments through a value: id(this), a lambda, a list, a local") {
+      val r = shell.run(
+        """import { java.util.Objects }
+          |class Box[T] {
+          |  var item: T
+          |public:
+          |  def this(v: T) { item = v }
+          |  def get(): T = item
+          |}
+          |def id[X](x: X): X = x
+          |class Mid[U](v: U) extends Box[U](v) {
+          |public:
+          |  def r1(): U = id(this).get()
+          |  def r2(): U { val me = this; return me.get() }
+          |  def r3(): U = Objects::requireNonNull(this).get()
+          |  def r4(): U { val f = () -> this; return f().get() }
+          |  def r5(): U { val xs = [this]; return xs[0].get() }
+          |}
+          |def main(args: String[]): Int {
+          |  val m = new Mid[String]("a")
+          |  return (m.r1() + m.r2() + m.r3() + m.r4() + m.r5()).length()
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(5) == r)
+    }
+    it("joins List[T] with List[U] as a raw List under an Object target") {
+      val r = shell.run(
+        """class P[T, U] {
+          |public:
+          |  var t: T
+          |  var u: U
+          |  def this(a: T, b: U) { t = a; u = b }
+          |  def pick(b: Boolean): Object = if b { [t] } else { [u] }
+          |  def lit(b: Boolean): Object = if b { [t] } else { ["s"] }
+          |  def fn(b: Boolean): Object = if b { () -> t } else { () -> u }
+          |  def sel(n: Int): Object = select n {
+          |    case 0: [t]
+          |    else: [u]
+          |  }
+          |  def sz(b: Boolean): Int = (if b { [t] } else { [u, u] }).size
+          |}
+          |def main(args: String[]): Int {
+          |  val p = new P[String, Integer]("a", 1)
+          |  val s = "" + p.pick(true) + p.pick(false) + p.lit(false) + p.sel(1)
+          |  return if s == "[a][1][s][1]" && p.fn(true) != null { p.sz(false) } else { -1 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(2) == r)
+    }
+    it("keeps a join of the same List[T] a List[T]") {
+      val r = shell.run(
+        """import { java.util.* }
+          |class P[T] {
+          |public:
+          |  var t: T
+          |  def this(a: T) { t = a }
+          |  def keep(b: Boolean): T { val xs = if b { [t] } else { new ArrayList[T]() }; xs.add(t); return xs.get(0) }
+          |}
+          |def main(args: String[]): Int = new P[String]("abc").keep(false).length()
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(3) == r)
+    }
+    it("still rejects a List[U] branch where a List[T] is expected, at that branch") {
+      val ifSrc =
+        """class P[T, U] {
+          |public:
+          |  var t: T
+          |  var u: U
+          |  def this(a: T, b: U) { t = a; u = b }
+          |  def bad(b: Boolean): List[T] { val ys: List[U] = [u]; return if b { [t] } else { ys } }
+          |}
+          |""".stripMargin
+      val es = errors(ifSrc)
+      assert(es.flatMap(_.errorCode) == Seq("E0000"))
+      assert(es.head.location.line == 6)
+      val selectSrc =
+        """class P[T, U] {
+          |public:
+          |  var t: T
+          |  var u: U
+          |  def this(a: T, b: U) { t = a; u = b }
+          |  def bad(n: Int): List[T] {
+          |    val ys: List[U] = [u]
+          |    return select n {
+          |      case 0: [t]
+          |      else: ys
+          |    }
+          |  }
+          |}
+          |""".stripMargin
+      assert(errorCodes(selectSrc) == Seq("E0000"))
+    }
+  }
 }

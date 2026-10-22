@@ -427,4 +427,49 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
       assert(Shell.Success(2) == r)
     }
   }
+
+  describe("an F-bounded type variable joined with another branch (#2328 review, round 4)") {
+    it("joins T extends Comparable[T] with a String under an Object target") {
+      val r = shell.run(
+        """class J[T extends Comparable[T]] {
+          |public:
+          |  def pick(c: Boolean, t: T): Object {
+          |    val o: Object = if c { t } else { "none" }
+          |    return o
+          |  }
+          |}
+          |def main(args: String[]): Int {
+          |  val a = new J[String]().pick(true, "t").toString()
+          |  val b = new J[Integer]().pick(false, 1).toString()
+          |  return if a == "t" && b == "none" { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("joins a method's N extends Comparable[N] with an Int literal") {
+      val r = shell.run(
+        """def num[N extends Comparable[N]](c: Boolean, n: N): Object = if c { n } else { 0 }
+          |def main(args: String[]): Int {
+          |  val a = num(true, "x").toString()
+          |  val b = num(false, "x").toString()
+          |  return if a == "x" && b == "0" { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("calls toString on the join and joins in a select") {
+      val r = shell.run(
+        """class K[T extends Comparable[T]] {
+          |public:
+          |  def s(c: Boolean, t: T): String = (if c { t } else { "none" }).toString()
+          |  def sel(c: Boolean, t: T): Object = select c { case true: t; case false: 42 }
+          |}
+          |def main(args: String[]): Int {
+          |  val k = new K[String]()
+          |  return if k.s(true, "a") == "a" && k.s(false, "a") == "none" && k.sel(false, "a").toString() == "42" { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+  }
 }

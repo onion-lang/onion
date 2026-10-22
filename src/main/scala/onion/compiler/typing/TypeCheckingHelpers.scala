@@ -71,13 +71,22 @@ private[typing] object TypeCheckingHelpers {
   // A branch that is a type variable but not a value of the other branch's
   // type joins through its bound, as in Java: `if c { n } else { 3 }` with
   // `N extends Number` is a `Number`, not `Serializable`.
+  // A bound that mentions a type variable joins through its raw class:
+  // with `T extends Comparable[T]`, neither `t` nor `"s"` is accepted as a
+  // `Comparable[T]`, so that join rejected both branches; `Comparable` takes
+  // both, as on `main` before the retry existed.
   private def boundOf(t: Type): Type = t match {
-    case tv: TypeVariableType => tv.upperBound
+    case tv: TypeVariableType => joinBound(tv)
     case n: NullableType => n.innerType match {
-      case tv: TypeVariableType => NullableType.of(tv.upperBound)
+      case tv: TypeVariableType => NullableType.of(joinBound(tv))
       case _ => null
     }
     case _ => null
+  }
+
+  private def joinBound(tv: TypeVariableType): Type = tv.upperBound match {
+    case ap: AppliedClassType if containsTypeVariable(ap) => ap.raw
+    case b => b
   }
 
   /**

@@ -84,6 +84,22 @@ private[typing] object TypeCheckingHelpers {
     case _ => null
   }
 
+  // `this` is typed by its raw class. Inside `Mid[U]`, joining `this` with
+  // an `o: Mid[U]` took the raw `Mid` when `this` came first, so
+  // `(if c { this } else { o }).get()` was an `Object`, while the swapped
+  // order was a `U` (#2308). A raw class joined with that same class
+  // applied to its own type parameters is the applied one.
+  private def isSelfApplicationOf(applied: Type, raw: Type): Boolean = (applied, raw) match {
+    case (ap: AppliedClassType, ct: ClassType) if !ct.isInstanceOf[AppliedClassType] && (ap.raw eq ct) =>
+      val params = ct.typeParameters.toList
+      params.nonEmpty && params.length == ap.typeArguments.length &&
+        params.zip(ap.typeArguments).forall {
+          case (p, tv: TypeVariableType) => tv.name == p.name
+          case _ => false
+        }
+    case _ => false
+  }
+
   private def joinBound(tv: TypeVariableType): Type = tv.upperBound match {
     case ap: AppliedClassType if containsTypeVariable(ap) => ap.raw
     case b => b
@@ -128,6 +144,8 @@ private[typing] object TypeCheckingHelpers {
       reportError(node, left, right)
       return null
     }
+    if (isSelfApplicationOf(right, left)) return right
+    if (isSelfApplicationOf(left, right)) return left
     if (joinsInto(left, right)) return left
     if (joinsInto(right, left)) return right
     val leftBound = boundOf(left)

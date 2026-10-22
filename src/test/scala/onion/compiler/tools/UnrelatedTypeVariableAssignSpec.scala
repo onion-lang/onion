@@ -472,4 +472,77 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
       assert(Shell.Success(1) == r)
     }
   }
+
+  describe("a type variable bounded by a later one, and this, in a join (#2328 review, round 5)") {
+    it("joins A extends B with B, in either branch order and in a select") {
+      val r = shell.run(
+        """class K[A extends B, B] {
+          |  var a: A
+          |  var b: B
+          |public:
+          |  def this(x: A, y: B) { a = x; b = y }
+          |  def pick(c: Boolean): B = if c { a } else { b }
+          |  def pick2(c: Boolean): B = if c { b } else { a }
+          |  def sel(n: Int): B = select n {
+          |    case 1: a
+          |    else: b
+          |  }
+          |}
+          |def main(args: String[]): Int {
+          |  val k = new K[String, Object]("a", "b")
+          |  val s = "" + k.pick(true) + k.pick2(false) + k.sel(1) + k.sel(2)
+          |  return if s == "aaab" { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("sees a later bound's members through A extends B, B extends CharSequence") {
+      val r = shell.run(
+        """class K[A extends B, B extends CharSequence] {
+          |  var a: A
+          |  var b: B
+          |public:
+          |  def this(x: A, y: B) { a = x; b = y }
+          |  def pick(c: Boolean): B = if c { a } else { b }
+          |  def len(): Int = a.length() + b.length()
+          |}
+          |def main(args: String[]): Int {
+          |  val k = new K[String, String]("ab", "c")
+          |  return if k.pick(true).toString() == "ab" && k.len() == 3 { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("still rejects a B put into an A slot") {
+      val src =
+        """class K[A extends B, B] {
+          |public:
+          |  def wrong(b: B): A = b
+          |}
+          |""".stripMargin
+      assert(errorCodes(src).contains("E0000"))
+    }
+    it("joins this with an o: Mid[U] in either branch order") {
+      val r = shell.run(
+        """class Box[T] {
+          |  val value: T
+          |public:
+          |  def this(v: T) { value = v }
+          |  def get(): T = value
+          |}
+          |class Mid[U](v: U) extends Box[U](v) {
+          |public:
+          |  def pick(c: Boolean, o: Mid[U]): U = (if c { this } else { o }).get()
+          |  def pick2(c: Boolean, o: Mid[U]): U = (if c { o } else { this }).get()
+          |}
+          |def main(args: String[]): Int {
+          |  val m = new Mid[String]("a")
+          |  val o = new Mid[String]("b")
+          |  val s = m.pick(true, o) + m.pick(false, o) + m.pick2(true, o) + m.pick2(false, o)
+          |  return if s == "abba" { 1 } else { 0 }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+  }
 }

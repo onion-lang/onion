@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Before: inside `class Mid[U] extends Box[U]`, `get()` or `this.get()` (declared on `Box` as `T`) was an `Object`; in a generic `enum Opt[T]`, `case s is Some` under `select this` bound a raw `Some`.
   - Now: `get()` is a `U`, also inside a lambda, and the case binds `Some[T]`. A raw receiver (`case m is Mid`, `(o as Mid)`) is unchanged.
   - `U` may be null, so `get().toString()` there is now E0057, as it already was inside `Box`. Write `get()?.toString()`, or bound it: `Mid[U extends Object]`.
+- **`vb += 1B` works on a top-level `Byte`/`Short`/`Char` `var`, as it does inside a function (#2319).**
+  - Before: E0000 "type Byte is expected, but type Int is used", plus a bogus E0002 "local variable vb is not found".
+  - Now: it narrows like Java and prints `6`. A value that does not fit a top-level `var` (`s = 1` for a `String`) reports only its E0000.
 - **`@TailRecursive` mutual recursion reads its current parameters inside lambdas and `try` (#2334).**
   - Before: in `ev`/`od` calling each other, `fs.add(() -> n)` captured the first `n` every round, so the lambdas returned `4 4 4 4`, with no error.
   - Now: they return `4 3 2 1`, as without the annotation. Deep mutual recursion still runs as a loop.

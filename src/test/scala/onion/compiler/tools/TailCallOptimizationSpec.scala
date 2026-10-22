@@ -314,4 +314,74 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       assert(Shell.Success(100000) == result)
     }
   }
+
+  describe("tail-call optimization of an expression body (#2330)") {
+    it("loops for `= if c { acc } else { f(..) }` in a static method") {
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }
+          |  static def main(args: String[]): Int = go(1000000, 0)
+          |}
+          |""".stripMargin,
+        "TcoExprIf.on",
+        Array()
+      )
+      assert(Shell.Success(1000000) == result)
+    }
+
+    it("loops through an else-if chain and a default argument in a top-level function") {
+      val result = shell.run(
+        """
+          |def walk(n: Int, acc: Long = 0L): Long =
+          |  if n == 0 { acc } else if n % 2 == 0 { walk(n - 1, acc + 2L) } else { walk(n - 1, acc + 1L) }
+          |val total: Long = walk(1000000)
+          |if total != 1500000L { throw new IllegalStateException("walk returned " + total) }
+          |""".stripMargin,
+        "TcoExprElseIf.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Success], s"expected success, got $result")
+    }
+
+    it("loops for a select in tail position, with a destructuring case and a guard") {
+      val result = shell.run(
+        """
+          |record P(a: Int, b: Int)
+          |class C {
+          |public:
+          |  static def go(p: P, acc: Long): Long = select p {
+          |    case P(a, b) when a == 0: acc
+          |    case P(a, b) when a % 2 == 0: go(new P(a - 1, b), acc + b)
+          |    case P(a, b): go(new P(a - 1, b), acc + 1L)
+          |  }
+          |  static def main(args: String[]): Long = go(new P(1000000, 3), 0L)
+          |}
+          |""".stripMargin,
+        "TcoExprSelect.on",
+        Array()
+      )
+      assert(Shell.Success(2000000L) == result)
+    }
+
+    it("keeps a self call that is not the branch's last value a real call") {
+      // `{ val x = f(n - 1); x + 1 }` and `f(0, acc) + 100` use the call's result,
+      // so turning them into a jump would return the wrong value.
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static def depth(n: Int): Int = if n == 0 { 0 } else { val x = depth(n - 1); x + 1 }
+          |  static def mixed(n: Int, acc: Int): Int =
+          |    if n == 0 { acc } else if n == 1 { mixed(0, acc) + 100 } else { mixed(n - 1, acc + 1) }
+          |  static def main(args: String[]): String = depth(5) + "," + mixed(5, 0)
+          |}
+          |""".stripMargin,
+        "TcoExprNonTail.on",
+        Array()
+      )
+      assert(Shell.Success("5,104") == result)
+    }
+  }
 }

@@ -725,7 +725,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       .map(sc => synthesizeHiddenJsonShape(declaration, sc)).toList
     val lawMethods = declaration.laws.map(synthesizeLawMethod)
     val exampleMethods = declaration.examples.zipWithIndex.map { case (ex, i) => synthesizeExampleMethod(ex, i) }
-    val all = fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods ++ shapeMethods ++ hiddenJsonShape ++ lawMethods ++ exampleMethods
+    // A generic record's synthesized statics take and return `R[T, ...]`, so each one is
+    // generic over the record's own type parameters, as a hand-written `static def
+    // mk[T](..): R[T]` would be (#2321). Laws and examples are the user's own code.
+    val generated = (fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods ++ shapeMethods ++ hiddenJsonShape)
+      .map(m => if (declaration.typeParameters.isEmpty) m else m.copy(typeParameters = declaration.typeParameters.map(_.copy(constraints = Nil))))
+    val all = generated ++ lawMethods ++ exampleMethods
     // A record's own user-written methods (e.g. `def f(): ... { do[Option] { ... } }`) need
     // the same body-level rewriting (do-notation desugaring, trait method lowering) that a
     // class's sections get in rewriteClassDeclaration - otherwise those constructs reach
@@ -762,6 +767,13 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
+  /** The record as a type: `R`, or `R[T, ...]` over its own type parameters when generic. */
+  private def recordDescriptor(declaration: AST.RecordDeclaration): AST.TypeDescriptor = {
+    val raw = AST.ReferenceType(declaration.name, false)
+    if (declaration.typeParameters.isEmpty) raw
+    else AST.ParameterizedType(raw, declaration.typeParameters.map(tp => AST.ReferenceType(tp.name, false)))
+  }
+
   /**
    * `shape name = json` (or `yaml`) -> `static def name(): Shape[R]` over a document whose
    * keys are the component names.
@@ -773,10 +785,9 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    */
   private def synthesizeFormatShape(declaration: AST.RecordDeclaration, clause: AST.ShapeClause, format: String): Option[AST.MethodDeclaration] = {
     val loc = clause.location
-    val recordName = declaration.name
-    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
+    val recordType = AST.TypeNode(loc, recordDescriptor(declaration), false)
     val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
-      AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(recordName, false))), false)
+      AST.ReferenceType("onion.Shape", true), List(recordDescriptor(declaration))), false)
     val factory = ShapeFormats.factoryFor(format) match {
       case Some(f) => f
       case None    => return None // typing reports the unknown format
@@ -842,10 +853,10 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    */
   private def synthesizeHiddenJsonShape(declaration: AST.RecordDeclaration, clause: AST.ShapeClause): AST.MethodDeclaration = {
     val loc = clause.location
-    val recordType = AST.TypeNode(loc, AST.ReferenceType(declaration.name, false), false)
+    val recordRef = AST.TypeNode(loc, AST.ReferenceType(declaration.name, false), false)
     val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
-      AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(declaration.name, false))), false)
-    val call = AST.StaticMethodCall(loc, recordType, clause.name, Nil)
+      AST.ReferenceType("onion.Shape", true), List(recordDescriptor(declaration))), false)
+    val call = AST.StaticMethodCall(loc, recordRef, clause.name, Nil)
     AST.MethodDeclaration(loc, AST.M_PUBLIC | AST.M_STATIC, JsonShapeComponents.HiddenShapeMethod, Nil, shapeType,
       AST.BlockExpression(loc, List(AST.ReturnExpression(loc, call))))
   }
@@ -883,10 +894,9 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
   private def synthesizeRegexShape(declaration: AST.RecordDeclaration, clause: AST.ShapeClause, pattern: String): Option[AST.MethodDeclaration] = {
     val loc = clause.location
-    val recordName = declaration.name
-    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
+    val recordType = AST.TypeNode(loc, recordDescriptor(declaration), false)
     val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
-      AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(recordName, false))), false)
+      AST.ReferenceType("onion.Shape", true), List(recordDescriptor(declaration))), false)
 
     // Every component must be a known scalar, or `T?` of one; typing reports the ones
     // that are not, the same way it does for `from` (E0061). A nullable tag carries a
@@ -1017,9 +1027,9 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    */
   private def synthesizeFromMethods(declaration: AST.RecordDeclaration, pattern: String): List[AST.MethodDeclaration] = {
     val loc = declaration.location
-    val recordName = declaration.name
-    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
-    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType(recordName, false)), false)
+    val recordType = AST.TypeNode(loc, recordDescriptor(declaration), false)
+    val recordRef = AST.TypeNode(loc, AST.ReferenceType(declaration.name, false), false)
+    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(recordDescriptor(declaration)), false)
     val stringType = AST.TypeNode(loc, AST.ReferenceType("String", false), false)
 
     // --- parse(s: String): Name? ---
@@ -1083,14 +1093,14 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     )
 
     // --- parseAll(text: String): List[Name] ---
-    val listType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(AST.ReferenceType(recordName, false))), false)
-    val arrayListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("ArrayList", false), List(AST.ReferenceType(recordName, false))), false)
+    val listType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(recordDescriptor(declaration))), false)
+    val arrayListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("ArrayList", false), List(recordDescriptor(declaration))), false)
     // Declare the accumulator with the List[Name] return type and widen the freshly
     // built ArrayList to it via a cast, so `return __acc` matches without E0000.
     val accInit = AST.Cast(loc, AST.NewObject(loc, arrayListType, Nil), listType)
     val accDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__acc", listType, accInit)
     val linesCall = AST.StaticMethodCall(loc, AST.TypeNode(loc, AST.ReferenceType("Strings", false), false), "lines", List(AST.Id(loc, "__text")))
-    val parseCall = AST.StaticMethodCall(loc, recordType, "parse", List(AST.Id(loc, "__line")))
+    val parseCall = AST.StaticMethodCall(loc, recordRef, "parse", List(AST.Id(loc, "__line")))
     val rDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__r", nullableRecordType, parseCall)
     val addCall = AST.MethodCall(loc, AST.Id(loc, "__acc"), "add", List(AST.Id(loc, "__r")))
     val guardedAdd = AST.IfExpression(
@@ -1185,9 +1195,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    */
   private def synthesizeDataMethods(declaration: AST.RecordDeclaration): List[AST.MethodDeclaration] = {
     val loc = declaration.location
-    val recordName = declaration.name
-    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
-    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType(recordName, false)), false)
+    val recordType = AST.TypeNode(loc, recordDescriptor(declaration), false)
+    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(recordDescriptor(declaration)), false)
     val objectType = AST.TypeNode(loc, AST.ReferenceType("Object", false), false)
     val mapType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("Map", false), List(AST.ReferenceType("String", false), AST.ReferenceType("Object", false))), false)
     val jsonType = AST.TypeNode(loc, AST.ReferenceType("Json", false), false)
@@ -1280,15 +1289,15 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    */
   private def synthesizeFormatMethods(declaration: AST.RecordDeclaration, format: String, typeName: String): List[AST.MethodDeclaration] = {
     val loc = declaration.location
-    val recordName = declaration.name
-    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
-    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType(recordName, false)), false)
+    val recordType = AST.TypeNode(loc, recordDescriptor(declaration), false)
+    val recordRef = AST.TypeNode(loc, AST.ReferenceType(declaration.name, false), false)
+    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(recordDescriptor(declaration)), false)
     val stringType = AST.TypeNode(loc, AST.ReferenceType("String", false), false)
     val fmtType = AST.TypeNode(loc, AST.ReferenceType(typeName, false), false)
 
     // fromXxx(s: String): Name?  ==  fromMap(Xxx::parse(s))
     val parseCall = AST.StaticMethodCall(loc, fmtType, "parse", List(AST.Id(loc, "__s")))
-    val fromMapCall = AST.StaticMethodCall(loc, recordType, "fromMap", List(parseCall))
+    val fromMapCall = AST.StaticMethodCall(loc, recordRef, "fromMap", List(parseCall))
     val fromTryBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, fromMapCall)))
     val fromCatchArg = AST.Argument(loc, "__e", AST.TypeNode(loc, AST.ReferenceType("Exception", false), false))
     val fromCatchBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc))))
@@ -1300,7 +1309,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     )
 
     // toXxx(v: Name): String  ==  Xxx::stringify(toMap(v))
-    val toMapCall = AST.StaticMethodCall(loc, recordType, "toMap", List(AST.Id(loc, "__v")))
+    val toMapCall = AST.StaticMethodCall(loc, recordRef, "toMap", List(AST.Id(loc, "__v")))
     val stringifyCall = AST.StaticMethodCall(loc, fmtType, "stringify", List(toMapCall))
     val toMethod = AST.MethodDeclaration(
       loc, AST.M_PUBLIC | AST.M_STATIC, s"to$format",
@@ -1337,15 +1346,15 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    */
   private def synthesizeFromListMethod(declaration: AST.RecordDeclaration, methodName: String, parseTypeName: String): AST.MethodDeclaration = {
     val loc = declaration.location
-    val recordName = declaration.name
-    val recordType = AST.TypeNode(loc, AST.ReferenceType(recordName, false), false)
-    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(AST.ReferenceType(recordName, false)), false)
+    val recordType = AST.TypeNode(loc, recordDescriptor(declaration), false)
+    val recordRef = AST.TypeNode(loc, AST.ReferenceType(declaration.name, false), false)
+    val nullableRecordType = AST.TypeNode(loc, AST.NullableType(recordDescriptor(declaration)), false)
     val objectType = AST.TypeNode(loc, AST.ReferenceType("Object", false), false)
     val stringType = AST.TypeNode(loc, AST.ReferenceType("String", false), false)
     val jsonType = AST.TypeNode(loc, AST.ReferenceType("Json", false), false)
     val parseType = AST.TypeNode(loc, AST.ReferenceType(parseTypeName, false), false)
-    val listType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(AST.ReferenceType(recordName, false))), false)
-    val arrayListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("ArrayList", false), List(AST.ReferenceType(recordName, false))), false)
+    val listType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(recordDescriptor(declaration))), false)
+    val arrayListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("ArrayList", false), List(recordDescriptor(declaration))), false)
     val objectListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(AST.ReferenceType("Object", false))), false)
 
     val accInit = AST.Cast(loc, AST.NewObject(loc, arrayListType, Nil), listType)
@@ -1354,7 +1363,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val asArrayCall = AST.StaticMethodCall(loc, jsonType, "asArray", List(parseOrNullCall))
     val arrDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__arr", objectListType, asArrayCall)
 
-    val fromMapCall = AST.StaticMethodCall(loc, recordType, "fromMap", List(AST.Id(loc, "__elem")))
+    val fromMapCall = AST.StaticMethodCall(loc, recordRef, "fromMap", List(AST.Id(loc, "__elem")))
     val rDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__r", nullableRecordType, fromMapCall)
     val addCall = AST.MethodCall(loc, AST.Id(loc, "__acc"), "add", List(AST.Id(loc, "__r")))
     val guardedAdd = AST.IfExpression(

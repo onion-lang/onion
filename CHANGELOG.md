@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
+  - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
+  - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.
 - **`vb += 1B` works on a top-level `Byte`/`Short`/`Char` `var`, as it does inside a function (#2319).**
   - Before: E0000 "type Byte is expected, but type Int is used", plus a bogus E0002 "local variable vb is not found".
   - Now: it narrows like Java and prints `6`. A value that does not fit a top-level `var` (`s = 1` for a `String`) reports only its E0000.

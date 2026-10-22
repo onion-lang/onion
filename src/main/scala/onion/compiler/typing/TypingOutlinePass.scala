@@ -389,9 +389,14 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
    */
   private def shapeAccessorSignature(node: AST.RecordDeclaration, sc: AST.ShapeClause): AST.MethodDeclaration = {
     val loc = sc.location
-    val shapeType = AST.TypeNode(loc, AST.ParameterizedType(
-      AST.ReferenceType("onion.Shape", true), List(AST.ReferenceType(node.name, false))), false)
-    AST.MethodDeclaration(loc, AST.M_PUBLIC | AST.M_STATIC, sc.name, Nil, shapeType, AST.BlockExpression(loc, Nil))
+    // A generic record's accessor is generic over its type parameters, as Rewriting's is (#2321).
+    val raw = AST.ReferenceType(node.name, false)
+    val record =
+      if (node.typeParameters.isEmpty) raw
+      else AST.ParameterizedType(raw, node.typeParameters.map(tp => AST.ReferenceType(tp.name, false)))
+    val shapeType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("onion.Shape", true), List(record)), false)
+    AST.MethodDeclaration(loc, AST.M_PUBLIC | AST.M_STATIC, sc.name, Nil, shapeType, AST.BlockExpression(loc, Nil),
+      typeParameters = node.typeParameters.map(_.copy(constraints = Nil)))
   }
 
   /** How a shape clause reads in source, for diagnostics: `shape doc = json`, `shape s = re"..."`. */

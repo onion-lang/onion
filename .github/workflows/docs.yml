@@ -1,23 +1,19 @@
 name: Deploy MkDocs to GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
-      - '.github/workflows/docs.yml'
-      # The Pygments lexer decides how every ```onion fence renders, so a change to it
-      # has to redeploy the site just as a docs change does.
-      - 'tools/pygments-onion/**'
+  # The site documents the latest release, so it deploys from a release tag only:
+  # release.yml dispatches this workflow with the new tag as its ref, and a release
+  # published by hand fires `release`. A merge to `main` never changes the live site.
+  release:
+    types: [published]
   # Build (but do not deploy) on pull requests, so a broken site or an unlexable code
-  # fence is caught before it reaches main rather than after.
+  # fence is caught before it is merged rather than after.
   pull_request:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
       - '.github/workflows/docs.yml'
+      # The Pygments lexer decides how every ```onion fence renders.
       - 'tools/pygments-onion/**'
   workflow_dispatch:
 

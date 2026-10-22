@@ -251,7 +251,7 @@ lazy val publishingSettings = Seq(
   organization := "org.onion-lang",
   organizationHomepage := Some(url("https://onion-lang.org")),
   homepage := Some(url("https://onion-lang.org")),
-  licenses := Seq(License("BSD-3-Clause", url("https://github.com/onion-lang/onion/blob/develop/LICENSE"))),
+  licenses := Seq(License("BSD-3-Clause", url("https://github.com/onion-lang/onion/blob/main/LICENSE"))),
   scmInfo := Some(ScmInfo(
     url("https://github.com/onion-lang/onion"),
     "scm:git:https://github.com/onion-lang/onion.git",

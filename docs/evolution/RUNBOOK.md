@@ -81,7 +81,7 @@ anything in this file.
      verify something, make no commit, and say what you found in a comment on the issue.
    - For a compiler fix, first add a spec that fails (RED), then make the minimal change
      (GREEN), then run the suite (see Known pitfalls for the right command).
-   - Never push to `develop` or `main`. Integrate through a PR from an `evo/` branch.
+   - Never push to `main`. Integrate through a PR from an `evo/` branch.
      Quote the verified test result or program output in the PR.
    - End every commit message with
      `Co-Authored-By: Yui (Onion Evolution Loop) <evolution-loop@onion-lang.org>`. You are your
@@ -106,9 +106,9 @@ anything in this file.
 
 Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day**.
 
-1. **Health first.** Check whether `develop` is red, looking only at the test workflows:
-   `gh run list --branch develop --workflow scala.yml --limit 3` and the same for
-   `dogfood.yml`. A failed `release` run is a release problem, not a red `develop`.
+1. **Health first.** Check whether `main` is red, looking only at the test workflows:
+   `gh run list --branch main --workflow scala.yml --limit 3` and the same for
+   `dogfood.yml`. A failed `release` run is a release problem, not a red `main`.
    If it is, fixing it is the only job this run: file or reuse a `kind:bug` `P0` issue and fix it.
 2. **Merge your own work.**
    - Enable auto-merge on your open `evo/*` PRs (`gh pr merge --auto --merge`). A `risk:low`
@@ -119,7 +119,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      reply once on the PR starting `/rebuttal` with your evidence; the next Reviewer run then
      calls the fifth reviewer (§4). Otherwise close the PR with the reason.
    - **Release** when all three hold: `CHANGELOG.md`'s `[Unreleased]` has a user-visible entry,
-     the newest tag is older than 24 hours, and `develop` is green. Then dispatch `release.yml`
+     the newest tag is older than 24 hours, and `main` is green. Then dispatch `release.yml`
      now (next minor version, see Known pitfalls) and open the changelog-cut PR (`risk:low`).
      If any of the three is false, no release. Do not defer a due release to "a run that can
      focus on it" and do not re-derive the rule: on 10-14 two runs read the old sentence
@@ -143,7 +143,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    - Claim before you build: label the issue `status:in-progress` and comment "Taking this"
      with your session link **first**, then branch. A `status:in-progress` label older than
      24 hours with no PR is a stale claim: take the issue and say so in your comment.
-   - Branch `evo/<issue>-<slug>` from `develop`.
+   - Branch `evo/<issue>-<slug>` from `main`.
    - Right before `git push`, re-read the issue's comments and re-run the `ls-remote`. If a
      sibling claimed it or a PR appeared, do not push; comment once on the issue and stop.
    - Start from evidence: the issue's repro, or a probe script you ran yourself. Write the
@@ -200,8 +200,8 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
 1. **Dogfood.** Run `dogfood/run.sh` (builds and tests every project under `dogfood/`, offline).
    A failure or awkwardness becomes a `kind:friction` or `kind:bug` issue with `source:dogfood`.
    When Maven Central answers HTTP 429 in the sandbox (every W41 run: 3 of 4 projects never
-   built), report the latest `dogfood.yml` run on `develop` as the dogfood result instead
-   (`gh api 'repos/onion-lang/onion/actions/workflows/dogfood.yml/runs?branch=develop&per_page=1'`;
+   built), report the latest `dogfood.yml` run on `main` as the dogfood result instead
+   (`gh api 'repos/onion-lang/onion/actions/workflows/dogfood.yml/runs?branch=main&per_page=1'`;
    it builds the same four projects on GitHub's runners, 96/96 green in W41) and say which
    projects you could not run locally. An empty row is not a result.
 2. **Probe.** Run the gap-probe workflow (`.claude/workflows/onion-gap-probe.js`) on **two**
@@ -235,7 +235,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
    - what the panel blocked, and why
    - a metrics snapshot: the dogfood result, open friction issues by priority, the share of
      last week's PRs that closed an issue, the share that were samples, and the CI result on
-     `develop`. The PR shares are one REST call (replace the date with 7 days ago):
+     `main`. The PR shares are one REST call (replace the date with 7 days ago):
      ```bash
      gh api 'repos/onion-lang/onion/pulls?state=closed&sort=updated&direction=desc&per_page=100' \
        --jq '[.[] | select(.merged_at != null and .merged_at >= "2026-09-28")]
@@ -255,7 +255,7 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      the hourly routine was still the July "release gate" prompt, and the episodes in the
      memory repo are the only place that showed it. Count the runs that obeyed it anyway:
      merged PRs on non-`evo/` branches, commits with the Kokone trailer, direct pushes to
-     `develop` (`git log origin/develop --first-parent --no-merges`), and `risk:ultrahigh` PRs
+     `main` (`git log origin/main --first-parent --no-merges`), and `risk:ultrahigh` PRs
      merged before their 48-hour veto window closed
    - merged and reverted PRs, and the duplicates: closed unmerged `evo/` PRs whose issue has a
      merged PR
@@ -359,7 +359,7 @@ compatibility (PRINCIPLES.md §2, §3, §9).
 
 ## §6 Release
 
-1. **Cadence.** A minor release every week when `develop` is green and `[Unreleased]` has a
+1. **Cadence.** A minor release every week when `main` is green and `[Unreleased]` has a
    user-visible entry; a patch release for any P0 fix. At most one release per day.
 2. **Order.** Dispatch `release.yml` first; then open the `risk:low` PR that moves
    `[Unreleased]` under the new version heading (Known pitfalls).
@@ -401,7 +401,7 @@ compatibility (PRINCIPLES.md §2, §3, §9).
 - **CI is Linux in the English locale.** Windows-only failures do not show up there. Message
   text is bilingual, so assert error codes, not localized text.
 - **Releases:**
-  - Dispatch `release.yml` (`gh workflow run release.yml -f version=vX.Y.Z --ref develop`); a
+  - Dispatch `release.yml` (`gh workflow run release.yml -f version=vX.Y.Z --ref main`); a
     client push of a tag gets 403.
   - Do not commit a `## [X.Y.Z]` CHANGELOG heading before the tag exists.
   - Maven Central deployments wait for a Publish click in the Portal unless the repository
@@ -418,7 +418,7 @@ compatibility (PRINCIPLES.md §2, §3, §9).
 - **Windows/PowerShell (local runs only):** PowerShell drops inner quotes in
   `sbt.bat '...'` arguments; pass sbt commands from Git Bash, or write them to a file.
 - **Workflow triggers:** a workflow on both `push` and `pull_request` runs twice per PR push;
-  new workflows should run on `pull_request` plus `push` to `develop` only.
+  new workflows should run on `pull_request` plus `push` to `main` only.
 - **Scratch files:** write PR bodies to uniquely named files. A shared scratch file has been
   overwritten by a concurrent session before.
 - **GitHub from a cloud session is REST only.** `gh issue list`, `gh pr list`, `gh issue create`

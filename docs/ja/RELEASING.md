@@ -4,7 +4,7 @@ Onion は **git タグ** をリリースの起点としています。バージ�
 
 ## リリースチェックリスト
 
-1. **`develop` が両ロケールで green であることを確認する。**
+1. **`main` が両ロケールで green であることを確認する。**
    ```bash
    sbt shutdown && sbt -Duser.language=en testFull
    sbt shutdown && sbt -Duser.language=ja testFull
@@ -34,15 +34,15 @@ Onion は **git タグ** をリリースの起点としています。バージ�
    ワークフロー自身が Actions トークンでタグを作成します:
 
    ```bash
-   gh workflow run release.yml -f version=v0.2.0 --ref develop
+   gh workflow run release.yml -f version=v0.2.0 --ref main
    gh run watch "$(gh run list --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
    ```
 
    `gh` CLI が無い場合（GitHub API/MCP ツールしか無いセッションなど）は、同じ
    `workflow_dispatch` イベントを `POST
    /repos/{owner}/{repo}/actions/workflows/release.yml/dispatches` に
-   `{"ref": "develop", "inputs": {"version": "v0.2.0"}}` を渡して呼び出せます。
-   GitHub MCP サーバでは通常 `workflow_id: "release.yml"`、`ref: "develop"`、
+   `{"ref": "main", "inputs": {"version": "v0.2.0"}}` を渡して呼び出せます。
+   GitHub MCP サーバでは通常 `workflow_id: "release.yml"`、`ref: "main"`、
    `inputs: {version: "v0.2.0"}` を取る「ワークフロー実行」アクションとして
    公開されています。
 
@@ -50,7 +50,7 @@ Onion は **git タグ** をリリースの起点としています。バージ�
    引き続き使えます:
 
    ```bash
-   git checkout develop
+   git checkout main
    git pull
    git tag -a v0.2.0 -m "Release v0.2.0"
    git push origin v0.2.0
@@ -107,7 +107,7 @@ sbt "assembly; dist"
 
 ### 仕組み
 
-- [リリースワークフロー](https://github.com/onion-lang/onion/blob/develop/.github/workflows/release.yml)の `publish-central` ジョブが、`release` ジョブの後に
+- [リリースワークフロー](https://github.com/onion-lang/onion/blob/main/.github/workflows/release.yml)の `publish-central` ジョブが、`release` ジョブの後に
   同じタグで動きます。署名鍵をインポートして `sbt centralStage sonaUpload` を実行します。
   `centralStage` はバージョンを検査してから両モジュールの `publishSigned` を
   `target/sona-staging` に対して実行し、`sonaUpload`（sbt 2 の組み込み）がその
@@ -169,7 +169,7 @@ sbt "assembly; dist"
    ```
 7. **最初のリリースを実行する。** いつもどおり（上の手順4）、タグ `vX.Y.Z` を push
    します。クライアントからのタグ push が HTTP 403 で拒否される環境では、
-   `gh workflow run release.yml -f version=vX.Y.Z --ref develop` でワークフローを
+   `gh workflow run release.yml -f version=vX.Y.Z --ref main` でワークフローを
    起動します。`publish-central` が成功したら
    <https://central.sonatype.com/publishing/deployments> を開き、デプロイメントに
    `onion` と `onion-llm`（jar、sources、javadoc、pom、それぞれ署名付き）があることを

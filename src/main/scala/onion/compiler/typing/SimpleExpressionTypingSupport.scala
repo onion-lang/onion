@@ -209,13 +209,20 @@ private[compiler] final class SimpleExpressionTypingSupport(
     // Java compound-assignment narrowing: `E1 op= E2` is `E1 = (T)(E1 op E2)`. For a
     // byte/short/char local target insert the implicit cast so `b += 5` type-checks
     // (b + 5 widens to int, which would not fit the narrower target otherwise). The
-    // type is read from the binding directly, so no extra typing / duplicate errors;
-    // field/array/map targets are not covered here.
+    // type is read from the binding directly, so no extra typing / duplicate errors.
+    // A bare name with no local binding may be a top-level var (a static field of the
+    // script class), which narrows the same way (#2319); other field/array/map targets
+    // are not covered here.
     val narrowKind: AST.PrimitiveTypeKind = lhs match {
       case id: AST.Id =>
         val bind = context.lookup(id.name)
-        if (bind == null) null
-        else bind.tp match {
+        val targetType: Type =
+          if (bind != null) bind.tp
+          else Option(bodyContext.definition.field(id.name))
+            .orElse(bodyContext.topLevelClass.flatMap(tc => Option(tc.field(id.name))))
+            .filter(f => (f.modifier & AST.M_STATIC) != 0)
+            .map(_.`type`).orNull
+        targetType match {
           case BasicType.BYTE => AST.K_BYTE
           case BasicType.SHORT => AST.K_SHORT
           case BasicType.CHAR => AST.K_CHAR

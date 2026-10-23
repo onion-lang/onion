@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`xs.addAll(o)` compiles inside a generic class when `xs` and `o` are both `List[T]` (#2341).**
   - Before: E0000, `Collection[? extends T]` is expected but `List[T]` is used.
   - Now: accepted, as in Java.
+- **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
+  - Before: the English text read `can''t` and `doesn''t`.
+  - Now: `can't` and `doesn't`.
 - **`@TailRecursive` no longer breaks a group member that has an overload outside the group (#2337).**
   - Before: `a(n: Int)` and `b` in a group, plus an unrelated `a(s: String)`: the class failed to load with `VerifyError`.
   - Now: only calls to the group members themselves become jumps; the overload stays a plain call.

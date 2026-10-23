@@ -290,11 +290,21 @@ final class AssignmentTyping(
       .orElse(bodyContext.topLevelClass.flatMap(tc => Option(tc.field(name)).map(f => (tc, f))))
       .filter { case (_, field) => (field.modifier & AST.M_STATIC) != 0 }
 
+  /** A `val` field, including a top-level one whose field is not JVM-final. */
+  private[typing] def isReadOnly(field: FieldRef): Boolean = Modifier.isFinal(field.modifier) || (field match {
+    case d: FieldDefinition => d.readOnly
+    case _ => false
+  })
+
   private def processImplicitStaticFieldAssign(
     owner: ClassType, field: FieldRef, node: AST.Assignment, context: LocalContext
   ): Term = {
     val value = typed(node.rhs, context, field.`type`).getOrElse(null)
     if (value == null) null
+    else if (isReadOnly(field)) {
+      bodyContext.report(CANNOT_ASSIGN_TO_VAL, node.lhs, field.name)
+      null
+    }
     else if (value.`type`.isBottomType) value
     else {
       val term = processAssignable(node.rhs, field.`type`, value)
@@ -320,7 +330,7 @@ final class AssignmentTyping(
               bodyContext.report(FIELD_NOT_ACCESSIBLE, selection, typeRef, selection.name, bodyContext.definition)
               return null
             }
-            if (Modifier.isFinal(field.modifier)) {
+            if (isReadOnly(field)) {
               bodyContext.report(CANNOT_ASSIGN_TO_VAL, selection, field.name)
               return null
             }

@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A lambda that assigns a method parameter now updates it for the method too (#2335).**
   - Before: `def g(n: Int) { val f = () -> { n = n + 10; n }; f(); return n }` returned the old `n`.
   - Now: the lambda and the method share one `n`, as they do for a captured `var` local.
+- **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
+  - Before: the English text read `can''t` and `doesn''t`.
+  - Now: `can't` and `doesn't`.
+- **`@TailRecursive` no longer breaks a group member that has an overload outside the group (#2337).**
+  - Before: `a(n: Int)` and `b` in a group, plus an unrelated `a(s: String)`: the class failed to load with `VerifyError`.
+  - Now: only calls to the group members themselves become jumps; the overload stays a plain call.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

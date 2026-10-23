@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
+  - Before: the English text read `can''t` and `doesn''t`.
+  - Now: `can't` and `doesn't`.
 - **`@TailRecursive` no longer breaks a group member that has an overload outside the group (#2337).**
   - Before: `a(n: Int)` and `b` in a group, plus an unrelated `a(s: String)`: the class failed to load with `VerifyError`.
   - Now: only calls to the group members themselves become jumps; the overload stays a plain call.

@@ -26,10 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now: `http"url".request("GET").header(...).timeoutSeconds(...).send()` reaches the exact builder `Http::request` returns, seeded with the URL so it doesn't need retyping (#2146).
 
 ### Fixed
+
 - **`@TailRecursive` no longer breaks a group member that has an overload outside the group (#2337).**
   - Before: `a(n: Int)` and `b` in a group, plus an unrelated `a(s: String)`: the class failed to load with `VerifyError`.
   - Now: only calls to the group members themselves become jumps; the overload stays a plain call.
-
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.
@@ -120,9 +120,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`@TailRecursive` no longer breaks a group member that has an overload outside the group (#2337).**
-  - Before: `a(n: Int)` and `b` in a group, plus an unrelated `a(s: String)`: the class failed to load with `VerifyError`.
-  - Now: only calls to the group members themselves become jumps; the overload stays a plain call.
 - **`Yaml` raises an error on nested, flow, anchor and block-scalar data instead of silently mangling it (#2239).**
   - Before: `Yaml::parse("c:\n  d: 1\n")` returned `{c=null, d=1}`, `[1, 2]` and `*x` came back as text, and `Yaml::stringify` wrote a nested Map as `c: {d=1}`.
   - Now: `Yaml::parse` throws `Yaml.YamlParseException` naming the construct and its line, at the top level and inside a sequence element. A nested sequence (`items:\n- k: v`) is rejected too; it used to come back as a key named `- k`.

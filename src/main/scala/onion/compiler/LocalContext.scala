@@ -79,6 +79,11 @@ class LocalContext {
   // every `var` mutable, preserving prior behavior.
   private var reassignedNames: Set[String] = null
 
+  // Statements run before the body: copy a shared (boxed) parameter out of its argument slot.
+  private val prologue = scala.collection.mutable.ListBuffer[TypedAST.ActionStatement]()
+  def addParameterPrologue(statement: TypedAST.ActionStatement): Unit = prologue += statement
+  def parameterPrologue: List[TypedAST.ActionStatement] = prologue.toList
+
   def setReassignedNames(names: Set[String]): Unit = {
     reassignedNames = names
   }

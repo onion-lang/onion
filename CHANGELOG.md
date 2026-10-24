@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`val k: H[String]? = j` with `j: H[Object]?` reports a type mismatch, not a null error (#2343).**
   - Before: E0070 "may be null", whose advice (`!!`, `?:`) cannot fix it.
   - Now: E0000 naming the two types. E0070 stays for a value that would fit if it were not null.
+- **`Yaml::parse` rejects a whole-line flow collection and a tag (#2327).**
+  - Before: `{a: 1, b: 2}` came back as the one-key map `{{a=1, b: 2}}`, and `a: !!str 5` as the text `!!str 5`.
+  - Now: `YamlParseException` naming the construct and line, as for anchors. Quote the value to keep it as text.
 
 - **`Files::copyDir("sub", "lnk/in")` is refused when `lnk` is a symlink to `sub` (#2304).**
   - Before: it recursed into `lnk/in/in/...` until the OS path limit, leaving junk in `sub/`.

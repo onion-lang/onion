@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.145.0] - 2026-10-24
+
 ### Breaking
 
 - **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**

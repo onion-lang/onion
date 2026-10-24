@@ -247,7 +247,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       val label = gen.mark()
       gen.visitLineNumber(ctor.location.line, label)
 
-    val localVars = new LocalVarContext(gen).withParameters(false, argTypes)
+    val localVars = new LocalVarContext(gen).withParameters(false, argTypes).withBoxedVariables(ctor.frame)
 
     if ctor.superInitializer != null then
       val superArgTypes = ctor.superInitializer.arguments.map(asmType)

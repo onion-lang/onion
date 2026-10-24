@@ -90,6 +90,28 @@ class HintMessageFormatSpec extends AbstractShellSpec {
       assert(!msgs.contains("'{'") && !msgs.contains("'}'"), s"hint leaked MessageFormat quoting: $msgs")
       assert(msgs.contains("`}`"), s"expected a literal closing brace in the hint, got: $msgs")
     }
+
+    it("prints single apostrophes, not doubled ones, in the nullable-function-type hint") {
+      val msgs = messages("var f: (() -> String)? = null\n").mkString("\n")
+      assert(msgs.contains("Function1"), s"expected the nullable-function-type hint, got: $msgs")
+      assert(!msgs.contains("''"), s"hint leaked a doubled-quote escape: $msgs")
+    }
+
+    it("prints single apostrophes, not doubled ones, in the foreach-parens hint") {
+      val msgs = messages(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    foreach (x in [1, 2]) { IO::println(x) }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin
+      ).mkString("\n")
+      assert(msgs.contains("foreach"), s"expected the foreach hint, got: $msgs")
+      assert(!msgs.contains("''"), s"hint leaked a doubled-quote escape: $msgs")
+    }
   }
 
   describe("hints resolved via the args-taking Message lookup") {

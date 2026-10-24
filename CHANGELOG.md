@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now: `get()` is a `U`, also inside a lambda, and the case binds `Some[T]`. A raw receiver (`case m is Mid`, `(o as Mid)`) is unchanged.
   - `this` itself is a `Mid[U]`, also through `val me = this`, `id(this)` or `[this]`, so `same(this)` fits an inherited `same(o: Box[T])`.
   - `U` may be null, so `get().toString()` there is now E0057, as it already was inside `Box`. Write `get()?.toString()`, or bound it: `Mid[U extends Object]`.
+- **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
+  - Before: the English text read `can''t` and `doesn''t`.
+  - Now: `can't` and `doesn't`.
+- **`@TailRecursive` no longer breaks a group member that has an overload outside the group (#2337).**
+  - Before: `a(n: Int)` and `b` in a group, plus an unrelated `a(s: String)`: the class failed to load with `VerifyError`.
+  - Now: only calls to the group members themselves become jumps; the overload stays a plain call.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

@@ -631,6 +631,9 @@ object TypedAST {
    */
   class FieldDefinition(val location: Location, val modifier: Int, val affiliation: TypedAST.ClassType, val name: String, val `type`: TypedAST.Type)
     extends Node with FieldRef {
+    /** A top-level `val`: its field is not JVM-final (it is written once from `start`), yet the
+      * language still forbids reassigning it (E0036). */
+    var readOnly: Boolean = false
   }
 
   /**
@@ -726,6 +729,9 @@ object TypedAST {
       this(null, frame, index, `type`)
     }
   }
+
+  /** The compiler temporary an if/select/try expression yields; never a user variable. */
+  class ResultRefLocal(bind: ClosureLocalBinding) extends RefLocal(bind)
 
   class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: TypedAST.Type, val value: TypedAST.Term) extends Term(location) {
     def this(bind: ClosureLocalBinding, value: TypedAST.Term) = {

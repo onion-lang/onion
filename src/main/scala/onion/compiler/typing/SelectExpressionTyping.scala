@@ -340,12 +340,20 @@ final class SelectExpressionTyping(
         val (bindingInfo, varBinds, guardInfo) = caseBindingData(caseIndex)
 
         // Build the inner body (after bindings are set up)
-        val innerBody: ActionStatement = guardInfo match {
+        // A guarded case records that it ran in `taken`, so the remaining cases are emitted
+        // once, after it: emitting them in both the guard-failed and the pattern-failed
+        // branch duplicated their bodies (a lambda there failed JVM verification).
+        val guardTaken: Option[(ClosureLocalBinding, Term)] = guardInfo match {
           case Some(GuardInfo(_, guardTerm)) if guardTerm != null =>
-            // Guard check: if guard passes, execute body; else fall through to remaining cases
-            val restOfCases = buildCaseBranches(caseIndex + 1, fallback)
-            new IfStatement(guardTerm, baseStmt, restOfCases)
-          case _ =>
+            val taken = new ClosureLocalBinding(0, context.add(context.newName, BasicType.BOOLEAN, isMutable = true), BasicType.BOOLEAN, isMutable = true)
+            Some((taken, guardTerm))
+          case _ => None
+        }
+        val innerBody: ActionStatement = guardTaken match {
+          case Some((taken, guardTerm)) =>
+            val markTaken = new ExpressionActionStatement(new SetLocal(taken, new BoolValue(node.location, true)))
+            new IfStatement(guardTerm, new GuardedBody(node.location, markTaken, baseStmt), new NOP(node.location))
+          case None =>
             baseStmt
         }
 
@@ -400,9 +408,18 @@ final class SelectExpressionTyping(
           case NoBindings => innerBody
         }
 
-        // Build: if (patternCond) { caseBody } else { restOfCases }
         val restOfCases = buildCaseBranches(caseIndex + 1, fallback)
-        new IfStatement(caseConditions(caseIndex), caseBody, restOfCases)
+        guardTaken match {
+          case Some((taken, _)) =>
+            // taken = false; if (patternCond) { bindings; if (guard) { taken = true; body } }; if (!taken) { restOfCases }
+            val init = new ExpressionActionStatement(new SetLocal(taken, new BoolValue(node.location, false)))
+            val matched = new IfStatement(caseConditions(caseIndex), caseBody, new NOP(node.location))
+            val notTaken = new UnaryTerm(UnaryTerm.Kind.NOT, BasicType.BOOLEAN, new RefLocal(taken))
+            new GuardedCaseBlock(node.location, init, matched, new IfStatement(notTaken, restOfCases, new NOP(node.location)))
+          case None =>
+            // Build: if (patternCond) { caseBody } else { restOfCases }
+            new IfStatement(caseConditions(caseIndex), caseBody, restOfCases)
+        }
       }
     }
 
@@ -412,7 +429,13 @@ final class SelectExpressionTyping(
     }
 
     val init = new ExpressionActionStatement(new SetLocal(0, index, condition.`type`, condition))
-    val statement = new StatementBlock(condition.location, init, branches)
+    // The verifier cannot see that a guarded case's `taken` flag implies the result was assigned,
+    // so the result slot is given a definite value up front when any case is guarded.
+    val resultInit: Seq[ActionStatement] =
+      if (resultVar != null && caseBindingData.exists(_._3.exists(_.guardTerm != null)))
+        Seq(new ExpressionActionStatement(new SetLocal(resultVar, body.defaultValue(resultType))))
+      else Nil
+    val statement = new StatementBlock(condition.location, (init +: resultInit :+ branches)*)
 
     if (resultVar == null) {
       Some(statementTerm(statement, resultType, node.location))

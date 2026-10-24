@@ -479,7 +479,7 @@ class TailCallOptimization(config: CompilerConfig)
     }
     val terms = begin.terms.toSeq
     val (prefix, tail) = terms match {
-      case init :+ (st: StatementTerm) :+ (result: RefLocal) =>
+      case init :+ (st: StatementTerm) :+ (result: ResultRefLocal) =>
         val (sunk, alwaysReturns) = sinkReturn(st.statement, result)
         (init, if (alwaysReturns) Seq(sunk) else Seq(sunk, new Return(null, result)))
       case init :+ last =>

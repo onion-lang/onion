@@ -383,5 +383,32 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("5,104") == result)
     }
+
+    it("does not drop the last store to a `var` a lambda captured") {
+      // `y = if .. { g(..) } else { .. }; y`: the closure must see the stored value.
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static var last: Function0[Int]? = null
+          |  static def g(n: Int): Int = {
+          |    var y = -1
+          |    val k: () -> Int = () -> y
+          |    if n == 3 { C::last = k }
+          |    y = if n > 0 { g(n - 1) } else { 100 }
+          |    y
+          |  }
+          |  static def main(args: String[]): String = {
+          |    val a = g(3)
+          |    val k = C::last!!
+          |    a + "," + k()
+          |  }
+          |}
+          |""".stripMargin,
+        "TcoExprCapturedVar.on",
+        Array()
+      )
+      assert(Shell.Success("100,100") == result)
+    }
   }
 }

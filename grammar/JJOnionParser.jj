@@ -789,10 +789,15 @@ public class JJOnionParser implements Parser {
   private void requireBareMinMagnitude(Token minus, AST.Expression operand) throws ParseException {
     if (minMagnitudeMinus == minus && operand != minMagnitudeLiteral) {
       String s = minus.next.image;
-      String kind = s.endsWith("L") ? "long literal out of range: " : s.endsWith("B") ? "byte literal out of range: "
+      String kind = s.endsWith("L") ? "long literal out of range: " : isByteSuffix(s) ? "byte literal out of range: "
         : s.endsWith("S") ? "short literal out of range: " : "integer literal out of range for Int: ";
       throw new ParseException(kind + s);
     }
+  }
+
+  // `B` ends a Byte literal, except in hex, where it is the digit `B`: `0xAB` is 171 (#2324).
+  private static boolean isByteSuffix(String s) {
+    return s.endsWith("B") && !(s.length() > 2 && s.charAt(0) == '0' && (s.charAt(1) == 'x' || s.charAt(1) == 'X'));
   }
 
   // Parse an int literal without ever throwing an unchecked exception (which would
@@ -3260,10 +3265,10 @@ AST.Expression null_literal() :{Token t;}{
 AST.Expression integer_literal() :{Token t; String s;}{
   t=<INTEGER> {
     s = t.image.replace("_", "");
-    if(s.endsWith("B") || s.endsWith("S")){
+    if(isByteSuffix(s) || s.endsWith("S")){
       // A decimal literal fits the signed range, its minimum's magnitude only right after
       // a `-` (as for Int); a binary or hex one may spell the whole bit pattern (#2316).
-      boolean isByte = s.endsWith("B");
+      boolean isByte = isByteSuffix(s);
       int max = isByte ? 127 : 32767;
       int iv = parseIntLiteral(chop(s));
       boolean radix = s.startsWith("0x") || s.startsWith("0X") || s.startsWith("0b");

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- **A hex literal ending in `B` is an `Int`: `0xAB` is 171, not the Byte 10 (#2324).**
+  - Before: `B` was a Byte suffix even in hex, so `0xAB` printed `10` and `0xFFB` printed `-1`.
+  - Now: `B` is a hex digit. `0xFFB` is 4091. For a Byte, write `0b11111111B` or `-1B`; `0xFFFFS` still works. See `docs/migration/pre-1.0.md`.
+
 - **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
   - Before: anywhere else it silently became the minimum value. `val x: Int = 2147483648` printed `-2147483648`; `-2147483648 as Long` printed `2147483648`, because `as` binds tighter than `-`.
   - Now: the usual "out of range for Int/Long" error. `-2147483648`, `-9223372036854775808L` and `0x80000000` still compile. To migrate, add `L` or parentheses: see `docs/migration/pre-1.0.md`.

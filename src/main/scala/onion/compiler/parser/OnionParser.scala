@@ -2759,7 +2759,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       val t = minMagnitudeToken
       val marker =
         if (t.image.endsWith("L")) LongLiteralOutOfRangeMarker
-        else if (t.image.endsWith("B")) ByteLiteralOutOfRangeMarker
+        else if (isByteSuffix(t.image)) ByteLiteralOutOfRangeMarker
         else if (t.image.endsWith("S")) ShortLiteralOutOfRangeMarker
         else IntLiteralOutOfRangeMarker
       val at = p(t)
@@ -2769,6 +2769,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     operand
   }
 
+  /** `B` ends a Byte literal, except in hex, where it is the digit `B`: `0xAB` is 171 (#2324). */
+  private def isByteSuffix(s: String): Boolean =
+    s.endsWith("B") && !(s.length > 2 && s.charAt(0) == '0' && (s.charAt(1) == 'x' || s.charAt(1) == 'X'))
+
   private def integerLiteral(): AST.Expression = {
     val prev = last
     val t = expect(K.INTEGER)
@@ -2776,10 +2780,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val s = t.image.replace("_", "")
     val noKinds = new java.util.LinkedHashSet[Integer]()
     try {
-      if (s.endsWith("B") || s.endsWith("S")) {
+      if (isByteSuffix(s) || s.endsWith("S")) {
         // See the grammar's integer_literal: signed range for decimal, bit pattern for
         // binary/hex, and the minimum's magnitude only as the bare operand of a `-` (#2316).
-        val isByte = s.endsWith("B")
+        val isByte = isByteSuffix(s)
         val max = if (isByte) 127 else 32767
         val iv = parseIntLiteral(s.substring(0, s.length - 1))
         val radix = s.startsWith("0x") || s.startsWith("0X") || s.startsWith("0b")
@@ -2807,7 +2811,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         // diagnostic (naming the type and the fix) instead of the deepest-reach
         // heuristic, which would otherwise blame whatever token follows the literal.
         val marker =
-          if (s.endsWith("B")) ByteLiteralOutOfRangeMarker
+          if (isByteSuffix(s)) ByteLiteralOutOfRangeMarker
           else if (s.endsWith("S")) ShortLiteralOutOfRangeMarker
           else if (s.endsWith("L")) LongLiteralOutOfRangeMarker
           else IntLiteralOutOfRangeMarker

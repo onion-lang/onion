@@ -497,7 +497,7 @@ final class OperatorTyping(
           new RefLocal(0, varIndex, operand.`type`)
         )
       case ref: RefField =>
-        if (Modifier.isFinal(ref.field.modifier)) {
+        if (AssignmentTyping.isReadOnly(ref.field)) {
           bodyContext.report(CANNOT_ASSIGN_TO_VAL, termNode, ref.field.name)
           return None
         }
@@ -514,7 +514,7 @@ final class OperatorTyping(
         // Post-increment/decrement on a static field (`C::count++`, and a top-level
         // `var` which is promoted to a static field). A static field has no receiver,
         // so bind the old value to a temp, write old+1, and yield the old value.
-        if (Modifier.isFinal(ref.field.modifier)) {
+        if (AssignmentTyping.isReadOnly(ref.field)) {
           bodyContext.report(CANNOT_ASSIGN_TO_VAL, termNode, ref.field.name)
           return None
         }

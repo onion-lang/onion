@@ -417,7 +417,7 @@ final class SelectExpressionTyping(
     if (resultVar == null) {
       Some(statementTerm(statement, resultType, node.location))
     } else {
-      Some(new Begin(node.location, Array[Term](statementTerm(statement, BasicType.VOID, node.location), new RefLocal(resultVar))))
+      Some(new Begin(node.location, Array[Term](statementTerm(statement, BasicType.VOID, node.location), new ResultRefLocal(resultVar))))
     }
   }
 

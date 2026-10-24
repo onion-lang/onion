@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -33,10 +33,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -4860,7 +4860,7 @@
 <h2 id="_1">リリースチェックリスト<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <ol>
 <li>
-<p><strong><code>develop</code> が両ロケールで green であることを確認する。</strong>
+<p><strong><code>main</code> が両ロケールで green であることを確認する。</strong>
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sbt<span class="w"> </span>shutdown<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sbt<span class="w"> </span>-Duser.language<span class="o">=</span>en<span class="w"> </span>testFull
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sbt<span class="w"> </span>shutdown<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sbt<span class="w"> </span>-Duser.language<span class="o">=</span>ja<span class="w"> </span>testFull
 </span></code></pre></div>
@@ -4893,19 +4893,19 @@
    リポジトリのタグ保護によって HTTP 403 で拒否され、これが何ヶ月もリリースを
    止めていた原因でした（issue #334）。そのためクライアント側のプッシュに頼らず、
    ワークフロー自身が Actions トークンでタグを作成します:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>release.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">version</span><span class="o">=</span>v0.2.0<span class="w"> </span>--ref<span class="w"> </span>develop
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>release.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">version</span><span class="o">=</span>v0.2.0<span class="w"> </span>--ref<span class="w"> </span>main
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>gh<span class="w"> </span>run<span class="w"> </span>watch<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>gh<span class="w"> </span>run<span class="w"> </span>list<span class="w"> </span>--workflow<span class="o">=</span>release.yml<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--json<span class="w"> </span>databaseId<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.[0].databaseId'</span><span class="k">)</span><span class="s2">"</span>
 </span></code></pre></div>
 <p><code>gh</code> CLI が無い場合（GitHub API/MCP ツールしか無いセッションなど）は、同じ
    <code>workflow_dispatch</code> イベントを <code>POST
    /repos/{owner}/{repo}/actions/workflows/release.yml/dispatches</code> に
-   <code>{"ref": "develop", "inputs": {"version": "v0.2.0"}}</code> を渡して呼び出せます。
-   GitHub MCP サーバでは通常 <code>workflow_id: "release.yml"</code>、<code>ref: "develop"</code>、
+   <code>{"ref": "main", "inputs": {"version": "v0.2.0"}}</code> を渡して呼び出せます。
+   GitHub MCP サーバでは通常 <code>workflow_id: "release.yml"</code>、<code>ref: "main"</code>、
    <code>inputs: {version: "v0.2.0"}</code> を取る「ワークフロー実行」アクションとして
    公開されています。</p>
 <p><code>v*</code> refをプッシュできる権限を持つ認証情報であれば、タグをプッシュする方法も
    引き続き使えます:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>develop
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>pull
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v0.2.0<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Release v0.2.0"</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.2.0
@@ -4968,7 +4968,7 @@
 ままです。</p>
 <h3 id="_3">仕組み<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
 <ul>
-<li><a href="https://github.com/onion-lang/onion/blob/develop/.github/workflows/release.yml">リリースワークフロー</a>の <code>publish-central</code> ジョブが、<code>release</code> ジョブの後に
+<li><a href="https://github.com/onion-lang/onion/blob/main/.github/workflows/release.yml">リリースワークフロー</a>の <code>publish-central</code> ジョブが、<code>release</code> ジョブの後に
   同じタグで動きます。署名鍵をインポートして <code>sbt centralStage sonaUpload</code> を実行します。
   <code>centralStage</code> はバージョンを検査してから両モジュールの <code>publishSigned</code> を
   <code>target/sona-staging</code> に対して実行し、<code>sonaUpload</code>（sbt 2 の組み込み）がその
@@ -5027,7 +5027,7 @@
 </span></code></pre></div></li>
 <li><strong>最初のリリースを実行する。</strong> いつもどおり（上の手順4）、タグ <code>vX.Y.Z</code> を push
    します。クライアントからのタグ push が HTTP 403 で拒否される環境では、
-   <code>gh workflow run release.yml -f version=vX.Y.Z --ref develop</code> でワークフローを
+   <code>gh workflow run release.yml -f version=vX.Y.Z --ref main</code> でワークフローを
    起動します。<code>publish-central</code> が成功したら
    <a href="https://central.sonatype.com/publishing/deployments">https://central.sonatype.com/publishing/deployments</a> を開き、デプロイメントに
    <code>onion</code> と <code>onion-llm</code>（jar、sources、javadoc、pom、それぞれ署名付き）があることを
@@ -5192,10 +5192,10 @@ sbt-pgp に Git の gpg を指定します: <code>set Global / PgpKeys.gpgComman
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

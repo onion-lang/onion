@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -33,10 +33,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -4838,7 +4838,7 @@ is no manual <code>version := ...</code> line to update in <code>build.sbt</code
 <h2 id="release-checklist">Release checklist<a class="headerlink" href="#release-checklist" title="Permanent link">&para;</a></h2>
 <ol>
 <li>
-<p><strong>Make sure <code>develop</code> is green — in both locales.</strong>
+<p><strong>Make sure <code>main</code> is green — in both locales.</strong>
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sbt<span class="w"> </span>shutdown<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sbt<span class="w"> </span>-Duser.language<span class="o">=</span>en<span class="w"> </span>testFull
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sbt<span class="w"> </span>shutdown<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sbt<span class="w"> </span>-Duser.language<span class="o">=</span>ja<span class="w"> </span>testFull
 </span></code></pre></div>
@@ -4874,18 +4874,18 @@ is no manual <code>version := ...</code> line to update in <code>build.sbt</code
    repository's tag protection (HTTP 403), which is what left releases stuck for
    months (issue #334), so the workflow creates the tag itself with the Actions
    token instead of relying on a client-side push:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>release.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">version</span><span class="o">=</span>v0.2.0<span class="w"> </span>--ref<span class="w"> </span>develop
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>release.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">version</span><span class="o">=</span>v0.2.0<span class="w"> </span>--ref<span class="w"> </span>main
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>gh<span class="w"> </span>run<span class="w"> </span>watch<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>gh<span class="w"> </span>run<span class="w"> </span>list<span class="w"> </span>--workflow<span class="o">=</span>release.yml<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--json<span class="w"> </span>databaseId<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.[0].databaseId'</span><span class="k">)</span><span class="s2">"</span>
 </span></code></pre></div>
 <p>Without the <code>gh</code> CLI (e.g. a session with only the GitHub API/MCP tools), the
    same <code>workflow_dispatch</code> event is <code>POST
    /repos/{owner}/{repo}/actions/workflows/release.yml/dispatches</code> with
-   <code>{"ref": "develop", "inputs": {"version": "v0.2.0"}}</code> — a GitHub MCP server
+   <code>{"ref": "main", "inputs": {"version": "v0.2.0"}}</code> — a GitHub MCP server
    typically exposes this as an "run workflow" action taking <code>workflow_id:
-   "release.yml"</code>, <code>ref: "develop"</code>, <code>inputs: {version: "v0.2.0"}</code>.</p>
+   "release.yml"</code>, <code>ref: "main"</code>, <code>inputs: {version: "v0.2.0"}</code>.</p>
 <p>The tag-push path still works for anyone whose credentials are allowed to
    create <code>v*</code> refs:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>develop
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>pull
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v0.2.0<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Release v0.2.0"</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.2.0
@@ -4947,7 +4947,7 @@ is no manual <code>version := ...</code> line to update in <code>build.sbt</code
 checksums. Only the Maven groupId is <code>org.onion-lang</code>; the packages stay <code>onion.*</code>.</p>
 <h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
 <ul>
-<li>The <code>publish-central</code> job of the <a href="https://github.com/onion-lang/onion/blob/develop/.github/workflows/release.yml">release workflow</a> runs after the
+<li>The <code>publish-central</code> job of the <a href="https://github.com/onion-lang/onion/blob/main/.github/workflows/release.yml">release workflow</a> runs after the
   <code>release</code> job, on the same tag. It imports the signing key and runs
   <code>sbt centralStage sonaUpload</code>: <code>centralStage</code> checks the version and then runs
   <code>publishSigned</code> for both modules into <code>target/sona-staging</code>, and <code>sonaUpload</code> (built
@@ -5005,7 +5005,7 @@ checksums. Only the Maven groupId is <code>org.onion-lang</code>; the packages s
 </span></code></pre></div></li>
 <li><strong>Run the first release</strong> the usual way (step 4 above): push the tag <code>vX.Y.Z</code>, or,
    where a client tag push is rejected with HTTP 403, start the workflow with
-   <code>gh workflow run release.yml -f version=vX.Y.Z --ref develop</code>. When
+   <code>gh workflow run release.yml -f version=vX.Y.Z --ref main</code>. When
    <code>publish-central</code> is green, open <a href="https://central.sonatype.com/publishing/deployments">https://central.sonatype.com/publishing/deployments</a>,
    check that the deployment holds <code>onion</code> and <code>onion-llm</code> (jar, sources, javadoc, pom,
    each signed) and press <strong>Publish</strong>. The files reach <code>repo1.maven.org</code> within about
@@ -5169,10 +5169,10 @@ apply the fix, and push a new patch tag (e.g. <code>v0.2.1</code>).</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

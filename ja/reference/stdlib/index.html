@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -33,10 +33,10 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -9896,7 +9896,7 @@ future は <code>isSuccess()</code> と <code>isFailure()</code> の両方が <c
 共有しており（scalar は同じ Java 型にマップされる）、<code>derive!(Yaml)</code> は
 <code>derive!(Json)</code> とまったく同じ <code>toMap</code> / <code>fromMap</code> の土台の上に構築されています。</p>
 <p>対象範囲: flat block mapping、またはそれらのトップレベル block シーケンス
-（要素内のネストした map/シーケンス、アンカー、flow collection は非対応）。
+（要素内のネストした map/シーケンス、アンカー、タグ、flow collection は非対応）。
 この範囲外の構文は、データを静かに失う代わりにエラーを発生させます:
 <code>Yaml::stringify</code> はネストした Map/List 値に対して <code>IllegalArgumentException</code> を
 投げます。<code>Yaml::parse</code> は次の場合に <code>Yaml.YamlParseException</code> を投げます:</p>
@@ -9904,8 +9904,9 @@ future は <code>isSuccess()</code> と <code>isFailure()</code> の両方が <c
 <li>ネストした mapping: 兄弟の行より深くインデントされた行（トップレベルでも、
   シーケンス要素の中でも）</li>
 <li>ネストしたシーケンス: キーの下の <code>-</code> 項目、または最初の項目と違う列にある項目</li>
-<li>flow collection（<code>[...]</code>/<code>{...}</code>）の値</li>
+<li>flow collection（<code>[...]</code>/<code>{...}</code>）。値としても、行全体としても</li>
 <li>アンカー/エイリアス（<code>&amp;name</code>/<code>*name</code>）の値</li>
+<li>タグ（<code>!!str 5</code>、<code>!name 5</code>）の値</li>
 <li>ブロックスカラー（<code>|</code>/<code>&gt;</code>。複数行テキストの書き方）</li>
 </ul>
 <p>全体が同じ幅でインデントされた文書は問題ありません。<code>Yaml::stringify</code> は
@@ -11426,10 +11427,10 @@ EOF を通知します。<code>close()</code> は冪等で、<code>conn.isClosed
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

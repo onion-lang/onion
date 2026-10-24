@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `T extends Comparable[T]` is accepted where a `Comparable[T]` is expected (#2338).**
+  - Before: `def asCmp(t: T): Comparable[T] = t` was E0000 "type Comparable[T] is expected, but type T is used".
+  - Now: it compiles, as in Java. Other applied types are still rejected.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

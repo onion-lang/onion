@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now: `get()` is a `U`, also inside a lambda, and the case binds `Some[T]`. A raw receiver (`case m is Mid`, `(o as Mid)`) is unchanged.
   - `this` itself is a `Mid[U]`, also through `val me = this`, `id(this)` or `[this]`, so `same(this)` fits an inherited `same(o: Box[T])`.
   - `U` may be null, so `get().toString()` there is now E0057, as it already was inside `Box`. Write `get()?.toString()`, or bound it: `Mid[U extends Object]`.
+- **`Files::copyDir("sub", "lnk/in")` is refused when `lnk` is a symlink to `sub` (#2304).**
+  - Before: it recursed into `lnk/in/in/...` until the OS path limit, leaving junk in `sub/`.
+  - Now: `IllegalArgumentException`, nothing written, as for `copyDir("sub", "sub/in")`.
+
 - **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
   - Before: the English text read `can''t` and `doesn''t`.
   - Now: `can't` and `doesn't`.

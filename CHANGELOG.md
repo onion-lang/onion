@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A lambda in a constructor that assigns a captured `var` writes it back (#2361).**
+  - Before: `def this(m: Int) { var n = m; val f = () -> { n = n * 3; n }; f(); v = n }` left `n` at `m`; the same lines in a method worked.
+  - Now: the constructor and the lambda share `n`, as in a method.
+
 ## [0.145.0] - 2026-10-24
 
 ### Breaking

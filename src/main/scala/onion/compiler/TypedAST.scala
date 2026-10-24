@@ -421,6 +421,21 @@ object TypedAST {
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =
       typeParameters_ = typeParameters
 
+    /**
+     * The variables this class's own type parameters denote in its body, in
+     * declaration order; empty for a non-generic class.
+     */
+    private[compiler] var ownTypeVariables: Array[TypedAST.TypeVariableType] = Array()
+
+    /**
+     * The type of `this` in this class's body: the class applied to its own
+     * type variables (`Mid[U]`), or the class itself when it is not generic.
+     * Read raw, an inherited `get(): T` on `id(this)` returned `Object`.
+     */
+    def selfType: TypedAST.ClassType =
+      if (ownTypeVariables.isEmpty || ownTypeVariables.length != typeParameters_.length) this
+      else TypedAST.AppliedClassType(this, ownTypeVariables.toList)
+
     def staticInitializers: Array[TypedAST.ActionStatement] = staticInitializers_
 
     def setStaticInitializers(initializers: Array[TypedAST.ActionStatement]): Unit =
@@ -1191,6 +1206,32 @@ object TypedAST {
     /** Inverse of [[nonNullView]]: the declared variable this view narrows. */
     def widen: TypeVariableType = if (widenTarget == null) this else widenTarget
 
+    /**
+     * For the placeholder that stands in for a parameter while its own bound is
+     * resolved (the `A` inside `[A extends Animal[A]]`), the parameter it became.
+     * Set once, right after that bound is resolved; null for any other variable.
+     */
+    private[compiler] var resolvedParameter: TypeVariableType = null
+
+    /** The declared parameter this variable denotes: itself, or what its placeholder became. */
+    def declared: TypeVariableType = {
+      val w = widen
+      if (w.resolvedParameter == null) w else w.resolvedParameter.widen
+    }
+
+    /**
+     * This variable with a placeholder replaced by the parameter it became,
+     * keeping a non-null view non-null. A member reached through the bound of
+     * `[A extends Animal[A]]` returns the placeholder; read as is, its bound is
+     * the root class, so a third `me()` in `me().me().me()` was not found.
+     */
+    def resolvedView: TypeVariableType = {
+      val w = widen
+      if (w.resolvedParameter == null) this
+      else if (this eq w) w.resolvedParameter
+      else w.resolvedParameter.widen.nonNullView
+    }
+
     def isInterface: Boolean = upperBound.isInterface
     def modifier: Int = upperBound.modifier
     def superClass: TypedAST.ClassType = upperBound.superClass
@@ -1831,6 +1872,14 @@ object TypedAST {
         case (_, _: TypedAST.NullableType) =>
           return false
         case _ => // continue with normal logic
+      }
+
+      // The same declared parameter, seen through its placeholder: inside
+      // `[A extends Animal[A]]`, `me()` reached through the bound yields the
+      // placeholder `A`, whose own bound is the root class (#2308).
+      (left, right) match {
+        case (l: TypedAST.TypeVariableType, r: TypedAST.TypeVariableType) if l.declared eq r.declared => return true
+        case _ =>
       }
 
       // A type variable's own bound can itself be another type variable

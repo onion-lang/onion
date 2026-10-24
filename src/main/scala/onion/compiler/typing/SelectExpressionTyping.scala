@@ -303,7 +303,7 @@ final class SelectExpressionTyping(
           if (node.elseBlock == null) caseTerms.map(_.`type`).toSeq
           else caseTerms.map(_.`type`).toSeq :+ elseTerm.`type`
         foldLubSilent(branchTypes) match {
-          case Some(t) => t
+          case Some(t) => control.checkErasedJoinAgainst(branchExpected, t, branchTypes)
           case None if asStatement => BasicType.VOID
           case None => foldLub(node, branchTypes).orNull // re-run to report the error
         }
@@ -536,7 +536,7 @@ final class SelectExpressionTyping(
         // The *binding* can be more precise than the check: matching a
         // `Some` out of an `Opt[String]` binds `Some[String]`, recovered from
         // the scrutinee's type arguments (#311).
-        bindingInfo = SingleBinding(name, TypeSubst.specializeFromScrutinee(mappedType, conditionType))
+        bindingInfo = SingleBinding(name, TypeSubst.specializeFromScrutinee(mappedType, conditionType, typing))
 
         instanceOfCheck
 

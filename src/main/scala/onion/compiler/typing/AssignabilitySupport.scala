@@ -179,7 +179,7 @@ private[compiler] final class AssignabilitySupport(
         // bound chain passes through `tv`" apart from "both happen to
         // erase to the same root class" (#2259's unsoundness) -- erasing
         // `tv` here first would throw away exactly the identity it needs.
-        TypeRules.isSuperType(tv, actual)
+        TypeRules.isSuperType(tv, actual) && TypeCheckingHelpers.fitsTypeVariable(tv, actual)
       case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
         def argsMatch(view: TypedAST.AppliedClassType): Boolean =
           ae.typeArguments.length == view.typeArguments.length &&
@@ -198,7 +198,9 @@ private[compiler] final class AssignabilitySupport(
               // rules (handled elsewhere), and requiring both directions
               // for it rejected ordinary covariant wildcard uses that
               // never involved a chained bound at all.
-              val involvesTypeVariable = e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType]
+              val involvesTypeVariable =
+                !e.isInstanceOf[TypedAST.WildcardType] &&
+                  (e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType])
               if (involvesTypeVariable) structurallyAssignable(e, a) && structurallyAssignable(a, e)
               else structurallyAssignable(e, a)
             }
@@ -250,7 +252,12 @@ private[compiler] final class AssignabilitySupport(
         // normalizeMethodCallTarget, MemberSelectionResolutionSupport.
         // normalizeMemberSelectionTarget), which already special-case
         // NullableType up front for their own (dereference-target) cases.
-        case nullable: NullableType =>
+        // A bare `T` slot takes null, so null is not why an `Object?` failed
+        // there; say that it is not a `T` (#2328 review).
+        case nullable: NullableType if !(expected match {
+          case tv: TypeVariableType => tv.acceptsNullable
+          case _ => false
+        }) =>
           bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "assignment")
         case _ =>
           bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)

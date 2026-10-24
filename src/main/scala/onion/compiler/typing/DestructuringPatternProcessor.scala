@@ -155,7 +155,7 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
     // parameters. Recover the actual type arguments from the scrutinee being
     // destructured (`bind`), same trick as a root `is`-pattern (#311), so
     // e.g. matching `Wrap(v)` out of a `Wrap[Int]` binds `v: Int`.
-    val appliedRecordType = TypeSubst.specializeFromScrutinee(recordType.asInstanceOf[ClassType], bind.tp)
+    val appliedRecordType = TypeSubst.specializeFromScrutinee(recordType.asInstanceOf[ClassType], bind.tp, typing)
 
     // Get fields in order (records store fields in insertion order)
     val fields = classDef.fields

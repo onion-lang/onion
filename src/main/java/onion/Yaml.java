@@ -10,13 +10,14 @@ import java.util.Map;
  * No external dependencies - completely self-contained.
  *
  * Scope: a flat block mapping, or a top-level block sequence of flat mappings
- * (no nested maps/sequences within an element, no anchors, no flow collections).
+ * (no nested maps/sequences within an element, no anchors, no tags, no flow collections).
  * A construct outside that scope raises an error rather than silently losing data:
  * {@link #stringify} throws {@code IllegalArgumentException} on a nested Map/List
  * value, and {@link #parse} throws {@link YamlParseException} on a nested mapping
  * (a line indented deeper than its siblings, also inside a sequence element), a
- * flow collection ({@code [...]}/{@code {...}}) value, an anchor/alias
- * ({@code &name}/{@code *name}) value, or a block scalar ({@code |}/{@code >}).
+ * flow collection ({@code [...]}/{@code {...}}) as a value or a whole line, an
+ * anchor/alias ({@code &name}/{@code *name}) value, a tag ({@code !!str}/{@code !name})
+ * value, or a block scalar ({@code |}/{@code >}).
  * A uniformly indented document is fine. {@link #stringify} quotes any string
  * that starts with such an indicator (or with {@code - }/{@code ? }), so a flat
  * Map, or a List of non-empty flat Maps, always parses back.
@@ -182,7 +183,9 @@ public final class Yaml {
             }
             int indent = indentOf(rawLine);
             if (indent > baseIndent) {
-                throw nestedLine(rawLine, lineNumber);
+                throw isSequenceItem(rawLine.trim())
+                    ? nestedSequence(rawLine, lineNumber)
+                    : nestedLine(rawLine, lineNumber);
             }
             baseIndent = indent;
             if (isSequenceItem(rawLine.trim())) {
@@ -212,6 +215,12 @@ public final class Yaml {
         return new YamlParseException(
             "Nested sequence is out of scope (Yaml reads flat data only; use Json for nested data): "
                 + rawLine.trim(), lineNumber);
+    }
+
+    private static YamlParseException flowCollection(String text, int lineNumber) {
+        return new YamlParseException(
+            "Flow collections are out of scope (quote the value to keep it as text; use Json for lists and maps): "
+                + text, lineNumber);
     }
 
     /**
@@ -267,6 +276,11 @@ public final class Yaml {
     /** Parse one already-trimmed `key: value` line and put it into `target`. */
     private static void parseKeyValueLine(String trimmedLine, int lineNumber, LinkedHashMap<String, Object> target)
             throws YamlParseException {
+        // A whole-line flow collection would otherwise be split at its first `: ` into a
+        // mangled key and value (`{a: 1, b: 2}` read as the one-key map `{{a=1, b: 2}}`).
+        if (trimmedLine.charAt(0) == '{' || trimmedLine.charAt(0) == '[') {
+            throw flowCollection(trimmedLine, lineNumber);
+        }
         int sep = findKeySeparator(trimmedLine);
         if (sep < 0) {
             throw new YamlParseException("Expected 'key: value' but found no colon: " + trimmedLine, lineNumber);
@@ -474,9 +488,7 @@ public final class Yaml {
         // Flow collections ([...]/{...}) are out of scope: without this check they would
         // come back as a literal, misleading String instead of the list/map they denote.
         if (raw.charAt(0) == '[' || raw.charAt(0) == '{') {
-            throw new YamlParseException(
-                "Flow collections are out of scope (quote the value to keep it as text; use Json for lists and maps): "
-                    + raw, lineNumber);
+            throw flowCollection(raw, lineNumber);
         }
 
         // Block scalars (a `|`/`>` header, then indented lines) are out of scope.
@@ -491,6 +503,13 @@ public final class Yaml {
         if (raw.charAt(0) == '&' || raw.charAt(0) == '*') {
             throw new YamlParseException(
                 "Anchors/aliases are out of scope (quote the value to keep it as text): " + raw, lineNumber);
+        }
+
+        // Tags (`!!str 5`, `!point 5`) are out of scope: without this check the tag would
+        // come back as part of a literal String value.
+        if (raw.charAt(0) == '!') {
+            throw new YamlParseException(
+                "Tags are out of scope (quote the value to keep it as text): " + raw, lineNumber);
         }
 
         // Integer?

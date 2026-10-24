@@ -102,4 +102,79 @@ class CannotAssignToValSpec extends AbstractShellSpec {
       assert(!results.map(_._1).contains(Some("E0036")))
     }
   }
+
+  describe("assigning to a val from inside a function (#2340)") {
+    it("reports E0036 for a top-level val reassigned in a function") {
+      val results = errors(
+        """
+          |val w: Int = 10
+          |def g(): void { w = 99 }
+          |g()
+          |""".stripMargin
+      )
+      assert(results.map(_._1).contains(Some("E0036")))
+    }
+
+    it("reports E0036 for a static val reassigned in a static method") {
+      val results = errors(
+        """
+          |class C {
+          |  static val sf: Int = 0
+          |public:
+          |  static def set(): void { sf = 3 }
+          |}
+          |""".stripMargin
+      )
+      assert(results.map(_._1).contains(Some("E0036")))
+    }
+
+    it("reports E0036 for w++ and w-- on a top-level val in a function") {
+      for (op <- Seq("w++", "w--")) {
+        val results = errors(
+          s"""
+            |val w: Int = 10
+            |def g(): void { $op }
+            |g()
+            |""".stripMargin
+        )
+        assert(results.map(_._1).contains(Some("E0036")), op)
+      }
+    }
+
+    it("reports E0036 for w++ on a top-level val in a class's method") {
+      val results = errors(
+        """
+          |val w: Int = 10
+          |class K {
+          |public:
+          |  def bump(): void { w++ }
+          |}
+          |new K().bump()
+          |""".stripMargin
+      )
+      assert(results.map(_._1).contains(Some("E0036")))
+    }
+
+    it("still allows w++ on a top-level var in a function") {
+      val results = errors(
+        """
+          |var w: Int = 10
+          |def g(): void { w++ }
+          |g()
+          |""".stripMargin
+      )
+      assert(!results.map(_._1).contains(Some("E0036")))
+    }
+
+    it("still allows a top-level var to be reassigned in a function") {
+      val results = errors(
+        """
+          |var w: Int = 10
+          |def g(): void { w = 99 }
+          |g()
+          |""".stripMargin
+      )
+      assert(!results.map(_._1).contains(Some("E0036")))
+    }
+  }
 }

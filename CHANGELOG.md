@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Files::copyDir` reads `link/..` the way the OS does (#2370).**
+  - Before: `copyDir("t/sub", "t/lnk/../in")` (`lnk` -> `sub/deep`) ran away and left `sub/in/in/...`, and a legal copy through `lnk/..` was refused.
+  - Now: the first throws `IllegalArgumentException` with nothing written; the second copies.
+
+## [0.145.0] - 2026-10-24
+
 ### Breaking
 
 - **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
@@ -30,6 +38,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A lambda in a `select` case after a guarded case no longer fails JVM verification (#2359).**
   - Before: `case P(a, b) when a == 0: ...` followed by a case whose body holds `() -> a` crashed with `VerifyError` at run time.
   - Now: it compiles and runs.
+- **Assigning a `val` from inside a function (`=`, `+=`, `++`) is now E0036 (#2340).**
+  - Before: `val w = 10` then `def g() { w = 99 }` (or `w++`) compiled; `w` read `99` in functions and `10` at top level. A `static val` crashed at run time with `IllegalAccessError`.
+  - Now: `E0036 cannot assign to val`, as at top level.
+- **An error inside an ADT enum `case` points at that `case`, not at the `enum` keyword (#2322).**
+  - Before: `case Circle(...)` missing an abstract method reported `1:1`, the same spot for every case.
+  - Now: each error is reported on its own `case` line.
+
+- **An expression-bodied recursive function runs as a loop, like one written with `return` (#2330).**
+  - Before: `def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }` hit "stack overflow" at depth 200000, while the `return` form ran fine. An `else if` chain, and a `select` whose self-call case is a literal, `else` or guarded destructuring case, overflowed the same way. A `select` with an unguarded destructuring or type-pattern case still overflows (#2350).
+  - Now: it prints `200000`. A call whose result is still used (`{ val x = f(n - 1); x + 1 }`) stays a real call.
+- **`Yaml::parse` rejects a whole-line flow collection and a tag (#2327).**
+  - Before: `{a: 1, b: 2}` came back as the one-key map `{{a=1, b: 2}}`, and `a: !!str 5` as the text `!!str 5`.
+  - Now: `YamlParseException` naming the construct and line, as for anchors. Quote the value to keep it as text.
+
+- **`Files::copyDir("sub", "lnk/in")` is refused when `lnk` is a symlink to `sub` (#2304).**
+  - Before: it recursed into `lnk/in/in/...` until the OS path limit, leaving junk in `sub/`.
+  - Now: `IllegalArgumentException`, nothing written, as for `copyDir("sub", "sub/in")`.
+
+- **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
+  - Before: the English text read `can''t` and `doesn''t`.
+  - Now: `can't` and `doesn't`.
+- **`@TailRecursive` no longer breaks a group member that has an overload outside the group (#2337).**
+  - Before: `a(n: Int)` and `b` in a group, plus an unrelated `a(s: String)`: the class failed to load with `VerifyError`.
+  - Now: only calls to the group members themselves become jumps; the overload stays a plain call.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

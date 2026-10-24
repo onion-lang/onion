@@ -119,6 +119,8 @@ class TailCallOptimization(config: CompilerConfig)
     stmts.exists {
       case ret: Return if ret.term != null =>
         isSelfCall(ret.term, method)
+      case body: GuardedBody =>
+        checkStatementForTailCall(body.statements.last, method)
       case block: StatementBlock =>
         containsTailCall(block.statements.toSeq, method)
       case ifStmt: IfStatement =>
@@ -140,6 +142,8 @@ class TailCallOptimization(config: CompilerConfig)
           trace(s"[TCO]     Return statement: hasSelfCall=$result")
         }
         result
+      case body: GuardedBody =>
+        checkStatementForTailCall(body.statements.last, method)
       case block: StatementBlock =>
         containsTailCall(block.statements.toSeq, method)
       case ifStmt: IfStatement =>
@@ -500,6 +504,14 @@ class TailCallOptimization(config: CompilerConfig)
           (new Return(exprStmt.location, set.value), true)
         case _ => (stmt, false)
       }
+    case guarded: GuardedCaseBlock =>
+      // statements: taken = false; the case; if (!taken) rest. Sinking into the case is safe:
+      // once it ran, nothing after it does. Not claiming "always returns" keeps the caller's
+      // trailing `return result`, which is harmless.
+      val Array(init, matched, rest) = guarded.statements
+      val (sunkMatched, _) = sinkReturn(matched, result)
+      val (sunkRest, _) = sinkReturn(rest, result)
+      (new GuardedCaseBlock(guarded.location, init, sunkMatched, sunkRest), false)
     case block: StatementBlock if block.statements.nonEmpty =>
       val (last, returns) = sinkReturn(block.statements.last, result)
       (new StatementBlock(block.location, (block.statements.init.toSeq :+ last): _*), returns)

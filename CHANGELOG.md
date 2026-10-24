@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An error inside an ADT enum `case` points at that `case`, not at the `enum` keyword (#2322).**
   - Before: `case Circle(...)` missing an abstract method reported `1:1`, the same spot for every case.
   - Now: each error is reported on its own `case` line.
+- **A lambda in a `select` case after a guarded case no longer fails JVM verification (#2359).**
+  - Before: `case P(a, b) when a == 0: ...` followed by a case whose body holds `() -> a` crashed with `VerifyError` at run time.
+  - Now: it compiles and runs.
 - **A lambda in a constructor that assigns a captured `var` writes it back (#2361).**
   - Before: `def this(m: Int) { var n = m; val f = () -> { n = n * 3; n }; f(); v = n }` left `n` at `m`; the same lines in a method worked.
   - Now: the constructor and the lambda share `n`, as in a method.

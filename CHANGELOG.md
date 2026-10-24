@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An `as` cast to or from an array that can never succeed is a compile error, also when one side is nullable (#2309).**
+  - Before: `(xs as String[])` with `xs: List[String]?`, or `(ys as Integer[])` with `ys: String[]`, compiled and always failed at run time with `invalid type cast`.
+  - Now: E0000, like `List[String] as String[]`. Casts that can work (`Int[]? as Int[]`, `Object[] as String[]`) still compile.
 - **A `select` case label that does not fit a Byte/Short/Char scrutinee no longer matches a truncated value (#2376).**
   - Before: `case 300:` (or `case 150 + 150:`, `case k:`) on a `Byte` was truncated to `44` and matched it, silently.
   - Now: a literal label is E0000, as for `val b: Byte = 300`; a computed one never matches. Labels inside the range still work.

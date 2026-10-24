@@ -67,9 +67,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A `config` shape keeps a `String` value's leading and trailing spaces (#2229).**
   - Before: `print` wrote `text =   x  `, and `parse` read it back as `x`, so `parse(print(v)) == v` failed.
   - Now: `print` quotes a value that is padded or starts with `"` (`text = "  x  "`); every other value is written as before.
+
 - **`-128B` and `-32768S` hold -128 and -32768 (#2297).**
   - Before: they widened to `128`/`32768`, and `println(-128B)` crashed in `Byte.valueOf`.
   - Now: unary minus on a `Byte` or `Short` stays in that type's range. `Char` negation is unchanged (`-c` for `'a'` is `-97`, as in Java).
+
 - **`(xs as String[])` on a `List[Int]` no longer hints at `xs.toArray(new String[0])` (#2305).**
   - Before: following the hint threw `ArrayStoreException` at run time.
   - Now: the `toArray` hint appears only when the elements fit the array (`List[String]` as `Object[]`, `List[Int]` as `Number[]`); otherwise you see the plain type mismatch.
@@ -163,8 +165,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Calling a `List` method by the name another language gives it now names Onion's spelling.** `xs.sortBy { ... }` suggested `sort`, `xs.forall { ... }` suggested `addAll`, `xs.each { ... }` suggested `add`, and `joinToString`/`foldLeft`/`inject`/`sumOf`/`unique`/`nonEmpty`/`collect`/`sortByDescending` suggested nothing. Each now says `did you mean: sortedBy` (`all`, `forEach`, `join`, `fold`, `sumBy`, `distinct`, `isNotEmpty`, `map`, `sortedByDescending`).
 - **A `W0012`/`W0015` warning (null to non-nullable, or implicit unboxing of a boxed platform value) printed no source file name, `[W0012] :1:17: ...` instead of `[W0012] w6.on:1:17: ...`, when it was the very first warning of the compilation (#2238).** Both warnings are reported straight from the assignability check, which relied on an earlier, unrelated diagnostic having already told the reporter the current file; with no such diagnostic yet, the file name was still empty. Both call sites now set it themselves first, like the other warnings already do.
 - **A multi-`tool` file's `--help` ran the shared `--plan`/`--contract`/`--help` lines straight into the last declared tool's own option list, with no visual break, so they read as that tool's options rather than global flags (#2252).** Each tool's usage block now ends with a blank line when the file declares more than one, setting the global flags apart; single-tool output is unchanged.
-- **E0080 now checks that a user `Shape`'s `law`/`example` actually exercises that shape, not merely that one exists somewhere in the file (#2228).** `class Broken conforms Shape[Int] { ... }` with an unrelated `example trivial { 1 + 1 
-2 }` elsewhere in the file used to compile clean despite a broken `parse`/`print` round-trip -- any law or example anywhere in the file satisfied the gate for every `Shape` in it. A law/example now only counts for a given shape when its body constructs it, calls or reads one of its members, or type-tests against it.
+- **E0080 now checks that a user `Shape`'s `law`/`example` actually exercises that shape, not merely that one exists somewhere in the file (#2228).** `class Broken conforms Shape[Int] { ... }` with an unrelated `example trivial { 1 + 1 == 2 }` elsewhere in the file used to compile clean despite a broken `parse`/`print` round-trip -- any law or example anywhere in the file satisfied the gate for every `Shape` in it. A law/example now only counts for a given shape when its body constructs it, calls or reads one of its members, or type-tests against it.
 - **Two `extension` blocks for the same receiver type now get a dedicated `E0102` naming that type, instead of a generic duplicate-class error (#2204).** `extension List[Int] { ... }` declared twice (or `extension List { ... }` split across two blocks) used to fail with a cryptic internal class name and leave the second block's methods unreachable; a call to one of them now points at the real cause instead of an unrelated "method not found". Distinct concrete instantiations of the same generic receiver are unaffected.
 
 ## [0.143.0] - 2026-10-18

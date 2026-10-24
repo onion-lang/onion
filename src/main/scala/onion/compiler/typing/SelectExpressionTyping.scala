@@ -352,7 +352,7 @@ final class SelectExpressionTyping(
         val innerBody: ActionStatement = guardTaken match {
           case Some((taken, guardTerm)) =>
             val markTaken = new ExpressionActionStatement(new SetLocal(taken, new BoolValue(node.location, true)))
-            new IfStatement(guardTerm, new StatementBlock(node.location, markTaken, baseStmt), new NOP(node.location))
+            new IfStatement(guardTerm, new GuardedBody(node.location, markTaken, baseStmt), new NOP(node.location))
           case None =>
             baseStmt
         }
@@ -415,7 +415,7 @@ final class SelectExpressionTyping(
             val init = new ExpressionActionStatement(new SetLocal(taken, new BoolValue(node.location, false)))
             val matched = new IfStatement(caseConditions(caseIndex), caseBody, new NOP(node.location))
             val notTaken = new UnaryTerm(UnaryTerm.Kind.NOT, BasicType.BOOLEAN, new RefLocal(taken))
-            new StatementBlock(node.location, init, matched, new IfStatement(notTaken, restOfCases, new NOP(node.location)))
+            new GuardedCaseBlock(node.location, init, matched, new IfStatement(notTaken, restOfCases, new NOP(node.location)))
           case None =>
             // Build: if (patternCond) { caseBody } else { restOfCases }
             new IfStatement(caseConditions(caseIndex), caseBody, restOfCases)

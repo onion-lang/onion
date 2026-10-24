@@ -214,6 +214,15 @@ private[compiler] final class AssignabilitySupport(
           bodyContext.table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
             .collectFirst { case (raw, view) if TypeRelations.sameClass(raw, ae.raw) && argsMatch(view) => true }
             .getOrElse(false)
+      case (ae: TypedAST.AppliedClassType, tv: TypedAST.TypeVariableType) =>
+        // A type variable fits an applied type its own bound reaches
+        // (`T extends Comparable[T]` is a `Comparable[T]`). An F-bound names
+        // the variable through the placeholder frozen while the bounds were
+        // resolved, so point that self-reference back at `tv` first.
+        TypeSubstitution.substituteType(tv.upperBound, Map(tv.name -> tv), Map.empty, defaultToBound = false) match {
+          case bound: TypedAST.ClassType => structurallyAssignable(ae, bound)
+          case _ => false
+        }
       case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>
         actual match {
           case classType: TypedAST.ClassType => TypeRelations.sameClass(ae.raw, classType)

@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `T extends Comparable[T]` is accepted where a `Comparable[T]` is expected (#2338).**
+  - Before: `def asCmp(t: T): Comparable[T] = t` was E0000 "type Comparable[T] is expected, but type T is used".
+  - Now: it compiles, as in Java. Other applied types are still rejected.
 - **`Yaml::parse` rejects a whole-line flow collection and a tag (#2327).**
   - Before: `{a: 1, b: 2}` came back as the one-key map `{{a=1, b: 2}}`, and `a: !!str 5` as the text `!!str 5`.
   - Now: `YamlParseException` naming the construct and line, as for anchors. Quote the value to keep it as text.

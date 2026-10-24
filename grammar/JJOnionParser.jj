@@ -797,7 +797,11 @@ public class JJOnionParser implements Parser {
 
   // `B` ends a Byte literal, except in hex, where it is the digit `B`: `0xAB` is 171 (#2324).
   private static boolean isByteSuffix(String s) {
-    return s.endsWith("B") && !(s.length() > 2 && s.charAt(0) == '0' && (s.charAt(1) == 'x' || s.charAt(1) == 'X'));
+    return s.endsWith("B") && !isHex(s);
+  }
+
+  private static boolean isHex(String s) {
+    return s.length() > 2 && s.charAt(0) == '0' && (s.charAt(1) == 'x' || s.charAt(1) == 'X');
   }
 
   // Parse an int literal without ever throwing an unchecked exception (which would
@@ -3289,7 +3293,7 @@ AST.Expression integer_literal() :{Token t; String s;}{
       int iv = parseIntLiteral(s);
       if (iv == Integer.MIN_VALUE && !s.startsWith("0") && !followsUnaryMinus(t))
         throw new ParseException("integer literal out of range for Int: " + s);
-      AST.Expression lit = new AST.IntegerLiteral(p(t), iv);
+      AST.Expression lit = new AST.IntegerLiteral(p(t), iv, isHex(s) && s.endsWith("B"));
       if (iv == Integer.MIN_VALUE && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeLiteral = lit; }
       return lit;
     }

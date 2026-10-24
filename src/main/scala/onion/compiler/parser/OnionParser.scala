@@ -2770,8 +2770,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   }
 
   /** `B` ends a Byte literal, except in hex, where it is the digit `B`: `0xAB` is 171 (#2324). */
-  private def isByteSuffix(s: String): Boolean =
-    s.endsWith("B") && !(s.length > 2 && s.charAt(0) == '0' && (s.charAt(1) == 'x' || s.charAt(1) == 'X'))
+  private def isByteSuffix(s: String): Boolean = s.endsWith("B") && !isHex(s)
+
+  private def isHex(s: String): Boolean = s.length > 2 && s.charAt(0) == '0' && (s.charAt(1) == 'x' || s.charAt(1) == 'X')
 
   private def integerLiteral(): AST.Expression = {
     val prev = last
@@ -2801,7 +2802,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       } else {
         val iv = parseIntLiteral(s)
         if (iv == Integer.MIN_VALUE && !s.startsWith("0") && !negated) throw theFail
-        val lit = AST.IntegerLiteral(p(t), iv)
+        val lit = AST.IntegerLiteral(p(t), iv, isHex(s) && s.endsWith("B"))
         if (iv == Integer.MIN_VALUE && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeToken = t; minMagnitudeLiteral = lit }
         lit
       }

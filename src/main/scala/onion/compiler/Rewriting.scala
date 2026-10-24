@@ -358,7 +358,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // indistinguishable from a genuine default of that string and, in `--plan`,
     // reads as the bound argument value rather than a description of it).
     def defaultRendering(e: AST.Expression): Option[String] = e match {
-      case AST.IntegerLiteral(_, v)   => Some(v.toString)
+      case AST.IntegerLiteral(_, v, _) => Some(v.toString)
       case AST.LongLiteral(_, v)      => Some(v.toString)
       case AST.DoubleLiteral(_, v)    => Some(v.toString)
       case AST.FloatLiteral(_, v)     => Some(v.toString)

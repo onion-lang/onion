@@ -252,6 +252,8 @@ private[compiler] final class AssignabilitySupport(
         // NullableType up front for their own (dereference-target) cases.
         case nullable: NullableType =>
           bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "assignment")
+        case _ if expected == BasicType.BYTE && ConstantNarrowing.isHexEndingInB(actual) =>
+          bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`, SemanticErrorReporter.HexDigitBHint)
         case _ =>
           bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
       }

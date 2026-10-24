@@ -250,7 +250,11 @@ private[compiler] final class AssignabilitySupport(
         // normalizeMethodCallTarget, MemberSelectionResolutionSupport.
         // normalizeMemberSelectionTarget), which already special-case
         // NullableType up front for their own (dereference-target) cases.
-        case nullable: NullableType =>
+        // Only when the value without its `?` would fit; otherwise the
+        // mismatch is elsewhere (a type argument, say) and `!!`/`?:` do not help.
+        case nullable: NullableType
+            if (if (containsTypeVariable(expected)) structurallyAssignable(expected, nullable.innerType)
+                else TypeRelations.isAssignableWithBoxing(expected, nullable.innerType, bodyContext.table)) =>
           bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "assignment")
         case _ =>
           bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)

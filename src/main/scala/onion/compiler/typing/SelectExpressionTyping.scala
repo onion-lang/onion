@@ -452,6 +452,12 @@ final class SelectExpressionTyping(
   ): Option[(Term, PatternBindingInfo)] =
     destructuringProcessor.process(dp, bind, context)
 
+  private def intConstant(term: Term): Option[Int] = term match {
+    case v: IntValue => Some(v.value)
+    case u: UnaryTerm if u.kind == UnaryTerm.Kind.MINUS => intConstant(u.operand).map(-_)
+    case _ => None
+  }
+
   /** Returns (condition, pattern binding info, hasWildcard, optional guard info) */
   /** Rewrite a bare `case CONST:` over an enum scrutinee into `EnumType::CONST`.
     * A local variable of the same name takes precedence (keeping the change
@@ -522,24 +528,38 @@ final class SelectExpressionTyping(
         if (typedExpr == null) break((null, NoBindings, false, None))
 
         // An int case label matches a byte/short/char scrutinee (compared by value,
-        // as Java's switch does); the narrowing cast below (`AsInstanceOf`) normalizes
-        // it to the scrutinee type. Char scrutinees still also accept char literals.
+        // as Java's switch does): the scrutinee is widened to Int for the comparison,
+        // so a label that does not fit never matches. Char scrutinees still also
+        // accept char literals.
         val narrowableIntLabel = typedExpr.`type` == BasicType.INT &&
           (conditionType == BasicType.BYTE || conditionType == BasicType.SHORT || conditionType == BasicType.CHAR)
-        if (!TypeRules.isAssignable(conditionType, typedExpr.`type`) && !narrowableIntLabel) {
+        // A constant label must fit the scrutinee type, as `val b: Byte = 300` must;
+        // narrowing it would make it match a different value (#2376).
+        val labelOutOfRange = narrowableIntLabel && (intConstant(typedExpr) match {
+          case Some(v) => conditionType match {
+            case BasicType.BYTE  => v < Byte.MinValue || v > Byte.MaxValue
+            case BasicType.SHORT => v < Short.MinValue || v > Short.MaxValue
+            case _               => v < Char.MinValue || v > Char.MaxValue
+          }
+          case None => false
+        })
+        if (!TypeRules.isAssignable(conditionType, typedExpr.`type`) && !narrowableIntLabel || labelOutOfRange) {
           bodyContext.report(INCOMPATIBLE_TYPE, expr, conditionType, typedExpr.`type`)
           break((null, NoBindings, false, None))
         }
 
         val normalizedExpr =
-          if (typedExpr.isBasicType && typedExpr.`type` != conditionType) new AsInstanceOf(typedExpr, conditionType)
+          if (narrowableIntLabel) typedExpr
+          else if (typedExpr.isBasicType && typedExpr.`type` != conditionType) new AsInstanceOf(typedExpr, conditionType)
           else if (typedExpr.isReferenceType && typedExpr.`type` != bodyContext.rootClass) new AsInstanceOf(typedExpr, bodyContext.rootClass)
           else typedExpr
 
         if (normalizedExpr.isReferenceType) {
           body.createEqualsForRef(new RefLocal(bind), normalizedExpr)
         } else {
-          new BinaryTerm(EQUAL, BasicType.BOOLEAN, new RefLocal(bind), normalizedExpr)
+          val subject =
+            if (narrowableIntLabel) new AsInstanceOf(new RefLocal(bind), BasicType.INT) else new RefLocal(bind)
+          new BinaryTerm(EQUAL, BasicType.BOOLEAN, subject, normalizedExpr)
         }
 
       case typePattern @ AST.TypePattern(_, name, typeRef) =>

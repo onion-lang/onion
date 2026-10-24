@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **W0016 names an out-of-group overload with its parameter types (#2371).**
   - Before: `... group (b, a) could not be optimized: Method b has tail calls to non-group methods: a`, as if `a` were outside the group.
   - Now: `... non-group methods: a(java.lang.String)`, so the overload is told apart from the member `a(Int)`.
+- **A `select` case label that does not fit a Byte/Short/Char scrutinee no longer matches a truncated value (#2376).**
+  - Before: `case 300:` (or `case 150 + 150:`, `case k:`) on a `Byte` was truncated to `44` and matched it, silently.
+  - Now: a literal label is E0000, as for `val b: Byte = 300`; a computed one never matches. Labels inside the range still work.
+- **`val k: H[String]? = j` with `j: H[Object]?` reports a type mismatch, not a null error (#2343).**
+  - Before: E0070 "may be null", whose advice (`!!`, `?:`) cannot fix it.
+  - Now: E0000 naming the two types. E0070 stays for a value that would fit if it were not null.
+- **`Yaml::parse` rejects a tag or anchor on a key instead of keeping it in the key text (#2369).**
+  - Before: `!!str 5: x` returned the key `"!!str 5"`; `&x k: 1` returned `"&x k"`.
+  - Now: a `YamlParseException`. Quote the key to keep the text.
 - **The List-to-array cast hint only suggests code that compiles (#2314).**
   - Before: `(nums as JInteger[])` said `Int[]` and suggested `toArray(new Int[0])` (E0005); `Comparable[]` suggested a raw type (E0066); a `List[T]` suggested a call that throws at run time.
   - Now: `JInteger[]` and `new JInteger[0]` as written. A generic component or a bare `T` gets the plain type error, with no snippet.
@@ -53,6 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
+  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
+  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
 - **An expression-bodied recursive function runs as a loop, like one written with `return` (#2330).**
   - Before: `def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }` hit "stack overflow" at depth 200000, while the `return` form ran fine. An `else if` chain, and a `select` whose self-call case is a literal, `else` or guarded destructuring case, overflowed the same way. A `select` with an unguarded destructuring or type-pattern case still overflows (#2350).
   - Now: it prints `200000`. A call whose result is still used (`{ val x = f(n - 1); x + 1 }`) stays a real call.

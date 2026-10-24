@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **W0016 names an out-of-group overload with its parameter types (#2371).**
+  - Before: `... group (b, a) could not be optimized: Method b has tail calls to non-group methods: a`, as if `a` were outside the group.
+  - Now: `... non-group methods: a(java.lang.String)`, so the overload is told apart from the member `a(Int)`.
 - **A `select` case label that does not fit a Byte/Short/Char scrutinee no longer matches a truncated value (#2376).**
   - Before: `case 300:` (or `case 150 + 150:`, `case k:`) on a `Byte` was truncated to `44` and matched it, silently.
   - Now: a literal label is E0000, as for `val b: Byte = 300`; a computed one never matches. Labels inside the range still work.

@@ -228,7 +228,7 @@ final class ExpressionFormTyping(
         if (sa.dimension == da.dimension) isValidArrayElementCast(sa.component, da.component)
         else {
           val shorter = if (sa.dimension < da.dimension) sa.component else da.component
-          shorter match {
+          nonNullable(shorter) match {
             case ct: ClassType => isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
             case _ => false
           }
@@ -240,9 +240,19 @@ final class ExpressionFormTyping(
   private def isArrayCast(source: Type, destination: Type): Boolean =
     source.isInstanceOf[ArrayType] || destination.isInstanceOf[ArrayType]
 
-  private def isValidArrayElementCast(source: Type, destination: Type): Boolean =
-    if (source.isBasicType || destination.isBasicType) source eq destination
-    else isValidCast(source, destination)
+  // An element type may be nullable (`Object?[]`); null fits any reference element, so
+  // the non-null element type is what must cast.
+  private def isValidArrayElementCast(source: Type, destination: Type): Boolean = {
+    val s = nonNullable(source)
+    val d = nonNullable(destination)
+    if (s.isBasicType || d.isBasicType) s eq d
+    else isValidCast(s, d)
+  }
+
+  private def nonNullable(tp: Type): Type = tp match {
+    case n: NullableType => n.innerType
+    case other => other
+  }
 
   private def isArrayRelatedType(ct: ClassType): Boolean =
     ct.name == "java.lang.Object" || ct.name == "java.io.Serializable" || ct.name == "java.lang.Cloneable"

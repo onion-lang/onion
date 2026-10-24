@@ -355,5 +355,43 @@ class CastValidationSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(4) == result)
     }
+
+    it("still allows Object?[] as String[][] and back (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val o: Object?[] = new String[2][3]
+          |val s = (o as String[][])
+          |val back = (s as Object?[])
+          |return s.length * 10 + s[0].length + back.length * 100
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableElementArrayAsArray2.on",
+        Array()
+      )
+      assert(Shell.Success(223) == result)
+    }
+
+    it("rejects a String?[] as Integer[] (#2309)") {
+      val result = shell.run(
+        """
+          |import { java.lang.Integer as JInteger }
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val xs: String?[] = new String[2]
+          |val ys = (xs as JInteger[])
+          |return ys.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableStringArrayAsIntegerArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
   }
 }

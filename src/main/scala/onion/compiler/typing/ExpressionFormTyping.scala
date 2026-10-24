@@ -158,6 +158,14 @@ final class ExpressionFormTyping(
   private def isValidCast(source: Type, destination: Type): Boolean = {
     if (source eq destination) return true
     (source, destination) match {
+      // A nullable side used to reach the catch-all `true`, so `(xs as String[])` with
+      // `xs: List[String]?` compiled and always threw (#2309). Only the array rules
+      // look through `?`: null passes any reference checkcast, so the non-null value
+      // is what must fit.
+      case (ns: NullableType, _) if isArrayCast(ns.innerType, destination) =>
+        isValidCast(ns.innerType, destination)
+      case (_, nd: NullableType) if isArrayCast(source, nd.innerType) =>
+        isValidCast(source, nd.innerType)
       case (_: NullType, _: BasicType) =>
         false
       case (bt: BasicType, ct: ClassType) =>
@@ -213,9 +221,28 @@ final class ExpressionFormTyping(
         isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
       case (_: ArrayType, ct: ClassType) =>
         isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
+      case (sa: ArrayType, da: ArrayType) =>
+        // The JVM casts `A[]` to `B[]` only when the elements cast: the same primitive,
+        // or reference elements that cast (#2309). Past the shorter array's dimensions,
+        // its elements must be able to hold an array.
+        if (sa.dimension == da.dimension) isValidArrayElementCast(sa.component, da.component)
+        else {
+          val shorter = if (sa.dimension < da.dimension) sa.component else da.component
+          shorter match {
+            case ct: ClassType => isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
+            case _ => false
+          }
+        }
       case _ => true
     }
   }
+
+  private def isArrayCast(source: Type, destination: Type): Boolean =
+    source.isInstanceOf[ArrayType] || destination.isInstanceOf[ArrayType]
+
+  private def isValidArrayElementCast(source: Type, destination: Type): Boolean =
+    if (source.isBasicType || destination.isBasicType) source eq destination
+    else isValidCast(source, destination)
 
   private def isArrayRelatedType(ct: ClassType): Boolean =
     ct.name == "java.lang.Object" || ct.name == "java.io.Serializable" || ct.name == "java.lang.Cloneable"

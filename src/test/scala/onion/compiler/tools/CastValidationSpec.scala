@@ -175,5 +175,185 @@ class CastValidationSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(1) == result)
     }
+
+    it("rejects a nullable List[String]? as String[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val xs: List[String]? = ["a"]
+          |val a = (xs as String[])
+          |return a.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableListAsArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects a String? as String[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val s: String? = "a"
+          |val a = (s as String[])
+          |return a.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableStringAsArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects a String[]? as List[String] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val arr: String[]? = new String[1]
+          |val l = (arr as List[String])
+          |return l.size
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableArrayAsList.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects a String[] as Integer[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val ys: String[] = new String[1]
+          |val b = (ys as Integer[])
+          |return b.length
+          |  }
+          |}
+          |""".stripMargin,
+        "StringArrayAsIntegerArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects an Int[] as Long[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val ys: Int[] = new Int[1]
+          |val b = (ys as Long[])
+          |return b.length
+          |  }
+          |}
+          |""".stripMargin,
+        "IntArrayAsLongArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects an Int[] as Int[][] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val ys: Int[] = new Int[1]
+          |val b = (ys as Int[][])
+          |return b.length
+          |  }
+          |}
+          |""".stripMargin,
+        "IntArrayAsIntArray2.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("still allows a nullable Int[]? as Int[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val ys: Int[]? = new Int[3]
+          |val b = (ys as Int[])
+          |return b.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableIntArrayAsIntArray.on",
+        Array()
+      )
+      assert(Shell.Success(3) == result)
+    }
+
+    it("still allows Object[] as String[] and String[] as Object[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val o: Object[] = (new String[2] as Object[])
+          |val s = (o as String[])
+          |return s.length
+          |  }
+          |}
+          |""".stripMargin,
+        "ObjectArrayStringArray.on",
+        Array()
+      )
+      assert(Shell.Success(2) == result)
+    }
+
+    it("still allows Object[] as String[][] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val o: Object[] = (new String[2][1] as Object[])
+          |val s = (o as String[][])
+          |return s.length
+          |  }
+          |}
+          |""".stripMargin,
+        "ObjectArrayAsStringArray2.on",
+        Array()
+      )
+      assert(Shell.Success(2) == result)
+    }
+
+    it("still allows a nullable Object? as String[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val o: Object? = new String[4]
+          |val s = (o as String[])
+          |return s.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableObjectAsArray.on",
+        Array()
+      )
+      assert(Shell.Success(4) == result)
+    }
   }
 }

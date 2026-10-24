@@ -102,6 +102,9 @@ final class BlockElementLowering(
       context.openLabeledLoop(node.name) {
         attachLoopLabel(translate(node.loop, context), node.name)
       }
+    case node: AST.ForeachExpression if nonMapPairForeach(node, context) =>
+      bodyContext.report(FOREACH_PAIR_NOT_MAP, node, pairForeachTargetType)
+      new NOP(node.location)
     case node: AST.ForeachExpression =>
       context.openScope {
         val collection = typed(node.collection, context).getOrElse(null)
@@ -727,6 +730,30 @@ final class BlockElementLowering(
     body.findMethod(node, target, name)
 
   /** True when the value is a java.util.Map (which has no iterator()). */
+  private var pairForeachTargetType: Type = null
+
+  /**
+   * `foreach (a, b) in xs` is rewritten to `xs.entrySet()` before typing, so over a
+   * List or record it used to fail with "entrySet() not found" and "operator + for
+   * K, V". Detects that rewrite over a plain variable or field that is not a Map
+   * (typing those twice is harmless; other targets keep the old path).
+   */
+  private def nonMapPairForeach(node: AST.ForeachExpression, context: LocalContext): Boolean =
+    (node.arg.name == "__foreach_entry") && (node.collection match {
+      case AST.MethodCall(_, target @ (_: AST.Id | _: AST.MemberSelection), "entrySet", Nil, _) =>
+        typed(target, context) match {
+          case Some(t) if !t.isBasicType && !t.isNullType =>
+            t.`type` match {
+              case ot @ (_: ClassType | _: ArrayType) if !isMapType(ot) =>
+                pairForeachTargetType = ot
+                true
+              case _ => false
+            }
+          case _ => false
+        }
+      case _ => false
+    })
+
   private def isMapType(tp: Type): Boolean =
     TypeRules.isSuperType(bodyContext.load("java.util.Map"), tp)
 

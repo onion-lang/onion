@@ -1139,6 +1139,24 @@ extension List[Int] { def bar(): Int = 2 }   // E0102: List[int] 用の extensio
 異なる具体的インスタンス化は衝突しません（`extension List[Int]` と
 `extension List[String]` は共存できます）。
 
+### `E0103` — Map ではないものに対する `foreach (a, b)`
+
+`foreach (a, b) in xs` は `Map` のエントリを回す構文です。`List`・配列・レコードに
+使うと、`foreach` の位置でこの1つのエラーになります。以前は `entrySet()` が見つからない
+というエラーと `K, V` への演算子エラーが出ていました。どちらも書いていない名前です。
+
+```onion
+record P(x: Int, y: Int)
+val ps = [new P(1, 2), new P(3, 4)]
+foreach (x, y) in ps { println(x + y) }   // E0103: List[P] は Map ではない
+```
+
+対処: `val (a, b) = p` で要素を分解してください。
+
+```onion
+foreach p in ps { val (x, y) = p; println(x + y) }
+```
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -1881,6 +1899,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
 | `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
+| `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
 
 ## 関連項目
 

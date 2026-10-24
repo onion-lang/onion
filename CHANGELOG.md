@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`foreach (x, y) in ps` over a List of records is one clear error, E0103 (#2301).**
+  - Before: two errors naming `entrySet()` and `K, V`, which you never wrote.
+  - Now: "`foreach (a, b)` walks the entries of a Map", with the fix `foreach p in ps { val (x, y) = p ... }`.
 - **`Yaml::parse` rejects a whole-line flow collection and a tag (#2327).**
   - Before: `{a: 1, b: 2}` came back as the one-key map `{{a=1, b: 2}}`, and `a: !!str 5` as the text `!!str 5`.
   - Now: `YamlParseException` naming the construct and line, as for anchors. Quote the value to keep it as text.

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `select` case constant that does not fit a Byte/Short/Char scrutinee is a compile error (#2376).**
+  - Before: `case 300:` on a `Byte` was truncated to `44` and matched it, silently.
+  - Now: E0000, as for `val b: Byte = 300`. Labels inside the range still work.
 - **A lambda in a `select` case after a guarded case no longer fails JVM verification (#2359).**
   - Before: `case P(a, b) when a == 0: ...` followed by a case whose body holds `() -> a` crashed with `VerifyError` at run time.
   - Now: it compiles and runs.

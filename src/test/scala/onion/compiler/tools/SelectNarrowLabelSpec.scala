@@ -28,4 +28,20 @@ class SelectNarrowLabelSpec extends AbstractShellSpec {
     assert(Shell.Failure(-1) == shell.run(
       "def main(args: String[]): void { val b: Byte = 2\n val r = select b { case \"x\": \"bad\" } }", "None", Array()))
   }
+  it("rejects an int label that does not fit a Byte scrutinee") {
+    assert(Shell.Failure(-1) == shell.run(
+      "def main(args: String[]): void { val b: Byte = 44B\n val r = select b { case 300: \"bad\"\n else: \"ok\" } }", "None", Array()))
+  }
+  it("rejects an int label that does not fit a Short scrutinee") {
+    assert(Shell.Failure(-1) == shell.run(
+      "def main(args: String[]): void { val s: Short = 4464S\n val r = select s { case 70000: \"bad\"\n else: \"ok\" } }", "None", Array()))
+  }
+  it("rejects a negative int label for a Char scrutinee") {
+    assert(Shell.Failure(-1) == shell.run(
+      "def main(args: String[]): void { val c: Char = 65\n val r = select c { case -1: \"bad\"\n else: \"ok\" } }", "None", Array()))
+  }
+  it("still accepts labels at the edges of the type") {
+    assert(Shell.Success("edge") == shell.run(
+      "def main(args: String[]): String { val b: Byte = -128B\n return select b { case 127: \"hi\"\n case -128: \"edge\"\n else: \"?\" } }", "None", Array()))
+  }
 }

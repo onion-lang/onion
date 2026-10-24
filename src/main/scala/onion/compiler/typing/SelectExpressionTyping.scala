@@ -456,6 +456,12 @@ final class SelectExpressionTyping(
   /** Rewrite a bare `case CONST:` over an enum scrutinee into `EnumType::CONST`.
     * A local variable of the same name takes precedence (keeping the change
     * purely additive: only previously-unresolvable identifiers are rewritten). */
+  private def intConstant(term: Term): Option[Int] = term match {
+    case v: IntValue => Some(v.value)
+    case u: UnaryTerm if u.kind == UnaryTerm.Kind.MINUS => intConstant(u.operand).map(-_)
+    case _ => None
+  }
+
   private def rewriteBareEnumConstants(
     cases: List[(List[AST.Pattern], AST.BlockExpression)],
     conditionType: Type,
@@ -526,7 +532,17 @@ final class SelectExpressionTyping(
         // it to the scrutinee type. Char scrutinees still also accept char literals.
         val narrowableIntLabel = typedExpr.`type` == BasicType.INT &&
           (conditionType == BasicType.BYTE || conditionType == BasicType.SHORT || conditionType == BasicType.CHAR)
-        if (!TypeRules.isAssignable(conditionType, typedExpr.`type`) && !narrowableIntLabel) {
+        // A constant label must fit the scrutinee type, as `val b: Byte = 300` must;
+        // narrowing it would make it match a different value (#2376).
+        val labelOutOfRange = narrowableIntLabel && (intConstant(typedExpr) match {
+          case Some(v) => conditionType match {
+            case BasicType.BYTE  => v < Byte.MinValue || v > Byte.MaxValue
+            case BasicType.SHORT => v < Short.MinValue || v > Short.MaxValue
+            case _               => v < Char.MinValue || v > Char.MaxValue
+          }
+          case None => false
+        })
+        if (!TypeRules.isAssignable(conditionType, typedExpr.`type`) && !narrowableIntLabel || labelOutOfRange) {
           bodyContext.report(INCOMPATIBLE_TYPE, expr, conditionType, typedExpr.`type`)
           break((null, NoBindings, false, None))
         }

@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now: `get()` is a `U`, also inside a lambda, and the case binds `Some[T]`. A raw receiver (`case m is Mid`, `(o as Mid)`) is unchanged.
   - `this` itself is a `Mid[U]`, also through `val me = this`, `id(this)` or `[this]`, so `same(this)` fits an inherited `same(o: Box[T])`.
   - `U` may be null, so `get().toString()` there is now E0057, as it already was inside `Box`. Write `get()?.toString()`, or bound it: `Mid[U extends Object]`.
+- **`Yaml::parse` rejects a whole-line flow collection and a tag (#2327).**
+  - Before: `{a: 1, b: 2}` came back as the one-key map `{{a=1, b: 2}}`, and `a: !!str 5` as the text `!!str 5`.
+  - Now: `YamlParseException` naming the construct and line, as for anchors. Quote the value to keep it as text.
+
 - **`Files::copyDir("sub", "lnk/in")` is refused when `lnk` is a symlink to `sub` (#2304).**
   - Before: it recursed into `lnk/in/in/...` until the OS path limit, leaving junk in `sub/`.
   - Now: `IllegalArgumentException`, nothing written, as for `copyDir("sub", "sub/in")`.

@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Files::copyDir("sub", "lnk/in")` is refused when `lnk` is a symlink to `sub` (#2304).**
+  - Before: it recursed into `lnk/in/in/...` until the OS path limit, leaving junk in `sub/`.
+  - Now: `IllegalArgumentException`, nothing written, as for `copyDir("sub", "sub/in")`.
+
 - **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
   - Before: the English text read `can''t` and `doesn''t`.
   - Now: `can't` and `doesn't`.

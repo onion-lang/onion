@@ -193,7 +193,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       checkDuplicateRecordComponents(node, clazz)
       for (section <- node.sections) processAccessSection(section)
       node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
-      DuplicationChecks.checkOverrideContracts(typing, clazz, node.location)
+      DuplicationChecks.checkOverrideContracts(typing, clazz, node.location, skipObject = true)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
     }
 

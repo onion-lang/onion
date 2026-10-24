@@ -60,11 +60,13 @@ private[compiler] object DuplicationChecks {
       case _ => false
   }
 
-  def checkOverrideContracts(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
+  def checkOverrideContracts(typing: Typing, clazz: ClassDefinition, fallback: Location, skipObject: Boolean = false): Unit = {
     if clazz.isInterface then return
     val allViews = typing.table_.appliedViewsOf(clazz)(AppliedTypeViews.collectAppliedViewsFrom(clazz))
     // Exclude the target class itself to avoid checking methods against themselves
-    val views = allViews - clazz
+    // A record keeps components named like Object's methods (`wait`, `notify`), which the JVM
+    // tells apart by descriptor; only the interface and record-supertype contracts are checked.
+    val views = (allViews - clazz).filter { case (c, _) => !(skipObject && c.name == "java.lang.Object") }
     if views.isEmpty then return
 
     val implementations = clazz.methods.filter(m => !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier))

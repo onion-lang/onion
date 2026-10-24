@@ -5,6 +5,15 @@ import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.typing.session.TypingBodyContext
 import onion.compiler.toolbox.Boxing
+import onion.compiler.typing.AssignmentTyping.isReadOnly
+
+object AssignmentTyping {
+  /** A `val` field, including a top-level one whose field is not JVM-final. */
+  private[typing] def isReadOnly(field: FieldRef): Boolean = Modifier.isFinal(field.modifier) || (field match {
+    case d: FieldDefinition => d.readOnly
+    case _ => false
+  })
+}
 
 final class AssignmentTyping(
   private val typing: Typing,
@@ -289,12 +298,6 @@ final class AssignmentTyping(
     Option(bodyContext.definition.field(name)).map(f => (bodyContext.definition, f))
       .orElse(bodyContext.topLevelClass.flatMap(tc => Option(tc.field(name)).map(f => (tc, f))))
       .filter { case (_, field) => (field.modifier & AST.M_STATIC) != 0 }
-
-  /** A `val` field, including a top-level one whose field is not JVM-final. */
-  private[typing] def isReadOnly(field: FieldRef): Boolean = Modifier.isFinal(field.modifier) || (field match {
-    case d: FieldDefinition => d.readOnly
-    case _ => false
-  })
 
   private def processImplicitStaticFieldAssign(
     owner: ClassType, field: FieldRef, node: AST.Assignment, context: LocalContext

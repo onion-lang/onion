@@ -29,8 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Assigning a `val` from inside a function is now E0036 (#2340).**
-  - Before: `val w = 10` then `def g() { w = 99 }` compiled; `w` read `99` in functions and `10` at top level. A `static val` crashed at run time with `IllegalAccessError`.
+- **Assigning a `val` from inside a function (`=`, `+=`, `++`) is now E0036 (#2340).**
+  - Before: `val w = 10` then `def g() { w = 99 }` (or `w++`) compiled; `w` read `99` in functions and `10` at top level. A `static val` crashed at run time with `IllegalAccessError`.
   - Now: `E0036 cannot assign to val`, as at top level.
 - **An error inside an ADT enum `case` points at that `case`, not at the `enum` keyword (#2322).**
   - Before: `case Circle(...)` missing an abstract method reported `1:1`, the same spot for every case.

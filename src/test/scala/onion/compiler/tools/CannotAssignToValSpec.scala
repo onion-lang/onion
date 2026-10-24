@@ -128,6 +128,44 @@ class CannotAssignToValSpec extends AbstractShellSpec {
       assert(results.map(_._1).contains(Some("E0036")))
     }
 
+    it("reports E0036 for w++ and w-- on a top-level val in a function") {
+      for (op <- Seq("w++", "w--")) {
+        val results = errors(
+          s"""
+            |val w: Int = 10
+            |def g(): void { $op }
+            |g()
+            |""".stripMargin
+        )
+        assert(results.map(_._1).contains(Some("E0036")), op)
+      }
+    }
+
+    it("reports E0036 for w++ on a top-level val in a class's method") {
+      val results = errors(
+        """
+          |val w: Int = 10
+          |class K {
+          |public:
+          |  def bump(): void { w++ }
+          |}
+          |new K().bump()
+          |""".stripMargin
+      )
+      assert(results.map(_._1).contains(Some("E0036")))
+    }
+
+    it("still allows w++ on a top-level var in a function") {
+      val results = errors(
+        """
+          |var w: Int = 10
+          |def g(): void { w++ }
+          |g()
+          |""".stripMargin
+      )
+      assert(!results.map(_._1).contains(Some("E0036")))
+    }
+
     it("still allows a top-level var to be reassigned in a function") {
       val results = errors(
         """

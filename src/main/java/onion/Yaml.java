@@ -273,6 +273,13 @@ public final class Yaml {
         }
 
         String rawKey = trimmedLine.substring(0, sep).trim();
+        // A tag (!x), anchor (&x) or alias (*x) on a key is out of scope: without this check
+        // the marker would come back as part of the key text.
+        if (!rawKey.isEmpty() && "!&*".indexOf(rawKey.charAt(0)) >= 0) {
+            throw new YamlParseException(
+                "Tags/anchors/aliases on a key are out of scope (quote the key to keep it as text): "
+                    + rawKey, lineNumber);
+        }
         String key = rawKey.startsWith("\"") ? unquote(rawKey, lineNumber) : rawKey;
 
         // Value: everything after the separator (": " = 2 chars, or ":" alone at end = 1 char)

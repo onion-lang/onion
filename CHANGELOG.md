@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yaml::parse` rejects a tag or anchor on a key instead of keeping it in the key text (#2369).**
+  - Before: `!!str 5: x` returned the key `"!!str 5"`; `&x k: 1` returned `"&x k"`.
+  - Now: a `YamlParseException`. Quote the key to keep the text.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

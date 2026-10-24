@@ -631,6 +631,9 @@ object TypedAST {
    */
   class FieldDefinition(val location: Location, val modifier: Int, val affiliation: TypedAST.ClassType, val name: String, val `type`: TypedAST.Type)
     extends Node with FieldRef {
+    /** A top-level `val`: its field is not JVM-final (it is written once from `start`), yet the
+      * language still forbids reassigning it (E0036). */
+    var readOnly: Boolean = false
   }
 
   /**

@@ -10,8 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Syntax-error hints no longer misread a tab-indented line (#2312).**
-  - Before: the `;`-after-`}` hint fired where no `}` preceded the `;`, and the enum-`case` hint could name the wrong case.
+  - Before: the `;`-after-`}` hint fired where no `}` preceded the `;`, and the enum-`case` hint was missing or named the wrong case.
   - Now: hints see the text before the error exactly, whatever the indentation.
+- **A lambda in a `select` case after a guarded case no longer fails JVM verification (#2359).**
+  - Before: `case P(a, b) when a == 0: ...` followed by a case whose body holds `() -> a` crashed with `VerifyError` at run time.
+  - Now: it compiles and runs.
 - **A lambda in a constructor that assigns a captured `var` writes it back (#2361).**
   - Before: `def this(m: Int) { var n = m; val f = () -> { n = n * 3; n }; f(); v = n }` left `n` at `m`; the same lines in a method worked.
   - Now: the constructor and the lambda share `n`, as in a method.

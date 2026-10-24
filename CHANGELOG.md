@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The List-to-array cast hint only suggests code that compiles (#2314).**
+  - Before: `(nums as JInteger[])` said `Int[]` and suggested `toArray(new Int[0])` (E0005); `Comparable[]` suggested a raw type (E0066); a `List[T]` suggested a call that throws at run time.
+  - Now: `JInteger[]` and `new JInteger[0]` as written. A generic component or a bare `T` gets the plain type error, with no snippet.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

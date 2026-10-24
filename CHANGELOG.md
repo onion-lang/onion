@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A default argument that uses an earlier parameter is a compile error, not a `VerifyError` (#2358).**
+  - Before: `def g(n: Int, m: Int = n + 1)` compiled, then the program died with `VerifyError` at load.
+  - Now: `E0002`, local variable `n` is not found. A default is evaluated at the call site, where `n` is not in scope.
+
 - **`Yaml::parse` rejects a whole-line flow collection and a tag (#2327).**
   - Before: `{a: 1, b: 2}` came back as the one-key map `{{a=1, b: 2}}`, and `a: !!str 5` as the text `!!str 5`.
   - Now: `YamlParseException` naming the construct and line, as for anchors. Quote the value to keep it as text.

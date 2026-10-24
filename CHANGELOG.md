@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`foreach (x, y) in ps` over a List of records is one clear error, E0103 (#2301).**
+  - Before: two errors naming `entrySet()` and `K, V`, which you never wrote.
+  - Now: "`foreach (a, b)` walks the entries of a Map", with the fix `foreach p in ps { val (x, y) = p ... }`.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

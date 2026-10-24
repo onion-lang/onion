@@ -1264,7 +1264,7 @@ flat block mapping ドキュメント、およびそれらのトップレベル 
 `derive!(Json)` とまったく同じ `toMap` / `fromMap` の土台の上に構築されています。
 
 対象範囲: flat block mapping、またはそれらのトップレベル block シーケンス
-（要素内のネストした map/シーケンス、アンカー、flow collection は非対応）。
+（要素内のネストした map/シーケンス、アンカー、タグ、flow collection は非対応）。
 この範囲外の構文は、データを静かに失う代わりにエラーを発生させます:
 `Yaml::stringify` はネストした Map/List 値に対して `IllegalArgumentException` を
 投げます。`Yaml::parse` は次の場合に `Yaml.YamlParseException` を投げます:
@@ -1272,8 +1272,9 @@ flat block mapping ドキュメント、およびそれらのトップレベル 
 - ネストした mapping: 兄弟の行より深くインデントされた行（トップレベルでも、
   シーケンス要素の中でも）
 - ネストしたシーケンス: キーの下の `- ` 項目、または最初の項目と違う列にある項目
-- flow collection（`[...]`/`{...}`）の値
+- flow collection（`[...]`/`{...}`）。値としても、行全体としても
 - アンカー/エイリアス（`&name`/`*name`）の値
+- タグ（`!!str 5`、`!name 5`）の値
 - ブロックスカラー（`|`/`>`。複数行テキストの書き方）
 
 全体が同じ幅でインデントされた文書は問題ありません。`Yaml::stringify` は

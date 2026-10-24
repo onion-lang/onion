@@ -111,7 +111,12 @@ private[compiler] object DuplicationChecks {
               }
             }
 
-            if (!primitiveAwareAssignable(specializedRet, impl.returnType, typing)) {
+            // A JVM override must return the same primitive: widening (Int where Double is
+            // declared) is assignable, but the bridge-less accessor would answer a different method.
+            val primitiveMismatch = (specializedRet, impl.returnType) match
+              case (c: BasicType, i: BasicType) => c != i
+              case _ => false
+            if (primitiveMismatch || !primitiveAwareAssignable(specializedRet, impl.returnType, typing)) {
               typing.report(SemanticError.INCOMPATIBLE_TYPE, location, specializedRet, impl.returnType)
             }
           }

@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A lambda in a `select` case after a guarded case no longer fails JVM verification (#2359).**
+  - Before: `case P(a, b) when a == 0: ...` followed by a case whose body holds `() -> a` crashed with `VerifyError` at run time.
+  - Now: it compiles and runs.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

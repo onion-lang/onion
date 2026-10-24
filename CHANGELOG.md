@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A lambda that assigns a method parameter now updates it for the method too (#2335).**
   - Before: `def g(n: Int) { val f = () -> { n = n + 10; n }; f(); return n }` returned the old `n`.
   - Now: the lambda and the method share one `n`, as they do for a captured `var` local.
+- **`Files::copyDir("sub", "lnk/in")` is refused when `lnk` is a symlink to `sub` (#2304).**
+  - Before: it recursed into `lnk/in/in/...` until the OS path limit, leaving junk in `sub/`.
+  - Now: `IllegalArgumentException`, nothing written, as for `copyDir("sub", "sub/in")`.
+
 - **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
   - Before: the English text read `can''t` and `doesn''t`.
   - Now: `can't` and `doesn't`.

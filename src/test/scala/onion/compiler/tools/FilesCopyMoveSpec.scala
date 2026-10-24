@@ -202,5 +202,34 @@ class FilesCopyMoveSpec extends AbstractShellSpec {
       srcFile.delete()
       srcDir.delete()
     }
+
+    it("refuses to copy a directory into itself through a symlink") {
+      val base = JFiles.createTempDirectory("onion-copydir-link-")
+      val srcDir = JFiles.createDirectory(base.resolve("sub"))
+      JFiles.writeString(srcDir.resolve("a.txt"), "1")
+      JFiles.createSymbolicLink(base.resolve("lnk"), srcDir)
+
+      val srcPath = srcDir.toString.replace('\\', '/')
+      val dstPath = base.resolve("lnk").resolve("in").toString.replace('\\', '/')
+
+      val thrown = intercept[ScriptException] {
+        shell.run(
+          s"""
+             |import { onion.Files; }
+             |class Test {
+             |public:
+             |  static def main(args: String[]): String {
+             |    Files::copyDir("$srcPath", "$dstPath")
+             |    return "no error"
+             |  }
+             |}
+             |""".stripMargin,
+          "FilesCopyDirSymlink.on",
+          Array()
+        )
+      }
+      assert(thrown.getCause.isInstanceOf[IllegalArgumentException])
+      assert(!JFiles.exists(srcDir.resolve("in")))
+    }
   }
 }

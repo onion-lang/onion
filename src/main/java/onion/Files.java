@@ -232,8 +232,8 @@ public final class Files {
     public static void copyDir(String src, String dst) throws IOException {
         final java.nio.file.Path srcPath = java.nio.file.Paths.get(src);
         final java.nio.file.Path dstPath = java.nio.file.Paths.get(dst);
-        final java.nio.file.Path srcAbs = srcPath.toAbsolutePath().normalize();
-        final java.nio.file.Path dstAbs = dstPath.toAbsolutePath().normalize();
+        final java.nio.file.Path srcAbs = realPathOfExistingPrefix(srcPath);
+        final java.nio.file.Path dstAbs = realPathOfExistingPrefix(dstPath);
         if (dstAbs.equals(srcAbs) || dstAbs.startsWith(srcAbs)) {
             throw new IllegalArgumentException("cannot copy a directory into itself: " + src + " -> " + dst);
         }
@@ -255,6 +255,20 @@ public final class Files {
                 return java.nio.file.FileVisitResult.CONTINUE;
             }
         });
+    }
+
+    /**
+     * The absolute path with symlinks resolved as far as the path exists; the part that does
+     * not exist yet (a destination about to be created) is appended unchanged.
+     */
+    private static java.nio.file.Path realPathOfExistingPrefix(java.nio.file.Path path) throws IOException {
+        java.nio.file.Path abs = path.toAbsolutePath().normalize();
+        java.nio.file.Path existing = abs;
+        while (existing != null && !java.nio.file.Files.exists(existing)) {
+            existing = existing.getParent();
+        }
+        if (existing == null) return abs;
+        return existing.toRealPath().resolve(existing.relativize(abs)).normalize();
     }
 
     // ========== Directory listing and glob ==========

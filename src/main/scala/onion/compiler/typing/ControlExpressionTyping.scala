@@ -163,7 +163,7 @@ final class ControlExpressionTyping(
           val resultVar = new ClosureLocalBinding(0, context.add(context.newName, resultType, isMutable = true), resultType, isMutable = true)
           val thenStmt = assignBranch(node.thenBlock, thenTerm, resultVar, resultType)
           val elseStmt = assignBranch(node.elseBlock, elseTerm, resultVar, resultType)
-          Some(new Begin(node.location, Array[Term](statementTerm(new IfStatement(condition, thenStmt, elseStmt), BasicType.VOID, node.location), new RefLocal(resultVar))))
+          Some(new Begin(node.location, Array[Term](statementTerm(new IfStatement(condition, thenStmt, elseStmt), BasicType.VOID, node.location), new ResultRefLocal(resultVar))))
         }
       }
     }

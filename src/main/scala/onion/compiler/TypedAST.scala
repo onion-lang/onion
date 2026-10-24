@@ -730,6 +730,9 @@ object TypedAST {
     }
   }
 
+  /** The compiler temporary an if/select/try expression yields; never a user variable. */
+  class ResultRefLocal(bind: ClosureLocalBinding) extends RefLocal(bind)
+
   class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: TypedAST.Type, val value: TypedAST.Term) extends Term(location) {
     def this(bind: ClosureLocalBinding, value: TypedAST.Term) = {
       this(null, bind.frameIndex, bind.index, bind.tp, value)

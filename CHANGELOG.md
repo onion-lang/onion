@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.145.0] - 2026-10-24
+
 ### Breaking
 
 - **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
@@ -30,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Assigning a `val` from inside a function is now E0036 (#2340).**
   - Before: `val w = 10` then `def g() { w = 99 }` compiled; `w` read `99` in functions and `10` at top level. A `static val` crashed at run time with `IllegalAccessError`.
   - Now: `E0036 cannot assign to val`, as at top level.
+- **An error inside an ADT enum `case` points at that `case`, not at the `enum` keyword (#2322).**
+  - Before: `case Circle(...)` missing an abstract method reported `1:1`, the same spot for every case.
+  - Now: each error is reported on its own `case` line.
+
+- **An expression-bodied recursive function runs as a loop, like one written with `return` (#2330).**
+  - Before: `def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }` hit "stack overflow" at depth 200000, while the `return` form ran fine. An `else if` chain, and a `select` whose self-call case is a literal, `else` or guarded destructuring case, overflowed the same way. A `select` with an unguarded destructuring or type-pattern case still overflows (#2350).
+  - Now: it prints `200000`. A call whose result is still used (`{ val x = f(n - 1); x + 1 }`) stays a real call.
 - **`Yaml::parse` rejects a whole-line flow collection and a tag (#2327).**
   - Before: `{a: 1, b: 2}` came back as the one-key map `{{a=1, b: 2}}`, and `a: !!str 5` as the text `!!str 5`.
   - Now: `YamlParseException` naming the construct and line, as for anchors. Quote the value to keep it as text.

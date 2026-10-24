@@ -219,6 +219,16 @@ object TypedAST {
   }
 
   /**
+   * A `select` case with a `when` guard: `taken = false; <pattern, guard, body>; if (!taken) <rest>`.
+   * `statements(1)` is the case itself and ends in the case's value; the rest runs only when
+   * that did not happen, so a return may be sunk into both (tail-call optimization).
+   */
+  class GuardedCaseBlock(location: Location, newStatements: TypedAST.ActionStatement*) extends StatementBlock(location, newStatements*)
+
+  /** The body of a guarded case once its guard held: `taken = true; <body>`; the body is the value. */
+  class GuardedBody(location: Location, newStatements: TypedAST.ActionStatement*) extends StatementBlock(location, newStatements*)
+
+  /**
    * @author Kota Mizushima
    */
   class BoolValue(location: Location, val value: Boolean) extends Term(location) {

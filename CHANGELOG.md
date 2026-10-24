@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`val k: H[String]? = j` with `j: H[Object]?` reports a type mismatch, not a null error (#2343).**
   - Before: E0070 "may be null", whose advice (`!!`, `?:`) cannot fix it.
   - Now: E0000 naming the two types. E0070 stays for a value that would fit if it were not null.
+- **A lambda in a `select` case after a guarded case no longer fails JVM verification (#2359).**
+  - Before: `case P(a, b) when a == 0: ...` followed by a case whose body holds `() -> a` crashed with `VerifyError` at run time.
+  - Now: it compiles and runs.
 - **A lambda in a constructor that assigns a captured `var` writes it back (#2361).**
   - Before: `def this(m: Int) { var n = m; val f = () -> { n = n * 3; n }; f(); v = n }` left `n` at `m`; the same lines in a method worked.
   - Now: the constructor and the lambda share `n`, as in a method.

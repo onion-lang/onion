@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `select` case label that does not fit a Byte/Short/Char scrutinee no longer matches a truncated value (#2376).**
+  - Before: `case 300:` (or `case 150 + 150:`, `case k:`) on a `Byte` was truncated to `44` and matched it, silently.
+  - Now: a literal label is E0000, as for `val b: Byte = 300`; a computed one never matches. Labels inside the range still work.
 - **`val k: H[String]? = j` with `j: H[Object]?` reports a type mismatch, not a null error (#2343).**
   - Before: E0070 "may be null", whose advice (`!!`, `?:`) cannot fix it.
   - Now: E0000 naming the two types. E0070 stays for a value that would fit if it were not null.

@@ -163,6 +163,9 @@ public class JJOnionParser implements Parser {
     return collectedErrors.size() < maxErrors;
   }
 
+  /** True while a record's brace body is being parsed (read by error recovery). */
+  private boolean inRecordBody = false;
+
   /**
    * Panic-mode skip for top-level error recovery. Consumes tokens while
    * tracking brace depth (relative to the error position) and stops:
@@ -174,6 +177,11 @@ public class JJOnionParser implements Parser {
    */
   private boolean skipToToplevelSyncPoint() {
     int depth = 0;
+    // Inside a record body a `;` or newline is no statement boundary: stopping there
+    // would re-parse the rest of the clause list as top-level text and add a second,
+    // unrelated error (#2382). Skip to the record's own closing brace instead.
+    boolean inRecord = inRecordBody;
+    inRecordBody = false;
     while (true) {
       Token next = getToken(1);
       if (next == null || next.kind == 0) { // 0 is EOF
@@ -189,7 +197,7 @@ public class JJOnionParser implements Parser {
       } else if ("}".equals(img)) {
         if (depth > 0) depth--;
         else return true; // closed the enclosing declaration
-      } else if (depth == 0 && (";".equals(img) || (img != null && img.contains("\n") && states.isEmpty()))) {
+      } else if (!inRecord && depth == 0 && (";".equals(img) || (img != null && img.contains("\n") && states.isEmpty()))) {
         return true;
       }
     }
@@ -1910,7 +1918,7 @@ AST.RecordDeclaration record_decl(int mset) : {
   // token(s) that follow), so they stay usable as ordinary identifiers everywhere else.
   // `law` and `example` each become a boolean static method the compiler executes at
   // build time (LawCheckPhase); `law` is property-checked over generated args.
-  [ "{"
+  [ "{" {inRecordBody = true;}
     ( sec=access_section() {append(sections, sec);}
     | LOOKAHEAD({getToken(1).image.equals("law") && getToken(2).kind == ID})
         <ID> lt=<ID> "(" largs=args() ")" lb=block()
@@ -1927,7 +1935,7 @@ AST.RecordDeclaration record_decl(int mset) : {
             { append(shapeBuf, AST.formatShapeClause(p(st), c(st), c(srt))); }
         )
     )*
-    "}"
+    "}" {inRecordBody = false;}
   ]
   [";"] {
     return AST.recordDeclaration(

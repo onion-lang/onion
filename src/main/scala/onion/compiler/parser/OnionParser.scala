@@ -362,7 +362,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
    * @return true if a sync point was found, false if EOF was reached
    */
   private def skipToToplevelSyncPoint(): Boolean = {
-    val eolIsSync = eolSignificant && modeStack.isEmpty
+    // Inside a record body a `;` or newline is no statement boundary (#2382); see JJOnionParser.
+    val inRecord = inRecordBody
+    inRecordBody = false
+    val eolIsSync = eolSignificant && modeStack.isEmpty && !inRecord
     var depth = 0
     while (true) {
       val t = rawAt(pos)
@@ -373,10 +376,13 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       cur = null
       if (t.kind == K.LBRACE) depth += 1
       else if (t.kind == K.RBRACE) { if (depth > 0) depth -= 1 else return true }
-      else if (depth == 0 && (t.kind == K.SEMI || (t.kind == K.EOL && eolIsSync))) return true
+      else if (depth == 0 && ((t.kind == K.SEMI && !inRecord) || (t.kind == K.EOL && eolIsSync))) return true
     }
     false
   }
+
+  /** True while a record's brace body is being parsed (read by error recovery). */
+  private var inRecordBody = false
 
   /** A failure can strand any of the parser's stacks mid-nesting (an `enterSection` whose
    *  `leaveSection` never ran); recovery restarts from the top level, whose baseline is
@@ -1126,6 +1132,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val superTypes = conformsClause()
     val sections = new ArrayBuffer[AST.AccessSection]()
     if (accept(K.LBRACE)) {
+      inRecordBody = true
       var going = true
       while (going) {
         if (isAccessSectionStart(kind(1))) {
@@ -1157,6 +1164,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         } else going = false
       }
       expect(K.RBRACE)
+      inRecordBody = false
     }
     accept(K.SEMI)
     AST.recordDeclaration(p(t1), mset, c(t2), tparams, args, superTypes.toList, fromRaw, derives.toList,

@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Assigning a `val` from inside a function is now E0036 (#2340).**
   - Before: `val w = 10` then `def g() { w = 99 }` compiled; `w` read `99` in functions and `10` at top level. A `static val` crashed at run time with `IllegalAccessError`.
   - Now: `E0036 cannot assign to val`, as at top level.
+- **`Files::copyDir("sub", "lnk/in")` is refused when `lnk` is a symlink to `sub` (#2304).**
+  - Before: it recursed into `lnk/in/in/...` until the OS path limit, leaving junk in `sub/`.
+  - Now: `IllegalArgumentException`, nothing written, as for `copyDir("sub", "sub/in")`.
+
 - **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
   - Before: the English text read `can''t` and `doesn''t`.
   - Now: `can't` and `doesn't`.

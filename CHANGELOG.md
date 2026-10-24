@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **W0016 names an out-of-group overload with its parameter types (#2371).**
+  - Before: `... group (b, a) could not be optimized: Method b has tail calls to non-group methods: a`, as if `a` were outside the group.
+  - Now: `... non-group methods: a(java.lang.String)`, so the overload is told apart from the member `a(Int)`.
 - **A lambda in a `select` case after a guarded case no longer fails JVM verification (#2359).**
   - Before: `case P(a, b) when a == 0: ...` followed by a case whose body holds `() -> a` crashed with `VerifyError` at run time.
   - Now: it compiles and runs.

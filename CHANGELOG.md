@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A lambda in a constructor that assigns a captured `var` writes it back (#2361).**
+  - Before: `def this(m: Int) { var n = m; val f = () -> { n = n * 3; n }; f(); v = n }` left `n` at `m`; the same lines in a method worked.
+  - Now: the constructor and the lambda share `n`, as in a method.
 - **`Files::copyDir` reads `link/..` the way the OS does (#2370).**
   - Before: `copyDir("t/sub", "t/lnk/../in")` (`lnk` -> `sub/deep`) ran away and left `sub/in/in/...`, and a legal copy through `lnk/..` was refused.
   - Now: the first throws `IllegalArgumentException` with nothing written; the second copies.

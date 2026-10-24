@@ -71,6 +71,9 @@ private[compiler] final class MethodBodySupport(
     val context = new LocalContext
     context.setConstructor(constructor)
     val paramTypes = constructor.getArgs
+    block match
+      case b: AST.BlockExpression => markCapturedVariables(context, args, b)
+      case _ =>
     bindParameters(context, args, paramTypes, block)
     constructor.setArgumentsWithDefaults(buildArgumentsWithDefaults(args, paramTypes, context))
     context

@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Assigning a `val` from inside a function is now E0036 (#2340).**
   - Before: `val w = 10` then `def g() { w = 99 }` compiled; `w` read `99` in functions and `10` at top level. A `static val` crashed at run time with `IllegalAccessError`.
   - Now: `E0036 cannot assign to val`, as at top level.
+- **`Yaml::parse` rejects a whole-line flow collection and a tag (#2327).**
+  - Before: `{a: 1, b: 2}` came back as the one-key map `{{a=1, b: 2}}`, and `a: !!str 5` as the text `!!str 5`.
+  - Now: `YamlParseException` naming the construct and line, as for anchors. Quote the value to keep it as text.
+
 - **`Files::copyDir("sub", "lnk/in")` is refused when `lnk` is a symlink to `sub` (#2304).**
   - Before: it recursed into `lnk/in/in/...` until the OS path limit, leaving junk in `sub/`.
   - Now: `IllegalArgumentException`, nothing written, as for `copyDir("sub", "sub/in")`.

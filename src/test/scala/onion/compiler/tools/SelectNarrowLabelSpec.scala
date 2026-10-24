@@ -44,4 +44,20 @@ class SelectNarrowLabelSpec extends AbstractShellSpec {
     assert(Shell.Success("edge") == shell.run(
       "def main(args: String[]): String { val b: Byte = -128B\n return select b { case 127: \"hi\"\n case -128: \"edge\"\n else: \"?\" } }", "None", Array()))
   }
+  it("never matches a computed label that does not fit a Byte scrutinee") {
+    assert(Shell.Success("other") == shell.run(
+      "def main(args: String[]): String { val c: Byte = 44B\n return select c { case 0x12C - 0: \"BAD\"\n else: \"other\" } }", "None", Array()))
+    assert(Shell.Success("other") == shell.run(
+      "def main(args: String[]): String { val c: Byte = 44B\n return select c { case 150 + 150: \"BAD\"\n else: \"other\" } }", "None", Array()))
+  }
+  it("never matches a variable label that does not fit a Short or Char scrutinee") {
+    assert(Shell.Success("other") == shell.run(
+      "def main(args: String[]): String { val s: Short = 4464S\n val k = 70000\n return select s { case k: \"BAD\"\n else: \"other\" } }", "None", Array()))
+    assert(Shell.Success("other") == shell.run(
+      "def main(args: String[]): String { val c: Char = 65535\n val k = -1\n return select c { case k: \"BAD\"\n else: \"other\" } }", "None", Array()))
+  }
+  it("still matches a computed label that fits") {
+    assert(Shell.Success("hit") == shell.run(
+      "def main(args: String[]): String { val c: Byte = -2B\n val k = 2\n return select c { case 0 - k: \"hit\"\n else: \"other\" } }", "None", Array()))
+  }
 }

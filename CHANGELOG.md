@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`val k: H[String]? = j` with `j: H[Object]?` reports a type mismatch, not a null error (#2343).**
+  - Before: E0070 "may be null", whose advice (`!!`, `?:`) cannot fix it.
+  - Now: E0000 naming the two types. E0070 stays for a value that would fit if it were not null.
 - **`Yaml::parse` rejects a tag or anchor on a key instead of keeping it in the key text (#2369).**
   - Before: `!!str 5: x` returned the key `"!!str 5"`; `&x k: 1` returned `"&x k"`.
   - Now: a `YamlParseException`. Quote the key to keep the text.

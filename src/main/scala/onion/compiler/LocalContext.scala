@@ -187,12 +187,25 @@ class LocalContext {
   def inLoop: Boolean = loopDepth > 0
 
   def lookup(name: String): ClosureLocalBinding = {
+    if readingArgumentSlots then
+      val slot = contextFrame.lookup(name + "#arg")
+      if slot != null then return slot
     contextFrame.lookup(name)
   }
 
   /** Option-returning version of lookup for safer null handling */
   def lookupOpt(name: String): Option[ClosureLocalBinding] = {
-    Option(contextFrame.lookup(name))
+    Option(lookup(name))
+  }
+
+  // While true, a shared parameter names its argument slot: a constructor's delegation
+  // arguments (`: this(n)`) run before the prologue fills the boxed copy (#2335).
+  private var readingArgumentSlots = false
+
+  def withArgumentSlots[A](body: => A): A = {
+    val saved = readingArgumentSlots
+    readingArgumentSlots = true
+    try body finally readingArgumentSlots = saved
   }
 
   /**

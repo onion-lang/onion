@@ -65,6 +65,30 @@ class ClosureAssignedParameterSpec extends AbstractShellSpec {
       assert(Shell.Success("n=11") == result)
     }
 
+    it("is passed by its argument value to a delegating constructor") {
+      val result = shell.run(
+        """
+          |class B {
+          |  var v: Int
+          |public:
+          |  def this(a: Int, b: Int) { v = a + b }
+          |  def this(n: Int): this(n, n * 2) {
+          |    val f: () -> Int = () -> { n = n + 1; n }
+          |    v = v * 100 + f()
+          |  }
+          |  def get: Int = v
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int = new B(5).get
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success(1506) == result)
+    }
+
     it("leaves a captured but never assigned parameter alone") {
       val result = run(
         """  static def g(n: Int): Int {

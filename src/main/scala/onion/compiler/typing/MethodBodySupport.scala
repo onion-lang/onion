@@ -79,7 +79,7 @@ private[compiler] final class MethodBodySupport(
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
     typing.kernelNodeOf[ConstructorDefinition](node).foreach { constructor =>
       val context = prepareConstructorContext(constructor, node.args, node.block)
-      val params0 = typedTerms(node.superInits.toArray, context)
+      val params0 = context.withArgumentSlots(typedTerms(node.superInits.toArray, context))
       // The object does not exist while its super/self initializer arguments are being
       // evaluated. A field read there -- `def this : this(seed)` where `seed` is a field,
       // or an explicit `this` -- is a GETFIELD on `uninitializedThis`, which the JVM

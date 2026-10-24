@@ -31,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Before: the `;`-after-`}` hint fired where no `}` preceded the `;`, and the enum-`case` hint could name the wrong case.
   - Now: hints see the text before the error exactly, whatever the indentation.
 
+- **`Files::copyDir("sub", "lnk/in")` is refused when `lnk` is a symlink to `sub` (#2304).**
+  - Before: it recursed into `lnk/in/in/...` until the OS path limit, leaving junk in `sub/`.
+  - Now: `IllegalArgumentException`, nothing written, as for `copyDir("sub", "sub/in")`.
+
+- **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
+  - Before: the English text read `can''t` and `doesn''t`.
+  - Now: `can't` and `doesn't`.
+- **`@TailRecursive` no longer breaks a group member that has an overload outside the group (#2337).**
+  - Before: `a(n: Int)` and `b` in a group, plus an unrelated `a(s: String)`: the class failed to load with `VerifyError`.
+  - Now: only calls to the group members themselves become jumps; the overload stays a plain call.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

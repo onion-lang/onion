@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Yaml::parse` rejects a tag or anchor on a key instead of keeping it in the key text (#2369).**
   - Before: `!!str 5: x` returned the key `"!!str 5"`; `&x k: 1` returned `"&x k"`.
   - Now: a `YamlParseException`. Quote the key to keep the text.
+- **The List-to-array cast hint only suggests code that compiles (#2314).**
+  - Before: `(nums as JInteger[])` said `Int[]` and suggested `toArray(new Int[0])` (E0005); `Comparable[]` suggested a raw type (E0066); a `List[T]` suggested a call that throws at run time.
+  - Now: `JInteger[]` and `new JInteger[0]` as written. A generic component or a bare `T` gets the plain type error, with no snippet.
+- **Assigning a `val` from inside a function (`=`, `+=`, `++`) is now E0036 (#2340).**
+  - Before: `val w = 10` then `def g() { w = 99 }` (or `w++`) compiled; `w` read `99` in functions and `10` at top level. A `static val` crashed at run time with `IllegalAccessError`.
+  - Now: `E0036 cannot assign to val`, as at top level.
+- **An error inside an ADT enum `case` points at that `case`, not at the `enum` keyword (#2322).**
+  - Before: `case Circle(...)` missing an abstract method reported `1:1`, the same spot for every case.
+  - Now: each error is reported on its own `case` line.
 - **A lambda in a `select` case after a guarded case no longer fails JVM verification (#2359).**
   - Before: `case P(a, b) when a == 0: ...` followed by a case whose body holds `() -> a` crashed with `VerifyError` at run time.
   - Now: it compiles and runs.
@@ -43,16 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now: `http"url".request("GET").header(...).timeoutSeconds(...).send()` reaches the exact builder `Http::request` returns, seeded with the URL so it doesn't need retyping (#2146).
 
 ### Fixed
-
-- **The List-to-array cast hint only suggests code that compiles (#2314).**
-  - Before: `(nums as JInteger[])` said `Int[]` and suggested `toArray(new Int[0])` (E0005); `Comparable[]` suggested a raw type (E0066); a `List[T]` suggested a call that throws at run time.
-  - Now: `JInteger[]` and `new JInteger[0]` as written. A generic component or a bare `T` gets the plain type error, with no snippet.
-- **Assigning a `val` from inside a function (`=`, `+=`, `++`) is now E0036 (#2340).**
-  - Before: `val w = 10` then `def g() { w = 99 }` (or `w++`) compiled; `w` read `99` in functions and `10` at top level. A `static val` crashed at run time with `IllegalAccessError`.
-  - Now: `E0036 cannot assign to val`, as at top level.
-- **An error inside an ADT enum `case` points at that `case`, not at the `enum` keyword (#2322).**
-  - Before: `case Circle(...)` missing an abstract method reported `1:1`, the same spot for every case.
-  - Now: each error is reported on its own `case` line.
 
 - **An expression-bodied recursive function runs as a loop, like one written with `return` (#2330).**
   - Before: `def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }` hit "stack overflow" at depth 200000, while the `return` form ran fine. An `else if` chain, and a `select` whose self-call case is a literal, `else` or guarded destructuring case, overflowed the same way. A `select` with an unguarded destructuring or type-pattern case still overflows (#2350).

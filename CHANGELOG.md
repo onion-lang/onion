@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Files::copyDir` reads `link/..` the way the OS does (#2370).**
+  - Before: `copyDir("t/sub", "t/lnk/../in")` (`lnk` -> `sub/deep`) ran away and left `sub/in/in/...`, and a legal copy through `lnk/..` was refused.
+  - Now: the first throws `IllegalArgumentException` with nothing written; the second copies.
+
 ## [0.145.0] - 2026-10-24
 
 ### Breaking

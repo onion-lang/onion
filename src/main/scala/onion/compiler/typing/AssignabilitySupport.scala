@@ -199,8 +199,18 @@ private[compiler] final class AssignabilitySupport(
               // for it rejected ordinary covariant wildcard uses that
               // never involved a chained bound at all.
               val involvesTypeVariable = e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType]
-              if (involvesTypeVariable) structurallyAssignable(e, a) && structurallyAssignable(a, e)
-              else structurallyAssignable(e, a)
+              e match {
+                // `Collection[? extends T]` (the JDK's `addAll`) takes a
+                // `List[T]`: the wildcard's own bound decides, one way
+                // (#2341). `? super L` is the mirror image.
+                case w: TypedAST.WildcardType if !a.isInstanceOf[TypedAST.WildcardType] =>
+                  w.lowerBound match {
+                    case Some(lb) => structurallyAssignable(a, lb)
+                    case None => structurallyAssignable(w.upperBound, a)
+                  }
+                case _ if involvesTypeVariable => structurallyAssignable(e, a) && structurallyAssignable(a, e)
+                case _ => structurallyAssignable(e, a)
+              }
             }
         if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
         else

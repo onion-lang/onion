@@ -45,7 +45,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
 
       val result = extractDoExpression(source)
       result match {
-        case AST.StaticMethodCall(_, typeRef, "successful", List(AST.IntegerLiteral(_, 42)), _) =>
+        case AST.StaticMethodCall(_, typeRef, "successful", List(AST.IntegerLiteral(_, 42, _)), _) =>
           assert(typeRef.desc.toString == "Future")
         case other =>
           fail(s"Expected StaticMethodCall to Future::successful, got: $other")
@@ -65,7 +65,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
 
       val result = extractDoExpression(source)
       result match {
-        case AST.StaticMethodCall(_, typeRef, "successful", List(AST.IntegerLiteral(_, 42)), _) =>
+        case AST.StaticMethodCall(_, typeRef, "successful", List(AST.IntegerLiteral(_, 42, _)), _) =>
           assert(typeRef.desc.toString == "Future")
         case other =>
           fail(s"Expected StaticMethodCall to Future::successful, got: $other")
@@ -172,7 +172,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       val result = rewriteExpression(expr)
 
       result match {
-        case AST.Addition(_, AST.IntegerLiteral(_, 1), AST.IntegerLiteral(_, 2)) =>
+        case AST.Addition(_, AST.IntegerLiteral(_, 1, _), AST.IntegerLiteral(_, 2, _)) =>
           // Success
         case other =>
           fail(s"Expected Addition(1, 2), got: $other")
@@ -186,7 +186,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       val result = rewriteExpression(expr)
 
       result match {
-        case AST.Subtraction(_, AST.IntegerLiteral(_, 10), AST.IntegerLiteral(_, 5)) =>
+        case AST.Subtraction(_, AST.IntegerLiteral(_, 10, _), AST.IntegerLiteral(_, 5, _)) =>
           // Success
         case other =>
           fail(s"Expected Subtraction(10, 5), got: $other")
@@ -200,7 +200,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       val result = rewriteExpression(expr)
 
       result match {
-        case AST.Assignment(_, AST.Id(_, "x"), AST.IntegerLiteral(_, 42)) =>
+        case AST.Assignment(_, AST.Id(_, "x"), AST.IntegerLiteral(_, 42, _)) =>
           // Success
         case other =>
           fail(s"Expected Assignment(x, 42), got: $other")
@@ -214,7 +214,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       val result = rewriteExpression(expr)
 
       result match {
-        case AST.Multiplication(_, AST.Addition(_, _, _), AST.IntegerLiteral(_, 3)) =>
+        case AST.Multiplication(_, AST.Addition(_, _, _), AST.IntegerLiteral(_, 3, _)) =>
           // Success
         case other =>
           fail(s"Expected Multiplication(Addition, 3), got: $other")
@@ -233,7 +233,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       val result = rewriteExpression(expr)
 
       result match {
-        case AST.Negate(_, AST.IntegerLiteral(_, 42)) =>
+        case AST.Negate(_, AST.IntegerLiteral(_, 42, _)) =>
           // Success
         case other =>
           fail(s"Expected Negate(42), got: $other")
@@ -259,7 +259,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       val result = rewriteExpression(expr)
 
       result match {
-        case AST.Negate(_, AST.Negate(_, AST.IntegerLiteral(_, 42))) =>
+        case AST.Negate(_, AST.Negate(_, AST.IntegerLiteral(_, 42, _))) =>
           // Success
         case other =>
           fail(s"Expected Negate(Negate(42)), got: $other")
@@ -460,7 +460,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       val result = rewriteExpression(expr)
 
       result match {
-        case AST.StaticMethodCall(_, _, "abs", List(AST.IntegerLiteral(_, -42)), _) =>
+        case AST.StaticMethodCall(_, _, "abs", List(AST.IntegerLiteral(_, -42, _)), _) =>
           // Success
         case other =>
           fail(s"Expected StaticMethodCall, got: $other")
@@ -523,7 +523,7 @@ class RewritingSpec extends AnyFunSpec with Diagrams {
       result.toplevels.head match {
         case AST.ClassDeclaration(_, _, _, _, _, _, sections, _, _) =>
           sections.head.members.head match {
-            case AST.FieldDeclaration(_, _, "x", _, AST.IntegerLiteral(_, 42)) =>
+            case AST.FieldDeclaration(_, _, "x", _, AST.IntegerLiteral(_, 42, _)) =>
               // Success
             case other =>
               fail(s"Expected FieldDeclaration, got: $other")

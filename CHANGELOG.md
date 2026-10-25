@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **W0016 names an overload the way the source writes it (#2407).**
+  - Before: `a(java.util.List[java.lang.String], [int)`.
+  - Now: `a(List[String], Int[])`.
+
 - **`Config::getInt` and `getLong` return the default for a number that does not fit (#2404).**
   - Before: `3000000000` read as `-1294967296` and `2.9` as `2`, so a config typo gave a negative port.
   - Now: both give the default, as `Json::getIntOr` does. `Json::getInt` and `Json.Value.asInt()` are unchanged.

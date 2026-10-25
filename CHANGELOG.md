@@ -62,9 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A `T extends Comparable[T]` is accepted where a `Comparable[T]` is expected (#2338).**
+- **A `T extends Comparable[T]` can be returned or assigned as a `Comparable[T]` (#2338).**
   - Before: `def asCmp(t: T): Comparable[T] = t` was E0000 "type Comparable[T] is expected, but type T is used".
-  - Now: it compiles, as in Java. Other applied types are still rejected.
+  - Now: it compiles, as in Java. Other applied types, and another variable's bound, are still rejected. Passing the `T` as a call argument is still E0005; assign it to a `val` first.
 - **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
   - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
   - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.

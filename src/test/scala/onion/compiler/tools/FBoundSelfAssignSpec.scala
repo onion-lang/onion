@@ -35,5 +35,33 @@ class FBoundSelfAssignSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Failure(-1) == r)
     }
+    it("is still rejected as the bound of a different F-bounded variable") {
+      val r = shell.run(
+        """class J[T extends Comparable[T], U extends Comparable[U]] {
+          |public:
+          |  def bad(t: T): Comparable[U] = t
+          |}
+          |def main(args: String[]): Int { return 0 }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
+    it("is still rejected as the bound of a different variable in a generic method") {
+      val r = shell.run(
+        """def bad[T extends Comparable[T], U extends Comparable[U]](t: T): Comparable[U] = t
+          |def main(args: String[]): Int { return 0 }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
+    it("keeps type arguments invariant: List[T] is not a List[Comparable[T]]") {
+      val r = shell.run(
+        """import { java.util.* }
+          |class J[T extends Comparable[T]] {
+          |public:
+          |  def widen(xs: List[T]): List[Comparable[T]] = xs
+          |}
+          |def main(args: String[]): Int { return 0 }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
   }
 }

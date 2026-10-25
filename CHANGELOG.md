@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`xs.addAll(o)` compiles inside a generic class when `xs` and `o` are both `List[T]` (#2341).**
   - Before: E0000, `Collection[? extends T]` is expected but `List[T]` is used.
   - Now: accepted, as in Java.
+  - Still rejected: `List[Object]`, `List[String]` or a `List[U]` of an unrelated type variable into a `List[T]`. `List[List[B]].addAll(List[List[T]])` is now rejected too.
 - **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
   - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
   - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.

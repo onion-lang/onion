@@ -204,9 +204,24 @@ private[compiler] final class AssignabilitySupport(
                 // `List[T]`: the wildcard's own bound decides, one way
                 // (#2341). `? super L` is the mirror image.
                 case w: TypedAST.WildcardType if !a.isInstanceOf[TypedAST.WildcardType] =>
+                  // A bound that is itself a type variable is abstract: only
+                  // that variable (or one whose bound chain reaches it)
+                  // fits. A concrete type, `Object` or an unrelated `U`
+                  // must not pass just because it erases to the same
+                  // class, or `xs.addAll(o)` with `o: List[Object]`
+                  // would pollute a `List[T]`.
                   w.lowerBound match {
+                    case Some(lb: TypedAST.TypeVariableType) =>
+                      a match {
+                        case av: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(av, lb)
+                        case _ => structurallyAssignable(a, lb)
+                      }
                     case Some(lb) => structurallyAssignable(a, lb)
-                    case None => structurallyAssignable(w.upperBound, a)
+                    case None =>
+                      w.upperBound match {
+                        case tv: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(tv, a)
+                        case ub => structurallyAssignable(ub, a)
+                      }
                   }
                 case _ if involvesTypeVariable => structurallyAssignable(e, a) && structurallyAssignable(a, e)
                 case _ => structurallyAssignable(e, a)

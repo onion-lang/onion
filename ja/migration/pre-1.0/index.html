@@ -4810,9 +4810,11 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 </span></code></pre></div>
 <ul>
 <li><strong>変更点:</strong> <code>2147483648</code> と同じく、<code>128B</code> と <code>32768S</code> は <code>-</code> のオペランドそのものである場合だけ有効です。</li>
-<li><strong>表示されるエラー:</strong> リテラルの位置に「整数リテラルがByteの範囲(-128..127、またはビットパターンとして0b11111111か0xFFまで)を超えています -- ...」が出ます（<code>S</code> サフィックスなら Short）。</li>
-<li><strong>引き続き使えるもの:</strong> <code>0b11111111B</code>、<code>0xFFB</code>、<code>0xFFFFS</code> のような2進数・16進数のビットパターン。</li>
-<li><strong>注意:</strong> 末尾が <code>B</code> の16進数リテラルは、16進数の数字 <code>B</code> のつもりでも <code>Byte</code> になります。<code>0xFFB</code> は Byte の -1、<code>0xAB</code> は Byte の 10 です。Int の 4091 や 171 ではありません。そのような Int は10進数（<code>4091</code>）か2進数で書いてください。</li>
+<li><strong>表示されるエラー:</strong> リテラルの位置に「整数リテラルがByteの範囲(-128..127、またはビットパターンとして0b11111111まで)を超えています -- ...」が出ます（<code>S</code> サフィックスなら Short）。</li>
+<li><strong>引き続き使えるもの:</strong> <code>0b11111111B</code> のような2進数のビットパターンと、<code>0xFFFFS</code> のように <code>S</code> を付けた16進数。</li>
+<li><strong>16進数と <code>B</code>:</strong> 16進数リテラルの <code>B</code> は数字であり、接尾辞ではありません。<code>0xAB</code> は Int の 171、<code>0xFFB</code> は Int の 4091 です。Byte にしたいときは <code>0b11111111B</code> か <code>-1B</code> と書いてください。</li>
+<li>そのようなリテラルが Byte に収まらなくなった箇所（<code>val x: Byte = 0xFFB</code>、Byte 引数への <code>f(0xFFB)</code>）では、エラーにその理由を示すヒントが付きます。</li>
+<li>まだ収まる箇所では何も報告されず、値だけが変わります。<code>bs[0] = 0x1B</code> は 27 を格納し（以前は 1）、<code>val y = 0x7FB</code> は 2043 です（以前は Byte の 127）。末尾が <code>B</code> の16進数リテラル（<code>0x...B</code>）をコードから検索してください。</li>
 </ul>
 <h2 id="config-string"><code>config</code> ファイルの引用符付き <code>String</code> は、引用符を外して読むようになりました<a class="headerlink" href="#config-string" title="Permanent link">&para;</a></h2>
 <p><code>shape name = config</code> のレコードは、二重引用符で囲まれた <code>String</code> の値を、引用された文字列として読みます。

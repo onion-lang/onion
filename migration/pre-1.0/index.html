@@ -4789,9 +4789,11 @@ as in Java. Larger values used to wrap silently.</p>
 </span></code></pre></div>
 <ul>
 <li><strong>What changed:</strong> like <code>2147483648</code>, the magnitudes <code>128B</code> and <code>32768S</code> are valid only as the whole operand of a <code>-</code>.</li>
-<li><strong>What you see:</strong> <code>integer literal out of range for Byte (-128..127, or a bit pattern up to 0b11111111 or 0xFF) -- ...</code>, at the literal (<code>... for Short ...</code> with the <code>S</code> suffix).</li>
-<li><strong>Still fine:</strong> a binary or hex bit pattern, such as <code>0b11111111B</code>, <code>0xFFB</code> or <code>0xFFFFS</code>.</li>
-<li><strong>Watch out:</strong> a hex literal that ends in <code>B</code> is a <code>Byte</code>, even when you meant the hex digit <code>B</code>. <code>0xFFB</code> is the Byte -1 and <code>0xAB</code> is the Byte 10, not the Int 4091 or 171. For such an Int, write it in decimal (<code>4091</code>) or binary.</li>
+<li><strong>What you see:</strong> <code>integer literal out of range for Byte (-128..127, or a bit pattern up to 0b11111111) -- ...</code>, at the literal (<code>... for Short ...</code> with the <code>S</code> suffix).</li>
+<li><strong>Still fine:</strong> a binary bit pattern such as <code>0b11111111B</code>, or a hex one with the <code>S</code> suffix such as <code>0xFFFFS</code>.</li>
+<li><strong>Hex and <code>B</code>:</strong> in a hex literal <code>B</code> is a digit, never a suffix. <code>0xAB</code> is the Int 171 and <code>0xFFB</code> is the Int 4091. For a Byte, write <code>0b11111111B</code> or <code>-1B</code>.</li>
+<li>Where such a literal no longer fits a Byte (<code>val x: Byte = 0xFFB</code>, <code>f(0xFFB)</code> with a Byte parameter), the error carries a hint that says so.</li>
+<li>Where it still fits, nothing is reported and the value changes: <code>bs[0] = 0x1B</code> stores 27 (was 1), and <code>val y = 0x7FB</code> is 2043 (was the Byte 127). Search your code for hex literals ending in <code>B</code> (<code>0x...B</code>).</li>
 </ul>
 <h2 id="a-quoted-string-in-a-config-file-is-read-without-its-quotes">A quoted <code>String</code> in a <code>config</code> file is read without its quotes<a class="headerlink" href="#a-quoted-string-in-a-config-file-is-read-without-its-quotes" title="Permanent link">&para;</a></h2>
 <p>A <code>shape name = config</code> record now reads a <code>String</code> value written in double quotes as quoted

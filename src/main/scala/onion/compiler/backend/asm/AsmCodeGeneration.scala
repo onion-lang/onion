@@ -218,8 +218,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       else
         codeMethod(cw, methodDef, name)
 
-    if !classDef.isInterface then
-      bridgeMethodEmitter.emitBridges(cw, classDef)
+    bridgeMethodEmitter.emitBridges(cw, classDef)
 
     // Closures generated for this class are nest members so they can reach
     // the host's private members (JEP 181); see ClosureCodegen.visitNestHost

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Syntax-error hints no longer misread a tab-indented line (#2312).**
+  - Before: the `;`-after-`}` hint fired where no `}` preceded the `;`, and the enum-`case` hint was missing or named the wrong case.
+  - Now: hints see the text before the error exactly, whatever the indentation.
 - **`xs.sort(c)` rejects a `Comparator[U]` for an unrelated type parameter `U` (#2367).**
   - Before: it compiled in `class Box[T, U]` with `xs: List[T]`, then threw `ClassCastException` inside the sort.
   - Now: `E0000` at the call, as in Java. `Comparator[T]` and `Comparator[Object]` still work.

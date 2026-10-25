@@ -16,11 +16,11 @@ private[compiler] object SourceContext {
    */
   def at(sourceText: String, line: Int, column: Int): SourceContext = {
     val lineStart = lineStartOffset(sourceText, line)
-    val contextStart = math.min(sourceText.length, lineStart + column - 1)
     val lineEnd = sourceText.indexOf('\n', lineStart) match {
       case -1 => sourceText.length
       case index => index
     }
+    val contextStart = columnOffset(sourceText, lineStart, lineEnd, column)
 
     SourceContext(
       context = sourceText.substring(
@@ -30,6 +30,20 @@ private[compiler] object SourceContext {
       sourceLine = sourceText.substring(lineStart, lineEnd),
       precedingText = sourceText.substring(0, lineStart)
     )
+  }
+
+  // Both parsers count a tab as advancing to the next multiple of 8, so a reported
+  // column is a visual one; map it back to a character offset on the line.
+  private val TabSize = 8
+
+  private def columnOffset(sourceText: String, lineStart: Int, lineEnd: Int, column: Int): Int = {
+    var offset = lineStart
+    var visual = 0
+    while (offset < lineEnd && visual < column - 1) {
+      visual += (if (sourceText.charAt(offset) == '\t') TabSize - (visual % TabSize) else 1)
+      offset += 1
+    }
+    offset
   }
 
   private def lineStartOffset(sourceText: String, line: Int): Int = {

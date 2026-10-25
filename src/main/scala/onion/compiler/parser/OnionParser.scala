@@ -52,6 +52,13 @@ object OnionParser {
    *  rather than (wrongly) as unclosed (issue #1966): the body IS balanced, just too deep. */
   val TooDeepInterpolationMarker: String = "#{..}"
 
+  /** Sentinel `found` image for a `#{}` interpolation with nothing (or only blanks) between
+   *  its braces, so it is reported at the `#` as empty instead of as an unexpected end of
+   *  file somewhere else (issue #2429). The triple-quoted variant has its own marker because
+   *  only an ordinary string can escape the `#` to mean a literal `#{}`. */
+  val EmptyInterpolationMarker: String = "#{}"
+  val EmptyMultiLineInterpolationMarker: String = "\"\"\"#{}"
+
   /** Sentinel `found` image for a STRING literal that failed to tokenize because of an
    *  escape sequence the `<STRING>` grammar doesn't support (e.g. `\d`), so it is reported
    *  with its own message instead of being mistaken for an unterminated string (issue
@@ -2917,6 +2924,12 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           throw fail
         }
         val exprStr = str.substring(interpStart + 2, interpEnd - 1)
+        if (exprStr.isBlank) {
+          val (hashLine, hashCol) = interpolationOrigin(str, interpStart, loc, quoteLen)
+          val marker = if (single) EmptyInterpolationMarker else EmptyMultiLineInterpolationMarker
+          adoptFailure(Location(hashLine, hashCol), marker, new java.util.LinkedHashSet[Integer]())
+          throw fail
+        }
         val (line, col) = interpolationOrigin(str, interpStart + 2, loc, quoteLen)
         // `#{name}` is most interpolations; a plain identifier needs no sub-parser (and its
         // lexer). Anything else is parsed as a term at its position in the enclosing file.

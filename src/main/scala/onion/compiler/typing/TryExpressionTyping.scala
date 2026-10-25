@@ -146,7 +146,7 @@ final class TryExpressionTyping(
       if (resultVar == null) {
         Some(control.statementTerm(statement, resultType, node.location))
       } else {
-        Some(new Begin(node.location, Array[Term](control.statementTerm(statement, BasicType.VOID, node.location), new RefLocal(resultVar))))
+        Some(new Begin(node.location, Array[Term](control.statementTerm(statement, BasicType.VOID, node.location), new ResultRefLocal(resultVar))))
       }
     }
   }

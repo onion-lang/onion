@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A record component named `hashCode` or `toString` is a compile error (#2391).**
-  - Before: `record H(hashCode: Int)` compiled, then failed at load with a raw `ClassFormatError`.
-  - Now: E0010 at the component, because the record already generates that method.
+- **`record H(hashCode: Int)` and `record T(toString: String)` are a compile error (#2391).**
+  - Before: they compiled, then failed at load with a raw `ClassFormatError`.
+  - Now: E0010 at the component, because the record already generates that method. Other types (`toString: Int`) still compile, as before.
+- **An interface default method that narrows its return type works through the parent interface (#2393).**
+  - Before: `interface SubNamed conforms Named { def name(): String = "d" }` threw `AbstractMethodError` when called as a `Named`.
+  - Now: it runs the default method, as in Java.
 - **An override that narrows its return type works through the supertype (#2386).**
   - Before: `def name(): String` for an inherited `name(): Object` threw `AbstractMethodError` through an interface, and through a superclass silently ran the parent's method. A record accessor (`record P(name: String) conforms Named`) failed the same way.
   - Now: it runs the override, as in Java.

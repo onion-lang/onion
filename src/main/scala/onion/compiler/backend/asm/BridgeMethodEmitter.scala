@@ -52,7 +52,9 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
           }
 
           implOpt.foreach { impl =>
-            if Modifier.isAbstract(impl.modifier) || Modifier.isStatic(impl.modifier) then
+            // In an interface only a default method (one with a body) has code to bridge to.
+            val hasNoBody = classDef.isInterface && impl.asInstanceOf[MethodDefinition].getBlock == null
+            if Modifier.isAbstract(impl.modifier) || Modifier.isStatic(impl.modifier) || hasNoBody then
               ()
             else
               val bridgeDesc = methodDesc(rawMethod.returnType, rawMethod.arguments)
@@ -82,7 +84,8 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                       gen.cast(provided, desired)
                   i += 1
 
-                gen.invokeVirtual(ownerType, AsmMethod(impl.name, implDesc))
+                if classDef.isInterface then gen.invokeInterface(ownerType, AsmMethod(impl.name, implDesc))
+                else gen.invokeVirtual(ownerType, AsmMethod(impl.name, implDesc))
                 val implRet = asmType(impl.returnType)
                 if implRet != AsmType.VOID_TYPE && !isReferenceAsmType(implRet) && isReferenceAsmType(bridgeReturnType) then
                   gen.valueOf(implRet)
@@ -159,7 +162,8 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
             traverse(raw.superClass, nextSubst)
             raw.interfaces.foreach(traverse(_, nextSubst))
 
-    traverse(classDef.superClass, Map.empty)
+    // An interface's superClass is Object, whose methods no default method overrides.
+    if !classDef.isInterface then traverse(classDef.superClass, Map.empty)
     classDef.interfaces.foreach(traverse(_, Map.empty))
     out.toList
 }

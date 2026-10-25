@@ -120,5 +120,49 @@ class CovariantReturnBridgeSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(1) == result)
     }
+
+    it("dispatches an interface default method that narrows the return type") {
+      val result = shell.run(
+        """
+          |interface Named { def name(): Object }
+          |interface SubNamed conforms Named { def name(): String = "default" }
+          |class C conforms SubNamed { public: def this {} }
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Object {
+          |    val n: Named = new C()
+          |    return n.name()
+          |  }
+          |}
+          |""".stripMargin,
+        "CovariantInterfaceDefault.on",
+        Array()
+      )
+      assert(Shell.Success("default") == result)
+    }
+
+    it("still lets a class override the narrowed default method") {
+      val result = shell.run(
+        """
+          |interface Named { def name(): Object }
+          |interface SubNamed conforms Named { def name(): String = "default" }
+          |class C conforms SubNamed {
+          |public:
+          |  def this {}
+          |  def name(): String = "own"
+          |}
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Object {
+          |    val n: Named = new C()
+          |    return n.name()
+          |  }
+          |}
+          |""".stripMargin,
+        "CovariantInterfaceOverride.on",
+        Array()
+      )
+      assert(Shell.Success("own") == result)
+    }
   }
 }

@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A default argument that reads an instance field is a compile error, not a `VerifyError` (#2375).**
   - Before: `def f(n: Int, m: Int = k)` with a field `k` compiled, then failed JVM verification when the class loaded.
   - Now: `E0002`, `k` is not found. A default may still call a static method.
+- **`Yaml::parse` removes the quotes of a single-quoted key (#2403).**
+  - Before: `'k': 1` gave the key `'k'`, quotes included, so `m.get("k")` was `null`; `'a: b': 1` was split at the inner `: `.
+  - Now: `'k'` is read as `k`, the same as `"k"`. A whole-line `{a: 1}` now suggests block `key: value` lines or Json, not quoting a value.
+- **Syntax-error hints no longer misread a tab-indented line (#2312).**
+  - Before: the `;`-after-`}` hint fired where no `}` preceded the `;`, and the enum-`case` hint was missing or named the wrong case.
+  - Now: hints see the text before the error exactly, whatever the indentation.
 - **`xs.sort(c)` rejects a `Comparator[U]` for an unrelated type parameter `U` (#2367).**
   - Before: it compiled in `class Box[T, U]` with `xs: List[T]`, then threw `ClassCastException` inside the sort.
   - Now: `E0000` at the call, as in Java. `Comparator[T]` and `Comparator[Object]` still work.

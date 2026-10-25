@@ -205,4 +205,19 @@ class NullableAssignabilitySpec extends AbstractShellSpec {
     )
     assert(codes.isEmpty, s"expected no errors assigning nullable to a bare type parameter: $codes")
   }
+
+  it("reports E0000, not E0070, when a nullable value fails on a type argument (#2343)") {
+    val codes = errorCodes(
+      """class H[T] {
+        |public:
+        |  def this {}
+        |  static def mk[T](): H[T]? = new H[T]()
+        |}
+        |val j = H::mk()
+        |val k: H[String]? = j
+        |""".stripMargin
+    )
+    assert(codes.contains("E0000"), s"expected E0000: $codes")
+    assert(!codes.contains("E0070"), s"E0070 sends the user after a null problem they do not have: $codes")
+  }
 }

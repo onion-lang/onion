@@ -100,13 +100,48 @@ public final class Scalars {
 
     private static Object narrow(String tag, Number n) {
         switch (tag) {
-            case "Int":    return Integer.valueOf(n.intValue());
-            case "Long":   return Long.valueOf(n.longValue());
+            case "Int":    return integral(n, Integer.MIN_VALUE, Integer.MAX_VALUE) == null
+                                   ? bad(tag, n) : Integer.valueOf(n.intValue());
+            case "Long":   return integral(n, Long.MIN_VALUE, Long.MAX_VALUE) == null
+                                   ? bad(tag, n) : Long.valueOf(n.longValue());
             case "Double": return Double.valueOf(n.doubleValue());
             case "Float":  return Float.valueOf(n.floatValue());
-            case "Short":  return Short.valueOf(n.shortValue());
-            default:       return Byte.valueOf(n.byteValue());
+            case "Short":  return integral(n, Short.MIN_VALUE, Short.MAX_VALUE) == null
+                                   ? bad(tag, n) : Short.valueOf(n.shortValue());
+            default:       return integral(n, Byte.MIN_VALUE, Byte.MAX_VALUE) == null
+                                   ? bad(tag, n) : Byte.valueOf(n.byteValue());
         }
+    }
+
+    private static Object bad(String tag, Number n) {
+        throw new IllegalArgumentException(tag + ": " + n);
+    }
+
+    /**
+     * {@code n} as a {@code long} when it is a whole number within {@code [min, max]};
+     * {@code null} for a fraction, NaN, or a value outside the range. A document number
+     * must not wrap or truncate into a different, plausible number.
+     */
+    static Long integral(Number n, long min, long max) {
+        if (n == null) return null;
+        long v;
+        if (n instanceof Double || n instanceof Float) {
+            double d = n.doubleValue();
+            if (Double.isNaN(d) || Double.isInfinite(d) || d != Math.rint(d)) return null;
+            // 2^63 is the first double above Long.MAX_VALUE
+            if (d < -9.223372036854775808E18 || d >= 9.223372036854775808E18) return null;
+            v = (long) d;
+        } else if (n instanceof java.math.BigInteger) {
+            java.math.BigInteger b = (java.math.BigInteger) n;
+            if (b.bitLength() > 63) return null;
+            v = b.longValue();
+        } else if (n instanceof java.math.BigDecimal) {
+            try { v = ((java.math.BigDecimal) n).longValueExact(); }
+            catch (ArithmeticException e) { return null; }
+        } else {
+            v = n.longValue();
+        }
+        return (v < min || v > max) ? null : Long.valueOf(v);
     }
 
     /** What was found, for a defect's `actual` -- the value's shape, not a dump of it. */

@@ -260,9 +260,11 @@ public final class Files {
     /**
      * The absolute path with symlinks resolved as far as the path exists; the part that does
      * not exist yet (a destination about to be created) is appended unchanged.
+     * A {@code ..} is not folded away first: the OS applies it after following a symlink, so
+     * {@code link/..} is the link target's parent, not the directory holding {@code link}.
      */
     private static java.nio.file.Path realPathOfExistingPrefix(java.nio.file.Path path) throws IOException {
-        java.nio.file.Path abs = path.toAbsolutePath().normalize();
+        java.nio.file.Path abs = path.toAbsolutePath();
         java.nio.file.Path existing = abs;
         while (existing != null && !java.nio.file.Files.exists(existing)) {
             existing = existing.getParent();

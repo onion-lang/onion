@@ -667,6 +667,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     loadTopClass match {
       case classType: ClassDefinition =>
         val field = new FieldDefinition(node.location, modifier, classType, node.name, typeRef)
+        field.readOnly = AST.hasModifier(node.modifiers, AST.M_FINAL)
         put(node, field)
         classType.add(field)
       case _ =>

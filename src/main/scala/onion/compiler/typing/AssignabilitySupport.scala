@@ -256,6 +256,8 @@ private[compiler] final class AssignabilitySupport(
             if (if (containsTypeVariable(expected)) structurallyAssignable(expected, nullable.innerType)
                 else TypeRelations.isAssignableWithBoxing(expected, nullable.innerType, bodyContext.table)) =>
           bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "assignment")
+        case _ if expected == BasicType.BYTE && ConstantNarrowing.isHexEndingInB(actual) =>
+          bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`, SemanticErrorReporter.HexDigitBHint)
         case _ =>
           bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
       }

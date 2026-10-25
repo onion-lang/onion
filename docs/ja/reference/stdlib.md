@@ -1966,7 +1966,7 @@ foreach i: Int in r { IO::println(i) }   // 2 3 4 5
 コレクションや配列向けのイテレーションユーティリティ:
 
 - `Iterables::map(list|iterable|set, f)`
-- `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す
+- `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す。順序は元の挿入順のまま
 - `Iterables::toList(iterable)` - 任意の `Iterable`（範囲を含む）を `List` に実体化する
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`

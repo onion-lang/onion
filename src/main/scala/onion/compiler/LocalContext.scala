@@ -213,7 +213,7 @@ class LocalContext {
    */
   def allNames: Set[String] = {
     if (contextFrame == null) Set.empty
-    else contextFrame.allNames
+    else contextFrame.allNames.filterNot(_.contains("#")) // synthetic slots (`n#arg`) are not names a user can write
   }
 
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {

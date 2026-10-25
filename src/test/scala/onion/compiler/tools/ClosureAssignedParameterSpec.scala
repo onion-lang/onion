@@ -97,5 +97,33 @@ class ClosureAssignedParameterSpec extends AbstractShellSpec {
           |  }""".stripMargin)
       assert(Shell.Success(3) == result)
     }
+
+    it("never shows its hidden argument slot in a \"did you mean\" suggestion") {
+      val buf = new java.io.ByteArrayOutputStream()
+      val ps = new java.io.PrintStream(buf, true, "UTF-8")
+      val (o, e) = (System.out, System.err)
+      val r =
+        try {
+          System.setOut(ps); System.setErr(ps)
+          Console.withOut(ps) { Console.withErr(ps) {
+            shell.run(
+              """
+                |def g(n: Int, max: Int): Int {
+                |  val f: () -> Int = () -> { n = n + 1; max = max - 1; n }
+                |  f()
+                |  println(maxArg)
+                |  return arg
+                |}
+                |println(g(1, 5))
+                |""".stripMargin,
+              "None",
+              Array())
+          } }
+        } finally { System.setOut(o); System.setErr(e) }
+      val out = new String(buf.toByteArray, "UTF-8")
+      assert(r.isInstanceOf[Shell.Failure], s"expected a compile failure, got $r\n$out")
+      assert(out.contains("E0002"), out)
+      assert(!out.contains("#"), s"hidden slot name leaked:\n$out")
+    }
   }
 }

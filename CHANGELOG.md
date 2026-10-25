@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Config::getInt(c, "items.99999999999", -1)` returns the default (#2423).**
+  - Before: an array index too big for an `Int` threw `invalid number format: For input string: "99999999999"`.
+  - Now: it is out of range like any other index, so `get` is `null` and every getter falls back to its default.
+
 - **`Timing::sleep(deadline - Timing::millis())` returns at once when the deadline has passed (#2421).**
   - Before: a negative duration threw `IllegalArgumentException: timeout value is negative` (`sleepNanos`: `nanosecond timeout value out of range`).
   - Now: `sleep` and `sleepNanos` return immediately for a zero or negative duration.

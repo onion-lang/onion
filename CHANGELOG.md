@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`xs.addAll(o)` compiles inside a generic class when `xs` and `o` are both `List[T]` (#2341).**
+  - Before: E0000, `Collection[? extends T]` is expected but `List[T]` is used.
+  - Now: accepted, as in Java.
+  - Still rejected: `List[Object]`, `List[String]` or a `List[U]` of an unrelated type variable into a `List[T]`. `List[List[B]].addAll(List[List[T]])` with `T extends B` is now rejected too.
+
 - **A lambda that assigns a method parameter now updates it for the method too (#2335).**
   - Before: `def g(n: Int): Int { val f: () -> Int = () -> { n = n + 10; n }; f(); return n }` returned the old `n`.
   - Now: the lambda and the method share one `n`, as they do for a captured `var` local. Constructors share it too, and a delegating `: this(...)` call sees the argument's value.

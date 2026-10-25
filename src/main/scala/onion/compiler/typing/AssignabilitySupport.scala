@@ -199,8 +199,33 @@ private[compiler] final class AssignabilitySupport(
               // for it rejected ordinary covariant wildcard uses that
               // never involved a chained bound at all.
               val involvesTypeVariable = e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType]
-              if (involvesTypeVariable) structurallyAssignable(e, a) && structurallyAssignable(a, e)
-              else structurallyAssignable(e, a)
+              e match {
+                // `Collection[? extends T]` (the JDK's `addAll`) takes a
+                // `List[T]`: the wildcard's own bound decides, one way
+                // (#2341). `? super L` is the mirror image.
+                case w: TypedAST.WildcardType if !a.isInstanceOf[TypedAST.WildcardType] =>
+                  // A bound that is itself a type variable is abstract: only
+                  // that variable (or one whose bound chain reaches it)
+                  // fits. A concrete type, `Object` or an unrelated `U`
+                  // must not pass just because it erases to the same
+                  // class, or `xs.addAll(o)` with `o: List[Object]`
+                  // would pollute a `List[T]`.
+                  w.lowerBound match {
+                    case Some(lb: TypedAST.TypeVariableType) =>
+                      a match {
+                        case av: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(av, lb)
+                        case _ => structurallyAssignable(a, lb)
+                      }
+                    case Some(lb) => structurallyAssignable(a, lb)
+                    case None =>
+                      w.upperBound match {
+                        case tv: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(tv, a)
+                        case ub => structurallyAssignable(ub, a)
+                      }
+                  }
+                case _ if involvesTypeVariable => structurallyAssignable(e, a) && structurallyAssignable(a, e)
+                case _ => structurallyAssignable(e, a)
+              }
             }
         if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
         else

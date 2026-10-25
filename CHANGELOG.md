@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A record method named like a component is a compile error (#2396).**
+  - Before: `record R(a: Int) { public: def a(): Int = 42 }` compiled, then died with a JVM `ClassFormatError`.
+  - Now: E0010 (duplicated method) at the `def`.
 - **W0016 names an overload the way the source writes it (#2407).**
   - Before: `a(java.util.List[java.lang.String], [int)`.
   - Now: `a(List[String], Int[])`.

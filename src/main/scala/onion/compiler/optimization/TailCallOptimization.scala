@@ -119,8 +119,10 @@ class TailCallOptimization(config: CompilerConfig)
     stmts.exists {
       case ret: Return if ret.term != null =>
         isSelfCall(ret.term, method)
+      case body: GuardedBody =>
+        checkStatementForTailCall(body.statements.last, method)
       case block: StatementBlock =>
-        containsTailCall(block.statements.toSeq, method)
+        blockHasTailCall(block, method)
       case ifStmt: IfStatement =>
         checkStatementForTailCall(ifStmt.thenStatement, method) ||
         (if (ifStmt.elseStatement != null) checkStatementForTailCall(ifStmt.elseStatement, method) else false)
@@ -128,6 +130,19 @@ class TailCallOptimization(config: CompilerConfig)
         false
     }
   }
+
+  /**
+   * A block has a tail call when a nested statement does, or when it ends in `result = f(..)`:
+   * the body of a `select` case with bindings (`case p is T:`, `case R(a, b):`) is such a block,
+   * where a literal case's body sits directly under the `if` (#2350).
+   */
+  private def blockHasTailCall(block: StatementBlock, method: MethodDefinition): Boolean =
+    containsTailCall(block.statements.toSeq, method) ||
+      (block.statements.lastOption match {
+        case Some(last: ExpressionActionStatement) if last.term.isInstanceOf[SetLocal] =>
+          checkStatementForTailCall(last, method)
+        case _ => false
+      })
 
   private def checkStatementForTailCall(stmt: ActionStatement, method: MethodDefinition): Boolean = {
     if (config.verbose) {
@@ -140,8 +155,10 @@ class TailCallOptimization(config: CompilerConfig)
           trace(s"[TCO]     Return statement: hasSelfCall=$result")
         }
         result
+      case body: GuardedBody =>
+        checkStatementForTailCall(body.statements.last, method)
       case block: StatementBlock =>
-        containsTailCall(block.statements.toSeq, method)
+        blockHasTailCall(block, method)
       case ifStmt: IfStatement =>
         if (config.verbose) {
           trace(s"[TCO]     IfStatement: checking then and else branches")
@@ -500,6 +517,14 @@ class TailCallOptimization(config: CompilerConfig)
           (new Return(exprStmt.location, set.value), true)
         case _ => (stmt, false)
       }
+    case guarded: GuardedCaseBlock =>
+      // statements: taken = false; the case; if (!taken) rest. Sinking into the case is safe:
+      // once it ran, nothing after it does. Not claiming "always returns" keeps the caller's
+      // trailing `return result`, which is harmless.
+      val Array(init, matched, rest) = guarded.statements
+      val (sunkMatched, _) = sinkReturn(matched, result)
+      val (sunkRest, _) = sinkReturn(rest, result)
+      (new GuardedCaseBlock(guarded.location, init, sunkMatched, sunkRest), false)
     case block: StatementBlock if block.statements.nonEmpty =>
       val (last, returns) = sinkReturn(block.statements.last, result)
       (new StatementBlock(block.location, (block.statements.init.toSeq :+ last): _*), returns)

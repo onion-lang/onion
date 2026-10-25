@@ -64,6 +64,37 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         Shell.Success("rejected|rejected|0"))
     }
 
+    it("base64Decode skips line breaks and spaces, as in a file or wrapped CLI output") {
+      runStr(
+        "import { onion.Codec }",
+        "return Codec::base64Decode(\"aGVsbG8=\\n\") + \"|\" + Codec::base64Decode(\"aGVs\\r\\nbG8g\\nd29y bGQ=\")",
+        Shell.Success("hello|hello world"))
+    }
+
+    it("base64Decode names the bad character, its index, and a bad length") {
+      runStr(
+        "import { onion.Codec }",
+        """var bad: String = "none"
+          |var len: String = "none"
+          |try { Codec::base64Decode("not base64!!") } catch e: IllegalArgumentException { bad = e.getMessage() }
+          |try { Codec::base64Decode("a") } catch e: IllegalArgumentException { len = e.getMessage() }
+          |return bad + "|" + len""".stripMargin,
+        Shell.Success("invalid Base64 character '!' at index 10|invalid Base64 length or padding: 1 character(s) after removing whitespace"))
+    }
+
+    it("urlDecode names the bad % escape and its index") {
+      runStr(
+        "import { onion.Codec }",
+        """var a: String = "none"
+          |var b: String = "none"
+          |try { Codec::urlDecode("100%zz") } catch e: IllegalArgumentException { a = e.getMessage() }
+          |try { Codec::urlDecode("50%") } catch e: IllegalArgumentException { b = e.getMessage() }
+          |return a + "|" + b""".stripMargin,
+        Shell.Success(
+          "invalid % escape at index 3 in \"100%zz\": a % must be followed by two hex digits|" +
+          "invalid % escape at index 2 in \"50%\": a % must be followed by two hex digits"))
+    }
+
     it("url encoding round-trips a reserved character") {
       runStr(
         "import { onion.Codec }",

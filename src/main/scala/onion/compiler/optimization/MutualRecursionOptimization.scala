@@ -283,7 +283,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
       val tailCalls = TailCallGraphAnalysis.findTailCalls(method)
       val externalCalls = tailCalls.filterNot(callee => group.exists(_ eq callee))
       if (externalCalls.nonEmpty) {
-        break(Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.map(_.name).mkString(", ")}"))
+        break(Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.map(signature).mkString(", ")}"))
       }
     }
 
@@ -302,6 +302,28 @@ class MutualRecursionOptimization(config: CompilerConfig)
     }
 
     validationError
+  }
+
+  // `a(String)`: a bare name cannot tell an out-of-group overload from a group member.
+  private def signature(method: MethodDefinition): String =
+    s"${method.name}(${method.arguments.map(sourceName).mkString(", ")})"
+
+  // A boxed primitive in a type argument is written as the primitive (`List[Int]`).
+  private def typeArgName(tpe: TypedAST.Type): String = sourceName(tpe) match {
+    case "Integer"   => "Int"
+    case "Character" => "Char"
+    case other       => other
+  }
+
+  // The way the source writes a type: simple class names, `Int[]` for arrays.
+  private def sourceName(tpe: TypedAST.Type): String = tpe match {
+    case a: TypedAST.ArrayType        => sourceName(a.component) + "[]" * a.dimension
+    case n: TypedAST.NullableType     => sourceName(n.innerType) + "?"
+    case c: TypedAST.AppliedClassType =>
+      val raw = c.raw.name.substring(c.raw.name.lastIndexOf('.') + 1)
+      if (c.typeArguments.isEmpty) raw else raw + c.typeArguments.map(typeArgName).mkString("[", ", ", "]")
+    case t: TypedAST.ClassType        => t.name.substring(t.name.lastIndexOf('.') + 1)
+    case other                        => other.displayName
   }
 
   /**

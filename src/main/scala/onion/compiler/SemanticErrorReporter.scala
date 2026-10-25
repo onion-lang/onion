@@ -454,6 +454,18 @@ class SemanticErrorReporter(threshold: Int) {
           case _ => false
   }
 
+  /** Whether `toArray(new C[0])` for the array type is itself valid Onion (#2314). */
+  private def snippetCompiles(list: TypedAST.Type, arrayType: TypedAST.ArrayType): Boolean = {
+    val componentOk = arrayType.component match
+      case _: TypedAST.AppliedClassType => false
+      case ct: TypedAST.ClassType => ct.typeParameters.isEmpty
+      case _ => true
+    val element = list match
+      case n: TypedAST.NullableType => listElementType(n.innerType)
+      case other => listElementType(other)
+    componentOk && !(arrayType.dimension == 1 && element.exists(_.isInstanceOf[TypedAST.TypeVariableType]))
+  }
+
   private def listElementType(t: TypedAST.Type): Option[TypedAST.Type] = t match
     case ct: TypedAST.ClassType =>
       onion.compiler.typing.AppliedTypeViews.collectAppliedViewsFrom(ct).collectFirst {
@@ -713,9 +725,12 @@ class SemanticErrorReporter(threshold: Int) {
       else if (isListType(expected) && actual.isInstanceOf[TypedAST.ArrayType])
         Some((actual.asInstanceOf[TypedAST.ArrayType], false))
       else None
+    def written(t: TypedAST.Type): String = t match
+      case a: TypedAST.ArrayType if listArrayCast.isDefined => onion.compiler.toolbox.TypeFormatting.arrayWrittenForm(a)
+      case other => typeName(other)
     val baseMessage = format(
       message(if (listArrayCast.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
-      Seq(typeName(expected), typeName(actual))
+      Seq(written(expected), written(actual))
     )
     val hint =
       if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
@@ -735,11 +750,14 @@ class SemanticErrorReporter(threshold: Int) {
           // 1-D primitive case has no one-line fix.
           if (arrayType.dimension == 1 && arrayType.component.isBasicType) None
           else if (isListToArray && !listElementsFit(actual, arrayType)) None
+          // `new C[0]` must compile when typed in: a generic component is raw there (E0066),
+          // and a bare type parameter's elements guarantee no more than Object does (#2314).
+          else if (isListToArray && !snippetCompiles(actual, arrayType)) None
           else if (isListToArray) {
             // Onion has no jagged-array syntax (`new Int[0][]` is a syntax error); a fully
             // sized `new Int[0][0]` compiles and is just as empty, since the outer (size-0)
             // dimension is the only one that matters to `toArray`.
-            val emptyArrayLiteral = typeName(arrayType.component) + ("[0]" * arrayType.dimension)
+            val emptyArrayLiteral = onion.compiler.toolbox.TypeFormatting.componentWrittenForm(arrayType.component) + ("[0]" * arrayType.dimension)
             Some(format(message("suggestion.listAsArrayCast"), Seq(emptyArrayLiteral)))
           } else {
             Some(message("suggestion.arrayAsListCast"))

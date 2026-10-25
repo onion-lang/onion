@@ -234,6 +234,40 @@ class ConfigSpec extends AbstractShellSpec {
         assert(Shell.Success("3000") == result)
       }
 
+      it("returns the default int for a number that is not a whole Int") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val config = Config::parseJson("{\"big\": 3000000000, \"frac\": 2.9, \"ok\": 7}");
+            |    return "" + Config::getInt(config, "big", 80) + "," + Config::getInt(config, "frac", 81) + "," + Config::getInt(config, "ok", 82);
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("80,81,7") == result)
+      }
+
+      it("returns the default long for a fractional number") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val config = Config::parseJson("{\"frac\": 2.9, \"big\": 3000000000}");
+            |    return "" + Config::getLong(config, "frac", 5L) + "," + Config::getLong(config, "big", 6L);
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("5,3000000000") == result)
+      }
+
       it("gets long values with getLong") {
         val result = shell.run(
           """
@@ -487,6 +521,28 @@ class ConfigSpec extends AbstractShellSpec {
           Array()
         )
         assert(Shell.Success("false") == result)
+      }
+    }
+
+    describe("array index too big for an Int (#2423)") {
+      it("falls back to the default instead of throwing") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val config = Config::parseJson("{\"items\": [10, 20]}");
+            |    return Config::getInt(config, "items.99999999999", -1) + "," +
+            |      Config::hasPath(config, "items.99999999999") + "," +
+            |      Config::getString(config, "items.2147483648", "none") + "," +
+            |      Config::getInt(config, "items.0001", -1);
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("-1,false,none,20") == result)
       }
     }
   }

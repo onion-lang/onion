@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.146.0] - 2026-10-25
+
 ### Breaking
 
 - **A hex literal ending in `B` is an `Int`: `0xAB` is 171, not the Byte 10 (#2324).**

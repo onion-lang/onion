@@ -11,7 +11,7 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
   import codegen.*
 
   def emitBridges(cw: ClassWriter, classDef: ClassDefinition): Unit =
-    val sources = collectAppliedGenericSupertypes(classDef)
+    val sources = collectSupertypes(classDef)
     if sources.isEmpty then return
 
     def methodDesc(ret: TypedAST.Type, args: Array[TypedAST.Type]): String =
@@ -29,25 +29,32 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     // method of every generic supertype, with per-argument compatibility checks.
     val ownByName = ownMethods.groupBy(_.name)
 
-    for source <- sources do
-      val subst: Map[String, TypedAST.Type] =
-        source.raw.typeParameters.map(_.name).zip(source.typeArguments).toMap
-
+    for (sourceRaw, subst) <- sources do
       def substituteClassParams(tp: TypedAST.Type): TypedAST.Type = substituteTypeVars(tp, subst)
 
-      for rawMethod <- source.raw.methods do
+      for rawMethod <- sourceRaw.methods do
         if Modifier.isStatic(rawMethod.modifier) || Modifier.isPrivate(rawMethod.modifier) then
           ()
         else
           val sameName = ownByName.getOrElse(rawMethod.name, Nil)
           val specializedArgs = if sameName.isEmpty then null else rawMethod.arguments.map(substituteClassParams)
           val implOpt = if sameName.isEmpty then None else sameName.find { m =>
-            m.arguments.length == specializedArgs.length &&
-            m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))
+            m.arguments.length == specializedArgs.length && (
+              if subst.isEmpty then
+                // A non-generic supertype: only a covariant return override, as
+                // in Java. `foo(x: Int)` beside an inherited `foo(Integer)` is
+                // an overload, so arguments must match exactly.
+                m.arguments.indices.forall(i => m.arguments(i).name == specializedArgs(i).name) &&
+                isCovariantReturn(rawMethod.returnType, m.returnType)
+              else
+                m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))
+            )
           }
 
           implOpt.foreach { impl =>
-            if Modifier.isAbstract(impl.modifier) || Modifier.isStatic(impl.modifier) then
+            // In an interface only a default method (one with a body) has code to bridge to.
+            val hasNoBody = classDef.isInterface && impl.asInstanceOf[MethodDefinition].getBlock == null
+            if Modifier.isAbstract(impl.modifier) || Modifier.isStatic(impl.modifier) || hasNoBody then
               ()
             else
               val bridgeDesc = methodDesc(rawMethod.returnType, rawMethod.arguments)
@@ -77,13 +84,17 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                       gen.cast(provided, desired)
                   i += 1
 
-                gen.invokeVirtual(ownerType, AsmMethod(impl.name, implDesc))
+                if classDef.isInterface then gen.invokeInterface(ownerType, AsmMethod(impl.name, implDesc))
+                else gen.invokeVirtual(ownerType, AsmMethod(impl.name, implDesc))
                 val implRet = asmType(impl.returnType)
                 if implRet != AsmType.VOID_TYPE && !isReferenceAsmType(implRet) && isReferenceAsmType(bridgeReturnType) then
                   gen.valueOf(implRet)
                 gen.returnValue()
                 gen.endMethod()
           }
+
+  private def isCovariantReturn(inherited: TypedAST.Type, own: TypedAST.Type): Boolean =
+    !inherited.isBasicType && !own.isBasicType && TypeRules.isSuperType(inherited, own)
 
   private def isBridgeCompatible(implArg: TypedAST.Type, specializedArg: TypedAST.Type): Boolean = {
     if implArg.name == specializedArg.name then return true
@@ -119,10 +130,15 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
       TypedAST.AppliedClassType(ap.raw, newArgs)
     case other => other
 
-  private def collectAppliedGenericSupertypes(classDef: ClassDefinition): List[AppliedClassType] =
+  // Every supertype, each with the substitution for its own type parameters
+  // (empty for a non-generic one). A non-generic supertype still needs a bridge
+  // when an override narrows its return type (`name(): String` for an inherited
+  // `name(): Object`), as javac emits; without one, a call through the supertype
+  // threw AbstractMethodError or ran the inherited method (#2386).
+  private def collectSupertypes(classDef: ClassDefinition): List[(TypedAST.ClassType, Map[String, TypedAST.Type])] =
     val visitedApplied = mutable.HashSet[AppliedClassType]()
     val visitedRaw = mutable.HashSet[TypedAST.ClassType]()
-    val out = mutable.ArrayBuffer[AppliedClassType]()
+    val out = mutable.ArrayBuffer[(TypedAST.ClassType, Map[String, TypedAST.Type])]()
 
     def traverse(tp: TypedAST.ClassType, subst: Map[String, TypedAST.Type]): Unit =
       if tp == null then return
@@ -132,20 +148,22 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
           val applied = TypedAST.AppliedClassType(applied0.raw, specializedArgs)
           if !visitedApplied.contains(applied) then
             visitedApplied += applied
-            if applied.raw.typeParameters.nonEmpty then out += applied
             val nextSubst: Map[String, TypedAST.Type] =
               applied.raw.typeParameters.map(_.name).zip(applied.typeArguments).toMap
+            out += ((applied.raw, nextSubst))
             traverse(applied.raw.superClass, nextSubst)
             applied.raw.interfaces.foreach(traverse(_, nextSubst))
 
         case raw =>
           if !visitedRaw.contains(raw) then
             visitedRaw += raw
+            if raw.typeParameters.isEmpty then out += ((raw, Map.empty))
             val nextSubst = if raw.typeParameters.nonEmpty then Map.empty[String, TypedAST.Type] else subst
             traverse(raw.superClass, nextSubst)
             raw.interfaces.foreach(traverse(_, nextSubst))
 
-    traverse(classDef.superClass, Map.empty)
+    // An interface's superClass is Object, whose methods no default method overrides.
+    if !classDef.isInterface then traverse(classDef.superClass, Map.empty)
     classDef.interfaces.foreach(traverse(_, Map.empty))
     out.toList
 }

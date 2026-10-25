@@ -26,6 +26,14 @@ class SourceContextSpec extends AnyFunSpec with Matchers {
       result.sourceLine shouldBe longLine
     }
 
+    it("maps a column that counts each tab as 8 back to a character offset") {
+      val source = "\t\tval n = (1;"
+
+      // two tabs = 16 columns, then `val n = (1` is 10 more, so `;` is column 27
+      SourceContext.at(source, line = 1, column = 27).context shouldBe ";"
+      SourceContext.at("a\tb;", line = 1, column = 10).context shouldBe ";"
+    }
+
     it("returns empty text when the requested line is past the end of the source") {
       val result = SourceContext.at("first\nsecond", line = 3, column = 1)
 

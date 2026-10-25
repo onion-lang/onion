@@ -502,9 +502,11 @@ final class ClosureTyping(
       if (argType == null) return false
       if (shared.contains(arg.name)) {
         // The argument slot keeps a name no source can spell; the boxed copy takes the real one.
-        context.add(arg.name + "#arg", argType, isMutable = false)
+        context.addUnboxed(arg.name + "#arg", argType, isMutable = false)
       } else {
-        context.add(arg.name, argType, isMutable = assigned.contains(arg.name))
+        // `markAsBoxed` is name-based and outlives this lambda, so a sibling lambda's shared
+        // parameter of the same name must not box this one.
+        context.addUnboxed(arg.name, argType, isMutable = assigned.contains(arg.name))
       }
       i += 1
     }

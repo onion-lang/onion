@@ -168,5 +168,29 @@ class ClosureAssignedParameterSpec extends AbstractShellSpec {
           |  }""".stripMargin)
       assert(Shell.Success(3) == result)
     }
+
+    it("does not box a sibling lambda's parameter of the same name") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val xs = [1, 2, 3]
+          |    val a = xs.map { k -> val f: () -> Int = () -> { k = k + 1; k }; f() }
+          |    val b = xs.map { k -> val f: () -> Int = () -> k * 3; f() }
+          |    return a[0] * 100000 + a[2] * 10000 + b[0] * 100 + b[2]
+          |  }""".stripMargin)
+      assert(Shell.Success(2 * 100000 + 4 * 10000 + 3 * 100 + 9) == result)
+    }
+
+    it("does not box a later lambda's parameter after a forEach that assigns it") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val xs = [1, 2, 3]
+          |    var total = 0
+          |    xs.forEach { x -> val f: () -> Int = () -> { x = x * 2; x }; total = total + f() }
+          |    val fs = xs.map { x -> () -> x + 1 }
+          |    val h = fs[2]
+          |    return total * 100 + h()
+          |  }""".stripMargin)
+      assert(Shell.Success(12 * 100 + 4) == result)
+    }
   }
 }

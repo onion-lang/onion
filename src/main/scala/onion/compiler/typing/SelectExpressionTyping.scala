@@ -340,12 +340,20 @@ final class SelectExpressionTyping(
         val (bindingInfo, varBinds, guardInfo) = caseBindingData(caseIndex)
 
         // Build the inner body (after bindings are set up)
-        val innerBody: ActionStatement = guardInfo match {
+        // A guarded case records that it ran in `taken`, so the remaining cases are emitted
+        // once, after it: emitting them in both the guard-failed and the pattern-failed
+        // branch duplicated their bodies (a lambda there failed JVM verification).
+        val guardTaken: Option[(ClosureLocalBinding, Term)] = guardInfo match {
           case Some(GuardInfo(_, guardTerm)) if guardTerm != null =>
-            // Guard check: if guard passes, execute body; else fall through to remaining cases
-            val restOfCases = buildCaseBranches(caseIndex + 1, fallback)
-            new IfStatement(guardTerm, baseStmt, restOfCases)
-          case _ =>
+            val taken = new ClosureLocalBinding(0, context.add(context.newName, BasicType.BOOLEAN, isMutable = true), BasicType.BOOLEAN, isMutable = true)
+            Some((taken, guardTerm))
+          case _ => None
+        }
+        val innerBody: ActionStatement = guardTaken match {
+          case Some((taken, guardTerm)) =>
+            val markTaken = new ExpressionActionStatement(new SetLocal(taken, new BoolValue(node.location, true)))
+            new IfStatement(guardTerm, new GuardedBody(node.location, markTaken, baseStmt), new NOP(node.location))
+          case None =>
             baseStmt
         }
 
@@ -400,9 +408,18 @@ final class SelectExpressionTyping(
           case NoBindings => innerBody
         }
 
-        // Build: if (patternCond) { caseBody } else { restOfCases }
         val restOfCases = buildCaseBranches(caseIndex + 1, fallback)
-        new IfStatement(caseConditions(caseIndex), caseBody, restOfCases)
+        guardTaken match {
+          case Some((taken, _)) =>
+            // taken = false; if (patternCond) { bindings; if (guard) { taken = true; body } }; if (!taken) { restOfCases }
+            val init = new ExpressionActionStatement(new SetLocal(taken, new BoolValue(node.location, false)))
+            val matched = new IfStatement(caseConditions(caseIndex), caseBody, new NOP(node.location))
+            val notTaken = new UnaryTerm(UnaryTerm.Kind.NOT, BasicType.BOOLEAN, new RefLocal(taken))
+            new GuardedCaseBlock(node.location, init, matched, new IfStatement(notTaken, restOfCases, new NOP(node.location)))
+          case None =>
+            // Build: if (patternCond) { caseBody } else { restOfCases }
+            new IfStatement(caseConditions(caseIndex), caseBody, restOfCases)
+        }
       }
     }
 
@@ -412,12 +429,18 @@ final class SelectExpressionTyping(
     }
 
     val init = new ExpressionActionStatement(new SetLocal(0, index, condition.`type`, condition))
-    val statement = new StatementBlock(condition.location, init, branches)
+    // The verifier cannot see that a guarded case's `taken` flag implies the result was assigned,
+    // so the result slot is given a definite value up front when any case is guarded.
+    val resultInit: Seq[ActionStatement] =
+      if (resultVar != null && caseBindingData.exists(_._3.exists(_.guardTerm != null)))
+        Seq(new ExpressionActionStatement(new SetLocal(resultVar, body.defaultValue(resultType))))
+      else Nil
+    val statement = new StatementBlock(condition.location, (init +: resultInit :+ branches)*)
 
     if (resultVar == null) {
       Some(statementTerm(statement, resultType, node.location))
     } else {
-      Some(new Begin(node.location, Array[Term](statementTerm(statement, BasicType.VOID, node.location), new RefLocal(resultVar))))
+      Some(new Begin(node.location, Array[Term](statementTerm(statement, BasicType.VOID, node.location), new ResultRefLocal(resultVar))))
     }
   }
 
@@ -428,6 +451,12 @@ final class SelectExpressionTyping(
     context: LocalContext
   ): Option[(Term, PatternBindingInfo)] =
     destructuringProcessor.process(dp, bind, context)
+
+  private def intConstant(term: Term): Option[Int] = term match {
+    case v: IntValue => Some(v.value)
+    case u: UnaryTerm if u.kind == UnaryTerm.Kind.MINUS => intConstant(u.operand).map(-_)
+    case _ => None
+  }
 
   /** Returns (condition, pattern binding info, hasWildcard, optional guard info) */
   /** Rewrite a bare `case CONST:` over an enum scrutinee into `EnumType::CONST`.
@@ -499,24 +528,38 @@ final class SelectExpressionTyping(
         if (typedExpr == null) break((null, NoBindings, false, None))
 
         // An int case label matches a byte/short/char scrutinee (compared by value,
-        // as Java's switch does); the narrowing cast below (`AsInstanceOf`) normalizes
-        // it to the scrutinee type. Char scrutinees still also accept char literals.
+        // as Java's switch does): the scrutinee is widened to Int for the comparison,
+        // so a label that does not fit never matches. Char scrutinees still also
+        // accept char literals.
         val narrowableIntLabel = typedExpr.`type` == BasicType.INT &&
           (conditionType == BasicType.BYTE || conditionType == BasicType.SHORT || conditionType == BasicType.CHAR)
-        if (!TypeRules.isAssignable(conditionType, typedExpr.`type`) && !narrowableIntLabel) {
+        // A constant label must fit the scrutinee type, as `val b: Byte = 300` must;
+        // narrowing it would make it match a different value (#2376).
+        val labelOutOfRange = narrowableIntLabel && (intConstant(typedExpr) match {
+          case Some(v) => conditionType match {
+            case BasicType.BYTE  => v < Byte.MinValue || v > Byte.MaxValue
+            case BasicType.SHORT => v < Short.MinValue || v > Short.MaxValue
+            case _               => v < Char.MinValue || v > Char.MaxValue
+          }
+          case None => false
+        })
+        if (!TypeRules.isAssignable(conditionType, typedExpr.`type`) && !narrowableIntLabel || labelOutOfRange) {
           bodyContext.report(INCOMPATIBLE_TYPE, expr, conditionType, typedExpr.`type`)
           break((null, NoBindings, false, None))
         }
 
         val normalizedExpr =
-          if (typedExpr.isBasicType && typedExpr.`type` != conditionType) new AsInstanceOf(typedExpr, conditionType)
+          if (narrowableIntLabel) typedExpr
+          else if (typedExpr.isBasicType && typedExpr.`type` != conditionType) new AsInstanceOf(typedExpr, conditionType)
           else if (typedExpr.isReferenceType && typedExpr.`type` != bodyContext.rootClass) new AsInstanceOf(typedExpr, bodyContext.rootClass)
           else typedExpr
 
         if (normalizedExpr.isReferenceType) {
           body.createEqualsForRef(new RefLocal(bind), normalizedExpr)
         } else {
-          new BinaryTerm(EQUAL, BasicType.BOOLEAN, new RefLocal(bind), normalizedExpr)
+          val subject =
+            if (narrowableIntLabel) new AsInstanceOf(new RefLocal(bind), BasicType.INT) else new RefLocal(bind)
+          new BinaryTerm(EQUAL, BasicType.BOOLEAN, subject, normalizedExpr)
         }
 
       case typePattern @ AST.TypePattern(_, name, typeRef) =>

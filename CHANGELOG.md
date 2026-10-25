@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **W0016 names an out-of-group overload with its parameter types (#2371).**
+  - Before: `... group (b, a) could not be optimized: Method b has tail calls to non-group methods: a`, as if `a` were outside the group.
+  - Now: `... non-group methods: a(java.lang.String)`, so the overload is told apart from the member `a(Int)`.
+- **A `select` case label that does not fit a Byte/Short/Char scrutinee no longer matches a truncated value (#2376).**
+  - Before: `case 300:` (or `case 150 + 150:`, `case k:`) on a `Byte` was truncated to `44` and matched it, silently.
+  - Now: a literal label is E0000, as for `val b: Byte = 300`; a computed one never matches. Labels inside the range still work.
+- **`val k: H[String]? = j` with `j: H[Object]?` reports a type mismatch, not a null error (#2343).**
+  - Before: E0070 "may be null", whose advice (`!!`, `?:`) cannot fix it.
+  - Now: E0000 naming the two types. E0070 stays for a value that would fit if it were not null.
+- **`Yaml::parse` rejects a tag or anchor on a key instead of keeping it in the key text (#2369).**
+  - Before: `!!str 5: x` returned the key `"!!str 5"`; `&x k: 1` returned `"&x k"`.
+  - Now: a `YamlParseException`. Quote the key to keep the text.
+- **The List-to-array cast hint only suggests code that compiles (#2314).**
+  - Before: `(nums as JInteger[])` said `Int[]` and suggested `toArray(new Int[0])` (E0005); `Comparable[]` suggested a raw type (E0066); a `List[T]` suggested a call that throws at run time.
+  - Now: `JInteger[]` and `new JInteger[0]` as written. A generic component or a bare `T` gets the plain type error, with no snippet.
+- **Assigning a `val` from inside a function (`=`, `+=`, `++`) is now E0036 (#2340).**
+  - Before: `val w = 10` then `def g() { w = 99 }` (or `w++`) compiled; `w` read `99` in functions and `10` at top level. A `static val` crashed at run time with `IllegalAccessError`.
+  - Now: `E0036 cannot assign to val`, as at top level.
+- **An error inside an ADT enum `case` points at that `case`, not at the `enum` keyword (#2322).**
+  - Before: `case Circle(...)` missing an abstract method reported `1:1`, the same spot for every case.
+  - Now: each error is reported on its own `case` line.
+- **A lambda in a `select` case after a guarded case no longer fails JVM verification (#2359).**
+  - Before: `case P(a, b) when a == 0: ...` followed by a case whose body holds `() -> a` crashed with `VerifyError` at run time.
+  - Now: it compiles and runs.
+- **A lambda in a constructor that assigns a captured `var` writes it back (#2361).**
+  - Before: `def this(m: Int) { var n = m; val f = () -> { n = n * 3; n }; f(); v = n }` left `n` at `m`; the same lines in a method worked.
+  - Now: the constructor and the lambda share `n`, as in a method.
+- **`Files::copyDir` reads `link/..` the way the OS does (#2370).**
+  - Before: `copyDir("t/sub", "t/lnk/../in")` (`lnk` -> `sub/deep`) ran away and left `sub/in/in/...`, and a legal copy through `lnk/..` was refused.
+  - Now: the first throws `IllegalArgumentException` with nothing written; the second copies.
+
+## [0.145.0] - 2026-10-24
+
 ### Breaking
 
 - **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
@@ -30,6 +65,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A `T extends Comparable[T]` is accepted where a `Comparable[T]` is expected (#2338).**
   - Before: `def asCmp(t: T): Comparable[T] = t` was E0000 "type Comparable[T] is expected, but type T is used".
   - Now: it compiles, as in Java. Other applied types are still rejected.
+- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
+  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
+  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
+- **An expression-bodied recursive function runs as a loop, like one written with `return` (#2330).**
+  - Before: `def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }` hit "stack overflow" at depth 200000, while the `return` form ran fine. An `else if` chain, and a `select` whose self-call case is a literal, `else` or guarded destructuring case, overflowed the same way. A `select` with an unguarded destructuring or type-pattern case still overflows (#2350).
+  - Now: it prints `200000`. A call whose result is still used (`{ val x = f(n - 1); x + 1 }`) stays a real call.
 - **`Yaml::parse` rejects a whole-line flow collection and a tag (#2327).**
   - Before: `{a: 1, b: 2}` came back as the one-key map `{{a=1, b: 2}}`, and `a: !!str 5` as the text `!!str 5`.
   - Now: `YamlParseException` naming the construct and line, as for anchors. Quote the value to keep it as text.

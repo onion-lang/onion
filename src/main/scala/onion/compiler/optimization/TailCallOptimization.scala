@@ -126,8 +126,32 @@ class TailCallOptimization(config: CompilerConfig)
       case ifStmt: IfStatement =>
         checkStatementForTailCall(ifStmt.thenStatement, method) ||
         (if (ifStmt.elseStatement != null) checkStatementForTailCall(ifStmt.elseStatement, method) else false)
+      case StatementForm(inner) =>
+        checkStatementForTailCall(inner, method)
       case _ =>
         false
+    }
+  }
+
+  /**
+   * A `select` in statement position is typed as an expression statement around its
+   * lowered statement (so its BOTTOM type still counts for definite return), or, when a
+   * case yields a value, around `{ <that statement>; result }` whose value is discarded.
+   * Its cases' `return f(..)` are tail calls like an `if` statement's (#2405).
+   */
+  private object StatementForm {
+    def unapply(stmt: ActionStatement): Option[ActionStatement] = stmt match {
+      case exprStmt: ExpressionActionStatement =>
+        exprStmt.term match {
+          case st: StatementTerm => Some(st.statement)
+          case begin: Begin if begin.terms.length == 2 && begin.terms(1).isInstanceOf[ResultRefLocal] =>
+            begin.terms(0) match {
+              case st: StatementTerm => Some(st.statement)
+              case _ => None
+            }
+          case _ => None
+        }
+      case _ => None
     }
   }
 
@@ -467,6 +491,15 @@ class TailCallOptimization(config: CompilerConfig)
         } else null
 
         new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
+
+      case StatementForm(inner) =>
+        val exprStmt = stmt.asInstanceOf[ExpressionActionStatement]
+        val termType = exprStmt.term match {
+          case st: StatementTerm => st.termType
+          case _ => BasicType.VOID
+        }
+        new ExpressionActionStatement(exprStmt.location,
+          new StatementTerm(exprStmt.term.location, transformStatement(inner, method, slots), termType))
 
       case exprStmt: ExpressionActionStatement =>
         // An ExpressionActionStatement whose value is assigned to a local variable

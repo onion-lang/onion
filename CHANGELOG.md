@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `select` statement with `return f(..)` in its cases loops instead of overflowing the stack (#2405).**
+  - Before: `select l { case Cons(h, t): return sum(t, acc + h); ... }` followed by `return -1` hit "stack overflow" at depth 200000. Literal and `else` cases overflowed too.
+  - Now: it loops, like the `= select l { ... }` form and an `if` statement with `return`.
 - **`Yaml::parse` removes the quotes of a single-quoted key (#2403).**
   - Before: `'k': 1` gave the key `'k'`, quotes included, so `m.get("k")` was `null`; `'a: b': 1` was split at the inner `: `.
   - Now: `'k'` is read as `k`, the same as `"k"`. A whole-line `{a: 1}` now suggests block `key: value` lines or Json, not quoting a value.

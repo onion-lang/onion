@@ -209,6 +209,10 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     for (arg <- node.args) {
       if (seen.contains(arg.name)) typing.report(SemanticError.DUPLICATE_RECORD_COMPONENT, arg, clazz, arg.name)
       else seen += arg.name
+      // The accessor of a component named like a method the record generates itself
+      // would be a second method of the same signature: a ClassFormatError at load (#2391).
+      if (arg.name == "hashCode" || arg.name == "toString")
+        typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type])
     }
   }
 

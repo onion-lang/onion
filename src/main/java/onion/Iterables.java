@@ -3,7 +3,7 @@ package onion;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,7 +30,7 @@ public class Iterables {
   
   public static <A, B, C, D> Map<C, D> mapMap(Map<A, B> map, Function1<Map.Entry<A, B>, Map.Entry<C, D>> f) {   
     Collection<Map.Entry<A, B>> mapView = View.asCollection(map);
-    Map<C, D> result = new HashMap<C, D>();
+    Map<C, D> result = new LinkedHashMap<C, D>();
     _map(mapView, f, View.asCollection(result));
     return result;
   }

@@ -259,7 +259,13 @@ class SemanticErrorReporter(threshold: Int) {
           case obj: TypedAST.ObjectType => toolbox.Suggestions.formatSuggestion(name, rankedCallCandidates(obj, name, argTypes, if (isUnqualifiedCall) None else Some(calledStatically)))
           case _ => None
       }
-    problem(position, appendSuggestion(baseMessage, suggestion))
+    // Set only by MethodCallReportingSupport, when a hex literal ending in `B` is passed where
+    // a same-named method takes a Byte: said after any other suggestion, which still applies.
+    val hexDigitB = items.length > 8 && items(8) == SemanticErrorReporter.HexDigitBHint
+    val withHexDigitB =
+      if (!hexDigitB) suggestion
+      else Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + message("suggestion.hexDigitB"))
+    problem(position, appendSuggestion(baseMessage, withHexDigitB))
   }
 
   /**
@@ -727,7 +733,9 @@ class SemanticErrorReporter(threshold: Int) {
       Seq(written(expected), written(actual))
     )
     val hint =
-      if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
+      if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
+        Some(message("suggestion.hexDigitB"))
+      } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
       } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
@@ -995,6 +1003,11 @@ class SemanticErrorReporter(threshold: Int) {
  * The reporter's constructor showed up in profiles of a one-line program for that reason.
  */
 object SemanticErrorReporter {
+  /**
+   * An extra item on INCOMPATIBLE_TYPE (third) or METHOD_NOT_FOUND (ninth): the failing value
+   * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
+   */
+  private[compiler] case object HexDigitBHint
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.

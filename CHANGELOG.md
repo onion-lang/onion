@@ -7,8 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.146.0] - 2026-10-25
+
+### Breaking
+
+- **A hex literal ending in `B` is an `Int`: `0xAB` is 171, not the Byte 10 (#2324).**
+  - Before: `B` was a Byte suffix even in hex, so `0xAB` printed `10` and `0xFFB` printed `-1`.
+  - Now: `B` is a hex digit. `0xFFB` is 4091. For a Byte, write `0b11111111B` or `-1B`; `0xFFFFS` still works. See `docs/migration/pre-1.0.md`.
+  - Where such a literal no longer fits a Byte, most contexts give an error that says why. Where it still fits (`bs[0] = 0x1B`), the value changes silently: search for `0x...B`.
+
 ### Fixed
 
+- **`xs.addAll(o)` compiles inside a generic class when `xs` and `o` are both `List[T]` (#2341).**
+  - Before: E0000, `Collection[? extends T]` is expected but `List[T]` is used.
+  - Now: accepted, as in Java.
+  - Still rejected: `List[Object]`, `List[String]` or a `List[U]` of an unrelated type variable into a `List[T]`. `List[List[B]].addAll(List[List[T]])` with `T extends B` is now rejected too.
+
+- **A lambda that assigns a method parameter now updates it for the method too (#2335).**
+  - Before: `def g(n: Int): Int { val f: () -> Int = () -> { n = n + 10; n }; f(); return n }` returned the old `n`.
+  - Now: the lambda and the method share one `n`, as they do for a captured `var` local. Constructors share it too, and a delegating `: this(...)` call sees the argument's value.
+  - A lambda that only reads the parameter also sees later assignments: `val f: () -> Int = () -> n; n = 5; f()` gave `1` and now gives `5`. Lambdas collected in a loop that advances `n` give `4,4,4,` where they gave `1,2,3,`.
+
+- **`Config::getInt(c, "items.99999999999", -1)` returns the default (#2423).**
+  - Before: an array index too big for an `Int` threw `invalid number format: For input string: "99999999999"`.
+  - Now: it is out of range like any other index, so `get` is `null` and every getter falls back to its default.
+
+- **`Timing::sleep(deadline - Timing::millis())` returns at once when the deadline has passed (#2421).**
+  - Before: a negative duration threw `IllegalArgumentException: timeout value is negative` (`sleepNanos`: `nanosecond timeout value out of range`).
+  - Now: `sleep` and `sleepNanos` return immediately for a zero or negative duration.
+
+- **`Codec::base64Decode` reads Base64 from a file or the `base64` CLI (#2417).**
+  - Before: a trailing newline threw `Input byte array has incorrect ending byte at 8`; a bad character gave `Illegal base64 character 20`.
+  - Now: whitespace is skipped, and errors name the character and index. `Codec::urlDecode` names a bad `%` escape the same way.
+
+- **`m.mapMap(f)` keeps the map's order (#2414).**
+  - Before: `["b": 2, "a": 1].mapMap(f)` came back in hash order, `{a=.., b=..}`.
+  - Now: insertion order, `{b=.., a=..}`, as every `Maps::` transform and `set.map { }` already do.
+
+- **W0016 names an overload the way the source writes it (#2407).**
+  - Before: `a(java.util.List[java.lang.String], [int)`.
+  - Now: `a(List[String], Int[])`.
+
+- **`Config::getInt` and `getLong` return the default for a number that does not fit (#2404).**
+  - Before: `3000000000` read as `-1294967296` and `2.9` as `2`, so a config typo gave a negative port.
+  - Now: both give the default, as `Json::getIntOr` does. `Json::getInt` and `Json.Value.asInt()` are unchanged.
+- **`Yaml::parse` removes the quotes of a single-quoted key (#2403).**
+  - Before: `'k': 1` gave the key `'k'`, quotes included, so `m.get("k")` was `null`; `'a: b': 1` was split at the inner `: `.
+  - Now: `'k'` is read as `k`, the same as `"k"`. A whole-line `{a: 1}` now suggests block `key: value` lines or Json, not quoting a value.
+- **Syntax-error hints no longer misread a tab-indented line (#2312).**
+  - Before: the `;`-after-`}` hint fired where no `}` preceded the `;`, and the enum-`case` hint was missing or named the wrong case.
+  - Now: hints see the text before the error exactly, whatever the indentation.
+- **`xs.sort(c)` rejects a `Comparator[U]` for an unrelated type parameter `U` (#2367).**
+  - Before: it compiled in `class Box[T, U]` with `xs: List[T]`, then threw `ClassCastException` inside the sort.
+  - Now: `E0000` at the call, as in Java. `Comparator[T]` and `Comparator[Object]` still work.
+- **An interface default method that narrows its return type works through the parent interface (#2393).**
+  - Before: `interface SubNamed conforms Named { def name(): String = "d" }` threw `AbstractMethodError` when called as a `Named`.
+  - Now: it runs the default method, as in Java.
+- **An override that narrows its return type works through the supertype (#2386).**
+  - Before: `def name(): String` for an inherited `name(): Object` threw `AbstractMethodError` through an interface, and through a superclass silently ran the parent's method. A record accessor (`record P(name: String) conforms Named`) failed the same way.
+  - Now: it runs the override, as in Java.
+- **Self tail calls in a `select` case with bindings loop instead of overflowing the stack (#2350).**
+  - Before: `case P(a, b): go(new P(a - 1, b), acc + b)` or `case i is Integer: go(..)` overflowed at about 10000 calls.
+  - Now: these cases loop, as `if x is T { ... }` and literal cases already did.
 - **W0016 names an out-of-group overload with its parameter types (#2371).**
   - Before: `... group (b, a) could not be optimized: Method b has tail calls to non-group methods: a`, as if `a` were outside the group.
   - Now: `... non-group methods: a(java.lang.String)`, so the overload is told apart from the member `a(Int)`.

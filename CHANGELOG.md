@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An override that narrows its return type works through the supertype (#2386).**
+  - Before: `def name(): String` for an inherited `name(): Object` threw `AbstractMethodError` through an interface, and through a superclass silently ran the parent's method. A record accessor (`record P(name: String) conforms Named`) failed the same way.
+  - Now: it runs the override, as in Java.
 - **Self tail calls in a `select` case with bindings loop instead of overflowing the stack (#2350).**
   - Before: `case P(a, b): go(new P(a - 1, b), acc + b)` or `case i is Integer: go(..)` overflowed at about 10000 calls.
   - Now: these cases loop, as `if x is T { ... }` and literal cases already did.

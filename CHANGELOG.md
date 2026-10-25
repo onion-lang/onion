@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`foreach (x, y) in ps` over a List of records is one clear error, E0103 (#2301).**
+  - Before: two errors naming `entrySet()` and `K, V`, which you never wrote.
+  - Now: "`foreach (a, b)` walks the entries of a Map", with the fix `foreach p in ps { val (x, y) = p ... }`.
+
 ## [0.146.0] - 2026-10-25
 
 ### Breaking
@@ -122,9 +128,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`foreach (x, y) in ps` over a List of records is one clear error, E0103 (#2301).**
-  - Before: two errors naming `entrySet()` and `K, V`, which you never wrote.
-  - Now: "`foreach (a, b)` walks the entries of a Map", with the fix `foreach p in ps { val (x, y) = p ... }`.
 - **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
   - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
   - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.

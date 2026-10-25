@@ -46,6 +46,45 @@ class ForeachPairNonMapSpec extends AbstractShellSpec {
         "None", Array())
       assert(Shell.Success(3) == result)
     }
+    it("still walks the entries an extension entrySet() provides (panel repro on #2354 at 2edd5af)") {
+      val result = shell.run(
+        """
+          |import { java.util.* }
+          |class Bag {
+          |  val m: HashMap[String, Int]
+          |public:
+          |  def this { m = new HashMap[String, Int](); m.put("a", 1); m.put("b", 2) }
+          |  def getM(): HashMap[String, Int] = m
+          |}
+          |extension Bag { def entrySet(): Set[Map.Entry[String, Int]] = this.getM().entrySet() }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val b = new Bag()
+          |    var total = 0
+          |    foreach (k, v) in b { total = total + v }
+          |    return total
+          |  }
+          |}
+          |""".stripMargin,
+        "None", Array())
+      assert(Shell.Success(3) == result)
+    }
+    it("does not report E0103 for a List whose entrySet() comes from an extension") {
+      val c = codes(
+        """import { java.util.* }
+          |extension List[String] {
+          |  def entrySet(): Set[Map.Entry[String, Int]] {
+          |    val m = new HashMap[String, Int]()
+          |    foreach s in this { m.put(s, s.length()) }
+          |    return m.entrySet()
+          |  }
+          |}
+          |val xs: List[String] = ["ab", "c"]
+          |foreach (k, v) in xs { println(k + v) }
+          |""".stripMargin)
+      assert(!c.contains("E0103"), c)
+    }
     it("still walks a Map's entries") {
       val result = shell.run(
         """

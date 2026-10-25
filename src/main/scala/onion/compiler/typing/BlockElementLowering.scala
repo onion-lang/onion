@@ -735,8 +735,9 @@ final class BlockElementLowering(
    * `foreach (a, b) in xs` is rewritten to `xs.entrySet()` before typing, so over a
    * List or record it used to fail with "entrySet() not found" and "operator + for
    * K, V". Detects that rewrite over a plain variable or field whose type is not a Map
-   * and has no applicable `entrySet()` of its own (a class that declares one keeps
-   * working, as before). Typing those targets twice is harmless; others keep the old path.
+   * and where `entrySet()` does not resolve the ordinary way (a declared, inherited or
+   * `extension` method keeps working, as before). Typing those targets twice is
+   * harmless; others keep the old path.
    */
   private def nonMapPairForeach(node: AST.ForeachExpression, context: LocalContext): Boolean =
     (node.arg.name == "__foreach_entry") && (node.collection match {
@@ -744,7 +745,7 @@ final class BlockElementLowering(
         typed(target, context) match {
           case Some(t) if !t.isBasicType && !t.isNullType =>
             t.`type` match {
-              case ot @ (_: ClassType | _: ArrayType) if !isMapType(ot) && !hasEntrySet(ot) =>
+              case ot @ (_: ClassType | _: ArrayType) if !isMapType(ot) && !resolvesEntrySet(node.collection, context) =>
                 pairForeachTargetType = ot
                 true
               case _ => false
@@ -754,8 +755,8 @@ final class BlockElementLowering(
       case _ => false
     })
 
-  private def hasEntrySet(tp: ObjectType): Boolean =
-    MethodResolution.findMethods(tp, "entrySet", new Array[Term](0), bodyContext.table).nonEmpty
+  private def resolvesEntrySet(call: AST.Expression, context: LocalContext): Boolean =
+    typing.withSuppressedReporting(typed(call, context)).isDefined
 
   /** True when the value is a java.util.Map (which has no iterator()). */
   private def isMapType(tp: Type): Boolean =

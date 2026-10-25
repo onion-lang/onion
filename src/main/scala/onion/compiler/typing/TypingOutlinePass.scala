@@ -79,6 +79,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           val tps = createTypeParams(node.typeParameters)
           declaredTypeParams_(node) = tps
           definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+          definition.ownTypeVariables = tps.map(_.variableType).toArray
         }
       case node: AST.InterfaceDeclaration =>
         typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
@@ -86,6 +87,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           val tps = createTypeParams(node.typeParameters)
           declaredTypeParams_(node) = tps
           definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+          definition.ownTypeVariables = tps.map(_.variableType).toArray
         }
       case node: AST.RecordDeclaration =>
         typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
@@ -93,6 +95,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           val tps = createTypeParams(node.typeParameters)
           declaredTypeParams_(node) = tps
           definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+          definition.ownTypeVariables = tps.map(_.variableType).toArray
         }
       case _ =>
     }
@@ -118,6 +121,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     val classTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
     declaredTypeParams_(node) = classTypeParams
     definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+    definition_.ownTypeVariables = classTypeParams.map(_.variableType).toArray
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
     if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
 
@@ -136,6 +140,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     val interfaceTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
     declaredTypeParams_(node) = interfaceTypeParams
     definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+    definition_.ownTypeVariables = interfaceTypeParams.map(_.variableType).toArray
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
     if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
 
@@ -151,6 +156,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     val recordTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
     declaredTypeParams_(node) = recordTypeParams
     definition_.setTypeParameters(recordTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+    definition_.ownTypeVariables = recordTypeParams.map(_.variableType).toArray
 
     // Record extends Object, may implement interfaces
     definition_.setSuperClass(rootClass)

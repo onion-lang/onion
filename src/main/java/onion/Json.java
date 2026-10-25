@@ -158,12 +158,13 @@ public final class Json {
      * Get an Integer value from a JSON object by key.
      * @param obj JSON object
      * @param key Key to look up
-     * @return Integer value, or null if not found or not a number
+     * @return Integer value, or null if not found, not a number, or not a whole number within Int range
      */
     public static Integer getInt(Object obj, String key) {
         Object value = get(obj, key);
         if (value instanceof Number) {
-            return ((Number) value).intValue();
+            Long v = Scalars.integral((Number) value, Integer.MIN_VALUE, Integer.MAX_VALUE);
+            return v == null ? null : Integer.valueOf(v.intValue());
         }
         return null;
     }
@@ -195,11 +196,11 @@ public final class Json {
 
     /**
      * Get a Long value from a JSON object by key.
-     * @return Long value, or null if not found or not a number
+     * @return Long value, or null if not found, not a number, or not a whole number within Long range
      */
     public static Long getLong(Object obj, String key) {
         Object value = get(obj, key);
-        return (value instanceof Number) ? ((Number) value).longValue() : null;
+        return (value instanceof Number) ? Scalars.integral((Number) value, Long.MIN_VALUE, Long.MAX_VALUE) : null;
     }
 
     /**
@@ -213,20 +214,24 @@ public final class Json {
 
     /**
      * Get a Short value from a JSON object by key.
-     * @return Short value, or null if not found or not a number
+     * @return Short value, or null if not found, not a number, or not a whole number within Short range
      */
     public static Short getShort(Object obj, String key) {
         Object value = get(obj, key);
-        return (value instanceof Number) ? ((Number) value).shortValue() : null;
+        if (!(value instanceof Number)) return null;
+        Long v = Scalars.integral((Number) value, Short.MIN_VALUE, Short.MAX_VALUE);
+        return v == null ? null : Short.valueOf(v.shortValue());
     }
 
     /**
      * Get a Byte value from a JSON object by key.
-     * @return Byte value, or null if not found or not a number
+     * @return Byte value, or null if not found, not a number, or not a whole number within Byte range
      */
     public static Byte getByte(Object obj, String key) {
         Object value = get(obj, key);
-        return (value instanceof Number) ? ((Number) value).byteValue() : null;
+        if (!(value instanceof Number)) return null;
+        Long v = Scalars.integral((Number) value, Byte.MIN_VALUE, Byte.MAX_VALUE);
+        return v == null ? null : Byte.valueOf(v.byteValue());
     }
 
     // ========== Defaulted accessors (missing/wrong-typed key -> default) ==========

@@ -79,7 +79,7 @@ private[compiler] object AdtEnumLowering {
     val recordDecls: List[AST.RecordDeclaration] = enumDecl.constants.filter(_.isCase).map { c =>
       val fields = c.caseFields.getOrElse(Nil)
       AST.recordDeclaration(
-        loc, AST.M_PUBLIC, c.name, typeParams, fields, List(enumTypeNode),
+        c.location, AST.M_PUBLIC, c.name, typeParams, fields, List(enumTypeNode),
         null, Nil, Nil, Nil, Nil, Nil
       )
     }

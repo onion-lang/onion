@@ -29,8 +29,8 @@ class AdtEnumRewritingSpec extends AnyFunSuite {
     val expected = input.copy(toplevels = List(
       before,
       InterfaceDeclaration(loc, M_PUBLIC | M_SEALED, "Choice", Nil, Nil),
-      RecordDeclaration(loc, M_PUBLIC, "Value", Nil, List(field), List(parent)),
-      RecordDeclaration(loc, M_PUBLIC, "Empty", Nil, Nil, List(parent)),
+      RecordDeclaration(Location(4, 7), M_PUBLIC, "Value", Nil, List(field), List(parent)),
+      RecordDeclaration(Location(5, 7), M_PUBLIC, "Empty", Nil, Nil, List(parent)),
       after
     ))
     assert(TestSupport.rewrite(input) == expected)
@@ -50,8 +50,8 @@ class AdtEnumRewritingSpec extends AnyFunSuite {
       List(ReferenceType("T", false), ReferenceType("U", false))), false)
     assert(TestSupport.rewrite(input) == input.copy(toplevels = List(
       InterfaceDeclaration(loc, M_PUBLIC | M_SEALED, "Choice", Nil, Nil, params),
-      RecordDeclaration(loc, M_PUBLIC, "Value", params, List(genericField), List(parent)),
-      RecordDeclaration(loc, M_PUBLIC, "Empty", params, Nil, List(parent))
+      RecordDeclaration(fieldLoc, M_PUBLIC, "Value", params, List(genericField), List(parent)),
+      RecordDeclaration(Location(5, 7), M_PUBLIC, "Empty", params, Nil, List(parent))
     )))
   }
 
@@ -72,8 +72,8 @@ class AdtEnumRewritingSpec extends AnyFunSuite {
     val parent = TypeNode(loc, ReferenceType("Choice", false), false)
     assert(TestSupport.rewrite(input) == input.copy(toplevels = List(
       InterfaceDeclaration(loc, M_PUBLIC | M_SEALED, "Choice", Nil, List(loweredMethod, abstractMethod)),
-      RecordDeclaration(loc, M_PUBLIC, "Value", Nil, List(field), List(parent)),
-      RecordDeclaration(loc, M_PUBLIC, "Empty", Nil, Nil, List(parent))
+      RecordDeclaration(Location(4, 7), M_PUBLIC, "Value", Nil, List(field), List(parent)),
+      RecordDeclaration(Location(5, 7), M_PUBLIC, "Empty", Nil, Nil, List(parent))
     )))
   }
 

@@ -351,5 +351,4 @@ object SemanticError {
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */
   def errorCode: String = f"E${code}%04d"
-
 }

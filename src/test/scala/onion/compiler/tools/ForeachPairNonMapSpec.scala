@@ -23,6 +23,29 @@ class ForeachPairNonMapSpec extends AbstractShellSpec {
       val c = codes("val xs = new Int[2]\nforeach (a, b) in xs { println(a) }")
       assert(c == Seq("E0103"), c)
     }
+    it("still walks the entries of a class that declares its own entrySet() (panel repro on #2354)") {
+      val result = shell.run(
+        """
+          |import { java.util.* }
+          |class Bag {
+          |  val m: HashMap[String, Int]
+          |public:
+          |  def this { m = new HashMap[String, Int](); m.put("a", 1); m.put("b", 2) }
+          |  def entrySet(): Set[Map.Entry[String, Int]] = m.entrySet()
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val b = new Bag()
+          |    var total = 0
+          |    foreach (k, v) in b { total = total + v }
+          |    return total
+          |  }
+          |}
+          |""".stripMargin,
+        "None", Array())
+      assert(Shell.Success(3) == result)
+    }
     it("still walks a Map's entries") {
       val result = shell.run(
         """

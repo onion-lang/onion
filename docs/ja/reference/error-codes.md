@@ -1141,8 +1141,10 @@ extension List[Int] { def bar(): Int = 2 }   // E0102: List[int] 用の extensio
 
 ### `E0103` — Map ではないものに対する `foreach (a, b)`
 
-`foreach (a, b) in xs` は `Map` のエントリを回す構文です。`List`・配列・レコードに
-使うと、`foreach` の位置でこの1つのエラーになります。以前は `entrySet()` が見つからない
+`foreach (a, b) in xs` は `Map`（または独自の `entrySet()` を持つクラス）のエントリを
+回す構文です。`xs` が変数かフィールドで、型が `List`・配列・レコードなどのときは、
+`foreach` の位置でこの1つのエラーになります。`xs` が呼び出し結果やリテラルのときは、
+従来のエラーのままです。以前は `entrySet()` が見つからない
 というエラーと `K, V` への演算子エラーが出ていました。どちらも書いていない名前です。
 
 ```onion

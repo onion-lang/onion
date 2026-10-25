@@ -119,6 +119,8 @@ class TailCallOptimization(config: CompilerConfig)
     stmts.exists {
       case ret: Return if ret.term != null =>
         isSelfCall(ret.term, method)
+      case body: GuardedBody =>
+        checkStatementForTailCall(body.statements.last, method)
       case block: StatementBlock =>
         containsTailCall(block.statements.toSeq, method)
       case ifStmt: IfStatement =>
@@ -140,6 +142,8 @@ class TailCallOptimization(config: CompilerConfig)
           trace(s"[TCO]     Return statement: hasSelfCall=$result")
         }
         result
+      case body: GuardedBody =>
+        checkStatementForTailCall(body.statements.last, method)
       case block: StatementBlock =>
         containsTailCall(block.statements.toSeq, method)
       case ifStmt: IfStatement =>
@@ -406,80 +410,14 @@ class TailCallOptimization(config: CompilerConfig)
     stmt match {
       case ret: Return if ret.term != null && isSelfCall(ret.term, method) =>
         trace(s"[TCO transformStatement] Return with tail call, term type=${ret.term.getClass.getSimpleName}")
-        // Tail call found
-        // Check if it's wrapped in Begin with IfStatement
         ret.term match {
           case begin: Begin if begin.terms.nonEmpty =>
+            // A Begin evaluates its terms in order and yields the last one, so only the
+            // last term is in tail position: `return { t1; ...; tn }` becomes
+            // `t1; ...; return tn`. A self call in an earlier term (`{ val x = f(n - 1);
+            // x + 1 }`) is not a tail call and stays a call.
             trace(s"[TCO transformStatement] Return: Begin with ${begin.terms.length} terms")
-            // Look for IfStatement in Begin
-            val ifStmtOpt = begin.terms.collectFirst {
-              case stmtTerm: StatementTerm =>
-                stmtTerm.statement match {
-                  case ifStmt: IfStatement => Some(ifStmt)
-                  case _ => None
-                }
-            }.flatten
-
-            trace(s"[TCO transformStatement] Return: ifStmtOpt = ${ifStmtOpt.isDefined}")
-            ifStmtOpt match {
-              case Some(ifStmt) =>
-                trace(s"[TCO transformStatement] Return: Transforming IfStatement branches")
-
-                // Get the result variable from the last term of Begin (RefLocal)
-                val resultTerm = begin.terms.last match {
-                  case refLocal: RefLocal => refLocal
-                  case other =>
-                    trace(s"[TCO transformStatement] Warning: Begin's last term is not RefLocal but ${other.getClass.getSimpleName}")
-                    other
-                }
-
-                // Transform the branches
-                // For branches without tail call, we need to add Return(resultTerm)
-                // For branches with tail call, transformStatement will add Continue
-
-                // Helper to add Return if branch doesn't end with Continue
-                def ensureProperBranchEnd(transformedBranch: ActionStatement, branchName: String): ActionStatement = {
-                  trace(s"[TCO ensureProperBranchEnd] $branchName: input type=${transformedBranch.getClass.getSimpleName}")
-                  val result = transformedBranch match {
-                    case block: StatementBlock if block.statements.nonEmpty =>
-                      trace(s"[TCO ensureProperBranchEnd] $branchName: StatementBlock with ${block.statements.length} statements")
-                      block.statements.zipWithIndex.foreach { case (stmt, i) =>
-                        trace(s"[TCO ensureProperBranchEnd]   stmt[$i]: ${stmt.getClass.getSimpleName}")
-                      }
-                      // Check if last statement is Continue
-                      block.statements.last match {
-                        case _: Continue =>
-                          trace(s"[TCO ensureProperBranchEnd] $branchName: Already has Continue")
-                          // Already has Continue, keep as-is
-                          block
-                        case _ =>
-                          trace(s"[TCO ensureProperBranchEnd] $branchName: Adding Return")
-                          // No Continue, add Return
-                          val stmtsWithReturn = block.statements.toSeq :+ new Return(null, resultTerm)
-                          new StatementBlock(block.location, stmtsWithReturn: _*)
-                      }
-                    case other =>
-                      trace(s"[TCO ensureProperBranchEnd] $branchName: Single statement, wrapping with Return")
-                      // Single statement (ExpressionActionStatement, etc.)
-                      // Wrap in block with Return
-                      new StatementBlock(null, Seq(other, new Return(null, resultTerm)): _*)
-                  }
-                  trace(s"[TCO ensureProperBranchEnd] $branchName: result type=${result.getClass.getSimpleName}")
-                  result
-                }
-
-                val transformedThen = ensureProperBranchEnd(transformStatement(ifStmt.thenStatement, method, slots), "then")
-                val transformedElse = if (ifStmt.elseStatement != null) {
-                  ensureProperBranchEnd(transformStatement(ifStmt.elseStatement, method, slots), "else")
-                } else null
-
-                // Return the transformed IfStatement directly
-                new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
-              case None =>
-                trace(s"[TCO transformStatement] Return: No IfStatement found, calling transformTailCall")
-                // No IfStatement found, transform as direct call
-                transformTailCall(ret.term, slots).getOrElse(ret)
-            }
+            transformStatement(sinkReturnIntoBegin(begin), method, slots)
           case stmtTerm: StatementTerm =>
             // Explicit return: Return(StatementTerm(IfStatement))
             trace(s"[TCO transformStatement] Return: StatementTerm wrapping ${stmtTerm.statement.getClass.getSimpleName}")
@@ -533,6 +471,63 @@ class TailCallOptimization(config: CompilerConfig)
   }
 
   /**
+   * `return { t1; ...; tn }` as `t1; ...; return tn`. An if/select expression's value
+   * (`= if c { a } else { f(..) }`) is typed as `{ <branches assign tmp>; tmp }`; there
+   * the return is sunk into each branch instead (`tmp = value; return tmp` returns
+   * `value`), so a self call at a branch's end becomes a tail call (#2330).
+   */
+  private def sinkReturnIntoBegin(begin: Begin): ActionStatement = {
+    def asStatement(t: Term): ActionStatement = t match {
+      case st: StatementTerm => st.statement
+      case other => new ExpressionActionStatement(other.location, other)
+    }
+    val terms = begin.terms.toSeq
+    val (prefix, tail) = terms match {
+      case init :+ (st: StatementTerm) :+ (result: ResultRefLocal) =>
+        val (sunk, alwaysReturns) = sinkReturn(st.statement, result)
+        (init, if (alwaysReturns) Seq(sunk) else Seq(sunk, new Return(null, result)))
+      case init :+ last =>
+        (init, Seq(new Return(null, last)))
+    }
+    new StatementBlock(begin.location, (prefix.map(asStatement) ++ tail): _*)
+  }
+
+  /**
+   * Rewrites a branch's final `result = value` into `return value`. Returns the new
+   * statement and whether every path through it now returns (or throws); a path that
+   * does not falls through to the caller's `return result`.
+   */
+  private def sinkReturn(stmt: ActionStatement, result: RefLocal): (ActionStatement, Boolean) = stmt match {
+    case exprStmt: ExpressionActionStatement =>
+      exprStmt.term match {
+        case set: SetLocal if set.frame == result.frame && set.index == result.index =>
+          (new Return(exprStmt.location, set.value), true)
+        case _ => (stmt, false)
+      }
+    case guarded: GuardedCaseBlock =>
+      // statements: taken = false; the case; if (!taken) rest. Sinking into the case is safe:
+      // once it ran, nothing after it does. Not claiming "always returns" keeps the caller's
+      // trailing `return result`, which is harmless.
+      val Array(init, matched, rest) = guarded.statements
+      val (sunkMatched, _) = sinkReturn(matched, result)
+      val (sunkRest, _) = sinkReturn(rest, result)
+      (new GuardedCaseBlock(guarded.location, init, sunkMatched, sunkRest), false)
+    case block: StatementBlock if block.statements.nonEmpty =>
+      val (last, returns) = sinkReturn(block.statements.last, result)
+      (new StatementBlock(block.location, (block.statements.init.toSeq :+ last): _*), returns)
+    case ifStmt: IfStatement =>
+      val (thenStmt, thenReturns) = sinkReturn(ifStmt.thenStatement, result)
+      if (ifStmt.elseStatement == null) {
+        (new IfStatement(ifStmt.location, ifStmt.condition, thenStmt, null), false)
+      } else {
+        val (elseStmt, elseReturns) = sinkReturn(ifStmt.elseStatement, result)
+        (new IfStatement(ifStmt.location, ifStmt.condition, thenStmt, elseStmt), thenReturns && elseReturns)
+      }
+    case _: Return | _: Throw => (stmt, true)
+    case _ => (stmt, false)
+  }
+
+  /**
    * Transforms a tail call into parameter assignments.
    *
    * For `return method(arg1, arg2, ...)`:
@@ -564,8 +559,8 @@ class TailCallOptimization(config: CompilerConfig)
           begin.terms.zipWithIndex.foreach { case (term, i) =>
             trace(s"$indent  Term $i: ${term.getClass.getSimpleName}")
           }
-          // If-else expression: recursively check all terms
-          begin.terms.flatMap(t => extractCall(t, depth + 1)).headOption
+          // Only the last term is the Begin's value
+          if (begin.terms.isEmpty) None else extractCall(begin.terms.last, depth + 1)
         case stmtTerm: StatementTerm =>
           trace(s"$indent[TCO extractCall] StatementTerm wrapping ${stmtTerm.statement.getClass.getSimpleName}")
           // Unwrap StatementTerm

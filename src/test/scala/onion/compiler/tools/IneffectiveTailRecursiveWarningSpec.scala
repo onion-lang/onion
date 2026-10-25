@@ -152,5 +152,28 @@ class IneffectiveTailRecursiveWarningSpec extends AnyFunSpec {
         WarningLevel.Error)
       assert(result.hasErrors)
     }
+
+    it("names an out-of-group overload with its parameter types (#2371)") {
+      val result = compileWarnings(
+        """
+          |class M {
+          |private:
+          |  static @TailRecursive def a(n: Int): String {
+          |    if n == 0 { return "A0" }
+          |    return b(n - 1)
+          |  }
+          |  static def a(s: String): String = "other:" + s
+          |  static @TailRecursive def b(n: Int): String {
+          |    if n == 0 { return a("x") }
+          |    return a(n - 1)
+          |  }
+          |}
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w16 = result.diagnostics.warnings.filter(_.category.code == "W0016")
+      assert(w16.nonEmpty, s"expected W0016, got: ${result.diagnostics.warnings.map(_.message)}")
+      assert(w16.forall(_.message.contains("non-group methods: a(java.lang.String)")),
+        s"the overload must be told apart from the group member a(Int): ${w16.map(_.message)}")
+    }
   }
 }

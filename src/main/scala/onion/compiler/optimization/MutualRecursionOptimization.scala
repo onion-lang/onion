@@ -283,7 +283,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
       val tailCalls = TailCallGraphAnalysis.findTailCalls(method)
       val externalCalls = tailCalls.filterNot(callee => group.exists(_ eq callee))
       if (externalCalls.nonEmpty) {
-        break(Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.map(_.name).mkString(", ")}"))
+        break(Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.map(signature).mkString(", ")}"))
       }
     }
 
@@ -303,6 +303,10 @@ class MutualRecursionOptimization(config: CompilerConfig)
 
     validationError
   }
+
+  // `a(java.lang.String)`: a bare name cannot tell an out-of-group overload from a group member.
+  private def signature(method: MethodDefinition): String =
+    s"${method.name}(${method.arguments.map(_.displayName).mkString(", ")})"
 
   /**
    * Warn that a detected `@TailRecursive` mutual-recursion group could not be

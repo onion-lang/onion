@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A default argument that reads an instance field is a compile error, not a `VerifyError` (#2375).**
   - Before: `def f(n: Int, m: Int = k)` with a field `k` compiled, then failed JVM verification when the class loaded.
   - Now: `E0002`, `k` is not found. A default may still call a static method.
+- **`Config::getInt` and `getLong` return the default for a number that does not fit (#2404).**
+  - Before: `3000000000` read as `-1294967296` and `2.9` as `2`, so a config typo gave a negative port.
+  - Now: both give the default, as `Json::getIntOr` does. `Json::getInt` and `Json.Value.asInt()` are unchanged.
 - **`Yaml::parse` removes the quotes of a single-quoted key (#2403).**
   - Before: `'k': 1` gave the key `'k'`, quotes included, so `m.get("k")` was `null`; `'a: b': 1` was split at the inner `: `.
   - Now: `'k'` is read as `k`, the same as `"k"`. A whole-line `{a: 1}` now suggests block `key: value` lines or Json, not quoting a value.

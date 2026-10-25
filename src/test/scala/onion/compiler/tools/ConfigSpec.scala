@@ -234,6 +234,40 @@ class ConfigSpec extends AbstractShellSpec {
         assert(Shell.Success("3000") == result)
       }
 
+      it("returns the default int for a number that is not a whole Int") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val config = Config::parseJson("{\"big\": 3000000000, \"frac\": 2.9, \"ok\": 7}");
+            |    return "" + Config::getInt(config, "big", 80) + "," + Config::getInt(config, "frac", 81) + "," + Config::getInt(config, "ok", 82);
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("80,81,7") == result)
+      }
+
+      it("returns the default long for a fractional number") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val config = Config::parseJson("{\"frac\": 2.9, \"big\": 3000000000}");
+            |    return "" + Config::getLong(config, "frac", 5L) + "," + Config::getLong(config, "big", 6L);
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("5,3000000000") == result)
+      }
+
       it("gets long values with getLong") {
         val result = shell.run(
           """

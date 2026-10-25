@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Codec::base64Decode` reads Base64 from a file or the `base64` CLI (#2417).**
+  - Before: a trailing newline threw `Input byte array has incorrect ending byte at 8`; a bad character gave `Illegal base64 character 20`.
+  - Now: whitespace is skipped, and errors name the character and index. `Codec::urlDecode` names a bad `%` escape the same way.
+
 - **`m.mapMap(f)` keeps the map's order (#2414).**
   - Before: `["b": 2, "a": 1].mapMap(f)` came back in hash order, `{a=.., b=..}`.
   - Now: insertion order, `{b=.., a=..}`, as every `Maps::` transform and `set.map { }` already do.

@@ -1956,6 +1956,9 @@ Codec::hexEncode("Hi") / Codec::hexDecode("4869")
 Codec::urlEncode("a b&c") / Codec::urlDecode(s)
 ```
 
+- `base64Decode` skips whitespace, so a file's trailing newline or `base64`'s 76-column lines decode as is.
+- Bad input to a decoder throws `IllegalArgumentException` naming the problem, for example `invalid Base64 character '!' at index 10` or `invalid % escape at index 3 in "100%zz"`.
+
 These are also builtin extension methods on `String`:
 
 ```onion

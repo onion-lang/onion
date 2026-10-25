@@ -1869,7 +1869,7 @@ val config2 = Config::parseJson("{\"port\": 8080}")   // parses a JSON string di
 
 Config::get(config, "database.host")                   // raw value, or null if not found
 Config::getString(config, "database.host", "localhost")
-Config::getInt(config, "database.port", 5432)
+Config::getInt(config, "database.port", 5432)         // the default if the number is a fraction or out of Int range
 Config::getLong(config, "database.maxConnections", 10L)
 Config::getDouble(config, "database.timeout", 30.0)
 Config::getBoolean(config, "database.ssl", false)

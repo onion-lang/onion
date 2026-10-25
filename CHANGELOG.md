@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`xs.sort(c)` also rejects `Comparator[? super U]`, and a `Comparator[U]` for a `List[String]` (#2397).**
   - Before: both compiled, then threw `ClassCastException` inside the sort.
   - Now: `E0005` at the call, as in Java. `Comparator[? super T]` for a `List[T]` still works.
+- **`Config::getInt` and `getLong` return the default for a number that does not fit (#2404).**
+  - Before: `3000000000` read as `-1294967296` and `2.9` as `2`, so a config typo gave a negative port.
+  - Now: both give the default, as `Json::getIntOr` does. `Json::getInt` and `Json.Value.asInt()` are unchanged.
 - **`Yaml::parse` removes the quotes of a single-quoted key (#2403).**
   - Before: `'k': 1` gave the key `'k'`, quotes included, so `m.get("k")` was `null`; `'a: b': 1` was split at the inner `: `.
   - Now: `'k'` is read as `k`, the same as `"k"`. A whole-line `{a: 1}` now suggests block `key: value` lines or Json, not quoting a value.

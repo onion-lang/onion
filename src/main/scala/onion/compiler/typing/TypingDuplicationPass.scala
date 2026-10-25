@@ -208,13 +208,25 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     var seen = Set.empty[String]
     for (arg <- node.args) {
       if (seen.contains(arg.name)) typing.report(SemanticError.DUPLICATE_RECORD_COMPONENT, arg, clazz, arg.name)
-      else seen += arg.name
-      // The accessor of a component named like a method the record generates itself
-      // would be a second method of the same signature: a ClassFormatError at load (#2391).
-      if (arg.name == "hashCode" || arg.name == "toString")
-        typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type])
+      else {
+        seen += arg.name
+        // The accessor of `hashCode: Int` or `toString: String` has the same signature as the
+        // method the record generates itself: a ClassFormatError at load (#2391). Any other
+        // type gives the accessor a different descriptor, which the JVM accepts.
+        if (clashesWithGeneratedMethod(arg.name, clazz.field(arg.name)))
+          typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type])
+      }
     }
   }
+
+  private def clashesWithGeneratedMethod(name: String, field: FieldRef): Boolean =
+    field != null && (name match {
+      case "hashCode" => field.`type` == BasicType.INT
+      case "toString" =>
+        val t = field.`type` match { case n: NullableType => n.innerType; case t => t }
+        t.isInstanceOf[ObjectType] && t.name == "java.lang.String"
+      case _ => false
+    })
 
   private def processSynthesizedMethodDeclaration(node: AST.MethodDeclaration): Unit =
     withKernel[MethodDefinition](node) { method =>

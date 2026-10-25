@@ -223,6 +223,13 @@ public final class Yaml {
                 + text, lineNumber);
     }
 
+    /** A whole line that is a flow collection: there is no value to quote, unlike {@link #flowCollection}. */
+    private static YamlParseException flowLine(String text, int lineNumber) {
+        return new YamlParseException(
+            "Flow collections are out of scope (write block 'key: value' lines, or use Json for lists and maps): "
+                + text, lineNumber);
+    }
+
     /**
      * Parse a top-level block sequence: each line starting with `-` (`isSequenceItem`)
      * opens a new flat-mapping element, and every following non-`-` line adds another
@@ -279,7 +286,7 @@ public final class Yaml {
         // A whole-line flow collection would otherwise be split at its first `: ` into a
         // mangled key and value (`{a: 1, b: 2}` read as the one-key map `{{a=1, b: 2}}`).
         if (trimmedLine.charAt(0) == '{' || trimmedLine.charAt(0) == '[') {
-            throw flowCollection(trimmedLine, lineNumber);
+            throw flowLine(trimmedLine, lineNumber);
         }
         int sep = findKeySeparator(trimmedLine);
         if (sep < 0) {
@@ -294,7 +301,9 @@ public final class Yaml {
                 "Tags/anchors/aliases on a key are out of scope (quote the key to keep it as text): "
                     + rawKey, lineNumber);
         }
-        String key = rawKey.startsWith("\"") ? unquote(rawKey, lineNumber) : rawKey;
+        String key = rawKey.startsWith("\"") ? unquote(rawKey, lineNumber)
+            : rawKey.startsWith("'") ? unquoteSingle(rawKey, lineNumber)
+            : rawKey;
 
         // Value: everything after the separator (": " = 2 chars, or ":" alone at end = 1 char)
         int valueStart = sep + (sep == trimmedLine.length() - 1 ? 1 : 2);
@@ -442,12 +451,13 @@ public final class Yaml {
     /**
      * Find the index of the ':' that terminates a YAML key in rawLine.
      * We look for ": " (colon + space) or ":" at the very end of the line.
-     * Respects double-quoted keys (skips content inside "...").
+     * Respects quoted keys (skips content inside "..." and '...').
      *
      * @return index of the ':' character, or -1 if not found
      */
     private static int findKeySeparator(String line) {
         boolean inQuote = false;
+        boolean inSingle = false;
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
             if (inQuote) {
@@ -455,7 +465,15 @@ public final class Yaml {
                 if (c == '"')  { inQuote = false; }
                 continue;
             }
+            if (inSingle) {
+                if (c == '\'') {
+                    if (i + 1 < line.length() && line.charAt(i + 1) == '\'') { i++; continue; } // '' escape
+                    inSingle = false;
+                }
+                continue;
+            }
             if (c == '"') { inQuote = true; continue; }
+            if (c == '\'' && i == 0) { inSingle = true; continue; }
             if (c == ':') {
                 // Accept ": " (colon-space) or ":" at end of line
                 if (i + 1 < line.length() && line.charAt(i + 1) == ' ') return i;

@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Before: with `o: Integer`, `def q(o: Integer, n: Int): Int = if n == 0 { o } else { q(o, n - 1) }` overflowed at 200000 calls.
   - Now: the `Integer` is unboxed inside its branch, so the self call is a tail call.
 
+- **`Codec::base64Decode` reads Base64 from a file or the `base64` CLI (#2417).**
+  - Before: a trailing newline threw `Input byte array has incorrect ending byte at 8`; a bad character gave `Illegal base64 character 20`.
+  - Now: whitespace is skipped, and errors name the character and index. `Codec::urlDecode` names a bad `%` escape the same way.
+
+- **`m.mapMap(f)` keeps the map's order (#2414).**
+  - Before: `["b": 2, "a": 1].mapMap(f)` came back in hash order, `{a=.., b=..}`.
+  - Now: insertion order, `{b=.., a=..}`, as every `Maps::` transform and `set.map { }` already do.
+
 - **W0016 names an overload the way the source writes it (#2407).**
   - Before: `a(java.util.List[java.lang.String], [int)`.
   - Now: `a(List[String], Int[])`.

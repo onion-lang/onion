@@ -1782,6 +1782,9 @@ Codec::hexEncode("Hi") / Codec::hexDecode("4869")
 Codec::urlEncode("a b&c") / Codec::urlDecode(s)
 ```
 
+- `base64Decode` は空白文字を読み飛ばします。ファイル末尾の改行や、`base64` コマンドの 76 桁ごとの改行があってもそのままデコードできます。
+- デコーダに不正な入力を渡すと、問題を示す `IllegalArgumentException` を投げます。例: `invalid Base64 character '!' at index 10`、`invalid % escape at index 3 in "100%zz"`。
+
 これらも `String` の組み込み拡張メソッドです:
 
 ```onion
@@ -1966,7 +1969,7 @@ foreach i: Int in r { IO::println(i) }   // 2 3 4 5
 コレクションや配列向けのイテレーションユーティリティ:
 
 - `Iterables::map(list|iterable|set, f)`
-- `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す
+- `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す。順序は元の挿入順のまま
 - `Iterables::toList(iterable)` - 任意の `Iterable`（範囲を含む）を `List` に実体化する
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`

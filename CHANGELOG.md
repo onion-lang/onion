@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`= if c { boxed } else { f(..) }` loops instead of overflowing the stack (#2406).**
+  - Before: with `o: Integer`, `def q(o: Integer, n: Int): Int = if n == 0 { o } else { q(o, n - 1) }` overflowed at 200000 calls.
+  - Now: the `Integer` is unboxed inside its branch, so the self call is a tail call.
+
 - **W0016 names an overload the way the source writes it (#2407).**
   - Before: `a(java.util.List[java.lang.String], [int)`.
   - Now: `a(List[String], Int[])`.

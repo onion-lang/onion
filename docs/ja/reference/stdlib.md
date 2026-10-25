@@ -1407,7 +1407,7 @@ val config2 = Config::parseJson("{\"port\": 8080}")   // JSON 文字列を直接
 
 Config::get(config, "database.host")                   // 生の値、見つからなければ null
 Config::getString(config, "database.host", "localhost")
-Config::getInt(config, "database.port", 5432)
+Config::getInt(config, "database.port", 5432)         // 小数や Int 範囲外の数値のときは既定値
 Config::getLong(config, "database.maxConnections", 10L)
 Config::getDouble(config, "database.timeout", 30.0)
 Config::getBoolean(config, "database.ssl", false)

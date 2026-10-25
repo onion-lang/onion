@@ -1,6 +1,9 @@
 package onion.compiler.tools
 
+import onion.compiler.{CompilationOutcome, CompilerConfig, OnionCompiler, StreamInputSource}
 import onion.tools.Shell
+
+import java.io.StringReader
 
 /**
  * Tests for cast validation: the compiler must reject casts that can never
@@ -392,6 +395,81 @@ class CastValidationSpec extends AbstractShellSpec {
         Array()
       )
       assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("still allows a generic T[] return whose T is an array, as String[][] (#2309 panel)") {
+      val result = shell.run(
+        """
+          |import { java.util.Arrays }
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val a: String[][] = new String[2][3]
+          |val c = Arrays::copyOf(a, 2)
+          |val d = (c as String[][])
+          |return d.length * 10 + d[0].length
+          |  }
+          |}
+          |""".stripMargin,
+        "GenericArrayReturnAsArray2.on",
+        Array()
+      )
+      assert(Shell.Success(23) == result)
+    }
+
+    it("still allows Int?[] as Integer[] and Object[] (#2309 panel)") {
+      val result = shell.run(
+        """
+          |import { java.lang.Integer as JInteger }
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val i: Int?[] = new Int?[2]
+          |val j = (i as JInteger[])
+          |val k = (i as Object[])
+          |return j.length * 10 + k.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableIntArrayAsBoxedArray.on",
+        Array()
+      )
+      assert(Shell.Success(22) == result)
+    }
+
+    it("still rejects Int?[] as Long[] (#2309 panel)") {
+      val result = shell.run(
+        """
+          |import { java.lang.Long as JLong }
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val i: Int?[] = new Int?[2]
+          |val j = (i as JLong[])
+          |return j.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableIntArrayAsLongArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("gives a nullable List cast the List-is-not-an-array hint, not the `!!` one (#2309 panel)") {
+      val src =
+        """
+          |val xs: List[String]? = ["a"]
+          |val a = (xs as String[])
+          |""".stripMargin
+      val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+      val msgs = new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "NullableListHint.on"))) match {
+        case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
+        case _ => ""
+      }
+      // Code spans are the same in both bundles, so this holds in en and ja.
+      assert(msgs.contains("toArray(new String[0])"), s"expected the List-is-not-an-array hint, got: $msgs")
+      assert(!msgs.contains("`!!`"), s"`!!` does not make this cast work, got: $msgs")
     }
   }
 }

@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
+  - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
+  - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

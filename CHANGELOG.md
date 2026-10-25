@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Before: `(k) -> { val f = () -> { k = k + 10; k }; f(); k }` called with 1 returned 1.
   - Now: it returns 11, as for a captured `var` or a method parameter.
   - The reverse holds too: a nested lambda reads the outer lambda's later writes.
+- **An empty `#{}` in a string is one error at the `#`, saying the interpolation needs an expression (#2429).**
+  - Before: "unexpected end of file — a closing `}` or `)` is probably missing", at line 1 or at no line at all.
+  - Now: `repro.on:2:12: empty string interpolation: put an expression between the braces, as in '#{expr}'.` For a literal `#{}` in an ordinary string, write `\#{}`.
 
 ## [0.146.0] - 2026-10-25
 

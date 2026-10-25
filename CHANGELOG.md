@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`xs.sort(c)` compiles when `xs` is a `List[T?]` and `c` a `Comparator[T?]` (#2399).**
+  - Before: E0000, `Comparator[? super T?]` expected but `Comparator[T?]` used.
+  - Now: accepted, as in Java. A `Comparator[U?]` for an unrelated `U` is still rejected.
 - **`m.mapMap(f)` keeps the map's order (#2414).**
   - Before: `["b": 2, "a": 1].mapMap(f)` came back in hash order, `{a=.., b=..}`.
   - Now: insertion order, `{b=.., a=..}`, as every `Maps::` transform and `set.map { }` already do.

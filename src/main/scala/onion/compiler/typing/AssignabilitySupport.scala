@@ -172,6 +172,9 @@ private[compiler] final class AssignabilitySupport(
         // hard INCOMPATIBLE_TYPE error — matching the non-type-variable path
         // (TypeRelations.isAssignableWithBoxing) which accepts null here (#283).
         !expected.isBasicType
+      // `? super T?` against a `T?` argument (`Comparator[T?]` sorting a `List[T?]`, #2399)
+      case (w: TypedAST.WildcardType, na: NullableType) if w.lowerBound.exists(_.isInstanceOf[NullableType]) =>
+        TypeRules.superWildcardAccepts(na, w.lowerBound.get)
       case (tv: TypedAST.TypeVariableType, _) =>
         // Pass `tv` itself, not its erased `upperBound`: when `actual` is
         // itself a type variable (e.g. `T` in `[B, T extends B]`), only

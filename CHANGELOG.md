@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **An empty `#{}` in a string is one error at the `#`, saying the interpolation needs an expression (#2429).**
+  - Before: "unexpected end of file — a closing `}` or `)` is probably missing", at line 1 or at no line at all.
+  - Now: `repro.on:2:12: empty string interpolation: put an expression between the braces, as in '#{expr}'.` For a literal `#{}` in an ordinary string, write `\#{}`.
+
 ## [0.146.0] - 2026-10-25
 
 ### Breaking

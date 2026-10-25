@@ -1372,6 +1372,8 @@ Timing::sleep(1000L)        // Sleep for 1000 milliseconds
 Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 ```
 
+A zero or negative duration returns immediately, so `Timing::sleep(deadline - Timing::millis())` is safe once the deadline has passed.
+
 ### Measuring Function Execution
 
 ```onion

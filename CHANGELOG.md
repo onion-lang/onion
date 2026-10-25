@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Timing::sleep(deadline - Timing::millis())` returns at once when the deadline has passed (#2421).**
+  - Before: a negative duration threw `IllegalArgumentException: timeout value is negative` (`sleepNanos`: `nanosecond timeout value out of range`).
+  - Now: `sleep` and `sleepNanos` return immediately for a zero or negative duration.
+
 - **`Codec::base64Decode` reads Base64 from a file or the `base64` CLI (#2417).**
   - Before: a trailing newline threw `Input byte array has incorrect ending byte at 8`; a bad character gave `Illegal base64 character 20`.
   - Now: whitespace is skipped, and errors name the character and index. `Codec::urlDecode` names a bad `%` escape the same way.

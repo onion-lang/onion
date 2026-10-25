@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A lambda that assigns a method parameter now updates it for the method too (#2335).**
+  - Before: `def g(n: Int): Int { val f: () -> Int = () -> { n = n + 10; n }; f(); return n }` returned the old `n`.
+  - Now: the lambda and the method share one `n`, as they do for a captured `var` local. Constructors share it too, and a delegating `: this(...)` call sees the argument's value.
+  - A lambda that only reads the parameter also sees later assignments: `val f: () -> Int = () -> n; n = 5; f()` gave `1` and now gives `5`. Lambdas collected in a loop that advances `n` give `4,4,4,` where they gave `1,2,3,`.
+
 - **`Config::getInt(c, "items.99999999999", -1)` returns the default (#2423).**
   - Before: an array index too big for an `Int` threw `invalid number format: For input string: "99999999999"`.
   - Now: it is out of range like any other index, so `get` is `null` and every getter falls back to its default.
@@ -103,9 +108,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A lambda that assigns a method parameter now updates it for the method too (#2335).**
-  - Before: `def g(n: Int): Int { val f = () -> { n = n + 10; n }; f(); return n }` returned the old `n`.
-  - Now: the lambda and the method share one `n`, as they do for a captured `var` local. Lambdas made in a loop share it too. Constructors still copy it (#2361).
 - **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
   - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
   - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.

@@ -1769,6 +1769,9 @@ stripped before this inference runs, unless it is inside a `"..."` or `'...'` qu
 `a: 1 # note` parses `a` as the `Long` `1`, and `b: 'q # no'` keeps the `#` as part of the
 string `q # no`.
 
+A key may be quoted the same two ways, and is unquoted by the same rules: `'k': 1` and
+`"k": 1` both give the key `k`, and `'a: b': 1` gives the key `a: b`.
+
 Throws `Yaml.YamlParseException` on malformed input; `derive!(Yaml)`'s
 `fromYaml` catches this and returns `null` instead.
 

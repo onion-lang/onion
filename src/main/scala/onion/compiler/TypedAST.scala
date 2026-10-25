@@ -219,6 +219,16 @@ object TypedAST {
   }
 
   /**
+   * A `select` case with a `when` guard: `taken = false; <pattern, guard, body>; if (!taken) <rest>`.
+   * `statements(1)` is the case itself and ends in the case's value; the rest runs only when
+   * that did not happen, so a return may be sunk into both (tail-call optimization).
+   */
+  class GuardedCaseBlock(location: Location, newStatements: TypedAST.ActionStatement*) extends StatementBlock(location, newStatements*)
+
+  /** The body of a guarded case once its guard held: `taken = true; <body>`; the body is the value. */
+  class GuardedBody(location: Location, newStatements: TypedAST.ActionStatement*) extends StatementBlock(location, newStatements*)
+
+  /**
    * @author Kota Mizushima
    */
   class BoolValue(location: Location, val value: Boolean) extends Term(location) {
@@ -631,6 +641,9 @@ object TypedAST {
    */
   class FieldDefinition(val location: Location, val modifier: Int, val affiliation: TypedAST.ClassType, val name: String, val `type`: TypedAST.Type)
     extends Node with FieldRef {
+    /** A top-level `val`: its field is not JVM-final (it is written once from `start`), yet the
+      * language still forbids reassigning it (E0036). */
+    var readOnly: Boolean = false
   }
 
   /**
@@ -726,6 +739,9 @@ object TypedAST {
       this(null, frame, index, `type`)
     }
   }
+
+  /** The compiler temporary an if/select/try expression yields; never a user variable. */
+  class ResultRefLocal(bind: ClosureLocalBinding) extends RefLocal(bind)
 
   class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: TypedAST.Type, val value: TypedAST.Term) extends Term(location) {
     def this(bind: ClosureLocalBinding, value: TypedAST.Term) = {

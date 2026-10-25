@@ -25,24 +25,20 @@ private[optimization] object TailCallGraphAnalysis {
    * @return Map from each method to the set of methods it tail-calls
    */
   def buildCallGraph(methods: Seq[MethodDefinition]): Map[MethodDefinition, Set[MethodDefinition]] = {
-    val methodByName = methods.map(m => m.name -> m).toMap
-
+    // Overloads share a name, so members are told apart by identity, not by name.
     methods.map { method =>
-      val calledMethods = findTailCalls(method).flatMap { callName =>
-        methodByName.get(callName)
-      }.toSet
-      method -> calledMethods
+      method -> findTailCalls(method).filter(callee => methods.exists(_ eq callee))
     }.toMap
   }
 
   /**
-   * Find method names called in tail position within a method.
+   * Find methods called in tail position within a method.
    *
    * A tail call is a method call that appears directly in a return statement,
    * with no further computation after the call returns.
    */
-  def findTailCalls(method: MethodDefinition): Set[String] = {
-    val calls = mutable.Set[String]()
+  def findTailCalls(method: MethodDefinition): Set[MethodDefinition] = {
+    val calls = mutable.Set[MethodDefinition]()
 
     def visitStatement(stmt: ActionStatement): Unit = {
       stmt match {
@@ -51,13 +47,13 @@ private[optimization] object TailCallGraphAnalysis {
             case call: Call =>
               call.method match {
                 case targetMethod: MethodDefinition =>
-                  calls += targetMethod.name
+                  calls += targetMethod
                 case _ =>
               }
             case call: CallStatic =>
               call.method match {
                 case targetMethod: MethodDefinition =>
-                  calls += targetMethod.name
+                  calls += targetMethod
                 case _ =>
               }
             case _ =>

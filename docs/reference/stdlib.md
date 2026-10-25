@@ -907,7 +907,7 @@ Provided via `onion.Iterables` (Java interface).
 Access iteration utilities for collections and arrays:
 
 - `Iterables::map(list|iterable|set, f)`
-- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map`
+- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map` in the original insertion order
 - `Iterables::toList(iterable)` - materializes any `Iterable` (ranges included) into a `List`
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`

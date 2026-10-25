@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`m.mapMap(f)` keeps the map's order (#2414).**
+  - Before: `["b": 2, "a": 1].mapMap(f)` came back in hash order, `{a=.., b=..}`.
+  - Now: insertion order, `{b=.., a=..}`, as every `Maps::` transform and `set.map { }` already do.
+
 - **W0016 names an overload the way the source writes it (#2407).**
   - Before: `a(java.util.List[java.lang.String], [int)`.
   - Now: `a(List[String], Int[])`.

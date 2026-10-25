@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`Yaml::parse` removes the quotes of a single-quoted key (#2403).**
+  - Before: `'k': 1` gave the key `'k'`, quotes included, so `m.get("k")` was `null`; `'a: b': 1` was split at the inner `: `.
+  - Now: `'k'` is read as `k`, the same as `"k"`. A whole-line `{a: 1}` now suggests block `key: value` lines or Json, not quoting a value.
 - **Syntax-error hints no longer misread a tab-indented line (#2312).**
   - Before: the `;`-after-`}` hint fired where no `}` preceded the `;`, and the enum-`case` hint was missing or named the wrong case.
   - Now: hints see the text before the error exactly, whatever the indentation.

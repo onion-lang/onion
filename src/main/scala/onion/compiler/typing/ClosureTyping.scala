@@ -207,7 +207,8 @@ final class ClosureTyping(
                 context.setMethod(typedMethod)
                 context.getContextFrame.parent.setAllClosed(true)
 
-                val prologue = args.zipWithIndex.flatMap { case (arg, i) =>
+                val sharedCopies = sharedParameterCopies(args, argTypes, context, node.body)
+                val prologue = sharedCopies ++ args.zipWithIndex.flatMap { case (arg, i) =>
                   Option(context.lookup(arg.name)).flatMap { bind =>
                     val erased = TypeSubstitution.substituteType(
                       typedMethod.arguments(i), Map.empty, Map.empty, defaultToBound = true
@@ -488,6 +489,8 @@ final class ClosureTyping(
     val assigned =
       if (closureBody == null) args.map(_.name).toSet
       else bodyContext.assignedNames(closureBody) // memoized: this runs once per candidate overload
+    val shared = sharedParameters(args, closureBody, assigned)
+    context.markAsBoxed(shared)
     var i = 0
     while (i < args.length) {
       val arg = args(i)
@@ -497,10 +500,44 @@ final class ClosureTyping(
       }
       val argType = argTypes(i)
       if (argType == null) return false
-      context.add(arg.name, argType, isMutable = assigned.contains(arg.name))
+      if (shared.contains(arg.name)) {
+        // The argument slot keeps a name no source can spell; the boxed copy takes the real one.
+        context.add(arg.name + "#arg", argType, isMutable = false)
+      } else {
+        context.add(arg.name, argType, isMutable = assigned.contains(arg.name))
+      }
       i += 1
     }
     true
+  }
+
+  /**
+   * Lambda parameters that a nested closure captures while the lambda also assigns them.
+   * They live in a box, like a captured `var` and a method parameter (#2335, #2426).
+   */
+  private def sharedParameters(args: List[AST.Argument], closureBody: AST.Node, assigned: Set[String]): Set[String] =
+    closureBody match {
+      case block: AST.BlockExpression => CapturedVariableScanner.scan(block) & args.map(_.name).toSet & assigned
+      case _ => Set.empty
+    }
+
+  /** Declares the boxed local for each shared parameter and returns the statements that fill it. */
+  private def sharedParameterCopies(
+    args: List[AST.Argument],
+    argTypes: Array[Type],
+    context: LocalContext,
+    closureBody: AST.Node
+  ): List[ActionStatement] = {
+    val assigned = if (closureBody == null) Set.empty[String] else bodyContext.assignedNames(closureBody)
+    val shared = sharedParameters(args, closureBody, assigned)
+    args.zipWithIndex.flatMap { case (arg, i) =>
+      Option.when(shared.contains(arg.name)) {
+        val from = context.lookupOnlyCurrentScope(arg.name + "#arg")
+        val index = context.add(arg.name, argTypes(i), isMutable = true)
+        new ExpressionActionStatement(
+          new SetLocal(arg.location, 0, index, argTypes(i), new RefLocal(arg.location, 0, from.index, argTypes(i))))
+      }
+    }
   }
 
   private def inferFunctionType(

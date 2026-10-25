@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A nested lambda that assigns an outer lambda's parameter now writes it back (#2426).**
+  - Before: `(k) -> { val f = () -> { k = k + 10; k }; f(); k }` called with 1 returned 1.
+  - Now: it returns 11, as for a captured `var` or a method parameter.
+
 ## [0.146.0] - 2026-10-25
 
 ### Breaking

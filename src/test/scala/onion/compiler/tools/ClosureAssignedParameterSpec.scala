@@ -126,4 +126,47 @@ class ClosureAssignedParameterSpec extends AbstractShellSpec {
       assert(!out.contains("#"), s"hidden slot name leaked:\n$out")
     }
   }
+
+  describe("a lambda parameter assigned inside a nested lambda") {
+    it("is seen updated by the outer lambda (#2426)") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val outer: (Int) -> Int = (k) -> {
+          |      val inner: () -> Int = () -> { k = k + 10; k }
+          |      inner()
+          |      k
+          |    }
+          |    return outer(n)
+          |  }""".stripMargin)
+      assert(Shell.Success(11) == result)
+    }
+
+    it("is shared both ways with a Long parameter and a later write") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val outer: (Long) -> Long = (k) -> {
+          |      val inner: () -> Long = () -> { k = k * 2L; k }
+          |      k = k + 1L
+          |      val a = inner()
+          |      k = k + 5L
+          |      a + k
+          |    }
+          |    val r: Long = outer(1L)
+          |    return r as Int
+          |  }""".stripMargin)
+      assert(Shell.Success(4 + 9) == result)
+    }
+
+    it("leaves a lambda parameter that is only read alone") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val outer: (Int) -> Int = (k) -> {
+          |      val inner: () -> Int = () -> k + 1
+          |      inner() + k
+          |    }
+          |    return outer(n)
+          |  }""".stripMargin)
+      assert(Shell.Success(3) == result)
+    }
+  }
 }

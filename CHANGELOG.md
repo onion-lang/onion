@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Syntax-error hints no longer misread a tab-indented line (#2312).**
   - Before: the `;`-after-`}` hint fired where no `}` preceded the `;`, and the enum-`case` hint was missing or named the wrong case.
   - Now: hints see the text before the error exactly, whatever the indentation.
+- **`xs.sort(c)` rejects a `Comparator[U]` for an unrelated type parameter `U` (#2367).**
+  - Before: it compiled in `class Box[T, U]` with `xs: List[T]`, then threw `ClassCastException` inside the sort.
+  - Now: `E0000` at the call, as in Java. `Comparator[T]` and `Comparator[Object]` still work.
+- **An interface default method that narrows its return type works through the parent interface (#2393).**
+  - Before: `interface SubNamed conforms Named { def name(): String = "d" }` threw `AbstractMethodError` when called as a `Named`.
+  - Now: it runs the default method, as in Java.
 - **An override that narrows its return type works through the supertype (#2386).**
   - Before: `def name(): String` for an inherited `name(): Object` threw `AbstractMethodError` through an interface, and through a superclass silently ran the parent's method. A record accessor (`record P(name: String) conforms Named`) failed the same way.
   - Now: it runs the override, as in Java.

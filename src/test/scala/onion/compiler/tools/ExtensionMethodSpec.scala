@@ -4,6 +4,45 @@ import onion.tools.Shell
 
 class ExtensionMethodSpec extends AbstractShellSpec {
   describe("Extension methods") {
+    it("fills default arguments of an extension method, plain and safe call") {
+      val result = shell.run(
+        """
+          |extension String {
+          |  def tag(a: String = "x", b: Int = 2): String = this + a + b
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s: String? = "q"
+          |    return "ab".tag() + "," + "ab".tag("y") + "," + "ab".tag("y", 9) + "," + s?.tag("z")
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("abx2,aby2,aby9,qz2") == result)
+    }
+
+    it("still rejects an extension call that omits a parameter with no default") {
+      val result = shell.run(
+        """
+          |extension String {
+          |  def tag(a: String, b: Int = 2): String = this + a + b
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String = "ab".tag()
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result == Shell.Failure(-1))
+    }
+
     it("can add methods to String") {
       val result = shell.run(
         """

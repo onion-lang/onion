@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Syntax-error hints no longer misread a tab-indented line (#2312).**
   - Before: the `;`-after-`}` hint fired where no `}` preceded the `;`, and the enum-`case` hint was missing or named the wrong case.
   - Now: hints see the text before the error exactly, whatever the indentation.
+- **Self tail calls in a `select` case with bindings loop instead of overflowing the stack (#2350).**
+  - Before: `case P(a, b): go(new P(a - 1, b), acc + b)` or `case i is Integer: go(..)` overflowed at about 10000 calls.
+  - Now: these cases loop, as `if x is T { ... }` and literal cases already did.
 - **W0016 names an out-of-group overload with its parameter types (#2371).**
   - Before: `... group (b, a) could not be optimized: Method b has tail calls to non-group methods: a`, as if `a` were outside the group.
   - Now: `... non-group methods: a(java.lang.String)`, so the overload is told apart from the member `a(Int)`.

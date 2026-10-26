@@ -1073,6 +1073,9 @@ def main(name: String, count: Int = 3, tags: List[String] = []): Int {
 Use a scalar, or `String[]` as the last parameter to collect repeated/trailing
 arguments (e.g. `def main(cmd: String, files: String[])`).
 
+A varargs parameter (`files: String...`) is E0094 too: write `files: String[]`. A `tool`
+reports the same mistake as `E0081`.
+
 ### `E0095` — `main`'s `String[]` parameter is misplaced
 
 A top-level auto-CLI `main` has a `String[]` parameter that is not in a supported

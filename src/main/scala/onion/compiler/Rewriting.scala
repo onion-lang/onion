@@ -242,6 +242,20 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case _ => false
     })
 
+  // A varargs parameter's typeRef is its ELEMENT type (`files: String...` has typeRef
+  // `String`), so checking the typeRef alone read it as one scalar argument: `files.length`
+  // was always 1 and `--contract` said `"type":"String"` (issue #2460). The command line
+  // fills neither a varargs main nor a varargs tool, so these see `T...` as unreadable.
+  private def cliKindOfArg(a: AST.Argument): Option[String] =
+    if (a.isVararg) None else cliKindOf(a.typeRef)
+
+  private def isStringArrayArg(a: AST.Argument): Boolean =
+    !a.isVararg && isStringArrayParam(a.typeRef)
+
+  /** The parameter's type as written, `String...` for varargs, for CLI diagnostics. */
+  private def cliTypeDesc(a: AST.Argument): String =
+    (if (a.typeRef == null) "(none)" else a.typeRef.desc.toString) + (if (a.isVararg) "..." else "")
+
   /**
    * Tool CLI synthesis (issue #358). A script whose top level declares `tool`s and has
    * neither a user `main` nor executable top-level statements gets a synthesized
@@ -279,12 +293,10 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val badParams = for {
       t <- tools
       a <- t.args
-      if cliKindOf(a.typeRef).isEmpty
+      if cliKindOfArg(a).isEmpty
     } yield CompileError("", a.location,
       Message("error.semantic.toolParameterNotCliConvertible",
-        Array[Any](t.name, a.name,
-          if (a.typeRef == null) "(none)" else a.typeRef.desc.toString,
-          ScalarConversions.supportedNames)),
+        Array[Any](t.name, a.name, cliTypeDesc(a), ScalarConversions.supportedNames)),
       Some(TOOL_PARAMETER_NOT_CLI_CONVERTIBLE.errorCode))
     if (badParams.nonEmpty) throw new CompilationException(badParams)
     val collisions = tools.flatMap(t => flagSpellingCollisions(t.name, t.args))
@@ -393,12 +405,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   private def appendAutoCliCall(toplevels: Buffer[AST.Toplevel]): Unit = {
-    val allScalar = (f: AST.FunctionDeclaration) => f.args.forall(a => cliKindOf(a.typeRef).isDefined)
+    val allScalar = (f: AST.FunctionDeclaration) => f.args.forall(a => cliKindOfArg(a).isDefined)
     // A main with required leading scalar parameters and a trailing String[] that
     // collects the remaining arguments, e.g. `def main(cmd: String, files: String[])`.
     val restPattern = (f: AST.FunctionDeclaration) =>
-      f.args.length >= 2 && isStringArrayParam(f.args.last.typeRef) && f.args.last.defaultValue == null &&
-        f.args.init.forall(a => cliKindOf(a.typeRef).isDefined && a.defaultValue == null)
+      f.args.length >= 2 && isStringArrayArg(f.args.last) && f.args.last.defaultValue == null &&
+        f.args.init.forall(a => cliKindOfArg(a).isDefined && a.defaultValue == null)
 
     // A top-level `main` with parameters must fit one of the supported shapes:
     // a single `String[]` (raw argv), all scalars (auto-CLI parses each), or a
@@ -407,7 +419,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // wired to the entry point and used to compile to a SILENT no-op (the body
     // landed on an unreachable overload). Reject it with a clear error instead.
     val singleStringArray = (f: AST.FunctionDeclaration) =>
-      f.args.length == 1 && isStringArrayParam(f.args(0).typeRef)
+      f.args.length == 1 && isStringArrayArg(f.args(0))
     toplevels.collectFirst {
       case f: AST.FunctionDeclaration if f.name == "main" && f.args.nonEmpty &&
         !singleStringArray(f) && !allScalar(f) && !restPattern(f) => f
@@ -419,19 +431,18 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       // type is individually supported (scalar, or String[]) do we fall back to
       // diagnosing the shape: a String[] that isn't alone or last.
       val badType = f.args.zipWithIndex.collectFirst {
-        case (a, _) if cliKindOf(a.typeRef).isEmpty && !isStringArrayParam(a.typeRef) => a
+        case (a, _) if cliKindOfArg(a).isEmpty && !isStringArrayArg(a) => a
       }
       badType match {
         case Some(a) =>
           throw new CompilationException(Seq(CompileError("", a.location,
             Message("error.semantic.mainParameterNotCliConvertible",
-              Array[Any](a.name, if (a.typeRef == null) "(none)" else a.typeRef.desc.toString,
-                ScalarConversions.supportedNames)),
+              Array[Any](a.name, cliTypeDesc(a), ScalarConversions.supportedNames)),
             Some(MAIN_PARAMETER_NOT_CLI_CONVERTIBLE.errorCode))))
         case None =>
           val lastIdx = f.args.length - 1
           val culprit = f.args.zipWithIndex.collectFirst {
-            case (a, i) if isStringArrayParam(a.typeRef) && i != lastIdx => a
+            case (a, i) if isStringArrayArg(a) && i != lastIdx => a
           }.getOrElse(f.args.last)
           throw new CompilationException(Seq(CompileError("", culprit.location,
             Message("error.semantic.mainParameterMisplacedArray", Array[Any](culprit.name)),

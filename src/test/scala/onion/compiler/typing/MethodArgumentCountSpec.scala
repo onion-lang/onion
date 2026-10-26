@@ -32,9 +32,13 @@ class MethodArgumentCountSpec extends AnyFunSuite:
     val second = new ClassDefinition(null, false, 0, "SameName", null, Seq.empty)
     val left = new MethodDefinition(null, 0, owner, "call", Array(first, BasicType.INT), BasicType.VOID, null)
     val right = new MethodDefinition(null, 0, owner, "call", Array(second, BasicType.LONG), BasicType.VOID, null)
-    // Existing comparator returns at the first nonidentical pair even when names
-    // compare equal, rather than examining subsequent parameters.
-    assert(new MethodComparator().compare(left, right) == 0)
+    // A nonidentical pair whose names compare equal is a tie, so the comparison goes on
+    // to the next parameter (#2445): two generic overloads each have their own `T`.
+    val comparator = new MethodComparator()
+    assert(comparator.compare(left, right) != 0)
+    assert(Integer.signum(comparator.compare(left, right)) == -Integer.signum(comparator.compare(right, left)))
+    val sameTail = new MethodDefinition(null, 0, owner, "call", Array(second, BasicType.INT), BasicType.VOID, null)
+    assert(comparator.compare(left, sameTail) == 0)
 
   test("ASM argument count does not request a defensive argument array"):
     val table = new ClassTable("")

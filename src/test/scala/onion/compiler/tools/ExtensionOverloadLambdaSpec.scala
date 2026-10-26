@@ -228,6 +228,32 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       }
     }
 
+    // The panel's cases on 631679d: non-generic over generic once the signatures tie, and
+    // nested lambdas next to an Object overload stay linear.
+    for (genericFirst <- Seq(true, false)) {
+      it(s"picks each2(String, g) over each2[A](A, g) for a typed lambda (generic ${if (genericFirst) "first" else "last"})") {
+        val gen = "  def each2[A](z: A, f: (A) -> void): String = \"gen\""
+        val str = "  def each2(s: String, f: (String) -> void): String = \"str\""
+        val decls = Seq("extension String {", if (genericFirst) gen else str, if (genericFirst) str else gen, "}").mkString("\n")
+        assert(Shell.Success("str") == runMain(decls, """"a".each2("q", (s: String) -> IO::print(""))"""))
+      }
+    }
+
+    it("types nested lambdas next to an Object overload in linear time") {
+      val depth = 12
+      val call = (1 to depth).foldRight("s" + depth) { (i, inner) => s"\"a\".w((s$i: String) -> $inner)" }
+      val decls =
+        """extension String {
+          |  def w(o: Object): String = "o"
+          |  def w(f: (String) -> String): String = f("x")
+          |}""".stripMargin
+      val start = System.nanoTime()
+      val result = runMain(decls, call)
+      val seconds = (System.nanoTime() - start) / 1e9
+      assert(Shell.Success("x") == result)
+      assert(seconds < 30, s"took $seconds s")
+    }
+
     it("types nested lambdas once per overload that can take them") {
       val depth = 10
       val call = (1 to depth).foldRight("s" + depth) { (i, inner) => s"\"a\".w((s$i: String) -> $inner)" }

@@ -12,6 +12,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 ) {
   private val overloadSupport = new CallOverloadSupport(typing, calls)
 
+  /** The overload each lambda call site chose, per receiver, argument and expected types. */
+  private val decisionsAt =
+    new java.util.IdentityHashMap[AST.MethodCall, java.util.HashMap[(Type, List[Type], Type), ExtensionMethodDefinition]]()
+
   /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
    *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
@@ -512,10 +516,29 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     // only SAM conversions fit, the void/value shape of the body decides, as for classes.
     val user = candidates.filterNot(isBuiltinExtension)
     if (user.length >= 2) {
+      // The winner is remembered per call site and argument types: a nested call is typed
+      // again for each overload its enclosing lambda is tried against, and repeating the
+      // whole choice at every level made nesting exponential. A remembered winner that no
+      // longer fits falls back to the full choice while errors are suppressed (an enclosing
+      // overload is being tried); when they are reported, its errors are the call's own.
+      val decisionKey = (targetType: Type, preliminaryParams.toList.map(p => if (p == null) null else p.`type`), expected)
+      val decisions = decisionsAt.computeIfAbsent(node, _ => new java.util.HashMap())
+      val remembered = decisions.get(decisionKey)
+      if (remembered != null) {
+        if (typing.reportingEnabled) break(attempt(remembered))
+        attempt(remembered) match {
+          case some @ Some(_) => break(some)
+          case None =>
+        }
+      }
+      def decided(winner: ExtensionMethodDefinition): Option[Term] = {
+        decisions.put(decisionKey, winner)
+        attempt(winner)
+      }
       val lambdaCapable = user.filter { m =>
         untypedClosureIndices.forall(i => i >= m.arguments.length || isLambdaSlot(m.arguments(i)))
       }
-      if (lambdaCapable.length == 1) break(attempt(lambdaCapable.head))
+      if (lambdaCapable.length == 1) break(decided(lambdaCapable.head))
       val fits =
         if (lambdaCapable.isEmpty) Seq.empty
         else lambdaCapable.flatMap(m => typing.withSuppressedReporting(attemptRanked(m)).map(r => (m, r._2, r._3)))
@@ -545,7 +568,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         (params < 0 && receiver <= 0) || (params == 0 && receiver < 0)
       }
       pool.find(a => pool.forall(b => (a eq b) || beats(a, b))) match {
-        case Some((winner, _, _)) => break(attempt(winner))
+        case Some((winner, _, _)) => break(decided(winner))
         case None =>
           val unbeaten = pool.filter(a => !pool.exists(b => (a ne b) && beats(b, a)))
           val (first, second) = unbeaten match {
@@ -565,8 +588,15 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   private def rankParameters(
     methodA: Method, a: Array[Type], methodB: Method, b: Array[Type], argTypes: Array[Type]
   ): Int =
-    if (TypeRules.isAllSuperType(a, b) && TypeRules.isAllSuperType(b, a)) 0
-    else {
+    if (TypeRules.isAllSuperType(a, b) && TypeRules.isAllSuperType(b, a)) {
+      // Equal once type arguments are substituted: the non-generic overload wins, as for
+      // class methods (`each2(String, g)` over `each2[A](A, g)`).
+      (methodA.typeParameters.isEmpty, methodB.typeParameters.isEmpty) match {
+        case (true, false) => -1
+        case (false, true) => 1
+        case _ => 0
+      }
+    } else {
       val (ma, mb) = (ApplicableMethod(methodA, a, Map.empty), ApplicableMethod(methodB, b, Map.empty))
       overloadSupport.selectMostSpecificApplicable(List(ma, mb), argTypes = argTypes) match {
         case CandidateSelection.Selected(am) => if (am eq ma) -1 else 1

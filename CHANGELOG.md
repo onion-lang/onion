@@ -9,19 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
-- **A lambda call is E0006 when one extension overload has the more specific parameters and another the more specific receiver (#2447).**
-  - Before: `extension Object { def z(f: (Object) -> void) }` beside `extension String { def z(o: Object) }` made `"abc".z((x: Object) -> ...)` run one of them, depending on declaration order.
-  - Now: E0006. Rename one of the two methods.
 - **`[[1, 2], []]` is a `List[List[Int]]`, so `adj[1].add(5)` compiles (#2430).**
   - Before: the empty `[]` made the outer list `List[Object]`, and `add` was E0005. So `xs.add("header")` compiled on that list.
   - Now: an empty `[]` or `[:]` takes its type from the other elements, in list literals and map values. `xs.add("header")` is E0005. To keep the old type, annotate it: `val xs: List[Object] = [[1, 2], []]`. See `docs/migration/pre-1.0.md`.
 
 ### Fixed
 
-- **A lambda passed to an overloaded extension method picks the overload that takes a function (#2447).**
-  - Before: with `def g(f: (Int) -> String)` declared before `def g(s: Int)`, `"a".g((n: Int) -> "n" + n)` was E0000 "type Int is expected".
-  - Before, too: next to an `Object` overload declared after it, the lambda silently ran the `Object` one.
-  - Now: the most specific overload the lambda fits is chosen, in either declaration order. For a lambda with typed parameters this is the class-method rule.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

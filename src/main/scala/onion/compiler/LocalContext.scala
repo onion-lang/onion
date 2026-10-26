@@ -79,6 +79,11 @@ class LocalContext {
   // every `var` mutable, preserving prior behavior.
   private var reassignedNames: Set[String] = null
 
+  // Statements run before the body: copy a shared (boxed) parameter out of its argument slot.
+  private val prologue = scala.collection.mutable.ListBuffer[TypedAST.ActionStatement]()
+  def addParameterPrologue(statement: TypedAST.ActionStatement): Unit = prologue += statement
+  def parameterPrologue: List[TypedAST.ActionStatement] = prologue.toList
+
   def setReassignedNames(names: Set[String]): Unit = {
     reassignedNames = names
   }
@@ -196,12 +201,25 @@ class LocalContext {
   def inLoop: Boolean = loopDepth > 0
 
   def lookup(name: String): ClosureLocalBinding = {
+    if readingArgumentSlots then
+      val slot = contextFrame.lookup(name + "#arg")
+      if slot != null then return slot
     contextFrame.lookup(name)
   }
 
   /** Option-returning version of lookup for safer null handling */
   def lookupOpt(name: String): Option[ClosureLocalBinding] = {
-    Option(contextFrame.lookup(name))
+    Option(lookup(name))
+  }
+
+  // While true, a shared parameter names its argument slot: a constructor's delegation
+  // arguments (`: this(n)`) run before the prologue fills the boxed copy (#2335).
+  private var readingArgumentSlots = false
+
+  def withArgumentSlots[A](body: => A): A = {
+    val saved = readingArgumentSlots
+    readingArgumentSlots = true
+    try body finally readingArgumentSlots = saved
   }
 
   /**
@@ -209,7 +227,7 @@ class LocalContext {
    */
   def allNames: Set[String] = {
     if (contextFrame == null) Set.empty
-    else contextFrame.allNames
+    else contextFrame.allNames.filterNot(_.contains("#")) // synthetic slots (`n#arg`) are not names a user can write
   }
 
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {

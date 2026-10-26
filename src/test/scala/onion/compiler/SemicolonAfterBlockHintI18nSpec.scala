@@ -55,4 +55,15 @@ class SemicolonAfterBlockHintI18nSpec extends AnyFunSpec with Diagrams {
   it("still accepts a `;` after an expression that ends in `}`") {
     assert(compileErrors("val xs = [1].map { x -> x * 2 }; println(xs)\n").isEmpty)
   }
+
+  it("stays out of a tab-indented line where no `}` precedes the `;` (#2312)") {
+    val msgs = compileErrors("def main(args: String[]): void {\n\tval n = (1;  }\n}\n")
+    assert(msgs.nonEmpty)
+    assert(!msgs.contains("`}`"), s"did not expect the block hint, got: $msgs")
+  }
+
+  it("still fires after a `}` on a tab-indented line (#2312)") {
+    val msgs = compileErrors("def main(args: String[]): void {\n\tif true { println(1) }; println(2)\n}\n")
+    assert(msgs.contains("`}`"), s"expected the block hint, got: $msgs")
+  }
 }

@@ -176,5 +176,24 @@ class IterablesSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("[3, 1, 4, 1, 5]") == result)
     }
+
+    it("mapMap keeps the map's insertion order, like every Maps transform (#2414)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val m: Map[String, Int] = ["b": 2, "a": 1, "c": 3]
+          |    val doubled: Map[String, Int] = m.mapMap((e) -> Colls::entry(e.getKey(), e.getValue() * 2))
+          |    val direct: Map[String, Int] = Iterables::mapMap(m, (e: Map.Entry[String, Int]) -> Colls::entry(e.getKey() + "!", e.getValue()))
+          |    return doubled.toString() + " " + direct.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "IterablesMapMapOrder.on",
+        Array()
+      )
+      assert(Shell.Success("{b=4, a=2, c=6} {b!=2, a!=1, c!=3}") == result)
+    }
   }
 }

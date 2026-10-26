@@ -188,6 +188,16 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       assert(codes == Seq(Some("E0006")))
     }
 
+    for (fnFirst <- Seq(true, false)) {
+      it(s"reports a wrong-arity lambda against the function overload, not Int (function ${if (fnFirst) "first" else "last"})") {
+        val fn = "  def g3(f: (Int) -> String): String = \"fn:\" + f(1)"
+        val int = "  def g3(s: Int): String = \"int:\" + s"
+        val decls = Seq("extension String {", if (fnFirst) fn else int, if (fnFirst) int else fn, "}").mkString("\n")
+        assert(errorCodes(decls + "\nIO::println(\"a\".g3((a: Int, b: Int) -> \"x\"))\n") == Seq(Some("E0101")))
+        assert(errorCodes(decls + "\nIO::println(\"a\".g3((a, b) -> \"x\"))\n") == Seq(Some("E0101")))
+      }
+    }
+
     it("reports a lambda that fits nothing against the overload of its arity") {
       val codes = errorCodes(
         """extension String {

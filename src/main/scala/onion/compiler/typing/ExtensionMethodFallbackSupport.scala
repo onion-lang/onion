@@ -520,22 +520,27 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     case _ => false
   }
 
-  /** When no overload fits, the one to report against: the first whose function-typed
-   *  parameters take as many arguments as the lambdas passed to them, else the first. */
-  private def closestByArity(overloads: Seq[ExtensionMethodDefinition], args: Array[AST.Expression]): ExtensionMethodDefinition =
-    overloads.find { m =>
+  /** When no overload fits, the one to report against (rule 2 on #2447): the first whose
+   *  function-typed parameters take as many arguments as the lambdas passed to them; else
+   *  the first with a function or SAM parameter at every lambda's position; else the first. */
+  private def closestByArity(overloads: Seq[ExtensionMethodDefinition], args: Array[AST.Expression]): ExtensionMethodDefinition = {
+    def atLambdas(slot: (AST.ClosureExpression, Type) => Boolean)(m: ExtensionMethodDefinition): Boolean =
       args.indices.forall { i =>
         args(i) match {
-          case c: AST.ClosureExpression if i < m.arguments.length =>
-            m.arguments(i) match {
-              case ct: ClassType if ct.name.startsWith("onion.Function") =>
-                ct.name == "onion.Function" + c.args.length
-              case _ => false
-            }
+          case c: AST.ClosureExpression if i < m.arguments.length => slot(c, m.arguments(i))
           case _ => true
         }
       }
-    }.getOrElse(overloads.head)
+    val sameArity = atLambdas {
+      case (c, ct: ClassType) if ct.name.startsWith("onion.Function") => ct.name == "onion.Function" + c.args.length
+      case _ => false
+    }
+    val functional = atLambdas {
+      case (_, ct: ClassType) => ct.name.startsWith("onion.Function") || ct.isInterface
+      case _ => false
+    }
+    overloads.find(sameArity).orElse(overloads.find(functional)).getOrElse(overloads.head)
+  }
 
   /** The backing static's first parameter must accept this receiver: array kinds
    *  must agree (an array-taking overload must not be picked for a List receiver

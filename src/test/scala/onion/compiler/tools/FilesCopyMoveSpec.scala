@@ -202,5 +202,94 @@ class FilesCopyMoveSpec extends AbstractShellSpec {
       srcFile.delete()
       srcDir.delete()
     }
+
+    it("refuses to copy a directory into itself through a symlink") {
+      val base = JFiles.createTempDirectory("onion-copydir-link-")
+      val srcDir = JFiles.createDirectory(base.resolve("sub"))
+      JFiles.writeString(srcDir.resolve("a.txt"), "1")
+      JFiles.createSymbolicLink(base.resolve("lnk"), srcDir)
+
+      val srcPath = srcDir.toString.replace('\\', '/')
+      val dstPath = base.resolve("lnk").resolve("in").toString.replace('\\', '/')
+
+      val thrown = intercept[ScriptException] {
+        shell.run(
+          s"""
+             |import { onion.Files; }
+             |class Test {
+             |public:
+             |  static def main(args: String[]): String {
+             |    Files::copyDir("$srcPath", "$dstPath")
+             |    return "no error"
+             |  }
+             |}
+             |""".stripMargin,
+          "FilesCopyDirSymlink.on",
+          Array()
+        )
+      }
+      assert(thrown.getCause.isInstanceOf[IllegalArgumentException])
+      assert(!JFiles.exists(srcDir.resolve("in")))
+    }
+
+    it("refuses a destination inside the source that reaches it through symlink/..") {
+      val base = JFiles.createTempDirectory("onion-copydir-dotdot-in-")
+      val srcDir = JFiles.createDirectories(base.resolve("sub"))
+      JFiles.createDirectories(srcDir.resolve("deep"))
+      JFiles.writeString(srcDir.resolve("a.txt"), "1")
+      JFiles.createSymbolicLink(base.resolve("lnk"), base.resolve("sub").resolve("deep"))
+
+      val srcPath = srcDir.toString.replace('\\', '/')
+      // lnk/.. is sub (the OS follows lnk first), so this is sub/in: inside the source
+      val dstPath = (base.resolve("lnk").toString + "/../in").replace('\\', '/')
+
+      val thrown = intercept[ScriptException] {
+        shell.run(
+          s"""
+             |import { onion.Files; }
+             |class Test {
+             |public:
+             |  static def main(args: String[]): String {
+             |    Files::copyDir("$srcPath", "$dstPath")
+             |    return "no error"
+             |  }
+             |}
+             |""".stripMargin,
+          "FilesCopyDirDotDotInside.on",
+          Array()
+        )
+      }
+      assert(thrown.getCause.isInstanceOf[IllegalArgumentException])
+      assert(!JFiles.exists(srcDir.resolve("in")))
+    }
+
+    it("copies when symlink/.. leads outside the source") {
+      val base = JFiles.createTempDirectory("onion-copydir-dotdot-out-")
+      val srcDir = JFiles.createDirectories(base.resolve("other"))
+      JFiles.createDirectories(base.resolve("far").resolve("deep"))
+      JFiles.writeString(srcDir.resolve("a.txt"), "1")
+      JFiles.createSymbolicLink(base.resolve("lnk"), base.resolve("far").resolve("deep"))
+
+      val srcPath = srcDir.toString.replace('\\', '/')
+      // lnk/.. is far, so this is far/other/x: outside the source, a legal copy
+      val dstPath = (base.resolve("lnk").toString + "/../other/x").replace('\\', '/')
+
+      val result = shell.run(
+        s"""
+           |import { onion.Files; }
+           |class Test {
+           |public:
+           |  static def main(args: String[]): String {
+           |    Files::copyDir("$srcPath", "$dstPath")
+           |    return "ok"
+           |  }
+           |}
+           |""".stripMargin,
+        "FilesCopyDirDotDotOutside.on",
+        Array()
+      )
+      assert(result == Shell.Success("ok"))
+      assert(JFiles.exists(base.resolve("far").resolve("other").resolve("x").resolve("a.txt")))
+    }
   }
 }

@@ -199,8 +199,33 @@ private[compiler] final class AssignabilitySupport(
               // for it rejected ordinary covariant wildcard uses that
               // never involved a chained bound at all.
               val involvesTypeVariable = e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType]
-              if (involvesTypeVariable) structurallyAssignable(e, a) && structurallyAssignable(a, e)
-              else structurallyAssignable(e, a)
+              e match {
+                // `Collection[? extends T]` (the JDK's `addAll`) takes a
+                // `List[T]`: the wildcard's own bound decides, one way
+                // (#2341). `? super L` is the mirror image.
+                case w: TypedAST.WildcardType if !a.isInstanceOf[TypedAST.WildcardType] =>
+                  // A bound that is itself a type variable is abstract: only
+                  // that variable (or one whose bound chain reaches it)
+                  // fits. A concrete type, `Object` or an unrelated `U`
+                  // must not pass just because it erases to the same
+                  // class, or `xs.addAll(o)` with `o: List[Object]`
+                  // would pollute a `List[T]`.
+                  w.lowerBound match {
+                    case Some(lb: TypedAST.TypeVariableType) =>
+                      a match {
+                        case av: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(av, lb)
+                        case _ => structurallyAssignable(a, lb)
+                      }
+                    case Some(lb) => structurallyAssignable(a, lb)
+                    case None =>
+                      w.upperBound match {
+                        case tv: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(tv, a)
+                        case ub => structurallyAssignable(ub, a)
+                      }
+                  }
+                case _ if involvesTypeVariable => structurallyAssignable(e, a) && structurallyAssignable(a, e)
+                case _ => structurallyAssignable(e, a)
+              }
             }
         if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
         else
@@ -250,8 +275,14 @@ private[compiler] final class AssignabilitySupport(
         // normalizeMethodCallTarget, MemberSelectionResolutionSupport.
         // normalizeMemberSelectionTarget), which already special-case
         // NullableType up front for their own (dereference-target) cases.
-        case nullable: NullableType =>
+        // Only when the value without its `?` would fit; otherwise the
+        // mismatch is elsewhere (a type argument, say) and `!!`/`?:` do not help.
+        case nullable: NullableType
+            if (if (containsTypeVariable(expected)) structurallyAssignable(expected, nullable.innerType)
+                else TypeRelations.isAssignableWithBoxing(expected, nullable.innerType, bodyContext.table)) =>
           bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "assignment")
+        case _ if expected == BasicType.BYTE && ConstantNarrowing.isHexEndingInB(actual) =>
+          bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`, SemanticErrorReporter.HexDigitBHint)
         case _ =>
           bodyContext.report(INCOMPATIBLE_TYPE, node, expected, actual.`type`)
       }

@@ -218,8 +218,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       else
         codeMethod(cw, methodDef, name)
 
-    if !classDef.isInterface then
-      bridgeMethodEmitter.emitBridges(cw, classDef)
+    bridgeMethodEmitter.emitBridges(cw, classDef)
 
     // Closures generated for this class are nest members so they can reach
     // the host's private members (JEP 181); see ClosureCodegen.visitNestHost
@@ -247,7 +246,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       val label = gen.mark()
       gen.visitLineNumber(ctor.location.line, label)
 
-    val localVars = new LocalVarContext(gen).withParameters(false, argTypes)
+    val localVars = new LocalVarContext(gen).withParameters(false, argTypes).withBoxedVariables(ctor.frame)
 
     if ctor.superInitializer != null then
       val superArgTypes = ctor.superInitializer.arguments.map(asmType)

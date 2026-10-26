@@ -259,7 +259,13 @@ class SemanticErrorReporter(threshold: Int) {
           case obj: TypedAST.ObjectType => toolbox.Suggestions.formatSuggestion(name, rankedCallCandidates(obj, name, argTypes, if (isUnqualifiedCall) None else Some(calledStatically)))
           case _ => None
       }
-    problem(position, appendSuggestion(baseMessage, suggestion))
+    // Set only by MethodCallReportingSupport, when a hex literal ending in `B` is passed where
+    // a same-named method takes a Byte: said after any other suggestion, which still applies.
+    val hexDigitB = items.length > 8 && items(8) == SemanticErrorReporter.HexDigitBHint
+    val withHexDigitB =
+      if (!hexDigitB) suggestion
+      else Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + message("suggestion.hexDigitB"))
+    problem(position, appendSuggestion(baseMessage, withHexDigitB))
   }
 
   /**
@@ -446,6 +452,18 @@ class SemanticErrorReporter(threshold: Int) {
             if (arrayType.component.isBasicType || ea.component.isBasicType) ea.component == arrayType.component
             else TypedAST.TypeRules.isSuperType(arrayType.component, ea.component)
           case _ => false
+  }
+
+  /** Whether `toArray(new C[0])` for the array type is itself valid Onion (#2314). */
+  private def snippetCompiles(list: TypedAST.Type, arrayType: TypedAST.ArrayType): Boolean = {
+    val componentOk = arrayType.component match
+      case _: TypedAST.AppliedClassType => false
+      case ct: TypedAST.ClassType => ct.typeParameters.isEmpty
+      case _ => true
+    val element = list match
+      case n: TypedAST.NullableType => listElementType(n.innerType)
+      case other => listElementType(other)
+    componentOk && !(arrayType.dimension == 1 && element.exists(_.isInstanceOf[TypedAST.TypeVariableType]))
   }
 
   private def listElementType(t: TypedAST.Type): Option[TypedAST.Type] = t match
@@ -707,12 +725,17 @@ class SemanticErrorReporter(threshold: Int) {
       else if (isListType(expected) && actual.isInstanceOf[TypedAST.ArrayType])
         Some((actual.asInstanceOf[TypedAST.ArrayType], false))
       else None
+    def written(t: TypedAST.Type): String = t match
+      case a: TypedAST.ArrayType if listArrayCast.isDefined => onion.compiler.toolbox.TypeFormatting.arrayWrittenForm(a)
+      case other => typeName(other)
     val baseMessage = format(
       message(if (listArrayCast.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
-      Seq(typeName(expected), typeName(actual))
+      Seq(written(expected), written(actual))
     )
     val hint =
-      if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
+      if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
+        Some(message("suggestion.hexDigitB"))
+      } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
       } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
@@ -727,11 +750,14 @@ class SemanticErrorReporter(threshold: Int) {
           // 1-D primitive case has no one-line fix.
           if (arrayType.dimension == 1 && arrayType.component.isBasicType) None
           else if (isListToArray && !listElementsFit(actual, arrayType)) None
+          // `new C[0]` must compile when typed in: a generic component is raw there (E0066),
+          // and a bare type parameter's elements guarantee no more than Object does (#2314).
+          else if (isListToArray && !snippetCompiles(actual, arrayType)) None
           else if (isListToArray) {
             // Onion has no jagged-array syntax (`new Int[0][]` is a syntax error); a fully
             // sized `new Int[0][0]` compiles and is just as empty, since the outer (size-0)
             // dimension is the only one that matters to `toArray`.
-            val emptyArrayLiteral = typeName(arrayType.component) + ("[0]" * arrayType.dimension)
+            val emptyArrayLiteral = onion.compiler.toolbox.TypeFormatting.componentWrittenForm(arrayType.component) + ("[0]" * arrayType.dimension)
             Some(format(message("suggestion.listAsArrayCast"), Seq(emptyArrayLiteral)))
           } else {
             Some(message("suggestion.arrayAsListCast"))
@@ -977,6 +1003,11 @@ class SemanticErrorReporter(threshold: Int) {
  * The reporter's constructor showed up in profiles of a one-line program for that reason.
  */
 object SemanticErrorReporter {
+  /**
+   * An extra item on INCOMPATIBLE_TYPE (third) or METHOD_NOT_FOUND (ninth): the failing value
+   * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
+   */
+  private[compiler] case object HexDigitBHint
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.

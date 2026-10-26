@@ -427,6 +427,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     else {
       val fieldType = binding.tp
       val field = new FieldDefinition(node.location, AST.M_PUBLIC | AST.M_STATIC, klass, node.name, fieldType)
+      field.readOnly = true
       klass.add(field)
       val readLocal = new RefLocal(node.location, binding.frameIndex, binding.index, fieldType)
       val setField = new ExpressionActionStatement(new SetStaticField(node.location, klass, field, readLocal))

@@ -36,8 +36,13 @@ private[typing] object TypeRelations {
           // subtype; wildcard variance is still handled by isSuperType above.
           sameClass(expectedApplied.raw, actualApplied.raw) &&
             expectedApplied.typeArguments.length == actualApplied.typeArguments.length &&
-            expectedApplied.typeArguments.zip(actualApplied.typeArguments).forall { (expArg, actArg) =>
-              isAssignableWithBoxing(expArg, actArg, table) && isAssignableWithBoxing(actArg, expArg, table)
+            expectedApplied.typeArguments.zip(actualApplied.typeArguments).forall {
+              // The wildcard rules of isSuperType above are the whole story: this
+              // mutual check would let `Comparator[U]` through for `? super T`,
+              // since both sides erase to Object (#2367).
+              case (_: WildcardType, _) => false
+              case (expArg, actArg) =>
+                isAssignableWithBoxing(expArg, actArg, table) && isAssignableWithBoxing(actArg, expArg, table)
             }
         case _ =>
           false

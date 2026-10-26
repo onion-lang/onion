@@ -163,7 +163,9 @@ object AST {
   case class Id(location: Location, name: String) extends Expression
   case class Indexing(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("[]")
   case class SafeIndexing(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("?[]")
-  case class IntegerLiteral(location: Location, value: Int) extends Expression
+  // `hexEndsInB`: spelled in hex with a trailing `B` (`0xFFB`), which was a Byte before #2324;
+  // only diagnostics read it, to explain why such a literal no longer fits a Byte.
+  case class IntegerLiteral(location: Location, value: Int, hexEndsInB: Boolean = false) extends Expression
   case class IsInstance(location: Location, target: Expression, typeRef: TypeNode) extends Expression
   case class LessOrEqual(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<=")
   case class LeftShiftAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("<<=")

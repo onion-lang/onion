@@ -53,8 +53,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
         Some(new ByteValue(loc, v))
       case node@AST.ShortLiteral(loc, v) =>
         Some(new ShortValue(loc, v))
-      case node@AST.IntegerLiteral(loc, v) =>
-        Some(new IntValue(loc, v))
+      case node@AST.IntegerLiteral(loc, v, hexEndsInB) =>
+        Some(new IntValue(loc, v, hexEndsInB))
       case node@AST.LongLiteral(loc, v) =>
         Some(new LongValue(loc, v))
       case node@AST.FloatLiteral(loc, v) =>

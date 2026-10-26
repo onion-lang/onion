@@ -4,6 +4,39 @@ import onion.tools.Shell
 
 class DefaultArgumentSpec extends AbstractShellSpec {
   describe("default arguments") {
+    it("rejects a default that reads an instance field instead of failing verification") {
+      val result = shell.run(
+        """
+          |class C {
+          |  val k: Int
+          |public:
+          |  def this { k = 7 }
+          |  def f(n: Int, m: Int = k): Int = n + m
+          |}
+          |println(new C().f(1))
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(result == Shell.Failure(-1))
+    }
+
+    it("still allows a default that calls a static method of the class") {
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static def g(n: Int): Int = n
+          |  def f(n: Int, m: Int = g(2)): Int = n + m
+          |  static def main(args: String[]): String = "" + new C().f(1)
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("3") == result)
+    }
+
     it("should use default value when argument is omitted") {
       val result = shell.run(
         """

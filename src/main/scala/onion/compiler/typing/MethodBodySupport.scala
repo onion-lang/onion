@@ -342,7 +342,12 @@ private[compiler] final class MethodBodySupport(
   ): Array[TypedAST.MethodArgument] =
     args.zipWithIndex.map { case (arg, i) =>
       val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        typed(expr, context, types(i))
+        // A default is spliced into each call site, where the callee's `this` is not the
+        // current instance, so it is typed as in a static context.
+        val wasStatic = context.isStatic
+        context.setStatic(true)
+        try typed(expr, context, types(i))
+        finally context.setStatic(wasStatic)
       }
       TypedAST.MethodArgument(arg.name, types(i), defaultTerm)
     }.toArray

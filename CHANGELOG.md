@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A default argument that reads an instance field is a compile error, not a `VerifyError` (#2375).**
+  - Before: `def f(n: Int, m: Int = k)` with a field `k` compiled, then failed JVM verification when the class loaded.
+  - Now: `E0002`, `k` is not found. A default may still call a static method.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

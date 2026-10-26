@@ -95,8 +95,11 @@ public final class Timing {
 
     /**
      * Sleeps for the specified number of milliseconds.
+     * A zero or negative duration returns immediately, so
+     * {@code sleep(deadline - millis())} is safe after the deadline has passed.
      */
     public static void sleep(long millis) {
+        if (millis <= 0) return;
         try {
             Thread.sleep(millis);
         } catch (InterruptedException e) {
@@ -106,8 +109,10 @@ public final class Timing {
 
     /**
      * Sleeps for the specified number of nanoseconds.
+     * A zero or negative duration returns immediately.
      */
     public static void sleepNanos(long nanos) {
+        if (nanos <= 0) return;
         try {
             Thread.sleep(nanos / 1_000_000, (int)(nanos % 1_000_000));
         } catch (InterruptedException e) {

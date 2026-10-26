@@ -142,6 +142,61 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
       }
     }
 
+  test("a ret with another clause after it is reported, even when its declaration is in another file"):
+    val sources = Seq(
+      """class Main extends Base {
+        |public:
+        |  def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret(a); yield a }
+        |}
+        |""".stripMargin,
+      """val o = do[Option] {
+        |  a <- Option::some(1)
+        |  ret(a)
+        |  b <- Option::some(2)
+        |  yield a + b
+        |}
+        |""".stripMargin,
+      """val o = do[Option] {
+        |  a <- Option::some(1)
+        |  ret(a)
+        |  log(a)
+        |}
+        |""".stripMargin)
+    sources.foreach { source =>
+      val (root, file) = script(source)
+
+      val result = invoke(root, file.toString)
+
+      withClue(source) {
+        result.exitCode shouldBe 1
+        read(file) shouldBe source
+        result.stderr should include("not the last clause of its do block")
+      }
+    }
+
+  test("an old ret whose expression spans several lines is still rewritten"):
+    val source =
+      """val r = do[Option] {
+        |  a <- Option::some(1)
+        |  ret if a > 0 {
+        |    a +
+        |      1
+        |  }
+        |  else { 0 }
+        |}
+        |val s = do[Option] { xs <- Option::some([1, 2])
+        |  ret xs
+        |    .map { x -> x * 2 }
+        |    |> size;
+        |}
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    invoke(root, file.toString).exitCode shouldBe 0
+
+    read(file) shouldBe source.replace("  ret if", "  yield if").replace("  ret xs", "  yield xs")
+
   test("ret outside a do block, or after a dot, is not the keyword"):
     val source =
       """def ret(x: Int): Int = x

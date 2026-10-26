@@ -107,6 +107,10 @@ object Migrator:
    * declaration, a lambda parameter, a destructuring or pattern binding, an argument) means
    * the file was written since and uses `ret` as an ordinary name. Then a bare `ret` at the
    * start of a clause is ambiguous: such a file's candidates are reported, not rewritten.
+   *
+   * The old keyword was also legal only in a do block's final clause. A `ret` with another
+   * clause after it is a call through a name declared somewhere this file cannot see (an
+   * inherited method, another file, a Java class), so it is reported too.
    */
   private object RetToYield:
     /** After these, `ret` is an operand, not the start of a clause. */
@@ -115,12 +119,18 @@ object Migrator:
       "*", "/", "%", "==", "!=", "===", "!==", "<", ">", "<=", ">=", "&&", "||", "?:", "|>",
       "+=", "-=", "*=", "/=", "%=", "as", "is", "instanceof")
     private val ValueKeywords = Set("true", "false", "null", "this", "self", "super")
+    /** On a new line, these continue the expression before them instead of starting a clause. */
+    private val Continuations = Set(".", "?.", "|>", "else", "catch", "finally")
+    /** At the end of a line, these leave the expression open. */
+    private val OpenEnds = Set(
+      "=", "+", "-", "*", "/", "%", "==", "!=", "===", "!==", "<", ">", "<=", ">=", "&&", "||",
+      "?:", "|>", ".", "?.", "::", "->", ",", "as", "is", "instanceof", "!")
 
     private enum Bracket:
       case Paren, Square, Brace, DoBrace
 
     def find(source: String, tokens: IndexedSeq[Token]): (Seq[Edit], Seq[Unsure]) =
-      val candidates = mutable.Buffer[Token]()
+      val candidates = mutable.Buffer[(Token, Int)]()
       var usesRetAsName = false
       val stack = mutable.Stack[Bracket]()
       // The `[` that opens a `do[...]`'s type, by stack depth, so its `]` knows that the
@@ -145,27 +155,63 @@ object Migrator:
               nextBraceIsDo = next.exists(_.image == "{")
           case "ret" if token.kind == K.ID =>
             if stack.headOption.contains(Bracket.DoBrace) && startsClause(previous) && takesOperand(next) then
-              candidates += token
+              candidates += ((token, i))
             else usesRetAsName = true
           case _ => ()
         if token.image == "{" then nextBraceIsDo = false
       }
 
-      val located = candidates.toSeq.flatMap { token =>
+      val located = candidates.toSeq.flatMap { (token, index) =>
         offsetOf(source, token.beginLine, token.beginColumn)
           .filter(offset => source.startsWith("ret", offset))
-          .map(offset => (token, offset))
+          .map(offset => (token, index, offset))
       }
       if usesRetAsName then
-        (Nil, located.map { (token, _) =>
+        (Nil, located.map { (token, _, _) =>
           Unsure(token.beginLine, token.beginColumn,
             "this `ret` may be the old do-block keyword, but the file also uses `ret` as a name; " +
               "if it ends the do block, change it to `yield` by hand")
         })
       else
-        (located.map { (token, offset) =>
+        val (last, notLast) = located.partition((_, index, _) => endsDoBlock(tokens, index))
+        (last.map { (token, _, offset) =>
           Edit(offset, 3, "yield", token.beginLine, token.beginColumn, "ret -> yield")
-        }, Nil)
+        }, notLast.map { (token, _, _) =>
+          Unsure(token.beginLine, token.beginColumn,
+            "this `ret` is not the last clause of its do block, so it is a call through a name " +
+              "`ret` declared elsewhere, not the old keyword; left as written")
+        })
+
+    /**
+     * Whether the clause the `ret` at `start` begins runs to the end of its do block. Only the
+     * tokens of that block itself are looked at, not those inside brackets nested in it: a
+     * `<-`, a `yield`, a `;` before anything but the closing `}`, or a new line that neither
+     * continues the line before nor is continued by it, starts another clause.
+     */
+    private def endsDoBlock(tokens: IndexedSeq[Token], start: Int): Boolean =
+      var depth = 0
+      var previous = tokens(start)
+      var i = start + 1
+      var result: Option[Boolean] = None
+      while result.isEmpty && i < tokens.length do
+        val token = tokens(i)
+        val image = token.image
+        if depth == 0 then
+          if image == "}" || image == ")" || image == "]" then result = Some(true)
+          else if image == "<-" || token.kind == K.K_YIELD then result = Some(false)
+          else if image == ";" then
+            if !tokens.lift(i + 1).exists(_.image == "}") then result = Some(false)
+          else if token.beginLine > previous.endLine && i > start + 1 &&
+            !Continuations.contains(image) && !OpenEnds.contains(previous.image) then
+            result = Some(false)
+        if result.isEmpty then
+          image match
+            case "(" | "[" | "{" => depth += 1
+            case ")" | "]" | "}" => depth -= 1
+            case _ => ()
+          if depth == 0 then previous = token
+          i += 1
+      result.getOrElse(true)
 
     /** The token before a do clause: the block's `{`, a `;`, or the end of the clause before. */
     private def startsClause(previous: Option[Token]): Boolean =

@@ -157,7 +157,7 @@ Rules so far:
 |---|---|---|
 | A `do` block's final value | `ret a + b` | `yield a + b` |
 
-A variable named `ret` is never renamed. See [Migrating to 1.0](../migration/pre-1.0.md) for each change.
+A variable or method named `ret` is never renamed. Only a `ret` that ends its `do` block is rewritten; any other `ret` is reported, and the command exits 1. See [Migrating to 1.0](../migration/pre-1.0.md) for each change.
 
 ### `onion doc`
 

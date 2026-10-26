@@ -152,6 +152,42 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       }
     }
 
+    // The panel's cases on b7deb07, ranked by the rule written on #2447.
+    for (intFirst <- Seq(true, false)) {
+      val order = if (intFirst) "Int first" else "Int last"
+      it(s"picks f(n: Int, g) over f(n: Object, g) for an Int argument and a lambda ($order)") {
+        val i = "  def f(n: Int, g: (Int) -> Int): String = \"int:\" + g(1)"
+        val o = "  def f(n: Object, g: (Int) -> Int): String = \"obj:\" + g(1)"
+        val decls = Seq("extension String {", if (intFirst) i else o, if (intFirst) o else i, "}").mkString("\n")
+        assert(Shell.Success("int:1") == runMain(decls, """"a".f(5, (x: Int) -> x)"""))
+      }
+
+      it(s"picks fold2(z: Int, g) over fold2[A](z: A, g) ($order)") {
+        val i = "  def fold2(z: Int, g: (Int) -> Int): String = \"int:\" + g(z)"
+        val a = "  def fold2[A](z: A, g: (A) -> A): String = \"gen:\" + g(z)"
+        val decls = Seq("extension String {", if (intFirst) i else a, if (intFirst) a else i, "}").mkString("\n")
+        assert(Shell.Success("int:1004") == runMain(decls, """"a".fold2(1000, (x: Int) -> x + 4)"""))
+      }
+
+      it(s"lets the receiver decide between (String) -> void and (Object) -> void (${if (intFirst) "String" else "Object"} block first)") {
+        val str = "extension String { def m(f: (String) -> void): String = \"string\" }"
+        val obj = "extension Object { def m(f: (Object) -> void): String = \"object\" }"
+        val decls = if (intFirst) str + "\n" + obj else obj + "\n" + str
+        assert(Shell.Success("string,string") ==
+          runMain(decls, """"abc".m { x -> IO::print("") } + "," + "abc".m((s: String) -> IO::print(""))"""))
+      }
+    }
+
+    it("is one E0006 when the parameters and the receivers disagree") {
+      val codes = errorCodes(
+        """extension Object { def z(f: (Object) -> void): String = "objfn" }
+          |extension String { def z(o: Object): String = "strobj" }
+          |IO::println("abc".z((x: Object) -> IO::print("")))
+          |""".stripMargin
+      )
+      assert(codes == Seq(Some("E0006")))
+    }
+
     it("reports a lambda that fits nothing against the overload of its arity") {
       val codes = errorCodes(
         """extension String {

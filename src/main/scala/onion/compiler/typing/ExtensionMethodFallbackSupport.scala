@@ -394,7 +394,9 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         break(tryExtensionMethodCallBidirectional(node, listTarget, listType, context, expected, untypedClosureIndices))
       case None =>
     }
-    def attempt(extMethod: ExtensionMethodDefinition): Option[Term] = {
+    // The call typed against one overload, with the substituted parameter types and the
+    // argument types, which the ranking below compares as the class path does.
+    def attemptRanked(extMethod: ExtensionMethodDefinition): Option[(Term, Array[Type], Array[Type])] = {
       val container = extMethod.containerClass
       val receiverType = staticReceiver(target, extMethod).`type`
       val statics = container.methods(name).filter { m =>
@@ -447,40 +449,68 @@ private[compiler] final class ExtensionMethodFallbackSupport(
             val finalExpectedArgs = TypeSubst.args(method, classSubst, finalSubst)
             calls.processParamsWithExpected(node, staticArgs, finalExpectedArgs).map { finalParams =>
               val call = new CallStatic(container, method, finalParams)
-              TypeSubst.withCast(call, TypeSubst.result(method.returnType, classSubst, finalSubst))
+              (TypeSubst.withCast(call, TypeSubst.result(method.returnType, classSubst, finalSubst)),
+                finalExpectedArgs.drop(1), finalArgs.map(_.`type`))
             }
           }
         }
     }
+    def attempt(extMethod: ExtensionMethodDefinition): Option[Term] = attemptRanked(extMethod).map(_._1)
 
-    // Several user overloads: the rule class methods use (#2447). Type the call against
-    // each one without reporting and keep those the arguments fit. A fit that takes each
-    // lambda as it is (a function type, `Object`) beats one that needs a SAM conversion
-    // (`Runnable`); among the rest the most specific receiver and parameters win
-    // (`String` over `Object`, `(Int) -> String` over `Object`).
+    // Several user overloads: the rule written on #2447. Type the call against each one
+    // without reporting and keep the fits. A fit that takes each lambda as it is (a function
+    // type, `Object`, a type variable) beats one that needs a SAM conversion (`Runnable`).
+    // Then a fit wins over another when its parameters rank higher, as for class methods,
+    // and its receiver is not less specific; or when the parameters tie and its receiver is
+    // more specific. Parameters and receiver disagreeing, or no winner, is one E0006.
     val user = candidates.filterNot(isBuiltinExtension)
     if (user.length >= 2) {
-      val fits = user.filter(m => typing.withSuppressedReporting(attempt(m)).isDefined)
+      val fits = user.flatMap(m => typing.withSuppressedReporting(attemptRanked(m)).map(r => (m, r._2, r._3)))
       if (fits.isEmpty) {
         val builtins = candidates.filter(isBuiltinExtension)
         break(if (builtins.isEmpty) attempt(closestByArity(user, args)) else builtins.iterator.flatMap(attempt).nextOption())
       }
-      val direct = fits.filter(m => untypedClosureIndices.forall(i => i >= m.arguments.length || takesLambdaDirectly(m.arguments(i))))
+      val direct = fits.filter { case (m, _, _) =>
+        untypedClosureIndices.forall(i => i >= m.arguments.length || takesLambdaDirectly(m.arguments(i)))
+      }
       val pool = if (direct.nonEmpty) direct else fits
-      val applicable = pool.map(m => ApplicableMethod(m, m.receiverType +: m.arguments, Map.empty)).toList
-      overloadSupport.selectMostSpecificApplicable(applicable) match {
-        case CandidateSelection.Selected(am) =>
-          break(attempt(am.method.asInstanceOf[ExtensionMethodDefinition]))
-        case CandidateSelection.Ambiguous(first, second) =>
-          val a = first.method.asInstanceOf[ExtensionMethodDefinition]
-          val b = second.method.asInstanceOf[ExtensionMethodDefinition]
-          calls.reportAmbiguousSignature(node, a.containerClass, name, a.arguments, b.containerClass, name, b.arguments)
+      def beats(a: (ExtensionMethodDefinition, Array[Type], Array[Type]), b: (ExtensionMethodDefinition, Array[Type], Array[Type])): Boolean = {
+        val params = rankParameters(a._1, a._2, b._1, b._2, a._3)
+        val receiver =
+          if (isMoreSpecificReceiver(a._1.receiverType, b._1.receiverType)) -1
+          else if (isMoreSpecificReceiver(b._1.receiverType, a._1.receiverType)) 1
+          else 0
+        (params < 0 && receiver <= 0) || (params == 0 && receiver < 0)
+      }
+      pool.find(a => pool.forall(b => (a eq b) || beats(a, b))) match {
+        case Some((winner, _, _)) => break(attempt(winner))
+        case None =>
+          val unbeaten = pool.filter(a => !pool.exists(b => (a ne b) && beats(b, a)))
+          val (first, second) = unbeaten match {
+            case Seq(x, y, _*) => (x._1, y._1)
+            case _ => (pool(0)._1, pool(1)._1)
+          }
+          calls.reportAmbiguousSignature(node, first.containerClass, name, first.arguments, second.containerClass, name, second.arguments)
           break(None)
-        case CandidateSelection.NoMatch =>
       }
     }
     candidates.iterator.flatMap(attempt).nextOption()
   }
+
+  /** -1 when parameters `a` rank above `b` the way class overloads do (subtypes, then the
+   *  primitive tiebreak for `argTypes`: `Int` over `Object`, `Integer` or a type variable),
+   *  1 for the reverse, 0 when they are equal or cannot be ranked. */
+  private def rankParameters(
+    methodA: Method, a: Array[Type], methodB: Method, b: Array[Type], argTypes: Array[Type]
+  ): Int =
+    if (TypeRules.isAllSuperType(a, b) && TypeRules.isAllSuperType(b, a)) 0
+    else {
+      val (ma, mb) = (ApplicableMethod(methodA, a, Map.empty), ApplicableMethod(methodB, b, Map.empty))
+      overloadSupport.selectMostSpecificApplicable(List(ma, mb), argTypes = argTypes) match {
+        case CandidateSelection.Selected(am) => if (am eq ma) -1 else 1
+        case _ => 0
+      }
+    }
 
   /** A parameter a lambda reaches with no SAM conversion: an Onion function type, `Object`
    *  or a type variable. */

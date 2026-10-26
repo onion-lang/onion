@@ -157,6 +157,9 @@ Migrated 1 of 4 file(s)
 - **Files that use each other are fine.** A file that compiles neither way on its own is
   tried again compiled together with every file you named. Name the whole project:
   `onion migrate src/ tests/`.
+  A syntax error in any of them stops that compile before it can check anything. Such a
+  file then counts as needing a manual change, and the syntax error is printed.
+  A file that cannot be read is reported and left out.
 - **`-classpath <path>`** is where classes from outside the named files come from, such as a
   library's jar.
 

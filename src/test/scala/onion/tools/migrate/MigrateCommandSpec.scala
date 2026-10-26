@@ -415,6 +415,64 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     }
     read(root.resolve("Main.on")) shouldBe main
 
+  test("the panel's repro: a file that cannot be read is left out of the joint pass"):
+    val root = Files.createTempDirectory("onion-migrate-project").toRealPath()
+    val src = Files.createDirectories(root.resolve("src"))
+    val model =
+      """class Calc {
+        |public:
+        |  def this {}
+        |  def add(x: Int, b: Int): Option[Int] = do[Option] { a <- Option::some(x); ret a + b }
+        |}
+        |""".stripMargin
+    val main = "val c = new Calc()\nval r = do[Option] { s <- c.add(1, 2); ret s * 10 }\nIO::println(r)\n"
+    Files.writeString(src.resolve("model.on"), model, UTF_8)
+    Files.writeString(src.resolve("main.on"), main, UTF_8)
+    Files.write(src.resolve("sjis.on"), "IO::println(\"こんにちは\")\n".getBytes("Shift_JIS"))
+
+    val result = invoke(root, src.toString)
+
+    withClue(result.stdout + result.stderr) {
+      result.exitCode shouldBe 1
+      result.stderr should include("Could not migrate src/sjis.on")
+      result.stdout should include("Migrated 2 of 3 file(s)")
+    }
+    read(src.resolve("model.on")) shouldBe model.replace("ret a + b", "yield a + b")
+    read(src.resolve("main.on")) shouldBe main.replace("ret s * 10", "yield s * 10")
+
+    val again = invoke(root, src.toString)
+    withClue(again.stdout + again.stderr) {
+      again.exitCode shouldBe 1
+      again.stdout should include("2 file(s) already up to date")
+    }
+
+  test("the panel's repro: a syntax error in another file makes a pending ret undecided, not a name"):
+    val root = Files.createTempDirectory("onion-migrate-project").toRealPath()
+    val src = Files.createDirectories(root.resolve("src"))
+    val tests = Files.createDirectories(root.resolve("tests"))
+    val util =
+      """class Util {
+        |public:
+        |  static def add(a: Int, b: Int): Option[Int] = do[Option] { x <- Option::some(a); ret x + b }
+        |}
+        |""".stripMargin
+    val t = "val r = do[Option] { a <- Util::add(1, 2); ret a * 10 }\n"
+    val broken = "val x: Int = (\n"
+    Files.writeString(src.resolve("Util.on"), util, UTF_8)
+    Files.writeString(tests.resolve("T.on"), t, UTF_8)
+    Files.writeString(src.resolve("Main.on"), broken, UTF_8)
+
+    val result = invoke(root, src.toString, tests.toString)
+
+    withClue(result.stdout + result.stderr) {
+      result.exitCode shouldBe 1
+      result.stdout should not include "compiles as written"
+      result.stderr should include("tests/T.on:1:44:")
+      result.stderr should include("src/Main.on")
+      result.stdout should include("1 file(s) need a manual change")
+    }
+    read(tests.resolve("T.on")) shouldBe t
+
   test("a file that compiles neither way is reported with the compiler's first error"):
     val source = "val o = do[Option] { a <- Option::some(1); ret a }\nval n: Int = \"no\"\n"
     val (root, file) = script(source)

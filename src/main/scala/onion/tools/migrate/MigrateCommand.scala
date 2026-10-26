@@ -25,7 +25,10 @@ import onion.tools.format.FormatCommand
  * rewritten only if the rewritten file compiles. Otherwise its places are printed to stderr,
  * the file is left as it was, the summary counts it as needing a manual change, and the exit
  * code is 1. Each file is compiled on its own, against `-classpath` (default: none); a file
- * that compiles neither way alone is tried again compiled together with every named file.
+ * that compiles neither way alone is tried again compiled together with every named file that
+ * could be read. That joint pass only narrows: if the joint compile stops before type checking
+ * (a syntax error in any file), it decides nothing, and the file is reported as needing a
+ * manual change.
  *
  * `--check` writes nothing and exits 1 if anything would change.
  *
@@ -96,9 +99,11 @@ object MigrateCommand:
 
     var changed = 0
     var undecided = 0
+    // Files that could not be read or migrated at all: never counted as up to date.
+    var skipped = 0
     var failed = false
-    // The new text of each file, once decided; a file that is not here keeps its own.
-    val decided = mutable.LinkedHashMap[Path, String]()
+    // The text each readable file has now: rewritten once decided, as read otherwise.
+    val texts = mutable.LinkedHashMap[Path, String]()
     // Files that compile neither way on their own: they may need the other named files.
     val pending = mutable.LinkedHashMap[Path, (String, Migrator.Result)]()
 
@@ -108,25 +113,41 @@ object MigrateCommand:
         err.println("This is a bug in onion migrate. Please report it with the file.")
         failed = true
       else
-        changed += 1
-        decided(file) = result.text
-        result.edits.foreach(e => out.println(s"${display(file)}:${e.line}:${e.column}: ${e.note}"))
-        if !check then Files.writeString(file, result.text, UTF_8)
+        try
+          if !check then Files.writeString(file, result.text, UTF_8)
+          changed += 1
+          texts(file) = result.text
+          result.edits.foreach(e => out.println(s"${display(file)}:${e.line}:${e.column}: ${e.note}"))
+        catch
+          case error: IOException =>
+            err.println(s"error: Could not write ${display(file)}: ${error.getMessage}")
+            failed = true
 
-    def cannotTell(file: Path, result: Migrator.Result, problems: Seq[Compile.Problem]): Unit =
+    /** `stopped` is the error that kept the joint compile from type checking, if one did. */
+    def cannotTell(
+      file: Path,
+      result: Migrator.Result,
+      problems: Seq[Compile.Problem],
+      stopped: Option[Compile.Problem] = None
+    ): Unit =
       undecided += 1
       failed = true
+      val why = stopped match
+        case Some(_) => "Another error stops the compiler before it can check this file, so onion migrate left it as written."
+        case None => "The file does not compile with `yield` there either, so onion migrate left it as written."
       result.edits.foreach { e =>
-        err.println(s"${display(file)}:${e.line}:${e.column}: this `ret` may be the old do-block keyword. " +
-          "The file does not compile with `yield` there either, so onion migrate left it as written.")
+        err.println(s"${display(file)}:${e.line}:${e.column}: this `ret` may be the old do-block keyword. " + why)
       }
-      problems.headOption.foreach(p => err.println(s"  first error with `yield`: ${p.render(display)}"))
+      stopped match
+        case Some(p) => err.println(s"  the error: ${p.render(display)}")
+        case None => problems.headOption.foreach(p => err.println(s"  first error with `yield`: ${p.render(display)}"))
       err.println("  Fix that error and run onion migrate again, or change the `ret` by hand. " +
         "If the file uses classes from other files, name those files too, or pass -classpath.")
 
     files.foreach { file =>
       try
         val source = Files.readString(file, UTF_8)
+        texts(file) = source
         val result = Migrator.migrate(source)
         result.notes.foreach(n => note(file, n.line, n.column, n.message))
         if result.changed then
@@ -136,40 +157,51 @@ object MigrateCommand:
       catch
         case error: IOException =>
           err.println(s"error: Could not migrate ${display(file)}: ${error.getMessage}")
+          skipped += 1
+          texts.remove(file)
           failed = true
         case _: StackOverflowError =>
           err.println(s"error: Could not migrate ${display(file)}: it nests too deeply; left untouched")
+          skipped += 1
+          texts.remove(file)
           failed = true
     }
 
     // A file may use classes another named file declares, so the undecided ones get a second
-    // chance compiled together with every named file, with the same rule: a file that
-    // compiles as written is left alone, and a rewrite is kept only if it compiles.
+    // chance compiled together with every named file that could be read, with the same rule:
+    // a file that compiles as written is left alone, and a rewrite is kept only if it
+    // compiles. The joint pass only narrows what the first pass decided: a joint compile that
+    // stops before type checking proves nothing about a file, so the file stays undecided.
     if pending.nonEmpty then
-      val unit = (rewritten: Set[Path]) => files.map { file =>
+      val joint = texts.size > 1
+      val unit = (rewritten: Set[Path]) => texts.toSeq.map { (file, text) =>
         pending.get(file) match
           case Some((source, result)) => file -> (if rewritten(file) then result.text else source)
-          case None => file -> decided.getOrElse(file, Files.readString(file, UTF_8))
+          case None => file -> text
       }
       val failing = (problems: Seq[Compile.Problem], file: Path) =>
         problems.filter(p => p.file.forall(_ == file.toString))
-      val asWritten = if files.size > 1 then Compile.problems(unit(Set.empty), classpath) else Seq()
+      val asWritten = if joint then Compile.check(unit(Set.empty), classpath) else Compile.Report(Seq(), true)
       val candidates =
-        if files.size > 1 then pending.keySet.filter(f => failing(asWritten, f).nonEmpty).toSet
+        if joint then pending.keySet.filter(f => failing(asWritten.problems, f).nonEmpty).toSet
         else pending.keySet.toSet
-      val withYield = Compile.problems(unit(candidates), classpath)
+      val withYield = Compile.check(unit(candidates), classpath)
       pending.foreach { case (file, (source, result)) =>
-        if !candidates(file) then compilesAsWritten(file, result)
+        if !candidates(file) then
+          if asWritten.typed then compilesAsWritten(file, result)
+          else cannotTell(file, result, asWritten.problems, asWritten.problems.headOption)
         else
-          val left = failing(withYield, file)
-          if left.isEmpty && files.size > 1 then rewrite(file, source, result)
-          else cannotTell(file, result, if left.nonEmpty then left else withYield)
+          val left = failing(withYield.problems, file)
+          if left.nonEmpty then cannotTell(file, result, left)
+          else if !withYield.typed then cannotTell(file, result, withYield.problems, withYield.problems.headOption)
+          else if joint then rewrite(file, source, result)
+          else cannotTell(file, result, withYield.problems)
       }
 
-    val upToDate = files.size - changed - undecided
+    val upToDate = files.size - changed - undecided - skipped
     if check && changed > 0 then out.println(s"$changed file(s) would be migrated")
     else if changed > 0 then out.println(s"Migrated $changed of ${files.size} file(s)")
-    else if upToDate > 0 || undecided == 0 then out.println(s"$upToDate file(s) already up to date")
+    else if upToDate > 0 || undecided + skipped == 0 then out.println(s"$upToDate file(s) already up to date")
     if undecided > 0 then out.println(s"$undecided file(s) need a manual change")
 
     if failed then 1
@@ -215,16 +247,26 @@ object MigrateCommand:
       def render(display: Path => String): String =
         file.fold(message)(f => s"${display(Path.of(f))}:$line:$column: $message")
 
+    /** The errors of one compile, and whether it got as far as type checking. */
+    final case class Report(problems: Seq[Problem], typed: Boolean)
+
     /** The errors compiling `sources` together against `classpath`; empty when it compiles. */
     def problems(sources: Seq[(Path, String)], classpath: Seq[String]): Seq[Problem] =
+      check(sources, classpath).problems
+
+    def check(sources: Seq[(Path, String)], classpath: Seq[String]): Report =
       val config = CompilerConfig(classpath, null, "UTF-8", "", 1000,
         warningLevel = onion.compiler.WarningLevel.Off, checkLaws = false)
       try
         val inputs = sources.map((file, text) => StringInputSource(text, file.toString))
-        new OnionCompiler(config).compileDetailed(inputs).allErrors.map { e =>
+        val result = new OnionCompiler(config).compileDetailed(inputs)
+        val problems = result.allErrors.map { e =>
           val location = Option(e.location)
           Problem(Option(e.sourceFile), location.fold(0)(_.line), location.fold(0)(_.column), e.message)
         }
+        Report(problems, result.timings.exists(_.name == TypingPhaseName))
       catch
         case error: (Exception | StackOverflowError) =>
-          Seq(Problem(None, 0, 0, s"the compiler failed: $error"))
+          Report(Seq(Problem(None, 0, 0, s"the compiler failed: $error")), false)
+
+    private val TypingPhaseName = "Typing"

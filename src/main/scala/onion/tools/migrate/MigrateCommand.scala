@@ -20,16 +20,21 @@ import onion.tools.format.FormatCommand
  * walked for `.on` files, as `onion fmt` does.
  *
  * Whether a place a rule found really is the old spelling can depend on names declared
- * outside the file, so the compiler decides. A file that compiles as written is never
- * changed: its places are names, printed to stdout as a `note:`. A file that does not is
- * rewritten only if the rewritten file compiles, and only if the named files compiled together
- * as written do not compile it either (another file may declare the name). Otherwise its places are printed to stderr,
- * the file is left as it was, the summary counts it as needing a manual change, and the exit
- * code is 1. Each file is compiled on its own, against `-classpath` (default: none); a file
- * that compiles neither way alone is tried again compiled together with every named file that
- * could be read. That joint pass only narrows: if the joint compile stops before type checking
- * (a syntax error in any file), it decides nothing, and the file is reported as needing a
- * manual change.
+ * outside the file, so the compiler decides (the rule is written down on #2442). A file that
+ * compiles on its own as written is never changed: its places are names, printed to stdout as
+ * a `note:`. The others are compiled together with every named file that could be read,
+ * against `-classpath` (default: none):
+ *  - no error in the file: its places are names another file declares, noted and left alone;
+ *  - every error in the joint compile, in any file, is at a place (`ret` not found, or not
+ *    applicable), and with its places rewritten the file has no error: it is rewritten;
+ *  - a file that does not parse as written, but does with its places rewritten, means
+ *    nothing as written: it is read with them rewritten, and kept so if it then has no error;
+ *  - anything else (an error anywhere that is not at a place, an error left after the rewrite, a
+ *    compile stopped before type checking): its places are printed to stderr with that
+ *    error, the file is left as it was, the summary counts it as needing a manual change, and
+ *    the exit code is 1.
+ * An error that is not at a place proves nothing: it may come from another file named
+ * alongside (a duplicate class), and change which names are found.
  *
  * `--check` writes nothing and exits 1 if anything would change.
  *
@@ -54,7 +59,11 @@ object MigrateCommand:
           missing.foreach(path => err.println(s"error: No such file or directory: $path"))
           2
         else
-          val files = paths.flatMap(FormatCommand.expand).distinct.sortBy(_.toString)
+          // One file named under two spellings (`t6` and `./t6/Main.on`) is one file.
+          val files = paths.flatMap(FormatCommand.expand)
+            .map(_.toAbsolutePath.normalize)
+            .distinctBy(file => try file.toRealPath() catch case _: IOException => file)
+            .sortBy(_.toString)
           if files.isEmpty then
             err.println("error: No .on files to migrate")
             1
@@ -105,11 +114,11 @@ object MigrateCommand:
     var failed = false
     // The text each readable file has now: rewritten once decided, as read otherwise.
     val texts = mutable.LinkedHashMap[Path, String]()
-    // Files that compile on their own only with `yield`: another named file may still make
-    // them compile as written (an extension, say), so the rewrite waits for the joint check.
-    val alone = mutable.LinkedHashMap[Path, (String, Migrator.Result)]()
-    // Files that compile neither way on their own: they may need the other named files.
+    // Files that do not compile on their own as written: the joint compile decides them.
     val pending = mutable.LinkedHashMap[Path, (String, Migrator.Result)]()
+    // Pending files that do not even parse as written, but do with `yield` (`ret [a, b]`): as
+    // written they mean nothing, so the joint compile reads them with `yield` from the start.
+    val unparsed = mutable.Set[Path]()
 
     def rewrite(file: Path, source: String, result: Migrator.Result): Unit =
       if !preserved(source, result) then
@@ -137,13 +146,13 @@ object MigrateCommand:
       undecided += 1
       failed = true
       val why = stopped match
-        case Some(_) => "Another error stops the compiler before it can check this file, so onion migrate left it as written."
+        case Some(_) => "The compiler reports another error, so it cannot tell, and onion migrate left it as written."
         case None => "The file does not compile with `yield` there either, so onion migrate left it as written."
       result.edits.foreach { e =>
         err.println(s"${display(file)}:${e.line}:${e.column}: this `ret` may be the old do-block keyword. " + why)
       }
       stopped match
-        case Some(p) => err.println(s"  the error: ${p.render(display)}")
+        case Some(p) => err.println(s"  the other error: ${p.render(display)}")
         case None => problems.headOption.foreach(p => err.println(s"  first error with `yield`: ${p.render(display)}"))
       err.println("  Fix that error and run onion migrate again, or change the `ret` by hand. " +
         "If the file uses classes from other files, name those files too, or pass -classpath.")
@@ -155,9 +164,11 @@ object MigrateCommand:
         val result = Migrator.migrate(source)
         result.notes.foreach(n => note(file, n.line, n.column, n.message))
         if result.changed then
-          if Compile.problems(Seq(file -> source), classpath).isEmpty then compilesAsWritten(file, result)
-          else if Compile.problems(Seq(file -> result.text), classpath).isEmpty then alone(file) = (source, result)
-          else pending(file) = (source, result)
+          val alone = Compile.check(Seq(file -> source), classpath)
+          if alone.problems.isEmpty then compilesAsWritten(file, result)
+          else
+            pending(file) = (source, result)
+            if !alone.typed && Compile.check(Seq(file -> result.text), classpath).typed then unparsed += file
       catch
         case error: IOException =>
           err.println(s"error: Could not migrate ${display(file)}: ${error.getMessage}")
@@ -171,47 +182,42 @@ object MigrateCommand:
           failed = true
     }
 
-    val joint = texts.size > 1
     val failing = (problems: Seq[Compile.Problem], file: Path) =>
       problems.filter(p => p.file.forall(_ == file.toString))
+    val atPlace = (p: Compile.Problem, result: Migrator.Result) =>
+      p.file.nonEmpty && result.edits.exists(e => e.line == p.line && e.column == p.column)
 
-    // A rewrite decided alone is kept only if the named files, compiled together as written,
-    // do not already compile this file: then its `ret` is a name another file declares. A
-    // joint compile that stops before type checking cannot confirm it, so it stays undecided.
-    if alone.nonEmpty then
-      val asWritten = if joint then Compile.check(texts.toSeq, classpath) else Compile.Report(Seq(), true)
-      alone.foreach { case (file, (source, result)) =>
-        if !asWritten.typed then cannotTell(file, result, asWritten.problems, asWritten.problems.headOption)
-        else if joint && failing(asWritten.problems, file).isEmpty then compilesAsWritten(file, result)
-        else rewrite(file, source, result)
-      }
-
-    // A file may use classes another named file declares, so the undecided ones get a second
-    // chance compiled together with every named file that could be read, with the same rule:
-    // a file that compiles as written is left alone, and a rewrite is kept only if it
-    // compiles. The joint pass only narrows what the first pass decided: a joint compile that
-    // stops before type checking proves nothing about a file, so the file stays undecided.
+    // A file may use classes, or a `ret`, another named file declares, so every undecided
+    // file is compiled together with every named file that could be read: once as written,
+    // once with the files that have errors rewritten. The first compile decides only if every
+    // error in it, in any file, is at a place: any other error (a class two unrelated scripts
+    // both declare, say) may be why a name is or is not found, so it proves nothing.
     if pending.nonEmpty then
       val unit = (rewritten: Set[Path]) => texts.toSeq.map { (file, text) =>
         pending.get(file) match
-          case Some((source, result)) => file -> (if rewritten(file) then result.text else source)
+          case Some((source, result)) => file -> (if rewritten(file) || unparsed(file) then result.text else source)
           case None => file -> text
       }
-      val asWritten = if joint then Compile.check(unit(Set.empty), classpath) else Compile.Report(Seq(), true)
-      val candidates =
-        if joint then pending.keySet.filter(f => failing(asWritten.problems, f).nonEmpty).toSet
-        else pending.keySet.toSet
-      val withYield = Compile.check(unit(candidates), classpath)
+      val asWritten = Compile.check(unit(Set.empty), classpath)
+      val other = asWritten.problems.find { p =>
+        !pending.exists { case (file, (_, result)) => !unparsed(file) && p.file.contains(file.toString) && atPlace(p, result) }
+      }
+      val decides = asWritten.typed && other.isEmpty
+      val candidates = pending.keySet.filter(file => !unparsed(file) && failing(asWritten.problems, file).nonEmpty).toSet
+      val withYield = if decides && candidates.nonEmpty then Compile.check(unit(candidates), classpath) else asWritten
       pending.foreach { case (file, (source, result)) =>
-        if !candidates(file) then
-          if asWritten.typed then compilesAsWritten(file, result)
-          else cannotTell(file, result, asWritten.problems, asWritten.problems.headOption)
+        val mine = failing(asWritten.problems, file)
+        if mine.isEmpty && !unparsed(file) && asWritten.typed then compilesAsWritten(file, result)
+        else if !decides then cannotTell(file, result, asWritten.problems, other.orElse(asWritten.problems.headOption))
+        else if unparsed(file) then
+          val left = failing(withYield.problems, file)
+          if left.isEmpty && withYield.typed then rewrite(file, source, result)
+          else cannotTell(file, result, left)
         else
           val left = failing(withYield.problems, file)
           if left.nonEmpty then cannotTell(file, result, left)
           else if !withYield.typed then cannotTell(file, result, withYield.problems, withYield.problems.headOption)
-          else if joint then rewrite(file, source, result)
-          else cannotTell(file, result, withYield.problems)
+          else rewrite(file, source, result)
       }
 
     val upToDate = files.size - changed - undecided - skipped

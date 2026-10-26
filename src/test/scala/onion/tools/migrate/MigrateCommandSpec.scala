@@ -521,6 +521,102 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     read(tests.resolve("T.on")) shouldBe t
     read(src.resolve("Util.on")) shouldBe util
 
+  /** The panel's ninth-round repro: `Main.on` uses an extension's `ret`, `A.on` is unrelated. */
+  private def extensionAndUnrelated(dir: Path, unrelated: String): (String, String) =
+    val ext = "extension Main {\n  def ret(): Option[Int] = Option::none()\n}\n"
+    val main =
+      """class Helper {
+        |public:
+        |  static def ten(): Int = 10
+        |}
+        |class Main {
+        |public:
+        |  def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(Helper::ten()); ret a }
+        |  static def main(args: String[]): void { IO::println(new Main().go()) }
+        |}
+        |""".stripMargin
+    Files.writeString(dir.resolve("Ext.on"), ext, UTF_8)
+    Files.writeString(dir.resolve("Main.on"), main, UTF_8)
+    Files.writeString(dir.resolve(unrelated),
+      "class Helper {\npublic:\n  static def ten(): Int = 20\n}\nIO::println(Helper::ten())\n", UTF_8)
+    (ext, main)
+
+  test("the panel's repro: an error that is not at a ret decides nothing, whatever the file names"):
+    for unrelated <- Seq("A.on", "Zed.on") do
+      val root = Files.createTempDirectory("onion-migrate-names").toRealPath()
+      val (_, main) = extensionAndUnrelated(root, unrelated)
+
+      val result = invoke(root, root.toString)
+
+      withClue(s"$unrelated: " + result.stdout + result.stderr) {
+        result.stdout should not include "ret -> yield"
+        read(root.resolve("Main.on")) shouldBe main
+      }
+
+  test("an error in another file decides nothing: two unrelated Base classes, only one declares ret"):
+    val root = Files.createTempDirectory("onion-migrate-base").toRealPath()
+    val main =
+      """class Main extends Base {
+        |public:
+        |  def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret a }
+        |  static def main(args: String[]): void { IO::println(new Main().go()) }
+        |}
+        |""".stripMargin
+    // The real program is B.on + Main.on; A.on is an unrelated script with its own Base.
+    Files.writeString(root.resolve("A.on"), "class Base {\npublic:\n  def this {}\n}\nIO::println(1)\n", UTF_8)
+    Files.writeString(root.resolve("B.on"),
+      "class Base {\npublic:\n  def this {}\n  def ret(): Option[Int] = Option::none()\n}\n", UTF_8)
+    Files.writeString(root.resolve("Main.on"), main, UTF_8)
+
+    val result = invoke(root, root.toString)
+
+    withClue(result.stdout + result.stderr) {
+      result.stdout should not include "ret -> yield"
+    }
+    read(root.resolve("Main.on")) shouldBe main
+
+  test("the panel's repro: one file named twice, under two spellings, is migrated once"):
+    val root = Files.createTempDirectory("onion-migrate-twice").toRealPath()
+    val dir = Files.createDirectories(root.resolve("t6"))
+    val main =
+      """class Main {
+        |public:
+        |  def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret a }
+        |  static def main(args: String[]): void { IO::println(new Main().go()) }
+        |}
+        |""".stripMargin
+    Files.writeString(dir.resolve("Ext.on"), "extension Main {\n  def ret(): Option[Int] = Option::none()\n}\n", UTF_8)
+    Files.writeString(dir.resolve("Main.on"), main, UTF_8)
+
+    val result = invoke(root, dir.toString, root.toString + "/./t6/Main.on")
+
+    withClue(result.stdout + result.stderr) {
+      result.exitCode shouldBe 0
+      result.stdout should include("t6/Main.on:4:62: note: the file compiles as written")
+      result.stdout should not include "ret -> yield"
+      result.stdout should include("2 file(s) already up to date")
+    }
+    read(dir.resolve("Main.on")) shouldBe main
+
+  test("a file whose old ret [..] does not parse is read with yield, and does not hold back the others"):
+    val root = Files.createTempDirectory("onion-migrate-unparsed").toRealPath()
+    val list = "val xs = do[Option] { a <- Option::some(1); ret [a, 2] }\nIO::println(xs)\n"
+    val other = "val o = do[Option] { b <- Option::some(3); ret b }\nIO::println(o)\n"
+    Files.writeString(root.resolve("list.on"), list, UTF_8)
+    Files.writeString(root.resolve("other.on"), other, UTF_8)
+
+    val result = invoke(root, root.toString)
+
+    withClue(result.stdout + result.stderr) {
+      result.exitCode shouldBe 0
+      result.stdout should include("Migrated 2 of 2 file(s)")
+    }
+    read(root.resolve("list.on")) shouldBe list.replace("ret [a, 2]", "yield [a, 2]")
+    read(root.resolve("other.on")) shouldBe other.replace("ret b", "yield b")
+
   test("a file that compiles neither way is reported with the compiler's first error"):
     val source = "val o = do[Option] { a <- Option::some(1); ret a }\nval n: Int = \"no\"\n"
     val (root, file) = script(source)

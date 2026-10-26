@@ -150,18 +150,25 @@ Migrated 1 of 4 file(s)
 - **Only code changes.** Strings, comments and spacing stay byte for byte. Code inside a
   string's `#{...}` is code, so it is migrated too.
 - **The compiler decides.** A file that compiles as written is never changed. A file that does
-  not is rewritten only if the rewritten file compiles.
+  not is rewritten only if every error in it is at a `ret` it would rewrite, and the rewritten
+  file compiles.
 - **It does not guess.** If neither version compiles, each place is printed with its line, and
   the file is left as it was. The summary counts it (`1 file(s) need a manual change`), and
   the exit code is `1`. The compiler's first error is printed too. Fix it, or the line by hand.
 - **Files that use each other are fine.** Each file is also checked compiled together with
   every file you named. If it compiles that way as written (another file declares `ret`, say,
-  in an `extension`), it is left alone. A file that compiles neither way on its own is
-  decided there. Name the whole project: `onion migrate src/ tests/`.
-  A syntax error in any of them stops that compile before it can check anything. A file
-  with a `ret` to decide then counts as needing a manual change, and the syntax error is
-  printed.
+  in an `extension`), it is left alone. Name the files that make up one program:
+  `onion migrate src/ tests/`.
+  An error that is not at a `ret`, in any named file, decides nothing. Two unrelated scripts
+  that both declare `class Helper` give one of them an `E0008`; then no file is rewritten,
+  and each `ret` is reported. Migrate such scripts one at a time:
+  `for f in scripts/*.on; do onion migrate "$f"; done`.
+  A syntax error stops that compile before it can check anything. A file with a `ret` to
+  decide then counts as needing a manual change, and the syntax error is printed. The
+  exception is an old `ret [a, b]`, which does not parse today: that file is read with
+  `yield`.
   A file that cannot be read is reported and left out.
+  A file named twice (`src` and `./src/Main.on`) is read once.
 - **`-classpath <path>`** is where classes from outside the named files come from, such as a
   library's jar.
 
@@ -178,8 +185,8 @@ compiler can tell:
 | The file | What `migrate` does |
 |---|---|
 | Compiles as written, alone or with the other named files | Leaves it, with a `note:`: `ret` is a name here |
-| Does not compile either way, but does with `yield` | Rewrites it to `yield` |
-| Compiles neither way | Reports it and exits 1 |
+| Does not compile, every error in the named files is at a `ret`, and it compiles with `yield` | Rewrites it to `yield` |
+| Has another error, or does not compile with `yield` either | Reports it, with that error, and exits 1 |
 
 A `ret` with another clause after it (`ret(a); yield a`) is always left alone, with a `note:`:
 the old keyword was only legal last, so it is a call.

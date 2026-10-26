@@ -103,9 +103,10 @@ object Migrator:
    * `ret e` → `yield e` in a `do[M] { ... }` block (#2291).
    *
    * Before the change `ret` was a keyword, legal only at the start of a do clause. So in a
-   * file written before it, every `ret` token is the keyword. A file written since may use
-   * `ret` as an ordinary name, and then a bare `ret` at the start of a clause is ambiguous:
-   * such a file's candidates are reported, not rewritten.
+   * file written before it, every `ret` token is a candidate. A `ret` anywhere else (a
+   * declaration, a lambda parameter, a destructuring or pattern binding, an argument) means
+   * the file was written since and uses `ret` as an ordinary name. Then a bare `ret` at the
+   * start of a clause is ambiguous: such a file's candidates are reported, not rewritten.
    */
   private object RetToYield:
     /** After these, `ret` is an operand, not the start of a clause. */
@@ -113,8 +114,6 @@ object Migrator:
       ".", "?.", "::", "=", "<-", ":", "->", ")", "]", "}", ";", ",", "++", "--",
       "*", "/", "%", "==", "!=", "===", "!==", "<", ">", "<=", ">=", "&&", "||", "?:", "|>",
       "+=", "-=", "*=", "/=", "%=", "as", "is", "instanceof")
-    private val Declares = Set("val", "var", "def", "foreach")
-    private val DeclaredBy = Set("<-", ":", "->", "=")
     private val ValueKeywords = Set("true", "false", "null", "this", "self", "super")
 
     private enum Bracket:
@@ -122,7 +121,7 @@ object Migrator:
 
     def find(source: String, tokens: IndexedSeq[Token]): (Seq[Edit], Seq[Unsure]) =
       val candidates = mutable.Buffer[Token]()
-      var declaresRet = false
+      var usesRetAsName = false
       val stack = mutable.Stack[Bracket]()
       // The `[` that opens a `do[...]`'s type, by stack depth, so its `]` knows that the
       // `{` after it opens a do block.
@@ -145,10 +144,9 @@ object Migrator:
             if token.image == "]" && doTypes.remove(stack.size) then
               nextBraceIsDo = next.exists(_.image == "{")
           case "ret" if token.kind == K.ID =>
-            if previous.exists(p => Declares.contains(p.image)) || next.exists(n => DeclaredBy.contains(n.image)) then
-              declaresRet = true
-            else if stack.headOption.contains(Bracket.DoBrace) && startsClause(previous) && takesOperand(next) then
+            if stack.headOption.contains(Bracket.DoBrace) && startsClause(previous) && takesOperand(next) then
               candidates += token
+            else usesRetAsName = true
           case _ => ()
         if token.image == "{" then nextBraceIsDo = false
       }
@@ -158,10 +156,10 @@ object Migrator:
           .filter(offset => source.startsWith("ret", offset))
           .map(offset => (token, offset))
       }
-      if declaresRet then
+      if usesRetAsName then
         (Nil, located.map { (token, _) =>
           Unsure(token.beginLine, token.beginColumn,
-            "this `ret` may be the old do-block keyword, but the file also declares a name `ret`; " +
+            "this `ret` may be the old do-block keyword, but the file also uses `ret` as a name; " +
               "if it ends the do block, change it to `yield` by hand")
         })
       else

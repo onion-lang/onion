@@ -114,7 +114,33 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     result.exitCode shouldBe 1
     read(file) shouldBe source
     result.stderr should include("old.on:2:46")
-    result.stderr should include("declares a name `ret`")
+    result.stderr should include("uses `ret` as a name")
+
+  test("a ret bound by a lambda parameter or a destructuring val is reported, not rewritten"):
+    val sources = Seq(
+      """val log: (Int) -> Option[Int] = (x) -> Option::some(x)
+        |val (ret, q) = [log, log]
+        |val o = do[Option] { a <- Option::some(1); ret(a); yield a }
+        |""".stripMargin,
+      """val f: ((Int) -> Option[Int]) -> Option[Int] =
+        |  (ret) -> do[Option] { a <- Option::some(1); ret(a); yield a + 1 }
+        |""".stripMargin,
+      """record Box(v: (Int) -> Option[Int])
+        |def g(b: Box): Option[Int] = select b {
+        |  case Box(ret): do[Option] { a <- Option::some(1); ret(a); yield a }
+        |}
+        |""".stripMargin)
+    sources.foreach { source =>
+      val (root, file) = script(source)
+
+      val result = invoke(root, file.toString)
+
+      withClue(source) {
+        result.exitCode shouldBe 1
+        read(file) shouldBe source
+        result.stderr should include("uses `ret` as a name")
+      }
+    }
 
   test("ret outside a do block, or after a dot, is not the keyword"):
     val source =

@@ -12,6 +12,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 ) {
   private val overloadSupport = new CallOverloadSupport(typing, calls)
 
+  /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
+   *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
+  def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
+    selectApplicableExtensionMethod(targetType, name, params).isInstanceOf[CandidateSelection.Ambiguous[?]]
+
   def tryExtensionMethodCall(
     node: AST.MethodCall,
     target: Term,
@@ -116,9 +121,30 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           case Seq(single) => Seq(single)
           case _ => pool
         }
-        if (chosen.isEmpty) CandidateSelection.NoMatch
-        else if (chosen.length > 1) CandidateSelection.Ambiguous(chosen(0), chosen(1))
-        else CandidateSelection.Selected(chosen.head)
+        // Then the rule class methods use for the remaining overloads, with the receiver as
+        // the first parameter: the one that is at least as specific everywhere wins
+        // (`ex(Char)` over `ex(Long)` for 'A').
+        val candidates = chosen.map(m => ApplicableMethod(m, m.receiverType +: m.arguments, Map.empty)).toList
+        val argTypes = (targetType: Type) +: calls.types(params)
+        overloadSupport.selectMostSpecificApplicable(candidates, argTypes = argTypes) match {
+          case CandidateSelection.NoMatch => CandidateSelection.NoMatch
+          case CandidateSelection.Ambiguous(first, second) =>
+            CandidateSelection.Ambiguous(
+              first.method.asInstanceOf[ExtensionMethodDefinition],
+              second.method.asInstanceOf[ExtensionMethodDefinition])
+          case CandidateSelection.Selected(am) =>
+            val winner = am.method.asInstanceOf[ExtensionMethodDefinition]
+            // The winner's receiver must also be at least as specific as every other's.
+            // Unrelated receivers (`extension I`, `extension J` on a `C conforms I, J`) or
+            // `List` beside `List[Int]` stay ambiguous, whatever order they are declared in.
+            chosen.find { o =>
+              !(o eq winner) && !(o.receiverType eq winner.receiverType) &&
+                !isMoreSpecificReceiver(winner.receiverType, o.receiverType)
+            } match {
+              case Some(other) => CandidateSelection.Ambiguous(winner, other)
+              case None => CandidateSelection.Selected(winner)
+            }
+        }
       case _ =>
         CandidateSelection.NoMatch
     }
@@ -306,7 +332,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   ): Option[Term] = {
     val containerClass = extMethod.containerClass
     val staticArgs = Array(staticReceiver(target, extMethod)) ++ params
-    val staticMethods = containerClass.findMethod(node.name, staticArgs)
+    val staticMethods = backingStaticMethod(extMethod) match {
+      case Some(method) => Array(method)
+      case None => containerClass.findMethod(node.name, staticArgs)
+    }
 
     staticMethods match {
       case Array() =>
@@ -321,6 +350,21 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       case multiple =>
         calls.reportAmbiguousMethods(node, node.name, multiple)
         None
+    }
+  }
+
+  /** The container's static method that implements `extMethod`: the receiver, then the
+   *  same parameter types. Looked up by signature, not re-resolved against the arguments,
+   *  so the call runs the overload that selection chose (`ez(Object)` for an `Int`). */
+  private def backingStaticMethod(extMethod: ExtensionMethodDefinition): Option[Method] = {
+    val formals = extMethod.arguments
+    extMethod.containerClass.methods(extMethod.name).filter { m =>
+      Modifier.isStatic(m.modifier) && m.arguments.length == formals.length + 1 &&
+        m.arguments(0).name == extMethod.receiverType.name &&
+        formals.indices.forall(i => m.arguments(i + 1).name == formals(i).name)
+    } match {
+      case Array(single) => Some(single)
+      case _ => None
     }
   }
 

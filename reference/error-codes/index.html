@@ -8091,6 +8091,8 @@ parameter, a <code>String[]</code> rest collector.</p>
 </span></code></pre></div>
 <p>Use a scalar, or <code>String[]</code> as the last parameter to collect repeated/trailing
 arguments (e.g. <code>def main(cmd: String, files: String[])</code>).</p>
+<p>A varargs parameter (<code>files: String...</code>) is E0094 too: write <code>files: String[]</code>. A <code>tool</code>
+reports the same mistake as <code>E0081</code>.</p>
 <h3 id="e0095-mains-string-parameter-is-misplaced"><code>E0095</code> — <code>main</code>'s <code>String[]</code> parameter is misplaced<a class="headerlink" href="#e0095-mains-string-parameter-is-misplaced" title="Permanent link">&para;</a></h3>
 <p>A top-level auto-CLI <code>main</code> has a <code>String[]</code> parameter that is not in a supported
 position: not the only parameter (raw argv) and not the last parameter (a rest

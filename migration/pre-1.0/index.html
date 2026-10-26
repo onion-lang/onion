@@ -4077,6 +4077,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#an-empty-or-takes-the-type-of-its-siblings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An empty [] or [:] takes the type of its siblings
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4714,6 +4725,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#an-empty-or-takes-the-type-of-its-siblings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An empty [] or [:] takes the type of its siblings
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4815,6 +4837,25 @@ text. This lets a value keep leading or trailing spaces through <code>print</cod
   that start with <code>"</code>. A value with no closing <code>"</code>, or with a bare <code>"</code> inside it (<code>"a" and "b"</code>),
   is now a <code>Defect</code> naming the line.</li>
 <li><strong>Only <code>String</code> components:</strong> an <code>Int</code>, <code>Boolean</code> or other scalar is read exactly as before.</li>
+</ul>
+<h2 id="an-empty-or-takes-the-type-of-its-siblings">An empty <code>[]</code> or <code>[:]</code> takes the type of its siblings<a class="headerlink" href="#an-empty-or-takes-the-type-of-its-siblings" title="Permanent link">&para;</a></h2>
+<p>In a list literal, or in the values of a map literal, an empty <code>[]</code> or <code>[:]</code> now has the
+type the other elements agree on. Before, it widened the whole literal to <code>Object</code>.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1">// Before: List[Object], so adj[1].add(5) was E0005, and this compiled</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">// Now: List[List[Int]], so adj[1].add(5) compiles, and this is E0005</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1">// To keep the old type, annotate it</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Object</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What changed:</strong> the empty literal is typed after its siblings, from their type. Elements are still evaluated in source order.</li>
+<li><strong>What you see:</strong> <code>E0005</code> naming <code>List[List[Int]].add(String)</code> (or <code>Map[String, List[Int]].set(...)</code>) where the code mixed element kinds, or passed the value to a <code>List[Object]</code> parameter.</li>
+<li><strong>Still fine:</strong> an explicit annotation wins, and a literal with no typed sibling (<code>[[], []]</code>) is typed as before.</li>
 </ul>
 
 

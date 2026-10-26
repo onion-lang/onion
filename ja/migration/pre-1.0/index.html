@@ -2163,6 +2163,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        空の [] / [:] は、隣の要素の型になりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4735,6 +4746,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        空の [] / [:] は、隣の要素の型になりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4836,6 +4858,25 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
   設定ファイルの中から <code>"</code> で始まる値を探してください。
   閉じる <code>"</code> のない値や、中に裸の <code>"</code> がある値（<code>"a" and "b"</code>）は、行番号付きの <code>Defect</code> になります。</li>
 <li><strong>対象は <code>String</code> 成分だけです:</strong> <code>Int</code> や <code>Boolean</code> などのスカラーは、これまでどおりに読みます。</li>
+</ul>
+<h2 id="_1">空の <code>[]</code> / <code>[:]</code> は、隣の要素の型になりました<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>リストリテラル、またはマップリテラルの値に空の <code>[]</code> / <code>[:]</code> があると、他の要素が揃っている型として扱います。
+以前は、リテラル全体が <code>Object</code> に広がっていました。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1">// 以前: List[Object] なので、adj[1].add(5) は E0005 で、次の行はコンパイルできた</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">// 現在: List[List[Int]] なので、adj[1].add(5) はコンパイルでき、次の行は E0005</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1">// 以前の型を保つには、型を注釈する</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Object</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+</span></code></pre></div>
+<ul>
+<li><strong>変わったこと:</strong> 空のリテラルは、隣の要素の後に、その型で型付けされます。要素の評価順は、これまでどおりソースの順です。</li>
+<li><strong>表示されるもの:</strong> 異なる種類の要素を混ぜたコードや、<code>List[Object]</code> の引数に渡したコードで、<code>List[List[Int]].add(String)</code>（または <code>Map[String, List[Int]].set(...)</code>）を示す <code>E0005</code> が出ます。</li>
+<li><strong>そのまま動くもの:</strong> 明示した型注釈が優先されます。型の分かる隣の要素がないリテラル（<code>[[], []]</code>）は、これまでどおりです。</li>
 </ul>
 
 

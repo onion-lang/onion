@@ -8104,6 +8104,8 @@ json shape を持たないレコード、受け付ける型を指す型エイリ
 </span></code></pre></div>
 <p>スカラー型を使うか、繰り返し・末尾引数を集めたいなら最後のパラメータを <code>String[]</code> にして
 ください（例: <code>def main(cmd: String, files: String[])</code>）。</p>
+<p>可変長引数のパラメータ（<code>files: String...</code>）も E0094 です。<code>files: String[]</code> と書いてください。
+<code>tool</code> では同じ誤りが <code>E0081</code> になります。</p>
 <h3 id="e0095-main-string"><code>E0095</code> — <code>main</code> の <code>String[]</code> パラメータが未対応の位置にある<a class="headerlink" href="#e0095-main-string" title="Permanent link">&para;</a></h3>
 <p>トップレベルの自動 CLI <code>main</code> に <code>String[]</code> パラメータがありますが、その位置が未対応です
 （単独の引数でも、最後のパラメータでもありません）。</p>

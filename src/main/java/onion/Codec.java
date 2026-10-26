@@ -18,8 +18,8 @@ public final class Codec {
         return Base64.getEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Decodes a standard Base64 string back to text (UTF-8). Whitespace is skipped, so
-     *  text read from a file or wrapped at 76 columns decodes as is.
+    /** Decodes a standard Base64 string back to text (UTF-8). Whitespace and a leading byte
+     *  order mark are skipped, so text read from a file or wrapped at 76 columns decodes as is.
      *  @throws IllegalArgumentException on a non-Base64 character, or a bad length or padding */
     public static String base64Decode(String encoded) {
         if (encoded == null || encoded.isEmpty()) return "";
@@ -27,10 +27,11 @@ public final class Codec {
         for (int i = 0; i < encoded.length(); i++) {
             char c = encoded.charAt(i);
             if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
+            if (c == '\uFEFF' && i == 0) continue;
             boolean ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
                 || c == '+' || c == '/' || c == '=';
             if (!ok) {
-                throw new IllegalArgumentException("invalid Base64 character '" + c + "' at index " + i);
+                throw new IllegalArgumentException("invalid Base64 character " + describeChar(c) + " at index " + i);
             }
             sb.append(c);
         }
@@ -40,6 +41,13 @@ public final class Codec {
             throw new IllegalArgumentException(
                 "invalid Base64 length or padding: " + sb.length() + " character(s) after removing whitespace", e);
         }
+    }
+
+    /** A character as an error message shows it: {@code '!'} when it is printable ASCII,
+     *  else {@code U+00A0}, so an invisible one is never printed raw. */
+    private static String describeChar(char c) {
+        if (c > ' ' && c < 0x7F) return "'" + c + "'";
+        return String.format(java.util.Locale.ROOT, "U+%04X", (int) c);
     }
 
     /** Encodes the UTF-8 bytes of {@code text} as a lowercase hex string. */

@@ -102,6 +102,9 @@ final class BlockElementLowering(
       context.openLabeledLoop(node.name) {
         attachLoopLabel(translate(node.loop, context), node.name)
       }
+    case node: AST.ForeachExpression if nonMapPairForeach(node, context) =>
+      bodyContext.report(FOREACH_PAIR_NOT_MAP, node, pairForeachTargetType)
+      new NOP(node.location)
     case node: AST.ForeachExpression =>
       context.openScope {
         val collection = typed(node.collection, context).getOrElse(null)
@@ -725,6 +728,35 @@ final class BlockElementLowering(
 
   private def findMethod(node: AST.Node, target: ObjectType, name: String): Method =
     body.findMethod(node, target, name)
+
+  private var pairForeachTargetType: Type = null
+
+  /**
+   * `foreach (a, b) in xs` is rewritten to `xs.entrySet()` before typing, so over a
+   * List or record it used to fail with "entrySet() not found" and "operator + for
+   * K, V". Detects that rewrite over a plain variable or field whose type is not a Map
+   * and where `entrySet()` does not resolve the ordinary way (a declared, inherited or
+   * `extension` method keeps working, as before). Typing those targets twice is
+   * harmless; others keep the old path.
+   */
+  private def nonMapPairForeach(node: AST.ForeachExpression, context: LocalContext): Boolean =
+    (node.arg.name == "__foreach_entry") && (node.collection match {
+      case AST.MethodCall(_, target @ (_: AST.Id | _: AST.MemberSelection), "entrySet", Nil, _) =>
+        typed(target, context) match {
+          case Some(t) if !t.isBasicType && !t.isNullType =>
+            t.`type` match {
+              case ot @ (_: ClassType | _: ArrayType) if !isMapType(ot) && !resolvesEntrySet(node.collection, context) =>
+                pairForeachTargetType = ot
+                true
+              case _ => false
+            }
+          case _ => false
+        }
+      case _ => false
+    })
+
+  private def resolvesEntrySet(call: AST.Expression, context: LocalContext): Boolean =
+    typing.withSuppressedReporting(typed(call, context)).isDefined
 
   /** True when the value is a java.util.Map (which has no iterator()). */
   private def isMapType(tp: Type): Boolean =

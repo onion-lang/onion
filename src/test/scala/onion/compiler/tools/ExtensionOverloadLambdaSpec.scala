@@ -270,6 +270,33 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       assert(seconds < 30, s"took $seconds s")
     }
 
+    // A typed inner lambda that captures the outer parameter: its body's type depends on
+    // the overload the outer lambda is tried against, so it must be typed again for each.
+    val fnOuter = "  def outer(f: (Int) -> Int): String = \"oi:\" + f(1)"
+    val jfnOuter = "  def outer(f: JFn[String, String]): String = \"os:\" + f.apply(\"s\")"
+    for ((label, first, second) <- Seq(("function first", fnOuter, jfnOuter), ("SAM first", jfnOuter, fnOuter))) {
+      it(s"types a capturing inner lambda against each outer overload ($label)") {
+        val result = runMain(
+          s"""import { java.util.function.Function as JFn }
+             |extension String {
+             |$first
+             |$second
+             |  def inner(f: (Int) -> String): String = "ext:" + f(1)
+             |}
+             |def inner(f: (Int) -> Object): String = "fn:" + f(1)
+             |class K {
+             |public:
+             |  def inner(f: (Int) -> Object): String = "k:" + f(1)
+             |}
+             |""".stripMargin,
+          """"a".outer { p -> inner((q: Int) -> p) } + "," +
+            |      "a".outer { p -> "a".inner((q: Int) -> p) } + "," +
+            |      "a".outer { p -> new K().inner((q: Int) -> p) }""".stripMargin
+        )
+        assert(Shell.Success("os:fn:s,os:ext:s,os:k:s") == result)
+      }
+    }
+
     it("reports a lambda that fits nothing against the overload of its arity") {
       val codes = errorCodes(
         """extension String {

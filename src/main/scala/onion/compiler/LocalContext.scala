@@ -216,6 +216,15 @@ class LocalContext {
     else contextFrame.allNames.filterNot(_.contains("#")) // synthetic slots (`n#arg`) are not names a user can write
   }
 
+  /**
+   * What a body typed here sees of its surroundings: the type of each visible name and the
+   * narrowings in force. A closure typed twice under equal views types the same way, so this
+   * is part of the key when its typing is memoized; a captured variable's type can differ
+   * between two overloads an enclosing lambda is tried against (#2447).
+   */
+  def typingView: (Map[String, TypedAST.Type], Map[String, TypedAST.Type], Map[String, TypedAST.Type]) =
+    (allNames.iterator.map(name => name -> lookup(name).tp).toMap, narrowings, flowNarrowings)
+
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
     contextFrame.lookupOnlyCurrentScope(name)
   }

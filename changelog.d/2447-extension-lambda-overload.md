@@ -5,6 +5,9 @@
   - `c(n: Long, g)` beside `c(n: Object, g)`, with `"a".c(5, (x: Long) -> x * 2L)`. `main` printed `obj` or `long:10`, depending on order. Pass `5L` to pick the `Long` one.
   - `k(s: Supplier[String])` beside `k(c: Callable[String])`, with `"a".k { "v" }`. `main` printed `call`. Pass a typed value: `val c: Callable[String] = () -> "v"`, then `"a".k(c)`.
   - `f(o: Object, g)` on `String` beside `f(s: String, g)` on `CharSequence`, with `"a".f("q", (x: Int) -> x)`. `main` printed `strobj1`. Write `"q" as Object`, or pass the lambda as a typed value.
+- **A lambda that fits both a function-type overload and a SAM overload now takes the function type.**
+  - With `outer(f: (Int) -> Int)` beside `outer(f: Function[String, String])`, `"a".outer { p -> ((q: Int) -> p).call(1) }` printed `os:s`; now it prints `oi:1`.
+  - To keep the old choice, pass a typed value: `val g: Function[String, String] = p -> ...`, then `"a".outer(g)`.
 
 ### Fixed
 

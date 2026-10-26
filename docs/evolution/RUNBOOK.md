@@ -475,8 +475,10 @@ compatibility (PRINCIPLES.md §2, §3, §9).
   (10-24). Write the whole body first and call the tool once; a placeholder comment is the
   W40 slip again (10-25, #2433). To correct a verdict, post a new one.
 - **Reviewer runs can overlap.** On 10-24 a run judged #2328, #2344 and #2345 at heads a
-  concurrent run had judged an hour earlier. Right before posting, re-read the PR's comments;
-  if a verdict for that head is there, drop yours.
+  concurrent run had judged an hour earlier. Claim each PR first with a "Panel in progress"
+  comment (runs did from 10-24 14:14, and it worked), skip a PR another run claimed in the
+  last hour, and re-read the comments right before posting: if a verdict for that head is
+  there, drop yours.
 - **A usage limit silences every role at once.** 10-22 14:39 to 10-23 20:30 UTC had no
   episode from any role, and the Reviewer and Sensor runs ended `USAGE_LIMIT_REACHED`. The
   first run after such a gap reads `list_triggers` and says on the Roadmap how long it was.

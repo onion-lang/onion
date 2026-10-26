@@ -78,6 +78,49 @@ class ExtensionOverloadSpecificitySpec extends AbstractShellSpec {
       assert(codes == Seq(Some("E0006")))
     }
 
+    it("reports unrelated receivers with equal parameters as E0006, in either order") {
+      val decls = Seq(
+        """extension I { def f(): String = "I" }""",
+        """extension J { def f(): String = "J" }"""
+      )
+      decls.permutations.foreach { order =>
+        val codes = errorCodes(
+          s"""interface I { }
+             |interface J { }
+             |class C conforms I, J { public: def this { } }
+             |${order.mkString("\n")}
+             |IO::println(new C().f())
+             |""".stripMargin
+        )
+        assert(codes == Seq(Some("E0006")), order)
+      }
+    }
+
+    it("reports a raw and an applied receiver with equal parameters as E0006, in either order") {
+      val decls = Seq(
+        """extension List { def tag(o: Object): String = "raw" }""",
+        """extension List[Int] { def tag(o: Object): String = "int" }"""
+      )
+      decls.permutations.foreach { order =>
+        val codes = errorCodes(
+          s"""${order.mkString("\n")}
+             |val xs: List[Int] = [1, 2]
+             |IO::println(xs.tag(1))
+             |""".stripMargin
+        )
+        assert(codes == Seq(Some("E0006")), order)
+      }
+    }
+
+    it("still lets the more specific receiver win when the parameters are equal") {
+      val result = runMain(
+        """extension CharSequence { def g(o: Object): String = "cs" }
+          |extension String { def g(o: Object): String = "str" }""".stripMargin,
+        """"x".g(1)"""
+      )
+      assert(Shell.Success("str") == result)
+    }
+
     it("still reports E0005 when no overload applies") {
       val codes = errorCodes(
         """extension String {

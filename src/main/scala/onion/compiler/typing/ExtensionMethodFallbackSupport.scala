@@ -121,17 +121,29 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           case Seq(single) => Seq(single)
           case _ => pool
         }
-        // Then the rule class methods use for the remaining overloads: the one whose
-        // parameters are all at least as specific wins (`ex(Char)` over `ex(Long)` for 'A').
-        val candidates = chosen.map(m => ApplicableMethod(m, m.arguments, Map.empty)).toList
-        overloadSupport.selectMostSpecificApplicable(candidates, argTypes = calls.types(params)) match {
+        // Then the rule class methods use for the remaining overloads, with the receiver as
+        // the first parameter: the one that is at least as specific everywhere wins
+        // (`ex(Char)` over `ex(Long)` for 'A').
+        val candidates = chosen.map(m => ApplicableMethod(m, m.receiverType +: m.arguments, Map.empty)).toList
+        val argTypes = (targetType: Type) +: calls.types(params)
+        overloadSupport.selectMostSpecificApplicable(candidates, argTypes = argTypes) match {
           case CandidateSelection.NoMatch => CandidateSelection.NoMatch
           case CandidateSelection.Ambiguous(first, second) =>
             CandidateSelection.Ambiguous(
               first.method.asInstanceOf[ExtensionMethodDefinition],
               second.method.asInstanceOf[ExtensionMethodDefinition])
           case CandidateSelection.Selected(am) =>
-            CandidateSelection.Selected(am.method.asInstanceOf[ExtensionMethodDefinition])
+            val winner = am.method.asInstanceOf[ExtensionMethodDefinition]
+            // The winner's receiver must also be at least as specific as every other's.
+            // Unrelated receivers (`extension I`, `extension J` on a `C conforms I, J`) or
+            // `List` beside `List[Int]` stay ambiguous, whatever order they are declared in.
+            chosen.find { o =>
+              !(o eq winner) && !(o.receiverType eq winner.receiverType) &&
+                !isMoreSpecificReceiver(winner.receiverType, o.receiverType)
+            } match {
+              case Some(other) => CandidateSelection.Ambiguous(winner, other)
+              case None => CandidateSelection.Selected(winner)
+            }
         }
       case _ =>
         CandidateSelection.NoMatch

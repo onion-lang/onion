@@ -10,6 +10,8 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   typing: Typing,
   calls: MethodCallTyping
 ) {
+  private val overloadSupport = new CallOverloadSupport(typing, calls)
+
   def tryExtensionMethodCall(
     node: AST.MethodCall,
     target: Term,
@@ -386,23 +388,13 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       }
     }
 
-    val sameArity = collectExtensionMethods(targetType, name).filter(_.arguments.length == args.length)
-    // A lambda cannot be passed where an overload wants an `Int` or a `String`: drop such
-    // overloads first, so `x.g { .. }` next to `x.g(5)` is typed against the function one
-    // whatever their declaration order (#2447). When none can take it, the first one is
-    // tried alone, so the call gets one error, not one per overload.
-    val candidates = {
-      val fitting = sameArity.filter { m =>
-        untypedClosureIndices.forall(i => i >= m.arguments.length || closureCanFit(m.arguments(i)))
-      }
-      if (fitting.nonEmpty) fitting else sameArity.take(1)
-    }
+    val candidates = collectExtensionMethods(targetType, name).filter(_.arguments.length == args.length)
     if (candidates.isEmpty) arrayAsList(node, target, targetType) match {
       case Some((listTarget, listType)) =>
         break(tryExtensionMethodCallBidirectional(node, listTarget, listType, context, expected, untypedClosureIndices))
       case None =>
     }
-    candidates.iterator.flatMap { extMethod =>
+    def attempt(extMethod: ExtensionMethodDefinition): Option[Term] = {
       val container = extMethod.containerClass
       val receiverType = staticReceiver(target, extMethod).`type`
       val statics = container.methods(name).filter { m =>
@@ -459,18 +451,31 @@ private[compiler] final class ExtensionMethodFallbackSupport(
             }
           }
         }
-    }.nextOption()
-  }
+    }
 
-  /** False only where no lambda can ever go: a primitive, an array, or a concrete class
-   *  other than `Object` (`String`, `Integer`). Interfaces, abstract classes and type
-   *  variables may take one. */
-  private def closureCanFit(param: Type): Boolean = param match {
-    case _: BasicType | _: ArrayType => false
-    case _: TypeVariableType => true
-    case ct: ClassType =>
-      ct.isInterface || Modifier.isAbstract(ct.modifier) || ct.name == "java.lang.Object"
-    case _ => true
+    // Several user overloads: the rule class methods use (#2447). Type the call against
+    // each one without reporting, keep those the arguments fit, and take the most specific
+    // (`(Int) -> String` over `Object`); a lambda that fits none gets one error.
+    val user = candidates.filterNot(isBuiltinExtension)
+    if (user.length >= 2) {
+      val fits = user.filter(m => typing.withSuppressedReporting(attempt(m)).isDefined)
+      if (fits.isEmpty) {
+        val builtins = candidates.filter(isBuiltinExtension)
+        break(if (builtins.isEmpty) attempt(user.head) else builtins.iterator.flatMap(attempt).nextOption())
+      }
+      val applicable = fits.map(m => ApplicableMethod(m, m.arguments, Map.empty)).toList
+      overloadSupport.selectMostSpecificApplicable(applicable) match {
+        case CandidateSelection.Selected(am) =>
+          break(attempt(am.method.asInstanceOf[ExtensionMethodDefinition]))
+        case CandidateSelection.Ambiguous(first, second) =>
+          val a = first.method.asInstanceOf[ExtensionMethodDefinition]
+          val b = second.method.asInstanceOf[ExtensionMethodDefinition]
+          calls.reportAmbiguousSignature(node, a.containerClass, name, a.arguments, b.containerClass, name, b.arguments)
+          break(None)
+        case CandidateSelection.NoMatch =>
+      }
+    }
+    candidates.iterator.flatMap(attempt).nextOption()
   }
 
   /** The backing static's first parameter must accept this receiver: array kinds

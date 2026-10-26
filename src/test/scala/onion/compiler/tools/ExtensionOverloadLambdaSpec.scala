@@ -77,6 +77,55 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       assert(Shell.Success("fn:lam,str:v") == result)
     }
 
+    // The panel's cases on #2452: each must print what the class version prints.
+    val neighbours = Seq(
+      "Int" -> "\"int\"", "String" -> "\"str\"", "Object" -> "\"obj\"",
+      "List[Int]" -> "\"list\"", "Runnable" -> "\"run\"", "Comparable[String]" -> "\"cmp\""
+    )
+    for ((tpe, value) <- neighbours; fnFirst <- Seq(true, false)) {
+      it(s"picks (Int) -> String over a $tpe overload, function declared ${if (fnFirst) "first" else "last"}") {
+        val fn = "  def t(f: (Int) -> String): String = \"fn:\" + f(1)"
+        val other = s"  def t(o: $tpe): String = $value"
+        val decls = Seq("extension String {", if (fnFirst) fn else other, if (fnFirst) other else fn, "}").mkString("\n")
+        assert(Shell.Success("fn:n1") == runMain(decls, """"a".t((n: Int) -> "n" + n)"""))
+      }
+    }
+
+    it("picks the 2-parameter function overload for a 2-parameter lambda") {
+      val result = runMain(
+        """extension String {
+          |  def h(f: (Int) -> String): String = "fn1:" + f(1)
+          |  def h(f: (Int, Int) -> String): String = "fn2:" + f(1, 2)
+          |}""".stripMargin,
+        """"a".h((a: Int, b: Int) -> "ab" + a + b) + "," + "a".h((n: Int) -> "n" + n)"""
+      )
+      assert(Shell.Success("fn2:ab12,fn1:n1") == result)
+    }
+
+    it("takes a trailing lambda over an Object overload declared first") {
+      val result = runMain(
+        """extension String {
+          |  def on(o: Object): String = "obj"
+          |  def on(f: () -> String): String = "fn:" + f()
+          |}""".stripMargin,
+        """"x".on { "lam" } + "," + "x".on("s")"""
+      )
+      assert(Shell.Success("fn:lam,obj") == result)
+    }
+
+    it("infers an untyped trailing lambda's parameter next to an Object or Runnable overload") {
+      val result = runMain(
+        """extension String {
+          |  def a(o: Object): String = "obj"
+          |  def a(f: (Int) -> Int): String = "fn:" + f(2)
+          |  def b(r: Runnable): String = "run"
+          |  def b(f: (Int) -> Int): String = "fn:" + f(4)
+          |}""".stripMargin,
+        """"x".a { n -> n * 10 } + "," + "x".b { n -> n * 10 }"""
+      )
+      assert(Shell.Success("fn:20,fn:40") == result)
+    }
+
     it("still rejects a lambda where no overload takes one, with one error") {
       val codes = errorCodes(
         """extension String {

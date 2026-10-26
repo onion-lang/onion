@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **`[[1, 2], []]` is a `List[List[Int]]`, so `adj[1].add(5)` compiles (#2430).**
+  - Before: the empty `[]` made the outer list `List[Object]`, and `add` was E0005. So `xs.add("header")` compiled on that list.
+  - Now: an empty `[]` or `[:]` takes its type from the other elements, in list literals and map values. `xs.add("header")` is E0005. To keep the old type, annotate it: `val xs: List[Object] = [[1, 2], []]`. See `docs/migration/pre-1.0.md`.
+
 ### Fixed
 
 - **Generic overloads that differ only after a type parameter both work: `tw[T](x: T, y: Int)` and `tw[T](x: T, y: String)` (#2445).**
@@ -19,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An empty `#{}` in a string is one error at the `#`, saying the interpolation needs an expression (#2429).**
   - Before: "unexpected end of file — a closing `}` or `)` is probably missing", at line 1 or at no line at all.
   - Now: `repro.on:2:12: empty string interpolation: put an expression between the braces, as in '#{expr}'.` For a literal `#{}` in an ordinary string, write `\#{}`.
+- **`;` between two clauses of a record body is one error with a hint (#2382).**
+  - Before: `{ shape doc = json; shape txt = re"..." }` gave two contradictory syntax errors, no hint.
+  - Now: one error at the `;`, saying clauses are separated by a newline or a space.
+- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
+  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
+  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
 
 ## [0.146.0] - 2026-10-25
 
@@ -135,13 +147,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`;` between two clauses of a record body is one error with a hint (#2382).**
-  - Before: `{ shape doc = json; shape txt = re"..." }` gave two contradictory syntax errors, no hint.
-  - Now: one error at the `;`, saying clauses are separated by a newline or a space.
-
-- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
-  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
-  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
 - **An expression-bodied recursive function runs as a loop, like one written with `return` (#2330).**
   - Before: `def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }` hit "stack overflow" at depth 200000, while the `return` form ran fine. An `else if` chain, and a `select` whose self-call case is a literal, `else` or guarded destructuring case, overflowed the same way. A `select` with an unguarded destructuring or type-pattern case still overflows (#2350).
   - Now: it prints `200000`. A call whose result is still used (`{ val x = f(n - 1); x + 1 }`) stays a real call.

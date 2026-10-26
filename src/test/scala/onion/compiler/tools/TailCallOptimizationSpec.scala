@@ -446,4 +446,34 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       assert(Shell.Success(1000000) == result)
     }
   }
+
+  describe("tail-call optimization next to a boxed branch (#2406)") {
+    def run(name: String, code: String) = shell.run(code.stripMargin, name, Array())
+
+    it("loops when the other branch is an Integer unboxed to the Int result") {
+      val result = run("TcoBoxedBranch.on",
+        """
+          |class C {
+          |public:
+          |  static def q(o: Integer, n: Int): Int = if n == 0 { o } else { q(o, n - 1) }
+          |  static def main(args: String[]): Int = q(7, 1000000)
+          |}
+          |""")
+      assert(Shell.Success(7) == result)
+    }
+
+    it("still throws NullPointerException for a null Integer in the taken branch") {
+      val result = run("TcoBoxedBranchNull.on",
+        """
+          |class C {
+          |public:
+          |  static def q(o: Integer, n: Int): Int = if n == 0 { o } else { q(o, n - 1) }
+          |  static def main(args: String[]): Int {
+          |    try { return q(null, 3) } catch e: NullPointerException { return -1 }
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(-1) == result)
+    }
+  }
 }

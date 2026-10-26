@@ -1,6 +1,9 @@
 package onion.compiler.tools
 
+import onion.compiler.{CompilationOutcome, CompilerConfig, OnionCompiler, StreamInputSource}
 import onion.tools.Shell
+
+import java.io.StringReader
 
 /**
  * Tests for cast validation: the compiler must reject casts that can never
@@ -174,6 +177,299 @@ class CastValidationSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success(1) == result)
+    }
+
+    it("rejects a nullable List[String]? as String[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val xs: List[String]? = ["a"]
+          |val a = (xs as String[])
+          |return a.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableListAsArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects a String? as String[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val s: String? = "a"
+          |val a = (s as String[])
+          |return a.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableStringAsArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects a String[]? as List[String] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val arr: String[]? = new String[1]
+          |val l = (arr as List[String])
+          |return l.size
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableArrayAsList.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects a String[] as Integer[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val ys: String[] = new String[1]
+          |val b = (ys as Integer[])
+          |return b.length
+          |  }
+          |}
+          |""".stripMargin,
+        "StringArrayAsIntegerArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects an Int[] as Long[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val ys: Int[] = new Int[1]
+          |val b = (ys as Long[])
+          |return b.length
+          |  }
+          |}
+          |""".stripMargin,
+        "IntArrayAsLongArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("rejects an Int[] as Int[][] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val ys: Int[] = new Int[1]
+          |val b = (ys as Int[][])
+          |return b.length
+          |  }
+          |}
+          |""".stripMargin,
+        "IntArrayAsIntArray2.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("still allows a nullable Int[]? as Int[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val ys: Int[]? = new Int[3]
+          |val b = (ys as Int[])
+          |return b.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableIntArrayAsIntArray.on",
+        Array()
+      )
+      assert(Shell.Success(3) == result)
+    }
+
+    it("still allows Object[] as String[] and String[] as Object[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val o: Object[] = (new String[2] as Object[])
+          |val s = (o as String[])
+          |return s.length
+          |  }
+          |}
+          |""".stripMargin,
+        "ObjectArrayStringArray.on",
+        Array()
+      )
+      assert(Shell.Success(2) == result)
+    }
+
+    it("still allows Object[] as String[][] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val o: Object[] = (new String[2][1] as Object[])
+          |val s = (o as String[][])
+          |return s.length
+          |  }
+          |}
+          |""".stripMargin,
+        "ObjectArrayAsStringArray2.on",
+        Array()
+      )
+      assert(Shell.Success(2) == result)
+    }
+
+    it("still allows a nullable Object? as String[] (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val o: Object? = new String[4]
+          |val s = (o as String[])
+          |return s.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableObjectAsArray.on",
+        Array()
+      )
+      assert(Shell.Success(4) == result)
+    }
+
+    it("still allows Object?[] as String[][] and back (#2309)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val o: Object?[] = new String[2][3]
+          |val s = (o as String[][])
+          |val back = (s as Object?[])
+          |return s.length * 10 + s[0].length + back.length * 100
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableElementArrayAsArray2.on",
+        Array()
+      )
+      assert(Shell.Success(223) == result)
+    }
+
+    it("rejects a String?[] as Integer[] (#2309)") {
+      val result = shell.run(
+        """
+          |import { java.lang.Integer as JInteger }
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val xs: String?[] = new String[2]
+          |val ys = (xs as JInteger[])
+          |return ys.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableStringArrayAsIntegerArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("still allows a generic T[] return whose T is an array, as String[][] (#2309 panel)") {
+      val result = shell.run(
+        """
+          |import { java.util.Arrays }
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val a: String[][] = new String[2][3]
+          |val c = Arrays::copyOf(a, 2)
+          |val d = (c as String[][])
+          |return d.length * 10 + d[0].length
+          |  }
+          |}
+          |""".stripMargin,
+        "GenericArrayReturnAsArray2.on",
+        Array()
+      )
+      assert(Shell.Success(23) == result)
+    }
+
+    it("still allows Int?[] as Integer[] and Object[] (#2309 panel)") {
+      val result = shell.run(
+        """
+          |import { java.lang.Integer as JInteger }
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val i: Int?[] = new Int?[2]
+          |val j = (i as JInteger[])
+          |val k = (i as Object[])
+          |return j.length * 10 + k.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableIntArrayAsBoxedArray.on",
+        Array()
+      )
+      assert(Shell.Success(22) == result)
+    }
+
+    it("still rejects Int?[] as Long[] (#2309 panel)") {
+      val result = shell.run(
+        """
+          |import { java.lang.Long as JLong }
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |val i: Int?[] = new Int?[2]
+          |val j = (i as JLong[])
+          |return j.length
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableIntArrayAsLongArray.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("gives a nullable List cast the List-is-not-an-array hint, not the `!!` one (#2309 panel)") {
+      val src =
+        """
+          |val xs: List[String]? = ["a"]
+          |val a = (xs as String[])
+          |""".stripMargin
+      val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+      val msgs = new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "NullableListHint.on"))) match {
+        case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
+        case _ => ""
+      }
+      // Code spans are the same in both bundles, so this holds in en and ja.
+      assert(msgs.contains("toArray(new String[0])"), s"expected the List-is-not-an-array hint, got: $msgs")
+      assert(!msgs.contains("`!!`"), s"`!!` does not make this cast work, got: $msgs")
     }
   }
 }

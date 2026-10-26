@@ -140,7 +140,13 @@ final class ExpressionFormTyping(
       typed(node.src, context).flatMap { term =>
         typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
           if (!isValidCast(term.`type`, destination)) {
-            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
+            // `!!` cannot fix a nullable cast that is rejected here: the non-null value
+            // does not cast either. Report that type, so its own hint shows (#2309).
+            val reported = term.`type` match {
+              case n: NullableType if !isValidCast(n.innerType, destination) => n.innerType
+              case other => other
+            }
+            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, reported)
             None
           } else {
             Some(new AsInstanceOf(term, destination))
@@ -158,6 +164,14 @@ final class ExpressionFormTyping(
   private def isValidCast(source: Type, destination: Type): Boolean = {
     if (source eq destination) return true
     (source, destination) match {
+      // A nullable side used to reach the catch-all `true`, so `(xs as String[])` with
+      // `xs: List[String]?` compiled and always threw (#2309). Only the array rules
+      // look through `?`: null passes any reference checkcast, so the non-null value
+      // is what must fit.
+      case (ns: NullableType, _) if isArrayCast(ns.innerType, destination) =>
+        isValidCast(ns.innerType, destination)
+      case (_, nd: NullableType) if isArrayCast(source, nd.innerType) =>
+        isValidCast(source, nd.innerType)
       case (_: NullType, _: BasicType) =>
         false
       case (bt: BasicType, ct: ClassType) =>
@@ -213,8 +227,48 @@ final class ExpressionFormTyping(
         isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
       case (_: ArrayType, ct: ClassType) =>
         isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
+      case (sa: ArrayType, da: ArrayType) =>
+        // The JVM casts `A[]` to `B[]` only when the elements cast: the same primitive,
+        // or reference elements that cast (#2309). Past the shorter array's dimensions,
+        // its elements must be able to hold an array.
+        val (se, sd) = jvmArrayShape(sa)
+        val (de, dd) = jvmArrayShape(da)
+        if (sd == dd) {
+          if (se.isBasicType || de.isBasicType) se eq de
+          else isValidCast(se, de)
+        } else {
+          (if (sd < dd) se else de) match {
+            case ct: ClassType => isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
+            case _ => false
+          }
+        }
       case _ => true
     }
+  }
+
+  private def isArrayCast(source: Type, destination: Type): Boolean =
+    source.isInstanceOf[ArrayType] || destination.isInstanceOf[ArrayType]
+
+  // An array's element type and dimension count as the JVM sees them: a `T[]` whose
+  // `T` is `String[]` is a `String[][]`, and an `Int?[]` is an `Integer[]`. Null fits
+  // any reference element, so a nullable element's non-null type is what must cast.
+  private def jvmArrayShape(array: ArrayType): (Type, Int) = {
+    var element: Type = array.component
+    var dimension = array.dimension
+    var done = false
+    while (!done) element match {
+      case n: NullableType =>
+        element = n.innerType match {
+          case bt: BasicType => Boxing.boxedType(bodyContext.table, bt)
+          case other => other
+        }
+      case inner: ArrayType =>
+        dimension += inner.dimension
+        element = inner.component
+      case _ =>
+        done = true
+    }
+    (element, dimension)
   }
 
   private def isArrayRelatedType(ct: ClassType): Boolean =

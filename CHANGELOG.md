@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An `as` cast to or from an array that can never succeed is a compile error, also when one side is nullable (#2309).**
+  - Before: `(xs as String[])` with `xs: List[String]?`, or `(ys as Integer[])` with `ys: String[]`, compiled and always failed at run time with `invalid type cast`.
+  - Now: E0000, like `List[String] as String[]`. Casts that can work (`Int[]? as Int[]`, `Object[] as String[]`, `Object?[] as String[][]`) still compile.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

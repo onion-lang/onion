@@ -10,6 +10,13 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   typing: Typing,
   calls: MethodCallTyping
 ) {
+  private val overloadSupport = new CallOverloadSupport(typing, calls)
+
+  /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
+   *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
+  def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
+    selectApplicableExtensionMethod(targetType, name, params).isInstanceOf[CandidateSelection.Ambiguous[?]]
+
   def tryExtensionMethodCall(
     node: AST.MethodCall,
     target: Term,
@@ -114,9 +121,18 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           case Seq(single) => Seq(single)
           case _ => pool
         }
-        if (chosen.isEmpty) CandidateSelection.NoMatch
-        else if (chosen.length > 1) CandidateSelection.Ambiguous(chosen(0), chosen(1))
-        else CandidateSelection.Selected(chosen.head)
+        // Then the rule class methods use for the remaining overloads: the one whose
+        // parameters are all at least as specific wins (`ex(Char)` over `ex(Long)` for 'A').
+        val candidates = chosen.map(m => ApplicableMethod(m, m.arguments, Map.empty)).toList
+        overloadSupport.selectMostSpecificApplicable(candidates, argTypes = calls.types(params)) match {
+          case CandidateSelection.NoMatch => CandidateSelection.NoMatch
+          case CandidateSelection.Ambiguous(first, second) =>
+            CandidateSelection.Ambiguous(
+              first.method.asInstanceOf[ExtensionMethodDefinition],
+              second.method.asInstanceOf[ExtensionMethodDefinition])
+          case CandidateSelection.Selected(am) =>
+            CandidateSelection.Selected(am.method.asInstanceOf[ExtensionMethodDefinition])
+        }
       case _ =>
         CandidateSelection.NoMatch
     }
@@ -304,7 +320,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   ): Option[Term] = {
     val containerClass = extMethod.containerClass
     val staticArgs = Array(staticReceiver(target, extMethod)) ++ params
-    val staticMethods = containerClass.findMethod(node.name, staticArgs)
+    val staticMethods = backingStaticMethod(extMethod) match {
+      case Some(method) => Array(method)
+      case None => containerClass.findMethod(node.name, staticArgs)
+    }
 
     staticMethods match {
       case Array() =>
@@ -319,6 +338,21 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       case multiple =>
         calls.reportAmbiguousMethods(node, node.name, multiple)
         None
+    }
+  }
+
+  /** The container's static method that implements `extMethod`: the receiver, then the
+   *  same parameter types. Looked up by signature, not re-resolved against the arguments,
+   *  so the call runs the overload that selection chose (`ez(Object)` for an `Int`). */
+  private def backingStaticMethod(extMethod: ExtensionMethodDefinition): Option[Method] = {
+    val formals = extMethod.arguments
+    extMethod.containerClass.methods(extMethod.name).filter { m =>
+      Modifier.isStatic(m.modifier) && m.arguments.length == formals.length + 1 &&
+        m.arguments(0).name == extMethod.receiverType.name &&
+        formals.indices.forall(i => m.arguments(i + 1).name == formals(i).name)
+    } match {
+      case Array(single) => Some(single)
+      case _ => None
     }
   }
 

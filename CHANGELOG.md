@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Extension overloads pick the most specific one, as class methods do (#2446).**
+  - Before: `"x".ex('A')` with `ex(Char)` and `ex(Long)` was E0006 ambiguous, then a contradicting E0005; `"x".ez(3)` with `ez(Object)` was E0005.
+  - Now: `ex(Char)` is chosen and `3` boxes into `Object`. A real ambiguity is one E0006.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

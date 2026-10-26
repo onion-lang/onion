@@ -23,6 +23,9 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
+  def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
+    extensionMethodFallbackSupport.isAmbiguousExtensionCall(targetType, name, params)
+
   /** Zero-arg extension property access: `expr.name` resolves `def name: T` in an extension block. */
   def tryZeroArgExtensionAccess(
     node: AST.Node,

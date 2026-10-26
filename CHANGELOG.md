@@ -13,9 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Before: `(k) -> { val f = () -> { k = k + 10; k }; f(); k }` called with 1 returned 1.
   - Now: it returns 11, as for a captured `var` or a method parameter.
   - The reverse holds too: a nested lambda reads the outer lambda's later writes.
+- **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
+  - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
+  - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.
+  - Onion overloads follow the same rule: with `g(c: Char)` and `g(l: Long)`, `g(65)` now calls the `Long` one.
 - **An empty `#{}` in a string is one error at the `#`, saying the interpolation needs an expression (#2429).**
   - Before: "unexpected end of file — a closing `}` or `)` is probably missing", at line 1 or at no line at all.
   - Now: `repro.on:2:12: empty string interpolation: put an expression between the braces, as in '#{expr}'.` For a literal `#{}` in an ordinary string, write `\#{}`.
+- **`;` between two clauses of a record body is one error with a hint (#2382).**
+  - Before: `{ shape doc = json; shape txt = re"..." }` gave two contradictory syntax errors, no hint.
+  - Now: one error at the `;`, saying clauses are separated by a newline or a space.
+- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
+  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
+  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
 
 ## [0.146.0] - 2026-10-25
 
@@ -132,9 +142,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
-  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
-  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
 - **An expression-bodied recursive function runs as a loop, like one written with `return` (#2330).**
   - Before: `def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }` hit "stack overflow" at depth 200000, while the `return` form ran fine. An `else if` chain, and a `select` whose self-call case is a literal, `else` or guarded destructuring case, overflowed the same way. A `select` with an unguarded destructuring or type-pattern case still overflows (#2350).
   - Now: it prints `200000`. A call whose result is still used (`{ val x = f(n - 1); x + 1 }`) stays a real call.

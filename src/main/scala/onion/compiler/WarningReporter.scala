@@ -20,6 +20,7 @@ class WarningReporter(
   suppressedCategories: Set[WarningCategory] = Set.empty
 ) {
   private val warnings = Buffer[CompileWarning]()
+  private val seen = scala.collection.mutable.HashSet[CompileWarning]()
   private var sourceFile: String = ""
 
   def setSourceFile(file: String): Unit = {
@@ -32,7 +33,10 @@ class WarningReporter(
     if (level == WarningLevel.Off) return
     if (suppressedCategories.contains(category)) return
 
-    warnings += CompileWarning(if (source != null) source else sourceFile, location, category, message)
+    // The same warning at the same place is reported once: a lambda body can be typed more
+    // than once while overloads are tried against it (#2452).
+    val warning = CompileWarning(if (source != null) source else sourceFile, location, category, message)
+    if (seen.add(warning)) warnings += warning
   }
 
   // Convenience methods for each warning category

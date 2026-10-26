@@ -1,6 +1,6 @@
 package onion.compiler.tools
 
-import onion.compiler.{OnionCompiler, CompilerConfig, StreamInputSource, CompilationOutcome}
+import onion.compiler.{OnionCompiler, CompilerConfig, StreamInputSource, CompilationOutcome, WarningLevel}
 import onion.tools.Shell
 import java.io.StringReader
 
@@ -252,6 +252,51 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       val seconds = (System.nanoTime() - start) / 1e9
       assert(Shell.Success("x") == result)
       assert(seconds < 30, s"took $seconds s")
+    }
+
+    // The panel's cases on 56af12b: a call site's remembered choice is keyed by what the
+    // call sees, so a captured variable typed differently by an enclosing overload counts.
+    for (stringFirst <- Seq(true, false)) {
+      val order = if (stringFirst) "String block first" else "Object block first"
+      it(s"picks the inner String-receiver overload once the captured p is a String ($order)") {
+        val str = """extension String {
+                    |  def inner(f: (Int) -> String): String = "str:" + f(1)
+                    |  def outer(f: (String) -> String): String = "os:" + f("s")
+                    |}""".stripMargin
+        val obj = """extension Object {
+                    |  def inner(f: (Int) -> Object): String = "obj:" + f(1)
+                    |  def outer(f: (Int) -> String): String = "oo:" + f(1)
+                    |}""".stripMargin
+        val decls = if (stringFirst) str + "\n" + obj else obj + "\n" + str
+        assert(Shell.Success("os:str:s") == runMain(decls, """"a".outer { p -> val r = "x".inner { q -> p }; r }"""))
+      }
+
+      it(s"keeps an inner choice whether the captured p is typed or inferred ($order)") {
+        val n = Seq("  def n(o: Object): String = \"nobj\"", "  def n(f: (Int) -> Int): String = \"nfn\"")
+        val o = Seq("  def o(s: String, f: (String) -> String): String = \"oS:\" + f(\"s\")",
+          "  def o(i: Int, f: (Int) -> String): String = \"oI:\" + f(1)")
+        val members = if (stringFirst) n ++ o else (n ++ o).reverse
+        val decls = ("extension String {" +: members :+ "}").mkString("\n")
+        assert(Shell.Success("oI:nfn,oI:nfn") == runMain(decls,
+          """"a".o(1) { p -> "a".n((x: Int) -> p) } + "," + "a".o(1, (p: Int) -> "a".n((x: Int) -> p))"""))
+      }
+    }
+
+    it("reports a warning inside a lambda once, however often overloads try it") {
+      val src =
+        """extension String {
+          |  def g(o: Object): String = "obj"
+          |  def g(f: (String) -> String): String = "fn:" + f("x")
+          |}
+          |IO::println("a".g((s: String) -> s.g((u: String) -> {
+          |  val t: String = null
+          |  u + t
+          |})))
+          |""".stripMargin
+      val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.On)
+      val result = new OnionCompiler(config).compileDetailed(Seq(new StreamInputSource(() => new StringReader(src), "w.on")))
+      val w12 = result.diagnostics.warnings.filter(_.category.code == "W0012")
+      assert(w12.length == 1, s"got: ${w12.map(w => s"${w.location} ${w.message}")}")
     }
 
     it("types nested lambdas once per overload that can take them") {

@@ -12,9 +12,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 ) {
   private val overloadSupport = new CallOverloadSupport(typing, calls)
 
-  /** The overload each lambda call site chose, per receiver, argument and expected types. */
+  /** The overload each lambda call site chose, per receiver, argument and expected types and
+   *  what the call sees around it (a captured variable's type can differ between two
+   *  overloads an enclosing lambda is tried against). */
   private val decisionsAt =
-    new java.util.IdentityHashMap[AST.MethodCall, java.util.HashMap[(Type, List[Type], Type), ExtensionMethodDefinition]]()
+    new java.util.IdentityHashMap[AST.MethodCall, java.util.HashMap[(Type, List[Type], Type, AnyRef), ExtensionMethodDefinition]]()
 
   /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
    *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
@@ -516,12 +518,15 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     // only SAM conversions fit, the void/value shape of the body decides, as for classes.
     val user = candidates.filterNot(isBuiltinExtension)
     if (user.length >= 2) {
-      // The winner is remembered per call site and argument types: a nested call is typed
-      // again for each overload its enclosing lambda is tried against, and repeating the
-      // whole choice at every level made nesting exponential. A remembered winner that no
-      // longer fits falls back to the full choice while errors are suppressed (an enclosing
-      // overload is being tried); when they are reported, its errors are the call's own.
-      val decisionKey = (targetType: Type, preliminaryParams.toList.map(p => if (p == null) null else p.`type`), expected)
+      // The winner is remembered per call site, receiver, argument types and what the call
+      // sees: a nested call is typed again for each overload its enclosing lambda is tried
+      // against, and repeating the whole choice at every level made nesting exponential.
+      // While errors are suppressed (an enclosing overload is being tried), a winner chosen
+      // under another expected type is tried first, since each enclosing overload hands the
+      // call a different one; if it fits, it is remembered for this expected type too, and
+      // if not, the full choice runs. When errors are reported, only an exact match is reused.
+      val looseKey = (targetType: Type, preliminaryParams.toList.map(p => if (p == null) null else p.`type`), null: Type, context.typingView)
+      val decisionKey = looseKey.copy(_3 = expected)
       val decisions = decisionsAt.computeIfAbsent(node, _ => new java.util.HashMap())
       val remembered = decisions.get(decisionKey)
       if (remembered != null) {
@@ -530,9 +535,18 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           case some @ Some(_) => break(some)
           case None =>
         }
+      } else if (!typing.reportingEnabled) {
+        val nearby = decisions.get(looseKey)
+        if (nearby != null) attempt(nearby) match {
+          case some @ Some(_) =>
+            decisions.put(decisionKey, nearby)
+            break(some)
+          case None =>
+        }
       }
       def decided(winner: ExtensionMethodDefinition): Option[Term] = {
         decisions.put(decisionKey, winner)
+        decisions.put(looseKey, winner)
         attempt(winner)
       }
       val lambdaCapable = user.filter { m =>

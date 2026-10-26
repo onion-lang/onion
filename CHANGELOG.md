@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`xs.sort(c)` also rejects `Comparator[? super U]`, and a `Comparator[U]` for a `List[String]` (#2397).**
+  - Before: both compiled, then threw `ClassCastException` inside the sort.
+  - Now: `E0005` at the call, as in Java. `Comparator[? super T]` for a `List[T]` still works.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

@@ -986,6 +986,8 @@ Timing::sleep(1000L)        // 1000ミリ秒スリープ
 Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 ```
 
+0 以下の時間を渡すと、待たずにすぐ戻ります。そのため、期限を過ぎた後に `Timing::sleep(deadline - Timing::millis())` を呼んでも安全です。
+
 ### 関数実行時間の計測
 
 ```onion
@@ -1264,7 +1266,7 @@ flat block mapping ドキュメント、およびそれらのトップレベル 
 `derive!(Json)` とまったく同じ `toMap` / `fromMap` の土台の上に構築されています。
 
 対象範囲: flat block mapping、またはそれらのトップレベル block シーケンス
-（要素内のネストした map/シーケンス、アンカー、flow collection は非対応）。
+（要素内のネストした map/シーケンス、アンカー、タグ、flow collection は非対応）。
 この範囲外の構文は、データを静かに失う代わりにエラーを発生させます:
 `Yaml::stringify` はネストした Map/List 値に対して `IllegalArgumentException` を
 投げます。`Yaml::parse` は次の場合に `Yaml.YamlParseException` を投げます:
@@ -1272,8 +1274,9 @@ flat block mapping ドキュメント、およびそれらのトップレベル 
 - ネストした mapping: 兄弟の行より深くインデントされた行（トップレベルでも、
   シーケンス要素の中でも）
 - ネストしたシーケンス: キーの下の `- ` 項目、または最初の項目と違う列にある項目
-- flow collection（`[...]`/`{...}`）の値
+- flow collection（`[...]`/`{...}`）。値としても、行全体としても
 - アンカー/エイリアス（`&name`/`*name`）の値
+- タグ（`!!str 5`、`!name 5`）の値
 - ブロックスカラー（`|`/`>`。複数行テキストの書き方）
 
 全体が同じ幅でインデントされた文書は問題ありません。`Yaml::stringify` は
@@ -1311,6 +1314,9 @@ scalar の型推論規則（Json と同一、ただし YAML 独自の2項目を�
 取り除かれます。ただし `"..."` または `'...'` でクォートされた値の内側は対象外です:
 `a: 1 # note` は `a` を `Long` の `1` としてパースし、`b: 'q # no'` は `#` を含む文字列
 `q # no` のまま保持します。
+
+キーも同じ二通りでクォートでき、同じ規則でクォートが外れます。`'k': 1` と
+`"k": 1` はどちらもキー `k` になり、`'a: b': 1` はキー `a: b` になります。
 
 不正な入力に対しては `Yaml.YamlParseException` を投げます。`derive!(Yaml)` の
 `fromYaml` はこれを捕捉して代わりに `null` を返します。
@@ -1403,7 +1409,7 @@ val config2 = Config::parseJson("{\"port\": 8080}")   // JSON 文字列を直接
 
 Config::get(config, "database.host")                   // 生の値、見つからなければ null
 Config::getString(config, "database.host", "localhost")
-Config::getInt(config, "database.port", 5432)
+Config::getInt(config, "database.port", 5432)         // 小数や Int 範囲外の数値のときは既定値
 Config::getLong(config, "database.maxConnections", 10L)
 Config::getDouble(config, "database.timeout", 30.0)
 Config::getBoolean(config, "database.ssl", false)
@@ -1778,6 +1784,9 @@ Codec::hexEncode("Hi") / Codec::hexDecode("4869")
 Codec::urlEncode("a b&c") / Codec::urlDecode(s)
 ```
 
+- `base64Decode` は空白文字を読み飛ばします。ファイル末尾の改行や、`base64` コマンドの 76 桁ごとの改行があってもそのままデコードできます。
+- デコーダに不正な入力を渡すと、問題を示す `IllegalArgumentException` を投げます。例: `invalid Base64 character '!' at index 10`、`invalid % escape at index 3 in "100%zz"`。
+
 これらも `String` の組み込み拡張メソッドです:
 
 ```onion
@@ -1962,7 +1971,7 @@ foreach i: Int in r { IO::println(i) }   // 2 3 4 5
 コレクションや配列向けのイテレーションユーティリティ:
 
 - `Iterables::map(list|iterable|set, f)`
-- `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す
+- `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す。順序は元の挿入順のまま
 - `Iterables::toList(iterable)` - 任意の `Iterable`（範囲を含む）を `List` に実体化する
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`

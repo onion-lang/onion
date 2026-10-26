@@ -41,6 +41,17 @@ object TypeFormatting {
   def methodReference(owner: TypedAST.ClassType, name: String): String =
     if (owner == null || isTopLevelContainer(owner)) name else s"${owner.name}::$name"
 
+  /** Like [[sourceForm]], but an array of a boxed wrapper keeps the name a program writes for
+    * it (`JInteger[]`): `Int[]` would be a different, primitive array type. */
+  def arrayWrittenForm(arr: ArrayType): String =
+    componentWrittenForm(arr.component) + ("[]" * math.max(1, arr.dimension))
+
+  def componentWrittenForm(component: TypedAST.Type): String = component match {
+    case ct: ClassType if boxedToPrimitive.contains(ct.name) =>
+      "J" + ct.name.substring(ct.name.lastIndexOf('.') + 1)
+    case other => sourceForm(other)
+  }
+
   def sourceForm(tp: TypedAST.Type): String = tp match {
     case null => "<unknown>"
     case n: NullableType => sourceForm(n.innerType) + "?"

@@ -7,6 +7,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
+  - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
+  - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.
+  - Onion overloads follow the same rule: with `g(c: Char)` and `g(l: Long)`, `g(65)` now calls the `Long` one.
+- **An empty `#{}` in a string is one error at the `#`, saying the interpolation needs an expression (#2429).**
+  - Before: "unexpected end of file — a closing `}` or `)` is probably missing", at line 1 or at no line at all.
+  - Now: `repro.on:2:12: empty string interpolation: put an expression between the braces, as in '#{expr}'.` For a literal `#{}` in an ordinary string, write `\#{}`.
+- **`;` between two clauses of a record body is one error with a hint (#2382).**
+  - Before: `{ shape doc = json; shape txt = re"..." }` gave two contradictory syntax errors, no hint.
+  - Now: one error at the `;`, saying clauses are separated by a newline or a space.
+- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
+  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
+  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
+
+## [0.146.0] - 2026-10-25
+
+### Breaking
+
+- **A hex literal ending in `B` is an `Int`: `0xAB` is 171, not the Byte 10 (#2324).**
+  - Before: `B` was a Byte suffix even in hex, so `0xAB` printed `10` and `0xFFB` printed `-1`.
+  - Now: `B` is a hex digit. `0xFFB` is 4091. For a Byte, write `0b11111111B` or `-1B`; `0xFFFFS` still works. See `docs/migration/pre-1.0.md`.
+  - Where such a literal no longer fits a Byte, most contexts give an error that says why. Where it still fits (`bs[0] = 0x1B`), the value changes silently: search for `0x...B`.
+
+### Fixed
+
+- **`xs.addAll(o)` compiles inside a generic class when `xs` and `o` are both `List[T]` (#2341).**
+  - Before: E0000, `Collection[? extends T]` is expected but `List[T]` is used.
+  - Now: accepted, as in Java.
+  - Still rejected: `List[Object]`, `List[String]` or a `List[U]` of an unrelated type variable into a `List[T]`. `List[List[B]].addAll(List[List[T]])` with `T extends B` is now rejected too.
+
+- **A lambda that assigns a method parameter now updates it for the method too (#2335).**
+  - Before: `def g(n: Int): Int { val f: () -> Int = () -> { n = n + 10; n }; f(); return n }` returned the old `n`.
+  - Now: the lambda and the method share one `n`, as they do for a captured `var` local. Constructors share it too, and a delegating `: this(...)` call sees the argument's value.
+  - A lambda that only reads the parameter also sees later assignments: `val f: () -> Int = () -> n; n = 5; f()` gave `1` and now gives `5`. Lambdas collected in a loop that advances `n` give `4,4,4,` where they gave `1,2,3,`.
+
+- **`Config::getInt(c, "items.99999999999", -1)` returns the default (#2423).**
+  - Before: an array index too big for an `Int` threw `invalid number format: For input string: "99999999999"`.
+  - Now: it is out of range like any other index, so `get` is `null` and every getter falls back to its default.
+
+- **`Timing::sleep(deadline - Timing::millis())` returns at once when the deadline has passed (#2421).**
+  - Before: a negative duration threw `IllegalArgumentException: timeout value is negative` (`sleepNanos`: `nanosecond timeout value out of range`).
+  - Now: `sleep` and `sleepNanos` return immediately for a zero or negative duration.
+
+- **`Codec::base64Decode` reads Base64 from a file or the `base64` CLI (#2417).**
+  - Before: a trailing newline threw `Input byte array has incorrect ending byte at 8`; a bad character gave `Illegal base64 character 20`.
+  - Now: whitespace is skipped, and errors name the character and index. `Codec::urlDecode` names a bad `%` escape the same way.
+
+- **`m.mapMap(f)` keeps the map's order (#2414).**
+  - Before: `["b": 2, "a": 1].mapMap(f)` came back in hash order, `{a=.., b=..}`.
+  - Now: insertion order, `{b=.., a=..}`, as every `Maps::` transform and `set.map { }` already do.
+
+- **W0016 names an overload the way the source writes it (#2407).**
+  - Before: `a(java.util.List[java.lang.String], [int)`.
+  - Now: `a(List[String], Int[])`.
+
+- **`Config::getInt` and `getLong` return the default for a number that does not fit (#2404).**
+  - Before: `3000000000` read as `-1294967296` and `2.9` as `2`, so a config typo gave a negative port.
+  - Now: both give the default, as `Json::getIntOr` does. `Json::getInt` and `Json.Value.asInt()` are unchanged.
+- **`Yaml::parse` removes the quotes of a single-quoted key (#2403).**
+  - Before: `'k': 1` gave the key `'k'`, quotes included, so `m.get("k")` was `null`; `'a: b': 1` was split at the inner `: `.
+  - Now: `'k'` is read as `k`, the same as `"k"`. A whole-line `{a: 1}` now suggests block `key: value` lines or Json, not quoting a value.
+- **Syntax-error hints no longer misread a tab-indented line (#2312).**
+  - Before: the `;`-after-`}` hint fired where no `}` preceded the `;`, and the enum-`case` hint was missing or named the wrong case.
+  - Now: hints see the text before the error exactly, whatever the indentation.
+- **`xs.sort(c)` rejects a `Comparator[U]` for an unrelated type parameter `U` (#2367).**
+  - Before: it compiled in `class Box[T, U]` with `xs: List[T]`, then threw `ClassCastException` inside the sort.
+  - Now: `E0000` at the call, as in Java. `Comparator[T]` and `Comparator[Object]` still work.
+- **An interface default method that narrows its return type works through the parent interface (#2393).**
+  - Before: `interface SubNamed conforms Named { def name(): String = "d" }` threw `AbstractMethodError` when called as a `Named`.
+  - Now: it runs the default method, as in Java.
+- **An override that narrows its return type works through the supertype (#2386).**
+  - Before: `def name(): String` for an inherited `name(): Object` threw `AbstractMethodError` through an interface, and through a superclass silently ran the parent's method. A record accessor (`record P(name: String) conforms Named`) failed the same way.
+  - Now: it runs the override, as in Java.
+- **Self tail calls in a `select` case with bindings loop instead of overflowing the stack (#2350).**
+  - Before: `case P(a, b): go(new P(a - 1, b), acc + b)` or `case i is Integer: go(..)` overflowed at about 10000 calls.
+  - Now: these cases loop, as `if x is T { ... }` and literal cases already did.
+- **W0016 names an out-of-group overload with its parameter types (#2371).**
+  - Before: `... group (b, a) could not be optimized: Method b has tail calls to non-group methods: a`, as if `a` were outside the group.
+  - Now: `... non-group methods: a(java.lang.String)`, so the overload is told apart from the member `a(Int)`.
+- **A `select` case label that does not fit a Byte/Short/Char scrutinee no longer matches a truncated value (#2376).**
+  - Before: `case 300:` (or `case 150 + 150:`, `case k:`) on a `Byte` was truncated to `44` and matched it, silently.
+  - Now: a literal label is E0000, as for `val b: Byte = 300`; a computed one never matches. Labels inside the range still work.
+- **`val k: H[String]? = j` with `j: H[Object]?` reports a type mismatch, not a null error (#2343).**
+  - Before: E0070 "may be null", whose advice (`!!`, `?:`) cannot fix it.
+  - Now: E0000 naming the two types. E0070 stays for a value that would fit if it were not null.
+- **`Yaml::parse` rejects a tag or anchor on a key instead of keeping it in the key text (#2369).**
+  - Before: `!!str 5: x` returned the key `"!!str 5"`; `&x k: 1` returned `"&x k"`.
+  - Now: a `YamlParseException`. Quote the key to keep the text.
+- **The List-to-array cast hint only suggests code that compiles (#2314).**
+  - Before: `(nums as JInteger[])` said `Int[]` and suggested `toArray(new Int[0])` (E0005); `Comparable[]` suggested a raw type (E0066); a `List[T]` suggested a call that throws at run time.
+  - Now: `JInteger[]` and `new JInteger[0]` as written. A generic component or a bare `T` gets the plain type error, with no snippet.
+- **Assigning a `val` from inside a function (`=`, `+=`, `++`) is now E0036 (#2340).**
+  - Before: `val w = 10` then `def g() { w = 99 }` (or `w++`) compiled; `w` read `99` in functions and `10` at top level. A `static val` crashed at run time with `IllegalAccessError`.
+  - Now: `E0036 cannot assign to val`, as at top level.
+- **An error inside an ADT enum `case` points at that `case`, not at the `enum` keyword (#2322).**
+  - Before: `case Circle(...)` missing an abstract method reported `1:1`, the same spot for every case.
+  - Now: each error is reported on its own `case` line.
+- **A lambda in a `select` case after a guarded case no longer fails JVM verification (#2359).**
+  - Before: `case P(a, b) when a == 0: ...` followed by a case whose body holds `() -> a` crashed with `VerifyError` at run time.
+  - Now: it compiles and runs.
+- **A lambda in a constructor that assigns a captured `var` writes it back (#2361).**
+  - Before: `def this(m: Int) { var n = m; val f = () -> { n = n * 3; n }; f(); v = n }` left `n` at `m`; the same lines in a method worked.
+  - Now: the constructor and the lambda share `n`, as in a method.
+- **`Files::copyDir` reads `link/..` the way the OS does (#2370).**
+  - Before: `copyDir("t/sub", "t/lnk/../in")` (`lnk` -> `sub/deep`) ran away and left `sub/in/in/...`, and a legal copy through `lnk/..` was refused.
+  - Now: the first throws `IllegalArgumentException` with nothing written; the second copies.
+
+## [0.145.0] - 2026-10-24
+
 ### Breaking
 
 - **`2147483648` (and `9223372036854775808L`) is out of range unless it is the whole operand of a `-` (#2296).**
@@ -30,6 +141,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A generic call that breaks a bound naming another type parameter is a compile error (#2325).**
   - Before: with `def g[B, T extends B](v: T): B`, `val s: String = g(Integer::valueOf(1))` compiled, then threw a `ClassCastException`.
   - Now: E0000 at the call, "type String is expected, but type Int is used". Calls where `T` fits `B` are unchanged.
+- **An expression-bodied recursive function runs as a loop, like one written with `return` (#2330).**
+  - Before: `def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }` hit "stack overflow" at depth 200000, while the `return` form ran fine. An `else if` chain, and a `select` whose self-call case is a literal, `else` or guarded destructuring case, overflowed the same way. A `select` with an unguarded destructuring or type-pattern case still overflows (#2350).
+  - Now: it prints `200000`. A call whose result is still used (`{ val x = f(n - 1); x + 1 }`) stays a real call.
+- **`Yaml::parse` rejects a whole-line flow collection and a tag (#2327).**
+  - Before: `{a: 1, b: 2}` came back as the one-key map `{{a=1, b: 2}}`, and `a: !!str 5` as the text `!!str 5`.
+  - Now: `YamlParseException` naming the construct and line, as for anchors. Quote the value to keep it as text.
+
+- **`Files::copyDir("sub", "lnk/in")` is refused when `lnk` is a symlink to `sub` (#2304).**
+  - Before: it recursed into `lnk/in/in/...` until the OS path limit, leaving junk in `sub/`.
+  - Now: `IllegalArgumentException`, nothing written, as for `copyDir("sub", "sub/in")`.
+
+- **The `foreach (x in xs)` and `(() -> T)?` hints print one apostrophe, not two (#2331).**
+  - Before: the English text read `can''t` and `doesn''t`.
+  - Now: `can't` and `doesn't`.
+- **`@TailRecursive` no longer breaks a group member that has an overload outside the group (#2337).**
+  - Before: `a(n: Int)` and `b` in a group, plus an unrelated `a(s: String)`: the class failed to load with `VerifyError`.
+  - Now: only calls to the group members themselves become jumps; the overload stays a plain call.
 - **`derive!`, `from re"..."` and `shape` work on a generic record such as `record Box[T](n: Int) derive!(Json)` (#2321).**
   - Before: E0066 "raw type Box is not allowed" at the `record` keyword, for a type the user never wrote.
   - Now: it compiles. `Box::toJson(b)`, `Box::parse(s)` and `Box::doc()` are generic over `T`; annotate the target (`val s: Shape[Box[String]] = Box::doc()`) when nothing else pins it.

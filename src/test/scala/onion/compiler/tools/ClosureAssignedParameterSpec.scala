@@ -1,0 +1,129 @@
+package onion.compiler.tools
+
+import onion.tools.Shell
+
+/**
+ * A parameter that a lambda assigns is one variable with the method, as a captured
+ * `var` local is (#2335). It used to be copied into the lambda, so the method kept
+ * the old value.
+ */
+class ClosureAssignedParameterSpec extends AbstractShellSpec {
+  private def run(body: String): Shell.Result =
+    shell.run(
+      s"""
+         |class Test {
+         |public:
+         |$body
+         |  static def main(args: String[]): Int {
+         |    return g(1)
+         |  }
+         |}
+         |""".stripMargin,
+      "None",
+      Array()
+    )
+
+  describe("a parameter assigned inside a lambda") {
+    it("is seen updated by the method") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val f: () -> Int = () -> { n = n + 10; n }
+          |    val inner = f()
+          |    return n * 1000 + inner
+          |  }""".stripMargin)
+      assert(Shell.Success(11011) == result)
+    }
+
+    it("is shared both ways with a long parameter and a later method write") {
+      val result = run(
+        """  static def g(n: Long): Int {
+          |    val f: () -> Long = () -> { n = n * 2L; n }
+          |    n = n + 1L
+          |    val a = f()
+          |    n = n + 5L
+          |    return (a + n) as Int
+          |  }""".stripMargin)
+      assert(Shell.Success(4 + 9) == result)
+    }
+
+    it("works on an instance method with another parameter") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  def g(label: String, n: Int): String {
+          |    val f: () -> Int = () -> { n = n + 10; n }
+          |    f()
+          |    return label + n
+          |  }
+          |  static def main(args: String[]): String = new Test().g("n=", 1)
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("n=11") == result)
+    }
+
+    it("is passed by its argument value to a delegating constructor") {
+      val result = shell.run(
+        """
+          |class B {
+          |  var v: Int
+          |public:
+          |  def this(a: Int, b: Int) { v = a + b }
+          |  def this(n: Int): this(n, n * 2) {
+          |    val f: () -> Int = () -> { n = n + 1; n }
+          |    v = v * 100 + f()
+          |  }
+          |  def get: Int = v
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int = new B(5).get
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success(1506) == result)
+    }
+
+    it("leaves a captured but never assigned parameter alone") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val f: () -> Int = () -> n + 1
+          |    return f() + n
+          |  }""".stripMargin)
+      assert(Shell.Success(3) == result)
+    }
+
+    it("never shows its hidden argument slot in a \"did you mean\" suggestion") {
+      val buf = new java.io.ByteArrayOutputStream()
+      val ps = new java.io.PrintStream(buf, true, "UTF-8")
+      val (o, e) = (System.out, System.err)
+      val r =
+        try {
+          System.setOut(ps); System.setErr(ps)
+          Console.withOut(ps) { Console.withErr(ps) {
+            shell.run(
+              """
+                |def g(n: Int, max: Int): Int {
+                |  val f: () -> Int = () -> { n = n + 1; max = max - 1; n }
+                |  f()
+                |  println(maxArg)
+                |  return arg
+                |}
+                |println(g(1, 5))
+                |""".stripMargin,
+              "None",
+              Array())
+          } }
+        } finally { System.setOut(o); System.setErr(e) }
+      val out = new String(buf.toByteArray, "UTF-8")
+      assert(r.isInstanceOf[Shell.Failure], s"expected a compile failure, got $r\n$out")
+      assert(out.contains("E0002"), out)
+      assert(!out.contains("#"), s"hidden slot name leaked:\n$out")
+    }
+  }
+}

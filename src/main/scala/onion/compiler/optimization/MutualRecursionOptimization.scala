@@ -276,15 +276,14 @@ class MutualRecursionOptimization(config: CompilerConfig)
     }
 
     // Check 5: All tail calls must be to methods in the group
-    val groupNames = group.map(_.name).toSet
     val validationError: Option[String] = None
     val iterator = group.iterator
     while (iterator.hasNext && validationError.isEmpty) {
       val method = iterator.next()
       val tailCalls = TailCallGraphAnalysis.findTailCalls(method)
-      val externalCalls = tailCalls.filterNot(groupNames.contains)
+      val externalCalls = tailCalls.filterNot(callee => group.exists(_ eq callee))
       if (externalCalls.nonEmpty) {
-        break(Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.mkString(", ")}"))
+        break(Some(s"Method ${method.name} has tail calls to non-group methods: ${externalCalls.map(signature).mkString(", ")}"))
       }
     }
 
@@ -303,6 +302,28 @@ class MutualRecursionOptimization(config: CompilerConfig)
     }
 
     validationError
+  }
+
+  // `a(String)`: a bare name cannot tell an out-of-group overload from a group member.
+  private def signature(method: MethodDefinition): String =
+    s"${method.name}(${method.arguments.map(sourceName).mkString(", ")})"
+
+  // A boxed primitive in a type argument is written as the primitive (`List[Int]`).
+  private def typeArgName(tpe: TypedAST.Type): String = sourceName(tpe) match {
+    case "Integer"   => "Int"
+    case "Character" => "Char"
+    case other       => other
+  }
+
+  // The way the source writes a type: simple class names, `Int[]` for arrays.
+  private def sourceName(tpe: TypedAST.Type): String = tpe match {
+    case a: TypedAST.ArrayType        => sourceName(a.component) + "[]" * a.dimension
+    case n: TypedAST.NullableType     => sourceName(n.innerType) + "?"
+    case c: TypedAST.AppliedClassType =>
+      val raw = c.raw.name.substring(c.raw.name.lastIndexOf('.') + 1)
+      if (c.typeArguments.isEmpty) raw else raw + c.typeArguments.map(typeArgName).mkString("[", ", ", "]")
+    case t: TypedAST.ClassType        => t.name.substring(t.name.lastIndexOf('.') + 1)
+    case other                        => other.displayName
   }
 
   /**
@@ -638,7 +659,9 @@ class MutualRecursionOptimization(config: CompilerConfig)
     paramCount: Int
   ): StatementBlock = {
     val loc: Location = null
-    val stateIdByName = stateIds.map { case (method, id) => method.name -> id }
+    // Overloads share a name, so a call is matched to its member by identity.
+    def stateIdOf(target: MethodDefinition): Option[Int] =
+      stateIds.collectFirst { case (method, id) if method eq target => id }
 
     def transformStatement(stmt: ActionStatement): ActionStatement = {
       stmt match {
@@ -647,14 +670,14 @@ class MutualRecursionOptimization(config: CompilerConfig)
           ret.term match {
             case call: Call =>
               call.method match {
-                case targetMethod: MethodDefinition if stateIdByName.contains(targetMethod.name) =>
+                case targetMethod: MethodDefinition if stateIdOf(targetMethod).isDefined =>
                   // Transform to: update params, set state, continue
                   if (config.verbose) {
-                    trace(s"[Mutual TCO]       Found tail call: ${targetMethod.name} -> state ${stateIdByName(targetMethod.name)}")
+                    trace(s"[Mutual TCO]       Found tail call: ${targetMethod.name} -> state ${stateIdOf(targetMethod).get}")
                   }
                   transformTailCallToStateTransition(
                     call.parameters,
-                    stateIdByName(targetMethod.name),
+                    stateIdOf(targetMethod).get,
                     loopVarOffset,
                     stateLoopVarIndex,
                     call.parameters.map(_.`type`)
@@ -664,13 +687,13 @@ class MutualRecursionOptimization(config: CompilerConfig)
               }
             case call: CallStatic =>
               call.method match {
-                case targetMethod: MethodDefinition if stateIdByName.contains(targetMethod.name) =>
+                case targetMethod: MethodDefinition if stateIdOf(targetMethod).isDefined =>
                   if (config.verbose) {
-                    trace(s"[Mutual TCO]       Found static tail call: ${targetMethod.name} -> state ${stateIdByName(targetMethod.name)}")
+                    trace(s"[Mutual TCO]       Found static tail call: ${targetMethod.name} -> state ${stateIdOf(targetMethod).get}")
                   }
                   transformTailCallToStateTransition(
                     call.parameters,
-                    stateIdByName(targetMethod.name),
+                    stateIdOf(targetMethod).get,
                     loopVarOffset,
                     stateLoopVarIndex,
                     call.parameters.map(_.`type`)
@@ -756,7 +779,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
         case call: Call =>
           call.method match {
             case targetMethod: MethodDefinition =>
-              val inGroup = stateIdByName.contains(targetMethod.name)
+              val inGroup = stateIdOf(targetMethod).isDefined
               if (config.verbose) {
                 trace(s"[Mutual TCO]         Checking Call: ${targetMethod.name}, in group: $inGroup")
               }
@@ -766,7 +789,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
         case call: CallStatic =>
           call.method match {
             case targetMethod: MethodDefinition =>
-              val inGroup = stateIdByName.contains(targetMethod.name)
+              val inGroup = stateIdOf(targetMethod).isDefined
               if (config.verbose) {
                 trace(s"[Mutual TCO]         Checking CallStatic: ${targetMethod.name}, in group: $inGroup")
               }

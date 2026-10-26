@@ -118,6 +118,21 @@ class HashCodecStatsSpec extends AbstractShellSpec {
           "invalid % escape at index 2 in \"50%\": a % must be followed by two hex digits"))
     }
 
+    it("urlDecode quotes a short window around the bad escape in a long input, not all of it") {
+      runStr(
+        "import { onion.Codec }",
+        """val sb = new StringBuilder()
+          |foreach i in 1..1000 { sb.append("a") }
+          |sb.append("%zz")
+          |foreach i in 1..1000 { sb.append("b") }
+          |var m: String = "none"
+          |try { Codec::urlDecode(sb.toString()) } catch e: IllegalArgumentException { m = e.getMessage() }
+          |return m""".stripMargin,
+        Shell.Success(
+          "invalid % escape at index 1000 in \"...aaaaaaaaaaaaaaaaaaaa%zzbbbbbbbbbbbbbbbbbbbb...\": " +
+          "a % must be followed by two hex digits"))
+    }
+
     it("url encoding round-trips a reserved character") {
       runStr(
         "import { onion.Codec }",

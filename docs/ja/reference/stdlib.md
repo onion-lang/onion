@@ -2535,7 +2535,7 @@ Http::delete(url): String
 
 ```
 Http::encodeUrl(str): String
-Http::decodeUrl(str): String
+Http::decodeUrl(str): String            // Codec::urlDecode と同じ
 Http::buildQuery(params): String        // params: キーと値を交互に並べる
 Http::buildUrl(baseUrl, params): String // "?"/"&" + buildQuery(params) を付加
 ```

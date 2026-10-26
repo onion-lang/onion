@@ -2382,7 +2382,7 @@ Http::delete(url): String
 
 ```
 Http::encodeUrl(str): String
-Http::decodeUrl(str): String
+Http::decodeUrl(str): String            // same as Codec::urlDecode
 Http::buildQuery(params): String        // params: alternating keys and values
 Http::buildUrl(baseUrl, params): String // appends "?"/"&" + buildQuery(params)
 ```

@@ -386,7 +386,17 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       }
     }
 
-    val candidates = collectExtensionMethods(targetType, name).filter(_.arguments.length == args.length)
+    val sameArity = collectExtensionMethods(targetType, name).filter(_.arguments.length == args.length)
+    // A lambda cannot be passed where an overload wants an `Int` or a `String`: drop such
+    // overloads first, so `x.g { .. }` next to `x.g(5)` is typed against the function one
+    // whatever their declaration order (#2447). When none can take it, the first one is
+    // tried alone, so the call gets one error, not one per overload.
+    val candidates = {
+      val fitting = sameArity.filter { m =>
+        untypedClosureIndices.forall(i => i >= m.arguments.length || closureCanFit(m.arguments(i)))
+      }
+      if (fitting.nonEmpty) fitting else sameArity.take(1)
+    }
     if (candidates.isEmpty) arrayAsList(node, target, targetType) match {
       case Some((listTarget, listType)) =>
         break(tryExtensionMethodCallBidirectional(node, listTarget, listType, context, expected, untypedClosureIndices))
@@ -395,11 +405,16 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     candidates.iterator.flatMap { extMethod =>
       val container = extMethod.containerClass
       val receiverType = staticReceiver(target, extMethod).`type`
-      container.methods(name)
-        .filter { m =>
-          Modifier.isStatic(m.modifier) && m.arguments.length == args.length + 1 &&
-            receiverKindMatches(m.arguments(0), receiverType)
-        }
+      val statics = container.methods(name).filter { m =>
+        Modifier.isStatic(m.modifier) && m.arguments.length == args.length + 1 &&
+          receiverKindMatches(m.arguments(0), receiverType)
+      }
+      // The static that implements this very overload, when the container has one with its
+      // parameter types; otherwise two same-arity overloads both ran the first-sorted one (#2447).
+      val ownStatic = statics.filter { m =>
+        extMethod.arguments.indices.forall(i => m.arguments(i + 1).name == extMethod.arguments(i).name)
+      }
+      (if (ownStatic.nonEmpty) ownStatic else statics)
         // Pick the overload whose first (receiver) parameter is the most specific
         // that still accepts the receiver — e.g. map(Set) over map(Iterable) for a
         // Set — instead of the first declared, which could be a sibling like
@@ -445,6 +460,17 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           }
         }
     }.nextOption()
+  }
+
+  /** False only where no lambda can ever go: a primitive, an array, or a concrete class
+   *  other than `Object` (`String`, `Integer`). Interfaces, abstract classes and type
+   *  variables may take one. */
+  private def closureCanFit(param: Type): Boolean = param match {
+    case _: BasicType | _: ArrayType => false
+    case _: TypeVariableType => true
+    case ct: ClassType =>
+      ct.isInterface || Modifier.isAbstract(ct.modifier) || ct.name == "java.lang.Object"
+    case _ => true
   }
 
   /** The backing static's first parameter must accept this receiver: array kinds

@@ -52,9 +52,15 @@ public class Config {
             if (current instanceof LinkedHashMap) {
                 current = ((LinkedHashMap<?, ?>) current).get(key);
             } else if (current instanceof ArrayList && key.matches("\\d+")) {
-                int index = Integer.parseInt(key);
                 ArrayList<?> list = (ArrayList<?>) current;
-                if (index >= 0 && index < list.size()) {
+                // An index too big for an Int is out of range, like any other
+                int index;
+                try {
+                    index = Integer.parseInt(key);
+                } catch (NumberFormatException e) {
+                    return null;
+                }
+                if (index < list.size()) {
                     current = list.get(index);
                 } else {
                     return null;

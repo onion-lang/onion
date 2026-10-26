@@ -52,9 +52,15 @@ public class Config {
             if (current instanceof LinkedHashMap) {
                 current = ((LinkedHashMap<?, ?>) current).get(key);
             } else if (current instanceof ArrayList && key.matches("\\d+")) {
-                int index = Integer.parseInt(key);
                 ArrayList<?> list = (ArrayList<?>) current;
-                if (index >= 0 && index < list.size()) {
+                // An index too big for an Int is out of range, like any other
+                int index;
+                try {
+                    index = Integer.parseInt(key);
+                } catch (NumberFormatException e) {
+                    return null;
+                }
+                if (index < list.size()) {
                     current = list.get(index);
                 } else {
                     return null;
@@ -76,12 +82,15 @@ public class Config {
     }
 
     /**
-     * Gets an integer value at path, or returns default if not found or not a number.
+     * Gets an integer value at path, or returns default if not found, not a number, or not a whole number within Int range.
      */
     public static int getInt(Object config, String path, int defaultValue) {
         Object value = get(config, path);
         if (value == null) return defaultValue;
-        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Number) {
+            Long v = Scalars.integral((Number) value, Integer.MIN_VALUE, Integer.MAX_VALUE);
+            return v == null ? defaultValue : v.intValue();
+        }
         try {
             return Integer.parseInt(value.toString());
         } catch (NumberFormatException e) {
@@ -90,12 +99,15 @@ public class Config {
     }
 
     /**
-     * Gets a long value at path, or returns default if not found or not a number.
+     * Gets a long value at path, or returns default if not found, not a number, or not a whole number within Long range.
      */
     public static long getLong(Object config, String path, long defaultValue) {
         Object value = get(config, path);
         if (value == null) return defaultValue;
-        if (value instanceof Number) return ((Number) value).longValue();
+        if (value instanceof Number) {
+            Long v = Scalars.integral((Number) value, Long.MIN_VALUE, Long.MAX_VALUE);
+            return v == null ? defaultValue : v;
+        }
         try {
             return Long.parseLong(value.toString());
         } catch (NumberFormatException e) {

@@ -907,7 +907,7 @@ Provided via `onion.Iterables` (Java interface).
 Access iteration utilities for collections and arrays:
 
 - `Iterables::map(list|iterable|set, f)`
-- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map`
+- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map` in the original insertion order
 - `Iterables::toList(iterable)` - materializes any `Iterable` (ranges included) into a `List`
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`
@@ -1372,6 +1372,8 @@ Timing::sleep(1000L)        // Sleep for 1000 milliseconds
 Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 ```
 
+A zero or negative duration returns immediately, so `Timing::sleep(deadline - Timing::millis())` is safe once the deadline has passed.
+
 ### Measuring Function Execution
 
 ```onion
@@ -1719,7 +1721,7 @@ as `Json` — scalars map to the same Java types — so `derive!(Yaml)` builds o
 exactly the same `toMap` / `fromMap` core as `derive!(Json)`.
 
 Scope: a flat block mapping, or a top-level block sequence of flat mappings (no
-nested maps/sequences within an element, no anchors, no flow collections). A
+nested maps/sequences within an element, no anchors, no tags, no flow collections). A
 construct outside that scope raises an error rather than silently losing data:
 `Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List value,
 and `Yaml::parse` throws `Yaml.YamlParseException` on:
@@ -1728,8 +1730,9 @@ and `Yaml::parse` throws `Yaml.YamlParseException` on:
   inside a sequence element
 - a nested sequence: a `- ` item under a key, or at a different column from the
   first item
-- a flow collection (`[...]`/`{...}`) value
+- a flow collection (`[...]`/`{...}`), as a value or as a whole line
 - an anchor/alias (`&name`/`*name`) value
+- a tag (`!!str 5`, `!name 5`) value
 - a block scalar (`|`/`>`)
 
 A uniformly indented document is fine. `Yaml::stringify` quotes any string that
@@ -1767,6 +1770,9 @@ A trailing ` #...` comment (a `#` at the start of the value, or preceded by whit
 stripped before this inference runs, unless it is inside a `"..."` or `'...'` quoted value:
 `a: 1 # note` parses `a` as the `Long` `1`, and `b: 'q # no'` keeps the `#` as part of the
 string `q # no`.
+
+A key may be quoted the same two ways, and is unquoted by the same rules: `'k': 1` and
+`"k": 1` both give the key `k`, and `'a: b': 1` gives the key `a: b`.
 
 Throws `Yaml.YamlParseException` on malformed input; `derive!(Yaml)`'s
 `fromYaml` catches this and returns `null` instead.
@@ -1865,7 +1871,7 @@ val config2 = Config::parseJson("{\"port\": 8080}")   // parses a JSON string di
 
 Config::get(config, "database.host")                   // raw value, or null if not found
 Config::getString(config, "database.host", "localhost")
-Config::getInt(config, "database.port", 5432)
+Config::getInt(config, "database.port", 5432)         // the default if the number is a fraction or out of Int range
 Config::getLong(config, "database.maxConnections", 10L)
 Config::getDouble(config, "database.timeout", 30.0)
 Config::getBoolean(config, "database.ssl", false)
@@ -1951,6 +1957,9 @@ Codec::base64Decode(enc)                  // "Hello"
 Codec::hexEncode("Hi") / Codec::hexDecode("4869")
 Codec::urlEncode("a b&c") / Codec::urlDecode(s)
 ```
+
+- `base64Decode` skips whitespace, so a file's trailing newline or `base64`'s 76-column lines decode as is.
+- Bad input to a decoder throws `IllegalArgumentException` naming the problem, for example `invalid Base64 character '!' at index 10` or `invalid % escape at index 3 in "100%zz"`.
 
 These are also builtin extension methods on `String`:
 

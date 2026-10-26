@@ -190,6 +190,33 @@ class DiagnosticHintsSpec extends AnyFunSpec {
       assert(numbers.exists(_.contains("toArray(new Number[0])")), s"expected a toArray hint, got: $numbers")
     }
 
+    // #2314: the hint's snippet must compile when typed in.
+    it("names JInteger[] as written and hints toArray(new JInteger[0])") {
+      val errors = listCastErrors("List[Int]", "[1, 2]", "JInteger[]")
+      assert(errors.exists(_.contains("toArray(new JInteger[0])")), s"expected a JInteger hint, got: $errors")
+      assert(errors.forall(!_.contains("new Int[0]")), s"did not expect a primitive snippet, got: $errors")
+    }
+
+    it("gives no toArray snippet for a generic component (List[String] as Comparable[])") {
+      val errors = listCastErrors("List[String]", "[\"a\"]", "Comparable[]")
+      assert(errors.exists(_.contains("Comparable[]")), s"expected the type mismatch, got: $errors")
+      assert(errors.forall(!_.contains("toArray")), s"did not expect a toArray hint, got: $errors")
+    }
+
+    it("gives no toArray snippet for a List of a bare type parameter") {
+      val errors = compile(
+        """
+          |class Test {
+          |public:
+          |  static def conv[T](xs: List[T]): String[] = (xs as String[])
+          |  static def main(args: String[]): Int { return 0 }
+          |}
+        """.stripMargin
+      )
+      assert(errors.exists(_.contains("List[T]")), s"expected the type mismatch, got: $errors")
+      assert(errors.forall(!_.contains("toArray")), s"did not expect a toArray hint, got: $errors")
+    }
+
     it("does not add the List/array hint for an ordinary incompatible cast") {
       val errors = compile(
         """

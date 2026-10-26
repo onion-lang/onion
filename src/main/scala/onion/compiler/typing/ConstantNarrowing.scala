@@ -20,6 +20,17 @@ private[typing] object ConstantNarrowing {
     case _ => None
   }
 
+  /**
+   * Whether `term` is a hex literal ending in `B` (or its negation), such as `0xFFB`: a
+   * Byte before #2324, an Int now. Errors use it to say why it no longer fits a Byte.
+   */
+  def isHexEndingInB(term: Term): Boolean = term match {
+    case iv: IntValue => iv.hexEndsInB
+    case u: UnaryTerm if u.kind == UnaryTerm.Kind.MINUS =>
+      u.operand match { case iv: IntValue => iv.hexEndsInB; case _ => false }
+    case _ => false
+  }
+
   /** Whether an integer value fits the range of a narrow integral target. */
   def fits(bt: BasicType, value: Int): Boolean = bt match {
     case BasicType.BYTE  => value >= -128 && value <= 127

@@ -126,6 +126,44 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       assert(Shell.Success("fn:20,fn:40") == result)
     }
 
+    // The panel's cases on 6b143c6: the receiver is ranked too, and a function type
+    // beats a SAM interface, in either declaration order.
+    for (stringFirst <- Seq(true, false)) {
+      val order = if (stringFirst) "String block first" else "Object block first"
+      it(s"picks the String receiver's extension over Object's for a lambda ($order)") {
+        val str = "extension String { def tap2(f: (Object) -> void): String = \"string\" }"
+        val obj = "extension Object { def tap2(f: (Object) -> void): String = \"object\" }"
+        val decls = if (stringFirst) str + "\n" + obj else obj + "\n" + str
+        assert(Shell.Success("string") == runMain(decls, """"abc".tap2 { x -> IO::print("") }"""))
+      }
+
+      it(s"picks the List receiver's extension over Collection's for a lambda ($order)") {
+        val list = "extension List { def each2(f: (Object) -> void): String = \"list\" }"
+        val coll = "extension Collection { def each2(f: (Object) -> void): String = \"collection\" }"
+        val decls = if (stringFirst) list + "\n" + coll else coll + "\n" + list
+        assert(Shell.Success("list") == runMain(decls, """["a"].each2 { x -> IO::print("") }"""))
+      }
+
+      it(s"picks () -> void over Runnable for a block lambda (${if (stringFirst) "function" else "Runnable"} first)") {
+        val fn = "  def k(f: () -> void): String = \"f\""
+        val run = "  def k(r: Runnable): String = \"r\""
+        val decls = Seq("extension String {", if (stringFirst) fn else run, if (stringFirst) run else fn, "}").mkString("\n")
+        assert(Shell.Success("f") == runMain(decls, """"a".k { IO::print("") }"""))
+      }
+    }
+
+    it("reports a lambda that fits nothing against the overload of its arity") {
+      val codes = errorCodes(
+        """extension String {
+          |  def h(f: (Int) -> String): String = "fn1:" + f(1)
+          |  def h(f: (Int, Int) -> String): String = "fn2:" + f(1, 2)
+          |}
+          |IO::println("a".h((a: Int, b: Int) -> a))
+          |""".stripMargin
+      )
+      assert(codes == Seq(Some("E0000")))
+    }
+
     it("still rejects a lambda where no overload takes one, with one error") {
       val codes = errorCodes(
         """extension String {

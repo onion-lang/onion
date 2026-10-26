@@ -454,16 +454,20 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }
 
     // Several user overloads: the rule class methods use (#2447). Type the call against
-    // each one without reporting, keep those the arguments fit, and take the most specific
-    // (`(Int) -> String` over `Object`); a lambda that fits none gets one error.
+    // each one without reporting and keep those the arguments fit. A fit that takes each
+    // lambda as it is (a function type, `Object`) beats one that needs a SAM conversion
+    // (`Runnable`); among the rest the most specific receiver and parameters win
+    // (`String` over `Object`, `(Int) -> String` over `Object`).
     val user = candidates.filterNot(isBuiltinExtension)
     if (user.length >= 2) {
       val fits = user.filter(m => typing.withSuppressedReporting(attempt(m)).isDefined)
       if (fits.isEmpty) {
         val builtins = candidates.filter(isBuiltinExtension)
-        break(if (builtins.isEmpty) attempt(user.head) else builtins.iterator.flatMap(attempt).nextOption())
+        break(if (builtins.isEmpty) attempt(closestByArity(user, args)) else builtins.iterator.flatMap(attempt).nextOption())
       }
-      val applicable = fits.map(m => ApplicableMethod(m, m.arguments, Map.empty)).toList
+      val direct = fits.filter(m => untypedClosureIndices.forall(i => i >= m.arguments.length || takesLambdaDirectly(m.arguments(i))))
+      val pool = if (direct.nonEmpty) direct else fits
+      val applicable = pool.map(m => ApplicableMethod(m, m.receiverType +: m.arguments, Map.empty)).toList
       overloadSupport.selectMostSpecificApplicable(applicable) match {
         case CandidateSelection.Selected(am) =>
           break(attempt(am.method.asInstanceOf[ExtensionMethodDefinition]))
@@ -477,6 +481,31 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }
     candidates.iterator.flatMap(attempt).nextOption()
   }
+
+  /** A parameter a lambda reaches with no SAM conversion: an Onion function type, `Object`
+   *  or a type variable. */
+  private def takesLambdaDirectly(param: Type): Boolean = param match {
+    case _: TypeVariableType => true
+    case ct: ClassType => ct.name.startsWith("onion.Function") || ct.name == "java.lang.Object"
+    case _ => false
+  }
+
+  /** When no overload fits, the one to report against: the first whose function-typed
+   *  parameters take as many arguments as the lambdas passed to them, else the first. */
+  private def closestByArity(overloads: Seq[ExtensionMethodDefinition], args: Array[AST.Expression]): ExtensionMethodDefinition =
+    overloads.find { m =>
+      args.indices.forall { i =>
+        args(i) match {
+          case c: AST.ClosureExpression if i < m.arguments.length =>
+            m.arguments(i) match {
+              case ct: ClassType if ct.name.startsWith("onion.Function") =>
+                ct.name == "onion.Function" + c.args.length
+              case _ => false
+            }
+          case _ => true
+        }
+      }
+    }.getOrElse(overloads.head)
 
   /** The backing static's first parameter must accept this receiver: array kinds
    *  must agree (an array-taking overload must not be picked for a List receiver

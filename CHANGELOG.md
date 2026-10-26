@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A lambda passed to an overloaded extension method picks the overload that takes a function (#2447).**
   - Before: with `def g(f: (Int) -> String)` declared before `def g(s: Int)`, `"a".g((n: Int) -> "n" + n)` was E0000 "type Int is expected".
   - Before, too: next to an `Object` overload declared after it, the lambda silently ran the `Object` one.
-  - Now: the most specific overload the lambda fits is chosen, in either declaration order, as class methods do.
+  - Now: the most specific overload the lambda fits is chosen, in either declaration order. For a lambda with typed parameters this is the class-method rule.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

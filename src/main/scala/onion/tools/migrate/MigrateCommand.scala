@@ -24,7 +24,8 @@ import onion.tools.format.FormatCommand
  * changed: its places are names, printed to stdout as a `note:`. A file that does not is
  * rewritten only if the rewritten file compiles. Otherwise its places are printed to stderr,
  * the file is left as it was, the summary counts it as needing a manual change, and the exit
- * code is 1. Each file is compiled on its own, against `-classpath` (default: none).
+ * code is 1. Each file is compiled on its own, against `-classpath` (default: none); a file
+ * that compiles neither way alone is tried again compiled together with every named file.
  *
  * `--check` writes nothing and exits 1 if anything would change.
  *
@@ -35,6 +36,9 @@ import onion.tools.format.FormatCommand
 object MigrateCommand:
 
   def run(cwd: Path, args: Array[String], out: PrintStream, err: PrintStream): Int =
+    if args.exists(a => a == "--help" || a == "-h") then
+      out.println(Usage)
+      return 0
     parse(args) match
       case Left(message) =>
         err.println(s"error: $message")
@@ -83,44 +87,84 @@ object MigrateCommand:
     val display = (path: Path) =>
       val relative = try cwd.relativize(path.toAbsolutePath) catch case _: IllegalArgumentException => path
       relative.toString
-
-    val compiles = (text: String, file: Path) => Compile.succeeds(text, file, classpath)
+    val note = (file: Path, line: Int, column: Int, message: String) =>
+      out.println(s"${display(file)}:$line:$column: note: $message")
+    val compilesAsWritten = (file: Path, result: Migrator.Result) =>
+      result.edits.foreach(e => note(file, e.line, e.column,
+        "the file compiles as written, so this `ret` is a name, " +
+          "not the old do-block keyword; left as written"))
 
     var changed = 0
     var undecided = 0
     var failed = false
+    // The new text of each file, once decided; a file that is not here keeps its own.
+    val decided = mutable.LinkedHashMap[Path, String]()
+    // Files that compile neither way on their own: they may need the other named files.
+    val pending = mutable.LinkedHashMap[Path, (String, Migrator.Result)]()
+
+    def rewrite(file: Path, source: String, result: Migrator.Result): Unit =
+      if !preserved(source, result) then
+        err.println(s"error: Migrating ${display(file)} would change more than the rewritten tokens; left untouched")
+        err.println("This is a bug in onion migrate. Please report it with the file.")
+        failed = true
+      else
+        changed += 1
+        decided(file) = result.text
+        result.edits.foreach(e => out.println(s"${display(file)}:${e.line}:${e.column}: ${e.note}"))
+        if !check then Files.writeString(file, result.text, UTF_8)
+
+    def cannotTell(file: Path, result: Migrator.Result, problems: Seq[Compile.Problem]): Unit =
+      undecided += 1
+      failed = true
+      result.edits.foreach { e =>
+        err.println(s"${display(file)}:${e.line}:${e.column}: this `ret` may be the old do-block keyword. " +
+          "The file does not compile with `yield` there either, so onion migrate left it as written.")
+      }
+      problems.headOption.foreach(p => err.println(s"  first error with `yield`: ${p.render(display)}"))
+      err.println("  Fix that error and run onion migrate again, or change the `ret` by hand. " +
+        "If the file uses classes from other files, name those files too, or pass -classpath.")
+
     files.foreach { file =>
       try
         val source = Files.readString(file, UTF_8)
         val result = Migrator.migrate(source)
-        val note = (line: Int, column: Int, message: String) =>
-          out.println(s"${display(file)}:$line:$column: note: $message")
-        result.notes.foreach(n => note(n.line, n.column, n.message))
+        result.notes.foreach(n => note(file, n.line, n.column, n.message))
         if result.changed then
-          if compiles(source, file) then
-            result.edits.foreach(e => note(e.line, e.column,
-              "the file compiles as written, so this `ret` is a name, " +
-                "not the old do-block keyword; left as written"))
-          else if !compiles(result.text, file) then
-            undecided += 1
-            failed = true
-            result.edits.foreach(e => err.println(s"${display(file)}:${e.line}:${e.column}: " +
-              "this `ret` may be the old do-block keyword, but the file does not compile with " +
-              "`yield` there either, so onion migrate cannot tell; fix the other errors " +
-              "(or pass -classpath) and run it again, or change it by hand"))
-          else if !preserved(source, result) then
-            err.println(s"error: Migrating ${display(file)} would change more than the rewritten tokens; left untouched")
-            err.println("This is a bug in onion migrate. Please report it with the file.")
-            failed = true
-          else
-            changed += 1
-            result.edits.foreach(e => out.println(s"${display(file)}:${e.line}:${e.column}: ${e.note}"))
-            if !check then Files.writeString(file, result.text, UTF_8)
+          if Compile.problems(Seq(file -> source), classpath).isEmpty then compilesAsWritten(file, result)
+          else if Compile.problems(Seq(file -> result.text), classpath).isEmpty then rewrite(file, source, result)
+          else pending(file) = (source, result)
       catch
         case error: IOException =>
           err.println(s"error: Could not migrate ${display(file)}: ${error.getMessage}")
           failed = true
+        case _: StackOverflowError =>
+          err.println(s"error: Could not migrate ${display(file)}: it nests too deeply; left untouched")
+          failed = true
     }
+
+    // A file may use classes another named file declares, so the undecided ones get a second
+    // chance compiled together with every named file, with the same rule: a file that
+    // compiles as written is left alone, and a rewrite is kept only if it compiles.
+    if pending.nonEmpty then
+      val unit = (rewritten: Set[Path]) => files.map { file =>
+        pending.get(file) match
+          case Some((source, result)) => file -> (if rewritten(file) then result.text else source)
+          case None => file -> decided.getOrElse(file, Files.readString(file, UTF_8))
+      }
+      val failing = (problems: Seq[Compile.Problem], file: Path) =>
+        problems.filter(p => p.file.forall(_ == file.toString))
+      val asWritten = if files.size > 1 then Compile.problems(unit(Set.empty), classpath) else Seq()
+      val candidates =
+        if files.size > 1 then pending.keySet.filter(f => failing(asWritten, f).nonEmpty).toSet
+        else pending.keySet.toSet
+      val withYield = Compile.problems(unit(candidates), classpath)
+      pending.foreach { case (file, (source, result)) =>
+        if !candidates(file) then compilesAsWritten(file, result)
+        else
+          val left = failing(withYield, file)
+          if left.isEmpty && files.size > 1 then rewrite(file, source, result)
+          else cannotTell(file, result, if left.nonEmpty then left else withYield)
+      }
 
     val upToDate = files.size - changed - undecided
     if check && changed > 0 then out.println(s"$changed file(s) would be migrated")
@@ -132,18 +176,55 @@ object MigrateCommand:
     else if check && changed > 0 then 1
     else 0
 
-  /** The migrated text lexes to the original tokens, with only the rewritten ones replaced. */
+  /**
+   * The migrated text lexes to the original tokens and comments, except that exactly as many
+   * rewrites as there are edits were made inside them. A rewrite may sit inside a string
+   * token, in the code of a `#{...}`, so a token is compared by walking both images.
+   */
   private def preserved(source: String, result: Migrator.Result): Boolean =
     val before = Migrator.signature(source)
     val after = Migrator.signature(result.text)
-    val expected = result.edits.sortBy(_.offset).map(e =>
-      (source.substring(e.offset, e.offset + e.length), e.replacement))
-    before.length == after.length && before.zip(after).filter(_ != _) == expected
+    val rewrites = result.edits.map(e => (source.substring(e.offset, e.offset + e.length), e.replacement)).distinct
+    /** How many rewrites turn `b` into `a`, or `None` if something else differs. */
+    def rewritesBetween(b: String, a: String): Option[Int] =
+      var i = 0
+      var j = 0
+      var count = 0
+      var ok = true
+      while ok && (i < b.length || j < a.length) do
+        if i < b.length && j < a.length && b.charAt(i) == a.charAt(j) then
+          i += 1
+          j += 1
+        else
+          rewrites.find((from, to) => b.startsWith(from, i) && a.startsWith(to, j)) match
+            case Some((from, to)) =>
+              i += from.length
+              j += to.length
+              count += 1
+            case None => ok = false
+      if ok then Some(count) else None
+    before.length == after.length && {
+      val counts = before.zip(after).map((b, a) => rewritesBetween(b, a))
+      counts.forall(_.isDefined) && counts.flatten.sum == result.edits.length
+    }
 
-  /** Compiles one file's text on its own, writing nothing and running nothing. */
+  /** Compiles source texts together, writing nothing and running nothing. */
   private object Compile:
-    def succeeds(text: String, file: Path, classpath: Seq[String]): Boolean =
-      val config = CompilerConfig(classpath, null, "UTF-8", "", 1,
+    /** One compile error; `file` is the name it was compiled under, when the error has one. */
+    final case class Problem(file: Option[String], line: Int, column: Int, message: String):
+      def render(display: Path => String): String =
+        file.fold(message)(f => s"${display(Path.of(f))}:$line:$column: $message")
+
+    /** The errors compiling `sources` together against `classpath`; empty when it compiles. */
+    def problems(sources: Seq[(Path, String)], classpath: Seq[String]): Seq[Problem] =
+      val config = CompilerConfig(classpath, null, "UTF-8", "", 1000,
         warningLevel = onion.compiler.WarningLevel.Off, checkLaws = false)
-      try !new OnionCompiler(config).compileDetailed(Seq(StringInputSource(text, file.toString))).hasErrors
-      catch case _: Exception => false
+      try
+        val inputs = sources.map((file, text) => StringInputSource(text, file.toString))
+        new OnionCompiler(config).compileDetailed(inputs).allErrors.map { e =>
+          val location = Option(e.location)
+          Problem(Option(e.sourceFile), location.fold(0)(_.line), location.fold(0)(_.column), e.message)
+        }
+      catch
+        case error: (Exception | StackOverflowError) =>
+          Seq(Problem(None, 0, 0, s"the compiler failed: $error"))

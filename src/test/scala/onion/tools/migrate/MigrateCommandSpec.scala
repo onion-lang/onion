@@ -329,6 +329,112 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     result.stdout should include("old.on:5:3: ret -> yield")
     result.stdout should include("1 file(s) would be migrated")
 
+  test("the panel's repro: a ret inside a string interpolation is rewritten too"):
+    val source =
+      """val x = Option::some(20)
+        |println("answer: #{do[Option] { a <- x; ret a + 1 }}")
+        |println("nested: #{do[Option] { a <- x; ret "#{a}!" }} and \#{do[Option] { a <- x; ret a }}")
+        |println(QQQ
+        |  multi: #{do[Option] { a <- x; ret a }}
+        |QQQ)
+        |""".stripMargin.replace("QQQ", "\"\"\"")
+    val (root, file) = script(source)
+
+    val check = invoke(root, "--check", file.toString)
+
+    check.exitCode shouldBe 1
+    check.stdout should include("1 file(s) would be migrated")
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 0
+    result.stdout should include("old.on:2:41: ret -> yield")
+    read(file) shouldBe source
+      .replace("ret a + 1", "yield a + 1")
+      .replace("""ret "#{a}!"""", """yield "#{a}!"""")
+      .replace("  multi: #{do[Option] { a <- x; ret a }}", "  multi: #{do[Option] { a <- x; yield a }}")
+    Shell(Seq()).run(read(file), "old.on", Array()) shouldBe a[Shell.Success]
+
+  test("the panel's repro: files that use each other are compiled together"):
+    val root = Files.createTempDirectory("onion-migrate-project").toRealPath()
+    val src = Files.createDirectories(root.resolve("src"))
+    val model =
+      """class Calc {
+        |public:
+        |  def this {}
+        |  def add(x: Int, y: Int): Option[Int] = do[Option] { a <- Option::some(x); b <- Option::some(y); ret a + b * Helper::ten() }
+        |}
+        |""".stripMargin
+    val main =
+      """class Helper {
+        |public:
+        |  static def ten(): Int = 10
+        |}
+        |val c = new Calc()
+        |val r = do[Option] { s <- c.add(1, 2); ret s * 10 }
+        |IO::println(r)
+        |""".stripMargin
+    Files.writeString(src.resolve("model.on"), model, UTF_8)
+    Files.writeString(src.resolve("main.on"), main, UTF_8)
+
+    val result = invoke(root, src.toString)
+
+    withClue(result.stdout + result.stderr) {
+      result.exitCode shouldBe 0
+      result.stderr shouldBe ""
+      result.stdout should include("Migrated 2 of 2 file(s)")
+    }
+    read(src.resolve("model.on")) shouldBe model.replace("ret a + b", "yield a + b")
+    read(src.resolve("main.on")) shouldBe main.replace("ret s * 10", "yield s * 10")
+
+  test("a file that compiles with the other named files is left as written"):
+    val root = Files.createTempDirectory("onion-migrate-project").toRealPath()
+    val base =
+      """class Base {
+        |public:
+        |  def this {}
+        |  def ret(): Option[Int] = Option::none()
+        |}
+        |""".stripMargin
+    val main =
+      """class Main extends Base {
+        |public:
+        |  def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret a }
+        |}
+        |""".stripMargin
+    Files.writeString(root.resolve("Base.on"), base, UTF_8)
+    Files.writeString(root.resolve("Main.on"), main, UTF_8)
+
+    val result = invoke(root, root.toString)
+
+    withClue(result.stdout + result.stderr) {
+      result.exitCode shouldBe 0
+      result.stdout should include("Main.on:4:62: note: the file compiles as written")
+      result.stdout should include("2 file(s) already up to date")
+    }
+    read(root.resolve("Main.on")) shouldBe main
+
+  test("a file that compiles neither way is reported with the compiler's first error"):
+    val source = "val o = do[Option] { a <- Option::some(1); ret a }\nval n: Int = \"no\"\n"
+    val (root, file) = script(source)
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 1
+    read(file) shouldBe source
+    result.stderr should include("old.on:1:44:")
+    result.stderr should include("old.on:2:")
+    result.stdout should include("1 file(s) need a manual change")
+
+  test("--help prints the usage and exits 0"):
+    val (root, _) = script(OldScript)
+
+    val result = invoke(root, "--help")
+
+    result.exitCode shouldBe 0
+    result.stdout should include("Usage: onion migrate")
+
   test("--check exits 0 when nothing would change"):
     val (root, file) = script("IO::println(1)\n")
 

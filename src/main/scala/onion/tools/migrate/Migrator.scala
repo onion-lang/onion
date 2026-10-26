@@ -33,9 +33,18 @@ object Migrator:
     def changed: Boolean = edits.nonEmpty
 
   def migrate(source: String): Result =
-    val tokens = codeTokens(source)
-    val found = RetToYield.find(source, tokens)
-    Result(apply(source, found.edits), found.edits, found.notes)
+    val (last, notLast) = RetToYield.find(source).partition(_._2)
+    val notes = notLast.map { (offset, _) =>
+      val (line, column) = lineColumnOf(source, offset)
+      Note(line, column,
+        "this `ret` is not the last clause of its do block, so it is a call through a name " +
+          "`ret` declared elsewhere, not the old keyword; left as written")
+    }
+    val edits = last.map { (offset, _) =>
+      val (line, column) = lineColumnOf(source, offset)
+      Edit(offset, 3, "yield", line, column, "ret -> yield")
+    }
+    Result(apply(source, edits), edits, notes)
 
   /**
    * The token images of `source`, comments included, for the before/after comparison: a
@@ -105,6 +114,63 @@ object Migrator:
         i += 1
       found
 
+  /** The lexer's line and column of the character at `offset`: the inverse of [[offsetOf]]. */
+  private[migrate] def lineColumnOf(source: String, offset: Int): (Int, Int) =
+    val lineStart = source.lastIndexOf('\n', offset - 1) + 1
+    val line = 1 + (0 until lineStart).count(source.charAt(_) == '\n')
+    var column = 0
+    (lineStart to offset).foreach { i =>
+      column += 1
+      if source.charAt(i) == '\t' && i < offset then
+        column -= 1
+        column += 8 - (column % 8)
+    }
+    (line, column)
+
+  /**
+   * The code inside each `#{...}` of a string literal token, as (offset in the token's
+   * image, text). A single-quoted string skips a `#{` behind an odd number of backslashes,
+   * which is literal text; a multi-line string has no escapes. Braces are matched the way
+   * the parser does, skipping string literals inside the body.
+   */
+  private def interpolationBodies(token: Token): Seq[(Int, String)] =
+    val single = token.kind == K.STRING
+    if !single && token.kind != K.MULTI_LINE_STRING then return Seq.empty
+    val image = token.image
+    val quote = if single then 1 else 3
+    val end = image.length - quote
+    val bodies = mutable.Buffer[(Int, String)]()
+    var from = quote
+    var going = true
+    while going do
+      var start = image.indexOf("#{", from)
+      if single then
+        while start >= 0 && start < end && {
+          var slashes = 0
+          while image.charAt(start - 1 - slashes) == '\\' do slashes += 1
+          slashes % 2 == 1
+        } do start = image.indexOf("#{", start + 1)
+      if start < 0 || start >= end then going = false
+      else
+        var depth = 1
+        var i = start + 2
+        while i < end && depth > 0 do
+          image.charAt(i) match
+            case '"' =>
+              i += 1
+              while i < end && image.charAt(i) != '"' do
+                if image.charAt(i) == '\\' then i += 1
+                i += 1
+            case '{' => depth += 1
+            case '}' => depth -= 1
+            case _ => ()
+          i += 1
+        if depth > 0 then going = false
+        else
+          bodies += ((start + 2, image.substring(start + 2, i - 1)))
+          from = i
+    bodies.toSeq
+
   /**
    * `ret e` → `yield e` in a `do[M] { ... }` block (#2291).
    *
@@ -119,8 +185,6 @@ object Migrator:
    * The full rule is on #2442.
    */
   private object RetToYield:
-    final case class Found(edits: Seq[Edit], notes: Seq[Note])
-
     /** After these, `ret` is an operand, not the start of a clause. */
     private val NotAnExpression = Set(
       ".", "?.", "::", "=", "<-", ":", "->", ")", "]", "}", ";", ",", "++", "--",
@@ -140,7 +204,30 @@ object Migrator:
     private enum Bracket:
       case Paren, Square, Brace, DoBrace
 
-    def find(source: String, tokens: IndexedSeq[Token]): Found =
+    /**
+     * Every candidate in `source` as (offset, whether it ends its do block), including those
+     * in the code of a string's `#{...}`, which the lexer keeps inside one string token.
+     */
+    def find(source: String): Seq[(Int, Boolean)] =
+      val tokens =
+        try codeTokens(source)
+        catch case _: Exception => IndexedSeq.empty
+      val interpolated = tokens.flatMap { token =>
+        val bodies = interpolationBodies(token)
+        if bodies.isEmpty then Seq.empty
+        else
+          offsetOf(source, token.beginLine, token.beginColumn)
+            .filter(offset => source.startsWith(token.image, offset))
+            .toSeq
+            .flatMap { offset =>
+              bodies.flatMap { (start, body) =>
+                find(body).map((at, last) => (offset + start + at, last))
+              }
+            }
+      }
+      (inThisCode(source, tokens) ++ interpolated).sortBy(_._1)
+
+    private def inThisCode(source: String, tokens: IndexedSeq[Token]): Seq[(Int, Boolean)] =
       val candidates = mutable.Buffer[(Token, Int)]()
       val stack = mutable.Stack[Bracket]()
       // The `[` that opens a `do[...]`'s type, by stack depth, so its `]` knows that the
@@ -175,16 +262,7 @@ object Migrator:
           .filter(offset => source.startsWith("ret", offset))
           .map(offset => (token, index, offset))
       }
-      val (last, notLast) = located.partition((_, index, _) => endsDoBlock(tokens, index))
-      val notes = notLast.map { (token, _, _) =>
-        Note(token.beginLine, token.beginColumn,
-          "this `ret` is not the last clause of its do block, so it is a call through a name " +
-            "`ret` declared elsewhere, not the old keyword; left as written")
-      }
-      val edits = last.map { (token, _, offset) =>
-        Edit(offset, 3, "yield", token.beginLine, token.beginColumn, "ret -> yield")
-      }
-      Found(edits, notes)
+      located.map((_, index, offset) => (offset, endsDoBlock(tokens, index)))
 
     /**
      * Whether the clause the `ret` at `start` begins runs to the end of its do block. Only the

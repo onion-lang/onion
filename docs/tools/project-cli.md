@@ -147,14 +147,18 @@ Migrated 1 of 4 file(s)
 
 - **Paths are required.** A file or a directory; a directory is walked for `.on` files.
 - **`--check`** writes nothing, prints what would change, and exits `1` if anything would.
-- **Only code changes.** Strings, comments and spacing stay byte for byte.
+- **Only code changes.** Strings, comments and spacing stay byte for byte. Code inside a
+  string's `#{...}` is code, so it is migrated too.
 - **The compiler decides.** A file that compiles as written is never changed. A file that does
   not is rewritten only if the rewritten file compiles.
 - **It does not guess.** If neither version compiles, each place is printed with its line, and
   the file is left as it was. The summary counts it (`1 file(s) need a manual change`), and
-  the exit code is `1`. Fix the other errors, or the line by hand.
-- **`-classpath <path>`** is where the classes a file uses come from. Each file is compiled
-  on its own, so a class declared in another `.on` file must be compiled onto it first.
+  the exit code is `1`. The compiler's first error is printed too. Fix it, or the line by hand.
+- **Files that use each other are fine.** A file that compiles neither way on its own is
+  tried again compiled together with every file you named. Name the whole project:
+  `onion migrate src/ tests/`.
+- **`-classpath <path>`** is where classes from outside the named files come from, such as a
+  library's jar.
 
 Rules so far:
 

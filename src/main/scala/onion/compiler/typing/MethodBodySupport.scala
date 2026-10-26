@@ -253,7 +253,8 @@ private[compiler] final class MethodBodySupport(
       .find { method =>
         (method.modifier & AST.M_STATIC) != 0 &&
         method.arguments.length == extMethod.arguments.length + 1 &&
-        method.arguments(0) == receiverType
+        method.arguments(0) == receiverType &&
+        extMethod.arguments.indices.forall(i => method.arguments(i + 1) == extMethod.arguments(i))
       }
       .map(_.asInstanceOf[MethodDefinition])
       .orNull

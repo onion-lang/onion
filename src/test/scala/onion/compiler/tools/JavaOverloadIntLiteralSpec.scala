@@ -16,6 +16,26 @@ class JavaOverloadIntLiteralSpec extends AbstractShellSpec {
           |}
         """.stripMargin, "None", Array()))
     }
+    it("PrintStream.println(75) prints the number, not K") {
+      assert(Shell.Success(5) == shell.run(
+        """
+          |def main(args: String[]): Int {
+          |  val bytes = new java.io.ByteArrayOutputStream()
+          |  val out = new java.io.PrintStream(bytes)
+          |  out.println(75)
+          |  out.flush()
+          |  return if bytes.toString().trim() == "75" { 5 } else { 0 }
+          |}
+        """.stripMargin, "None", Array()))
+    }
+    it("prefers widening to Long over narrowing to Char for an Onion overload") {
+      assert(Shell.Success(2) == shell.run(
+        """
+          |def g(c: Char): Int { return 1 }
+          |def g(l: Long): Int { return 2 }
+          |def main(args: String[]): Int { return g(65) }
+        """.stripMargin, "None", Array()))
+    }
     it("still narrows a literal when only a Byte overload exists") {
       assert(Shell.Success(100) == shell.run(
         """

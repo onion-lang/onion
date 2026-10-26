@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.147.0] - 2026-10-26
+
 ### Breaking
 
 - **`[[1, 2], []]` is a `List[List[Int]]`, so `adj[1].add(5)` compiles (#2430).**
@@ -15,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
+  - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
+  - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.
+- **`Future::delay(deadline - Timing::millis())` completes at once when the deadline has passed (#2453).**
+  - Before: a negative delay failed with `IllegalArgumentException: timeout value is negative`.
+  - Now: a zero or negative delay gives a Future that has already completed, as `Timing::sleep` returns at once.
+- **Extension overloads pick the most specific one, as class methods do (#2446).**
+  - Before: `"x".ex('A')` with `ex(Char)` and `ex(Long)` was E0006 ambiguous, then a contradicting E0005; `"x".ez(3)` with `ez(Object)` was E0005.
+  - Now: `ex(Char)` is chosen and `3` boxes into `Object`. A real ambiguity, including two receivers that neither one is more specific than (`extension I` and `extension J`), is one E0006.
+- **Generic overloads that differ only after a type parameter both work: `tw[T](x: T, y: Int)` and `tw[T](x: T, y: String)` (#2445).**
+  - Before: in an `extension` block, E0084 "duplicated extension method"; on a class, a static or a top-level function, E0005 at the call that needed the second one.
+  - Now: each call picks its overload, as in Java. Two overloads with the same parameters are still a duplicate, and two that erase to the same JVM method (`f[T](x: T, y: T)` beside `f[T](x: T, y: Object)`) are E0035.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.
@@ -25,9 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`;` between two clauses of a record body is one error with a hint (#2382).**
   - Before: `{ shape doc = json; shape txt = re"..." }` gave two contradictory syntax errors, no hint.
   - Now: one error at the `;`, saying clauses are separated by a newline or a space.
-- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
-  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
-  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
 
 ## [0.146.0] - 2026-10-25
 
@@ -39,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Where such a literal no longer fits a Byte, most contexts give an error that says why. Where it still fits (`bs[0] = 0x1B`), the value changes silently: search for `0x...B`.
 
 ### Fixed
+
+- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
+  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
+  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
 
 - **`xs.addAll(o)` compiles inside a generic class when `xs` and `o` are both `List[T]` (#2341).**
   - Before: E0000, `Collection[? extends T]` is expected but `List[T]` is used.

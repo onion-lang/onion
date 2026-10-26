@@ -708,7 +708,7 @@ object TypedAST {
     def `type`: TypedAST.Type = BasicType.BOOLEAN
   }
 
-  class IntValue(location: Location, val value: Int)  extends Term(location) {
+  class IntValue(location: Location, val value: Int, val hexEndsInB: Boolean = false)  extends Term(location) {
     def this(value: Int) = {
       this(null, value)
     }

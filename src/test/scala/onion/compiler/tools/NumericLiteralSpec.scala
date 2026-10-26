@@ -64,5 +64,25 @@ class NumericLiteralSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("2.5 2.5 2.5 2.5 3.0") == result)
     }
+
+    it("reads a trailing B in a hex literal as a digit, not a Byte suffix (#2324)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val a: Int = 0xAB
+          |    val b: Int = 0x1FFB
+          |    val c: Long = 0xABL
+          |    val d: Short = 0x1S
+          |    return "" + a + " " + b + " " + c + " " + d + " " + 0xFFB + " " + 0x1B
+          |  }
+          |}
+          |""".stripMargin,
+        "HexBDigit.on",
+        Array()
+      )
+      assert(Shell.Success("171 8187 171 1 4091 27") == result)
+    }
   }
 }

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A default argument that uses an earlier parameter is a compile error, not a `VerifyError` (#2358).**
+  - Before: `def g(n: Int, m: Int = n + 1)` compiled, then the program died with `VerifyError` at load.
+  - Now: `E0002`, local variable `n` is not found. A default is evaluated at the call site, where `n` is not in scope.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

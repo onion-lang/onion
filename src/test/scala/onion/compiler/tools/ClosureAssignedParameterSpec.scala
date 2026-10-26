@@ -126,4 +126,71 @@ class ClosureAssignedParameterSpec extends AbstractShellSpec {
       assert(!out.contains("#"), s"hidden slot name leaked:\n$out")
     }
   }
+
+  describe("a lambda parameter assigned inside a nested lambda") {
+    it("is seen updated by the outer lambda (#2426)") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val outer: (Int) -> Int = (k) -> {
+          |      val inner: () -> Int = () -> { k = k + 10; k }
+          |      inner()
+          |      k
+          |    }
+          |    return outer(n)
+          |  }""".stripMargin)
+      assert(Shell.Success(11) == result)
+    }
+
+    it("is shared both ways with a Long parameter and a later write") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val outer: (Long) -> Long = (k) -> {
+          |      val inner: () -> Long = () -> { k = k * 2L; k }
+          |      k = k + 1L
+          |      val a = inner()
+          |      k = k + 5L
+          |      a + k
+          |    }
+          |    val r: Long = outer(1L)
+          |    return r as Int
+          |  }""".stripMargin)
+      assert(Shell.Success(4 + 9) == result)
+    }
+
+    it("leaves a lambda parameter that is only read alone") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val outer: (Int) -> Int = (k) -> {
+          |      val inner: () -> Int = () -> k + 1
+          |      inner() + k
+          |    }
+          |    return outer(n)
+          |  }""".stripMargin)
+      assert(Shell.Success(3) == result)
+    }
+
+    it("does not box a sibling lambda's parameter of the same name") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val xs = [1, 2, 3]
+          |    val a = xs.map { k -> val f: () -> Int = () -> { k = k + 1; k }; f() }
+          |    val b = xs.map { k -> val f: () -> Int = () -> k * 3; f() }
+          |    return a[0] * 100000 + a[2] * 10000 + b[0] * 100 + b[2]
+          |  }""".stripMargin)
+      assert(Shell.Success(2 * 100000 + 4 * 10000 + 3 * 100 + 9) == result)
+    }
+
+    it("does not box a later lambda's parameter after a forEach that assigns it") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val xs = [1, 2, 3]
+          |    var total = 0
+          |    xs.forEach { x -> val f: () -> Int = () -> { x = x * 2; x }; total = total + f() }
+          |    val fs = xs.map { x -> () -> x + 1 }
+          |    val h = fs[2]
+          |    return total * 100 + h()
+          |  }""".stripMargin)
+      assert(Shell.Success(12 * 100 + 4) == result)
+    }
+  }
 }

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A nested lambda that assigns an outer lambda's parameter now writes it back (#2426).**
+  - Before: `(k) -> { val f = () -> { k = k + 10; k }; f(); k }` called with 1 returned 1.
+  - Now: it returns 11, as for a captured `var` or a method parameter.
+  - The reverse holds too: a nested lambda reads the outer lambda's later writes.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

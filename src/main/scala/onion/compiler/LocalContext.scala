@@ -242,6 +242,13 @@ class LocalContext {
     contextFrame.add(name, `type`, isMutable, isBoxed)
   }
 
+  /**
+   * Adds a variable that is never boxed, whatever names were marked boxed. A lambda's
+   * parameter arrives in its slot unboxed; the boxed names belong to the enclosing method.
+   */
+  def addUnboxed(name: String, `type`: TypedAST.Type, isMutable: Boolean): Int =
+    contextFrame.add(name, `type`, isMutable, isBoxed = false)
+
   def add(`type` : TypedAST.Type): String = {
     val name = newName
     contextFrame.add(name, `type`, isMutable = true, isBoxed = false)

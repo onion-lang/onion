@@ -1065,6 +1065,9 @@ def main(name: String, count: Int = 3, tags: List[String] = []): Int {
 スカラー型を使うか、繰り返し・末尾引数を集めたいなら最後のパラメータを `String[]` にして
 ください（例: `def main(cmd: String, files: String[])`）。
 
+可変長引数のパラメータ（`files: String...`）も E0094 です。`files: String[]` と書いてください。
+`tool` では同じ誤りが `E0081` になります。
+
 ### `E0095` — `main` の `String[]` パラメータが未対応の位置にある
 
 トップレベルの自動 CLI `main` に `String[]` パラメータがありますが、その位置が未対応です

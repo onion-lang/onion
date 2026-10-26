@@ -986,6 +986,8 @@ Timing::sleep(1000L)        // 1000ミリ秒スリープ
 Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 ```
 
+0 以下の時間を渡すと、待たずにすぐ戻ります。そのため、期限を過ぎた後に `Timing::sleep(deadline - Timing::millis())` を呼んでも安全です。
+
 ### 関数実行時間の計測
 
 ```onion
@@ -1781,6 +1783,9 @@ Codec::base64Decode(enc)                  // "Hello"
 Codec::hexEncode("Hi") / Codec::hexDecode("4869")
 Codec::urlEncode("a b&c") / Codec::urlDecode(s)
 ```
+
+- `base64Decode` は空白文字を読み飛ばします。ファイル末尾の改行や、`base64` コマンドの 76 桁ごとの改行があってもそのままデコードできます。
+- デコーダに不正な入力を渡すと、問題を示す `IllegalArgumentException` を投げます。例: `invalid Base64 character '!' at index 10`、`invalid % escape at index 3 in "100%zz"`。
 
 これらも `String` の組み込み拡張メソッドです:
 

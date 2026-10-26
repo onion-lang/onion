@@ -1915,6 +1915,24 @@ object TypedAST {
     def isAssignable(left: TypedAST.Type, right: TypedAST.Type): Boolean = isSuperType(left, right)
 
     /**
+     * `? super lower` accepts the type argument `actualArg` when `actualArg` is a
+     * supertype of `lower`. Two type variables are related only by identity: erased to
+     * Object they would otherwise match, and `Comparator[U]` would sort a `List[T]` (#2367).
+     * `T?` is a view of the declared `T`, so it is looked through (#2399).
+     */
+    def superWildcardAccepts(actualArg: TypedAST.Type, lower: TypedAST.Type): Boolean = {
+      def inner(t: TypedAST.Type): TypedAST.Type = t match {
+        case n: TypedAST.NullableType => n.innerType
+        case other => other
+      }
+      (inner(actualArg), inner(lower)) match {
+        case (at: TypedAST.TypeVariableType, lt: TypedAST.TypeVariableType) =>
+          isSuperTypeByIdentity(at.widen, lt.widen)
+        case _ => isSuperType(actualArg, lower)
+      }
+    }
+
+    /**
      * Like isSuperType, but never falls back to comparing erased classes:
      * for callers that already know `left` is still abstract (an
      * unresolved type variable whose own value isn't fixed yet -- e.g. a
@@ -2047,10 +2065,7 @@ object TypedAST {
                     // ? super E ← A: A must be supertype of E. Two type variables
                     // are related only by identity: erased to Object they would
                     // otherwise match, and `Comparator[U]` would sort a `List[T]` (#2367).
-                    (actualArg, w.lowerBound.get) match
-                      case (at: TypedAST.TypeVariableType, lt: TypedAST.TypeVariableType) =>
-                        isSuperTypeByIdentity(at, lt)
-                      case (_, lower) => isSuperType(actualArg, lower)
+                    superWildcardAccepts(actualArg, w.lowerBound.get)
               // Expected: type variable T (respects the variable's
               // nullability: NonNull T rejects nullable actuals)
               case (tv: TypedAST.TypeVariableType, _) =>

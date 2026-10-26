@@ -96,11 +96,20 @@ public final class Codec {
             if (i + 2 >= text.length()
                 || !isAsciiHex(text.charAt(i + 1))
                 || !isAsciiHex(text.charAt(i + 2))) {
-                throw new IllegalArgumentException("invalid % escape at index " + i + " in \"" + text
-                    + "\": a % must be followed by two hex digits");
+                throw new IllegalArgumentException("invalid % escape at index " + i + " in \""
+                    + window(text, i) + "\": a % must be followed by two hex digits");
             }
         }
         return java.net.URLDecoder.decode(text, StandardCharsets.UTF_8);
+    }
+
+    /** {@code text} itself when short; otherwise 20 chars either side of the 3-char escape at
+     *  {@code at}, with "..." where it was cut, so a 100 KB form body is not copied into a message. */
+    private static String window(String text, int at) {
+        if (text.length() <= 60) return text;
+        int from = Math.max(0, at - 20);
+        int to = Math.min(text.length(), at + 23);
+        return (from > 0 ? "..." : "") + text.substring(from, to) + (to < text.length() ? "..." : "");
     }
 
     private static boolean isAsciiHex(char c) {

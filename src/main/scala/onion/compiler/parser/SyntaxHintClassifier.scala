@@ -247,6 +247,12 @@ private[compiler] object SyntaxHintClassifier {
   private val EnumCaseWithClause =
     """(?:^|[;{])\s*case\s+([A-Za-z_]\w*)\s*(?:\(([^;]*)\))?\s*$""".r
 
+  // A record body's clauses end at a newline or a space, so `shape a = json; shape b = ...`
+  // fails at the `;`. Anchored to the end of the text before the `;`: a `shape` clause
+  // (`shape name = json` / `re"..."`), or an `example`/`law` clause whose block just closed.
+  private val RecordClauseBeforeSemicolon =
+    """(?:^|[{;\s])(?:shape\s+[A-Za-z_]\w*\s*=\s*(?:re"[^"]*"|[A-Za-z_]\w*)|(?:example|law)\b[^;]*\})\s*$""".r
+
   def classify(
     found: String,
     expected: String,
@@ -264,6 +270,8 @@ private[compiler] object SyntaxHintClassifier {
       // expected-token list for whatever may start the next declaration. An
       // expression ending in `}` (a trailing lambda, a map literal) does take
       // one and never reaches here.
+      case ";" if RecordClauseBeforeSemicolon.findFirstIn(textBefore(context, sourceLine)).isDefined =>
+        hint("error.parsing.hint.semicolon_between_record_clauses")
       case ";" if textBefore(context, sourceLine).trim.endsWith("}") =>
         hint("error.parsing.hint.semicolon_after_block")
       // A JS/TS `for (const x of arr)` fails right at `const` itself (`for (`

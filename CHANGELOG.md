@@ -7,12 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **`onion migrate <path>...` rewrites code for pre-1.0 breaking changes, in place (#2442).**
-  - First rule: a `do` block's `ret a + b` becomes `yield a + b`. A variable named `ret`, strings and comments are left alone.
-  - `--check` changes nothing and exits 1 if a file would change. A place it cannot decide is printed, not guessed.
-
 ### Breaking
 
 - **`[[1, 2], []]` is a `List[List[Int]]`, so `adj[1].add(5)` compiles (#2430).**

@@ -246,6 +246,8 @@ class Parsing(config: CompilerConfig) extends AnyRef
       if (found == "\"") Message("error.parsing.unterminated_string")
       else if (found == "'") Message("error.parsing.unterminated_char")
       else if (found == OnionParser.UnclosedInterpolationMarker) Message("error.parsing.unclosed_interpolation")
+      else if (found == OnionParser.EmptyInterpolationMarker) Message("error.parsing.empty_interpolation") + " " + Message("error.parsing.empty_interpolation_escape")
+      else if (found == OnionParser.EmptyMultiLineInterpolationMarker) Message("error.parsing.empty_interpolation")
       else if (found == OnionParser.TooDeepInterpolationMarker) Message("error.parsing.interpolation_too_deep", OnionLexer.MaxInterpBraceDepth)
       else if (found == OnionParser.InvalidStringEscapeMarker) Message("error.parsing.invalid_string_escape")
       else if (found == OnionParser.IntLiteralOutOfRangeMarker) Message("error.parsing.int_literal_out_of_range")

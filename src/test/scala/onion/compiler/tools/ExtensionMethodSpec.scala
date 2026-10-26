@@ -291,5 +291,26 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("HELLO") == result)
     }
+
+    it("runs the right body for overloads with the same arity (#2435)") {
+      val result = shell.run(
+        """
+          |extension String {
+          |  def ez(i: Int): String = "int:" + i
+          |  def ez(s: String): String = "str:" + s
+          |}
+          |
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "x".ez(1) + "," + "x".ez("a")
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("int:1,str:a") == result)
+    }
   }
 }

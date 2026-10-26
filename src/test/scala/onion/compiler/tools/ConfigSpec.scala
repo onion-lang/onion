@@ -523,5 +523,27 @@ class ConfigSpec extends AbstractShellSpec {
         assert(Shell.Success("false") == result)
       }
     }
+
+    describe("array index too big for an Int (#2423)") {
+      it("falls back to the default instead of throwing") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val config = Config::parseJson("{\"items\": [10, 20]}");
+            |    return Config::getInt(config, "items.99999999999", -1) + "," +
+            |      Config::hasPath(config, "items.99999999999") + "," +
+            |      Config::getString(config, "items.2147483648", "none") + "," +
+            |      Config::getInt(config, "items.0001", -1);
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("-1,false,none,20") == result)
+      }
+    }
   }
 }

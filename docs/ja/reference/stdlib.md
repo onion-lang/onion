@@ -986,6 +986,8 @@ Timing::sleep(1000L)        // 1000ミリ秒スリープ
 Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 ```
 
+0 以下の時間を渡すと、待たずにすぐ戻ります。そのため、期限を過ぎた後に `Timing::sleep(deadline - Timing::millis())` を呼んでも安全です。
+
 ### 関数実行時間の計測
 
 ```onion

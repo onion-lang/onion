@@ -148,8 +148,9 @@ Migrated 1 of 4 file(s)
 - **Paths are required.** A file or a directory; a directory is walked for `.on` files.
 - **`--check`** writes nothing, prints what would change, and exits `1` if anything would.
 - **Only code changes.** Strings, comments and spacing stay byte for byte.
-- **It does not guess.** A place it cannot decide is printed with its line and left as it
-  was, and the exit code is `1`. Fix that line by hand.
+- **It does not guess.** A place it cannot decide is printed with its line, and its file is
+  left as it was. The summary counts it (`1 file(s) need a manual change`), and the exit code
+  is `1`. Fix that line by hand.
 
 Rules so far:
 
@@ -157,7 +158,15 @@ Rules so far:
 |---|---|---|
 | A `do` block's final value | `ret a + b` | `yield a + b` |
 
-A variable or method named `ret` is never renamed. Only a `ret` that ends its `do` block is rewritten; any other `ret` is reported, and the command exits 1. See [Migrating to 1.0](../migration/pre-1.0.md) for each change.
+A variable or method named `ret` is never renamed. For `ret` at the start of a do clause:
+
+| Where the `ret` is | What `migrate` does |
+|---|---|
+| It starts the block's last clause: `ret a + b }` | Rewrites it to `yield` |
+| As above, but followed by `(`, `[`, `{`, `-`, `+` or `!`, or the file also uses `ret` as a name | Reports it and exits 1: it may be a call to a method named `ret` |
+| Another clause follows it: `ret(a); yield a` | Prints a `note:` and leaves it: the old keyword was only legal last, so it is a call |
+
+See [Migrating to 1.0](../migration/pre-1.0.md) for each change.
 
 ### `onion doc`
 

@@ -115,8 +115,9 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     read(file) shouldBe source
     result.stderr should include("old.on:2:46")
     result.stderr should include("uses `ret` as a name")
+    result.stdout should include("1 file(s) need a manual change")
 
-  test("a ret bound by a lambda parameter or a destructuring val is reported, not rewritten"):
+  test("a ret bound by a lambda parameter or a destructuring val is left alone"):
     val sources = Seq(
       """val log: (Int) -> Option[Int] = (x) -> Option::some(x)
         |val (ret, q) = [log, log]
@@ -136,19 +137,40 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
       val result = invoke(root, file.toString)
 
       withClue(source) {
-        result.exitCode shouldBe 1
+        result.exitCode shouldBe 0
         read(file) shouldBe source
-        result.stderr should include("uses `ret` as a name")
       }
     }
 
-  test("a ret with another clause after it is reported, even when its declaration is in another file"):
+  test("a final ret in a file that binds ret as a lambda parameter is reported, not rewritten"):
+    val source =
+      """val f: ((Int) -> Option[Int]) -> Option[Int] =
+        |  (ret) -> do[Option] { a <- Option::some(1); ret a }
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 1
+    read(file) shouldBe source
+    result.stderr should include("uses `ret` as a name")
+    result.stdout should include("1 file(s) need a manual change")
+
+  test("a ret with another clause after it is a call, noted and left alone, with exit 0"):
     val sources = Seq(
       """class Main extends Base {
         |public:
         |  def this {}
         |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret(a); yield a }
         |}
+        |""".stripMargin,
+      """class Main extends Base {
+        |public:
+        |  def this {}
+        |  def go(): Object = do[Option] { a <- Option::some(1); ret(a) Option::some(a + 1) }
+        |}
+        |""".stripMargin,
+      """val o = do[Option] { a <- Option::some(1); ret a Option::some(a) }
         |""".stripMargin,
       """val o = do[Option] {
         |  a <- Option::some(1)
@@ -169,9 +191,44 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
       val result = invoke(root, file.toString)
 
       withClue(source) {
+        result.exitCode shouldBe 0
+        read(file) shouldBe source
+        result.stdout should include("note:")
+        result.stdout should include("not the last clause of its do block")
+        result.stdout should include("1 file(s) already up to date")
+        result.stderr shouldBe ""
+      }
+    }
+
+  test("a final ret that could be a call or an operator on a name ret is reported, not rewritten"):
+    val sources = Seq(
+      """class Main extends Base { public: def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret(a) }
+        |}
+        |""".stripMargin,
+      """class Main extends Base { public: def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret -a }
+        |}
+        |""".stripMargin,
+      """val o = do[Option] { a <- Option::some(1); ret [a, 2] }
+        |""".stripMargin,
+      """val o = do[Option] { a <- Option::some(1); ret { -> a } }
+        |""".stripMargin,
+      """val o = do[Option] { a <- Option::some(1); ret +a }
+        |""".stripMargin,
+      """val o = do[Option] { a <- Option::some(true); ret !a }
+        |""".stripMargin)
+    sources.foreach { source =>
+      val (root, file) = script(source)
+
+      val result = invoke(root, file.toString)
+
+      withClue(source) {
         result.exitCode shouldBe 1
         read(file) shouldBe source
-        result.stderr should include("not the last clause of its do block")
+        result.stderr should include("could also be a call or an operator on a name `ret`")
+        result.stdout should include("1 file(s) need a manual change")
+        result.stdout should not include "ret -> yield"
       }
     }
 

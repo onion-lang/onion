@@ -20,16 +20,22 @@ object Migrator:
   /** One rewrite: `length` characters at `offset` become `replacement`. */
   final case class Edit(offset: Int, length: Int, replacement: String, line: Int, column: Int, note: String)
 
-  /** A place a rule could not decide, with why. */
+  /** A place a rule could not decide, or one it decided to leave alone, with why. */
   final case class Unsure(line: Int, column: Int, message: String)
 
-  final case class Result(text: String, edits: Seq[Edit], unsure: Seq[Unsure]):
+  /**
+   * A file with an undecided place keeps all of its text: `edits` is then empty, so a file is
+   * either fully migrated or left exactly as it was. `notes` are places a rule proved are not
+   * the old spelling; they are reported, but need nothing from the user.
+   */
+  final case class Result(text: String, edits: Seq[Edit], unsure: Seq[Unsure], notes: Seq[Unsure]):
     def changed: Boolean = edits.nonEmpty
 
   def migrate(source: String): Result =
     val tokens = codeTokens(source)
-    val (edits, unsure) = RetToYield.find(source, tokens)
-    Result(apply(source, edits), edits, unsure)
+    val found = RetToYield.find(source, tokens)
+    val edits = if found.unsure.nonEmpty then Nil else found.edits
+    Result(apply(source, edits), edits, found.unsure, found.notes)
 
   /**
    * The token images of `source`, comments included, for the before/after comparison: a
@@ -110,9 +116,15 @@ object Migrator:
    *
    * The old keyword was also legal only in a do block's final clause. A `ret` with another
    * clause after it is a call through a name declared somewhere this file cannot see (an
-   * inherited method, another file, a Java class), so it is reported too.
+   * inherited method, another file, a Java class): it is noted and left alone.
+   *
+   * A final `ret` followed by `(`, `[`, `{`, `-`, `+` or `!` may be that call, an index or an
+   * operator on such a name, and rewriting it would silently change what the program
+   * computes. It is reported instead. The full rule is on #2442.
    */
   private object RetToYield:
+    final case class Found(edits: Seq[Edit], unsure: Seq[Unsure], notes: Seq[Unsure])
+
     /** After these, `ret` is an operand, not the start of a clause. */
     private val NotAnExpression = Set(
       ".", "?.", "::", "=", "<-", ":", "->", ")", "]", "}", ";", ",", "++", "--",
@@ -126,10 +138,15 @@ object Migrator:
       "=", "+", "-", "*", "/", "%", "==", "!=", "===", "!==", "<", ">", "<=", ">=", "&&", "||",
       "?:", "|>", ".", "?.", "::", "->", ",", "as", "is", "instanceof", "!")
 
+    /** After `ret`, these could continue a name `ret` as well as start the old keyword's operand. */
+    private val NameContinuations = Set("(", "[", "{", "-", "+", "!")
+    /** Keywords that start an expression, so after a finished operand they start a new clause. */
+    private val ExpressionKeywords = Set("new", "if", "select", "do", "try")
+
     private enum Bracket:
       case Paren, Square, Brace, DoBrace
 
-    def find(source: String, tokens: IndexedSeq[Token]): (Seq[Edit], Seq[Unsure]) =
+    def find(source: String, tokens: IndexedSeq[Token]): Found =
       val candidates = mutable.Buffer[(Token, Int)]()
       var usesRetAsName = false
       val stack = mutable.Stack[Bracket]()
@@ -166,27 +183,35 @@ object Migrator:
           .filter(offset => source.startsWith("ret", offset))
           .map(offset => (token, index, offset))
       }
-      if usesRetAsName then
-        (Nil, located.map { (token, _, _) =>
-          Unsure(token.beginLine, token.beginColumn,
-            "this `ret` may be the old do-block keyword, but the file also uses `ret` as a name; " +
-              "if it ends the do block, change it to `yield` by hand")
-        })
-      else
-        val (last, notLast) = located.partition((_, index, _) => endsDoBlock(tokens, index))
-        (last.map { (token, _, offset) =>
-          Edit(offset, 3, "yield", token.beginLine, token.beginColumn, "ret -> yield")
-        }, notLast.map { (token, _, _) =>
-          Unsure(token.beginLine, token.beginColumn,
-            "this `ret` is not the last clause of its do block, so it is a call through a name " +
-              "`ret` declared elsewhere, not the old keyword; left as written")
-        })
+      val (last, notLast) = located.partition((_, index, _) => endsDoBlock(tokens, index))
+      val notes = notLast.map { (token, _, _) =>
+        Unsure(token.beginLine, token.beginColumn,
+          "this `ret` is not the last clause of its do block, so it is a call through a name " +
+            "`ret` declared elsewhere, not the old keyword; left as written")
+      }
+      val (ambiguous, clear) =
+        if usesRetAsName then (last, Nil)
+        else last.partition((_, index, _) => tokens.lift(index + 1).exists(t => NameContinuations.contains(t.image)))
+      val unsure = ambiguous.map { (token, _, _) =>
+        val why =
+          if usesRetAsName then "the file also uses `ret` as a name"
+          else "it could also be a call or an operator on a name `ret` declared elsewhere"
+        Unsure(token.beginLine, token.beginColumn,
+          s"this `ret` may be the old do-block keyword, but $why; " +
+            "if it is the keyword, change it to `yield` by hand, otherwise leave it")
+      }
+      val edits = clear.map { (token, _, offset) =>
+        Edit(offset, 3, "yield", token.beginLine, token.beginColumn, "ret -> yield")
+      }
+      Found(edits, unsure, notes)
 
     /**
      * Whether the clause the `ret` at `start` begins runs to the end of its do block. Only the
      * tokens of that block itself are looked at, not those inside brackets nested in it: a
      * `<-`, a `yield`, a `;` before anything but the closing `}`, or a new line that neither
-     * continues the line before nor is continued by it, starts another clause.
+     * continues the line before nor is continued by it, starts another clause. So does a token
+     * that starts an operand right after one that finished an operand, on the same line:
+     * clauses need no separator.
      */
     private def endsDoBlock(tokens: IndexedSeq[Token], start: Int): Boolean =
       var depth = 0
@@ -204,6 +229,8 @@ object Migrator:
           else if token.beginLine > previous.endLine && i > start + 1 &&
             !Continuations.contains(image) && !OpenEnds.contains(previous.image) then
             result = Some(false)
+          else if i > start + 1 && endsOperand(previous) && startsOperand(token) then
+            result = Some(false)
         if result.isEmpty then
           image match
             case "(" | "[" | "{" => depth += 1
@@ -212,6 +239,15 @@ object Migrator:
           if depth == 0 then previous = token
           i += 1
       result.getOrElse(true)
+
+    private def isOperandToken(t: Token): Boolean =
+      t.kind == K.ID || ValueKeywords.contains(t.image) || (t.kind >= K.INTEGER && t.kind <= K.SCHEME_STRING)
+
+    private def endsOperand(t: Token): Boolean =
+      isOperandToken(t) || t.image == ")" || t.image == "]" || t.image == "}"
+
+    private def startsOperand(t: Token): Boolean =
+      isOperandToken(t) || ExpressionKeywords.contains(t.image)
 
     /** The token before a do clause: the block's `{`, a `;`, or the end of the clause before. */
     private def startsClause(previous: Option[Token]): Boolean =

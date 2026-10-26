@@ -19,7 +19,9 @@ import onion.tools.format.FormatCommand
  * walked for `.on` files, as `onion fmt` does.
  *
  * `--check` writes nothing and exits 1 if anything would change. A place a rule cannot decide
- * is printed to stderr and makes the exit code 1, and that file is left as it was.
+ * is printed to stderr and makes the exit code 1, and that file is left as it was; the summary
+ * counts such files as needing a manual change. A place a rule proved is not the old spelling
+ * is printed to stdout as a `note:` and changes nothing else.
  *
  * Every file is re-lexed before it is written: the result must have the original's tokens and
  * comments, except the rewritten ones. Anything else would be a bug in a rule, and the file is
@@ -68,16 +70,18 @@ object MigrateCommand:
       relative.toString
 
     var changed = 0
+    var undecided = 0
     var failed = false
     files.foreach { file =>
       try
         val source = Files.readString(file, UTF_8)
         val result = Migrator.migrate(source)
-        result.unsure.foreach { u =>
-          err.println(s"${display(file)}:${u.line}:${u.column}: ${u.message}")
+        result.notes.foreach(n => out.println(s"${display(file)}:${n.line}:${n.column}: note: ${n.message}"))
+        result.unsure.foreach(u => err.println(s"${display(file)}:${u.line}:${u.column}: ${u.message}"))
+        if result.unsure.nonEmpty then
+          undecided += 1
           failed = true
-        }
-        if result.changed then
+        else if result.changed then
           if !preserved(source, result) then
             err.println(s"error: Migrating ${display(file)} would change more than the rewritten tokens; left untouched")
             err.println("This is a bug in onion migrate. Please report it with the file.")
@@ -92,11 +96,11 @@ object MigrateCommand:
           failed = true
     }
 
-    if check then
-      if changed > 0 then out.println(s"$changed file(s) would be migrated")
-      else out.println(s"${files.size} file(s) already up to date")
-    else if changed == 0 then out.println(s"${files.size} file(s) already up to date")
-    else out.println(s"Migrated $changed of ${files.size} file(s)")
+    val upToDate = files.size - changed - undecided
+    if check && changed > 0 then out.println(s"$changed file(s) would be migrated")
+    else if changed > 0 then out.println(s"Migrated $changed of ${files.size} file(s)")
+    else if upToDate > 0 || undecided == 0 then out.println(s"$upToDate file(s) already up to date")
+    if undecided > 0 then out.println(s"$undecided file(s) need a manual change")
 
     if failed then 1
     else if check && changed > 0 then 1

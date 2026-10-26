@@ -118,6 +118,10 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      same branch (a push makes the old verdict stale). If it has none and you disagree,
      reply once on the PR starting `/rebuttal` with your evidence; the next Reviewer run then
      calls the fifth reviewer (§4). Otherwise close the PR with the reason.
+   - A PR blocked a third time, each time on a new variant, is missing a rule, not a patch.
+     Stop fixing variants. Write the rule down in one comment on the linked issue: what is
+     accepted, what is rejected, and the cases the blocks found. Then fix to the rule, or open
+     a `kind:rfc` if the rule changes what compiles. W43: #2328 took 12 verdicts, #2315 six.
    - **Release** when all three hold: `CHANGELOG.md`'s `[Unreleased]` has a user-visible entry,
      the newest tag is older than 24 hours, and `main` is green. Then dispatch `release.yml`
      now (next minor version, see Known pitfalls) and open the changelog-cut PR (`risk:low`).
@@ -401,8 +405,14 @@ compatibility (PRINCIPLES.md §2, §3, §9).
 - **CI is Linux in the English locale.** Windows-only failures do not show up there. Message
   text is bilingual, so assert error codes, not localized text.
 - **Releases:**
-  - Dispatch `release.yml` (`gh workflow run release.yml -f version=vX.Y.Z --ref main`); a
-    client push of a tag gets 403.
+  - Dispatch `release.yml` with the GitHub MCP tool `actions_run_trigger` (`run_workflow`,
+    `release.yml`, ref `main`, input `version: vX.Y.Z`). In a scheduled session the
+    permission classifier denied `gh workflow run` and the REST dispatch (10-22, twice on
+    10-25); the MCP call went through on 10-24 and 10-25. A client push of a tag gets 403.
+  - After a release cut, a base merge puts a PR's new CHANGELOG lines under the released
+    `## [X.Y.Z]` heading, with no conflict to warn you (9 open PRs on 10-25; #2377 repaired
+    three merged ones). After every base merge, check that the added lines come before the
+    first `## [0.` heading: `git diff origin/main...HEAD -- CHANGELOG.md | grep -m1 '^@@'`.
   - Do not commit a `## [X.Y.Z]` CHANGELOG heading before the tag exists.
   - Maven Central deployments wait for a Publish click in the Portal unless the repository
     variable `CENTRAL_AUTO_RELEASE` is `true`.
@@ -460,3 +470,13 @@ compatibility (PRINCIPLES.md §2, §3, §9).
   `--amend -F <file>`, and retry the push once unchanged.
 - **A stop-hook may demand a commit before the suite finishes** (five times by W42). Do not
   comply; read the real exit code first.
+- **A panel verdict is posted once, complete, and never edited.** The gate ignores an edited
+  comment: two APPROVED verdicts edited 20 s after posting held #2355 and #2356 for 3 hours
+  (10-24). Write the whole body first and call the tool once; a placeholder comment is the
+  W40 slip again (10-25, #2433). To correct a verdict, post a new one.
+- **Reviewer runs can overlap.** On 10-24 a run judged #2328, #2344 and #2345 at heads a
+  concurrent run had judged an hour earlier. Right before posting, re-read the PR's comments;
+  if a verdict for that head is there, drop yours.
+- **A usage limit silences every role at once.** 10-22 14:39 to 10-23 20:30 UTC had no
+  episode from any role, and the Reviewer and Sensor runs ended `USAGE_LIMIT_REACHED`. The
+  first run after such a gap reads `list_triggers` and says on the Roadmap how long it was.

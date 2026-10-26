@@ -154,11 +154,13 @@ Migrated 1 of 4 file(s)
 - **It does not guess.** If neither version compiles, each place is printed with its line, and
   the file is left as it was. The summary counts it (`1 file(s) need a manual change`), and
   the exit code is `1`. The compiler's first error is printed too. Fix it, or the line by hand.
-- **Files that use each other are fine.** A file that compiles neither way on its own is
-  tried again compiled together with every file you named. Name the whole project:
-  `onion migrate src/ tests/`.
-  A syntax error in any of them stops that compile before it can check anything. Such a
-  file then counts as needing a manual change, and the syntax error is printed.
+- **Files that use each other are fine.** Each file is also checked compiled together with
+  every file you named. If it compiles that way as written (another file declares `ret`, say,
+  in an `extension`), it is left alone. A file that compiles neither way on its own is
+  decided there. Name the whole project: `onion migrate src/ tests/`.
+  A syntax error in any of them stops that compile before it can check anything. A file
+  with a `ret` to decide then counts as needing a manual change, and the syntax error is
+  printed.
   A file that cannot be read is reported and left out.
 - **`-classpath <path>`** is where classes from outside the named files come from, such as a
   library's jar.
@@ -175,8 +177,8 @@ compiler can tell:
 
 | The file | What `migrate` does |
 |---|---|
-| Compiles as written | Leaves it, with a `note:`: `ret` is a name here |
-| Does not compile, but does with `yield` | Rewrites it to `yield` |
+| Compiles as written, alone or with the other named files | Leaves it, with a `note:`: `ret` is a name here |
+| Does not compile either way, but does with `yield` | Rewrites it to `yield` |
 | Compiles neither way | Reports it and exits 1 |
 
 A `ret` with another clause after it (`ret(a); yield a`) is always left alone, with a `note:`:

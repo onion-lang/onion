@@ -415,6 +415,51 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     }
     read(root.resolve("Main.on")) shouldBe main
 
+  test("the panel's repro: a file that compiles alone only with yield, but together as written, is left alone"):
+    val root = Files.createTempDirectory("onion-migrate-project").toRealPath()
+    val ext =
+      """extension Main {
+        |  def ret(): Option[Int] = Option::none()
+        |}
+        |""".stripMargin
+    val main =
+      """class Main {
+        |public:
+        |  def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret a }
+        |  static def main(args: String[]): void { IO::println(new Main().go()) }
+        |}
+        |""".stripMargin
+    Files.writeString(root.resolve("Ext.on"), ext, UTF_8)
+    Files.writeString(root.resolve("Main.on"), main, UTF_8)
+
+    val result = invoke(root, root.resolve("Ext.on").toString, root.resolve("Main.on").toString)
+
+    withClue(result.stdout + result.stderr) {
+      result.exitCode shouldBe 0
+      result.stdout should include("Main.on:4:62: note: the file compiles as written")
+      result.stdout should not include "ret -> yield"
+      result.stdout should include("2 file(s) already up to date")
+    }
+    read(root.resolve("Main.on")) shouldBe main
+
+  test("a first-pass rewrite waits when a syntax error in another named file stops the joint compile"):
+    val root = Files.createTempDirectory("onion-migrate-project").toRealPath()
+    val main = "val r = do[Option] { a <- Option::some(1); ret a }\nIO::println(r)\n"
+    Files.writeString(root.resolve("Main.on"), main, UTF_8)
+    Files.writeString(root.resolve("Broken.on"), "val x: Int = (\n", UTF_8)
+
+    val result = invoke(root, root.toString)
+
+    withClue(result.stdout + result.stderr) {
+      result.exitCode shouldBe 1
+      result.stdout should not include "ret -> yield"
+      result.stderr should include("Main.on:1:44:")
+      result.stderr should include("Broken.on")
+      result.stdout should include("1 file(s) need a manual change")
+    }
+    read(root.resolve("Main.on")) shouldBe main
+
   test("the panel's repro: a file that cannot be read is left out of the joint pass"):
     val root = Files.createTempDirectory("onion-migrate-project").toRealPath()
     val src = Files.createDirectories(root.resolve("src"))
@@ -469,9 +514,12 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
       result.stdout should not include "compiles as written"
       result.stderr should include("tests/T.on:1:44:")
       result.stderr should include("src/Main.on")
-      result.stdout should include("1 file(s) need a manual change")
+      // Util.on compiles alone only with yield, but the joint compile cannot confirm it.
+      result.stderr should include("src/Util.on:3:84:")
+      result.stdout should include("2 file(s) need a manual change")
     }
     read(tests.resolve("T.on")) shouldBe t
+    read(src.resolve("Util.on")) shouldBe util
 
   test("a file that compiles neither way is reported with the compiler's first error"):
     val source = "val o = do[Option] { a <- Option::some(1); ret a }\nval n: Int = \"no\"\n"

@@ -22,7 +22,8 @@ import onion.tools.format.FormatCommand
  * Whether a place a rule found really is the old spelling can depend on names declared
  * outside the file, so the compiler decides. A file that compiles as written is never
  * changed: its places are names, printed to stdout as a `note:`. A file that does not is
- * rewritten only if the rewritten file compiles. Otherwise its places are printed to stderr,
+ * rewritten only if the rewritten file compiles, and only if the named files compiled together
+ * as written do not compile it either (another file may declare the name). Otherwise its places are printed to stderr,
  * the file is left as it was, the summary counts it as needing a manual change, and the exit
  * code is 1. Each file is compiled on its own, against `-classpath` (default: none); a file
  * that compiles neither way alone is tried again compiled together with every named file that
@@ -104,6 +105,9 @@ object MigrateCommand:
     var failed = false
     // The text each readable file has now: rewritten once decided, as read otherwise.
     val texts = mutable.LinkedHashMap[Path, String]()
+    // Files that compile on their own only with `yield`: another named file may still make
+    // them compile as written (an extension, say), so the rewrite waits for the joint check.
+    val alone = mutable.LinkedHashMap[Path, (String, Migrator.Result)]()
     // Files that compile neither way on their own: they may need the other named files.
     val pending = mutable.LinkedHashMap[Path, (String, Migrator.Result)]()
 
@@ -152,7 +156,7 @@ object MigrateCommand:
         result.notes.foreach(n => note(file, n.line, n.column, n.message))
         if result.changed then
           if Compile.problems(Seq(file -> source), classpath).isEmpty then compilesAsWritten(file, result)
-          else if Compile.problems(Seq(file -> result.text), classpath).isEmpty then rewrite(file, source, result)
+          else if Compile.problems(Seq(file -> result.text), classpath).isEmpty then alone(file) = (source, result)
           else pending(file) = (source, result)
       catch
         case error: IOException =>
@@ -167,20 +171,32 @@ object MigrateCommand:
           failed = true
     }
 
+    val joint = texts.size > 1
+    val failing = (problems: Seq[Compile.Problem], file: Path) =>
+      problems.filter(p => p.file.forall(_ == file.toString))
+
+    // A rewrite decided alone is kept only if the named files, compiled together as written,
+    // do not already compile this file: then its `ret` is a name another file declares. A
+    // joint compile that stops before type checking cannot confirm it, so it stays undecided.
+    if alone.nonEmpty then
+      val asWritten = if joint then Compile.check(texts.toSeq, classpath) else Compile.Report(Seq(), true)
+      alone.foreach { case (file, (source, result)) =>
+        if !asWritten.typed then cannotTell(file, result, asWritten.problems, asWritten.problems.headOption)
+        else if joint && failing(asWritten.problems, file).isEmpty then compilesAsWritten(file, result)
+        else rewrite(file, source, result)
+      }
+
     // A file may use classes another named file declares, so the undecided ones get a second
     // chance compiled together with every named file that could be read, with the same rule:
     // a file that compiles as written is left alone, and a rewrite is kept only if it
     // compiles. The joint pass only narrows what the first pass decided: a joint compile that
     // stops before type checking proves nothing about a file, so the file stays undecided.
     if pending.nonEmpty then
-      val joint = texts.size > 1
       val unit = (rewritten: Set[Path]) => texts.toSeq.map { (file, text) =>
         pending.get(file) match
           case Some((source, result)) => file -> (if rewritten(file) then result.text else source)
           case None => file -> text
       }
-      val failing = (problems: Seq[Compile.Problem], file: Path) =>
-        problems.filter(p => p.file.forall(_ == file.toString))
       val asWritten = if joint then Compile.check(unit(Set.empty), classpath) else Compile.Report(Seq(), true)
       val candidates =
         if joint then pending.keySet.filter(f => failing(asWritten.problems, f).nonEmpty).toSet

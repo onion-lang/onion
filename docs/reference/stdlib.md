@@ -907,7 +907,7 @@ Provided via `onion.Iterables` (Java interface).
 Access iteration utilities for collections and arrays:
 
 - `Iterables::map(list|iterable|set, f)`
-- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map`
+- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map` in the original insertion order
 - `Iterables::toList(iterable)` - materializes any `Iterable` (ranges included) into a `List`
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`
@@ -1371,6 +1371,8 @@ val formattedMs: String = Timing::formatMillis(millis)  // "2m5s"
 Timing::sleep(1000L)        // Sleep for 1000 milliseconds
 Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 ```
+
+A zero or negative duration returns immediately, so `Timing::sleep(deadline - Timing::millis())` is safe once the deadline has passed.
 
 ### Measuring Function Execution
 
@@ -1955,6 +1957,9 @@ Codec::base64Decode(enc)                  // "Hello"
 Codec::hexEncode("Hi") / Codec::hexDecode("4869")
 Codec::urlEncode("a b&c") / Codec::urlDecode(s)
 ```
+
+- `base64Decode` skips whitespace, so a file's trailing newline or `base64`'s 76-column lines decode as is.
+- Bad input to a decoder throws `IllegalArgumentException` naming the problem, for example `invalid Base64 character '!' at index 10` or `invalid % escape at index 3 in "100%zz"`.
 
 These are also builtin extension methods on `String`:
 

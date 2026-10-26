@@ -53,8 +53,12 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     if (seenFields.contains(field)) typing.report(SemanticError.DUPLICATE_FIELD, ast, field.affiliation, field.name)
     else seenFields.add(field)
 
+  // Component names of the record being checked: each one already generates a public
+  // zero-argument accessor, so a body method of that name would be a duplicate (#2396).
+  private var recordComponentNames = Set.empty[String]
+
   private def registerMethod(ast: AST.Node, method: MethodDefinition): Unit =
-    if (seenMethods.contains(method)) typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
+    if (seenMethods.contains(method) || (method.arguments.isEmpty && recordComponentNames.contains(method.name))) typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
     else seenMethods.add(method)
 
   private def registerConstructor(ast: AST.Node, constructor: ConstructorDefinition): Unit =
@@ -191,7 +195,9 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     withKernel[ClassDefinition](node) { clazz =>
       resetForTypeDeclaration(clazz)
       checkDuplicateRecordComponents(node, clazz)
-      for (section <- node.sections) processAccessSection(section)
+      recordComponentNames = node.args.map(_.name).toSet
+      try for (section <- node.sections) processAccessSection(section)
+      finally recordComponentNames = Set.empty
       node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
     }

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A record method named like a component is a compile error (#2396).**
+  - Before: `record R(a: Int) { public: def a(): Int = 42 }` compiled, then died with a JVM `ClassFormatError`.
+  - Now: E0010 (duplicated method) at the `def`.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

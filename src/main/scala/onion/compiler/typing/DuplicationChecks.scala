@@ -60,11 +60,13 @@ private[compiler] object DuplicationChecks {
       case _ => false
   }
 
-  def checkOverrideContracts(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
+  def checkOverrideContracts(typing: Typing, clazz: ClassDefinition, fallback: Location, skipObject: Boolean = false): Unit = {
     if clazz.isInterface then return
     val allViews = typing.table_.appliedViewsOf(clazz)(AppliedTypeViews.collectAppliedViewsFrom(clazz))
     // Exclude the target class itself to avoid checking methods against themselves
-    val views = allViews - clazz
+    // A record keeps components named like Object's methods (`wait`, `notify`), which the JVM
+    // tells apart by descriptor; only the interface and record-supertype contracts are checked.
+    val views = (allViews - clazz).filter { case (c, _) => !(skipObject && c.name == "java.lang.Object") }
     if views.isEmpty then return
 
     val implementations = clazz.methods.filter(m => !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier))
@@ -111,7 +113,12 @@ private[compiler] object DuplicationChecks {
               }
             }
 
-            if (!primitiveAwareAssignable(specializedRet, impl.returnType, typing)) {
+            // A JVM override must return the same primitive: widening (Int where Double is
+            // declared) is assignable, but the bridge-less accessor would answer a different method.
+            val primitiveMismatch = (specializedRet, impl.returnType) match
+              case (c: BasicType, i: BasicType) => c != i
+              case _ => false
+            if (primitiveMismatch || !primitiveAwareAssignable(specializedRet, impl.returnType, typing)) {
               typing.report(SemanticError.INCOMPATIBLE_TYPE, location, specializedRet, impl.returnType)
             }
           }

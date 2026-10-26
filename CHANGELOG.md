@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A record component whose accessor returns a different type than an inherited method is an error (#2372).**
+  - Before: `record Circle(area: Int) conforms Shape` with `Shape.area(): Double` compiled; `s.area()` through `Shape` ran the other method.
+  - Now: the usual incompatible-type error, as in Java.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

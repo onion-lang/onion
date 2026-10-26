@@ -507,9 +507,18 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     // Then a fit wins over another when its parameters rank higher, as for class methods,
     // and its receiver is not less specific; or when the parameters tie and its receiver is
     // more specific. Parameters and receiver disagreeing, or no winner, is one E0006.
+    // An overload with no lambda slot where a lambda is passed (`Int`, `List`) cannot fit and
+    // is never typed against, so nested lambdas are typed once per real candidate. When
+    // only SAM conversions fit, the void/value shape of the body decides, as for classes.
     val user = candidates.filterNot(isBuiltinExtension)
     if (user.length >= 2) {
-      val fits = user.flatMap(m => typing.withSuppressedReporting(attemptRanked(m)).map(r => (m, r._2, r._3)))
+      val lambdaCapable = user.filter { m =>
+        untypedClosureIndices.forall(i => i >= m.arguments.length || isLambdaSlot(m.arguments(i)))
+      }
+      if (lambdaCapable.length == 1) break(attempt(lambdaCapable.head))
+      val fits =
+        if (lambdaCapable.isEmpty) Seq.empty
+        else lambdaCapable.flatMap(m => typing.withSuppressedReporting(attemptRanked(m)).map(r => (m, r._2, r._3)))
       if (fits.isEmpty) {
         val builtins = candidates.filter(isBuiltinExtension)
         break(if (builtins.isEmpty) attempt(closestByArity(user, args)) else builtins.iterator.flatMap(attempt).nextOption())
@@ -517,7 +526,16 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       val direct = fits.filter { case (m, _, _) =>
         untypedClosureIndices.forall(i => i >= m.arguments.length || takesLambdaDirectly(m.arguments(i)))
       }
-      val pool = if (direct.nonEmpty) direct else fits
+      val pool =
+        if (direct.nonEmpty) direct
+        else {
+          val shaped = overloadSupport.disambiguateClosureOverloads(
+            fits.map { case (m, expectedArgs, _) => ApplicableMethod(m, expectedArgs, Map.empty) }.toList,
+            untypedClosureIndices,
+            calls.closureSamMatcher(node.args, context)
+          ).map(_.method)
+          fits.filter { case (m, _, _) => shaped.exists(_ eq m) }
+        }
       def beats(a: (ExtensionMethodDefinition, Array[Type], Array[Type]), b: (ExtensionMethodDefinition, Array[Type], Array[Type])): Boolean = {
         val params = rankParameters(a._1, a._2, b._1, b._2, a._3)
         val receiver =
@@ -556,6 +574,27 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       }
     }
 
+  /** A parameter a lambda can be passed to (rule 1 on #2447): an Onion function type,
+   *  `Object`, a type variable, or an interface with one abstract method (not counting
+   *  `Object`'s). Never a primitive, an array, a class, or an interface like `List`. */
+  private def isLambdaSlot(param: Type): Boolean = param match {
+    case _: TypeVariableType => true
+    case ct: ClassType =>
+      if (ct.name.startsWith("onion.Function") || ct.name == "java.lang.Object") true
+      else if (!ct.isInterface) false
+      else {
+        val raw = rawOf(ct)
+        raw.methods.filter(m => Modifier.isAbstract(m.modifier) && !isPublicObjectMethod(m)).map(_.name).distinct.length <= 1
+      }
+    case _ => false
+  }
+
+  private def isPublicObjectMethod(m: Method): Boolean = m.name match {
+    case "equals" => m.arguments.length == 1 && m.arguments(0).name == "java.lang.Object"
+    case "hashCode" | "toString" => m.arguments.isEmpty
+    case _ => false
+  }
+
   /** A parameter a lambda reaches with no SAM conversion: an Onion function type, `Object`
    *  or a type variable. */
   private def takesLambdaDirectly(param: Type): Boolean = param match {
@@ -566,7 +605,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 
   /** When no overload fits, the one to report against (rule 2 on #2447): the first whose
    *  function-typed parameters take as many arguments as the lambdas passed to them; else
-   *  the first with a function or SAM parameter at every lambda's position; else the first. */
+   *  the first with a lambda slot at every lambda's position; else the first. */
   private def closestByArity(overloads: Seq[ExtensionMethodDefinition], args: Array[AST.Expression]): ExtensionMethodDefinition = {
     def atLambdas(slot: (AST.ClosureExpression, Type) => Boolean)(m: ExtensionMethodDefinition): Boolean =
       args.indices.forall { i =>
@@ -579,10 +618,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       case (c, ct: ClassType) if ct.name.startsWith("onion.Function") => ct.name == "onion.Function" + c.args.length
       case _ => false
     }
-    val functional = atLambdas {
-      case (_, ct: ClassType) => ct.name.startsWith("onion.Function") || ct.isInterface
-      case _ => false
-    }
+    val functional = atLambdas((_, param) => isLambdaSlot(param))
     overloads.find(sameArity).orElse(overloads.find(functional)).getOrElse(overloads.head)
   }
 

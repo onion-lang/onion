@@ -198,6 +198,52 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       }
     }
 
+    // The panel's cases on 268e9cd: non-SAM interfaces are no lambda slot, and SAM vs SAM is
+    // decided by the body's void/value shape (rules 1, 2 and 3b on #2447).
+    for (first <- Seq(true, false)) {
+      val order = if (first) "function first" else "function last"
+      for ((tpe, call) <- Seq("List[Int]" -> "\"a\".k((a: Int, b: Int) -> \"x\")", "CharSequence" -> "\"a\".k { a, b -> \"x\" }")) {
+        it(s"reports a wrong-arity lambda as E0101 next to a $tpe overload ($order)") {
+          val fn = "  def k(f: (Int) -> String): String = \"fn\""
+          val other = s"  def k(xs: $tpe): String = \"other\""
+          val decls = Seq("extension String {", if (first) fn else other, if (first) other else fn, "}").mkString("\n")
+          assert(errorCodes(decls + s"\nIO::println($call)\n") == Seq(Some("E0101")))
+        }
+      }
+
+      it(s"sends a value block to Callable and a void block to Runnable (${if (first) "Runnable" else "Callable"} first)") {
+        val run = "  def k(r: Runnable): String = \"run\""
+        val call = "  def k(c: Callable[Integer]): String = \"call\""
+        val decls = Seq("import { java.util.concurrent.Callable }", "extension String {",
+          if (first) run else call, if (first) call else run, "}").mkString("\n")
+        assert(Shell.Success("call,run") == runMain(decls, """"a".k { 42 } + "," + "a".k { IO::print("") }"""))
+      }
+
+      it(s"sends a value block to Supplier over Runnable (${if (first) "Runnable" else "Supplier"} first)") {
+        val run = "  def k(r: Runnable): String = \"run\""
+        val sup = "  def k(s: Supplier[String]): String = \"sup\""
+        val decls = Seq("import { java.util.function.Supplier }", "extension String {",
+          if (first) run else sup, if (first) sup else run, "}").mkString("\n")
+        assert(Shell.Success("sup") == runMain(decls, """"a".k { "v" }"""))
+      }
+    }
+
+    it("types nested lambdas once per overload that can take them") {
+      val depth = 10
+      val call = (1 to depth).foldRight("s" + depth) { (i, inner) => s"\"a\".w((s$i: String) -> $inner)" }
+      val decls =
+        """extension String {
+          |  def w(n: Int): String = "i"
+          |  def w(b: Boolean): String = "b"
+          |  def w(f: (String) -> String): String = f("x")
+          |}""".stripMargin
+      val start = System.nanoTime()
+      val result = runMain(decls, call)
+      val seconds = (System.nanoTime() - start) / 1e9
+      assert(Shell.Success("x") == result)
+      assert(seconds < 30, s"took $seconds s")
+    }
+
     it("reports a lambda that fits nothing against the overload of its arity") {
       val codes = errorCodes(
         """extension String {

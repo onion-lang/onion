@@ -20,7 +20,7 @@ object OnionCli:
       |  onion clean
       |  onion doc [-d <dir>] [<source.on>...]
       |  onion fmt [--check] [<path>...]
-      |  onion migrate [--check] <path>...
+      |  onion migrate [--check] [-classpath <path>] <path>...
       |  onion repl [repl-options...]
       |  onion [script-runner-options...] <source.on> [arguments...]
       |""".stripMargin

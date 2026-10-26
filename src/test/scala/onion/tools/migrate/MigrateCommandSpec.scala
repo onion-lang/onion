@@ -102,20 +102,19 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     read(file) shouldBe source
     result.stdout should include("1 file(s) already up to date")
 
-  test("a file that names ret and still has an old ret is reported, not guessed at"):
+  test("a file that does not compile with a final ret, and does with yield, is rewritten"):
     val source =
       """val ret = 1
         |val r = do[Option] { a <- Option::some(ret); ret a + 1 }
+        |IO::println(r)
         |""".stripMargin
     val (root, file) = script(source)
 
     val result = invoke(root, file.toString)
 
-    result.exitCode shouldBe 1
-    read(file) shouldBe source
-    result.stderr should include("old.on:2:46")
-    result.stderr should include("uses `ret` as a name")
-    result.stdout should include("1 file(s) need a manual change")
+    result.exitCode shouldBe 0
+    read(file) shouldBe source.replace("ret a + 1", "yield a + 1")
+    result.stdout should include("old.on:2:46: ret -> yield")
 
   test("a ret bound by a lambda parameter or a destructuring val is left alone"):
     val sources = Seq(
@@ -141,20 +140,6 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
         read(file) shouldBe source
       }
     }
-
-  test("a final ret in a file that binds ret as a lambda parameter is reported, not rewritten"):
-    val source =
-      """val f: ((Int) -> Option[Int]) -> Option[Int] =
-        |  (ret) -> do[Option] { a <- Option::some(1); ret a }
-        |""".stripMargin
-    val (root, file) = script(source)
-
-    val result = invoke(root, file.toString)
-
-    result.exitCode shouldBe 1
-    read(file) shouldBe source
-    result.stderr should include("uses `ret` as a name")
-    result.stdout should include("1 file(s) need a manual change")
 
   test("a ret with another clause after it is a call, noted and left alone, with exit 0"):
     val sources = Seq(
@@ -200,35 +185,103 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
       }
     }
 
-  test("a final ret that could be a call or an operator on a name ret is reported, not rewritten"):
+  /** `Base.on` declares `ret` as `member`; its class file goes into a fresh directory. */
+  private def baseClasses(member: String): Path =
+    val dir = Files.createTempDirectory("onion-migrate-base").toRealPath()
+    val base =
+      s"""class Base {
+         |public:
+         |  def this {}
+         |  $member
+         |}
+         |""".stripMargin
+    val config = onion.compiler.CompilerConfig(Seq(), null, "UTF-8", "", 10, checkLaws = false)
+    val classes = new onion.compiler.OnionCompiler(config)
+      .compileOrThrow(Seq(onion.compiler.StringInputSource(base, "Base.on")))
+    classes.foreach(c => Files.write(dir.resolve(c.className + ".class"), c.content))
+    dir
+
+  test("a file that compiles as written is never changed: a final ret through an inherited name"):
+    val cases = Seq(
+      "def ret(): Option[Int] = Option::none()" -> "ret a",
+      "val ret: Option[Int] = Option::none()" -> "ret a",
+      "def ret(x: Int): Option[Int] = Option::none()" -> "ret(a)",
+      "def ret(x: Int): Option[Int] = Option::none()" -> "ret (a)",
+      "def ret(x: Int): Option[Int] = Option::none()" -> "ret(-a)",
+      "val ret: Option[Int] = Option::none()" -> "ret a + 1")
+    for (member, clause) <- cases do
+      val source =
+        s"""class Main extends Base {
+           |public:
+           |  def this {}
+           |  def go(): Object = do[Option] { a <- Option::some(1); $clause }
+           |}
+           |""".stripMargin
+      val (root, file) = script(source, "Main.on")
+
+      val result = invoke(root, "-classpath", baseClasses(member).toString, file.toString)
+
+      withClue(s"$member / $clause: ${result.stdout}${result.stderr}") {
+        result.exitCode shouldBe 0
+        read(file) shouldBe source
+        result.stdout should include("note: the file compiles as written")
+        result.stdout should include("1 file(s) already up to date")
+      }
+
+  test("the panel's repro: a final ret a through an inherited ret() is left as written"):
+    val source =
+      """class Main extends Base {
+        |public:
+        |  def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret a }
+        |  static def main(args: String[]): void { IO::println(new Main().go()) }
+        |}
+        |""".stripMargin
+    val (root, file) = script(source, "Main.on")
+    val classes = baseClasses("def ret(): Option[Int] = Option::none()")
+
+    val result = invoke(root, "-classpath", classes.toString, file.toString)
+
+    result.exitCode shouldBe 0
+    read(file) shouldBe source
+    result.stdout should include("Main.on:4:62: note: the file compiles as written")
+    result.stdout should include("1 file(s) already up to date")
+
+  test("without the class that declares ret, the file is reported, not guessed at"):
+    val source =
+      """class Main extends Base {
+        |public:
+        |  def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret a }
+        |}
+        |""".stripMargin
+    val (root, file) = script(source, "Main.on")
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 1
+    read(file) shouldBe source
+    result.stderr should include("Main.on:4:62: this `ret` may be the old do-block keyword")
+    result.stderr should include("-classpath")
+    result.stdout should include("1 file(s) need a manual change")
+    result.stdout should not include "ret -> yield"
+
+  test("an old final ret followed by ( [ - + ! is rewritten when nothing else declares ret"):
     val sources = Seq(
-      """class Main extends Base { public: def this {}
-        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret(a) }
-        |}
-        |""".stripMargin,
-      """class Main extends Base { public: def this {}
-        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret -a }
-        |}
-        |""".stripMargin,
-      """val o = do[Option] { a <- Option::some(1); ret [a, 2] }
-        |""".stripMargin,
-      """val o = do[Option] { a <- Option::some(1); ret { -> a } }
-        |""".stripMargin,
-      """val o = do[Option] { a <- Option::some(1); ret +a }
-        |""".stripMargin,
-      """val o = do[Option] { a <- Option::some(true); ret !a }
-        |""".stripMargin)
+      "val o = do[Option] { a <- Option::some(1); ret(a) }\n",
+      "val o = do[Option] { a <- Option::some(1); ret -a }\n",
+      "val o = do[Option] { a <- Option::some(1); ret [a, 2] }\n",
+      "val o = do[Option] { a <- Option::some(1); ret +a }\n",
+      "val o = do[Option] { a <- Option::some(true); ret !a }\n")
     sources.foreach { source =>
       val (root, file) = script(source)
 
       val result = invoke(root, file.toString)
 
-      withClue(source) {
-        result.exitCode shouldBe 1
-        read(file) shouldBe source
-        result.stderr should include("could also be a call or an operator on a name `ret`")
-        result.stdout should include("1 file(s) need a manual change")
-        result.stdout should not include "ret -> yield"
+      withClue(source + result.stderr) {
+        result.exitCode shouldBe 0
+        read(file) shouldBe source.replace("ret", "yield")
+        result.stdout should include("ret -> yield")
       }
     }
 
@@ -242,10 +295,11 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
         |  }
         |  else { 0 }
         |}
+        |def count(xs: List[Int]): Int = xs.size
         |val s = do[Option] { xs <- Option::some([1, 2])
         |  ret xs
         |    .map { x -> x * 2 }
-        |    |> size;
+        |    |> count;
         |}
         |""".stripMargin
     val (root, file) = script(source)
@@ -302,4 +356,5 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
 
     invoke(root).exitCode shouldBe 2
     invoke(root, "--frobnicate", "x.on").exitCode shouldBe 2
+    invoke(root, "x.on", "-classpath").exitCode shouldBe 2
     invoke(root, root.resolve("missing.on").toString).exitCode shouldBe 2

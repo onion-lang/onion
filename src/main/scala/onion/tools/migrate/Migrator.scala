@@ -12,30 +12,30 @@ import scala.collection.mutable
  * copied byte for byte, and the result is re-lexed and compared with the original before
  * anything is written (see [[MigrateCommand]]).
  *
- * A rule that cannot tell the old spelling from new code reports the place instead of
- * guessing. A wrong rewrite in someone's source is worse than one they make by hand.
+ * A rule finds the places that look like the old spelling. Whether one really is the old
+ * spelling depends on names the rule cannot resolve, so [[MigrateCommand]] decides by
+ * compiling: a file that compiles is never changed, and a rewrite is kept only if the
+ * rewritten file compiles.
  */
 object Migrator:
 
   /** One rewrite: `length` characters at `offset` become `replacement`. */
   final case class Edit(offset: Int, length: Int, replacement: String, line: Int, column: Int, note: String)
 
-  /** A place a rule could not decide, or one it decided to leave alone, with why. */
-  final case class Unsure(line: Int, column: Int, message: String)
+  /** A place a rule left alone, or could not change, with why. */
+  final case class Note(line: Int, column: Int, message: String)
 
   /**
-   * A file with an undecided place keeps all of its text: `edits` is then empty, so a file is
-   * either fully migrated or left exactly as it was. `notes` are places a rule proved are not
+   * `text` is the source with every edit applied. `notes` are places a rule proved are not
    * the old spelling; they are reported, but need nothing from the user.
    */
-  final case class Result(text: String, edits: Seq[Edit], unsure: Seq[Unsure], notes: Seq[Unsure]):
+  final case class Result(text: String, edits: Seq[Edit], notes: Seq[Note]):
     def changed: Boolean = edits.nonEmpty
 
   def migrate(source: String): Result =
     val tokens = codeTokens(source)
     val found = RetToYield.find(source, tokens)
-    val edits = if found.unsure.nonEmpty then Nil else found.edits
-    Result(apply(source, edits), edits, found.unsure, found.notes)
+    Result(apply(source, found.edits), found.edits, found.notes)
 
   /**
    * The token images of `source`, comments included, for the before/after comparison: a
@@ -108,22 +108,18 @@ object Migrator:
   /**
    * `ret e` → `yield e` in a `do[M] { ... }` block (#2291).
    *
-   * Before the change `ret` was a keyword, legal only at the start of a do clause. So in a
-   * file written before it, every `ret` token is a candidate. A `ret` anywhere else (a
-   * declaration, a lambda parameter, a destructuring or pattern binding, an argument) means
-   * the file was written since and uses `ret` as an ordinary name. Then a bare `ret` at the
-   * start of a clause is ambiguous: such a file's candidates are reported, not rewritten.
+   * Before the change `ret` was a keyword, legal only at the start of a do block's final
+   * clause, followed by that clause's expression. Every `ret` in that place is a candidate.
+   * Today `ret` is an ordinary name, and `ret a` there may also be a name `ret` declared
+   * somewhere this file cannot see (an inherited method or field, another file), followed by
+   * a clause `a`. Only the compiler can tell, so [[MigrateCommand]] keeps a candidate only
+   * when the file does not compile as written and does compile with it rewritten.
    *
-   * The old keyword was also legal only in a do block's final clause. A `ret` with another
-   * clause after it is a call through a name declared somewhere this file cannot see (an
-   * inherited method, another file, a Java class): it is noted and left alone.
-   *
-   * A final `ret` followed by `(`, `[`, `{`, `-`, `+` or `!` may be that call, an index or an
-   * operator on such a name, and rewriting it would silently change what the program
-   * computes. It is reported instead. The full rule is on #2442.
+   * A `ret` with another clause after it was never the keyword: it is noted and left alone.
+   * The full rule is on #2442.
    */
   private object RetToYield:
-    final case class Found(edits: Seq[Edit], unsure: Seq[Unsure], notes: Seq[Unsure])
+    final case class Found(edits: Seq[Edit], notes: Seq[Note])
 
     /** After these, `ret` is an operand, not the start of a clause. */
     private val NotAnExpression = Set(
@@ -138,8 +134,6 @@ object Migrator:
       "=", "+", "-", "*", "/", "%", "==", "!=", "===", "!==", "<", ">", "<=", ">=", "&&", "||",
       "?:", "|>", ".", "?.", "::", "->", ",", "as", "is", "instanceof", "!")
 
-    /** After `ret`, these could continue a name `ret` as well as start the old keyword's operand. */
-    private val NameContinuations = Set("(", "[", "{", "-", "+", "!")
     /** Keywords that start an expression, so after a finished operand they start a new clause. */
     private val ExpressionKeywords = Set("new", "if", "select", "do", "try")
 
@@ -148,7 +142,6 @@ object Migrator:
 
     def find(source: String, tokens: IndexedSeq[Token]): Found =
       val candidates = mutable.Buffer[(Token, Int)]()
-      var usesRetAsName = false
       val stack = mutable.Stack[Bracket]()
       // The `[` that opens a `do[...]`'s type, by stack depth, so its `]` knows that the
       // `{` after it opens a do block.
@@ -173,7 +166,6 @@ object Migrator:
           case "ret" if token.kind == K.ID =>
             if stack.headOption.contains(Bracket.DoBrace) && startsClause(previous) && takesOperand(next) then
               candidates += ((token, i))
-            else usesRetAsName = true
           case _ => ()
         if token.image == "{" then nextBraceIsDo = false
       }
@@ -185,25 +177,14 @@ object Migrator:
       }
       val (last, notLast) = located.partition((_, index, _) => endsDoBlock(tokens, index))
       val notes = notLast.map { (token, _, _) =>
-        Unsure(token.beginLine, token.beginColumn,
+        Note(token.beginLine, token.beginColumn,
           "this `ret` is not the last clause of its do block, so it is a call through a name " +
             "`ret` declared elsewhere, not the old keyword; left as written")
       }
-      val (ambiguous, clear) =
-        if usesRetAsName then (last, Nil)
-        else last.partition((_, index, _) => tokens.lift(index + 1).exists(t => NameContinuations.contains(t.image)))
-      val unsure = ambiguous.map { (token, _, _) =>
-        val why =
-          if usesRetAsName then "the file also uses `ret` as a name"
-          else "it could also be a call or an operator on a name `ret` declared elsewhere"
-        Unsure(token.beginLine, token.beginColumn,
-          s"this `ret` may be the old do-block keyword, but $why; " +
-            "if it is the keyword, change it to `yield` by hand, otherwise leave it")
-      }
-      val edits = clear.map { (token, _, offset) =>
+      val edits = last.map { (token, _, offset) =>
         Edit(offset, 3, "yield", token.beginLine, token.beginColumn, "ret -> yield")
       }
-      Found(edits, unsure, notes)
+      Found(edits, notes)
 
     /**
      * Whether the clause the `ret` at `start` begins runs to the end of its do block. Only the

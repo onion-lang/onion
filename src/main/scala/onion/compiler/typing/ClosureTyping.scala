@@ -87,7 +87,7 @@ final class ClosureTyping(
           // Memoized like inferBodyReturnType: the bidirectional call path types the same
           // closure against the same template more than once per call site.
           val inferred = {
-            val key = (node, argTypes.toList, samReturnTemplate, context.typingView)
+            val key = (node, argTypes.toList, samReturnTemplate, context.typingViewFor(MentionedNames.of(node)))
             val cached = returnInferenceMemo.get(key)
             if (cached != null) cached
             else {
@@ -442,7 +442,7 @@ final class ClosureTyping(
   private val returnInferenceMemo = new java.util.HashMap[(AST.ClosureExpression, List[Type], Type, View), Option[Type]]()
 
   private def inferBodyReturnType(node: AST.ClosureExpression, context: LocalContext, argTypes: Array[Type]): Option[Type] = {
-    val key = (node, argTypes.toList, context.typingView)
+    val key = (node, argTypes.toList, context.typingViewFor(MentionedNames.of(node)))
     val cached = bodyReturnMemo.get(key)
     if (cached != null) cached
     else {

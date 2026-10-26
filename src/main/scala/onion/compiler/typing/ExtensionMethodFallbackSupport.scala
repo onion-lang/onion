@@ -18,6 +18,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   private val decisionsAt =
     new java.util.IdentityHashMap[AST.MethodCall, java.util.HashMap[(Type, List[Type], Type, AnyRef), ExtensionMethodDefinition]]()
 
+  /** The keys under which a lambda call site fitted no overload, or two equally. */
+  private val failedAt =
+    new java.util.IdentityHashMap[AST.MethodCall, java.util.HashSet[(Type, List[Type], Type, AnyRef)]]()
+
   /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
    *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
@@ -524,7 +528,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       // exponential. A remembered winner that no longer fits falls back to the full choice
       // while errors are suppressed (an enclosing overload is being tried); when they are
       // reported, its errors are the call's own.
-      val decisionKey = (targetType: Type, preliminaryParams.toList.map(p => if (p == null) null else p.`type`), expected, context.typingView)
+      val decisionKey = (targetType: Type, preliminaryParams.toList.map(p => if (p == null) null else p.`type`), expected, context.typingViewFor(MentionedNames.of(node.args)))
       val decisions = decisionsAt.computeIfAbsent(node, _ => new java.util.HashMap())
       val remembered = decisions.get(decisionKey)
       if (remembered != null) {
@@ -534,6 +538,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           case None =>
         }
       }
+      // A call that fitted no overload, or two equally, under this key does so again; while
+      // an enclosing overload is only being tried, that answer is reused instead of the
+      // whole choice (#2452). When errors are reported, the choice runs to report them.
+      val failures = failedAt.computeIfAbsent(node, _ => new java.util.HashSet())
+      if (!typing.reportingEnabled && failures.contains(decisionKey)) break(None)
       def decided(winner: ExtensionMethodDefinition): Option[Term] = {
         decisions.put(decisionKey, winner)
         attempt(winner)
@@ -544,12 +553,32 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       if (lambdaCapable.length == 1) break(decided(lambdaCapable.head))
       val fits =
         if (lambdaCapable.isEmpty) Seq.empty
-        else lambdaCapable.flatMap { m =>
-          // A try: its errors and warnings are not the call's; the winner is typed again below.
-          typing.warningReporter_.discarding(typing.withSuppressedReporting(attemptRanked(m))).map(r => (m, r._2, r._3))
+        else {
+          // An overload that a fitting one always beats is not tried: the fitting one is
+          // non-generic, takes every lambda directly (so rule 3 cannot prefer the other) and
+          // has strictly more specific parameters and a receiver no less specific (rule 4).
+          // Trying the most specific first lets `w(f)` beside `w(o: Object)` skip the
+          // `Object` try, so nesting such calls does not double the work at every level.
+          def dominates(a: ExtensionMethodDefinition, b: ExtensionMethodDefinition): Boolean =
+            a.typeParameters.isEmpty && b.typeParameters.isEmpty &&
+              untypedClosureIndices.forall(i => i >= a.arguments.length || takesLambdaDirectly(a.arguments(i))) &&
+              TypeRules.isAllSuperType(b.arguments, a.arguments) && !TypeRules.isAllSuperType(a.arguments, b.arguments) &&
+              !isMoreSpecificReceiver(b.receiverType, a.receiverType)
+          val ordered = lambdaCapable.sortBy(m => -lambdaCapable.count(o => (o ne m) && dominates(m, o)))
+          val found = scala.collection.mutable.ArrayBuffer[(ExtensionMethodDefinition, Array[Type], Array[Type])]()
+          ordered.foreach { m =>
+            if (!found.exists(f => dominates(f._1, m))) {
+              // A try: its errors and warnings are not the call's; the winner is typed again below.
+              typing.warningReporter_.discarding(typing.withSuppressedReporting(attemptRanked(m)))
+                .foreach(r => found += ((m, r._2, r._3)))
+            }
+          }
+          // Keep declaration order for the ranking and its E0006 message.
+          lambdaCapable.flatMap(m => found.find(_._1 eq m))
         }
       if (fits.isEmpty) {
         val builtins = candidates.filter(isBuiltinExtension)
+        if (builtins.isEmpty) failures.add(decisionKey)
         break(if (builtins.isEmpty) attempt(closestByArity(user, args)) else builtins.iterator.flatMap(attempt).nextOption())
       }
       val direct = fits.filter { case (m, _, _) =>
@@ -576,12 +605,14 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       pool.find(a => pool.forall(b => (a eq b) || beats(a, b))) match {
         case Some((winner, _, _)) => break(decided(winner))
         case None =>
+          failures.add(decisionKey)
           val unbeaten = pool.filter(a => !pool.exists(b => (a ne b) && beats(b, a)))
           val (first, second) = unbeaten match {
             case Seq(x, y, _*) => (x._1, y._1)
             case _ => (pool(0)._1, pool(1)._1)
           }
-          calls.reportAmbiguousSignature(node, first.containerClass, name, first.arguments, second.containerClass, name, second.arguments)
+          calls.reportAmbiguousSignature(node, first.containerClass, name, first.arguments, second.containerClass, name,
+            second.arguments, SemanticErrorReporter.LambdaOverloadHint)
           break(None)
       }
     }

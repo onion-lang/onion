@@ -117,3 +117,23 @@ val xs: List[Object] = [[1, 2], []]
 - **What changed:** the empty literal is typed after its siblings, from their type. Elements are still evaluated in source order.
 - **What you see:** `E0005` naming `List[List[Int]].add(String)` (or `Map[String, List[Int]].set(...)`) where the code mixed element kinds, or passed the value to a `List[Object]` parameter.
 - **Still fine:** an explicit annotation wins, and a literal with no typed sibling (`[[], []]`) is typed as before.
+
+## A lambda passed to overloaded extension methods picks like a class method
+
+When an `extension` declares the same method more than once, a lambda argument now picks the
+overload a class method would. The choice no longer depends on declaration order. Five calls
+that used to compile now mean something else:
+
+| Overloads | Call | Before | Now | To keep the old one |
+|---|---|---|---|---|
+| `z(f: (Object) -> void)` on `Object`, `z(o: Object)` on `String` | `"abc".z((x: Object) -> …)` | `String`'s `z(Object)` | E0006 | rename one method |
+| `c(n: Long, g: (Long) -> Long)`, `c(n: Object, g: (Long) -> Long)` | `"a".c(5, (x: Long) -> x * 2L)` | `obj` or `long:10`, by order | E0006 | `"a".c(5L, …)` |
+| `k(s: Supplier[String])`, `k(c: Callable[String])` | `"a".k { "v" }` | `call` | E0006 | `val c: Callable[String] = () -> "v"`, then `"a".k(c)` |
+| `f(o: Object, g)` on `String`, `f(s: String, g)` on `CharSequence` | `"a".f("q", (x: Int) -> x)` | `strobj1` | E0006 | `"a".f("q" as Object, …)` |
+| `outer(f: (Int) -> Int)`, `outer(f: Function[String, String])` | `"a".outer { p -> ((q: Int) -> p).call(1) }` | `os:s` | `oi:1` | pass a typed `Function[String, String]` value |
+
+- **What changed:** the overloads the lambda fits are ranked as for class methods. The rule is
+  written on issue #2447.
+- **What you see:** `E0006 method call is applicable for both …`, with a hint naming the fixes
+  in the last column.
+- **Still fine:** a call with one matching overload, or with no lambda argument.

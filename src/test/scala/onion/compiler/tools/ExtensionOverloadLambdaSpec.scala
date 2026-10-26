@@ -333,6 +333,61 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       assert(w12.length == 1 && w12.head.message.contains("java.lang.Object"), s"got: ${w12.map(_.message)}")
     }
 
+    // The panel's cases on 4ed8553: nesting stays fast for three SAM overloads and on the
+    // class path, and this path's E0006 says how to pick an overload.
+    def timed(src: String): (Seq[Option[String]], Double) = {
+      val start = System.nanoTime()
+      val codes = errorCodes(src)
+      (codes, (System.nanoTime() - start) / 1e9)
+    }
+
+    it("types nested lambdas against three SAM overloads in linear time") {
+      val inner = (1 to 16).foldLeft("\"z\" + x1") { (body, i) => s"\"a\".g { x$i -> $body }" }
+      val (codes, seconds) = timed(
+        s"""import { java.util.function.Function as JFn; java.util.function.IntFunction }
+           |extension String {
+           |  def g(f: JFn[String, String]): String = "fs:" + f.apply("x")
+           |  def g(f: IntFunction[String]): String = "fi:" + f.apply(1)
+           |  def g(f: Runnable): String = "r"
+           |}
+           |IO::println($inner)
+           |""".stripMargin)
+      assert(codes.nonEmpty)
+      assert(seconds < 30, s"took $seconds s")
+    }
+
+    it("types nested lambdas on a class method in linear time") {
+      val inner = (1 to 18).foldLeft("\"z\"") { (body, i) => s"s.g((x$i: String) -> s.g { x$i -> $body })" }
+      val (codes, seconds) = timed(
+        s"""import { java.util.function.Function as JFn; java.util.function.IntFunction }
+           |class S { public:
+           |  def g(f: JFn[String, String]): String = "fs:" + f.apply("x")
+           |  def g(f: IntFunction[Integer]): String = "fi:" + f.apply(1)
+           |}
+           |val s = new S()
+           |IO::println($inner)
+           |""".stripMargin)
+      assert(codes.nonEmpty)
+      assert(seconds < 30, s"took $seconds s")
+    }
+
+    it("gives this path's E0006 a hint at the fix") {
+      val src =
+        """extension String {
+          |  def c(n: Long, g: (Long) -> Long): String = "long:" + g(n)
+          |  def c(n: Object, g: (Long) -> Long): String = "obj"
+          |}
+          |IO::println("a".c(5, (x: Long) -> x * 2L))
+          |""".stripMargin
+      val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+      new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "h.on"))) match {
+        case CompilationOutcome.Failure(errs) =>
+          assert(errs.map(_.errorCode) == Seq(Some("E0006")))
+          assert(errs.head.message.contains("5L"), errs.head.message)
+        case other => fail(s"expected E0006, got $other")
+      }
+    }
+
     it("types nested lambdas once per overload that can take them") {
       val depth = 10
       val call = (1 to depth).foldRight("s" + depth) { (i, inner) => s"\"a\".w((s$i: String) -> $inner)" }

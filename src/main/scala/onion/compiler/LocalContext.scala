@@ -225,6 +225,13 @@ class LocalContext {
   def typingView: (Map[String, TypedAST.Type], Map[String, TypedAST.Type], Map[String, TypedAST.Type]) =
     (allNames.iterator.map(name => name -> lookup(name).tp).toMap, narrowings, flowNarrowings)
 
+  /** [[typingView]] restricted to `names`, the names a piece of source mentions: a body
+   *  typed twice types the same way when these agree, and a key that leaves out the names it
+   *  never reads lets a nested call reuse its result under every enclosing overload (#2452). */
+  def typingViewFor(names: Set[String]): (Map[String, TypedAST.Type], Map[String, TypedAST.Type], Map[String, TypedAST.Type]) =
+    (allNames.iterator.filter(names).map(name => name -> lookup(name).tp).toMap,
+      narrowings.filter(e => names(e._1)), flowNarrowings.filter(e => names(e._1)))
+
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
     contextFrame.lookupOnlyCurrentScope(name)
   }

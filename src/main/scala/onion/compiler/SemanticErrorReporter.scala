@@ -677,8 +677,12 @@ class SemanticErrorReporter(threshold: Int) {
     val target2 = objectTypeName(item2(0))
     val name2 = asString(item2(1))
     val args2 = typeNames(asTypeArray(item2(2)))
-    problem(position, format(message("error.semantic.ambiguousMethod"),
-      Seq(target1, name1, args1, target2, name2, args2)))
+    val baseMessage = format(message("error.semantic.ambiguousMethod"),
+      Seq(target1, name1, args1, target2, name2, args2))
+    val hint =
+      if (items.length > 2 && items(2) == SemanticErrorReporter.LambdaOverloadHint) Some(message("suggestion.lambdaOverloadAmbiguous"))
+      else None
+    problem(position, appendSuggestion(baseMessage, hint))
   }
 
   /**
@@ -1008,6 +1012,10 @@ object SemanticErrorReporter {
    * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
    */
   private[compiler] case object HexDigitBHint
+
+  /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
+   *  methods equally, so the error says how to pick one (#2447). */
+  private[compiler] case object LambdaOverloadHint
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.

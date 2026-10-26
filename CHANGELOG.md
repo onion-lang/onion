@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Breaking
 
 - **`[[1, 2], []]` is a `List[List[Int]]`, so `adj[1].add(5)` compiles (#2430).**
-  - Before: the empty `[]` made the outer list `List[Object]`, and `add` was E0005.
-  - Now: an empty `[]` or `[:]` takes its type from the other elements, in list literals and map values.
+  - Before: the empty `[]` made the outer list `List[Object]`, and `add` was E0005. So `xs.add("header")` compiled on that list.
+  - Now: an empty `[]` or `[:]` takes its type from the other elements, in list literals and map values. `xs.add("header")` is E0005. To keep the old type, annotate it: `val xs: List[Object] = [[1, 2], []]`. See `docs/migration/pre-1.0.md`.
+
+### Fixed
+
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

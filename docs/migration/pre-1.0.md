@@ -95,3 +95,25 @@ name = "\"Alice\""      # read as "Alice"  (to keep literal quotes)
   that start with `"`. A value with no closing `"`, or with a bare `"` inside it (`"a" and "b"`),
   is now a `Defect` naming the line.
 - **Only `String` components:** an `Int`, `Boolean` or other scalar is read exactly as before.
+
+## An empty `[]` or `[:]` takes the type of its siblings
+
+In a list literal, or in the values of a map literal, an empty `[]` or `[:]` now has the
+type the other elements agree on. Before, it widened the whole literal to `Object`.
+
+```onion
+val adj = [[1, 2], []]
+
+// Before: List[Object], so adj[1].add(5) was E0005, and this compiled
+adj.add("header")
+
+// Now: List[List[Int]], so adj[1].add(5) compiles, and this is E0005
+adj.add("header")
+
+// To keep the old type, annotate it
+val xs: List[Object] = [[1, 2], []]
+```
+
+- **What changed:** the empty literal is typed after its siblings, from their type. Elements are still evaluated in source order.
+- **What you see:** `E0005` naming `List[List[Int]].add(String)` (or `Map[String, List[Int]].set(...)`) where the code mixed element kinds, or passed the value to a `List[Object]` parameter.
+- **Still fine:** an explicit annotation wins, and a literal with no typed sibling (`[[], []]`) is typed as before.

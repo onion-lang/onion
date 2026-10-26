@@ -18,6 +18,15 @@ private[typing] object GenericMethodTypeArguments {
     case _ => null
   }
 
+  private def mentionsTypeParam(t: Type, names: Set[String]): Boolean = t match {
+    case tv: TypeVariableType => names.contains(tv.name)
+    case applied: AppliedClassType => applied.typeArguments.exists(mentionsTypeParam(_, names))
+    case at: ArrayType => mentionsTypeParam(at.base, names)
+    case n: NullableType => mentionsTypeParam(n.innerType, names)
+    case w: WildcardType => mentionsTypeParam(w.upperBound, names) || w.lowerBound.exists(mentionsTypeParam(_, names))
+    case _ => false
+  }
+
   def explicitFromMappedArgs(
     typing: Typing,
     callNode: AST.Node,
@@ -431,7 +440,21 @@ private[typing] object GenericMethodTypeArguments {
         inferred += name -> inferredType
       }
 
-      inferred.toMap
+      // A bound that names another of this method's type parameters
+      // (`[B, T extends B]`) was checked above with that parameter erased to
+      // its own bound. Re-check it now that every argument is known (#2325).
+      val finalSubst = inferred.toMap
+      for (tp <- typeParams; upper0 <- tp.upperBound if mentionsTypeParam(upper0, paramNames - tp.name)) {
+        val upper = TypeSubstitution.substituteType(upper0, classSubst, finalSubst, defaultToBound = true)
+        val arg = finalSubst(tp.name)
+        val argInner = arg match {
+          case n: NullableType => n.innerType
+          case other => other
+        }
+        if (!isAssignableForBounds(upper, argInner)) reportError(callNode, INCOMPATIBLE_TYPE, upper, arg)
+      }
+
+      finalSubst
     }
   }
 }

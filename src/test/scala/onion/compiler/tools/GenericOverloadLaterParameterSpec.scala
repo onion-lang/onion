@@ -105,5 +105,49 @@ class GenericOverloadLaterParameterSpec extends AbstractShellSpec {
       )
       assert(codes.nonEmpty)
     }
+
+    // `(x: T, y: T)` and `(x: T, y: Object)` are distinct overloads but erase to the same
+    // JVM method; without a check, the class failed to load with ClassFormatError.
+    it("reports top-level functions with the same erasure as E0035") {
+      val codes = errorCodes(
+        """def f[T](x: T, y: T): String = "tt"
+          |def f[T](x: T, y: Object): String = "to"
+          |IO::println("hi")
+          |""".stripMargin
+      )
+      assert(codes == Seq(Some("E0035")))
+    }
+
+    it("reports extension methods with the same erasure as E0035") {
+      val codes = errorCodes(
+        """extension String {
+          |  def f[T](x: T, y: T): String = "tt"
+          |  def f[T](x: T, y: Object): String = "to"
+          |}
+          |IO::println("hi")
+          |""".stripMargin
+      )
+      assert(codes == Seq(Some("E0035")))
+    }
+
+    it("reports a bounded type parameter erasing to a concrete one as E0035") {
+      val codes = errorCodes(
+        """def g[T extends String](x: T, y: T): String = "a"
+          |def g[T extends String](x: T, y: String): String = "b"
+          |IO::println("hi")
+          |""".stripMargin
+      )
+      assert(codes == Seq(Some("E0035")))
+    }
+
+    it("reports a real duplicate top-level function once, as E0012") {
+      val codes = errorCodes(
+        """def f[T](x: T, y: Int): String = "a"
+          |def f[T](x: T, y: Int): String = "b"
+          |IO::println("hi")
+          |""".stripMargin
+      )
+      assert(codes == Seq(Some("E0012")))
+    }
   }
 }

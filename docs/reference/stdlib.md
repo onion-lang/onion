@@ -1098,6 +1098,8 @@ val safe: Future[Int] = Future::asyncThrowing {
 val delayed: Future[Void] = Future::delay(1000L)  // 1 second
 ```
 
+A zero or negative delay completes at once, so `Future::delay(deadline - Timing::millis())` is safe once the deadline has passed.
+
 ### Transformation Methods
 
 ```onion

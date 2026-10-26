@@ -1062,6 +1062,8 @@ val safe: Future[Int] = Future::asyncThrowing {
 val delayed: Future[Void] = Future::delay(1000L)  // 1秒
 ```
 
+`Future::delay` に 0 以下の時間を渡すと、すぐに完了します。そのため、期限を過ぎた後に `Future::delay(deadline - Timing::millis())` を呼んでも安全です。
+
 ### 変換メソッド
 
 ```onion

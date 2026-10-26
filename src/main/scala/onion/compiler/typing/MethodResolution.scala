@@ -151,7 +151,11 @@ private[compiler] object MethodResolution {
   ): Array[Method] =
     val support = new MethodResolutionSupport(views, params, table)
     val all = candidatesOf(target, name, table)
-    val applicableMethods = all.iterator.filter(support.applicable).toList
+    // Java never narrows an int literal while resolving a call, so `println(75)` is println(int).
+    // Narrowing (Onion's `takesByte(100)`) only rescues a call nothing else accepts.
+    val applicableMethods =
+      val strict = all.iterator.filter(m => support.applicable(m, narrowConstants = false)).toList
+      if strict.nonEmpty then strict else all.iterator.filter(support.applicable).toList
     if applicableMethods.isEmpty then return new Array[Method](0)
     if applicableMethods.length == 1 then return Array(applicableMethods.head)
 

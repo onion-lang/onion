@@ -12,6 +12,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An extension method's default argument works: `"ab".pad()` compiles (#2401).**
   - Before: `E0005`, "method not found", for a method you can see.
   - Now: the default fills in, for `.` and `?.` calls alike. A parameter with no default is still required.
+- **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
+  - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
+  - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.
+  - Onion overloads follow the same rule: with `g(c: Char)` and `g(l: Long)`, `g(65)` now calls the `Long` one.
+- **An empty `#{}` in a string is one error at the `#`, saying the interpolation needs an expression (#2429).**
+  - Before: "unexpected end of file — a closing `}` or `)` is probably missing", at line 1 or at no line at all.
+  - Now: `repro.on:2:12: empty string interpolation: put an expression between the braces, as in '#{expr}'.` For a literal `#{}` in an ordinary string, write `\#{}`.
+- **`;` between two clauses of a record body is one error with a hint (#2382).**
+  - Before: `{ shape doc = json; shape txt = re"..." }` gave two contradictory syntax errors, no hint.
+  - Now: one error at the `;`, saying clauses are separated by a newline or a space.
+- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
+  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
+  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
+
+## [0.146.0] - 2026-10-25
+
+### Breaking
+
+- **A hex literal ending in `B` is an `Int`: `0xAB` is 171, not the Byte 10 (#2324).**
+  - Before: `B` was a Byte suffix even in hex, so `0xAB` printed `10` and `0xFFB` printed `-1`.
+  - Now: `B` is a hex digit. `0xFFB` is 4091. For a Byte, write `0b11111111B` or `-1B`; `0xFFFFS` still works. See `docs/migration/pre-1.0.md`.
+  - Where such a literal no longer fits a Byte, most contexts give an error that says why. Where it still fits (`bs[0] = 0x1B`), the value changes silently: search for `0x...B`.
+
+### Fixed
+
+- **`xs.addAll(o)` compiles inside a generic class when `xs` and `o` are both `List[T]` (#2341).**
+  - Before: E0000, `Collection[? extends T]` is expected but `List[T]` is used.
+  - Now: accepted, as in Java.
+  - Still rejected: `List[Object]`, `List[String]` or a `List[U]` of an unrelated type variable into a `List[T]`. `List[List[B]].addAll(List[List[T]])` with `T extends B` is now rejected too.
+
+- **A lambda that assigns a method parameter now updates it for the method too (#2335).**
+  - Before: `def g(n: Int): Int { val f: () -> Int = () -> { n = n + 10; n }; f(); return n }` returned the old `n`.
+  - Now: the lambda and the method share one `n`, as they do for a captured `var` local. Constructors share it too, and a delegating `: this(...)` call sees the argument's value.
+  - A lambda that only reads the parameter also sees later assignments: `val f: () -> Int = () -> n; n = 5; f()` gave `1` and now gives `5`. Lambdas collected in a loop that advances `n` give `4,4,4,` where they gave `1,2,3,`.
+
+- **`Config::getInt(c, "items.99999999999", -1)` returns the default (#2423).**
+  - Before: an array index too big for an `Int` threw `invalid number format: For input string: "99999999999"`.
+  - Now: it is out of range like any other index, so `get` is `null` and every getter falls back to its default.
+
+- **`Timing::sleep(deadline - Timing::millis())` returns at once when the deadline has passed (#2421).**
+  - Before: a negative duration threw `IllegalArgumentException: timeout value is negative` (`sleepNanos`: `nanosecond timeout value out of range`).
+  - Now: `sleep` and `sleepNanos` return immediately for a zero or negative duration.
+
+- **`Codec::base64Decode` reads Base64 from a file or the `base64` CLI (#2417).**
+  - Before: a trailing newline threw `Input byte array has incorrect ending byte at 8`; a bad character gave `Illegal base64 character 20`.
+  - Now: whitespace is skipped, and errors name the character and index. `Codec::urlDecode` names a bad `%` escape the same way.
+
+- **`m.mapMap(f)` keeps the map's order (#2414).**
+  - Before: `["b": 2, "a": 1].mapMap(f)` came back in hash order, `{a=.., b=..}`.
+  - Now: insertion order, `{b=.., a=..}`, as every `Maps::` transform and `set.map { }` already do.
+
+- **W0016 names an overload the way the source writes it (#2407).**
+  - Before: `a(java.util.List[java.lang.String], [int)`.
+  - Now: `a(List[String], Int[])`.
+
 - **`Config::getInt` and `getLong` return the default for a number that does not fit (#2404).**
   - Before: `3000000000` read as `-1294967296` and `2.9` as `2`, so a config typo gave a negative port.
   - Now: both give the default, as `Json::getIntOr` does. `Json::getInt` and `Json.Value.asInt()` are unchanged.
@@ -86,9 +141,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
-  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
-  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
 - **An expression-bodied recursive function runs as a loop, like one written with `return` (#2330).**
   - Before: `def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }` hit "stack overflow" at depth 200000, while the `return` form ran fine. An `else if` chain, and a `select` whose self-call case is a literal, `else` or guarded destructuring case, overflowed the same way. A `select` with an unguarded destructuring or type-pattern case still overflows (#2350).
   - Now: it prints `200000`. A call whose result is still used (`{ val x = f(n - 1); x + 1 }`) stays a real call.

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`[[1, 2], []]` is a `List[List[Int]]`, so `adj[1].add(5)` compiles (#2430).**
+  - Before: the empty `[]` made the outer list `List[Object]`, and `add` was E0005.
+  - Now: an empty `[]` or `[:]` takes its type from the other elements, in list literals and map values.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.
@@ -137,10 +140,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now: `http"url".request("GET").header(...).timeoutSeconds(...).send()` reaches the exact builder `Http::request` returns, seeded with the URL so it doesn't need retyping (#2146).
 
 ### Fixed
-
-- **`[[1, 2], []]` is a `List[List[Int]]`, so `adj[1].add(5)` compiles (#2430).**
-  - Before: the empty `[]` made the outer list `List[Object]`, and `add` was E0005.
-  - Now: an empty `[]` or `[:]` takes its type from the other elements, in list literals and map values.
 
 - **An expression-bodied recursive function runs as a loop, like one written with `return` (#2330).**
   - Before: `def go(n: Int, acc: Int): Int = if n == 0 { acc } else { go(n - 1, acc + 1) }` hit "stack overflow" at depth 200000, while the `return` form ran fine. An `else if` chain, and a `select` whose self-call case is a literal, `else` or guarded destructuring case, overflowed the same way. A `select` with an unguarded destructuring or type-pattern case still overflows (#2350).

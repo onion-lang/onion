@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **`[[1, 2], []]` is a `List[List[Int]]`, so `adj[1].add(5)` compiles (#2430).**
+  - Before: the empty `[]` made the outer list `List[Object]`, and `add` was E0005. So `xs.add("header")` compiled on that list.
+  - Now: an empty `[]` or `[:]` takes its type from the other elements, in list literals and map values. `xs.add("header")` is E0005. To keep the old type, annotate it: `val xs: List[Object] = [[1, 2], []]`. See `docs/migration/pre-1.0.md`.
+
 ### Fixed
 
 - **Extension overloads pick the most specific one, as class methods do (#2446).**

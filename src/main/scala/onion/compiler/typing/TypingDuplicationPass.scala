@@ -21,6 +21,11 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private val seenConstructors = new JTreeSet[ConstructorRef](new ConstructorComparator)
   private val seenGlobalVariables = new JTreeSet[FieldRef](new FieldComparator)
   private val seenFunctions = new JTreeSet[Method](new MethodComparator)
+  // Distinct overloads can still erase to one JVM method (`f[T](x: T, y: T)` beside
+  // `f[T](x: T, y: Object)`); a class gets E0035 from checkErasureSignatureCollisions,
+  // top-level functions and extension methods get it here (#2448).
+  private val seenFunctionErasures = scala.collection.mutable.HashSet[(String, String)]()
+  private val seenExtensionErasures = scala.collection.mutable.HashSet[(String, String)]()
 
   private def withKernel[T <: Node : ClassTag](ast: AST.Node)(f: T => Unit): Unit =
     typing.kernelNodeOf[T](ast).foreach(f)
@@ -29,6 +34,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
     seenGlobalVariables.clear()
     seenFunctions.clear()
+    seenFunctionErasures.clear()
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
@@ -89,8 +95,16 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit =
     withKernel[MethodDefinition](node) { method =>
       if (seenFunctions.contains(method)) typing.report(SemanticError.DUPLICATE_FUNCTION, node, method.name, method.arguments)
-      else seenFunctions.add(method)
+      else {
+        seenFunctions.add(method)
+        registerErasure(seenFunctionErasures, node, method, method.affiliation)
+      }
     }
+
+  private def registerErasure(seen: scala.collection.mutable.HashSet[(String, String)], node: AST.Node, method: Method, owner: Type): Unit = {
+    val key = DuplicationChecks.erasedSignatureKey(method)
+    if (!seen.add(key)) typing.report(SemanticError.ERASURE_SIGNATURE_COLLISION, node, owner, key._1, key._2)
+  }
 
   private def makeDelegationMethod(delegated: FieldRef, delegator: Method): MethodDefinition = {
     // Substitute the forwarded interface's type parameters with the field's type
@@ -237,6 +251,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit =
     withKernel[ClassDefinition](node) { clazz =>
       seenMethods.clear()
+      seenExtensionErasures.clear()
       unitContext.currentDefinition = clazz
       typing.find(clazz.name).foreach(unitContext.currentMapper = _)
       node.methods.foreach(processExtensionMethodDeclaration)
@@ -248,6 +263,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
         typing.report(SemanticError.DUPLICATE_EXTENSION_METHOD, node, method.receiverType, method.name, method.arguments)
       else {
         seenMethods.add(method)
+        registerErasure(seenExtensionErasures, node, method, method.receiverType)
         ExtensionShadowCheck.check(typing, node, method)
       }
     }

@@ -27,8 +27,12 @@ is no manual `version := ...` line to update in `build.sbt`.
    - Release candidate: `v0.3.0-RC1`
 
 3. **Update `CHANGELOG.md`.**
-   Add a new section for the release with the date and a summary of user-facing
-   changes, bug fixes, and internal improvements.
+   PRs write their entries as fragments in `changelog.d/` (see its README). After the tag
+   exists (step 4), gather them under the new version and open that change as a PR:
+
+   ```bash
+   python3 scripts/changelog/changelog.py cut 0.2.0
+   ```
 
 4. **Start the release.**
 

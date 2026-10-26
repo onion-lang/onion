@@ -229,6 +229,10 @@ private[compiler] object DuplicationChecks {
         seen(key) = m
   }
 
+  /** The JVM identity of a method: its name and erased descriptor. Two methods with the same
+    * key cannot both be emitted into one class file. */
+  def erasedSignatureKey(m: Method): (String, String) = (m.name, erasedMethodDesc(m))
+
   def checkAbstractMethodImplementation(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     // Skip if the class is abstract or an interface
     if Modifier.isAbstract(clazz.modifier) || clazz.isInterface then return

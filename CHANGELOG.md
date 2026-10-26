@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An extension method's default argument works: `"ab".pad()` compiles (#2401).**
+  - Before: `E0005`, "method not found", for a method you can see.
+  - Now: the default fills in, for `.` and `?.` calls alike. A parameter with no default is still required.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.

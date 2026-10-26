@@ -114,12 +114,29 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           case Seq(single) => Seq(single)
           case _ => pool
         }
-        if (chosen.isEmpty) CandidateSelection.NoMatch
-        else if (chosen.length > 1) CandidateSelection.Ambiguous(chosen(0), chosen(1))
-        else CandidateSelection.Selected(chosen.head)
+        // Then, as for a class method, the overload whose parameters are all at least as
+        // specific as every other candidate's wins (`ex(Char)` over `ex(Long)` for 'A').
+        val bySpecificParams =
+          if (chosen.length > 1)
+            chosen.filter { m =>
+              chosen.forall(o => (o eq m) || TypeRules.isAllSuperType(o.arguments, m.arguments))
+            } match {
+              case Seq(single) => Seq(single)
+              case _ => chosen
+            }
+          else chosen
+        select(bySpecificParams)
       case _ =>
         CandidateSelection.NoMatch
     }
+
+  private def select(chosen: Seq[ExtensionMethodDefinition]): CandidateSelection[ExtensionMethodDefinition] =
+    chosen match {
+      case Seq() => CandidateSelection.NoMatch
+      case Seq(single) => CandidateSelection.Selected(single)
+      case _ => CandidateSelection.Ambiguous(chosen(0), chosen(1))
+    }
+
 
   /** A `List` pipeline call on an array of references (`line.split(" ").distinct()`):
    *  the array as `toList()` and that `List` type, when the array has no extension of

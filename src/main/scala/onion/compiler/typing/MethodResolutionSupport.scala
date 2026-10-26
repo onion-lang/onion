@@ -49,7 +49,10 @@ private[compiler] final class MethodResolutionSupport(
       }
     )
 
-  def applicable(method: Method): Boolean = {
+  def applicable(method: Method): Boolean = applicable(method, narrowConstants = true)
+
+  /** `narrowConstants = false` is Java's invocation context: an int literal is never narrowed to byte/short/char. */
+  def applicable(method: Method, narrowConstants: Boolean): Boolean = {
     // Substitution preserves arity. Reject impossible candidates before creating
     // specialized parameter arrays or inspecting generic parameter names.
     val arity = method.argumentCount
@@ -70,7 +73,7 @@ private[compiler] final class MethodResolutionSupport(
         isAssignableWithBoxing(expected(idx), params(idx).`type`) ||
           TypeRules.emptyCollectionLiteralAccepts(expected(idx), params(idx)) ||
           (expected(idx) match {
-            case bt: BasicType => ConstantNarrowing.constantIntOf(params(idx)).exists(v => ConstantNarrowing.fits(bt, v))
+            case bt: BasicType if narrowConstants => ConstantNarrowing.constantIntOf(params(idx)).exists(v => ConstantNarrowing.fits(bt, v))
             case _ => false
           })
 

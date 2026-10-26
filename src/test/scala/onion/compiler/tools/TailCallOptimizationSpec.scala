@@ -411,4 +411,39 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       assert(Shell.Success("100,100") == result)
     }
   }
+
+  describe("tail-call optimization of a select case with bindings (#2350)") {
+    def run(name: String, code: String) = shell.run(code.stripMargin, name, Array())
+
+    it("loops through an unguarded record destructuring case") {
+      val result = run("TcoSelectDestructure.on",
+        """
+          |record P(a: Int, b: Int)
+          |class C {
+          |public:
+          |  static def go(p: P, acc: Int): Int = select p {
+          |    case P(a, b) when a == 0: acc
+          |    case P(a, b): go(new P(a - 1, b), acc + b)
+          |  }
+          |  static def main(args: String[]): Int = go(new P(1000000, 1), 0)
+          |}
+          |""")
+      assert(Shell.Success(1000000) == result)
+    }
+
+    it("loops through a type pattern case") {
+      val result = run("TcoSelectTypePattern.on",
+        """
+          |class C {
+          |public:
+          |  static def go(o: Object, n: Int, acc: Int): Int = select o {
+          |    case i is Integer: if n == 0 { acc } else { go(o, n - 1, acc + 1) }
+          |    else: acc
+          |  }
+          |  static def main(args: String[]): Int = go(1, 1000000, 0)
+          |}
+          |""")
+      assert(Shell.Success(1000000) == result)
+    }
+  }
 }

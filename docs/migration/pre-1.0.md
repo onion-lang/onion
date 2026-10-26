@@ -21,11 +21,8 @@ val sum = do[Option] { a <- getA(); b <- getB(); yield a + b }
 - **What changed:** `yield` is a reserved word; `ret` is an ordinary identifier again.
 - **What you see:** old code reports `local variable ret is not found.`, with a hint to write `yield`.
 - **A Java method named `yield`:** call it with backticks, e.g. ``Thread::`yield`()``.
-- **Update a whole project:**
-  ```bash
-  grep -rl '\bret\b' --include='*.on' . | xargs perl -pi -e 's/\bret\b/yield/g'
-  ```
-  Check the result if you use `ret` as a variable name.
+- **Update a whole project:** `onion migrate src/ tests/` (or any files and directories).
+  It rewrites only a `do` block's `ret`, never a variable named `ret`, a string or a comment.
 
 ## `2147483648` needs a `-` directly in front
 

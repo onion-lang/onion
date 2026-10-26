@@ -1,0 +1,182 @@
+package onion.tools.migrate
+
+import onion.compiler.parser.{JJOnionParserConstants as K, OnionLexer, Token}
+
+import scala.collection.mutable
+
+/**
+ * The rewrite rules behind `onion migrate`: one per pre-1.0 breaking change.
+ *
+ * A rule works on the token stream, never on raw text, so a string or a comment that happens
+ * to contain the old spelling is never touched. Everything outside the rewritten tokens is
+ * copied byte for byte, and the result is re-lexed and compared with the original before
+ * anything is written (see [[MigrateCommand]]).
+ *
+ * A rule that cannot tell the old spelling from new code reports the place instead of
+ * guessing. A wrong rewrite in someone's source is worse than one they make by hand.
+ */
+object Migrator:
+
+  /** One rewrite: `length` characters at `offset` become `replacement`. */
+  final case class Edit(offset: Int, length: Int, replacement: String, line: Int, column: Int, note: String)
+
+  /** A place a rule could not decide, with why. */
+  final case class Unsure(line: Int, column: Int, message: String)
+
+  final case class Result(text: String, edits: Seq[Edit], unsure: Seq[Unsure]):
+    def changed: Boolean = edits.nonEmpty
+
+  def migrate(source: String): Result =
+    val tokens = codeTokens(source)
+    val (edits, unsure) = RetToYield.find(source, tokens)
+    Result(apply(source, edits), edits, unsure)
+
+  /**
+   * The token images of `source`, comments included, for the before/after comparison: a
+   * migration may change exactly the tokens it rewrote and nothing else.
+   */
+  def signature(source: String): Seq[String] =
+    val images = mutable.Buffer[String]()
+    val lexer = new OnionLexer(source)
+    var token = lexer.getNextToken()
+    while
+      val comments = mutable.Buffer[String]()
+      var special = token.specialToken
+      while special != null do
+        comments.prepend(special.image)
+        special = special.specialToken
+      images ++= comments
+      if token.kind != K.EOF then images += token.image
+      token.kind != K.EOF
+    do token = lexer.getNextToken()
+    images.toSeq
+
+  private def apply(source: String, edits: Seq[Edit]): String =
+    val out = new StringBuilder
+    var cursor = 0
+    edits.sortBy(_.offset).foreach { edit =>
+      out ++= source.substring(cursor, edit.offset)
+      out ++= edit.replacement
+      cursor = edit.offset + edit.length
+    }
+    out ++= source.substring(cursor)
+    out.toString
+
+  /** The code tokens of `source`, without comments, in order. */
+  private def codeTokens(source: String): IndexedSeq[Token] =
+    val tokens = mutable.ArrayBuffer[Token]()
+    val lexer = new OnionLexer(source)
+    var token = lexer.getNextToken()
+    while token.kind != K.EOF do
+      tokens += token
+      token = lexer.getNextToken()
+    tokens.toIndexedSeq
+
+  /**
+   * The character offset of a token's position. The lexer counts a tab to the next multiple
+   * of eight, as JavaCC does, so the column is not a character index; this walks the line
+   * with the same rule. `None` when no character sits at that column (a `\u` escape shifts
+   * the lexer's columns), and the caller then leaves the token alone.
+   */
+  private[migrate] def offsetOf(source: String, line: Int, column: Int): Option[Int] =
+    var start = 0
+    var current = 1
+    while current < line && start >= 0 do
+      start = source.indexOf('\n', start)
+      if start >= 0 then start += 1
+      current += 1
+    if start < 0 then None
+    else
+      var i = start
+      var col = 0
+      var found: Option[Int] = None
+      while found.isEmpty && i < source.length && source.charAt(i) != '\n' do
+        col += 1
+        if source.charAt(i) == '\t' then
+          col -= 1
+          col += 8 - (col % 8)
+        if col == column then found = Some(i)
+        i += 1
+      found
+
+  /**
+   * `ret e` → `yield e` in a `do[M] { ... }` block (#2291).
+   *
+   * Before the change `ret` was a keyword, legal only at the start of a do clause. So in a
+   * file written before it, every `ret` token is the keyword. A file written since may use
+   * `ret` as an ordinary name, and then a bare `ret` at the start of a clause is ambiguous:
+   * such a file's candidates are reported, not rewritten.
+   */
+  private object RetToYield:
+    /** After these, `ret` is an operand, not the start of a clause. */
+    private val NotAnExpression = Set(
+      ".", "?.", "::", "=", "<-", ":", "->", ")", "]", "}", ";", ",", "++", "--",
+      "*", "/", "%", "==", "!=", "===", "!==", "<", ">", "<=", ">=", "&&", "||", "?:", "|>",
+      "+=", "-=", "*=", "/=", "%=", "as", "is", "instanceof")
+    private val Declares = Set("val", "var", "def", "foreach")
+    private val DeclaredBy = Set("<-", ":", "->", "=")
+    private val ValueKeywords = Set("true", "false", "null", "this", "self", "super")
+
+    private enum Bracket:
+      case Paren, Square, Brace, DoBrace
+
+    def find(source: String, tokens: IndexedSeq[Token]): (Seq[Edit], Seq[Unsure]) =
+      val candidates = mutable.Buffer[Token]()
+      var declaresRet = false
+      val stack = mutable.Stack[Bracket]()
+      // The `[` that opens a `do[...]`'s type, by stack depth, so its `]` knows that the
+      // `{` after it opens a do block.
+      val doTypes = mutable.Set[Int]()
+      var nextBraceIsDo = false
+
+      tokens.indices.foreach { i =>
+        val token = tokens(i)
+        val previous = if i > 0 then Some(tokens(i - 1)) else None
+        val next = if i + 1 < tokens.length then Some(tokens(i + 1)) else None
+        token.image match
+          case "(" => stack.push(Bracket.Paren)
+          case "[" =>
+            if previous.exists(_.kind == K.K_DO) then doTypes += stack.size
+            stack.push(Bracket.Square)
+          case "{" =>
+            stack.push(if nextBraceIsDo then Bracket.DoBrace else Bracket.Brace)
+          case ")" | "]" | "}" =>
+            if stack.nonEmpty then stack.pop()
+            if token.image == "]" && doTypes.remove(stack.size) then
+              nextBraceIsDo = next.exists(_.image == "{")
+          case "ret" if token.kind == K.ID =>
+            if previous.exists(p => Declares.contains(p.image)) || next.exists(n => DeclaredBy.contains(n.image)) then
+              declaresRet = true
+            else if stack.headOption.contains(Bracket.DoBrace) && startsClause(previous) && takesOperand(next) then
+              candidates += token
+          case _ => ()
+        if token.image == "{" then nextBraceIsDo = false
+      }
+
+      val located = candidates.toSeq.flatMap { token =>
+        offsetOf(source, token.beginLine, token.beginColumn)
+          .filter(offset => source.startsWith("ret", offset))
+          .map(offset => (token, offset))
+      }
+      if declaresRet then
+        (Nil, located.map { (token, _) =>
+          Unsure(token.beginLine, token.beginColumn,
+            "this `ret` may be the old do-block keyword, but the file also declares a name `ret`; " +
+              "if it ends the do block, change it to `yield` by hand")
+        })
+      else
+        (located.map { (token, offset) =>
+          Edit(offset, 3, "yield", token.beginLine, token.beginColumn, "ret -> yield")
+        }, Nil)
+
+    /** The token before a do clause: the block's `{`, a `;`, or the end of the clause before. */
+    private def startsClause(previous: Option[Token]): Boolean =
+      previous.forall { p =>
+        p.image == "{" || p.image == ";" || p.image == ")" || p.image == "]" || p.image == "}" ||
+          p.kind == K.ID || ValueKeywords.contains(p.image) ||
+          (p.kind >= K.INTEGER && p.kind <= K.SCHEME_STRING)
+      }
+
+    /** The keyword was always followed by the clause's expression. */
+    private def takesOperand(next: Option[Token]): Boolean =
+      next.exists(n => !NotAnExpression.contains(n.image))

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`onion migrate <path>...` rewrites code for pre-1.0 breaking changes, in place (#2442).**
+  - First rule: a `do` block's `ret a + b` becomes `yield a + b`. A variable named `ret`, strings and comments are left alone.
+  - `--check` changes nothing and exits 1 if a file would change. A place it cannot decide is printed, not guessed.
+
 ### Fixed
 
 - **An empty `#{}` in a string is one error at the `#`, saying the interpolation needs an expression (#2429).**

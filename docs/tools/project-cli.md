@@ -61,6 +61,7 @@ onion test [--verbose] [--report-xml <path>]
 onion clean
 onion doc [-d <dir>] [<source.on>...]
 onion fmt [--check] [<path>...]
+onion migrate [--check] <path>...
 ```
 
 ### `onion test --report-xml`
@@ -129,6 +130,34 @@ needs a parser.
 Before writing any file, the formatted text is re-lexed and compared token for token,
 comments included, against the original. If they differ the file is left untouched and the
 command reports it as a bug.
+
+### `onion migrate`
+
+Rewrites code written before a pre-1.0 breaking change so it compiles today. It edits the
+files in place and prints each change:
+
+```bash
+onion migrate scripts/
+```
+
+```text
+scripts/old.on:5:3: ret -> yield
+Migrated 1 of 4 file(s)
+```
+
+- **Paths are required.** A file or a directory; a directory is walked for `.on` files.
+- **`--check`** writes nothing, prints what would change, and exits `1` if anything would.
+- **Only code changes.** Strings, comments and spacing stay byte for byte.
+- **It does not guess.** A place it cannot decide is printed with its line and left as it
+  was, and the exit code is `1`. Fix that line by hand.
+
+Rules so far:
+
+| Rule | Before | After |
+|---|---|---|
+| A `do` block's final value | `ret a + b` | `yield a + b` |
+
+A variable named `ret` is never renamed. See [Migrating to 1.0](../migration/pre-1.0.md) for each change.
 
 ### `onion doc`
 

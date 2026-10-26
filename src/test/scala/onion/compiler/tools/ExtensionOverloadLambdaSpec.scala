@@ -299,6 +299,40 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       assert(w12.length == 1, s"got: ${w12.map(w => s"${w.location} ${w.message}")}")
     }
 
+    // The panel's cases on 10c7f36: an inner choice is reused only under the same expected
+    // type, and a try against an overload that is not chosen leaves no warning behind.
+    for (objectFirst <- Seq(true, false); (dType, dArg) <- Seq("Object" -> "\"s\"", "Int" -> "5")) {
+      it(s"picks outer by whether the inner call fits its expected type (d: $dType, ${if (objectFirst) "Integer-returning first" else "String-returning first"})") {
+        val oi = s"  def outer(d: $dType, f: (Int) -> Integer): String = \"oI:\" + f(1)"
+        val os = "  def outer(d: String, f: (Int) -> String): String = \"oS:\" + f(1)"
+        val decls = Seq(
+          "extension Object {",
+          "  def inner(f: (String) -> String): String = \"n\"",
+          "}",
+          "extension String {",
+          "  def inner[A](f: (A) -> String): A = null",
+          if (objectFirst) oi else os,
+          if (objectFirst) os else oi,
+          "}").mkString("\n")
+        assert(Shell.Success("oI:null") == runMain(decls, s"\"a\".outer($dArg, { p -> \"x\".inner { q -> \"v\" } })"))
+      }
+    }
+
+    it("reports only the chosen overload's warning") {
+      val src =
+        """import { java.util.function.Function as JFn }
+          |extension String {
+          |  def outer(f: JFn[String, String]): String = "os"
+          |  def outer(f: (Int) -> Object): String = "oi"
+          |}
+          |IO::println("a".outer { p -> null })
+          |""".stripMargin
+      val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.On)
+      val result = new OnionCompiler(config).compileDetailed(Seq(new StreamInputSource(() => new StringReader(src), "w.on")))
+      val w12 = result.diagnostics.warnings.filter(_.category.code == "W0012")
+      assert(w12.length == 1 && w12.head.message.contains("java.lang.Object"), s"got: ${w12.map(_.message)}")
+    }
+
     it("types nested lambdas once per overload that can take them") {
       val depth = 10
       val call = (1 to depth).foldRight("s" + depth) { (i, inner) => s"\"a\".w((s$i: String) -> $inner)" }

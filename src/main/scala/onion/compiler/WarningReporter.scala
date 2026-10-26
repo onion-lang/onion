@@ -39,6 +39,17 @@ class WarningReporter(
     if (seen.add(warning)) warnings += warning
   }
 
+  /** Runs `block` and forgets the warnings it reported: for typing that is only a try
+   *  (an overload a lambda is tried against), whose chosen result is typed again (#2452). */
+  def discarding[A](block: => A): A = {
+    val before = warnings.length
+    try block
+    finally {
+      warnings.drop(before).foreach(seen.remove)
+      warnings.dropRightInPlace(warnings.length - before)
+    }
+  }
+
   // Convenience methods for each warning category
 
   def unusedVariable(location: Location, name: String): Unit = {

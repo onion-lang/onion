@@ -518,15 +518,13 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     // only SAM conversions fit, the void/value shape of the body decides, as for classes.
     val user = candidates.filterNot(isBuiltinExtension)
     if (user.length >= 2) {
-      // The winner is remembered per call site, receiver, argument types and what the call
-      // sees: a nested call is typed again for each overload its enclosing lambda is tried
-      // against, and repeating the whole choice at every level made nesting exponential.
-      // While errors are suppressed (an enclosing overload is being tried), a winner chosen
-      // under another expected type is tried first, since each enclosing overload hands the
-      // call a different one; if it fits, it is remembered for this expected type too, and
-      // if not, the full choice runs. When errors are reported, only an exact match is reused.
-      val looseKey = (targetType: Type, preliminaryParams.toList.map(p => if (p == null) null else p.`type`), null: Type, context.typingView)
-      val decisionKey = looseKey.copy(_3 = expected)
+      // The winner is remembered per call site, receiver, argument, expected types and what
+      // the call sees: a nested call is typed again for each overload its enclosing lambda is
+      // tried against, and repeating the whole choice at every level made nesting
+      // exponential. A remembered winner that no longer fits falls back to the full choice
+      // while errors are suppressed (an enclosing overload is being tried); when they are
+      // reported, its errors are the call's own.
+      val decisionKey = (targetType: Type, preliminaryParams.toList.map(p => if (p == null) null else p.`type`), expected, context.typingView)
       val decisions = decisionsAt.computeIfAbsent(node, _ => new java.util.HashMap())
       val remembered = decisions.get(decisionKey)
       if (remembered != null) {
@@ -535,18 +533,9 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           case some @ Some(_) => break(some)
           case None =>
         }
-      } else if (!typing.reportingEnabled) {
-        val nearby = decisions.get(looseKey)
-        if (nearby != null) attempt(nearby) match {
-          case some @ Some(_) =>
-            decisions.put(decisionKey, nearby)
-            break(some)
-          case None =>
-        }
       }
       def decided(winner: ExtensionMethodDefinition): Option[Term] = {
         decisions.put(decisionKey, winner)
-        decisions.put(looseKey, winner)
         attempt(winner)
       }
       val lambdaCapable = user.filter { m =>
@@ -555,7 +544,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       if (lambdaCapable.length == 1) break(decided(lambdaCapable.head))
       val fits =
         if (lambdaCapable.isEmpty) Seq.empty
-        else lambdaCapable.flatMap(m => typing.withSuppressedReporting(attemptRanked(m)).map(r => (m, r._2, r._3)))
+        else lambdaCapable.flatMap { m =>
+          // A try: its errors and warnings are not the call's; the winner is typed again below.
+          typing.warningReporter_.discarding(typing.withSuppressedReporting(attemptRanked(m))).map(r => (m, r._2, r._3))
+        }
       if (fits.isEmpty) {
         val builtins = candidates.filter(isBuiltinExtension)
         break(if (builtins.isEmpty) attempt(closestByArity(user, args)) else builtins.iterator.flatMap(attempt).nextOption())

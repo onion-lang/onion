@@ -352,6 +352,10 @@ they get the point in one pass.
 
 **CHANGELOG entry**
 
+Write it in a new file, `changelog.d/<issue>-<slug>.md`, under a `### Fixed` (or `Added`,
+`Breaking`, ...) heading; never edit `CHANGELOG.md` in a PR. The release cut gathers the
+files (`changelog.d/README.md`).
+
 One bold line saying what changed for the user, then at most two short sentences or bullets.
 
 Bad:

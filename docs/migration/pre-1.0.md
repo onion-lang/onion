@@ -127,7 +127,7 @@ that used to compile now mean something else:
 | Overloads | Call | Before | Now | To keep the old one |
 |---|---|---|---|---|
 | `z(f: (Object) -> void)` on `Object`, `z(o: Object)` on `String` | `"abc".z((x: Object) -> …)` | `String`'s `z(Object)` | E0006 | rename one method |
-| `c(n: Long, g: (Long) -> Long)`, `c(n: Object, g: (Long) -> Long)` | `"a".c(5, (x: Long) -> x * 2L)` | `obj` or `long:10`, by order | E0006 | `"a".c(5L, …)` |
+| `c(n: Long, g: (Long) -> Long)`, `c(n: Object, g: (Long) -> Long)` | `"a".c(5, (x: Long) -> x * 2L)` | `obj` or `long:10`, by order | E0006 | for `long:10`, `"a".c(5L, …)`; for `obj`, `"a".c(5 as Object, …)` |
 | `k(s: Supplier[String])`, `k(c: Callable[String])` | `"a".k { "v" }` | `call` | E0006 | `val c: Callable[String] = () -> "v"`, then `"a".k(c)` |
 | `f(o: Object, g)` on `String`, `f(s: String, g)` on `CharSequence` | `"a".f("q", (x: Int) -> x)` | `strobj1` | E0006 | `"a".f("q" as Object, …)` |
 | `outer(f: (Int) -> Int)`, `outer(f: Function[String, String])` | `"a".outer { p -> ((q: Int) -> p).call(1) }` | `os:s` | `oi:1` | pass a typed `Function[String, String]` value |

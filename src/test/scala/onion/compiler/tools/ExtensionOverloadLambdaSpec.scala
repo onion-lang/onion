@@ -431,6 +431,24 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       }
     }
 
+    it("passes an Int literal beside a lambda to the Int overload, not a narrower one") {
+      for (order <- Seq(true, false)) {
+        val short = """  def h(x: Short, f: (Int) -> Int): String = "short" + f(1)"""
+        val int = """  def h(x: Int, f: (Int) -> Int): String = "int" + f(1)"""
+        val byte = """  def b(x: Byte, f: (Int) -> Int): String = "byte" + f(1)"""
+        val long = """  def b(x: Long, f: (Int) -> Int): String = "long" + f(1)"""
+        val obj = """  def o(x: Object, f: (Int) -> Int): String = "obj" + f(1)"""
+        val shortO = """  def o(x: Short, f: (Int) -> Int): String = "short" + f(1)"""
+        val decls = (if (order) Seq(short, int, byte, long, shortO, obj) else Seq(int, short, long, byte, obj, shortO))
+        val result = runMain(
+          decls.mkString("extension String {\n", "\n", "\n}"),
+          """"a".h(5, { n -> n }) + "," + "a".h(5, (n: Int) -> n) + "," + "a".b(100, (n: Int) -> n) + "," +
+            |      "a".o(5, (n: Int) -> n) + "," + "a".h(5 as Short, (n: Int) -> n)""".stripMargin
+        )
+        assert(Shell.Success("int1,int1,long1,obj1,short1") == result, s"declaration order $order")
+      }
+    }
+
     it("reports a lambda that fits nothing against the overload of its arity") {
       val codes = errorCodes(
         """extension String {

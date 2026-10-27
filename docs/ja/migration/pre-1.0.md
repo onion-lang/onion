@@ -127,7 +127,7 @@ val xs: List[Object] = [[1, 2], []]
 | 多重定義 | 呼び出し | 以前 | 現在 | 以前の選択を保つには |
 |---|---|---|---|---|
 | `Object` 上の `z(f: (Object) -> void)`、`String` 上の `z(o: Object)` | `"abc".z((x: Object) -> …)` | `String` の `z(Object)` | E0006 | どちらかのメソッド名を変える |
-| `c(n: Long, g: (Long) -> Long)`、`c(n: Object, g: (Long) -> Long)` | `"a".c(5, (x: Long) -> x * 2L)` | 順番により `obj` または `long:10` | E0006 | `"a".c(5L, …)` |
+| `c(n: Long, g: (Long) -> Long)`、`c(n: Object, g: (Long) -> Long)` | `"a".c(5, (x: Long) -> x * 2L)` | 順番により `obj` または `long:10` | E0006 | `long:10` なら `"a".c(5L, …)`、`obj` なら `"a".c(5 as Object, …)` |
 | `k(s: Supplier[String])`、`k(c: Callable[String])` | `"a".k { "v" }` | `call` | E0006 | `val c: Callable[String] = () -> "v"` として `"a".k(c)` |
 | `String` 上の `f(o: Object, g)`、`CharSequence` 上の `f(s: String, g)` | `"a".f("q", (x: Int) -> x)` | `strobj1` | E0006 | `"a".f("q" as Object, …)` |
 | `outer(f: (Int) -> Int)`、`outer(f: Function[String, String])` | `"a".outer { p -> ((q: Int) -> p).call(1) }` | `os:s` | `oi:1` | 型付きの `Function[String, String]` の値を渡す |

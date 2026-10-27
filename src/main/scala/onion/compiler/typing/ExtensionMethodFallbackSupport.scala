@@ -551,7 +551,13 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         untypedClosureIndices.forall(i => i >= m.arguments.length || isLambdaSlot(m.arguments(i)))
       }
       if (lambdaCapable.length == 1) break(decided(lambdaCapable.head))
-      val fits =
+      // A primitive argument the parameter only takes narrowed (an `Int` literal for `Short`).
+      def narrows(params: Array[Type]): Boolean = preliminaryParams.indices.exists { i =>
+        val arg = preliminaryParams(i)
+        arg != null && i < params.length && arg.`type`.isBasicType && params(i).isBasicType &&
+          !TypeRules.isAssignable(params(i), arg.`type`)
+      }
+      val fits0 =
         if (lambdaCapable.isEmpty) Seq.empty
         else {
           // An overload that a fitting one always beats is not tried: the fitting one is
@@ -560,7 +566,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           // Trying the most specific first lets `w(f)` beside `w(o: Object)` skip the
           // `Object` try, so nesting such calls does not double the work at every level.
           def dominates(a: ExtensionMethodDefinition, b: ExtensionMethodDefinition): Boolean =
-            a.typeParameters.isEmpty && b.typeParameters.isEmpty &&
+            a.typeParameters.isEmpty && b.typeParameters.isEmpty && !narrows(a.arguments) &&
               untypedClosureIndices.forall(i => i >= a.arguments.length || takesLambdaDirectly(a.arguments(i))) &&
               TypeRules.isAllSuperType(b.arguments, a.arguments) && !TypeRules.isAllSuperType(a.arguments, b.arguments) &&
               !isMoreSpecificReceiver(b.receiverType, a.receiverType)
@@ -576,11 +582,16 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           // Keep declaration order for the ranking and its E0006 message.
           lambdaCapable.flatMap(m => found.find(_._1 eq m))
         }
-      if (fits.isEmpty) {
+      if (fits0.isEmpty) {
         val builtins = candidates.filter(isBuiltinExtension)
         if (builtins.isEmpty) failures.add(decisionKey)
         break(if (builtins.isEmpty) attempt(closestByArity(user, args)) else builtins.iterator.flatMap(attempt).nextOption())
       }
+      // A fit that takes each argument as it is (identity, widening, boxing) beats one that
+      // needs a primitive narrowed: `5` goes to `h(Int, f)`, not `h(Short, f)`, as for class
+      // methods, which never pick a narrowing overload while another one applies.
+      val fitsAsIs = fits0.filterNot { case (_, expectedArgs, _) => narrows(expectedArgs) }
+      val fits = if (fitsAsIs.nonEmpty) fitsAsIs else fits0
       val direct = fits.filter { case (m, _, _) =>
         untypedClosureIndices.forall(i => i >= m.arguments.length || takesLambdaDirectly(m.arguments(i)))
       }

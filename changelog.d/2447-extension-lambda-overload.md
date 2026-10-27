@@ -1,12 +1,7 @@
 ### Breaking
 
-- **Four lambda calls on overloaded extensions are now E0006 (#2447).** Each depended on declaration order, or picked differently from the same methods on a class. `docs/migration/pre-1.0.md` lists them with the fix for each.
-  - Fix: pass a literal of the exact type (`5L`, `"q" as Object`), pass the lambda as a typed value, or rename one method.
-- **A lambda that fits both a function-type and a SAM extension overload now takes the function type, in either order.**
-  - Before: `os:s` or `oi:1` by order for `"a".outer { p -> ((q: Int) -> p).call(1) }`; now `oi:1`. A class method still reports E0006 here (#2472). The migration guide lists the fix.
-
-- **A lambda call beside an `Object` overload now takes the more specific overload, in either order.**
-  - Before: `"a".r { IO::print("") }` with `r(f: () -> void)` and `r(o: Object)` ran `obj` or `fn` by order, and `"a".m(1, { x -> x })` with `m(Int, …)` and `m(Object, …)` ran `obj:1` or `int:1`. Now `fn` and `int:1`; pass the argument `as Object` to keep the other.
+- **A lambda passed to overloaded extension methods no longer depends on declaration order (#2447).**
+  - A call that compiled may now run a different overload (mostly with untyped lambda parameters), or be E0006 where two fit equally. `docs/migration/pre-1.0.md` gives examples and the fixes: type the lambda's parameters, pass the other argument with `as`, pass the lambda as a typed value, or rename a method.
 
 ### Fixed
 

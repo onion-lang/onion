@@ -31,7 +31,8 @@ public final class Codec {
             boolean ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
                 || c == '+' || c == '/' || c == '=';
             if (!ok) {
-                throw new IllegalArgumentException("invalid Base64 character " + describeChar(c) + " at index " + i);
+                throw new IllegalArgumentException(
+                    "invalid Base64 character " + describeChar(encoded.codePointAt(i)) + " at index " + i);
             }
             sb.append(c);
         }
@@ -44,10 +45,11 @@ public final class Codec {
     }
 
     /** A character as an error message shows it: {@code '!'} when it is printable ASCII,
-     *  else {@code U+00A0}, so an invisible one is never printed raw. */
-    private static String describeChar(char c) {
-        if (c > ' ' && c < 0x7F) return "'" + c + "'";
-        return String.format(java.util.Locale.ROOT, "U+%04X", (int) c);
+     *  else {@code U+00A0}, so an invisible one is never printed raw. An emoji is named by its
+     *  code point ({@code U+1F600}), not by half of its surrogate pair. */
+    private static String describeChar(int c) {
+        if (c > ' ' && c < 0x7F) return "'" + (char) c + "'";
+        return String.format(java.util.Locale.ROOT, "U+%04X", c);
     }
 
     /** Encodes the UTF-8 bytes of {@code text} as a lowercase hex string. */
@@ -104,11 +106,16 @@ public final class Codec {
     }
 
     /** {@code text} itself when short; otherwise 20 chars either side of the 3-char escape at
-     *  {@code at}, with "..." where it was cut, so a 100 KB form body is not copied into a message. */
+     *  {@code at}, with "..." where it was cut, so a 100 KB form body is not copied into a message.
+     *  A cut never splits a surrogate pair: the window widens to keep the whole emoji. */
     private static String window(String text, int at) {
         if (text.length() <= 60) return text;
         int from = Math.max(0, at - 20);
         int to = Math.min(text.length(), at + 23);
+        if (from > 0 && Character.isLowSurrogate(text.charAt(from))
+            && Character.isHighSurrogate(text.charAt(from - 1))) from--;
+        if (to < text.length() && Character.isHighSurrogate(text.charAt(to - 1))
+            && Character.isLowSurrogate(text.charAt(to))) to++;
         return (from > 0 ? "..." : "") + text.substring(from, to) + (to < text.length() ? "..." : "");
     }
 

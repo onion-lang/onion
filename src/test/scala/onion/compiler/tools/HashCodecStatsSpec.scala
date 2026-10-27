@@ -105,6 +105,15 @@ class HashCodecStatsSpec extends AbstractShellSpec {
           "|invalid Base64 character U+000C at index 4"))
     }
 
+    it("base64Decode names an emoji by its code point, not half a surrogate pair (#2470)") {
+      runStr(
+        "import { onion.Codec }",
+        "var m: String = \"none\"\n" +
+        "try { Codec::base64Decode(\"aGVs\\uD83D\\uDE00bG8=\") } catch e: IllegalArgumentException { m = e.getMessage() }\n" +
+        "return m",
+        Shell.Success("invalid Base64 character U+1F600 at index 4"))
+    }
+
     it("urlDecode names the bad % escape and its index") {
       runStr(
         "import { onion.Codec }",
@@ -130,6 +139,24 @@ class HashCodecStatsSpec extends AbstractShellSpec {
           |return m""".stripMargin,
         Shell.Success(
           "invalid % escape at index 1000 in \"...aaaaaaaaaaaaaaaaaaaa%zzbbbbbbbbbbbbbbbbbbbb...\": " +
+          "a % must be followed by two hex digits"))
+    }
+
+    it("urlDecode's quoted window never cuts an emoji in half (#2470)") {
+      runStr(
+        "import { onion.Codec }",
+        """val e = "😀"
+          |var head: String = "none"
+          |var tail: String = "none"
+          |try { Codec::urlDecode("a".repeat(30) + e + "a".repeat(19) + "%zz" + "b".repeat(50)) }
+          |catch x: IllegalArgumentException { head = x.getMessage() }
+          |try { Codec::urlDecode("a".repeat(100) + "%zz" + "b".repeat(19) + e + "b".repeat(50)) }
+          |catch x: IllegalArgumentException { tail = x.getMessage() }
+          |return head + "|" + tail""".stripMargin,
+        Shell.Success(
+          "invalid % escape at index 51 in \"...😀" + "a" * 19 + "%zz" + "b" * 20 + "...\": " +
+          "a % must be followed by two hex digits|" +
+          "invalid % escape at index 100 in \"..." + "a" * 20 + "%zz" + "b" * 19 + "😀...\": " +
           "a % must be followed by two hex digits"))
     }
 

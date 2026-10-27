@@ -1098,6 +1098,8 @@ val safe: Future[Int] = Future::asyncThrowing {
 val delayed: Future[Void] = Future::delay(1000L)  // 1 second
 ```
 
+A zero or negative delay completes at once, so `Future::delay(deadline - Timing::millis())` is safe once the deadline has passed.
+
 ### Transformation Methods
 
 ```onion
@@ -1959,7 +1961,8 @@ Codec::urlEncode("a b&c") / Codec::urlDecode(s)
 ```
 
 - `base64Decode` skips whitespace, so a file's trailing newline or `base64`'s 76-column lines decode as is.
-- Bad input to a decoder throws `IllegalArgumentException` naming the problem, for example `invalid Base64 character '!' at index 10` or `invalid % escape at index 3 in "100%zz"`.
+  A byte order mark at the start (a file saved as "UTF-8 with BOM") is skipped too.
+- Bad input to a decoder throws `IllegalArgumentException` naming the problem, for example `invalid Base64 character '!' at index 10` (an invisible or non-ASCII character shows as `U+00A0`) or `invalid % escape at index 3 in "100%zz"`.
 
 These are also builtin extension methods on `String`:
 
@@ -2379,7 +2382,7 @@ Http::delete(url): String
 
 ```
 Http::encodeUrl(str): String
-Http::decodeUrl(str): String
+Http::decodeUrl(str): String            // same as Codec::urlDecode
 Http::buildQuery(params): String        // params: alternating keys and values
 Http::buildUrl(baseUrl, params): String // appends "?"/"&" + buildQuery(params)
 ```

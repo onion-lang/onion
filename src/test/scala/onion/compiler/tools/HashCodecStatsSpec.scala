@@ -82,6 +82,29 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         Shell.Success("invalid Base64 character '!' at index 10|invalid Base64 length or padding: 1 character(s) after removing whitespace"))
     }
 
+    it("base64Decode skips a leading byte order mark, as in a file saved as UTF-8 with BOM (#2454)") {
+      runStr(
+        "import { onion.Codec }",
+        "return Codec::base64Decode(\"\\uFEFFaGVsbG8=\\r\\n\")",
+        Shell.Success("hello"))
+    }
+
+    it("base64Decode shows an invisible or non-ASCII bad character as U+XXXX (#2454)") {
+      runStr(
+        "import { onion.Codec }",
+        "var nbsp: String = \"none\"\n" +
+        "var bom: String = \"none\"\n" +
+        "var ctl: String = \"none\"\n" +
+        "try { Codec::base64Decode(\"aGVs\\u00A0bG8=\") } catch e: IllegalArgumentException { nbsp = e.getMessage() }\n" +
+        "try { Codec::base64Decode(\"aGVs\\uFEFFbG8=\") } catch e: IllegalArgumentException { bom = e.getMessage() }\n" +
+        "try { Codec::base64Decode(\"aGVs\\u000CbG8=\") } catch e: IllegalArgumentException { ctl = e.getMessage() }\n" +
+        "return nbsp + \"|\" + bom + \"|\" + ctl",
+        Shell.Success(
+          "invalid Base64 character U+00A0 at index 4" +
+          "|invalid Base64 character U+FEFF at index 4" +
+          "|invalid Base64 character U+000C at index 4"))
+    }
+
     it("urlDecode names the bad % escape and its index") {
       runStr(
         "import { onion.Codec }",
@@ -93,6 +116,21 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         Shell.Success(
           "invalid % escape at index 3 in \"100%zz\": a % must be followed by two hex digits|" +
           "invalid % escape at index 2 in \"50%\": a % must be followed by two hex digits"))
+    }
+
+    it("urlDecode quotes a short window around the bad escape in a long input, not all of it") {
+      runStr(
+        "import { onion.Codec }",
+        """val sb = new StringBuilder()
+          |foreach i in 1..1000 { sb.append("a") }
+          |sb.append("%zz")
+          |foreach i in 1..1000 { sb.append("b") }
+          |var m: String = "none"
+          |try { Codec::urlDecode(sb.toString()) } catch e: IllegalArgumentException { m = e.getMessage() }
+          |return m""".stripMargin,
+        Shell.Success(
+          "invalid % escape at index 1000 in \"...aaaaaaaaaaaaaaaaaaaa%zzbbbbbbbbbbbbbbbbbbbb...\": " +
+          "a % must be followed by two hex digits"))
     }
 
     it("url encoding round-trips a reserved character") {

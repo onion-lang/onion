@@ -169,6 +169,8 @@ class SemanticErrorReporter(threshold: Int) {
     val suggestion =
       if (streamToListHint(targetType, name).isDefined) {
         streamToListHint(targetType, name)
+      } else if (primitiveArrayPipelineHint(targetType, name).isDefined) {
+        primitiveArrayPipelineHint(targetType, name)
       } else if (enclosingStaticOwner != null) {
         Some(format(message("suggestion.didYouMean"), Seq(s"$enclosingStaticOwner::$name")))
       } else if (!calledStatically && ForeignStringNames.contains(name) && isStringType(targetType)) {
@@ -418,6 +420,24 @@ class SemanticErrorReporter(threshold: Int) {
           .exists(n => implementsType(ct, n))
         val conversion = if (primitive) "boxed().toList()" else "toList()"
         Some(format(message("suggestion.didYouMean"), Seq(s"$conversion.$name")))
+      case _ => None
+
+  /**
+   * The builtin array pipelines take a `T[]`, which a primitive array (`Int[]`) is not (#2458).
+   * Say so instead of a name-similarity guess such as `wait`. `Int[]`/`Long[]`/`Double[]` have an
+   * `Arrays::stream`, so they get a one-line conversion; the other primitive arrays get a copy loop.
+   */
+  private def primitiveArrayPipelineHint(t: TypedAST.Type, name: String): Option[String] =
+    t match
+      case at: TypedAST.ArrayType if at.dimension == 1 && at.component.isBasicType &&
+          Typing.builtinExtensions.getOrElse(Typing.ArrayExtensionReceiver, Nil).exists(_.name == name) =>
+        if (Set[TypedAST.Type](TypedAST.BasicType.INT, TypedAST.BasicType.LONG, TypedAST.BasicType.DOUBLE).contains(at.component)) {
+          val conversion = "java.util.Arrays::stream(xs).boxed().toList()"
+          val snippet = if (name == "toList") conversion else s"$conversion.$name(...)"
+          Some(format(message("suggestion.primitiveArrayPipeline"), Seq(typeName(at), snippet)))
+        } else {
+          Some(format(message("suggestion.primitiveArrayPipelineCopy"), Seq(typeName(at), typeName(at.component))))
+        }
       case _ => None
 
   private def implementsType(ct: TypedAST.ClassType, target: String): Boolean = {
@@ -677,8 +697,12 @@ class SemanticErrorReporter(threshold: Int) {
     val target2 = objectTypeName(item2(0))
     val name2 = asString(item2(1))
     val args2 = typeNames(asTypeArray(item2(2)))
-    problem(position, format(message("error.semantic.ambiguousMethod"),
-      Seq(target1, name1, args1, target2, name2, args2)))
+    val baseMessage = format(message("error.semantic.ambiguousMethod"),
+      Seq(target1, name1, args1, target2, name2, args2))
+    val hint =
+      if (items.length > 2 && items(2) == SemanticErrorReporter.LambdaOverloadHint) Some(message("suggestion.lambdaOverloadAmbiguous"))
+      else None
+    problem(position, appendSuggestion(baseMessage, hint))
   }
 
   /**
@@ -1008,6 +1032,10 @@ object SemanticErrorReporter {
    * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
    */
   private[compiler] case object HexDigitBHint
+
+  /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
+   *  methods equally, so the error says how to pick one (#2447). */
+  private[compiler] case object LambdaOverloadHint
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.

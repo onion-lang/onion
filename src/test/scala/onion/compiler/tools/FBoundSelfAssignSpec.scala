@@ -52,6 +52,23 @@ class FBoundSelfAssignSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Failure(-1) == r)
     }
+    it("is still rejected when a raw bound would stand in for an applied type (class)") {
+      val r = shell.run(
+        """class J[T extends Comparable, U] {
+          |public:
+          |  def f(t: T): Comparable[U] = t
+          |}
+          |def main(args: String[]): Int { return 0 }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
+    it("is still rejected when a raw bound would stand in for an applied type (generic method)") {
+      val r = shell.run(
+        """def f[T extends Comparable, U](t: T, u: U): Comparable[U] = t
+          |def main(args: String[]): Int { return 0 }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
     it("keeps type arguments invariant: List[T] is not a List[Comparable[T]]") {
       val r = shell.run(
         """import { java.util.* }

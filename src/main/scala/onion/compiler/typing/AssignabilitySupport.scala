@@ -163,6 +163,14 @@ private[compiler] final class AssignabilitySupport(
     def containsTypeVariable(typeToCheck: Type): Boolean =
       TypeCheckingHelpers.containsTypeVariable(typeToCheck)
 
+    // An F-bound names the variable through the placeholder frozen while the
+    // bounds were resolved, so point that self-reference back at `tv` first.
+    def appliedSelfBound(tv: TypedAST.TypeVariableType): Option[TypedAST.AppliedClassType] =
+      TypeSubstitution.substituteType(tv.upperBound, Map(tv.name -> tv), Map.empty, defaultToBound = false) match {
+        case bound: TypedAST.AppliedClassType => Some(bound)
+        case _ => None
+      }
+
     // `nested` is true inside a type-argument comparison, where type arguments are
     // invariant and a variable must not widen to its bound; `strict` makes two type
     // variables match only by identity (used when comparing a variable's own bound).
@@ -244,15 +252,13 @@ private[compiler] final class AssignabilitySupport(
           bodyContext.table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
             .collectFirst { case (raw, view) if TypeRelations.sameClass(raw, ae.raw) && argsMatch(view) => true }
             .getOrElse(false)
-      case (ae: TypedAST.AppliedClassType, tv: TypedAST.TypeVariableType) if !nested =>
+      case (ae: TypedAST.AppliedClassType, tv: TypedAST.TypeVariableType)
+          if !nested && appliedSelfBound(tv).isDefined =>
         // A type variable fits an applied type its own bound reaches
-        // (`T extends Comparable[T]` is a `Comparable[T]`). An F-bound names
-        // the variable through the placeholder frozen while the bounds were
-        // resolved, so point that self-reference back at `tv` first.
-        TypeSubstitution.substituteType(tv.upperBound, Map(tv.name -> tv), Map.empty, defaultToBound = false) match {
-          case bound: TypedAST.ClassType => structurallyAssignable(ae, bound, nested = true, strict = true)
-          case _ => false
-        }
+        // (`T extends Comparable[T]` is a `Comparable[T]`). A raw bound
+        // (`T extends Comparable`) says nothing about type arguments, so it
+        // keeps the cases below, which reject it.
+        structurallyAssignable(ae, appliedSelfBound(tv).get, nested = true, strict = true)
       case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>
         actual match {
           case classType: TypedAST.ClassType => TypeRelations.sameClass(ae.raw, classType)

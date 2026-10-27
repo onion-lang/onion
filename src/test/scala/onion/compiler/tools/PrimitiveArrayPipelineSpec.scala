@@ -55,6 +55,26 @@ class PrimitiveArrayPipelineSpec extends AbstractShellSpec {
       val msg = errors("val b = new Char[2]\nIO::println(b.toList())\n").map(_.message).mkString
       assert(!msg.contains("Arrays::stream"))
     }
+
+    for (elem <- Seq("Char", "Short", "Float", "Byte", "Boolean"); call <- Seq("map { x -> x }", "filter { x -> true }", "toList()"))
+      it(s"is a copy into a List, never `wait`, for $elem[].$call") {
+        val errs = errors(s"val b = new $elem[2]\nIO::println(b.$call)\n")
+        assert(errs.map(_.errorCode) == Seq(Some("E0005")))
+        val msg = errs.map(_.message).mkString
+        assert(!msg.contains("wait"))
+        assert(msg.contains(s"val ys: List[$elem] = []; foreach x in xs { ys.add(x) }"))
+      }
+
+    for (elem <- Seq("Char", "Short", "Float", "Byte", "Boolean"))
+      it(s"the copy it shows for $elem[] runs") {
+        assert(Shell.Success("[2]") == shell.run(
+          "def main(args: String[]): String {\n" +
+          s"  val xs = new $elem[2]\n" +
+          s"  val ys: List[$elem] = []; foreach x in xs { ys.add(x) }\n" +
+          "  return \"[\" + ys.size + \"]\"\n" +
+          "}\n",
+          "None", Array()))
+      }
   }
 
   describe("arrays the pipelines do take") {

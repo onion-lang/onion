@@ -540,8 +540,8 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     result.toSeq
   }
 
-  /** An array of primitives (`Int[]`) fits only an extension on that exact array type,
-   *  as in Java: a `T[]` receiver cannot bind `T` to `Int` (#2458). */
+  /** A `T[]` receiver cannot bind `T` to a primitive, as in Java (#2458), so a primitive
+   *  array (`Int[]`) is matched only against a receiver of exactly its own array type. */
   private def arrayReceiverAccepts(receiverType: Type, actual: ArrayType): Boolean = {
     def primitiveArray(t: Type): Boolean = t match {
       case a: ArrayType => a.dimension == 1 && a.component.isBasicType

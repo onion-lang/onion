@@ -423,18 +423,21 @@ class SemanticErrorReporter(threshold: Int) {
       case _ => None
 
   /**
-   * The builtin array pipelines take a `T[]`, which an `Int[]` is not (#2458): convert
-   * through a boxed stream, instead of a name-similarity guess such as `wait`. Only
-   * `Int[]`/`Long[]`/`Double[]` have an `Arrays::stream`, so only they get the hint.
+   * The builtin array pipelines take a `T[]`, which a primitive array (`Int[]`) is not (#2458).
+   * Say so instead of a name-similarity guess such as `wait`. `Int[]`/`Long[]`/`Double[]` have an
+   * `Arrays::stream`, so they get a one-line conversion; the other primitive arrays get a copy loop.
    */
   private def primitiveArrayPipelineHint(t: TypedAST.Type, name: String): Option[String] =
     t match
-      case at: TypedAST.ArrayType if at.dimension == 1 &&
-          Set[TypedAST.Type](TypedAST.BasicType.INT, TypedAST.BasicType.LONG, TypedAST.BasicType.DOUBLE).contains(at.component) &&
+      case at: TypedAST.ArrayType if at.dimension == 1 && at.component.isBasicType &&
           Typing.builtinExtensions.getOrElse(Typing.ArrayExtensionReceiver, Nil).exists(_.name == name) =>
-        val conversion = "java.util.Arrays::stream(xs).boxed().toList()"
-        val snippet = if (name == "toList") conversion else s"$conversion.$name(...)"
-        Some(format(message("suggestion.primitiveArrayPipeline"), Seq(typeName(at), snippet)))
+        if (Set[TypedAST.Type](TypedAST.BasicType.INT, TypedAST.BasicType.LONG, TypedAST.BasicType.DOUBLE).contains(at.component)) {
+          val conversion = "java.util.Arrays::stream(xs).boxed().toList()"
+          val snippet = if (name == "toList") conversion else s"$conversion.$name(...)"
+          Some(format(message("suggestion.primitiveArrayPipeline"), Seq(typeName(at), snippet)))
+        } else {
+          Some(format(message("suggestion.primitiveArrayPipelineCopy"), Seq(typeName(at), typeName(at.component))))
+        }
       case _ => None
 
   private def implementsType(ct: TypedAST.ClassType, target: String): Boolean = {

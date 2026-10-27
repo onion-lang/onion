@@ -11,6 +11,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   calls: MethodCallTyping
 ) {
   private val overloadSupport = new CallOverloadSupport(typing, calls)
+  private val mentionedNames = new MentionedNames
 
   /** The overload each lambda call site chose, per receiver, argument and expected types and
    *  what the call sees around it (a captured variable's type can differ between two
@@ -528,7 +529,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       // exponential. A remembered winner that no longer fits falls back to the full choice
       // while errors are suppressed (an enclosing overload is being tried); when they are
       // reported, its errors are the call's own.
-      val decisionKey = (targetType: Type, preliminaryParams.toList.map(p => if (p == null) null else p.`type`), expected, context.typingViewFor(MentionedNames.of(node.args)))
+      val decisionKey = (targetType: Type, preliminaryParams.toList.map(p => if (p == null) null else p.`type`), expected, context.typingViewFor(mentionedNames.of(node.args)))
       val decisions = decisionsAt.computeIfAbsent(node, _ => new java.util.HashMap())
       val remembered = decisions.get(decisionKey)
       if (remembered != null) {
@@ -605,8 +606,12 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           ).map(_.method)
           fits.filter { case (m, _, _) => shaped.exists(_ eq m) }
         }
+      // An untyped lambda's own position does not rank (rule 4 on #2447), as on the class
+      // path: `(Long) -> Long` and `(Int) -> Int` never compare, so the other arguments
+      // decide. With nothing else to compare, every position counts.
+      val ranked = args.indices.filterNot(i => ArgumentHelpers.isClosureWithUntypedParams(args(i)))
       def beats(a: (ExtensionMethodDefinition, Array[Type], Array[Type]), b: (ExtensionMethodDefinition, Array[Type], Array[Type])): Boolean = {
-        val params = rankParameters(a._1, a._2, b._1, b._2, a._3)
+        val params = rankParameters(a._1, a._2, b._1, b._2, a._3, ranked)
         val receiver =
           if (isMoreSpecificReceiver(a._1.receiverType, b._1.receiverType)) -1
           else if (isMoreSpecificReceiver(b._1.receiverType, a._1.receiverType)) 1
@@ -634,9 +639,12 @@ private[compiler] final class ExtensionMethodFallbackSupport(
    *  primitive tiebreak for `argTypes`: `Int` over `Object`, `Integer` or a type variable),
    *  1 for the reverse, 0 when they are equal or cannot be ranked. */
   private def rankParameters(
-    methodA: Method, a: Array[Type], methodB: Method, b: Array[Type], argTypes: Array[Type]
-  ): Int =
-    if (TypeRules.isAllSuperType(a, b) && TypeRules.isAllSuperType(b, a)) {
+    methodA: Method, a: Array[Type], methodB: Method, b: Array[Type], argTypes: Array[Type],
+    ranked: Seq[Int] = Nil
+  ): Int = {
+    val positions = if (ranked.isEmpty) a.indices else ranked
+    val (pa, pb) = (positions.map(a(_)).toArray, positions.map(b(_)).toArray)
+    if (TypeRules.isAllSuperType(pa, pb) && TypeRules.isAllSuperType(pb, pa)) {
       // Equal once type arguments are substituted: the non-generic overload wins, as for
       // class methods (`each2(String, g)` over `each2[A](A, g)`).
       (methodA.typeParameters.isEmpty, methodB.typeParameters.isEmpty) match {
@@ -646,11 +654,12 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       }
     } else {
       val (ma, mb) = (ApplicableMethod(methodA, a, Map.empty), ApplicableMethod(methodB, b, Map.empty))
-      overloadSupport.selectMostSpecificApplicable(List(ma, mb), argTypes = argTypes) match {
+      overloadSupport.selectMostSpecificApplicable(List(ma, mb), relevantIndices = ranked, argTypes = argTypes) match {
         case CandidateSelection.Selected(am) => if (am eq ma) -1 else 1
         case _ => 0
       }
     }
+  }
 
   /** A parameter a lambda can be passed to (rule 1 on #2447): an Onion function type,
    *  `Object`, a type variable, or an interface with one abstract method (not counting

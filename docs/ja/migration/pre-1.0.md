@@ -122,7 +122,7 @@ val xs: List[Object] = [[1, 2], []]
 
 `extension` で同じ名前のメソッドを複数宣言した場合、ラムダ引数で選ばれる多重定義は、宣言の順番によらず同じになりました。
 引数の型を書いたラムダでは、クラスのメソッドと同じ多重定義が選ばれます。
-次の 6 つの呼び出しは、これまでコンパイルできましたが、意味が変わります。
+次の 7 つの呼び出しは、これまでコンパイルできましたが、意味が変わります。
 
 | 多重定義 | 呼び出し | 以前 | 現在 | 以前の結果を保つには |
 |---|---|---|---|---|
@@ -132,6 +132,7 @@ val xs: List[Object] = [[1, 2], []]
 | `String` 上の `f(o: Object, g)`、`CharSequence` 上の `f(s: String, g)` | `"a".f("q", (x: Int) -> x)` | `strobj1` | E0006 | `"a".f("q" as Object, …)` |
 | `outer(f: (Int) -> Int)`、`outer(f: Function[String, String])`（`import { java.util.function.Function }`） | `"a".outer { p -> ((q: Int) -> p).call(1) }` | 順番により `os:s` または `oi:1` | `oi:1` | `val g: Function[String, String] = (p: String) -> …` として `"a".outer(g)` |
 | `r(f: () -> void)`、`r(o: Object)` | `"a".r { IO::print("") }` | 順番により `obj` または `fn` | `fn` | `val h: () -> void = () -> …` として `"a".r(h as Object)` |
+| `m(n: Int, f: (Int) -> Int)`、`m(n: Object, f: (Object) -> Object)` | `"a".m(1, { x -> x })` | 順番により `obj:1` または `int:1` | `int:1` | `"a".m(1 as Object, { x -> x })` |
 
 - **変わったこと:** ラムダが当てはまる多重定義を、issue #2447 に書かれた 1 つの規則で順位付けします。
   これはクラスのメソッドの規則に、1 点を加えたものです。関数型の引数は、`Function` や `Comparator` のような SAM インターフェース（抽象メソッドが 1 つのインターフェース）より優先されます（`outer` の行）。

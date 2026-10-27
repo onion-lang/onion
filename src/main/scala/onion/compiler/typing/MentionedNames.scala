@@ -4,11 +4,13 @@ import onion.compiler.{AST, Location}
 
 /** Every name a piece of source could refer to: each identifier, and every other string in
  *  its nodes (a called name, a field name), which over-approximates the locals it reads.
- *  Memo keys use it to leave out variables a lambda never mentions (#2452). */
-private[compiler] object MentionedNames {
+ *  Memo keys use it to leave out variables a lambda never mentions (#2452). One instance
+ *  lives as long as the typing that owns it, so a long-lived compiler (daemon, REPL, LSP)
+ *  does not keep every compiled AST reachable. */
+private[compiler] final class MentionedNames {
   private val memo = new java.util.IdentityHashMap[AnyRef, Set[String]]()
 
-  def of(node: AnyRef): Set[String] = memo.synchronized {
+  def of(node: AnyRef): Set[String] = {
     val cached = memo.get(node)
     if (cached != null) cached
     else {

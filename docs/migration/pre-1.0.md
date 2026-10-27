@@ -122,7 +122,7 @@ val xs: List[Object] = [[1, 2], []]
 
 When an `extension` declares the same method more than once, a lambda argument now picks the
 same overload whatever order the methods are declared in. For a lambda with typed parameters
-this is the overload a class method would pick. Six calls that used to compile now mean
+this is the overload a class method would pick. Seven calls that used to compile now mean
 something else:
 
 | Overloads | Call | Before | Now | To keep the old result |
@@ -133,6 +133,7 @@ something else:
 | `f(o: Object, g)` on `String`, `f(s: String, g)` on `CharSequence` | `"a".f("q", (x: Int) -> x)` | `strobj1` | E0006 | `"a".f("q" as Object, …)` |
 | `outer(f: (Int) -> Int)`, `outer(f: Function[String, String])` (`import { java.util.function.Function }`) | `"a".outer { p -> ((q: Int) -> p).call(1) }` | `os:s` or `oi:1`, by order | `oi:1` | `val g: Function[String, String] = (p: String) -> …`, then `"a".outer(g)` |
 | `r(f: () -> void)`, `r(o: Object)` | `"a".r { IO::print("") }` | `obj` or `fn`, by order | `fn` | `val h: () -> void = () -> …`, then `"a".r(h as Object)` |
+| `m(n: Int, f: (Int) -> Int)`, `m(n: Object, f: (Object) -> Object)` | `"a".m(1, { x -> x })` | `obj:1` or `int:1`, by order | `int:1` | `"a".m(1 as Object, { x -> x })` |
 
 - **What changed:** the overloads the lambda fits are ranked by one rule, written on issue
   #2447. It is the class-method rule, with one addition: a function-type parameter beats a SAM

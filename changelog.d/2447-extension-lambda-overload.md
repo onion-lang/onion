@@ -5,6 +5,9 @@
 - **A lambda that fits both a function-type and a SAM extension overload now takes the function type, in either order.**
   - Before: `os:s` or `oi:1` by order for `"a".outer { p -> ((q: Int) -> p).call(1) }`; now `oi:1`. A class method still reports E0006 here (#2472). The migration guide lists the fix.
 
+- **A lambda call beside an `Object` overload now takes the more specific overload, in either order.**
+  - Before: `"a".r { IO::print("") }` with `r(f: () -> void)` and `r(o: Object)` ran `obj` or `fn` by order, and `"a".m(1, { x -> x })` with `m(Int, …)` and `m(Object, …)` ran `obj:1` or `int:1`. Now `fn` and `int:1`; pass the argument `as Object` to keep the other.
+
 ### Fixed
 
 - **A lambda passed to an overloaded extension method picks the overload that takes a function (#2447).**

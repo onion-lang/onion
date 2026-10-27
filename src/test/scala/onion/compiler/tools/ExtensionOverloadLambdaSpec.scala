@@ -388,6 +388,18 @@ class ExtensionOverloadLambdaSpec extends AbstractShellSpec {
       }
     }
 
+    // The panel's case on b191766: an untyped lambda's own position does not rank, so the
+    // other argument decides (rule 4 on #2447), as on the class path.
+    for (longFirst <- Seq(true, false)) {
+      it(s"lets the Int argument pick m(Int, f) for an untyped lambda (${if (longFirst) "Long" else "Int"} first)") {
+        val l = "  def m(n: Long, f: (Long) -> Long): String = \"long:\" + f(n)"
+        val i = "  def m(n: Int, f: (Int) -> Int): String = \"int:\" + f(n)"
+        val decls = Seq("extension String {", if (longFirst) l else i, if (longFirst) i else l, "}").mkString("\n")
+        assert(Shell.Success("int:1,int:1,long:1") ==
+          runMain(decls, """"a".m(1, { x -> x }) + "," + "a".m(1, (x: Int) -> x) + "," + "a".m(1L, { x -> x })"""))
+      }
+    }
+
     it("types nested lambdas once per overload that can take them") {
       val depth = 10
       val call = (1 to depth).foldRight("s" + depth) { (i, inner) => s"\"a\".w((s$i: String) -> $inner)" }

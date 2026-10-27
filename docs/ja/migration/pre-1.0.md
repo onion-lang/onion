@@ -114,3 +114,33 @@ val xs: List[Object] = [[1, 2], []]
 - **変わったこと:** 空のリテラルは、隣の要素の後に、その型で型付けされます。要素の評価順は、これまでどおりソースの順です。
 - **表示されるもの:** 異なる種類の要素を混ぜたコードや、`List[Object]` の引数に渡したコードで、`List[List[Int]].add(String)`（または `Map[String, List[Int]].set(...)`）を示す `E0005` が出ます。
 - **そのまま動くもの:** 明示した型注釈が優先されます。型の分かる隣の要素がないリテラル（`[[], []]`）は、これまでどおりです。
+
+## 多重定義された拡張メソッドにラムダを渡したとき、宣言の順番で結果が変わらなくなりました
+
+`extension` で同じ名前のメソッドを複数宣言した場合、ラムダ引数で選ばれる多重定義は、宣言の順番によらず同じになりました。
+以前は、最初または最後に宣言された多重定義が実行されることがよくありました。
+全体として、次のように変わります。
+
+- **コンパイルできていた呼び出しで、別の多重定義が実行されることがあります。** クラスのメソッドが選ぶもの（下記の 1 点を除く）です。主に、引数の型を書いていないラムダが対象です。
+- **コンパイルできていた呼び出しが E0006 になることがあります。** 2 つの多重定義が同じ程度に当てはまる場合です。
+- **以前の多重定義を保つには:** ラムダの引数に型を書く、ほかの引数を `as` で渡す（`5 as Object`、`2 as Double`）、ラムダを型付きの値として渡す、またはどちらかのメソッド名を変えてください。
+
+例:
+
+| 多重定義 | 呼び出し | 以前 | 現在 | 以前の結果を保つには |
+|---|---|---|---|---|
+| `Object` 上の `z(f: (Object) -> void)`、`String` 上の `z(o: Object)` | `"abc".z((x: Object) -> …)` | `String` の `z(Object)` | E0006 | どちらかのメソッド名を変える |
+| `c(n: Long, g: (Long) -> Long)`、`c(n: Object, g: (Long) -> Long)` | `"a".c(5, (x: Long) -> x * 2L)` | 順番により `obj` または `long:10` | E0006 | `long:10` には `"a".c(5L, …)`、`obj` には `"a".c(5 as Object, …)` |
+| `k(s: Supplier[String])`、`k(c: Callable[String])` | `"a".k { "v" }` | 順番により `call` または `sup` | E0006 | `call` には `val c: Callable[String] = () -> "v"` として `"a".k(c)`、`sup` には同様に `val s: Supplier[String]` |
+| `String` 上の `f(o: Object, g)`、`CharSequence` 上の `f(s: String, g)` | `"a".f("q", (x: Int) -> x)` | `strobj1` | E0006 | `"a".f("q" as Object, …)` |
+| `outer(f: (Int) -> Int)`、`outer(f: Function[String, String])`（`import { java.util.function.Function }`） | `"a".outer { p -> ((q: Int) -> p).call(1) }` | 順番により `os:s` または `oi:1` | `oi:1` | `val g: Function[String, String] = (p: String) -> …` として `"a".outer(g)` |
+| `r(f: () -> void)`、`r(o: Object)` | `"a".r { IO::print("") }` | 順番により `obj` または `fn` | `fn` | `val h: () -> void = () -> …` として `"a".r(h as Object)` |
+| `m(n: Int, f: (Int) -> Int)`、`m(n: Object, f: (Object) -> Object)` | `"a".m(1, { x -> x })` | 順番により `obj:1` または `int:1` | `int:1` | `"a".m(1 as Object, { x -> x })` |
+| `k(n: Int, f: (Int) -> Int): Int`、`k(n: Double, f: (Double) -> Double): Double` | `"a".k(2, { x -> x * 2 })` | `4.0`（`Double` のほう） | `4` | `"a".k(2, (x: Double) -> x * 2.0)` |
+| `run(r: Runnable)`、`run(c: Callable[Object])` | `"a".run { IO::print("") }` | `callable:null` | `runnable` | 型付きの `Callable[Object]` の値を渡す |
+
+- **変わったこと:** ラムダが当てはまる多重定義を、issue #2447 に書かれた 1 つの規則で順位付けします。
+  これはクラスのメソッドの規則に、1 点を加えたものです。関数型の引数は、`Function` や `Comparator` のような SAM インターフェース（抽象メソッドが 1 つのインターフェース）より優先されます（`outer` の行）。
+  クラスのメソッドでは、ここはまだ E0006 になります。クラスを同じ規則にそろえる作業は #2472 で扱います。
+- **表示されるもの:** `E0006`（2 つのメソッドのどちらにも当てはまるという意味のエラー）が出ます。最後の列の直し方を示すヒントが付きます。
+- **そのまま動くもの:** 当てはまる多重定義が 1 つだけの呼び出しと、ラムダ引数のない呼び出しです。

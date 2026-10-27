@@ -1,9 +1,9 @@
 ### Breaking
 
-- **Four lambda calls on overloaded extensions are now E0006 (#2447).** Each depended on declaration order, or picked differently from the same methods on a class. `docs/migration/pre-1.0.md` lists the four, with the fix for each.
+- **Four lambda calls on overloaded extensions are now E0006 (#2447).** Each depended on declaration order, or picked differently from the same methods on a class. `docs/migration/pre-1.0.md` lists them with the fix for each.
   - Fix: pass a literal of the exact type (`5L`, `"q" as Object`), pass the lambda as a typed value, or rename one method.
-- **A lambda that fits both a function-type overload and a SAM overload now takes the function type.**
-  - With `outer(f: (Int) -> Int)` beside `outer(f: Function[String, String])`, `"a".outer { p -> ((q: Int) -> p).call(1) }` printed `os:s`; now it prints `oi:1`. To keep the old choice, pass a typed `Function[String, String]` value.
+- **A lambda that fits both a function-type and a SAM extension overload now takes the function type, in either order.**
+  - Before: `os:s` or `oi:1` by order for `"a".outer { p -> ((q: Int) -> p).call(1) }`; now `oi:1`. A class method still reports E0006 here (#2472). The migration guide lists the fix.
 
 ### Fixed
 

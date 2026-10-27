@@ -118,20 +118,23 @@ val xs: List[Object] = [[1, 2], []]
 - **表示されるもの:** 異なる種類の要素を混ぜたコードや、`List[Object]` の引数に渡したコードで、`List[List[Int]].add(String)`（または `Map[String, List[Int]].set(...)`）を示す `E0005` が出ます。
 - **そのまま動くもの:** 明示した型注釈が優先されます。型の分かる隣の要素がないリテラル（`[[], []]`）は、これまでどおりです。
 
-## 多重定義された拡張メソッドにラムダを渡すと、クラスのメソッドと同じように選ばれます
+## 多重定義された拡張メソッドにラムダを渡したとき、宣言の順番で結果が変わらなくなりました
 
-`extension` で同じ名前のメソッドを複数宣言した場合、ラムダ引数で選ばれる多重定義は、クラスのメソッドと同じになりました。
-宣言の順番で選択が変わることはなくなりました。
-次の 5 つの呼び出しは、これまでコンパイルできましたが、意味が変わります。
+`extension` で同じ名前のメソッドを複数宣言した場合、ラムダ引数で選ばれる多重定義は、宣言の順番によらず同じになりました。
+引数の型を書いたラムダでは、クラスのメソッドと同じ多重定義が選ばれます。
+次の 6 つの呼び出しは、これまでコンパイルできましたが、意味が変わります。
 
-| 多重定義 | 呼び出し | 以前 | 現在 | 以前の選択を保つには |
+| 多重定義 | 呼び出し | 以前 | 現在 | 以前の結果を保つには |
 |---|---|---|---|---|
 | `Object` 上の `z(f: (Object) -> void)`、`String` 上の `z(o: Object)` | `"abc".z((x: Object) -> …)` | `String` の `z(Object)` | E0006 | どちらかのメソッド名を変える |
-| `c(n: Long, g: (Long) -> Long)`、`c(n: Object, g: (Long) -> Long)` | `"a".c(5, (x: Long) -> x * 2L)` | 順番により `obj` または `long:10` | E0006 | `long:10` なら `"a".c(5L, …)`、`obj` なら `"a".c(5 as Object, …)` |
-| `k(s: Supplier[String])`、`k(c: Callable[String])` | `"a".k { "v" }` | `call` | E0006 | `val c: Callable[String] = () -> "v"` として `"a".k(c)` |
+| `c(n: Long, g: (Long) -> Long)`、`c(n: Object, g: (Long) -> Long)` | `"a".c(5, (x: Long) -> x * 2L)` | 順番により `obj` または `long:10` | E0006 | `long:10` には `"a".c(5L, …)`、`obj` には `"a".c(5 as Object, …)` |
+| `k(s: Supplier[String])`、`k(c: Callable[String])` | `"a".k { "v" }` | 順番により `call` または `sup` | E0006 | `call` には `val c: Callable[String] = () -> "v"` として `"a".k(c)`、`sup` には同様に `val s: Supplier[String]` |
 | `String` 上の `f(o: Object, g)`、`CharSequence` 上の `f(s: String, g)` | `"a".f("q", (x: Int) -> x)` | `strobj1` | E0006 | `"a".f("q" as Object, …)` |
-| `outer(f: (Int) -> Int)`、`outer(f: Function[String, String])` | `"a".outer { p -> ((q: Int) -> p).call(1) }` | `os:s` | `oi:1` | 型付きの `Function[String, String]` の値を渡す |
+| `outer(f: (Int) -> Int)`、`outer(f: Function[String, String])`（`import { java.util.function.Function }`） | `"a".outer { p -> ((q: Int) -> p).call(1) }` | 順番により `os:s` または `oi:1` | `oi:1` | `val g: Function[String, String] = (p: String) -> …` として `"a".outer(g)` |
+| `r(f: () -> void)`、`r(o: Object)` | `"a".r { IO::print("") }` | 順番により `obj` または `fn` | `fn` | `val h: () -> void = () -> …` として `"a".r(h as Object)` |
 
-- **変わったこと:** ラムダが当てはまる多重定義を、クラスのメソッドと同じ規則で順位付けします。規則は issue #2447 に書かれています。
+- **変わったこと:** ラムダが当てはまる多重定義を、issue #2447 に書かれた 1 つの規則で順位付けします。
+  これはクラスのメソッドの規則に、1 点を加えたものです。関数型の引数は、`Function` や `Comparator` のような SAM インターフェース（抽象メソッドが 1 つのインターフェース）より優先されます（`outer` の行）。
+  クラスのメソッドでは、ここはまだ E0006 になります。クラスを同じ規則にそろえる作業は #2472 で扱います。
 - **表示されるもの:** `E0006`（2 つのメソッドのどちらにも当てはまるという意味のエラー）が出ます。最後の列の直し方を示すヒントが付きます。
 - **そのまま動くもの:** 当てはまる多重定義が 1 つだけの呼び出しと、ラムダ引数のない呼び出しです。

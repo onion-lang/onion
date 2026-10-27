@@ -118,22 +118,26 @@ val xs: List[Object] = [[1, 2], []]
 - **What you see:** `E0005` naming `List[List[Int]].add(String)` (or `Map[String, List[Int]].set(...)`) where the code mixed element kinds, or passed the value to a `List[Object]` parameter.
 - **Still fine:** an explicit annotation wins, and a literal with no typed sibling (`[[], []]`) is typed as before.
 
-## A lambda passed to overloaded extension methods picks like a class method
+## A lambda passed to overloaded extension methods no longer depends on declaration order
 
 When an `extension` declares the same method more than once, a lambda argument now picks the
-overload a class method would. The choice no longer depends on declaration order. Five calls
-that used to compile now mean something else:
+same overload whatever order the methods are declared in. For a lambda with typed parameters
+this is the overload a class method would pick. Six calls that used to compile now mean
+something else:
 
-| Overloads | Call | Before | Now | To keep the old one |
+| Overloads | Call | Before | Now | To keep the old result |
 |---|---|---|---|---|
 | `z(f: (Object) -> void)` on `Object`, `z(o: Object)` on `String` | `"abc".z((x: Object) -> …)` | `String`'s `z(Object)` | E0006 | rename one method |
 | `c(n: Long, g: (Long) -> Long)`, `c(n: Object, g: (Long) -> Long)` | `"a".c(5, (x: Long) -> x * 2L)` | `obj` or `long:10`, by order | E0006 | for `long:10`, `"a".c(5L, …)`; for `obj`, `"a".c(5 as Object, …)` |
-| `k(s: Supplier[String])`, `k(c: Callable[String])` | `"a".k { "v" }` | `call` | E0006 | `val c: Callable[String] = () -> "v"`, then `"a".k(c)` |
+| `k(s: Supplier[String])`, `k(c: Callable[String])` | `"a".k { "v" }` | `call` or `sup`, by order | E0006 | for `call`, `val c: Callable[String] = () -> "v"`, then `"a".k(c)`; for `sup`, the same with `val s: Supplier[String]` |
 | `f(o: Object, g)` on `String`, `f(s: String, g)` on `CharSequence` | `"a".f("q", (x: Int) -> x)` | `strobj1` | E0006 | `"a".f("q" as Object, …)` |
-| `outer(f: (Int) -> Int)`, `outer(f: Function[String, String])` | `"a".outer { p -> ((q: Int) -> p).call(1) }` | `os:s` | `oi:1` | pass a typed `Function[String, String]` value |
+| `outer(f: (Int) -> Int)`, `outer(f: Function[String, String])` (`import { java.util.function.Function }`) | `"a".outer { p -> ((q: Int) -> p).call(1) }` | `os:s` or `oi:1`, by order | `oi:1` | `val g: Function[String, String] = (p: String) -> …`, then `"a".outer(g)` |
+| `r(f: () -> void)`, `r(o: Object)` | `"a".r { IO::print("") }` | `obj` or `fn`, by order | `fn` | `val h: () -> void = () -> …`, then `"a".r(h as Object)` |
 
-- **What changed:** the overloads the lambda fits are ranked as for class methods. The rule is
-  written on issue #2447.
+- **What changed:** the overloads the lambda fits are ranked by one rule, written on issue
+  #2447. It is the class-method rule, with one addition: a function-type parameter beats a SAM
+  interface such as `Function` or `Comparator` (the `outer` row). A class method still reports
+  E0006 there; #2472 tracks bringing classes onto the same rule.
 - **What you see:** `E0006 method call is applicable for both …`, with a hint naming the fixes
   in the last column.
 - **Still fine:** a call with one matching overload, or with no lambda argument.

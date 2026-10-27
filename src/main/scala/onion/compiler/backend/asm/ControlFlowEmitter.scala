@@ -21,6 +21,26 @@ final class ControlFlowEmitter(
   // enclosing try/catch/synchronized's own handler ranges; see `withFinally`.
   private type HoleMarker = (() => Unit) => Unit
 
+  /** Stores the exception a handler just caught (on the stack) into the catch binding and
+    * returns a slot that holds the exception itself. A binding a lambda captures lives in a
+    * box, as any captured local does, so the handler boxes the exception first (#2479). */
+  private def storeCaughtException(binding: onion.compiler.ClosureLocalBinding): Int =
+    val exceptionType = asmType(binding.tp)
+    if !localVars.isBoxed(binding.index) then
+      val slot = localVars.allocateSlot(binding.index, exceptionType)
+      gen.storeLocal(slot)
+      slot
+    else
+      val exceptionSlot = gen.newLocal(exceptionType)
+      gen.storeLocal(exceptionSlot)
+      val boxType = AsmCodeGeneration.boxAsmType(binding.tp)
+      gen.newInstance(boxType)
+      gen.dup()
+      gen.loadLocal(exceptionSlot)
+      gen.invokeConstructor(boxType, org.objectweb.asm.commons.Method("<init>", "(Ljava/lang/Object;)V"))
+      gen.storeLocal(localVars.allocateSlot(binding.index, boxType))
+      exceptionSlot
+
   private def runPendingFinallies(): Unit = runFinalliesDownTo(0)
 
   /** Emit the finally blocks entered since the finally-stack was `depth` deep
@@ -425,8 +445,7 @@ final class ControlFlowEmitter(
         val catchType = node.catchTypes(i)
         val catchStmt = node.catchStatements(i)
         gen.catchException(tryStart, tryEnd, asmType(catchType.tp))
-        val slot = localVars.allocateSlot(catchType.index, asmType(catchType.tp))
-        gen.storeLocal(slot)
+        storeCaughtException(catchType)
         visitStatement(catchStmt)
         gen.goTo(endLabel)
 
@@ -514,8 +533,7 @@ final class ControlFlowEmitter(
           val catchType = node.catchTypes(i)
           val catchStmt = node.catchStatements(i)
           catchExcluding(tryStart, tryEnd, holes, asmType(catchType.tp))
-          val slot = localVars.allocateSlot(catchType.index, asmType(catchType.tp))
-          gen.storeLocal(slot)
+          val slot = storeCaughtException(catchType)
           // Close resources before catch block (Java try-with-resources spec). Pass the
           // matched exception's slot as the primary so a close() failure is suppressed
           // onto it (and the catch body still runs) rather than replacing it.
@@ -586,8 +604,7 @@ final class ControlFlowEmitter(
           val catchType = node.catchTypes(i)
           val catchStmt = node.catchStatements(i)
           catchExcluding(tryStart, tryEnd, holes, asmType(catchType.tp))
-          val slot = localVars.allocateSlot(catchType.index, asmType(catchType.tp))
-          gen.storeLocal(slot)
+          val slot = storeCaughtException(catchType)
           val alreadyClosed = gen.newLabel()
           gen.loadLocal(closedFlag)
           gen.ifZCmp(GeneratorAdapter.NE, alreadyClosed)

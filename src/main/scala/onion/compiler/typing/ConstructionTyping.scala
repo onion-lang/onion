@@ -481,8 +481,10 @@ final class ConstructionTyping(
           val classSubst = TypeSubstitution.classSubstitution(applied)
           val formals = constructors(0).getArgs.map(t =>
             TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+          warnNullArguments(constructors(0), node.args.toArray, parameters, formals)
           Some(new NewObject(appliedCtor, adaptToFormals(parameters, formals)))
         case _ =>
+          warnNullArguments(constructors(0), node.args.toArray, parameters, constructors(0).getArgs)
           Some(new NewObject(constructors(0), adaptToFormals(parameters, constructors(0).getArgs)))
       }
     }
@@ -520,6 +522,23 @@ final class ConstructionTyping(
         i += 1
       }
       out
+    }
+
+  /** W0012 for a `null` argument to an Onion-declared constructor's non-null
+   *  parameter, as a method call already warns (#2464). A Java constructor's
+   *  parameter nullness is unknown, so it stays silent (#2116). */
+  private def warnNullArguments(ctor: ConstructorRef, args: Array[? <: AST.Node], params: Array[Term], formals: Array[Type]): Unit =
+    if (ctor.isInstanceOf[ConstructorDefinition]) {
+      var i = 0
+      while (i < params.length && i < args.length && i < formals.length) {
+        val p = params(i)
+        val f = formals(i)
+        if (p != null && args(i) != null && p.`type`.isNullType && !f.isBasicType && !f.isNullable && !f.isNullType) {
+          bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
+          bodyContext.warningReporter.nullToNonNullable(args(i).location, f.displayName)
+        }
+        i += 1
+      }
     }
 
   /** Whether `actual` can fill a parameter declared `formal`, either through
@@ -918,6 +937,7 @@ final class ConstructionTyping(
       TypeSubstitution.substituteType(a.argType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
     val result = new Array[Term](argsWithDefaults.length)
     val filled = new Array[Boolean](argsWithDefaults.length)
+    val sources = new Array[AST.Node](argsWithDefaults.length)
 
     var positionalIndex = 0
     var sawNamed = false
@@ -942,6 +962,7 @@ final class ConstructionTyping(
               case Some(term) =>
                 result(paramIndex) = term
                 filled(paramIndex) = true
+                sources(paramIndex) = named.value
               case None =>
                 hasError = true
             }
@@ -961,6 +982,7 @@ final class ConstructionTyping(
               case Some(term) =>
                 result(positionalIndex) = term
                 filled(positionalIndex) = true
+                sources(positionalIndex) = expr
                 positionalIndex += 1
               case None =>
                 hasError = true
@@ -989,6 +1011,7 @@ final class ConstructionTyping(
         argsWithDefaults.map(_.argType), ctor.affiliation.constructors)
       return None
     }
+    warnNullArguments(ctor, sources, result, formals)
 
     // Fill missing arguments with default values
     argsWithDefaults.indices.foreach { i =>

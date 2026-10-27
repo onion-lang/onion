@@ -169,6 +169,8 @@ class SemanticErrorReporter(threshold: Int) {
     val suggestion =
       if (streamToListHint(targetType, name).isDefined) {
         streamToListHint(targetType, name)
+      } else if (primitiveArrayPipelineHint(targetType, name).isDefined) {
+        primitiveArrayPipelineHint(targetType, name)
       } else if (enclosingStaticOwner != null) {
         Some(format(message("suggestion.didYouMean"), Seq(s"$enclosingStaticOwner::$name")))
       } else if (!calledStatically && ForeignStringNames.contains(name) && isStringType(targetType)) {
@@ -418,6 +420,21 @@ class SemanticErrorReporter(threshold: Int) {
           .exists(n => implementsType(ct, n))
         val conversion = if (primitive) "boxed().toList()" else "toList()"
         Some(format(message("suggestion.didYouMean"), Seq(s"$conversion.$name")))
+      case _ => None
+
+  /**
+   * The builtin array pipelines take a `T[]`, which an `Int[]` is not (#2458): convert
+   * through a boxed stream, instead of a name-similarity guess such as `wait`. Only
+   * `Int[]`/`Long[]`/`Double[]` have an `Arrays::stream`, so only they get the hint.
+   */
+  private def primitiveArrayPipelineHint(t: TypedAST.Type, name: String): Option[String] =
+    t match
+      case at: TypedAST.ArrayType if at.dimension == 1 &&
+          Set[TypedAST.Type](TypedAST.BasicType.INT, TypedAST.BasicType.LONG, TypedAST.BasicType.DOUBLE).contains(at.component) &&
+          Typing.builtinExtensions.getOrElse(Typing.ArrayExtensionReceiver, Nil).exists(_.name == name) =>
+        val conversion = "java.util.Arrays::stream(xs).boxed().toList()"
+        val snippet = if (name == "toList") conversion else s"$conversion.$name(...)"
+        Some(format(message("suggestion.primitiveArrayPipeline"), Seq(typeName(at), snippet)))
       case _ => None
 
   private def implementsType(ct: TypedAST.ClassType, target: String): Boolean = {

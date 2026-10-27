@@ -526,9 +526,9 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           typing.lookupExtensionMethods(classType.name).foreach { extMethod =>
             if (extMethod.name == name) result += extMethod
           }
-        case _: ArrayType =>
+        case at: ArrayType =>
           typing.lookupExtensionMethods(Typing.ArrayExtensionReceiver).foreach { extMethod =>
-            if (extMethod.name == name) result += extMethod
+            if (extMethod.name == name && arrayReceiverAccepts(extMethod.receiverType, at)) result += extMethod
           }
         case _ =>
       }
@@ -538,6 +538,20 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 
     collect(targetType)
     result.toSeq
+  }
+
+  /** An array of primitives (`Int[]`) fits only an extension on that exact array type,
+   *  as in Java: a `T[]` receiver cannot bind `T` to `Int` (#2458). */
+  private def arrayReceiverAccepts(receiverType: Type, actual: ArrayType): Boolean = {
+    def primitiveArray(t: Type): Boolean = t match {
+      case a: ArrayType => a.dimension == 1 && a.component.isBasicType
+      case _ => false
+    }
+    if (primitiveArray(actual) || primitiveArray(receiverType)) receiverType match {
+      case a: ArrayType => a.dimension == actual.dimension && a.component == actual.component
+      case _ => false
+    }
+    else true
   }
 
   /** A builtin stdlib extension (the bundled collection/string utilities), as

@@ -167,7 +167,8 @@ Migrated 1 of 4 file(s)
   decide then counts as needing a manual change, and the syntax error is printed. The
   exception is an old `ret [a, b]`, which does not parse today: that file is read with
   `yield`.
-  A file that cannot be read is reported and left out.
+  A file that cannot be read (onion migrate reads UTF-8 only) is reported. It may declare
+  a `ret`, so while one is left out no file is rewritten, and each `ret` is reported.
   A file named twice (`src` and `./src/Main.on`) is read once.
 - **`-classpath <path>`** is where classes from outside the named files come from, such as a
   library's jar.

@@ -460,7 +460,7 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     }
     read(root.resolve("Main.on")) shouldBe main
 
-  test("the panel's repro: a file that cannot be read is left out of the joint pass"):
+  test("the panel's repro: a file that cannot be read leaves every pending ret undecided"):
     val root = Files.createTempDirectory("onion-migrate-project").toRealPath()
     val src = Files.createDirectories(root.resolve("src"))
     val model =
@@ -475,21 +475,62 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     Files.writeString(src.resolve("main.on"), main, UTF_8)
     Files.write(src.resolve("sjis.on"), "IO::println(\"こんにちは\")\n".getBytes("Shift_JIS"))
 
-    val result = invoke(root, src.toString)
+    for args <- Seq(Seq("--check", src.toString), Seq(src.toString)) do
+      val result = invoke(root, args*)
+      withClue(result.stdout + result.stderr) {
+        result.exitCode shouldBe 1
+        result.stderr should include("Could not migrate src/sjis.on: it is not valid UTF-8")
+        result.stderr should not include "Exception"
+        result.stderr should include("src/model.on:4:77:")
+        result.stderr should include("src/main.on:2:40:")
+        result.stderr should include("left out: src/sjis.on")
+        result.stdout should include("2 file(s) need a manual change")
+        result.stdout should not include "Migrated"
+        result.stdout should not include "would be migrated"
+      }
+      read(src.resolve("model.on")) shouldBe model
+      read(src.resolve("main.on")) shouldBe main
 
-    withClue(result.stdout + result.stderr) {
-      result.exitCode shouldBe 1
-      result.stderr should include("Could not migrate src/sjis.on")
-      result.stdout should include("Migrated 2 of 3 file(s)")
+    Files.writeString(src.resolve("sjis.on"), "IO::println(\"こんにちは\")\n", UTF_8)
+    val converted = invoke(root, src.toString)
+    withClue(converted.stdout + converted.stderr) {
+      converted.exitCode shouldBe 0
+      converted.stdout should include("Migrated 2 of 3 file(s)")
     }
     read(src.resolve("model.on")) shouldBe model.replace("ret a + b", "yield a + b")
     read(src.resolve("main.on")) shouldBe main.replace("ret s * 10", "yield s * 10")
 
-    val again = invoke(root, src.toString)
-    withClue(again.stdout + again.stderr) {
-      again.exitCode shouldBe 1
-      again.stdout should include("2 file(s) already up to date")
+  test("the panel's repro: an unreadable file that declares ret keeps a ret that calls it"):
+    val dir = Files.createTempDirectory("onion-migrate-sj").toRealPath()
+    val sj = Files.createDirectories(dir.resolve("sj"))
+    val ext = "// あい comment in Shift_JIS\nextension Main {\n  def ret(): Option[Int] = Option::none()\n}\n"
+    val main =
+      """class Main {
+        |public:
+        |  def this {}
+        |  def go(): Option[Int] = do[Option] { a <- Option::some(1); ret a }
+        |  static def main(args: String[]): void { IO::println(new Main().go()) }
+        |}
+        |""".stripMargin
+    Files.write(sj.resolve("Ext.on"), ext.getBytes("Shift_JIS"))
+    Files.writeString(sj.resolve("Main.on"), main, UTF_8)
+
+    val check = invoke(dir, "--check", sj.toString)
+    withClue(check.stdout + check.stderr) {
+      check.exitCode shouldBe 1
+      check.stdout should not include "would be migrated"
+      check.stderr should include("sj/Main.on:4:62: this `ret` may be the old do-block keyword")
     }
+
+    val result = invoke(dir, sj.toString)
+    withClue(result.stdout + result.stderr) {
+      result.exitCode shouldBe 1
+      result.stderr should include("Could not migrate sj/Ext.on")
+      result.stderr should include("sj/Main.on:4:62:")
+      result.stdout should not include "ret -> yield"
+      result.stdout should include("1 file(s) need a manual change")
+    }
+    read(sj.resolve("Main.on")) shouldBe main
 
   test("the panel's repro: a syntax error in another file makes a pending ret undecided, not a name"):
     val root = Files.createTempDirectory("onion-migrate-project").toRealPath()

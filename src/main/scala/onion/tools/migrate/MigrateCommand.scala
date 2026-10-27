@@ -30,7 +30,7 @@ import onion.tools.format.FormatCommand
  *  - a file that does not parse as written, but does with its places rewritten, means
  *    nothing as written: it is read with them rewritten, and kept so if it then has no error;
  *  - anything else (an error anywhere that is not at a place, an error left after the rewrite, a
- *    compile stopped before type checking): its places are printed to stderr with that
+ *    compile stopped before type checking, a named file that could not be read or migrated): its places are printed to stderr with that
  *    error, the file is left as it was, the summary counts it as needing a manual change, and
  *    the exit code is 1.
  * An error that is not at a place proves nothing: it may come from another file named
@@ -109,8 +109,9 @@ object MigrateCommand:
 
     var changed = 0
     var undecided = 0
-    // Files that could not be read or migrated at all: never counted as up to date.
-    var skipped = 0
+    // Files that could not be read or migrated at all: never counted as up to date, and left
+    // out of the joint compile, so while there is one it decides nothing.
+    val leftOut = mutable.ListBuffer[Path]()
     var failed = false
     // The text each readable file has now: rewritten once decided, as read otherwise.
     val texts = mutable.LinkedHashMap[Path, String]()
@@ -157,6 +158,17 @@ object MigrateCommand:
       err.println("  Fix that error and run onion migrate again, or change the `ret` by hand. " +
         "If the file uses classes from other files, name those files too, or pass -classpath.")
 
+    /** A named file was left out of the joint compile; it may declare this `ret`. */
+    def notRead(file: Path, result: Migrator.Result): Unit =
+      undecided += 1
+      failed = true
+      result.edits.foreach { e =>
+        err.println(s"${display(file)}:${e.line}:${e.column}: this `ret` may be the old do-block keyword. " +
+          "Another named file could not be migrated, and it may declare `ret`, so onion migrate left this one as written.")
+      }
+      leftOut.foreach(skippedFile => err.println(s"  left out: ${display(skippedFile)}"))
+      err.println("  Fix the error reported for that file and run onion migrate again, or change the `ret` by hand.")
+
     files.foreach { file =>
       try
         val source = Files.readString(file, UTF_8)
@@ -170,14 +182,20 @@ object MigrateCommand:
             pending(file) = (source, result)
             if !alone.typed && Compile.check(Seq(file -> result.text), classpath).typed then unparsed += file
       catch
+        case _: java.nio.charset.MalformedInputException =>
+          err.println(s"error: Could not migrate ${display(file)}: it is not valid UTF-8; " +
+            "onion migrate reads UTF-8 only. Convert the file to UTF-8 and run onion migrate again.")
+          leftOut += file
+          texts.remove(file)
+          failed = true
         case error: IOException =>
           err.println(s"error: Could not migrate ${display(file)}: ${error.getMessage}")
-          skipped += 1
+          leftOut += file
           texts.remove(file)
           failed = true
         case _: StackOverflowError =>
           err.println(s"error: Could not migrate ${display(file)}: it nests too deeply; left untouched")
-          skipped += 1
+          leftOut += file
           texts.remove(file)
           failed = true
     }
@@ -192,7 +210,9 @@ object MigrateCommand:
     // once with the files that have errors rewritten. The first compile decides only if every
     // error in it, in any file, is at a place: any other error (a class two unrelated scripts
     // both declare, say) may be why a name is or is not found, so it proves nothing.
-    if pending.nonEmpty then
+    if pending.nonEmpty && leftOut.nonEmpty then
+      pending.foreach { case (file, (_, result)) => notRead(file, result) }
+    else if pending.nonEmpty then
       val unit = (rewritten: Set[Path]) => texts.toSeq.map { (file, text) =>
         pending.get(file) match
           case Some((source, result)) => file -> (if rewritten(file) || unparsed(file) then result.text else source)
@@ -220,10 +240,10 @@ object MigrateCommand:
           else rewrite(file, source, result)
       }
 
-    val upToDate = files.size - changed - undecided - skipped
+    val upToDate = files.size - changed - undecided - leftOut.size
     if check && changed > 0 then out.println(s"$changed file(s) would be migrated")
     else if changed > 0 then out.println(s"Migrated $changed of ${files.size} file(s)")
-    else if upToDate > 0 || undecided + skipped == 0 then out.println(s"$upToDate file(s) already up to date")
+    else if upToDate > 0 || undecided + leftOut.size == 0 then out.println(s"$upToDate file(s) already up to date")
     if undecided > 0 then out.println(s"$undecided file(s) need a manual change")
 
     if failed then 1

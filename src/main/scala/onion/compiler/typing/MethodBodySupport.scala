@@ -108,10 +108,23 @@ private[compiler] final class MethodBodySupport(
       else if matched.length > 1 then
         bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
       else
+        warnNullSuperArguments(matched(0), node.superInits, params)
         val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
         finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
     }
+
+  /** W0012 for a `null` argument to an Onion-declared super/self constructor's
+   *  non-null parameter, as `new P(null)` already warns (#2477). A Java
+   *  constructor's parameter nullness is unknown, so it stays silent (#2116). */
+  private def warnNullSuperArguments(ctor: ConstructorRef, args: List[AST.Expression], params: Array[Term]): Unit =
+    if ctor.isInstanceOf[ConstructorDefinition] then
+      val formals = ctor.getArgs
+      args.zip(params).zip(formals).foreach { case ((arg, p), f) =>
+        if p != null && p.`type`.isNullType && !f.isBasicType && !f.isNullable && !f.isNullType then
+          bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
+          bodyContext.warningReporter.nullToNonNullable(arg.location, f.displayName)
+      }
 
   /**
    * Boxing-aware super-constructor fallback: substitutes the parent's class type

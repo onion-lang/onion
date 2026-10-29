@@ -767,7 +767,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       case a: ArrayType => a.dimension == actual.dimension && a.component == actual.component
       case _ => false
     }
-    else true
+    else receiverType match {
+      case a: ArrayType => TypeRules.isAssignable(a, actual)
+      case _ => true
+    }
   }
 
   /** A builtin stdlib extension (the bundled collection/string utilities), as

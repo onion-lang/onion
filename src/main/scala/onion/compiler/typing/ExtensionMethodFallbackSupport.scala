@@ -740,7 +740,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       currentType match {
         case classType: ClassType =>
           typing.lookupExtensionMethods(classType.name).foreach { extMethod =>
-            if (extMethod.name == name) result += extMethod
+            if (extMethod.name == name && receiverArgumentsMatch(extMethod.receiverType, classType)) result += extMethod
           }
         case at: ArrayType =>
           typing.lookupExtensionMethods(Typing.ArrayExtensionReceiver).foreach { extMethod =>
@@ -755,6 +755,18 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     collect(targetType)
     result.toSeq
   }
+
+  /** `extension List[Int]` and `extension List[String]` can both declare `describe`: a block
+   *  whose type arguments differ from the receiver's own (`List[Int]`) is not a candidate
+   *  (#2457). A raw receiver type, or a different class, is not compared. */
+  private def receiverArgumentsMatch(declared: Type, actual: ClassType): Boolean =
+    (declared, actual) match {
+      case (d: AppliedClassType, a: AppliedClassType) if d.raw.name == a.raw.name && d.typeArguments.length == a.typeArguments.length =>
+        d.typeArguments.zip(a.typeArguments).forall { (x, y) =>
+          TypeRules.isSuperType(x, y) && TypeRules.isSuperType(y, x)
+        }
+      case _ => true
+    }
 
   /** A `T[]` receiver cannot bind `T` to a primitive, as in Java (#2458), so a primitive
    *  array (`Int[]`) is matched only against a receiver of exactly its own array type. */

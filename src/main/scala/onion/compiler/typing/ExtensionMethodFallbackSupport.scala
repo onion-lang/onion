@@ -740,7 +740,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       currentType match {
         case classType: ClassType =>
           typing.lookupExtensionMethods(classType.name).foreach { extMethod =>
-            if (extMethod.name == name && receiverArgumentsMatch(extMethod.receiverType, classType)) result += extMethod
+            if (extMethod.name == name && (isBuiltinExtension(extMethod) || receiverArgumentsMatch(extMethod.receiverType, classType))) result += extMethod
           }
         case at: ArrayType =>
           typing.lookupExtensionMethods(Typing.ArrayExtensionReceiver).foreach { extMethod =>

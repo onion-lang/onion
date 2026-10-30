@@ -252,6 +252,15 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   private def isStringArrayArg(a: AST.Argument): Boolean =
     !a.isVararg && isStringArrayParam(a.typeRef)
 
+  // A `List[..]` or array parameter (not varargs): the author wants a list of arguments,
+  // which a `tool` cannot take yet (issue #2254), so the message says that.
+  private def isListArg(a: AST.Argument): Boolean =
+    !a.isVararg && a.typeRef != null && (a.typeRef.desc match {
+      case _: AST.ArrayType => true
+      case AST.ParameterizedType(AST.ReferenceType(n, _), _) => n == "List" || n == "java.util.List"
+      case _ => false
+    })
+
   /** The parameter's type as written, `String...` for varargs, for CLI diagnostics. */
   private def cliTypeDesc(a: AST.Argument): String =
     (if (a.typeRef == null) "(none)" else a.typeRef.desc.toString) + (if (a.isVararg) "..." else "")
@@ -295,7 +304,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       a <- t.args
       if cliKindOfArg(a).isEmpty
     } yield CompileError("", a.location,
-      Message("error.semantic.toolParameterNotCliConvertible",
+      if (isListArg(a)) Message("error.semantic.toolListParameter", Array[Any](t.name, a.name, cliTypeDesc(a)))
+      else Message("error.semantic.toolParameterNotCliConvertible",
         Array[Any](t.name, a.name, cliTypeDesc(a), ScalarConversions.supportedNames)),
       Some(TOOL_PARAMETER_NOT_CLI_CONVERTIBLE.errorCode))
     if (badParams.nonEmpty) throw new CompilationException(badParams)

@@ -2174,6 +2174,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多重定義された拡張メソッドにラムダを渡したとき、宣言の順番で結果が変わらなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4757,6 +4768,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多重定義された拡張メソッドにラムダを渡したとき、宣言の順番で結果が変わらなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4794,23 +4816,21 @@
 <li><strong>変わったこと:</strong> <code>yield</code> は予約語になりました。<code>ret</code> は普通の識別子に戻りました。</li>
 <li><strong>表示されるもの:</strong> 古いコードでは「ローカル変数 ret が見つかりません」と表示され、<code>yield</code> を使うようヒントが出ます。</li>
 <li><strong><code>yield</code> という名前の Java メソッド:</strong> バッククォートで呼び出します（例: <code>Thread::`yield`()</code>）。</li>
-<li><strong>プロジェクト全体を書き換える:</strong>
-  <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>grep<span class="w"> </span>-rl<span class="w"> </span><span class="s1">'\bret\b'</span><span class="w"> </span>--include<span class="o">=</span><span class="s1">'*.on'</span><span class="w"> </span>.<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>perl<span class="w"> </span>-pi<span class="w"> </span>-e<span class="w"> </span><span class="s1">'s/\bret\b/yield/g'</span>
-</span></code></pre></div>
-  <code>ret</code> を変数名として使っている場合は、結果を確認してください。</li>
+<li><strong>プロジェクト全体を書き換える:</strong> <code>onion migrate src/ tests/</code>（ファイルやディレクトリを任意に指定できます）。
+  書き換えるのは <code>do</code> ブロックの <code>ret</code> だけです。<code>ret</code> という名前の変数・文字列・コメントは変えません。</li>
 </ul>
 <h2 id="2147483648-"><code>2147483648</code> の直前には <code>-</code> が必要になりました<a class="headerlink" href="#2147483648-" title="Permanent link">&para;</a></h2>
 <p>リテラル <code>2147483648</code>（と <code>9223372036854775808L</code>）は、<code>-2147483648</code> のように単項 <code>-</code> のオペランドそのものである場合だけ有効です。
 それ以外の場所では、以前は黙って最小値に化けていました。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// 以前: コンパイルでき、意外な値になっていた</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648</span><span class="w">          </span><span class="c1">// -2147483647（ラップアラウンドによる）</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Long</span><span class="w">     </span><span class="c1">// 2147483648: `as` は `-` より強く結合する</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">         </span><span class="c1">// 1073741824: `/` は `-` より強く結合する</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1">// 現在</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648L</span><span class="w">         </span><span class="c1">// または 1L - 2147483648L</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648L</span><span class="w">            </span><span class="c1">// または (-2147483648) as Long</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">-</span><span class="mi">2147483648</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">       </span><span class="c1">// -1073741824</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// 以前: コンパイルでき、意外な値になっていた</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648</span><span class="w">          </span><span class="c1">// -2147483647（ラップアラウンドによる）</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Long</span><span class="w">     </span><span class="c1">// 2147483648: `as` は `-` より強く結合する</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">         </span><span class="c1">// 1073741824: `/` は `-` より強く結合する</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1">// 現在</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648L</span><span class="w">         </span><span class="c1">// または 1L - 2147483648L</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648L</span><span class="w">            </span><span class="c1">// または (-2147483648) as Long</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">-</span><span class="mi">2147483648</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">       </span><span class="c1">// -1073741824</span>
 </span></code></pre></div>
 <ul>
 <li><strong>変わったこと:</strong> 最小値の絶対値は、トークンではなく、それを符号反転する場所で検査します。</li>
@@ -4820,15 +4840,15 @@
 <h2 id="10-bs">10進数の <code>B</code>/<code>S</code> リテラルは符号付きの範囲に収める必要があります<a class="headerlink" href="#10-bs" title="Permanent link">&para;</a></h2>
 <p>10進数の <code>Byte</code> リテラルは -128..127、10進数の <code>Short</code> リテラルは -32768..32767 の範囲になりました。
 Java と同じです。以前は、範囲外の値が黙って桁あふれしていました。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// 以前: コンパイルが通り、意外な値になる</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">mask</span><span class="p">:</span><span class="w"> </span><span class="kt">Byte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">255</span><span class="nc">B</span><span class="w">           </span><span class="c1">// -1</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Short</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">40000</span><span class="nc">S</span><span class="w">        </span><span class="c1">// -25536</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">128</span><span class="nc">B</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Int</span><span class="w">            </span><span class="c1">// 128: `as` は `-` より強く結合する</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1">// 現在</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">mask</span><span class="p">:</span><span class="w"> </span><span class="kt">Byte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mb">0b11111111</span><span class="nc">B</span><span class="w">    </span><span class="c1">// -1。ビットパターンとして書く</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">40000</span><span class="w">           </span><span class="c1">// Short には 40000 は入らない</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">-</span><span class="mi">128</span><span class="nc">B</span><span class="p">)</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Int</span><span class="w">          </span><span class="c1">// -128</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// 以前: コンパイルが通り、意外な値になる</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">mask</span><span class="p">:</span><span class="w"> </span><span class="kt">Byte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">255</span><span class="nc">B</span><span class="w">           </span><span class="c1">// -1</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Short</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">40000</span><span class="nc">S</span><span class="w">        </span><span class="c1">// -25536</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">128</span><span class="nc">B</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Int</span><span class="w">            </span><span class="c1">// 128: `as` は `-` より強く結合する</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1">// 現在</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">mask</span><span class="p">:</span><span class="w"> </span><span class="kt">Byte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mb">0b11111111</span><span class="nc">B</span><span class="w">    </span><span class="c1">// -1。ビットパターンとして書く</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">40000</span><span class="w">           </span><span class="c1">// Short には 40000 は入らない</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">-</span><span class="mi">128</span><span class="nc">B</span><span class="p">)</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Int</span><span class="w">          </span><span class="c1">// -128</span>
 </span></code></pre></div>
 <ul>
 <li><strong>変更点:</strong> <code>2147483648</code> と同じく、<code>128B</code> と <code>32768S</code> は <code>-</code> のオペランドそのものである場合だけ有効です。</li>
@@ -4841,14 +4861,14 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <h2 id="config-string"><code>config</code> ファイルの引用符付き <code>String</code> は、引用符を外して読むようになりました<a class="headerlink" href="#config-string" title="Permanent link">&para;</a></h2>
 <p><code>shape name = config</code> のレコードは、二重引用符で囲まれた <code>String</code> の値を、引用された文字列として読みます。
 これで、前後の空白を持つ値も <code>print</code> と <code>parse</code> を往復できます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a># 以前: 引用符も値の一部だった
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>name = "Alice"          # "Alice" と読む（7 文字）
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a># 現在
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>name = "Alice"          # Alice と読む（5 文字）
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>name = "  Alice  "      #   Alice   と読む（空白を保つ）
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>name =   Alice          # Alice と読む（引用符のない値はこれまでどおり trim）
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>name = "\"Alice\""      # "Alice" と読む（引用符を文字として残す書き方）
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># 以前: 引用符も値の一部だった
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>name = "Alice"          # "Alice" と読む（7 文字）
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a># 現在
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>name = "Alice"          # Alice と読む（5 文字）
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>name = "  Alice  "      #   Alice   と読む（空白を保つ）
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>name =   Alice          # Alice と読む（引用符のない値はこれまでどおり trim）
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>name = "\"Alice\""      # "Alice" と読む（引用符を文字として残す書き方）
 </span></code></pre></div>
 <ul>
 <li><strong>変わったこと:</strong> 引用符の中では、<code>\"</code> が引用符、<code>\\</code> がバックスラッシュです。
@@ -4862,21 +4882,114 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <h2 id="_1">空の <code>[]</code> / <code>[:]</code> は、隣の要素の型になりました<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>リストリテラル、またはマップリテラルの値に空の <code>[]</code> / <code>[:]</code> があると、他の要素が揃っている型として扱います。
 以前は、リテラル全体が <code>Object</code> に広がっていました。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1">// 以前: List[Object] なので、adj[1].add(5) は E0005 で、次の行はコンパイルできた</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">// 現在: List[List[Int]] なので、adj[1].add(5) はコンパイルでき、次の行は E0005</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1">// 以前の型を保つには、型を注釈する</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Object</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">// 以前: List[Object] なので、adj[1].add(5) は E0005 で、次の行はコンパイルできた</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1">// 現在: List[List[Int]] なので、adj[1].add(5) はコンパイルでき、次の行は E0005</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1">// 以前の型を保つには、型を注釈する</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Object</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
 </span></code></pre></div>
 <ul>
 <li><strong>変わったこと:</strong> 空のリテラルは、隣の要素の後に、その型で型付けされます。要素の評価順は、これまでどおりソースの順です。</li>
 <li><strong>表示されるもの:</strong> 異なる種類の要素を混ぜたコードや、<code>List[Object]</code> の引数に渡したコードで、<code>List[List[Int]].add(String)</code>（または <code>Map[String, List[Int]].set(...)</code>）を示す <code>E0005</code> が出ます。</li>
 <li><strong>そのまま動くもの:</strong> 明示した型注釈が優先されます。型の分かる隣の要素がないリテラル（<code>[[], []]</code>）は、これまでどおりです。</li>
+</ul>
+<h2 id="_2">多重定義された拡張メソッドにラムダを渡したとき、宣言の順番で結果が変わらなくなりました<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p><code>extension</code> で同じ名前のメソッドを複数宣言した場合、ラムダ引数で選ばれる多重定義は、宣言の順番によらず同じになりました。
+以前は、最初または最後に宣言された多重定義が実行されることがよくありました。
+全体として、次のように変わります。</p>
+<ul>
+<li><strong>コンパイルできていた呼び出しで、別の多重定義が実行されることがあります。</strong> クラスのメソッドが選ぶもの（下記の 1 点を除く）です。主に、引数の型を書いていないラムダが対象です。</li>
+<li><strong>コンパイルできていた呼び出しが E0006 になることがあります。</strong> 2 つの多重定義が同じ程度に当てはまる場合です。</li>
+<li><strong>以前の多重定義を保つには:</strong> ラムダの引数に型を書く、ほかの引数を <code>as</code> で渡す（<code>5 as Object</code>、<code>2 as Double</code>）、ラムダを型付きの値として渡す、またはどちらかのメソッド名を変えてください。</li>
+</ul>
+<p>例:</p>
+<table>
+<thead>
+<tr>
+<th>多重定義</th>
+<th>呼び出し</th>
+<th>以前</th>
+<th>現在</th>
+<th>以前の結果を保つには</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Object</code> 上の <code>z(f: (Object) -&gt; void)</code>、<code>String</code> 上の <code>z(o: Object)</code></td>
+<td><code>"abc".z((x: Object) -&gt; …)</code></td>
+<td><code>String</code> の <code>z(Object)</code></td>
+<td>E0006</td>
+<td>どちらかのメソッド名を変える</td>
+</tr>
+<tr>
+<td><code>c(n: Long, g: (Long) -&gt; Long)</code>、<code>c(n: Object, g: (Long) -&gt; Long)</code></td>
+<td><code>"a".c(5, (x: Long) -&gt; x * 2L)</code></td>
+<td>順番により <code>obj</code> または <code>long:10</code></td>
+<td>E0006</td>
+<td><code>long:10</code> には <code>"a".c(5L, …)</code>、<code>obj</code> には <code>"a".c(5 as Object, …)</code></td>
+</tr>
+<tr>
+<td><code>k(s: Supplier[String])</code>、<code>k(c: Callable[String])</code></td>
+<td><code>"a".k { "v" }</code></td>
+<td>順番により <code>call</code> または <code>sup</code></td>
+<td>E0006</td>
+<td><code>call</code> には <code>val c: Callable[String] = () -&gt; "v"</code> として <code>"a".k(c)</code>、<code>sup</code> には同様に <code>val s: Supplier[String]</code></td>
+</tr>
+<tr>
+<td><code>String</code> 上の <code>f(o: Object, g)</code>、<code>CharSequence</code> 上の <code>f(s: String, g)</code></td>
+<td><code>"a".f("q", (x: Int) -&gt; x)</code></td>
+<td><code>strobj1</code></td>
+<td>E0006</td>
+<td><code>"a".f("q" as Object, …)</code></td>
+</tr>
+<tr>
+<td><code>outer(f: (Int) -&gt; Int)</code>、<code>outer(f: Function[String, String])</code>（<code>import { java.util.function.Function }</code>）</td>
+<td><code>"a".outer { p -&gt; ((q: Int) -&gt; p).call(1) }</code></td>
+<td>順番により <code>os:s</code> または <code>oi:1</code></td>
+<td><code>oi:1</code></td>
+<td><code>val g: Function[String, String] = (p: String) -&gt; …</code> として <code>"a".outer(g)</code></td>
+</tr>
+<tr>
+<td><code>r(f: () -&gt; void)</code>、<code>r(o: Object)</code></td>
+<td><code>"a".r { IO::print("") }</code></td>
+<td>順番により <code>obj</code> または <code>fn</code></td>
+<td><code>fn</code></td>
+<td><code>val h: () -&gt; void = () -&gt; …</code> として <code>"a".r(h as Object)</code></td>
+</tr>
+<tr>
+<td><code>m(n: Int, f: (Int) -&gt; Int)</code>、<code>m(n: Object, f: (Object) -&gt; Object)</code></td>
+<td><code>"a".m(1, { x -&gt; x })</code></td>
+<td>順番により <code>obj:1</code> または <code>int:1</code></td>
+<td><code>int:1</code></td>
+<td><code>"a".m(1 as Object, { x -&gt; x })</code></td>
+</tr>
+<tr>
+<td><code>k(n: Int, f: (Int) -&gt; Int): Int</code>、<code>k(n: Double, f: (Double) -&gt; Double): Double</code></td>
+<td><code>"a".k(2, { x -&gt; x * 2 })</code></td>
+<td><code>4.0</code>（<code>Double</code> のほう）</td>
+<td><code>4</code></td>
+<td><code>"a".k(2, (x: Double) -&gt; x * 2.0)</code></td>
+</tr>
+<tr>
+<td><code>run(r: Runnable)</code>、<code>run(c: Callable[Object])</code></td>
+<td><code>"a".run { IO::print("") }</code></td>
+<td><code>callable:null</code></td>
+<td><code>runnable</code></td>
+<td>型付きの <code>Callable[Object]</code> の値を渡す</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>変わったこと:</strong> ラムダが当てはまる多重定義を、issue #2447 に書かれた 1 つの規則で順位付けします。
+  これはクラスのメソッドの規則に、1 点を加えたものです。関数型の引数は、<code>Function</code> や <code>Comparator</code> のような SAM インターフェース（抽象メソッドが 1 つのインターフェース）より優先されます（<code>outer</code> の行）。
+  クラスのメソッドでは、ここはまだ E0006 になります。クラスを同じ規則にそろえる作業は #2472 で扱います。</li>
+<li><strong>表示されるもの:</strong> <code>E0006</code>（2 つのメソッドのどちらにも当てはまるという意味のエラー）が出ます。最後の列の直し方を示すヒントが付きます。</li>
+<li><strong>そのまま動くもの:</strong> 当てはまる多重定義が 1 つだけの呼び出しと、ラムダ引数のない呼び出しです。</li>
 </ul>
 
 

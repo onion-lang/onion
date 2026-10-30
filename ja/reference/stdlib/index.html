@@ -10325,8 +10325,9 @@ SAM 変換され、<code>a.forEach(action)</code> は常に <strong>ネイティ
 </span><span id="__span-113-4"><a id="__codelineno-113-4" name="__codelineno-113-4" href="#__codelineno-113-4"></a><span class="nb">Codec</span><span class="o">::</span><span class="nf">urlEncode</span><span class="p">(</span><span class="s2">"a b&amp;c"</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nb">Codec</span><span class="o">::</span><span class="nf">urlDecode</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
 </span></code></pre></div>
 <ul>
-<li><code>base64Decode</code> は空白文字を読み飛ばします。ファイル末尾の改行や、<code>base64</code> コマンドの 76 桁ごとの改行があってもそのままデコードできます。</li>
-<li>デコーダに不正な入力を渡すと、問題を示す <code>IllegalArgumentException</code> を投げます。例: <code>invalid Base64 character '!' at index 10</code>、<code>invalid % escape at index 3 in "100%zz"</code>。</li>
+<li><code>base64Decode</code> は空白文字を読み飛ばします。ファイル末尾の改行や、<code>base64</code> コマンドの 76 桁ごとの改行があってもそのままデコードできます。
+  先頭のバイトオーダーマーク（BOM。「UTF-8 (BOM 付き)」で保存したファイルの先頭に付く印）も読み飛ばします。</li>
+<li>デコーダに不正な入力を渡すと、問題を示す <code>IllegalArgumentException</code> を投げます。例: <code>invalid Base64 character '!' at index 10</code>（目に見えない文字や ASCII 以外の文字は <code>U+00A0</code> の形で示します）、<code>invalid % escape at index 3 in "100%zz"</code>。</li>
 </ul>
 <p>これらも <code>String</code> の組み込み拡張メソッドです:</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-114-1"><a id="__codelineno-114-1" name="__codelineno-114-1" href="#__codelineno-114-1"></a><span class="s2">"Hello"</span><span class="p">.</span><span class="nf">base64Encode</span><span class="p">().</span><span class="nf">base64Decode</span><span class="p">()</span><span class="w">   </span><span class="c1">// "Hello"</span>
@@ -10913,7 +10914,7 @@ null なプラットフォーム型の <code>List</code> に対して直接呼�
 </span></code></pre></div>
 <h3 id="url">URL ユーティリティ<a class="headerlink" href="#url" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-155-1"><a id="__codelineno-155-1" name="__codelineno-155-1" href="#__codelineno-155-1"></a>Http::encodeUrl(str): String
-</span><span id="__span-155-2"><a id="__codelineno-155-2" name="__codelineno-155-2" href="#__codelineno-155-2"></a>Http::decodeUrl(str): String
+</span><span id="__span-155-2"><a id="__codelineno-155-2" name="__codelineno-155-2" href="#__codelineno-155-2"></a>Http::decodeUrl(str): String            // Codec::urlDecode と同じ
 </span><span id="__span-155-3"><a id="__codelineno-155-3" name="__codelineno-155-3" href="#__codelineno-155-3"></a>Http::buildQuery(params): String        // params: キーと値を交互に並べる
 </span><span id="__span-155-4"><a id="__codelineno-155-4" name="__codelineno-155-4" href="#__codelineno-155-4"></a>Http::buildUrl(baseUrl, params): String // "?"/"&amp;" + buildQuery(params) を付加
 </span></code></pre></div>

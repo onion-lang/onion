@@ -3677,6 +3677,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#onion-migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion migrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#onion-doc" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4879,6 +4890,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#onion-migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion migrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#onion-doc" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5106,6 +5128,7 @@ No Git repository is initialized and no existing path is ever overwritten.</p>
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>onion clean
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>onion doc [-d &lt;dir&gt;] [&lt;source.on&gt;...]
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>onion fmt [--check] [&lt;path&gt;...]
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>onion migrate [--check] [-classpath &lt;path&gt;] &lt;path&gt;...
 </span></code></pre></div>
 <h3 id="onion-test-report-xml"><code>onion test --report-xml</code><a class="headerlink" href="#onion-test-report-xml" title="Permanent link">&para;</a></h3>
 <p>Writes the run as JUnit XML, which is what CI reads to annotate a build with the tests that
@@ -5153,14 +5176,96 @@ needs a parser.</p>
 <p>Before writing any file, the formatted text is re-lexed and compared token for token,
 comments included, against the original. If they differ the file is left untouched and the
 command reports it as a bug.</p>
+<h3 id="onion-migrate"><code>onion migrate</code><a class="headerlink" href="#onion-migrate" title="Permanent link">&para;</a></h3>
+<p>Rewrites code written before a pre-1.0 breaking change so it compiles today. It edits the
+files in place and prints each change:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>onion<span class="w"> </span>migrate<span class="w"> </span>scripts/
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>scripts/old.on:5:3: ret -&gt; yield
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>Migrated 1 of 4 file(s)
+</span></code></pre></div>
+<ul>
+<li><strong>Paths are required.</strong> A file or a directory; a directory is walked for <code>.on</code> files.</li>
+<li><strong><code>--check</code></strong> writes nothing, prints what would change, and exits <code>1</code> if anything would.</li>
+<li><strong>Only code changes.</strong> Strings, comments and spacing stay byte for byte. Code inside a
+  string's <code>#{...}</code> is code, so it is migrated too.</li>
+<li><strong>The compiler decides.</strong> A file that compiles as written is never changed. A file that does
+  not is rewritten only if every error in it is at a <code>ret</code> it would rewrite, and the rewritten
+  file compiles.</li>
+<li><strong>It does not guess.</strong> If neither version compiles, each place is printed with its line, and
+  the file is left as it was. The summary counts it (<code>1 file(s) need a manual change</code>), and
+  the exit code is <code>1</code>. The compiler's first error is printed too. Fix it, or the line by hand.</li>
+<li><strong>Files that use each other are fine.</strong> Each file is also checked compiled together with
+  every file you named. If it compiles that way as written (another file declares <code>ret</code>, say,
+  in an <code>extension</code>), it is left alone. Name the files that make up one program:
+  <code>onion migrate src/ tests/</code>.
+  An error that is not at a <code>ret</code>, in any named file, decides nothing. Two unrelated scripts
+  that both declare <code>class Helper</code> give one of them an <code>E0008</code>; then no file is rewritten,
+  and each <code>ret</code> is reported. Migrate such scripts one at a time:
+  <code>for f in scripts/*.on; do onion migrate "$f"; done</code>.
+  A syntax error stops that compile before it can check anything. A file with a <code>ret</code> to
+  decide then counts as needing a manual change, and the syntax error is printed. The
+  exception is an old <code>ret [a, b]</code>, which does not parse today: that file is read with
+  <code>yield</code>.
+  A file that cannot be read (onion migrate reads UTF-8 only) is reported. It may declare
+  a <code>ret</code>, so while one is left out no file is rewritten, and each <code>ret</code> is reported.
+  A file named twice (<code>src</code> and <code>./src/Main.on</code>) is read once.</li>
+<li><strong><code>-classpath &lt;path&gt;</code></strong> is where classes from outside the named files come from, such as a
+  library's jar.</li>
+</ul>
+<p>Rules so far:</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Before</th>
+<th>After</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A <code>do</code> block's final value</td>
+<td><code>ret a + b</code></td>
+<td><code>yield a + b</code></td>
+</tr>
+</tbody>
+</table>
+<p>A <code>ret</code> that starts the last clause of a <code>do</code> block may be the old keyword, or a name <code>ret</code>
+declared elsewhere (an inherited method or field) followed by another clause. Only the
+compiler can tell:</p>
+<table>
+<thead>
+<tr>
+<th>The file</th>
+<th>What <code>migrate</code> does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compiles as written, alone or with the other named files</td>
+<td>Leaves it, with a <code>note:</code>: <code>ret</code> is a name here</td>
+</tr>
+<tr>
+<td>Does not compile, every error in the named files is at a <code>ret</code>, and it compiles with <code>yield</code></td>
+<td>Rewrites it to <code>yield</code></td>
+</tr>
+<tr>
+<td>Has another error, or does not compile with <code>yield</code> either</td>
+<td>Reports it, with that error, and exits 1</td>
+</tr>
+</tbody>
+</table>
+<p>A <code>ret</code> with another clause after it (<code>ret(a); yield a</code>) is always left alone, with a <code>note:</code>:
+the old keyword was only legal last, so it is a call.</p>
+<p>See <a href="../../migration/pre-1.0/">Migrating to 1.0</a> for each change.</p>
 <h3 id="onion-doc"><code>onion doc</code><a class="headerlink" href="#onion-doc" title="Permanent link">&para;</a></h3>
 <p>Generates API documentation as HTML. With no arguments inside a project it documents the
 production sources under <code>src/</code> into <code>target/doc</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>onion<span class="w"> </span>doc
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>onion<span class="w"> </span>doc
 </span></code></pre></div>
 <p><code>-d &lt;dir&gt;</code> writes somewhere else, and naming source files explicitly makes it work outside
 a project entirely:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>onion<span class="w"> </span>doc<span class="w"> </span>-d<span class="w"> </span>api<span class="w"> </span>src/main.on<span class="w"> </span>src/util.on
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>onion<span class="w"> </span>doc<span class="w"> </span>-d<span class="w"> </span>api<span class="w"> </span>src/main.on<span class="w"> </span>src/util.on
 </span></code></pre></div>
 <p>Doc comments (<code>/** … */</code>) on classes, interfaces, records, enums and methods are carried
 across, not just the signatures.</p>
@@ -5183,13 +5288,13 @@ with a line and column when the TOML parser can supply one. No source-root overr
 entrypoint overrides, compiler flags, or scripts are accepted.</p>
 <h3 id="dependencies"><code>[dependencies]</code><a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h3>
 <p>Maven coordinates, one per line, as <code>"group:artifact" = "version"</code>:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">[package]</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"report"</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.0"</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="k">[dependencies]</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="s2">"org.postgresql:postgresql"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"42.7.3"</span>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="s2">"com.fasterxml.jackson.core:jackson-databind"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2.17.0"</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">[package]</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"report"</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.0"</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="k">[dependencies]</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="s2">"org.postgresql:postgresql"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"42.7.3"</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="s2">"com.fasterxml.jackson.core:jackson-databind"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2.17.0"</span>
 </span></code></pre></div>
 <p>The key has to be quoted, because a Maven coordinate contains a colon. Versions are
 exact — no ranges, no <code>latest</code>. The manifest rejects, naming the dependency and its
@@ -5211,8 +5316,8 @@ has no <code>onion.lock</code>, so its transitive versions are not pinned; when 
 a project.</p>
 <h3 id="repositories"><code>[[repositories]]</code><a class="headerlink" href="#repositories" title="Permanent link">&para;</a></h3>
 <p>Extra Maven repositories, searched <strong>before</strong> Maven Central and in the order written:</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">[[repositories]]</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://nexus.example.com/repository/maven-public"</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">[[repositories]]</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://nexus.example.com/repository/maven-public"</span>
 </span></code></pre></div>
 <p>Maven Central stays available; these are added to it rather than replacing it. Only
 absolute <code>http</code>, <code>https</code> and <code>file</code> URLs are accepted — a relative or misspelled entry is
@@ -5243,23 +5348,23 @@ takes a transitive out from under the POM that manages its version (<code>&lt;de
 a parent BOM) and can pick a different one. The lock also records a SHA-256 for each
 artifact, compared before anything is compiled. Different bytes for a version that was
 already published stops the build:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>error: Resolved dependencies do not match onion.lock:
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>different bytes for the same file:
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  postgresql-42.7.3.jar
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    locked 8f3a...
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    found  1c90...
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>A published version's bytes should never change. Check the repository, or delete onion.lock
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>to accept what it is serving now.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>error: Resolved dependencies do not match onion.lock:
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>different bytes for the same file:
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>  postgresql-42.7.3.jar
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    locked 8f3a...
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    found  1c90...
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>A published version's bytes should never change. Check the repository, or delete onion.lock
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>to accept what it is serving now.
 </span></code></pre></div>
 <p>A different <em>set</em> of artifacts is a resolution difference rather than changed bytes, and the
 error says so, listing the versions that moved instead of blaming the repository:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>error: Resolved dependencies do not match onion.lock:
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>not in the lock: lib-2.0.0.jar
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>missing: lib-1.0.0.jar
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>resolved versions differ from the lock:
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>  com.example:lib  locked 1.0.0  resolved 2.0.0
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>The artifacts resolved differently from the ones the lock records; no file's bytes changed.
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>Delete onion.lock to resolve again and record the new answer.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>error: Resolved dependencies do not match onion.lock:
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>not in the lock: lib-2.0.0.jar
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>missing: lib-1.0.0.jar
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>resolved versions differ from the lock:
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>  com.example:lib  locked 1.0.0  resolved 2.0.0
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>The artifacts resolved differently from the ones the lock records; no file's bytes changed.
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>Delete onion.lock to resolve again and record the new answer.
 </span></code></pre></div>
 <p>Once a build has resolved and verified a lock, it records the resulting classpath in
 <code>target/.onion/dependency-classpath.json</code>, keyed by the lock's contents. The next
@@ -5288,10 +5393,10 @@ directory is a successful test run with a zero-test summary.</p>
 (or the build that <code>run</code> and <code>test</code> perform first) reuses that output when a
 SHA-256 fingerprint over the compiler's identity, the Java version, the exact
 manifest bytes, and every source path and its bytes still matches:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion build
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>Built hello (1 classes)
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>$ onion build
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>Built hello (cached)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>$ onion build
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>Built hello (1 classes)
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>$ onion build
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>Built hello (cached)
 </span></code></pre></div>
 <p>Any source addition, removal, rename, or content change invalidates the
 cache and triggers a full rebuild.</p>
@@ -5328,24 +5433,24 @@ top-level <code>tool</code>; more than one candidate fails and lists every candi
 source and location so the ambiguity can be resolved.</p>
 <p>Arguments after <code>--</code> go to the program, so a tool project is driven like the
 script it would otherwise be:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ onion run -- --help
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>usage: meeting-summary &lt;notes&gt; &lt;out&gt;
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>  ...
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>$ onion run -- samples/notes.md out.json --plan
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>plan: `summarize` would
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>  read    derived from notes = samples/notes.md
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>  write   derived from out = out.json
-</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>  ...
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>$ onion run -- --help
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>usage: meeting-summary &lt;notes&gt; &lt;out&gt;
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>  ...
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>$ onion run -- samples/notes.md out.json --plan
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>plan: `summarize` would
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>  read    derived from notes = samples/notes.md
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>  write   derived from out = out.json
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>  ...
 </span></code></pre></div>
 <p>The usage line names the project's package (<code>[package].name</code>) where a script's
 names its file.</p>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <p><code>test</code> builds production sources once, then compiles and runs each discovered
 test file in sorted order, sequentially:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>$ onion test
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>test tests/main_test.on ... ok
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>1 tests, 1 passed, 0 failed
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>$ onion test
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>test tests/main_test.on ... ok
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>1 tests, 1 passed, 0 failed
 </span></code></pre></div>
 <p>A test's own <code>stdout</code>/<code>stderr</code> are shown only when it fails, unless
 <code>--verbose</code> is given. One test's compile failure, assertion failure, runtime
@@ -5355,18 +5460,18 @@ with a <code>0 tests, 0 passed, 0 failed</code> summary.</p>
 <p>A failed assertion or runtime exception is reported at the line that raised it
 — for an <code>Assert::</code> call, the line of that call, in the test or in a project
 source it reached — followed by that line:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>$ onion test
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>test tests/summary_test.on ... FAILED
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>1 tests, 0 passed, 1 failed
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>error: tests/summary_test.on:4: AssertionError: Expected true but was false
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>  4 | Assert::isTrue(words.size == 4)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>$ onion test
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>test tests/summary_test.on ... FAILED
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>1 tests, 0 passed, 1 failed
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>error: tests/summary_test.on:4: AssertionError: Expected true but was false
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>  4 | Assert::isTrue(words.size == 4)
 </span></code></pre></div>
 <p><code>onion script.on</code> reports a failed assertion the same way.</p>
 <h2 id="clean">Clean<a class="headerlink" href="#clean" title="Permanent link">&para;</a></h2>
 <p><code>clean</code> removes exactly the project's canonical <code>target/</code> directory:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>$ onion clean
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>Cleaned target
+<div class="language-text highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>$ onion clean
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>Cleaned target
 </span></code></pre></div>
 <p>It requires a valid, located project first, succeeds (printing the same
 message) whether <code>target/</code> exists or not, and refuses to touch a <code>target</code>

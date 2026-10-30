@@ -1755,6 +1755,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#onion-migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion migrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#onion-doc" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4903,6 +4914,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#onion-migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        onion migrate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#onion-doc" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5130,6 +5152,7 @@ Gitリポジトリの初期化は行われず、既存のパスを上書きす�
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>onion clean
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>onion doc [-d &lt;ディレクトリ&gt;] [&lt;source.on&gt;...]
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>onion fmt [--check] [&lt;パス&gt;...]
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>onion migrate [--check] [-classpath &lt;パス&gt;] &lt;パス&gt;...
 </span></code></pre></div>
 <h3 id="onion-test-report-xml"><code>onion test --report-xml</code><a class="headerlink" href="#onion-test-report-xml" title="Permanent link">&para;</a></h3>
 <p>実行結果を JUnit XML で書き出します。CI がこれを読むことで、「何かが失敗した」だけでなく
@@ -5175,14 +5198,80 @@ Gitリポジトリの初期化は行われず、既存のパスを上書きす�
 <p>ファイルを書き込む前に、整形後のテキストを再度字句解析して、コメントを含むトークン列が
 元と一致するかを検査します。一致しない場合はそのファイルを書き換えず、フォーマッタ側の
 バグとして報告します。</p>
+<h3 id="onion-migrate"><code>onion migrate</code><a class="headerlink" href="#onion-migrate" title="Permanent link">&para;</a></h3>
+<p>1.0 までの互換性を壊す変更の前に書かれたコードを、今のバージョンでコンパイルできるように
+書き換えます。ファイルをその場で書き換え、変更を 1 件ずつ表示します。</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>onion<span class="w"> </span>migrate<span class="w"> </span>scripts/
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>scripts/old.on:5:3: ret -&gt; yield
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>Migrated 1 of 4 file(s)
+</span></code></pre></div>
+<ul>
+<li><strong>パスは必須です。</strong> ファイルかディレクトリを渡します。ディレクトリは <code>.on</code> ファイルを再帰的に辿ります。</li>
+<li><strong><code>--check</code></strong> は何も書き込まず、変わる箇所を表示し、1 つでもあれば <code>1</code> で終了します。</li>
+<li><strong>変えるのはコードだけです。</strong> 文字列・コメント・空白はバイト単位でそのまま残ります。文字列の <code>#{...}</code> の中はコードなので、ここも書き換えます。</li>
+<li><strong>判断はコンパイラがします。</strong> そのままでコンパイルできるファイルは変更しません。コンパイルできないファイルは、エラーがすべて書き換え対象の <code>ret</code> の位置にあり、書き換えた結果がコンパイルできる場合だけ書き換えます。</li>
+<li><strong>推測はしません。</strong> どちらもコンパイルできなければ、各箇所を行番号付きで表示し、ファイルは書き換えずに残します。最後の集計にも数えます（<code>1 file(s) need a manual change</code>）。終了コードは <code>1</code> です。コンパイラの最初のエラーも表示します。そのエラーを直すか、その行を手で直してください。</li>
+<li><strong>互いに使い合うファイルも扱えます。</strong> 各ファイルは、指定したすべてのファイルと一緒にコンパイルしても確かめます。そのままで一緒にコンパイルできるなら（たとえば別のファイルが <code>extension</code> で <code>ret</code> を宣言している）、ファイルは変更しません。一つのプログラムを作るファイルを指定してください（<code>onion migrate src/ tests/</code>）。
+  指定したどのファイルでも、<code>ret</code> の位置にないエラーは判断の根拠になりません。無関係な 2 つのスクリプトがどちらも <code>class Helper</code> を宣言すると、片方に <code>E0008</code> が出ます。そのときはどのファイルも書き換えず、各 <code>ret</code> を報告します。こうしたスクリプトは 1 つずつ移行してください（<code>for f in scripts/*.on; do onion migrate "$f"; done</code>）。
+  構文エラーがあると、その一括コンパイルは何も確かめないまま止まります。
+  そのとき判断が必要な <code>ret</code> を含むファイルは「手作業での修正が必要」に数えられ、構文エラーが表示されます。
+  例外は古い <code>ret [a, b]</code> です。今の文法では解析できないので、そのファイルは <code>yield</code> にした形で読みます。
+  読めないファイルは報告します（onion migrate が読むのは UTF-8 だけです）。
+  そのファイルが <code>ret</code> を宣言しているかもしれないので、読めないファイルが 1 つでもあれば、どのファイルも書き換えず、各 <code>ret</code> を報告します。
+  2 通りの書き方で指定したファイル（<code>src</code> と <code>./src/Main.on</code>）は 1 回だけ読みます。</li>
+<li><strong><code>-classpath &lt;パス&gt;</code></strong> は、指定したファイル以外から来るクラス（ライブラリの jar など）の置き場所です。</li>
+</ul>
+<p>現在のルール:</p>
+<table>
+<thead>
+<tr>
+<th>ルール</th>
+<th>変更前</th>
+<th>変更後</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>do</code> ブロックの最終値</td>
+<td><code>ret a + b</code></td>
+<td><code>yield a + b</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>do</code> ブロックの最後の節（clause、<code>do</code> ブロック内の一つの式や束縛）の先頭にある <code>ret</code> は、古いキーワードかもしれません。別の場所で宣言された <code>ret</code> という名前（継承したメソッドやフィールド）と、それに続く別の節かもしれません。区別できるのはコンパイラだけです。</p>
+<table>
+<thead>
+<tr>
+<th>ファイル</th>
+<th><code>migrate</code> の動作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>単独でも、指定した他のファイルと一緒でも、そのままでコンパイルできる</td>
+<td><code>note:</code> を表示し、そのまま残します。ここでの <code>ret</code> は名前です</td>
+</tr>
+<tr>
+<td>コンパイルできず、指定したファイルのエラーがすべて <code>ret</code> の位置にあり、<code>yield</code> にするとコンパイルできる</td>
+<td><code>yield</code> に書き換えます</td>
+</tr>
+<tr>
+<td>他のエラーがある、または <code>yield</code> にしてもコンパイルできない</td>
+<td>そのエラーとともに報告し、終了コード 1 で終わります</td>
+</tr>
+</tbody>
+</table>
+<p>後ろに別の節が続く <code>ret</code>（<code>ret(a); yield a</code>）は、常に <code>note:</code> を表示してそのまま残します。古いキーワードは最後の節にしか書けなかったので、これは呼び出しです。</p>
+<p>変更ごとの説明は <a href="../../migration/pre-1.0/">1.0 への移行</a> を参照してください。</p>
 <h3 id="onion-doc"><code>onion doc</code><a class="headerlink" href="#onion-doc" title="Permanent link">&para;</a></h3>
 <p>API ドキュメントを HTML で生成します。プロジェクト内で引数なしに実行すると、<code>src/</code> 配下の
 production ソースを対象に <code>target/doc</code> へ出力します。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>onion<span class="w"> </span>doc
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>onion<span class="w"> </span>doc
 </span></code></pre></div>
 <p><code>-d &lt;ディレクトリ&gt;</code> で出力先を変えられます。ソースファイルを明示すれば、プロジェクトの外でも
 使えます。</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>onion<span class="w"> </span>doc<span class="w"> </span>-d<span class="w"> </span>api<span class="w"> </span>src/main.on<span class="w"> </span>src/util.on
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>onion<span class="w"> </span>doc<span class="w"> </span>-d<span class="w"> </span>api<span class="w"> </span>src/main.on<span class="w"> </span>src/util.on
 </span></code></pre></div>
 <p>クラス・インターフェース・record・enum・メソッドに付けたドキュメントコメント（<code>/** … */</code>）は
 シグネチャだけでなく本文も引き継がれます。</p>
@@ -5206,13 +5295,13 @@ production ソースを対象に <code>target/doc</code> へ出力します。</
 上書き、コンパイラフラグ、スクリプトは受け付けません。</p>
 <h3 id="dependencies"><code>[dependencies]</code><a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h3>
 <p>Maven の座標を <code>"group:artifact" = "version"</code> の形で1行ずつ書きます。</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">[package]</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"report"</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.0"</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="k">[dependencies]</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="s2">"org.postgresql:postgresql"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"42.7.3"</span>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="s2">"com.fasterxml.jackson.core:jackson-databind"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2.17.0"</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">[package]</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"report"</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1.0"</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="k">[dependencies]</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="s2">"org.postgresql:postgresql"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"42.7.3"</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="s2">"com.fasterxml.jackson.core:jackson-databind"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2.17.0"</span>
 </span></code></pre></div>
 <p>Maven の座標はコロンを含むため、キーは必ずクォートします。バージョンは厳密指定で、
 範囲指定や <code>latest</code> は使えません。Maven の範囲指定（<code>[1.0,2.0)</code>・<code>(,1.0]</code> など、<code>[</code>・<code>]</code>・
@@ -5233,8 +5322,8 @@ production ソースを対象に <code>target/doc</code> へ出力します。</
 プロジェクトにしてください。</p>
 <h3 id="repositories"><code>[[repositories]]</code><a class="headerlink" href="#repositories" title="Permanent link">&para;</a></h3>
 <p>追加の Maven リポジトリを、書いた順に、<strong>Maven Central より先に</strong>探索します。</p>
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">[[repositories]]</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://nexus.example.com/repository/maven-public"</span>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">[[repositories]]</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://nexus.example.com/repository/maven-public"</span>
 </span></code></pre></div>
 <p>Maven Central は置き換えではなく併用されるので、そのまま使えます。受け付けるのは絶対
 URL の <code>http</code>・<code>https</code>・<code>file</code> のみです。相対パスやスペルミスはここで弾かれ、後段で
@@ -5265,23 +5354,23 @@ Onion が組み込んでいる coursier の Java API はキャッシュポリシ
 （<code>&lt;dependencyManagement&gt;</code> や親 BOM）の下から外れ、別のバージョンが選ばれることがあるからです。
 さらに各成果物の SHA-256 を記録し、コンパイル前に照合します。既に publish された版の
 バイト列が変わっていたらビルドを止めます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>error: Resolved dependencies do not match onion.lock:
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>different bytes for the same file:
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  postgresql-42.7.3.jar
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    locked 8f3a...
-</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    found  1c90...
-</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>A published version's bytes should never change. Check the repository, or delete onion.lock
-</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>to accept what it is serving now.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>error: Resolved dependencies do not match onion.lock:
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>different bytes for the same file:
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>  postgresql-42.7.3.jar
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    locked 8f3a...
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    found  1c90...
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>A published version's bytes should never change. Check the repository, or delete onion.lock
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>to accept what it is serving now.
 </span></code></pre></div>
 <p>成果物の<strong>集合</strong>が違うのはバイト列の変化ではなく解決結果の違いなので、エラーもそう述べ、
 リポジトリのせいにする代わりに動いたバージョンを列挙します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>error: Resolved dependencies do not match onion.lock:
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>not in the lock: lib-2.0.0.jar
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>missing: lib-1.0.0.jar
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>resolved versions differ from the lock:
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>  com.example:lib  locked 1.0.0  resolved 2.0.0
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>The artifacts resolved differently from the ones the lock records; no file's bytes changed.
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>Delete onion.lock to resolve again and record the new answer.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>error: Resolved dependencies do not match onion.lock:
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>not in the lock: lib-2.0.0.jar
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>missing: lib-1.0.0.jar
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>resolved versions differ from the lock:
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>  com.example:lib  locked 1.0.0  resolved 2.0.0
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>The artifacts resolved differently from the ones the lock records; no file's bytes changed.
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>Delete onion.lock to resolve again and record the new answer.
 </span></code></pre></div>
 <p>ロックを解決して照合し終えたビルドは、得られたクラスパスをロックの内容をキーにして
 <code>target/.onion/dependency-classpath.json</code> に記録します。同じロックでの次の
@@ -5311,10 +5400,10 @@ Onion が組み込んでいる coursier の Java API はキャッシュポリシ
 すべてのソースパスとその内容から計算したSHA-256フィンガープリントが
 一致する限り、2回目以降の <code>build</code>（および <code>run</code>・<code>test</code> が最初に行う
 ビルド）はそのキャッシュを再利用します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ onion build
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>Built hello (1 classes)
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>$ onion build
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>Built hello (cached)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>$ onion build
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>Built hello (1 classes)
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>$ onion build
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>Built hello (cached)
 </span></code></pre></div>
 <p>ソースの追加・削除・リネーム・内容の変更はいずれもキャッシュを無効化し、
 フルリビルドを引き起こします。</p>
@@ -5354,24 +5443,24 @@ Onion が組み込んでいる coursier の Java API はキャッシュポリシ
 あいまいさを解消できます。</p>
 <p><code>--</code> より後ろの引数はプログラムに渡されるので、ツールのプロジェクトは
 スクリプトの場合と同じように操作できます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ onion run -- --help
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>usage: meeting-summary &lt;notes&gt; &lt;out&gt;
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>  ...
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>$ onion run -- samples/notes.md out.json --plan
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>plan: `summarize` would
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>  read    derived from notes = samples/notes.md
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>  write   derived from out = out.json
-</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>  ...
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>$ onion run -- --help
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>usage: meeting-summary &lt;notes&gt; &lt;out&gt;
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>  ...
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>$ onion run -- samples/notes.md out.json --plan
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>plan: `summarize` would
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>  read    derived from notes = samples/notes.md
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>  write   derived from out = out.json
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>  ...
 </span></code></pre></div>
 <p>使い方の行には、スクリプトならファイル名が入るところにプロジェクトの
 パッケージ名（<code>[package].name</code>）が入ります。</p>
 <h2 id="_8">テスト<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <p><code>test</code> はまずプロダクションソースを一度だけビルドし、その後、発見した
 各テストファイルをソート順に1つずつ、順番にコンパイル・実行します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>$ onion test
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>test tests/main_test.on ... ok
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>1 tests, 1 passed, 0 failed
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>$ onion test
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>test tests/main_test.on ... ok
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>1 tests, 1 passed, 0 failed
 </span></code></pre></div>
 <p>各テストの <code>stdout</code>/<code>stderr</code> は、<code>--verbose</code> を指定しない限り失敗した
 場合にのみ表示されます。あるテストのコンパイル失敗・アサーション失敗・
@@ -5381,18 +5470,18 @@ Onion が組み込んでいる coursier の Java API はキャッシュポリシ
 <p>アサーション失敗や実行時例外は、それを起こした行 —— <code>Assert::</code> の呼び出しなら、
 テスト内であれ、テストから到達したプロジェクトのソース内であれ、その呼び出しの行 ——
 で報告され、続けてその行が表示されます：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>$ onion test
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>test tests/summary_test.on ... FAILED
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>1 tests, 0 passed, 1 failed
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>error: tests/summary_test.on:4: AssertionError: Expected true but was false
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>  4 | Assert::isTrue(words.size == 4)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>$ onion test
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>test tests/summary_test.on ... FAILED
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>1 tests, 0 passed, 1 failed
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>error: tests/summary_test.on:4: AssertionError: Expected true but was false
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>  4 | Assert::isTrue(words.size == 4)
 </span></code></pre></div>
 <p><code>onion script.on</code> でも、失敗したアサーションは同じように報告されます。</p>
 <h2 id="_9">クリーン<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <p><code>clean</code> はプロジェクトの正規の <code>target/</code> ディレクトリだけを削除します。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>$ onion clean
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>Cleaned target
+<div class="language-text highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>$ onion clean
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>Cleaned target
 </span></code></pre></div>
 <p>実行には有効な、発見済みのプロジェクトであることが前提となり、
 <code>target/</code> が存在するかどうかにかかわらず同じメッセージで成功します。

@@ -10611,8 +10611,9 @@ by default (tracked in <a href="https://github.com/onion-lang/onion/issues/2180"
 </span><span id="__span-129-4"><a id="__codelineno-129-4" name="__codelineno-129-4" href="#__codelineno-129-4"></a><span class="nb">Codec</span><span class="o">::</span><span class="nf">urlEncode</span><span class="p">(</span><span class="s2">"a b&amp;c"</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nb">Codec</span><span class="o">::</span><span class="nf">urlDecode</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
 </span></code></pre></div>
 <ul>
-<li><code>base64Decode</code> skips whitespace, so a file's trailing newline or <code>base64</code>'s 76-column lines decode as is.</li>
-<li>Bad input to a decoder throws <code>IllegalArgumentException</code> naming the problem, for example <code>invalid Base64 character '!' at index 10</code> or <code>invalid % escape at index 3 in "100%zz"</code>.</li>
+<li><code>base64Decode</code> skips whitespace, so a file's trailing newline or <code>base64</code>'s 76-column lines decode as is.
+  A byte order mark at the start (a file saved as "UTF-8 with BOM") is skipped too.</li>
+<li>Bad input to a decoder throws <code>IllegalArgumentException</code> naming the problem, for example <code>invalid Base64 character '!' at index 10</code> (an invisible or non-ASCII character shows as <code>U+00A0</code>) or <code>invalid % escape at index 3 in "100%zz"</code>.</li>
 </ul>
 <p>These are also builtin extension methods on <code>String</code>:</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-130-1"><a id="__codelineno-130-1" name="__codelineno-130-1" href="#__codelineno-130-1"></a><span class="s2">"Hello"</span><span class="p">.</span><span class="nf">base64Encode</span><span class="p">().</span><span class="nf">base64Decode</span><span class="p">()</span><span class="w">   </span><span class="c1">// "Hello"</span>
@@ -10944,7 +10945,7 @@ another <code>java.io.IOException</code>. <code>send().getOrThrow()</code> would
 </span></code></pre></div>
 <h3 id="url-utilities">URL Utilities<a class="headerlink" href="#url-utilities" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-153-1"><a id="__codelineno-153-1" name="__codelineno-153-1" href="#__codelineno-153-1"></a>Http::encodeUrl(str): String
-</span><span id="__span-153-2"><a id="__codelineno-153-2" name="__codelineno-153-2" href="#__codelineno-153-2"></a>Http::decodeUrl(str): String
+</span><span id="__span-153-2"><a id="__codelineno-153-2" name="__codelineno-153-2" href="#__codelineno-153-2"></a>Http::decodeUrl(str): String            // same as Codec::urlDecode
 </span><span id="__span-153-3"><a id="__codelineno-153-3" name="__codelineno-153-3" href="#__codelineno-153-3"></a>Http::buildQuery(params): String        // params: alternating keys and values
 </span><span id="__span-153-4"><a id="__codelineno-153-4" name="__codelineno-153-4" href="#__codelineno-153-4"></a>Http::buildUrl(baseUrl, params): String // appends "?"/"&amp;" + buildQuery(params)
 </span></code></pre></div>

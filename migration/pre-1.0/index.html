@@ -4088,6 +4088,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-lambda-passed-to-overloaded-extension-methods-no-longer-depends-on-declaration-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A lambda passed to overloaded extension methods no longer depends on declaration order
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4736,6 +4747,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-lambda-passed-to-overloaded-extension-methods-no-longer-depends-on-declaration-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A lambda passed to overloaded extension methods no longer depends on declaration order
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4773,23 +4795,21 @@ compiling and means the same thing on later 1.x releases.</p>
 <li><strong>What changed:</strong> <code>yield</code> is a reserved word; <code>ret</code> is an ordinary identifier again.</li>
 <li><strong>What you see:</strong> old code reports <code>local variable ret is not found.</code>, with a hint to write <code>yield</code>.</li>
 <li><strong>A Java method named <code>yield</code>:</strong> call it with backticks, e.g. <code>Thread::`yield`()</code>.</li>
-<li><strong>Update a whole project:</strong>
-  <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>grep<span class="w"> </span>-rl<span class="w"> </span><span class="s1">'\bret\b'</span><span class="w"> </span>--include<span class="o">=</span><span class="s1">'*.on'</span><span class="w"> </span>.<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>perl<span class="w"> </span>-pi<span class="w"> </span>-e<span class="w"> </span><span class="s1">'s/\bret\b/yield/g'</span>
-</span></code></pre></div>
-  Check the result if you use <code>ret</code> as a variable name.</li>
+<li><strong>Update a whole project:</strong> <code>onion migrate src/ tests/</code> (or any files and directories).
+  It rewrites only a <code>do</code> block's <code>ret</code>, never a variable named <code>ret</code>, a string or a comment.</li>
 </ul>
 <h2 id="2147483648-needs-a-directly-in-front"><code>2147483648</code> needs a <code>-</code> directly in front<a class="headerlink" href="#2147483648-needs-a-directly-in-front" title="Permanent link">&para;</a></h2>
 <p>The literal <code>2147483648</code> (and <code>9223372036854775808L</code>) is valid only as the whole operand of a
 unary <code>-</code>, as in <code>-2147483648</code>. Anywhere else it used to wrap silently to the minimum value.</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// Before: compiled, with a surprising value</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648</span><span class="w">          </span><span class="c1">// -2147483647, by wraparound</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Long</span><span class="w">     </span><span class="c1">// 2147483648: `as` binds tighter than `-`</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">         </span><span class="c1">// 1073741824: `/` binds tighter than `-`</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1">// Now</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648L</span><span class="w">         </span><span class="c1">// or 1L - 2147483648L</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648L</span><span class="w">            </span><span class="c1">// or (-2147483648) as Long</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">-</span><span class="mi">2147483648</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">       </span><span class="c1">// -1073741824</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// Before: compiled, with a surprising value</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648</span><span class="w">          </span><span class="c1">// -2147483647, by wraparound</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Long</span><span class="w">     </span><span class="c1">// 2147483648: `as` binds tighter than `-`</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">         </span><span class="c1">// 1073741824: `/` binds tighter than `-`</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1">// Now</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2147483648L</span><span class="w">         </span><span class="c1">// or 1L - 2147483648L</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">2147483648L</span><span class="w">            </span><span class="c1">// or (-2147483648) as Long</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">-</span><span class="mi">2147483648</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w">       </span><span class="c1">// -1073741824</span>
 </span></code></pre></div>
 <ul>
 <li><strong>What changed:</strong> the magnitude of the minimum value is checked where it is negated, not at the token.</li>
@@ -4799,15 +4819,15 @@ unary <code>-</code>, as in <code>-2147483648</code>. Anywhere else it used to w
 <h2 id="a-decimal-bs-literal-must-fit-the-signed-range">A decimal <code>B</code>/<code>S</code> literal must fit the signed range<a class="headerlink" href="#a-decimal-bs-literal-must-fit-the-signed-range" title="Permanent link">&para;</a></h2>
 <p>A decimal <code>Byte</code> literal now takes -128..127 and a decimal <code>Short</code> literal -32768..32767,
 as in Java. Larger values used to wrap silently.</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// Before: compiled, with a surprising value</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">mask</span><span class="p">:</span><span class="w"> </span><span class="kt">Byte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">255</span><span class="nc">B</span><span class="w">           </span><span class="c1">// -1</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Short</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">40000</span><span class="nc">S</span><span class="w">        </span><span class="c1">// -25536</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">128</span><span class="nc">B</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Int</span><span class="w">            </span><span class="c1">// 128: `as` binds tighter than `-`</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1">// Now</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">mask</span><span class="p">:</span><span class="w"> </span><span class="kt">Byte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mb">0b11111111</span><span class="nc">B</span><span class="w">    </span><span class="c1">// -1, written as a bit pattern</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">40000</span><span class="w">           </span><span class="c1">// a Short cannot hold 40000</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">-</span><span class="mi">128</span><span class="nc">B</span><span class="p">)</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Int</span><span class="w">          </span><span class="c1">// -128</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// Before: compiled, with a surprising value</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">mask</span><span class="p">:</span><span class="w"> </span><span class="kt">Byte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">255</span><span class="nc">B</span><span class="w">           </span><span class="c1">// -1</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Short</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">40000</span><span class="nc">S</span><span class="w">        </span><span class="c1">// -25536</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="mi">128</span><span class="nc">B</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Int</span><span class="w">            </span><span class="c1">// 128: `as` binds tighter than `-`</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1">// Now</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">mask</span><span class="p">:</span><span class="w"> </span><span class="kt">Byte</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mb">0b11111111</span><span class="nc">B</span><span class="w">    </span><span class="c1">// -1, written as a bit pattern</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="kd">val</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">40000</span><span class="w">           </span><span class="c1">// a Short cannot hold 40000</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="o">-</span><span class="mi">128</span><span class="nc">B</span><span class="p">)</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">Int</span><span class="w">          </span><span class="c1">// -128</span>
 </span></code></pre></div>
 <ul>
 <li><strong>What changed:</strong> like <code>2147483648</code>, the magnitudes <code>128B</code> and <code>32768S</code> are valid only as the whole operand of a <code>-</code>.</li>
@@ -4820,14 +4840,14 @@ as in Java. Larger values used to wrap silently.</p>
 <h2 id="a-quoted-string-in-a-config-file-is-read-without-its-quotes">A quoted <code>String</code> in a <code>config</code> file is read without its quotes<a class="headerlink" href="#a-quoted-string-in-a-config-file-is-read-without-its-quotes" title="Permanent link">&para;</a></h2>
 <p>A <code>shape name = config</code> record now reads a <code>String</code> value written in double quotes as quoted
 text. This lets a value keep leading or trailing spaces through <code>print</code> and <code>parse</code>.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a># Before: the quotes were part of the value
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>name = "Alice"          # read as "Alice"  (7 characters)
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a># Now
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>name = "Alice"          # read as Alice    (5 characters)
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>name = "  Alice  "      # read as   Alice  (spaces kept)
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>name =   Alice          # read as Alice    (unquoted values are still trimmed)
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>name = "\"Alice\""      # read as "Alice"  (to keep literal quotes)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># Before: the quotes were part of the value
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>name = "Alice"          # read as "Alice"  (7 characters)
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a># Now
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>name = "Alice"          # read as Alice    (5 characters)
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>name = "  Alice  "      # read as   Alice  (spaces kept)
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>name =   Alice          # read as Alice    (unquoted values are still trimmed)
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>name = "\"Alice\""      # read as "Alice"  (to keep literal quotes)
 </span></code></pre></div>
 <ul>
 <li><strong>What changed:</strong> inside the quotes, <code>\"</code> is a quote and <code>\\</code> is a backslash. Any other
@@ -4841,21 +4861,119 @@ text. This lets a value keep leading or trailing spaces through <code>print</cod
 <h2 id="an-empty-or-takes-the-type-of-its-siblings">An empty <code>[]</code> or <code>[:]</code> takes the type of its siblings<a class="headerlink" href="#an-empty-or-takes-the-type-of-its-siblings" title="Permanent link">&para;</a></h2>
 <p>In a list literal, or in the values of a map literal, an empty <code>[]</code> or <code>[:]</code> now has the
 type the other elements agree on. Before, it widened the whole literal to <code>Object</code>.</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1">// Before: List[Object], so adj[1].add(5) was E0005, and this compiled</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">// Now: List[List[Int]], so adj[1].add(5) compiles, and this is E0005</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1">// To keep the old type, annotate it</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Object</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">// Before: List[Object], so adj[1].add(5) was E0005, and this compiled</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1">// Now: List[List[Int]], so adj[1].add(5) compiles, and this is E0005</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1">// To keep the old type, annotate it</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Object</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
 </span></code></pre></div>
 <ul>
 <li><strong>What changed:</strong> the empty literal is typed after its siblings, from their type. Elements are still evaluated in source order.</li>
 <li><strong>What you see:</strong> <code>E0005</code> naming <code>List[List[Int]].add(String)</code> (or <code>Map[String, List[Int]].set(...)</code>) where the code mixed element kinds, or passed the value to a <code>List[Object]</code> parameter.</li>
 <li><strong>Still fine:</strong> an explicit annotation wins, and a literal with no typed sibling (<code>[[], []]</code>) is typed as before.</li>
+</ul>
+<h2 id="a-lambda-passed-to-overloaded-extension-methods-no-longer-depends-on-declaration-order">A lambda passed to overloaded extension methods no longer depends on declaration order<a class="headerlink" href="#a-lambda-passed-to-overloaded-extension-methods-no-longer-depends-on-declaration-order" title="Permanent link">&para;</a></h2>
+<p>When an <code>extension</code> declares the same method more than once, a lambda argument now picks the
+same overload whatever order the methods are declared in. Before, such a call often ran
+whichever overload was declared first or last. In general:</p>
+<ul>
+<li><strong>A call that compiled may now run a different overload</strong>, the one a class method would pick
+  (with one difference, below). This mostly affects lambdas with untyped parameters.</li>
+<li><strong>A call that compiled may now be E0006</strong>, where two overloads fit equally.</li>
+<li><strong>To keep the old overload:</strong> give the lambda's parameters their types, pass the other
+  argument with <code>as</code> (<code>5 as Object</code>, <code>2 as Double</code>), pass the lambda as a typed value, or
+  rename one method.</li>
+</ul>
+<p>Examples:</p>
+<table>
+<thead>
+<tr>
+<th>Overloads</th>
+<th>Call</th>
+<th>Before</th>
+<th>Now</th>
+<th>To keep the old result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>z(f: (Object) -&gt; void)</code> on <code>Object</code>, <code>z(o: Object)</code> on <code>String</code></td>
+<td><code>"abc".z((x: Object) -&gt; …)</code></td>
+<td><code>String</code>'s <code>z(Object)</code></td>
+<td>E0006</td>
+<td>rename one method</td>
+</tr>
+<tr>
+<td><code>c(n: Long, g: (Long) -&gt; Long)</code>, <code>c(n: Object, g: (Long) -&gt; Long)</code></td>
+<td><code>"a".c(5, (x: Long) -&gt; x * 2L)</code></td>
+<td><code>obj</code> or <code>long:10</code>, by order</td>
+<td>E0006</td>
+<td>for <code>long:10</code>, <code>"a".c(5L, …)</code>; for <code>obj</code>, <code>"a".c(5 as Object, …)</code></td>
+</tr>
+<tr>
+<td><code>k(s: Supplier[String])</code>, <code>k(c: Callable[String])</code></td>
+<td><code>"a".k { "v" }</code></td>
+<td><code>call</code> or <code>sup</code>, by order</td>
+<td>E0006</td>
+<td>for <code>call</code>, <code>val c: Callable[String] = () -&gt; "v"</code>, then <code>"a".k(c)</code>; for <code>sup</code>, the same with <code>val s: Supplier[String]</code></td>
+</tr>
+<tr>
+<td><code>f(o: Object, g)</code> on <code>String</code>, <code>f(s: String, g)</code> on <code>CharSequence</code></td>
+<td><code>"a".f("q", (x: Int) -&gt; x)</code></td>
+<td><code>strobj1</code></td>
+<td>E0006</td>
+<td><code>"a".f("q" as Object, …)</code></td>
+</tr>
+<tr>
+<td><code>outer(f: (Int) -&gt; Int)</code>, <code>outer(f: Function[String, String])</code> (<code>import { java.util.function.Function }</code>)</td>
+<td><code>"a".outer { p -&gt; ((q: Int) -&gt; p).call(1) }</code></td>
+<td><code>os:s</code> or <code>oi:1</code>, by order</td>
+<td><code>oi:1</code></td>
+<td><code>val g: Function[String, String] = (p: String) -&gt; …</code>, then <code>"a".outer(g)</code></td>
+</tr>
+<tr>
+<td><code>r(f: () -&gt; void)</code>, <code>r(o: Object)</code></td>
+<td><code>"a".r { IO::print("") }</code></td>
+<td><code>obj</code> or <code>fn</code>, by order</td>
+<td><code>fn</code></td>
+<td><code>val h: () -&gt; void = () -&gt; …</code>, then <code>"a".r(h as Object)</code></td>
+</tr>
+<tr>
+<td><code>m(n: Int, f: (Int) -&gt; Int)</code>, <code>m(n: Object, f: (Object) -&gt; Object)</code></td>
+<td><code>"a".m(1, { x -&gt; x })</code></td>
+<td><code>obj:1</code> or <code>int:1</code>, by order</td>
+<td><code>int:1</code></td>
+<td><code>"a".m(1 as Object, { x -&gt; x })</code></td>
+</tr>
+<tr>
+<td><code>k(n: Int, f: (Int) -&gt; Int): Int</code>, <code>k(n: Double, f: (Double) -&gt; Double): Double</code></td>
+<td><code>"a".k(2, { x -&gt; x * 2 })</code></td>
+<td><code>4.0</code> (the <code>Double</code> one)</td>
+<td><code>4</code></td>
+<td><code>"a".k(2, (x: Double) -&gt; x * 2.0)</code></td>
+</tr>
+<tr>
+<td><code>run(r: Runnable)</code>, <code>run(c: Callable[Object])</code></td>
+<td><code>"a".run { IO::print("") }</code></td>
+<td><code>callable:null</code></td>
+<td><code>runnable</code></td>
+<td>pass a typed <code>Callable[Object]</code> value</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>What changed:</strong> the overloads the lambda fits are ranked by one rule, written on issue
+  #2447. It is the class-method rule, with one addition: a function-type parameter beats a SAM
+  interface such as <code>Function</code> or <code>Comparator</code> (the <code>outer</code> row). A class method still reports
+  E0006 there; #2472 tracks bringing classes onto the same rule.</li>
+<li><strong>What you see:</strong> <code>E0006 method call is applicable for both …</code>, with a hint naming the fixes
+  in the last column.</li>
+<li><strong>Still fine:</strong> a call with one matching overload, or with no lambda argument.</li>
 </ul>
 
 

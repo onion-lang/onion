@@ -97,6 +97,11 @@ private[compiler] final class InstanceMethodCallSupport(
           val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound = false)
           if (ext.isDefined) return ext
         }
+        // Every lambda here declares its parameter types (params are typed), so a user
+        // extension can take them as they are; re-typing the bodies per candidate made
+        // nested calls exponential (#2463).
+        val userExt = fallback.tryUserExtensionWithTypedArguments(node, target, targetType, params, expected)
+        if (userExt.isDefined) return userExt.get
         return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, closureIndices)
       }
       // Resolution order for an unmatched call: extension methods first (a

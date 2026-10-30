@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.148.0] - 2026-10-30
+
+### Breaking
+
+- **A lambda passed to overloaded extension methods no longer depends on declaration order (#2447).**
+  - A call that compiled may now run a different overload (mostly with untyped lambda parameters), or be E0006 where two fit equally. `docs/migration/pre-1.0.md` gives examples and the fixes: type the lambda's parameters, pass the other argument with `as`, pass the lambda as a typed value, or rename a method.
+
+### Added
+
+- **`onion migrate <path>...` rewrites code for pre-1.0 breaking changes, in place (#2442).**
+  - First rule: a `do` block's final `ret a + b` becomes `yield a + b`, also inside a string's `#{...}`. Strings and comments are left alone.
+  - Files that use each other's classes are compiled together, so `onion migrate src/ tests/` handles a whole project.
+  - The compiler decides: a file that compiles as written, alone or with the other named files, is never changed. A file is rewritten only if every error in it is at a `ret`, and it then compiles. Otherwise the place is printed with the error, the file left alone, and the exit code is 1.
+  - Unrelated scripts that declare the same class are not one program: migrate them one at a time.
+  - Files are read as UTF-8. If a named file cannot be read, nothing is rewritten and each `ret` is reported.
+  - `--check` changes nothing and exits 1 if a file would change. `-classpath` names the classes a file uses.
+  - A script named `migrate` with no extension now runs as `onion ./migrate`, as with `fmt`, `run` and `test`.
+
+### Fixed
+
+- **`Codec::base64Decode` names an emoji as `U+1F600`, not half of it (#2470).**
+  - Before: `invalid Base64 character U+D83D at index 4`.
+  - Now: `invalid Base64 character U+1F600 at index 4`. The quoted window in `Codec::urlDecode`/`Http::decodeUrl` errors no longer starts or ends inside an emoji either.
+- **`new Q(null)` now warns W0012 when the parameter is a non-null Onion type, as `q.m(null)` already did (#2464).**
+  - Before: no warning for constructors, records or named arguments; the program failed later with `null value used`.
+  - Now: W0012 at the `null`. A `String?` parameter or a Java constructor still gets no warning.
+- **A lambda parameter read by a nested lambda no longer crashes the compiler when a captured variable elsewhere has the same name (#2462).**
+  - Before: `run { p -> run { q -> "" + p } }` next to a captured `val p` failed with I0000 (`Index -1 out of bounds`).
+  - Now: it compiles, and the parameter keeps its own value.
+- **`intArray.map { ... }` gets one clear error with a fix that compiles (#2458).**
+  - Before: E0000 "type Int[] is expected, but type Int[] is used".
+  - Now: E0005 with a hint: `Arrays::stream(xs).boxed().toList()` for `Int[]`/`Long[]`/`Double[]`, a `foreach` copy into a List for the other primitive arrays.
+- **`Http::decodeUrl("100%zz")` names the bad escape, as `Codec::urlDecode` does (#2455).**
+  - Before: the JDK's `Illegal hex characters in escape (%) pattern - Error at index 0 in: "zz"`.
+  - Now: `invalid % escape at index 3 in "100%zz": a % must be followed by two hex digits`; a long input is quoted as 20 characters either side of the escape, not in full.
+- **`Codec::base64Decode(Files::readText("token.b64"))` works when the file was saved as UTF-8 with BOM (#2454).**
+  - Before: `invalid Base64 character '?' at index 0`, with the invisible character printed raw.
+  - Now: a leading BOM is skipped. Any other invisible or non-ASCII bad character is named as `U+XXXX`, for example `invalid Base64 character U+00A0 at index 4` for a no-break space.
+- **A lambda passed to an overloaded extension method picks the overload that takes a function (#2447).**
+  - Before: with `def g(f: (Int) -> String)` declared before `def g(s: Int)`, `"a".g((n: Int) -> "n" + n)` was E0000 "type Int is expected". Next to an `Object` overload declared after it, the lambda silently ran the `Object` one.
+  - Now: the most specific overload the lambda fits is chosen, in either declaration order. A value block goes to `Callable`, a void block to `Runnable`, and a non-generic overload beats a generic one that ties with it.
+- **A warning inside a lambda is reported once, and only for the overload that is chosen (#2452).**
+  - Before: a `W0012` in a lambda passed to overloaded methods printed once per overload tried, including overloads that were not chosen.
+
 ## [0.147.0] - 2026-10-26
 
 ### Breaking

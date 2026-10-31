@@ -367,7 +367,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         if (a.defaultValue == null) cast
         else AST.IfExpression(loc,
           AST.Equal(loc, raw, AST.NullLiteral(loc)),
-          AST.BlockExpression(loc, List(rewriteExpression(a.defaultValue))),
+          AST.BlockExpression(loc, List(narrowedDefault(loc, a, cliKindOfArg(a)))),
           AST.BlockExpression(loc, List(cast)))
       }
       val call = AST.UnqualifiedMethodCall(loc, tool.name, callArgs)
@@ -551,7 +551,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
               else AST.IfExpression(
                 loc,
                 AST.Equal(loc, AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i)), AST.NullLiteral(loc)),
-                AST.BlockExpression(loc, List(rewriteExpression(a.defaultValue))),
+                AST.BlockExpression(loc, List(narrowedDefault(loc, a, cliKindOf(a.typeRef)))),
                 AST.BlockExpression(loc, List(converted))
               )
             }
@@ -560,6 +560,15 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
           }
         }
     }
+  }
+
+  /**
+   * A `Short`/`Byte` parameter's default is written as an Int literal (`s: Short = 3`),
+   * which a direct call narrows; the synthesized call passes it as an Int, so cast it.
+   */
+  private def narrowedDefault(loc: Location, a: AST.Argument, kind: Option[String]): AST.Expression = {
+    val d = rewriteExpression(a.defaultValue)
+    if (kind.exists(k => k == "Short" || k == "Byte")) AST.Cast(loc, d, a.typeRef) else d
   }
 
   /**

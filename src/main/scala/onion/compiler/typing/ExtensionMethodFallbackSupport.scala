@@ -25,6 +25,28 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 
   /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
    *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
+  /** The call typed against a user-declared extension from its already-typed arguments.
+   *  A call whose lambdas declare every parameter type needs no bidirectional re-typing, and
+   *  re-typing the lambda bodies once per nesting level made nested calls exponential (#2463).
+   *  None when there is no user extension of the name, or none fits unambiguously; otherwise
+   *  the build's own result, errors reported as on the no-lambda path. */
+  def tryUserExtensionWithTypedArguments(
+    node: AST.MethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Option[Term]] =
+    val user = collectExtensionMethods(targetType, node.name).filterNot(isBuiltinExtension)
+    // One receiver type for all of them: overloads whose parameters and receivers could rank
+    // in opposite directions (E0006) are left to the ranking in the bidirectional path.
+    if (user.isEmpty || user.exists(m => !(m.receiverType eq user.head.receiverType))) None
+    else selectApplicableExtensionMethod(targetType, node.name, params) match {
+      case CandidateSelection.Selected(m) if !isBuiltinExtension(m) =>
+        Some(buildExtensionCall(node, target, targetType, params, expected, m))
+      case _ => None
+    }
+
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
     selectApplicableExtensionMethod(targetType, name, params).isInstanceOf[CandidateSelection.Ambiguous[?]]
 

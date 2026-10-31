@@ -23,6 +23,15 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
+  def tryUserExtensionWithTypedArguments(
+    node: AST.MethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Option[Term]] =
+    extensionMethodFallbackSupport.tryUserExtensionWithTypedArguments(node, target, targetType, params, expected)
+
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
     extensionMethodFallbackSupport.isAmbiguousExtensionCall(targetType, name, params)
 

@@ -294,7 +294,7 @@ private[compiler] final class StaticMethodCallSupport(
 
     val finalMethodSubst = explicitMethodSubst.getOrElse(
       GenericMethodTypeArguments.infer(typing, node, method, finalParams, classSubst, expected))
-    val finalExpectedArgs = TypeSubst.args(method, classSubst, finalMethodSubst)
+    val finalExpectedArgs = TypeSubst.paramArgs(method, classSubst, finalMethodSubst)
 
     for {
       finalProcessedParams <- calls.prepareCallParams(node, argList, method, finalParams, finalExpectedArgs)

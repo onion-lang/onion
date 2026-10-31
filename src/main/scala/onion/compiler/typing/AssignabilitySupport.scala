@@ -164,7 +164,18 @@ private[compiler] final class AssignabilitySupport(
     def containsTypeVariable(typeToCheck: Type): Boolean =
       TypeCheckingHelpers.containsTypeVariable(typeToCheck)
 
-    def structurallyAssignable(expected: Type, actual: Type): Boolean = (expected, actual) match {
+    // An F-bound names the variable through the placeholder frozen while the
+    // bounds were resolved, so point that self-reference back at `tv` first.
+    def appliedSelfBound(tv: TypedAST.TypeVariableType): Option[TypedAST.AppliedClassType] =
+      TypeSubstitution.substituteType(tv.upperBound, Map(tv.name -> tv), Map.empty, defaultToBound = false) match {
+        case bound: TypedAST.AppliedClassType => Some(bound)
+        case _ => None
+      }
+
+    // `nested` is true inside a type-argument comparison, where type arguments are
+    // invariant and a variable must not widen to its bound; `strict` makes two type
+    // variables match only by identity (used when comparing a variable's own bound).
+    def structurallyAssignable(expected: Type, actual: Type, nested: Boolean = false, strict: Boolean = false): Boolean = (expected, actual) match {
       case (_, nt) if nt.isNullType =>
         // The null literal is assignable to any reference (non-basic) target,
         // including a generic type parameterized by a type variable (Node[T]).
@@ -224,8 +235,10 @@ private[compiler] final class AssignabilitySupport(
                         case ub => structurallyAssignable(ub, a)
                       }
                   }
-                case _ if involvesTypeVariable => structurallyAssignable(e, a) && structurallyAssignable(a, e)
-                case _ => structurallyAssignable(e, a)
+                case ev: TypedAST.TypeVariableType if strict && a.isInstanceOf[TypedAST.TypeVariableType] =>
+                  ev.widen eq a.asInstanceOf[TypedAST.TypeVariableType].widen
+                case _ if involvesTypeVariable => structurallyAssignable(e, a, nested = true, strict = strict) && structurallyAssignable(a, e, nested = true, strict = strict)
+                case _ => structurallyAssignable(e, a, nested = true, strict = strict)
               }
             }
         if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
@@ -240,6 +253,13 @@ private[compiler] final class AssignabilitySupport(
           bodyContext.table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
             .collectFirst { case (raw, view) if TypeRelations.sameClass(raw, ae.raw) && argsMatch(view) => true }
             .getOrElse(false)
+      case (ae: TypedAST.AppliedClassType, tv: TypedAST.TypeVariableType)
+          if !nested && appliedSelfBound(tv).isDefined =>
+        // A type variable fits an applied type its own bound reaches
+        // (`T extends Comparable[T]` is a `Comparable[T]`). A raw bound
+        // (`T extends Comparable`) says nothing about type arguments, so it
+        // keeps the cases below, which reject it.
+        structurallyAssignable(ae, appliedSelfBound(tv).get, nested = true, strict = true)
       case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>
         actual match {
           case classType: TypedAST.ClassType => TypeRelations.sameClass(ae.raw, classType)

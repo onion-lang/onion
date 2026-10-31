@@ -355,6 +355,28 @@ class HttpSpec extends AbstractShellSpec {
         assert(Shell.Success("") == result)
       }
 
+      it("decodeUrl reports a bad % escape the way Codec::urlDecode does") {
+        val result = shell.run(
+          """
+            |import { onion.Http; onion.Codec; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    var a: String = "none"
+            |    var b: String = "none"
+            |    try { Http::decodeUrl("100%zz") } catch e: IllegalArgumentException { a = e.getMessage() }
+            |    try { Codec::urlDecode("100%zz") } catch e: IllegalArgumentException { b = e.getMessage() }
+            |    return a + "|" + b
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        val msg = "invalid % escape at index 3 in \"100%zz\": a % must be followed by two hex digits"
+        assert(Shell.Success(msg + "|" + msg) == result)
+      }
+
       it("handles null URL in decodeUrl") {
         val result = shell.run(
           """

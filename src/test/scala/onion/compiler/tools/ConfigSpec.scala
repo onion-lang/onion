@@ -545,5 +545,37 @@ class ConfigSpec extends AbstractShellSpec {
         assert(Shell.Success("-1,false,none,20") == result)
       }
     }
+
+    describe("maps and lists that are not LinkedHashMap/ArrayList (#2494)") {
+      it("walks a Colls-built map and list, a HashMap and a TreeMap") {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val cfg: Object = Colls::mapOf1(Colls::entry("port", 8080));
+            |    val nested: Object = ["hosts": Colls::listOf("a", "b")];
+            |    val hm = new java.util.HashMap[String, Object]();
+            |    hm.put("k", "v");
+            |    val tm = new java.util.TreeMap[String, Object]();
+            |    tm.put("k", "w");
+            |    val im = new java.util.TreeMap[JInteger, Object]();
+            |    im.put(1, "x");
+            |    return Config::getInt(cfg, "port", 3000) + "," +
+            |      Config::hasPath(cfg, "port") + "," +
+            |      Config::getString(nested, "hosts.1", "none") + "," +
+            |      Config::getString(nested, "hosts.2", "none") + "," +
+            |      Config::getString(hm, "k", "none") + "," +
+            |      Config::getString(tm, "k", "none") + "," +
+            |      Config::getString(im, "k", "none");
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("8080,true,b,none,v,w,none") == result)
+      }
+    }
   }
 }

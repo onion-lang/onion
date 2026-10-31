@@ -501,7 +501,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           else {
             val staticArgs = Array(staticReceiver(target, extMethod)) ++ finalArgs
             val finalSubst = GenericMethodTypeArguments.infer(typing, node, method, staticArgs, classSubst, expected)
-            val finalExpectedArgs = TypeSubst.args(method, classSubst, finalSubst)
+            val finalExpectedArgs = TypeSubst.paramArgs(method, classSubst, finalSubst)
             calls.processParamsWithExpected(node, staticArgs, finalExpectedArgs).map { finalParams =>
               val call = new CallStatic(container, method, finalParams)
               (TypeSubst.withCast(call, TypeSubst.result(method.returnType, classSubst, finalSubst)),

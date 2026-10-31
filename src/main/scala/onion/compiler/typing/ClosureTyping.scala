@@ -87,7 +87,7 @@ final class ClosureTyping(
           // Memoized like inferBodyReturnType: the bidirectional call path types the same
           // closure against the same template more than once per call site.
           val inferred = {
-            val key = (node, argTypes.toList, samReturnTemplate)
+            val key = (node, argTypes.toList, samReturnTemplate, context.typingViewFor(mentionedNames.of(node)))
             val cached = returnInferenceMemo.get(key)
             if (cached != null) cached
             else {
@@ -436,12 +436,15 @@ final class ClosureTyping(
   // SAM disambiguation asks this once per candidate overload, and the candidates of one
   // call site nearly always hand the lambda the same parameter types -- so the speculative
   // typing of the body (a full walk under suppressed reporting) is memoized per
-  // (closure, parameter types). Types are interned, so the list compares by identity.
-  private val bodyReturnMemo = new java.util.HashMap[(AST.ClosureExpression, List[Type]), Option[Type]]()
-  private val returnInferenceMemo = new java.util.HashMap[(AST.ClosureExpression, List[Type], Type), Option[Type]]()
+  // (closure, parameter types, what the body sees around it). Types are interned, so the
+  // list compares by identity.
+  private type View = (Map[String, Type], Map[String, Type], Map[String, Type])
+  private val mentionedNames = new MentionedNames
+  private val bodyReturnMemo = new java.util.HashMap[(AST.ClosureExpression, List[Type], View), Option[Type]]()
+  private val returnInferenceMemo = new java.util.HashMap[(AST.ClosureExpression, List[Type], Type, View), Option[Type]]()
 
   private def inferBodyReturnType(node: AST.ClosureExpression, context: LocalContext, argTypes: Array[Type]): Option[Type] = {
-    val key = (node, argTypes.toList)
+    val key = (node, argTypes.toList, context.typingViewFor(mentionedNames.of(node)))
     val cached = bodyReturnMemo.get(key)
     if (cached != null) cached
     else {
@@ -504,8 +507,7 @@ final class ClosureTyping(
         // The argument slot keeps a name no source can spell; the boxed copy takes the real one.
         context.addUnboxed(arg.name + "#arg", argType, isMutable = false)
       } else {
-        // `markAsBoxed` is name-based and outlives this lambda, so a sibling lambda's shared
-        // parameter of the same name must not box this one.
+        // A same-named shared variable in an enclosing or sibling lambda must not box this parameter.
         context.addUnboxed(arg.name, argType, isMutable = assigned.contains(arg.name))
       }
       i += 1

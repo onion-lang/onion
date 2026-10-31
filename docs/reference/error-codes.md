@@ -1028,6 +1028,18 @@ tool takeRec(p: P): Int requires { console } { IO::println("" + p.x()); return 0
 This used to be silent: CLI synthesis skipped such a script, which then compiled to a
 program with no `main` and nothing to run (issue #424).
 
+A `List[String]` or `String[]` parameter gets a message of its own: a `tool` cannot take a
+list of arguments yet. Take one flag and split it:
+
+```onion
+tool greet(csv: String = "") requires { console } {
+  if csv != "" {
+    foreach n: String in Strings::split(csv, ",") { IO::println("Hello, " + n) }
+  }
+}
+// $ onion greet.on --csv ann,bob
+```
+
 ### `E0082` — Duplicate tool name
 
 Two `tool`s share a name. Function overloading is fine, but the command line selects a
@@ -1072,6 +1084,9 @@ def main(name: String, count: Int = 3, tags: List[String] = []): Int {
 
 Use a scalar, or `String[]` as the last parameter to collect repeated/trailing
 arguments (e.g. `def main(cmd: String, files: String[])`).
+
+A varargs parameter (`files: String...`) is E0094 too: write `files: String[]`. A `tool`
+reports the same mistake as `E0081`.
 
 ### `E0095` — `main`'s `String[]` parameter is misplaced
 

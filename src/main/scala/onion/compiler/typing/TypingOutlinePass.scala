@@ -575,7 +575,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // method-call targets are boxed before extension resolution.
       val receiverFqcn = receiverType match {
         case ct: ClassType => ct.name
-        case at: ArrayType => s"[${at.component}"  // array representation
+        case _: ArrayType => Typing.ArrayExtensionReceiver  // looked up by array receivers
         case bt: BasicType if bt != BasicType.VOID => Boxing.boxedType(typing.table_, bt).name
         case _ => receiverType.toString
       }

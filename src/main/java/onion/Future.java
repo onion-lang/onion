@@ -396,10 +396,13 @@ public final class Future<T> {
 
     /**
      * Creates a Future that completes after a delay.
+     * A zero or negative delay gives a Future that has already completed, so
+     * {@code delay(deadline - Timing.millis())} is safe after the deadline has passed.
      *
      * @param delayMs delay in milliseconds
      */
     public static Future<Void> delay(long delayMs) {
+        if (delayMs <= 0) return successful(null);
         return new Future<>(CompletableFuture.supplyAsync(() -> {
             try {
                 Thread.sleep(delayMs);

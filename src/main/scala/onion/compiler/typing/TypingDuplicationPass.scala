@@ -26,6 +26,9 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   // top-level functions and extension methods get it here (#2448).
   private val seenFunctionErasures = scala.collection.mutable.HashSet[(String, String)]()
   private val seenExtensionErasures = scala.collection.mutable.HashSet[(String, String)]()
+  // Constructors too: `this(x: T)` beside `this(x: Object)` are two `<init>(Object)V`
+  // in one class file, a ClassFormatError at load time (#2498).
+  private val seenConstructorErasures = scala.collection.mutable.HashSet[String]()
 
   private def withKernel[T <: Node : ClassTag](ast: AST.Node)(f: T => Unit): Unit =
     typing.kernelNodeOf[T](ast).foreach(f)
@@ -51,6 +54,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     seenMethods.clear()
     seenFields.clear()
     seenConstructors.clear()
+    seenConstructorErasures.clear()
     unitContext.currentDefinition = clazz
     typing.find(clazz.name).foreach(unitContext.currentMapper = _)
   }
@@ -65,7 +69,12 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
 
   private def registerConstructor(ast: AST.Node, constructor: ConstructorDefinition): Unit =
     if (seenConstructors.contains(constructor)) typing.report(SemanticError.DUPLICATE_CONSTRUCTOR, ast, constructor.affiliation, constructor.getArgs)
-    else seenConstructors.add(constructor)
+    else {
+      seenConstructors.add(constructor)
+      val desc = DuplicationChecks.erasedConstructorDescriptor(constructor)
+      if (!seenConstructorErasures.add(desc))
+        typing.report(SemanticError.ERASURE_SIGNATURE_COLLISION, ast, constructor.affiliation, "this", desc)
+    }
 
   private def processFieldLikeDeclaration(ast: AST.Node): Unit =
     withKernel[FieldDefinition](ast)(field => registerField(ast, field))

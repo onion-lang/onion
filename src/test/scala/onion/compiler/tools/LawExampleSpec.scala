@@ -170,4 +170,58 @@ class LawExampleSpec extends AbstractShellSpec {
       assert(Shell.Success("ok") == result)
     }
   }
+
+  // #2513: the String samples never contained a delimiter or a control character, so a
+  // round-trip law over a comma-, tab- or newline-delimited shape "held" for a shape that
+  // loses data on ordinary input.
+  describe("String samples exercise delimiters and control characters (#2513)") {
+    def lawProgram(regex: String): String =
+      s"""
+         |record Row(name: String, n: Int) from re"$regex" {
+         |  law roundtrip(r: Row) { Row::parse(Row::format(r)) == r }
+         |}
+         |class Test {
+         |public:
+         |  static def main(args: String[]): String { return "ok" }
+         |}
+         |""".stripMargin
+
+    it("falsifies a round-trip law over a comma-delimited shape") {
+      val codes = errorCodes(lawProgram("""([^,]*),(-?\d+)"""))
+      assert(codes == Seq(Some("E0064")), s"expected only E0064, got: $codes")
+    }
+
+    it("samples a String containing a tab") {
+      val codes = errorCodes(
+        """
+          |record Cell(v: String) {
+          |  law noTab(s: String) { s.indexOf("\t") < 0 }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "ok" }
+          |}
+          |""".stripMargin)
+      assert(codes == Seq(Some("E0064")), s"expected only E0064, got: $codes")
+    }
+
+    it("falsifies a round-trip law whose string group cannot hold a newline") {
+      val codes = errorCodes(lawProgram("""(.*):(-?\d+)"""))
+      assert(codes == Seq(Some("E0064")), s"expected only E0064, got: $codes")
+    }
+
+    it("still passes a round-trip law that holds for every String") {
+      val codes = errorCodes(
+        """
+          |record Name(v: String) {
+          |  law same(s: String) { new Name(s).v() == s }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "ok" }
+          |}
+          |""".stripMargin)
+      assert(codes.isEmpty, s"expected no errors, got: $codes")
+    }
+  }
 }

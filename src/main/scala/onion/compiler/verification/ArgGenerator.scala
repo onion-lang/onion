@@ -153,19 +153,25 @@ object ArgGenerator {
     List(java.lang.Boolean.TRUE, java.lang.Boolean.FALSE)
 
   // --- string ---
+  // The delimiters and control characters (#2513) are what a text shape most often
+  // loses: without them a round-trip law over a comma-, tab- or newline-delimited format
+  // passes for a shape that corrupts ordinary input.
   private val fixedStrings: List[String] = List(
-    "", "a", "abc", "  x  ", "0", "-1", "true", "null", "a:b", "日本語"
+    "", "a", "abc", "  x  ", "0", "-1", "true", "null", "a:b", "日本語",
+    ",", "a,b", "\t", "\n", ";", "=", "|", "\""
   )
 
-  private val AlphaNum: Array[Char] =
-    (('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')).toArray
+  // Random strings draw from printable ASCII, so punctuation shows up beyond the fixed
+  // samples too.
+  private val PrintableAscii: Array[Char] =
+    (' ' to '~').toArray
 
   private def randomString(rng: Random, maxLen: Int): String = {
     val len = rng.nextInt(maxLen + 1)
     val sb = new java.lang.StringBuilder(len)
     var i = 0
     while (i < len) {
-      sb.append(AlphaNum(rng.nextInt(AlphaNum.length)))
+      sb.append(PrintableAscii(rng.nextInt(PrintableAscii.length)))
       i += 1
     }
     sb.toString

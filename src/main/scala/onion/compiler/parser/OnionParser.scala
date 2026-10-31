@@ -52,6 +52,13 @@ object OnionParser {
    *  rather than (wrongly) as unclosed (issue #1966): the body IS balanced, just too deep. */
   val TooDeepInterpolationMarker: String = "#{..}"
 
+  /** Sentinel `found` image for a `#{}` interpolation with nothing (or only blanks) between
+   *  its braces, so it is reported at the `#` as empty instead of as an unexpected end of
+   *  file somewhere else (issue #2429). The triple-quoted variant has its own marker because
+   *  only an ordinary string can escape the `#` to mean a literal `#{}`. */
+  val EmptyInterpolationMarker: String = "#{}"
+  val EmptyMultiLineInterpolationMarker: String = "\"\"\"#{}"
+
   /** Sentinel `found` image for a STRING literal that failed to tokenize because of an
    *  escape sequence the `<STRING>` grammar doesn't support (e.g. `\d`), so it is reported
    *  with its own message instead of being mistaken for an unterminated string (issue
@@ -362,7 +369,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
    * @return true if a sync point was found, false if EOF was reached
    */
   private def skipToToplevelSyncPoint(): Boolean = {
-    val eolIsSync = eolSignificant && modeStack.isEmpty
+    // Inside a record body a `;` or newline is no statement boundary (#2382); see JJOnionParser.
+    val inRecord = inRecordBody
+    inRecordBody = false
+    val eolIsSync = eolSignificant && modeStack.isEmpty && !inRecord
     var depth = 0
     while (true) {
       val t = rawAt(pos)
@@ -373,10 +383,13 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       cur = null
       if (t.kind == K.LBRACE) depth += 1
       else if (t.kind == K.RBRACE) { if (depth > 0) depth -= 1 else return true }
-      else if (depth == 0 && (t.kind == K.SEMI || (t.kind == K.EOL && eolIsSync))) return true
+      else if (depth == 0 && ((t.kind == K.SEMI && !inRecord) || (t.kind == K.EOL && eolIsSync))) return true
     }
     false
   }
+
+  /** True while a record's brace body is being parsed (read by error recovery). */
+  private var inRecordBody = false
 
   /** A failure can strand any of the parser's stacks mid-nesting (an `enterSection` whose
    *  `leaveSection` never ran); recovery restarts from the top level, whose baseline is
@@ -1126,6 +1139,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val superTypes = conformsClause()
     val sections = new ArrayBuffer[AST.AccessSection]()
     if (accept(K.LBRACE)) {
+      inRecordBody = true
       var going = true
       while (going) {
         if (isAccessSectionStart(kind(1))) {
@@ -1157,6 +1171,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         } else going = false
       }
       expect(K.RBRACE)
+      inRecordBody = false
     }
     accept(K.SEMI)
     AST.recordDeclaration(p(t1), mset, c(t2), tparams, args, superTypes.toList, fromRaw, derives.toList,
@@ -2759,7 +2774,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       val t = minMagnitudeToken
       val marker =
         if (t.image.endsWith("L")) LongLiteralOutOfRangeMarker
-        else if (t.image.endsWith("B")) ByteLiteralOutOfRangeMarker
+        else if (isByteSuffix(t.image)) ByteLiteralOutOfRangeMarker
         else if (t.image.endsWith("S")) ShortLiteralOutOfRangeMarker
         else IntLiteralOutOfRangeMarker
       val at = p(t)
@@ -2769,6 +2784,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     operand
   }
 
+  /** `B` ends a Byte literal, except in hex, where it is the digit `B`: `0xAB` is 171 (#2324). */
+  private def isByteSuffix(s: String): Boolean = s.endsWith("B") && !isHex(s)
+
+  private def isHex(s: String): Boolean = s.length > 2 && s.charAt(0) == '0' && (s.charAt(1) == 'x' || s.charAt(1) == 'X')
+
   private def integerLiteral(): AST.Expression = {
     val prev = last
     val t = expect(K.INTEGER)
@@ -2776,10 +2796,10 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val s = t.image.replace("_", "")
     val noKinds = new java.util.LinkedHashSet[Integer]()
     try {
-      if (s.endsWith("B") || s.endsWith("S")) {
+      if (isByteSuffix(s) || s.endsWith("S")) {
         // See the grammar's integer_literal: signed range for decimal, bit pattern for
         // binary/hex, and the minimum's magnitude only as the bare operand of a `-` (#2316).
-        val isByte = s.endsWith("B")
+        val isByte = isByteSuffix(s)
         val max = if (isByte) 127 else 32767
         val iv = parseIntLiteral(s.substring(0, s.length - 1))
         val radix = s.startsWith("0x") || s.startsWith("0X") || s.startsWith("0b")
@@ -2797,7 +2817,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       } else {
         val iv = parseIntLiteral(s)
         if (iv == Integer.MIN_VALUE && !s.startsWith("0") && !negated) throw theFail
-        val lit = AST.IntegerLiteral(p(t), iv)
+        val lit = AST.IntegerLiteral(p(t), iv, isHex(s) && s.endsWith("B"))
         if (iv == Integer.MIN_VALUE && !s.startsWith("0")) { minMagnitudeMinus = unaryMinus; minMagnitudeToken = t; minMagnitudeLiteral = lit }
         lit
       }
@@ -2807,7 +2827,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         // diagnostic (naming the type and the fix) instead of the deepest-reach
         // heuristic, which would otherwise blame whatever token follows the literal.
         val marker =
-          if (s.endsWith("B")) ByteLiteralOutOfRangeMarker
+          if (isByteSuffix(s)) ByteLiteralOutOfRangeMarker
           else if (s.endsWith("S")) ShortLiteralOutOfRangeMarker
           else if (s.endsWith("L")) LongLiteralOutOfRangeMarker
           else IntLiteralOutOfRangeMarker
@@ -2912,6 +2932,12 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           throw fail
         }
         val exprStr = str.substring(interpStart + 2, interpEnd - 1)
+        if (exprStr.isBlank) {
+          val (hashLine, hashCol) = interpolationOrigin(str, interpStart, loc, quoteLen)
+          val marker = if (single) EmptyInterpolationMarker else EmptyMultiLineInterpolationMarker
+          adoptFailure(Location(hashLine, hashCol), marker, new java.util.LinkedHashSet[Integer]())
+          throw fail
+        }
         val (line, col) = interpolationOrigin(str, interpStart + 2, loc, quoteLen)
         // `#{name}` is most interpolations; a plain identifier needs no sub-parser (and its
         // lexer). Anything else is parsed as a term at its position in the enclosing file.

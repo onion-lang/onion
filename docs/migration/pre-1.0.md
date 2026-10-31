@@ -21,11 +21,8 @@ val sum = do[Option] { a <- getA(); b <- getB(); yield a + b }
 - **What changed:** `yield` is a reserved word; `ret` is an ordinary identifier again.
 - **What you see:** old code reports `local variable ret is not found.`, with a hint to write `yield`.
 - **A Java method named `yield`:** call it with backticks, e.g. ``Thread::`yield`()``.
-- **Update a whole project:**
-  ```bash
-  grep -rl '\bret\b' --include='*.on' . | xargs perl -pi -e 's/\bret\b/yield/g'
-  ```
-  Check the result if you use `ret` as a variable name.
+- **Update a whole project:** `onion migrate src/ tests/` (or any files and directories).
+  It rewrites only a `do` block's `ret`, never a variable named `ret`, a string or a comment.
 
 ## `2147483648` needs a `-` directly in front
 
@@ -66,9 +63,11 @@ val n = (-128B) as Int          // -128
 ```
 
 - **What changed:** like `2147483648`, the magnitudes `128B` and `32768S` are valid only as the whole operand of a `-`.
-- **What you see:** `integer literal out of range for Byte (-128..127, or a bit pattern up to 0b11111111 or 0xFF) -- ...`, at the literal (`... for Short ...` with the `S` suffix).
-- **Still fine:** a binary or hex bit pattern, such as `0b11111111B`, `0xFFB` or `0xFFFFS`.
-- **Watch out:** a hex literal that ends in `B` is a `Byte`, even when you meant the hex digit `B`. `0xFFB` is the Byte -1 and `0xAB` is the Byte 10, not the Int 4091 or 171. For such an Int, write it in decimal (`4091`) or binary.
+- **What you see:** `integer literal out of range for Byte (-128..127, or a bit pattern up to 0b11111111) -- ...`, at the literal (`... for Short ...` with the `S` suffix).
+- **Still fine:** a binary bit pattern such as `0b11111111B`, or a hex one with the `S` suffix such as `0xFFFFS`.
+- **Hex and `B`:** in a hex literal `B` is a digit, never a suffix. `0xAB` is the Int 171 and `0xFFB` is the Int 4091. For a Byte, write `0b11111111B` or `-1B`.
+  - Where such a literal no longer fits a Byte (`val x: Byte = 0xFFB`, `f(0xFFB)` with a Byte parameter), the error carries a hint that says so.
+  - Where it still fits, nothing is reported and the value changes: `bs[0] = 0x1B` stores 27 (was 1), and `val y = 0x7FB` is 2043 (was the Byte 127). Search your code for hex literals ending in `B` (`0x...B`).
 
 ## A quoted `String` in a `config` file is read without its quotes
 
@@ -143,3 +142,59 @@ public:
   `E0000`.
 - **No `onion migrate` rule, on purpose:** the only mechanical rewrite is inserting
   `(u as T)`, which would hide exactly the bugs this check finds. Read each error and decide.
+## An empty `[]` or `[:]` takes the type of its siblings
+
+In a list literal, or in the values of a map literal, an empty `[]` or `[:]` now has the
+type the other elements agree on. Before, it widened the whole literal to `Object`.
+
+```onion
+val adj = [[1, 2], []]
+
+// Before: List[Object], so adj[1].add(5) was E0005, and this compiled
+adj.add("header")
+
+// Now: List[List[Int]], so adj[1].add(5) compiles, and this is E0005
+adj.add("header")
+
+// To keep the old type, annotate it
+val xs: List[Object] = [[1, 2], []]
+```
+
+- **What changed:** the empty literal is typed after its siblings, from their type. Elements are still evaluated in source order.
+- **What you see:** `E0005` naming `List[List[Int]].add(String)` (or `Map[String, List[Int]].set(...)`) where the code mixed element kinds, or passed the value to a `List[Object]` parameter.
+- **Still fine:** an explicit annotation wins, and a literal with no typed sibling (`[[], []]`) is typed as before.
+
+## A lambda passed to overloaded extension methods no longer depends on declaration order
+
+When an `extension` declares the same method more than once, a lambda argument now picks the
+same overload whatever order the methods are declared in. Before, such a call often ran
+whichever overload was declared first or last. In general:
+
+- **A call that compiled may now run a different overload**, the one a class method would pick
+  (with one difference, below). This mostly affects lambdas with untyped parameters.
+- **A call that compiled may now be E0006**, where two overloads fit equally.
+- **To keep the old overload:** give the lambda's parameters their types, pass the other
+  argument with `as` (`5 as Object`, `2 as Double`), pass the lambda as a typed value, or
+  rename one method.
+
+Examples:
+
+| Overloads | Call | Before | Now | To keep the old result |
+|---|---|---|---|---|
+| `z(f: (Object) -> void)` on `Object`, `z(o: Object)` on `String` | `"abc".z((x: Object) -> …)` | `String`'s `z(Object)` | E0006 | rename one method |
+| `c(n: Long, g: (Long) -> Long)`, `c(n: Object, g: (Long) -> Long)` | `"a".c(5, (x: Long) -> x * 2L)` | `obj` or `long:10`, by order | E0006 | for `long:10`, `"a".c(5L, …)`; for `obj`, `"a".c(5 as Object, …)` |
+| `k(s: Supplier[String])`, `k(c: Callable[String])` | `"a".k { "v" }` | `call` or `sup`, by order | E0006 | for `call`, `val c: Callable[String] = () -> "v"`, then `"a".k(c)`; for `sup`, the same with `val s: Supplier[String]` |
+| `f(o: Object, g)` on `String`, `f(s: String, g)` on `CharSequence` | `"a".f("q", (x: Int) -> x)` | `strobj1` | E0006 | `"a".f("q" as Object, …)` |
+| `outer(f: (Int) -> Int)`, `outer(f: Function[String, String])` (`import { java.util.function.Function }`) | `"a".outer { p -> ((q: Int) -> p).call(1) }` | `os:s` or `oi:1`, by order | `oi:1` | `val g: Function[String, String] = (p: String) -> …`, then `"a".outer(g)` |
+| `r(f: () -> void)`, `r(o: Object)` | `"a".r { IO::print("") }` | `obj` or `fn`, by order | `fn` | `val h: () -> void = () -> …`, then `"a".r(h as Object)` |
+| `m(n: Int, f: (Int) -> Int)`, `m(n: Object, f: (Object) -> Object)` | `"a".m(1, { x -> x })` | `obj:1` or `int:1`, by order | `int:1` | `"a".m(1 as Object, { x -> x })` |
+| `k(n: Int, f: (Int) -> Int): Int`, `k(n: Double, f: (Double) -> Double): Double` | `"a".k(2, { x -> x * 2 })` | `4.0` (the `Double` one) | `4` | `"a".k(2, (x: Double) -> x * 2.0)` |
+| `run(r: Runnable)`, `run(c: Callable[Object])` | `"a".run { IO::print("") }` | `callable:null` | `runnable` | pass a typed `Callable[Object]` value |
+
+- **What changed:** the overloads the lambda fits are ranked by one rule, written on issue
+  #2447. It is the class-method rule, with one addition: a function-type parameter beats a SAM
+  interface such as `Function` or `Comparator` (the `outer` row). A class method still reports
+  E0006 there; #2472 tracks bringing classes onto the same rule.
+- **What you see:** `E0006 method call is applicable for both …`, with a hint naming the fixes
+  in the last column.
+- **Still fine:** a call with one matching overload, or with no lambda argument.

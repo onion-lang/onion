@@ -169,6 +169,8 @@ class SemanticErrorReporter(threshold: Int) {
     val suggestion =
       if (streamToListHint(targetType, name).isDefined) {
         streamToListHint(targetType, name)
+      } else if (primitiveArrayPipelineHint(targetType, name).isDefined) {
+        primitiveArrayPipelineHint(targetType, name)
       } else if (enclosingStaticOwner != null) {
         Some(format(message("suggestion.didYouMean"), Seq(s"$enclosingStaticOwner::$name")))
       } else if (!calledStatically && ForeignStringNames.contains(name) && isStringType(targetType)) {
@@ -259,7 +261,13 @@ class SemanticErrorReporter(threshold: Int) {
           case obj: TypedAST.ObjectType => toolbox.Suggestions.formatSuggestion(name, rankedCallCandidates(obj, name, argTypes, if (isUnqualifiedCall) None else Some(calledStatically)))
           case _ => None
       }
-    problem(position, appendSuggestion(baseMessage, suggestion))
+    // Set only by MethodCallReportingSupport, when a hex literal ending in `B` is passed where
+    // a same-named method takes a Byte: said after any other suggestion, which still applies.
+    val hexDigitB = items.length > 8 && items(8) == SemanticErrorReporter.HexDigitBHint
+    val withHexDigitB =
+      if (!hexDigitB) suggestion
+      else Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + message("suggestion.hexDigitB"))
+    problem(position, appendSuggestion(baseMessage, withHexDigitB))
   }
 
   /**
@@ -412,6 +420,24 @@ class SemanticErrorReporter(threshold: Int) {
           .exists(n => implementsType(ct, n))
         val conversion = if (primitive) "boxed().toList()" else "toList()"
         Some(format(message("suggestion.didYouMean"), Seq(s"$conversion.$name")))
+      case _ => None
+
+  /**
+   * The builtin array pipelines take a `T[]`, which a primitive array (`Int[]`) is not (#2458).
+   * Say so instead of a name-similarity guess such as `wait`. `Int[]`/`Long[]`/`Double[]` have an
+   * `Arrays::stream`, so they get a one-line conversion; the other primitive arrays get a copy loop.
+   */
+  private def primitiveArrayPipelineHint(t: TypedAST.Type, name: String): Option[String] =
+    t match
+      case at: TypedAST.ArrayType if at.dimension == 1 && at.component.isBasicType &&
+          Typing.builtinExtensions.getOrElse(Typing.ArrayExtensionReceiver, Nil).exists(_.name == name) =>
+        if (Set[TypedAST.Type](TypedAST.BasicType.INT, TypedAST.BasicType.LONG, TypedAST.BasicType.DOUBLE).contains(at.component)) {
+          val conversion = "java.util.Arrays::stream(xs).boxed().toList()"
+          val snippet = if (name == "toList") conversion else s"$conversion.$name(...)"
+          Some(format(message("suggestion.primitiveArrayPipeline"), Seq(typeName(at), snippet)))
+        } else {
+          Some(format(message("suggestion.primitiveArrayPipelineCopy"), Seq(typeName(at), typeName(at.component))))
+        }
       case _ => None
 
   private def implementsType(ct: TypedAST.ClassType, target: String): Boolean = {
@@ -671,8 +697,12 @@ class SemanticErrorReporter(threshold: Int) {
     val target2 = objectTypeName(item2(0))
     val name2 = asString(item2(1))
     val args2 = typeNames(asTypeArray(item2(2)))
-    problem(position, format(message("error.semantic.ambiguousMethod"),
-      Seq(target1, name1, args1, target2, name2, args2)))
+    val baseMessage = format(message("error.semantic.ambiguousMethod"),
+      Seq(target1, name1, args1, target2, name2, args2))
+    val hint =
+      if (items.length > 2 && items(2) == SemanticErrorReporter.LambdaOverloadHint) Some(message("suggestion.lambdaOverloadAmbiguous"))
+      else None
+    problem(position, appendSuggestion(baseMessage, hint))
   }
 
   /**
@@ -727,7 +757,9 @@ class SemanticErrorReporter(threshold: Int) {
       Seq(written(expected), written(actual))
     )
     val hint =
-      if (sameNamedTypeVariables(expected, actual)) {
+      if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
+        Some(message("suggestion.hexDigitB"))
+      } else if (sameNamedTypeVariables(expected, actual)) {
         // `def m[T](a: T) { t = a }` inside `class K[T]`: two parameters named `T`,
         // so "type T is expected, but type T is used" contradicts itself without this.
         Some(format(message("suggestion.shadowedTypeParameter"), Seq(typeName(expected))))
@@ -936,6 +968,9 @@ class SemanticErrorReporter(threshold: Int) {
         reportMethodNotAccessible(position, items)
       case SemanticError.FIELD_NOT_ACCESSIBLE =>
         reportFieldNotAccessible(position, items)
+      case SemanticError.DUPLICATE_METHOD
+          if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordComponentClash] =>
+        reportRecordComponentClash(position, items)
 
       // Data-driven cases
       case _ =>
@@ -952,6 +987,20 @@ class SemanticErrorReporter(threshold: Int) {
     if (errorCount >= threshold) {
       throw new CompilationException(problems.toSeq)
     }
+  }
+
+  /**
+   * DUPLICATE_METHOD raised by a record component whose accessor has the signature of a
+   * method every record generates (`hashCode: Int`, `toString: String`; #2391). The user
+   * wrote no method, so the generic "duplicated method definition" text would mislead.
+   * Items: the record, the component name, (unused) argument types, the clash marker.
+   */
+  private def reportRecordComponentClash(position: Location, items: Array[AnyRef]): Unit = {
+    val clash = items(3).asInstanceOf[SemanticErrorReporter.RecordComponentClash]
+    problem(position, format(
+      message("error.semantic.recordComponentClashesGeneratedMethod"),
+      Seq(typeName(items(0)), asString(items(1)), typeName(clash.componentType))
+    ))
   }
 
   def getProblems: Array[CompileError] = problems.toArray
@@ -1028,6 +1077,19 @@ class SemanticErrorReporter(threshold: Int) {
  * The reporter's constructor showed up in profiles of a one-line program for that reason.
  */
 object SemanticErrorReporter {
+  /**
+   * An extra item on INCOMPATIBLE_TYPE (third) or METHOD_NOT_FOUND (ninth): the failing value
+   * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
+   */
+  private[compiler] case object HexDigitBHint
+
+  /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
+   *  methods equally, so the error says how to pick one (#2447). */
+  private[compiler] case object LambdaOverloadHint
+
+  /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record component's
+   *  accessor colliding with a method the record generates, so the error says so (#2391). */
+  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type)
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.

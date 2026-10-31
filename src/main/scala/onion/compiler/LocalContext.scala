@@ -79,6 +79,11 @@ class LocalContext {
   // every `var` mutable, preserving prior behavior.
   private var reassignedNames: Set[String] = null
 
+  // Statements run before the body: copy a shared (boxed) parameter out of its argument slot.
+  private val prologue = scala.collection.mutable.ListBuffer[TypedAST.ActionStatement]()
+  def addParameterPrologue(statement: TypedAST.ActionStatement): Unit = prologue += statement
+  def parameterPrologue: List[TypedAST.ActionStatement] = prologue.toList
+
   def setReassignedNames(names: Set[String]): Unit = {
     reassignedNames = names
   }
@@ -182,12 +187,25 @@ class LocalContext {
   def inLoop: Boolean = loopDepth > 0
 
   def lookup(name: String): ClosureLocalBinding = {
+    if readingArgumentSlots then
+      val slot = contextFrame.lookup(name + "#arg")
+      if slot != null then return slot
     contextFrame.lookup(name)
   }
 
   /** Option-returning version of lookup for safer null handling */
   def lookupOpt(name: String): Option[ClosureLocalBinding] = {
-    Option(contextFrame.lookup(name))
+    Option(lookup(name))
+  }
+
+  // While true, a shared parameter names its argument slot: a constructor's delegation
+  // arguments (`: this(n)`) run before the prologue fills the boxed copy (#2335).
+  private var readingArgumentSlots = false
+
+  def withArgumentSlots[A](body: => A): A = {
+    val saved = readingArgumentSlots
+    readingArgumentSlots = true
+    try body finally readingArgumentSlots = saved
   }
 
   /**
@@ -195,8 +213,24 @@ class LocalContext {
    */
   def allNames: Set[String] = {
     if (contextFrame == null) Set.empty
-    else contextFrame.allNames
+    else contextFrame.allNames.filterNot(_.contains("#")) // synthetic slots (`n#arg`) are not names a user can write
   }
+
+  /**
+   * What a body typed here sees of its surroundings: the type of each visible name and the
+   * narrowings in force. A closure typed twice under equal views types the same way, so this
+   * is part of the key when its typing is memoized; a captured variable's type can differ
+   * between two overloads an enclosing lambda is tried against (#2447).
+   */
+  def typingView: (Map[String, TypedAST.Type], Map[String, TypedAST.Type], Map[String, TypedAST.Type]) =
+    (allNames.iterator.map(name => name -> lookup(name).tp).toMap, narrowings, flowNarrowings)
+
+  /** [[typingView]] restricted to `names`, the names a piece of source mentions: a body
+   *  typed twice types the same way when these agree, and a key that leaves out the names it
+   *  never reads lets a nested call reuse its result under every enclosing overload (#2452). */
+  def typingViewFor(names: Set[String]): (Map[String, TypedAST.Type], Map[String, TypedAST.Type], Map[String, TypedAST.Type]) =
+    (allNames.iterator.filter(names).map(name => name -> lookup(name).tp).toMap,
+      narrowings.filter(e => names(e._1)), flowNarrowings.filter(e => names(e._1)))
 
   def lookupOnlyCurrentScope(name: String): ClosureLocalBinding = {
     contextFrame.lookupOnlyCurrentScope(name)
@@ -223,6 +257,13 @@ class LocalContext {
     val isBoxed = boxedVariables.contains(name)
     contextFrame.add(name, `type`, isMutable, isBoxed)
   }
+
+  /**
+   * Adds a variable that is never boxed, whatever names were marked boxed. A lambda's
+   * parameter arrives in its slot unboxed; the boxed names belong to the enclosing method.
+   */
+  def addUnboxed(name: String, `type`: TypedAST.Type, isMutable: Boolean): Int =
+    contextFrame.add(name, `type`, isMutable, isBoxed = false)
 
   def add(`type` : TypedAST.Type): String = {
     val name = newName

@@ -8,6 +8,14 @@ private[typing] object TypeRelations {
   def sameClass(left: ClassType, right: ClassType): Boolean =
     (left eq right) || (left.name == right.name)
 
+  /** A bare, Onion-declared type variable (`[T]`, or `[T extends B?]`): its type
+   *  arguments may be nullable, so `null` is a valid `T` and W0012 does not apply
+   *  (#2500). `[T extends B]`, and the non-null view after a smart cast, do not. */
+  def isBareNullableTypeVariable(tp: Type): Boolean = tp match {
+    case tv: TypeVariableType => tv.nullability == Nullability.Nullable
+    case _                    => false
+  }
+
   def isAssignableWithBoxing(expected: Type, actual: Type, table: ClassTable): Boolean =
     if TypeRules.isAssignable(expected, actual) then true
     else if !expected.isBasicType && actual.isBasicType then
@@ -36,8 +44,13 @@ private[typing] object TypeRelations {
           // subtype; wildcard variance is still handled by isSuperType above.
           sameClass(expectedApplied.raw, actualApplied.raw) &&
             expectedApplied.typeArguments.length == actualApplied.typeArguments.length &&
-            expectedApplied.typeArguments.zip(actualApplied.typeArguments).forall { (expArg, actArg) =>
-              isAssignableWithBoxing(expArg, actArg, table) && isAssignableWithBoxing(actArg, expArg, table)
+            expectedApplied.typeArguments.zip(actualApplied.typeArguments).forall {
+              // The wildcard rules of isSuperType above are the whole story: this
+              // mutual check would let `Comparator[U]` through for `? super T`,
+              // since both sides erase to Object (#2367).
+              case (_: WildcardType, _) => false
+              case (expArg, actArg) =>
+                isAssignableWithBoxing(expArg, actArg, table) && isAssignableWithBoxing(actArg, expArg, table)
             }
         case _ =>
           false

@@ -113,6 +113,9 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\.\*)?)\s*;?\s*$""".r
   private val JavaStyleConstructor =
     """^\s*(?:public|private|protected)?\s*[A-Z][A-Za-z0-9_]*\s*\(""".r
+  // A Java/Kotlin-style `this(...)` / `super(...)` call as a statement in a constructor
+  // body: `this`/`super` parse as the start of a member access, so the error lands on `(`.
+  private val ConstructorDelegationCall = """(?:^|[{;])\s*(this|super)\s*$""".r
   private val JsStyleConstructorDeclaration = """^\s*constructor\s*\(""".r
   private val JavaStyleMethodDeclaration =
     """^\s*(?:public|private|protected)?\s*(?!public\b|private\b|protected\b|def\b)[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
@@ -247,6 +250,12 @@ private[compiler] object SyntaxHintClassifier {
   private val EnumCaseWithClause =
     """(?:^|[;{])\s*case\s+([A-Za-z_]\w*)\s*(?:\(([^;]*)\))?\s*$""".r
 
+  // A record body's clauses end at a newline or a space, so `shape a = json; shape b = ...`
+  // fails at the `;`. Anchored to the end of the text before the `;`: a `shape` clause
+  // (`shape name = json` / `re"..."`), or an `example`/`law` clause whose block just closed.
+  private val RecordClauseBeforeSemicolon =
+    """(?:^|[{;\s])(?:shape\s+[A-Za-z_]\w*\s*=\s*(?:re"[^"]*"|[A-Za-z_]\w*)|(?:example|law)\b[^;]*\})\s*$""".r
+
   def classify(
     found: String,
     expected: String,
@@ -264,6 +273,8 @@ private[compiler] object SyntaxHintClassifier {
       // expected-token list for whatever may start the next declaration. An
       // expression ending in `}` (a trailing lambda, a map literal) does take
       // one and never reaches here.
+      case ";" if RecordClauseBeforeSemicolon.findFirstIn(textBefore(context, sourceLine)).isDefined =>
+        hint("error.parsing.hint.semicolon_between_record_clauses")
       case ";" if textBefore(context, sourceLine).trim.endsWith("}") =>
         hint("error.parsing.hint.semicolon_after_block")
       // A JS/TS `for (const x of arr)` fails right at `const` itself (`for (`
@@ -338,6 +349,10 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.old_extends")
       case "(" if expected.contains("\"this\"") && !expected.contains("<ID>") =>
         hint("error.parsing.hint.old_super_init")
+      case "(" if ConstructorDelegationCall.findFirstMatchIn(textBefore(context, sourceLine)).exists(_.group(1) == "this") =>
+        hint("error.parsing.hint.constructor_body_this_call")
+      case "(" if ConstructorDelegationCall.findFirstMatchIn(textBefore(context, sourceLine)).exists(_.group(1) == "super") =>
+        hint("error.parsing.hint.constructor_body_super_call")
       case "(" if expected.contains("<ID>") && ParenthesizedCatchClause.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.catch_parens")
       // Specific foreach syntax must win over the generic removed `for ... in` form.

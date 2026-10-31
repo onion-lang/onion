@@ -25,7 +25,7 @@ private[compiler] final class MethodBodySupport(
     val translated = translate(block, context)
     method.mayContainTry = bodyContext.tryCount != triesBefore
     checkMissingReturn(method.returnType, translated, method.name, block)
-    val translatedBlock = addReturnNode(translated, method.returnType)
+    val translatedBlock = addReturnNode(withPrologue(context, translated), method.returnType)
     method.setBlock(translatedBlock)
     method.setFrame(context.getContextFrame)
     reportUnused(context)
@@ -82,7 +82,7 @@ private[compiler] final class MethodBodySupport(
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
     typing.kernelNodeOf[ConstructorDefinition](node).foreach { constructor =>
       val context = prepareConstructorContext(constructor, node.args, node.block)
-      val params0 = typedTerms(node.superInits.toArray, context)
+      val params0 = context.withArgumentSlots(typedTerms(node.superInits.toArray, context))
       // The object does not exist while its super/self initializer arguments are being
       // evaluated. A field read there -- `def this : this(seed)` where `seed` is a field,
       // or an explicit `this` -- is a GETFIELD on `uninitializedThis`, which the JVM
@@ -108,10 +108,31 @@ private[compiler] final class MethodBodySupport(
       else if matched.length > 1 then
         bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
       else
+        warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
         val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
         finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
     }
+
+  /** W0012 for a `null` argument to an Onion-declared super/self constructor's
+   *  non-null parameter, as `new P(null)` already warns (#2477). A Java
+   *  constructor's parameter nullness is unknown, so it stays silent (#2116).
+   *  The parent's type arguments are substituted first, so `extends G[String?](null)`
+   *  is silent and `extends G[String](null)` names `String`; a type variable that
+   *  admits null (a bare `[T]`, as in `: this(null)` inside `class D[T]`) is silent too. */
+  private def warnNullSuperArguments(targetClass: ClassType, ctor: ConstructorRef, args: List[AST.Expression], params: Array[Term]): Unit =
+    if ctor.isInstanceOf[ConstructorDefinition] then
+      val classSubst = TypeSubstitution.classSubstitution(targetClass)
+      val formals = ctor.getArgs.map(t =>
+        TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      def admitsNull(f: Type): Boolean = f match
+        case tv: TypeVariableType => tv.acceptsNullable
+        case _ => f.isNullable || f.isNullType
+      args.zip(params).zip(formals).foreach { case ((arg, p), f) =>
+        if p != null && p.`type`.isNullType && !f.isBasicType && !admitsNull(f) then
+          bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
+          bodyContext.warningReporter.nullToNonNullable(arg.location, f.displayName)
+      }
 
   /**
    * Boxing-aware super-constructor fallback: substitutes the parent's class type
@@ -151,7 +172,7 @@ private[compiler] final class MethodBodySupport(
     primaryAssignments: Int = 0
   ): Unit = {
     constructor.superInitializer = initializer
-    constructor.block = addReturnNode(translate(block, context), BasicType.VOID)
+    constructor.block = addReturnNode(withPrologue(context, translate(block, context)), BasicType.VOID)
     constructor.frame = context.getContextFrame
     constructor.primaryAssignments = primaryAssignments
   }
@@ -170,7 +191,7 @@ private[compiler] final class MethodBodySupport(
     val extTranslated = translate(node.block, context)
     staticMethod.mayContainTry = bodyContext.tryCount != triesBefore
     checkMissingReturn(staticMethod.returnType, extTranslated, staticMethod.name, node.block)
-    val translatedBlock = addReturnNode(extTranslated, staticMethod.returnType)
+    val translatedBlock = addReturnNode(withPrologue(context, extTranslated), staticMethod.returnType)
     staticMethod.setBlock(translatedBlock)
     staticMethod.setFrame(context.getContextFrame)
     extMethod.setBlock(translatedBlock)
@@ -230,9 +251,13 @@ private[compiler] final class MethodBodySupport(
     val arguments = staticMethod.arguments
     val assigned = if (node.block == null) node.args.map(_.name).toSet else bodyContext.assignedNames(node.block)
     context.setReassignedNames(assigned)
+    val shared = sharedParameters(node.args.map(_.name), node.block, assigned)
+    context.markAsBoxed(shared)
     for ((arg, i) <- node.args.zipWithIndex) {
-      context.add(arg.name, arguments(i + 1), isMutable = assigned.contains(arg.name))
+      if shared.contains(arg.name) then context.add(arg.name + "#arg", arguments(i + 1), isMutable = false)
+      else context.add(arg.name, arguments(i + 1), isMutable = assigned.contains(arg.name))
     }
+    addSharedParameterCopies(context, node.args, arguments.tail, shared)
 
     staticMethod.setArgumentsWithDefaults(buildArgumentsWithDefaults(extArgs, arguments, context))
     context
@@ -249,7 +274,8 @@ private[compiler] final class MethodBodySupport(
       .find { method =>
         (method.modifier & AST.M_STATIC) != 0 &&
         method.arguments.length == extMethod.arguments.length + 1 &&
-        method.arguments(0) == receiverType
+        method.arguments(0) == receiverType &&
+        extMethod.arguments.indices.forall(i => method.arguments(i + 1) == extMethod.arguments(i))
       }
       .map(_.asInstanceOf[MethodDefinition])
       .orNull
@@ -270,13 +296,59 @@ private[compiler] final class MethodBodySupport(
     // Share the reassigned-name set with local `var` declarations so a var
     // never reassigned in this body can be smart-cast (issue #273).
     context.setReassignedNames(assigned)
+    val shared = sharedParameters(args.map(_.name), body, assigned)
+    context.markAsBoxed(shared)
     var i = 0
     args.foreach { arg =>
-      context.add(arg.name, types(i), isMutable = assigned.contains(arg.name))
-      context.recordDeclaration(arg.name, arg.location, isParameter = true)
+      addParameter(context, arg, types(i), assigned, shared)
       i += 1
     }
+    addSharedParameterCopies(context, args, types, shared)
   }
+
+  /**
+   * Parameters that a closure captures while the body also assigns them. The closure and the
+   * method must see one variable, so these live in a box (issue #2335), like a captured `var`.
+   */
+  private def sharedParameters(names: List[String], body: AST.Node, assigned: Set[String]): Set[String] =
+    body match
+      case block: AST.BlockExpression =>
+        CapturedVariableScanner.scan(block) & names.toSet & assigned
+      case _ => Set.empty
+
+  private def addParameter(
+    context: LocalContext,
+    arg: AST.Argument,
+    tp: Type,
+    assigned: Set[String],
+    shared: Set[String]
+  ): Unit =
+    if shared.contains(arg.name) then
+      // The argument slot stays under a name no source can spell; the boxed copy below takes the real name.
+      context.add(arg.name + "#arg", tp, isMutable = false)
+    else
+      context.add(arg.name, tp, isMutable = assigned.contains(arg.name))
+    context.recordDeclaration(arg.name, arg.location, isParameter = true)
+
+  /** Declares the boxed local for each shared parameter and records the statements that fill it. */
+  private def addSharedParameterCopies(
+    context: LocalContext,
+    args: List[AST.Argument],
+    types: Array[Type],
+    shared: Set[String]
+  ): Unit =
+    args.zipWithIndex.foreach { case (arg, i) =>
+      if shared.contains(arg.name) then
+        val from = context.lookupOnlyCurrentScope(arg.name + "#arg")
+        val index = context.add(arg.name, types(i), isMutable = true)
+        context.addParameterPrologue(
+          new ExpressionActionStatement(
+            new SetLocal(arg.location, 0, index, types(i), new RefLocal(arg.location, 0, from.index, types(i)))))
+    }
+
+  private def withPrologue(context: LocalContext, body: ActionStatement): ActionStatement =
+    val prologue = context.parameterPrologue
+    if prologue.isEmpty then body else new StatementBlock(prologue :+ body*)
 
   private def markCapturedVariables(context: LocalContext, args: List[AST.Argument], block: AST.BlockExpression): Unit = {
     val paramNames = args.map(_.name).toSet

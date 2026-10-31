@@ -53,8 +53,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
         Some(new ByteValue(loc, v))
       case node@AST.ShortLiteral(loc, v) =>
         Some(new ShortValue(loc, v))
-      case node@AST.IntegerLiteral(loc, v) =>
-        Some(new IntValue(loc, v))
+      case node@AST.IntegerLiteral(loc, v, hexEndsInB) =>
+        Some(new IntValue(loc, v, hexEndsInB))
       case node@AST.LongLiteral(loc, v) =>
         Some(new LongValue(loc, v))
       case node@AST.FloatLiteral(loc, v) =>
@@ -250,11 +250,13 @@ private[compiler] final class SimpleExpressionTypingSupport(
     var failed = false
     var incompatibleLeft: Type = null
     var incompatibleRight: Type = null
-    var index = 0
 
-    node.elements.foreach { element =>
+    // An empty `[]`/`[:]` has no type of its own: type it after its siblings and
+    // from theirs, so `[[1, 2], []]` is a List[List[Int]], not a List[Object].
+    val order = node.elements.zipWithIndex.sortBy { case (e, _) => if (isEmptyCollectionLiteral(e)) 1 else 0 }
+    order.foreach { case (element, index) =>
       if (!failed) {
-        val typedElement = typed(element, context, expectedElem).orNull
+        val typedElement = typed(element, context, siblingExpected(expectedElem, elementType, element)).orNull
         if (typedElement == null) {
           failed = true
         } else if (typedElement.`type` eq BasicType.VOID) {
@@ -266,7 +268,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
         } else {
           typedElements(index) = typedElement
           val normalizedType = normalizeListElementType(typedElement.`type`)
-          if (index == 0) {
+          if (elementType == null) {
             elementType = normalizedType
           } else {
             val merged = mergeListElementType(elementType, normalizedType)
@@ -278,7 +280,6 @@ private[compiler] final class SimpleExpressionTypingSupport(
               elementType = merged
             }
           }
-          index += 1
         }
       }
     }
@@ -495,12 +496,12 @@ private[compiler] final class SimpleExpressionTypingSupport(
     var keyType: Type = null
     var valueType: Type = null
     var failed = false
-    var index = 0
 
-    node.entries.foreach { case (keyExpr, valueExpr) =>
+    val order = node.entries.zipWithIndex.sortBy { case ((_, v), _) => if (isEmptyCollectionLiteral(v)) 1 else 0 }
+    order.foreach { case ((keyExpr, valueExpr), index) =>
       if (!failed) {
         val typedKey = typed(keyExpr, context, expectedKey).orNull
-        val typedValue = typed(valueExpr, context, expectedValue).orNull
+        val typedValue = typed(valueExpr, context, siblingExpected(expectedValue, valueType, valueExpr)).orNull
         if (typedKey == null || typedValue == null) {
           failed = true
         } else if (typedKey.`type` eq BasicType.VOID) {
@@ -514,7 +515,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
           values(index) = typedValue
           val normalizedKey = normalizeListElementType(typedKey.`type`)
           val normalizedValue = normalizeListElementType(typedValue.`type`)
-          if (index == 0) {
+          if (keyType == null) {
             keyType = normalizedKey
             valueType = normalizedValue
           } else {
@@ -531,7 +532,6 @@ private[compiler] final class SimpleExpressionTypingSupport(
               valueType = mergedValue
             }
           }
-          index += 1
         }
       }
     }
@@ -572,6 +572,18 @@ private[compiler] final class SimpleExpressionTypingSupport(
       case basicType: BasicType => Boxing.boxedType(bodyContext.table, basicType)
       case other => other
     }
+
+  private def isEmptyCollectionLiteral(e: AST.Expression): Boolean = e match {
+    case l: AST.ListLiteral => l.elements.isEmpty
+    case m: AST.MapLiteral => m.entries.isEmpty
+    case _ => false
+  }
+
+  /** The type to expect for `element`: the annotation if any, else (for an empty
+   *  collection literal) the type its already-typed siblings agreed on. */
+  private def siblingExpected(expected: Type, siblings: Type, element: AST.Expression): Type =
+    if (expected != null || siblings == null || !isEmptyCollectionLiteral(element)) expected
+    else siblings
 
   private def mergeListElementType(left: Type, right: Type): Type =
     if (left == null || right == null) null

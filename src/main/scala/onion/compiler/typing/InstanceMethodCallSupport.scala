@@ -105,6 +105,7 @@ private[compiler] final class InstanceMethodCallSupport(
       // `e.message` does, so parens are optional on property accessors too.
       val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound = false)
       if (ext.isDefined) return ext
+      if (fallback.isAmbiguousExtensionCall(targetType, name, params)) return None
       if (params != null && params.length == 0) {
         val getters = {
           val g = MethodResolution.findMethods(targetType, calls.getter(name), params, bodyContext.table)

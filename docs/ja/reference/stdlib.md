@@ -986,6 +986,8 @@ Timing::sleep(1000L)        // 1000ミリ秒スリープ
 Timing::sleepNanos(500000L) // 500,000ナノ秒スリープ
 ```
 
+0 以下の時間を渡すと、待たずにすぐ戻ります。そのため、期限を過ぎた後に `Timing::sleep(deadline - Timing::millis())` を呼んでも安全です。
+
 ### 関数実行時間の計測
 
 ```onion
@@ -1059,6 +1061,8 @@ val safe: Future[Int] = Future::asyncThrowing {
 // 遅延
 val delayed: Future[Void] = Future::delay(1000L)  // 1秒
 ```
+
+`Future::delay` に 0 以下の時間を渡すと、すぐに完了します。そのため、期限を過ぎた後に `Future::delay(deadline - Timing::millis())` を呼んでも安全です。
 
 ### 変換メソッド
 
@@ -1313,6 +1317,9 @@ scalar の型推論規則（Json と同一、ただし YAML 独自の2項目を�
 `a: 1 # note` は `a` を `Long` の `1` としてパースし、`b: 'q # no'` は `#` を含む文字列
 `q # no` のまま保持します。
 
+キーも同じ二通りでクォートでき、同じ規則でクォートが外れます。`'k': 1` と
+`"k": 1` はどちらもキー `k` になり、`'a: b': 1` はキー `a: b` になります。
+
 不正な入力に対しては `Yaml.YamlParseException` を投げます。`derive!(Yaml)` の
 `fromYaml` はこれを捕捉して代わりに `null` を返します。
 
@@ -1404,7 +1411,7 @@ val config2 = Config::parseJson("{\"port\": 8080}")   // JSON 文字列を直接
 
 Config::get(config, "database.host")                   // 生の値、見つからなければ null
 Config::getString(config, "database.host", "localhost")
-Config::getInt(config, "database.port", 5432)
+Config::getInt(config, "database.port", 5432)         // 小数や Int 範囲外の数値のときは既定値
 Config::getLong(config, "database.maxConnections", 10L)
 Config::getDouble(config, "database.timeout", 30.0)
 Config::getBoolean(config, "database.ssl", false)
@@ -1416,6 +1423,8 @@ Config::getBoolean(config, "database.ssl", false)
 val config = Config::parseJson("{\"users\": [{\"name\": \"Alice\"}, {\"name\": \"Bob\"}]}")
 Config::getString(config, "users.0.name", "unknown")   // "Alice"
 ```
+
+config には、パースした JSON だけでなく任意の `Map` と `List` を渡せます。`Colls::mapOf` で作った map や Java の `HashMap` も同じように扱えます。
 
 キーが見つからない場合・array の添字が範囲外の場合・値を要求された型へ変換できない場合は、例外を投げず指定したデフォルト値にフォールバックします。数値系のゲッターは JSON の数値だけでなく数値文字列も受け付けます。`hasPath` はデフォルト値なしで存在確認だけ行います:
 
@@ -1779,6 +1788,10 @@ Codec::hexEncode("Hi") / Codec::hexDecode("4869")
 Codec::urlEncode("a b&c") / Codec::urlDecode(s)
 ```
 
+- `base64Decode` は空白文字を読み飛ばします。ファイル末尾の改行や、`base64` コマンドの 76 桁ごとの改行があってもそのままデコードできます。
+  先頭のバイトオーダーマーク（BOM。「UTF-8 (BOM 付き)」で保存したファイルの先頭に付く印）も読み飛ばします。
+- デコーダに不正な入力を渡すと、問題を示す `IllegalArgumentException` を投げます。例: `invalid Base64 character '!' at index 10`（目に見えない文字や ASCII 以外の文字は `U+00A0` の形で示します）、`invalid % escape at index 3 in "100%zz"`。
+
 これらも `String` の組み込み拡張メソッドです:
 
 ```onion
@@ -1963,7 +1976,7 @@ foreach i: Int in r { IO::println(i) }   // 2 3 4 5
 コレクションや配列向けのイテレーションユーティリティ:
 
 - `Iterables::map(list|iterable|set, f)`
-- `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す
+- `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す。順序は元の挿入順のまま
 - `Iterables::toList(iterable)` - 任意の `Iterable`（範囲を含む）を `List` に実体化する
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`
@@ -2524,7 +2537,7 @@ Http::delete(url): String
 
 ```
 Http::encodeUrl(str): String
-Http::decodeUrl(str): String
+Http::decodeUrl(str): String            // Codec::urlDecode と同じ
 Http::buildQuery(params): String        // params: キーと値を交互に並べる
 Http::buildUrl(baseUrl, params): String // "?"/"&" + buildQuery(params) を付加
 ```

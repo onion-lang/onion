@@ -907,7 +907,7 @@ Provided via `onion.Iterables` (Java interface).
 Access iteration utilities for collections and arrays:
 
 - `Iterables::map(list|iterable|set, f)`
-- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map`
+- `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map` in the original insertion order
 - `Iterables::toList(iterable)` - materializes any `Iterable` (ranges included) into a `List`
 - `Iterables::filter(list|iterable, predicate)`
 - `Iterables::foldl(iterable, init, f)`
@@ -1097,6 +1097,8 @@ val safe: Future[Int] = Future::asyncThrowing {
 // Delay
 val delayed: Future[Void] = Future::delay(1000L)  // 1 second
 ```
+
+A zero or negative delay completes at once, so `Future::delay(deadline - Timing::millis())` is safe once the deadline has passed.
 
 ### Transformation Methods
 
@@ -1371,6 +1373,8 @@ val formattedMs: String = Timing::formatMillis(millis)  // "2m5s"
 Timing::sleep(1000L)        // Sleep for 1000 milliseconds
 Timing::sleepNanos(500000L) // Sleep for 500,000 nanoseconds
 ```
+
+A zero or negative duration returns immediately, so `Timing::sleep(deadline - Timing::millis())` is safe once the deadline has passed.
 
 ### Measuring Function Execution
 
@@ -1769,6 +1773,9 @@ stripped before this inference runs, unless it is inside a `"..."` or `'...'` qu
 `a: 1 # note` parses `a` as the `Long` `1`, and `b: 'q # no'` keeps the `#` as part of the
 string `q # no`.
 
+A key may be quoted the same two ways, and is unquoted by the same rules: `'k': 1` and
+`"k": 1` both give the key `k`, and `'a: b': 1` gives the key `a: b`.
+
 Throws `Yaml.YamlParseException` on malformed input; `derive!(Yaml)`'s
 `fromYaml` catches this and returns `null` instead.
 
@@ -1866,7 +1873,7 @@ val config2 = Config::parseJson("{\"port\": 8080}")   // parses a JSON string di
 
 Config::get(config, "database.host")                   // raw value, or null if not found
 Config::getString(config, "database.host", "localhost")
-Config::getInt(config, "database.port", 5432)
+Config::getInt(config, "database.port", 5432)         // the default if the number is a fraction or out of Int range
 Config::getLong(config, "database.maxConnections", 10L)
 Config::getDouble(config, "database.timeout", 30.0)
 Config::getBoolean(config, "database.ssl", false)
@@ -1879,6 +1886,9 @@ an array:
 val config = Config::parseJson("{\"users\": [{\"name\": \"Alice\"}, {\"name\": \"Bob\"}]}")
 Config::getString(config, "users.0.name", "unknown")   // "Alice"
 ```
+
+The config can be any `Map` and `List`, not only parsed JSON. A map built with
+`Colls::mapOf` or a Java `HashMap` works the same way.
 
 A missing key, an out-of-range array index, or a value that can't convert to the requested
 type all fall back to the supplied default instead of throwing; the numeric getters accept
@@ -1952,6 +1962,10 @@ Codec::base64Decode(enc)                  // "Hello"
 Codec::hexEncode("Hi") / Codec::hexDecode("4869")
 Codec::urlEncode("a b&c") / Codec::urlDecode(s)
 ```
+
+- `base64Decode` skips whitespace, so a file's trailing newline or `base64`'s 76-column lines decode as is.
+  A byte order mark at the start (a file saved as "UTF-8 with BOM") is skipped too.
+- Bad input to a decoder throws `IllegalArgumentException` naming the problem, for example `invalid Base64 character '!' at index 10` (an invisible or non-ASCII character shows as `U+00A0`) or `invalid % escape at index 3 in "100%zz"`.
 
 These are also builtin extension methods on `String`:
 
@@ -2371,7 +2385,7 @@ Http::delete(url): String
 
 ```
 Http::encodeUrl(str): String
-Http::decodeUrl(str): String
+Http::decodeUrl(str): String            // same as Codec::urlDecode
 Http::buildQuery(params): String        // params: alternating keys and values
 Http::buildUrl(baseUrl, params): String // appends "?"/"&" + buildQuery(params)
 ```

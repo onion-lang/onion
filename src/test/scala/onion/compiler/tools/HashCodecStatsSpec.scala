@@ -64,6 +64,102 @@ class HashCodecStatsSpec extends AbstractShellSpec {
         Shell.Success("rejected|rejected|0"))
     }
 
+    it("base64Decode skips line breaks and spaces, as in a file or wrapped CLI output") {
+      runStr(
+        "import { onion.Codec }",
+        "return Codec::base64Decode(\"aGVsbG8=\\n\") + \"|\" + Codec::base64Decode(\"aGVs\\r\\nbG8g\\nd29y bGQ=\")",
+        Shell.Success("hello|hello world"))
+    }
+
+    it("base64Decode names the bad character, its index, and a bad length") {
+      runStr(
+        "import { onion.Codec }",
+        """var bad: String = "none"
+          |var len: String = "none"
+          |try { Codec::base64Decode("not base64!!") } catch e: IllegalArgumentException { bad = e.getMessage() }
+          |try { Codec::base64Decode("a") } catch e: IllegalArgumentException { len = e.getMessage() }
+          |return bad + "|" + len""".stripMargin,
+        Shell.Success("invalid Base64 character '!' at index 10|invalid Base64 length or padding: 1 character(s) after removing whitespace"))
+    }
+
+    it("base64Decode skips a leading byte order mark, as in a file saved as UTF-8 with BOM (#2454)") {
+      runStr(
+        "import { onion.Codec }",
+        "return Codec::base64Decode(\"\\uFEFFaGVsbG8=\\r\\n\")",
+        Shell.Success("hello"))
+    }
+
+    it("base64Decode shows an invisible or non-ASCII bad character as U+XXXX (#2454)") {
+      runStr(
+        "import { onion.Codec }",
+        "var nbsp: String = \"none\"\n" +
+        "var bom: String = \"none\"\n" +
+        "var ctl: String = \"none\"\n" +
+        "try { Codec::base64Decode(\"aGVs\\u00A0bG8=\") } catch e: IllegalArgumentException { nbsp = e.getMessage() }\n" +
+        "try { Codec::base64Decode(\"aGVs\\uFEFFbG8=\") } catch e: IllegalArgumentException { bom = e.getMessage() }\n" +
+        "try { Codec::base64Decode(\"aGVs\\u000CbG8=\") } catch e: IllegalArgumentException { ctl = e.getMessage() }\n" +
+        "return nbsp + \"|\" + bom + \"|\" + ctl",
+        Shell.Success(
+          "invalid Base64 character U+00A0 at index 4" +
+          "|invalid Base64 character U+FEFF at index 4" +
+          "|invalid Base64 character U+000C at index 4"))
+    }
+
+    it("base64Decode names an emoji by its code point, not half a surrogate pair (#2470)") {
+      runStr(
+        "import { onion.Codec }",
+        "var m: String = \"none\"\n" +
+        "try { Codec::base64Decode(\"aGVs\\uD83D\\uDE00bG8=\") } catch e: IllegalArgumentException { m = e.getMessage() }\n" +
+        "return m",
+        Shell.Success("invalid Base64 character U+1F600 at index 4"))
+    }
+
+    it("urlDecode names the bad % escape and its index") {
+      runStr(
+        "import { onion.Codec }",
+        """var a: String = "none"
+          |var b: String = "none"
+          |try { Codec::urlDecode("100%zz") } catch e: IllegalArgumentException { a = e.getMessage() }
+          |try { Codec::urlDecode("50%") } catch e: IllegalArgumentException { b = e.getMessage() }
+          |return a + "|" + b""".stripMargin,
+        Shell.Success(
+          "invalid % escape at index 3 in \"100%zz\": a % must be followed by two hex digits|" +
+          "invalid % escape at index 2 in \"50%\": a % must be followed by two hex digits"))
+    }
+
+    it("urlDecode quotes a short window around the bad escape in a long input, not all of it") {
+      runStr(
+        "import { onion.Codec }",
+        """val sb = new StringBuilder()
+          |foreach i in 1..1000 { sb.append("a") }
+          |sb.append("%zz")
+          |foreach i in 1..1000 { sb.append("b") }
+          |var m: String = "none"
+          |try { Codec::urlDecode(sb.toString()) } catch e: IllegalArgumentException { m = e.getMessage() }
+          |return m""".stripMargin,
+        Shell.Success(
+          "invalid % escape at index 1000 in \"...aaaaaaaaaaaaaaaaaaaa%zzbbbbbbbbbbbbbbbbbbbb...\": " +
+          "a % must be followed by two hex digits"))
+    }
+
+    it("urlDecode's quoted window never cuts an emoji in half (#2470)") {
+      runStr(
+        "import { onion.Codec }",
+        """val e = "😀"
+          |var head: String = "none"
+          |var tail: String = "none"
+          |try { Codec::urlDecode("a".repeat(30) + e + "a".repeat(19) + "%zz" + "b".repeat(50)) }
+          |catch x: IllegalArgumentException { head = x.getMessage() }
+          |try { Codec::urlDecode("a".repeat(100) + "%zz" + "b".repeat(19) + e + "b".repeat(50)) }
+          |catch x: IllegalArgumentException { tail = x.getMessage() }
+          |return head + "|" + tail""".stripMargin,
+        Shell.Success(
+          "invalid % escape at index 51 in \"...😀" + "a" * 19 + "%zz" + "b" * 20 + "...\": " +
+          "a % must be followed by two hex digits|" +
+          "invalid % escape at index 100 in \"..." + "a" * 20 + "%zz" + "b" * 19 + "😀...\": " +
+          "a % must be followed by two hex digits"))
+    }
+
     it("url encoding round-trips a reserved character") {
       runStr(
         "import { onion.Codec }",

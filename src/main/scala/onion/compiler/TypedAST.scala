@@ -723,7 +723,7 @@ object TypedAST {
     def `type`: TypedAST.Type = BasicType.BOOLEAN
   }
 
-  class IntValue(location: Location, val value: Int)  extends Term(location) {
+  class IntValue(location: Location, val value: Int, val hexEndsInB: Boolean = false)  extends Term(location) {
     def this(value: Int) = {
       this(null, value)
     }
@@ -1629,7 +1629,12 @@ object TypedAST {
       while (i < count) {
         val arg1 = m1.argumentTypeAt(i)
         val arg2 = m2.argumentTypeAt(i)
-        if (arg1 ne arg2) return arg1.name.compareTo(arg2.name)
+        // Two methods' own type parameters are distinct objects with the same name (`T`),
+        // so a tie here must fall through to the later parameters (#2445).
+        if (arg1 ne arg2) {
+          result = arg1.name.compareTo(arg2.name)
+          if (result != 0) return result
+        }
         i += 1
       }
       0
@@ -2093,8 +2098,13 @@ object TypedAST {
                     // ? super E ← ? extends A: incompatible
                     false
                   case _ =>
-                    // ? super E ← A: A must be supertype of E
-                    isSuperType(actualArg, w.lowerBound.get)
+                    // ? super E ← A: A must be supertype of E. Two type variables
+                    // are related only by identity: erased to Object they would
+                    // otherwise match, and `Comparator[U]` would sort a `List[T]` (#2367).
+                    (actualArg, w.lowerBound.get) match
+                      case (at: TypedAST.TypeVariableType, lt: TypedAST.TypeVariableType) =>
+                        isSuperTypeByIdentity(at, lt)
+                      case (_, lower) => isSuperType(actualArg, lower)
               // Expected: type variable T (respects the variable's
               // nullability: NonNull T rejects nullable actuals)
               case (tv: TypedAST.TypeVariableType, _) =>

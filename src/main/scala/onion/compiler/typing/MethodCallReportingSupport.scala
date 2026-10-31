@@ -42,7 +42,33 @@ private[compiler] final class MethodCallReportingSupport(
         }
       case _ => null
     }
-    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed, java.lang.Boolean.valueOf(calledStatically), enclosingStaticOwner)
+    val hexDigitBHint: AnyRef =
+      if (passesHexEndingInBForByte(node, targetType, name, argTypes.length)) SemanticErrorReporter.HexDigitBHint else null
+    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed, java.lang.Boolean.valueOf(calledStatically), enclosingStaticOwner, hexDigitBHint)
+  }
+
+  // `f(0xFFB)` where some `f` of that arity takes a Byte in that position: before #2324 the
+  // literal was that Byte; now it is an Int, and the error should say so.
+  private def passesHexEndingInBForByte(node: AST.Node, targetType: AnyRef, name: String, argc: Int): Boolean = {
+    def isHexEndingInB(e: AST.Expression): Boolean = e match {
+      case AST.IntegerLiteral(_, _, hexEndsInB) => hexEndsInB
+      case AST.Negate(_, AST.IntegerLiteral(_, _, hexEndsInB)) => hexEndsInB
+      case _ => false
+    }
+    val args: List[AST.Expression] = node match {
+      case c: AST.MethodCall => c.args
+      case c: AST.UnqualifiedMethodCall => c.args
+      case c: AST.StaticMethodCall => c.args
+      case _ => Nil
+    }
+    val positions = args.indices.filter(i => isHexEndingInB(args(i)))
+    positions.nonEmpty && (targetType match {
+      case obj: ObjectType =>
+        obj.methods.exists { m =>
+          m.name == name && m.arguments.length == argc && positions.exists(i => i < argc && m.arguments(i) == BasicType.BYTE)
+        }
+      case _ => false
+    })
   }
 
   def reportAmbiguousMethods(
@@ -69,14 +95,13 @@ private[compiler] final class MethodCallReportingSupport(
     firstArguments: Array[Type],
     secondAffiliation: AnyRef,
     secondName: String,
-    secondArguments: Array[Type]
+    secondArguments: Array[Type],
+    hint: AnyRef = null
   ): Unit = {
-    bodyContext.report(
-      AMBIGUOUS_METHOD,
-      node,
-      Array[AnyRef](firstAffiliation, firstName, firstArguments),
-      Array[AnyRef](secondAffiliation, secondName, secondArguments)
-    )
+    val first = Array[AnyRef](firstAffiliation, firstName, firstArguments)
+    val second = Array[AnyRef](secondAffiliation, secondName, secondArguments)
+    if (hint == null) bodyContext.report(AMBIGUOUS_METHOD, node, first, second)
+    else bodyContext.report(AMBIGUOUS_METHOD, node, first, second, hint)
   }
 
   def reportIllegalMethodCall(

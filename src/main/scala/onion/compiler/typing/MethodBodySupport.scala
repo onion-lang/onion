@@ -108,7 +108,7 @@ private[compiler] final class MethodBodySupport(
       else if matched.length > 1 then
         bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
       else
-        warnNullSuperArguments(matched(0), node.superInits, params)
+        warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
         val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
         finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
@@ -116,12 +116,20 @@ private[compiler] final class MethodBodySupport(
 
   /** W0012 for a `null` argument to an Onion-declared super/self constructor's
    *  non-null parameter, as `new P(null)` already warns (#2477). A Java
-   *  constructor's parameter nullness is unknown, so it stays silent (#2116). */
-  private def warnNullSuperArguments(ctor: ConstructorRef, args: List[AST.Expression], params: Array[Term]): Unit =
+   *  constructor's parameter nullness is unknown, so it stays silent (#2116).
+   *  The parent's type arguments are substituted first, so `extends G[String?](null)`
+   *  is silent and `extends G[String](null)` names `String`; a type variable that
+   *  admits null (a bare `[T]`, as in `: this(null)` inside `class D[T]`) is silent too. */
+  private def warnNullSuperArguments(targetClass: ClassType, ctor: ConstructorRef, args: List[AST.Expression], params: Array[Term]): Unit =
     if ctor.isInstanceOf[ConstructorDefinition] then
-      val formals = ctor.getArgs
+      val classSubst = TypeSubstitution.classSubstitution(targetClass)
+      val formals = ctor.getArgs.map(t =>
+        TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      def admitsNull(f: Type): Boolean = f match
+        case tv: TypeVariableType => tv.acceptsNullable
+        case _ => f.isNullable || f.isNullType
       args.zip(params).zip(formals).foreach { case ((arg, p), f) =>
-        if p != null && p.`type`.isNullType && !f.isBasicType && !f.isNullable && !f.isNullType then
+        if p != null && p.`type`.isNullType && !f.isBasicType && !admitsNull(f) then
           bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
           bodyContext.warningReporter.nullToNonNullable(arg.location, f.displayName)
       }

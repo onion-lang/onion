@@ -41,5 +41,29 @@ class NullToNonNullableSuperCallSpec extends AnyFunSpec {
           |""".stripMargin)
       assert(lines.isEmpty, s"W0012 lines: $lines")
     }
+
+    it("substitutes a generic parent's type arguments before deciding") {
+      val lines = w12Lines(
+        """class G[T](val x: T)
+          |class H extends G[String?](null) { }
+          |class W[U] extends G[U](null) { }
+          |class S extends G[String](null) { }
+          |""".stripMargin)
+      assert(lines == Seq(4), s"W0012 lines: $lines")
+    }
+
+    it("stays silent for : this(null) into a bare type parameter, warns for a non-null bound") {
+      val lines = w12Lines(
+        """class D[T](val a: T) {
+          |public:
+          |  def this() : this(null) { }
+          |}
+          |class B[T extends Object](val a: T) {
+          |public:
+          |  def this() : this(null) { }
+          |}
+          |""".stripMargin)
+      assert(lines == Seq(7), s"W0012 lines: $lines")
+    }
   }
 }

@@ -529,6 +529,8 @@ private[compiler] object SyntaxHintClassifier {
       // misread as an identifier slot.
       case "import" if sourceLine.trim.startsWith("import") =>
         hint("error.parsing.hint.duplicate_import_block")
+      case "val" | "var" if insideDoBlock(precedingText + textBefore(context, sourceLine)) =>
+        hint("error.parsing.hint.do_block_let", context.takeWhile(c => c != ';' && c != '\n' && c != '}').trim)
       case "yield" if YieldExpression.findFirstMatchIn(context).isDefined && !yieldNamed(expected, context, sourceLine) =>
         hint("error.parsing.hint.yield_not_supported")
       case word if ReservedWords.contains(word) && (expected.contains("<ID>") || expected.contains("<QUOTED_ID>")) =>
@@ -612,6 +614,20 @@ private[compiler] object SyntaxHintClassifier {
    * The parameter list is split at top-level commas, so `[K, V extends Comparable[V]]`
    * gives `K` and `V extends Comparable[V]`.
    */
+  private val DoBlockOpen = """\bdo\s*\[[^\]\n]*\]\s*\{""".r
+
+  // True when the innermost unclosed `{` before the error opens a `do[M] {` block.
+  private def insideDoBlock(text: String): Boolean =
+    DoBlockOpen.findAllMatchIn(text).toList.lastOption.exists { m =>
+      var depth = 1
+      text.substring(m.end).foreach {
+        case '{' => depth += 1
+        case '}' => depth -= 1
+        case _   =>
+      }
+      depth == 1
+    }
+
   private def enclosingEnum(text: String): Option[(String, List[String])] =
     EnumHeader.findAllMatchIn(text).toList.lastOption.map { m =>
       val params =

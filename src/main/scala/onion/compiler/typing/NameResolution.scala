@@ -93,19 +93,7 @@ class NameResolver(private val context: NameResolutionContext) {
     case AST.PrimitiveType(AST.KBoolean)    => BasicType.BOOLEAN
     case AST.PrimitiveType(AST.KVoid)       => BasicType.VOID
     case AST.ReferenceType(name, qualified) =>
-      val aliasFqcn =
-        if (qualified) name
-        else {
-          val module = context.currentUnit.module
-          val moduleName = if (module != null) module.name else null
-          context.createFQCN(moduleName, name)
-        }
-      val aliasOpt = context.typeAliases.get(aliasFqcn).orElse {
-        if (!qualified && context.typeAliases.nonEmpty) {
-          imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => context.typeAliases.get(fqcn)).nextOption()
-        } else None
-      }
-      aliasOpt match {
+      aliasFor(name, qualified) match {
         case Some(entry) if entry.typeParameters.isEmpty =>
           resolveTypeAlias(entry, Nil)
         case _ =>
@@ -117,19 +105,7 @@ class NameResolver(private val context: NameResolutionContext) {
 
       base match {
         case AST.ReferenceType(name, qualified) =>
-          val aliasFqcn =
-            if (qualified) name
-            else {
-              val module = context.currentUnit.module
-              val moduleName = if (module != null) module.name else null
-              context.createFQCN(moduleName, name)
-            }
-          val aliasOpt = context.typeAliases.get(aliasFqcn).orElse {
-            if (!qualified && context.typeAliases.nonEmpty) {
-              imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => context.typeAliases.get(fqcn)).nextOption()
-            } else None
-          }
-          aliasOpt match {
+          aliasFor(name, qualified) match {
             case Some(aliasEntry) =>
               return resolveTypeAlias(aliasEntry, mappedArgs)
             case None =>
@@ -178,6 +154,28 @@ class NameResolver(private val context: NameResolutionContext) {
       if (mappedInner == null) null else TypedAST.NullableType.of(mappedInner)
     case _ =>
       null
+  }
+
+  /**
+   * The `type` alias a type name refers to, if any. A type parameter in scope (the
+   * class's, record's or method's own `[T]`) shadows a same-named alias, as a local
+   * type parameter shadows an outer name in Java and Scala (#2510); `forName` then
+   * resolves it to the parameter.
+   */
+  private def aliasFor(name: String, qualified: Boolean): Option[TypeAliasEntry] = {
+    if (!qualified && context.currentTypeParams.get(name).isDefined) return None
+    val aliasFqcn =
+      if (qualified) name
+      else {
+        val module = context.currentUnit.module
+        val moduleName = if (module != null) module.name else null
+        context.createFQCN(moduleName, name)
+      }
+    context.typeAliases.get(aliasFqcn).orElse {
+      if (!qualified && context.typeAliases.nonEmpty) {
+        imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => context.typeAliases.get(fqcn)).nextOption()
+      } else None
+    }
   }
 
   private lazy val scanMemo = context.table.importScanMemo(imports)

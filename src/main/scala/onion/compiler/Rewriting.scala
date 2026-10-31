@@ -191,6 +191,34 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     if (desc eq typeRef.desc) typeRef else typeRef.copy(desc = desc)
   }
 
+  /**
+   * `typeRef` with every alias inside it resolved: at the top, under `?`, and in type
+   * arguments and array components. A record's `from re`/`derive!`/`shape` synthesis
+   * picks each component's conversion from its written type, so `port: Port` with
+   * `type Port = Int` must read as `port: Int` there (issue #2507).
+   */
+  private def dealiasDeep(typeRef: AST.TypeNode): AST.TypeNode = {
+    if (typeRef == null) return null
+    def go(desc: AST.TypeDescriptor, seen: Set[String]): AST.TypeDescriptor = desc match {
+      case AST.ReferenceType(name, false)
+          if !seen.contains(name) && !typeParamsInScope.contains(name) && cliAliases.contains(name) =>
+        go(cliAliases(name), seen + name)
+      case AST.NullableType(inner) => go(inner, seen) match {
+        case n: AST.NullableType => n // `Port?` with `type Port = Int?` is just `Int?`
+        case d                   => if (d eq inner) desc else AST.NullableType(d)
+      }
+      case AST.ParameterizedType(base, args) =>
+        val mapped = args.map(go(_, seen))
+        if (mapped.lazyZip(args).forall(_ eq _)) desc else AST.ParameterizedType(base, mapped)
+      case AST.ArrayType(component) =>
+        val c = go(component, seen)
+        if (c eq component) desc else AST.ArrayType(c)
+      case d => d
+    }
+    val desc = go(typeRef.desc, Set.empty)
+    if (desc eq typeRef.desc) typeRef else typeRef.copy(desc = desc)
+  }
+
   // See AST.CompilationUnit.needsBodyRewrite: the only body-level transforms are do-notation
   // and trait method calls, and most units have neither.
   private var bodyRewriteNeeded: Boolean = true
@@ -588,7 +616,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   private def cliKindOf(typeRef: AST.TypeNode): Option[String] =
     ScalarConversions.ofAst(dealiasForCli(typeRef)).map(_.tag)
 
-  /** The scalar kind of a type exactly as written (record `from re`/`derive` synthesis). */
+  /** The scalar kind of a type as written (record synthesis dealiases its components first). */
   private def scalarKindOf(typeRef: AST.TypeNode): Option[String] =
     ScalarConversions.ofAst(typeRef).map(_.tag)
 
@@ -758,7 +786,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
-  def rewriteRecordDeclaration(declaration: AST.RecordDeclaration): RecordDeclaration = withTypeParams(declaration.typeParameters.map(_.name)) {
+  def rewriteRecordDeclaration(written: AST.RecordDeclaration): RecordDeclaration = withTypeParams(written.typeParameters.map(_.name)) {
+    // Components are synthesized from, and checked against, their alias-free types, so
+    // `port: Port` (`type Port = Int`) converts like `port: Int` (issue #2507). Typing
+    // resolves the alias to the same type, so the record itself is unchanged.
+    val declaration = written.copy(args = written.args.map(a => a.copy(typeRef = dealiasDeep(a.typeRef))))
     // A componentless record has nothing to derive into, so don't synthesize methods.
     val fromMethods = declaration.fromPattern match {
       case Some(pattern) if declaration.args.nonEmpty => synthesizeFromMethods(declaration, pattern)

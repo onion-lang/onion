@@ -7,11 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.148.0] - 2026-10-30
+
+### Breaking
+
+- **A lambda passed to overloaded extension methods no longer depends on declaration order (#2447).**
+  - A call that compiled may now run a different overload (mostly with untyped lambda parameters), or be E0006 where two fit equally. `docs/migration/pre-1.0.md` gives examples and the fixes: type the lambda's parameters, pass the other argument with `as`, pass the lambda as a typed value, or rename a method.
+
+### Added
+
+- **`onion migrate <path>...` rewrites code for pre-1.0 breaking changes, in place (#2442).**
+  - First rule: a `do` block's final `ret a + b` becomes `yield a + b`, also inside a string's `#{...}`. Strings and comments are left alone.
+  - Files that use each other's classes are compiled together, so `onion migrate src/ tests/` handles a whole project.
+  - The compiler decides: a file that compiles as written, alone or with the other named files, is never changed. A file is rewritten only if every error in it is at a `ret`, and it then compiles. Otherwise the place is printed with the error, the file left alone, and the exit code is 1.
+  - Unrelated scripts that declare the same class are not one program: migrate them one at a time.
+  - Files are read as UTF-8. If a named file cannot be read, nothing is rewritten and each `ret` is reported.
+  - `--check` changes nothing and exits 1 if a file would change. `-classpath` names the classes a file uses.
+  - A script named `migrate` with no extension now runs as `onion ./migrate`, as with `fmt`, `run` and `test`.
+
+### Fixed
+
+- **`Codec::base64Decode` names an emoji as `U+1F600`, not half of it (#2470).**
+  - Before: `invalid Base64 character U+D83D at index 4`.
+  - Now: `invalid Base64 character U+1F600 at index 4`. The quoted window in `Codec::urlDecode`/`Http::decodeUrl` errors no longer starts or ends inside an emoji either.
+- **`new Q(null)` now warns W0012 when the parameter is a non-null Onion type, as `q.m(null)` already did (#2464).**
+  - Before: no warning for constructors, records or named arguments; the program failed later with `null value used`.
+  - Now: W0012 at the `null`. A `String?` parameter or a Java constructor still gets no warning.
+- **A lambda parameter read by a nested lambda no longer crashes the compiler when a captured variable elsewhere has the same name (#2462).**
+  - Before: `run { p -> run { q -> "" + p } }` next to a captured `val p` failed with I0000 (`Index -1 out of bounds`).
+  - Now: it compiles, and the parameter keeps its own value.
+- **`intArray.map { ... }` gets one clear error with a fix that compiles (#2458).**
+  - Before: E0000 "type Int[] is expected, but type Int[] is used".
+  - Now: E0005 with a hint: `Arrays::stream(xs).boxed().toList()` for `Int[]`/`Long[]`/`Double[]`, a `foreach` copy into a List for the other primitive arrays.
+- **`Http::decodeUrl("100%zz")` names the bad escape, as `Codec::urlDecode` does (#2455).**
+  - Before: the JDK's `Illegal hex characters in escape (%) pattern - Error at index 0 in: "zz"`.
+  - Now: `invalid % escape at index 3 in "100%zz": a % must be followed by two hex digits`; a long input is quoted as 20 characters either side of the escape, not in full.
+- **`Codec::base64Decode(Files::readText("token.b64"))` works when the file was saved as UTF-8 with BOM (#2454).**
+  - Before: `invalid Base64 character '?' at index 0`, with the invisible character printed raw.
+  - Now: a leading BOM is skipped. Any other invisible or non-ASCII bad character is named as `U+XXXX`, for example `invalid Base64 character U+00A0 at index 4` for a no-break space.
+- **A lambda passed to an overloaded extension method picks the overload that takes a function (#2447).**
+  - Before: with `def g(f: (Int) -> String)` declared before `def g(s: Int)`, `"a".g((n: Int) -> "n" + n)` was E0000 "type Int is expected". Next to an `Object` overload declared after it, the lambda silently ran the `Object` one.
+  - Now: the most specific overload the lambda fits is chosen, in either declaration order. A value block goes to `Callable`, a void block to `Runnable`, and a non-generic overload beats a generic one that ties with it.
+- **A warning inside a lambda is reported once, and only for the overload that is chosen (#2452).**
+  - Before: a `W0012` in a lambda passed to overloaded methods printed once per overload tried, including overloads that were not chosen.
+
+## [0.147.0] - 2026-10-26
+
+### Breaking
+
+- **`[[1, 2], []]` is a `List[List[Int]]`, so `adj[1].add(5)` compiles (#2430).**
+  - Before: the empty `[]` made the outer list `List[Object]`, and `add` was E0005. So `xs.add("header")` compiled on that list.
+  - Now: an empty `[]` or `[:]` takes its type from the other elements, in list literals and map values. `xs.add("header")` is E0005. To keep the old type, annotate it: `val xs: List[Object] = [[1, 2], []]`. See `docs/migration/pre-1.0.md`.
+
 ### Fixed
 
 - **A `select` statement with `return f(..)` in its cases loops instead of overflowing the stack (#2405).**
   - Before: `select l { case Cons(h, t): return sum(t, acc + h); ... }` followed by `return -1` hit "stack overflow" at depth 200000. Literal and `else` cases overflowed too.
   - Now: it loops, like the `= select l { ... }` form and an `if` statement with `return`.
+- **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
+  - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
+  - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.
+- **`Future::delay(deadline - Timing::millis())` completes at once when the deadline has passed (#2453).**
+  - Before: a negative delay failed with `IllegalArgumentException: timeout value is negative`.
+  - Now: a zero or negative delay gives a Future that has already completed, as `Timing::sleep` returns at once.
+- **Extension overloads pick the most specific one, as class methods do (#2446).**
+  - Before: `"x".ex('A')` with `ex(Char)` and `ex(Long)` was E0006 ambiguous, then a contradicting E0005; `"x".ez(3)` with `ez(Object)` was E0005.
+  - Now: `ex(Char)` is chosen and `3` boxes into `Object`. A real ambiguity, including two receivers that neither one is more specific than (`extension I` and `extension J`), is one E0006.
+- **Generic overloads that differ only after a type parameter both work: `tw[T](x: T, y: Int)` and `tw[T](x: T, y: String)` (#2445).**
+  - Before: in an `extension` block, E0084 "duplicated extension method"; on a class, a static or a top-level function, E0005 at the call that needed the second one.
+  - Now: each call picks its overload, as in Java. Two overloads with the same parameters are still a duplicate, and two that erase to the same JVM method (`f[T](x: T, y: T)` beside `f[T](x: T, y: Object)`) are E0035.
 - **`System::out.println(75)` prints `75`, and `sb.append(75)` appends `75` (#2425).**
   - Before: the `Int` literal was narrowed to `Char`, so the output was `K`.
   - Now: the `int` overload is chosen, as in Java. `takesByte(100)` still works when no other overload fits.
@@ -22,9 +86,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`;` between two clauses of a record body is one error with a hint (#2382).**
   - Before: `{ shape doc = json; shape txt = re"..." }` gave two contradictory syntax errors, no hint.
   - Now: one error at the `;`, saying clauses are separated by a newline or a space.
-- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
-  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
-  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
 
 ## [0.146.0] - 2026-10-25
 
@@ -36,6 +97,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Where such a literal no longer fits a Byte, most contexts give an error that says why. Where it still fits (`bs[0] = 0x1B`), the value changes silently: search for `0x...B`.
 
 ### Fixed
+
+- **A `json`/`yaml` shape and `derive!(Json)` reject a number that does not fit (#2381).**
+  - Before: `3000000000` read into an `Int` as `-1294967296`, `2.9` as `2`, `70000` into a `Short` as `4464`, with no defect.
+  - Now: a defect (`derive!(Json)`'s `fromJson` returns `null`). `3.0` still reads as `3`.
 
 - **`xs.addAll(o)` compiles inside a generic class when `xs` and `o` are both `List[T]` (#2341).**
   - Before: E0000, `Collection[? extends T]` is expected but `List[T]` is used.

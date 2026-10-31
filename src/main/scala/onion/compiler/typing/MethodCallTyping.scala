@@ -294,7 +294,8 @@ final class MethodCallTyping(
     firstArguments: Array[Type],
     secondAffiliation: AnyRef,
     secondName: String,
-    secondArguments: Array[Type]
+    secondArguments: Array[Type],
+    hint: AnyRef = null
   ): Unit =
     methodCallReportingSupport.reportAmbiguousSignature(
       node,
@@ -303,7 +304,8 @@ final class MethodCallTyping(
       firstArguments,
       secondAffiliation,
       secondName,
-      secondArguments
+      secondArguments,
+      hint
     )
 
   private[typing] def reportIllegalMethodCall(

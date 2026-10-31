@@ -95,14 +95,13 @@ private[compiler] final class MethodCallReportingSupport(
     firstArguments: Array[Type],
     secondAffiliation: AnyRef,
     secondName: String,
-    secondArguments: Array[Type]
+    secondArguments: Array[Type],
+    hint: AnyRef = null
   ): Unit = {
-    bodyContext.report(
-      AMBIGUOUS_METHOD,
-      node,
-      Array[AnyRef](firstAffiliation, firstName, firstArguments),
-      Array[AnyRef](secondAffiliation, secondName, secondArguments)
-    )
+    val first = Array[AnyRef](firstAffiliation, firstName, firstArguments)
+    val second = Array[AnyRef](secondAffiliation, secondName, secondArguments)
+    if (hint == null) bodyContext.report(AMBIGUOUS_METHOD, node, first, second)
+    else bodyContext.report(AMBIGUOUS_METHOD, node, first, second, hint)
   }
 
   def reportIllegalMethodCall(

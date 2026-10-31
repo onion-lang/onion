@@ -18,8 +18,8 @@ public final class Codec {
         return Base64.getEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Decodes a standard Base64 string back to text (UTF-8). Whitespace is skipped, so
-     *  text read from a file or wrapped at 76 columns decodes as is.
+    /** Decodes a standard Base64 string back to text (UTF-8). Whitespace and a leading byte
+     *  order mark are skipped, so text read from a file or wrapped at 76 columns decodes as is.
      *  @throws IllegalArgumentException on a non-Base64 character, or a bad length or padding */
     public static String base64Decode(String encoded) {
         if (encoded == null || encoded.isEmpty()) return "";
@@ -27,10 +27,12 @@ public final class Codec {
         for (int i = 0; i < encoded.length(); i++) {
             char c = encoded.charAt(i);
             if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
+            if (c == '\uFEFF' && i == 0) continue;
             boolean ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
                 || c == '+' || c == '/' || c == '=';
             if (!ok) {
-                throw new IllegalArgumentException("invalid Base64 character '" + c + "' at index " + i);
+                throw new IllegalArgumentException(
+                    "invalid Base64 character " + describeChar(encoded.codePointAt(i)) + " at index " + i);
             }
             sb.append(c);
         }
@@ -40,6 +42,14 @@ public final class Codec {
             throw new IllegalArgumentException(
                 "invalid Base64 length or padding: " + sb.length() + " character(s) after removing whitespace", e);
         }
+    }
+
+    /** A character as an error message shows it: {@code '!'} when it is printable ASCII,
+     *  else {@code U+00A0}, so an invisible one is never printed raw. An emoji is named by its
+     *  code point ({@code U+1F600}), not by half of its surrogate pair. */
+    private static String describeChar(int c) {
+        if (c > ' ' && c < 0x7F) return "'" + (char) c + "'";
+        return String.format(java.util.Locale.ROOT, "U+%04X", c);
     }
 
     /** Encodes the UTF-8 bytes of {@code text} as a lowercase hex string. */
@@ -88,11 +98,25 @@ public final class Codec {
             if (i + 2 >= text.length()
                 || !isAsciiHex(text.charAt(i + 1))
                 || !isAsciiHex(text.charAt(i + 2))) {
-                throw new IllegalArgumentException("invalid % escape at index " + i + " in \"" + text
-                    + "\": a % must be followed by two hex digits");
+                throw new IllegalArgumentException("invalid % escape at index " + i + " in \""
+                    + window(text, i) + "\": a % must be followed by two hex digits");
             }
         }
         return java.net.URLDecoder.decode(text, StandardCharsets.UTF_8);
+    }
+
+    /** {@code text} itself when short; otherwise 20 chars either side of the 3-char escape at
+     *  {@code at}, with "..." where it was cut, so a 100 KB form body is not copied into a message.
+     *  A cut never splits a surrogate pair: the window widens to keep the whole emoji. */
+    private static String window(String text, int at) {
+        if (text.length() <= 60) return text;
+        int from = Math.max(0, at - 20);
+        int to = Math.min(text.length(), at + 23);
+        if (from > 0 && Character.isLowSurrogate(text.charAt(from))
+            && Character.isHighSurrogate(text.charAt(from - 1))) from--;
+        if (to < text.length() && Character.isHighSurrogate(text.charAt(to - 1))
+            && Character.isLowSurrogate(text.charAt(to))) to++;
+        return (from > 0 ? "..." : "") + text.substring(from, to) + (to < text.length() ? "..." : "");
     }
 
     private static boolean isAsciiHex(char c) {

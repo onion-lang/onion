@@ -122,9 +122,11 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      Stop fixing variants. Write the rule down in one comment on the linked issue: what is
      accepted, what is rejected, and the cases the blocks found. Then fix to the rule, or open
      a `kind:rfc` if the rule changes what compiles. W43: #2328 took 12 verdicts, #2315 six.
-   - **Release** when all three hold: `CHANGELOG.md`'s `[Unreleased]` has a user-visible entry,
-     the newest tag is older than 24 hours, and `main` is green. Then dispatch `release.yml`
-     now (next minor version, see Known pitfalls) and open the changelog-cut PR (`risk:low`).
+   - **Release** when all three hold: there is a user-visible entry (a fragment in
+     `changelog.d/`, or a line under `CHANGELOG.md`'s `[Unreleased]`), the newest tag is older
+     than 24 hours, and `main` is green. Then dispatch `release.yml` now (next minor version,
+     see Known pitfalls) and open the changelog-cut PR (`risk:low`): it runs
+     `python3 scripts/changelog/changelog.py cut X.Y.Z` and lists the fragments it consumed.
      If any of the three is false, no release. Do not defer a due release to "a run that can
      focus on it" and do not re-derive the rule: on 10-14 two runs read the old sentence
      oppositely from the same facts.
@@ -179,8 +181,12 @@ Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day
      only a forecast, and the PR's diff decides. When in doubt, the higher tier. The risk gate
      raises a label that is too low; never lower one.
    - Enable auto-merge on it right away (§1.2); leave the issue `status:in-progress`.
-   - CHANGELOG conflicts between sibling PRs are routine: resolve them by keeping both
-     entries (`git merge-file --union` on the three stages), never by dropping one.
+   - Put the PR's changelog entry in a new file, `changelog.d/<issue>-<slug>.md`
+     (`changelog.d/README.md`), never in `CHANGELOG.md`: each PR's own file cannot conflict
+     with a sibling's. `python3 scripts/changelog/changelog.py check` validates it.
+   - A PR opened before fragments still edits `CHANGELOG.md`; its conflicts are resolved by
+     keeping both entries (`git merge-file --union` on the three stages), never by dropping
+     one. Moving the entry into a fragment on the next push ends them for good.
    - Bugs you find along the way: file them as issues (template, labels, repro) instead of
      fixing them in the same PR, and label them `status:ready` when the repro is verified,
      whoever files them. An unlabelled verified bug is invisible to the next run (#1972).
@@ -346,7 +352,7 @@ compatibility (PRINCIPLES.md §2, §3, §9).
    Stream), duplicate stdlib entry points, and names that break the "one obvious way".
 2. **Each item is a `breaking` RFC** that the panel decides (§4).
 3. **Each implementation PR carries the migration package:**
-   - a `### Breaking` entry in CHANGELOG
+   - a `### Breaking` entry in the PR's `changelog.d/` fragment
    - a section in `docs/migration/pre-1.0.md` and `docs/ja/migration/pre-1.0.md`
    - a hint diagnostic that points from the old spelling to the new one
    - an `onion migrate` rewrite rule, once that tool exists; building it is the first item
@@ -363,10 +369,11 @@ compatibility (PRINCIPLES.md §2, §3, §9).
 
 ## §6 Release
 
-1. **Cadence.** A minor release every week when `main` is green and `[Unreleased]` has a
-   user-visible entry; a patch release for any P0 fix. At most one release per day.
-2. **Order.** Dispatch `release.yml` first; then open the `risk:low` PR that moves
-   `[Unreleased]` under the new version heading (Known pitfalls).
+1. **Cadence.** A minor release every week when `main` is green and there is a user-visible
+   entry (`changelog.d/` or `[Unreleased]`); a patch release for any P0 fix. At most one release per day.
+2. **Order.** Dispatch `release.yml` first; then open the `risk:low` PR that moves the
+   `changelog.d/` fragments and `[Unreleased]` under the new version heading
+   (`python3 scripts/changelog/changelog.py cut X.Y.Z`; Known pitfalls).
 3. `v1.0.0` and every new major version are `risk:ultrahigh` (GUARDRAILS.md).
 
 ## Known pitfalls
@@ -409,10 +416,11 @@ compatibility (PRINCIPLES.md §2, §3, §9).
     `release.yml`, ref `main`, input `version: vX.Y.Z`). In a scheduled session the
     permission classifier denied `gh workflow run` and the REST dispatch (10-22, twice on
     10-25); the MCP call went through on 10-24 and 10-25. A client push of a tag gets 403.
-  - After a release cut, a base merge puts a PR's new CHANGELOG lines under the released
+  - After a release cut, a base merge puts a PR's new `CHANGELOG.md` lines under the released
     `## [X.Y.Z]` heading, with no conflict to warn you (9 open PRs on 10-25; #2377 repaired
-    three merged ones). After every base merge, check that the added lines come before the
-    first `## [0.` heading: `git diff origin/main...HEAD -- CHANGELOG.md | grep -m1 '^@@'`.
+    three merged ones). A `changelog.d/` fragment cannot land there; for a PR that still edits
+    `CHANGELOG.md`, check after every base merge that the added lines come before the first
+    `## [0.` heading: `git diff origin/main...HEAD -- CHANGELOG.md | grep -m1 '^@@'`.
   - Do not commit a `## [X.Y.Z]` CHANGELOG heading before the tag exists.
   - Maven Central deployments wait for a Publish click in the Portal unless the repository
     variable `CENTRAL_AUTO_RELEASE` is `true`.

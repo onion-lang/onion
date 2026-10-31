@@ -174,10 +174,27 @@ private[compiler] final class MethodCallFallbackSupport(
       calls.closureSamMatcher(args, context)
     )
 
-    val method = overloadSupport.selectMostSpecificApplicable(
-      disambiguated,
-      nonClosureTypes.keys.toSeq.sorted
-    ) match {
+    // Only when the parameters leave a tie: a function type then beats a SAM interface.
+    val closureArities = untypedClosureIndices.toSeq.flatMap { i =>
+      if (i >= args.length) None
+      else args(i) match {
+        case c: AST.ClosureExpression => Some(i -> c.args.length)
+        case b: AST.BlockExpression => b.elements match {
+          case List(c: AST.ClosureExpression) => Some(i -> c.args.length)
+          case _ => None
+        }
+        case _ => None
+      }
+    }.toMap
+    val selection = overloadSupport.selectMostSpecificApplicable(disambiguated, nonClosureTypes.keys.toSeq.sorted) match {
+      case CandidateSelection.Ambiguous(_, _) =>
+        overloadSupport.selectMostSpecificApplicable(
+          overloadSupport.preferDirectLambdaSlots(disambiguated, closureArities),
+          nonClosureTypes.keys.toSeq.sorted
+        )
+      case other => other
+    }
+    val method = selection match {
       case CandidateSelection.Selected(selected) =>
         selected.method
       case CandidateSelection.Ambiguous(first, second) =>

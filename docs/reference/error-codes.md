@@ -1033,7 +1033,9 @@ list of arguments yet. Take one flag and split it:
 
 ```onion
 tool greet(csv: String = "") requires { console } {
-  foreach n: String in Strings::split(csv, ",") { IO::println("Hello, " + n) }
+  if csv != "" {
+    foreach n: String in Strings::split(csv, ",") { IO::println("Hello, " + n) }
+  }
 }
 // $ onion greet.on --csv ann,bob
 ```

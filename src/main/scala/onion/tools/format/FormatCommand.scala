@@ -75,7 +75,7 @@ object FormatCommand:
         case Right(layout) =>
           Right((layout.productionSources ++ layout.testSources).map(_.path).sortBy(_.toString))
 
-  private def expand(path: Path): Seq[Path] =
+  private[tools] def expand(path: Path): Seq[Path] =
     if Files.isDirectory(path) then
       val stream = Files.walk(path)
       try

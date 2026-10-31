@@ -113,6 +113,9 @@ private[compiler] object SyntaxHintClassifier {
     """^\s*([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\.\*)?)\s*;?\s*$""".r
   private val JavaStyleConstructor =
     """^\s*(?:public|private|protected)?\s*[A-Z][A-Za-z0-9_]*\s*\(""".r
+  // A Java/Kotlin-style `this(...)` / `super(...)` call as a statement in a constructor
+  // body: `this`/`super` parse as the start of a member access, so the error lands on `(`.
+  private val ConstructorDelegationCall = """(?:^|[{;])\s*(this|super)\s*$""".r
   private val JsStyleConstructorDeclaration = """^\s*constructor\s*\(""".r
   private val JavaStyleMethodDeclaration =
     """^\s*(?:public|private|protected)?\s*(?!public\b|private\b|protected\b|def\b)[A-Za-z_]\w*\s+[A-Za-z_]\w*\s*\(""".r
@@ -346,6 +349,10 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.old_extends")
       case "(" if expected.contains("\"this\"") && !expected.contains("<ID>") =>
         hint("error.parsing.hint.old_super_init")
+      case "(" if ConstructorDelegationCall.findFirstMatchIn(textBefore(context, sourceLine)).exists(_.group(1) == "this") =>
+        hint("error.parsing.hint.constructor_body_this_call")
+      case "(" if ConstructorDelegationCall.findFirstMatchIn(textBefore(context, sourceLine)).exists(_.group(1) == "super") =>
+        hint("error.parsing.hint.constructor_body_super_call")
       case "(" if expected.contains("<ID>") && ParenthesizedCatchClause.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.catch_parens")
       // Specific foreach syntax must win over the generic removed `for ... in` form.

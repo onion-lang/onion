@@ -1,7 +1,8 @@
 package onion.compiler.tools
 
-import onion.compiler.{CompilerConfig, OnionCompiler, StreamInputSource}
+import onion.compiler.{CompilationOutcome, CompilerConfig, OnionCompiler, StreamInputSource}
 import onion.tools.Shell
+import org.objectweb.asm.{ClassReader, ClassVisitor, MethodVisitor, Opcodes}
 
 import java.io.StringReader
 
@@ -97,6 +98,63 @@ class RecordAliasComponentSpec extends AbstractShellSpec {
       val codes = result.allErrors.flatMap(_.code)
       assert(codes.contains("E0061"), codes)
       assert(!codes.contains("E0021"), codes)
+    }
+  }
+
+  /** Compiles `files` (name -> source) together; the classes, or the error codes. */
+  private def compileAll(files: (String, String)*): Either[Seq[String], Map[String, Array[Byte]]] =
+    new OnionCompiler(CompilerConfig(Seq("."), null, "UTF-8", "", 10)).compile(
+      files.map { case (name, src) => new StreamInputSource(() => new StringReader(src), name) }
+    ) match {
+      case CompilationOutcome.Success(classes) => Right(classes.map(c => c.className -> c.content).toMap)
+      case CompilationOutcome.Failure(errors)  => Left(errors.map(e => e.code.getOrElse("?") + " " + e.message))
+    }
+
+  /** The descriptors of the public constructors of the class compiled to `bytes`. */
+  private def constructorDescriptors(bytes: Array[Byte]): List[String] = {
+    val found = List.newBuilder[String]
+    new ClassReader(bytes).accept(new ClassVisitor(Opcodes.ASM9) {
+      override def visitMethod(access: Int, name: String, desc: String, sig: String, ex: Array[String]): MethodVisitor = {
+        if (name == "<init>" && (access & Opcodes.ACC_PUBLIC) != 0) found += desc
+        null
+      }
+    }, ClassReader.SKIP_CODE)
+    found.result()
+  }
+
+  // #2509: an alias declared in another file was written under that file's imports, so
+  // the record keeps the type as written and its own file's imports never re-read it.
+  describe("a record component typed with an alias from another file") {
+    it("keeps a target the other file imported") {
+      val out = compileAll(
+        "A.on" -> "import { java.awt.Point; }\ntype P = Point\n",
+        "B.on" -> "record R(p: P)\nclass Main {\npublic:\n  static def main(args: String[]): void { println(new R(new java.awt.Point(1, 2)).p().x) }\n}\n")
+      assert(out.isRight, out)
+      assert(constructorDescriptors(out.toOption.get("R")) == List("(Ljava/awt/Point;)V"))
+    }
+
+    it("does not re-read a simple name under the record file's imports") {
+      val out = compileAll(
+        "A.on" -> "import { java.sql.Date; }\ntype D = Date\n",
+        "B.on" -> "record R(d: D)\n")
+      assert(out.isRight, out)
+      assert(constructorDescriptors(out.toOption.get("R")) == List("(Ljava/sql/Date;)V"))
+    }
+
+    it("keeps a target named through an import alias") {
+      val out = compileAll(
+        "A.on" -> "import { java.lang.StringBuilder as SB; }\ntype Buf = SB\n",
+        "B.on" -> "record R(b: Buf)\n")
+      assert(out.isRight, out)
+      assert(constructorDescriptors(out.toOption.get("R")) == List("(Ljava/lang/StringBuilder;)V"))
+    }
+
+    it("still converts a primitive alias in a from re\"...\" parser") {
+      val out = compileAll(
+        "A.on" -> "type Port = Int\n",
+        "B.on" -> "record Addr(host: String, port: Port) from re\"(\\S+):(\\d+)\"\n")
+      assert(out.isRight, out)
+      assert(constructorDescriptors(out.toOption.get("Addr")) == List("(Ljava/lang/String;I)V"))
     }
   }
 }

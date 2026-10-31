@@ -21,7 +21,7 @@ private[compiler] final class MethodInvocationBuilderSupport(
     expected: Type
   ): Option[ResolvedMethodInvocation] =
     calls.resolveMethodTypeArgs(node, method, params, typeArgs, classSubst, expected).map { methodSubst =>
-      ResolvedMethodInvocation(methodSubst, TypeSubst.args(method, classSubst, methodSubst))
+      ResolvedMethodInvocation(methodSubst, TypeSubst.paramArgs(method, classSubst, methodSubst))
     }
 
   def buildResolvedCall(

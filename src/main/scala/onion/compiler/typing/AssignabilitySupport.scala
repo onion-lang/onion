@@ -88,7 +88,8 @@ private[compiler] final class AssignabilitySupport(
       }
     }
 
-    if (actual.`type`.isNullType && !expected.isBasicType && !expected.isNullable && !expected.isNullType) {
+    if (actual.`type`.isNullType && !expected.isBasicType && !expected.isNullable && !expected.isNullType &&
+        !TypeRelations.isBareNullableTypeVariable(expected)) {
       // The null literal flowing into a non-nullable type is almost always a
       // bug waiting for an NPE; values coming from Java stay unchecked
       // (Kotlin's platform-type dilemma — see issue #132). suppressNullWarning

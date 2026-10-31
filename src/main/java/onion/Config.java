@@ -1,7 +1,7 @@
 package onion;
 
-import java.util.LinkedHashMap;
-import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.io.IOException;
 
 /**
@@ -40,6 +40,7 @@ public class Config {
     /**
      * Gets a value at the specified dot-notation path.
      * Supports array indexing with numeric keys (e.g., "items.0").
+     * Walks any {@code java.util.Map} and {@code java.util.List}.
      * @param config The config object
      * @param path Dot-separated path (e.g., "database.host")
      * @return Value at path, or null if not found
@@ -49,10 +50,15 @@ public class Config {
         Object current = config;
         for (String key : keys) {
             if (current == null) return null;
-            if (current instanceof LinkedHashMap) {
-                current = ((LinkedHashMap<?, ?>) current).get(key);
-            } else if (current instanceof ArrayList && key.matches("\\d+")) {
-                ArrayList<?> list = (ArrayList<?>) current;
+            if (current instanceof Map) {
+                // Any Map, not just the LinkedHashMap Json builds: Colls::mapOf, a HashMap...
+                try {
+                    current = ((Map<?, ?>) current).get(key);
+                } catch (ClassCastException | NullPointerException e) {
+                    return null; // a sorted map whose keys are not Strings
+                }
+            } else if (current instanceof List && key.matches("\\d+")) {
+                List<?> list = (List<?>) current;
                 // An index too big for an Int is out of range, like any other
                 int index;
                 try {

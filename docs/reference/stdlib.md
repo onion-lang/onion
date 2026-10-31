@@ -1098,6 +1098,8 @@ val safe: Future[Int] = Future::asyncThrowing {
 val delayed: Future[Void] = Future::delay(1000L)  // 1 second
 ```
 
+A zero or negative delay completes at once, so `Future::delay(deadline - Timing::millis())` is safe once the deadline has passed.
+
 ### Transformation Methods
 
 ```onion
@@ -1885,6 +1887,9 @@ val config = Config::parseJson("{\"users\": [{\"name\": \"Alice\"}, {\"name\": \
 Config::getString(config, "users.0.name", "unknown")   // "Alice"
 ```
 
+The config can be any `Map` and `List`, not only parsed JSON. A map built with
+`Colls::mapOf` or a Java `HashMap` works the same way.
+
 A missing key, an out-of-range array index, or a value that can't convert to the requested
 type all fall back to the supplied default instead of throwing; the numeric getters accept
 the stored value as either a JSON number or a numeric string. `hasPath` checks presence
@@ -1959,7 +1964,8 @@ Codec::urlEncode("a b&c") / Codec::urlDecode(s)
 ```
 
 - `base64Decode` skips whitespace, so a file's trailing newline or `base64`'s 76-column lines decode as is.
-- Bad input to a decoder throws `IllegalArgumentException` naming the problem, for example `invalid Base64 character '!' at index 10` or `invalid % escape at index 3 in "100%zz"`.
+  A byte order mark at the start (a file saved as "UTF-8 with BOM") is skipped too.
+- Bad input to a decoder throws `IllegalArgumentException` naming the problem, for example `invalid Base64 character '!' at index 10` (an invisible or non-ASCII character shows as `U+00A0`) or `invalid % escape at index 3 in "100%zz"`.
 
 These are also builtin extension methods on `String`:
 
@@ -2379,7 +2385,7 @@ Http::delete(url): String
 
 ```
 Http::encodeUrl(str): String
-Http::decodeUrl(str): String
+Http::decodeUrl(str): String            // same as Codec::urlDecode
 Http::buildQuery(params): String        // params: alternating keys and values
 Http::buildUrl(baseUrl, params): String // appends "?"/"&" + buildQuery(params)
 ```

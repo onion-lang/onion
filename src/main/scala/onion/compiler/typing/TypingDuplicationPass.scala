@@ -21,6 +21,14 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private val seenConstructors = new JTreeSet[ConstructorRef](new ConstructorComparator)
   private val seenGlobalVariables = new JTreeSet[FieldRef](new FieldComparator)
   private val seenFunctions = new JTreeSet[Method](new MethodComparator)
+  // Distinct overloads can still erase to one JVM method (`f[T](x: T, y: T)` beside
+  // `f[T](x: T, y: Object)`); a class gets E0035 from checkErasureSignatureCollisions,
+  // top-level functions and extension methods get it here (#2448).
+  private val seenFunctionErasures = scala.collection.mutable.HashSet[(String, String)]()
+  private val seenExtensionErasures = scala.collection.mutable.HashSet[(String, String)]()
+  // Constructors too: `this(x: T)` beside `this(x: Object)` are two `<init>(Object)V`
+  // in one class file, a ClassFormatError at load time (#2498).
+  private val seenConstructorErasures = scala.collection.mutable.HashSet[String]()
 
   private def withKernel[T <: Node : ClassTag](ast: AST.Node)(f: T => Unit): Unit =
     typing.kernelNodeOf[T](ast).foreach(f)
@@ -29,6 +37,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
     seenGlobalVariables.clear()
     seenFunctions.clear()
+    seenFunctionErasures.clear()
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
@@ -45,6 +54,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     seenMethods.clear()
     seenFields.clear()
     seenConstructors.clear()
+    seenConstructorErasures.clear()
     unitContext.currentDefinition = clazz
     typing.find(clazz.name).foreach(unitContext.currentMapper = _)
   }
@@ -59,7 +69,12 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
 
   private def registerConstructor(ast: AST.Node, constructor: ConstructorDefinition): Unit =
     if (seenConstructors.contains(constructor)) typing.report(SemanticError.DUPLICATE_CONSTRUCTOR, ast, constructor.affiliation, constructor.getArgs)
-    else seenConstructors.add(constructor)
+    else {
+      seenConstructors.add(constructor)
+      val desc = DuplicationChecks.erasedConstructorDescriptor(constructor)
+      if (!seenConstructorErasures.add(desc))
+        typing.report(SemanticError.ERASURE_SIGNATURE_COLLISION, ast, constructor.affiliation, "this", desc)
+    }
 
   private def processFieldLikeDeclaration(ast: AST.Node): Unit =
     withKernel[FieldDefinition](ast)(field => registerField(ast, field))
@@ -89,8 +104,16 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private def processFunctionDeclaration(node: AST.FunctionDeclaration): Unit =
     withKernel[MethodDefinition](node) { method =>
       if (seenFunctions.contains(method)) typing.report(SemanticError.DUPLICATE_FUNCTION, node, method.name, method.arguments)
-      else seenFunctions.add(method)
+      else {
+        seenFunctions.add(method)
+        registerErasure(seenFunctionErasures, node, method, method.affiliation)
+      }
     }
+
+  private def registerErasure(seen: scala.collection.mutable.HashSet[(String, String)], node: AST.Node, method: Method, owner: Type): Unit = {
+    val key = DuplicationChecks.erasedSignatureKey(method)
+    if (!seen.add(key)) typing.report(SemanticError.ERASURE_SIGNATURE_COLLISION, node, owner, key._1, key._2)
+  }
 
   private def makeDelegationMethod(delegated: FieldRef, delegator: Method): MethodDefinition = {
     // Substitute the forwarded interface's type parameters with the field's type
@@ -208,9 +231,27 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     var seen = Set.empty[String]
     for (arg <- node.args) {
       if (seen.contains(arg.name)) typing.report(SemanticError.DUPLICATE_RECORD_COMPONENT, arg, clazz, arg.name)
-      else seen += arg.name
+      else {
+        seen += arg.name
+        // The accessor of `hashCode: Int` or `toString: String` has the same signature as the
+        // method the record generates itself: a ClassFormatError at load (#2391). Any other
+        // type gives the accessor a different descriptor, which the JVM accepts.
+        val field = clazz.field(arg.name)
+        if (clashesWithGeneratedMethod(arg.name, field))
+          typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type],
+            SemanticErrorReporter.RecordComponentClash(field.`type`))
+      }
     }
   }
+
+  private def clashesWithGeneratedMethod(name: String, field: FieldRef): Boolean =
+    field != null && (name match {
+      case "hashCode" => field.`type` == BasicType.INT
+      case "toString" =>
+        val t = field.`type` match { case n: NullableType => n.innerType; case t => t }
+        t.isInstanceOf[ObjectType] && t.name == "java.lang.String"
+      case _ => false
+    })
 
   private def processSynthesizedMethodDeclaration(node: AST.MethodDeclaration): Unit =
     withKernel[MethodDefinition](node) { method =>
@@ -237,6 +278,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private def processExtensionDeclaration(node: AST.ExtensionDeclaration): Unit =
     withKernel[ClassDefinition](node) { clazz =>
       seenMethods.clear()
+      seenExtensionErasures.clear()
       unitContext.currentDefinition = clazz
       typing.find(clazz.name).foreach(unitContext.currentMapper = _)
       node.methods.foreach(processExtensionMethodDeclaration)
@@ -248,6 +290,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
         typing.report(SemanticError.DUPLICATE_EXTENSION_METHOD, node, method.receiverType, method.name, method.arguments)
       else {
         seenMethods.add(method)
+        registerErasure(seenExtensionErasures, node, method, method.receiverType)
         ExtensionShadowCheck.check(typing, node, method)
       }
     }

@@ -1,7 +1,6 @@
 package onion;
 
 import java.net.URI;
-import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -513,11 +512,11 @@ public final class Http {
     }
 
     /**
-     * URL-decodes the given value.
+     * URL-decodes the given value; the same as {@link Codec#urlDecode}.
+     * @throws IllegalArgumentException on a % not followed by two hex digits
      */
     public static String decodeUrl(String value) {
-        if (value == null) return "";
-        return URLDecoder.decode(value, StandardCharsets.UTF_8);
+        return Codec.urlDecode(value);
     }
 
     /**

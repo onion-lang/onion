@@ -160,6 +160,11 @@ private[compiler] object SyntaxHintClassifier {
   private val DotAfterPrimitiveTypeName = """\A[A-Za-z]+\s*\.\s*([A-Za-z_]\w*)""".r
   private val JavaStyleRecordBody =
     """^\s*record\s+([A-Za-z_]\w*)(?:\[[^\]]*\])?\s*\{""".r
+  // Java's anonymous class, `new Runnable { ... }` or `new Comparator[String]() { ... }`:
+  // the constructor call parses, then its `{` cannot follow. Matched on the text before
+  // that `{`, so a `new T()` earlier in a line that later opens a block never fires.
+  private val AnonymousClassBody =
+    """\bnew\s+([A-Za-z_][\w.]*(?:\[.*\])?)\s*(?:\([^()]*\))?\s*$""".r
   private val JavaStyleTryResource =
     """\btry\s*\(\s*([A-Z][A-Za-z0-9_]*(?:\[[^\]]*\])?\??)\s+([A-Za-z_]\w*)\s*=""".r
   private val JavaStyleImplements =
@@ -468,6 +473,10 @@ private[compiler] object SyntaxHintClassifier {
       case "{" if expected.contains("\"(\"") && JavaStyleRecordBody.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleRecordBody.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_record_body", matched.group(1))
+      case "{" if AnonymousClassBody.findFirstMatchIn(textBefore(context, sourceLine)).isDefined =>
+        val typeName = AnonymousClassBody.findFirstMatchIn(textBefore(context, sourceLine)).get.group(1)
+        val simpleName = typeName.takeWhile(_ != '[').split('.').last
+        hint("error.parsing.hint.anonymous_class", typeName, simpleName + "Impl")
       case "(" if expected.contains("{") && JavaStyleTryResource.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleTryResource.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_try_resource", matched.group(1), matched.group(2))

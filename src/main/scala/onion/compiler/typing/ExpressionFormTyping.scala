@@ -158,6 +158,9 @@ final class ExpressionFormTyping(
   private def isValidCast(source: Type, destination: Type): Boolean = {
     if (source eq destination) return true
     (source, destination) match {
+      // `?` only admits null, which passes any reference cast, so the inner types decide.
+      case (n: NullableType, _) => isValidCast(n.innerType, destination)
+      case (_, n: NullableType) => isValidCast(source, n.innerType)
       case (_: NullType, _: BasicType) =>
         false
       case (bt: BasicType, ct: ClassType) =>

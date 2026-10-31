@@ -10,6 +10,24 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   typing: Typing,
   calls: MethodCallTyping
 ) {
+  private val overloadSupport = new CallOverloadSupport(typing, calls)
+  private val mentionedNames = new MentionedNames
+
+  /** The overload each lambda call site chose, per receiver, argument and expected types and
+   *  what the call sees around it (a captured variable's type can differ between two
+   *  overloads an enclosing lambda is tried against). */
+  private val decisionsAt =
+    new java.util.IdentityHashMap[AST.MethodCall, java.util.HashMap[(Type, List[Type], Type, AnyRef), ExtensionMethodDefinition]]()
+
+  /** The keys under which a lambda call site fitted no overload, or two equally. */
+  private val failedAt =
+    new java.util.IdentityHashMap[AST.MethodCall, java.util.HashSet[(Type, List[Type], Type, AnyRef)]]()
+
+  /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
+   *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
+  def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
+    selectApplicableExtensionMethod(targetType, name, params).isInstanceOf[CandidateSelection.Ambiguous[?]]
+
   def tryExtensionMethodCall(
     node: AST.MethodCall,
     target: Term,
@@ -114,9 +132,30 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           case Seq(single) => Seq(single)
           case _ => pool
         }
-        if (chosen.isEmpty) CandidateSelection.NoMatch
-        else if (chosen.length > 1) CandidateSelection.Ambiguous(chosen(0), chosen(1))
-        else CandidateSelection.Selected(chosen.head)
+        // Then the rule class methods use for the remaining overloads, with the receiver as
+        // the first parameter: the one that is at least as specific everywhere wins
+        // (`ex(Char)` over `ex(Long)` for 'A').
+        val candidates = chosen.map(m => ApplicableMethod(m, m.receiverType +: m.arguments, Map.empty)).toList
+        val argTypes = (targetType: Type) +: calls.types(params)
+        overloadSupport.selectMostSpecificApplicable(candidates, argTypes = argTypes) match {
+          case CandidateSelection.NoMatch => CandidateSelection.NoMatch
+          case CandidateSelection.Ambiguous(first, second) =>
+            CandidateSelection.Ambiguous(
+              first.method.asInstanceOf[ExtensionMethodDefinition],
+              second.method.asInstanceOf[ExtensionMethodDefinition])
+          case CandidateSelection.Selected(am) =>
+            val winner = am.method.asInstanceOf[ExtensionMethodDefinition]
+            // The winner's receiver must also be at least as specific as every other's.
+            // Unrelated receivers (`extension I`, `extension J` on a `C conforms I, J`) or
+            // `List` beside `List[Int]` stay ambiguous, whatever order they are declared in.
+            chosen.find { o =>
+              !(o eq winner) && !(o.receiverType eq winner.receiverType) &&
+                !isMoreSpecificReceiver(winner.receiverType, o.receiverType)
+            } match {
+              case Some(other) => CandidateSelection.Ambiguous(winner, other)
+              case None => CandidateSelection.Selected(winner)
+            }
+        }
       case _ =>
         CandidateSelection.NoMatch
     }
@@ -309,7 +348,12 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     val staticArgs = Array(staticReceiver(target, extMethod)) ++ params
     val staticMethods =
       if (params.length < extMethod.arguments.length) findStaticMethods(extMethod, node.name, staticArgs)
-      else containerClass.findMethod(node.name, staticArgs)
+      else {
+        backingStaticMethod(extMethod) match {
+          case Some(method) => Array(method)
+          case None => containerClass.findMethod(node.name, staticArgs)
+        }
+      }
 
     staticMethods match {
       case Array() =>
@@ -324,6 +368,21 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       case multiple =>
         calls.reportAmbiguousMethods(node, node.name, multiple)
         None
+    }
+  }
+
+  /** The container's static method that implements `extMethod`: the receiver, then the
+   *  same parameter types. Looked up by signature, not re-resolved against the arguments,
+   *  so the call runs the overload that selection chose (`ez(Object)` for an `Int`). */
+  private def backingStaticMethod(extMethod: ExtensionMethodDefinition): Option[Method] = {
+    val formals = extMethod.arguments
+    extMethod.containerClass.methods(extMethod.name).filter { m =>
+      Modifier.isStatic(m.modifier) && m.arguments.length == formals.length + 1 &&
+        m.arguments(0).name == extMethod.receiverType.name &&
+        formals.indices.forall(i => m.arguments(i + 1).name == formals(i).name)
+    } match {
+      case Array(single) => Some(single)
+      case _ => None
     }
   }
 
@@ -397,14 +456,21 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         break(tryExtensionMethodCallBidirectional(node, listTarget, listType, context, expected, untypedClosureIndices))
       case None =>
     }
-    candidates.iterator.flatMap { extMethod =>
+    // The call typed against one overload, with the substituted parameter types and the
+    // argument types, which the ranking below compares as the class path does.
+    def attemptRanked(extMethod: ExtensionMethodDefinition): Option[(Term, Array[Type], Array[Type])] = {
       val container = extMethod.containerClass
       val receiverType = staticReceiver(target, extMethod).`type`
-      container.methods(name)
-        .filter { m =>
-          Modifier.isStatic(m.modifier) && m.arguments.length == args.length + 1 &&
-            receiverKindMatches(m.arguments(0), receiverType)
-        }
+      val statics = container.methods(name).filter { m =>
+        Modifier.isStatic(m.modifier) && m.arguments.length == args.length + 1 &&
+          receiverKindMatches(m.arguments(0), receiverType)
+      }
+      // The static that implements this very overload, when the container has one with its
+      // parameter types; otherwise two same-arity overloads both ran the first-sorted one (#2447).
+      val ownStatic = statics.filter { m =>
+        extMethod.arguments.indices.forall(i => m.arguments(i + 1).name == extMethod.arguments(i).name)
+      }
+      (if (ownStatic.nonEmpty) ownStatic else statics)
         // Pick the overload whose first (receiver) parameter is the most specific
         // that still accepts the receiver — e.g. map(Set) over map(Iterable) for a
         // Set — instead of the first declared, which could be a sibling like
@@ -442,14 +508,212 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           else {
             val staticArgs = Array(staticReceiver(target, extMethod)) ++ finalArgs
             val finalSubst = GenericMethodTypeArguments.infer(typing, node, method, staticArgs, classSubst, expected)
-            val finalExpectedArgs = TypeSubst.args(method, classSubst, finalSubst)
+            val finalExpectedArgs = TypeSubst.paramArgs(method, classSubst, finalSubst)
             calls.processParamsWithExpected(node, staticArgs, finalExpectedArgs).map { finalParams =>
               val call = new CallStatic(container, method, finalParams)
-              TypeSubst.withCast(call, TypeSubst.result(method.returnType, classSubst, finalSubst))
+              (TypeSubst.withCast(call, TypeSubst.result(method.returnType, classSubst, finalSubst)),
+                finalExpectedArgs.drop(1), finalArgs.map(_.`type`))
             }
           }
         }
-    }.nextOption()
+    }
+    def attempt(extMethod: ExtensionMethodDefinition): Option[Term] = attemptRanked(extMethod).map(_._1)
+
+    // Several user overloads: the rule written on #2447. Type the call against each one
+    // without reporting and keep the fits. A fit that takes each lambda as it is (a function
+    // type, `Object`, a type variable) beats one that needs a SAM conversion (`Runnable`).
+    // Then a fit wins over another when its parameters rank higher, as for class methods,
+    // and its receiver is not less specific; or when the parameters tie and its receiver is
+    // more specific. Parameters and receiver disagreeing, or no winner, is one E0006.
+    // An overload with no lambda slot where a lambda is passed (`Int`, `List`) cannot fit and
+    // is never typed against, so nested lambdas are typed once per real candidate. When
+    // only SAM conversions fit, the void/value shape of the body decides, as for classes.
+    val user = candidates.filterNot(isBuiltinExtension)
+    if (user.length >= 2) {
+      // The winner is remembered per call site, receiver, argument, expected types and what
+      // the call sees: a nested call is typed again for each overload its enclosing lambda is
+      // tried against, and repeating the whole choice at every level made nesting
+      // exponential. A remembered winner that no longer fits falls back to the full choice
+      // while errors are suppressed (an enclosing overload is being tried); when they are
+      // reported, its errors are the call's own.
+      val decisionKey = (targetType: Type, preliminaryParams.toList.map(p => if (p == null) null else p.`type`), expected, context.typingViewFor(mentionedNames.of(node.args)))
+      val decisions = decisionsAt.computeIfAbsent(node, _ => new java.util.HashMap())
+      val remembered = decisions.get(decisionKey)
+      if (remembered != null) {
+        if (typing.reportingEnabled) break(attempt(remembered))
+        attempt(remembered) match {
+          case some @ Some(_) => break(some)
+          case None =>
+        }
+      }
+      // A call that fitted no overload, or two equally, under this key does so again; while
+      // an enclosing overload is only being tried, that answer is reused instead of the
+      // whole choice (#2452). When errors are reported, the choice runs to report them.
+      val failures = failedAt.computeIfAbsent(node, _ => new java.util.HashSet())
+      if (!typing.reportingEnabled && failures.contains(decisionKey)) break(None)
+      def decided(winner: ExtensionMethodDefinition): Option[Term] = {
+        decisions.put(decisionKey, winner)
+        attempt(winner)
+      }
+      val lambdaCapable = user.filter { m =>
+        untypedClosureIndices.forall(i => i >= m.arguments.length || isLambdaSlot(m.arguments(i)))
+      }
+      if (lambdaCapable.length == 1) break(decided(lambdaCapable.head))
+      // A primitive argument the parameter only takes narrowed (an `Int` literal for `Short`).
+      def narrows(params: Array[Type]): Boolean = preliminaryParams.indices.exists { i =>
+        val arg = preliminaryParams(i)
+        arg != null && i < params.length && arg.`type`.isBasicType && params(i).isBasicType &&
+          !TypeRules.isAssignable(params(i), arg.`type`)
+      }
+      val fits0 =
+        if (lambdaCapable.isEmpty) Seq.empty
+        else {
+          // An overload that a fitting one always beats is not tried: the fitting one is
+          // non-generic, takes every lambda directly (so rule 3 cannot prefer the other) and
+          // has strictly more specific parameters and a receiver no less specific (rule 4).
+          // Trying the most specific first lets `w(f)` beside `w(o: Object)` skip the
+          // `Object` try, so nesting such calls does not double the work at every level.
+          def dominates(a: ExtensionMethodDefinition, b: ExtensionMethodDefinition): Boolean =
+            a.typeParameters.isEmpty && b.typeParameters.isEmpty && !narrows(a.arguments) &&
+              untypedClosureIndices.forall(i => i >= a.arguments.length || takesLambdaDirectly(a.arguments(i))) &&
+              TypeRules.isAllSuperType(b.arguments, a.arguments) && !TypeRules.isAllSuperType(a.arguments, b.arguments) &&
+              !isMoreSpecificReceiver(b.receiverType, a.receiverType)
+          val ordered = lambdaCapable.sortBy(m => -lambdaCapable.count(o => (o ne m) && dominates(m, o)))
+          val found = scala.collection.mutable.ArrayBuffer[(ExtensionMethodDefinition, Array[Type], Array[Type])]()
+          ordered.foreach { m =>
+            if (!found.exists(f => dominates(f._1, m))) {
+              // A try: its errors and warnings are not the call's; the winner is typed again below.
+              typing.warningReporter_.discarding(typing.withSuppressedReporting(attemptRanked(m)))
+                .foreach(r => found += ((m, r._2, r._3)))
+            }
+          }
+          // Keep declaration order for the ranking and its E0006 message.
+          lambdaCapable.flatMap(m => found.find(_._1 eq m))
+        }
+      if (fits0.isEmpty) {
+        val builtins = candidates.filter(isBuiltinExtension)
+        if (builtins.isEmpty) failures.add(decisionKey)
+        break(if (builtins.isEmpty) attempt(closestByArity(user, args)) else builtins.iterator.flatMap(attempt).nextOption())
+      }
+      // A fit that takes each argument as it is (identity, widening, boxing) beats one that
+      // needs a primitive narrowed: `5` goes to `h(Int, f)`, not `h(Short, f)`, as for class
+      // methods, which never pick a narrowing overload while another one applies.
+      val fitsAsIs = fits0.filterNot { case (_, expectedArgs, _) => narrows(expectedArgs) }
+      val fits = if (fitsAsIs.nonEmpty) fitsAsIs else fits0
+      val direct = fits.filter { case (m, _, _) =>
+        untypedClosureIndices.forall(i => i >= m.arguments.length || takesLambdaDirectly(m.arguments(i)))
+      }
+      val pool =
+        if (direct.nonEmpty) direct
+        else {
+          val shaped = overloadSupport.disambiguateClosureOverloads(
+            fits.map { case (m, expectedArgs, _) => ApplicableMethod(m, expectedArgs, Map.empty) }.toList,
+            untypedClosureIndices,
+            calls.closureSamMatcher(node.args, context)
+          ).map(_.method)
+          fits.filter { case (m, _, _) => shaped.exists(_ eq m) }
+        }
+      // An untyped lambda's own position does not rank (rule 4 on #2447), as on the class
+      // path: `(Long) -> Long` and `(Int) -> Int` never compare, so the other arguments
+      // decide. With nothing else to compare, every position counts.
+      val ranked = args.indices.filterNot(i => ArgumentHelpers.isClosureWithUntypedParams(args(i)))
+      def beats(a: (ExtensionMethodDefinition, Array[Type], Array[Type]), b: (ExtensionMethodDefinition, Array[Type], Array[Type])): Boolean = {
+        val params = rankParameters(a._1, a._2, b._1, b._2, a._3, ranked)
+        val receiver =
+          if (isMoreSpecificReceiver(a._1.receiverType, b._1.receiverType)) -1
+          else if (isMoreSpecificReceiver(b._1.receiverType, a._1.receiverType)) 1
+          else 0
+        (params < 0 && receiver <= 0) || (params == 0 && receiver < 0)
+      }
+      pool.find(a => pool.forall(b => (a eq b) || beats(a, b))) match {
+        case Some((winner, _, _)) => break(decided(winner))
+        case None =>
+          failures.add(decisionKey)
+          val unbeaten = pool.filter(a => !pool.exists(b => (a ne b) && beats(b, a)))
+          val (first, second) = unbeaten match {
+            case Seq(x, y, _*) => (x._1, y._1)
+            case _ => (pool(0)._1, pool(1)._1)
+          }
+          calls.reportAmbiguousSignature(node, first.containerClass, name, first.arguments, second.containerClass, name,
+            second.arguments, SemanticErrorReporter.LambdaOverloadHint)
+          break(None)
+      }
+    }
+    candidates.iterator.flatMap(attempt).nextOption()
+  }
+
+  /** -1 when parameters `a` rank above `b` the way class overloads do (subtypes, then the
+   *  primitive tiebreak for `argTypes`: `Int` over `Object`, `Integer` or a type variable),
+   *  1 for the reverse, 0 when they are equal or cannot be ranked. */
+  private def rankParameters(
+    methodA: Method, a: Array[Type], methodB: Method, b: Array[Type], argTypes: Array[Type],
+    ranked: Seq[Int] = Nil
+  ): Int = {
+    val positions = if (ranked.isEmpty) a.indices else ranked
+    val (pa, pb) = (positions.map(a(_)).toArray, positions.map(b(_)).toArray)
+    if (TypeRules.isAllSuperType(pa, pb) && TypeRules.isAllSuperType(pb, pa)) {
+      // Equal once type arguments are substituted: the non-generic overload wins, as for
+      // class methods (`each2(String, g)` over `each2[A](A, g)`).
+      (methodA.typeParameters.isEmpty, methodB.typeParameters.isEmpty) match {
+        case (true, false) => -1
+        case (false, true) => 1
+        case _ => 0
+      }
+    } else {
+      val (ma, mb) = (ApplicableMethod(methodA, a, Map.empty), ApplicableMethod(methodB, b, Map.empty))
+      overloadSupport.selectMostSpecificApplicable(List(ma, mb), relevantIndices = ranked, argTypes = argTypes) match {
+        case CandidateSelection.Selected(am) => if (am eq ma) -1 else 1
+        case _ => 0
+      }
+    }
+  }
+
+  /** A parameter a lambda can be passed to (rule 1 on #2447): an Onion function type,
+   *  `Object`, a type variable, or an interface with one abstract method (not counting
+   *  `Object`'s). Never a primitive, an array, a class, or an interface like `List`. */
+  private def isLambdaSlot(param: Type): Boolean = param match {
+    case _: TypeVariableType => true
+    case ct: ClassType =>
+      if (ct.name.startsWith("onion.Function") || ct.name == "java.lang.Object") true
+      else if (!ct.isInterface) false
+      else {
+        val raw = rawOf(ct)
+        raw.methods.filter(m => Modifier.isAbstract(m.modifier) && !isPublicObjectMethod(m)).map(_.name).distinct.length <= 1
+      }
+    case _ => false
+  }
+
+  private def isPublicObjectMethod(m: Method): Boolean = m.name match {
+    case "equals" => m.arguments.length == 1 && m.arguments(0).name == "java.lang.Object"
+    case "hashCode" | "toString" => m.arguments.isEmpty
+    case _ => false
+  }
+
+  /** A parameter a lambda reaches with no SAM conversion: an Onion function type, `Object`
+   *  or a type variable. */
+  private def takesLambdaDirectly(param: Type): Boolean = param match {
+    case _: TypeVariableType => true
+    case ct: ClassType => ct.name.startsWith("onion.Function") || ct.name == "java.lang.Object"
+    case _ => false
+  }
+
+  /** When no overload fits, the one to report against (rule 2 on #2447): the first whose
+   *  function-typed parameters take as many arguments as the lambdas passed to them; else
+   *  the first with a lambda slot at every lambda's position; else the first. */
+  private def closestByArity(overloads: Seq[ExtensionMethodDefinition], args: Array[AST.Expression]): ExtensionMethodDefinition = {
+    def atLambdas(slot: (AST.ClosureExpression, Type) => Boolean)(m: ExtensionMethodDefinition): Boolean =
+      args.indices.forall { i =>
+        args(i) match {
+          case c: AST.ClosureExpression if i < m.arguments.length => slot(c, m.arguments(i))
+          case _ => true
+        }
+      }
+    val sameArity = atLambdas {
+      case (c, ct: ClassType) if ct.name.startsWith("onion.Function") => ct.name == "onion.Function" + c.args.length
+      case _ => false
+    }
+    val functional = atLambdas((_, param) => isLambdaSlot(param))
+    overloads.find(sameArity).orElse(overloads.find(functional)).getOrElse(overloads.head)
   }
 
   /** The backing static's first parameter must accept this receiver: array kinds
@@ -483,11 +747,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       currentType match {
         case classType: ClassType =>
           typing.lookupExtensionMethods(classType.name).foreach { extMethod =>
-            if (extMethod.name == name) result += extMethod
+            if (extMethod.name == name && (isBuiltinExtension(extMethod) || receiverArgumentsMatch(extMethod.receiverType, classType))) result += extMethod
           }
-        case _: ArrayType =>
+        case at: ArrayType =>
           typing.lookupExtensionMethods(Typing.ArrayExtensionReceiver).foreach { extMethod =>
-            if (extMethod.name == name) result += extMethod
+            if (extMethod.name == name && arrayReceiverAccepts(extMethod.receiverType, at)) result += extMethod
           }
         case _ =>
       }
@@ -497,6 +761,35 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 
     collect(targetType)
     result.toSeq
+  }
+
+  /** `extension List[Int]` and `extension List[String]` can both declare `describe`: a block
+   *  whose type arguments differ from the receiver's own (`List[Int]`) is not a candidate
+   *  (#2457). A raw receiver type, or a different class, is not compared. */
+  private def receiverArgumentsMatch(declared: Type, actual: ClassType): Boolean =
+    (declared, actual) match {
+      case (d: AppliedClassType, a: AppliedClassType) if d.raw.name == a.raw.name && d.typeArguments.length == a.typeArguments.length =>
+        d.typeArguments.zip(a.typeArguments).forall { (x, y) =>
+          TypeRules.isSuperType(x, y) && TypeRules.isSuperType(y, x)
+        }
+      case _ => true
+    }
+
+  /** A `T[]` receiver cannot bind `T` to a primitive, as in Java (#2458), so a primitive
+   *  array (`Int[]`) is matched only against a receiver of exactly its own array type. */
+  private def arrayReceiverAccepts(receiverType: Type, actual: ArrayType): Boolean = {
+    def primitiveArray(t: Type): Boolean = t match {
+      case a: ArrayType => a.dimension == 1 && a.component.isBasicType
+      case _ => false
+    }
+    if (primitiveArray(actual) || primitiveArray(receiverType)) receiverType match {
+      case a: ArrayType => a.dimension == actual.dimension && a.component == actual.component
+      case _ => false
+    }
+    else receiverType match {
+      case a: ArrayType => TypeRules.isAssignable(a, actual)
+      case _ => true
+    }
   }
 
   /** A builtin stdlib extension (the bundled collection/string utilities), as
@@ -518,14 +811,6 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       calls.isAssignableWithBoxing(expectedArgs(i), params(i).`type`)
     }
   }
-
-  /** The static method an extension compiles to (receiver first), whose defaults the call may rely on. */
-  private def backingStaticMethod(extMethod: ExtensionMethodDefinition): Option[Method] =
-    extMethod.containerClass.methods(extMethod.name).find { m =>
-      Modifier.isStatic(m.modifier) &&
-        m.arguments.length == extMethod.arguments.length + 1 &&
-        m.arguments(0) == extMethod.receiverType
-    }
 
   /** The static method for a call with `staticArgs` (receiver first); a call that leaves out
    *  trailing arguments takes the backing method directly and fills their defaults afterwards. */

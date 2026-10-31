@@ -1020,6 +1020,18 @@ tool takeRec(p: P): Int requires { console } { IO::println("" + p.x()); return 0
 以前はこれが無言でした。CLI 合成がそのスクリプトを黙って飛ばし、`main` のない何も実行
 しないプログラムがコンパイルされていました（issue #424）。
 
+`List[String]` や `String[]` のパラメータには専用のメッセージが出ます。`tool` はまだ引数の
+リストを受け取れません。代わりにフラグを1つ受け取って分割してください。
+
+```onion
+tool greet(csv: String = "") requires { console } {
+  if csv != "" {
+    foreach n: String in Strings::split(csv, ",") { IO::println("Hello, " + n) }
+  }
+}
+// $ onion greet.on --csv ann,bob
+```
+
 ### `E0082` — tool 名の重複
 
 2つの `tool` が同じ名前を持っています。関数のオーバーロード自体は正当ですが、コマンド
@@ -1064,6 +1076,9 @@ def main(name: String, count: Int = 3, tags: List[String] = []): Int {
 
 スカラー型を使うか、繰り返し・末尾引数を集めたいなら最後のパラメータを `String[]` にして
 ください（例: `def main(cmd: String, files: String[])`）。
+
+可変長引数のパラメータ（`files: String...`）も E0094 です。`files: String[]` と書いてください。
+`tool` では同じ誤りが `E0081` になります。
 
 ### `E0095` — `main` の `String[]` パラメータが未対応の位置にある
 

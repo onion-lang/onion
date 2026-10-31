@@ -80,4 +80,22 @@ class LawDiagnosticLocationSpec extends AnyFunSpec {
       assert(e.location.line == 2, s"expected line 2, got ${e.location.line}")
     }
   }
+
+  describe("the column of a clause inside a record body") {
+    it("points at the clause, not column 1 (#2516)") {
+      val law = s"""|record Pt(x: Int) {
+                    |  law wrong(p: Pt) { p.x() == 0 - 1 }
+                    |}
+                    |$main""".stripMargin
+      val ex = s"""|record R(x: Int) {
+                   |  example { new R(1).x() == 2 }
+                   |}
+                   |$main""".stripMargin
+      val l = errors(law).find(_.errorCode.contains("E0064")).get
+      val e = errors(ex).find(_.errorCode.contains("E0065")).get
+      assert(l.location.column == 7, // under the law's name
+         s"law column ${l.location.column}")
+      assert(e.location.column > 1, s"example column ${e.location.column}")
+    }
+  }
 }

@@ -935,6 +935,9 @@ class SemanticErrorReporter(threshold: Int) {
         reportMethodNotAccessible(position, items)
       case SemanticError.FIELD_NOT_ACCESSIBLE =>
         reportFieldNotAccessible(position, items)
+      case SemanticError.DUPLICATE_METHOD
+          if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordComponentClash] =>
+        reportRecordComponentClash(position, items)
 
       // Data-driven cases
       case _ =>
@@ -951,6 +954,20 @@ class SemanticErrorReporter(threshold: Int) {
     if (errorCount >= threshold) {
       throw new CompilationException(problems.toSeq)
     }
+  }
+
+  /**
+   * DUPLICATE_METHOD raised by a record component whose accessor has the signature of a
+   * method every record generates (`hashCode: Int`, `toString: String`; #2391). The user
+   * wrote no method, so the generic "duplicated method definition" text would mislead.
+   * Items: the record, the component name, (unused) argument types, the clash marker.
+   */
+  private def reportRecordComponentClash(position: Location, items: Array[AnyRef]): Unit = {
+    val clash = items(3).asInstanceOf[SemanticErrorReporter.RecordComponentClash]
+    problem(position, format(
+      message("error.semantic.recordComponentClashesGeneratedMethod"),
+      Seq(typeName(items(0)), asString(items(1)), typeName(clash.componentType))
+    ))
   }
 
   def getProblems: Array[CompileError] = problems.toArray
@@ -1036,6 +1053,10 @@ object SemanticErrorReporter {
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */
   private[compiler] case object LambdaOverloadHint
+
+  /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record component's
+   *  accessor colliding with a method the record generates, so the error says so (#2391). */
+  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type)
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.

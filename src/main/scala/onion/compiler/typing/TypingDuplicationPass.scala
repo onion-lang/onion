@@ -236,8 +236,10 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
         // The accessor of `hashCode: Int` or `toString: String` has the same signature as the
         // method the record generates itself: a ClassFormatError at load (#2391). Any other
         // type gives the accessor a different descriptor, which the JVM accepts.
-        if (clashesWithGeneratedMethod(arg.name, clazz.field(arg.name)))
-          typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type])
+        val field = clazz.field(arg.name)
+        if (clashesWithGeneratedMethod(arg.name, field))
+          typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type],
+            SemanticErrorReporter.RecordComponentClash(field.`type`))
       }
     }
   }

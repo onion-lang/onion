@@ -10,13 +10,15 @@ import java.io.StringReader
  * then failed to load with a raw `ClassFormatError` (#2391).
  */
 class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
-  private def codes(src: String): Seq[Option[String]] = {
+  private def errors(src: String) = {
     val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
     new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
-      case CompilationOutcome.Failure(errs) => errs.map(_.errorCode)
+      case CompilationOutcome.Failure(errs) => errs.toSeq
       case _ => Seq.empty
     }
   }
+
+  private def codes(src: String): Seq[Option[String]] = errors(src).map(_.errorCode)
 
   describe("a record component named like a generated method") {
     it("rejects hashCode at compile time") {
@@ -34,6 +36,16 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
     it("reports a repeated hashCode component once per clash, not once per occurrence") {
       val cs = codes("record H(hashCode: Int, hashCode: Int)")
       assert(cs.count(_.contains("E0010")) == 1, cs)
+    }
+
+    it("says the component clashes with the generated method, not that a method is duplicated") {
+      // Locale-agnostic: both the en and ja texts quote the accessor and the generated method.
+      val msgs = errors("record H(hashCode: Int)").filter(_.errorCode.contains("E0010")).map(_.message)
+      assert(msgs.size == 1, msgs)
+      assert(msgs.head.contains("hashCode: Int") && msgs.head.contains("hashCode()"), msgs)
+      assert(!msgs.head.contains("H.hashCode()"), msgs)
+      val ts = errors("record T(toString: String?)").filter(_.errorCode.contains("E0010")).map(_.message)
+      assert(ts.size == 1 && ts.head.contains("toString: String?") && ts.head.contains("toString()"), ts)
     }
 
     it("accepts a component whose type gives the accessor a different signature") {

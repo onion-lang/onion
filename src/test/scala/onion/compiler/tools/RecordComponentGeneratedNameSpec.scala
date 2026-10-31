@@ -48,6 +48,15 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
       assert(ts.size == 1 && ts.head.contains("toString: String?") && ts.head.contains("toString()"), ts)
     }
 
+    it("rejects getClass: Class, whose accessor would override the final Object.getClass (#2512)") {
+      assert(codes("record G(getClass: Class[String])").contains(Some("E0010")))
+      assert(codes("record G(getClass: Class[String]?)").contains(Some("E0010")))
+    }
+
+    it("accepts a getClass component of another type") {
+      assert(codes("record G(getClass: Int)\nprintln(new G(1).getClass())").isEmpty)
+    }
+
     it("accepts a component whose type gives the accessor a different signature") {
       assert(codes("record T(toString: Int)\nprintln(new T(5).toString())").isEmpty)
       assert(codes("record H(hashCode: String)\nprintln(new H(\"a\").hashCode())").isEmpty)

@@ -244,12 +244,17 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     }
   }
 
+  private def isClassNamed(field: FieldRef, className: String): Boolean = {
+    val t = field.`type` match { case n: NullableType => n.innerType; case t => t }
+    t.isInstanceOf[ObjectType] && t.name == className
+  }
+
   private def clashesWithGeneratedMethod(name: String, field: FieldRef): Boolean =
     field != null && (name match {
       case "hashCode" => field.`type` == BasicType.INT
-      case "toString" =>
-        val t = field.`type` match { case n: NullableType => n.innerType; case t => t }
-        t.isInstanceOf[ObjectType] && t.name == "java.lang.String"
+      case "toString" => isClassNamed(field, "java.lang.String")
+      // Object.getClass() is final: an accessor `getClass(): Class` fails to load (#2512).
+      case "getClass" => isClassNamed(field, "java.lang.Class")
       case _ => false
     })
 

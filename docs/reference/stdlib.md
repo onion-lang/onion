@@ -898,6 +898,9 @@ r.contains(9)                // false
 r.toString()                 // "Range(2..<6)"; empty ranges print "Range(empty)"
 
 foreach i: Int in r { IO::println(i) }   // 2 3 4 5
+
+val evens = (1..10).filter { x -> x % 2 == 0 }   // a List[Int]: [2, 4, 6, 8, 10]
+evens.size                   // 5
 ```
 
 ## Iterables Module
@@ -906,10 +909,10 @@ Provided via `onion.Iterables` (Java interface).
 
 Access iteration utilities for collections and arrays:
 
-- `Iterables::map(list|iterable|set, f)`
+- `Iterables::map(list|iterable|set, f)` - a `List` for a list or any other `Iterable` (a range, `map.values()`), a `Set` for a set
 - `Iterables::mapMap(map, f)` - maps each `Map.Entry` through `f`, returning a new `Map` in the original insertion order
 - `Iterables::toList(iterable)` - materializes any `Iterable` (ranges included) into a `List`
-- `Iterables::filter(list|iterable, predicate)`
+- `Iterables::filter(list|iterable, predicate)` - always a `List`
 - `Iterables::foldl(iterable, init, f)`
 - `Iterables::reduce(list, initial, reducer)`
 - `Iterables::exists(iterable, predicate)`

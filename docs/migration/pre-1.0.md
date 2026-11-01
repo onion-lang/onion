@@ -198,3 +198,32 @@ Examples:
 - **What you see:** `E0006 method call is applicable for both …`, with a hint naming the fixes
   in the last column.
 - **Still fine:** a call with one matching overload, or with no lambda argument.
+
+## `map` and `filter` on any iterable return a `List`
+
+`map` and `filter` on a range, on `map.values()` or on any other `Iterable` that is not a
+`List` or a `Set` now return a `List`. Before, the result was typed `Iterable`, though it was
+already a list.
+
+```onion
+val evens = (1..10).filter { x -> x % 2 == 0 }
+evens.size                         // Before: E0004. Now: 5
+
+var xs = (1..3).map { x -> x + 1 }
+xs = new java.util.TreeSet[Int]()  // Before: compiled. Now: E0000
+
+// To keep a variable that holds any iterable, declare its type
+var ys: Iterable[Int] = (1..3).map { x -> x + 1 }
+ys = new java.util.TreeSet[Int]()
+```
+
+- **What changed:** `Iterables::map(Iterable, f)` and `Iterables::filter(Iterable, p)` return
+  `List[T]`. A list's or a set's own `map`/`filter` is unchanged.
+- **What you see:** `E0000 type List[Int] is expected, but type TreeSet[Int] is used`, with a
+  hint to declare `var xs: Iterable[Int] = ...`.
+- **Runs differently:** with an overload or an extension on both `Iterable` and `List`, a
+  call on the result now picks the `List` one. Rename one of them to keep the old choice.
+- **Recompile:** a class compiled against an older `onion.jar` that calls these methods
+  throws `NoSuchMethodError` until it is compiled again.
+- **Still fine:** `.toList()` after such a pipeline still works, and the result still fits an
+  `Iterable` parameter or variable.

@@ -335,7 +335,7 @@ IO::println("Twin primes (p, p+2 both prime):")
 val twins: List[Int] = nums.filter { p -> (p + 2).isPrime() && primesUpTo(p + 2).contains(p + 2) }
 IO::println("  #{twins.size()} twin-prime leaders: #{twins.take(8)}")
 
-val squares: List[Int] = (1..20).map { n -> n * n }.filter { n -> n.isPrime() }.toList()
+val squares: List[Int] = (1..20).map { n -> n * n }.filter { n -> n.isPrime() }
 IO::println("Squares of 1..20 that are prime: #{squares}")
 
 IO::println("")

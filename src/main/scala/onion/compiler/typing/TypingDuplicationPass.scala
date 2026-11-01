@@ -234,7 +234,8 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       else {
         seen += arg.name
         // The accessor of `hashCode: Int` or `toString: String` has the same signature as the
-        // method the record generates itself: a ClassFormatError at load (#2391). Any other
+        // method the record generates itself: a ClassFormatError at load (#2391). The accessor
+        // of `getClass: Class` would override the final Object.getClass() (#2512). Any other
         // type gives the accessor a different descriptor, which the JVM accepts.
         val field = clazz.field(arg.name)
         if (clashesWithGeneratedMethod(arg.name, field))
@@ -244,19 +245,19 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     }
   }
 
-  private def isClassNamed(field: FieldRef, className: String): Boolean = {
-    val t = field.`type` match { case n: NullableType => n.innerType; case t => t }
-    t.isInstanceOf[ObjectType] && t.name == className
-  }
-
+  // Compared by erasure: `toString: X` with `X extends String` gets the accessor
+  // `toString()Ljava/lang/String;`, the same as `toString: String` (#2522).
   private def clashesWithGeneratedMethod(name: String, field: FieldRef): Boolean =
     field != null && (name match {
       case "hashCode" => field.`type` == BasicType.INT
-      case "toString" => isClassNamed(field, "java.lang.String")
+      case "toString" => erasedDescriptor(field) == "Ljava/lang/String;"
       // Object.getClass() is final: an accessor `getClass(): Class` fails to load (#2512).
-      case "getClass" => isClassNamed(field, "java.lang.Class")
+      case "getClass" => erasedDescriptor(field) == "Ljava/lang/Class;"
       case _ => false
     })
+
+  private def erasedDescriptor(field: FieldRef): String =
+    onion.compiler.generics.Erasure.asmType(field.`type`).getDescriptor
 
   private def processSynthesizedMethodDeclaration(node: AST.MethodDeclaration): Unit =
     withKernel[MethodDefinition](node) { method =>

@@ -57,6 +57,17 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
       assert(codes("record G(getClass: Int)\nprintln(new G(1).getClass())").isEmpty)
     }
 
+    it("rejects toString typed by a type parameter bounded by String, which erases to String (#2522)") {
+      assert(codes("record T[X extends String](toString: X)\nprintln(new T[String](\"a\"))").contains(Some("E0010")))
+      assert(codes("record T[X extends String](toString: X?)").contains(Some("E0010")))
+      assert(codes("record T[Y extends String, X extends Y](toString: X)").contains(Some("E0010")))
+    }
+
+    it("accepts toString typed by a type parameter that erases to something else") {
+      assert(codes("record T[X](toString: X)\nprintln(new T[String](\"a\").toString())").isEmpty)
+      assert(codes("record T[X extends CharSequence](toString: X)\nprintln(new T[String](\"a\"))").isEmpty)
+    }
+
     it("accepts a component whose type gives the accessor a different signature") {
       assert(codes("record T(toString: Int)\nprintln(new T(5).toString())").isEmpty)
       assert(codes("record H(hashCode: String)\nprintln(new H(\"a\").hashCode())").isEmpty)

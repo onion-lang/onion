@@ -78,9 +78,9 @@ in the contract itself (the `Counter` in §3 needs `requires n < 2147483647`).
 | Verdict | Meaning | What happens |
 |---|---|---|
 | Proved | The VC is unsatisfiable and the answer passed an independent check (§8) | A guard for a postcondition or invariant may be dropped (§7.3); a `requires` keeps its guard |
-| Counterexample | Running the program breaks the contract (§7) | Error |
+| Counterexample | A static check or a proof shows the contract broken, and for a proof the run of §7.4 reproduces it | Error |
 | Sampled | Not proved. N inputs were tried and none broke it | Silent. `--contracts-report` lists them |
-| Not proved | No proof, and the contract cannot be sampled (see §7) | Warning `W0021` |
+| Not proved | No proof, and nothing was found against it: the solver gave up, the construct is not modelled, the type cannot be generated, or a model could not be reached by a run | A note in `--contracts-report`; and `W0021` once proofs exist (stage 6). See "One rule for Not proved" in §6 |
 
 `Sampled` is what `law` gave. It stays a first-class verdict, because `Double`, strings and
 anything the prover does not model will never reach `Proved`.
@@ -140,8 +140,10 @@ Today an empty effect set means *no I/O*. It does not mean *no mutation*: the ef
 `List`, `ArrayList`, `HashMap` and `StringBuilder` as `#*=pure`, so `ensures xs.add(1)` would
 pass. This design adds one effect, **`mutate`**:
 
-- A write to a field or array element of an object that is not created inside the expression,
-  or a call to something that does one, carries `mutate`.
+- A write to a field or array element, or a call to something that does one, carries `mutate`.
+  This is deliberately conservative: it does not try to tell a write to an object the expression
+  created itself from a write to anything else. A clause must have no `mutate` at all; the build
+  is more lenient about what it runs (§6).
 - Library mutators are re-marked in the effect table (`List.add`, `StringBuilder.append`, ...).
 - A contract expression must have **no effect at all, including `mutate`**.
 - `onionc --effects` prints the new effect. `modifies`, which the prover needs for framing
@@ -264,10 +266,10 @@ subclass, is allowed, and it is **checked** against the history instead of being
 is forbidden is `other.n = 0` on a different object, which no call to `other` would ever check.
 
 The check needs no solver. `reset` assigns the constant `0` to a field whose history says
-`n >= old(n)`. The history relates the new value to the old one, and a constant below some
-reachable value breaks it. A write the compiler can compare this way (a constant, or the field
-plus or minus a constant) is decided by the static check of stage 2 in §11. Anything harder
-waits for the prover.
+`n >= old(n)`, and `Counter.inc` raises `n`, so `n` can be above `0` when `reset` runs. That is
+a fact about the syntax of the two methods, not a guess about a run. §7.1 gives the full rule,
+including what is *not* reported (a class whose only write is `n = 0` breaks nothing). Anything
+harder waits for the prover.
 
 ### 4.2 Interfaces
 
@@ -327,18 +329,32 @@ class FixedWidth conforms Shape[Person] {
 public:
   // ... parse, print and describe as before ...
   def printable(v: Person): Boolean =
-    v.name().length() <= 10 && v.amount() >= 0 && v.amount() <= 999999
+    v.name().length() <= 10 && v.name() == v.name().trim()
+      && v.amount() >= 0 && v.amount() <= 999999
 }
 ```
+
+**The `trim` condition is not decoration; it was measured.** `parse` trims the name, so a name
+with a space at either end does not come back. Run against the real `FixedWidth` of
+`run/FixedWidthDemo.on`, with ten names and an amount of 42:
+
+| Domain | Result |
+|---|---|
+| length at most 10, amount 0 to 999999 | **4 fail**: `"  x  "`, `" AB"`, `"AB "`, `"\t"` |
+| the same, and `name == name.trim()` | **0 fail** |
+
+The first draft of this section had only the first row and was wrong. Every value the sampler
+draws as a fixed string (`"  x  "`, `"\t"`) hits it, so the domain has to say so.
 
 - **Not weaker than E0080.** E0080 made a shape assert its round-trip *somewhere*. Here, a shape
   that says nothing is held to the round-trip on **every** value, which is stricter. Stating the
   domain is how a correct shape avoids a false error, and the domain is written once, in the
   shape, not in each file that tests it.
 - **When `T` cannot be generated** (an interface, an array, a class with several constructors), the
-  contract cannot be sampled. The verdict is then `Not proved`, and `W0021` says so under
-  `--contracts verify`. It is never silently passed: E0080 refused such a shape outright, and
-  this keeps the warning where E0080 had the error.
+  contract cannot be sampled. The verdict is `Not proved` and the warning `W0022` is reported, on
+  by default from stage 3, naming the shape and the type. It is never silently passed: E0080
+  refused such a shape outright, and the shape is still held to the contract (it can be tested
+  by a closed predicate, §7.2); only the automatic sampling is skipped.
 - A **non-invertible** shape has `canPrint() == false`. Its `print` precondition is never met, so it
   owes nothing.
 - The usual verdict is `Sampled`: the body is string work the prover does not model. A shape
@@ -350,6 +366,11 @@ E0080 is removed only after this entry works (§11).
 **After migration, `run/FixedWidthDemo.on`** drops its `example fixedWidthL1`. The `FixedWidth`
 class gains the `printable` method above, and nothing else changes. Its round-trip is then
 checked against the `Shape` contract, for the values it can print.
+
+What is established today, and what is not: the probe above shows that every value the
+`printable` method admits round-trips through the real class. The compiler does not yet draw
+those values by itself (that is stage 3), so "the migrated file passes sampling" is a claim
+about stage 3 and is not made here.
 
 ---
 
@@ -380,16 +401,45 @@ A reserved name is not accepted so that no mode promises a check it does not mak
 starts to do something, it is accepted, and it keeps the meaning given here. At the end of the
 preview, `verify` becomes the default, because the design's answer is the static one.
 
-**What the build runs.** The static checks run no user code. Two things do:
+**What the build runs.** The static checks run no user code. A **closed predicate** (a `static def`
+with no parameters that returns `Boolean`, the `example` replacement) is run at build time, and
+so is a **sampled** parameterized predicate. Two different questions decide whether one runs:
 
-- A **closed predicate** (a pure `static def` with no parameters, the `example` replacement) is
-  run at build time. Only a predicate whose inferred effects are empty is run (§3.1), so the build
-  never does I/O, and `onion build` still touches nothing outside the project.
-- A **sampled** parameterized predicate is run on generated inputs, under the same rule.
+| Question | Applies to | Rule |
+|---|---|---|
+| May a **clause** call it? (§3.1) | `requires`, `ensures`, `invariant`, `history` | The effect set must be empty, `mutate` included: a contract states what holds, and may not write |
+| May the **build run** it? | a closed or sampled predicate | The effect set may contain **`mutate`** and nothing from the outside world. The build's concern is I/O, not memory: a predicate that builds a list and reads it is the ordinary case, and it ran as an `example` before |
 
-**`W0021` (contract not proved)** is off by default. It turns on under `--contracts verify`
-once the prover exists, because before that every contract is "not proved" and the warning
-would be noise.
+So a predicate that only writes to memory runs. One whose effects include `read`, `write`,
+`net`, `exec`, `env`, `clock`, `rand` or `console` is **not run**, and says so: the warning
+`W0023` names the predicate and the effect. One that calls something the effect table cannot
+vouch for (`unknown`) gets the same warning. **Nothing stops running silently.** In
+`run/`, 10 checks in 9 files (for example `ShoppingCart.on:86`, `GlobMatcher.on:24`,
+`Mandelbrot.on:48`) have `mutate` through the methods they call, and they run under this rule;
+under the stricter one of the first draft they would not have.
+
+A run is bounded by `--contract-timeout`. A predicate that does not finish is `Not proved`,
+with the note naming it, so a non-terminating one cannot hang the build.
+
+A write to a **static** field by a predicate is not stopped by this rule and can reach another
+predicate in the same build. Predicates are run one at a time, each in a fresh class loader, so
+the static state starts clean for each.
+
+**One rule for `Not proved`.** It is a verdict, and what is shown depends on the stage, not on
+the section you read:
+
+| Stage | What `Not proved` shows |
+|---|---|
+| 1 to 2 | Nothing applies yet: there is no proof and no sampling |
+| 3 to 5 | A line in `--contracts-report`. **Exception: a `Shape` whose type cannot be generated** gets the warning `W0022`, on by default, because E0080 used to refuse that shape and the replacement must not be quieter than the error it replaces |
+| 6 onward | The same report line, and `W0021` under `--contracts verify` |
+
+So `W0021` is not what a user sees before proofs exist. §2, §6 and §7.4 all mean this table.
+
+**The default per stage.** `--contracts` is `off` in stages 1 and 2, because the checks do not
+exist yet. It becomes **`check` at the end of stage 3**, before `law` and `example` are removed
+in stage 4: when they go, the form they migrate to is already accepted and checked by default,
+so no migrated file needs a flag. `verify` becomes the default when proofs exist (stage 6).
 
 **Flags that replace the old ones:** `--contract-samples <n>` and `--contract-seed <n>`
 (sampling), `--contract-timeout <seconds>` (prover), `--contracts-report` (list `Sampled`).
@@ -410,11 +460,26 @@ mistakes.
 | **Effective contract of an override** (§4) | `pre_eff = pre_super ∨ pre_sub`, `post_eff = (old(pre_super) ⇒ post_super) ∧ (old(pre_sub) ⇒ post_sub)`. An override that restates a precondition more strictly is read as a weakening, so the methods rule holds by construction |
 | **A history is a preorder** (§3.3) | Reflexive and transitive, for the relations of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`, and `old(b) ==> b`. `n == old(n) + 1` is E0109 |
 | **Framing** (§3.2) | Rules 1 to 4, transitively through pure methods |
-| **A write that breaks a history** (§4.1) | A method assigns a constant, or the field plus or minus a constant, to a field named by a `history`. The compiler compares the new value with the old one and reports E0108 when the history cannot hold. A write it cannot compare is left to the prover |
+| **A write that breaks a history** (§4.1) | E0108 only for what needs no reachability. See "When E0108 is reported" below |
 | **Purity and placement** (§3.1) | E0106, E0107 |
 
-The history check is the first thing a user can see work. For `ResettableCounter` (§4.1) it
-reports E0108 with no solver and no run.
+**When E0108 is reported.** A write breaks a history only if the old value can be one it breaks
+on, and whether a value is reachable is a question about the program, not about one line of it.
+So E0108 is reported only when the syntax settles it. Take the history `n >= old(n)`:
+
+| The write | Result | Why |
+|---|---|---|
+| `n = n - c`, with `c` a positive constant | **E0108** | `n - c >= n` is false for every `n` (apart from overflow, §3). No reachability is needed |
+| `n = c`, and some method of the class or its supertypes **raises** `n` (`n = n + k`, `k` positive) | **E0108**, and the message names that method | `n` can exceed `c`, because that method raises it. The reason is a fact in the syntax |
+| `n = c`, and nothing raises `n` | **nothing** | `n` never exceeds its start, so the write cannot lower it. A class whose only write is `n = 0` is fine |
+| any other expression | `Not proved` | The prover decides (stage 7) |
+
+The same reasoning applies to a history `n <= old(n)` with the directions swapped, and to
+`x == old(x)`, where any write to `x` through a method that is not a constructor is reported.
+
+For `ResettableCounter` (§4.1) the second row applies: `reset` writes `0`, and `Counter.inc`
+raises `n`. The error names `inc` as the reason. This is the first thing a user can see work,
+with no solver and no run.
 
 ### 7.2 Closed and parameterized predicates (the `law` and `example` replacement)
 

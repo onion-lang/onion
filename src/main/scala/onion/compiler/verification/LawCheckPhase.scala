@@ -42,7 +42,7 @@ final class LawCheckPhase(config: CompilerConfig)
     // Same parent CL as Shell.run so synthesized methods resolve the onion stdlib.
     val loader = new OnionClassLoader(classOf[OnionClassLoader].getClassLoader, config.classPath, classes)
     val errors = ArrayBuffer.empty[CompileError]
-    clauseColumns = clauseColumnsOf(ctx)
+    clauseLocations = clauseLocationsOf(ctx)
     shownRecords = shownRecordsOf(ctx)
     val thread = Thread.currentThread
     val previous = thread.getContextClassLoader
@@ -74,17 +74,47 @@ final class LawCheckPhase(config: CompilerConfig)
   }
 
   // The class file records a clause's line but not its column. The parsed units still
-  // know where each `law`/`example` keyword starts, so a line maps back to that column.
-  private var clauseColumns: Map[Int, Int] = Map.empty
+  // know where each `law`/`example` clause starts, so each check method maps back to its
+  // clause: keyed by source file, owning record (None for a top-level example) and the
+  // synthesized method name, never by line alone. A line-only key took the column from
+  // another file's clause on the same line, and from the first clause of a one-line body
+  // (#2540).
+  private type ClauseKey = (String, Option[String], String)
+  private var clauseLocations: Map[ClauseKey, Location] = Map.empty
 
-  private def clauseColumnsOf(ctx: PhaseContext): Map[Int, Int] = {
-    val locations = ctx.debugArtifacts.parsedUnits.toList.flatten.flatMap(_.toplevels).flatMap {
-      case r: onion.compiler.AST.RecordDeclaration => r.laws.map(_.location) ++ r.examples.map(_.location)
-      case e: onion.compiler.AST.TopLevelExample   => List(e.location)
-      case _                                       => Nil
+  private def clauseLocationsOf(ctx: PhaseContext): Map[ClauseKey, Location] = {
+    // Mirrors the naming in Rewriting: `onion$$law$$<name>`, and `onion$$example$$<name>`
+    // or the example's index (within its record; across all files for top-level ones).
+    var topLevelExamples = 0
+    val entries = ctx.debugArtifacts.parsedUnits.toList.flatten.flatMap { unit =>
+      val file = Option(unit.sourceFile).getOrElse("")
+      unit.toplevels.flatMap {
+        case r: onion.compiler.AST.RecordDeclaration =>
+          r.laws.map(l => (file, Some(r.name), LawPrefix + l.name) -> l.location) ++
+            r.examples.zipWithIndex.map { case (ex, i) =>
+              (file, Some(r.name), ExamplePrefix + ex.name.getOrElse(i.toString)) -> ex.location
+            }
+        case ex: onion.compiler.AST.TopLevelExample =>
+          val suffix = ex.name.getOrElse(topLevelExamples.toString)
+          topLevelExamples += 1
+          List((file, None, ExamplePrefix + suffix) -> ex.location)
+        case _ => Nil
+      }
     }
-    locations.filter(l => l != null && l.line > 0 && l.column > 0)
-      .groupBy(_.line).map { case (line, ls) => line -> ls.map(_.column).min }
+    entries.filter { case (_, l) => l != null && l.line > 0 && l.column > 0 }.toMap
+  }
+
+  private def baseName(path: String): String =
+    path.substring(math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
+
+  /** The clause's column, if its parsed location is known and lies on the recorded line. */
+  private def clauseColumn(file: String, owner: String, method: String, line: Int): Option[Int] = {
+    def lookup(matches: String => Boolean): Option[Location] =
+      List(Some(owner), None).iterator.flatMap { o =>
+        clauseLocations.collectFirst { case ((f, `o`, `method`), l) if matches(f) => l }
+      }.nextOption()
+    lookup(_ == file).orElse(lookup(f => baseName(f) == baseName(file)))
+      .filter(_.line == line).map(_.column)
   }
 
   // Records whose `toString` is the synthesized one, with their component names: a
@@ -189,7 +219,9 @@ final class LawCheckPhase(config: CompilerConfig)
     methodName: Option[String], msg: String
   ): CompileError = {
     val file = index.sourceFile.getOrElse(cc.className)
-    val location = methodName.flatMap(index.lineOf).map(line => new Location(line, clauseColumns.getOrElse(line, 1))).orNull
+    val location = methodName.flatMap { m =>
+      index.lineOf(m).map(line => new Location(line, clauseColumn(file, simpleName(cc), m, line).getOrElse(1)))
+    }.orNull
     CompileError(file, location, msg, Some(code))
   }
 

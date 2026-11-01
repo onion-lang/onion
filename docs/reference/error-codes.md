@@ -1264,6 +1264,28 @@ class A {
 
 Fix: use `x >= old(x)`, `x <= old(x)` or `x == old(x)`.
 
+### `E0109` — a write that can break a `history`
+
+`history n >= old(n)` says `n` never decreases. A method that lowers `n`, or that sets `n` to a
+constant while another method raises `n`, can break it. This is the case a subtype's
+`reset` creates: it keeps every precondition and postcondition and still breaks the history.
+
+```onion
+class Counter {
+  var n: Int
+  history n >= old(n)
+public:
+  def this { n = 0 }
+  def inc(): void { n = n + 1 }
+}
+class ResettableCounter extends Counter {
+public:
+  def reset(): void { n = 0 }   // E0109: inc raises n, so n can be above 0
+}
+```
+
+Only what the syntax settles is reported. Fix: remove the write, or weaken the history.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -2030,6 +2052,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 | `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
+| `E0109` | this write can break the history … on … |
 
 ## See also
 

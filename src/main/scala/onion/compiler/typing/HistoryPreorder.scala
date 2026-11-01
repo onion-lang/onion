@@ -28,6 +28,25 @@ private[typing] object HistoryPreorder {
     case _ => Unknown
   }
 
+  /**
+   * The plain relations of a history, `(field, op)` with `op` one of `>=`, `<=`, `==` and the
+   * field on the left (`old(n) <= n` is `(n, >=)`). Clauses of any other shape are skipped.
+   */
+  def simpleRelations(e: AST.Expression): List[(String, String)] = e match {
+    case AST.LogicalAnd(_, l, r) => simpleRelations(l) ++ simpleRelations(r)
+    case AST.GreaterOrEqual(_, l, r) => pair(">=", "<=", l, r)
+    case AST.LessOrEqual(_, l, r) => pair("<=", ">=", l, r)
+    case AST.Equal(_, l, r) => pair("==", "==", l, r)
+    case _ => Nil
+  }
+
+  private def pair(op: String, flipped: String, l: AST.Expression, r: AST.Expression): List[(String, String)] =
+    (shape(l), shape(r)) match {
+      case (Some(Now(a)), Some(Old(b, None))) if a == b => List((a, op))
+      case (Some(Old(b, None)), Some(Now(a))) if a == b => List((a, flipped))
+      case _ => Nil
+    }
+
   private def combine(a: Verdict, b: Verdict): Verdict = (a, b) match {
     case (n: NotPreorder, _) => n
     case (_, n: NotPreorder) => n

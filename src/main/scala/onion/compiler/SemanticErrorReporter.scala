@@ -1400,6 +1400,15 @@ object SemanticErrorReporter {
       "error.semantic.historyNotPreorder",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.HISTORY_BROKEN_BY_WRITE -> ErrorDef(
+      "error.semantic.historyBrokenByWrite",
+      // items: field, history as source text, reason kind (lower | set | any), the method that raises the field (or "").
+      Seq(
+        items => asString(items(0)),
+        items => asString(items(1)),
+        items => format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
+      )
+    ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))

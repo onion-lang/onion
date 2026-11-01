@@ -1252,6 +1252,28 @@ class A {
 
 直し方: `x >= old(x)`、`x <= old(x)`、`x == old(x)` のいずれかを使います。
 
+### `E0109` — `history` を壊しうる書き込み
+
+`history n >= old(n)` は `n` が減らないという意味です。`n` を減らすメソッドや、別のメソッドが `n` を増やすのに
+`n` へ定数を入れるメソッドは、これを壊しえます。部分型の `reset` がその例で、事前条件も事後条件も守ったまま
+history を壊します。
+
+```onion
+class Counter {
+  var n: Int
+  history n >= old(n)
+public:
+  def this { n = 0 }
+  def inc(): void { n = n + 1 }
+}
+class ResettableCounter extends Counter {
+public:
+  def reset(): void { n = 0 }   // E0109: inc が n を増やすので、n は 0 より大きくなりえます
+}
+```
+
+構文だけで決まるものだけを報告します。直し方: その書き込みをなくすか、history を弱めます。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -2013,6 +2035,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 | `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
+| `E0109` | this write can break the history … on … |
 
 ## 関連項目
 

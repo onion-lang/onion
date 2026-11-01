@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0104) for identification
+ * type checking. Each error has a unique code (E0000-E0107) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -89,6 +89,9 @@ package onion.compiler
  *
  * '''Enum Errors (E0098-E0099)'''
  *   - ADT_ENUM_MIXES_SHARED_PARAMS, HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS
+ *
+ * '''Contract Errors (E0105-E0107)'''
+ *   - CONTRACTS_NOT_ENABLED, CONTRACT_NOT_PURE, CONTRACT_MISPLACED
  *
  * '''Pattern Matching Errors, continued (E0100)'''
  *   - MULTIPLE_BINDING_PATTERNS_IN_CASE
@@ -355,6 +358,19 @@ object SemanticError {
    * calls through the supertype ran the inherited method instead (issue #2372).
    */
   case object OVERRIDE_RETURN_TYPE_MISMATCH extends SemanticError(104)
+  /**
+   * A contract clause (`requires`, `ensures`, `invariant`, `history`) in a program compiled
+   * with `--contracts off`, the default. It is an error rather than being ignored: a contract
+   * that silently does nothing is worse than none (RFC #2557).
+   */
+  case object CONTRACTS_NOT_ENABLED extends SemanticError(105)
+  /**
+   * A contract expression that is not pure: it does I/O, writes memory, or calls something the
+   * effect inference cannot vouch for. A contract states what holds; it may not change anything.
+   */
+  case object CONTRACT_NOT_PURE extends SemanticError(106)
+  /** `old(e)` somewhere other than an `ensures` or a `history` (RFC #2557). */
+  case object CONTRACT_MISPLACED extends SemanticError(107)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

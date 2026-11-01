@@ -120,6 +120,25 @@ object EffectInference {
   }
 
   /**
+   * The effects of one expression, and the calls it makes. A contract clause is a single
+   * `Term` rather than a method body (RFC #2557); `unitEffects` is the whole program's
+   * inference, so a call to a program-defined method carries that method's effects.
+   * Each call site is returned with the callee's full effect set, to name the culprit.
+   */
+  def termEffects(term: Term, classes: Seq[ClassDefinition],
+                  unitEffects: Map[Unit0, Set[Effect]],
+                  table: EffectTable.Table = EffectTable.builtin): (Set[Effect], Seq[CallSite]) = {
+    val collector = new Collector(unitEffects.keySet, classes, table)
+    collector.term(term)
+    val sites = collector.rawSites.toSeq.map { raw =>
+      CallSite(raw.location, raw.callee,
+        raw.resolved.getOrElse(unitEffects.getOrElse(raw.internal, Set(Effect.Unknown))))
+    }
+    // A write inside the term has no call site; the collector's own set has it.
+    (collector.effects.toSet ++ sites.flatMap(_.effects), sites)
+  }
+
+  /**
    * Every `Term`/`ActionStatement` node the Collector's match arms handle, by simple
    * name. `EffectWalkerCompletenessSpec` scans `TypedAST.scala` and fails when a node
    * exists that is not in this set — the drift guard for the no-silently-dropped-effect

@@ -127,6 +127,20 @@ produced its counterexample.
 onion --law-samples 500 MyScript.on
 ```
 
+### `--contracts <off|check>`
+
+Accept contract clauses (`requires` and `ensures` on a method, `invariant` and `history` in a
+class) and check them statically. This is a preview feature (RFC #2557). The default is `off`,
+and with `off` a clause is an error that names this flag, so a contract is never silently ignored.
+
+`check` types the clauses and runs the static checks that need no solver. **Nothing is enforced
+when the program runs.** `runtime` (guards for what was not proved) and `verify` (proofs) are
+reserved names: the command line refuses them until they check something.
+
+```bash
+onion --contracts check MyScript.on
+```
+
 ### `--effects`
 
 Print each compiled method's inferred effect set (`read write net exec env clock rand console unknown`; empty means pure) to stderr.

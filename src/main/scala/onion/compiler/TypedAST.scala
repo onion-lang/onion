@@ -403,6 +403,13 @@ object TypedAST {
 
     /** Names of the primary constructor's parameters (set by the body pass), for the E0002 hint. */
     var primaryParameterNames: scala.collection.immutable.Set[String] = scala.collection.immutable.Set.empty
+    /**
+     * The typed `invariant` and `history` clauses of the body (RFC #2557), in source order.
+     * Empty unless `--contracts` is on. In a `history`, `old(e)` is typed as `e` itself:
+     * the terms are for checking, not yet for code generation.
+     */
+    var invariants: Seq[Term] = Nil
+    var histories: Seq[Term] = Nil
     private var staticInitializers_ = Array[TypedAST.ActionStatement]()
 
     /**
@@ -846,6 +853,13 @@ object TypedAST {
      * detection (see backend.asm.TermContainsTry).
      */
     var mayContainTry: Boolean = true
+    /**
+     * The typed `requires` and `ensures` clauses (RFC #2557), in source order. Empty unless
+     * `--contracts` is on. In an `ensures`, `old(e)` is typed as `e` itself and `result` is a
+     * local: these terms are for checking, not yet for code generation.
+     */
+    var preconditions: Seq[Term] = Nil
+    var postconditions: Seq[Term] = Nil
     private var closure: Boolean = false
     private var frame: LocalFrame = _
     private var argsWithDefaults_ : Array[MethodArgument] = null

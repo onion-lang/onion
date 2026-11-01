@@ -1388,6 +1388,23 @@ object SemanticErrorReporter {
       // A boxed wrapper keeps its written name (`JInteger`): `Int` vs `Int` would hide the clash.
       Seq(items => asString(items(0)), items => writtenTypeName(items(1)), items => typeName(items(2)), items => writtenTypeName(items(3)))
     ),
+    SemanticError.CONTRACTS_NOT_ENABLED -> ErrorDef(
+      "error.semantic.contractsNotEnabled",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.CONTRACT_NOT_PURE -> ErrorDef(
+      "error.semantic.contractNotPure",
+      // items: callee, reason kind, outside-effect names. The reason is a message key, not a sentence.
+      Seq(
+        items => asString(items(0)),
+        items => format(message("error.semantic.contractNotPure.reason." + asString(items(1))), Seq(asString(items(2))))
+      )
+    ),
+    SemanticError.CONTRACT_MISPLACED -> ErrorDef(
+      "error.semantic.contractMisplaced",
+      // item: the scope the `old(...)` appeared in (Pre or Invariant), named in the message.
+      Seq(items => message("error.semantic.contractMisplaced.in" + asString(items(0))))
+    ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))

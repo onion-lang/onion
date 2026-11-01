@@ -19,18 +19,85 @@ private[compiler] final class MethodBodySupport(
   def processMethodLikeBody(
     method: MethodDefinition,
     args: List[AST.Argument],
-    block: AST.BlockExpression
+    block: AST.BlockExpression,
+    requires: List[AST.Expression] = Nil,
+    ensures: List[AST.Expression] = Nil
   ): Unit = {
     val context = prepareMethodContext(method, args, block)
+    // Preconditions see the parameters and the object, before the body runs.
+    if (requires.nonEmpty) method.preconditions = typeContractClauses(requires, context, ContractScope.Pre)
     val triesBefore = bodyContext.tryCount
     val translated = translate(block, context)
     method.mayContainTry = bodyContext.tryCount != triesBefore
     checkMissingReturn(method.returnType, translated, method.name, block)
+    // Postconditions are typed in the same context once the body is, with `result` bound.
+    if (ensures.nonEmpty) method.postconditions = typePostconditions(method, ensures, context)
     val translatedBlock = addReturnNode(withPrologue(context, translated), method.returnType)
     method.setBlock(translatedBlock)
     method.setFrame(context.getContextFrame)
     reportUnused(context)
   }
+
+  /**
+   * Types contract clauses as Boolean expressions in `context`, marked with `scope` so that
+   * `old(e)` and `result` resolve only where they are allowed (RFC #2557). A clause that fails
+   * to type is reported and dropped. With `--contracts off` a clause is an error (E0105)
+   * instead of being ignored, and nothing is typed.
+   */
+  private[typing] def typeContractClauses(
+    clauses: List[AST.Expression],
+    context: LocalContext,
+    scope: ContractScope,
+    keyword: String = null
+  ): Seq[Term] = {
+    val word = if (keyword != null) keyword else scope match {
+      case ContractScope.Pre       => "requires"
+      case ContractScope.Post      => "ensures"
+      case ContractScope.Invariant => "invariant"
+      case ContractScope.History   => "history"
+    }
+    if (bodyContext.contractMode == ContractMode.Off) {
+      clauses.foreach(c => bodyContext.report(CONTRACTS_NOT_ENABLED, c, word))
+      Nil
+    } else {
+      val saved = context.contractScope
+      context.contractScope = Some(scope)
+      try clauses.flatMap { c =>
+        typed(c, context, BasicType.BOOLEAN).flatMap { t =>
+          Option(processAssignable(c, BasicType.BOOLEAN, t))
+        }
+      } finally context.contractScope = saved
+    }
+  }
+
+  /**
+   * The `invariant` and `history` clauses of a type body (RFC #2557), typed in a context that
+   * has `this`, so a bare field name is a field of the object. A `history` also sees `old(e)`
+   * for the earlier state. With contracts off, each clause is E0105 instead.
+   */
+  def processTypeContracts(
+    definition: ClassDefinition,
+    invariants: List[AST.Expression],
+    histories: List[AST.Expression]
+  ): Unit = {
+    if (invariants.nonEmpty || histories.nonEmpty) {
+      val context = new LocalContext
+      context.setStatic(false)
+      definition.invariants = typeContractClauses(invariants, context, ContractScope.Invariant)
+      definition.histories = typeContractClauses(histories, context, ContractScope.History)
+    }
+  }
+
+  /** `ensures`: the parameters, the object, `old(e)`, and `result` unless the method is `void`. */
+  private def typePostconditions(method: MethodDefinition, clauses: List[AST.Expression], context: LocalContext): Seq[Term] =
+    if (method.returnType == BasicType.VOID || bodyContext.contractMode == ContractMode.Off)
+      typeContractClauses(clauses, context, ContractScope.Post)
+    else
+      // `result` lives in a scope of its own, so it is gone again after the clauses.
+      context.openScope {
+        context.add("result", method.returnType, false)
+        typeContractClauses(clauses, context, ContractScope.Post)
+      }
 
   /**
    * Reports MISSING_RETURN when a value-returning method body can complete

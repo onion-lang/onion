@@ -1170,10 +1170,10 @@ instantiations of the same generic receiver do not collide
 ### `E0103` — `foreach (a, b)` over something that is not a Map
 
 `foreach (a, b) in xs` walks the entries of a `Map` (or of any class with its own
-`entrySet()`). When `xs` is a variable or field of another type, such as a `List`,
-an array or a record, it is this one error, at the `foreach`. It used to report
-`entrySet()` not found and an operator error on `K, V`, names you never wrote.
-Other forms of `xs` (a call result, a literal) still report the old errors.
+`entrySet()`). When `xs` is of another type, such as a `List`, an array or a
+record, it is this one error, at the `foreach`. This holds for any `xs`: a
+variable, a field, a call result or a literal. It used to report `entrySet()`
+not found and an operator error on `K, V`, names you never wrote.
 
 ```onion
 record P(x: Int, y: Int)

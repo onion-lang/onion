@@ -104,5 +104,45 @@ class ForeachPairNonMapSpec extends AbstractShellSpec {
         "None", Array())
       assert(Shell.Success(3) == result)
     }
+      it("reports only E0103 for a call result (panel block at 92b6be8)") {
+      val c = codes("record P(x: Int, y: Int)\ndef getPs(): List[P] = [new P(1, 2)]\nforeach (x, y) in getPs() { println(x + y) }")
+      assert(c == Seq("E0103"), c)
+    }
+    it("reports only E0103 for a list literal (panel block at 92b6be8)") {
+      val c = codes("record P(x: Int, y: Int)\nforeach (x, y) in [new P(1, 2)] { println(x + y) }")
+      assert(c == Seq("E0103"), c)
+    }
+    it("reports a broken target's own error once, with no entrySet() or K, V error") {
+      val c = codes("foreach (k, v) in undefinedThing { println(k) }")
+      assert(c == Seq("E0002"), c)
+    }
+    it("keeps the null-safety error for a nullable Map") {
+      val c = codes("import { java.util.* }\nval m: Map[String, Int]? = null\nforeach (k, v) in m { println(k) }")
+      assert(c == Seq("E0070"), c)
+    }
+    it("still walks the entries of a Map returned by a call, typing the call once") {
+      val result = shell.run(
+        """
+          |import { java.util.HashMap }
+          |class Test {
+          |  static var calls: Int = 0
+          |public:
+          |  static def make(): HashMap[String, Int] {
+          |    calls = calls + 1
+          |    val m = new HashMap[String, Int]()
+          |    m.put("a", 1)
+          |    m.put("b", 2)
+          |    return m
+          |  }
+          |  static def main(args: String[]): Int {
+          |    var total = 0
+          |    foreach (k, v) in make() { total = total + v }
+          |    return total * 10 + calls
+          |  }
+          |}
+          |""".stripMargin,
+        "None", Array())
+      assert(Shell.Success(31) == result)
+    }
   }
 }

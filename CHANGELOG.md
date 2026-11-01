@@ -117,9 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`foreach (x, y) in ps` over a List of records is one clear error, E0103 (#2301).**
-  - Before: two errors naming `entrySet()` and `K, V`, which you never wrote.
-  - Now: "`foreach (a, b)` walks the entries of a Map", with the fix `foreach p in ps { val (x, y) = p ... }`.
 - **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
   - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
   - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.

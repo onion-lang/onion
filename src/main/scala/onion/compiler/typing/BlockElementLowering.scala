@@ -102,90 +102,96 @@ final class BlockElementLowering(
       context.openLabeledLoop(node.name) {
         attachLoopLabel(translate(node.loop, context), node.name)
       }
-    case node: AST.ForeachExpression if nonMapPairForeach(node, context) =>
-      bodyContext.report(FOREACH_PAIR_NOT_MAP, node, pairForeachTargetType)
-      new NOP(node.location)
     case node: AST.ForeachExpression =>
       context.openScope {
-        val collection = typed(node.collection, context).getOrElse(null)
-        val arg = node.arg
-        // A loop variable never reassigned in the body is effectively final, so
-        // (like an unassigned parameter) it may be smart-cast by a null/is check;
-        // otherwise it stays mutable and is not narrowed.
-        val loopVarReassigned = bodyContext.assignedNames(node.statement).contains(arg.name)
-        addForeachElement(arg, collection, context, isMutable = loopVarReassigned)
-        var block = context.openLoop {
-          translate(node.statement, context)
+        val (collection, prelude) = pairForeachCollection(node, context) match {
+          case Some(pair) => pair
+          case None => (typed(node.collection, context).getOrElse(null), null)
         }
-        if (collection == null) {
-          new NOP(node.location)
-        } else if (collection.isBasicType || collection.isNullType) {
-          bodyContext.report(INCOMPATIBLE_TYPE, node.collection, bodyContext.load("java.util.Collection"), collection.`type`)
-          new NOP(node.location)
-        } else if (collection.`type`.isInstanceOf[NullableType]) {
-          // `foreach x in b` where `b: List[Int]?`: iterating dereferences the
-          // receiver just like `b.field`/`b[i]` do, so it gets the same
-          // null-safety error (E0070) instead of falling through to the
-          // generic array/map/iterator dispatch below, where the iterator
-          // branch's `collection.`type`.asInstanceOf[ObjectType]` crashes with
-          // a ClassCastException on a NullableType -- mirrors the indexing
-          // read path (ConstructionTyping.typeIndexing).
-          val nullable = collection.`type`.asInstanceOf[NullableType]
-          bodyContext.report(NULLABLE_MEMBER_ACCESS, node.collection, nullable.displayName)
-          new NOP(node.location)
-        } else {
-          val elementVar = context.lookupOnlyCurrentScope(arg.name)
-          if (elementVar == null) {
-            // The element type failed to resolve (already reported)
-            new NOP(node.location)
-          } else {
-            val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`, isMutable = true)
-
-            if (collection.isArrayType) {
-              val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, BasicType.INT), BasicType.INT, isMutable = true)
-              val init =
-                new StatementBlock(
-                  new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
-                  new ExpressionActionStatement(new SetLocal(counterVariable, new IntValue(0)))
-                )
-
-              block =
-                new ConditionalLoop(
-                  new BinaryTerm(LESS_THAN, BasicType.BOOLEAN, ref(counterVariable), new ArrayLength(ref(collectionVar))),
-                  new StatementBlock(
-                    assign(elementVar, indexref(collectionVar, ref(counterVariable))),
-                    block,
-                    assign(counterVariable, new BinaryTerm(ADD, BasicType.INT, ref(counterVariable), new IntValue(1)))
-                  )
-                )
-              new StatementBlock(init, block)
-            } else if (isMapType(collection.`type`)) {
-              // `foreach x: T in aMap` otherwise failed with "method
-              // Map[K, V].iterator() is not found", which leaks the desugaring and
-              // names a method the user never wrote. The `(k, v)` form is
-              // desugared to an entrySet() walk by the parser, so only the bare
-              // form reaches here -- exactly the case worth guiding.
-              bodyContext.report(MAP_NOT_DIRECTLY_ITERABLE, node.collection, collection.`type`)
+        if (prelude eq PairForeachRejected) new NOP(node.location)
+        else {
+          val loop: ActionStatement = {
+            val arg = node.arg
+            // A loop variable never reassigned in the body is effectively final, so
+            // (like an unassigned parameter) it may be smart-cast by a null/is check;
+            // otherwise it stays mutable and is not narrowed.
+            val loopVarReassigned = bodyContext.assignedNames(node.statement).contains(arg.name)
+            addForeachElement(arg, collection, context, isMutable = loopVarReassigned)
+            var block = context.openLoop {
+              translate(node.statement, context)
+            }
+            if (collection == null) {
+              new NOP(node.location)
+            } else if (collection.isBasicType || collection.isNullType) {
+              bodyContext.report(INCOMPATIBLE_TYPE, node.collection, bodyContext.load("java.util.Collection"), collection.`type`)
+              new NOP(node.location)
+            } else if (collection.`type`.isInstanceOf[NullableType]) {
+              // `foreach x in b` where `b: List[Int]?`: iterating dereferences the
+              // receiver just like `b.field`/`b[i]` do, so it gets the same
+              // null-safety error (E0070) instead of falling through to the
+              // generic array/map/iterator dispatch below, where the iterator
+              // branch's `collection.`type`.asInstanceOf[ObjectType]` crashes with
+              // a ClassCastException on a NullableType -- mirrors the indexing
+              // read path (ConstructionTyping.typeIndexing).
+              val nullable = collection.`type`.asInstanceOf[NullableType]
+              bodyContext.report(NULLABLE_MEMBER_ACCESS, node.collection, nullable.displayName)
               new NOP(node.location)
             } else {
-              val iteratorType = bodyContext.load("java.util.Iterator")
-              val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType, isMutable = true)
-              val mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectType], "iterator")
-              val mNext = findMethod(node.collection, iteratorType, "next")
-              val mHasNext = findMethod(node.collection, iteratorType, "hasNext")
-              val init =
-                new StatementBlock(
-                  new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
-                  assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0)))
-                )
-              var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
-              if (elementVar.tp != bodyContext.rootClass) {
-                next = new AsInstanceOf(next, elementVar.tp)
+              val elementVar = context.lookupOnlyCurrentScope(arg.name)
+              if (elementVar == null) {
+                // The element type failed to resolve (already reported)
+                new NOP(node.location)
+              } else {
+                val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`, isMutable = true)
+
+                if (collection.isArrayType) {
+                  val counterVariable = new ClosureLocalBinding(0, context.add(context.newName, BasicType.INT), BasicType.INT, isMutable = true)
+                  val init =
+                    new StatementBlock(
+                      new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
+                      new ExpressionActionStatement(new SetLocal(counterVariable, new IntValue(0)))
+                    )
+
+                  block =
+                    new ConditionalLoop(
+                      new BinaryTerm(LESS_THAN, BasicType.BOOLEAN, ref(counterVariable), new ArrayLength(ref(collectionVar))),
+                      new StatementBlock(
+                        assign(elementVar, indexref(collectionVar, ref(counterVariable))),
+                        block,
+                        assign(counterVariable, new BinaryTerm(ADD, BasicType.INT, ref(counterVariable), new IntValue(1)))
+                      )
+                    )
+                  new StatementBlock(init, block)
+                } else if (isMapType(collection.`type`)) {
+                  // `foreach x: T in aMap` otherwise failed with "method
+                  // Map[K, V].iterator() is not found", which leaks the desugaring and
+                  // names a method the user never wrote. The `(k, v)` form is
+                  // desugared to an entrySet() walk by the parser, so only the bare
+                  // form reaches here -- exactly the case worth guiding.
+                  bodyContext.report(MAP_NOT_DIRECTLY_ITERABLE, node.collection, collection.`type`)
+                  new NOP(node.location)
+                } else {
+                  val iteratorType = bodyContext.load("java.util.Iterator")
+                  val iteratorVar = new ClosureLocalBinding(0, context.add(context.newName, iteratorType), iteratorType, isMutable = true)
+                  val mIterator = findMethod(node.collection, collection.`type`.asInstanceOf[ObjectType], "iterator")
+                  val mNext = findMethod(node.collection, iteratorType, "next")
+                  val mHasNext = findMethod(node.collection, iteratorType, "hasNext")
+                  val init =
+                    new StatementBlock(
+                      new ExpressionActionStatement(new SetLocal(collectionVar, collection)),
+                      assign(iteratorVar, new Call(ref(collectionVar), mIterator, new Array[Term](0)))
+                    )
+                  var next: Term = new Call(ref(iteratorVar), mNext, new Array[Term](0))
+                  if (elementVar.tp != bodyContext.rootClass) {
+                    next = new AsInstanceOf(next, elementVar.tp)
+                  }
+                  block = new ConditionalLoop(new Call(ref(iteratorVar), mHasNext, new Array[Term](0)), new StatementBlock(assign(elementVar, next), block))
+                  new StatementBlock(init, block)
+                }
               }
-              block = new ConditionalLoop(new Call(ref(iteratorVar), mHasNext, new Array[Term](0)), new StatementBlock(assign(elementVar, next), block))
-              new StatementBlock(init, block)
             }
           }
+          if (prelude == null) loop else new StatementBlock(prelude, loop)
         }
       }
     case node: AST.ForExpression =>
@@ -729,34 +735,44 @@ final class BlockElementLowering(
   private def findMethod(node: AST.Node, target: ObjectType, name: String): Method =
     body.findMethod(node, target, name)
 
-  private var pairForeachTargetType: Type = null
+  /** The `prelude` of a pair foreach whose target is not a Map: E0103 was reported. */
+  private val PairForeachRejected: ActionStatement = new NOP(null: Location)
 
   /**
-   * `foreach (a, b) in xs` is rewritten to `xs.entrySet()` before typing, so over a
-   * List or record it used to fail with "entrySet() not found" and "operator + for
-   * K, V". Detects that rewrite over a plain variable or field whose type is not a Map
-   * and where `entrySet()` does not resolve the ordinary way (a declared, inherited or
-   * `extension` method keeps working, as before). Typing those targets twice is
-   * harmless; others keep the old path.
+   * `foreach (a, b) in xs` is rewritten to a walk over `xs.entrySet()` before typing. Types
+   * `xs` once, whatever its form (a name, a call, a literal), into a fresh local, then
+   * resolves `entrySet()` on that local without reporting. A declared, inherited or
+   * `extension` `entrySet()` keeps working. When none resolves and `xs` is not a Map, this
+   * is one E0103 at the `foreach`, instead of "entrySet() not found" and an operator error
+   * on `K, V`, names the user never wrote (#2301). A Map or a nullable target keeps the
+   * ordinary error. Returns the collection term and the statement storing `xs`, or None
+   * for any other foreach.
    */
-  private def nonMapPairForeach(node: AST.ForeachExpression, context: LocalContext): Boolean =
-    (node.arg.name == "__foreach_entry") && (node.collection match {
-      case AST.MethodCall(_, target @ (_: AST.Id | _: AST.MemberSelection), "entrySet", Nil, _) =>
-        typed(target, context) match {
-          case Some(t) if !t.isBasicType && !t.isNullType =>
-            t.`type` match {
-              case ot @ (_: ClassType | _: ArrayType) if !isMapType(ot) && !resolvesEntrySet(node.collection, context) =>
-                pairForeachTargetType = ot
-                true
-              case _ => false
+  private def pairForeachCollection(node: AST.ForeachExpression, context: LocalContext): Option[(Term, ActionStatement)] =
+    (node.arg.name == AST.ForeachEntryName, node.collection) match {
+      case (true, call @ AST.MethodCall(_, target, "entrySet", Nil, _)) if target != null =>
+        Some(typed(target, context) match {
+          // The target's own error is reported; its entries' `K, V` would only add noise.
+          case None => (null, PairForeachRejected)
+          case Some(targetTerm) =>
+            val name = context.add(targetTerm.`type`)
+            val local = context.lookupOnlyCurrentScope(name)
+            val store = new ExpressionActionStatement(new SetLocal(local, targetTerm))
+            val entrySet = new AST.MethodCall(call.location, AST.Id(call.location, name), "entrySet", Nil)
+            typing.withSuppressedReporting(typed(entrySet, context)) match {
+              case Some(collection) => (collection, store)
+              case None if isMapType(targetTerm.`type`) || targetTerm.`type`.isInstanceOf[NullableType] =>
+                typed(entrySet, context) match {
+                  case Some(collection) => (collection, store)
+                  case None => (null, PairForeachRejected)
+                }
+              case None =>
+                bodyContext.report(FOREACH_PAIR_NOT_MAP, node, targetTerm.`type`)
+                (null, PairForeachRejected)
             }
-          case _ => false
-        }
-      case _ => false
-    })
-
-  private def resolvesEntrySet(call: AST.Expression, context: LocalContext): Boolean =
-    typing.withSuppressedReporting(typed(call, context)).isDefined
+        })
+      case _ => None
+    }
 
   /** True when the value is a java.util.Map (which has no iterator()). */
   private def isMapType(tp: Type): Boolean =

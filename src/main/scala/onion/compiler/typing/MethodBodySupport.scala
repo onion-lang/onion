@@ -259,7 +259,20 @@ private[compiler] final class MethodBodySupport(
     }
     addSharedParameterCopies(context, node.args, arguments.tail, shared)
 
-    staticMethod.setArgumentsWithDefaults(buildArgumentsWithDefaults(extArgs, arguments, context))
+    // A default is spliced into each call site, where neither the receiver nor the other
+    // parameters exist: type it without them, so `self` or an earlier parameter in a
+    // default is "not found" (E0002) instead of reading the caller's own slots (#2401).
+    val defaultsContext = new LocalContext
+    defaultsContext.setStatic(true)
+    defaultsContext.setMethod(staticMethod)
+    // A default that failed to type has been reported; keep the parameter optional so the
+    // call sites do not add a second, contradictory "method not found" (E0005).
+    val withDefaults = buildArgumentsWithDefaults(extArgs, arguments, defaultsContext).zip(extArgs).map {
+      case (typed, arg) if arg.defaultValue != null && typed.defaultValue.isEmpty =>
+        typed.copy(defaultValue = Some(Term.defaultValue(typed.argType)))
+      case (typed, _) => typed
+    }
+    staticMethod.setArgumentsWithDefaults(withDefaults)
     context
   }
 
@@ -357,7 +370,7 @@ private[compiler] final class MethodBodySupport(
   ): Array[TypedAST.MethodArgument] =
     args.zipWithIndex.map { case (arg, i) =>
       val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        typed(expr, context, types(i))
+        typed(expr, context.withoutParameters, types(i))
       }
       TypedAST.MethodArgument(arg.name, types(i), defaultTerm)
     }.toArray

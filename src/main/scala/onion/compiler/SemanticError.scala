@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0102) for identification
+ * type checking. Each error has a unique code (E0000-E0103) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -98,6 +98,9 @@ package onion.compiler
  *
  * '''Duplication Errors, continued (E0102)'''
  *   - DUPLICATE_EXTENSION_BLOCK
+ *
+ * '''Control Flow Errors, continued (E0103)'''
+ *   - FOREACH_PAIR_NOT_MAP
  *
  * == Error Message Lookup ==
  *
@@ -336,6 +339,14 @@ object SemanticError {
    * they redefine the same class.
    */
   case object DUPLICATE_EXTENSION_BLOCK extends SemanticError(102)
+
+  /**
+   * `foreach (a, b) in xs` where `xs` is not a Map. The parser rewrites the pair form
+   * to a walk over `xs.entrySet()`, so a List of records used to report
+   * "entrySet() not found" and "operator + for K, V" -- names the user never wrote
+   * (issue #2301).
+   */
+  case object FOREACH_PAIR_NOT_MAP extends SemanticError(103)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

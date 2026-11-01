@@ -66,6 +66,8 @@ private[compiler] object DuplicationChecks {
    * by descriptor. A body method with the full descriptor of a final Object method (`notify()V`,
    * `getClass()Ljava/lang/Class;`) does override it, and the class then fails to load (#2533).
    * Report E0039 for exactly those; a same-named method with another descriptor still runs.
+   * Only a component's own accessor (no parameters) is left to E0010 (#2518): a body overload
+   * named like a component, `wait(ms: Long)` beside `wait: Int`, is checked like any other.
    */
   def checkRecordFinalObjectOverrides(
     typing: Typing,
@@ -82,7 +84,7 @@ private[compiler] object DuplicationChecks {
           finals.iterator.map(m => (m.name, Erasure.methodDescriptor(m.returnType, m.arguments))).toSet
         for (impl <- clazz.methods
              if !Modifier.isStatic(impl.modifier) && !Modifier.isPrivate(impl.modifier) &&
-               !componentNames.contains(impl.name) &&
+               !(impl.arguments.isEmpty && componentNames.contains(impl.name)) &&
                finalDescriptors.contains((impl.name, Erasure.methodDescriptor(impl.returnType, impl.arguments)))) {
           val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
           val paramDescriptor = impl.arguments.map(_.name).mkString(", ")

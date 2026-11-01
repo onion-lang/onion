@@ -36,6 +36,13 @@ class RecordFinalObjectOverrideSpec extends AbstractShellSpec {
       assert(codes(body("  def getClass(): Class[String]? = null")).contains(Some("E0039")))
     }
 
+    it("rejects an overload named like a component when it matches a final Object method") {
+      val cs = codes("record R(wait: Int) {\npublic:\n  def wait(ms: Long): void { }\n}\nIO::println(new R(1))\n")
+      assert(cs == Seq(Some("E0039")), cs)
+      val cs2 = codes("record R(wait: Int, notify: String) {\npublic:\n  def wait(ms: Long, nanos: Int): void { }\n}\nIO::println(new R(1, \"n\"))\n")
+      assert(cs2 == Seq(Some("E0039")), cs2)
+    }
+
     it("still runs a record whose same-named method has another JVM descriptor") {
       val src =
         """record R(x: Int) {

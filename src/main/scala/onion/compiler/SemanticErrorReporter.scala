@@ -751,14 +751,24 @@ class SemanticErrorReporter(threshold: Int) {
       else if (isListType(expected) && actual.isInstanceOf[TypedAST.ArrayType])
         Some((actual.asInstanceOf[TypedAST.ArrayType], false))
       else None
+    val castSource: Option[SemanticErrorReporter.CastSource] =
+      if (items.length > 2) items(2) match
+        case c: SemanticErrorReporter.CastSource => Some(c)
+        case _ => None
+      else None
+    val sourceNullable = castSource.exists(_.nullable)
+    // The variable the hint names, null-checked when the cast's source was nullable.
+    val sourceRef = castSource.flatMap(c => Option(c.name)).getOrElse("xs") + (if (sourceNullable) "!!" else "")
     def written(t: TypedAST.Type): String = t match
       case a: TypedAST.ArrayType if listArrayCast.isDefined => onion.compiler.toolbox.TypeFormatting.arrayWrittenForm(a)
       case other => typeName(other)
     // A set or range is never a List at runtime either, so a cast is no fix for the widening case.
     val widenToIterable = items.length > 2 && items(2).isInstanceOf[SemanticErrorReporter.WidenToIterableHint]
     val baseMessage = format(
-      message(if (listArrayCast.isDefined || widenToIterable) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
-      Seq(written(expected), written(actual))
+      // "Consider a cast" is no advice on an `as` cast that was itself rejected, nor on the
+      // widening case (a set or range is never a List at runtime either).
+      message(if (listArrayCast.isDefined || widenToIterable || castSource.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      Seq(written(expected), written(actual) + (if (sourceNullable) "?" else ""))
     )
     val hint =
       if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
@@ -794,9 +804,9 @@ class SemanticErrorReporter(threshold: Int) {
             // sized `new Int[0][0]` compiles and is just as empty, since the outer (size-0)
             // dimension is the only one that matters to `toArray`.
             val emptyArrayLiteral = onion.compiler.toolbox.TypeFormatting.componentWrittenForm(arrayType.component) + ("[0]" * arrayType.dimension)
-            Some(format(message("suggestion.listAsArrayCast"), Seq(emptyArrayLiteral)))
+            Some(format(message("suggestion.listAsArrayCast"), Seq(emptyArrayLiteral, sourceRef)))
           } else {
-            Some(message("suggestion.arrayAsListCast"))
+            Some(format(message("suggestion.arrayAsListCast"), Seq(sourceRef)))
           }
         case None => None
       }
@@ -1111,6 +1121,13 @@ object SemanticErrorReporter {
    *  another `Iterable`, and declaring the variable `wider` (`Iterable[E]`) would accept it.
    *  `var xs = (1..3).map { ... }` is a `List` since #2496, so this is the migration hint. */
   private[compiler] final case class WidenToIterableHint(name: String, wider: TypedAST.Type)
+
+  /**
+   * An extra (third) item on INCOMPATIBLE_TYPE for a rejected `as` cast: how the source is
+   * written when it is a plain name (else null), and whether its type was nullable. The
+   * List/array hint then names that variable and stays null-safe (`xs!!.toArray(..)`).
+   */
+  private[compiler] final case class CastSource(name: String, nullable: Boolean)
 
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */

@@ -1366,7 +1366,9 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       any = true
       eols()
       val keyword = next()
-      val e = inConditionOf(term())
+      // `pipeline()`, not `term()`: a clause is never an assignment, so a `=` after it begins the
+      // body (`def f(x: Int): Int requires x > 0 = x + 1`) instead of being read as `0 = x + 1`.
+      val e = inConditionOf(pipeline())
       if (keyword.image == "requires") reqs += e else enss += e
     }
     if (any && (rawKindSkippingEol(0)._1 == K.LBRACE || rawKindSkippingEol(0)._1 == K.ASSIGN)) eols()
@@ -1398,7 +1400,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     // a clause is a member of the body in that respect, so it keeps the pair.
     enterSection()
     val keyword = next()
-    val e = term()
+    val e = pipeline()
     eosOrBlockEnd()
     if (keyword.image == "invariant") invariantClauses += e else historyClauses += e
   }

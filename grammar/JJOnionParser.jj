@@ -1817,7 +1817,7 @@ int modifiers():{ mset = 0; Token t = null, last = null; }{
 
 /** One {@code invariant e} or {@code history e} clause of a type body, collected into the buffers. */
 void type_clause() : { Token kw; AST.Expression e; }{
-  {enterSection();} kw=<ID> e=term() eos_or_block_end() {
+  {enterSection();} kw=<ID> e=pipeline() eos_or_block_end() {
     if (kw.image.equals("invariant")) invariantClauses.addOne(e); else historyClauses.addOne(e);
   }
 }
@@ -2187,7 +2187,7 @@ AST.MethodDeclaration method_decl(int mset) : {
   List<AST.Annotation> anns = scala.collection.immutable.List$.MODULE$.<AST.Annotation>empty();
 }{
   anns=annotations() {enterSection();} "def" t=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
-  ( LOOKAHEAD({contractClauseAhead()}) eols() ct=<ID> {enterCondition();} ce=term() {leaveCondition();}
+  ( LOOKAHEAD({contractClauseAhead()}) eols() ct=<ID> {enterCondition();} ce=pipeline() {leaveCondition();}
     { if (ct.image.equals("requires")) reqs.addOne(ce); else enss.addOne(ce); }
   )*
   ( LOOKAHEAD({(reqs.nonEmpty() || enss.nonEmpty()) && methodBodyAheadAfterClauses() && getToken(1).kind == EOL}) <EOL> )*
@@ -2228,7 +2228,7 @@ AST.MethodDeclaration interface_method_decl() : {
 }{
   {enterSection();}
   "def" n=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
-  ( LOOKAHEAD({contractClauseAhead()}) eols() ct=<ID> {enterCondition();} ce=term() {leaveCondition();}
+  ( LOOKAHEAD({contractClauseAhead()}) eols() ct=<ID> {enterCondition();} ce=pipeline() {leaveCondition();}
     { if (ct.image.equals("requires")) reqs.addOne(ce); else enss.addOne(ce); }
   )*
   ( LOOKAHEAD({(reqs.nonEmpty() || enss.nonEmpty()) && methodBodyAheadAfterClauses() && getToken(1).kind == EOL}) <EOL> )*

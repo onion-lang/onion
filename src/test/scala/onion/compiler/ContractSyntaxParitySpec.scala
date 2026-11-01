@@ -96,6 +96,20 @@ class ContractSyntaxParitySpec extends AnyFunSpec {
       assert(f.block != null)
     }
 
+    it("ends a clause at = as well as at {, on one line (panel review of RFC #2557)") {
+      val ms = both(
+        """class A {
+          |public:
+          |  def f(x: Int): Int requires x > 0 = x + 1
+          |  def g(x: Int): Int requires x > 0 ensures result > x = x + 1
+          |}""".stripMargin)
+      val f = ms.find(_.name == "f").get
+      val g = ms.find(_.name == "g").get
+      assert(f.requires.size == 1 && f.ensures.isEmpty, s"f: ${f.requires.size} requires")
+      assert(g.requires.size == 1 && g.ensures.size == 1)
+      assert(f.block != null && g.block != null)
+    }
+
     it("reads clauses on an interface method that has no body") {
       val ms = both(
         """interface I {

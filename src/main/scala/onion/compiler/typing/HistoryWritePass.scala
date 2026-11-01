@@ -26,16 +26,20 @@ final class HistoryWritePass(typing: Typing) {
   def run(units: Seq[AST.CompilationUnit]): Unit = {
     val classes: Map[String, AST.ClassDeclaration] =
       units.flatMap(_.toplevels).collect { case c: AST.ClassDeclaration => c.name -> c }.toMap
-    if (classes.values.exists(_.histories.nonEmpty)) {
-      for (cls <- classes.values) check(cls, classes)
+    val interfaces: Map[String, AST.InterfaceDeclaration] =
+      units.flatMap(_.toplevels).collect { case i: AST.InterfaceDeclaration => i.name -> i }.toMap
+    if (classes.values.exists(_.histories.nonEmpty) || interfaces.values.exists(_.histories.nonEmpty)) {
+      for (cls <- classes.values) check(cls, classes, interfaces)
     }
   }
 
-  private def check(cls: AST.ClassDeclaration, classes: Map[String, AST.ClassDeclaration]): Unit = {
+  private def check(cls: AST.ClassDeclaration, classes: Map[String, AST.ClassDeclaration],
+                     interfaces: Map[String, AST.InterfaceDeclaration]): Unit = {
     val chain = hierarchy(cls, classes)
+    // An interface's history binds every implementor (design 4.2), like a superclass's.
+    val histories = chain.flatMap(_.histories) ++ interfaceHistories(chain.flatMap(_.superInterfaces), interfaces, Set.empty)
     val relations = for {
-      c <- chain
-      h <- c.histories
+      h <- histories
       (field, op) <- HistoryPreorder.simpleRelations(h)
     } yield (field, op)
     if (relations.nonEmpty) {
@@ -65,6 +69,12 @@ final class HistoryWritePass(typing: Typing) {
       case _                => None
     }
   }
+
+  private def interfaceHistories(refs: Seq[AST.TypeNode], interfaces: Map[String, AST.InterfaceDeclaration],
+                                 seen: Set[String]): Seq[AST.Expression] =
+    refs.map(_.desc).collect { case AST.ReferenceType(n, _) => n }.filterNot(seen.contains).flatMap { n =>
+      interfaces.get(n).toSeq.flatMap(i => i.histories ++ interfaceHistories(i.superInterfaces, interfaces, seen + n))
+    }
 
   /** The class and its superclasses declared in the program, the class first. */
   private def hierarchy(cls: AST.ClassDeclaration, classes: Map[String, AST.ClassDeclaration]): Seq[AST.ClassDeclaration] = {

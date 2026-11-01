@@ -78,4 +78,20 @@ class HistoryWriteSpec extends AnyFunSpec {
       assert(codes(src).contains("E0109"))
     }
   }
+
+  describe("a history on an interface") {
+    it("binds the implementing class too (design 4.2)") {
+      val src =
+        """interface Monotone {
+          |  history n >= old(n)
+          |}
+          |class Impl conforms Monotone {
+          |public:
+          |  var n: Int
+          |  def this { n = 5 }
+          |  def dec(): void { n = n - 1 }
+          |}""".stripMargin
+      assert(codes(src).contains("E0109"))
+    }
+  }
 }

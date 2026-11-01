@@ -117,6 +117,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A default argument that uses an earlier parameter is a compile error, not a `VerifyError` (#2358).**
+  - Before: `def g(n: Int, m: Int = n + 1)` compiled, then the program died with `VerifyError` at load.
+  - Now: `E0002`, local variable `n` is not found. A default is evaluated at the call site, where `n` is not in scope.
 - **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
   - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
   - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.

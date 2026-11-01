@@ -357,7 +357,7 @@ private[compiler] final class MethodBodySupport(
   ): Array[TypedAST.MethodArgument] =
     args.zipWithIndex.map { case (arg, i) =>
       val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        typed(expr, context, types(i))
+        typed(expr, context.withoutParameters, types(i))
       }
       TypedAST.MethodArgument(arg.name, types(i), defaultTerm)
     }.toArray

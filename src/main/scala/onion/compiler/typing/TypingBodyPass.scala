@@ -229,7 +229,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
       } else {
         val functionTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
         typing.openTypeParams(typing.emptyTypeParams ++ functionTypeParams) {
-          methodBodySupport.processMethodLikeBody(function, node.args, node.block)
+          methodBodySupport.processMethodLikeBody(function, node.args, node.block, node.requires, node.ensures)
         }
       }
     }

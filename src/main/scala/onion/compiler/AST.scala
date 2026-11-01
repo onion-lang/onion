@@ -308,9 +308,14 @@ object AST {
   case class DoWhileExpression(location: Location, block: BlockExpression, condition: Expression) extends Expression
   case class WhileExpression(location: Location, condition: Expression, block: BlockExpression) extends Expression
 
-  case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil) extends Toplevel {
+  case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil,
+    /** `requires e` and `ensures e` clauses of a top-level function, in source order (RFC #2557). */
+    requires: List[Expression] = Nil, ensures: List[Expression] = Nil) extends Toplevel {
     def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, throwsTypes: List[TypeNode]) =
-      this(location, modifiers, name, args, returnType, block, Nil, throwsTypes, Nil)
+      this(location, modifiers, name, args, returnType, block, Nil, throwsTypes, Nil, Nil, Nil)
+    /** The shape the grammar's `tool` declaration builds: no clauses. Java cannot see the defaults. */
+    def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter], throwsTypes: List[TypeNode], annotations: List[Annotation]) =
+      this(location, modifiers, name, args, returnType, block, typeParameters, throwsTypes, annotations, Nil, Nil)
   }
   case class GlobalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Toplevel
 

@@ -146,6 +146,55 @@ class ContractSyntaxParitySpec extends AnyFunSpec {
     }
   }
 
+  /** Top-level functions with their clauses. */
+  private def functions(node: Any): List[AST.FunctionDeclaration] = node match {
+    case f: AST.FunctionDeclaration => f :: Nil
+    case p: Product                 => p.productIterator.toList.flatMap(functions)
+    case it: Iterable[?]            => it.toList.flatMap(functions)
+    case _                          => Nil
+  }
+
+  private def bothFunctions(code: String): List[AST.FunctionDeclaration] = {
+    val f = fast(code)
+    assert(f == jj(code), "the fast-path AST differs from the JavaCC AST")
+    functions(f)
+  }
+
+  describe("clauses on a top-level function (panel review of RFC #2557)") {
+    it("reads requires and ensures before an expression body, on one line") {
+      val fs = bothFunctions("def twice(x: Int): Int requires x > 0 ensures result > x = x * 2\nprintln(twice(2))\n")
+      val f = fs.find(_.name == "twice").get
+      assert(f.requires.size == 1 && f.ensures.size == 1)
+      assert(f.block != null)
+    }
+
+    it("reads the form that `example` migrates to: a predicate with ensures result") {
+      val fs = bothFunctions("def example_1(): Boolean ensures result = 1 + 1 == 2\nprintln(example_1())\n")
+      val f = fs.find(_.name == "example_1").get
+      assert(f.ensures.size == 1)
+      assert(f.block != null)
+    }
+
+    it("reads one clause per line, with a block body on its own line") {
+      val fs = bothFunctions(
+        """def f(x: Int): Int
+          |  requires x > 0
+          |  ensures result > x
+          |{
+          |  return x + 1
+          |}
+          |println(f(1))
+          |""".stripMargin)
+      val f = fs.find(_.name == "f").get
+      assert(f.requires.size == 1 && f.ensures.size == 1 && f.block != null)
+    }
+
+    it("leaves a function without clauses alone, and requires stays a name") {
+      val fs = bothFunctions("def requires(x: Int): Int = x\ndef g(): Int = requires(1)\nprintln(g())\n")
+      assert(fs.forall(f => f.requires.isEmpty && f.ensures.isEmpty))
+    }
+  }
+
   describe("invariant and history in a type body") {
     it("reads them in the default section and in an access section") {
       val cs = bothClasses(

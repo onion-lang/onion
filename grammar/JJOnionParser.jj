@@ -1684,6 +1684,10 @@ AST.TypeAliasDeclaration type_alias_decl(int modifiers) : {
 
 AST.FunctionDeclaration fun_decl(int modifiers) : {
   Token t1, t2;
+  Token ct;
+  AST.Expression ce;
+  ArrayBuffer<AST.Expression> reqs = new ArrayBuffer<AST.Expression>();
+  ArrayBuffer<AST.Expression> enss = new ArrayBuffer<AST.Expression>();
   List<AST.Argument> args = (List<AST.Argument>)AST.NIL();
   AST.TypeNode ty = null;
   AST.BlockExpression b = null;
@@ -1693,8 +1697,11 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
   List<AST.Annotation> anns = scala.collection.immutable.List$.MODULE$.<AST.Annotation>empty();
 }{
   anns=annotations() t1="def" t2=id() [tparams=type_params()] ["(" args=args() ")"] [":" ty=return_type()] [throwsTypes=throws_clause()]
+  ( LOOKAHEAD({contractClauseAhead()}) ct=<ID> {enterCondition();} ce=pipeline() {leaveCondition();}
+    { if (ct.image.equals("requires")) reqs.addOne(ce); else enss.addOne(ce); }
+  )*
   (  (b=block() | {enterSection();} eos()) {
-       return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, tparams, throwsTypes, anns);
+       return new AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, tparams, throwsTypes, anns, toList(reqs), toList(enss));
      }
   |  ({enterSection();} "=" eols() {enterAssignScope();} e=term() eos()) {
        List<AST.BlockElement> bodyElems = isVoidReturnType(ty)
@@ -1703,7 +1710,7 @@ AST.FunctionDeclaration fun_decl(int modifiers) : {
        return new AST.FunctionDeclaration(
          p(t1), modifiers, c(t2), args, ty,
          new AST.BlockExpression(p(t1), bodyElems, leaveAssignScope()),
-         tparams, throwsTypes, anns
+         tparams, throwsTypes, anns, toList(reqs), toList(enss)
        );
      }
   )

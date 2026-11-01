@@ -851,10 +851,13 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val args = if (accept(K.LPAREN)) { val a = argsList(); expect(K.RPAREN); a } else Nil
     val ty = if (accept(K.COLON)) returnType() else null
     val throwsTypes = if (kind(1) == K.K_THROWS) throwsClause() else Nil
+    // Contract clauses (RFC #2557), as on a method. A top-level function does not open a section
+    // before its body, so line breaks here are already invisible: the clauses read the same way.
+    val (reqs, enss) = contractClauses()
     kind(1) match {
       case K.LBRACE =>
         val b = block()
-        AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, tparams, throwsTypes, anns)
+        AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, b, tparams, throwsTypes, anns, reqs, enss)
       case K.ASSIGN =>
         enterSection()
         next()
@@ -865,11 +868,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         val bodyElems: List[AST.BlockElement] =
           if (isVoidReturnType(ty)) List(e) else List(AST.ReturnExpression(p(t1), e))
         AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty,
-          AST.BlockExpression(p(t1), bodyElems, leaveAssignScope()), tparams, throwsTypes, anns)
+          AST.BlockExpression(p(t1), bodyElems, leaveAssignScope()), tparams, throwsTypes, anns, reqs, enss)
       case _ =>
         enterSection()
         eos()
-        AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, null, tparams, throwsTypes, anns)
+        AST.FunctionDeclaration(p(t1), modifiers, c(t2), args, ty, null, tparams, throwsTypes, anns, reqs, enss)
     }
   }
 

@@ -14,6 +14,12 @@ package onion.compiler.effects
  *   - `Console` — reads or writes the attached console (stdin/stdout/stderr)
  *   - `Unknown` — a call the effect table cannot vouch for
  *
+ * One more value is *internal*: `Mutate` — writes to memory that outlives the call (a
+ * field, an array element, a collection). It describes the program's own state, not the
+ * outside world, so it is not a capability: a `tool` never declares it, and the
+ * capability layer ignores it. It exists so that "pure" can mean what it says: a contract
+ * expression must have no effects and must not write (RFC #2557).
+ *
  * A pure call has the empty set. `Unknown` is deliberately an effect rather than an
  * absence: an unlisted Java method is *not known to be pure*, and pretending otherwise
  * would make every guarantee built on this vocabulary a lie. The capability layer
@@ -34,15 +40,26 @@ object Effect {
   case object Rand    extends Effect("rand")
   case object Console extends Effect("console")
   case object Unknown extends Effect("unknown")
+  case object Mutate  extends Effect("mutate")
 
+  /** The capabilities a `tool` can declare in `requires { ... }`. Does not contain
+   *  the internal effects. */
   val all: Seq[Effect] = Seq(Read, Write, Net, Exec, Env, Clock, Rand, Console, Unknown)
+
+  /** Effects that describe the program's own memory. They show up in inference, the
+   *  effect table and `--effects`, but are never declared and never checked. */
+  val internal: Set[Effect] = Set(Mutate)
 
   /** Effects that can be tied to a parameter (`read(src)`); the rest are ambient. */
   val parameterized: Set[Effect] = Set(Read, Write, Net, Exec)
 
-  private val byName: Map[String, Effect] = all.map(e => e.name -> e).toMap
+  private val byName: Map[String, Effect] = (all ++ internal).map(e => e.name -> e).toMap
 
+  /** Every effect by name, internal ones included. The effect table uses this. */
   def parse(name: String): Option[Effect] = byName.get(name)
+
+  /** A name a `tool` may write in `requires { ... }`: `parse` without the internal effects. */
+  def parseCapability(name: String): Option[Effect] = parse(name).filterNot(internal.contains)
 
   /** Renders a set the way diagnostics and `--effects` print it: `pure` for the
    *  empty set, otherwise the names sorted and comma-joined (`read,write`). */

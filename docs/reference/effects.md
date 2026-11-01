@@ -35,6 +35,23 @@ make every guarantee built on this vocabulary a lie. `unknown` is therefore an e
 that propagates like any other, and the capability layer treats it as "needs an
 explicit allow", never as "harmless".
 
+One more effect is *internal*: `mutate` means *the call writes memory that outlives it* —
+a field, an array element, a collection, a `StringBuilder`. It describes the program's own
+state, not the outside world, so it is not a capability. A `tool` never declares it
+(`requires { mutate }` is E0079), and the capability check never asks for it. It appears
+in `--effects` and in the effect table, and it is what lets a contract expression say it
+is pure: an expression that writes is not.
+
+```
+$ onionc --effects Counter.on
+Counter#get(): pure
+Counter#set(Int): mutate
+Counter#<init>(Int): pure
+```
+
+A constructor that fills in its own `this` is not a mutation: nobody else holds the object
+yet, so `new C(1)` stays `pure`. Writing to any other object is.
+
 ## Where the facts come from
 
 Effects cannot ride on annotations in this compiler — Java methods reach the type
@@ -62,6 +79,12 @@ streams and `File`, `java.nio.file.Files`; stream wrappers such as `BufferedRead
 stay `unknown` because they may wrap `System.in` or a socket), and the JDK's well-known
 effect points (`System::getenv`, `System::exit`, `Runtime::exec`, `Thread::sleep`,
 `PrintStream` as the type of `System::out`).
+
+Classes that hold changeable state — `List`, `Map`, `Set` and their implementations,
+`StringBuilder`, `Iterator`, `Matcher`, `StringJoiner` — are listed the other way round:
+the default is `mutate`, and only the methods known to leave the receiver alone are
+`pure`. A method added in a later JDK is therefore a mutation until someone lists it, never
+a false `pure`. Their constructors are `pure`.
 
 Granularity is per-type, not per-instance. A `PrintStream` over a file would be a
 `write`, but in Onion code a `PrintStream` is `System::out` or `System::err`, so the

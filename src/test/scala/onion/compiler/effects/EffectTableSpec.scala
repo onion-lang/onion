@@ -142,10 +142,12 @@ class EffectTableSpec extends AnyFunSpec {
     }
     it("covers common JDK value and collection types") {
       assert(of("java.lang.String", "length").isEmpty)
-      assert(of("java.lang.StringBuilder", "append").isEmpty)
       assert(of("java.util.List", "get").isEmpty)
-      assert(of("java.util.LinkedHashMap", "put").isEmpty)
       assert(of("java.lang.Object", "<init>").isEmpty)
+      // Mutable classes touch no outside resource, so they never reach `unknown` or any
+      // capability. They write memory, which is the internal `mutate` effect.
+      assert(of("java.lang.StringBuilder", "append") == Set(Mutate))
+      assert(of("java.util.LinkedHashMap", "put") == Set(Mutate))
       assert(of("java.lang.Integer", "parseInt").isEmpty)
     }
     it("covers what the stdlib entry points hand back (nested result and value classes)") {

@@ -1020,6 +1020,18 @@ tool takeRec(p: P): Int requires { console } { IO::println("" + p.x()); return 0
 以前はこれが無言でした。CLI 合成がそのスクリプトを黙って飛ばし、`main` のない何も実行
 しないプログラムがコンパイルされていました（issue #424）。
 
+`List[String]` や `String[]` のパラメータには専用のメッセージが出ます。`tool` はまだ引数の
+リストを受け取れません。代わりにフラグを1つ受け取って分割してください。
+
+```onion
+tool greet(csv: String = "") requires { console } {
+  if csv != "" {
+    foreach n: String in Strings::split(csv, ",") { IO::println("Hello, " + n) }
+  }
+}
+// $ onion greet.on --csv ann,bob
+```
+
 ### `E0082` — tool 名の重複
 
 2つの `tool` が同じ名前を持っています。関数のオーバーロード自体は正当ですが、コマンド

@@ -135,6 +135,28 @@ private[compiler] final class CallOverloadSupport(
     if (filtered.nonEmpty && filtered.length < applicable.length) filtered else applicable
   }
 
+  /**
+   * Rule 3 on #2447, as for extension methods: when an untyped lambda fits both a parameter
+   * that takes it as it is (an Onion function type of its arity, `Object`, a type variable)
+   * and one that needs a SAM conversion (`Function[String, String]`), the first wins.
+   * Returns the original list unless that leaves a smaller, non-empty set.
+   */
+  def preferDirectLambdaSlots(
+    applicable: List[ApplicableMethod],
+    closureArities: Map[Int, Int]
+  ): List[ApplicableMethod] = {
+    if (applicable.length <= 1 || closureArities.isEmpty) return applicable
+    def direct(param: Type, arity: Int): Boolean = param match {
+      case _: TypeVariableType => true
+      case ct: ClassType => ct.name == "java.lang.Object" || ct.name == "onion.Function" + arity
+      case _ => false
+    }
+    val filtered = applicable.filter { am =>
+      closureArities.forall { case (i, arity) => i >= am.expectedArgs.length || direct(am.expectedArgs(i), arity) }
+    }
+    if (filtered.nonEmpty && filtered.length < applicable.length) filtered else applicable
+  }
+
   def selectMostSpecificApplicable(
     applicable0: List[ApplicableMethod],
     relevantIndices: Seq[Int] = Nil,

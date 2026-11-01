@@ -542,7 +542,8 @@ final class ConstructionTyping(
       while (i < params.length && i < args.length && i < formals.length) {
         val p = params(i)
         val f = formals(i)
-        if (p != null && args(i) != null && p.`type`.isNullType && !f.isBasicType && !f.isNullable && !f.isNullType) {
+        if (p != null && args(i) != null && p.`type`.isNullType && !f.isBasicType && !f.isNullable && !f.isNullType &&
+            !TypeRelations.isBareNullableTypeVariable(f)) {
           bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
           bodyContext.warningReporter.nullToNonNullable(args(i).location, f.displayName)
         }

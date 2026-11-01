@@ -92,8 +92,20 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    */
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[AST.CompilationUnit] = {
     val rewritten = Buffer.empty[AST.CompilationUnit]
+    // Type aliases are module-scoped (TypingHeaderPass registers `module.Name`), so a
+    // unit's CLI checks see every non-generic alias its module declares, in any file.
+    def moduleOf(u: AST.CompilationUnit): String = if (u.module == null) "" else u.module.name
+    val aliasesByModule: scala.collection.immutable.Map[String, scala.collection.immutable.Map[String, AST.TypeDescriptor]] =
+      source.groupBy(moduleOf).view.mapValues { units =>
+        units.flatMap(_.toplevels).collect {
+          case a: AST.TypeAliasDeclaration if a.typeParameters.isEmpty && a.targetType != null =>
+            a.name -> a.targetType.desc
+        }.toMap
+      }.toMap
     for (unit <- source) {
       try {
+        cliAliases = aliasesByModule.getOrElse(moduleOf(unit), scala.collection.immutable.Map.empty)
+        recordAliases = recordAliasesOf(unit, cliAliases)
         rewritten += rewrite(unit)
       } catch {
         // Rewriting-phase errors (desugar guards, do-notation, coherence, auto-CLI) are built with
@@ -157,6 +169,86 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   }
 
   private var topLevelExampleCount: Int = 0
+
+  // The non-generic `type` aliases visible to the unit being rewritten, name -> target.
+  // The command-line checks run before typing resolves aliases, so they follow these
+  // themselves: `tool greet(name: S)` with `type S = String` is a String parameter
+  // (issue #2503).
+  private var cliAliases: scala.collection.immutable.Map[String, AST.TypeDescriptor] = scala.collection.immutable.Map.empty
+
+  /** `typeRef` with an alias chain at its top resolved (a cycle stops where it repeats). */
+  private def dealiasForCli(typeRef: AST.TypeNode): AST.TypeNode = {
+    if (typeRef == null) return null
+    var desc = typeRef.desc
+    var seen = Set.empty[String]
+    var done = false
+    while (!done) desc match {
+      case AST.ReferenceType(name, false)
+          if !seen.contains(name) && !typeParamsInScope.contains(name) && cliAliases.contains(name) =>
+        seen += name
+        desc = cliAliases(name)
+      case _ => done = true
+    }
+    if (desc eq typeRef.desc) typeRef else typeRef.copy(desc = desc)
+  }
+
+  /**
+   * `typeRef` with every alias inside it resolved: at the top, under `?`, and in type
+   * arguments and array components. A record's `from re`/`derive!`/`shape` synthesis
+   * picks each component's conversion from its written type, so `port: Port` with
+   * `type Port = Int` must read as `port: Int` there (issue #2507).
+   */
+  private def dealiasDeep(typeRef: AST.TypeNode): AST.TypeNode = {
+    if (typeRef == null) return null
+    def go(desc: AST.TypeDescriptor, seen: Set[String]): AST.TypeDescriptor = desc match {
+      case AST.ReferenceType(name, false)
+          if !seen.contains(name) && !typeParamsInScope.contains(name) && recordAliases.contains(name) =>
+        go(recordAliases(name), seen + name)
+      case AST.NullableType(inner) => go(inner, seen) match {
+        case n: AST.NullableType => n // `Port?` with `type Port = Int?` is just `Int?`
+        case d                   => if (d eq inner) desc else AST.NullableType(d)
+      }
+      case AST.ParameterizedType(base, args) =>
+        val mapped = args.map(go(_, seen))
+        if (mapped.lazyZip(args).forall(_ eq _)) desc else AST.ParameterizedType(base, mapped)
+      case AST.ArrayType(component) =>
+        val c = go(component, seen)
+        if (c eq component) desc else AST.ArrayType(c)
+      case d => d
+    }
+    val desc = go(typeRef.desc, Set.empty)
+    if (desc eq typeRef.desc) typeRef else typeRef.copy(desc = desc)
+  }
+
+  /**
+   * The aliases `dealiasDeep` may expand inside `unit`. An alias target was written under
+   * the imports of the file that declares it, and the expanded text is resolved under the
+   * record's file (the synthesized `parse`/`fromMap` bodies mention it). So only aliases
+   * whose target means the same in both are taken: those declared in `unit` itself, and
+   * those from another file of the module whose target names only primitives and
+   * fully-qualified types. `import { java.sql.Date }` + `type D = Date` in another file
+   * would otherwise read as `java.util.Date` here (#2509).
+   */
+  private var recordAliases: scala.collection.immutable.Map[String, AST.TypeDescriptor] = scala.collection.immutable.Map.empty
+
+  private def recordAliasesOf(
+    unit: AST.CompilationUnit,
+    moduleAliases: scala.collection.immutable.Map[String, AST.TypeDescriptor]
+  ): scala.collection.immutable.Map[String, AST.TypeDescriptor] = {
+    val own: scala.collection.immutable.Map[String, AST.TypeDescriptor] = unit.toplevels.collect {
+      case a: AST.TypeAliasDeclaration if a.typeParameters.isEmpty && a.targetType != null =>
+        a.name -> a.targetType.desc
+    }.toMap
+    def unambiguous(desc: AST.TypeDescriptor): Boolean = desc match {
+      case _: AST.PrimitiveType                 => true
+      case AST.ReferenceType(_, qualified)      => qualified
+      case AST.NullableType(inner)              => unambiguous(inner)
+      case AST.ArrayType(component)             => unambiguous(component)
+      case AST.ParameterizedType(base, args)    => unambiguous(base) && args.forall(unambiguous)
+      case _                                    => false
+    }
+    moduleAliases.filter { case (name, target) => !own.contains(name) && unambiguous(target) } ++ own
+  }
 
   // See AST.CompilationUnit.needsBodyRewrite: the only body-level transforms are do-notation
   // and trait method calls, and most units have neither.
@@ -236,7 +328,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    */
   /** Whether a parameter type is `String[]` (the rest collector for auto-CLI). */
   private def isStringArrayParam(typeRef: AST.TypeNode): Boolean =
-    typeRef != null && (typeRef.desc match {
+    typeRef != null && (dealiasForCli(typeRef).desc match {
       case AST.ArrayType(AST.ReferenceType("String", _)) => true
       case AST.ArrayType(AST.ReferenceType("java.lang.String", _)) => true
       case _ => false
@@ -251,6 +343,15 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
   private def isStringArrayArg(a: AST.Argument): Boolean =
     !a.isVararg && isStringArrayParam(a.typeRef)
+
+  // A `List[..]` or array parameter (not varargs): the author wants a list of arguments,
+  // which a `tool` cannot take yet (issue #2254), so the message says that.
+  private def isListArg(a: AST.Argument): Boolean =
+    !a.isVararg && a.typeRef != null && (dealiasForCli(a.typeRef).desc match {
+      case _: AST.ArrayType => true
+      case AST.ParameterizedType(AST.ReferenceType(n, _), _) => n == "List" || n == "java.util.List"
+      case _ => false
+    })
 
   /** The parameter's type as written, `String...` for varargs, for CLI diagnostics. */
   private def cliTypeDesc(a: AST.Argument): String =
@@ -295,7 +396,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       a <- t.args
       if cliKindOfArg(a).isEmpty
     } yield CompileError("", a.location,
-      Message("error.semantic.toolParameterNotCliConvertible",
+      if (isListArg(a)) Message("error.semantic.toolListParameter", Array[Any](t.name, a.name, cliTypeDesc(a)))
+      else Message("error.semantic.toolParameterNotCliConvertible",
         Array[Any](t.name, a.name, cliTypeDesc(a), ScalarConversions.supportedNames)),
       Some(TOOL_PARAMETER_NOT_CLI_CONVERTIBLE.errorCode))
     if (badParams.nonEmpty) throw new CompilationException(badParams)
@@ -324,7 +426,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         if (a.defaultValue == null) cast
         else AST.IfExpression(loc,
           AST.Equal(loc, raw, AST.NullLiteral(loc)),
-          AST.BlockExpression(loc, List(rewriteExpression(a.defaultValue))),
+          AST.BlockExpression(loc, List(narrowedDefault(loc, a, cliKindOfArg(a)))),
           AST.BlockExpression(loc, List(cast)))
       }
       val call = AST.UnqualifiedMethodCall(loc, tool.name, callArgs)
@@ -508,7 +610,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
               else AST.IfExpression(
                 loc,
                 AST.Equal(loc, AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i)), AST.NullLiteral(loc)),
-                AST.BlockExpression(loc, List(rewriteExpression(a.defaultValue))),
+                AST.BlockExpression(loc, List(narrowedDefault(loc, a, cliKindOf(a.typeRef)))),
                 AST.BlockExpression(loc, List(converted))
               )
             }
@@ -517,6 +619,15 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
           }
         }
     }
+  }
+
+  /**
+   * A `Short`/`Byte` parameter's default is written as an Int literal (`s: Short = 3`),
+   * which a direct call narrows; the synthesized call passes it as an Int, so cast it.
+   */
+  private def narrowedDefault(loc: Location, a: AST.Argument, kind: Option[String]): AST.Expression = {
+    val d = rewriteExpression(a.defaultValue)
+    if (kind.exists(k => k == "Short" || k == "Byte")) AST.Cast(loc, d, a.typeRef) else d
   }
 
   /**
@@ -543,6 +654,10 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
 
   /** The CLI conversion kind for a parameter type, or None when unsupported. */
   private def cliKindOf(typeRef: AST.TypeNode): Option[String] =
+    ScalarConversions.ofAst(dealiasForCli(typeRef)).map(_.tag)
+
+  /** The scalar kind of a type as written (record synthesis dealiases its components first). */
+  private def scalarKindOf(typeRef: AST.TypeNode): Option[String] =
     ScalarConversions.ofAst(typeRef).map(_.tag)
 
   /** Builds the AST converting a raw CLI string to the parameter's type.
@@ -711,7 +826,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
-  def rewriteRecordDeclaration(declaration: AST.RecordDeclaration): RecordDeclaration = withTypeParams(declaration.typeParameters.map(_.name)) {
+  def rewriteRecordDeclaration(written: AST.RecordDeclaration): RecordDeclaration = withTypeParams(written.typeParameters.map(_.name)) {
+    // Components are synthesized from, and checked against, their alias-free types, so
+    // `port: Port` (`type Port = Int`) converts like `port: Int` (issue #2507). The record
+    // itself keeps the types as written (restored below): typing resolves them in the
+    // alias's own scope, so its constructor and accessors are exactly what `main` built.
+    val declaration = written.copy(args = written.args.map(a => a.copy(typeRef = dealiasDeep(a.typeRef))))
     // A componentless record has nothing to derive into, so don't synthesize methods.
     val fromMethods = declaration.fromPattern match {
       case Some(pattern) if declaration.args.nonEmpty => synthesizeFromMethods(declaration, pattern)
@@ -747,11 +867,13 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // class's sections get in rewriteClassDeclaration - otherwise those constructs reach
     // typing unrewritten inside a record method.
     val newSections = declaration.sections.map(rewriteAccessSection)
-    if (all.isEmpty) declaration.copy(sections = newSections)
+    val synthesisArgTypes = declaration.args.map(_.typeRef)
+    if (all.isEmpty) written.copy(sections = newSections)
     // `shapes` is deliberately kept: typing validates each pattern (E0059) and its
     // capture-group count against the components (E0060), which the `from` synthesis gets
     // for free by routing through a regex select pattern and this one does not.
-    else declaration.copy(sections = newSections, synthesizedMethods = all, laws = Nil, examples = Nil)
+    else written.copy(sections = newSections, synthesizedMethods = all, laws = Nil, examples = Nil,
+      synthesisArgTypes = synthesisArgTypes)
   }
 
   /**
@@ -1063,7 +1185,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
             List(AST.Id(loc, "__s"), AST.StringLiteral(loc, pattern), AST.IntegerLiteral(loc, idx + 1)))
           nullableDecls += AST.LocalVariableDeclaration(loc, AST.M_FINAL, declName, nullableStringType, captured)
           val declRef = AST.Id(loc, declName)
-          val convertedNonNull = cliKindOf(innerTypeRef) match {
+          val convertedNonNull = scalarKindOf(innerTypeRef) match {
             case Some(kind) => convertCapturedValue(loc, kind, declRef)
             case None       => declRef // unsupported inner type; typing reports the error
           }
@@ -1074,7 +1196,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
           )
         case _ =>
           val raw = AST.Id(loc, gName)
-          cliKindOf(arg.typeRef) match {
+          scalarKindOf(arg.typeRef) match {
             case Some(kind) => convertCapturedValue(loc, kind, raw)
             case None       => raw // unsupported component type; typing reports the error
           }
@@ -1248,7 +1370,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
           // "absent/null" and "wrong type" alike, so the raw value is read separately
           // first, only to tell the two apart.
           val innerTypeRef = AST.TypeNode(arg.typeRef.location, inner, arg.typeRef.isRelaxed)
-          val getter = cliKindOf(innerTypeRef).map(jsonGetterOf).getOrElse("getString")
+          val getter = scalarKindOf(innerTypeRef).map(jsonGetterOf).getOrElse("getString")
           val rawCall = AST.StaticMethodCall(loc, jsonType, "get", List(AST.Id(loc, "__m"), AST.StringLiteral(loc, arg.name)))
           val getCall = AST.StaticMethodCall(loc, jsonType, getter, List(AST.Id(loc, "__m"), AST.StringLiteral(loc, arg.name)))
           val rawTmp = s"__raw${nextTmp}"
@@ -1264,7 +1386,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
           getterStmts += AST.IfExpression(loc, wrongType, AST.BlockExpression(loc, List(throwStmt)), null)
           AST.Id(loc, gotTmp)
         case _ =>
-          val tag = cliKindOf(arg.typeRef)
+          val tag = scalarKindOf(arg.typeRef)
           val getter = tag.map(jsonGetterOf).getOrElse("getString")
           val getCall = AST.StaticMethodCall(loc, jsonType, getter, List(AST.Id(loc, "__m"), AST.StringLiteral(loc, arg.name)))
           if (tag.contains("String")) {

@@ -42,6 +42,7 @@ final class LawCheckPhase(config: CompilerConfig)
     // Same parent CL as Shell.run so synthesized methods resolve the onion stdlib.
     val loader = new OnionClassLoader(classOf[OnionClassLoader].getClassLoader, config.classPath, classes)
     val errors = ArrayBuffer.empty[CompileError]
+    clauseColumns = clauseColumnsOf(ctx)
     val thread = Thread.currentThread
     val previous = thread.getContextClassLoader
     thread.setContextClassLoader(loader)
@@ -69,6 +70,20 @@ final class LawCheckPhase(config: CompilerConfig)
     }
     if (errors.nonEmpty) throw new CompilationException(errors.toSeq)
     classes
+  }
+
+  // The class file records a clause's line but not its column. The parsed units still
+  // know where each `law`/`example` keyword starts, so a line maps back to that column.
+  private var clauseColumns: Map[Int, Int] = Map.empty
+
+  private def clauseColumnsOf(ctx: PhaseContext): Map[Int, Int] = {
+    val locations = ctx.debugArtifacts.parsedUnits.toList.flatten.flatMap(_.toplevels).flatMap {
+      case r: onion.compiler.AST.RecordDeclaration => r.laws.map(_.location) ++ r.examples.map(_.location)
+      case e: onion.compiler.AST.TopLevelExample   => List(e.location)
+      case _                                       => Nil
+    }
+    locations.filter(l => l != null && l.line > 0 && l.column > 0)
+      .groupBy(_.line).map { case (line, ls) => line -> ls.map(_.column).min }
   }
 
   private def isBooleanStatic(m: Method): Boolean =
@@ -162,7 +177,7 @@ final class LawCheckPhase(config: CompilerConfig)
     methodName: Option[String], msg: String
   ): CompileError = {
     val file = index.sourceFile.getOrElse(cc.className)
-    val location = methodName.flatMap(index.lineOf).map(new Location(_, 1)).orNull
+    val location = methodName.flatMap(index.lineOf).map(line => new Location(line, clauseColumns.getOrElse(line, 1))).orNull
     CompileError(file, location, msg, Some(code))
   }
 

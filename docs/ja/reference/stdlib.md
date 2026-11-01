@@ -1424,6 +1424,8 @@ val config = Config::parseJson("{\"users\": [{\"name\": \"Alice\"}, {\"name\": \
 Config::getString(config, "users.0.name", "unknown")   // "Alice"
 ```
 
+config には、パースした JSON だけでなく任意の `Map` と `List` を渡せます。`Colls::mapOf` で作った map や Java の `HashMap` も同じように扱えます。
+
 キーが見つからない場合・array の添字が範囲外の場合・値を要求された型へ変換できない場合は、例外を投げず指定したデフォルト値にフォールバックします。数値系のゲッターは JSON の数値だけでなく数値文字列も受け付けます。`hasPath` はデフォルト値なしで存在確認だけ行います:
 
 ```onion

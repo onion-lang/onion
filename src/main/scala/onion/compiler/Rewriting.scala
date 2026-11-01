@@ -424,22 +424,24 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         null)
     )
     for ((tool, index) <- tools.zipWithIndex) {
+      val bound = boundCliArguments(loc, tool.args, "__toolArg")
       val callArgs = tool.args.zipWithIndex.map { case (a, j) =>
         val raw = AST.MethodCall(loc, res, "value", List(AST.IntegerLiteral(loc, j)))
         val cast = AST.Cast(loc, raw, a.typeRef)
         if (a.defaultValue == null) cast
         else AST.IfExpression(loc,
           AST.Equal(loc, raw, AST.NullLiteral(loc)),
-          AST.BlockExpression(loc, List(narrowedDefault(loc, a, cliKindOfArg(a)))),
+          AST.BlockExpression(loc, defaultBlock(loc, tool.args, j, bound, cliKindOfArg(a))),
           AST.BlockExpression(loc, List(cast)))
       }
-      val call = AST.UnqualifiedMethodCall(loc, tool.name, callArgs)
+      val (bindings, finalArgs) = bindCliArguments(loc, tool.args, callArgs, bound)
+      val call = AST.UnqualifiedMethodCall(loc, tool.name, finalArgs)
       // An Int-returning tool's result is the exit code; anything else exits 0.
-      val body =
+      val body = bindings ++ (
         if (cliKindOf(tool.returnType).contains("Int"))
           List(AST.ReturnExpression(loc, call))
         else
-          List(call, AST.ReturnExpression(loc, AST.IntegerLiteral(loc, 0)))
+          List(call, AST.ReturnExpression(loc, AST.IntegerLiteral(loc, 0))))
       statements += AST.IfExpression(loc,
         AST.Equal(loc, AST.MethodCall(loc, res, "tool", Nil), AST.IntegerLiteral(loc, index)),
         AST.BlockExpression(loc, body),
@@ -607,6 +609,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
               List(AST.Id(loc, "args"), AST.StringLiteral(loc, spec))
             )
             val decl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, cliVar, null, parseCall)
+            val bound = boundCliArguments(loc, f.args, "__cliArg")
             val argExprs = f.args.zipWithIndex.map { case (a, i) =>
               val raw = AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i))
               val converted = convertCliValue(loc, cliKindOf(a.typeRef).get, a.name, raw)
@@ -614,16 +617,64 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
               else AST.IfExpression(
                 loc,
                 AST.Equal(loc, AST.Indexing(loc, AST.Id(loc, cliVar), AST.IntegerLiteral(loc, i)), AST.NullLiteral(loc)),
-                AST.BlockExpression(loc, List(narrowedDefault(loc, a, cliKindOf(a.typeRef)))),
+                AST.BlockExpression(loc, defaultBlock(loc, f.args, i, bound, cliKindOf(a.typeRef))),
                 AST.BlockExpression(loc, List(converted))
               )
             }
+            val (bindings, finalArgs) = bindCliArguments(loc, f.args, argExprs, bound)
             toplevels += decl
-            toplevels += AST.UnqualifiedMethodCall(loc, "main", argExprs)
+            toplevels ++= bindings
+            toplevels += AST.UnqualifiedMethodCall(loc, "main", finalArgs)
           }
         }
     }
   }
+
+  /**
+   * A default may read an earlier parameter (`b: Int = a * 2`), as it may on any function
+   * (#2398). The synthesized call evaluates defaults at the call site, where those
+   * parameters do not exist (#2575), so when any default reads one, every argument is
+   * first bound to a local, in order: `None` when no default needs that.
+   */
+  private def boundCliArguments(loc: Location, args: List[AST.Argument], prefix: String): Option[List[String]] =
+    val needed = args.zipWithIndex.exists { case (a, i) =>
+      a.defaultValue != null && earlierReferenced(args, i).nonEmpty
+    }
+    if needed then Some(args.indices.map(i => s"$prefix$i").toList) else None
+
+  /** The indices of the parameters before `i` whose names parameter `i`'s default mentions. */
+  private def earlierReferenced(args: List[AST.Argument], i: Int): List[Int] =
+    val names = scala.collection.mutable.Set[String]()
+    def visit(n: AST.Node): Unit =
+      n match
+        case id: AST.Id => names += id.name
+        case _ => ()
+      ASTWalk.visitChildren(n)(visit)
+    visit(args(i).defaultValue)
+    args.take(i).zipWithIndex.collect { case (a, j) if names.contains(a.name) => j }
+
+  /** Parameter `i`'s default, preceded by the earlier parameters it reads, bound to their values. */
+  private def defaultBlock(
+    loc: Location, args: List[AST.Argument], i: Int, bound: Option[List[String]], kind: Option[String]
+  ): List[AST.BlockElement] =
+    val earlier = bound.toList.flatMap { locals =>
+      earlierReferenced(args, i).map { j =>
+        AST.LocalVariableDeclaration(args(j).location, AST.M_FINAL, args(j).name, args(j).typeRef, AST.Id(loc, locals(j)))
+      }
+    }
+    earlier :+ narrowedDefault(loc, args(i), kind)
+
+  /** The declarations binding each argument to its local, and the call's arguments. */
+  private def bindCliArguments(
+    loc: Location, args: List[AST.Argument], exprs: List[AST.Expression], bound: Option[List[String]]
+  ): (List[AST.BlockElement], List[AST.Expression]) =
+    bound match
+      case None => (Nil, exprs)
+      case Some(locals) =>
+        val decls = args.indices.map { i =>
+          AST.LocalVariableDeclaration(loc, AST.M_FINAL, locals(i), args(i).typeRef, exprs(i))
+        }.toList
+        (decls, locals.map(n => AST.Id(loc, n)))
 
   /**
    * A `Short`/`Byte` parameter's default is written as an Int literal (`s: Short = 3`),

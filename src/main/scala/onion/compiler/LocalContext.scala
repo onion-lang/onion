@@ -57,6 +57,8 @@ class LocalContext {
   private var flowNarrowings: Map[String, TypedAST.Type] = Map.empty
   private var returnTypeCollectionDepth: Int = 0
   var isClosure: Boolean                     = false
+  /** Set while a contract clause is typed; None everywhere else (RFC #2557). */
+  var contractScope: Option[ContractScope]   = None
   var isStatic: Boolean                      = false
   var isGlobal: Boolean                      = false
   // Top-level `val`/`var` declarations become static fields (which get a

@@ -149,6 +149,7 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0018` | `foreign-effect-entry` | ライブラリ jar の効果表が jar の外のクラスを名指しており、それらのエントリは無視された |
 | `W0019` | `discarded-builder-result` | イミュータブルなビルダーのメソッドの結果が捨てられており、呼び出しが何も行わない |
 | `W0020` | `extension-method-shadowed` | `extension` メソッドの名前とアリティが既存のメンバーと完全に一致しており、その extension メソッドは呼び出されない |
+| `W0021` | `history-not-proved` | メソッドが `history` を壊しうる。ソルバーが反例を見つけた |
 
 ### `--no-check-laws`
 
@@ -170,6 +171,20 @@ onionc --no-check-laws MyProgram.on
 ```bash
 onionc --law-samples 500 MyProgram.on
 onionc --law-seed 7 MyProgram.on
+```
+
+### `--contracts <off|check>`
+
+契約の節（メソッドの `requires` と `ensures`、クラスの `invariant` と `history`）を受け付けて、
+静的に検査します。これはプレビュー機能です（RFC #2557）。既定は `off` で、`off` のとき節は
+このフラグを示すエラーになります。契約が黙って無視されることはありません。
+
+`check` は節を型付けして、ソルバーの要らない静的検査を行います。**プログラムの実行時には
+何も強制されません。** `runtime`（証明できなかった分の保険）と `verify`（証明）は予約された
+名前で、何かを検査するようになるまで、コマンドラインは受け付けません。
+
+```bash
+onionc --contracts check MyProgram.on
 ```
 
 ### `--effects`

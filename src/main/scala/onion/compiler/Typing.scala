@@ -181,6 +181,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     warnings = new WarningReporter(config.warningLevel, config.suppressedWarnings)
   )
   private[compiler] val session = new TypingSession(config, globalState, emptyTypeParams)
+  /** Whether contract clauses are accepted (RFC #2557). */
+  private[compiler] def contractMode: ContractMode = config.contracts
 
   /**
    * The effect table this compilation consults: the built-in table plus the tables that
@@ -215,6 +217,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     // surface as ordinary semantic errors. Effects are erased at this line: nothing
     // downstream (optimizers, backend) sees them.
     new onion.compiler.typing.CapabilityCheckPass(this).run(table_.classes.values.toSeq)
+    // Pass 6 (RFC #2557): a contract expression must be pure. Same reason to run here.
+    new onion.compiler.typing.ContractPurityPass(this).run(table_.classes.values.toSeq)
+    // RFC #2557: a write that breaks a `history`, decided from the syntax alone.
+    new onion.compiler.typing.HistoryWritePass(this).run(source)
+    // RFC #2557 3.2: an invariant or history may name only value-typed fields.
+    new onion.compiler.typing.ContractFramingPass(this).run(table_.classes.values.toSeq)
     // Issue #364: a user-written Shape instance must assert its laws.
     new onion.compiler.typing.ShapeInstanceLawPass(this).run(table_.classes.values.toSeq)
     diagnostics.finishOrThrow()

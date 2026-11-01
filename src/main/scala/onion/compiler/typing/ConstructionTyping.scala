@@ -404,6 +404,10 @@ final class ConstructionTyping(
     // substitution (T -> String), not merely under the erased bound (Object).
     // Otherwise `new Box[String](aStringBuilder)` compiled and threw a runtime
     // ClassCastException — a type-safety hole the instance-method path does not have.
+    def nonNullCore(t: TypedAST.Type): TypedAST.Type = t match {
+      case n: TypedAST.NullableType => n.innerType
+      case other => other
+    }
     def substitutionValidFor(ctors: Array[TypedAST.ConstructorRef], params: Array[Term]): Boolean = typeRef match {
       case applied: TypedAST.AppliedClassType if ctors.length == 1 =>
         val classSubst = TypeSubstitution.classSubstitution(applied)
@@ -419,7 +423,13 @@ final class ConstructionTyping(
             formals(i) match {
               case tv: TypedAST.TypeVariableType if params(i).`type`.isInstanceOf[TypedAST.TypeVariableType] =>
                 TypeRules.isSuperTypeByIdentity(tv, params(i).`type`)
-              case f => TypeRelations.isAssignableWithBoxing(f, params(i).`type`, bodyContext.table)
+              // A `T?` slot takes what a `T` slot takes, plus null: `new S[T, U](u, u)`
+              // into `def this(x: T?, ...)` compiled and threw on the next read (#2332).
+              case n: TypedAST.NullableType
+                  if n.innerType.isInstanceOf[TypedAST.TypeVariableType] &&
+                    nonNullCore(params(i).`type`).isInstanceOf[TypedAST.TypeVariableType] =>
+                TypeRules.isSuperTypeByIdentity(n.innerType, nonNullCore(params(i).`type`))
+              case f =>TypeRelations.isAssignableWithBoxing(f, params(i).`type`, bodyContext.table)
             }
           }
       case _ => true

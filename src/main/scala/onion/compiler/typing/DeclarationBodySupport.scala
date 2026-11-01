@@ -21,6 +21,7 @@ private[compiler] final class DeclarationBodySupport(
     typing.find(definition.name).foreach(unitContext.currentMapper = _)
     val classTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
     typing.openTypeParams(typing.emptyTypeParams ++ classTypeParams) {
+      methodBodySupport.processTypeContracts(definition, node.invariants, node.histories)
       val instanceInitializers = Buffer[ActionStatement]()
       val staticInitializers = Buffer[ActionStatement]()
       definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {

@@ -7,6 +7,164 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.150.0] - 2026-11-01
+
+### Breaking
+
+- **`map`/`filter` on a range, `map.values()` or another `Iterable` that is not a `List` or `Set` are typed `List[T]` (#2496).**
+  - Before: `Iterable[T]`, so `(1..10).filter { ... }.size`, `[i]` and `.take(n)` were E0004/E0005 unless you added `.toList()`.
+  - Now: `List[T]`, the list they already returned.
+  - Breaks: `var xs = (1..3).map { ... }` is a `List[Int]`, so a later `xs = someSet` is E0000. The error says to declare `var xs: Iterable[Int] = ...`.
+  - Changes meaning: an overload or extension on both `Iterable` and `List` now picks the `List` one.
+  - Recompile: a class compiled against an older `onion.jar` that calls these methods throws `NoSuchMethodError`.
+  - See `docs/migration/pre-1.0.md`.
+- **A `T?` slot (field, variable, argument, return, constructor argument) no longer takes an unrelated value (#2332).**
+  - Before: `o = u`, `o = uo` or `o = "x"` into `o: T?` compiled, then threw `ClassCastException` where the value was read back as a `T`.
+  - Now: `E0000 type T? is expected, but type U is used.` (`E0021` for a constructor argument, as for a `T` parameter). A `T`, a `T?` and `null` still fit; write `(u as T)` if the value really is a `T`.
+
+### Added
+
+- **An `invariant` or `history` on a mutable object is E0110.**
+  - `invariant items != null` on a `List` field is rejected; `Int`, `String`, enum and record fields are fine.
+- **An `invariant` or `history` on a class with a Java superclass is E0111.**
+- **W0021: a method can break a `history`; the solver found a counterexample.**
+  - `n = n + 1` against `history n >= old(n)` warns with `n = 2147483647` until an `invariant` bounds `n`.
+- **A `history` that is not a preorder is E0108.**
+  - `history n == old(n) + 1` or `n > old(n)` is rejected; `n >= old(n)` is accepted.
+  - Needs `--contracts check`.
+- **`--verbose` lists the histories the solver proved.**
+  - Example: `[history] proved: Counter.inc: n >= old(n)`.
+  - Without `--verbose` a proof prints nothing, as before.
+- **A history counterexample the compiled code reproduces is E0112.**
+  - `n = n + 1` against `history n >= old(n)` with no bound on `n` now fails: run from `n = 2147483647`, `n` goes negative.
+  - A counterexample that cannot be run, or does not break when run, stays the warning W0021.
+  - Bound the state with an `invariant` or a `requires`, or weaken the history.
+- **A write that can break a `history` is E0109.**
+  - `ResettableCounter.reset` (`n = 0`) breaks `history n >= old(n)` because `Counter.inc` raises `n`.
+  - Reported only when the syntax settles it; a class whose only write is `n = 0` is fine.
+- **The history prover models `Int` locals and a trailing `return`.**
+  - `val d = k * 2` then `n = n + d` is now proved (or gets a counterexample) instead of being skipped.
+- **Java's anonymous class (`new Runnable { ... }`) gets a hint (#2514).**
+  - Before: a bare `Syntax error. Encountered "{"` with a token list.
+  - Now: the hint says Onion has no anonymous classes and shows the two ways out: a lambda for an interface with one abstract method (`val f: Runnable = () -> ...`), or a named class (`class RunnableImpl conforms Runnable { public: def ... }`, `extends` for a class such as `TimerTask`).
+
+### Changed
+
+- **`onionc --effects` now says when a method writes to memory: a new `mutate` effect (#2557).**
+  - Before: a setter, or a method that only calls `list.add(x)`, was `pure`.
+  - Now: it is `mutate`. A constructor that only fills in its own `this` stays `pure`.
+  - `mutate` is not a capability. A `tool` does not declare it and is never asked to, and `requires { mutate }` is E0079.
+  - Library classes with changeable state (`List`, `Map`, `Set`, `StringBuilder`, ...) default to `mutate`; only methods known to leave the receiver alone are `pure`.
+
+### Fixed
+
+- **A `main` or `tool` default can use an earlier parameter: `def main(a: Int, b: Int = a * 2)` (#2575).**
+  - Before: E0002 with a hint naming a hidden `args`, and `main(args: String, out: String = args + ".out")` silently read the script's `String[]`.
+  - Now: `onion x.on 5` prints `15` and `--b 1` gives `6`, as on any other function.
+- **`(n as Int)` compiles again when `n` is a `Number?`, and `(i as Long)` when `i` is an `Integer` (#2551).**
+  - Before: E0000, "type Int is expected, but type Number? is used". Nullable forms ran before #2487.
+  - Now: a box's supertype or another numeric box converts as the primitive cast does. `Comparable[String] as Int` and `Integer as Char` stay E0000.
+- **`(o as Byte)` and `(o as Short)` narrow the value, so a `Byte` never holds 300 (#2562).**
+  - Before: `val o: Object = 300; val b: Byte = o as Byte` held 300, and printing it could crash.
+  - Now: it holds `44`, the same as `(300 as Byte)`.
+- **`record R(n: Int) conforms G[JInteger]` compiles again when `G` declares `n(): JInteger` (#2549).**
+  - Before: E0104 on `main` since #2385 (unreleased); before that, the program ran.
+  - Now: an `Int` method may cover a `JInteger` (or `Number`) method of a generic supertype, which is bridged. `Int` over `Double`, and `JInteger` over `Int`, are still E0104.
+- **A call on `this` inside a generic class sees the class's own `T`, not its bound (#2547, #2536).**
+  - Before: in `class J[T extends Comparable[T]]`, `cmp(t)` into a `Comparable[T]` parameter was E0000 `Comparable[Comparable]`; in `class J[T extends Number]`, `first(ys)` passed a `List[Number]` as `List[T]` and threw `ClassCastException` at run time.
+  - Now: the first compiles, as `j.cmp(t)` already did; the second is a compile error. Both for `f(x)` and `this.f(x)`, and from inside a lambda.
+- **A parameter default is checked against the parameter's type, like `val x: T = e` (#2541).**
+  - Before: `b: Byte = 200` ran as `-56` on `main`/`tool`, and crashed at load on other functions. `s: Short = 3.7` and `l: Long = 7` threw `VerifyError`.
+  - Now: an out-of-range or wrong-typed default is E0000 at the default; `l: Long = 7` and `d: Double = 1.0f` run.
+- **A failing `law` or `example` points at its own clause when many files compile together, or when several clauses share a line.**
+  - Before: `A.on:3:3`, the column of an `example` in `B.on`; every clause on a one-line record body got the first clause's column.
+  - Now: `A.on:3:15`, under the law's name; each clause on a line gets its own column.
+- **A record method that overrides a final `Object` method is E0039, as in a class.**
+  - Before: `record R(x: Int) { public: def notify(): void { } }` compiled, then failed to load with `IncompatibleClassChangeError`. Same for `wait`, `notifyAll` and `getClass(): Class`.
+  - Now: E0039 at the method. A same-named method with other parameters or another return type (`def notify(): Int`) still runs.
+- **`xs.sort(c)` on a `List[T?]` rejects a `Comparator[U?]` or `Comparator[U]` for an unrelated `U` (#2527).**
+  - Before: it compiled, then threw `ClassCastException` at run time.
+  - Now: E0005, as for a `List[T]`. A `Comparator[T?]` still sorts a `List[T?]`.
+- **`record T[X extends String](toString: X)` is a compile error, not a load-time crash.**
+  - Before: compiled, then `ClassFormatError: Duplicate method name "toString"` when the class loaded.
+  - Now: E0010 at the component, as for `toString: String`.
+- **A `type Name = String` from another file works in a record's `shape doc = json` (#2517).**
+  - Before: E0005 about `String.onion$$jsonShape()`, a method the user never wrote.
+  - Now: `n: Name` reads like `n: String`. An alias the shape still cannot read is E0061.
+- **Reading a plain constructor parameter in a method now says to declare it `val` (#2515).**
+  - Before: `class Lru(cap: Int)` with `cap` used in a method gave E0002 and `did you mean: e`.
+  - Now: E0002 adds "`cap` is a constructor parameter, not a field. Declare it `val cap` or `var cap`."
+- **A `law` over a `String` now tries delimiters and control characters (#2513).**
+  - Before: samples never held `,` `;` `=` `|` `"`, a tab or a newline, so `Row::parse(Row::format(r)) == r` passed for `from re"([^,]*),(-?\d+)"` while `Row("Smith, J", 3)` parses to `null`.
+  - Now: such a law fails with E0064 and the counterexample, here a `name` of `","`. A law that passed before may now fail; the counterexample shows the input the shape loses.
+- **An E0064 counterexample shows a `String` as a quoted, escaped Onion literal.**
+  - Before: `Row(name=,, n=-415012931)`, and a newline split the diagnostic over two lines.
+  - Now: `Row(name=",", n=-415012931)` and `Row(name="\n", n=1991376913)`, on one line, ready to paste into an `example`.
+- **`record G(getClass: Class[String])` is a compile error, not a load-time crash.**
+  - Before: compiled, then `IncompatibleClassChangeError` when the class loaded.
+  - Now: E0010 at the component, saying the accessor would override the final `Object.getClass()`. A type parameter bounded by `Class` (`record G[T extends Class[String]](getClass: T)`) is caught too.
+- **A class's, record's or method's own `[T]` wins over a module `type T = ...` alias (#2510).**
+  - Before: inside `class Box[T]`, `T` meant the alias, so `new Box[String]("x")` was E0021 against a `Box(Int)` nobody wrote.
+  - Now: `T` is the type parameter wherever `[T]` is in scope, static members included; outside the declaration, the alias still applies.
+- **An alias means the same thing wherever it is used (#2510).**
+  - Before: `type Wrap = List[S]` used inside `class C[S]` read `S` as `C`'s parameter, and `type Pair[A] = Map[String, A]` used inside `class C[A]` or `def f[A]` leaked its `A` into `C`'s or `f`'s. Valid calls were rejected with E0005 or E0000.
+  - Now: an alias's target is read where the alias is declared, with only its own type parameters, which are replaced by the arguments.
+- **An erasure-duplicate extension method is one error, not one per call.**
+  - Before: `p((Int) -> Int)` beside `p((String) -> String)` gave E0084 and an E0000 at each call.
+  - Now: E0084 at the declaration only.
+- **A `val`/`var` inside `do[...] { }` now gets a hint that compiles (#2465).**
+  - Before: "escape `val` with backticks", which is still a syntax error.
+  - Now: compute the value inside the `yield`; for `Option`, `Future` and `List` the hint also shows a bind form that compiles, such as `y <- Option::some(x + 1)`.
+- **Nested lambdas passed to an overloaded extension method compile in linear time.**
+  - Before: depth 20 did not finish in 60 s; the time doubled every two levels.
+  - Now: depth 20 compiles in about a second.
+- **A nested lambda that assigns an outer lambda's parameter now writes it back (#2426).**
+  - Before: `(k) -> { val f: () -> Int = () -> { k = k + 10; k }; f(); k }` called with 1 returned 1.
+  - Now: it returns 11, as for a captured `var` or a method parameter.
+  - The reverse holds too: a nested lambda reads the outer lambda's later writes.
+- **A self call next to an `Integer` branch is now a tail call (#2406).**
+  - Before: with `o: Integer`, `def q(o: Integer, n: Int): Int = if n == 0 { o } else { q(o, n - 1) }` failed with `error: stack overflow` at 200000 calls.
+  - Now: it loops. A null `Integer` still throws where it did, so a `try` around such an `if` behaves as before.
+- **A `select` statement with `return f(..)` in its cases loops instead of overflowing the stack (#2405).**
+  - Before: `select l { case Cons(h, t): return sum(t, acc + h); ... }` then `return -1` hit "stack overflow" on a long list.
+  - Now: it loops, also when the case body has several statements (`val m = n - 1` then `return f(m, ..)`).
+- **An extension method's default argument works: `"ab".pad()` compiles (#2401).**
+  - Before: `E0005`, "method not found", for a method you can see.
+  - Now: the default fills in, for `.` and `?.` calls. An overload that takes exactly the written arguments still wins. Like any default (#2375), it can use `self` and the parameters before it.
+- **`xs.sort(c)` also rejects `Comparator[? super U]`, and a `Comparator[U]` for a `List[String]` (#2397).**
+  - Before: both compiled, then threw `ClassCastException` inside the sort.
+  - Now: `E0005` at the call, as in Java. `Comparator[? super T]` for a `List[T]` still works, and so does an inherited `sort(c)` called inside `class Sub[S] extends ArrayList[S]`.
+- **A record method named like a component is a compile error (#2396).**
+  - Before: `record R(a: Int) { public: def a(): Int = 42 }` compiled, then died with a JVM `ClassFormatError`. With another return type, the body method was silently ignored.
+  - Now: E0010 at the `def`: "record component a: Int in R already generates the accessor a(): Int, so the record body cannot define a() again."
+- **A cast from a nullable value is checked like the non-null form (#2388).**
+  - Before: `(s as Integer)` with `s: String?` compiled, then threw `ClassCastException`.
+  - Now: E0000, with no `!!` hint (`!!` would not help). `null as Int?` and other valid casts still compile.
+- **A default argument can read the receiver's fields and the parameters before it (#2375, #2358).**
+  - Before: `def f(n: Int, m: Int = k)` with a field `k`, or `def g(n: Int, m: Int = n + 1)`, failed with `VerifyError` when the class loaded; a `private static` field threw `IllegalAccessError`.
+  - Now: the default runs in the called method, so `new C(7).f(1)` is `8` and `g(1)` is `3`. A default that names its own or a later parameter is `E0002`, with a hint.
+- **A default is checked against its parameter's type (#2541).**
+  - Before: `def f(b: Byte = 200)` compiled, then ran with `-56` or crashed when loaded.
+  - Now: `E0000`, as for `val b: Byte = 200`. An `Int` constant that fits still narrows (`b: Byte = 3`).
+- **An override that changes a primitive return type is `E0104` (#2372).**
+  - Before: `record Circle(area: Int) conforms Shape` with `Shape.area(): Double` or `area(): JInteger` compiled. Calls through `Shape` ran the other method, or threw `AbstractMethodError`.
+  - Now: `E0104` at the component, naming both methods. The same rule applies to a class method (`size(): Int` over `size(): Long`), as in Java.
+- **A `T extends Comparable[T]` is accepted where a `Comparable[T]` is expected (#2338).**
+  - Before: `def asCmp(t: T): Comparable[T] = t` was E0000, and `j.cmp(a, b)` into a `Comparable[T]` parameter was E0005.
+  - Now: both compile, as in Java, for `return`, `val`/`var` and call arguments. Other applied types, a raw bound and another variable's bound are still rejected.
+- **`new Box[T](u)` with an unrelated type variable `U` is a compile error (E0021), not a `ClassCastException` (#2332).**
+  - Before: it compiled, then threw `ClassCastException` at run time.
+  - Now: E0021 at the call, unless `U` is bounded by `T` (`[U extends T]`). Other mismatched arguments to a `T` slot (a `String`, an `Object`, a `U?`) are not covered yet; #2332 tracks them. If you meant the old behaviour, write `(u as T)`.
+- **A generic method call that breaks a `T extends B` bound is a compile error (#2325).**
+  - Before: with `def g[B, T extends B](v: T): B`, `val s: String = g(Integer::valueOf(1))` compiled, then threw a `ClassCastException`.
+  - Now: E0000 at the call. Calls where `T` fits `B`, or where nothing fixes `T` (`null`, `[]`, no argument), are unchanged.
+- **An `as` cast to or from an array that can never succeed is a compile error, also when one side is nullable (#2309).**
+  - Before: `(xs as String[])` with `xs: List[String]?`, or `(ys as Integer[])` with `ys: String[]`, compiled and always failed at run time with `invalid type cast`.
+  - Now: E0000. The List/array hint names your variable and is null-safe when needed (`xs!!.toArray(new String[0])`). Casts that can work (`Int[]? as Int[]`, `Object[] as String[]`) still compile.
+- **`foreach (x, y) in ps` over a List of records is one clear error, E0103 (#2301).**
+  - Before: two errors naming `entrySet()` and `K, V`, which you never wrote.
+  - Now: "`foreach (a, b)` walks the entries of a Map", with the fix `foreach p in ps { val (x, y) = p ... }`. Also for a call result or a literal (`in getPs()`, `in [p]`).
+
 ## [0.149.0] - 2026-10-31
 
 ### Fixed

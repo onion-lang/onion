@@ -1201,6 +1201,125 @@ record Circle(area: Int) conforms Shape   // E0104: area(): Int cannot override 
 
 Fix: give the component or method the inherited type (`area: JInteger`), or rename it.
 
+### `E0105` — A contract clause while contracts are off
+
+A `requires`, `ensures`, `invariant` or `history` clause appears in a program compiled with
+`--contracts off`, the default. Contracts are a preview feature (RFC #2557). The clause is an
+error rather than being ignored: a contract that silently does nothing is worse than none.
+
+```onion
+class Counter {
+  var n: Int
+public:
+  def get(): Int ensures result == n { return n }   // E0105: contracts are off
+}
+```
+
+Fix: compile with `--contracts check`, or remove the clause.
+
+### `E0106` — A contract that is not pure
+
+A contract expression calls something that does I/O, writes memory, or that the effect
+inference cannot vouch for. A contract states what holds; it may not change anything. A call
+to a method of the program is allowed when that method is pure.
+
+```onion
+import { java.util.* }
+class A {
+public:
+  def f(xs: List[Int]): Int requires xs.add(1) { return 0 }   // E0106: List.add writes to memory
+}
+```
+
+Fix: call a pure method (`xs.size`, `xs.get(0)`), or move the work out of the contract.
+
+### `E0107` — `old(...)` out of place
+
+`old(e)` is the value of `e` on entry to a method. It means that only in an `ensures` or a
+`history`. In a `requires` or an `invariant` there is no earlier state to look at.
+
+```onion
+class A {
+  var n: Int
+public:
+  def f(): void requires old(n) > 0 { }   // E0107
+}
+```
+
+Fix: use the plain value in a `requires`, or move the condition to an `ensures`.
+
+### `E0108` — a `history` that is not a preorder
+
+A `history` relates two states of one object. It must be reflexive (`h(a, a)` holds) and
+transitive, so that checking one call at a time checks the whole life of the object.
+`n == old(n) + 1` is neither; `n > old(n)` is not reflexive.
+
+```onion
+class A {
+  var n: Int
+  history n == old(n) + 1   // E0108
+  history n >= old(n)       // ok
+}
+```
+
+Fix: use `x >= old(x)`, `x <= old(x)` or `x == old(x)`.
+
+### `E0109` — a write that can break a `history`
+
+`history n >= old(n)` says `n` never decreases. A method that lowers `n`, or that sets `n` to a
+constant while another method raises `n`, can break it. This is the case a subtype's
+`reset` creates: it keeps every precondition and postcondition and still breaks the history.
+
+```onion
+class Counter {
+  var n: Int
+  history n >= old(n)
+public:
+  def this { n = 0 }
+  def inc(): void { n = n + 1 }
+}
+class ResettableCounter extends Counter {
+public:
+  def reset(): void { n = 0 }   // E0109: inc raises n, so n can be above 0
+}
+```
+
+Only what the syntax settles is reported. Fix: remove the write, or weaken the history.
+
+### `E0110` — an `invariant` or `history` on a mutable object
+
+A clause may name only fields of a primitive, `String`, enum or record type. A `List` or another
+class can change without this class running, so the clause could not be checked one call at a time.
+
+```onion
+class A {
+  var items: java.util.List
+  invariant items != null   // E0110
+}
+```
+
+Fix: name a value-typed field, or a pure method that reads the object.
+
+### `E0111` — an `invariant` or `history` on a class with a Java superclass
+
+A Java superclass can have methods that change state, and the compiler can neither prove nor
+guard them. Extend only `Object` or an Onion class.
+
+```onion
+class A extends java.util.ArrayList {
+  invariant size >= 0   // E0111
+}
+```
+
+### `E0112` — a history that breaks when the code runs
+
+The solver found a state in which a method breaks a `history`, and running the compiled code from
+that state confirms it. `n = n + 1` against `history n >= old(n)` breaks at `n = 2147483647`,
+where `n + 1` wraps to a negative number.
+
+Fix: add an `invariant` or a `requires` that rules the state out, or weaken the history. A
+counterexample that does not break when run stays the warning `W0021`.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -1851,6 +1970,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0018` | a library jar's effect table names classes outside the jar; those entries were ignored |
 | `W0019` | the result of an immutable builder method (`Http.Request.header`, ...) is discarded as a statement, so the call does nothing |
 | `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
+| `W0021` | a method can break a `history`: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 
 ## Every diagnostic code
 
@@ -1963,6 +2083,14 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 | `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
 | `E0104` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
+| `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts check`) |
+| `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
+| `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
+| `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
+| `E0109` | this write can break the history … on … |
+| `E0110` | an `invariant` or `history` names a field that holds a mutable object |
+| `E0111` | a class with an `invariant` or `history` extends a Java class |
+| `E0112` | this method breaks the history … when run from … |
 
 ## See also
 

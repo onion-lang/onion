@@ -1189,6 +1189,125 @@ record Circle(area: Int) conforms Shape   // E0104: area(): Int は Shape.area()
 
 対処: コンポーネントやメソッドを継承元と同じ型にするか（`area: Integer`）、名前を変えてください。
 
+### `E0105` — 契約が無効なのに契約の節がある
+
+`requires`、`ensures`、`invariant`、`history` の節が、`--contracts off`（既定）でコンパイルした
+プログラムにあります。契約はプレビュー機能です（RFC #2557）。節は無視されずエラーになります。
+黙って何もしない契約は、無い方が悪くないからです。
+
+```onion
+class Counter {
+  var n: Int
+public:
+  def get(): Int ensures result == n { return n }   // E0105: 契約が無効
+}
+```
+
+直し方: `--contracts check` を付けてコンパイルするか、節を取り除きます。
+
+### `E0106` — 純粋でない契約
+
+契約の式が、I/O をするもの、メモリに書き込むもの、効果推論が保証できないものを呼んでいます。
+契約は「何が成り立つか」を述べるもので、何も変えてはいけません。プログラム自身のメソッドは、
+それが純粋なら呼べます。
+
+```onion
+import { java.util.* }
+class A {
+public:
+  def f(xs: List[Int]): Int requires xs.add(1) { return 0 }   // E0106: List.add はメモリに書き込む
+}
+```
+
+直し方: 純粋なメソッド（`xs.size`、`xs.get(0)`）を呼ぶか、処理を契約の外に出します。
+
+### `E0107` — 置けない場所の `old(...)`
+
+`old(e)` は、メソッドに入った時点での `e` の値です。その意味になるのは `ensures` と `history`
+の中だけです。`requires` や `invariant` には、見に行く以前の状態がありません。
+
+```onion
+class A {
+  var n: Int
+public:
+  def f(): void requires old(n) > 0 { }   // E0107
+}
+```
+
+直し方: `requires` では普通の値を使うか、条件を `ensures` に移します。
+
+### `E0108` — 前順序でない `history`
+
+`history` は同じオブジェクトの二つの状態の関係です。反射的（`h(a, a)` が成り立つ）で推移的でなければ、
+一回の呼び出しごとの検査が履歴全体の検査になりません。
+`n == old(n) + 1` はどちらでもなく、`n > old(n)` は反射的ではありません。
+
+```onion
+class A {
+  var n: Int
+  history n == old(n) + 1   // E0108
+  history n >= old(n)       // 通る
+}
+```
+
+直し方: `x >= old(x)`、`x <= old(x)`、`x == old(x)` のいずれかを使います。
+
+### `E0109` — `history` を壊しうる書き込み
+
+`history n >= old(n)` は `n` が減らないという意味です。`n` を減らすメソッドや、別のメソッドが `n` を増やすのに
+`n` へ定数を入れるメソッドは、これを壊しえます。部分型の `reset` がその例で、事前条件も事後条件も守ったまま
+history を壊します。
+
+```onion
+class Counter {
+  var n: Int
+  history n >= old(n)
+public:
+  def this { n = 0 }
+  def inc(): void { n = n + 1 }
+}
+class ResettableCounter extends Counter {
+public:
+  def reset(): void { n = 0 }   // E0109: inc が n を増やすので、n は 0 より大きくなりえます
+}
+```
+
+構文だけで決まるものだけを報告します。直し方: その書き込みをなくすか、history を弱めます。
+
+### `E0110` — 可変オブジェクトに対する `invariant` / `history`
+
+契約が名指しできるのは、基本型・`String`・enum・record のフィールドだけです。`List` や別のクラスは、
+このクラスのコードが動かなくても変わりうるので、一回の呼び出しごとの検査ができません。
+
+```onion
+class A {
+  var items: java.util.List
+  invariant items != null   // E0110
+}
+```
+
+直し方: 値型のフィールドを使うか、そのオブジェクトを読む純粋なメソッドを使います。
+
+### `E0111` — Java の親クラスを持つクラスの `invariant` / `history`
+
+Java の親クラスは状態を変えるメソッドを持ちえて、コンパイラはそれを証明も監視もできません。
+継承してよいのは `Object` か Onion のクラスだけです。
+
+```onion
+class A extends java.util.ArrayList {
+  invariant size >= 0   // E0111
+}
+```
+
+### `E0112` — 実行すると壊れる `history`
+
+ソルバーが、メソッドが `history` を壊す状態を見つけ、コンパイル済みのコードをその状態から実行しても
+壊れることを確かめました。`history n >= old(n)` に対する `n = n + 1` は、`n + 1` が負の数へ
+桁あふれする `n = 2147483647` で壊れます。
+
+直し方: その状態を除く `invariant` か `requires` を足すか、`history` を弱めます。実行しても壊れなかった
+反例は、警告 `W0021` のままです。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -1834,6 +1953,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `W0018` | ライブラリ jar の効果表が jar の外のクラスを名指しており、それらのエントリは無視された |
 | `W0019` | イミュータブルなビルダーのメソッド（`Http.Request.header` など）の結果が文として捨てられており、呼び出しが何も行わない |
 | `W0020` | `extension` メソッドの名前とアリティが既存のメンバー（自身または継承）と完全に一致している。既存のメンバーが常に優先されるため、その extension メソッドは呼び出されない |
+| `W0021` | メソッドが `history` を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
 
 ## 診断コード一覧
 
@@ -1946,6 +2066,14 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 | `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
 | `E0104` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
+| `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts check`) |
+| `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
+| `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
+| `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
+| `E0109` | this write can break the history … on … |
+| `E0110` | an `invariant` or `history` names a field that holds a mutable object |
+| `E0111` | a class with an `invariant` or `history` extends a Java class |
+| `E0112` | this method breaks the history … when run from … |
 
 ## 関連項目
 

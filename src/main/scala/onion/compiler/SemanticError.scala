@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0104) for identification
+ * type checking. Each error has a unique code (E0000-E0112) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -89,6 +89,9 @@ package onion.compiler
  *
  * '''Enum Errors (E0098-E0099)'''
  *   - ADT_ENUM_MIXES_SHARED_PARAMS, HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS
+ *
+ * '''Contract Errors (E0105-E0112)'''
+ *   - CONTRACTS_NOT_ENABLED, CONTRACT_NOT_PURE, CONTRACT_MISPLACED, HISTORY_NOT_PREORDER, HISTORY_BROKEN_BY_WRITE, CONTRACT_FIELD_NOT_VALUE, CONTRACT_JAVA_SUPERCLASS, HISTORY_REPRODUCED
  *
  * '''Pattern Matching Errors, continued (E0100)'''
  *   - MULTIPLE_BINDING_PATTERNS_IN_CASE
@@ -355,6 +358,44 @@ object SemanticError {
    * calls through the supertype ran the inherited method instead (issue #2372).
    */
   case object OVERRIDE_RETURN_TYPE_MISMATCH extends SemanticError(104)
+  /**
+   * A contract clause (`requires`, `ensures`, `invariant`, `history`) in a program compiled
+   * with `--contracts off`, the default. It is an error rather than being ignored: a contract
+   * that silently does nothing is worse than none (RFC #2557).
+   */
+  case object CONTRACTS_NOT_ENABLED extends SemanticError(105)
+  /**
+   * A contract expression that is not pure: it does I/O, writes memory, or calls something the
+   * effect inference cannot vouch for. A contract states what holds; it may not change anything.
+   */
+  case object CONTRACT_NOT_PURE extends SemanticError(106)
+  /** `old(e)` somewhere other than an `ensures` or a `history` (RFC #2557). */
+  case object CONTRACT_MISPLACED extends SemanticError(107)
+  /**
+   * A `history` that is not a preorder (RFC #2557, design 3.3): not reflexive or not transitive,
+   * so checking one call at a time would not check the whole life of the object.
+   */
+  case object HISTORY_NOT_PREORDER extends SemanticError(108)
+  /**
+   * A write to a field that can break a `history` on it (RFC #2557, design 4.1): the history says
+   * the field never decreases (or never increases, or never changes) and this write can do that.
+   * Reported only when the syntax settles it; anything else is left to the prover.
+   */
+  case object HISTORY_BROKEN_BY_WRITE extends SemanticError(109)
+  /**
+   * An `invariant` or `history` that names a field holding a mutable object (design 3.2, rule 1):
+   * the field can change without the owner's code running, so the clause cannot be checked one
+   * call at a time.
+   */
+  case object CONTRACT_FIELD_NOT_VALUE extends SemanticError(110)
+  /** A class with an `invariant` or `history` that extends a Java class other than `Object` (design 3.2, rule 4). */
+  case object CONTRACT_JAVA_SUPERCLASS extends SemanticError(111)
+  /**
+   * A history counterexample that was reproduced by running the compiled code (design 7.4): from
+   * the values the solver found, the method really breaks the history. Raised by the
+   * HistoryRepro phase, not the typer.
+   */
+  case object HISTORY_REPRODUCED extends SemanticError(112)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

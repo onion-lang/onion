@@ -1,7 +1,7 @@
 package onion.tools
 
 import java.io.UnsupportedEncodingException
-import onion.compiler.{CompilerConfig, Location, OnionCompiler, WarningCategory, WarningLevel, WarningReporter}
+import onion.compiler.{CompilerConfig, ContractMode, Location, OnionCompiler, WarningCategory, WarningLevel, WarningReporter}
 import onion.compiler.diagnostics.DiagnosticRenderer
 import onion.compiler.pipeline.{CompilationResult, CompileProfileFormat, CompileProfileReporter, CompileProfileSettings}
 import onion.compiler.toolbox.{Message, Systems}
@@ -32,6 +32,8 @@ object CompilerOptions {
   final val LAW_SEED: String = "--law-seed"
   final val LAW_SAMPLES: String = "--law-samples"
   final val SHOW_EFFECTS: String = "--effects"
+  /** `off` (default), `runtime` or `verify`: whether contract clauses are accepted (RFC #2557). */
+  final val CONTRACTS: String = "--contracts"
   /** Named after javac's -g:none, and meaning the same thing: no LocalVariableTable. */
   final val NO_DEBUG_INFO: String = "-g:none"
   final val STACKTRACE: String = "--stacktrace"
@@ -63,14 +65,15 @@ object CompilerOptions {
     OptionConfig(NO_CHECK_LAWS, false),
     OptionConfig(LAW_SEED, true),
     OptionConfig(LAW_SAMPLES, true),
-    OptionConfig(SHOW_EFFECTS, false)
+    OptionConfig(SHOW_EFFECTS, false),
+    OptionConfig(CONTRACTS, true)
   )
 
   /** The shared options that take a value (their value is skipped when locating a script file). */
   final val VALUE_OPTIONS: Set[String] = Set(
     CLASSPATH, SCRIPT_SUPER_CLASS, ENCODING, MAX_ERROR,
     PROFILE_FORMAT, PROFILE_OUTPUT, WARN_LEVEL, SUPPRESS_WARNINGS,
-    LAW_SEED, LAW_SAMPLES
+    LAW_SEED, LAW_SAMPLES, CONTRACTS
   )
 
   private def printError(message: String): Unit = System.err.println(message)
@@ -103,6 +106,7 @@ object CompilerOptions {
       profile <- parseCompileProfile(option)
       level <- parseWarningLevel(option.get(WARN_LEVEL))
       suppressed <- parseSuppressedWarnings(option.get(SUPPRESS_WARNINGS))
+      contracts <- parseContractMode(option.get(CONTRACTS))
     } yield new CompilerConfig(
       classpath.toIndexedSeq,
       "",
@@ -118,7 +122,8 @@ object CompilerOptions {
       checkLaws = checkLaws,
       emitDebugInfo = emitDebugInfo,
       lawSeed = longParam(option, LAW_SEED, ArgGenerator.DefaultSeed),
-      lawSamples = intParam(option, LAW_SAMPLES, ArgGenerator.DefaultSamples)
+      lawSamples = intParam(option, LAW_SAMPLES, ArgGenerator.DefaultSamples),
+      contracts = contracts
     )
   }
 
@@ -237,6 +242,24 @@ object CompilerOptions {
       printError(Message("error.command.noArgument", WARN_LEVEL))
       None
     case None => Some(WarningLevel.On)
+  }
+
+  def parseContractMode(param: Option[CommandLineParam]): Option[ContractMode] = param match {
+    case Some(ValuedParam(value)) =>
+      ContractMode.fromName(value) match {
+        case Some(mode) if ContractMode.isAvailable(mode) => Some(mode)
+        case Some(reserved) =>
+          // runtime and verify are reserved names: refuse them rather than accept a mode that checks nothing.
+          printError(Message("error.command.contractsModeNotBuilt", CONTRACTS, ContractMode.flagName(reserved)))
+          None
+        case None =>
+          printError(Message("error.command.contractsInvalidMode", CONTRACTS, value))
+          None
+      }
+    case Some(NoValuedParam) =>
+      printError(Message("error.command.noArgument", CONTRACTS))
+      None
+    case None => Some(ContractMode.Off)
   }
 
   def parseSuppressedWarnings(param: Option[CommandLineParam]): Option[Set[WarningCategory]] = param match {

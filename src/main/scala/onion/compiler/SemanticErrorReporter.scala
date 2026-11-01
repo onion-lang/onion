@@ -784,13 +784,22 @@ class SemanticErrorReporter(threshold: Int) {
       } else if (sameNamedTypeVariables(expected, actual)) {
         // `def m[T](a: T) { t = a }` inside `class K[T]`: two parameters named `T`,
         // so "type T is expected, but type T is used" contradicts itself without this.
-        Some(format(message("suggestion.shadowedTypeParameter"), Seq(typeName(expected))))
+        Some(format(message("suggestion.shadowedTypeParameter"), Seq(typeName(expected match {
+          case n: TypedAST.NullableType => n.innerType
+          case other => other
+        }))))
       } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable &&
           !nonNullStillMisfitsTypeVariable(expected, actual) &&
           // A rejected cast is about the inner types: `(s!! as Integer)` fails the same way.
           castSource.isEmpty) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
-      } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
+      } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] &&
+          // A `T?` slot is a type-variable slot too: `t = u` there is the same mistake as
+          // into a `T`, not a lost type argument (#2332 review).
+          !(expected match {
+            case n: TypedAST.NullableType => n.innerType
+            case other => other
+          }).isInstanceOf[TypedAST.TypeVariableType]) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
         // nested class does not restore the scrutinee's type arguments, a pattern does.
         Some(format(message("suggestion.castLosesTypeArguments"), Seq(typeName(actual))))
@@ -1378,6 +1387,44 @@ object SemanticErrorReporter {
       "error.semantic.overrideReturnTypeMismatch",
       // A boxed wrapper keeps its written name (`JInteger`): `Int` vs `Int` would hide the clash.
       Seq(items => asString(items(0)), items => writtenTypeName(items(1)), items => typeName(items(2)), items => writtenTypeName(items(3)))
+    ),
+    SemanticError.CONTRACTS_NOT_ENABLED -> ErrorDef(
+      "error.semantic.contractsNotEnabled",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.CONTRACT_NOT_PURE -> ErrorDef(
+      "error.semantic.contractNotPure",
+      // items: callee, reason kind, outside-effect names. The reason is a message key, not a sentence.
+      Seq(
+        items => asString(items(0)),
+        items => format(message("error.semantic.contractNotPure.reason." + asString(items(1))), Seq(asString(items(2))))
+      )
+    ),
+    SemanticError.CONTRACT_MISPLACED -> ErrorDef(
+      "error.semantic.contractMisplaced",
+      // item: the scope the `old(...)` appeared in (Pre or Invariant), named in the message.
+      Seq(items => message("error.semantic.contractMisplaced.in" + asString(items(0))))
+    ),
+    SemanticError.HISTORY_NOT_PREORDER -> ErrorDef(
+      "error.semantic.historyNotPreorder",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.HISTORY_BROKEN_BY_WRITE -> ErrorDef(
+      "error.semantic.historyBrokenByWrite",
+      // items: field, history as source text, reason kind (lower | set | any), the method that raises the field (or "").
+      Seq(
+        items => asString(items(0)),
+        items => asString(items(1)),
+        items => format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
+      )
+    ),
+    SemanticError.CONTRACT_FIELD_NOT_VALUE -> ErrorDef(
+      "error.semantic.contractFieldNotValue",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.CONTRACT_JAVA_SUPERCLASS -> ErrorDef(
+      "error.semantic.contractJavaSuperclass",
+      Seq(items => asString(items(0)), items => asString(items(1)))
     ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",

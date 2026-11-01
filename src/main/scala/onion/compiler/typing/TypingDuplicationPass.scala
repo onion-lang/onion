@@ -232,6 +232,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
       DuplicationChecks.checkOverrideContracts(
         typing, clazz, node.location, skipObject = true, memberLocations = node.args.map(a => a.name -> a.location).toMap)
+      DuplicationChecks.checkRecordFinalObjectOverrides(typing, clazz, node.args.map(_.name).toSet, node.location)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
     }
 

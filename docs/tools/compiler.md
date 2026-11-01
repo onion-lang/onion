@@ -149,6 +149,7 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 | `W0018` | `foreign-effect-entry` | A library jar's effect table names classes outside the jar; those entries were ignored |
 | `W0019` | `discarded-builder-result` | The result of an immutable builder method is discarded, so the call has no effect |
 | `W0020` | `extension-method-shadowed` | An extension method's name and arity exactly match an existing member, so the extension is never called |
+| `W0021` | `history-not-proved` | A method can break a history; the solver found a counterexample |
 
 ### `--no-check-laws`
 
@@ -171,6 +172,20 @@ count widens the search for others.
 ```bash
 onionc --law-samples 500 MyProgram.on
 onionc --law-seed 7 MyProgram.on
+```
+
+### `--contracts <off|check>`
+
+Accept contract clauses (`requires` and `ensures` on a method, `invariant` and `history` in a
+class) and check them statically. This is a preview feature (RFC #2557). The default is `off`,
+and with `off` a clause is an error that names this flag, so a contract is never silently ignored.
+
+`check` types the clauses and runs the static checks that need no solver. **Nothing is enforced
+when the program runs.** `runtime` (guards for what was not proved) and `verify` (proofs) are
+reserved names: the command line refuses them until they check something.
+
+```bash
+onionc --contracts check MyProgram.on
 ```
 
 ### `--effects`

@@ -203,6 +203,16 @@
           "match": "\\b(requires)\\b(?=\\s*\\{)"
         },
         {
+          "comment": "Contract clauses (RFC #2557). Pinned to the start of a line, or to the end of a signature, with an expression after it, so a variable named `ensures` stays uncoloured.",
+          "name": "keyword.other.contract.onion",
+          "match": "(?:^|(?<=\\)|[A-Za-z_\\]?]))\\s*\\b(requires|ensures)\\b(?=\\s+[^\\s=,;:.)\\]}])"
+        },
+        {
+          "comment": "Type-body contract clauses (RFC #2557): `invariant e` and `history e` at the start of a line. A field or method with these names starts with `var` or `def`, so it stays uncoloured.",
+          "name": "keyword.other.contract.onion",
+          "match": "^\\s*\\b(invariant|history)\\b(?=\\s+[^\\s=,;:.()\\]}])"
+        },
+        {
           "name": "storage.type.shape.onion",
           "match": "\\b(shape)\\b(?=\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*=)"
         },

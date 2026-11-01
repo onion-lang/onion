@@ -50,6 +50,17 @@ object AST {
   ): RecordDeclaration =
     RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, laws, examples, Nil, sections, shapes)
 
+  /** The same as [[recordDeclaration]], with the `invariant` and `history` clauses of the body (RFC #2557). */
+  def recordDeclarationWithContracts(
+    location: Location, modifiers: Int, name: String,
+    typeParameters: List[TypeParameter], args: List[Argument],
+    superInterfaces: List[TypeNode], fromRaw: String, derives: List[String],
+    laws: List[LawClause], examples: List[ExampleClause],
+    sections: List[AccessSection], shapes: List[ShapeClause],
+    invariants: List[Expression], histories: List[Expression]
+  ): RecordDeclaration =
+    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, laws, examples, Nil, sections, shapes, Nil, invariants, histories)
+
   /** Java-callable factory for an `example` clause; `name` may be null (unnamed example). */
   def exampleClause(location: Location, name: String, body: BlockExpression): ExampleClause =
     ExampleClause(location, Option(name), body)
@@ -297,9 +308,14 @@ object AST {
   case class DoWhileExpression(location: Location, block: BlockExpression, condition: Expression) extends Expression
   case class WhileExpression(location: Location, condition: Expression, block: BlockExpression) extends Expression
 
-  case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil) extends Toplevel {
+  case class FunctionDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil,
+    /** `requires e` and `ensures e` clauses of a top-level function, in source order (RFC #2557). */
+    requires: List[Expression] = Nil, ensures: List[Expression] = Nil) extends Toplevel {
     def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, throwsTypes: List[TypeNode]) =
-      this(location, modifiers, name, args, returnType, block, Nil, throwsTypes, Nil)
+      this(location, modifiers, name, args, returnType, block, Nil, throwsTypes, Nil, Nil, Nil)
+    /** The shape the grammar's `tool` declaration builds: no clauses. Java cannot see the defaults. */
+    def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter], throwsTypes: List[TypeNode], annotations: List[Annotation]) =
+      this(location, modifiers, name, args, returnType, block, typeParameters, throwsTypes, annotations, Nil, Nil)
   }
   case class GlobalVariableDeclaration(location: Location, modifiers: Int, name: String, typeRef: TypeNode, init: Expression/*nullable*/) extends Toplevel
 
@@ -331,7 +347,11 @@ object AST {
   case class TypeParameter(location: Location, name: String, upperBound: Option[TypeNode] = None, constraints: List[TypeNode] = Nil) extends Node
   case class Annotation(location: Location, name: String) extends Node
 
-  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil) extends MemberDeclaration {
+  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil,
+    /** `requires e` clauses, in source order (RFC #2557). Always empty unless `--contracts` is on. */
+    requires: List[Expression] = Nil,
+    /** `ensures e` clauses, in source order. `result` and `old(e)` may appear in them. */
+    ensures: List[Expression] = Nil) extends MemberDeclaration {
     def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression) =
       this(location, modifiers, name, args, returnType, block, Nil, Nil, Nil)
     def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter]) =
@@ -367,7 +387,7 @@ object AST {
    *                           synthesize the static `parse`/`parseAll` methods (None when absent).
    * @param synthesizedMethods Methods derived from `fromPattern` (filled in during Rewriting).
    */
-  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, laws: List[LawClause] = Nil, examples: List[ExampleClause] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil, sections: List[AccessSection] = Nil, shapes: List[ShapeClause] = Nil, synthesisArgTypes: List[TypeNode] = Nil) extends TypeDeclaration
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, laws: List[LawClause] = Nil, examples: List[ExampleClause] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil, sections: List[AccessSection] = Nil, shapes: List[ShapeClause] = Nil, synthesisArgTypes: List[TypeNode] = Nil, invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration
   /**
    * A `shape name = re"..."` clause on a record — a named, first-class boundary.
    *
@@ -399,11 +419,14 @@ object AST {
    *                   A class with neither has no primary; its `def this` constructors call
    *                   the superclass's no-arg constructor directly, as they always have.
    */
-  case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil, hasPrimary: Boolean = false) extends TypeDeclaration {
+  case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil, hasPrimary: Boolean = false,
+    /** `invariant e` and `history e` clauses of the body, in source order (RFC #2557). */
+    invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
       this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil, false)
   }
-  case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
+  case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration], typeParameters: List[TypeParameter] = Nil,
+    invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration]) =
       this(location, modifiers, name, superInterfaces, methods, Nil)
   }

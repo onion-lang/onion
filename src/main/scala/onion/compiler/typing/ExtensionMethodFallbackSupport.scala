@@ -23,8 +23,54 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   private val failedAt =
     new java.util.IdentityHashMap[AST.MethodCall, java.util.HashSet[(Type, List[Type], Type, AnyRef)]]()
 
+  /** The call typed against a user-declared extension from its already-typed arguments.
+   *  A call whose lambdas declare every parameter type needs no bidirectional re-typing, and
+   *  re-typing the lambda bodies once per nesting level made nested calls exponential (#2463).
+   *  None when there is no user extension of the name, or none fits unambiguously; otherwise
+   *  the build's own result, errors reported as on the no-lambda path.
+   *  Also None when another overload takes a function or SAM at a lambda's position that the
+   *  typed lambda does not fit (invariance: `(String) -> String` is not a `(String) -> Object`):
+   *  the bidirectional path would re-type the lambda against it and may pick it, and writing a
+   *  lambda's parameter type must not change which overload runs. */
+  def tryUserExtensionWithTypedArguments(
+    node: AST.MethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Option[Term]] =
+    val user = collectExtensionMethods(targetType, node.name).filterNot(isBuiltinExtension)
+    // One receiver type for all of them: overloads whose parameters and receivers could rank
+    // in opposite directions (E0006) are left to the ranking in the bidirectional path.
+    if (user.isEmpty || user.exists(m => !(m.receiverType eq user.head.receiverType))) None
+    else selectApplicableExtensionMethod(targetType, node.name, params) match {
+      case CandidateSelection.Selected(m) if !isBuiltinExtension(m) && !lambdaCouldRetypeToAnother(m, user, node, params) =>
+        Some(buildExtensionCall(node, target, targetType, params, expected, m))
+      case _ => None
+    }
+
+  private def lambdaCouldRetypeToAnother(
+    selected: ExtensionMethodDefinition,
+    overloads: Seq[ExtensionMethodDefinition],
+    node: AST.MethodCall,
+    params: Array[Term]
+  ): Boolean = {
+    val lambdaIndices = node.args.indices.filter(i => node.args(i).isInstanceOf[AST.ClosureExpression])
+    overloads.exists { o =>
+      !(o eq selected) && o.arguments.length == params.length && lambdaIndices.exists { i =>
+        val p = o.arguments(i)
+        val functional = p match {
+          case ct: ClassType => ct.name != "java.lang.Object" && isLambdaSlot(ct)
+          case _ => false
+        }
+        functional && !calls.isAssignableWithBoxing(p, params(i).`type`)
+      }
+    }
+  }
+
   /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
    *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
+
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
     selectApplicableExtensionMethod(targetType, name, params).isInstanceOf[CandidateSelection.Ambiguous[?]]
 

@@ -167,11 +167,31 @@ final class TypingTypeSupport(private val typing: Typing) {
     // earlier one's bound (ordinary declaration-order scoping); self- and
     // mutually-F-bounded references still resolve via their Phase 1
     // placeholder, exactly as before.
+    // A bound that is a bare later parameter (`[A extends B, B]`) is resolved
+    // after that parameter, so `A`'s bound is `B` itself, not `B`'s
+    // placeholder. Through the placeholder, `A`'s bound chain never reached
+    // `B`: joining an `A` with a `B` failed with "type B is expected, but
+    // type B is used" (#2308). A cycle keeps declaration order.
+    val byName = distinct.map(tp => tp.name -> tp).toMap
+    def bareBoundParam(tp: AST.TypeParameter): Option[AST.TypeParameter] =
+      tp.upperBound.map(_.desc).collect {
+        case AST.ReferenceType(n, false) => n
+        case AST.NullableType(AST.ReferenceType(n, false)) => n
+      }.filter(_ != tp.name).flatMap(byName.get)
+    val resolutionOrder = Buffer[AST.TypeParameter]()
+    val visiting = MutableSet[String]()
+    def visit(tp: AST.TypeParameter): Unit =
+      if (!visiting.contains(tp.name)) {
+        visiting += tp.name
+        bareBoundParam(tp).foreach(visit)
+        resolutionOrder += tp
+      }
+    distinct.foreach(visit)
     val outerScope = typing.typeParams_
     var scope = outerScope ++ placeholders
     typing.setTypeParams(scope)
     try {
-      distinct.map { tp =>
+      val resolvedByName = resolutionOrder.map { tp =>
         // Nullability: bare [T] means T ranges over nullable types too;
         // an explicit non-null bound [T extends B] restricts T to non-null
         // types; [T extends B?] opts back into nullable with bound B
@@ -209,8 +229,14 @@ final class TypingTypeSupport(private val typing: Typing) {
         val resolved = TypeParam(tp.name, variableType, upper, constraintTypes)
         scope = scope ++ Seq(resolved)
         typing.setTypeParams(scope)
-        resolved
-      }.toSeq
+        tp.name -> resolved
+      }.toMap
+      // A bound that names its own parameter (`A` in `[A extends Animal[A]]`)
+      // still holds the placeholder, so a member reached through that bound
+      // (`me().me()`) yields the placeholder, not `A`. Link it, so a `T` slot
+      // recognises it as the same parameter (#2308).
+      placeholders.foreach(ph => ph.variableType.resolvedParameter = resolvedByName(ph.name).variableType)
+      distinct.map(tp => resolvedByName(tp.name)).toSeq
     } finally {
       typing.setTypeParams(outerScope)
     }

@@ -14,7 +14,7 @@ class RecordAccessorOverrideSpec extends AbstractShellSpec {
     }
   }
 
-  describe("A primitive return type must match the inherited one exactly (E0103)") {
+  describe("A primitive return type must match the inherited one exactly (E0104)") {
     it("rejects Int over Integer in an enum case, at the component") {
       val errs = errors(
         """
@@ -26,7 +26,7 @@ class RecordAccessorOverrideSpec extends AbstractShellSpec {
           |val s: Shape = new Circle(3)
           |println(s.area())
           |""")
-      assert(errs.flatMap(_.errorCode) == Seq("E0103"))
+      assert(errs.flatMap(_.errorCode) == Seq("E0104"))
       assert(errs.head.location.line == 3)
       assert(errs.head.message.contains("area"))
     }
@@ -39,7 +39,7 @@ class RecordAccessorOverrideSpec extends AbstractShellSpec {
           |val h: HasN = new R(4)
           |println(h.n())
           |""")
-      assert(errs.flatMap(_.errorCode) == Seq("E0103"))
+      assert(errs.flatMap(_.errorCode) == Seq("E0104"))
       assert(errs.head.location.line == 3)
     }
 
@@ -49,7 +49,7 @@ class RecordAccessorOverrideSpec extends AbstractShellSpec {
           |interface Shape { def area(): Double }
           |record Circle(r: Int, area: Int) conforms Shape
           |""")
-      assert(record.flatMap(_.errorCode) == Seq("E0103"))
+      assert(record.flatMap(_.errorCode) == Seq("E0104"))
       assert(record.head.location.line == 3)
       val klass = errors(
         """
@@ -64,7 +64,7 @@ class RecordAccessorOverrideSpec extends AbstractShellSpec {
           |  def size(): Int = 2
           |}
           |""")
-      assert(klass.flatMap(_.errorCode) == Seq("E0103"))
+      assert(klass.flatMap(_.errorCode) == Seq("E0104"))
       assert(klass.head.location.line == 10)
     }
 

@@ -250,12 +250,13 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       else {
         seen += arg.name
         // The accessor of `hashCode: Int` or `toString: String` has the same signature as the
-        // method the record generates itself: a ClassFormatError at load (#2391). Any other
+        // method the record generates itself: a ClassFormatError at load (#2391). The accessor
+        // of `getClass: Class` would override the final Object.getClass() (#2512). Any other
         // type gives the accessor a different descriptor, which the JVM accepts.
         val field = clazz.field(arg.name)
         if (clashesWithGeneratedMethod(arg.name, field))
           typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type],
-            SemanticErrorReporter.RecordComponentClash(field.`type`))
+            SemanticErrorReporter.RecordComponentClash(field.`type`, overridesFinal = arg.name == "getClass"))
       }
     }
   }
@@ -265,10 +266,14 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private def clashesWithGeneratedMethod(name: String, field: FieldRef): Boolean =
     field != null && (name match {
       case "hashCode" => field.`type` == BasicType.INT
-      case "toString" =>
-        onion.compiler.generics.Erasure.asmType(field.`type`).getDescriptor == "Ljava/lang/String;"
+      case "toString" => erasedDescriptor(field) == "Ljava/lang/String;"
+      // Object.getClass() is final: an accessor `getClass(): Class` fails to load (#2512).
+      case "getClass" => erasedDescriptor(field) == "Ljava/lang/Class;"
       case _ => false
     })
+
+  private def erasedDescriptor(field: FieldRef): String =
+    onion.compiler.generics.Erasure.asmType(field.`type`).getDescriptor
 
   private def processSynthesizedMethodDeclaration(node: AST.MethodDeclaration): Unit =
     withKernel[MethodDefinition](node) { method =>

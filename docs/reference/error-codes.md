@@ -1167,7 +1167,27 @@ Fix: combine the methods into the first block. Distinct concrete
 instantiations of the same generic receiver do not collide
 (`extension List[Int]` and `extension List[String]` can coexist).
 
-### `E0103` — Override changes a primitive return type
+### `E0103` — `foreach (a, b)` over something that is not a Map
+
+`foreach (a, b) in xs` walks the entries of a `Map` (or of any class with its own
+`entrySet()`). When `xs` is of another type, such as a `List`, an array or a
+record, it is this one error, at the `foreach`. This holds for any `xs`: a
+variable, a field, a call result or a literal. It used to report `entrySet()`
+not found and an operator error on `K, V`, names you never wrote.
+
+```onion
+record P(x: Int, y: Int)
+val ps = [new P(1, 2), new P(3, 4)]
+foreach (x, y) in ps { println(x + y) }   // E0103: this is List[P], not a Map
+```
+
+Fix: take each element apart with `val (a, b) = p`.
+
+```onion
+foreach p in ps { val (x, y) = p; println(x + y) }
+```
+
+### `E0104` — Override changes a primitive return type
 
 A method, or a record component's accessor, overrides an inherited method with a
 different return type, and one of the two types is primitive. The JVM matches an
@@ -1176,7 +1196,7 @@ Calls through the supertype would run the inherited method instead.
 
 ```onion
 interface Shape { def area(): JInteger }
-record Circle(area: Int) conforms Shape   // E0103: area(): Int cannot override Shape.area(): JInteger
+record Circle(area: Int) conforms Shape   // E0104: area(): Int cannot override Shape.area(): JInteger
 ```
 
 Fix: give the component or method the inherited type (`area: JInteger`), or rename it.
@@ -1941,7 +1961,8 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
 | `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
-| `E0103` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
+| `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
+| `E0104` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
 
 ## See also
 

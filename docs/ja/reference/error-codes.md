@@ -1154,7 +1154,27 @@ extension List[Int] { def bar(): Int = 2 }   // E0102: List[int] 用の extensio
 異なる具体的インスタンス化は衝突しません（`extension List[Int]` と
 `extension List[String]` は共存できます）。
 
-### `E0103` — オーバーライドでプリミティブの戻り値型が変わる
+### `E0103` — Map ではないものに対する `foreach (a, b)`
+
+`foreach (a, b) in xs` は `Map`（または独自の `entrySet()` を持つクラス）のエントリを
+回す構文です。`xs` の型が `List`・配列・レコードなどのときは、`foreach` の位置で
+この1つのエラーになります。`xs` が変数・フィールド・呼び出し結果・リテラルの
+どれでも同じです。以前は `entrySet()` が見つからない
+というエラーと `K, V` への演算子エラーが出ていました。どちらも書いていない名前です。
+
+```onion
+record P(x: Int, y: Int)
+val ps = [new P(1, 2), new P(3, 4)]
+foreach (x, y) in ps { println(x + y) }   // E0103: List[P] は Map ではない
+```
+
+対処: `val (a, b) = p` で要素を分解してください。
+
+```onion
+foreach p in ps { val (x, y) = p; println(x + y) }
+```
+
+### `E0104` — オーバーライドでプリミティブの戻り値型が変わる
 
 メソッド、またはレコードのコンポーネントのアクセサが、継承したメソッドを別の戻り値型でオーバーライドしています。
 しかも、どちらかの型がプリミティブ型です。
@@ -1164,7 +1184,7 @@ JVM はオーバーライドを正確なディスクリプタ（引数と戻り�
 
 ```onion
 interface Shape { def area(): JInteger }
-record Circle(area: Int) conforms Shape   // E0103: area(): Int は Shape.area(): JInteger をオーバーライドできない
+record Circle(area: Int) conforms Shape   // E0104: area(): Int は Shape.area(): JInteger をオーバーライドできない
 ```
 
 対処: コンポーネントやメソッドを継承元と同じ型にするか（`area: Integer`）、名前を変えてください。
@@ -1924,7 +1944,8 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
 | `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
-| `E0103` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
+| `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
+| `E0104` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
 
 ## 関連項目
 

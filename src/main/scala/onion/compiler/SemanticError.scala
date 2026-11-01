@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0103) for identification
+ * type checking. Each error has a unique code (E0000-E0104) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -35,7 +35,7 @@ package onion.compiler
  * '''Access Errors (E0013-E0015)'''
  *   - METHOD_NOT_ACCESSIBLE, FIELD_NOT_ACCESSIBLE, CLASS_NOT_ACCESSIBLE
  *
- * '''Inheritance Errors (E0016, E0018, E0023, E0037-E0039, E0068, E0072, E0103)'''
+ * '''Inheritance Errors (E0016, E0018, E0023, E0037-E0039, E0068, E0072, E0104)'''
  *   - CYCLIC_INHERITANCE, ILLEGAL_INHERITANCE, INTERFACE_REQUIRED
  *   - UNIMPLEMENTED_ABSTRACT_METHOD, ABSTRACT_CLASS_INSTANTIATION, FINAL_METHOD_OVERRIDE
  *   - OVERRIDE_TARGET_NOT_FOUND, ABSTRACT_METHOD_WITH_BODY, OVERRIDE_RETURN_TYPE_MISMATCH
@@ -98,6 +98,9 @@ package onion.compiler
  *
  * '''Duplication Errors, continued (E0102)'''
  *   - DUPLICATE_EXTENSION_BLOCK
+ *
+ * '''Control Flow Errors, continued (E0103)'''
+ *   - FOREACH_PAIR_NOT_MAP
  *
  * == Error Message Lookup ==
  *
@@ -338,12 +341,20 @@ object SemanticError {
   case object DUPLICATE_EXTENSION_BLOCK extends SemanticError(102)
 
   /**
+   * `foreach (a, b) in xs` where `xs` is not a Map. The parser rewrites the pair form
+   * to a walk over `xs.entrySet()`, so a List of records used to report
+   * "entrySet() not found" and "operator + for K, V" -- names the user never wrote
+   * (issue #2301).
+   */
+  case object FOREACH_PAIR_NOT_MAP extends SemanticError(103)
+
+  /**
    * A method (or a record component's accessor) overrides an inherited one with a different
    * return type where either is primitive: `area(): Int` over `area(): Integer` or
    * `area(): Double`. The JVM matches overrides by descriptor and no bridge is emitted, so
    * calls through the supertype ran the inherited method instead (issue #2372).
    */
-  case object OVERRIDE_RETURN_TYPE_MISMATCH extends SemanticError(103)
+  case object OVERRIDE_RETURN_TYPE_MISMATCH extends SemanticError(104)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

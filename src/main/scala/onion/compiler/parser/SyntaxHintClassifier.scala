@@ -160,6 +160,45 @@ private[compiler] object SyntaxHintClassifier {
   private val DotAfterPrimitiveTypeName = """\A[A-Za-z]+\s*\.\s*([A-Za-z_]\w*)""".r
   private val JavaStyleRecordBody =
     """^\s*record\s+([A-Za-z_]\w*)(?:\[[^\]]*\])?\s*\{""".r
+  // Java's anonymous class, `new Runnable { ... }` or `new Comparator[String]() { ... }`:
+  // the constructor call parses, then its `{` cannot follow. Matched on the text before
+  // that `{`, so a `new T()` earlier in a line that later opens a block never fires.
+  // The brackets match balanced (two levels of nesting), never across `]...[`, and must
+  // hold type arguments, not an array size: `new Int[3] {` is not an anonymous class.
+  private val AnonymousClassBody =
+    """\bnew\s+([A-Za-z_][\w.]*)(\[(?:[^\[\]]|\[(?:[^\[\]]|\[[^\[\]]*\])*\])*\])?\s*(?:\([^()]*\))?\s*$""".r
+  // One type argument: a (qualified) type name whose last segment is capitalized, with
+  // optional type arguments and `?`, or a function type. `3`, `n`, `n + 1` are sizes.
+  private val TypeArgument = """(?:[A-Za-z_]\w*\.)*[A-Z]\w*(?:\[.*\])?\??|.*->.*""".r
+
+  private def anonymousClassType(textBeforeBrace: String): Option[String] =
+    AnonymousClassBody.findFirstMatchIn(textBeforeBrace).collect {
+      case m if m.group(2) == null => m.group(1)
+      // A primitive takes no type arguments: `new Int[MAX] {` is an array whatever the size.
+      case m if !PrimitiveTypeNames.contains(m.group(1)) && isTypeArguments(m.group(2).drop(1).dropRight(1)) =>
+        m.group(1) + m.group(2)
+    }
+
+  private def isTypeArguments(inside: String): Boolean = {
+    val parts = topLevelCommaSplit(inside).map(_.trim)
+    parts.nonEmpty && parts.forall(part => TypeArgument.matches(part))
+  }
+
+  private def topLevelCommaSplit(text: String): List[String] = {
+    val parts = List.newBuilder[String]
+    var depth = 0
+    var start = 0
+    for (i <- text.indices) text(i) match {
+      case '[' | '(' => depth += 1
+      case ']' | ')' => depth -= 1
+      case ',' if depth == 0 =>
+        parts += text.substring(start, i)
+        start = i + 1
+      case _ =>
+    }
+    parts += text.substring(start)
+    parts.result()
+  }
   private val JavaStyleTryResource =
     """\btry\s*\(\s*([A-Z][A-Za-z0-9_]*(?:\[[^\]]*\])?\??)\s+([A-Za-z_]\w*)\s*=""".r
   private val JavaStyleImplements =
@@ -468,6 +507,10 @@ private[compiler] object SyntaxHintClassifier {
       case "{" if expected.contains("\"(\"") && JavaStyleRecordBody.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleRecordBody.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_record_body", matched.group(1))
+      case "{" if anonymousClassType(textBefore(context, sourceLine)).isDefined =>
+        val typeName = anonymousClassType(textBefore(context, sourceLine)).get
+        val simpleName = typeName.takeWhile(_ != '[').split('.').last
+        hint("error.parsing.hint.anonymous_class", typeName, simpleName + "Impl")
       case "(" if expected.contains("{") && JavaStyleTryResource.findFirstMatchIn(sourceLine).isDefined =>
         val matched = JavaStyleTryResource.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.java_style_try_resource", matched.group(1), matched.group(2))
@@ -536,6 +579,8 @@ private[compiler] object SyntaxHintClassifier {
       // misread as an identifier slot.
       case "import" if sourceLine.trim.startsWith("import") =>
         hint("error.parsing.hint.duplicate_import_block")
+      case "val" | "var" if enclosingDoBlockMonad(precedingText + textBefore(context, sourceLine)).isDefined =>
+        doBlockLetHint(enclosingDoBlockMonad(precedingText + textBefore(context, sourceLine)).get, context)
       case "yield" if YieldExpression.findFirstMatchIn(context).isDefined && !yieldNamed(expected, context, sourceLine) =>
         hint("error.parsing.hint.yield_not_supported")
       case word if ReservedWords.contains(word) && (expected.contains("<ID>") || expected.contains("<QUOTED_ID>")) =>
@@ -619,6 +664,44 @@ private[compiler] object SyntaxHintClassifier {
    * The parameter list is split at top-level commas, so `[K, V extends Comparable[V]]`
    * gives `K` and `V extends Comparable[V]`.
    */
+  private val DoBlockOpen = """\bdo\s*\[([^\]\n]*)\]\s*\{""".r
+  private val LetStatement = """^(?:val|var)\s+([A-Za-z_]\w*)\s*(?::[^=]*)?=\s*(.+)$""".r
+
+  // The `M` of `do[M] {` when the innermost unclosed `{` before the error opens that block.
+  private def enclosingDoBlockMonad(text: String): Option[String] =
+    DoBlockOpen.findAllMatchIn(text).toList.lastOption.filter { m =>
+      var depth = 1
+      text.substring(m.end).foreach {
+        case '{' => depth += 1
+        case '}' => depth -= 1
+        case _   =>
+      }
+      depth == 1
+    }.map(_.group(1).trim)
+
+  // A `val y = e` in a do block (#2465). Computing `e` inside the `yield` works for every
+  // monad; a bind form is named only for the monads whose unit infers there (`Option::some`,
+  // `Future::successful`, a one-element list). `Result::successful(e)` cannot pin the error
+  // type, so `do[Result]` and a user monad get the `yield` advice alone.
+  private def doBlockLetHint(monad: String, context: String): Option[SyntaxHint] = {
+    val statement = context.takeWhile(c => c != ';' && c != '\n' && c != '\r' && c != '}').trim
+    val (name, expr) = statement match {
+      case LetStatement(n, e) => (n, e.trim)
+      case _ => ("y", "expr")
+    }
+    val simple = monad.substring(monad.lastIndexOf('.') + 1)
+    val bind = simple match {
+      case "Option" => Some(s"$name <- $monad::some($expr)")
+      case "Future" => Some(s"$name <- $monad::successful($expr)")
+      case "List" => Some(s"$name <- [$expr]")
+      case _ => None
+    }
+    bind match {
+      case Some(b) => hint("error.parsing.hint.do_block_let", monad, b)
+      case None => hint("error.parsing.hint.do_block_let_yield", monad)
+    }
+  }
+
   private def enclosingEnum(text: String): Option[(String, List[String])] =
     EnumHeader.findAllMatchIn(text).toList.lastOption.map { m =>
       val params =

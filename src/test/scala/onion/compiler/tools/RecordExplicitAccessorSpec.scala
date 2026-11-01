@@ -28,6 +28,14 @@ class RecordExplicitAccessorSpec extends AbstractShellSpec {
       assert(c.contains(Some("E0010")))
     }
 
+    it("covers the generic case the issue names, a String-bounded toString component") {
+      val c = codes(
+        """record G[T extends String](toString: T)
+          |println(new G[String]("x").toString())
+          |""".stripMargin)
+      assert(c.contains(Some("E0010")))
+    }
+
     it("still allows a method with parameters, or a different name") {
       val c = codes(
         """record R(a: Int) {

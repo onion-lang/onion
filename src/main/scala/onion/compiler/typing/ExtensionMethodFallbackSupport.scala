@@ -23,6 +23,13 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   private val failedAt =
     new java.util.IdentityHashMap[AST.MethodCall, java.util.HashSet[(Type, List[Type], Type, AnyRef)]]()
 
+  /** One `extension` block that applies to this receiver declares two `name`s with the same
+   *  erased signature: the declaration is E0084, so its calls must not add errors (#2475). */
+  def hasErasureTwinExtension(targetType: ObjectType, name: String): Boolean =
+    collectExtensionMethods(targetType, name).groupBy(_.containerClass).exists { (_, ms) =>
+      ms.lengthCompare(1) > 0 && ms.map(DuplicationChecks.erasedSignatureKey).distinct.lengthCompare(ms.length) < 0
+    }
+
   /** The call typed against a user-declared extension from its already-typed arguments.
    *  A call whose lambdas declare every parameter type needs no bidirectional re-typing, and
    *  re-typing the lambda bodies once per nesting level made nested calls exponential (#2463).

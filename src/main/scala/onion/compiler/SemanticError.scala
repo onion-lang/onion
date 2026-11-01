@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0110) for identification
+ * type checking. Each error has a unique code (E0000-E0111) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -90,8 +90,8 @@ package onion.compiler
  * '''Enum Errors (E0098-E0099)'''
  *   - ADT_ENUM_MIXES_SHARED_PARAMS, HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS
  *
- * '''Contract Errors (E0105-E0110)'''
- *   - CONTRACTS_NOT_ENABLED, CONTRACT_NOT_PURE, CONTRACT_MISPLACED, HISTORY_NOT_PREORDER, HISTORY_BROKEN_BY_WRITE, CONTRACT_FIELD_NOT_VALUE
+ * '''Contract Errors (E0105-E0111)'''
+ *   - CONTRACTS_NOT_ENABLED, CONTRACT_NOT_PURE, CONTRACT_MISPLACED, HISTORY_NOT_PREORDER, HISTORY_BROKEN_BY_WRITE, CONTRACT_FIELD_NOT_VALUE, CONTRACT_JAVA_SUPERCLASS
  *
  * '''Pattern Matching Errors, continued (E0100)'''
  *   - MULTIPLE_BINDING_PATTERNS_IN_CASE
@@ -388,6 +388,8 @@ object SemanticError {
    * call at a time.
    */
   case object CONTRACT_FIELD_NOT_VALUE extends SemanticError(110)
+  /** A class with an `invariant` or `history` that extends a Java class other than `Object` (design 3.2, rule 4). */
+  case object CONTRACT_JAVA_SUPERCLASS extends SemanticError(111)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

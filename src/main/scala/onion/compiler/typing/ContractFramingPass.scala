@@ -14,7 +14,18 @@ final class ContractFramingPass(typing: Typing) {
   private val valueClasses = Set("java.lang.String", "java.lang.Integer", "java.lang.Long", "java.lang.Double",
     "java.lang.Float", "java.lang.Short", "java.lang.Byte", "java.lang.Character", "java.lang.Boolean")
 
-  def run(classes: Seq[ClassDefinition]): Unit =
+  def run(classes: Seq[ClassDefinition]): Unit = {
+    // Rule 4: a Java superclass can have mutators the compiler can neither prove nor wrap.
+    for (cd <- classes if cd.invariants.nonEmpty || cd.histories.nonEmpty) {
+      val sup = cd.superClass
+      if (sup != null && sup.name != "java.lang.Object" && !sup.isInstanceOf[ClassDefinition] && !cd.isRecord &&
+          !Modifier.isEnum(cd.modifier))
+        typing.report(SemanticError.CONTRACT_JAVA_SUPERCLASS, cd.location, cd.name, sup.name)
+    }
+    checkFields(classes)
+  }
+
+  private def checkFields(classes: Seq[ClassDefinition]): Unit =
     for (cd <- classes; clause <- cd.invariants ++ cd.histories)
       TermWalk.exists(clause) {
         case r: RefField =>

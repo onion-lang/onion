@@ -1288,6 +1288,17 @@ class A {
 
 直し方: 値型のフィールドを使うか、そのオブジェクトを読む純粋なメソッドを使います。
 
+### `E0111` — Java の親クラスを持つクラスの `invariant` / `history`
+
+Java の親クラスは状態を変えるメソッドを持ちえて、コンパイラはそれを証明も監視もできません。
+継承してよいのは `Object` か Onion のクラスだけです。
+
+```onion
+class A extends java.util.ArrayList {
+  invariant size >= 0   // E0111
+}
+```
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -2051,6 +2062,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
 | `E0109` | this write can break the history … on … |
 | `E0110` | an `invariant` or `history` names a field that holds a mutable object |
+| `E0111` | a class with an `invariant` or `history` extends a Java class |
 
 ## 関連項目
 

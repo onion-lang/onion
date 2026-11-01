@@ -1300,6 +1300,17 @@ class A {
 
 Fix: name a value-typed field, or a pure method that reads the object.
 
+### `E0111` — an `invariant` or `history` on a class with a Java superclass
+
+A Java superclass can have methods that change state, and the compiler can neither prove nor
+guard them. Extend only `Object` or an Onion class.
+
+```onion
+class A extends java.util.ArrayList {
+  invariant size >= 0   // E0111
+}
+```
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -2068,6 +2079,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
 | `E0109` | this write can break the history … on … |
 | `E0110` | an `invariant` or `history` names a field that holds a mutable object |
+| `E0111` | a class with an `invariant` or `history` extends a Java class |
 
 ## See also
 

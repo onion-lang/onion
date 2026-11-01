@@ -1413,6 +1413,10 @@ object SemanticErrorReporter {
       "error.semantic.contractFieldNotValue",
       Seq(items => asString(items(0)), items => asString(items(1)))
     ),
+    SemanticError.CONTRACT_JAVA_SUPERCLASS -> ErrorDef(
+      "error.semantic.contractJavaSuperclass",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))

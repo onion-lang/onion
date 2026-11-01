@@ -20,6 +20,14 @@ class ContractFramingSpec extends AnyFunSpec {
   it("accepts a String field") {
     assert(!codes("class A {\n  invariant s != null\npublic:\n  var s: String\n  def this { s = \"\" }\n}").contains("E0110"))
   }
+  it("rejects a Java superclass other than Object (rule 4)") {
+    val src = "import { java.util.* }\nclass A extends ArrayList {\n  invariant n >= 0\npublic:\n  var n: Int\n  def this { n = 0 }\n}"
+    assert(codes(src).contains("E0111"))
+  }
+  it("accepts an Onion superclass") {
+    val src = "class B {\n}\nclass A extends B {\n  invariant n >= 0\npublic:\n  var n: Int\n  def this { n = 0 }\n}"
+    assert(!codes(src).contains("E0111"))
+  }
   it("rejects a List field") {
     val src = "import { java.util.* }\nclass A {\n  invariant items != null\npublic:\n  var items: List\n  def this { items = new ArrayList() }\n}"
     assert(codes(src).contains("E0110"))

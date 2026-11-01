@@ -1,8 +1,8 @@
 # Contracts — static verification for Onion
 
 Status: **proposed.** Nothing here is implemented. RFC: [#2557](https://github.com/onion-lang/onion/issues/2557).
-Onion is in `consolidation` mode and has one known user, so this design breaks compatibility
-without a transition period (see §10).
+Onion is in `consolidation` mode and has one known user, so the removal of `law`/`example`
+needs no transition period. It still lands **after** its replacement works (§11).
 
 Code blocks show **proposed** syntax. `docs/design/` is outside the scope of
 `DocExamplesCompileSpec`, so nothing here is compile-checked.
@@ -12,32 +12,34 @@ Code blocks show **proposed** syntax. `docs/design/` is outside the scope of
 ## 1. Positioning
 
 > **A method says what it needs and what it gives back. A class says what stays true.
-> The compiler proves it, or says it could not.**
+> The compiler proves it, tests it, or says it could not.**
 
 Onion today has one way to state a property: `law` and `example`. Both are **build-time
 tests**. The compiler runs the generated code on sampled inputs and reports a failure. It
 never proves anything.
 
-The evidence from `run/`:
+The evidence from `run/` (610 programs):
 
-- 111 of 612 programs use them: 307 clauses, of which 299 are `example` and 8 are `law`.
+- 111 use them: 307 clauses, of which 299 are `example` and 8 are `law`.
 - About 255 of the `example` clauses are closed boolean checks such as
   `example { new X(1).f() == 2 }`. They are unit tests, not properties.
 - No clause says what a *method* promises or what a *class* keeps true.
-- Nothing can say how an object may change over time. That is exactly the gap Liskov and
-  Wing (1994) call a *history property*.
+- Nothing can say how an object may change over time. That is the gap Liskov and Wing (1994)
+  call a *history property*.
 
-This document replaces `law` and `example` with **contracts that are checked statically**.
+This document replaces `law` and `example` with **contracts**. They are tested first and
+proved later, and the removal waits until the test tier works.
 
 ### Design constraints this document holds itself to
 
 | Constraint | Source |
 |---|---|
-| One mechanism for stating a property, not two | PRINCIPLES 2 |
+| One mechanism for stating a property, not two (once the replacement works) | PRINCIPLES 2 |
 | A reported error can always be reproduced by running the program | PRINCIPLES 1 |
 | Stage the feature; each stage is useful on its own | PRINCIPLES 6, 9 |
 | Every diagnostic has a code, a location and a fix hint, in en and ja | PRINCIPLES 7 |
 | The formatter, LSP and highlighting learn the new syntax in the same change | PRINCIPLES 8 |
+| A stable feature is never replaced by a preview one | PRINCIPLES 3, 6 |
 | `onion.jar` stays self-contained and small | CLAUDE.md |
 
 ---
@@ -45,14 +47,18 @@ This document replaces `law` and `example` with **contracts that are checked sta
 ## 2. The core, in three concepts
 
 1. **Contract clauses**: `requires`, `ensures`, `invariant`, `history`.
-2. **Verification condition (VC)**: a logical formula that is valid exactly when a contract holds.
-3. **Verdict**: one of *proved*, *counterexample*, *not proved*.
+2. **Verification condition (VC)**: a formula that is valid exactly when a contract holds.
+3. **Verdict**: one of four.
 
 | Verdict | Meaning | What happens |
 |---|---|---|
 | Proved | The VC is unsatisfiable and the answer passed an independent check (§8) | The runtime check may be dropped |
-| Counterexample | The VC has a model **and running the program on it breaks the contract** | Error |
-| Not proved | Timeout, unsupported construct, or a model that does not reproduce | Warning `W0021`; the runtime check stays |
+| Counterexample | Running the program breaks the contract (§7) | Error |
+| Sampled | Not proved. N inputs were tried and none broke it | Silent. `--contracts-report` lists them |
+| Not proved | No proof, and the contract cannot be sampled (see §7) | Warning `W0021` |
+
+`Sampled` is what `law` gave. It stays a first-class verdict, because `Double`, strings and
+anything the prover does not model will never reach `Proved`.
 
 The promise: **every error can be reproduced by running the program, and every "proved" has
 passed an independent check.** A tool that reports a false error is ignored. A tool that
@@ -72,7 +78,10 @@ class Counter {
   history n >= old(n)                   // once raised, never lowered
 public:
   def this { n = 0 }
-  def inc(): void ensures n == old(n) + 1 { n = n + 1 }
+  def inc(): void
+    requires n < 2147483647             // Int wraps on the JVM; ask for headroom
+    ensures n == old(n) + 1
+  { n = n + 1 }
   def get(): Int ensures result == n { return n }
 }
 ```
@@ -80,23 +89,59 @@ public:
 | Clause | Where | Meaning |
 |---|---|---|
 | `requires e` | after the signature, before the body | `e` holds on entry. The caller must establish it. |
-| `ensures e` | same | `e` holds on normal return. `result` is the return value; `old(x)` is `x` on entry. |
+| `ensures e` | same | `e` holds on normal return. `result` is the return value; `old(e)` is `e` evaluated on entry. |
 | `invariant e` | class or record body | `e` holds after every constructor, and on entry to and exit from every public method. |
 | `invariant e` | before a loop body | `e` holds before each iteration. Used by the prover only. |
 | `history e` | class or record body | A relation between two states of one object. `old(x)` is the earlier state, a bare `x` the later one. |
 
 Several clauses of one kind combine by conjunction.
 
-### 3.1 Contract expressions are pure
+**Integers wrap.** `Int` and `Long` are 32 and 64 bits and wrap as on the JVM, in programs and
+in contracts alike. A contract is not about mathematical integers. Without `requires n <
+2147483647`, `inc()` at the maximum makes `n` negative and breaks both `invariant` and `history`.
+The compiler finds exactly that (§7).
 
-A contract may use: integer and boolean operators, comparisons, `null` checks, the object's
-own fields, parameters, `result`, `old(...)`, and calls to methods whose **inferred effect set
-is empty**. The effect inference that backs E0077 decides this (`effects/EffectInference.scala`),
-so no new notion of purity is added. Anything else is an error that names the offending call.
+**`old(e)`** evaluates `e` on entry and keeps the value. If `e` is a reference, the value is
+the reference, not a copy of the object it points to. `old(xs.size())` keeps a number;
+`old(xs)` keeps nothing useful.
 
-There are no quantifiers in the first version. See §12.
+### 3.1 Contract expressions are pure — and "pure" gets stricter
 
-### 3.2 `history`
+A contract may use: integer and boolean operators, comparisons, `null` checks, parameters,
+`result`, `old(...)`, the object's own fields, and calls to methods that are **pure**.
+
+Today an empty effect set means *no I/O*. It does not mean *no mutation*: the effect table marks
+`List`, `ArrayList`, `HashMap` and `StringBuilder` as `#*=pure`, so `ensures xs.add(1)` would
+pass. This design adds one effect, **`mutate`**:
+
+- A write to a field or array element of an object that is not created inside the expression,
+  or a call to something that does one, carries `mutate`.
+- Library mutators are re-marked in the effect table (`List.add`, `StringBuilder.append`, ...).
+- A contract expression must have **no effect at all, including `mutate`**.
+- `onionc --effects` prints the new effect. `modifies`, which the prover needs for framing
+  (§7), is read from the same inference.
+
+This is a prerequisite of stage 1, because a contract that mutates is not a contract.
+
+### 3.2 What a contract may talk about (framing)
+
+Aliasing is the usual way "one call at a time" breaks. These rules close it in the first version.
+
+1. `invariant` and `history` may name only fields of `this` whose type is a **value type**:
+   a primitive, `String`, an enum, or a record whose components are value types.
+   A field that holds a mutable object (`List`, an array, another class) cannot be named.
+2. A field named by an `invariant` or `history` is **written only through `this`**, inside its own
+   class. `o.n = 0` with `o` another instance is an error. The field must not be assignable from
+   outside the class (`private`, or `val`).
+3. A class with an `invariant` or `history` may not extend a Java class other than `Object`,
+   because a Java superclass can have mutators the compiler can neither prove nor wrap.
+4. `requires` and `ensures` may mention parameters of any type, through pure methods.
+5. A call is **atomic**: no callback re-enters the object halfway, and no other thread
+   interleaves. Invariants and histories are promised only at call boundaries.
+
+These are checks, not hopes: breaking one is a diagnostic (§9).
+
+### 3.3 `history`
 
 `history e` says: for any two states `s` and `t` of one object, where `t` is reachable from
 `s` by method calls, `e` holds with `old(x)` read in `s` and `x` read in `t`.
@@ -108,21 +153,18 @@ method. That is sound when the relation is a preorder.
 > call from state `a` to state `b` satisfies `φ(a, b)`, then `φ(s, t)` holds for every reachable
 > pair. Proof: induction on the number of calls between `s` and `t`.
 
-The compiler checks reflexivity and transitivity as VCs. `n >= old(n)` passes.
-`n == old(n) + 1` is reported: it is not transitive, so it cannot describe a whole history.
+The compiler checks reflexivity and transitivity. `n >= old(n)` passes. `n == old(n) + 1`
+is reported: it is not transitive, so it cannot describe a whole history.
 
-### 3.3 Soundness conditions
+### 3.4 Where the clauses may appear, and how they parse
 
-These are stated in the language guide and enforced where they can be.
-
-- A call is **atomic**: no callback re-enters the object halfway, and no other thread
-  interleaves. Invariants and histories are only promised at call boundaries.
-- A field named by an `invariant` or `history` must not be assignable from outside the class.
-  Otherwise outside code could break the contract with no call to check. This is an error.
-- A contract speaks about `this`, the parameters and the result. Another object is seen only
-  through pure methods.
-- A Java call that is not in the effect table may change anything, so a proof that crosses it is
-  *not proved*.
+- **Not on a `tool`.** A `tool` keeps `requires { cap }` for capabilities and takes no
+  contract clauses in the first version; a contract on a tool is an error that suggests a
+  helper method. So `requires` never means two things on one declaration.
+- **A clause expression ends at the `{` that opens the body.** It follows the same rule as the
+  condition of `if c {`: `ensures result == n { return n }` is not read as a trailing lambda on
+  `n`. To pass a lambda inside a clause, parenthesize the call. The parser already has this
+  context (`conditionContexts`).
 
 ---
 
@@ -135,8 +177,8 @@ subtype may stand in for its supertype. Their rules, and what this design does w
 |---|---|---|
 | Signature | The existing override check | `typing/DuplicationChecks.scala` |
 | Methods: preconditions weaken, postconditions strengthen | **By construction**, below | The override's body is verified against the effective contract |
-| Invariant: the subtype preserves the supertype's invariant | `inv_eff = inv_sub ∧ inv_super` | VC |
-| History (their "constraint"): the subtype preserves the supertype's history, **including through methods the supertype does not have** | `hist_eff = hist_sub ∧ hist_super`, applied to every public method | VC |
+| Invariant: the subtype preserves the supertype's invariant | `inv_eff = inv_sub ∧ inv_super` | Tests / VC |
+| History (their "constraint"): the subtype preserves the supertype's history, **including through methods the supertype does not have** | `hist_eff = hist_sub ∧ hist_super`, applied to every public method | Tests / VC |
 
 **Effective contract of an override**, in the style of Eiffel's `require else` / `ensure then`
 (Meyer):
@@ -146,9 +188,14 @@ pre_eff  = pre_super  ∨ pre_sub
 post_eff = (old(pre_super) ⇒ post_super) ∧ (old(pre_sub) ⇒ post_sub)
 ```
 
-So `pre_super ⇒ pre_eff` and `post_eff ⇒ post_super` hold without any proof, and a programmer
-cannot write an override that is unsound by the methods rule. An override without its own
-clauses simply inherits.
+So `pre_super ⇒ pre_eff` holds without proof, and `post_eff ⇒ post_super` holds whenever
+`pre_super` held on entry, which is what a caller of the supertype guarantees. A programmer
+cannot write an override that is unsound by the methods rule. An override without clauses of
+its own simply inherits.
+
+A method the subclass **inherits without overriding** is verified again against `inv_sub` and
+`hist_sub`, in the subclass's context: the callees it reaches through overridable methods use
+the effective contracts there.
 
 This design does **not** reproduce the paper's abstraction functions. They are needed when a
 subtype represents its state differently. A subclass in Onion shares its superclass's fields,
@@ -165,14 +212,7 @@ public:
 ```
 
 Every inherited pre/postcondition still holds, and `reset` has no contract of its own. A tool
-that checks only pre/postconditions accepts this class. With the history above the compiler
-reports:
-
-```
-ResettableCounter.reset breaks history of Counter: n >= old(n)
-  state before: n = 3
-  state after:  n = 0
-```
+that checks only pre/postconditions accepts this class. The compiler reports it (full text in §9).
 
 ### 4.2 Interfaces
 
@@ -200,21 +240,60 @@ Java classes cannot carry these clauses. Contracts for them live in a **contract
 the same way as the effect table: a built-in table, plus an optional table shipped inside a
 library jar. A malformed table is a warning, not an error.
 
-The first entry is `onion.Shape`: its `print` and `parse` must round-trip. Every class that
-conforms to `Shape` inherits that contract and is verified against it. This is what E0080
-(`a user-written Shape needs a law`) was approximating. With the contract on the interface,
-the rule is no longer needed.
+### 5.1 The `Shape` contract
+
+`onion.Shape` documents two laws and says one of them is false in general (`Shape.java`):
+
+| Law | Statement | Contract? |
+|---|---|---|
+| L1 round-trip | `parse(print(v)) == Ok(v)`, wherever `print` exists | **Yes** |
+| L2 normalization | `print(parse(t)) == t` | **No.** It is false in general, so it is never asserted |
+
+```onion
+// ContractTable entry for onion.Shape[T]
+def print(v: T): String
+  requires canPrint()
+  ensures parse(result) is Ok(v)
+```
+
+- Every class that conforms to `Shape` inherits it and is checked against it. A user-written
+  shape no longer needs a `law` to satisfy E0080.
+- A **non-invertible** shape has `canPrint() == false`. Its `print` precondition is never met,
+  so it owes nothing. This is why the contract has a precondition rather than being absolute.
+- The usual verdict is `Sampled` (the body is string work the prover does not model); a shape
+  over fixed-width integers can be `Proved`.
+
+E0080 is removed only after this entry works (§11).
 
 ---
 
-## 6. Replacing `law` and `example`
+## 6. Where contracts run
 
-| Today | After |
+| Context | Behaviour |
 |---|---|
-| `law name(p: T) { e }` | A pure predicate with a contract (below) |
-| `example [name] { e }` | The same, with no parameters |
-| E0080: a user `Shape` needs a law | The `Shape` contract (§5) |
-| `--no-check-laws`, `--law-seed`, `--law-samples` | `--contracts <off\|runtime\|verify>`, `--contract-timeout <s>` |
+| `onion script.on`, REPL | `runtime`: entry and exit checks on, closed predicates run. No prover. |
+| `onion build` | Closed predicates run, parameterized predicates are sampled. `--contracts verify` adds the prover. |
+| `onion test` | `runtime`, plus closed predicates and sampling. |
+| LSP | Typing, purity, framing and effective-contract diagnostics only. **It never runs user code**, matching the current `checkLaws = false` (#346). No prover until it fits an editor's latency budget. |
+
+**`--contracts <off|runtime|verify>`.**
+- While in preview the default is `off`: contract clauses are a syntax error with a hint to
+  enable the flag.
+- At stage 4, when `law`/`example` are removed, the `runtime` tier **graduates** and becomes the
+  default. The migrated `run/` programs then need no flag.
+- `verify` stays opt-in until the prover is proven in use (stage 7).
+
+**`W0021` (contract not proved)** is off by default. It turns on under `--contracts verify`,
+because before the prover exists every contract is "not proved" and the warning would be noise.
+
+**Flags that replace the old ones:** `--contract-samples <n>` and `--contract-seed <n>`
+(sampling), `--contract-timeout <seconds>` (prover), `--contracts-report` (list `Sampled`).
+
+---
+
+## 7. How a contract is checked
+
+### 7.1 Closed and parameterized predicates (the `law` and `example` replacement)
 
 ```onion
 static def roundTrip(p: Point): Boolean
@@ -222,33 +301,45 @@ static def roundTrip(p: Point): Boolean
   = Point::parse(Point::format(p)) == p
 ```
 
-A predicate with parameters is a property over all inputs: the prover tries to prove it, and if
-it cannot, sampled inputs look for a counterexample (reusing `ArgGenerator`). A predicate with
-**no** parameters is closed. A closed predicate usually calls other methods, which a prover
-cannot unfold, so it is decided by **running it at build time**, as `example` is today.
+- A predicate with **parameters** is a property over all inputs. The prover tries first
+  (stage 6). Until then, and for what the prover does not model, sampled inputs look for a
+  counterexample (`ArgGenerator`) and the verdict is `Sampled`.
+- A predicate with **no** parameters is closed. It usually calls other methods, which a prover
+  cannot unfold, so it is decided by running it at build time, as `example` is today.
 
-No new keyword is added for this. A `check` sugar would be `law` under another name.
+No new keyword is added. A `check` sugar would be `law` under another name.
 
----
-
-## 7. How a contract is verified
+### 7.2 Methods and classes
 
 1. After typing and before tail-call optimization, a new phase reads each method's effective
-   contract. Running before TCO matters: the body is still a loop, not a rewritten state machine.
-2. **Verification condition generation.** Weakest precondition over the typed tree:
-   assignments to locals and fields, `if`, `while` with its `invariant`, `return`, and operators.
-   A call is handled **modularly**: assert the callee's effective precondition, forget what the
-   callee may modify, assume its postcondition. `modifies` is inferred from the body.
-3. **Encoding.** `Int` and `Long` are bit-vectors of 32 and 64 bits, so wrap-around matches the
-   JVM exactly. Booleans are booleans. A pure method with an expression body is inlined to a
-   fixed depth; otherwise it is an uninterpreted function.
-4. The solver (§8) answers. A model is turned into concrete arguments and **replayed**: the
-   instrumented program runs, and only a real violation becomes an error.
-5. What was not proved keeps a runtime check (`--contracts runtime`): entry and exit checks, with
-   `old` values saved into hidden locals.
+   contract. Running before TCO matters: the body is still a loop.
+2. **Tests first (stage 2).** Objects are built by constructors, public methods are called in
+   random sequences, and `invariant`/`history` are checked after every call. This is the
+   `Sampled` and `Counterexample` source until the prover exists.
+3. **Verification conditions (stages 6–7).** Weakest precondition over the typed tree.
+   A call is handled modularly: assert the callee's effective precondition, forget what it may
+   `modify` (§3.1), assume its postcondition.
+4. **Encoding.** `Int` and `Long` are 32/64-bit vectors, so wrap-around matches the JVM. A pure
+   method with an expression body is inlined to a fixed depth, or is an uninterpreted function.
+5. What is not proved keeps a runtime check.
 
-Not modelled, so *not proved*: `Double` and `Float`, strings beyond equality and length, and
-reflection.
+### 7.3 Replay: what makes a counterexample real
+
+A prover's model gives field values and arguments. To keep "every error can be reproduced":
+
+1. **Reachable first.** Build the object with a constructor and a bounded call sequence that
+   steers towards the model, then call the method.
+2. **If no sequence is found,** write the model's field values directly (reflection) and run the
+   method. This is valid because the model satisfies the invariant. It is reported as an error
+   with the note *"from a state that satisfies the invariant; reachability not shown"*. It means
+   the invariant is not strong enough to be preserved, which is the programmer's to fix.
+3. If the run does not break the contract, the verdict is `Not proved`, not an error.
+
+The `Counter` without headroom shows both: `n = 2147483647` satisfies `n >= 0`, and `inc()` makes
+it `-2147483648`.
+
+Not modelled, so never `Proved`: `Double` and `Float`, strings beyond equality and length,
+reflection, and anything behind a Java call that is not in the effect table.
 
 ---
 
@@ -268,14 +359,20 @@ solved exactly and with answers that can be checked.
 **Why a hand-written solver can be trusted:**
 
 - **UNSAT is certified.** S1 emits a DRAT proof; a separate checker of about 200 lines verifies
-  it. If the check fails, the verdict is *not proved*.
-- **SAT is certified.** The model is substituted into the formula, then replayed on the real
-  program (§7.4).
+  it. If the check fails, the verdict is `Not proved`.
+- **SAT is certified.** The model is substituted into the formula, then replayed (§7.3).
 - **A fuzz spec** builds random formulas over 4–6 bit vectors and compares the solver with
   exhaustive search. It needs no external tool. An optional CI job compares against z3.
 
 What the checkers cannot see is a bug in VC generation or in the bit-blaster. The fuzz spec and
 the replay are the guard there.
+
+**The case for building it (PRINCIPLES 9).** Tests (§7.2) already give counterexamples and
+`Sampled`. Only a proof can (a) drop a runtime check, (b) cover `2^32` inputs rather than 40,
+and (c) establish a history for **all** call sequences rather than the ones that were tried.
+The cost is bounded by staging: stages 1–4 are the "runtime contracts plus sampling, no solver"
+option in full. If the solver stages are cut, that option is what remains, and it is already
+more than `law`/`example` gave.
 
 The solver sits behind a `Solver` interface, so an external z3 or cvc5 can be added later as
 another backend.
@@ -284,18 +381,37 @@ another backend.
 
 ## 9. Error model
 
-New diagnostics (codes are assigned when each stage lands):
+Codes are **provisional** and assigned when each stage lands (the highest code today is E0104).
 
-| Diagnostic | Notes |
+| Code | Diagnostic |
 |---|---|
-| Precondition may not hold at a call | Names the callee and the argument values of the counterexample |
-| Postcondition does not hold | Shows `old` and `result` |
-| Invariant not preserved by a method or constructor | |
-| **History broken by a method** | Names the method, the inherited history, and the states before and after |
-| History is not reflexive / not transitive | Shows the failing triple |
-| A contract is not pure, or `old`/`result` is out of place | |
-| A field named by a contract is writable from outside | |
-| `W0021`: contract not proved | A warning; the runtime check stays |
+| E0105 | Precondition may not hold at a call (names the callee and the arguments found) |
+| E0106 | Postcondition does not hold (shows `old` and `result`) |
+| E0107 | Invariant not preserved by a method or constructor |
+| **E0108** | **History broken by a method** (below) |
+| E0109 | History is not reflexive / not transitive (shows the failing triple) |
+| E0110 | A contract is not pure, or `old`/`result` is out of place |
+| E0111 | A field named by a contract is written from outside `this`, or is not a value type |
+| E0112 | Contract not allowed here (on a `tool`, or on a class that extends a Java class) |
+| W0021 | Contract not proved |
+
+The history error, with the call sequence that reproduces it and a next step:
+
+```
+reset.on:12:5: [E0108] ResettableCounter.reset() breaks the history of Counter: n >= old(n)
+  reproduced by:  new ResettableCounter(); inc(); inc(); inc(); reset()
+  n before: 3     n after: 0
+  hint: a subclass may add methods, but each must keep every history of its superclass.
+        Remove the write to `n`, or relax the history in Counter.
+```
+
+```
+reset.on:12:5: [E0108] ResettableCounter.reset() は Counter の history `n >= old(n)` を破ります
+  再現手順:  new ResettableCounter(); inc(); inc(); inc(); reset()
+  n: 3 -> 0
+  ヒント: サブクラスはメソッドを足せますが、スーパークラスの history はすべて保たなければ
+          なりません。`n` への代入を外すか、Counter の history を緩めてください。
+```
 
 Each has an en and ja message and a hint, and is added to `docs/reference/error-codes.md` and
 its ja mirror.
@@ -304,24 +420,30 @@ its ja mirror.
 
 ## 10. Compatibility — the breaking change
 
-One known user. No transition period: the removal and the migration land in one PR.
+One known user. No transition period. The removal lands in **one PR, at stage 4**, after
+every replacement exists (§11).
 
 **Removed**
 - `law` and `example`, in a record body and at the top level.
-- `--no-check-laws`, `--law-seed`, `--law-samples`.
+- `--no-check-laws`, `--law-seed`, `--law-samples`, including their parsing in `DaemonClient`.
 - E0064, E0065, E0074, E0075, E0080. These numbers are **not reused**.
 - The compiler pieces behind them: `LawCheckPhase`, `CheckMethodIndex`, `CounterexampleText`,
   `ShapeInstanceLawPass`, the grammar and AST nodes, the `Rewriting` synthesis.
-  `ArgGenerator` stays: it feeds counterexample search.
+  `ArgGenerator` stays: it feeds sampling.
 
-**Kept from the RUNBOOK §5.3 package**
+**Must change in the same PR**
+- `docs/quality-bar.md` and its ja mirror: removing five codes makes `declared` smaller than the
+  recorded figure, which `QualityBarSpec` row 7 rejects (`recorded <= declared`).
+- `ProjectBuilder` and `ProjectTestRunner`, which force laws on today (§6 gives the new modes).
+- Everything that relied on E0080: `run/FixedWidthDemo.on`, `UserShapeInstanceSpec`,
+  `docs/guide/shapes.md` (en/ja), `docs/getting-started/quick-start.md`.
+
+**The RUNBOOK §5.3 package**
 - A `### Breaking` fragment in `changelog.d/`.
 - A section in `docs/migration/pre-1.0.md` and its ja mirror.
 - A hint at the old spelling, pointing to the replacement and to `onion migrate`.
-- An `onion migrate` rule (token-level, applied only when the result compiles).
-
-The rule is also the quickest way to move the 111 files in `run/`: it is run once and the
-result is committed, which is its first real test.
+- An `onion migrate` rule (token-level, applied only when the result compiles). It is also run
+  once over the 111 files in `run/` and the result committed.
 
 **Also updated:** the VS Code grammar, the Pygments lexer, `CLAUDE.md` and `CLAUDE_ja.md`, about
 15 docs pages, 7 specs deleted and about 18 edited.
@@ -330,31 +452,32 @@ result is committed, which is its first real test.
 
 ## 11. Staging and reversibility
 
-Each stage lands as its own PR, behind `--contracts` until the last one, and is useful alone.
+The order is **additive first**: nothing is removed until what replaces it has a defined verdict.
+Each stage is its own PR and is useful alone.
 
-| Stage | Content |
-|---|---|
-| 1 | Syntax, typing, runtime checks, closed-predicate run, **and the removal with its migration** |
-| 2 | Effective contracts for overrides; `ContractTable` and `Shape` |
-| 3 | Solver S1 and S2, with the DRAT checker and the fuzz spec |
-| 4 | VCs for straight-line code and loop invariants |
-| 5 | History VCs, counterexample replay, guide and sample (en/ja) |
-| 6 | Solver S3 |
+| Stage | Content | `law`/`example` |
+|---|---|---|
+| 1 | `mutate` effect; contract syntax and typing; framing rules; entry/exit checks; closed-predicate run. Behind `--contracts` | kept |
+| 2 | Effective contracts for overrides; invariant and history **tests** (random call sequences); sampling of parameterized predicates; the `Sampled` verdict | kept |
+| 3 | `ContractTable` and the `Shape` contract | kept (E0080 still on) |
+| 4 | **The breaking PR:** migration rule, `run/` migrated, `law`/`example`/E0080 removed, docs and flags. The `runtime` tier graduates | **removed** |
+| 5 | Solver S1 and S2, with the DRAT checker and the fuzz spec | — |
+| 6 | VCs for straight-line code and loop invariants. `verify` mode, `W0021` on | — |
+| 7 | History VCs, replay of counterexamples, guide and sample (en/ja). `verify` stays opt-in | — |
+| 8 | Solver S3 | — |
 
-If stages 3 to 6 are never finished, stages 1 and 2 still give contracts, inheritance of
-contracts and runtime checking, which is more than `law`/`example` gave.
+If stages 5 to 8 are never finished, stages 1 to 4 still give contracts, inheritance of
+contracts, history checking by test, and runtime checking. That is more than `law`/`example` gave.
 
 ---
 
 ## 12. Open questions
 
-- `requires` is already a soft word in `tool ... requires { cap }`. They are told apart by
-  position (a brace set of capabilities, or an expression). Is that clear enough?
 - A runtime `ensures` wrapper is not a tail call, so it defeats tail-call optimization. Route
   self-calls inside the wrapper, or document the limit?
 - Quantifiers. `forall` over `Int` ranges, or pure recursive helper predicates? Collections need one.
 - `ensures` on an exceptional exit.
-- Which `Shape` contract exactly, given that not every shape is invertible?
+- Mutable aggregates in `invariant`/`history` (`items.size() <= 10`) need an ownership rule. Not in v1.
 
 ---
 
@@ -362,10 +485,12 @@ contracts and runtime checking, which is more than `law`/`example` gave.
 
 | Alternative | Why not |
 |---|---|
-| Keep `law`/`example` and add contracts | Two mechanisms for one purpose (PRINCIPLES 2) |
+| Keep `law`/`example` and add contracts, for good | Two mechanisms for one purpose (PRINCIPLES 2). They go at stage 4 |
+| Remove `law`/`example` first | A stable feature would be replaced by a preview one (PRINCIPLES 3, 6) |
 | A `check` keyword that replaces `law` | It is `law` renamed; no complexity removed (PRINCIPLES 9) |
+| **Runtime contracts plus sampling, no solver** | Not rejected: it is stages 1–4. The solver is the extra, and §8 gives the case for it |
 | Proofs by an external z3/cvc5 only | Nothing is proved where no solver is installed |
-| Runtime assertions only | Not static; no counterexample before a run |
+| Runtime assertions only | No counterexample before a run, and no history across call sequences |
 | String annotations `@Requires("...")` | The expression is not typed; no editor support; `Annotation` has no arguments |
 | Refinement types | A far larger change to the type system |
 | Liskov–Wing abstraction functions | Needed only when a subtype changes its representation (§4) |
@@ -374,10 +499,10 @@ contracts and runtime checking, which is more than `law`/`example` gave.
 
 ## 14. What this buys, concretely
 
-- A subtype that breaks its supertype's history is rejected at compile time, with the states
-  that show it (§4.1). Pre/postcondition checkers miss this.
+- A subtype that breaks its supertype's history is rejected, with the call sequence that shows
+  it (§4.1, §9). Pre/postcondition checkers miss this.
 - A contract that is proved needs no runtime check.
 - A broken contract comes with a reproducible counterexample, not a statistic.
 - The `Shape` round-trip rule is stated once, on the interface, instead of in every file that
-  implements it.
-- About 300 build-time test clauses move to one mechanism.
+  implements it, and the false rule (L2) is never asserted.
+- About 300 build-time test clauses move to one mechanism, after that mechanism works.

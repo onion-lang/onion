@@ -314,33 +314,17 @@ class NameResolver(private val context: NameResolutionContext) {
     context.typeAliasResolutionStack += entry.fqcn
     try {
       val aliasMapper = new NameResolver(context.copy(imports = entry.imports))
-      if (params.nonEmpty && typeArgs.nonEmpty) {
-        val substitutions = params.zip(typeArgs).map { case (p, arg) =>
-          val varType = arg match {
-            case tv: TypeVariableType => tv
-            case ct: ClassType => TypeVariableType(p.name, ct)
-            // A nullable argument keeps its nullability through the alias:
-            // occurrences of the parameter behave as a nullable variable
-            // bounded by the inner type
-            case n: NullableType =>
-              n.innerType match {
-                case ct: ClassType => TypeVariableType(p.name, ct, Nullability.Nullable)
-                case _ => TypeVariableType(p.name, context.rootClass, Nullability.Nullable)
-              }
-            case _ => TypeVariableType(p.name, context.rootClass)
-          }
-          TypeParam(p.name, varType, p.upperBound)
-        }
-        val savedTypeParams = context.currentTypeParams
-        context.updateTypeParams(TypeParamScope(Map.empty) ++ substitutions)
-        try {
-          aliasMapper.map(entry.targetDescriptor)
-        } finally {
-          context.updateTypeParams(savedTypeParams)
-        }
-      } else {
-        aliasMapper.map(entry.targetDescriptor)
-      }
+      // The target means what it means where the alias is declared: only the alias's own
+      // parameters are in scope, never the [T] of the class or method using it (#2510).
+      // Those parameters are then replaced by the arguments, so no alias parameter name
+      // reaches the use site, where a same-named class or method [A] would capture it.
+      val savedTypeParams = context.currentTypeParams
+      context.updateTypeParams(TypeParamScope(Map.empty) ++ params)
+      val target =
+        try aliasMapper.map(entry.targetDescriptor)
+        finally context.updateTypeParams(savedTypeParams)
+      if (target == null || params.isEmpty) target
+      else TypeSubstitution.substituteType(target, params.map(_.name).zip(typeArgs).toMap, scala.collection.immutable.Map.empty, defaultToBound = false)
     } finally {
       context.typeAliasResolutionStack -= entry.fqcn
     }

@@ -509,5 +509,42 @@ class CastValidationSpec extends AbstractShellSpec {
       assert(msgs.contains("Integer[]") || msgs.contains("Int[]"), s"expected the cast error, got: $msgs")
       assert(!msgs.contains("Consider a cast") && !msgs.contains("キャスト"), s"no cast advice on a cast, got: $msgs")
     }
+
+    it("rejects a cast the non-null form rejects when the source is nullable (#2388)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val s: String? = "x"
+          |    val n = (s as Integer)
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableStringAsInteger.on",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Failure])
+    }
+
+    it("still allows a valid cast from or to a nullable type (#2388)") {
+      val result = shell.run(
+        """
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val o: Object? = "abc"
+          |    val s: String? = (o as String?)
+          |    val t: String = (o as String)
+          |    return (s as String).length() + t.length()
+          |  }
+          |}
+          |""".stripMargin,
+        "NullableValidCast.on",
+        Array()
+      )
+      assert(Shell.Success(6) == result)
+    }
   }
 }

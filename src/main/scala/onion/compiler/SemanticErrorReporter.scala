@@ -786,7 +786,9 @@ class SemanticErrorReporter(threshold: Int) {
         // so "type T is expected, but type T is used" contradicts itself without this.
         Some(format(message("suggestion.shadowedTypeParameter"), Seq(typeName(expected))))
       } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable &&
-                 !nonNullStillMisfitsTypeVariable(expected, actual)) {
+          !nonNullStillMisfitsTypeVariable(expected, actual) &&
+          // A rejected cast is about the inner types: `(s!! as Integer)` fails the same way.
+          castSource.isEmpty) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
       } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
@@ -1132,7 +1134,8 @@ object SemanticErrorReporter {
   private[compiler] final case class WidenToIterableHint(name: String, wider: TypedAST.Type)
 
   /**
-   * An extra (third) item on INCOMPATIBLE_TYPE for a rejected `as` cast: how the source is
+   * An extra (third) item on INCOMPATIBLE_TYPE for every rejected `as` cast (#2309, #2388),
+   * so no `!!` hint is offered (`!!` never makes a rejected cast valid): how the source is
    * written when it is a plain name (else null), and whether its type was nullable. The
    * List/array hint then names that variable and stays null-safe (`xs!!.toArray(..)`).
    */

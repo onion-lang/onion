@@ -129,7 +129,7 @@ final class ExpressionFormTyping(
       typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
         typed(node.src, context, destination).flatMap { term =>
           if (!isValidCast(term.`type`, destination)) {
-            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
+            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`, SemanticErrorReporter.CastSource(null, false))
             None
           } else {
             Some(new AsInstanceOf(term, destination))
@@ -141,7 +141,7 @@ final class ExpressionFormTyping(
         typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
           if (!isValidCast(term.`type`, destination)) {
             // `!!` cannot fix a nullable cast that is rejected here: the non-null value
-            // does not cast either. Report that type, so its own hint shows (#2309).
+            // does not cast either. Report that type, so its own hint shows (#2309, #2388).
             // The message still shows the `?`, and a List/array hint stays null-safe (`xs!!`).
             val (reported, nullable) = term.`type` match {
               case n: NullableType if !isValidCast(n.innerType, destination) => (n.innerType, true)
@@ -169,14 +169,12 @@ final class ExpressionFormTyping(
   private def isValidCast(source: Type, destination: Type): Boolean = {
     if (source eq destination) return true
     (source, destination) match {
-      // A nullable side used to reach the catch-all `true`, so `(xs as String[])` with
-      // `xs: List[String]?` compiled and always threw (#2309). Only the array rules
-      // look through `?`: null passes any reference checkcast, so the non-null value
-      // is what must fit.
-      case (ns: NullableType, _) if isArrayCast(ns.innerType, destination) =>
-        isValidCast(ns.innerType, destination)
-      case (_, nd: NullableType) if isArrayCast(source, nd.innerType) =>
-        isValidCast(source, nd.innerType)
+      // `?` only admits null, which passes any reference cast, so the inner types decide
+      // (#2388; arrays first, #2309). `null` itself fits every nullable type, a nullable
+      // primitive (`null as Int?`) too.
+      case (_: NullType, _: NullableType) => true
+      case (n: NullableType, _) => isValidCast(n.innerType, destination)
+      case (_, n: NullableType) => isValidCast(source, n.innerType)
       case (_: NullType, _: BasicType) =>
         false
       case (bt: BasicType, ct: ClassType) =>
@@ -250,9 +248,6 @@ final class ExpressionFormTyping(
       case _ => true
     }
   }
-
-  private def isArrayCast(source: Type, destination: Type): Boolean =
-    source.isInstanceOf[ArrayType] || destination.isInstanceOf[ArrayType]
 
   // An array's element type and dimension count as the JVM sees them: a `T[]` whose
   // `T` is `String[]` is a `String[][]`, and an `Int?[]` is an `Integer[]`. Null fits

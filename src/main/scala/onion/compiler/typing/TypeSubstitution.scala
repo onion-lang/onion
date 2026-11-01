@@ -58,12 +58,36 @@ private[compiler] object TypeSubstitution {
    * @param tp The type to extract substitution from
    * @return A map from type parameter names to their actual type arguments
    */
-  def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = tp match {
+  def classSubstitution(tp: Type): scala.collection.immutable.Map[String, Type] = receiverView(tp) match {
     case applied: TypedAST.AppliedClassType =>
       val rawParams = applied.raw.typeParameters
-      rawParams.map(_.name)(using onion.compiler.TypedAST.stringTag).zip(applied.typeArguments).toMap
+      val args = applied.typeArguments.map {
+        case tv: TypedAST.TypeVariableType => tv.resolvedView
+        case other => other
+      }(using onion.compiler.TypedAST.typeTag)
+      rawParams.map(_.name)(using onion.compiler.TypedAST.stringTag).zip(args).toMap
     case _ =>
       scala.collection.immutable.Map.empty
+  }
+
+  /**
+   * The type a member is looked up on. A receiver typed by a type variable
+   * (`b: B` with `B extends Box[T]`) is read through its bound, so `b.get()`
+   * is the holder's `T`; without this, Box's own `T` came back unsubstituted
+   * and failed the strict type-variable check ("type T is expected, but type
+   * T is used", #2308).
+   */
+  @scala.annotation.tailrec
+  private def receiverView(tp: Type, seen: Set[TypedAST.TypeVariableType] = Set.empty): Type = tp match {
+    case tv: TypedAST.TypeVariableType if tv.upperBound != null && !seen(tv.widen) =>
+      receiverView(tv.upperBound, seen + tv.widen)
+    case _ => tp
+  }
+
+  /** `this`, or `this`/`self` (and a bare member) reached from inside a closure. */
+  def isSelfReceiver(term: TypedAST.Term): Boolean = term match {
+    case _: TypedAST.This | _: TypedAST.OuterThis => true
+    case _ => false
   }
 
   /**
@@ -72,15 +96,21 @@ private[compiler] object TypeSubstitution {
    * arguments, so StringBox (: Box[String]) sees Box.get(): T as String.
    * Falls back to the receiver's own substitution when the chain doesn't
    * reach `declaring` (e.g. erased external classes).
+   * With `selfReceiver` (the receiver is `this`), the receiver's own
+   * unsubstituted variable stays a variable, as it does for a member declared
+   * on the receiver itself: inside `Mid[U] extends Box[U]`, an inherited
+   * `get(): T` called on `this` is a `U`, not `Object` (#2308). Any other raw
+   * receiver (`case m is Mid`, `(o as Mid)`) has no `U` in scope, so its
+   * variables collapse to their bounds.
    */
-  def hierarchySubstitution(receiver: Type, declaring: TypedAST.ClassType): scala.collection.immutable.Map[String, Type] = {
+  def hierarchySubstitution(receiver: Type, declaring: TypedAST.ClassType, selfReceiver: Boolean = false): scala.collection.immutable.Map[String, Type] = {
     def rawOf(ct: TypedAST.ClassType): TypedAST.ClassType = ct match {
       case a: TypedAST.AppliedClassType => a.raw
       case c => c
     }
     val targetName = rawOf(declaring).name
     val direct = classSubstitution(receiver)
-    val receiverClass = receiver match {
+    val receiverClass = receiverView(receiver) match {
       case ct: TypedAST.ClassType => rawOf(ct)
       case _ => return direct
     }
@@ -94,7 +124,7 @@ private[compiler] object TypeSubstitution {
         val parentSubst = parent match {
           case ap: TypedAST.AppliedClassType =>
             ap.raw.typeParameters.map(_.name)(using onion.compiler.TypedAST.stringTag)
-              .zip(ap.typeArguments.map(arg => substituteType(arg, subst, scala.collection.immutable.Map.empty, defaultToBound = true))(using onion.compiler.TypedAST.typeTag))
+              .zip(ap.typeArguments.map(arg => substituteType(arg, subst, scala.collection.immutable.Map.empty, defaultToBound = !selfReceiver))(using onion.compiler.TypedAST.typeTag))
               .toMap
           case _ => scala.collection.immutable.Map.empty[String, Type]
         }

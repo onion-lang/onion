@@ -447,6 +447,170 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
     }
   }
 
+  describe("tail-call optimization of a select statement with return in its cases (#2405)") {
+    def run(name: String, code: String) = shell.run(code.stripMargin, name, Array())
+
+    it("loops through return in a destructuring case") {
+      val result = run("TcoSelectStmtDestructure.on",
+        """
+          |enum L { case Cons(head: Int, tail: L); case Nil }
+          |class C {
+          |public:
+          |  static def build(n: Int, acc: L): L = if n == 0 { acc } else { build(n - 1, new Cons(1, acc)) }
+          |  static def sum(l: L, acc: Int): Int {
+          |    select l {
+          |      case Cons(h, t): return sum(t, acc + h)
+          |      case n is Nil: return acc
+          |    }
+          |    return -1
+          |  }
+          |  static def main(args: String[]): Int = sum(build(1000000, new Nil()), 0)
+          |}
+          |""")
+      assert(Shell.Success(1000000) == result)
+    }
+
+    // A wrong rewrite of these shapes loops forever, so give each run a deadline.
+    def runWithin(name: String, code: String): Shell.Result = {
+      import scala.concurrent.{Await, Future}
+      import scala.concurrent.duration.*
+      import scala.concurrent.ExecutionContext.Implicits.global
+      Await.result(Future(run(name, code)), 60.seconds)
+    }
+
+    it("returns from a void method whose select makes a bare self call in else") {
+      val result = runWithin("TcoSelectStmtVoidBareCall.on",
+        """
+          |class C {
+          |  static var out: Int = 0
+          |public:
+          |  static def v(n: Int): void {
+          |    select n {
+          |      case 0: out = out + 100
+          |      else: v(n - 1)
+          |    }
+          |  }
+          |  static def main(args: String[]): Int { v(3); return out }
+          |}
+          |""")
+      assert(Shell.Success(100) == result)
+    }
+
+    it("runs the code after a select whose case discards a self call's value") {
+      val result = runWithin("TcoSelectStmtDiscardedCall.on",
+        """
+          |class C {
+          |public:
+          |  static def g(n: Int): Int {
+          |    select n {
+          |      case 0: n
+          |      else: g(n - 1)
+          |    }
+          |    return 7
+          |  }
+          |  static def main(args: String[]): Int = g(3)
+          |}
+          |""")
+      assert(Shell.Success(7) == result)
+    }
+
+    it("loops through return at the end of a multi-statement case body") {
+      val result = runWithin("TcoSelectStmtMultiStatement.on",
+        """
+          |class C {
+          |public:
+          |  static def f(n: Int, acc: Int): Int {
+          |    select n {
+          |      case 0: return acc
+          |      else:
+          |        val m = n - 1
+          |        return f(m, acc + 1)
+          |    }
+          |    return -1
+          |  }
+          |  static def main(args: String[]): Int = f(1000000, 0)
+          |}
+          |""")
+      assert(Shell.Success(1000000) == result)
+    }
+
+    it("loops through return after a val in a destructuring case") {
+      val result = runWithin("TcoSelectStmtDestructureVal.on",
+        """
+          |enum L { case Cons(head: Int, tail: L); case Nil }
+          |class C {
+          |public:
+          |  static def build(n: Int, acc: L): L = if n == 0 { acc } else { build(n - 1, new Cons(1, acc)) }
+          |  static def sum(l: L, acc: Int): Int {
+          |    select l {
+          |      case Cons(h, t):
+          |        val a2 = acc + h
+          |        return sum(t, a2)
+          |      case n is Nil: return acc
+          |    }
+          |    return -1
+          |  }
+          |  static def main(args: String[]): Int = sum(build(1000000, new Nil()), 0)
+          |}
+          |""")
+      assert(Shell.Success(1000000) == result)
+    }
+
+    it("loops through return in a literal case and else") {
+      val result = run("TcoSelectStmtLiteral.on",
+        """
+          |class C {
+          |public:
+          |  static def f(n: Int, acc: Int): Int {
+          |    select n {
+          |      case 0: return acc
+          |      else: return f(n - 1, acc + 1)
+          |    }
+          |    return -1
+          |  }
+          |  static def main(args: String[]): Int = f(1000000, 0)
+          |}
+          |""")
+      assert(Shell.Success(1000000) == result)
+    }
+
+    it("still runs the code after a case that does not return") {
+      val result = run("TcoSelectStmtFallThrough.on",
+        """
+          |class C {
+          |public:
+          |  static def f(n: Int, acc: Int): Int {
+          |    select n {
+          |      case 0: acc = acc + 5
+          |      else: return f(n - 1, acc + 1)
+          |    }
+          |    return acc * 10
+          |  }
+          |  static def main(args: String[]): Int = f(1000000, 0)
+          |}
+          |""")
+      assert(Shell.Success(10000050) == result)
+    }
+
+    it("keeps a self call that is not in tail position a call") {
+      val result = run("TcoSelectStmtNonTail.on",
+        """
+          |class C {
+          |public:
+          |  static def f(n: Int): Int {
+          |    select n {
+          |      case 0: return 0
+          |      else: return f(n - 1) + 2
+          |    }
+          |    return -1
+          |  }
+          |  static def main(args: String[]): Int = f(100)
+          |}
+          |""")
+      assert(Shell.Success(200) == result)
+    }
+  }
+
   describe("tail-call optimization next to a boxed branch (#2406)") {
     def run(name: String, code: String) = shell.run(code.stripMargin, name, Array())
 

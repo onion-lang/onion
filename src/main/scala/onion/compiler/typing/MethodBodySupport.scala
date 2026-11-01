@@ -251,7 +251,7 @@ private[compiler] final class MethodBodySupport(
     val arguments = staticMethod.arguments
     val assigned = if (node.block == null) node.args.map(_.name).toSet else bodyContext.assignedNames(node.block)
     context.setReassignedNames(assigned)
-    val shared = sharedParameters(node.args.map(_.name), node.block, assigned)
+    val shared = CapturedVariableScanner.sharedParameters(node.args.map(_.name), node.block, assigned)
     context.markAsBoxed(shared)
     for ((arg, i) <- node.args.zipWithIndex) {
       if shared.contains(arg.name) then context.add(arg.name + "#arg", arguments(i + 1), isMutable = false)
@@ -259,7 +259,20 @@ private[compiler] final class MethodBodySupport(
     }
     addSharedParameterCopies(context, node.args, arguments.tail, shared)
 
-    staticMethod.setArgumentsWithDefaults(buildArgumentsWithDefaults(extArgs, arguments, context))
+    // A default is spliced into each call site, where neither the receiver nor the other
+    // parameters exist: type it without them, so `self` or an earlier parameter in a
+    // default is "not found" (E0002) instead of reading the caller's own slots (#2401).
+    val defaultsContext = new LocalContext
+    defaultsContext.setStatic(true)
+    defaultsContext.setMethod(staticMethod)
+    // A default that failed to type has been reported; keep the parameter optional so the
+    // call sites do not add a second, contradictory "method not found" (E0005).
+    val withDefaults = buildArgumentsWithDefaults(extArgs, arguments, defaultsContext).zip(extArgs).map {
+      case (typed, arg) if arg.defaultValue != null && typed.defaultValue.isEmpty =>
+        typed.copy(defaultValue = Some(Term.defaultValue(typed.argType)))
+      case (typed, _) => typed
+    }
+    staticMethod.setArgumentsWithDefaults(withDefaults)
     context
   }
 
@@ -296,7 +309,7 @@ private[compiler] final class MethodBodySupport(
     // Share the reassigned-name set with local `var` declarations so a var
     // never reassigned in this body can be smart-cast (issue #273).
     context.setReassignedNames(assigned)
-    val shared = sharedParameters(args.map(_.name), body, assigned)
+    val shared = CapturedVariableScanner.sharedParameters(args.map(_.name), body, assigned)
     context.markAsBoxed(shared)
     var i = 0
     args.foreach { arg =>
@@ -310,12 +323,6 @@ private[compiler] final class MethodBodySupport(
    * Parameters that a closure captures while the body also assigns them. The closure and the
    * method must see one variable, so these live in a box (issue #2335), like a captured `var`.
    */
-  private def sharedParameters(names: List[String], body: AST.Node, assigned: Set[String]): Set[String] =
-    body match
-      case block: AST.BlockExpression =>
-        CapturedVariableScanner.scan(block) & names.toSet & assigned
-      case _ => Set.empty
-
   private def addParameter(
     context: LocalContext,
     arg: AST.Argument,
@@ -363,7 +370,7 @@ private[compiler] final class MethodBodySupport(
   ): Array[TypedAST.MethodArgument] =
     args.zipWithIndex.map { case (arg, i) =>
       val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        typed(expr, context, types(i))
+        typed(expr, context.withoutParameters, types(i))
       }
       TypedAST.MethodArgument(arg.name, types(i), defaultTerm)
     }.toArray

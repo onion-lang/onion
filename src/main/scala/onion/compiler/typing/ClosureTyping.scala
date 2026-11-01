@@ -201,13 +201,14 @@ final class ClosureTyping(
 
           body.openFrame(context) {
             body.openClosure(context) {
-              if (!addClosureArguments(args, argTypes, context, node.body)) {
+              val boundArguments = addClosureArguments(args, argTypes, context, node.body)
+              if (boundArguments.isEmpty) {
                 None
               } else {
                 context.setMethod(typedMethod)
                 context.getContextFrame.parent.setAllClosed(true)
 
-                val prologue = args.zipWithIndex.flatMap { case (arg, i) =>
+                val prologue = boundArguments.get ++ args.zipWithIndex.flatMap { case (arg, i) =>
                   Option(context.lookup(arg.name)).flatMap { bind =>
                     val erased = TypeSubstitution.substituteType(
                       typedMethod.arguments(i), Map.empty, Map.empty, defaultToBound = true
@@ -481,32 +482,60 @@ final class ClosureTyping(
     }
   }
 
+  /**
+   * Binds the lambda's parameters in `context`, and returns the statements that copy each
+   * shared parameter into its box (None on an error). Every path that types the body, the
+   * real one and the result-type inference ones, binds through here, so a shared
+   * parameter's name resolves the same way in all of them.
+   */
   private def addClosureArguments(
     args: List[AST.Argument],
     argTypes: Array[Type],
     context: LocalContext,
     closureBody: AST.Node
-  ): Boolean = {
+  ): Option[List[ActionStatement]] = {
     // Unassigned lambda parameters behave like vals so smart casts apply
     val assigned =
       if (closureBody == null) args.map(_.name).toSet
       else bodyContext.assignedNames(closureBody) // memoized: this runs once per candidate overload
+    val shared = CapturedVariableScanner.sharedParameters(args.map(_.name), closureBody, assigned)
+    context.markAsBoxed(shared)
     var i = 0
     while (i < args.length) {
       val arg = args(i)
       if (context.lookupOnlyCurrentScope(arg.name) != null) {
         bodyContext.report(DUPLICATE_LOCAL_VARIABLE, arg, arg.name)
-        return false
+        return None
       }
       val argType = argTypes(i)
-      if (argType == null) return false
-      // `markAsBoxed` is name-based and covers the whole enclosing method, so an outer
-      // variable of the same name must not box this parameter (#2462).
-      context.addUnboxed(arg.name, argType, isMutable = assigned.contains(arg.name))
+      if (argType == null) return None
+      if (shared.contains(arg.name)) {
+        // The argument slot keeps a name no source can spell; the boxed copy takes the real one.
+        context.addUnboxed(arg.name + "#arg", argType, isMutable = false)
+      } else {
+        // A same-named shared variable in an enclosing or sibling lambda must not box this parameter.
+        context.addUnboxed(arg.name, argType, isMutable = assigned.contains(arg.name))
+      }
       i += 1
     }
-    true
+    Some(sharedParameterCopies(args, argTypes, context, shared))
   }
+
+  /** Declares the boxed local for each shared parameter and returns the statements that fill it. */
+  private def sharedParameterCopies(
+    args: List[AST.Argument],
+    argTypes: Array[Type],
+    context: LocalContext,
+    shared: Set[String]
+  ): List[ActionStatement] =
+    args.zipWithIndex.flatMap { case (arg, i) =>
+      Option.when(shared.contains(arg.name)) {
+        val from = context.lookupOnlyCurrentScope(arg.name + "#arg")
+        val index = context.add(arg.name, argTypes(i), isMutable = true)
+        new ExpressionActionStatement(
+          new SetLocal(arg.location, 0, index, argTypes(i), new RefLocal(arg.location, 0, from.index, argTypes(i))))
+      }
+    }
 
   private def inferFunctionType(
     rawType: ClassType,
@@ -555,7 +584,7 @@ final class ClosureTyping(
     typing.withSuppressedReporting {
       body.openFrame(context) {
         body.openClosure(context) {
-          if (addClosureArguments(node.args, argTypes, context, node.body)) {
+          if (addClosureArguments(node.args, argTypes, context, node.body).isDefined) {
             // Feed the SAM's expected return template (with unbound type
             // variables) as the expected type of the body's tail expression so a
             // generic call there pins its already-known type arguments (#230).
@@ -577,7 +606,7 @@ final class ClosureTyping(
     typing.withSuppressedReporting {
       body.openFrame(context) {
         body.openClosure(context) {
-          if (addClosureArguments(node.args, argTypes, context, node.body)) {
+          if (addClosureArguments(node.args, argTypes, context, node.body).isDefined) {
             val collected = context.startReturnTypeCollection()
             val translated = body.translate(node.body, context)
             context.stopReturnTypeCollection()

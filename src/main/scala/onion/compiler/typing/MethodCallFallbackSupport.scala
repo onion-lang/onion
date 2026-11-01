@@ -23,6 +23,9 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
+  def hasErasureTwinExtension(targetType: ObjectType, name: String): Boolean =
+    extensionMethodFallbackSupport.hasErasureTwinExtension(targetType, name)
+
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
     extensionMethodFallbackSupport.isAmbiguousExtensionCall(targetType, name, params)
 

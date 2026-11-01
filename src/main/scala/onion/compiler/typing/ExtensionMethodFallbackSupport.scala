@@ -23,6 +23,13 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   private val failedAt =
     new java.util.IdentityHashMap[AST.MethodCall, java.util.HashSet[(Type, List[Type], Type, AnyRef)]]()
 
+  /** One `extension` block that applies to this receiver declares two `name`s with the same
+   *  erased signature: the declaration is E0084, so its calls must not add errors (#2475). */
+  def hasErasureTwinExtension(targetType: ObjectType, name: String): Boolean =
+    collectExtensionMethods(targetType, name).groupBy(_.containerClass).exists { (_, ms) =>
+      ms.lengthCompare(1) > 0 && ms.map(DuplicationChecks.erasedSignatureKey).distinct.lengthCompare(ms.length) < 0
+    }
+
   /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
    *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =

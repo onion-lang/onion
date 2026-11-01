@@ -398,7 +398,9 @@ final class MethodCallTyping(
     params: Array[Term],
     expected: Type
   ): Option[Term] =
-    methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
+    if (methodCallFallbackSupport.hasErasureTwinExtension(targetType, node.name))
+      typing.withSuppressedReporting(methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected))
+    else methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
 
   /** Resolve an operator convention method via an `extension` block; None on miss. */
   private[typing] def tryExtensionOperatorMethod(

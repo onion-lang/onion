@@ -42,6 +42,20 @@ private[compiler] final class InstanceMethodCallSupport(
     params0: Array[Term],
     context: LocalContext,
     expected: Type = null
+  ): Option[Term] =
+    // An extension block declaring two `name`s with one erasure is already E0084; a call to
+    // that name, whichever twin it means, reports nothing of its own (#2475).
+    if (fallback.hasErasureTwinExtension(targetType, node.name))
+      calls.typing.withSuppressedReporting(typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected))
+    else typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected)
+
+  private def typeMethodCallOnObjectChecked(
+    node: AST.MethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params0: Array[Term],
+    context: LocalContext,
+    expected: Type
   ): Option[Term] = {
     val name = node.name
 

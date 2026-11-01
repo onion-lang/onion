@@ -631,14 +631,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         )
         put(node, extensionMethod)
 
-        // Register the extension method for lookup during method resolution. A twin with the
-        // same erased signature in this block is reported once as E0084 (duplication pass);
-        // leaving it out of lookup keeps its calls from adding an error of their own (#2475).
-        val key = DuplicationChecks.erasedSignatureKey(extensionMethod)
-        val isErasureTwin = typing.lookupExtensionMethods(receiverFqcn).exists { m =>
-          (m.containerClass eq definition_) && DuplicationChecks.erasedSignatureKey(m) == key
-        }
-        if (!isErasureTwin) registerExtensionMethod(receiverFqcn, extensionMethod)
+        // Register the extension method for lookup during method resolution
+        registerExtensionMethod(receiverFqcn, extensionMethod)
 
         // Also create a static method in the container class
         // The static method has an extra first parameter for the receiver
@@ -655,7 +649,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           throwsTypes,
           hasVararg
         )
-        if (!isErasureTwin) definition_.add(staticMethod)
+        definition_.add(staticMethod)
       }
     }
   }

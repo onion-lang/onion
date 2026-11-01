@@ -142,11 +142,16 @@ final class ExpressionFormTyping(
           if (!isValidCast(term.`type`, destination)) {
             // `!!` cannot fix a nullable cast that is rejected here: the non-null value
             // does not cast either. Report that type, so its own hint shows (#2309).
-            val reported = term.`type` match {
-              case n: NullableType if !isValidCast(n.innerType, destination) => n.innerType
-              case other => other
+            // The message still shows the `?`, and a List/array hint stays null-safe (`xs!!`).
+            val (reported, nullable) = term.`type` match {
+              case n: NullableType if !isValidCast(n.innerType, destination) => (n.innerType, true)
+              case other => (other, false)
             }
-            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, reported)
+            val name = node.src match {
+              case id: AST.Id => id.name
+              case _ => null
+            }
+            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, reported, SemanticErrorReporter.CastSource(name, nullable))
             None
           } else {
             Some(new AsInstanceOf(term, destination))

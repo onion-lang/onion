@@ -471,5 +471,43 @@ class CastValidationSpec extends AbstractShellSpec {
       assert(msgs.contains("toArray(new String[0])"), s"expected the List-is-not-an-array hint, got: $msgs")
       assert(!msgs.contains("`!!`"), s"`!!` does not make this cast work, got: $msgs")
     }
+      def inMain(body: String): String =
+      s"class Main {\npublic:\n  static def main(args: String[]): Int {\n    $body\n  }\n}\n"
+
+    def castMessages(src: String): String = {
+      val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+      new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "CastHint.on"))) match {
+        case CompilationOutcome.Failure(errors) => errors.map(_.message).mkString("\n")
+        case _ => ""
+      }
+    }
+
+    it("gives a nullable List source a null-safe toArray hint that compiles (#2309 panel round 4)") {
+      val msgs = castMessages("val xs: List[String]? = [\"a\"]\nval a = (xs as String[])\n")
+      assert(msgs.contains("`xs!!.toArray(new String[0])`"), s"expected a null-safe toArray hint, got: $msgs")
+      assert(msgs.contains("List[String]?"), s"the message should keep the `?`, got: $msgs")
+      val followed = shell.run(inMain("val xs: List[String]? = [\"a\"]\n    return xs!!.toArray(new String[0]).length"), "None", Array())
+      assert(followed == Shell.Success(1))
+    }
+
+    it("gives a nullable array source a null-safe Colls::toList hint that compiles (#2309 panel round 4)") {
+      val msgs = castMessages("val arr: String[]? = new String[1]\nval l = (arr as List[String])\n")
+      assert(msgs.contains("`Colls::toList(arr!!)`"), s"expected a null-safe Colls::toList hint, got: $msgs")
+      assert(msgs.contains("String[]?"), s"the message should keep the `?`, got: $msgs")
+      val followed = shell.run(inMain("val arr: String[]? = new String[1]\n    return Colls::toList(arr!!).size"), "None", Array())
+      assert(followed == Shell.Success(1))
+    }
+
+    it("names the user's own variable in the List/array hint") {
+      val msgs = castMessages("val names: List[String] = [\"a\"]\nval a = (names as String[])\n")
+      assert(msgs.contains("`names.toArray(new String[0])`"), s"expected the variable's own name, got: $msgs")
+      assert(!msgs.contains("!!"), s"a non-null source needs no `!!`, got: $msgs")
+    }
+
+    it("does not advise a cast on a rejected array cast") {
+      val msgs = castMessages("val ys: String[] = new String[1]\nval b = (ys as Integer[])\n")
+      assert(msgs.contains("Integer[]") || msgs.contains("Int[]"), s"expected the cast error, got: $msgs")
+      assert(!msgs.contains("Consider a cast") && !msgs.contains("キャスト"), s"no cast advice on a cast, got: $msgs")
+    }
   }
 }

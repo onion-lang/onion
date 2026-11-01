@@ -117,9 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **An `as` cast to or from an array that can never succeed is a compile error, also when one side is nullable (#2309).**
-  - Before: `(xs as String[])` with `xs: List[String]?`, or `(ys as Integer[])` with `ys: String[]`, compiled and always failed at run time with `invalid type cast`.
-  - Now: E0000, like `List[String] as String[]`. Casts that can work (`Int[]? as Int[]`, `Object[] as String[]`, `Object?[] as String[][]`) still compile.
 - **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
   - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
   - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.

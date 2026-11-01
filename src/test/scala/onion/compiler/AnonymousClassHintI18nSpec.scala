@@ -63,7 +63,10 @@ class AnonymousClassHintI18nSpec extends AnyFunSpec with Diagrams {
          |""".stripMargin, "java.util.Comparator[String]", "ComparatorImpl"),
     "a call argument" ->
       ("""val t = new Thread(new Runnable { def run(): void { println("x") } })
-         |""".stripMargin, "Runnable", "RunnableImpl")
+         |""".stripMargin, "Runnable", "RunnableImpl"),
+    "nested type arguments" ->
+      ("""val m = new java.util.Map[String, List[Int]]() { def size(): Int = 0 }
+         |""".stripMargin, "java.util.Map[String, List[Int]]", "MapImpl")
   )
 
   cases.foreach { case (label, (src, typeName, implName)) =>
@@ -73,6 +76,37 @@ class AnonymousClassHintI18nSpec extends AnyFunSpec with Diagrams {
       assert(msgs.contains(s"class $implName conforms $typeName '{' public:") || msgs.contains(s"class $implName conforms $typeName { public:"),
         s"expected the named-class example, got: $msgs")
     }
+  }
+
+  it("says the lambda is for an interface, and when to use `extends`, before the example") {
+    val enText = en.getString(key)
+    assert(enText.contains("is an interface with one abstract method"), enText)
+    assert(enText.indexOf("extends") >= 0 && enText.indexOf("extends") < enText.indexOf("class {1} conforms"), enText)
+    val jaText = ja.getString(key)
+    assert(jaText.contains("インターフェース"), jaText)
+    assert(jaText.indexOf("extends") >= 0 && jaText.indexOf("extends") < jaText.indexOf("class {1} conforms"), jaText)
+  }
+
+  // An array size in the brackets is not a type argument: `new Int[3] {` is not an
+  // anonymous class, and a greedy match once read `Foo[Int]().items[0]` as one type.
+  private val notAnonymous = Seq(
+    "a literal array size" -> "val xs = new Int[3] {1, 2, 3}\n",
+    "a variable array size" -> "val n = 2\nval xs = new String[n] {\"a\", \"b\"}\n",
+    "a computed array size" -> "val n = 2\nval xs = new Int[n + 1] {1}\n",
+    "a constant array size of a primitive" -> "val MAX = 2\nval xs = new Int[MAX] {1}\n",
+    "an index after a constructor call" -> "val x = new java.util.ArrayList[Int]().toArray()[0] {\n"
+  )
+
+  notAnonymous.foreach { case (label, src) =>
+    it(s"does not fire for $label") {
+      val msgs = compileErrors(src)
+      assert(msgs.nonEmpty, "expected a syntax error")
+      assert(!msgs.contains("val f: ") && !msgs.contains("Impl conforms"), s"unexpected hint: $msgs")
+    }
+  }
+
+  it("leaves an array initializer `new Int[] { ... }`, which compiles, alone") {
+    assert(compileErrors("val xs = new Int[] {1, 2}\nprintln(xs.length)\n") == "")
   }
 
   it("does not fire for a constructor call followed by a block statement") {

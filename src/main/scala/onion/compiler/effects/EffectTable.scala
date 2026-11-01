@@ -113,7 +113,7 @@ object EffectTable {
                 if (colon < 0) (item, None)
                 else (item.substring(0, colon).trim, Some(item.substring(colon + 1).trim))
               val effect = Effect.parse(name).getOrElse(
-                fail(s"unknown effect '$name' (know: ${Effect.all.mkString(", ")})"))
+                fail(s"unknown effect '$name' (know: ${(Effect.all ++ Effect.internal.toSeq.sorted).mkString(", ")})"))
               operand match {
                 case Some("") => fail(s"empty operand after '$name:': $line")
                 case Some(_) if effect == Effect.Unknown => fail(s"'unknown' takes no operand: $line")

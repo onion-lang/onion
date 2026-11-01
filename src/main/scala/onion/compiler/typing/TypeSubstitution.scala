@@ -109,8 +109,15 @@ private[compiler] object TypeSubstitution {
       case c => c
     }
     val targetName = rawOf(declaring).name
-    val direct = classSubstitution(receiver)
-    val receiverClass = receiverView(receiver) match {
+    // `this` in a generic class's body is the class applied to its own variables:
+    // read raw, a self-call's `Comparable[T]` collapsed to `Comparable[Comparable]`,
+    // which no `T` argument fits (#2547).
+    val self = receiver match {
+      case d: TypedAST.ClassDefinition if selfReceiver => d.selfType
+      case other => other
+    }
+    val direct = classSubstitution(self)
+    val receiverClass = receiverView(self) match {
       case ct: TypedAST.ClassType => rawOf(ct)
       case _ => return direct
     }

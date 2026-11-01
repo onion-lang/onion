@@ -5472,6 +5472,10 @@ constructors:</p>
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="nf">greet</span><span class="p">(</span><span class="s2">"kota"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Yo"</span><span class="p">)</span><span class="w">            </span><span class="c1">// Yo, kota</span>
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nf">greet</span><span class="p">(</span><span class="n">greeting</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Hi"</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"kota"</span><span class="p">)</span>
 </span></code></pre></div>
+<p>A default is evaluated in the called method, each time an argument is omitted. It can use:
+- the parameters declared before it: <code>def range(from: Int, to: Int = from + 10)</code>
+- the receiver's fields and methods, including private ones: <code>def f(n: Int, m: Int = this.limit)</code></p>
+<p>A default that names its own or a later parameter is <code>E0002</code>.</p>
 <h3 id="varargs">Varargs<a class="headerlink" href="#varargs" title="Permanent link">&para;</a></h3>
 <p>A trailing <code>Type...</code> parameter collects extra arguments into an array;
 passing an array directly also works:</p>

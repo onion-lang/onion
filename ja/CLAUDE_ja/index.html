@@ -5482,6 +5482,7 @@
 <li><code>--Wno &lt;codes&gt;</code> - 特定の警告を抑制 (例: W0001,unused-parameter)</li>
 <li><code>--no-check-laws</code> - レコードの <code>law</code>/<code>example</code> 節を実行しない（既定ではコンパイル時に実行される。LSPでは常に無効）</li>
 <li><code>--law-seed &lt;n&gt;</code> / <code>--law-samples &lt;n&gt;</code> - lawのサンプリングを制御。反証されたlawは、その反例を生成した設定を報告する</li>
+<li><code>--contracts &lt;off|check&gt;</code> - 契約の節（メソッドの <code>requires</code>/<code>ensures</code>、クラスの <code>invariant</code>/<code>history</code>）を受け付けて静的に検査する。プレビュー機能（RFC #2557）で既定は off。off のとき節は無視されずエラーになる。<code>runtime</code> と <code>verify</code> は予約済みで受け付けない</li>
 <li><code>--print-classpath</code> - <code>onionc</code> のみ: 出力を実行するための classpath（<code>-d</code> のディレクトリまたは <code>.</code>、<code>-classpath</code>、ファイルの <code>//&gt; using dep</code> ディレクティブが解決する jar の順）をプラットフォームの区切り文字で標準出力に表示し、コンパイルせずに終了する</li>
 <li><code>--stacktrace</code> - 未捕捉の実行時エラーで生のJVMスタックトレースを表示する（既定ではスクリプト自身のフレームのみを含む診断形式のレポートになる）</li>
 <li><code>ONION_DAEMON=1</code> (環境変数) - <code>onionc</code> と <code>onion script.on</code> は常駐デーモン（<code>onion.tools.daemon</code>）経由でコンパイルする。デーモンは初回利用時に起動し、スクリプトのクラスは呼び出し元プロセスに戻って実行される。デーモンに接続できない場合はプロセス内コンパイルにフォールバックする。<code>java -cp onion.jar onion.tools.daemon.DaemonClient stop|status</code> で制御できる</li>

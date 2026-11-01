@@ -4621,7 +4621,7 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 <td>1</td>
 <td>Test suite</td>
 <td><code>sbt shutdown &amp;&amp; sbt -Duser.language=en testFull</code> (see the note below)</td>
-<td>5669 pass / 0 fail / 1 cancelled</td>
+<td>9586 pass / 0 fail / 2 cancelled</td>
 <td>0 failed, 0 skipped</td>
 </tr>
 <tr>
@@ -4663,13 +4663,13 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 <td>7</td>
 <td>Diagnostics</td>
 <td>distinct <code>E00xx</code> codes with EN+JA messages</td>
-<td>100</td>
+<td>102</td>
 <td>every common error has a dedicated code</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Row 3 is a floor, not a goal.</strong> New samples are added only to exercise a new or changed feature, at most one a day (see <code>docs/evolution/README.md</code>); growing the count is not progress.</p>
-<p><strong>Rows 2 and 3 are checked against a tolerance band, not exact equality</strong> (issue #1370).
+<p><strong>Rows 2, 3 and 7 are checked against a tolerance band, not exact equality</strong> (issue #1370; row 7 added in W44, when five PRs that each added an error code re-conflicted one after another). A new error code no longer needs to touch row 7; top it up when drift nears 10.
 Every PR that adds a sample to <code>run/</code> used to have to bump the exact counts in both rows
 <em>and</em> insert its sample's name into row 3's alphabetized list — and because every such PR
 touched the same two lines, any two of them landed within an hour of each other conflicted,

@@ -5430,6 +5430,9 @@
 </span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a><span class="kd">val</span><span class="w"> </span><span class="n">third</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Fraction</span><span class="o">::</span><span class="nf">of</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">)</span>
 </span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="kd">val</span><span class="w"> </span><span class="n">one</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">third</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">third</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">third</span><span class="w">            </span><span class="c1">// ちょうど 1/1</span>
 </span></code></pre></div>
+<p>本体で成分のアクセサを定義し直すことはできません。<code>Fraction</code> に <code>def num(): Int</code> を書くと
+E0010 になります。メソッド名を変えてください。<code>num(scale: Int)</code> のように引数のある
+オーバーロードは書けます。</p>
 <h2 id="_14">演算子オーバーロード<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
 <p>二項演算子は左オペランドのメソッドにディスパッチされます（Kotlinスタイル）：<code>a + b</code> は <code>a.plus(b)</code> を呼び出します：</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Vec</span><span class="w"> </span><span class="p">{</span>

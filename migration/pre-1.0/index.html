@@ -4078,6 +4078,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-slot-typed-t-accepts-only-a-t" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A slot typed T accepts only a T
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#an-empty-or-takes-the-type-of-its-siblings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4093,6 +4104,17 @@
     <span class="md-ellipsis">
       
         A lambda passed to overloaded extension methods no longer depends on declaration order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-and-filter-on-any-iterable-return-a-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        map and filter on any iterable return a List
       
     </span>
   </a>
@@ -4737,6 +4759,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-slot-typed-t-accepts-only-a-t" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A slot typed T accepts only a T
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#an-empty-or-takes-the-type-of-its-siblings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4752,6 +4785,17 @@
     <span class="md-ellipsis">
       
         A lambda passed to overloaded extension methods no longer depends on declaration order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#map-and-filter-on-any-iterable-return-a-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        map and filter on any iterable return a List
       
     </span>
   </a>
@@ -4858,19 +4902,70 @@ text. This lets a value keep leading or trailing spaces through <code>print</cod
   is now a <code>Defect</code> naming the line.</li>
 <li><strong>Only <code>String</code> components:</strong> an <code>Int</code>, <code>Boolean</code> or other scalar is read exactly as before.</li>
 </ul>
+<h2 id="a-slot-typed-t-accepts-only-a-t">A slot typed <code>T</code> accepts only a <code>T</code><a class="headerlink" href="#a-slot-typed-t-accepts-only-a-t" title="Permanent link">&para;</a></h2>
+<p>Inside a generic class, assigning to a field, local or parameter typed by a type parameter <code>T</code>,
+initializing one, or returning from a method declared <code>: T</code> now accepts only a value of type <code>T</code>,
+as in Java. It used to accept anything that fit <code>T</code>'s bound,
+and the program then threw a <code>ClassCastException</code> on the next read.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">S</span><span class="p">[</span><span class="nc">T</span><span class="p">,</span><span class="w"> </span><span class="nc">U</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">t</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">u</span><span class="p">:</span><span class="w"> </span><span class="nc">U</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="nc">U</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">;</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="c1">// Before: compiled, then `new S[String, Integer]("a", 1)` threw on the next read of t</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">():</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="c1">// Now: write the unchecked cast yourself, if the value really is a T</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">g</span><span class="p">():</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">u</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">T</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What changed:</strong> a value of an unrelated type variable (<code>U</code>), of the bound (<code>Object</code>,
+  <code>CharSequence</code>), or of a concrete type (<code>"x"</code>) no longer fits a <code>T</code> slot.</li>
+<li><strong>What you see:</strong> <code>E0000 type T is expected, but type U is used.</code> at the value.</li>
+<li><strong>Still fine:</strong> a <code>T</code>; a variable bounded by <code>T</code> (<code>[T, U extends T]</code>, then <code>t = u</code>); <code>null</code>;
+  and an argument to a Java method on a raw Java receiver (<code>(o as ArrayList).add(u)</code>). A value
+  read back through one (<code>t = (o as ArrayList).get(0)</code>) is not a <code>T</code>, so it needs a cast.</li>
+<li><strong>Two parameters named <code>T</code>:</strong> a method's <code>[T]</code> inside <code>class K[T]</code> is a different <code>T</code>. The
+  error then adds a hint saying so. To use the class's <code>T</code>, drop the method's <code>[T]</code>.</li>
+<li><strong>Calls:</strong> an argument is checked when the method is inherited (<code>set(o)</code> inside
+  <code>Mid[U] extends Box[U]</code>) or the receiver is typed with your variable (<code>xs.add(o)</code> with
+  <code>xs: List[T]</code>, <code>b.set(o)</code> with <code>b: Box[T]</code>).</li>
+<li><strong>A <code>T?</code> slot:</strong> it takes what a <code>T</code> slot takes, plus <code>null</code> and a <code>T?</code>. So <code>o = u</code>,
+  <code>o = uo</code> (<code>uo: U?</code>) and <code>o = "x"</code> into <code>o: T?</code> are <code>E0000</code> too (#2332). A constructor
+  argument into a <code>T?</code> parameter (<code>new Box[T](u)</code> with <code>def this(x: T?)</code>) is <code>E0021</code>, as it
+  already was for a <code>T</code> parameter.</li>
+<li><strong>Not covered yet:</strong> <code>xs[0] = u</code>, <code>m["k"] = u</code> and a literal <code>[u]</code> still accept a <code>U</code>, and
+  still throw at run time (#2332). Cast there too, so the code keeps compiling once they are
+  checked.</li>
+<li><strong>Inherited members are now <code>U</code>:</strong> inside <code>class Mid[U] extends Box[U]</code>, an inherited
+  <code>get(): T</code> is a <code>U</code> (it was <code>Object</code>). <code>U</code> may be null, so <code>get().toString()</code> is now <code>E0057</code>,
+  as it already was inside <code>Box</code>. Write <code>get()?.toString()</code>, <code>get() ?: fallback</code>, or give <code>U</code> a
+  non-null bound: <code>class Mid[U extends Object]</code>. A Java superclass is the same: inside
+  <code>class MyList[T] extends ArrayList[T]</code>, <code>get(0).toString()</code> is now <code>E0057</code>.</li>
+<li><strong><code>this</code> is a <code>Mid[U]</code>:</strong> inside <code>class Mid[U]</code>, <code>this</code> keeps <code>U</code>, also through
+  <code>val me = this</code>, <code>id(this)</code>, <code>[this]</code> or <code>() -&gt; this</code>. So <code>same(this)</code> fits an inherited
+  <code>same(o: Box[T])</code>, and <code>me.get()</code> is a <code>U</code> (it was raw <code>Mid</code>, so <code>me.get()</code> was an <code>Object</code>).</li>
+<li><strong>Branches with different type arguments:</strong> <code>if b { [t] } else { [u] }</code> is a raw <code>List</code>.
+  It compiles where an <code>Object</code> is expected; where a <code>List[T]</code> is expected, the <code>[u]</code> branch is
+  <code>E0000</code>.</li>
+<li><strong>No <code>onion migrate</code> rule, on purpose:</strong> the only mechanical rewrite is inserting
+  <code>(u as T)</code>, which would hide exactly the bugs this check finds. Read each error and decide.</li>
+</ul>
 <h2 id="an-empty-or-takes-the-type-of-its-siblings">An empty <code>[]</code> or <code>[:]</code> takes the type of its siblings<a class="headerlink" href="#an-empty-or-takes-the-type-of-its-siblings" title="Permanent link">&para;</a></h2>
 <p>In a list literal, or in the values of a map literal, an empty <code>[]</code> or <code>[:]</code> now has the
 type the other elements agree on. Before, it widened the whole literal to <code>Object</code>.</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">// Before: List[Object], so adj[1].add(5) was E0005, and this compiled</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1">// Now: List[List[Int]], so adj[1].add(5) compiles, and this is E0005</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1">// To keep the old type, annotate it</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Object</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1">// Before: List[Object], so adj[1].add(5) was E0005, and this compiled</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">// Now: List[List[Int]], so adj[1].add(5) compiles, and this is E0005</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1">// To keep the old type, annotate it</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Object</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
 </span></code></pre></div>
 <ul>
 <li><strong>What changed:</strong> the empty literal is typed after its siblings, from their type. Elements are still evaluated in source order.</li>
@@ -4974,6 +5069,32 @@ whichever overload was declared first or last. In general:</p>
 <li><strong>What you see:</strong> <code>E0006 method call is applicable for both …</code>, with a hint naming the fixes
   in the last column.</li>
 <li><strong>Still fine:</strong> a call with one matching overload, or with no lambda argument.</li>
+</ul>
+<h2 id="map-and-filter-on-any-iterable-return-a-list"><code>map</code> and <code>filter</code> on any iterable return a <code>List</code><a class="headerlink" href="#map-and-filter-on-any-iterable-return-a-list" title="Permanent link">&para;</a></h2>
+<p><code>map</code> and <code>filter</code> on a range, on <code>map.values()</code> or on any other <code>Iterable</code> that is not a
+<code>List</code> or a <code>Set</code> now return a <code>List</code>. Before, the result was typed <code>Iterable</code>, though it was
+already a list.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">evens</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">..</span><span class="mi">10</span><span class="p">).</span><span class="n">filter</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">evens</span><span class="p">.</span><span class="n">size</span><span class="w">                         </span><span class="c1">// Before: E0004. Now: 5</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="kd">var</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">..</span><span class="mi">3</span><span class="p">).</span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">xs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">util</span><span class="p">.</span><span class="nc">TreeSet</span><span class="p">[</span><span class="kt">Int</span><span class="p">]()</span><span class="w">  </span><span class="c1">// Before: compiled. Now: E0000</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1">// To keep a variable that holds any iterable, declare its type</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="kd">var</span><span class="w"> </span><span class="n">ys</span><span class="p">:</span><span class="w"> </span><span class="nc">Iterable</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">..</span><span class="mi">3</span><span class="p">).</span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">ys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">util</span><span class="p">.</span><span class="nc">TreeSet</span><span class="p">[</span><span class="kt">Int</span><span class="p">]()</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What changed:</strong> <code>Iterables::map(Iterable, f)</code> and <code>Iterables::filter(Iterable, p)</code> return
+  <code>List[T]</code>. A list's or a set's own <code>map</code>/<code>filter</code> is unchanged.</li>
+<li><strong>What you see:</strong> <code>E0000 type List[Int] is expected, but type TreeSet[Int] is used</code>, with a
+  hint to declare <code>var xs: Iterable[Int] = ...</code>.</li>
+<li><strong>Runs differently:</strong> with an overload or an extension on both <code>Iterable</code> and <code>List</code>, a
+  call on the result now picks the <code>List</code> one. Rename one of them to keep the old choice.</li>
+<li><strong>Recompile:</strong> a class compiled against an older <code>onion.jar</code> that calls these methods
+  throws <code>NoSuchMethodError</code> until it is compiled again.</li>
+<li><strong>Still fine:</strong> <code>.toList()</code> after such a pipeline still works, and the result still fits an
+  <code>Iterable</code> parameter or variable.</li>
 </ul>
 
 

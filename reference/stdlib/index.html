@@ -9797,15 +9797,18 @@ conversion table, so a <code>shape</code>/<code>from re"..."</code> derivation a
 </span><span id="__span-66-8"><a id="__codelineno-66-8" name="__codelineno-66-8" href="#__codelineno-66-8"></a><span class="n">r</span><span class="p">.</span><span class="nf">toString</span><span class="p">()</span><span class="w">                 </span><span class="c1">// "Range(2..&lt;6)"; empty ranges print "Range(empty)"</span>
 </span><span id="__span-66-9"><a id="__codelineno-66-9" name="__codelineno-66-9" href="#__codelineno-66-9"></a>
 </span><span id="__span-66-10"><a id="__codelineno-66-10" name="__codelineno-66-10" href="#__codelineno-66-10"></a><span class="k">foreach</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// 2 3 4 5</span>
+</span><span id="__span-66-11"><a id="__codelineno-66-11" name="__codelineno-66-11" href="#__codelineno-66-11"></a>
+</span><span id="__span-66-12"><a id="__codelineno-66-12" name="__codelineno-66-12" href="#__codelineno-66-12"></a><span class="kd">val</span><span class="w"> </span><span class="n">evens</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">..</span><span class="mi">10</span><span class="p">).</span><span class="n">filter</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// a List[Int]: [2, 4, 6, 8, 10]</span>
+</span><span id="__span-66-13"><a id="__codelineno-66-13" name="__codelineno-66-13" href="#__codelineno-66-13"></a><span class="n">evens</span><span class="p">.</span><span class="n">size</span><span class="w">                   </span><span class="c1">// 5</span>
 </span></code></pre></div>
 <h2 id="iterables-module">Iterables Module<a class="headerlink" href="#iterables-module" title="Permanent link">&para;</a></h2>
 <p>Provided via <code>onion.Iterables</code> (Java interface).</p>
 <p>Access iteration utilities for collections and arrays:</p>
 <ul>
-<li><code>Iterables::map(list|iterable|set, f)</code></li>
+<li><code>Iterables::map(list|iterable|set, f)</code> - a <code>List</code> for a list or any other <code>Iterable</code> (a range, <code>map.values()</code>), a <code>Set</code> for a set</li>
 <li><code>Iterables::mapMap(map, f)</code> - maps each <code>Map.Entry</code> through <code>f</code>, returning a new <code>Map</code> in the original insertion order</li>
 <li><code>Iterables::toList(iterable)</code> - materializes any <code>Iterable</code> (ranges included) into a <code>List</code></li>
-<li><code>Iterables::filter(list|iterable, predicate)</code></li>
+<li><code>Iterables::filter(list|iterable, predicate)</code> - always a <code>List</code></li>
 <li><code>Iterables::foldl(iterable, init, f)</code></li>
 <li><code>Iterables::reduce(list, initial, reducer)</code></li>
 <li><code>Iterables::exists(iterable, predicate)</code></li>

@@ -4803,16 +4803,28 @@ capability 層は今それを土台にして動いています。</p>
 装えばこの語彙の上に築かれる保証すべてが嘘になります。だから <code>unknown</code> は他の効果と同じ
 ように伝播する効果であり、capability 層はこれを「明示的な許可が要る」と扱います。
 「無害」とは決して扱いません。</p>
+<p>もう一つ、<em>内部</em>の効果があります。<code>mutate</code> は<em>呼び出しが、呼び出しより長く残るメモリに書き込む</em>
+ことを表します。フィールド、配列の要素、コレクション、<code>StringBuilder</code> などです。これはプログラム
+自身の状態の話で、外の世界の話ではないので、capability ではありません。<code>tool</code> が宣言することは
+なく（<code>requires { mutate }</code> は E0079）、capability の検査も要求しません。<code>--effects</code> と効果の表には
+現れます。契約の式が「純粋」と言えるのは、この効果のおかげです。書き込む式は純粋ではありません。</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$ onionc --effects Counter.on
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Counter#get(): pure
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>Counter#set(Int): mutate
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>Counter#&lt;init&gt;(Int): pure
+</span></code></pre></div>
+<p>コンストラクタが自分の <code>this</code> を初期化するだけなら、変更とは数えません。まだ誰もそのオブジェクトを
+持っていないので、<code>new C(1)</code> は <code>pure</code> のままです。他のオブジェクトへの書き込みは変更です。</p>
 <h2 id="_2">事実の出どころ<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p>このコンパイラでは効果をアノテーションに載せられません — Java メソッドのアノテーションは
 型検査器に届かず、バイトコードにも出力されず、最適化器はメソッドを再構築するときに捨てて
 しまいます。だから事実は帯域外、コンパイラに同梱されるリソース（<code>onion/effect-table.txt</code>）
 にあります。各行が 1 メソッド（またはワイルドカードでクラス全体）を分類し、個別エントリは
 クラスのワイルドカードに勝ちます。ほぼ純粋なクラスが例外だけ申告する書き方です：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>onion.DateTime#*=pure
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>onion.DateTime#now=clock
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>onion.Files#copy=read,write
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>onion.Cli#parse=console,exec
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>onion.DateTime#*=pure
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>onion.DateTime#now=clock
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>onion.Files#copy=read,write
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>onion.Cli#parse=console,exec
 </span></code></pre></div>
 <p>表には標準ライブラリの効果を持つ全表面 — <code>Files</code>、<code>FileResource</code>、<code>Proc</code>、<code>Http</code>、
 <code>HttpResource</code>、<code>Config</code>、<code>IO</code>、<code>Cli</code>、<code>DateTime</code>、<code>Timing</code>、<code>Rand</code>、<code>OnionMath</code>、
@@ -4823,6 +4835,10 @@ capability 層は今それを土台にして動いています。</p>
 <code>File</code>、<code>java.nio.file.Files</code>。<code>BufferedReader</code> などのラッパーは <code>System.in</code> やソケットを包むこともあるため
 <code>unknown</code> のまま）、JDK の既知の効果点（<code>System::getenv</code>、<code>System::exit</code>、<code>Runtime::exec</code>、<code>Thread::sleep</code>、
 <code>System::out</code> の型としての <code>PrintStream</code>）が入っています。</p>
+<p>変更可能な状態を持つクラス（<code>List</code>、<code>Map</code>、<code>Set</code> とその実装、<code>StringBuilder</code>、<code>Iterator</code>、
+<code>Matcher</code>、<code>StringJoiner</code>）は、逆向きに載せてあります。既定は <code>mutate</code> で、レシーバを変えないと
+分かっているメソッドだけが <code>pure</code> です。後の JDK で増えたメソッドは、誰かが載せるまで変更とみなされ、
+誤って <code>pure</code> になることはありません。コンストラクタは <code>pure</code> です。</p>
 <p>粒度は型単位であり、インスタンス単位ではありません。ファイルの上の <code>PrintStream</code> は本来
 <code>write</code> ですが、Onion コードで <code>PrintStream</code> といえば <code>System::out</code> / <code>System::err</code> なので、
 この型は <code>console</code> に分類されています。この区別が重要な場面では、stdlib 自身の入り口
@@ -4831,15 +4847,15 @@ capability 層は今それを土台にして動いています。</p>
 <p>ライブラリの jar は、自分の呼び出しを <code>unknown</code> のままにしておく必要はありません。
 <strong>コンパイル時クラスパス</strong>上の jar —— <code>-classpath</code>、スクリプトの <code>//&gt; using dep</code> が
 解決した jar、プロジェクトの <code>[dependencies]</code> —— は、組み込みの表と同じ形式の表を</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>META-INF/onion/effect-table.txt
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>META-INF/onion/effect-table.txt
 </span></code></pre></div>
 <p>に同梱でき、コンパイラはそのコンパイルに限ってそれを組み込みの表に合流させます。
 そのライブラリを呼ぶ <code>tool</code> は、<code>unknown</code> ではなく本当の効果（<code>requires { net, env }</code>）を
 宣言できます。</p>
 <p>表のどの行でも、効果に<strong>固定オペランド</strong> <code>effect:operand</code> を付けられます：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># Class#method=effect[:operand][,effect[:operand]...]   または   Class#method=pure
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>onion.llm.Llm#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>onion.llm.Llm#text=pure
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a># Class#method=effect[:operand][,effect[:operand]...]   または   Class#method=pure
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>onion.llm.Llm#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>onion.llm.Llm#text=pure
 </span></code></pre></div>
 <p>オペランドは最初の <code>:</code> の後ろから次の <code>,</code> までの全部（前後の空白は除く）です。空には
 できず、<code>pure</code> と <code>unknown</code> には付けられません。これまでどおり、素の <code>net</code> は「オペランド

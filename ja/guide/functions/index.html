@@ -4869,6 +4869,10 @@
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nf">greet</span><span class="p">(</span><span class="s2">"kota"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Yo"</span><span class="p">)</span><span class="w">                   </span><span class="c1">// Yo, kota</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nf">greet</span><span class="p">(</span><span class="n">greeting</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Hi"</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"kota"</span><span class="p">)</span><span class="w"> </span><span class="c1">// 名前付き引数（順序自由）</span>
 </span></code></pre></div>
+<p>デフォルト値は、引数を省略するたびに、呼ばれたメソッドの中で評価されます。使えるものは次のとおりです。
+- それより前に宣言した引数: <code>def range(from: Int, to: Int = from + 10)</code>
+- レシーバ（呼び出し先のオブジェクト）のフィールドとメソッド。private なものも含みます: <code>def f(n: Int, m: Int = this.limit)</code></p>
+<p>自分自身や、後ろの引数を参照するデフォルト値は <code>E0002</code> です。</p>
 <h2 id="varargs">可変長引数（Varargs）<a class="headerlink" href="#varargs" title="Permanent link">&para;</a></h2>
 <p>末尾の <code>Type...</code> パラメータで可変個の引数を配列として受け取ります：</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">join</span><span class="p">(</span><span class="n">parts</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="o">..</span><span class="p">.):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="p">{</span>

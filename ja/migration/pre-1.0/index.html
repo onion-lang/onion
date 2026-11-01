@@ -2164,6 +2164,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#t-t" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        型 T の場所には T しか入らなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_1" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2179,6 +2190,17 @@
     <span class="md-ellipsis">
       
         多重定義された拡張メソッドにラムダを渡したとき、宣言の順番で結果が変わらなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iterable-map-filter-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        任意の Iterable に対する map / filter は List を返すようになりました
       
     </span>
   </a>
@@ -4758,6 +4780,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#t-t" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        型 T の場所には T しか入らなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_1" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4773,6 +4806,17 @@
     <span class="md-ellipsis">
       
         多重定義された拡張メソッドにラムダを渡したとき、宣言の順番で結果が変わらなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iterable-map-filter-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        任意の Iterable に対する map / filter は List を返すようになりました
       
     </span>
   </a>
@@ -4879,19 +4923,64 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
   閉じる <code>"</code> のない値や、中に裸の <code>"</code> がある値（<code>"a" and "b"</code>）は、行番号付きの <code>Defect</code> になります。</li>
 <li><strong>対象は <code>String</code> 成分だけです:</strong> <code>Int</code> や <code>Boolean</code> などのスカラーは、これまでどおりに読みます。</li>
 </ul>
+<h2 id="t-t">型 <code>T</code> の場所には <code>T</code> しか入らなくなりました<a class="headerlink" href="#t-t" title="Permanent link">&para;</a></h2>
+<p>ジェネリッククラスの中で、型パラメータ <code>T</code> で型付けしたフィールド・ローカル変数・引数への代入と初期化、
+<code>: T</code> と宣言したメソッドの戻り値には、型 <code>T</code> の値だけが入ります。Java と同じです。
+以前は <code>T</code> の上限に合う値なら何でも入り、次に読んだところで <code>ClassCastException</code> が出ていました。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">S</span><span class="p">[</span><span class="nc">T</span><span class="p">,</span><span class="w"> </span><span class="nc">U</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">t</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">u</span><span class="p">:</span><span class="w"> </span><span class="nc">U</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="nc">U</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">;</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="c1">// 以前: コンパイルが通り、new S[String, Integer]("a", 1) で t を次に読むと例外になる</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">():</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="c1">// 現在: 値が本当に T なら、検査なしのキャストを自分で書く</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">g</span><span class="p">():</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">u</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">T</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>変わったこと:</strong> 無関係な型変数（<code>U</code>）、上限の型（<code>Object</code>、<code>CharSequence</code>）、
+  具体的な型（<code>"x"</code>）の値は、<code>T</code> の場所に入らなくなりました。</li>
+<li><strong>表示されるエラー:</strong> 値の位置に「E0000 型 T が期待されている箇所に、型 U を使用しました。」が出ます。</li>
+<li><strong>引き続き使えるもの:</strong> <code>T</code> の値、<code>T</code> を上限に持つ型変数（<code>[T, U extends T]</code> での <code>t = u</code>）、<code>null</code>、
+  raw な Java の受け手に対する Java メソッドの引数（<code>(o as ArrayList).add(u)</code>）。
+  そこから読み戻した値（<code>t = (o as ArrayList).get(0)</code>）は <code>T</code> ではないので、キャストが必要です。</li>
+<li><strong>同じ名前 <code>T</code> の型パラメータが二つある場合:</strong> <code>class K[T]</code> の中のメソッドの <code>[T]</code> は、別の <code>T</code> です。
+  このときエラーにはその旨のヒントが付きます。クラスの <code>T</code> を使うなら、メソッドの <code>[T]</code> を外してください。</li>
+<li><strong>呼び出し:</strong> 継承したメソッド（<code>Mid[U] extends Box[U]</code> の中の <code>set(o)</code>）と、
+  型変数で型付けした受け手（<code>xs: List[T]</code> に対する <code>xs.add(o)</code>、<code>b: Box[T]</code> に対する <code>b.set(o)</code>）では、引数も検査します。</li>
+<li><strong><code>T?</code> の場所:</strong> <code>T</code> の場所に入るものに加えて、<code>null</code> と <code>T?</code> が入ります。
+  そのため <code>o: T?</code> への <code>o = u</code>、<code>o = uo</code>（<code>uo: U?</code>）、<code>o = "x"</code> も <code>E0000</code> になります（#2332）。
+  <code>T?</code> 型のコンストラクタ引数（<code>def this(x: T?)</code> に対する <code>new Box[T](u)</code>）は、<code>T</code> 型の引数と同じく <code>E0021</code> になります。</li>
+<li><strong>まだ検査しないもの:</strong> <code>xs[0] = u</code>、<code>m["k"] = u</code>、リテラル <code>[u]</code> には、今も <code>U</code> が入り、実行時に例外になります（#2332）。
+  ここでもキャストを書いておくと、検査が入った後もそのままコンパイルできます。</li>
+<li><strong>継承したメンバーは <code>U</code> になりました:</strong> <code>class Mid[U] extends Box[U]</code> の中で、継承した <code>get(): T</code> は <code>U</code> です（以前は <code>Object</code>）。
+  <code>U</code> は null になりうるので、<code>get().toString()</code> は <code>E0057</code> になります。<code>Box</code> の中では以前からそうでした。
+  <code>get()?.toString()</code> や <code>get() ?: 代わりの値</code> と書くか、<code>class Mid[U extends Object]</code> のように null でない上限を付けてください。
+  Java のスーパークラスでも同じです。<code>class MyList[T] extends ArrayList[T]</code> の中の <code>get(0).toString()</code> も <code>E0057</code> になります。</li>
+<li><strong><code>this</code> は <code>Mid[U]</code> です:</strong> <code>class Mid[U]</code> の中の <code>this</code> は <code>U</code> を保ちます。
+  <code>val me = this</code>、<code>id(this)</code>、<code>[this]</code>、<code>() -&gt; this</code> を通しても同じです。
+  そのため <code>same(this)</code> は継承した <code>same(o: Box[T])</code> に渡せ、<code>me.get()</code> は <code>U</code> です（以前は raw な <code>Mid</code> で、<code>me.get()</code> は <code>Object</code> でした）。</li>
+<li><strong>型引数が異なる分岐:</strong> <code>if b { [t] } else { [u] }</code> は raw な <code>List</code> になります。
+  <code>Object</code> が期待される場所ではコンパイルできます。<code>List[T]</code> が期待される場所では、<code>[u]</code> の分岐が <code>E0000</code> になります。</li>
+<li><strong><code>onion migrate</code> の書き換え規則はありません（意図的です）:</strong> 機械的にできる書き換えは <code>(u as T)</code> の挿入だけです。
+  それでは、この検査が見つけるバグをそのまま隠してしまいます。エラーを一つずつ読んで判断してください。</li>
+</ul>
 <h2 id="_1">空の <code>[]</code> / <code>[:]</code> は、隣の要素の型になりました<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>リストリテラル、またはマップリテラルの値に空の <code>[]</code> / <code>[:]</code> があると、他の要素が揃っている型として扱います。
 以前は、リテラル全体が <code>Object</code> に広がっていました。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">// 以前: List[Object] なので、adj[1].add(5) は E0005 で、次の行はコンパイルできた</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1">// 現在: List[List[Int]] なので、adj[1].add(5) はコンパイルでき、次の行は E0005</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1">// 以前の型を保つには、型を注釈する</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Object</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">adj</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1">// 以前: List[Object] なので、adj[1].add(5) は E0005 で、次の行はコンパイルできた</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">// 現在: List[List[Int]] なので、adj[1].add(5) はコンパイルでき、次の行は E0005</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">adj</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="s2">"header"</span><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1">// 以前の型を保つには、型を注釈する</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Object</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="p">[]]</span>
 </span></code></pre></div>
 <ul>
 <li><strong>変わったこと:</strong> 空のリテラルは、隣の要素の後に、その型で型付けされます。要素の評価順は、これまでどおりソースの順です。</li>
@@ -4990,6 +5079,26 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
   クラスのメソッドでは、ここはまだ E0006 になります。クラスを同じ規則にそろえる作業は #2472 で扱います。</li>
 <li><strong>表示されるもの:</strong> <code>E0006</code>（2 つのメソッドのどちらにも当てはまるという意味のエラー）が出ます。最後の列の直し方を示すヒントが付きます。</li>
 <li><strong>そのまま動くもの:</strong> 当てはまる多重定義が 1 つだけの呼び出しと、ラムダ引数のない呼び出しです。</li>
+</ul>
+<h2 id="iterable-map-filter-list">任意の Iterable に対する <code>map</code> / <code>filter</code> は <code>List</code> を返すようになりました<a class="headerlink" href="#iterable-map-filter-list" title="Permanent link">&para;</a></h2>
+<p>範囲、<code>map.values()</code>、その他 <code>List</code> でも <code>Set</code> でもない <code>Iterable</code> に対する <code>map</code> と <code>filter</code> は、<code>List</code> を返すようになりました。
+以前は、結果はすでにリストでしたが、型は <code>Iterable</code> でした。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">evens</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">..</span><span class="mi">10</span><span class="p">).</span><span class="n">filter</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">evens</span><span class="p">.</span><span class="n">size</span><span class="w">                         </span><span class="c1">// 以前: E0004。現在: 5</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="kd">var</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">..</span><span class="mi">3</span><span class="p">).</span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">xs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">util</span><span class="p">.</span><span class="nc">TreeSet</span><span class="p">[</span><span class="kt">Int</span><span class="p">]()</span><span class="w">  </span><span class="c1">// 以前: コンパイルできた。現在: E0000</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1">// どの Iterable も保持できる変数にするには、型を宣言する</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="kd">var</span><span class="w"> </span><span class="n">ys</span><span class="p">:</span><span class="w"> </span><span class="nc">Iterable</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">..</span><span class="mi">3</span><span class="p">).</span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">ys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">util</span><span class="p">.</span><span class="nc">TreeSet</span><span class="p">[</span><span class="kt">Int</span><span class="p">]()</span>
+</span></code></pre></div>
+<ul>
+<li><strong>変わったこと:</strong> <code>Iterables::map(Iterable, f)</code> と <code>Iterables::filter(Iterable, p)</code> は <code>List[T]</code> を返します。リストやセット自身の <code>map</code> / <code>filter</code> は変わりません。</li>
+<li><strong>表示されるもの:</strong> <code>E0000</code>（型が合わないという意味のエラー）が出ます。<code>var xs: Iterable[Int] = ...</code> と宣言するよう促すヒントが付きます。</li>
+<li><strong>動作が変わるもの:</strong> <code>Iterable</code> と <code>List</code> の両方に多重定義や拡張メソッドがある場合、結果に対する呼び出しは <code>List</code> の方を選びます。以前の選択を保つには、どちらかの名前を変えてください。</li>
+<li><strong>再コンパイルが必要なもの:</strong> 古い <code>onion.jar</code> に対してコンパイルしたクラスがこれらのメソッドを呼ぶと、再コンパイルするまで <code>NoSuchMethodError</code> を投げます。</li>
+<li><strong>そのまま動くもの:</strong> このようなパイプラインの後の <code>.toList()</code> は、これまでどおり動きます。結果は <code>Iterable</code> の引数や変数にもそのまま渡せます。</li>
 </ul>
 
 

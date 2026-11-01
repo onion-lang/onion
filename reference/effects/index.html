@@ -4784,6 +4784,19 @@ call</em>. An unlisted Java method is not known to be pure, and pretending other
 make every guarantee built on this vocabulary a lie. <code>unknown</code> is therefore an effect
 that propagates like any other, and the capability layer treats it as "needs an
 explicit allow", never as "harmless".</p>
+<p>One more effect is <em>internal</em>: <code>mutate</code> means <em>the call writes memory that outlives it</em> —
+a field, an array element, a collection, a <code>StringBuilder</code>. It describes the program's own
+state, not the outside world, so it is not a capability. A <code>tool</code> never declares it
+(<code>requires { mutate }</code> is E0079), and the capability check never asks for it. It appears
+in <code>--effects</code> and in the effect table, and it is what lets a contract expression say it
+is pure: an expression that writes is not.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$ onionc --effects Counter.on
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Counter#get(): pure
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>Counter#set(Int): mutate
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>Counter#&lt;init&gt;(Int): pure
+</span></code></pre></div>
+<p>A constructor that fills in its own <code>this</code> is not a mutation: nobody else holds the object
+yet, so <code>new C(1)</code> stays <code>pure</code>. Writing to any other object is.</p>
 <h2 id="where-the-facts-come-from">Where the facts come from<a class="headerlink" href="#where-the-facts-come-from" title="Permanent link">&para;</a></h2>
 <p>Effects cannot ride on annotations in this compiler — Java methods reach the type
 checker without theirs, nothing is emitted to bytecode, and the optimizer rebuilds
@@ -4791,10 +4804,10 @@ methods without them — so the facts live out of band, in a resource shipped wi
 compiler (<code>onion/effect-table.txt</code>). Each line classifies one method, or a whole class
 via a wildcard, and a specific entry beats its class's wildcard, which is how a
 mostly-pure class declares its exceptions:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>onion.DateTime#*=pure
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>onion.DateTime#now=clock
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>onion.Files#copy=read,write
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>onion.Cli#parse=console,exec
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>onion.DateTime#*=pure
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>onion.DateTime#now=clock
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>onion.Files#copy=read,write
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>onion.Cli#parse=console,exec
 </span></code></pre></div>
 <p>The table ships with the whole effectful surface of the standard library classified —
 <code>Files</code>, <code>FileResource</code>, <code>Proc</code>, <code>Http</code>, <code>HttpResource</code>, <code>Config</code>, <code>IO</code>, <code>Cli</code>,
@@ -4807,6 +4820,11 @@ streams and <code>File</code>, <code>java.nio.file.Files</code>; stream wrappers
 stay <code>unknown</code> because they may wrap <code>System.in</code> or a socket), and the JDK's well-known
 effect points (<code>System::getenv</code>, <code>System::exit</code>, <code>Runtime::exec</code>, <code>Thread::sleep</code>,
 <code>PrintStream</code> as the type of <code>System::out</code>).</p>
+<p>Classes that hold changeable state — <code>List</code>, <code>Map</code>, <code>Set</code> and their implementations,
+<code>StringBuilder</code>, <code>Iterator</code>, <code>Matcher</code>, <code>StringJoiner</code> — are listed the other way round:
+the default is <code>mutate</code>, and only the methods known to leave the receiver alone are
+<code>pure</code>. A method added in a later JDK is therefore a mutation until someone lists it, never
+a false <code>pure</code>. Their constructors are <code>pure</code>.</p>
 <p>Granularity is per-type, not per-instance. A <code>PrintStream</code> over a file would be a
 <code>write</code>, but in Onion code a <code>PrintStream</code> is <code>System::out</code> or <code>System::err</code>, so the
 type is classified <code>console</code>. When that distinction matters, the stdlib's own entry
@@ -4815,15 +4833,15 @@ points (<code>Files</code>, <code>IO</code>) are the precise path.</p>
 <p>A library jar does not have to leave its calls <code>unknown</code>. A jar on the <strong>compile
 classpath</strong> — <code>-classpath</code>, the jars of a script's <code>//&gt; using dep</code> directives, a
 project's <code>[dependencies]</code> — may ship its own table at</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>META-INF/onion/effect-table.txt
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>META-INF/onion/effect-table.txt
 </span></code></pre></div>
 <p>in the same format as the built-in one, and the compiler merges it in for that
 compilation. A <code>tool</code> that calls the library then declares the real effects
 (<code>requires { net, env }</code>) instead of <code>unknown</code>.</p>
 <p>An effect in any table line may carry a <strong>fixed operand</strong>, <code>effect:operand</code>:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># Class#method=effect[:operand][,effect[:operand]...]   or   Class#method=pure
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>onion.llm.Llm#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>onion.llm.Llm#text=pure
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a># Class#method=effect[:operand][,effect[:operand]...]   or   Class#method=pure
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>onion.llm.Llm#ask=net:api.anthropic.com,env:ANTHROPIC_API_KEY
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>onion.llm.Llm#text=pure
 </span></code></pre></div>
 <p>The operand is everything after the first <code>:</code> up to the next <code>,</code>, trimmed; it may not be
 empty, and <code>pure</code> and <code>unknown</code> take none. A bare <code>net</code> still means "no operand", as

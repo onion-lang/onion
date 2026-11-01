@@ -5558,6 +5558,8 @@ The methods see the generated component accessors:</p>
 </span><span id="__span-17-14"><a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a><span class="kd">val</span><span class="w"> </span><span class="n">third</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Fraction</span><span class="o">::</span><span class="nf">of</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">)</span>
 </span><span id="__span-17-15"><a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a><span class="kd">val</span><span class="w"> </span><span class="n">one</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">third</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">third</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">third</span><span class="w">            </span><span class="c1">// exactly 1/1</span>
 </span></code></pre></div>
+<p>A body cannot redefine a component's accessor: <code>def num(): Int</code> in <code>Fraction</code> is E0010.
+Rename the method instead; an overload with parameters, such as <code>num(scale: Int)</code>, is fine.</p>
 <h2 id="generic-classes">Generic Classes<a class="headerlink" href="#generic-classes" title="Permanent link">&para;</a></h2>
 <p>Classes can take type parameters in <code>[]</code>. A parameter is available
 throughout the body as an ordinary type:</p>

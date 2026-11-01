@@ -458,19 +458,19 @@ mistakes.
 | Check | What it decides |
 |---|---|
 | **Effective contract of an override** (§4) | `pre_eff = pre_super ∨ pre_sub`, `post_eff = (old(pre_super) ⇒ post_super) ∧ (old(pre_sub) ⇒ post_sub)`. An override that restates a precondition more strictly is read as a weakening, so the methods rule holds by construction |
-| **A history is a preorder** (§3.3) | Reflexive and transitive, for the relations of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`, and `old(b) ==> b`. `n == old(n) + 1` is E0109 |
+| **A history is a preorder** (§3.3) | Reflexive and transitive, for the relations of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`, and `old(b) ==> b`. `n == old(n) + 1` is E0108 |
 | **Framing** (§3.2) | Rules 1 to 4, transitively through pure methods |
-| **A write that breaks a history** (§4.1) | E0108 only for what needs no reachability. See "When E0108 is reported" below |
+| **A write that breaks a history** (§4.1) | E0109 only for what needs no reachability. See "When E0109 is reported" below |
 | **Purity and placement** (§3.1) | E0106, E0107 |
 
-**When E0108 is reported.** A write breaks a history only if the old value can be one it breaks
+**When E0109 is reported.** A write breaks a history only if the old value can be one it breaks
 on, and whether a value is reachable is a question about the program, not about one line of it.
-So E0108 is reported only when the syntax settles it. Take the history `n >= old(n)`:
+So E0109 is reported only when the syntax settles it. Take the history `n >= old(n)`:
 
 | The write | Result | Why |
 |---|---|---|
-| `n = n - c`, with `c` a positive constant | **E0108** | `n - c >= n` is false for every `n` (apart from overflow, §3). No reachability is needed |
-| `n = c`, and some method of the class or its supertypes **raises** `n` (`n = n + k`, `k` positive) | **E0108**, and the message names that method | `n` can exceed `c`, because that method raises it. The reason is a fact in the syntax |
+| `n = n - c`, with `c` a positive constant | **E0109** | `n - c >= n` is false for every `n` (apart from overflow, §3). No reachability is needed |
+| `n = c`, and some method of the class or its supertypes **raises** `n` (`n = n + k`, `k` positive) | **E0109**, and the message names that method | `n` can exceed `c`, because that method raises it. The reason is a fact in the syntax |
 | `n = c`, and nothing raises `n` | **nothing** | `n` never exceeds its start, so the write cannot lower it. A class whose only write is `n = 0` is fine |
 | any other expression | `Not proved` | The prover decides (stage 7) |
 
@@ -604,8 +604,8 @@ are assigned when each stage lands.
 | **E0105** | A contract clause while contracts are off (`--contracts off`) | 1, landed |
 | **E0106** | A contract that is not pure (it does I/O, writes memory, or calls something unvouched for) | 1, landed |
 | **E0107** | `old(...)` where there is no earlier state (anywhere but an `ensures` or a `history`) | 1, landed |
-| **E0108** | **History broken by a method** (below) | 2 |
-| E0109 | A history is not reflexive or not transitive (shows the failing triple) | 2 |
+| **E0109** | **History broken by a method** (below) | 2 |
+| E0108 | A history is not reflexive or not transitive (shows the failing triple) | 2 |
 | E0110 | A field named by a contract is written through another object, or is not a value type (§3.2) | 2 |
 | E0111 | Contract not allowed here (on a `tool`, or on a class that extends a Java class) | 2 |
 | E0112 | Precondition may not hold at a call (names the callee and the arguments found) | 6 |
@@ -616,14 +616,14 @@ are assigned when each stage lands.
 The history error comes from the static check of §7.1, so it **names the write**, not a run:
 
 ```
-reset.on:12:5: [E0108] ResettableCounter.reset() breaks the history of Counter: n >= old(n)
+reset.on:12:5: [E0109] ResettableCounter.reset() breaks the history of Counter: n >= old(n)
   `this.n = 0` sets n to 0, but the history says n never decreases.
   hint: a subclass may add methods, but each must keep every history of its superclass.
         Remove the write to `n`, or relax the history in Counter.
 ```
 
 ```
-reset.on:12:5: [E0108] ResettableCounter.reset() は Counter の history `n >= old(n)` を破ります
+reset.on:12:5: [E0109] ResettableCounter.reset() は Counter の history `n >= old(n)` を破ります
   `this.n = 0` は n を 0 にしますが、history は n が減らないことを求めています。
   ヒント: サブクラスはメソッドを足せますが、スーパークラスの history はすべて保たなければ
           なりません。`n` への代入を外すか、Counter の history を緩めてください。

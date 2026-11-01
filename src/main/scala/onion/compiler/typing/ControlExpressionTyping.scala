@@ -4,7 +4,6 @@ import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
 import onion.compiler.typing.session.TypingBodyContext
-import onion.compiler.toolbox.Boxing
 
 import scala.collection.mutable.Buffer
 import scala.util.boundary, boundary.break
@@ -154,16 +153,6 @@ final class ControlExpressionTyping(
             && TypeRules.isAssignable(expected, thenTerm.`type`)
             && TypeRules.isAssignable(expected, elseTerm.`type`)) {
           resultType = expected
-        }
-
-        // A boxed join under a primitive expectation (`: Int = if c { boxed } else { f(..) }`)
-        // would be unboxed outside the branches, hiding a self call from tail-call optimisation
-        // (#2406). Unbox inside each branch instead, where the value is first produced.
-        expected match {
-          case primitive: BasicType if primitive != BasicType.VOID &&
-              !resultType.isBasicType && resultType == Boxing.boxedType(bodyContext.table, primitive) =>
-            resultType = primitive
-          case _ =>
         }
 
         if (resultType.isBottomType || resultType == BasicType.VOID) {

@@ -117,9 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`= if c { boxed } else { f(..) }` loops instead of overflowing the stack (#2406).**
-  - Before: with `o: Integer`, `def q(o: Integer, n: Int): Int = if n == 0 { o } else { q(o, n - 1) }` overflowed at 200000 calls.
-  - Now: the `Integer` is unboxed inside its branch, so the self call is a tail call.
 - **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
   - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
   - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.

@@ -475,5 +475,45 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
           |""")
       assert(Shell.Success(-1) == result)
     }
+
+    it("leaves the unboxing of an if under a try outside the branches, like a bare call") {
+      // The panel's repro on #2413: a `try` around `if c { nn() }` must let the unboxing
+      // NullPointerException escape, as a `try` around a bare `nn()` does.
+      val result = run("TcoBoxedBranchTry.on",
+        """
+          |class C {
+          |public:
+          |  static def nn(): Integer = null
+          |  static def a(): Int {
+          |    val x: Int = try { nn() } catch e: NullPointerException { -1 }
+          |    return x
+          |  }
+          |  static def d(c: Boolean): Int {
+          |    val x: Int = try { if c { nn() } else { 1 } } catch e: NullPointerException { -1 }
+          |    return x
+          |  }
+          |  static def main(args: String[]): Int {
+          |    var r: Int = 0
+          |    try { a() } catch e: NullPointerException { r = r + 1 }
+          |    try { d(true) } catch e: NullPointerException { r = r + 10 }
+          |    return r + d(false) * 100
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(111) == result)
+    }
+
+    it("loops through an else-if chain with a boxed Long branch") {
+      val result = run("TcoBoxedBranchLong.on",
+        """
+          |class C {
+          |public:
+          |  static def q(o: JLong, n: Int): Long =
+          |    if n == 0 { o } else if n == -1 { 0L } else { q(o, n - 1) }
+          |  static def main(args: String[]): Int = q(5L, 1000000) as Int
+          |}
+          |""")
+      assert(Shell.Success(5) == result)
+    }
   }
 }

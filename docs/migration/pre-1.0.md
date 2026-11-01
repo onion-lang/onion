@@ -126,9 +126,11 @@ public:
 - **Calls:** an argument is checked when the method is inherited (`set(o)` inside
   `Mid[U] extends Box[U]`) or the receiver is typed with your variable (`xs.add(o)` with
   `xs: List[T]`, `b.set(o)` with `b: Box[T]`).
-- **Not covered yet:** a call to the class's own method (`put(u)` where `def put(x: T)`), a
-  constructor argument (`new Box[T](u)`), a `T?` slot, `xs[0] = u`, `m["k"] = u` and a literal `[u]` still accept a `U`, and still throw
-  at run time (#2332). Cast there too, so the code keeps compiling once they are checked.
+- **A `T?` slot:** it takes what a `T` slot takes, plus `null` and a `T?`. So `o = u`,
+  `o = uo` (`uo: U?`) and `o = "x"` into `o: T?` are `E0000` too (#2332).
+- **Not covered yet:** `xs[0] = u`, `m["k"] = u` and a literal `[u]` still accept a `U`, and
+  still throw at run time (#2332). Cast there too, so the code keeps compiling once they are
+  checked.
 - **Inherited members are now `U`:** inside `class Mid[U] extends Box[U]`, an inherited
   `get(): T` is a `U` (it was `Object`). `U` may be null, so `get().toString()` is now `E0057`,
   as it already was inside `Box`. Write `get()?.toString()`, `get() ?: fallback`, or give `U` a

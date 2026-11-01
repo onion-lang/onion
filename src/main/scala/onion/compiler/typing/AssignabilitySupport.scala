@@ -183,6 +183,15 @@ private[compiler] final class AssignabilitySupport(
         // erase to the same root class" (#2259's unsoundness) -- erasing
         // `tv` here first would throw away exactly the identity it needs.
         TypeRules.isSuperType(tv, actual) && TypeCheckingHelpers.fitsTypeVariable(tv, actual)
+      case (en: NullableType, _) if en.innerType.isInstanceOf[TypedAST.TypeVariableType] =>
+        // A `T?` slot takes what a `T` slot takes, plus null (handled above)
+        // and an `S?` whose `S` fits `T`. Falling through to the erased check
+        // let a `U`, a `String` or an `Object` into it (#2332).
+        val inner = actual match {
+          case an: NullableType => an.innerType
+          case other => other
+        }
+        structurallyAssignable(en.innerType, inner, nested)
       case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
         def argsMatch(view: TypedAST.AppliedClassType): Boolean =
           ae.typeArguments.length == view.typeArguments.length &&

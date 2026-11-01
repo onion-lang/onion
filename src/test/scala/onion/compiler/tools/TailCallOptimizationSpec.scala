@@ -515,5 +515,23 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
           |""")
       assert(Shell.Success(5) == result)
     }
+
+    it("keeps a user-defined static valueOf in a branch: only a java.lang box is a box") {
+      // The panel's repro on #2413 at 2c7ad76: K::valueOf is not Integer.valueOf, so the
+      // rewrite must not drop the call and return its argument.
+      val result = run("TcoBoxedBranchUserValueOf.on",
+        """
+          |class K {
+          |public:
+          |  static def valueOf(x: Int): Integer = x * 10
+          |}
+          |class C {
+          |public:
+          |  static def f(n: Int): Int = if n == 0 { K::valueOf(5) } else { f(n - 1) }
+          |  static def main(args: String[]): Int = f(3)
+          |}
+          |""")
+      assert(Shell.Success(50) == result)
+    }
   }
 }

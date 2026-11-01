@@ -516,13 +516,25 @@ class TailCallOptimization(config: CompilerConfig)
     "intValue", "longValue", "floatValue", "doubleValue"
   )
 
-  /** `x.intValue()` (and the other primitive unboxings) on a `java.lang` box. */
+  /** Whether `owner` is the `java.lang` box class of the primitive `primitive`. */
+  private def isBoxClassOf(owner: Type, primitive: Type): Boolean = (owner, primitive) match {
+    case (ct: ClassType, b: BasicType) => toolbox.Boxing.boxedClassName(b).contains(ct.name)
+    case _ => false
+  }
+
+  /** `x.intValue()` (and the other primitive unboxings) on the `java.lang` box of the result. */
   private def isUnboxCall(call: Call): Boolean =
-    call.parameters.isEmpty && call.`type`.isBasicType && unboxMethodNames.contains(call.method.name) &&
-      (call.target.`type` match {
-        case ct: ClassType => ct.name.startsWith("java.lang.")
-        case _ => false
-      })
+    call.parameters.isEmpty && unboxMethodNames.contains(call.method.name) &&
+      isBoxClassOf(call.method.affiliation, call.`type`) &&
+      isBoxClassOf(call.target.`type`, call.`type`)
+
+  /** `Integer.valueOf(i)` (and the other boxings), the box of `primitive`; never a user method. */
+  private def isBoxCall(term: Term, primitive: Type): Boolean = term match {
+    case box: CallStatic =>
+      box.method.name == "valueOf" && box.parameters.length == 1 &&
+        box.parameters(0).`type` == primitive && isBoxClassOf(box.method.affiliation, primitive)
+    case _ => false
+  }
 
   /**
    * `return unbox({ <branches assign tmp>; tmp })`, the shape of an if/select expression whose
@@ -539,9 +551,7 @@ class TailCallOptimization(config: CompilerConfig)
         begin.terms.toSeq match {
           case init :+ (st: StatementTerm) :+ (result: ResultRefLocal) =>
             def unboxed(value: Term): Term = value match {
-              case box: CallStatic if box.method.name == "valueOf" && box.parameters.length == 1 &&
-                  box.parameters(0).`type` == call.`type` =>
-                box.parameters(0)
+              case box: CallStatic if isBoxCall(box, call.`type`) => box.parameters(0)
               case other => new Call(other.location, other, call.method, Array.empty[Term])
             }
             val (sunk, alwaysReturns) = sinkReturn(st.statement, result, unboxed)

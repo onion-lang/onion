@@ -47,7 +47,9 @@ class JsonShapeComponentSpec extends AnyFunSpec {
       "a nullable list"           -> ("a: List[String]?", ""),
       "a nullable nested record"  -> ("a: Action?", nestedRecord),
       "a record declared later"   -> ("a: Later", "record Later(x: Int) {\n  shape doc = json\n}"),
-      "a record containing itself"-> ("name: String, kids: List[R]", "")
+      "a record containing itself"-> ("name: String, kids: List[R]", ""),
+      // An alias reads as the type it names (#2507); the runtime read is in RecordAliasComponentSpec.
+      "a type alias of a list"    -> ("a: Tags", "type Tags = List[String]")
     )
     accepted.foreach { case (what, (components, prelude)) =>
       it(what) {
@@ -65,7 +67,7 @@ class JsonShapeComponentSpec extends AnyFunSpec {
       "a record with only a regex shape"  -> ("a: Inner", "record Inner(x: Int) {\n  shape line = re\"(\\d+)\"\n}"),
       "a list of lists"                   -> ("a: List[List[String]]", ""),
       "an array"                          -> ("a: String[]", ""),
-      "a type alias of a list"            -> ("a: Tags", "type Tags = List[String]")
+      "a type alias of an array"          -> ("a: Names", "type Names = String[]")
     )
     rejected.foreach { case (what, (components, prelude)) =>
       it(what) {

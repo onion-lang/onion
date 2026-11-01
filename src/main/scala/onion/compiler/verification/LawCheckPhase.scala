@@ -43,6 +43,7 @@ final class LawCheckPhase(config: CompilerConfig)
     val loader = new OnionClassLoader(classOf[OnionClassLoader].getClassLoader, config.classPath, classes)
     val errors = ArrayBuffer.empty[CompileError]
     clauseColumns = clauseColumnsOf(ctx)
+    shownRecords = shownRecordsOf(ctx)
     val thread = Thread.currentThread
     val previous = thread.getContextClassLoader
     thread.setContextClassLoader(loader)
@@ -86,6 +87,17 @@ final class LawCheckPhase(config: CompilerConfig)
       .groupBy(_.line).map { case (line, ls) => line -> ls.map(_.column).min }
   }
 
+  // Records whose `toString` is the synthesized one, with their component names: a
+  // counterexample shows them component by component (CounterexampleText).
+  private var shownRecords: Map[String, Seq[String]] = Map.empty
+
+  private def shownRecordsOf(ctx: PhaseContext): Map[String, Seq[String]] =
+    ctx.debugArtifacts.typedClasses.toList.flatten.flatMap { cd =>
+      val synthesizedToString = cd.methods("toString").exists(m =>
+        m.arguments.isEmpty && onion.compiler.Modifier.isSyntheticRecord(m.modifier))
+      cd.recordComponents.filter(_ => synthesizedToString).map(cs => cd.name -> cs.map(_._1).toSeq)
+    }.toMap
+
   private def isBooleanStatic(m: Method): Boolean =
     Modifier.isStatic(m.getModifiers) && m.getReturnType == java.lang.Boolean.TYPE
 
@@ -125,7 +137,7 @@ final class LawCheckPhase(config: CompilerConfig)
     val it = combos.iterator
     while (it.hasNext && !done) {
       val args = it.next()
-      val shown = if (args.isEmpty) "(no args)" else args.map(String.valueOf).mkString(", ")
+      val shown = if (args.isEmpty) "(no args)" else args.map(CounterexampleText.render(_, shownRecords)).mkString(", ")
       try {
         if (m.invoke(null, args*) != java.lang.Boolean.TRUE) {
           errors += err(SemanticError.LAW_VIOLATION.errorCode, cc, index, Some(m.getName),
@@ -192,8 +204,9 @@ final class LawCheckPhase(config: CompilerConfig)
     case _ => t
   }
 
+  // On one line: the message may quote the input, newline and all (`For input string: "\n"`).
   private def describe(t: Throwable): String = {
     val msg = Option(t.getMessage).filter(_.nonEmpty).map(": " + _).getOrElse("")
-    t.getClass.getSimpleName + msg
+    CounterexampleText.oneLine(t.getClass.getSimpleName + msg)
   }
 }

@@ -97,6 +97,11 @@ private[compiler] final class InstanceMethodCallSupport(
           val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound = false)
           if (ext.isDefined) return ext
         }
+        // Every lambda here declares its parameter types (params are typed), so a user
+        // extension (one, or several overloads) can take them as they are; re-typing the
+        // bodies per candidate made nested calls exponential (#2463).
+        val userExt = fallback.tryUserExtensionWithTypedArguments(node, target, targetType, params, expected)
+        if (userExt.isDefined) return userExt.get
         return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, closureIndices)
       }
       // Resolution order for an unmatched call: extension methods first (a
@@ -114,7 +119,7 @@ private[compiler] final class InstanceMethodCallSupport(
         if (getters.length > 0) {
           calls.selectSingleMethod(node, targetType, name, getters, calls.types(params)) match {
             case Some(getter) if (getter.modifier & AST.M_STATIC) == 0 =>
-              val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, getter.affiliation)
+              val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, getter.affiliation, TypeSubstitution.isSelfReceiver(target))
               return calls.buildResolvedCall(node, getter, params, node.typeArgs, classSubst, expected)(
                 expectedArgs => calls.prepareCallParams(node, node.args, getter, params, expectedArgs),
                 finalParams => new Call(target, getter, finalParams)
@@ -134,7 +139,7 @@ private[compiler] final class InstanceMethodCallSupport(
         calls.reportIllegalMethodCall(node, method, name)
         None
       case Some(method) =>
-        val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation)
+        val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
         calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
           expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
           finalParams => new Call(target, method, finalParams)
@@ -174,7 +179,7 @@ private[compiler] final class InstanceMethodCallSupport(
         calls.reportAmbiguousMethod(node, first, second, node.name)
         None
       case CandidateSelection.Selected(method) =>
-        val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation)
+        val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
         calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
             expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),

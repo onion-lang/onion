@@ -93,6 +93,55 @@ name = "\"Alice\""      # read as "Alice"  (to keep literal quotes)
   is now a `Defect` naming the line.
 - **Only `String` components:** an `Int`, `Boolean` or other scalar is read exactly as before.
 
+## A slot typed `T` accepts only a `T`
+
+Inside a generic class, assigning to a field, local or parameter typed by a type parameter `T`,
+initializing one, or returning from a method declared `: T` now accepts only a value of type `T`,
+as in Java. It used to accept anything that fit `T`'s bound,
+and the program then threw a `ClassCastException` on the next read.
+
+```onion
+class S[T, U] {
+  var t: T
+  var u: U
+public:
+  def this(x: T, y: U) { t = x; u = y }
+
+  // Before: compiled, then `new S[String, Integer]("a", 1)` threw on the next read of t
+  def f(): void { t = u }
+
+  // Now: write the unchecked cast yourself, if the value really is a T
+  def g(): void { t = (u as T) }
+}
+```
+
+- **What changed:** a value of an unrelated type variable (`U`), of the bound (`Object`,
+  `CharSequence`), or of a concrete type (`"x"`) no longer fits a `T` slot.
+- **What you see:** `E0000 type T is expected, but type U is used.` at the value.
+- **Still fine:** a `T`; a variable bounded by `T` (`[T, U extends T]`, then `t = u`); `null`;
+  and an argument to a Java method on a raw Java receiver (`(o as ArrayList).add(u)`). A value
+  read back through one (`t = (o as ArrayList).get(0)`) is not a `T`, so it needs a cast.
+- **Two parameters named `T`:** a method's `[T]` inside `class K[T]` is a different `T`. The
+  error then adds a hint saying so. To use the class's `T`, drop the method's `[T]`.
+- **Calls:** an argument is checked when the method is inherited (`set(o)` inside
+  `Mid[U] extends Box[U]`) or the receiver is typed with your variable (`xs.add(o)` with
+  `xs: List[T]`, `b.set(o)` with `b: Box[T]`).
+- **Not covered yet:** a call to the class's own method (`put(u)` where `def put(x: T)`), a
+  constructor argument (`new Box[T](u)`), a `T?` slot, `xs[0] = u`, `m["k"] = u` and a literal `[u]` still accept a `U`, and still throw
+  at run time (#2332). Cast there too, so the code keeps compiling once they are checked.
+- **Inherited members are now `U`:** inside `class Mid[U] extends Box[U]`, an inherited
+  `get(): T` is a `U` (it was `Object`). `U` may be null, so `get().toString()` is now `E0057`,
+  as it already was inside `Box`. Write `get()?.toString()`, `get() ?: fallback`, or give `U` a
+  non-null bound: `class Mid[U extends Object]`. A Java superclass is the same: inside
+  `class MyList[T] extends ArrayList[T]`, `get(0).toString()` is now `E0057`.
+- **`this` is a `Mid[U]`:** inside `class Mid[U]`, `this` keeps `U`, also through
+  `val me = this`, `id(this)`, `[this]` or `() -> this`. So `same(this)` fits an inherited
+  `same(o: Box[T])`, and `me.get()` is a `U` (it was raw `Mid`, so `me.get()` was an `Object`).
+- **Branches with different type arguments:** `if b { [t] } else { [u] }` is a raw `List`.
+  It compiles where an `Object` is expected; where a `List[T]` is expected, the `[u]` branch is
+  `E0000`.
+- **No `onion migrate` rule, on purpose:** the only mechanical rewrite is inserting
+  `(u as T)`, which would hide exactly the bugs this check finds. Read each error and decide.
 ## An empty `[]` or `[:]` takes the type of its siblings
 
 In a list literal, or in the values of a map literal, an empty `[]` or `[:]` now has the

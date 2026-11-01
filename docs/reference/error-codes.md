@@ -1167,6 +1167,26 @@ Fix: combine the methods into the first block. Distinct concrete
 instantiations of the same generic receiver do not collide
 (`extension List[Int]` and `extension List[String]` can coexist).
 
+### `E0103` — `foreach (a, b)` over something that is not a Map
+
+`foreach (a, b) in xs` walks the entries of a `Map` (or of any class with its own
+`entrySet()`). When `xs` is of another type, such as a `List`, an array or a
+record, it is this one error, at the `foreach`. This holds for any `xs`: a
+variable, a field, a call result or a literal. It used to report `entrySet()`
+not found and an operator error on `K, V`, names you never wrote.
+
+```onion
+record P(x: Int, y: Int)
+val ps = [new P(1, 2), new P(3, 4)]
+foreach (x, y) in ps { println(x + y) }   // E0103: this is List[P], not a Map
+```
+
+Fix: take each element apart with `val (a, b) = p`.
+
+```onion
+foreach p in ps { val (x, y) = p; println(x + y) }
+```
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -1228,6 +1248,19 @@ public:
 
 Fix: rename one method, or give it different parameter types to make it a genuine
 overload.
+
+A record component already generates its accessor, so a record body cannot define a
+zero-argument method of the same name, whatever its return type or modifiers:
+
+```onion
+record R(a: Int) {
+public:
+  def a(): Int = 42   // E0010: component a: Int already generates a(): Int
+}
+```
+
+Fix: rename the method or the component. A method `a(x: Int)` with parameters is a
+genuine overload and compiles.
 
 ### `E0025` — Duplicate constructor
 
@@ -1914,6 +1947,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
 | `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
+| `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
 
 ## See also
 

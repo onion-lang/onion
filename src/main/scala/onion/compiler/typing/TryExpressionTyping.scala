@@ -107,7 +107,7 @@ final class TryExpressionTyping(
         if (catchTerms.isEmpty) tryTerm.`type`
         else {
           val types = tryTerm.`type` +: catchTerms.map(_.`type`).toSeq
-          control.foldLub(node, types).orNull
+          control.foldLub(node, types).map(control.checkErasedJoinAgainst(branchExpected, _, types)).orNull
         }
       if (resultType == null) break(None)
 

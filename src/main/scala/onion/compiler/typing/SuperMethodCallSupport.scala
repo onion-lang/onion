@@ -14,7 +14,11 @@ private[compiler] final class SuperMethodCallSupport(
     val contextClass = bodyContext.definition
     calls.tryFindMethod(node, contextClass.superClass, node.name, parameters) match {
       case Right(method) =>
-        val classSubst = TypeSubstitution.classSubstitution(contextClass.superClass)
+        // The method may be declared further up (`Leaf[V] extends Mid[V]
+        // extends Box[U]`), so substitute along the whole extends chain: with
+        // the direct superclass's arguments alone, Box's `T` came back
+        // unsubstituted (#2308).
+        val classSubst = TypeSubstitution.hierarchySubstitution(contextClass.superClass, method.affiliation, selfReceiver = true)
         calls.buildResolvedCall(node, method, parameters, node.typeArgs, classSubst, expected)(
           expectedArgs => calls.prepareCallParams(node, node.args, method, parameters, expectedArgs),
           finalParams => new CallSuper(new This(contextClass), method, finalParams)

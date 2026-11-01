@@ -279,6 +279,10 @@ object AST {
   case class ContinueExpression(location: Location, label: String = null) extends Expression
   /** label: while/for/foreach/do — target for labeled break/continue */
   case class LabeledLoop(location: Location, name: String, loop: Expression) extends Expression
+  /** The entry variable both parsers give `foreach (k, v) in m`, which they rewrite to a walk
+   *  over `m.entrySet()`; typing recognizes the pair form by it (#2301). */
+  val ForeachEntryName: String = "__foreach_entry"
+
   case class ForeachExpression(location: Location, arg: Argument, collection: Expression, statement: BlockExpression) extends Expression
   case class ForExpression(location: Location, init: ForInitializer, condition: Expression /*nullable*/ , update: Expression /*nullable*/ , block: BlockExpression) extends Expression
   case class IfExpression(location: Location, condition: Expression, thenBlock: BlockExpression, elseBlock: BlockExpression /*nullable*/) extends Expression

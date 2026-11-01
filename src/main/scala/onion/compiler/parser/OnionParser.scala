@@ -1944,7 +1944,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   }
 
   private def desugarMapForeach(loc: Location, kName: String, vName: String, mapExpr: AST.Expression, body: AST.BlockExpression): AST.ForeachExpression = {
-    val entryName = "__foreach_entry"
+    val entryName = AST.ForeachEntryName
     val entryType = AST.TypeNode(loc, AST.ReferenceType("java.util.Map$Entry", true), false)
     val entryArg = AST.Argument(loc, entryName, entryType, null, false)
     val entrySet = new AST.MethodCall(loc, mapExpr, "entrySet", Nil)

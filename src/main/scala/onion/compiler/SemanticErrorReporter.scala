@@ -766,7 +766,12 @@ class SemanticErrorReporter(threshold: Int) {
       } else if (widenToIterable) {
         val widen = items(2).asInstanceOf[SemanticErrorReporter.WidenToIterableHint]
         Some(format(message("suggestion.widenVarToIterable"), Seq(widen.name, typeName(expected), typeName(widen.wider))))
-      } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
+      } else if (sameNamedTypeVariables(expected, actual)) {
+        // `def m[T](a: T) { t = a }` inside `class K[T]`: two parameters named `T`,
+        // so "type T is expected, but type T is used" contradicts itself without this.
+        Some(format(message("suggestion.shadowedTypeParameter"), Seq(typeName(expected))))
+      } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable &&
+                 !nonNullStillMisfitsTypeVariable(expected, actual)) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
       } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
@@ -796,6 +801,34 @@ class SemanticErrorReporter(threshold: Int) {
         case None => None
       }
     problem(position, appendSuggestion(baseMessage, hint))
+  }
+
+  // `item = o` with `o: Object?` into a `T` slot: `o!!` is an `Object`, still not
+  // a `T`, so the `!!` hint only led to a second error (#2328 review). It stays
+  // for a `T?` value into a non-null `T`, where `!!` is the fix.
+  private def nonNullStillMisfitsTypeVariable(expected: TypedAST.Type, actual: TypedAST.Type): Boolean =
+    expected match {
+      case tv: TypedAST.TypeVariableType =>
+        val inner = actual match {
+          case n: TypedAST.NullableType => n.innerType
+          case t => t
+        }
+        inner match {
+          case atv: TypedAST.TypeVariableType => atv.declared ne tv.declared
+          case _ => true
+        }
+      case _ => false
+    }
+
+  private def sameNamedTypeVariables(expected: TypedAST.Type, actual: TypedAST.Type): Boolean = {
+    def variable(t: TypedAST.Type): TypedAST.TypeVariableType = t match {
+      case tv: TypedAST.TypeVariableType => tv
+      case n: TypedAST.NullableType => variable(n.innerType)
+      case _ => null
+    }
+    val e = variable(expected)
+    val a = variable(actual)
+    e != null && a != null && e.name == a.name && (e.declared ne a.declared)
   }
 
   /**
@@ -945,6 +978,9 @@ class SemanticErrorReporter(threshold: Int) {
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordComponentClash] =>
         reportRecordComponentClash(position, items)
+      case SemanticError.DUPLICATE_METHOD
+          if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordAccessorRedefined] =>
+        reportRecordAccessorRedefined(position, items)
 
       // Data-driven cases
       case _ =>
@@ -974,6 +1010,20 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, format(
       message("error.semantic.recordComponentClashesGeneratedMethod"),
       Seq(typeName(items(0)), asString(items(1)), typeName(clash.componentType))
+    ))
+  }
+
+  /**
+   * DUPLICATE_METHOD raised by a record body method `a()` for a component `a`, which already
+   * generates that accessor (#2396). There is only one `def a()` in the source, so the generic
+   * "duplicated method definition" text does not say what it duplicates.
+   * Items: the record, the method name, its (empty) argument types, the marker.
+   */
+  private def reportRecordAccessorRedefined(position: Location, items: Array[AnyRef]): Unit = {
+    val redefined = items(3).asInstanceOf[SemanticErrorReporter.RecordAccessorRedefined]
+    problem(position, format(
+      message("error.semantic.recordBodyRedefinesAccessor"),
+      Seq(typeName(items(0)), asString(items(1)), typeName(redefined.componentType))
     ))
   }
 
@@ -1069,6 +1119,10 @@ object SemanticErrorReporter {
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record component's
    *  accessor colliding with a method the record generates, so the error says so (#2391). */
   private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type)
+
+  /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record body method
+   *  `a()` that redefines component `a`'s generated accessor, so the error says so (#2396). */
+  private[compiler] final case class RecordAccessorRedefined(componentType: TypedAST.Type)
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.
@@ -1428,6 +1482,10 @@ object SemanticErrorReporter {
     ),
     SemanticError.MAP_NOT_DIRECTLY_ITERABLE -> ErrorDef(
       "error.semantic.mapNotDirectlyIterable",
+      Seq(items => typeName(items(0)))
+    ),
+    SemanticError.FOREACH_PAIR_NOT_MAP -> ErrorDef(
+      "error.semantic.foreachPairNotMap",
       Seq(items => typeName(items(0)))
     ),
     // LABEL_NOT_FOUND handled specially with suggestions

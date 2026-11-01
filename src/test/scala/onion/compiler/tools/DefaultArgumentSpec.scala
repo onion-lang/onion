@@ -138,5 +138,20 @@ class DefaultArgumentSpec extends AbstractShellSpec {
       // r3 = <test> (both provided)
       assert(Shell.Success("[test],<test],<test>") == result)
     }
+
+    it("rejects a default that uses an earlier parameter instead of crashing with VerifyError") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def g(n: Int, m: Int = n + 1): Int { return n + m; }
+          |  static def main(args: String[]): Int { return g(1); }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Failure(-1) == result)
+    }
   }
 }

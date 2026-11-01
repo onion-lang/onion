@@ -1987,6 +1987,13 @@ object TypedAST {
      */
     def isSuperTypeByIdentity(left: TypedAST.Type, right: TypedAST.Type): Boolean = rightVariableChainAccepts(left, right)
 
+    /** `java.lang.Object` itself, the type an unbound type variable erases to. */
+    private def isErasedTop(t: TypedAST.Type): Boolean = t match {
+      case ct: TypedAST.ClassType => !ct.isInstanceOf[TypedAST.AppliedClassType] &&
+        !ct.isInstanceOf[TypedAST.TypeVariableType] && ct.name == "java.lang.Object"
+      case _ => false
+    }
+
     /**
      * Walks a type variable's own bound chain (the `right` side of
      * isSuperType, which started out as a type variable) looking for a
@@ -2095,19 +2102,28 @@ object TypedAST {
               case (w: TypedAST.WildcardType, _) if w.lowerBound.isDefined =>
                 actualArg match
                   case aw: TypedAST.WildcardType if aw.lowerBound.isDefined =>
-                    // ? super E ← ? super A: E must be subtype of A (contravariant)
-                    isSuperType(aw.lowerBound.get, w.lowerBound.get)
+                    // ? super E ← ? super A: E must be subtype of A (contravariant).
+                    // A type variable A is a supertype only by identity (#2397).
+                    aw.lowerBound.get match
+                      case at: TypedAST.TypeVariableType if !isErasedTop(w.lowerBound.get) =>
+                        isSuperTypeByIdentity(at, w.lowerBound.get)
+                      case lower => isSuperType(lower, w.lowerBound.get)
                   case aw: TypedAST.WildcardType if aw.lowerBound.isEmpty =>
                     // ? super E ← ? extends A: incompatible
                     false
                   case _ =>
-                    // ? super E ← A: A must be supertype of E. Two type variables
-                    // are related only by identity: erased to Object they would
-                    // otherwise match, and `Comparator[U]` would sort a `List[T]` (#2367).
-                    (actualArg, w.lowerBound.get) match
-                      case (at: TypedAST.TypeVariableType, lt: TypedAST.TypeVariableType) =>
-                        isSuperTypeByIdentity(at, lt)
-                      case (_, lower) => isSuperType(actualArg, lower)
+                    // ? super E ← A: A must be supertype of E. A type variable A is
+                    // a supertype of E only by identity (E is A, or E's bound chain
+                    // reaches A): erased to Object it would otherwise match anything,
+                    // and `Comparator[U]` would sort a `List[T]` (#2367) or a
+                    // `List[String]` (#2397).
+                    // A slot of `? super Object` keeps the erased check: that is what an
+                    // inherited `sort(c)` reached through `this` in `Sub[S] extends
+                    // ArrayList[S]` expects, since `this` carries no type arguments (#2400).
+                    actualArg match
+                      case at: TypedAST.TypeVariableType if !isErasedTop(w.lowerBound.get) =>
+                        isSuperTypeByIdentity(at, w.lowerBound.get)
+                      case _ => isSuperType(actualArg, w.lowerBound.get)
               // Expected: type variable T (respects the variable's
               // nullability: NonNull T rejects nullable actuals)
               case (tv: TypedAST.TypeVariableType, _) =>

@@ -88,6 +88,74 @@ class RecordAccessorOverrideSpec extends AbstractShellSpec {
     }
   }
 
+  describe("A primitive over a boxed contract inherited through a generic supertype is bridged (#2549)") {
+    def runMain(body: String, name: String) = shell.run(body.stripMargin, name, Array())
+
+    it("accepts a record whose Int component covers a JInteger method of G[JInteger]") {
+      val result = runMain(
+        """
+          |interface G[T] { def get(): T; def n(): JInteger }
+          |record R(get: Int, n: Int) conforms G[JInteger]
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val g: G[JInteger] = new R(5, 7)
+          |    return "" + g.get() + "," + g.n() + "," + new R(5, 7).n()
+          |  }
+          |}
+          |""", "BoxedBridgeRecord.on")
+      assert(Shell.Success("5,7,7") == result)
+    }
+
+    it("accepts a class method Int over JInteger, and over Number, of a generic interface") {
+      val result = runMain(
+        """
+          |interface G[T] { def get(): T; def n(): JInteger; def m(): Number }
+          |class C conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def get(): JInteger = 1
+          |  def n(): Int = 2
+          |  def m(): Int = 3
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val g: G[JInteger] = new C
+          |    return "" + g.n() + "," + g.m() + "," + new C().n()
+          |  }
+          |}
+          |""", "BoxedBridgeClass.on")
+      assert(Shell.Success("2,3,2") == result)
+    }
+
+    it("still rejects what no bridge can carry: Int over Double, and JInteger over Int") {
+      val widening = errors(
+        """
+          |interface G[T] { def get(): T; def d(): Double }
+          |record R(get: Int, d: Int) conforms G[JInteger]
+          |""")
+      assert(widening.flatMap(_.errorCode) == Seq("E0104"))
+      val unboxing = errors(
+        """
+          |interface G[T] { def get(): T; def n(): Int }
+          |class C conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def get(): JInteger = 1
+          |  def n(): JInteger = 2
+          |}
+          |""")
+      assert(unboxing.flatMap(_.errorCode) == Seq("E0104"))
+      val wrongBox = errors(
+        """
+          |interface G[T] { def get(): T; def n(): JLong }
+          |record R(get: Int, n: Int) conforms G[JInteger]
+          |""")
+      assert(wrongBox.flatMap(_.errorCode).nonEmpty)
+    }
+  }
+
   describe("Record accessor vs inherited method") {
 
     it("rejects a component whose accessor returns a different type than the interface method") {

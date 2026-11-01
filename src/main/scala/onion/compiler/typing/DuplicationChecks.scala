@@ -126,12 +126,24 @@ private[compiler] object DuplicationChecks {
             // `Int` over `Double` or over `Integer` is assignable, but the method would answer
             // only calls made through its own type (#2372). A type-variable contract is erased
             // and bridged, so it keeps the assignability rule.
+            // A contract inherited through a generic supertype (`G[JInteger]`) is bridged
+            // even when its return is not a type variable, and the bridge boxes a
+            // primitive return: `n(): Int` over `n(): JInteger` (or `Number`) works (#2549).
+            // It never unboxes or widens, so `JInteger` over `Int` and `Int` over `Double`
+            // still clash.
+            val boxedByBridge =
+              view.raw.typeParameters.nonEmpty && view.typeArguments.nonEmpty &&
+                !Modifier.isAbstract(impl.modifier) && !specializedRet.isBasicType &&
+                (impl.returnType match
+                  case bt: BasicType if bt != BasicType.VOID =>
+                    TypeRules.isSuperType(specializedRet, typing.boxedTypeArgument(bt))
+                  case _ => false)
             val descriptorClash =
-              !contract.returnType.isInstanceOf[TypeVariableType] &&
+              !contract.returnType.isInstanceOf[TypeVariableType] && !boxedByBridge &&
                 (specializedRet.isBasicType || impl.returnType.isBasicType) && specializedRet != impl.returnType
             if (descriptorClash) {
               typing.report(SemanticError.OVERRIDE_RETURN_TYPE_MISMATCH, location, impl.name, impl.returnType, view.raw, specializedRet)
-            } else if (!primitiveAwareAssignable(specializedRet, impl.returnType, typing)) {
+            } else if (!boxedByBridge && !primitiveAwareAssignable(specializedRet, impl.returnType, typing)) {
               typing.report(SemanticError.INCOMPATIBLE_TYPE, location, specializedRet, impl.returnType)
             }
           }

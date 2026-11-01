@@ -960,14 +960,18 @@ class SemanticErrorReporter(threshold: Int) {
 
   /**
    * DUPLICATE_METHOD raised by a record component whose accessor has the signature of a
-   * method every record generates (`hashCode: Int`, `toString: String`; #2391). The user
-   * wrote no method, so the generic "duplicated method definition" text would mislead.
+   * method every record generates (`hashCode: Int`, `toString: String`; #2391), or of the
+   * final `Object.getClass()` (`getClass: Class`; #2512). The user wrote no method, so the
+   * generic "duplicated method definition" text would mislead.
    * Items: the record, the component name, (unused) argument types, the clash marker.
    */
   private def reportRecordComponentClash(position: Location, items: Array[AnyRef]): Unit = {
     val clash = items(3).asInstanceOf[SemanticErrorReporter.RecordComponentClash]
+    val key =
+      if (clash.overridesFinal) "error.semantic.recordComponentOverridesFinalMethod"
+      else "error.semantic.recordComponentClashesGeneratedMethod"
     problem(position, format(
-      message("error.semantic.recordComponentClashesGeneratedMethod"),
+      message(key),
       Seq(typeName(items(0)), asString(items(1)), typeName(clash.componentType))
     ))
   }
@@ -1057,8 +1061,10 @@ object SemanticErrorReporter {
   private[compiler] case object LambdaOverloadHint
 
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record component's
-   *  accessor colliding with a method the record generates, so the error says so (#2391). */
-  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type)
+   *  accessor colliding with a method the record generates, so the error says so (#2391).
+   *  `overridesFinal`: the accessor would instead override a final `Object` method, which no
+   *  record generates (`getClass: Class`, #2512), so the error names that method. */
+  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type, overridesFinal: Boolean = false)
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.

@@ -240,7 +240,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
         val field = clazz.field(arg.name)
         if (clashesWithGeneratedMethod(arg.name, field))
           typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type],
-            SemanticErrorReporter.RecordComponentClash(field.`type`))
+            SemanticErrorReporter.RecordComponentClash(field.`type`, overridesFinal = arg.name == "getClass"))
       }
     }
   }

@@ -361,19 +361,24 @@ could not be proved (§7.4). It is never the way a contract is *enforced*.
 
 | Context | Behaviour |
 |---|---|
-| `onion build`, `onionc`, `onion script.on` | The static checks of §7.1 and §7.2, then `--contracts verify` adds the proofs of §7.3. **No user code runs for the check itself** (see "What the build runs" below). |
+| `onion build`, `onionc`, `onion script.on` | The static checks of §7.1 and §7.2, with `--contracts check`; once proofs exist (stage 6), `--contracts verify` adds those of §7.3. **No user code runs for the check itself** (see "What the build runs" below). |
 | LSP | The same static checks that are fast enough for an editor: typing, purity, framing and effective-contract diagnostics. Never runs user code, matching the current `checkLaws = false` (#346). No prover until it fits an editor's latency budget. |
 | `onion test`, the REPL | Run programs; a contract kept as a guard (§7.4) is checked there. |
 
-**`--contracts <off|runtime|verify>`.** The names are kept from the first draft; read them as
-"which tier":
+**`--contracts <off|check>`, and two reserved names.** A mode is named for what it does today
+(this follows the panel's review of PR #2564, which found `runtime` accepted while it checked
+nothing):
 
-- `off` (default while this is a preview): a contract clause is E0105 with a hint to enable the flag.
-- `verify`: **the static checks and the proofs.** This is the mode the design is about.
-- `runtime`: keep a guard in the compiled code for each contract not proved (§7.4). It is a
-  safety net for what the prover could not settle, and is on top of `verify`, not instead of it.
+- `off` (default while this is a preview): a contract clause is E0105, with a hint to use `check`.
+- `check`: **what exists.** The clauses are typed, and the static checks of §7.1 run. Nothing is
+  enforced when the program runs.
+- `verify`: reserved for the proofs of §7.3. The command line refuses it, with a message that says
+  to use `check`, until proofs exist.
+- `runtime`: reserved for the guards of §7.4, refused in the same way until they exist.
 
-At the end of the preview, `verify` becomes the default.
+A reserved name is not accepted so that no mode promises a check it does not make. When a name
+starts to do something, it is accepted, and it keeps the meaning given here. At the end of the
+preview, `verify` becomes the default, because the design's answer is the static one.
 
 **What the build runs.** The static checks run no user code. Two things do:
 

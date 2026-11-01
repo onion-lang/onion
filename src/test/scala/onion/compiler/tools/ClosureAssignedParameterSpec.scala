@@ -192,5 +192,47 @@ class ClosureAssignedParameterSpec extends AbstractShellSpec {
           |  }""".stripMargin)
       assert(Shell.Success(12 * 100 + 4) == result)
     }
+
+    it("keeps the inferred result type of a lambda passed to a generic method") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val ys = [1, 2].map { k ->
+          |      val inc: () -> void = () -> { k = k + 10 }
+          |      inc()
+          |      "s" + k
+          |    }
+          |    var total = 0
+          |    foreach v in ys { total = total + v.length() }
+          |    return total
+          |  }""".stripMargin)
+      assert(Shell.Success(6) == result)
+    }
+
+    it("keeps the inferred result type when the result does not use the parameter") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val ys = [1, 2].map((k) -> {
+          |      val inc: () -> void = () -> { k = k + 10 }
+          |      inc()
+          |      k * 0 + 7
+          |    })
+          |    val y: Int = ys[0]
+          |    return y + ys[1]
+          |  }""".stripMargin)
+      assert(Shell.Success(14) == result)
+    }
+
+    it("keeps the inferred result type of a lambda with an explicit return") {
+      val result = run(
+        """  static def g(n: Int): Int {
+          |    val ys = [1, 2].map { k ->
+          |      val inc: () -> void = () -> { k = k + 10 }
+          |      inc()
+          |      return "s" + k
+          |    }
+          |    return ys[0].length() + ys[1].length()
+          |  }""".stripMargin)
+      assert(Shell.Success(6) == result)
+    }
   }
 }

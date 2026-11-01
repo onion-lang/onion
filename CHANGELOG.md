@@ -117,10 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A nested lambda that assigns an outer lambda's parameter now writes it back (#2426).**
-  - Before: `(k) -> { val f = () -> { k = k + 10; k }; f(); k }` called with 1 returned 1.
-  - Now: it returns 11, as for a captured `var` or a method parameter.
-  - The reverse holds too: a nested lambda reads the outer lambda's later writes.
 - **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
   - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
   - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.

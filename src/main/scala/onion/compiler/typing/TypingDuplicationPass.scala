@@ -230,6 +230,8 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       try for (section <- node.sections) processAccessSection(section)
       finally recordComponents = Map.empty
       node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
+      DuplicationChecks.checkOverrideContracts(
+        typing, clazz, node.location, skipObject = true, memberLocations = node.args.map(a => a.name -> a.location).toMap)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
     }
 

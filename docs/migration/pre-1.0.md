@@ -127,7 +127,9 @@ public:
   `Mid[U] extends Box[U]`) or the receiver is typed with your variable (`xs.add(o)` with
   `xs: List[T]`, `b.set(o)` with `b: Box[T]`).
 - **A `T?` slot:** it takes what a `T` slot takes, plus `null` and a `T?`. So `o = u`,
-  `o = uo` (`uo: U?`) and `o = "x"` into `o: T?` are `E0000` too (#2332).
+  `o = uo` (`uo: U?`) and `o = "x"` into `o: T?` are `E0000` too (#2332). A constructor
+  argument into a `T?` parameter (`new Box[T](u)` with `def this(x: T?)`) is `E0021`, as it
+  already was for a `T` parameter.
 - **Not covered yet:** `xs[0] = u`, `m["k"] = u` and a literal `[u]` still accept a `U`, and
   still throw at run time (#2332). Cast there too, so the code keeps compiling once they are
   checked.

@@ -23,7 +23,7 @@ had already drifted after the effect-table / tool-capability / tool-contracts wo
 
 **Row 3 is a floor, not a goal.** New samples are added only to exercise a new or changed feature, at most one a day (see `docs/evolution/README.md`); growing the count is not progress.
 
-**Rows 2 and 3 are checked against a tolerance band, not exact equality** (issue #1370).
+**Rows 2, 3 and 7 are checked against a tolerance band, not exact equality** (issue #1370; row 7 added in W44, when five PRs that each added an error code re-conflicted one after another). A new error code no longer needs to touch row 7; top it up when drift nears 10.
 Every PR that adds a sample to `run/` used to have to bump the exact counts in both rows
 *and* insert its sample's name into row 3's alphabetized list — and because every such PR
 touched the same two lines, any two of them landed within an hour of each other conflicted,

@@ -37,3 +37,11 @@
 # file as checked out. Both comparisons silently failed on a Windows checkout with
 # `core.autocrlf=true`, since `.on` files were not covered by the rule above.
 *.on text eol=lf
+
+# Append-only lists that every PR adding a diagnostic extends in the same place, so two
+# such PRs merged in the same hour conflicted on adjacent lines (W44: #2384, #2487, #2497,
+# #2518 each re-conflicted after the one before it landed). `union` keeps both sides' lines
+# and never conflicts. It cannot reorder or detect a key added twice: MessageBundleKeyParitySpec
+# and the en/ja parity specs still catch a duplicate or missing key at build time.
+src/main/resources/errorMessage.properties    merge=union
+src/main/resources/errorMessage_ja.properties merge=union

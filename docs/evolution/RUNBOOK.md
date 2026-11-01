@@ -106,6 +106,13 @@ anything in this file.
 
 Budget: open at most **2 PRs per run**, and dispatch at most **1 release per day**.
 
+**WIP cap: 8 open PRs.** Count the open pull requests (`gh pr list --state open`). At 8 or
+more, this run opens **no new PR**: steps 1 and 2 only, then drain (clear a block, merge
+`main` into a conflicted branch, nudge nothing else) and stop. Producing faster than the
+panel can review only grows the queue: on 2026-11-01 there were 24 open PRs, the panel
+takes 3 per run, and every push, even a plain merge of `main`, voids its verdict and
+restarts the four lenses. A PR you did not open still counts.
+
 1. **Health first.** Check whether `main` is red, looking only at the test workflows:
    `gh run list --branch main --workflow scala.yml --limit 3` and the same for
    `dogfood.yml`. A failed `release` run is a release problem, not a red `main`.

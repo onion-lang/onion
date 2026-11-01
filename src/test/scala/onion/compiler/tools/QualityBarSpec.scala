@@ -74,6 +74,7 @@ class QualityBarSpec extends AnyFunSpec {
   // longer needs to touch this file, and the recorded figure only needs a top-up once
   // drift approaches the band, not on every single addition.
   private val sampleCountBand = 20
+  private val diagnosticCodeBand = 10
 
   describe("docs/quality-bar.md matches what is actually there") {
     it("row 2: the sample count tracks the number of run/*.on files") {
@@ -106,11 +107,17 @@ class QualityBarSpec extends AnyFunSpec {
       assert(firstInt(en(6)) == e, s"quality-bar says ${en(6)}, actual is $e / $j")
     }
 
-    it("row 7: the diagnostic-code count equals the declared SemanticError cases") {
+    it("row 7: the diagnostic-code count tracks the declared SemanticError cases") {
+      // Exact equality made every PR that adds an error code hand-edit this one number,
+      // so two such PRs merged in the same hour conflicted (W44: five PRs re-conflicted
+      // one after another). Same band as rows 2 and 3: the recorded figure may lag, never lead.
       val declared = """case object \w+ extends SemanticError\(""".r
         .findAllIn(read("src/main/scala/onion/compiler/SemanticError.scala")).size
-      assert(firstInt(en(7)) == declared,
-        s"quality-bar says ${en(7)} diagnostic codes, SemanticError declares $declared")
+      val recorded = firstInt(en(7))
+      assert(recorded <= declared,
+        s"quality-bar claims $recorded diagnostic codes but SemanticError only declares $declared")
+      assert(declared - recorded <= diagnosticCodeBand,
+        s"quality-bar says $recorded diagnostic codes, SemanticError declares $declared — drift exceeds $diagnosticCodeBand, please re-measure")
     }
 
     it("row 1: the recorded test count tracks the number of declared tests") {

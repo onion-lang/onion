@@ -37,6 +37,10 @@ object Boxing {
       row(1).asInstanceOf[String] -> row(0).asInstanceOf[TypedAST.BasicType]
     }.toMap
 
+  /** The `java.lang` box class name of a primitive type (`Int` -> `java.lang.Integer`). */
+  def boxedClassName(`type`: TypedAST.BasicType): Option[String] =
+    basicToIndex.get(`type`).map(index => TABLE(index)(1).asInstanceOf[String])
+
   private val boxedTypeCache = new JWeakHashMap[ClassTable, Array[TypedAST.ClassType]]()
   private val valueOfMethodCache = new JWeakHashMap[ClassTable, Array[TypedAST.Method]]()
   private val unboxMethodCache = new JWeakHashMap[ClassTable, Array[TypedAST.Method]]()

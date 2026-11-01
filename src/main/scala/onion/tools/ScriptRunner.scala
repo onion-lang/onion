@@ -278,6 +278,8 @@ class ScriptRunner {
          |  --law-seed <n>              RNG seed for law sample generation
          |  --law-samples <n>           Number of samples generated per law parameter
          |  --effects                   Print each method's inferred effect set to stderr
+         |  --contracts <off|runtime|verify>
+         |                              Accept contract clauses (requires/ensures/invariant/history); default: off
          |  --stacktrace                Print the raw JVM trace for an uncaught runtime error
          |  --watch                     Re-run the script whenever its file changes
          |  -h, --help                  Show this help message

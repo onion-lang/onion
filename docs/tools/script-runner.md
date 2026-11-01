@@ -127,6 +127,16 @@ produced its counterexample.
 onion --law-samples 500 MyScript.on
 ```
 
+### `--contracts <off|runtime|verify>`
+
+Accept contract clauses: `requires` and `ensures` on a method, `invariant` and `history` in a
+class. This is a preview feature (RFC #2557). The default is `off`, and with `off` a clause is
+an error that names this flag, so a contract is never silently ignored.
+
+```bash
+onion --contracts runtime MyScript.on
+```
+
 ### `--effects`
 
 Print each compiled method's inferred effect set (`read write net exec env clock rand console unknown`; empty means pure) to stderr.

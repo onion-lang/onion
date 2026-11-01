@@ -33,5 +33,7 @@ case class CompilerConfig(
   // Whether to emit a LocalVariableTable. On by default, because a debugger that can step
   // through `.on` source but shows nothing for any variable is most of the way to useless,
   // and the cost is a few bytes per method. `-g:none` turns it off.
-  emitDebugInfo: Boolean = true
+  emitDebugInfo: Boolean = true,
+  // Contract clauses are a preview feature (RFC #2557): off unless asked for.
+  contracts: ContractMode = ContractMode.Off
 )

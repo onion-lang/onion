@@ -172,6 +172,16 @@ onionc --law-samples 500 MyProgram.on
 onionc --law-seed 7 MyProgram.on
 ```
 
+### `--contracts <off|runtime|verify>`
+
+契約の節を受け付けます。メソッドの `requires` と `ensures`、クラスの `invariant` と `history` です。
+これはプレビュー機能です（RFC #2557）。既定は `off` で、`off` のとき契約の節はこのフラグを示す
+エラーになります。契約が黙って無視されることはありません。
+
+```bash
+onionc --contracts runtime MyProgram.on
+```
+
 ### `--effects`
 
 コンパイルされた各メソッドの推論済みエフェクト集合（`read write net exec env clock rand console unknown`。空はpureを意味する）を標準エラー出力に表示します。

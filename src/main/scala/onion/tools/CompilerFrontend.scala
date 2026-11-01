@@ -189,6 +189,8 @@ class CompilerFrontend {
          |  --law-seed <n>              RNG seed for law sample generation
          |  --law-samples <n>           Number of samples generated per law parameter
          |  --effects                   Print each method's inferred effect set to stderr
+         |  --contracts <off|runtime|verify>
+         |                              Accept contract clauses (requires/ensures/invariant/history); default: off
          |  --print-classpath           Print the classpath to run the output with (the -d
          |                              directory, -classpath, and the jars of the files'
          |                              //> using directives) and exit without compiling

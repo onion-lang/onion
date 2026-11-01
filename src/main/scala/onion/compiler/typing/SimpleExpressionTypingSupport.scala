@@ -391,7 +391,11 @@ private[compiler] final class SimpleExpressionTypingSupport(
               // for by that error; saying "not found" once per use would be both
               // wrong (it *is* declared) and louder than the root cause (#333).
               if (!context.isFailedDeclaration(node.name)) {
-                fieldQualificationHint(node.name, context) match {
+                if (!context.isStatic && bodyContext.definition.findField(node.name) == null &&
+                    bodyContext.definition.primaryParameterNames.contains(node.name))
+                  // A plain primary-constructor parameter is not a field; only `val`/`var` ones are (#2515).
+                  bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, null, java.lang.Boolean.TRUE)
+                else fieldQualificationHint(node.name, context) match {
                   case Some(hint) => bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, hint)
                   case None =>
                     if (namesResolvableClass(node.name)) bodyContext.report(CLASS_USED_AS_VALUE, node, node.name)

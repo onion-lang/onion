@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.149.0] - 2026-10-31
+
+### Fixed
+
+- **A failing `law` or `example` in a record body is reported at the clause, not column 1.**
+  - Before: `2:1` with the caret under the indentation.
+  - Now: the caret sits on the `law` name (`2:7`), so an editor jumps to the clause.
+- **A record component typed with a `type` alias works in `from re"..."`, `derive!(Json)` and `shape` (#2507).**
+  - Before: `type Port = Int` then `record Addr(host: String, port: Port) from re"(\S+):(\d+)"` was E0021, about a constructor call nobody wrote.
+  - Now: `port` is read as an `Int`. An alias to an unsupported type is E0061, as the type itself would be.
+  - In a `shape doc = json` record, `type Tags = List[String]` now reads as a list instead of E0061.
+  - An alias from another file is used here only when it names a primitive or a fully-qualified type (`type Port = Int`, `type D = java.sql.Date`); the record's own types are never rewritten.
+- **`def main(s: Short = 3)` and `tool t(b: Byte = 2)` compile (#2506).**
+  - Before: E0005 for `main(Int, Int, Int)`, a signature you never wrote.
+  - Now: the Int-literal default is narrowed, as in an ordinary call.
+- **A `tool` or `main` parameter typed with a `type` alias works like the type it names (#2503).**
+  - Before: `type Port = Int` then `tool serve(port: Port)` was E0081 (E0094 for `main`), naming `Port` as unsupported.
+  - Now: it is read as an `Int`; `--help` and `--contract` say `Int`. An alias to `List[String]` gets the list-specific E0081.
+- **The E0081 CSV workaround in the docs prints nothing when `--csv` is left out (#2502).**
+  - Before: `Strings::split("", ",")` returns `[""]`, so the example printed `Hello, `.
+  - Now: the example guards the loop with `if csv != ""`.
+- **`null` passed to a bare `T` inside its generic class no longer warns W0012 (#2500).**
+  - Before: `m(null)`, `new D[T](null)` and `val y: T = null` in `class D[T]` warned, naming `java.lang.Object?`.
+  - Now: silent, since a bare `[T]` admits null. `[T extends Object]` and a `D[String]` receiver still warn.
+- **Two constructors with the same erasure are a compile error (#2498).**
+  - Before: `def this(x: T)` beside `def this(x: Object)` compiled, then the class failed to load with `ClassFormatError`.
+  - Now: E0035 at the second constructor, as for two methods with the same erasure.
+- **`Config::get` and its getters read any `Map` or `List`, not only parsed JSON (#2494).**
+  - Before: a map from `Colls::mapOf`, a `HashMap` or a `TreeMap` read as "not found", so `Config::getInt(cfg, "port", 3000)` returned `3000`.
+  - Now: the value is found, as it is for a map from `Config::parseJson`.
+- **A lambda inside a `catch` block can use the caught exception (#2479).**
+  - Before: `catch e: Exception { run { q -> e.getMessage() } }` compiled, then failed with `java.lang.VerifyError`.
+  - Now: the lambda reads `e`, and an assignment to `e` inside it is visible after the call.
+- **`extends P(null)` and `: this(a, null)` warn W0012 for a non-null parameter.**
+  - Before: only `new P(null)` warned; these two forms stayed silent.
+  - Now: all three warn. A `String?` parameter, a bare `[T]` parameter or a Java
+    superclass stays silent; `extends G[String?](null)` is silent too.
+- **An untyped lambda passed to overloaded class methods prefers a function type over a SAM interface, as extension methods do.**
+  - Before: `new K().outer { p -> ... }` with `outer((Int) -> Int)` beside `outer(Function[String, String])` was E0006.
+  - Now: the function-type overload is chosen, for instance and static methods.
+- **A method in `extension String[]` or `extension Int[]` is found at the call.**
+  - Before: E0005 on every call.
+  - Now: it resolves; `extension Int[]` stays off `Long[]`, and `extension String[]` stays off `Integer[]`.
+- **`this(...)` or `super(...)` in a constructor body now says where delegation goes (#2466).**
+  - Before: a bare syntax error at `(`, plus a second one at the closing `}`.
+  - Now: a hint to write `def this(s: Int) : this(s, s) { }`, or to pass superclass arguments on the `extends` clause.
+- **`extension List[Int]` and `extension List[String]` can both declare `describe()`.**
+  - Before: every call was E0006 (ambiguous) plus E0005.
+  - Now: the block whose type argument matches the receiver is chosen.
+- **`record H(hashCode: Int)` and `record T(toString: String)` are a compile error (#2391).**
+  - Before: they compiled, then failed at load with a raw `ClassFormatError`.
+  - Now: E0010 at the component, saying it clashes with the method every record generates. Other types (`toString: Int`) still compile, as before.
+- **A `tool` parameter of type `List[String]` or `String[]` now says a tool cannot take a list (#2254).**
+  - Before: E0081 listed the scalar types and left you to guess.
+  - Now: E0081 says a list is not supported yet and shows the workaround, one flag split with `Strings::split` (`--csv a,b`).
+
 ## [0.148.0] - 2026-10-30
 
 ### Breaking
@@ -61,9 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A `select` statement with `return f(..)` in its cases loops instead of overflowing the stack (#2405).**
-  - Before: `select l { case Cons(h, t): return sum(t, acc + h); ... }` followed by `return -1` hit "stack overflow" at depth 200000. Literal and `else` cases overflowed too.
-  - Now: it loops, like the `= select l { ... }` form and an `if` statement with `return`.
 - **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
   - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
   - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.

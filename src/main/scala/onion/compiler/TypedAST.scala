@@ -1928,17 +1928,19 @@ object TypedAST {
      * Object they would otherwise match, and `Comparator[U]` would sort a `List[T]` (#2367).
      * `T?` is a view of the declared `T`, so it is looked through (#2399).
      */
-    def superWildcardAccepts(actualArg: TypedAST.Type, lower: TypedAST.Type): Boolean = {
-      def inner(t: TypedAST.Type): TypedAST.Type = t match {
-        case n: TypedAST.NullableType => n.innerType
-        case other => other
-      }
-      (inner(actualArg), inner(lower)) match {
+    def superWildcardAccepts(actualArg: TypedAST.Type, lower: TypedAST.Type): Boolean =
+      (actualArg, lower) match {
+        // `T?` super `T?`, and `T?` super `T`: compare the declared variables.
+        case (an: TypedAST.NullableType, ln: TypedAST.NullableType) => superWildcardAccepts(an.innerType, ln.innerType)
+        case (an: TypedAST.NullableType, lt: TypedAST.TypeVariableType) => superWildcardAccepts(an.innerType, lt)
+        // A non-null variable is not a supertype of a nullable one: a `Comparator[T]`
+        // would be handed the `List[T?]`'s nulls. A bare `[T]` already admits null.
+        case (at: TypedAST.TypeVariableType, ln: TypedAST.NullableType) if ln.innerType.isInstanceOf[TypedAST.TypeVariableType] =>
+          at.nullability == Nullability.Nullable && superWildcardAccepts(at, ln.innerType)
         case (at: TypedAST.TypeVariableType, lt: TypedAST.TypeVariableType) =>
           isSuperTypeByIdentity(at.widen, lt.widen)
         case _ => isSuperType(actualArg, lower)
       }
-    }
 
     /**
      * Like isSuperType, but never falls back to comparing erased classes:

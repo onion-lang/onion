@@ -173,9 +173,6 @@ private[compiler] final class AssignabilitySupport(
         // hard INCOMPATIBLE_TYPE error — matching the non-type-variable path
         // (TypeRelations.isAssignableWithBoxing) which accepts null here (#283).
         !expected.isBasicType
-      // `? super T?` against a `T?` argument (`Comparator[T?]` sorting a `List[T?]`, #2399)
-      case (w: TypedAST.WildcardType, na: NullableType) if w.lowerBound.exists(_.isInstanceOf[NullableType]) =>
-        TypeRules.superWildcardAccepts(na, w.lowerBound.get)
       case (tv: TypedAST.TypeVariableType, _) =>
         // Pass `tv` itself, not its erased `upperBound`: when `actual` is
         // itself a type variable (e.g. `T` in `[B, T extends B]`), only
@@ -214,12 +211,15 @@ private[compiler] final class AssignabilitySupport(
                   // must not pass just because it erases to the same
                   // class, or `xs.addAll(o)` with `o: List[Object]`
                   // would pollute a `List[T]`.
+                  // `? super L` with a variable on either side (`T`, `T?`): the one
+                  // rule overload resolution also uses (#2367, #2399).
+                  def variableLike(t: Type): Boolean = t match {
+                    case _: TypedAST.TypeVariableType => true
+                    case n: NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
+                    case _ => false
+                  }
                   w.lowerBound match {
-                    case Some(lb: TypedAST.TypeVariableType) =>
-                      a match {
-                        case av: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(av, lb)
-                        case _ => structurallyAssignable(a, lb)
-                      }
+                    case Some(lb) if variableLike(lb) || variableLike(a) => TypeRules.superWildcardAccepts(a, lb)
                     case Some(lb) => structurallyAssignable(a, lb)
                     case None =>
                       w.upperBound match {

@@ -117,9 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`xs.sort(c)` compiles when `xs` is a `List[T?]` and `c` a `Comparator[T?]` (#2399).**
-  - Before: E0000, `Comparator[? super T?]` expected but `Comparator[T?]` used.
-  - Now: accepted, as in Java. A `Comparator[U?]` for an unrelated `U` is still rejected.
 - **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
   - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
   - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.

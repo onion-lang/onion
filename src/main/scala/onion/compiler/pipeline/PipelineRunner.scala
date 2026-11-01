@@ -40,7 +40,15 @@ object PipelineRunner {
         }
       },
       bytecodeGeneration = new BytecodeGenerationPhase(config),
-      lawCheck = new onion.compiler.verification.LawCheckPhase(config)
+      lawCheck = {
+        val laws = new onion.compiler.verification.LawCheckPhase(config)
+        val histories = new onion.compiler.verification.HistoryReproPhase(config)
+        new CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]] {
+          override def name: String = laws.name
+          override def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] =
+            histories.run(laws.run(classes, ctx), ctx)
+        }
+      }
     )
 }
 

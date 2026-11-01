@@ -17,6 +17,10 @@ import onion.compiler.contracts.HistoryProver
  * has no earlier state.
  */
 final class HistoryWritePass(typing: Typing) {
+  import HistoryWritePass.Repro
+  // `counterexamples` runs the same analysis without reporting and collects what the solver found.
+  private var collected: scala.collection.mutable.ArrayBuffer[Repro] = null
+  private var unitFile: String = null
   private sealed trait Kind
   private case object Raise extends Kind
   private case object Lower extends Kind
@@ -24,7 +28,19 @@ final class HistoryWritePass(typing: Typing) {
   private case object Other extends Kind
   private final case class Write(field: String, kind: Kind, node: AST.Node)
 
-  def run(units: Seq[AST.CompilationUnit]): Unit = {
+  /** The solver's counterexamples, for the phase that tries to reproduce them by running the code. */
+  def counterexamples(units: Seq[AST.CompilationUnit]): Seq[Repro] = {
+    collected = scala.collection.mutable.ArrayBuffer.empty
+    try analyze(units, report = false) finally ()
+    collected.toSeq
+  }
+
+  def run(units: Seq[AST.CompilationUnit]): Unit = analyze(units, report = true)
+
+  private var reporting = true
+
+  private def analyze(units: Seq[AST.CompilationUnit], report: Boolean): Unit = {
+    reporting = report
     val classes: Map[String, AST.ClassDeclaration] =
       units.flatMap(_.toplevels).collect { case c: AST.ClassDeclaration => c.name -> c }.toMap
     val interfaces: Map[String, AST.InterfaceDeclaration] =
@@ -33,7 +49,7 @@ final class HistoryWritePass(typing: Typing) {
       units.flatMap(u => u.toplevels.collect { case c: AST.ClassDeclaration => c.name -> u }).toMap
     if (classes.values.exists(_.histories.nonEmpty) || interfaces.values.exists(_.histories.nonEmpty)) {
       for (cls <- classes.values) {
-        typing.warningReporter_.setSourceFile(unitOf(cls.name).sourceFile)
+        unitFile = unitOf(cls.name).sourceFile
         check(cls, classes, interfaces)
       }
     }
@@ -57,8 +73,8 @@ final class HistoryWritePass(typing: Typing) {
         w <- writes if !shadowed.contains(w.field)
         (field, op) <- relations.distinct if field == w.field
         problem <- problemOf(op, w.kind, field, perMethod)
-      } typing.report(SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)", problem._1, problem._2)
-      proveRest(cls, chain, relations.distinct)
+      } if (reporting) typing.report(SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)", problem._1, problem._2)
+      if (!reporting) proveRest(cls, chain, relations.distinct)
     }
   }
 
@@ -77,8 +93,7 @@ final class HistoryWritePass(typing: Typing) {
       (field, op) <- relations
     } HistoryProver.prove(m, field, op, intFields, invariants) match {
       case HistoryProver.Counterexample(before) =>
-        val shown = before.toSeq.sortBy(_._1).map { case (k, v) => s"$k = $v" }.mkString(", ")
-        typing.warningReporter_.historyNotProved(m.location, m.name, s"$field $op old($field)", shown)
+        collected += Repro(unitFile, cls, m, field, op, before)
       case _ =>
     }
   }
@@ -178,5 +193,14 @@ final class HistoryWritePass(typing: Typing) {
     case AST.UnqualifiedFieldReference(_, n) => Some(n)
     case AST.MemberSelection(_, _: AST.CurrentInstance, n) => Some(n)
     case _ => None
+  }
+}
+
+object HistoryWritePass {
+  /** A counterexample the solver found: the method, the history, and the values before the call. */
+  final case class Repro(sourceFile: String, cls: AST.ClassDeclaration, method: AST.MethodDeclaration,
+                         field: String, op: String, before: Map[String, Int]) {
+    def history: String = s"$field $op old($field)"
+    def shown: String = before.toSeq.sortBy(_._1).map { case (k, v) => s"$k = $v" }.mkString(", ")
   }
 }

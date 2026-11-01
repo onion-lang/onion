@@ -383,6 +383,9 @@ val third = Fraction::of(1, 3)
 val one = third + third + third            // exactly 1/1
 ```
 
+A body cannot redefine a component's accessor: `def num(): Int` in `Fraction` is E0010.
+Rename the method instead; an overload with parameters, such as `num(scale: Int)`, is fine.
+
 ## Generic Classes
 
 Classes can take type parameters in `[]`. A parameter is available

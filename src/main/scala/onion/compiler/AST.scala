@@ -363,7 +363,7 @@ object AST {
    *                           synthesize the static `parse`/`parseAll` methods (None when absent).
    * @param synthesizedMethods Methods derived from `fromPattern` (filled in during Rewriting).
    */
-  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, laws: List[LawClause] = Nil, examples: List[ExampleClause] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil, sections: List[AccessSection] = Nil, shapes: List[ShapeClause] = Nil) extends TypeDeclaration
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, laws: List[LawClause] = Nil, examples: List[ExampleClause] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil, sections: List[AccessSection] = Nil, shapes: List[ShapeClause] = Nil, synthesisArgTypes: List[TypeNode] = Nil) extends TypeDeclaration
   /**
    * A `shape name = re"..."` clause on a record — a named, first-class boundary.
    *

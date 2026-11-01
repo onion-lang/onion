@@ -207,6 +207,36 @@ class DefaultArgumentScopeSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a default's type (#2541)") {
+    it("is checked against the parameter, as `val b: Byte = 200` is") {
+      val byte = errors(
+        """
+          |def f(p: Int, b: Byte = 200): Int = p + b
+          |println(f(1))
+        """)
+      assert(byte.flatMap(_.errorCode) == Seq("E0000"))
+      val short = errors(
+        """
+          |def f(p: Int, s: Short = 3.7): Int = p + s
+          |println(f(1))
+        """)
+      assert(short.flatMap(_.errorCode) == Seq("E0000"))
+    }
+
+    it("still narrows an Int constant that fits, and widens as before") {
+      val result = run(
+        """
+          |class Test {
+          |public:
+          |  static def a(b: Byte = 3, s: Short = -4, l: Long = 1, d: Double = 1, o: Object = 1, x: Int? = null): String =
+          |    b + " " + s + " " + l + " " + d + " " + o + " " + x
+          |  static def main(args: String[]): String = a()
+          |}
+        """)
+      assert(Shell.Success("3 -4 1 1.0 1 null") == result)
+    }
+  }
+
   describe("a default that names its own or a later parameter") {
     it("is E0002 at the name, even when a top-level val shares it, and no E0005 at the call") {
       val errs = errors(

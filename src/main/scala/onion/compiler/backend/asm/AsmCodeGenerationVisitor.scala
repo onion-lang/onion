@@ -520,6 +520,14 @@ class AsmCodeGenerationVisitor(
         // unbox emits the checkcast to the wrapper plus the xxxValue() call.
         // Falling through to a bare checkcast would emit 'checkcast I'.
         gen.unbox(asmType(to))
+        // unbox reads Byte and Short through Number.intValue(), so a wider box
+        // (`(n as Byte)` with n: Integer = 300) would leave 300 in a byte slot.
+        // Narrow as the primitive cast does; for an exact Byte/Short box this is a no-op.
+        to match
+          case BasicType.BYTE  => gen.visitInsn(Opcodes.I2B)
+          case BasicType.SHORT => gen.visitInsn(Opcodes.I2S)
+          case _ =>
+        end match
       case _ =>
         gen.checkCast(asmType(node.destination))
   

@@ -92,6 +92,31 @@ class NullableCastSpec extends AbstractShellSpec {
           |""".stripMargin, "BoxToOtherPrimitive.on", Array())
       assert(Shell.Success(742) == r)
     }
+    it("narrows an out-of-range value to Byte and Short, like the primitive cast") {
+      // Each line must equal the primitive cast of the same value: (300 as Byte) is 44,
+      // (70000 as Short) is 4464, (-129 as Byte) is 127.
+      val r = shell.run(
+        """def main(args: String[]): Int {
+          |  val i: JInteger = 300
+          |  val n: Number = 300
+          |  val o: Object = 300
+          |  val s: JInteger = 70000
+          |  val m: Number? = -129
+          |  val b1: Byte = (i as Byte)
+          |  val b2: Byte = (n as Byte)
+          |  val b3: Byte = (o as Byte)
+          |  val h: Short = (s as Short)
+          |  val b4: Byte = (m as Byte)
+          |  val ok = b1 == (300 as Byte) && b2 == (300 as Byte) && b3 == (300 as Byte) &&
+          |    h == (70000 as Short) && b4 == (-129 as Byte)
+          |  val x: Int = b1
+          |  val y: Int = h
+          |  val z: Int = b4
+          |  return if ok { x + y + z } else { -1 }
+          |}
+          |""".stripMargin, "NarrowBoxToByteShort.on", Array())
+      assert(Shell.Success(44 + 4464 + 127) == r)
+    }
     it("still rejects a cast the boxed value can never satisfy") {
       for (src <- Seq(
         "val s: String? = \"1\"\n  val n = (s as Int)",

@@ -17,7 +17,8 @@ public class Iterables {
     _map(list, f, result);
     return result;
   }
-  public static <A, B> Iterable<B> map(Iterable<A> list, Function1<A, B> f) {
+  /** Maps any Iterable (ranges, {@code map.values()}) into a new mutable List. */
+  public static <A, B> List<B> map(Iterable<A> list, Function1<A, B> f) {
     List<B> result = new ArrayList<B>();
     _map(list, f, result);
     return result;
@@ -65,8 +66,8 @@ public class Iterables {
     return result;
   }
 
-  // Filter iterable elements
-  public static <T> Iterable<T> filter(Iterable<T> iterable, Function1<T, Boolean> predicate) {
+  // Filter iterable elements (ranges, map.values()) into a new mutable List
+  public static <T> List<T> filter(Iterable<T> iterable, Function1<T, Boolean> predicate) {
     List<T> result = new ArrayList<>();
     for (T item : iterable) {
       Boolean keep = predicate.call(item);

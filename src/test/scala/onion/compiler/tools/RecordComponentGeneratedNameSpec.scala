@@ -48,6 +48,29 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
       assert(ts.size == 1 && ts.head.contains("toString: String?") && ts.head.contains("toString()"), ts)
     }
 
+    it("rejects getClass: Class, whose accessor would override the final Object.getClass (#2512)") {
+      assert(codes("record G(getClass: Class[String])").contains(Some("E0010")))
+      assert(codes("record G(getClass: Class[String]?)").contains(Some("E0010")))
+    }
+
+    it("accepts a getClass component of another type") {
+      assert(codes("record G(getClass: Int)\nprintln(new G(1).getClass())").isEmpty)
+    }
+
+    it("says getClass: Class would override the final Object.getClass(), which no record generates") {
+      // Locale-agnostic: both the en and ja texts name `Object.getClass()`.
+      val msgs = errors("record G(getClass: Class[String])").filter(_.errorCode.contains("E0010")).map(_.message)
+      assert(msgs.size == 1, msgs)
+      assert(msgs.head.contains("getClass: Class[String]") && msgs.head.contains("Object.getClass()"), msgs)
+      val hs = errors("record H(hashCode: Int)").filter(_.errorCode.contains("E0010")).map(_.message)
+      assert(hs.size == 1 && !hs.head.contains("Object."), hs)
+    }
+
+    it("rejects getClass typed by a type parameter that erases to Class") {
+      assert(codes("record G[T extends Class[String]](getClass: T)\nprintln(\"ok\")").contains(Some("E0010")))
+      assert(codes("record G[T](getClass: T)\nprintln(new G[Int](1).getClass())").isEmpty)
+    }
+
     it("rejects toString typed by a type parameter bounded by String, which erases to String (#2522)") {
       assert(codes("record T[X extends String](toString: X)\nprintln(new T[String](\"a\"))").contains(Some("E0010")))
       assert(codes("record T[X extends String](toString: X?)").contains(Some("E0010")))

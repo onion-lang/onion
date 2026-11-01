@@ -30,8 +30,54 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       ms.lengthCompare(1) > 0 && ms.map(DuplicationChecks.erasedSignatureKey).distinct.lengthCompare(ms.length) < 0
     }
 
+  /** The call typed against a user-declared extension from its already-typed arguments.
+   *  A call whose lambdas declare every parameter type needs no bidirectional re-typing, and
+   *  re-typing the lambda bodies once per nesting level made nested calls exponential (#2463).
+   *  None when there is no user extension of the name, or none fits unambiguously; otherwise
+   *  the build's own result, errors reported as on the no-lambda path.
+   *  Also None when another overload takes a function or SAM at a lambda's position that the
+   *  typed lambda does not fit (invariance: `(String) -> String` is not a `(String) -> Object`):
+   *  the bidirectional path would re-type the lambda against it and may pick it, and writing a
+   *  lambda's parameter type must not change which overload runs. */
+  def tryUserExtensionWithTypedArguments(
+    node: AST.MethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Option[Term]] =
+    val user = collectExtensionMethods(targetType, node.name).filterNot(isBuiltinExtension)
+    // One receiver type for all of them: overloads whose parameters and receivers could rank
+    // in opposite directions (E0006) are left to the ranking in the bidirectional path.
+    if (user.isEmpty || user.exists(m => !(m.receiverType eq user.head.receiverType))) None
+    else selectApplicableExtensionMethod(targetType, node.name, params) match {
+      case CandidateSelection.Selected(m) if !isBuiltinExtension(m) && !lambdaCouldRetypeToAnother(m, user, node, params) =>
+        Some(buildExtensionCall(node, target, targetType, params, expected, m))
+      case _ => None
+    }
+
+  private def lambdaCouldRetypeToAnother(
+    selected: ExtensionMethodDefinition,
+    overloads: Seq[ExtensionMethodDefinition],
+    node: AST.MethodCall,
+    params: Array[Term]
+  ): Boolean = {
+    val lambdaIndices = node.args.indices.filter(i => node.args(i).isInstanceOf[AST.ClosureExpression])
+    overloads.exists { o =>
+      !(o eq selected) && o.arguments.length == params.length && lambdaIndices.exists { i =>
+        val p = o.arguments(i)
+        val functional = p match {
+          case ct: ClassType => ct.name != "java.lang.Object" && isLambdaSlot(ct)
+          case _ => false
+        }
+        functional && !calls.isAssignableWithBoxing(p, params(i).`type`)
+      }
+    }
+  }
+
   /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
    *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
+
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
     selectApplicableExtensionMethod(targetType, name, params).isInstanceOf[CandidateSelection.Ambiguous[?]]
 
@@ -121,9 +167,14 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       // without the ArrayType case a no-closure call like `arr.toList()` would
       // never find its builtin array extension (the closure path already does).
       case _: ClassType | _: ArrayType =>
-        val applicable = collectExtensionMethods(targetType, name).filter { extMethod =>
+        val applicableAll = collectExtensionMethods(targetType, name).filter { extMethod =>
           extMethod.name == name && isExtensionMethodApplicable(extMethod, params)
         }
+        // An overload that takes exactly the arguments written outranks one that needs a
+        // default filled in, whatever its receiver: `h(a)` beside `h(a, b = 5)` keeps calling
+        // `h(a)`, and a builtin `take(n)` keeps beating a user `take(n, tag = ..)` (#2401).
+        val exactArity = applicableAll.filter(_.arguments.length == params.length)
+        val applicable = if (exactArity.nonEmpty) exactArity else applicableAll
         // A user-declared `extension` shadows a builtin stdlib extension
         // (onion.Colls / onion.Iterables) of the same name+arity: an explicit
         // user extension expresses clear intent and should win rather than
@@ -250,7 +301,10 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     val lookupReceiver = staticReceiver(nonNullableReceiverForLookup(target, extMethod), extMethod)
     val staticArgs = Array(lookupReceiver) ++ params
 
-    containerClass.findMethod(node.name, staticArgs) match {
+    val staticMethods =
+      if (params.length < extMethod.arguments.length) findStaticMethods(extMethod, node.name, staticArgs)
+      else containerClass.findMethod(node.name, staticArgs)
+    staticMethods match {
       case Array() =>
         calls.reportMethodNotFound(node, targetType, node.name, calls.types(params))
         None
@@ -260,7 +314,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
           expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
           // finalParams(0) is the processed receiver; drop it — codegen handles
           // the receiver from node.target (null-check + optional unbox)
-          finalParams => new SafeStaticExtensionCall(node.location, target, containerClass, staticMethod, receiverBasicType, finalParams.tail)
+          finalParams => new SafeStaticExtensionCall(node.location, target, containerClass, staticMethod, receiverBasicType, withDefaults(staticMethod, finalParams).tail)
         )
       case multiple =>
         calls.reportAmbiguousMethods(node, node.name, multiple)
@@ -350,10 +404,14 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   ): Option[Term] = {
     val containerClass = extMethod.containerClass
     val staticArgs = Array(staticReceiver(target, extMethod)) ++ params
-    val staticMethods = backingStaticMethod(extMethod) match {
-      case Some(method) => Array(method)
-      case None => containerClass.findMethod(node.name, staticArgs)
-    }
+    val staticMethods =
+      if (params.length < extMethod.arguments.length) findStaticMethods(extMethod, node.name, staticArgs)
+      else {
+        backingStaticMethod(extMethod) match {
+          case Some(method) => Array(method)
+          case None => containerClass.findMethod(node.name, staticArgs)
+        }
+      }
 
     staticMethods match {
       case Array() =>
@@ -363,7 +421,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         val classSubst = TypeSubstitution.classSubstitution(containerClass)
         calls.buildResolvedCall(node, staticMethod, staticArgs, node.typeArgs, classSubst, expected)(
           expectedArgs => calls.processParamsWithExpected(node, staticArgs, expectedArgs),
-          finalParams => new CallStatic(containerClass, staticMethod, finalParams)
+          finalParams => new CallStatic(containerClass, staticMethod, withDefaults(staticMethod, finalParams))
         )
       case multiple =>
         calls.reportAmbiguousMethods(node, node.name, multiple)
@@ -803,11 +861,28 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     params: Array[Term]
   ): Boolean = {
     val expectedArgs = extMethod.arguments
-    params.length == expectedArgs.length &&
+    val countFits =
+      params.length == expectedArgs.length ||
+        (params.length < expectedArgs.length && backingStaticMethod(extMethod).exists(_.minArguments - 1 <= params.length))
+    countFits &&
     params.indices.forall { i =>
       calls.isAssignableWithBoxing(expectedArgs(i), params(i).`type`)
     }
   }
+
+  /** The static method for a call with `staticArgs` (receiver first); a call that leaves out
+   *  trailing arguments takes the backing method directly and fills their defaults afterwards. */
+  private def findStaticMethods(
+    extMethod: ExtensionMethodDefinition,
+    name: String,
+    staticArgs: Array[Term]
+  ): Array[Method] =
+    if (staticArgs.length <= extMethod.arguments.length)
+      backingStaticMethod(extMethod).filter(_.minArguments <= staticArgs.length).toArray
+    else extMethod.containerClass.findMethod(name, staticArgs)
+
+  private def withDefaults(method: Method, finalParams: Array[Term]): Array[Term] =
+    ArgumentHelpers.fillDefaultArguments(finalParams, method).getOrElse(finalParams)
 }
 
 private[compiler] object ExtensionMethodFallbackSupport {

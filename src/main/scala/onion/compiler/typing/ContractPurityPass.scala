@@ -41,20 +41,25 @@ final class ContractPurityPass(typing: Typing) {
     if (effects.nonEmpty) {
       // Name the first call that has an effect; a bare write has no call to name.
       val culprit = sites.find(_.effects.nonEmpty)
-      val callee = culprit.map(_.callee).getOrElse("an assignment")
-      val why = describe(culprit.map(_.effects).getOrElse(effects))
+      val callee = culprit.map(_.callee).getOrElse("=")
+      val blamed = culprit.map(_.effects).getOrElse(effects)
       val where = culprit.flatMap(c => Option(c.location)).orElse(Option(clause.location)).getOrElse(ownerLocation)
-      typing.report(SemanticError.CONTRACT_NOT_PURE, where, callee, why)
+      // The reason is a kind and the effect names (identifiers, the same in every language); the
+      // sentence is built from a message key, so it is translated with the rest of the message.
+      typing.report(SemanticError.CONTRACT_NOT_PURE, where, callee, reasonKind(blamed), worldEffects(blamed))
     }
   }
 
-  /** What the effects mean for a reader, completing "calls X, which ...". */
-  private def describe(effects: Set[Effect]): String = {
+  /** `memory` (writes only), `world` (an outside effect only), `both`, or `unknown` (not in the table). */
+  private def reasonKind(effects: Set[Effect]): String = {
     val world = effects - Effect.Mutate
-    val parts = Seq(
-      if (world.nonEmpty) Some(s"has the effect ${world.toSeq.sorted.map(_.name).mkString(", ")}") else None,
-      if (effects.contains(Effect.Mutate)) Some("writes to memory") else None
-    ).flatten
-    parts.mkString(" and ") + (if (world.contains(Effect.Unknown)) " (it is not in the effect table)" else "")
+    if (world.contains(Effect.Unknown)) "unknown"
+    else if (world.nonEmpty && effects.contains(Effect.Mutate)) "both"
+    else if (world.nonEmpty) "world"
+    else "memory"
   }
+
+  /** The names of the outside effects, e.g. `console, read`; empty when the call only writes memory. */
+  private def worldEffects(effects: Set[Effect]): String =
+    (effects - Effect.Mutate - Effect.Unknown).toSeq.sorted.map(_.name).mkString(", ")
 }

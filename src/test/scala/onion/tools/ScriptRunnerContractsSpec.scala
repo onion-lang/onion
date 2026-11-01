@@ -47,19 +47,21 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     code should not be 0
     out should include("E0105")
 
-  test("--contracts runtime accepts the clause and runs the script"):
+  test("--contracts check accepts the clause and runs the script"):
     val path = writeScript(withContract)
-    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "check", path)))
     out should not include "invalid argument"
     out should not include "E0105"
     code shouldBe 0
     out should include("true")
 
-  test("--contracts verify is accepted too"):
+  test("--contracts runtime and verify are refused, since nothing is enforced yet"):
     val path = writeScript(withContract)
-    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "verify", path)))
-    out should not include "invalid argument"
-    code shouldBe 0
+    for mode <- Seq("runtime", "verify") do
+      val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", mode, path)))
+      code should not be 0
+      out should include("--contracts")
+      out should include(mode)
 
   test("an unknown mode is reported against the flag"):
     val path = writeScript(withContract)

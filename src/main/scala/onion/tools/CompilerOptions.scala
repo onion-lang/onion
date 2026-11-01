@@ -246,9 +246,15 @@ object CompilerOptions {
 
   def parseContractMode(param: Option[CommandLineParam]): Option[ContractMode] = param match {
     case Some(ValuedParam(value)) =>
-      ContractMode.fromName(value).orElse {
-        printError(Message("error.command.invalidArgument", CONTRACTS))
-        None
+      ContractMode.fromName(value) match {
+        case Some(mode) if ContractMode.isAvailable(mode) => Some(mode)
+        case Some(reserved) =>
+          // runtime and verify are reserved names: refuse them rather than accept a mode that checks nothing.
+          printError(Message("error.command.contractsModeNotBuilt", CONTRACTS, ContractMode.flagName(reserved)))
+          None
+        case None =>
+          printError(Message("error.command.contractsInvalidMode", CONTRACTS, value))
+          None
       }
     case Some(NoValuedParam) =>
       printError(Message("error.command.noArgument", CONTRACTS))

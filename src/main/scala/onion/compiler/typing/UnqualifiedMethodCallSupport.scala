@@ -360,7 +360,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       case Some(ContractScope.Post) | Some(ContractScope.History) =>
         calls.typed(node.args.head, context)
       case _ =>
-        bodyContext.report(SemanticError.CONTRACT_MISPLACED, node, "`old(...)` has no earlier state here")
+        bodyContext.report(SemanticError.CONTRACT_MISPLACED, node, context.contractScope.fold("")(_.toString))
         None
     }
 

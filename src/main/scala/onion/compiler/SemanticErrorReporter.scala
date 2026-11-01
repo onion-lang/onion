@@ -1385,11 +1385,16 @@ object SemanticErrorReporter {
     ),
     SemanticError.CONTRACT_NOT_PURE -> ErrorDef(
       "error.semantic.contractNotPure",
-      Seq(items => asString(items(0)), items => asString(items(1)))
+      // items: callee, reason kind, outside-effect names. The reason is a message key, not a sentence.
+      Seq(
+        items => asString(items(0)),
+        items => format(message("error.semantic.contractNotPure.reason." + asString(items(1))), Seq(asString(items(2))))
+      )
     ),
     SemanticError.CONTRACT_MISPLACED -> ErrorDef(
       "error.semantic.contractMisplaced",
-      Seq(items => asString(items(0)))
+      // item: the scope the `old(...)` appeared in (Pre or Invariant), named in the message.
+      Seq(items => message("error.semantic.contractMisplaced.in" + asString(items(0))))
     ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",

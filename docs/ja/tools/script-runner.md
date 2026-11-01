@@ -126,14 +126,18 @@ onion --no-check-laws MyScript.on
 onion --law-samples 500 MyScript.on
 ```
 
-### `--contracts <off|runtime|verify>`
+### `--contracts <off|check>`
 
-契約の節を受け付けます。メソッドの `requires` と `ensures`、クラスの `invariant` と `history` です。
-これはプレビュー機能です（RFC #2557）。既定は `off` で、`off` のとき契約の節はこのフラグを示す
-エラーになります。契約が黙って無視されることはありません。
+契約の節（メソッドの `requires` と `ensures`、クラスの `invariant` と `history`）を受け付けて、
+静的に検査します。これはプレビュー機能です（RFC #2557）。既定は `off` で、`off` のとき節は
+このフラグを示すエラーになります。契約が黙って無視されることはありません。
+
+`check` は節を型付けして、ソルバーの要らない静的検査を行います。**プログラムの実行時には
+何も強制されません。** `runtime`（証明できなかった分の保険）と `verify`（証明）は予約された
+名前で、何かを検査するようになるまで、コマンドラインは受け付けません。
 
 ```bash
-onion --contracts runtime MyScript.on
+onion --contracts check MyScript.on
 ```
 
 ### `--effects`

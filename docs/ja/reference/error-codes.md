@@ -1203,7 +1203,7 @@ public:
 }
 ```
 
-直し方: `--contracts runtime` を付けてコンパイルするか、節を取り除きます。
+直し方: `--contracts check` を付けてコンパイルするか、節を取り除きます。
 
 ### `E0106` — 純粋でない契約
 
@@ -1993,7 +1993,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 | `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
 | `E0104` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
-| `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts runtime`) |
+| `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts check`) |
 | `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 

@@ -19,7 +19,7 @@ class ContractTypingSpec extends AnyFunSpec {
     }
   }
 
-  private def codes(source: String, mode: ContractMode = ContractMode.Runtime): Seq[String] =
+  private def codes(source: String, mode: ContractMode = ContractMode.Check): Seq[String] =
     compile(source, mode).flatMap(_.errorCode)
 
   private val counter =

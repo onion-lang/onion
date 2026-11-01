@@ -16,16 +16,37 @@ class ContractsFlagSpec extends AnyFunSpec {
   private def mode(value: String): Option[ContractMode] =
     CompilerOptions.parseContractMode(Some(ValuedParam(value)))
 
+  private def captureErr(body: => Any): String = {
+    val buf = new java.io.ByteArrayOutputStream()
+    val saved = System.err
+    try { System.setErr(new java.io.PrintStream(buf, true, "UTF-8")); body } finally System.setErr(saved)
+    new String(buf.toByteArray, "UTF-8")
+  }
+
   describe("parseContractMode") {
     it("defaults to off") {
       assert(CompilerOptions.parseContractMode(None) == Some(ContractMode.Off))
     }
 
-    it("accepts the three modes, in any case") {
+    it("accepts the modes that do something, in any case") {
       assert(mode("off") == Some(ContractMode.Off))
-      assert(mode("runtime") == Some(ContractMode.Runtime))
-      assert(mode("verify") == Some(ContractMode.Verify))
-      assert(mode("RUNTIME") == Some(ContractMode.Runtime))
+      assert(mode("check") == Some(ContractMode.Check))
+      assert(mode("CHECK") == Some(ContractMode.Check))
+    }
+
+    it("refuses runtime and verify until they check something") {
+      assert(mode("runtime").isEmpty)
+      assert(mode("verify").isEmpty)
+    }
+
+    it("says which value to use instead, and does not list the reserved ones as accepted") {
+      val err = captureErr(mode("verify"))
+      assert(err.contains("--contracts"), err)
+      assert(err.contains("check"), err)
+      assert(err.contains("verify"), err)
+      val bad = captureErr(mode("always"))
+      assert(bad.contains("off") && bad.contains("check"), bad)
+      assert(!bad.contains("runtime"), bad)
     }
 
     it("rejects an unknown value and a missing value") {
@@ -36,9 +57,9 @@ class ContractsFlagSpec extends AnyFunSpec {
 
   describe("configFrom") {
     it("carries the mode into the compiler config") {
-      val opts: Map[String, CommandLineParam] = Map(CompilerOptions.CONTRACTS -> ValuedParam("runtime"))
+      val opts: Map[String, CommandLineParam] = Map(CompilerOptions.CONTRACTS -> ValuedParam("check"))
       val config = CompilerOptions.configFrom(opts, outputDirectory = "", verbose = false)
-      assert(config.map(_.contracts) == Some(ContractMode.Runtime))
+      assert(config.map(_.contracts) == Some(ContractMode.Check))
     }
 
     it("leaves contracts off when the flag is absent") {

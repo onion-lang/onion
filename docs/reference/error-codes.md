@@ -1215,7 +1215,7 @@ public:
 }
 ```
 
-Fix: compile with `--contracts runtime`, or remove the clause.
+Fix: compile with `--contracts check`, or remove the clause.
 
 ### `E0106` — A contract that is not pure
 
@@ -2010,7 +2010,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 | `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
 | `E0104` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
-| `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts runtime`) |
+| `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts check`) |
 | `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 

@@ -328,7 +328,10 @@ author: never review a PR whose session link is your own session.
    3. **Diagnostics and UX:** what a newcomer sees, in en and ja.
    4. **Compatibility:** what existing programs (`run/`, `dogfood/`, docs samples) do now. In
       `consolidation` mode a break is allowed only with the §5 migration package.
-3. **Verdict.** Post one comment starting `<!-- panel v1 sha=<head sha> -->` with a table
+3. **Verdict.** Post one comment starting `<!-- panel v1 sha=<head sha> diff=<fingerprint> -->`
+   (get the fingerprint with
+   `gh api --paginate repos/onion-lang/onion/pulls/<n>/files | python3 .github/scripts/evolution_lib.py fingerprint`;
+   if it prints nothing, leave `diff=` out) with a table
    (lens, APPROVE or BLOCK, evidence) and, on its own line, `verdict: APPROVED` if all four
    approve or `verdict: BLOCKED` otherwise. The `evolution/risk-gate` check reads that line;
    it updates the `panel:*` labels itself.

@@ -84,9 +84,16 @@ Four fresh reviewers, each seeing only the diff, the linked issue or RFC, and PR
 until the code changes; any other block gets one rebuttal round, then a fifth reviewer decides.
 
 **Only the verdict comment counts.** Approval is a comment starting
-`<!-- panel v1 sha=<head sha> -->` that contains the line `verdict: APPROVED`, for the PR's
-current head SHA; the newest such comment for that head decides. The `panel:approved` label is a display aid; the gate ignores it. A push makes every
-earlier verdict stale automatically.
+`<!-- panel v1 sha=<head sha> diff=<fingerprint> -->` that contains the line
+`verdict: APPROVED`, for the PR's current change; the newest such comment for it decides. The
+`panel:approved` label is a display aid; the gate ignores it.
+
+A verdict is for the current change when `sha` is the PR's head **or** `diff` equals the
+fingerprint of the PR's change now: a hash of each changed file's name, status and `+`/`-`
+lines (context lines and hunk positions left out). A push that only merges `main` keeps the
+verdict; any push that changes a line the PR adds or removes makes it stale automatically. A
+mark without `diff=`, or a PR with too many files to fingerprint, matches by head SHA alone.
+A BLOCKED verdict carries over the same way.
 
 ## Required checks
 

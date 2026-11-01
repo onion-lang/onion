@@ -1972,6 +1972,26 @@ object TypedAST {
     def isAssignable(left: TypedAST.Type, right: TypedAST.Type): Boolean = isSuperType(left, right)
 
     /**
+     * `? super lower` accepts the type argument `actualArg` when `actualArg` is a
+     * supertype of `lower`. Two type variables are related only by identity: erased to
+     * Object they would otherwise match, and `Comparator[U]` would sort a `List[T]` (#2367).
+     * `T?` is a view of the declared `T`, so it is looked through (#2399).
+     */
+    def superWildcardAccepts(actualArg: TypedAST.Type, lower: TypedAST.Type): Boolean =
+      (actualArg, lower) match {
+        // `T?` super `T?`, and `T?` super `T`: compare the declared variables.
+        case (an: TypedAST.NullableType, ln: TypedAST.NullableType) => superWildcardAccepts(an.innerType, ln.innerType)
+        case (an: TypedAST.NullableType, lt: TypedAST.TypeVariableType) => superWildcardAccepts(an.innerType, lt)
+        // A non-null variable is not a supertype of a nullable one: a `Comparator[T]`
+        // would be handed the `List[T?]`'s nulls. A bare `[T]` already admits null.
+        case (at: TypedAST.TypeVariableType, ln: TypedAST.NullableType) if ln.innerType.isInstanceOf[TypedAST.TypeVariableType] =>
+          at.nullability == Nullability.Nullable && superWildcardAccepts(at, ln.innerType)
+        case (at: TypedAST.TypeVariableType, lt: TypedAST.TypeVariableType) =>
+          isSuperTypeByIdentity(at.widen, lt.widen)
+        case _ => isSuperType(actualArg, lower)
+      }
+
+    /**
      * Like isSuperType, but never falls back to comparing erased classes:
      * for callers that already know `left` is still abstract (an
      * unresolved type variable whose own value isn't fixed yet -- e.g. a
@@ -2116,14 +2136,21 @@ object TypedAST {
                     // a supertype of E only by identity (E is A, or E's bound chain
                     // reaches A): erased to Object it would otherwise match anything,
                     // and `Comparator[U]` would sort a `List[T]` (#2367) or a
-                    // `List[String]` (#2397).
+                    // `List[String]` (#2397). A variable E, nullable or not, goes through
+                    // superWildcardAccepts, which also keeps a `Comparator[T]` off a
+                    // `List[T?]` (#2399).
                     // A slot of `? super Object` keeps the erased check: that is what an
                     // inherited `sort(c)` reached through `this` in `Sub[S] extends
                     // ArrayList[S]` expects, since `this` carries no type arguments (#2400).
+                    val lower = w.lowerBound.get
+                    val lowerIsVariable = lower match
+                      case _: TypedAST.TypeVariableType => true
+                      case n: TypedAST.NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
+                      case _ => false
                     actualArg match
-                      case at: TypedAST.TypeVariableType if !isErasedTop(w.lowerBound.get) =>
-                        isSuperTypeByIdentity(at, w.lowerBound.get)
-                      case _ => isSuperType(actualArg, w.lowerBound.get)
+                      case at: TypedAST.TypeVariableType if !isErasedTop(lower) && !lowerIsVariable =>
+                        isSuperTypeByIdentity(at, lower)
+                      case _ => superWildcardAccepts(actualArg, lower)
               // Expected: type variable T (respects the variable's
               // nullability: NonNull T rejects nullable actuals)
               case (tv: TypedAST.TypeVariableType, _) =>

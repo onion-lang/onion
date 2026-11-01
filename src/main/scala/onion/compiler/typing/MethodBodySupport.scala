@@ -11,6 +11,7 @@ private[compiler] final class MethodBodySupport(
   unitContext: TypingUnitContext,
   bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
+  processAssignable: (AST.Node, Type, Term) => Term,
   typedTerms: (Array[AST.Expression], LocalContext) => Array[Term],
   translate: (AST.BlockElement, LocalContext) => ActionStatement,
   addReturnNode: (ActionStatement, Type) => StatementBlock
@@ -369,8 +370,14 @@ private[compiler] final class MethodBodySupport(
     context: LocalContext
   ): Array[TypedAST.MethodArgument] =
     args.zipWithIndex.map { case (arg, i) =>
+      // A default is checked like `val x: T = e` (issue #2541): an out-of-range `200` for a
+      // `Byte` or a `3.7` for a `Short` is E0000 here, not a truncated value or a VerifyError.
       val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        typed(expr, context.withoutParameters, types(i))
+        // A rejected default keeps a placeholder (codegen never runs after an error), so a
+        // call that relies on it is not reported a second time as E0005.
+        typed(expr, context.withoutParameters, types(i)).map { t =>
+          Option(processAssignable(expr, types(i), t)).getOrElse(Term.defaultValue(types(i)))
+        }
       }
       TypedAST.MethodArgument(arg.name, types(i), defaultTerm)
     }.toArray

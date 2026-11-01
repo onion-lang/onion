@@ -446,4 +446,92 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       assert(Shell.Success(1000000) == result)
     }
   }
+
+  describe("tail-call optimization next to a boxed branch (#2406)") {
+    def run(name: String, code: String) = shell.run(code.stripMargin, name, Array())
+
+    it("loops when the other branch is an Integer unboxed to the Int result") {
+      val result = run("TcoBoxedBranch.on",
+        """
+          |class C {
+          |public:
+          |  static def q(o: Integer, n: Int): Int = if n == 0 { o } else { q(o, n - 1) }
+          |  static def main(args: String[]): Int = q(7, 1000000)
+          |}
+          |""")
+      assert(Shell.Success(7) == result)
+    }
+
+    it("still throws NullPointerException for a null Integer in the taken branch") {
+      val result = run("TcoBoxedBranchNull.on",
+        """
+          |class C {
+          |public:
+          |  static def q(o: Integer, n: Int): Int = if n == 0 { o } else { q(o, n - 1) }
+          |  static def main(args: String[]): Int {
+          |    try { return q(null, 3) } catch e: NullPointerException { return -1 }
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(-1) == result)
+    }
+
+    it("leaves the unboxing of an if under a try outside the branches, like a bare call") {
+      // The panel's repro on #2413: a `try` around `if c { nn() }` must let the unboxing
+      // NullPointerException escape, as a `try` around a bare `nn()` does.
+      val result = run("TcoBoxedBranchTry.on",
+        """
+          |class C {
+          |public:
+          |  static def nn(): Integer = null
+          |  static def a(): Int {
+          |    val x: Int = try { nn() } catch e: NullPointerException { -1 }
+          |    return x
+          |  }
+          |  static def d(c: Boolean): Int {
+          |    val x: Int = try { if c { nn() } else { 1 } } catch e: NullPointerException { -1 }
+          |    return x
+          |  }
+          |  static def main(args: String[]): Int {
+          |    var r: Int = 0
+          |    try { a() } catch e: NullPointerException { r = r + 1 }
+          |    try { d(true) } catch e: NullPointerException { r = r + 10 }
+          |    return r + d(false) * 100
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(111) == result)
+    }
+
+    it("loops through an else-if chain with a boxed Long branch") {
+      val result = run("TcoBoxedBranchLong.on",
+        """
+          |class C {
+          |public:
+          |  static def q(o: JLong, n: Int): Long =
+          |    if n == 0 { o } else if n == -1 { 0L } else { q(o, n - 1) }
+          |  static def main(args: String[]): Int = q(5L, 1000000) as Int
+          |}
+          |""")
+      assert(Shell.Success(5) == result)
+    }
+
+    it("keeps a user-defined static valueOf in a branch: only a java.lang box is a box") {
+      // The panel's repro on #2413 at 2c7ad76: K::valueOf is not Integer.valueOf, so the
+      // rewrite must not drop the call and return its argument.
+      val result = run("TcoBoxedBranchUserValueOf.on",
+        """
+          |class K {
+          |public:
+          |  static def valueOf(x: Int): Integer = x * 10
+          |}
+          |class C {
+          |public:
+          |  static def f(n: Int): Int = if n == 0 { K::valueOf(5) } else { f(n - 1) }
+          |  static def main(args: String[]): Int = f(3)
+          |}
+          |""")
+      assert(Shell.Success(50) == result)
+    }
+  }
 }

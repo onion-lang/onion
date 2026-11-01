@@ -185,7 +185,17 @@ final class ExpressionFormTyping(
         val boxed = Boxing.boxedType(bodyContext.table, bt)
         (boxed eq ct) || TypeRules.isSuperType(ct, boxed) || ct.isInstanceOf[TypeVariableType]
       case (ct: ClassType, bt: BasicType) =>
-        (Boxing.boxedType(bodyContext.table, bt) eq ct) || (ct eq bodyContext.rootClass) || ct.isInstanceOf[TypeVariableType]
+        // Codegen unboxes through `Number.xxxValue()` for a numeric primitive other than
+        // Char (and checkcasts to the exact box for Boolean/Char), so a valid source is:
+        // - the exact box (`Integer as Int`),
+        // - a supertype of the box, narrowed then unboxed as in Java (`Number as Int`,
+        //   `Serializable as Int`, `Comparable[JInteger] as Int`; #2551),
+        // - another numeric box, like the primitive cast (`Integer as Long`; #2551).
+        val boxed = Boxing.boxedType(bodyContext.table, bt)
+        def viaNumber(t: BasicType) = numericCastTypes.contains(t)
+        (boxed eq ct) || (ct eq bodyContext.rootClass) || ct.isInstanceOf[TypeVariableType] ||
+          boxSupertypeAccepts(ct, boxed) ||
+          (viaNumber(bt) && numericCastTypes.exists(p => Boxing.boxedType(bodyContext.table, p) eq ct))
       case (ct: ClassType, dt: ClassType) =>
         // Generics are erasure-based, so a cast between two parameterizations of
         // erasure-compatible raw classes (e.g. `List[String] as List[Object]`) is
@@ -273,6 +283,21 @@ final class ExpressionFormTyping(
 
   private def isArrayRelatedType(ct: ClassType): Boolean =
     ct.name == "java.lang.Object" || ct.name == "java.io.Serializable" || ct.name == "java.lang.Cloneable"
+
+  // `ct` is a supertype of the box `boxed`. The box is a raw class, which an applied
+  // type accepts by erasure, so an applied `ct` is matched against the box's own view
+  // of that class instead: `Comparable[JInteger]` fits `Integer`, `Comparable[String]`
+  // does not.
+  private def boxSupertypeAccepts(ct: ClassType, boxed: ClassType): Boolean = ct match {
+    case applied: AppliedClassType =>
+      val views = bodyContext.table.appliedViewsOf(boxed)(AppliedTypeViews.collectAppliedViewsFrom(boxed))
+      views.exists { case (raw, view) => TypeRelations.sameClass(raw, applied.raw) && TypeRules.isSuperType(applied, view) }
+    case _ => TypeRules.isSuperType(ct, boxed)
+  }
+
+  // The numeric primitives codegen unboxes through `java.lang.Number` (not Char).
+  private val numericCastTypes: Seq[BasicType] =
+    Seq(BasicType.INT, BasicType.LONG, BasicType.SHORT, BasicType.BYTE, BasicType.FLOAT, BasicType.DOUBLE)
 
   private def isNumericBasic(bt: BasicType): Boolean = bt match {
     case BasicType.INT | BasicType.LONG | BasicType.SHORT | BasicType.BYTE |

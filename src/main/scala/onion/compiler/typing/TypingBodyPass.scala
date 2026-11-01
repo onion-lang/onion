@@ -127,12 +127,13 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     // Rewriting); type their bodies like ordinary record methods. A record body
     // (`{ access-section* }`) contributes user methods that must have their bodies
     // typed too, mirroring enum bodies. Plain records with neither have nothing to do.
-    if (node.synthesizedMethods.nonEmpty || node.sections.nonEmpty) {
+    if (node.synthesizedMethods.nonEmpty || node.sections.nonEmpty || node.invariants.nonEmpty || node.histories.nonEmpty) {
       typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
         unitContext.currentDefinition = definition
         typing.find(definition.name).foreach(unitContext.currentMapper = _)
         val recordTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
         typing.openTypeParams(typing.emptyTypeParams ++ recordTypeParams) {
+          methodBodySupport.processTypeContracts(definition, node.invariants, node.histories)
           node.synthesizedMethods.foreach(processMethodDeclaration)
           // Type the bodies of user-defined members from the record body,
           // mirroring processEnumDeclaration.
@@ -154,12 +155,13 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext): Unit =
     // Default methods (interface methods with bodies) get typed like
     // instance methods; signature-only declarations have nothing to do
-    if (node.methods.exists(_.block != null)) {
+    if (node.methods.exists(_.block != null) || node.invariants.nonEmpty || node.histories.nonEmpty) {
       typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
         unitContext.currentDefinition = definition
         typing.find(definition.name).foreach(unitContext.currentMapper = _)
         val interfaceTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
         typing.openTypeParams(typing.emptyTypeParams ++ interfaceTypeParams) {
+          methodBodySupport.processTypeContracts(definition, node.invariants, node.histories)
           node.methods.foreach(processMethodDeclaration)
         }
       }

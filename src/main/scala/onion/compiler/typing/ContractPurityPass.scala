@@ -24,15 +24,18 @@ final class ContractPurityPass(typing: Typing) {
       md <- Some(m).collect { case d: MethodDefinition => d }
       if md.preconditions.nonEmpty || md.postconditions.nonEmpty
     } yield md
-    if (withContracts.nonEmpty) {
+    val typesWithContracts: Seq[ClassDefinition] = classes.filter(c => c.invariants.nonEmpty || c.histories.nonEmpty)
+    if (withContracts.nonEmpty || typesWithContracts.nonEmpty) {
       val table = typing.effectTable
       val (_, unitEffects) = EffectInference.inferUnits(classes, table)
       for (md <- withContracts; clause <- md.preconditions ++ md.postconditions)
-        check(md, clause, classes, unitEffects, table)
+        check(clause, md.location, classes, unitEffects, table)
+      for (cd <- typesWithContracts; clause <- cd.invariants ++ cd.histories)
+        check(clause, cd.location, classes, unitEffects, table)
     }
   }
 
-  private def check(owner: MethodDefinition, clause: Term, classes: Seq[ClassDefinition],
+  private def check(clause: Term, ownerLocation: Location, classes: Seq[ClassDefinition],
                     unitEffects: Map[EffectInference.Unit0, Set[Effect]], table: EffectTable.Table): Unit = {
     val (effects, sites) = EffectInference.termEffects(clause, classes, unitEffects, table)
     if (effects.nonEmpty) {
@@ -40,7 +43,7 @@ final class ContractPurityPass(typing: Typing) {
       val culprit = sites.find(_.effects.nonEmpty)
       val callee = culprit.map(_.callee).getOrElse("an assignment")
       val why = describe(culprit.map(_.effects).getOrElse(effects))
-      val where = culprit.flatMap(c => Option(c.location)).orElse(Option(clause.location)).getOrElse(owner.location)
+      val where = culprit.flatMap(c => Option(c.location)).orElse(Option(clause.location)).getOrElse(ownerLocation)
       typing.report(SemanticError.CONTRACT_NOT_PURE, where, callee, why)
     }
   }

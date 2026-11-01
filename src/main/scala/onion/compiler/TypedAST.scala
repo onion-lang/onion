@@ -403,6 +403,13 @@ object TypedAST {
 
     /** Names of the primary constructor's parameters (set by the body pass), for the E0002 hint. */
     var primaryParameterNames: scala.collection.immutable.Set[String] = scala.collection.immutable.Set.empty
+    /**
+     * The typed `invariant` and `history` clauses of the body (RFC #2557), in source order.
+     * Empty unless `--contracts` is on. In a `history`, `old(e)` is typed as `e` itself:
+     * the terms are for checking, not yet for code generation.
+     */
+    var invariants: Seq[Term] = Nil
+    var histories: Seq[Term] = Nil
     private var staticInitializers_ = Array[TypedAST.ActionStatement]()
 
     /**

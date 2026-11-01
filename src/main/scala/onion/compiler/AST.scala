@@ -50,6 +50,17 @@ object AST {
   ): RecordDeclaration =
     RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, laws, examples, Nil, sections, shapes)
 
+  /** The same as [[recordDeclaration]], with the `invariant` and `history` clauses of the body (RFC #2557). */
+  def recordDeclarationWithContracts(
+    location: Location, modifiers: Int, name: String,
+    typeParameters: List[TypeParameter], args: List[Argument],
+    superInterfaces: List[TypeNode], fromRaw: String, derives: List[String],
+    laws: List[LawClause], examples: List[ExampleClause],
+    sections: List[AccessSection], shapes: List[ShapeClause],
+    invariants: List[Expression], histories: List[Expression]
+  ): RecordDeclaration =
+    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, laws, examples, Nil, sections, shapes, Nil, invariants, histories)
+
   /** Java-callable factory for an `example` clause; `name` may be null (unnamed example). */
   def exampleClause(location: Location, name: String, body: BlockExpression): ExampleClause =
     ExampleClause(location, Option(name), body)
@@ -371,7 +382,7 @@ object AST {
    *                           synthesize the static `parse`/`parseAll` methods (None when absent).
    * @param synthesizedMethods Methods derived from `fromPattern` (filled in during Rewriting).
    */
-  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, laws: List[LawClause] = Nil, examples: List[ExampleClause] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil, sections: List[AccessSection] = Nil, shapes: List[ShapeClause] = Nil, synthesisArgTypes: List[TypeNode] = Nil) extends TypeDeclaration
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, laws: List[LawClause] = Nil, examples: List[ExampleClause] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil, sections: List[AccessSection] = Nil, shapes: List[ShapeClause] = Nil, synthesisArgTypes: List[TypeNode] = Nil, invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration
   /**
    * A `shape name = re"..."` clause on a record — a named, first-class boundary.
    *
@@ -403,11 +414,14 @@ object AST {
    *                   A class with neither has no primary; its `def this` constructors call
    *                   the superclass's no-arg constructor directly, as they always have.
    */
-  case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil, hasPrimary: Boolean = false) extends TypeDeclaration {
+  case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil, hasPrimary: Boolean = false,
+    /** `invariant e` and `history e` clauses of the body, in source order (RFC #2557). */
+    invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
       this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil, false)
   }
-  case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration], typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration {
+  case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration], typeParameters: List[TypeParameter] = Nil,
+    invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration]) =
       this(location, modifiers, name, superInterfaces, methods, Nil)
   }

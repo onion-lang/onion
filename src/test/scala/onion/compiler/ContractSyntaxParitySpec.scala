@@ -29,6 +29,24 @@ class ContractSyntaxParitySpec extends AnyFunSpec {
     case _                        => Nil
   }
 
+  /** Class, record and interface declarations, with their class-level clauses. */
+  private case class Clauses(name: String, invariants: Int, histories: Int)
+
+  private def clausesOf(node: Any): List[Clauses] = node match {
+    case c: AST.ClassDeclaration     => Clauses(c.name, c.invariants.size, c.histories.size) :: Nil
+    case r: AST.RecordDeclaration    => Clauses(r.name, r.invariants.size, r.histories.size) :: Nil
+    case i: AST.InterfaceDeclaration => Clauses(i.name, i.invariants.size, i.histories.size) :: Nil
+    case p: Product                  => p.productIterator.toList.flatMap(clausesOf)
+    case it: Iterable[?]             => it.toList.flatMap(clausesOf)
+    case _                           => Nil
+  }
+
+  private def bothClasses(code: String): List[Clauses] = {
+    val f = fast(code)
+    assert(f == jj(code), "the fast-path AST differs from the JavaCC AST")
+    clausesOf(f)
+  }
+
   private def both(code: String): List[AST.MethodDeclaration] = {
     val f = fast(code)
     assert(f == jj(code), "the fast-path AST differs from the JavaCC AST")
@@ -111,6 +129,60 @@ class ContractSyntaxParitySpec extends AnyFunSpec {
           |}""".stripMargin)
       val f = ms.find(_.name == "f").get
       assert(f.requires.size == 2 && f.ensures.size == 2)
+    }
+  }
+
+  describe("invariant and history in a type body") {
+    it("reads them in the default section and in an access section") {
+      val cs = bothClasses(
+        """class Counter {
+          |  var n: Int
+          |  invariant n >= 0
+          |public:
+          |  history n >= old(n)
+          |  def get(): Int { return n }
+          |}""".stripMargin)
+      assert(cs == List(Clauses("Counter", 1, 1)))
+    }
+
+    it("reads several of each, in order") {
+      val cs = bothClasses(
+        """class A {
+          |  var n: Int
+          |  var m: Int
+          |  invariant n >= 0
+          |  invariant m >= 0
+          |  history n >= old(n)
+          |  history m >= old(m)
+          |}""".stripMargin)
+      assert(cs == List(Clauses("A", 2, 2)))
+    }
+
+    it("reads them in a record body") {
+      val cs = bothClasses(
+        """record Range(lo: Int, hi: Int) {
+          |  invariant lo <= hi
+          |}""".stripMargin)
+      assert(cs == List(Clauses("Range", 1, 0)))
+    }
+
+    it("reads a history in an interface") {
+      val cs = bothClasses(
+        """interface Point {
+          |  def x(): Int
+          |  history x() == old(x())
+          |}""".stripMargin)
+      assert(cs == List(Clauses("Point", 0, 1)))
+    }
+
+    it("lets a field and a method be called invariant and history") {
+      val cs = bothClasses(
+        """class A {
+          |  var invariant: Int
+          |public:
+          |  def history(): Int { return invariant }
+          |}""".stripMargin)
+      assert(cs == List(Clauses("A", 0, 0)))
     }
   }
 

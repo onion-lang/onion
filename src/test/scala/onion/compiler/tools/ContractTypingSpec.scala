@@ -105,6 +105,60 @@ class ContractTypingSpec extends AnyFunSpec {
     }
   }
 
+  describe("invariant and history") {
+    it("rejects them while contracts are off") {
+      val src = "class A {\n  var n: Int\n  invariant n >= 0\n  history n >= old(n)\n}"
+      assert(codes(src, ContractMode.Off).count(_ == "E0105") == 2)
+    }
+
+    it("accepts them over the fields of this") {
+      val src =
+        """class Counter {
+          |  var n: Int
+          |  invariant n >= 0
+          |  history n >= old(n)
+          |public:
+          |  def get(): Int { return n }
+          |}""".stripMargin
+      assert(codes(src).isEmpty, codes(src).toString)
+    }
+
+    it("accepts them on a record") {
+      val src = "record Range(lo: Int, hi: Int) {\n  invariant lo <= hi\n}"
+      assert(codes(src).isEmpty, codes(src).toString)
+    }
+
+    it("accepts a history over the pure methods of an interface") {
+      val src = "interface Point {\n  def x(): Int\n  history x() == old(x())\n}"
+      assert(codes(src).isEmpty, codes(src).toString)
+    }
+
+    it("puts old() in a history only") {
+      val src = "class A {\n  var n: Int\n  invariant old(n) >= 0\n}"
+      assert(codes(src).contains("E0107"), codes(src).toString)
+    }
+
+    it("has no result") {
+      val src = "class A {\n  var n: Int\n  invariant result >= 0\n}"
+      assert(codes(src).nonEmpty)
+    }
+
+    it("rejects a clause that is not a Boolean") {
+      val src = "class A {\n  var n: Int\n  invariant n\n}"
+      assert(codes(src).nonEmpty)
+    }
+
+    it("rejects an impure clause") {
+      val src =
+        """import { java.util.* }
+          |class A {
+          |  var xs: List[Int]
+          |  invariant xs.add(1)
+          |}""".stripMargin
+      assert(codes(src).contains("E0106"), codes(src).toString)
+    }
+  }
+
   describe("purity") {
     it("rejects a clause that writes to memory") {
       val src =

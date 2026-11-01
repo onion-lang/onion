@@ -574,6 +574,21 @@ public class JJOnionParser implements Parser {
     return softAt(i, "requires") || softAt(i, "ensures");
   }
 
+  /**
+   * The {@code invariant e} and {@code history e} clauses of the type body being read (RFC #2557).
+   * A body has no other member that starts with a bare name, so the word at the start of a member
+   * is unambiguous; as a field ({@code var history}) or a method ({@code def history()}) it
+   * follows {@code var} or {@code def}.
+   */
+  private ArrayBuffer<AST.Expression> invariantClauses = new ArrayBuffer<AST.Expression>();
+  private ArrayBuffer<AST.Expression> historyClauses = new ArrayBuffer<AST.Expression>();
+
+  private boolean typeClauseAhead() {
+    if (!(softAt(1, "invariant") || softAt(1, "history"))) return false;
+    int k = getToken(2).kind;
+    return k != COLON && k != LPAREN && k != ASSIGN && k != EOL;
+  }
+
   /** After contract clauses: past any line breaks, does the body ({@code {} or {@code =}) begin? */
   private boolean methodBodyAheadAfterClauses() {
     int i = 1;
@@ -1800,6 +1815,13 @@ int modifiers():{ mset = 0; Token t = null, last = null; }{
   )* {return mset;}
 }
 
+/** One {@code invariant e} or {@code history e} clause of a type body, collected into the buffers. */
+void type_clause() : { Token kw; AST.Expression e; }{
+  {enterSection();} kw=<ID> e=term() eos_or_block_end() {
+    if (kw.image.equals("invariant")) invariantClauses.addOne(e); else historyClauses.addOne(e);
+  }
+}
+
 AST.AccessSection default_section() : {
   ArrayBuffer<AST.MemberDeclaration> members = new ArrayBuffer<AST.MemberDeclaration>();
   AST.MemberDeclaration m; int mset; Location location;
@@ -1809,7 +1831,9 @@ AST.AccessSection default_section() : {
      append(members, m); location = m.location();
    }
   )
-  ({mset = 0;} [mset=modifiers()] m=member_decl(mset) {append(members, m);})*
+  ( LOOKAHEAD({typeClauseAhead()}) type_clause()
+  | {mset = 0;} [mset=modifiers()] m=member_decl(mset) {append(members, m);}
+  )*
   {return new AST.AccessSection(location, AST.M_PRIVATE(), toList(members));}
 }
 
@@ -1822,7 +1846,9 @@ AST.AccessSection access_section() :{
   |t="protected" {sectionType = AST.M_PROTECTED();}
   |t="private"   {sectionType = AST.M_PRIVATE();}
   ) ":"
-  ({mset = 0;} [mset=modifiers()] m=member_decl(mset) {append(members, m);})*
+  ( LOOKAHEAD({typeClauseAhead()}) type_clause()
+  | {mset = 0;} [mset=modifiers()] m=member_decl(mset) {append(members, m);}
+  )*
   {return new AST.AccessSection(p(t), sectionType, toList(members));}
 }
 
@@ -1855,7 +1881,9 @@ AST.ClassDeclaration class_decl(int mset) : {
   // `conforms` is a soft keyword: recognized only in this supertype position, so it
   // stays usable as an ordinary identifier (a `def conforms(..)` still parses).
   [ LOOKAHEAD({getToken(1).image.equals("conforms")}) <ID> ty2=type() {append(ty2s, ty2);} ("," ty2=type() {append(ty2s, ty2);})*]
+  { invariantClauses = new ArrayBuffer<AST.Expression>(); historyClauses = new ArrayBuffer<AST.Expression>(); }
   ( "{"
+    ( LOOKAHEAD({typeClauseAhead()}) type_clause() )*
     [sec1=default_section()] { sec3 = option(sec1); }
     (sec2=access_section() {append(sec2s, sec2);})*
     "}" [";"]
@@ -1904,7 +1932,8 @@ AST.ClassDeclaration class_decl(int mset) : {
       append(sec2s, new AST.AccessSection(p(t1), AST.M_PUBLIC(), toList(members)));
     }
     return new AST.ClassDeclaration(
-      p(t1), mset, c(t2), ty1, toList(ty2s), sec3, toList(sec2s), tparams, hasPrimary
+      p(t1), mset, c(t2), ty1, toList(ty2s), sec3, toList(sec2s), tparams, hasPrimary,
+      toList(invariantClauses), toList(historyClauses)
     );
   }
 }
@@ -1951,8 +1980,10 @@ AST.RecordDeclaration record_decl(int mset) : {
   // token(s) that follow), so they stay usable as ordinary identifiers everywhere else.
   // `law` and `example` each become a boolean static method the compiler executes at
   // build time (LawCheckPhase); `law` is property-checked over generated args.
+  { invariantClauses = new ArrayBuffer<AST.Expression>(); historyClauses = new ArrayBuffer<AST.Expression>(); }
   [ "{" {inRecordBody = true;}
     ( sec=access_section() {append(sections, sec);}
+    | LOOKAHEAD({typeClauseAhead()}) type_clause()
     | LOOKAHEAD({getToken(1).image.equals("law") && getToken(2).kind == ID})
         <ID> lt=<ID> "(" largs=args() ")" lb=block()
         { append(lawBuf, new AST.LawClause(p(lt), c(lt), largs, lb)); }
@@ -1971,9 +2002,10 @@ AST.RecordDeclaration record_decl(int mset) : {
     "}" {inRecordBody = false;}
   ]
   [";"] {
-    return AST.recordDeclaration(
+    return AST.recordDeclarationWithContracts(
       p(t1), mset, c(t2), tparams, args, toList(superTypes), fromRaw, toList(deriveBuf),
-      toList(lawBuf), toList(exBuf), toList(sections), toList(shapeBuf)
+      toList(lawBuf), toList(exBuf), toList(sections), toList(shapeBuf),
+      toList(invariantClauses), toList(historyClauses)
     );
   }
 }
@@ -1994,14 +2026,18 @@ AST.InterfaceDeclaration interface_decl(int mset) : {
   // Body optional, mirroring class_decl: `interface Marker`, `interface Marker;`,
   // and `interface Marker { ... }` all parse (a bare marker interface used to be a
   // syntax error even though a bare class was allowed).
+  { invariantClauses = new ArrayBuffer<AST.Expression>(); historyClauses = new ArrayBuffer<AST.Expression>(); }
   ( "{"
-      (signature = interface_method_decl() {append(signatures, signature); })*
+      ( LOOKAHEAD({typeClauseAhead()}) type_clause()
+      | signature = interface_method_decl() {append(signatures, signature); }
+      )*
     "}" [";"]
   | ";"
   | LOOKAHEAD({getToken(1).kind != LBRACE}) {}
   ) {
     return new AST.InterfaceDeclaration(
-      p(start), mset, c(name), toList(superTypes), toList(signatures), tparams
+      p(start), mset, c(name), toList(superTypes), toList(signatures), tparams,
+      toList(invariantClauses), toList(historyClauses)
     );
   }
 }
@@ -2021,11 +2057,15 @@ AST.InterfaceDeclaration trait_decl(int mset) : {
   [ LOOKAHEAD({getToken(1).image.equals("conforms")}) <ID>
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
-  ] "{"
-    (signature = interface_method_decl() {append(signatures, signature); })*
+  ] { invariantClauses = new ArrayBuffer<AST.Expression>(); historyClauses = new ArrayBuffer<AST.Expression>(); }
+  "{"
+    ( LOOKAHEAD({typeClauseAhead()}) type_clause()
+    | signature = interface_method_decl() {append(signatures, signature); }
+    )*
   "}" [";"] {
     return new AST.InterfaceDeclaration(
-      p(start), mset, c(name), toList(superTypes), toList(signatures), tparams
+      p(start), mset, c(name), toList(superTypes), toList(signatures), tparams,
+      toList(invariantClauses), toList(historyClauses)
     );
   }
 }

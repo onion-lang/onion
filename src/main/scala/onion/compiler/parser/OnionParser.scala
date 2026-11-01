@@ -982,13 +982,18 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   private def defaultSection(): AST.AccessSection = {
     val members = new ArrayBuffer[AST.MemberDeclaration]()
+    // A body may open with a clause (`invariant n >= 0`); then the section starts at the first member.
+    while (typeClauseAhead()) typeClause()
     var mset = if (isModifierKind(kind(1))) modifiers() else 0
     val first = memberDecl(mset)
     members += first
     val location = first.location
-    while (isMemberStart(kind(1))) {
-      mset = if (isModifierKind(kind(1))) modifiers() else 0
-      members += memberDecl(mset)
+    while (isMemberStart(kind(1)) || typeClauseAhead()) {
+      if (typeClauseAhead()) typeClause()
+      else {
+        mset = if (isModifierKind(kind(1))) modifiers() else 0
+        members += memberDecl(mset)
+      }
     }
     recordExpectedAll(K.K_VAL, K.K_VAR, K.K_FORWARD, K.K_DEF, K.ANNOTATION)
     AST.AccessSection(location, AST.M_PRIVATE, members.toList)
@@ -1006,9 +1011,12 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     }
     expect(K.COLON)
     val members = new ArrayBuffer[AST.MemberDeclaration]()
-    while (isMemberStart(kind(1))) {
-      val mset = if (isModifierKind(kind(1))) modifiers() else 0
-      members += memberDecl(mset)
+    while (isMemberStart(kind(1)) || typeClauseAhead()) {
+      if (typeClauseAhead()) typeClause()
+      else {
+        val mset = if (isModifierKind(kind(1))) modifiers() else 0
+        members += memberDecl(mset)
+      }
     }
     recordExpectedAll(K.K_VAL, K.K_VAR, K.K_FORWARD, K.K_DEF, K.ANNOTATION)
     AST.AccessSection(p(t), sectionType, members.toList)
@@ -1072,8 +1080,11 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     }
     var sec1: AST.AccessSection = null
     val sec2s = new ArrayBuffer[AST.AccessSection]()
+    invariantClauses.clear(); historyClauses.clear()
     if (kind(1) == K.LBRACE) {
       next()
+      // A body that is only clauses (or opens with them, then `public:`) has no default section.
+      while (typeClauseAhead()) typeClause()
       if (kind(1) != K.RBRACE && !isAccessSectionStart(kind(1))) sec1 = defaultSection()
       while (isAccessSectionStart(kind(1))) sec2s += accessSection()
       recordExpectedAll(K.K_PUBLIC, K.K_PROTECTED, K.K_PRIVATE)
@@ -1109,7 +1120,8 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         AST.BlockExpression(p(t1), assigns.toList, null), false, true, assigns.length)
       sec2s += AST.AccessSection(p(t1), AST.M_PUBLIC, members.toList)
     }
-    AST.ClassDeclaration(p(t1), mset, c(t2), ty1, ty2s.toList, Option(sec1), sec2s.toList, tparams, hasPrimary)
+    AST.ClassDeclaration(p(t1), mset, c(t2), ty1, ty2s.toList, Option(sec1), sec2s.toList, tparams, hasPrimary,
+      invariantClauses.toList, historyClauses.toList)
   }
 
   private def recordDecl(mset: Int): AST.RecordDeclaration = {
@@ -1138,12 +1150,15 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val shapes = new ArrayBuffer[AST.ShapeClause]()
     val superTypes = conformsClause()
     val sections = new ArrayBuffer[AST.AccessSection]()
+    invariantClauses.clear(); historyClauses.clear()
     if (accept(K.LBRACE)) {
       inRecordBody = true
       var going = true
       while (going) {
         if (isAccessSectionStart(kind(1))) {
           sections += accessSection()
+        } else if (typeClauseAhead()) {
+          typeClause()
         } else if (kind(1) == K.ID && image(1) == "law" && kind(2) == K.ID) {
           next()
           val lt = expect(K.ID)
@@ -1174,8 +1189,8 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       inRecordBody = false
     }
     accept(K.SEMI)
-    AST.recordDeclaration(p(t1), mset, c(t2), tparams, args, superTypes.toList, fromRaw, derives.toList,
-      laws.toList, examples.toList, sections.toList, shapes.toList)
+    AST.recordDeclarationWithContracts(p(t1), mset, c(t2), tparams, args, superTypes.toList, fromRaw, derives.toList,
+      laws.toList, examples.toList, sections.toList, shapes.toList, invariantClauses.toList, historyClauses.toList)
   }
 
   private def interfaceDecl(mset: Int): AST.InterfaceDeclaration = {
@@ -1184,13 +1199,17 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val tparams = if (kind(1) == K.LBRACKET) typeParams() else Nil
     val superTypes = conformsClause()
     val signatures = new ArrayBuffer[AST.MethodDeclaration]()
+    invariantClauses.clear(); historyClauses.clear()
     if (kind(1) == K.LBRACE) {
       next()
-      while (kind(1) == K.K_DEF) signatures += interfaceMethodDecl()
+      while (kind(1) == K.K_DEF || typeClauseAhead()) {
+        if (typeClauseAhead()) typeClause() else signatures += interfaceMethodDecl()
+      }
       expect(K.RBRACE)
       accept(K.SEMI)
     } else if (kind(1) == K.SEMI) next()
-    AST.InterfaceDeclaration(p(start), mset, c(name), superTypes.toList, signatures.toList, tparams)
+    AST.InterfaceDeclaration(p(start), mset, c(name), superTypes.toList, signatures.toList, tparams,
+      invariantClauses.toList, historyClauses.toList)
   }
 
   /** `conforms T1, T2, ...` when present, else empty. */
@@ -1211,10 +1230,14 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val superTypes = conformsClause()
     expect(K.LBRACE)
     val signatures = new ArrayBuffer[AST.MethodDeclaration]()
-    while (kind(1) == K.K_DEF) signatures += interfaceMethodDecl()
+    invariantClauses.clear(); historyClauses.clear()
+    while (kind(1) == K.K_DEF || typeClauseAhead()) {
+      if (typeClauseAhead()) typeClause() else signatures += interfaceMethodDecl()
+    }
     expect(K.RBRACE)
     accept(K.SEMI)
-    AST.InterfaceDeclaration(p(start), mset, c(name), superTypes.toList, signatures.toList, tparams)
+    AST.InterfaceDeclaration(p(start), mset, c(name), superTypes.toList, signatures.toList, tparams,
+      invariantClauses.toList, historyClauses.toList)
   }
 
   private def enumDecl(mset: Int): AST.EnumDeclaration = {
@@ -1354,6 +1377,30 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
   private def contractClauseAhead(): Boolean = {
     val (k, i) = rawKindSkippingEol(0)
     k == K.ID && { val w = rawAt(i).image; w == "requires" || w == "ensures" }
+  }
+
+  /**
+   * The `invariant e` and `history e` clauses of the type body being read (RFC #2557). A body
+   * has no other member that starts with a bare name, so the word at the start of a member
+   * is unambiguous; `invariant` and `history` stay ordinary names as a field (`var history`)
+   * or a method (`def history()`), which start with `var` or `def`.
+   */
+  private val invariantClauses = new ArrayBuffer[AST.Expression]()
+  private val historyClauses = new ArrayBuffer[AST.Expression]()
+
+  private def typeClauseAhead(): Boolean =
+    kind(1) == K.ID && (image(1) == "invariant" || image(1) == "history") &&
+      kind(2) != K.COLON && kind(2) != K.LPAREN && kind(2) != K.ASSIGN && kind(2) != K.EOL
+
+  /** Reads one `invariant e` / `history e` clause into the buffers; the expression ends at the line. */
+  private def typeClause(): Unit = {
+    // A member declaration pairs enterSection() with the leaveSection() inside eosOrBlockEnd();
+    // a clause is a member of the body in that respect, so it keeps the pair.
+    enterSection()
+    val keyword = next()
+    val e = term()
+    eosOrBlockEnd()
+    if (keyword.image == "invariant") invariantClauses += e else historyClauses += e
   }
 
   // ---------------------------------------------------------------- types

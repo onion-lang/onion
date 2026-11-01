@@ -70,6 +70,24 @@ private[compiler] final class MethodBodySupport(
     }
   }
 
+  /**
+   * The `invariant` and `history` clauses of a type body (RFC #2557), typed in a context that
+   * has `this`, so a bare field name is a field of the object. A `history` also sees `old(e)`
+   * for the earlier state. With contracts off, each clause is E0105 instead.
+   */
+  def processTypeContracts(
+    definition: ClassDefinition,
+    invariants: List[AST.Expression],
+    histories: List[AST.Expression]
+  ): Unit = {
+    if (invariants.nonEmpty || histories.nonEmpty) {
+      val context = new LocalContext
+      context.setStatic(false)
+      definition.invariants = typeContractClauses(invariants, context, ContractScope.Invariant)
+      definition.histories = typeContractClauses(histories, context, ContractScope.History)
+    }
+  }
+
   /** `ensures`: the parameters, the object, `old(e)`, and `result` unless the method is `void`. */
   private def typePostconditions(method: MethodDefinition, clauses: List[AST.Expression], context: LocalContext): Seq[Term] =
     if (method.returnType == BasicType.VOID || bodyContext.contractMode == ContractMode.Off)

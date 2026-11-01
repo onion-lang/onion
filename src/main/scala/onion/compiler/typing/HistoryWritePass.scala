@@ -1,6 +1,7 @@
 package onion.compiler.typing
 
 import onion.compiler.{AST, ASTWalk, SemanticError, Typing}
+import onion.compiler.contracts.HistoryProver
 
 /**
  * Pass 7 of typing (RFC #2557, design 4.1): a write that can break a `history`.
@@ -28,8 +29,13 @@ final class HistoryWritePass(typing: Typing) {
       units.flatMap(_.toplevels).collect { case c: AST.ClassDeclaration => c.name -> c }.toMap
     val interfaces: Map[String, AST.InterfaceDeclaration] =
       units.flatMap(_.toplevels).collect { case i: AST.InterfaceDeclaration => i.name -> i }.toMap
+    val unitOf: Map[String, AST.CompilationUnit] =
+      units.flatMap(u => u.toplevels.collect { case c: AST.ClassDeclaration => c.name -> u }).toMap
     if (classes.values.exists(_.histories.nonEmpty) || interfaces.values.exists(_.histories.nonEmpty)) {
-      for (cls <- classes.values) check(cls, classes, interfaces)
+      for (cls <- classes.values) {
+        typing.warningReporter_.setSourceFile(unitOf(cls.name).sourceFile)
+        check(cls, classes, interfaces)
+      }
     }
   }
 
@@ -52,7 +58,34 @@ final class HistoryWritePass(typing: Typing) {
         (field, op) <- relations.distinct if field == w.field
         problem <- problemOf(op, w.kind, field, perMethod)
       } typing.report(SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)", problem._1, problem._2)
+      proveRest(cls, chain, relations.distinct)
     }
+  }
+
+  /**
+   * What the syntax did not settle goes to the solver (design 7.3). A counterexample is a warning
+   * (W0021), not an error: it may rest on a wrap-around the program never reaches, and only a
+   * run can confirm it. A method with a syntactic E0109 is skipped; it is already reported.
+   */
+  private def proveRest(cls: AST.ClassDeclaration, chain: Seq[AST.ClassDeclaration], relations: Seq[(String, String)]): Unit = {
+    val intFields = chain.flatMap(c => (c.defaultSection.toSeq ++ c.sections).flatMap(_.members)).collect {
+      case f: AST.FieldDeclaration if f.typeRef != null && f.typeRef.desc == AST.PrimitiveType(AST.KInt) => f.name
+    }.toSet
+    val invariants = chain.flatMap(_.invariants)
+    for {
+      m <- methodsOf(cls) if m.block != null && !writesIn(m.block).exists(w => relations.exists(_._1 == w.field) && brokenSyntactically(w, relations, chain))
+      (field, op) <- relations
+    } HistoryProver.prove(m, field, op, intFields, invariants) match {
+      case HistoryProver.Counterexample(before) =>
+        val shown = before.toSeq.sortBy(_._1).map { case (k, v) => s"$k = $v" }.mkString(", ")
+        typing.warningReporter_.historyNotProved(m.location, m.name, s"$field $op old($field)", shown)
+      case _ =>
+    }
+  }
+
+  private def brokenSyntactically(w: Write, relations: Seq[(String, String)], chain: Seq[AST.ClassDeclaration]): Boolean = {
+    val perMethod = for (c <- chain; m <- methodsOf(c) if m.block != null) yield (m, writesIn(m.block))
+    relations.exists { case (f, op) => f == w.field && problemOf(op, w.kind, f, perMethod).isDefined }
   }
 
   /** `(reason kind, name of the method that makes the write wrong)`, or none when the syntax does not settle it. */

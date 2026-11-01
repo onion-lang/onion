@@ -149,6 +149,7 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 | `W0018` | `foreign-effect-entry` | A library jar's effect table names classes outside the jar; those entries were ignored |
 | `W0019` | `discarded-builder-result` | The result of an immutable builder method is discarded, so the call has no effect |
 | `W0020` | `extension-method-shadowed` | An extension method's name and arity exactly match an existing member, so the extension is never called |
+| `W0021` | `history-not-proved` | A method can break a history; the solver found a counterexample |
 
 ### `--no-check-laws`
 

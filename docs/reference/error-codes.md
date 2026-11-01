@@ -1961,6 +1961,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0018` | a library jar's effect table names classes outside the jar; those entries were ignored |
 | `W0019` | the result of an immutable builder method (`Http.Request.header`, ...) is discarded as a statement, so the call does nothing |
 | `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
+| `W0021` | a method can break a `history`: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 
 ## Every diagnostic code
 

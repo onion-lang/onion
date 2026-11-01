@@ -1036,6 +1036,22 @@ object TypedAST {
     }
   }
 
+  /**
+   * An omitted argument whose parameter declares a default. The default is not spliced
+   * into the call: it runs in `method`, a synthesized method of the callee's class that
+   * takes the parameters before it, so it sees the callee's `this`, its private members
+   * and those earlier parameters (#2358, #2375). Code generation turns it into a call of
+   * `method` with the receiver and the values already computed for the earlier slots;
+   * it only ever appears as an element of a call's or constructor's argument array.
+   */
+  class DefaultArgument(location: Location, val `type`: TypedAST.Type, val method: TypedAST.MethodDefinition, val index: Int)
+    extends Term(location) {
+    /** The call computing this default, given the receiver (null for a static default method) and the earlier arguments. */
+    def invocation(receiver: TypedAST.Term, earlier: Array[TypedAST.Term]): TypedAST.Term =
+      if (receiver == null) new CallStatic(location, method.classType, method, earlier)
+      else new Call(location, receiver, method, earlier)
+  }
+
   class Throw(location: Location, val term: TypedAST.Term)  extends ActionStatement(location) {
     def this(term: TypedAST.Term) = {
       this(null, term)

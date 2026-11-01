@@ -357,6 +357,10 @@ private[compiler] final class SimpleExpressionTypingSupport(
       val effectiveType = context.getEffectiveType(node.name)
       if (effectiveType != bind.tp) Some(new AsInstanceOf(new RefLocal(bind), effectiveType))
       else Some(new RefLocal(bind))
+    } else if (context.laterParameterNames.contains(node.name)) {
+      // A default argument naming its own or a later parameter: those are not bound yet.
+      bodyContext.report(VARIABLE_NOT_FOUND, node, node.name, context.allNames.toArray, null, null, java.lang.Boolean.TRUE)
+      None
     } else {
       // Implicit field access: a bare name with no local binding resolves to a
       // field of the current class -- this.<name> for an instance field, the

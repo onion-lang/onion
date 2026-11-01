@@ -121,6 +121,8 @@ class SemanticErrorReporter(threshold: Int) {
         // The pre-1.0 do-notation keyword: `ret e` now reads as an unknown variable `ret`
         // followed by `e`, so name the new spelling instead of a similar-name guess.
         Some(message("suggestion.retRenamedToYield"))
+      } else if (items.length > 4 && items(4) == java.lang.Boolean.TRUE) {
+        Some(format(message("suggestion.defaultLaterParameter"), Seq(name)))
       } else if (items.length > 3 && items(3) == java.lang.Boolean.TRUE) {
         Some(format(message("suggestion.ctorParamNotField"), Seq(name)))
       } else if (items.length > 2 && items(2) != null) {
@@ -292,6 +294,9 @@ class SemanticErrorReporter(threshold: Int) {
    * arguments form a last tier: `Strings::trimm(s, 1)` is a misspelled `trim` called with
    * one argument too many, and naming `trim` beats saying nothing. Library privates stay out of every tier.
    */
+  /** A method synthesized to compute a default argument (`f$default$2`): never a suggestion. */
+  private def isDefaultArgumentMethod(name: String): Boolean = name.contains("$default$")
+
   private def rankedCallCandidates(obj: TypedAST.ObjectType, name: String, argTypes: Array[TypedAST.Type], calledStatically: Option[Boolean]): Seq[String] = {
     val argc = argTypes.length
     // A private member of a class compiled elsewhere (`Format.group`) can never be called
@@ -299,7 +304,7 @@ class SemanticErrorReporter(threshold: Int) {
     val fromSource = obj.isInstanceOf[TypedAST.ClassDefinition]
     def visible(m: TypedAST.MemberRef): Boolean = fromSource || !Modifier.isPrivate(m.modifier)
     def sameCallKind(m: TypedAST.MemberRef): Boolean = calledStatically.forall(Modifier.isStatic(m.modifier) == _)
-    val byName = obj.methods.toSeq.filter(visible).filter(sameCallKind).groupBy(_.name)
+    val byName = obj.methods.toSeq.filter(visible).filter(sameCallKind).filterNot(m => isDefaultArgumentMethod(m.name)).groupBy(_.name)
     val applicable = byName.collect {
       case (n, ms) if ms.exists(m => acceptsArity(m, argc) && acceptsTypes(m, argTypes)) => n
     }.toSeq
@@ -586,7 +591,7 @@ class SemanticErrorReporter(threshold: Int) {
     // empty and the user got no guidance.
     val candidates = targetType match
       case obj: TypedAST.ObjectType =>
-        (obj.fields.map(_.name) ++ obj.methods.filter(_.arguments.isEmpty).map(_.name)).distinct.toSeq
+        (obj.fields.map(_.name) ++ obj.methods.filter(m => m.arguments.isEmpty && !isDefaultArgumentMethod(m.name)).map(_.name)).distinct.toSeq
       case _ => Seq.empty
     val suggestion = streamToListHint(targetType, name).orElse(toolbox.Suggestions.formatSuggestion(name, candidates))
     problem(position, appendSuggestion(baseMessage, suggestion))

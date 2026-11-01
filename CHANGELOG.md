@@ -117,9 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A default argument that reads an instance field is a compile error, not a `VerifyError` (#2375).**
-  - Before: `def f(n: Int, m: Int = k)` with a field `k` compiled, then failed JVM verification when the class loaded.
-  - Now: `E0002`, `k` is not found. A default may still call a static method.
 - **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
   - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
   - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.

@@ -50,7 +50,7 @@ object TermWalk:
     // leaves
     case _: RefLocal | _: This | _: OuterThis | _: NullValue | _: IntValue | _: LongValue | _: DoubleValue |
          _: FloatValue | _: BoolValue | _: ByteValue | _: ShortValue | _: CharacterValue | _: StringValue |
-         _: RefStaticField | _: NOP | _: Break | _: Continue => Nil
+         _: RefStaticField | _: NOP | _: Break | _: Continue | _: DefaultArgument => Nil
     // one child
     case n: ArrayLength => n.target :: Nil
     case n: NonNullAssert => n.target :: Nil

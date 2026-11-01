@@ -308,6 +308,16 @@ class LocalContext {
     usageTracker.recordUsage(name)
   }
 
+  /**
+   * While a default argument is typed: the names of its parameter and the parameters after
+   * it, which the default cannot read (only the earlier ones are bound). Such a name is
+   * reported as one of them even if a field or top-level `val` shares it.
+   */
+  var laterParameterNames: Set[String] = Set.empty
+
+  /** Every name recorded as used in this context so far. */
+  def usedNames: scala.collection.Set[String] = usageTracker.usedNames
+
   // Declarations whose type could not be determined (the initializer failed to
   // type, and no explicit type was given). The name is NOT bound -- binding it
   // at some placeholder type just trades "variable not found" noise for

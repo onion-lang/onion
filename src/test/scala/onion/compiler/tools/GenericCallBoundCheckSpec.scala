@@ -67,4 +67,35 @@ class GenericCallBoundCheckSpec extends AbstractShellSpec {
       assert(Shell.Success(5) == r)
     }
   }
+  describe("a call where nothing fixes the bounded parameter (panel blocks on #2434)") {
+    it("compiles when T appears in no parameter") {
+      val r = shell.run(
+        """def mk[B, T extends B](b: B): B = b
+          |def main(args: String[]): Int { val s: String = mk("x"); return s.length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("compiles when T is fixed only by an empty list literal") {
+      val r = shell.run(
+        """def firstOr[B, T extends B](xs: List[T], d: B): B = if xs.size > 0 { xs[0] } else { d }
+          |def main(args: String[]): Int { val s: String = firstOr([], "d2"); return s.length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(2) == r)
+    }
+    it("compiles when T is fixed only by a null argument") {
+      val r = shell.run(
+        """def pick[B, T extends B](b: B, t: T?): B = b
+          |def main(args: String[]): Int { val s: String = pick("a", null); return s.length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("compiles for a null argument under a nullable chained bound") {
+      val r = shell.run(
+        """def g[B, T extends B](v: T?): B? = null
+          |def wid[B, T extends B?](v: T): B? = null
+          |def main(args: String[]): Int { val s: String? = g(null); val u: Object? = wid(null); return if s == null && u == null { 4 } else { 0 } }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(4) == r)
+    }
+  }
 }

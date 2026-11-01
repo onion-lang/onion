@@ -117,9 +117,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A generic call that breaks a bound naming another type parameter is a compile error (#2325).**
-  - Before: with `def g[B, T extends B](v: T): B`, `val s: String = g(Integer::valueOf(1))` compiled, then threw a `ClassCastException`.
-  - Now: E0000 at the call, "type String is expected, but type Int is used". Calls where `T` fits `B` are unchanged.
 - **A `String...` parameter on a top-level `main` or a `tool` is a compile error (#2460).**
   - Before: it compiled, but was read as one `String`: `files.length` was always 1, a second argument was rejected, and `--contract` said `"type":"String"`.
   - Now: E0094 for `main` (write `files: String[]` to collect the rest), E0081 for a `tool`. Varargs elsewhere, such as a class's `static def main(args: String...)`, are unchanged.

@@ -27,6 +27,15 @@ private[typing] object GenericMethodTypeArguments {
     case _ => false
   }
 
+  private def typeParamsIn(t: Type, names: Set[String]): Set[String] = t match {
+    case tv: TypeVariableType => if (names.contains(tv.name)) Set(tv.name) else Set.empty
+    case applied: AppliedClassType => applied.typeArguments.toSet.flatMap(typeParamsIn(_, names))
+    case at: ArrayType => typeParamsIn(at.base, names)
+    case n: NullableType => typeParamsIn(n.innerType, names)
+    case w: WildcardType => typeParamsIn(w.upperBound, names) ++ w.lowerBound.toSet.flatMap(typeParamsIn(_, names))
+    case _ => Set.empty
+  }
+
   def explicitFromMappedArgs(
     typing: Typing,
     callNode: AST.Node,
@@ -382,6 +391,23 @@ private[typing] object GenericMethodTypeArguments {
 
     }
 
+    private def fixedByCall(): Set[String] = {
+      val names = typeParams.map(_.name).toSet
+      def informative(t: Term): Boolean = t != null && !t.`type`.isNullType && (t match {
+        case l: ListLiteral => l.elements.nonEmpty
+        case m: MapLiteral => m.keys.nonEmpty
+        case _ => true
+      })
+      val formals = method.arguments
+      val fromArgs =
+        if (formals.isEmpty) Set.empty[String]
+        else args.indices.toSet.flatMap { i =>
+          if (informative(args(i))) typeParamsIn(formals(math.min(i, formals.length - 1)), names) else Set.empty[String]
+        }
+      val fromReturn = if (expectedReturn != null) typeParamsIn(method.returnType, names) else Set.empty[String]
+      fromArgs ++ fromReturn
+    }
+
     /** Only the type parameters that were actually constrained: no defaults to bounds, so closure return inference still sees type variables. */
     def constrainedOnly(): scala.collection.immutable.Map[String, Type] = {
       collect()
@@ -401,6 +427,11 @@ private[typing] object GenericMethodTypeArguments {
     /** Every type parameter: inferred, else its lower constraint, else its (upper-constrained) bound; violations reported. */
     def withDefaults(): scala.collection.immutable.Map[String, Type] = {
       collect()
+      // Parameters an argument or the expected type actually fixed. A `null` argument, an
+      // empty `[]`/`[:]` literal, or no mention at all fixes nothing: such a parameter is its
+      // bound (or `Object`) by default. Only fixed ones are re-checked against a chained bound.
+      val pinned = fixedByCall().filter(n => inferred.contains(n) || lowerConstraints.contains(n))
+      val failedBound = scala.collection.mutable.Set[String]()
       for (tp <- typeParams) {
         val name = tp.name
         val bound0 = bounds(name)
@@ -412,6 +443,7 @@ private[typing] object GenericMethodTypeArguments {
               else if (isSuperTypeForBounds(upper, bound0)) bound0
               else {
                 reportError(callNode, INCOMPATIBLE_TYPE, bound0, upper)
+                failedBound += name
                 bound0
               }
 
@@ -432,6 +464,7 @@ private[typing] object GenericMethodTypeArguments {
         val inferredType =
           if (!boundsOk) {
             reportError(callNode, INCOMPATIBLE_TYPE, bound, inferredType0)
+            failedBound += name
             bound
           } else {
             inferredType0
@@ -442,9 +475,12 @@ private[typing] object GenericMethodTypeArguments {
 
       // A bound that names another of this method's type parameters
       // (`[B, T extends B]`) was checked above with that parameter erased to
-      // its own bound. Re-check it now that every argument is known (#2325).
+      // its own bound. Re-check it now that every argument is known (#2325),
+      // for a parameter something fixed (a defaulted one is its bound, as in
+      // `mk[B, T extends B](b: B)`) and whose own bound check has not failed.
       val finalSubst = inferred.toMap
-      for (tp <- typeParams; upper0 <- tp.upperBound if mentionsTypeParam(upper0, paramNames - tp.name)) {
+      for (tp <- typeParams; upper0 <- tp.upperBound
+           if pinned(tp.name) && !failedBound(tp.name) && mentionsTypeParam(upper0, paramNames - tp.name)) {
         val upper = TypeSubstitution.substituteType(upper0, classSubst, finalSubst, defaultToBound = true)
         val arg = finalSubst(tp.name)
         val argInner = arg match {

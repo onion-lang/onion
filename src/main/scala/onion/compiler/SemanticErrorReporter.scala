@@ -1396,6 +1396,10 @@ object SemanticErrorReporter {
       // item: the scope the `old(...)` appeared in (Pre or Invariant), named in the message.
       Seq(items => message("error.semantic.contractMisplaced.in" + asString(items(0))))
     ),
+    SemanticError.HISTORY_NOT_PREORDER -> ErrorDef(
+      "error.semantic.historyNotPreorder",
+      Seq(items => asString(items(0)))
+    ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))

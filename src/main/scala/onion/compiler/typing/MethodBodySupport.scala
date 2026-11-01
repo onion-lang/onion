@@ -85,6 +85,10 @@ private[compiler] final class MethodBodySupport(
       context.setStatic(false)
       definition.invariants = typeContractClauses(invariants, context, ContractScope.Invariant)
       definition.histories = typeContractClauses(histories, context, ContractScope.History)
+      for (h <- histories) HistoryPreorder.classify(h) match {
+        case HistoryPreorder.NotPreorder(reason) => bodyContext.report(SemanticError.HISTORY_NOT_PREORDER, h, reason)
+        case _ =>
+      }
     }
   }
 

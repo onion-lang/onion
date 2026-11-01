@@ -1248,6 +1248,22 @@ public:
 
 Fix: use the plain value in a `requires`, or move the condition to an `ensures`.
 
+### `E0108` — a `history` that is not a preorder
+
+A `history` relates two states of one object. It must be reflexive (`h(a, a)` holds) and
+transitive, so that checking one call at a time checks the whole life of the object.
+`n == old(n) + 1` is neither; `n > old(n)` is not reflexive.
+
+```onion
+class A {
+  var n: Int
+  history n == old(n) + 1   // E0108
+  history n >= old(n)       // ok
+}
+```
+
+Fix: use `x >= old(x)`, `x <= old(x)` or `x == old(x)`.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -2013,6 +2029,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts check`) |
 | `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
+| `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
 
 ## See also
 

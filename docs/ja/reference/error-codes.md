@@ -1236,6 +1236,22 @@ public:
 
 直し方: `requires` では普通の値を使うか、条件を `ensures` に移します。
 
+### `E0108` — 前順序でない `history`
+
+`history` は同じオブジェクトの二つの状態の関係です。反射的（`h(a, a)` が成り立つ）で推移的でなければ、
+一回の呼び出しごとの検査が履歴全体の検査になりません。
+`n == old(n) + 1` はどちらでもなく、`n > old(n)` は反射的ではありません。
+
+```onion
+class A {
+  var n: Int
+  history n == old(n) + 1   // E0108
+  history n >= old(n)       // 通る
+}
+```
+
+直し方: `x >= old(x)`、`x <= old(x)`、`x == old(x)` のいずれかを使います。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -1996,6 +2012,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts check`) |
 | `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
+| `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
 
 ## 関連項目
 

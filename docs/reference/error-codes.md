@@ -1248,6 +1248,69 @@ public:
 
 Fix: use the plain value in a `requires`, or move the condition to an `ensures`.
 
+### `E0108` — a `history` that is not a preorder
+
+A `history` relates two states of one object. It must be reflexive (`h(a, a)` holds) and
+transitive, so that checking one call at a time checks the whole life of the object.
+`n == old(n) + 1` is neither; `n > old(n)` is not reflexive.
+
+```onion
+class A {
+  var n: Int
+  history n == old(n) + 1   // E0108
+  history n >= old(n)       // ok
+}
+```
+
+Fix: use `x >= old(x)`, `x <= old(x)` or `x == old(x)`.
+
+### `E0109` — a write that can break a `history`
+
+`history n >= old(n)` says `n` never decreases. A method that lowers `n`, or that sets `n` to a
+constant while another method raises `n`, can break it. This is the case a subtype's
+`reset` creates: it keeps every precondition and postcondition and still breaks the history.
+
+```onion
+class Counter {
+  var n: Int
+  history n >= old(n)
+public:
+  def this { n = 0 }
+  def inc(): void { n = n + 1 }
+}
+class ResettableCounter extends Counter {
+public:
+  def reset(): void { n = 0 }   // E0109: inc raises n, so n can be above 0
+}
+```
+
+Only what the syntax settles is reported. Fix: remove the write, or weaken the history.
+
+### `E0110` — an `invariant` or `history` on a mutable object
+
+A clause may name only fields of a primitive, `String`, enum or record type. A `List` or another
+class can change without this class running, so the clause could not be checked one call at a time.
+
+```onion
+class A {
+  var items: java.util.List
+  invariant items != null   // E0110
+}
+```
+
+Fix: name a value-typed field, or a pure method that reads the object.
+
+### `E0111` — an `invariant` or `history` on a class with a Java superclass
+
+A Java superclass can have methods that change state, and the compiler can neither prove nor
+guard them. Extend only `Object` or an Onion class.
+
+```onion
+class A extends java.util.ArrayList {
+  invariant size >= 0   // E0111
+}
+```
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -1898,6 +1961,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0018` | a library jar's effect table names classes outside the jar; those entries were ignored |
 | `W0019` | the result of an immutable builder method (`Http.Request.header`, ...) is discarded as a statement, so the call does nothing |
 | `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
+| `W0021` | a method can break a `history`: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 
 ## Every diagnostic code
 
@@ -2013,6 +2077,10 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts check`) |
 | `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
+| `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
+| `E0109` | this write can break the history … on … |
+| `E0110` | an `invariant` or `history` names a field that holds a mutable object |
+| `E0111` | a class with an `invariant` or `history` extends a Java class |
 
 ## See also
 

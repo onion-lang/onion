@@ -41,6 +41,7 @@ enum WarningCategory(val code: String, val description: String):
   case LibraryEffectTableForeignClass extends WarningCategory("W0018", "A library jar's effect table names classes outside the jar; those entries were ignored")
   case DiscardedBuilderResult extends WarningCategory("W0019", "The result of an immutable builder method is discarded, so the call has no effect")
   case ExtensionMethodShadowed extends WarningCategory("W0020", "An extension method's name and arity exactly match an existing member, so the extension is never called")
+  case HistoryNotProved extends WarningCategory("W0021", "A method can break a history; the solver found a counterexample")
 
 object WarningCategory:
   private val aliases: Map[String, WarningCategory] = Map(
@@ -65,7 +66,8 @@ object WarningCategory:
     "malformed-effect-table" -> WarningCategory.LibraryEffectTableMalformed,
     "foreign-effect-entry" -> WarningCategory.LibraryEffectTableForeignClass,
     "discarded-builder-result" -> WarningCategory.DiscardedBuilderResult,
-    "extension-method-shadowed" -> WarningCategory.ExtensionMethodShadowed
+    "extension-method-shadowed" -> WarningCategory.ExtensionMethodShadowed,
+    "history-not-proved" -> WarningCategory.HistoryNotProved
   )
 
   def fromString(value: String): Option[WarningCategory] =

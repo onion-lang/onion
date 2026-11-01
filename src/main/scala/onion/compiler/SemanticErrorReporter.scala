@@ -1405,6 +1405,27 @@ object SemanticErrorReporter {
       // item: the scope the `old(...)` appeared in (Pre or Invariant), named in the message.
       Seq(items => message("error.semantic.contractMisplaced.in" + asString(items(0))))
     ),
+    SemanticError.HISTORY_NOT_PREORDER -> ErrorDef(
+      "error.semantic.historyNotPreorder",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.HISTORY_BROKEN_BY_WRITE -> ErrorDef(
+      "error.semantic.historyBrokenByWrite",
+      // items: field, history as source text, reason kind (lower | set | any), the method that raises the field (or "").
+      Seq(
+        items => asString(items(0)),
+        items => asString(items(1)),
+        items => format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
+      )
+    ),
+    SemanticError.CONTRACT_FIELD_NOT_VALUE -> ErrorDef(
+      "error.semantic.contractFieldNotValue",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.CONTRACT_JAVA_SUPERCLASS -> ErrorDef(
+      "error.semantic.contractJavaSuperclass",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))

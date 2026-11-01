@@ -219,6 +219,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     new onion.compiler.typing.CapabilityCheckPass(this).run(table_.classes.values.toSeq)
     // Pass 6 (RFC #2557): a contract expression must be pure. Same reason to run here.
     new onion.compiler.typing.ContractPurityPass(this).run(table_.classes.values.toSeq)
+    // RFC #2557: a write that breaks a `history`, decided from the syntax alone.
+    new onion.compiler.typing.HistoryWritePass(this).run(source)
+    // RFC #2557 3.2: an invariant or history may name only value-typed fields.
+    new onion.compiler.typing.ContractFramingPass(this).run(table_.classes.values.toSeq)
     // Issue #364: a user-written Shape instance must assert its laws.
     new onion.compiler.typing.ShapeInstanceLawPass(this).run(table_.classes.values.toSeq)
     diagnostics.finishOrThrow()

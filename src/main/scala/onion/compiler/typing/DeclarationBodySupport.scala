@@ -23,6 +23,9 @@ private[compiler] final class DeclarationBodySupport(
     typing.openTypeParams(typing.emptyTypeParams ++ classTypeParams) {
       val instanceInitializers = Buffer[ActionStatement]()
       val staticInitializers = Buffer[ActionStatement]()
+      definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {
+        case ctor: AST.ConstructorDeclaration if ctor.primary => ctor.args.map(_.name)
+      }.flatten.toSet
       for (section <- node.defaultSection ++ node.sections; member <- section.members) {
         member match {
           case field: AST.FieldDeclaration =>

@@ -1028,6 +1028,18 @@ tool takeRec(p: P): Int requires { console } { IO::println("" + p.x()); return 0
 This used to be silent: CLI synthesis skipped such a script, which then compiled to a
 program with no `main` and nothing to run (issue #424).
 
+A `List[String]` or `String[]` parameter gets a message of its own: a `tool` cannot take a
+list of arguments yet. Take one flag and split it:
+
+```onion
+tool greet(csv: String = "") requires { console } {
+  if csv != "" {
+    foreach n: String in Strings::split(csv, ",") { IO::println("Hello, " + n) }
+  }
+}
+// $ onion greet.on --csv ann,bob
+```
+
 ### `E0082` — Duplicate tool name
 
 Two `tool`s share a name. Function overloading is fine, but the command line selects a
@@ -1216,6 +1228,19 @@ public:
 
 Fix: rename one method, or give it different parameter types to make it a genuine
 overload.
+
+A record component already generates its accessor, so a record body cannot define a
+zero-argument method of the same name, whatever its return type or modifiers:
+
+```onion
+record R(a: Int) {
+public:
+  def a(): Int = 42   // E0010: component a: Int already generates a(): Int
+}
+```
+
+Fix: rename the method or the component. A method `a(x: Int)` with parameters is a
+genuine overload and compiles.
 
 ### `E0025` — Duplicate constructor
 

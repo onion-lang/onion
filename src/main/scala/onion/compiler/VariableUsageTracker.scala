@@ -37,6 +37,9 @@ class VariableUsageTracker {
     usages += name
   }
 
+  /** Every name recorded as used so far. */
+  def usedNames: scala.collection.Set[String] = usages
+
   /**
    * Returns all unused variables (declared but never used).
    *

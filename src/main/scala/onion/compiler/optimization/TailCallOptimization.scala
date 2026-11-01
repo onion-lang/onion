@@ -723,10 +723,19 @@ class TailCallOptimization(config: CompilerConfig)
     }
     val actualCall = actualCallOpt.get
 
-    val newArgs: Array[Term] = actualCall match {
+    val callArgs: Array[Term] = actualCall match {
       case call: Call => call.parameters
       case call: CallStatic => call.parameters
       case _ => Array.empty
+    }
+    // An omitted defaulted argument is computed by its default method from the new values
+    // of the arguments before it, which the multi-argument path below holds in temps.
+    val newArgs: Array[Term] = callArgs.zipWithIndex.map {
+      case (d: DefaultArgument, i) =>
+        val receiver = if (Modifier.isStatic(d.method.modifier)) null else new This(d.method.classType)
+        val earlier = Array.tabulate[Term](i)(j => new RefLocal(null, 0, slots.tempVarOffset + j, slots.paramTypes(j)))
+        d.invocation(receiver, earlier)
+      case (arg, _) => arg
     }
 
     if (config.verbose) {

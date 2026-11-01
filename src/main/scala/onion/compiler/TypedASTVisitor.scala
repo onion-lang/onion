@@ -9,6 +9,7 @@ import TypedAST._
 trait TypedASTVisitor[T]:
   // Expression visitors
   def visitArrayLength(node: ArrayLength): T
+  def visitDefaultArgument(node: DefaultArgument): T
   def visitRefArray(node: RefArray): T
   def visitSetArray(node: SetArray): T
   def visitBegin(node: Begin): T
@@ -84,6 +85,7 @@ trait TypedASTVisitor[T]:
     case n: UnaryTerm => visitUnaryTerm(n)
     case n: BoolValue => visitBoolValue(n)
     case n: ArrayLength => visitArrayLength(n)
+    case n: DefaultArgument => visitDefaultArgument(n)
     case n: RefArray => visitRefArray(n)
     case n: SetArray => visitSetArray(n)
     case n: Begin => visitBegin(n)
@@ -133,6 +135,7 @@ abstract class DefaultTypedASTVisitor[T] extends TypedASTVisitor[T]:
   def defaultValue: T
   
   override def visitArrayLength(node: ArrayLength): T = defaultValue
+  override def visitDefaultArgument(node: DefaultArgument): T = defaultValue
   override def visitRefArray(node: RefArray): T = defaultValue
   override def visitSetArray(node: SetArray): T = defaultValue
   override def visitBegin(node: Begin): T = defaultValue

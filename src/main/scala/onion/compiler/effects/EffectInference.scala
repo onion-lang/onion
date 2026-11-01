@@ -136,7 +136,7 @@ object EffectInference {
     "SynchronizedTerm", "RefField", "SafeFieldAccess", "SetField", "SetStaticField",
     "SetLocal", "ListLiteral", "MapLiteral", "NewArray", "NewArrayWithValues",
     // leaves
-    "RefLocal", "RefStaticField", "This", "OuterThis",
+    "RefLocal", "RefStaticField", "This", "OuterThis", "DefaultArgument",
     "BoolValue", "ByteValue", "ShortValue", "IntValue", "LongValue",
     "FloatValue", "DoubleValue", "CharacterValue", "StringValue", "NullValue"
   )
@@ -350,6 +350,8 @@ object EffectInference {
       case n: NewArray      => n.parameters.foreach(term)
       case n: NewArrayWithValues => n.values.foreach(term)
       case _: RefLocal | _: RefStaticField | _: This | _: OuterThis => ()
+      // An omitted argument runs its default method: the call has that method's effects.
+      case d: DefaultArgument => method(d.method, entry, null, Array.empty)
       case _: BoolValue | _: ByteValue | _: ShortValue | _: IntValue | _: LongValue => ()
       case _: FloatValue | _: DoubleValue | _: CharacterValue | _: StringValue | _: NullValue => ()
       case _ =>

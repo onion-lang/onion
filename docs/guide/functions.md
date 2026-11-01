@@ -60,6 +60,12 @@ greet("kota", "Yo")            // Yo, kota
 greet(greeting = "Hi", name = "kota")
 ```
 
+A default is evaluated in the called method, each time an argument is omitted. It can use:
+- the parameters declared before it: `def range(from: Int, to: Int = from + 10)`
+- the receiver's fields and methods, including private ones: `def f(n: Int, m: Int = this.limit)`
+
+A default that names its own or a later parameter is `E0002`.
+
 ### Varargs
 
 A trailing `Type...` parameter collects extra arguments into an array;

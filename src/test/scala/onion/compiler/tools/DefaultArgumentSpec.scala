@@ -4,6 +4,22 @@ import onion.tools.Shell
 
 class DefaultArgumentSpec extends AbstractShellSpec {
   describe("default arguments") {
+    it("still allows a default that calls a static method of the class") {
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static def g(n: Int): Int = n
+          |  def f(n: Int, m: Int = g(2)): Int = n + m
+          |  static def main(args: String[]): String = "" + new C().f(1)
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("3") == result)
+    }
+
     it("should use default value when argument is omitted") {
       val result = shell.run(
         """
@@ -139,7 +155,9 @@ class DefaultArgumentSpec extends AbstractShellSpec {
       assert(Shell.Success("[test],<test],<test>") == result)
     }
 
-    it("rejects a default that uses an earlier parameter instead of crashing with VerifyError") {
+    // #2358 asked for this not to crash with VerifyError. #2360 made it E0002; a default now
+    // runs in the callee (#2375), so the earlier parameter is in scope and g(1) is 1 + 2.
+    it("accepts a default that uses an earlier parameter instead of crashing with VerifyError") {
       val result = shell.run(
         """
           |class Test {
@@ -151,7 +169,7 @@ class DefaultArgumentSpec extends AbstractShellSpec {
         "None",
         Array()
       )
-      assert(Shell.Failure(-1) == result)
+      assert(Shell.Success(3) == result)
     }
   }
 }

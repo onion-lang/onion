@@ -670,7 +670,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
           ret.term match {
             case call: Call =>
               call.method match {
-                case targetMethod: MethodDefinition if stateIdOf(targetMethod).isDefined =>
+                case targetMethod: MethodDefinition if stateIdOf(targetMethod).isDefined && !call.parameters.exists(_.isInstanceOf[DefaultArgument]) =>
                   // Transform to: update params, set state, continue
                   if (config.verbose) {
                     trace(s"[Mutual TCO]       Found tail call: ${targetMethod.name} -> state ${stateIdOf(targetMethod).get}")
@@ -687,7 +687,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
               }
             case call: CallStatic =>
               call.method match {
-                case targetMethod: MethodDefinition if stateIdOf(targetMethod).isDefined =>
+                case targetMethod: MethodDefinition if stateIdOf(targetMethod).isDefined && !call.parameters.exists(_.isInstanceOf[DefaultArgument]) =>
                   if (config.verbose) {
                     trace(s"[Mutual TCO]       Found static tail call: ${targetMethod.name} -> state ${stateIdOf(targetMethod).get}")
                   }

@@ -7,8 +7,8 @@ import java.io.StringReader
 /**
  * A default on an extension method parameter (#2401), and the review panel's blocks on #2402:
  * an overload that takes exactly the written arguments keeps winning over one that needs a
- * default, and a default cannot see `self` or the other parameters (it is spliced into the
- * call site, where they do not exist).
+ * default. A default runs in the callee (#2375), so it sees `self` and the parameters
+ * before it, but not its own or a later one.
  */
 class ExtensionDefaultArgumentSpec extends AbstractShellSpec {
   private def errorCodes(src: String): Seq[String] = {
@@ -51,13 +51,21 @@ class ExtensionDefaultArgumentSpec extends AbstractShellSpec {
       assert(run(decls, "\"s\".r() + \",\" + \"s\".r(7)") == Shell.Success("zero,one7"))
     }
 
-    it("a default that reads self is E0050, not the caller's slot (repro 2)") {
-      val src = main("""extension String { def g(c: String = self + "!"): String = self + "/" + c }""", "\"s\".g()")
-      assert(errorCodes(src) == Seq("E0050"))
+    // Repro 2 and the earlier-parameter case were E0050 / E0002 while a default was spliced
+    // into the call site. A default now runs in the callee (#2375, #2398), so it reads the
+    // receiver it is called on and the arguments before it, never the caller's slots.
+    it("a default that reads self sees the call's receiver, not the caller's slot (repro 2)") {
+      val decls = """extension String { def g(c: String = self + "!"): String = self + "/" + c }"""
+      assert(run(decls, "\"s\".g() + \",\" + \"t\".g(\"x\")") == Shell.Success("s/s!,t/x"))
     }
 
-    it("a default that reads an earlier parameter is E0002, not a VerifyError") {
-      val src = main("""extension String { def g(a: Int, b: Int = a * 10): String = self + a + b }""", "\"s\".g(1)")
+    it("a default that reads an earlier parameter sees its argument, not a VerifyError") {
+      val decls = """extension String { def g(a: Int, b: Int = a * 10): String = self + a + "," + b }"""
+      assert(run(decls, "\"s\".g(1) + \";\" + \"s\".g(1, 2)") == Shell.Success("s1,10;s1,2"))
+    }
+
+    it("a default that reads a later parameter is E0002, with no E0005 at the call") {
+      val src = main("""extension String { def g(a: Int = b, b: Int = 1): String = self + a + b }""", "\"s\".g()")
       assert(errorCodes(src) == Seq("E0002"))
     }
 

@@ -2,7 +2,7 @@ package onion.compiler.backend.asm
 
 import org.objectweb.asm.{Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{GeneratorAdapter, Method => AsmMethod}
-import onion.compiler.{Location, TypedAST, TypedASTVisitor}
+import onion.compiler.{Location, Modifier, TypedAST, TypedASTVisitor}
 import TypedAST.*
 
 /**
@@ -72,6 +72,9 @@ class AsmCodeGenerationVisitor(
     expectedTypes: Array[AsmType],
     pendingTypes: Array[AsmType] = AsmUtil.noAsmTypes
   ): Unit =
+    if hasDefaults(params) then
+      emitArgumentsWithDefaults(params, expectedTypes, pendingTypes, if pendingTypes.isEmpty then -1 else 0, special = false)
+      return
     if TermContainsTry.currentMethodHasNoTry then
       // Nothing to spill around: emit the arguments in order.
       var i = 0
@@ -103,6 +106,67 @@ class AsmCodeGenerationVisitor(
         asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedType)
       pending += expectedType
       i += 1
+
+  private def hasDefaults(params: Array[Term]): Boolean =
+    var i = 0
+    while i < params.length do
+      if params(i).isInstanceOf[DefaultArgument] then return true
+      i += 1
+    false
+
+  /**
+   * Arguments of a call that omits defaulted ones (see `DefaultArgument`). The values in
+   * `pendingTypes` (the receiver, at `receiverIndex`) are already on the stack. They are
+   * spilled, then every argument is computed into a local in order: an omitted one by
+   * calling its default method with the receiver and the arguments before it. Finally the
+   * pending values and the arguments are reloaded. `special` calls an instance default
+   * with invokespecial, for `super.f()`.
+   */
+  private def emitArgumentsWithDefaults(
+    params: Array[Term],
+    expectedTypes: Array[AsmType],
+    pendingTypes: Array[AsmType],
+    receiverIndex: Int,
+    special: Boolean,
+    receiverIsFirstArgument: Boolean = false
+  ): Unit =
+    val pendingSlots = new Array[Int](pendingTypes.length)
+    for j <- (pendingTypes.length - 1) to 0 by -1 do
+      val slot = gen.newLocal(pendingTypes(j))
+      gen.storeLocal(slot)
+      pendingSlots(j) = slot
+    val argSlots = new Array[Int](params.length)
+    for i <- params.indices do
+      params(i) match
+        case d: DefaultArgument =>
+          val method = d.method
+          val owner = method.classType
+          val shape = callShape(method, owner.name)
+          val isStatic = (method.modifier & Modifier.STATIC) != 0
+          if !isStatic then
+            if receiverIndex < 0 then throw new IllegalStateException(s"default of ${method.name} needs a receiver")
+            gen.loadLocal(pendingSlots(receiverIndex))
+          val offset = if receiverIsFirstArgument then 1 else 0
+          if receiverIsFirstArgument && d.index > 0 then gen.loadLocal(pendingSlots(receiverIndex))
+          for j <- offset until d.index do gen.loadLocal(argSlots(j - offset))
+          if isStatic then
+            gen.visitMethodInsn(Opcodes.INVOKESTATIC, shape.owner.getInternalName, method.name, shape.descriptor, owner.isInterface)
+          else if special then
+            gen.visitMethodInsn(Opcodes.INVOKESPECIAL, shape.owner.getInternalName, method.name, shape.descriptor, owner.isInterface)
+          else if owner.isInterface then gen.invokeInterface(shape.owner, shape.asmMethod)
+          else gen.invokeVirtual(shape.owner, shape.asmMethod)
+          asmCodeGen.adaptValueOnStack(gen, d.`type`, expectedTypes(i))
+        case param =>
+          visitTerm(param)
+          asmCodeGen.adaptValueOnStack(gen, param.`type`, expectedTypes(i))
+      val slot = gen.newLocal(expectedTypes(i))
+      gen.storeLocal(slot)
+      argSlots(i) = slot
+    for slot <- pendingSlots do gen.loadLocal(slot)
+    for slot <- argSlots do gen.loadLocal(slot)
+
+  override def visitDefaultArgument(node: DefaultArgument): Unit =
+    throw new IllegalStateException(s"default argument of ${node.method.name} outside a call's arguments")
 
   // Expression visitors
   override def visitArrayLength(node: ArrayLength): Unit =
@@ -281,7 +345,10 @@ class AsmCodeGenerationVisitor(
   override def visitCallSuper(node: CallSuper): Unit =
     visitTerm(node.target)
     val argTypes = node.method.arguments.map(asmType)
-    emitArgumentsWithAdaptation(node.params, argTypes, Array(asmType(node.target.`type`)))
+    if hasDefaults(node.params) then
+      emitArgumentsWithDefaults(node.params, argTypes, Array(asmType(node.target.`type`)), 0, special = true)
+    else
+      emitArgumentsWithAdaptation(node.params, argTypes, Array(asmType(node.target.`type`)))
     val ownerType = AsmUtil.objectType(node.method.affiliation.name)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
@@ -374,7 +441,11 @@ class AsmCodeGenerationVisitor(
       case None     => // reference receiver: no adaptation needed
 
     // Push the non-receiver arguments (argTypes(0) is the receiver; the rest match parameters).
-    emitArgumentsWithAdaptation(node.parameters, argTypes.drop(1))
+    if hasDefaults(node.parameters) then
+      // The receiver is the static method's first argument, so a default sees it as one.
+      emitArgumentsWithDefaults(node.parameters, argTypes.drop(1), Array(argTypes(0)), 0, special = false, receiverIsFirstArgument = true)
+    else
+      emitArgumentsWithAdaptation(node.parameters, argTypes.drop(1))
 
     if node.containerClass.isInterface then
       gen.visitMethodInsn(Opcodes.INVOKESTATIC, shape.owner.getInternalName, node.method.name, shape.descriptor, true)
@@ -624,7 +695,19 @@ class AsmCodeGenerationVisitor(
   override def visitNewObject(node: NewObject): Unit =
     val classType = AsmUtil.objectType(node.constructor.affiliation.name)
     val argTypes = node.constructor.getArgs.map(asmType)
-    if node.parameters.exists(TermContainsTry.contains) then
+    if hasDefaults(node.parameters) then
+      // Defaults are computed before `new`, for the reason given below.
+      emitArgumentsWithDefaults(node.parameters, argTypes, AsmUtil.noAsmTypes, -1, special = false)
+      val argSlots = new Array[Int](argTypes.length)
+      for i <- (argTypes.length - 1) to 0 by -1 do
+        val slot = gen.newLocal(argTypes(i))
+        gen.storeLocal(slot)
+        argSlots(i) = slot
+      gen.newInstance(classType)
+      gen.dup()
+      for slot <- argSlots do gen.loadLocal(slot)
+      gen.invokeConstructor(classType, AsmMethod("<init>", AsmType.getMethodDescriptor(AsmType.VOID_TYPE, argTypes*)))
+    else if node.parameters.exists(TermContainsTry.contains) then
       // Unlike an ordinary receiver (visitCall), the value `new` pushes is not
       // yet a real object -- the verifier tracks it as "uninitialized(new-site)"
       // until the matching invokespecial runs, and that special type cannot

@@ -11,10 +11,10 @@ private[compiler] final class MethodBodySupport(
   unitContext: TypingUnitContext,
   bodyContext: TypingBodyContext,
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
-  processAssignable: (AST.Node, Type, Term) => Term,
   typedTerms: (Array[AST.Expression], LocalContext) => Array[Term],
   translate: (AST.BlockElement, LocalContext) => ActionStatement,
-  addReturnNode: (ActionStatement, Type) => StatementBlock
+  addReturnNode: (ActionStatement, Type) => StatementBlock,
+  processAssignable: (AST.Node, Type, Term) => Term
 ) {
   def processMethodLikeBody(
     method: MethodDefinition,
@@ -76,7 +76,8 @@ private[compiler] final class MethodBodySupport(
       case b: AST.BlockExpression => markCapturedVariables(context, args, b)
       case _ =>
     bindParameters(context, args, paramTypes, block)
-    constructor.setArgumentsWithDefaults(buildArgumentsWithDefaults(args, paramTypes, context))
+    constructor.setArgumentsWithDefaults(
+      buildArgumentsWithDefaults(args, paramTypes, context, DefaultOwner("init", constructor.modifier | AST.M_STATIC, Array())))
     context
   }
 
@@ -227,7 +228,8 @@ private[compiler] final class MethodBodySupport(
     val arguments = method.arguments
     markCapturedVariables(context, args, block)
     bindParameters(context, args, arguments, block)
-    method.setArgumentsWithDefaults(buildArgumentsWithDefaults(args, arguments, context))
+    method.setArgumentsWithDefaults(
+      buildArgumentsWithDefaults(args, arguments, context, DefaultOwner(method.name, method.modifier, method.typeParameters)))
     context
   }
 
@@ -260,20 +262,8 @@ private[compiler] final class MethodBodySupport(
     }
     addSharedParameterCopies(context, node.args, arguments.tail, shared)
 
-    // A default is spliced into each call site, where neither the receiver nor the other
-    // parameters exist: type it without them, so `self` or an earlier parameter in a
-    // default is "not found" (E0002) instead of reading the caller's own slots (#2401).
-    val defaultsContext = new LocalContext
-    defaultsContext.setStatic(true)
-    defaultsContext.setMethod(staticMethod)
-    // A default that failed to type has been reported; keep the parameter optional so the
-    // call sites do not add a second, contradictory "method not found" (E0005).
-    val withDefaults = buildArgumentsWithDefaults(extArgs, arguments, defaultsContext).zip(extArgs).map {
-      case (typed, arg) if arg.defaultValue != null && typed.defaultValue.isEmpty =>
-        typed.copy(defaultValue = Some(Term.defaultValue(typed.argType)))
-      case (typed, _) => typed
-    }
-    staticMethod.setArgumentsWithDefaults(withDefaults)
+    staticMethod.setArgumentsWithDefaults(
+      buildArgumentsWithDefaults(extArgs, arguments, context, DefaultOwner(staticMethod.name, staticMethod.modifier, staticMethod.typeParameters, staticMethod.classType.asInstanceOf[ClassDefinition])))
     context
   }
 
@@ -364,23 +354,80 @@ private[compiler] final class MethodBodySupport(
     context.markAsBoxed(capturedVars)
   }
 
+  /** What a default argument's synthesized method copies from its callee: the name it is derived from, the modifiers (access and static-ness), and the method's type parameters. */
+  private final case class DefaultOwner(name: String, modifier: Int, typeParameters: Array[TypeParameter], cls: ClassDefinition = null)
+
+  /**
+   * The callee's arguments, each with its default, if any. A default is not spliced into
+   * the call site, where `this` is the caller and the callee's parameters do not exist
+   * (#2358, #2375): it becomes the body of a method of the callee's own class that takes
+   * the parameters before it, so it is typed exactly as the callee's body would see it,
+   * minus the parameters not yet bound. A call that omits the argument calls that method
+   * on the same receiver (see `DefaultArgument`). A constructor's defaults are static,
+   * since no object exists yet.
+   */
   private def buildArgumentsWithDefaults(
     args: List[AST.Argument],
     types: Array[Type],
-    context: LocalContext
+    calleeContext: LocalContext,
+    owner: DefaultOwner
   ): Array[TypedAST.MethodArgument] =
     args.zipWithIndex.map { case (arg, i) =>
       // A default is checked like `val x: T = e` (issue #2541): an out-of-range `200` for a
       // `Byte` or a `3.7` for a `Short` is E0000 here, not a truncated value or a VerifyError.
       val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        // A rejected default keeps a placeholder (codegen never runs after an error), so a
-        // call that relies on it is not reported a second time as E0005.
-        typed(expr, context.withoutParameters, types(i)).map { t =>
-          Option(processAssignable(expr, types(i), t)).getOrElse(Term.defaultValue(types(i)))
-        }
+        synthesizeDefault(args, types, calleeContext, owner, i, expr)
       }
       TypedAST.MethodArgument(arg.name, types(i), defaultTerm)
     }.toArray
+
+  private def synthesizeDefault(
+    args: List[AST.Argument],
+    types: Array[Type],
+    calleeContext: LocalContext,
+    owner: DefaultOwner,
+    i: Int,
+    expr: AST.Expression
+  ): Option[Term] = {
+    val definition = if owner.cls != null then owner.cls else bodyContext.definition
+    val isStatic = (owner.modifier & AST.M_STATIC) != 0
+    val access = owner.modifier & (AST.M_PUBLIC | AST.M_PROTECTED | AST.M_PRIVATE)
+    val prefixTypes = types.take(i)
+    val name = defaultMethodName(definition, s"${owner.name}$$default$$${i + 1}", prefixTypes)
+    val method = new MethodDefinition(
+      expr.location, access | (if isStatic then AST.M_STATIC else 0), definition, name,
+      prefixTypes, types(i), null, owner.typeParameters)
+    val context = new LocalContext
+    if isStatic then context.setStatic(true)
+    context.setMethod(method)
+    context.setReassignedNames(Set.empty)
+    args.take(i).zip(prefixTypes).foreach { (a, t) => context.add(a.name, t, isMutable = false) }
+    context.laterParameterNames = args.drop(i).map(_.name).toSet
+    val triesBefore = bodyContext.tryCount
+    val problemsBefore = bodyContext.problemCount
+    val value = typed(expr, context, types(i)).map(term => processAssignable(expr, types(i), term)).filter(_ != null)
+    // A parameter read only by a later default is used (no W0006).
+    context.usedNames.foreach(calleeContext.recordUsage)
+    value match
+      case Some(term) =>
+        method.mayContainTry = bodyContext.tryCount != triesBefore
+        method.setBlock(new StatementBlock(expr.location, new Return(expr.location, term)))
+        method.setFrame(context.getContextFrame)
+        definition.add(method)
+        Some(new DefaultArgument(expr.location, types(i), method, i))
+      case None if bodyContext.problemCount != problemsBefore =>
+        // The default's own error is reported; still count the parameter as defaulted, so
+        // each call that omits it is not also rejected with E0005 (it never reaches codegen).
+        Some(new DefaultArgument(expr.location, types(i), method, i))
+      case None => None
+  }
+
+  /** `base`, or `base$2`, `base$3`, ... when an overload already took `base` for the same parameter types. */
+  private def defaultMethodName(definition: ClassDefinition, base: String, params: Array[Type]): String = {
+    def taken(n: String) = definition.methods(n).exists(_.arguments.sameElements(params))
+    if !taken(base) then base
+    else Iterator.from(2).map(k => s"$base$$$k").find(n => !taken(n)).get
+  }
 
   private def reportUnused(context: LocalContext): Unit =
     typing.reportUnusedVariables(context)

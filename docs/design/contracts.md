@@ -30,6 +30,31 @@ The evidence from `run/` (610 programs):
 This document replaces `law` and `example` with **contracts**. They are tested first and
 proved later, and the removal waits until the test tier works.
 
+### 1.1 Why now
+
+Checking a program against its contracts statically is old (Hoare logic; Eiffel's Design by
+Contract, 1986; Liskov and Wing, 1994; later JML, Spec#, Dafny, SPARK). It has lived in research
+and in a few niches, and it has not become a normal feature of a general-purpose language.
+Five things made it impractical. Each one has changed, or is changed by this design.
+
+| What kept it impractical | What is different here |
+|---|---|
+| **The annotations cost more than the code.** A person wrote a contract, often a loop invariant too, by hand. | A model writes the code and its contract together. Onion's own development is run by a loop of AI agents (`docs/evolution/`), so the writers and the users of contracts are the same. |
+| **A failure was opaque.** "Postcondition might not hold", with a solver term to decode. | An error is a run that reproduces. A broken history shows the call sequence that breaks it (§9). |
+| **All or nothing.** A contract was either proved, or worth nothing. | Four verdicts (§2). Tests come first, so a contract is useful before any prover exists. |
+| **The toolchain was heavy.** An external solver, in a version that drifts. | An in-house solver in `onion.jar`, with checkable answers (§8). It is the last tier, and optional. |
+| **It was bolted onto languages that did not fit.** Free aliasing, unspecified overflow. | The JVM integer is exact, and Onion is young and pre-1.0. It can restrict what a contract may name (§3.2) before habits form, and it can break compatibility to do so. |
+
+One reason is new, and it is the main one. **Code is now written faster than it is reviewed.**
+A short contract is a smaller thing to review than the body it governs, for a person or for a
+model, and the compiler holds the rest of the code to it. Reading a method's promise is cheaper
+than reading the method.
+
+What this does not claim: that verification is now easy, or that a contract is always right.
+A weak contract proves nothing useful, and a model can write one. So the verdicts say which
+contracts were proved and which were only sampled, and a counterexample often exposes the hole
+in the contract itself (the `Counter` in §3 needs `requires n < 2147483647`).
+
 ### Design constraints this document holds itself to
 
 | Constraint | Source |

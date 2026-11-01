@@ -33,6 +33,22 @@ capability 層は今それを土台にして動いています。
 ように伝播する効果であり、capability 層はこれを「明示的な許可が要る」と扱います。
 「無害」とは決して扱いません。
 
+もう一つ、*内部*の効果があります。`mutate` は*呼び出しが、呼び出しより長く残るメモリに書き込む*
+ことを表します。フィールド、配列の要素、コレクション、`StringBuilder` などです。これはプログラム
+自身の状態の話で、外の世界の話ではないので、capability ではありません。`tool` が宣言することは
+なく（`requires { mutate }` は E0079）、capability の検査も要求しません。`--effects` と効果の表には
+現れます。契約の式が「純粋」と言えるのは、この効果のおかげです。書き込む式は純粋ではありません。
+
+```
+$ onionc --effects Counter.on
+Counter#get(): pure
+Counter#set(Int): mutate
+Counter#<init>(Int): pure
+```
+
+コンストラクタが自分の `this` を初期化するだけなら、変更とは数えません。まだ誰もそのオブジェクトを
+持っていないので、`new C(1)` は `pure` のままです。他のオブジェクトへの書き込みは変更です。
+
 ## 事実の出どころ
 
 このコンパイラでは効果をアノテーションに載せられません — Java メソッドのアノテーションは
@@ -57,6 +73,11 @@ onion.Cli#parse=console,exec
 `File`、`java.nio.file.Files`。`BufferedReader` などのラッパーは `System.in` やソケットを包むこともあるため
 `unknown` のまま）、JDK の既知の効果点（`System::getenv`、`System::exit`、`Runtime::exec`、`Thread::sleep`、
 `System::out` の型としての `PrintStream`）が入っています。
+
+変更可能な状態を持つクラス（`List`、`Map`、`Set` とその実装、`StringBuilder`、`Iterator`、
+`Matcher`、`StringJoiner`）は、逆向きに載せてあります。既定は `mutate` で、レシーバを変えないと
+分かっているメソッドだけが `pure` です。後の JDK で増えたメソッドは、誰かが載せるまで変更とみなされ、
+誤って `pure` になることはありません。コンストラクタは `pure` です。
 
 粒度は型単位であり、インスタンス単位ではありません。ファイルの上の `PrintStream` は本来
 `write` ですが、Onion コードで `PrintStream` といえば `System::out` / `System::err` なので、

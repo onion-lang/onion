@@ -74,7 +74,7 @@ object EffectInference {
     val base = mutable.LinkedHashMap[Unit0, Set[Effect]]()
     val edges = mutable.LinkedHashMap[Unit0, Set[Unit0]]()
     for ((u, _) <- units) {
-      val collector = new Collector(units.keySet, classes, table)
+      val collector = new Collector(units.keySet, classes, table, inConstructor = u.isInstanceOf[ConstructorDefinition])
       u match {
         case md: MethodDefinition =>
           if (md.getBlock != null) collector.statement(md.getBlock)
@@ -185,7 +185,7 @@ object EffectInference {
   /** [[BodyFacts]] for one inference unit; `units` is the set of program-defined bodies. */
   def bodyFacts(unit: Unit0, units: collection.Set[Unit0], classes: Seq[ClassDefinition],
                 table: EffectTable.Table = EffectTable.builtin): BodyFacts = {
-    val collector = new Collector(units, classes, table)
+    val collector = new Collector(units, classes, table, inConstructor = unit.isInstanceOf[ConstructorDefinition])
     unit match {
       case md: MethodDefinition =>
         if (md.getBlock != null) collector.statement(md.getBlock)
@@ -211,7 +211,7 @@ object EffectInference {
    * because a missed node here means a silently dropped effect.
    */
   private final class Collector(units: collection.Set[Unit0], classes: Seq[ClassDefinition],
-                                table: EffectTable.Table) {
+                                table: EffectTable.Table, inConstructor: Boolean = false) {
     val effects = mutable.Set[Effect]()
     val internalCallees = mutable.LinkedHashSet[Unit0]()
     val rawSites = mutable.Buffer[RawSite]()
@@ -330,7 +330,7 @@ object EffectInference {
       case a: ArrayLength   => term(a.target)
       case r: RefArray      => term(r.target); term(r.index)
       case r: SafeRefArray  => term(r.target); term(r.index)
-      case s: SetArray      => term(s.target); term(s.index); term(s.value)
+      case s: SetArray      => term(s.target); term(s.index); term(s.value); effects += Effect.Mutate
       case n: NonNullAssert => term(n.target)
       case a: AsInstanceOf  => term(a.target)
       case i: InstanceOf    => term(i.target)
@@ -338,8 +338,12 @@ object EffectInference {
       case s: SynchronizedTerm => term(s.lock); term(s.body)
       case r: RefField      => term(r.target)
       case r: SafeFieldAccess => term(r.target)
-      case s: SetField      => term(s.target); term(s.value)
-      case s: SetStaticField => term(s.value)
+      case s: SetField      =>
+        term(s.target); term(s.value)
+        // A constructor filling in its own `this` is initialisation: nobody else holds the
+        // object yet, so `new C(..)` stays pure. Writing any other object is a mutation.
+        if (!(inConstructor && s.target.isInstanceOf[This])) effects += Effect.Mutate
+      case s: SetStaticField => term(s.value); effects += Effect.Mutate
       case s: SetLocal      =>
         // A write whose relative frame equals the closure depth targets the body's own
         // frame (frame 0 from the body itself, 1 from a closure directly inside it, ...).

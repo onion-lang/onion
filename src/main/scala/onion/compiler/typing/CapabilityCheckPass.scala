@@ -115,7 +115,7 @@ final class CapabilityCheckPass(typing: Typing) {
     val valid = Set.newBuilder[Effect]
     for (cap <- caps) cap match {
       case CapabilityForm(name, arg) =>
-        Effect.parse(name) match {
+        Effect.parseCapability(name) match {
           case None =>
             report(SemanticError.TOOL_BAD_CAPABILITY, tool.location, tool.name, cap,
               Message("error.semantic.toolCapability.notAnEffect", name, Effect.all.map(_.name).mkString(", ")))
@@ -142,7 +142,8 @@ final class CapabilityCheckPass(typing: Typing) {
                               table: EffectTable.Table): Unit = {
     val reported = scala.collection.mutable.Set[Effect]()
     for (site <- EffectInference.callSites(tool.getBlock, classes, unitEffects, table)) {
-      val missing = (site.effects -- declared) -- reported
+      // `mutate` describes memory, not the world: it is never declared, so never missing.
+      val missing = ((site.effects -- Effect.internal) -- declared) -- reported
       for (effect <- missing.toSeq.sorted) {
         reported += effect
         val where = if (site.location != null) site.location else tool.location

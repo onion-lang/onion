@@ -1,7 +1,7 @@
 package onion.compiler.typing
 
 import onion.compiler.TypedAST
-import onion.compiler.TypedAST.{AppliedClassType, AsInstanceOf, ClassType, Method, Term, Type, TypeVariableType}
+import onion.compiler.TypedAST.{AppliedClassType, AsInstanceOf, ClassType, Method, NullableType, Nullability, Term, Type, TypeVariableType}
 
 import scala.collection.immutable.Map
 
@@ -46,6 +46,24 @@ private[typing] object TypeSubst {
   /** Substitute all argument types of a method */
   def args(method: Method, classSubst: Map[String, Type], methodSubst: Map[String, Type]): Array[Type] =
     method.arguments.map(tp => apply(tp, classSubst, methodSubst))(using onion.compiler.TypedAST.typeTag)
+
+  /**
+   * Like [[args]], for checking the arguments of a call already chosen: a
+   * parameter declared as a bare (nullable) type variable that nothing binds
+   * here -- `m(x: T)` called inside its own generic class -- collapses to the
+   * nullable form of its bound (`Object?`), not `Object`, because a bare `[T]`
+   * admits null (#2500). Overload selection keeps using [[args]].
+   */
+  def paramArgs(method: Method, classSubst: Map[String, Type], methodSubst: Map[String, Type]): Array[Type] =
+    method.arguments.map { tp =>
+      val substituted = apply(tp, classSubst, methodSubst)
+      tp match {
+        case tv: TypeVariableType
+          if tv.nullability == Nullability.Nullable && !methodSubst.contains(tv.name) && !classSubst.contains(tv.name) =>
+          NullableType.of(substituted)
+        case _ => substituted
+      }
+    }(using onion.compiler.TypedAST.typeTag)
 
   /** Wrap term in AsInstanceOf if types differ, otherwise return as-is */
   def withCast(term: Term, targetType: Type): Term =

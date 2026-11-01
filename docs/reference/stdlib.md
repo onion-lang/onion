@@ -1887,6 +1887,9 @@ val config = Config::parseJson("{\"users\": [{\"name\": \"Alice\"}, {\"name\": \
 Config::getString(config, "users.0.name", "unknown")   // "Alice"
 ```
 
+The config can be any `Map` and `List`, not only parsed JSON. A map built with
+`Colls::mapOf` or a Java `HashMap` works the same way.
+
 A missing key, an out-of-range array index, or a value that can't convert to the requested
 type all fall back to the supplied default instead of throwing; the numeric getters accept
 the stored value as either a JSON number or a numeric string. `hasPath` checks presence

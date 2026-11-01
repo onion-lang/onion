@@ -26,6 +26,9 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   // top-level functions and extension methods get it here (#2448).
   private val seenFunctionErasures = scala.collection.mutable.HashSet[(String, String)]()
   private val seenExtensionErasures = scala.collection.mutable.HashSet[(String, String)]()
+  // Constructors too: `this(x: T)` beside `this(x: Object)` are two `<init>(Object)V`
+  // in one class file, a ClassFormatError at load time (#2498).
+  private val seenConstructorErasures = scala.collection.mutable.HashSet[String]()
 
   private def withKernel[T <: Node : ClassTag](ast: AST.Node)(f: T => Unit): Unit =
     typing.kernelNodeOf[T](ast).foreach(f)
@@ -51,6 +54,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     seenMethods.clear()
     seenFields.clear()
     seenConstructors.clear()
+    seenConstructorErasures.clear()
     unitContext.currentDefinition = clazz
     typing.find(clazz.name).foreach(unitContext.currentMapper = _)
   }
@@ -59,13 +63,30 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     if (seenFields.contains(field)) typing.report(SemanticError.DUPLICATE_FIELD, ast, field.affiliation, field.name)
     else seenFields.add(field)
 
-  private def registerMethod(ast: AST.Node, method: MethodDefinition): Unit =
-    if (seenMethods.contains(method)) typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
-    else seenMethods.add(method)
+  // Components of the record being checked, by name: each one already generates a public
+  // zero-argument accessor, so a body method of that name would be a duplicate (#2396).
+  private var recordComponents = Map.empty[String, Type]
+
+  private def registerMethod(ast: AST.Node, method: MethodDefinition): Unit = {
+    val redefinedAccessor = if (method.arguments.isEmpty) recordComponents.get(method.name) else None
+    redefinedAccessor match {
+      case Some(componentType) =>
+        typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments,
+          SemanticErrorReporter.RecordAccessorRedefined(componentType))
+      case None =>
+        if (seenMethods.contains(method)) typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
+        else seenMethods.add(method)
+    }
+  }
 
   private def registerConstructor(ast: AST.Node, constructor: ConstructorDefinition): Unit =
     if (seenConstructors.contains(constructor)) typing.report(SemanticError.DUPLICATE_CONSTRUCTOR, ast, constructor.affiliation, constructor.getArgs)
-    else seenConstructors.add(constructor)
+    else {
+      seenConstructors.add(constructor)
+      val desc = DuplicationChecks.erasedConstructorDescriptor(constructor)
+      if (!seenConstructorErasures.add(desc))
+        typing.report(SemanticError.ERASURE_SIGNATURE_COLLISION, ast, constructor.affiliation, "this", desc)
+    }
 
   private def processFieldLikeDeclaration(ast: AST.Node): Unit =
     withKernel[FieldDefinition](ast)(field => registerField(ast, field))
@@ -205,7 +226,9 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     withKernel[ClassDefinition](node) { clazz =>
       resetForTypeDeclaration(clazz)
       checkDuplicateRecordComponents(node, clazz)
-      for (section <- node.sections) processAccessSection(section)
+      recordComponents = node.args.flatMap(arg => Option(clazz.field(arg.name)).map(f => arg.name -> f.`type`)).toMap
+      try for (section <- node.sections) processAccessSection(section)
+      finally recordComponents = Map.empty
       node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
     }
@@ -222,9 +245,28 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     var seen = Set.empty[String]
     for (arg <- node.args) {
       if (seen.contains(arg.name)) typing.report(SemanticError.DUPLICATE_RECORD_COMPONENT, arg, clazz, arg.name)
-      else seen += arg.name
+      else {
+        seen += arg.name
+        // The accessor of `hashCode: Int` or `toString: String` has the same signature as the
+        // method the record generates itself: a ClassFormatError at load (#2391). Any other
+        // type gives the accessor a different descriptor, which the JVM accepts.
+        val field = clazz.field(arg.name)
+        if (clashesWithGeneratedMethod(arg.name, field))
+          typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type],
+            SemanticErrorReporter.RecordComponentClash(field.`type`))
+      }
     }
   }
+
+  // Compared by erasure: `toString: X` with `X extends String` gets the accessor
+  // `toString()Ljava/lang/String;`, the same as `toString: String` (#2522).
+  private def clashesWithGeneratedMethod(name: String, field: FieldRef): Boolean =
+    field != null && (name match {
+      case "hashCode" => field.`type` == BasicType.INT
+      case "toString" =>
+        onion.compiler.generics.Erasure.asmType(field.`type`).getDescriptor == "Ljava/lang/String;"
+      case _ => false
+    })
 
   private def processSynthesizedMethodDeclaration(node: AST.MethodDeclaration): Unit =
     withKernel[MethodDefinition](node) { method =>

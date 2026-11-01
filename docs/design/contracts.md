@@ -693,9 +693,24 @@ def example_1(): Boolean
   = 1 + 1 == 2
 ```
 
-The `= body` form is why a clause must end at `=` (§3.4). A block with more than one statement
-is not rewritten: the rule leaves it alone and says why, since only a file that compiles after
-the rewrite is changed.
+The `= body` form is why a clause must end at `=` (§3.4).
+
+Cases the rule handles explicitly:
+
+| Input | Result |
+|---|---|
+| unnamed `example` in a record body | `example_1`, `example_2`, ... in source order, skipping names already taken |
+| a record with no `{}` body | the rule adds `{ public: ... }` after the component list |
+| a block with more than one statement | **not rewritten**; the rule says why. Only a file that compiles after the rewrite is changed |
+| `law` with a counterexample-only use (`--law-seed`) | rewritten; the seed flags are gone, sampling uses `--contract-seed` |
+
+Running it twice changes nothing the second time.
+
+**What replaces E0064 and E0065.** From stage 3 a falsified sampled predicate reports a
+**new** code (taken from the end of the list, never 64 or 65). It names the predicate and the
+counterexample, in English and Japanese, with the same seed and sample count so the run can be
+repeated. A false closed predicate reports the same code without a counterexample.
+The old codes are retired only at stage 4.
 
 **The RUNBOOK §5.3 package**
 - A `### Breaking` fragment in `changelog.d/`.
@@ -711,6 +726,10 @@ the rewrite is changed.
 
 ## 11. Staging and reversibility
 
+The default of `--contracts` is `off` at stages 1 and 2 and `check` from stage 3, so the
+replacement is already running before `law`/`example` go. Stages 5 to 8 do not change it
+until stage 6 (`verify`).
+
 The order is **static checks first, and additive first**: nothing is removed until what replaces
 it has a defined verdict, and the checks that need no solver come before the solver.
 Each stage is its own PR and is useful alone.
@@ -719,7 +738,7 @@ Each stage is its own PR and is useful alone.
 |---|---|---|
 | 1 | `mutate` effect; `--contracts`; syntax and typing of `requires`, `ensures`, `invariant`, `history`; the purity check. A clause is E0105 while contracts are off. **Landed** (#2563, #2564) | kept |
 | 2 | **Static checks without a solver** (§7.1): the framing rules (§3.2), the effective contract of an override, a history is a preorder, a write that breaks a history. `ResettableCounter.reset` is reported here | kept |
-| 3 | `ContractTable`, the `Shape` contract and its `printable` domain (§5.1); closed and parameterized predicates (§7.2), with sampling and the `Sampled` verdict | kept (E0080 still on) |
+| 3 | `ContractTable`, the `Shape` contract and its `printable` domain (§5.1); closed and parameterized predicates (§7.2), with sampling and the `Sampled` verdict; the successor diagnostic for E0064/E0065; **`--contracts check` becomes the default** | kept (E0080 still on) |
 | 4 | **The breaking PR:** migration rule, `run/` migrated, `law`/`example`/E0080 removed, docs and flags. Lands inside the 8-week consolidation window (RUNBOOK §5.4) | **removed** |
 | 5 | Solver S1 and S2, with the DRAT checker and the fuzz spec | — |
 | 6 | Proofs (§7.3): VCs for straight-line code and loop invariants. `--contracts verify` becomes the default, `W0021` on | — |

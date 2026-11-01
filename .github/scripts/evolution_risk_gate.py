@@ -15,7 +15,8 @@ def evaluate(pr):
     # Fresh state for this PR: the sweep's list may be minutes old.
     pr = ev.get(f"/repos/{ev.REPO}/pulls/{pr['number']}")
     number, head = pr["number"], pr["head"]["sha"]
-    tier, computed, current, reasons = ev.effective_tier(pr, ev.pr_files(number))
+    files = ev.pr_files(number)
+    tier, computed, current, reasons = ev.effective_tier(pr, files)
 
     ev.set_labels(pr, add=[f"risk:{tier}"], remove=[f"risk:{t}" for t in ev.TIERS if t != tier])
     print(f"#{number}: tier={tier} (computed {computed}, labelled {current}); " + "; ".join(reasons[:5]))
@@ -23,7 +24,7 @@ def evaluate(pr):
     if tier == "low":
         ev.set_status(head, "evolution/risk-gate", "success", "risk:low: green checks are enough")
         return
-    approval = ev.panel_approval(pr, ev.comments(number))
+    approval = ev.panel_approval(pr, ev.comments(number), ev.diff_fingerprint(files))
     if approval:
         ev.set_status(head, "evolution/risk-gate", "success", f"risk:{tier}: panel approved {head[:7]}")
         if not ev.DRY_RUN and not ev.still_approved(number):

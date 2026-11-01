@@ -7,6 +7,7 @@ Everything here fails safe: when in doubt, a PR gets the higher tier, an approva
 counted, and a veto is.
 """
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -214,8 +215,30 @@ def effective_tier(pr, files):
 
 # ---------------------------------------------------------------- panel verdicts
 
-PANEL_MARK = re.compile(r"^<!-- panel v1 sha=([0-9a-f]{40}) -->")
+PANEL_MARK = re.compile(r"^<!-- panel v1 sha=([0-9a-f]{40})(?: diff=([0-9a-f]{64}))? -->")
 VERDICT = re.compile(r"^verdict:\s*(APPROVED|BLOCKED)\s*$", re.M)
+
+
+def diff_fingerprint(files):
+    """A hash of the PR's own change: per file, its name, status and the +/- lines of its patch.
+
+    Context lines and `@@` positions are left out, so merging `main` into the branch does not
+    change it unless the merge alters a line the PR itself adds or removes. A file with no patch
+    (binary, or too large) is told apart by its blob sha. None when the files API was cut off
+    (`FILES_API_LIMIT`): then the diff cannot be judged and only an exact head matches."""
+    if len(files) >= FILES_API_LIMIT:
+        return None
+    h = hashlib.sha256()
+    for fl in sorted(files, key=lambda x: (x["filename"], x.get("status", ""))):
+        h.update(f"F\0{fl['filename']}\0{fl.get('status', '')}\0{fl.get('previous_filename', '')}\n".encode())
+        patch = fl.get("patch")
+        if patch is None:
+            h.update(f"B\0{fl.get('sha', '')}\n".encode())
+            continue
+        for line in patch.split("\n"):
+            if line[:1] in ("+", "-"):
+                h.update(line.encode() + b"\n")
+    return h.hexdigest()
 
 
 def trusted(comment):
@@ -227,17 +250,24 @@ def unedited(comment):
     return comment.get("updated_at") in (None, comment.get("created_at"))
 
 
-def panel_approval(pr, pr_comments):
-    """The newest panel verdict for the PR's current head, if it approves; else None.
+def panel_approval(pr, pr_comments, fingerprint=None):
+    """The newest panel verdict for the PR's current change, if it approves; else None.
 
-    It counts only if it starts with `<!-- panel v1 sha=<full 40-char head sha> -->`, has a
+    It counts only if it starts with `<!-- panel v1 sha=<full 40-char sha> -->`, has a
     `verdict: APPROVED` line, was written by a trusted author, and was never edited (an edit
-    would let an old comment's timestamp skip the veto window). Labels are ignored."""
+    would let an old comment's timestamp skip the veto window). Labels are ignored.
+
+    The verdict is for the current change when its sha is the PR's head, or when it also
+    carries `diff=<fingerprint>` equal to `fingerprint` (the PR's change now, see
+    `diff_fingerprint`): a push that only merges `main` keeps the verdict, any other change
+    to the PR voids it. A BLOCKED verdict carries over the same way."""
     head = pr["head"]["sha"]
     newest = None
     for c in pr_comments:
         m = PANEL_MARK.match(c.get("body") or "")
-        if m and m.group(1) == head and trusted(c):
+        if not (m and trusted(c)):
+            continue
+        if m.group(1) == head or (fingerprint is not None and m.group(2) == fingerprint):
             newest = c
     # Pick the newest verdict first, then judge it: an edited or blocking newest verdict
     # means no approval, so editing a BLOCKED verdict cannot revive an older APPROVED one.
@@ -268,7 +298,7 @@ def vetoed(pr, pr_comments, events=()):
 def still_approved(number):
     """Re-read the PR right after writing success: a newer BLOCKED verdict or a new push wins."""
     pr = get(f"/repos/{REPO}/pulls/{number}")
-    return panel_approval(pr, comments(number)) is not None
+    return panel_approval(pr, comments(number), diff_fingerprint(pr_files(number))) is not None
 
 
 def parse_time(text):
@@ -277,3 +307,28 @@ def parse_time(text):
 
 def now():
     return datetime.now(timezone.utc)
+
+
+def _read_json_arrays(text):
+    """All JSON values in `text`, concatenated: `gh api --paginate` prints one array per page."""
+    out, dec, i = [], json.JSONDecoder(), 0
+    while i < len(text):
+        while i < len(text) and text[i].isspace():
+            i += 1
+        if i >= len(text):
+            break
+        value, i = dec.raw_decode(text, i)
+        out.extend(value if isinstance(value, list) else [value])
+    return out
+
+
+if __name__ == "__main__":
+    # `gh api --paginate repos/<o>/<r>/pulls/<n>/files | python3 evolution_lib.py fingerprint`
+    # prints the value for the `diff=` part of a panel mark (nothing if it cannot be judged).
+    import sys
+    if sys.argv[1:] == ["fingerprint"]:
+        fp = diff_fingerprint(_read_json_arrays(sys.stdin.read()))
+        if fp:
+            print(fp)
+    else:
+        sys.exit("usage: gh api --paginate repos/<o>/<r>/pulls/<n>/files | evolution_lib.py fingerprint")

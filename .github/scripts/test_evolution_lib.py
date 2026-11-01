@@ -78,6 +78,65 @@ def comment(body, login="kmizu", assoc="OWNER", created="2026-10-21T00:00:00Z", 
             "created_at": created, "updated_at": updated or created}
 
 
+class FingerprintTest(unittest.TestCase):
+    """A verdict follows the PR's own change, not the head SHA: merging main must not void it."""
+    base = [f("src/A.scala", patch="@@ -1,3 +1,3 @@\n ctx\n-old\n+new\n ctx2")]
+
+    def test_context_lines_and_hunk_positions_do_not_matter(self):
+        moved = [f("src/A.scala", patch="@@ -40,3 +52,3 @@ class Other\n different ctx\n-old\n+new\n more ctx")]
+        self.assertEqual(ev.diff_fingerprint(self.base), ev.diff_fingerprint(moved))
+
+    def test_a_changed_line_changes_it(self):
+        other = [f("src/A.scala", patch="@@ -1,3 +1,3 @@\n ctx\n-old\n+newer\n ctx2")]
+        self.assertNotEqual(ev.diff_fingerprint(self.base), ev.diff_fingerprint(other))
+
+    def test_an_extra_file_or_a_rename_changes_it(self):
+        self.assertNotEqual(ev.diff_fingerprint(self.base), ev.diff_fingerprint(self.base + [f("B.md", patch="+x")]))
+        renamed = [f("src/C.scala", status="renamed", previous="src/A.scala", patch=self.base[0]["patch"])]
+        self.assertNotEqual(ev.diff_fingerprint(self.base), ev.diff_fingerprint(renamed))
+
+    def test_file_order_does_not_matter(self):
+        a, b = f("a.md", patch="+1"), f("b.md", patch="+2")
+        self.assertEqual(ev.diff_fingerprint([a, b]), ev.diff_fingerprint([b, a]))
+
+    def test_a_file_without_a_patch_is_told_apart_by_its_blob(self):
+        x = {"filename": "img.png", "status": "added", "sha": "1" * 40}
+        y = {"filename": "img.png", "status": "added", "sha": "2" * 40}
+        self.assertNotEqual(ev.diff_fingerprint([x]), ev.diff_fingerprint([y]))
+
+    def test_too_many_files_cannot_be_judged(self):
+        self.assertIsNone(ev.diff_fingerprint([f(f"f{i}", patch="+x") for i in range(ev.FILES_API_LIMIT)]))
+
+
+class PanelDiffTest(unittest.TestCase):
+    pr = {"head": {"sha": HEAD}, "labels": []}
+    OLD = "1" * 40
+    fp = ev.diff_fingerprint([f("a.md", patch="+1")])
+    other_fp = ev.diff_fingerprint([f("a.md", patch="+2")])
+
+    def mark(self, sha=None, fp=None, verdict="APPROVED"):
+        d = f" diff={fp}" if fp else ""
+        return comment(f"<!-- panel v1 sha={sha or self.OLD}{d} -->\nverdict: {verdict}")
+
+    def test_an_older_head_with_the_same_diff_still_approves(self):
+        c = self.mark(fp=self.fp)
+        self.assertIs(ev.panel_approval(self.pr, [c], fingerprint=self.fp), c)
+
+    def test_a_different_diff_does_not_approve(self):
+        self.assertIsNone(ev.panel_approval(self.pr, [self.mark(fp=self.fp)], fingerprint=self.other_fp))
+
+    def test_a_mark_without_a_diff_still_needs_the_exact_head(self):
+        self.assertIsNone(ev.panel_approval(self.pr, [self.mark()], fingerprint=self.fp))
+
+    def test_no_current_fingerprint_means_the_head_must_match(self):
+        self.assertIsNone(ev.panel_approval(self.pr, [self.mark(fp=self.fp)], fingerprint=None))
+
+    def test_a_block_on_the_same_diff_carries_over(self):
+        approve = self.mark(sha=HEAD, fp=self.fp)
+        block = self.mark(fp=self.fp, verdict="BLOCKED")
+        self.assertIsNone(ev.panel_approval(self.pr, [approve, block], fingerprint=self.fp))
+
+
 class PanelTest(unittest.TestCase):
     pr = {"head": {"sha": HEAD}, "labels": []}
     ok_body = f"<!-- panel v1 sha={HEAD} -->\n| lens | verdict |\nverdict: APPROVED"

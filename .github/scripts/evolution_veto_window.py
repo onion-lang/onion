@@ -27,7 +27,8 @@ def evaluate(pr):
     pr = ev.get(f"/repos/{ev.REPO}/pulls/{pr['number']}")
     number, head = pr["number"], pr["head"]["sha"]
     # The diff, not just the label: removing `risk:ultrahigh` must not skip the window.
-    tier, _, _, _ = ev.effective_tier(pr, ev.pr_files(number))
+    files = ev.pr_files(number)
+    tier, _, _, _ = ev.effective_tier(pr, files)
     if tier != "ultrahigh":
         ev.set_status(head, CONTEXT, "success", "not risk:ultrahigh: no veto window")
         ev.set_labels(pr, remove=["veto-window:open"])
@@ -42,7 +43,7 @@ def evaluate(pr):
         ev.set_status(head, CONTEXT, "pending", "vetoed: only Kota clears a veto, by closing the PR")
         print(f"#{number}: vetoed")
         return
-    approval = ev.panel_approval(pr, pr_comments)
+    approval = ev.panel_approval(pr, pr_comments, ev.diff_fingerprint(files))
     if approval is None:
         ev.set_status(head, CONTEXT, "pending", f"waiting for a panel approval of {head[:7]}")
         print(f"#{number}: no panel approval yet")

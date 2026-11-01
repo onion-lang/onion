@@ -1286,6 +1286,20 @@ public:
 
 Only what the syntax settles is reported. Fix: remove the write, or weaken the history.
 
+### `E0110` — an `invariant` or `history` on a mutable object
+
+A clause may name only fields of a primitive, `String`, enum or record type. A `List` or another
+class can change without this class running, so the clause could not be checked one call at a time.
+
+```onion
+class A {
+  var items: java.util.List
+  invariant items != null   // E0110
+}
+```
+
+Fix: name a value-typed field, or a pure method that reads the object.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -2053,6 +2067,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 | `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
 | `E0109` | this write can break the history … on … |
+| `E0110` | an `invariant` or `history` names a field that holds a mutable object |
 
 ## See also
 

@@ -1274,6 +1274,20 @@ public:
 
 構文だけで決まるものだけを報告します。直し方: その書き込みをなくすか、history を弱めます。
 
+### `E0110` — 可変オブジェクトに対する `invariant` / `history`
+
+契約が名指しできるのは、基本型・`String`・enum・record のフィールドだけです。`List` や別のクラスは、
+このクラスのコードが動かなくても変わりうるので、一回の呼び出しごとの検査ができません。
+
+```onion
+class A {
+  var items: java.util.List
+  invariant items != null   // E0110
+}
+```
+
+直し方: 値型のフィールドを使うか、そのオブジェクトを読む純粋なメソッドを使います。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -2036,6 +2050,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 | `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
 | `E0109` | this write can break the history … on … |
+| `E0110` | an `invariant` or `history` names a field that holds a mutable object |
 
 ## 関連項目
 

@@ -1409,6 +1409,10 @@ object SemanticErrorReporter {
         items => format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
       )
     ),
+    SemanticError.CONTRACT_FIELD_NOT_VALUE -> ErrorDef(
+      "error.semantic.contractFieldNotValue",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))

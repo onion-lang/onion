@@ -23,6 +23,15 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
+  def tryUserExtensionWithTypedArguments(
+    node: AST.MethodCall,
+    target: Term,
+    targetType: ObjectType,
+    params: Array[Term],
+    expected: Type
+  ): Option[Option[Term]] =
+    extensionMethodFallbackSupport.tryUserExtensionWithTypedArguments(node, target, targetType, params, expected)
+
   def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
     extensionMethodFallbackSupport.isAmbiguousExtensionCall(targetType, name, params)
 
@@ -204,7 +213,7 @@ private[compiler] final class MethodCallFallbackSupport(
         reportNotFound(nonClosureTypes.values.toArray)
         return None
     }
-    val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation)
+    val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
     // Preserve positions of the resolved (non-closure) arguments — closure slots
     // stay null — so each unifies against its own formal parameter. Collapsing
     // them shifted a determining argument that follows a closure onto the wrong

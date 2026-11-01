@@ -761,7 +761,12 @@ class SemanticErrorReporter(threshold: Int) {
     val hint =
       if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
         Some(message("suggestion.hexDigitB"))
+      } else if (sameNamedTypeVariables(expected, actual)) {
+        // `def m[T](a: T) { t = a }` inside `class K[T]`: two parameters named `T`,
+        // so "type T is expected, but type T is used" contradicts itself without this.
+        Some(format(message("suggestion.shadowedTypeParameter"), Seq(typeName(expected))))
       } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable &&
+          !nonNullStillMisfitsTypeVariable(expected, actual) &&
           // A failed cast is about the inner types: `(s!! as Integer)` fails the same way.
           !(items.length > 2 && items(2) == SemanticErrorReporter.CastCheckHint)) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
@@ -793,6 +798,34 @@ class SemanticErrorReporter(threshold: Int) {
         case None => None
       }
     problem(position, appendSuggestion(baseMessage, hint))
+  }
+
+  // `item = o` with `o: Object?` into a `T` slot: `o!!` is an `Object`, still not
+  // a `T`, so the `!!` hint only led to a second error (#2328 review). It stays
+  // for a `T?` value into a non-null `T`, where `!!` is the fix.
+  private def nonNullStillMisfitsTypeVariable(expected: TypedAST.Type, actual: TypedAST.Type): Boolean =
+    expected match {
+      case tv: TypedAST.TypeVariableType =>
+        val inner = actual match {
+          case n: TypedAST.NullableType => n.innerType
+          case t => t
+        }
+        inner match {
+          case atv: TypedAST.TypeVariableType => atv.declared ne tv.declared
+          case _ => true
+        }
+      case _ => false
+    }
+
+  private def sameNamedTypeVariables(expected: TypedAST.Type, actual: TypedAST.Type): Boolean = {
+    def variable(t: TypedAST.Type): TypedAST.TypeVariableType = t match {
+      case tv: TypedAST.TypeVariableType => tv
+      case n: TypedAST.NullableType => variable(n.innerType)
+      case _ => null
+    }
+    val e = variable(expected)
+    val a = variable(actual)
+    e != null && a != null && e.name == a.name && (e.declared ne a.declared)
   }
 
   /**
@@ -1443,6 +1476,10 @@ object SemanticErrorReporter {
     ),
     SemanticError.MAP_NOT_DIRECTLY_ITERABLE -> ErrorDef(
       "error.semantic.mapNotDirectlyIterable",
+      Seq(items => typeName(items(0)))
+    ),
+    SemanticError.FOREACH_PAIR_NOT_MAP -> ErrorDef(
+      "error.semantic.foreachPairNotMap",
       Seq(items => typeName(items(0)))
     ),
     // LABEL_NOT_FOUND handled specially with suggestions

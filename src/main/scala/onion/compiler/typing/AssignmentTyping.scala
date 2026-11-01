@@ -187,7 +187,7 @@ final class AssignmentTyping(
         // -- lets `this.items = []` adopt List[T] rather than defaulting Object.
         val fieldExpected: Type =
           if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
-            val subst = TypeSubstitution.hierarchySubstitution(target.`type`, field.affiliation)
+            val subst = TypeSubstitution.hierarchySubstitution(target.`type`, field.affiliation, TypeSubstitution.isSelfReceiver(target))
             TypeSubstitution.substituteType(field.`type`, subst, scala.collection.immutable.Map.empty, defaultToBound = false)
           } else null
         val value: Term = typed(expression, context, fieldExpected).getOrElse(null)

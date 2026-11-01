@@ -93,19 +93,7 @@ class NameResolver(private val context: NameResolutionContext) {
     case AST.PrimitiveType(AST.KBoolean)    => BasicType.BOOLEAN
     case AST.PrimitiveType(AST.KVoid)       => BasicType.VOID
     case AST.ReferenceType(name, qualified) =>
-      val aliasFqcn =
-        if (qualified) name
-        else {
-          val module = context.currentUnit.module
-          val moduleName = if (module != null) module.name else null
-          context.createFQCN(moduleName, name)
-        }
-      val aliasOpt = context.typeAliases.get(aliasFqcn).orElse {
-        if (!qualified && context.typeAliases.nonEmpty) {
-          imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => context.typeAliases.get(fqcn)).nextOption()
-        } else None
-      }
-      aliasOpt match {
+      aliasFor(name, qualified) match {
         case Some(entry) if entry.typeParameters.isEmpty =>
           resolveTypeAlias(entry, Nil)
         case _ =>
@@ -117,19 +105,7 @@ class NameResolver(private val context: NameResolutionContext) {
 
       base match {
         case AST.ReferenceType(name, qualified) =>
-          val aliasFqcn =
-            if (qualified) name
-            else {
-              val module = context.currentUnit.module
-              val moduleName = if (module != null) module.name else null
-              context.createFQCN(moduleName, name)
-            }
-          val aliasOpt = context.typeAliases.get(aliasFqcn).orElse {
-            if (!qualified && context.typeAliases.nonEmpty) {
-              imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => context.typeAliases.get(fqcn)).nextOption()
-            } else None
-          }
-          aliasOpt match {
+          aliasFor(name, qualified) match {
             case Some(aliasEntry) =>
               return resolveTypeAlias(aliasEntry, mappedArgs)
             case None =>
@@ -178,6 +154,28 @@ class NameResolver(private val context: NameResolutionContext) {
       if (mappedInner == null) null else TypedAST.NullableType.of(mappedInner)
     case _ =>
       null
+  }
+
+  /**
+   * The `type` alias a type name refers to, if any. A type parameter in scope (the
+   * class's, record's or method's own `[T]`) shadows a same-named alias, as a local
+   * type parameter shadows an outer name in Java and Scala (#2510); `forName` then
+   * resolves it to the parameter.
+   */
+  private def aliasFor(name: String, qualified: Boolean): Option[TypeAliasEntry] = {
+    if (!qualified && context.currentTypeParams.get(name).isDefined) return None
+    val aliasFqcn =
+      if (qualified) name
+      else {
+        val module = context.currentUnit.module
+        val moduleName = if (module != null) module.name else null
+        context.createFQCN(moduleName, name)
+      }
+    context.typeAliases.get(aliasFqcn).orElse {
+      if (!qualified && context.typeAliases.nonEmpty) {
+        imports.iterator.flatMap(_.matches(name)).flatMap(fqcn => context.typeAliases.get(fqcn)).nextOption()
+      } else None
+    }
   }
 
   private lazy val scanMemo = context.table.importScanMemo(imports)
@@ -316,33 +314,17 @@ class NameResolver(private val context: NameResolutionContext) {
     context.typeAliasResolutionStack += entry.fqcn
     try {
       val aliasMapper = new NameResolver(context.copy(imports = entry.imports))
-      if (params.nonEmpty && typeArgs.nonEmpty) {
-        val substitutions = params.zip(typeArgs).map { case (p, arg) =>
-          val varType = arg match {
-            case tv: TypeVariableType => tv
-            case ct: ClassType => TypeVariableType(p.name, ct)
-            // A nullable argument keeps its nullability through the alias:
-            // occurrences of the parameter behave as a nullable variable
-            // bounded by the inner type
-            case n: NullableType =>
-              n.innerType match {
-                case ct: ClassType => TypeVariableType(p.name, ct, Nullability.Nullable)
-                case _ => TypeVariableType(p.name, context.rootClass, Nullability.Nullable)
-              }
-            case _ => TypeVariableType(p.name, context.rootClass)
-          }
-          TypeParam(p.name, varType, p.upperBound)
-        }
-        val savedTypeParams = context.currentTypeParams
-        context.updateTypeParams(TypeParamScope(Map.empty) ++ substitutions)
-        try {
-          aliasMapper.map(entry.targetDescriptor)
-        } finally {
-          context.updateTypeParams(savedTypeParams)
-        }
-      } else {
-        aliasMapper.map(entry.targetDescriptor)
-      }
+      // The target means what it means where the alias is declared: only the alias's own
+      // parameters are in scope, never the [T] of the class or method using it (#2510).
+      // Those parameters are then replaced by the arguments, so no alias parameter name
+      // reaches the use site, where a same-named class or method [A] would capture it.
+      val savedTypeParams = context.currentTypeParams
+      context.updateTypeParams(TypeParamScope(Map.empty) ++ params)
+      val target =
+        try aliasMapper.map(entry.targetDescriptor)
+        finally context.updateTypeParams(savedTypeParams)
+      if (target == null || params.isEmpty) target
+      else TypeSubstitution.substituteType(target, params.map(_.name).zip(typeArgs).toMap, scala.collection.immutable.Map.empty, defaultToBound = false)
     } finally {
       context.typeAliasResolutionStack -= entry.fqcn
     }

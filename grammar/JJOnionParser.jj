@@ -208,7 +208,7 @@ public class JJOnionParser implements Parser {
    * foreach __e: Map$Entry in map.entrySet() { val k = __e.getKey(); val v = __e.getValue(); { body } }
    */
   private AST.ForeachExpression desugarMapForeach(Location loc, String kName, String vName, AST.Expression mapExpr, AST.BlockExpression body) {
-    String entryName = "__foreach_entry";
+    String entryName = AST.ForeachEntryName();
     AST.TypeNode entryType = new AST.TypeNode(loc, new AST.ReferenceType("java.util.Map$Entry", true), false);
     AST.Argument entryArg = new AST.Argument(loc, entryName, entryType, null, false);
     AST.Expression entrySet = new AST.MethodCall(loc, mapExpr, "entrySet", (List<AST.Expression>)AST.NIL());

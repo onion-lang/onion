@@ -1474,6 +1474,10 @@ object SemanticErrorReporter {
       "error.semantic.mapNotDirectlyIterable",
       Seq(items => typeName(items(0)))
     ),
+    SemanticError.FOREACH_PAIR_NOT_MAP -> ErrorDef(
+      "error.semantic.foreachPairNotMap",
+      Seq(items => typeName(items(0)))
+    ),
     // LABEL_NOT_FOUND handled specially with suggestions
     SemanticError.REGEX_PATTERN_INVALID -> ErrorDef(
       "error.semantic.regexPatternInvalid",

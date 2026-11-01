@@ -114,9 +114,14 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       // without the ArrayType case a no-closure call like `arr.toList()` would
       // never find its builtin array extension (the closure path already does).
       case _: ClassType | _: ArrayType =>
-        val applicable = collectExtensionMethods(targetType, name).filter { extMethod =>
+        val applicableAll = collectExtensionMethods(targetType, name).filter { extMethod =>
           extMethod.name == name && isExtensionMethodApplicable(extMethod, params)
         }
+        // An overload that takes exactly the arguments written outranks one that needs a
+        // default filled in, whatever its receiver: `h(a)` beside `h(a, b = 5)` keeps calling
+        // `h(a)`, and a builtin `take(n)` keeps beating a user `take(n, tag = ..)` (#2401).
+        val exactArity = applicableAll.filter(_.arguments.length == params.length)
+        val applicable = if (exactArity.nonEmpty) exactArity else applicableAll
         // A user-declared `extension` shadows a builtin stdlib extension
         // (onion.Colls / onion.Iterables) of the same name+arity: an explicit
         // user extension expresses clear intent and should win rather than

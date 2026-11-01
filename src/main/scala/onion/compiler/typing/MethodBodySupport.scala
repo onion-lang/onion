@@ -373,6 +373,8 @@ private[compiler] final class MethodBodySupport(
     owner: DefaultOwner
   ): Array[TypedAST.MethodArgument] =
     args.zipWithIndex.map { case (arg, i) =>
+      // A default is checked like `val x: T = e` (issue #2541): an out-of-range `200` for a
+      // `Byte` or a `3.7` for a `Short` is E0000 here, not a truncated value or a VerifyError.
       val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
         synthesizeDefault(args, types, calleeContext, owner, i, expr)
       }

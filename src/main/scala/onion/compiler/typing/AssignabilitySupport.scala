@@ -215,12 +215,15 @@ private[compiler] final class AssignabilitySupport(
                   // must not pass just because it erases to the same
                   // class, or `xs.addAll(o)` with `o: List[Object]`
                   // would pollute a `List[T]`.
+                  // `? super L` with a variable on either side (`T`, `T?`): the one
+                  // rule overload resolution also uses (#2367, #2399).
+                  def variableLike(t: Type): Boolean = t match {
+                    case _: TypedAST.TypeVariableType => true
+                    case n: NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
+                    case _ => false
+                  }
                   w.lowerBound match {
-                    case Some(lb: TypedAST.TypeVariableType) =>
-                      a match {
-                        case av: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(av, lb)
-                        case _ => structurallyAssignable(a, lb)
-                      }
+                    case Some(lb) if variableLike(lb) || variableLike(a) => TypeRules.superWildcardAccepts(a, lb)
                     case Some(lb) => structurallyAssignable(a, lb)
                     case None =>
                       w.upperBound match {

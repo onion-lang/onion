@@ -1,5 +1,5 @@
 ### Fixed
 
-- **`(s as Integer)` with `s: String?` is a compile error, like the non-null form (#2388).**
-  - Before: it compiled, then threw `ClassCastException` at run time.
-  - Now: E0000, because `?` only adds null and the inner types must still fit.
+- **A cast from a nullable value is checked like the non-null form (#2388).**
+  - Before: `(s as Integer)` with `s: String?` compiled, then threw `ClassCastException`.
+  - Now: E0000, with no `!!` hint (`!!` would not help). `null as Int?` and other valid casts still compile.

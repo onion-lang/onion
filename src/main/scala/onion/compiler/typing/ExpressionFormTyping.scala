@@ -129,7 +129,7 @@ final class ExpressionFormTyping(
       typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
         typed(node.src, context, destination).flatMap { term =>
           if (!isValidCast(term.`type`, destination)) {
-            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
+            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`, SemanticErrorReporter.CastCheckHint)
             None
           } else {
             Some(new AsInstanceOf(term, destination))
@@ -140,7 +140,7 @@ final class ExpressionFormTyping(
       typed(node.src, context).flatMap { term =>
         typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
           if (!isValidCast(term.`type`, destination)) {
-            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`)
+            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`, SemanticErrorReporter.CastCheckHint)
             None
           } else {
             Some(new AsInstanceOf(term, destination))
@@ -159,6 +159,8 @@ final class ExpressionFormTyping(
     if (source eq destination) return true
     (source, destination) match {
       // `?` only admits null, which passes any reference cast, so the inner types decide.
+      // `null` itself fits every nullable type, a nullable primitive (`null as Int?`) too.
+      case (_: NullType, _: NullableType) => true
       case (n: NullableType, _) => isValidCast(n.innerType, destination)
       case (_, n: NullableType) => isValidCast(source, n.innerType)
       case (_: NullType, _: BasicType) =>

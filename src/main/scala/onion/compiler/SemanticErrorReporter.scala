@@ -761,7 +761,9 @@ class SemanticErrorReporter(threshold: Int) {
     val hint =
       if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
         Some(message("suggestion.hexDigitB"))
-      } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
+      } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable &&
+          // A failed cast is about the inner types: `(s!! as Integer)` fails the same way.
+          !(items.length > 2 && items(2) == SemanticErrorReporter.CastCheckHint)) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
       } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
@@ -1068,6 +1070,8 @@ object SemanticErrorReporter {
    * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
    */
   private[compiler] case object HexDigitBHint
+  /** Marks an INCOMPATIBLE_TYPE raised by an `as` cast check (#2388). */
+  private[compiler] case object CastCheckHint
 
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */

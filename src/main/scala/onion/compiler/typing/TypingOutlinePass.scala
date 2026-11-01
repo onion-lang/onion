@@ -79,6 +79,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           val tps = createTypeParams(node.typeParameters)
           declaredTypeParams_(node) = tps
           definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+          definition.ownTypeVariables = tps.map(_.variableType).toArray
         }
       case node: AST.InterfaceDeclaration =>
         typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
@@ -86,6 +87,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           val tps = createTypeParams(node.typeParameters)
           declaredTypeParams_(node) = tps
           definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+          definition.ownTypeVariables = tps.map(_.variableType).toArray
         }
       case node: AST.RecordDeclaration =>
         typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
@@ -93,6 +95,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
           val tps = createTypeParams(node.typeParameters)
           declaredTypeParams_(node) = tps
           definition.setTypeParameters(tps.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+          definition.ownTypeVariables = tps.map(_.variableType).toArray
         }
       case _ =>
     }
@@ -118,6 +121,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     val classTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
     declaredTypeParams_(node) = classTypeParams
     definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+    definition_.ownTypeVariables = classTypeParams.map(_.variableType).toArray
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
     if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
 
@@ -136,6 +140,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     val interfaceTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
     declaredTypeParams_(node) = interfaceTypeParams
     definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+    definition_.ownTypeVariables = interfaceTypeParams.map(_.variableType).toArray
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
     if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
 
@@ -151,6 +156,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     val recordTypeParams = declaredTypeParams_.getOrElse(node, createTypeParams(node.typeParameters))
     declaredTypeParams_(node) = recordTypeParams
     definition_.setTypeParameters(recordTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
+    definition_.ownTypeVariables = recordTypeParams.map(_.variableType).toArray
 
     // Record extends Object, may implement interfaces
     definition_.setSuperClass(rootClass)
@@ -326,14 +332,17 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         // the same components and cannot read them.
         val unsupportedShape: List[(AST.Argument, Type, AST.ShapeClause)] =
           if (hasShapes) node.args.zip(argTypes).zipWithIndex.flatMap { case ((arg, argType), i) =>
-            if (isFromDerivableType(argType)) None
+            // The runtime reads what Rewriting classified from the type it synthesized
+            // from (the written type, with the record file's own aliases expanded,
+            // #2507); accept the component only when that agrees with the resolved type.
+            val resolved = JsonShapeComponents.tagOfType(argType, isJsonRecord)
+            val synthesized = node.synthesisArgTypes.lift(i).getOrElse(arg.typeRef)
+            val jsonReadable = resolved.isDefined && resolved == JsonShapeComponents.tagOfAst(synthesized)
+            // A scalar is readable by every format, except by a json shape that classified
+            // it as something else: an alias Rewriting could not expand (`type N = JS`,
+            // `JS` imported as java.lang.String) reads as a nested record there (#2517).
+            if (isFromDerivableType(argType) && (jsonReadable || !node.shapes.exists(isJsonClause))) None
             else {
-              val resolved = JsonShapeComponents.tagOfType(argType, isJsonRecord)
-              // The runtime reads what Rewriting classified from the type it synthesized
-              // from (the written type, with the record file's own aliases expanded,
-              // #2507); accept the component only when that agrees with the resolved type.
-              val synthesized = node.synthesisArgTypes.lift(i).getOrElse(arg.typeRef)
-              val jsonReadable = resolved.isDefined && resolved == JsonShapeComponents.tagOfAst(synthesized)
               // A nullable scalar (`T?`) is also readable by a regex shape clause: an
               // unmatched optional capture group becomes a real `null`, the same as
               // `from re"..."` (#1967, #1969).

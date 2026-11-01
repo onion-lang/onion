@@ -82,6 +82,24 @@ private[typing] object TypeSubst {
    * variable left free -- keeps the raw type, so this only ever adds
    * precision.
    */
+  def specializeFromScrutinee(matched: Type, scrutinee: Type, typing: onion.compiler.Typing): Type =
+    specializeFromScrutinee(matched, selfApplied(scrutinee, typing))
+
+  /**
+   * `this` is typed by its raw class, so `select this` inside a generic class
+   * (`enum Lookup[T]`'s methods) had no type arguments to recover: `f` in
+   * `case f is Found` bound a raw `Found`, whose `value()` is `Found`'s own
+   * `T`, not the enum's (#2308). Read the enclosing class, unapplied, as
+   * applied to its own type parameters.
+   */
+  private def selfApplied(scrutinee: Type, typing: onion.compiler.Typing): Type = scrutinee match {
+    case ct: ClassType
+      if !ct.isInstanceOf[AppliedClassType] && ct.typeParameters.nonEmpty && (ct eq typing.currentDefinition) =>
+      val vars = ct.typeParameters.toList.map(p => typing.typeParams_.get(p.name).map(_.variableType))
+      if (vars.forall(_.isDefined)) AppliedClassType(ct, vars.map(_.get)) else scrutinee
+    case _ => scrutinee
+  }
+
   def specializeFromScrutinee(matched: Type, scrutinee: Type): Type = (matched, scrutinee) match {
     // The common case: the matched class *is* the scrutinee's own class (e.g.
     // destructuring `Wrap(v)` straight out of a `Wrap[Int]` scrutinee, no

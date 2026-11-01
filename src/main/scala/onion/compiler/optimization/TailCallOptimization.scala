@@ -126,8 +126,52 @@ class TailCallOptimization(config: CompilerConfig)
       case ifStmt: IfStatement =>
         checkStatementForTailCall(ifStmt.thenStatement, method) ||
         (if (ifStmt.elseStatement != null) checkStatementForTailCall(ifStmt.elseStatement, method) else false)
+      case StatementForm(inner) =>
+        statementHasTailCall(inner, method)
       case _ =>
         false
+    }
+  }
+
+  /**
+   * A tail call in statement position, counted exactly as transformStatement rewrites it:
+   * a `return f(..)` reached through blocks, `if`s and select statements. A bare `f(..)`
+   * whose value is discarded is not one; counting it wrapped the method in a loop that
+   * never rewrote the call, so the method never returned (#2405).
+   */
+  private def statementHasTailCall(stmt: ActionStatement, method: MethodDefinition): Boolean = stmt match {
+    case ret: Return => ret.term != null && isSelfCall(ret.term, method)
+    case StatementForm(inner) => statementHasTailCall(inner, method)
+    case block: StatementBlock => block.statements.exists(statementHasTailCall(_, method))
+    case ifStmt: IfStatement =>
+      statementHasTailCall(ifStmt.thenStatement, method) ||
+        (ifStmt.elseStatement != null && statementHasTailCall(ifStmt.elseStatement, method))
+    case _ => false
+  }
+
+  /**
+   * A `select` in statement position is typed as an expression statement around its
+   * lowered statement (so its BOTTOM type still counts for definite return), or, when a
+   * case yields a value, around `{ <that statement>; result }` whose value is discarded.
+   * Its cases' `return f(..)` are tail calls like an `if` statement's (#2405).
+   */
+  private object StatementForm {
+    def unapply(stmt: ActionStatement): Option[ActionStatement] = stmt match {
+      case exprStmt: ExpressionActionStatement =>
+        exprStmt.term match {
+          case st: StatementTerm => Some(st.statement)
+          case begin: Begin if begin.terms.length == 2 && begin.terms(1).isInstanceOf[ResultRefLocal] =>
+            begin.terms(0) match {
+              case st: StatementTerm => Some(st.statement)
+              case _ => None
+            }
+          // A case body of several statements (`val m = n - 1` then `return f(m)`)
+          // is a sequence of statement terms whose value is discarded.
+          case begin: Begin if begin.terms.nonEmpty && begin.terms.forall(_.isInstanceOf[StatementTerm]) =>
+            Some(new StatementBlock(begin.location, begin.terms.toSeq.map(_.asInstanceOf[StatementTerm].statement): _*))
+          case _ => None
+        }
+      case _ => None
     }
   }
 
@@ -192,6 +236,9 @@ class TailCallOptimization(config: CompilerConfig)
       trace(s"[TCO]   Checking term type: ${term.getClass.getSimpleName}")
     }
     term match {
+      case call: Call if unboxedJoin(call).isDefined =>
+        // `: Int = if c { boxed } else { f(..) }`: the whole `if` is unboxed (#2406)
+        checkStatementForTailCall(unboxedJoin(call).get, method)
       case call: Call =>
         call.method match {
           case targetMethod: MethodDefinition =>
@@ -431,6 +478,9 @@ class TailCallOptimization(config: CompilerConfig)
             // x + 1 }`) is not a tail call and stays a call.
             trace(s"[TCO transformStatement] Return: Begin with ${begin.terms.length} terms")
             transformStatement(sinkReturnIntoBegin(begin), method, slots)
+          case call: Call if unboxedJoin(call).isDefined =>
+            trace(s"[TCO transformStatement] Return: unboxed if/select join")
+            transformStatement(unboxedJoin(call).get, method, slots)
           case stmtTerm: StatementTerm =>
             // Explicit return: Return(StatementTerm(IfStatement))
             trace(s"[TCO transformStatement] Return: StatementTerm wrapping ${stmtTerm.statement.getClass.getSimpleName}")
@@ -467,6 +517,15 @@ class TailCallOptimization(config: CompilerConfig)
         } else null
 
         new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
+
+      case StatementForm(inner) =>
+        val exprStmt = stmt.asInstanceOf[ExpressionActionStatement]
+        val termType = exprStmt.term match {
+          case st: StatementTerm => st.termType
+          case _ => BasicType.VOID
+        }
+        new ExpressionActionStatement(exprStmt.location,
+          new StatementTerm(exprStmt.term.location, transformStatement(inner, method, slots), termType))
 
       case exprStmt: ExpressionActionStatement =>
         // An ExpressionActionStatement whose value is assigned to a local variable
@@ -505,16 +564,78 @@ class TailCallOptimization(config: CompilerConfig)
     new StatementBlock(begin.location, (prefix.map(asStatement) ++ tail): _*)
   }
 
+  private val unboxMethodNames = Set(
+    "booleanValue", "byteValue", "shortValue", "charValue",
+    "intValue", "longValue", "floatValue", "doubleValue"
+  )
+
+  /** Whether `owner` is the `java.lang` box class of the primitive `primitive`. */
+  private def isBoxClassOf(owner: Type, primitive: Type): Boolean = (owner, primitive) match {
+    case (ct: ClassType, b: BasicType) => toolbox.Boxing.boxedClassName(b).contains(ct.name)
+    case _ => false
+  }
+
+  /** `x.intValue()` (and the other primitive unboxings) on the `java.lang` box of the result. */
+  private def isUnboxCall(call: Call): Boolean =
+    call.parameters.isEmpty && unboxMethodNames.contains(call.method.name) &&
+      isBoxClassOf(call.method.affiliation, call.`type`) &&
+      isBoxClassOf(call.target.`type`, call.`type`)
+
+  /** `Integer.valueOf(i)` (and the other boxings), the box of `primitive`; never a user method. */
+  private def isBoxCall(term: Term, primitive: Type): Boolean = term match {
+    case box: CallStatic =>
+      box.method.name == "valueOf" && box.parameters.length == 1 &&
+        box.parameters(0).`type` == primitive && isBoxClassOf(box.method.affiliation, primitive)
+    case _ => false
+  }
+
+  /**
+   * `return unbox({ <branches assign tmp>; tmp })`, the shape of an if/select expression whose
+   * boxed join (`Integer` and `Int` join to `Integer`) is unboxed to the method's primitive
+   * result, as `return`s sunk into the branches: `tmp = v` becomes `return unbox(v)`, and
+   * `tmp = box(f(..))` becomes `return f(..)`, a tail call (#2406). The unbox still runs in
+   * return position, where nothing in this method can catch it, so a null box throws from
+   * the same place as before. `None` for any other shape.
+   */
+  private def unboxedJoin(call: Call): Option[ActionStatement] = {
+    if (!isUnboxCall(call)) return None
+    call.target match {
+      case begin: Begin =>
+        begin.terms.toSeq match {
+          case init :+ (st: StatementTerm) :+ (result: ResultRefLocal) =>
+            def unboxed(value: Term): Term = value match {
+              case box: CallStatic if isBoxCall(box, call.`type`) => box.parameters(0)
+              case other => new Call(other.location, other, call.method, Array.empty[Term])
+            }
+            val (sunk, alwaysReturns) = sinkReturn(st.statement, result, unboxed)
+            def asStatement(t: Term): ActionStatement = t match {
+              case s: StatementTerm => s.statement
+              case other => new ExpressionActionStatement(other.location, other)
+            }
+            val tail =
+              if (alwaysReturns) Seq(sunk)
+              else Seq(sunk, new Return(null, new Call(call.location, result, call.method, Array.empty[Term])))
+            Some(new StatementBlock(begin.location, (init.map(asStatement) ++ tail): _*))
+          case _ => None
+        }
+      case _ => None
+    }
+  }
+
   /**
    * Rewrites a branch's final `result = value` into `return value`. Returns the new
    * statement and whether every path through it now returns (or throws); a path that
    * does not falls through to the caller's `return result`.
    */
-  private def sinkReturn(stmt: ActionStatement, result: RefLocal): (ActionStatement, Boolean) = stmt match {
+  private def sinkReturn(
+    stmt: ActionStatement,
+    result: RefLocal,
+    returned: Term => Term = identity
+  ): (ActionStatement, Boolean) = stmt match {
     case exprStmt: ExpressionActionStatement =>
       exprStmt.term match {
         case set: SetLocal if set.frame == result.frame && set.index == result.index =>
-          (new Return(exprStmt.location, set.value), true)
+          (new Return(exprStmt.location, returned(set.value)), true)
         case _ => (stmt, false)
       }
     case guarded: GuardedCaseBlock =>
@@ -522,18 +643,18 @@ class TailCallOptimization(config: CompilerConfig)
       // once it ran, nothing after it does. Not claiming "always returns" keeps the caller's
       // trailing `return result`, which is harmless.
       val Array(init, matched, rest) = guarded.statements
-      val (sunkMatched, _) = sinkReturn(matched, result)
-      val (sunkRest, _) = sinkReturn(rest, result)
+      val (sunkMatched, _) = sinkReturn(matched, result, returned)
+      val (sunkRest, _) = sinkReturn(rest, result, returned)
       (new GuardedCaseBlock(guarded.location, init, sunkMatched, sunkRest), false)
     case block: StatementBlock if block.statements.nonEmpty =>
-      val (last, returns) = sinkReturn(block.statements.last, result)
+      val (last, returns) = sinkReturn(block.statements.last, result, returned)
       (new StatementBlock(block.location, (block.statements.init.toSeq :+ last): _*), returns)
     case ifStmt: IfStatement =>
-      val (thenStmt, thenReturns) = sinkReturn(ifStmt.thenStatement, result)
+      val (thenStmt, thenReturns) = sinkReturn(ifStmt.thenStatement, result, returned)
       if (ifStmt.elseStatement == null) {
         (new IfStatement(ifStmt.location, ifStmt.condition, thenStmt, null), false)
       } else {
-        val (elseStmt, elseReturns) = sinkReturn(ifStmt.elseStatement, result)
+        val (elseStmt, elseReturns) = sinkReturn(ifStmt.elseStatement, result, returned)
         (new IfStatement(ifStmt.location, ifStmt.condition, thenStmt, elseStmt), thenReturns && elseReturns)
       }
     case _: Return | _: Throw => (stmt, true)

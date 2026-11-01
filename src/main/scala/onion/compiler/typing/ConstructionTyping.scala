@@ -412,7 +412,16 @@ final class ConstructionTyping(
         // Only reject on an arity-matched signature; differing arity is handled
         // by the vararg/default-parameter paths below, so leave it to them.
         formals.length != params.length ||
-          formals.indices.forall(i => TypeRelations.isAssignableWithBoxing(formals(i), params(i).`type`, bodyContext.table))
+          formals.indices.forall { i =>
+            // A type-variable slot is abstract (#2332): only that variable, or
+            // one whose bound chain reaches it, fits. Erasure would let an
+            // unrelated `U` through, to fail later as a ClassCastException.
+            formals(i) match {
+              case tv: TypedAST.TypeVariableType if params(i).`type`.isInstanceOf[TypedAST.TypeVariableType] =>
+                TypeRules.isSuperTypeByIdentity(tv, params(i).`type`)
+              case f => TypeRelations.isAssignableWithBoxing(f, params(i).`type`, bodyContext.table)
+            }
+          }
       case _ => true
     }
     // Nothing matched eagerly, or it only matched via the empty-collection-literal

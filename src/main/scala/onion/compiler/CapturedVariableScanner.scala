@@ -20,6 +20,16 @@ object CapturedVariableScanner {
     scanElements(block.elements, parameterNames)
 
   /**
+   * The parameters that live in a box: a nested closure captures them and the body assigns
+   * them. One rule for a method's parameters and a lambda's (#2335, #2426).
+   */
+  def sharedParameters(names: Iterable[String], body: AST.Node, assigned: Set[String]): Set[String] =
+    body match {
+      case block: AST.BlockExpression => scan(block) & names.toSet & assigned
+      case _ => Set.empty
+    }
+
+  /**
    * Scans a sequence of block elements (e.g. the top-level statements of a
    * compilation unit, which are not wrapped in a single BlockExpression) and
    * returns the set of variable names captured by closures within them.

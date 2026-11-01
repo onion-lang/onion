@@ -751,24 +751,39 @@ class SemanticErrorReporter(threshold: Int) {
       else if (isListType(expected) && actual.isInstanceOf[TypedAST.ArrayType])
         Some((actual.asInstanceOf[TypedAST.ArrayType], false))
       else None
+    val castSource: Option[SemanticErrorReporter.CastSource] =
+      if (items.length > 2) items(2) match
+        case c: SemanticErrorReporter.CastSource => Some(c)
+        case _ => None
+      else None
+    val sourceNullable = castSource.exists(_.nullable)
+    // The variable the hint names, null-checked when the cast's source was nullable.
+    val sourceRef = castSource.flatMap(c => Option(c.name)).getOrElse("xs") + (if (sourceNullable) "!!" else "")
     def written(t: TypedAST.Type): String = t match
       case a: TypedAST.ArrayType if listArrayCast.isDefined => onion.compiler.toolbox.TypeFormatting.arrayWrittenForm(a)
       case other => typeName(other)
+    // A set or range is never a List at runtime either, so a cast is no fix for the widening case.
+    val widenToIterable = items.length > 2 && items(2).isInstanceOf[SemanticErrorReporter.WidenToIterableHint]
     val baseMessage = format(
-      message(if (listArrayCast.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
-      Seq(written(expected), written(actual))
+      // "Consider a cast" is no advice on an `as` cast that was itself rejected, nor on the
+      // widening case (a set or range is never a List at runtime either).
+      message(if (listArrayCast.isDefined || widenToIterable || castSource.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      Seq(written(expected), written(actual) + (if (sourceNullable) "?" else ""))
     )
     val hint =
       if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
         Some(message("suggestion.hexDigitB"))
+      } else if (widenToIterable) {
+        val widen = items(2).asInstanceOf[SemanticErrorReporter.WidenToIterableHint]
+        Some(format(message("suggestion.widenVarToIterable"), Seq(widen.name, typeName(expected), typeName(widen.wider))))
       } else if (sameNamedTypeVariables(expected, actual)) {
         // `def m[T](a: T) { t = a }` inside `class K[T]`: two parameters named `T`,
         // so "type T is expected, but type T is used" contradicts itself without this.
         Some(format(message("suggestion.shadowedTypeParameter"), Seq(typeName(expected))))
       } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable &&
           !nonNullStillMisfitsTypeVariable(expected, actual) &&
-          // A failed cast is about the inner types: `(s!! as Integer)` fails the same way.
-          !(items.length > 2 && items(2) == SemanticErrorReporter.CastCheckHint)) {
+          // A rejected cast is about the inner types: `(s!! as Integer)` fails the same way.
+          castSource.isEmpty) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
       } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
@@ -791,9 +806,9 @@ class SemanticErrorReporter(threshold: Int) {
             // sized `new Int[0][0]` compiles and is just as empty, since the outer (size-0)
             // dimension is the only one that matters to `toArray`.
             val emptyArrayLiteral = onion.compiler.toolbox.TypeFormatting.componentWrittenForm(arrayType.component) + ("[0]" * arrayType.dimension)
-            Some(format(message("suggestion.listAsArrayCast"), Seq(emptyArrayLiteral)))
+            Some(format(message("suggestion.listAsArrayCast"), Seq(emptyArrayLiteral, sourceRef)))
           } else {
-            Some(message("suggestion.arrayAsListCast"))
+            Some(format(message("suggestion.arrayAsListCast"), Seq(sourceRef)))
           }
         case None => None
       }
@@ -998,14 +1013,18 @@ class SemanticErrorReporter(threshold: Int) {
 
   /**
    * DUPLICATE_METHOD raised by a record component whose accessor has the signature of a
-   * method every record generates (`hashCode: Int`, `toString: String`; #2391). The user
-   * wrote no method, so the generic "duplicated method definition" text would mislead.
+   * method every record generates (`hashCode: Int`, `toString: String`; #2391), or of the
+   * final `Object.getClass()` (`getClass: Class`; #2512). The user wrote no method, so the
+   * generic "duplicated method definition" text would mislead.
    * Items: the record, the component name, (unused) argument types, the clash marker.
    */
   private def reportRecordComponentClash(position: Location, items: Array[AnyRef]): Unit = {
     val clash = items(3).asInstanceOf[SemanticErrorReporter.RecordComponentClash]
+    val key =
+      if (clash.overridesFinal) "error.semantic.recordComponentOverridesFinalMethod"
+      else "error.semantic.recordComponentClashesGeneratedMethod"
     problem(position, format(
-      message("error.semantic.recordComponentClashesGeneratedMethod"),
+      message(key),
       Seq(typeName(items(0)), asString(items(1)), typeName(clash.componentType))
     ))
   }
@@ -1103,16 +1122,29 @@ object SemanticErrorReporter {
    * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
    */
   private[compiler] case object HexDigitBHint
-  /** Marks an INCOMPATIBLE_TYPE raised by an `as` cast check (#2388). */
-  private[compiler] case object CastCheckHint
+
+  /** An extra (third) item on INCOMPATIBLE_TYPE: the variable `name` is a `List`, the value
+   *  another `Iterable`, and declaring the variable `wider` (`Iterable[E]`) would accept it.
+   *  `var xs = (1..3).map { ... }` is a `List` since #2496, so this is the migration hint. */
+  private[compiler] final case class WidenToIterableHint(name: String, wider: TypedAST.Type)
+
+  /**
+   * An extra (third) item on INCOMPATIBLE_TYPE for every rejected `as` cast (#2309, #2388),
+   * so no `!!` hint is offered (`!!` never makes a rejected cast valid): how the source is
+   * written when it is a plain name (else null), and whether its type was nullable. The
+   * List/array hint then names that variable and stays null-safe (`xs!!.toArray(..)`).
+   */
+  private[compiler] final case class CastSource(name: String, nullable: Boolean)
 
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */
   private[compiler] case object LambdaOverloadHint
 
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record component's
-   *  accessor colliding with a method the record generates, so the error says so (#2391). */
-  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type)
+   *  accessor colliding with a method the record generates, so the error says so (#2391).
+   *  `overridesFinal`: the accessor would instead override a final `Object` method, which no
+   *  record generates (`getClass: Class`, #2512), so the error names that method. */
+  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type, overridesFinal: Boolean = false)
 
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record body method
    *  `a()` that redefines component `a`'s generated accessor, so the error says so (#2396). */
@@ -1125,6 +1157,8 @@ object SemanticErrorReporter {
 
   private def typeName(item: AnyRef): String =
     if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.Type])
+  private def writtenTypeName(item: AnyRef): String =
+    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.componentWrittenForm(item.asInstanceOf[TypedAST.Type])
   private def classTypeName(item: AnyRef): String =
     if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.ClassType])
   private def objectTypeName(item: AnyRef): String =
@@ -1334,6 +1368,11 @@ object SemanticErrorReporter {
     SemanticError.ABSTRACT_CLASS_INSTANTIATION -> ErrorDef(
       "error.semantic.abstractClassInstantiation",
       Seq(items => typeName(items(0)))
+    ),
+    SemanticError.OVERRIDE_RETURN_TYPE_MISMATCH -> ErrorDef(
+      "error.semantic.overrideReturnTypeMismatch",
+      // A boxed wrapper keeps its written name (`JInteger`): `Int` vs `Int` would hide the clash.
+      Seq(items => asString(items(0)), items => writtenTypeName(items(1)), items => typeName(items(2)), items => writtenTypeName(items(3)))
     ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",

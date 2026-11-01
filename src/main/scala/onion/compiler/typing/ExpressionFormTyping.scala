@@ -129,7 +129,7 @@ final class ExpressionFormTyping(
       typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
         typed(node.src, context, destination).flatMap { term =>
           if (!isValidCast(term.`type`, destination)) {
-            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`, SemanticErrorReporter.CastCheckHint)
+            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`, SemanticErrorReporter.CastSource(null, false))
             None
           } else {
             Some(new AsInstanceOf(term, destination))
@@ -140,7 +140,18 @@ final class ExpressionFormTyping(
       typed(node.src, context).flatMap { term =>
         typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
           if (!isValidCast(term.`type`, destination)) {
-            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, term.`type`, SemanticErrorReporter.CastCheckHint)
+            // `!!` cannot fix a nullable cast that is rejected here: the non-null value
+            // does not cast either. Report that type, so its own hint shows (#2309, #2388).
+            // The message still shows the `?`, and a List/array hint stays null-safe (`xs!!`).
+            val (reported, nullable) = term.`type` match {
+              case n: NullableType if !isValidCast(n.innerType, destination) => (n.innerType, true)
+              case other => (other, false)
+            }
+            val name = node.src match {
+              case id: AST.Id => id.name
+              case _ => null
+            }
+            bodyContext.report(INCOMPATIBLE_TYPE, node, destination, reported, SemanticErrorReporter.CastSource(name, nullable))
             None
           } else {
             Some(new AsInstanceOf(term, destination))
@@ -158,8 +169,9 @@ final class ExpressionFormTyping(
   private def isValidCast(source: Type, destination: Type): Boolean = {
     if (source eq destination) return true
     (source, destination) match {
-      // `?` only admits null, which passes any reference cast, so the inner types decide.
-      // `null` itself fits every nullable type, a nullable primitive (`null as Int?`) too.
+      // `?` only admits null, which passes any reference cast, so the inner types decide
+      // (#2388; arrays first, #2309). `null` itself fits every nullable type, a nullable
+      // primitive (`null as Int?`) too.
       case (_: NullType, _: NullableType) => true
       case (n: NullableType, _) => isValidCast(n.innerType, destination)
       case (_, n: NullableType) => isValidCast(source, n.innerType)
@@ -218,8 +230,45 @@ final class ExpressionFormTyping(
         isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
       case (_: ArrayType, ct: ClassType) =>
         isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
+      case (sa: ArrayType, da: ArrayType) =>
+        // The JVM casts `A[]` to `B[]` only when the elements cast: the same primitive,
+        // or reference elements that cast (#2309). Past the shorter array's dimensions,
+        // its elements must be able to hold an array.
+        val (se, sd) = jvmArrayShape(sa)
+        val (de, dd) = jvmArrayShape(da)
+        if (sd == dd) {
+          if (se.isBasicType || de.isBasicType) se eq de
+          else isValidCast(se, de)
+        } else {
+          (if (sd < dd) se else de) match {
+            case ct: ClassType => isArrayRelatedType(ct) || ct.isInstanceOf[TypeVariableType]
+            case _ => false
+          }
+        }
       case _ => true
     }
+  }
+
+  // An array's element type and dimension count as the JVM sees them: a `T[]` whose
+  // `T` is `String[]` is a `String[][]`, and an `Int?[]` is an `Integer[]`. Null fits
+  // any reference element, so a nullable element's non-null type is what must cast.
+  private def jvmArrayShape(array: ArrayType): (Type, Int) = {
+    var element: Type = array.component
+    var dimension = array.dimension
+    var done = false
+    while (!done) element match {
+      case n: NullableType =>
+        element = n.innerType match {
+          case bt: BasicType => Boxing.boxedType(bodyContext.table, bt)
+          case other => other
+        }
+      case inner: ArrayType =>
+        dimension += inner.dimension
+        element = inner.component
+      case _ =>
+        done = true
+    }
+    (element, dimension)
   }
 
   private def isArrayRelatedType(ct: ClassType): Boolean =

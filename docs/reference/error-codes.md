@@ -1187,6 +1187,20 @@ Fix: take each element apart with `val (a, b) = p`.
 foreach p in ps { val (x, y) = p; println(x + y) }
 ```
 
+### `E0104` — Override changes a primitive return type
+
+A method, or a record component's accessor, overrides an inherited method with a
+different return type, and one of the two types is primitive. The JVM matches an
+override by its exact descriptor, so `Int` does not override `Double` or `JInteger`.
+Calls through the supertype would run the inherited method instead.
+
+```onion
+interface Shape { def area(): JInteger }
+record Circle(area: Int) conforms Shape   // E0104: area(): Int cannot override Shape.area(): JInteger
+```
+
+Fix: give the component or method the inherited type (`area: JInteger`), or rename it.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -1948,6 +1962,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 | `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
+| `E0104` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
 
 ## See also
 

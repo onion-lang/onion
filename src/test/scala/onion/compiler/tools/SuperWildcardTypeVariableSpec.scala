@@ -88,4 +88,50 @@ class SuperWildcardTypeVariableSpec extends AbstractShellSpec {
       assert(Shell.Success(1) == r)
     }
   }
+  describe("an inherited `? super` method reached through `this` in a generic subclass (#2400)") {
+    it("sorts with an unqualified sort(c) and with this.sort(c) on ArrayList[S]") {
+      val r = shell.run(
+        """import { java.util.* }
+          |class Sub[S] extends ArrayList[S] {
+          |public:
+          |  def sortSub(c: Comparator[S]): void { sort(c) }
+          |  def sortThis(c: Comparator[S]): void { this.sort(c) }
+          |}
+          |def main(args: String[]): String {
+          |  val s = new Sub[String]()
+          |  s.add("z"); s.add("y")
+          |  s.sortSub((x: String, y: String) -> x.compareTo(y))
+          |  val first = "" + s
+          |  s.add("a")
+          |  s.sortThis((x: String, y: String) -> x.compareTo(y))
+          |  return first + s
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("[y, z][a, y, z]") == r)
+    }
+    it("calls an inherited sortWith(Comparator[? super T]) of an Onion base class") {
+      val r = shell.run(
+        """import { java.util.* }
+          |class Box[T] {
+          |  val items: ArrayList[T]
+          |public:
+          |  def this { items = new ArrayList[T]() }
+          |  def add(t: T): void { items.add(t) }
+          |  def sortWith(c: Comparator[? super T]): void { items.sort(c) }
+          |  def show(): String = "" + items
+          |}
+          |class Sub[S] extends Box[S] {
+          |public:
+          |  def sortSub(c: Comparator[S]): void { sortWith(c) }
+          |}
+          |def main(args: String[]): String {
+          |  val s = new Sub[String]()
+          |  s.add("z"); s.add("y")
+          |  s.sortSub((x: String, y: String) -> x.compareTo(y))
+          |  return s.show()
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("[y, z]") == r)
+    }
+  }
 }

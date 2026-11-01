@@ -536,8 +536,8 @@ private[compiler] object SyntaxHintClassifier {
       // misread as an identifier slot.
       case "import" if sourceLine.trim.startsWith("import") =>
         hint("error.parsing.hint.duplicate_import_block")
-      case "val" | "var" if insideDoBlock(precedingText + textBefore(context, sourceLine)) =>
-        hint("error.parsing.hint.do_block_let", context.takeWhile(c => c != ';' && c != '\n' && c != '}').trim)
+      case "val" | "var" if enclosingDoBlockMonad(precedingText + textBefore(context, sourceLine)).isDefined =>
+        doBlockLetHint(enclosingDoBlockMonad(precedingText + textBefore(context, sourceLine)).get, context)
       case "yield" if YieldExpression.findFirstMatchIn(context).isDefined && !yieldNamed(expected, context, sourceLine) =>
         hint("error.parsing.hint.yield_not_supported")
       case word if ReservedWords.contains(word) && (expected.contains("<ID>") || expected.contains("<QUOTED_ID>")) =>
@@ -621,11 +621,12 @@ private[compiler] object SyntaxHintClassifier {
    * The parameter list is split at top-level commas, so `[K, V extends Comparable[V]]`
    * gives `K` and `V extends Comparable[V]`.
    */
-  private val DoBlockOpen = """\bdo\s*\[[^\]\n]*\]\s*\{""".r
+  private val DoBlockOpen = """\bdo\s*\[([^\]\n]*)\]\s*\{""".r
+  private val LetStatement = """^(?:val|var)\s+([A-Za-z_]\w*)\s*(?::[^=]*)?=\s*(.+)$""".r
 
-  // True when the innermost unclosed `{` before the error opens a `do[M] {` block.
-  private def insideDoBlock(text: String): Boolean =
-    DoBlockOpen.findAllMatchIn(text).toList.lastOption.exists { m =>
+  // The `M` of `do[M] {` when the innermost unclosed `{` before the error opens that block.
+  private def enclosingDoBlockMonad(text: String): Option[String] =
+    DoBlockOpen.findAllMatchIn(text).toList.lastOption.filter { m =>
       var depth = 1
       text.substring(m.end).foreach {
         case '{' => depth += 1
@@ -633,7 +634,30 @@ private[compiler] object SyntaxHintClassifier {
         case _   =>
       }
       depth == 1
+    }.map(_.group(1).trim)
+
+  // A `val y = e` in a do block (#2465). Computing `e` inside the `yield` works for every
+  // monad; a bind form is named only for the monads whose unit infers there (`Option::some`,
+  // `Future::successful`, a one-element list). `Result::successful(e)` cannot pin the error
+  // type, so `do[Result]` and a user monad get the `yield` advice alone.
+  private def doBlockLetHint(monad: String, context: String): Option[SyntaxHint] = {
+    val statement = context.takeWhile(c => c != ';' && c != '\n' && c != '\r' && c != '}').trim
+    val (name, expr) = statement match {
+      case LetStatement(n, e) => (n, e.trim)
+      case _ => ("y", "expr")
     }
+    val simple = monad.substring(monad.lastIndexOf('.') + 1)
+    val bind = simple match {
+      case "Option" => Some(s"$name <- $monad::some($expr)")
+      case "Future" => Some(s"$name <- $monad::successful($expr)")
+      case "List" => Some(s"$name <- [$expr]")
+      case _ => None
+    }
+    bind match {
+      case Some(b) => hint("error.parsing.hint.do_block_let", monad, b)
+      case None => hint("error.parsing.hint.do_block_let_yield", monad)
+    }
+  }
 
   private def enclosingEnum(text: String): Option[(String, List[String])] =
     EnumHeader.findAllMatchIn(text).toList.lastOption.map { m =>

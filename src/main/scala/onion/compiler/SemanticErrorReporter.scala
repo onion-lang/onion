@@ -940,6 +940,9 @@ class SemanticErrorReporter(threshold: Int) {
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordComponentClash] =>
         reportRecordComponentClash(position, items)
+      case SemanticError.DUPLICATE_METHOD
+          if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordAccessorRedefined] =>
+        reportRecordAccessorRedefined(position, items)
 
       // Data-driven cases
       case _ =>
@@ -969,6 +972,20 @@ class SemanticErrorReporter(threshold: Int) {
     problem(position, format(
       message("error.semantic.recordComponentClashesGeneratedMethod"),
       Seq(typeName(items(0)), asString(items(1)), typeName(clash.componentType))
+    ))
+  }
+
+  /**
+   * DUPLICATE_METHOD raised by a record body method `a()` for a component `a`, which already
+   * generates that accessor (#2396). There is only one `def a()` in the source, so the generic
+   * "duplicated method definition" text does not say what it duplicates.
+   * Items: the record, the method name, its (empty) argument types, the marker.
+   */
+  private def reportRecordAccessorRedefined(position: Location, items: Array[AnyRef]): Unit = {
+    val redefined = items(3).asInstanceOf[SemanticErrorReporter.RecordAccessorRedefined]
+    problem(position, format(
+      message("error.semantic.recordBodyRedefinesAccessor"),
+      Seq(typeName(items(0)), asString(items(1)), typeName(redefined.componentType))
     ))
   }
 
@@ -1059,6 +1076,10 @@ object SemanticErrorReporter {
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record component's
    *  accessor colliding with a method the record generates, so the error says so (#2391). */
   private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type)
+
+  /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record body method
+   *  `a()` that redefines component `a`'s generated accessor, so the error says so (#2396). */
+  private[compiler] final case class RecordAccessorRedefined(componentType: TypedAST.Type)
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.

@@ -500,7 +500,9 @@ final class ClosureTyping(
       }
       val argType = argTypes(i)
       if (argType == null) return false
-      context.add(arg.name, argType, isMutable = assigned.contains(arg.name))
+      // `markAsBoxed` is name-based and covers the whole enclosing method, so an outer
+      // variable of the same name must not box this parameter (#2462).
+      context.addUnboxed(arg.name, argType, isMutable = assigned.contains(arg.name))
       i += 1
     }
     true

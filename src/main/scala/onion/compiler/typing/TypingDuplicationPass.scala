@@ -250,12 +250,13 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     }
   }
 
+  // Compared by erasure: `toString: X` with `X extends String` gets the accessor
+  // `toString()Ljava/lang/String;`, the same as `toString: String` (#2522).
   private def clashesWithGeneratedMethod(name: String, field: FieldRef): Boolean =
     field != null && (name match {
       case "hashCode" => field.`type` == BasicType.INT
       case "toString" =>
-        val t = field.`type` match { case n: NullableType => n.innerType; case t => t }
-        t.isInstanceOf[ObjectType] && t.name == "java.lang.String"
+        onion.compiler.generics.Erasure.asmType(field.`type`).getDescriptor == "Ljava/lang/String;"
       case _ => false
     })
 

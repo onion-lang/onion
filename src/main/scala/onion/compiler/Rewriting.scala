@@ -105,6 +105,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     for (unit <- source) {
       try {
         cliAliases = aliasesByModule.getOrElse(moduleOf(unit), scala.collection.immutable.Map.empty)
+        recordAliases = recordAliasesOf(unit, cliAliases)
         rewritten += rewrite(unit)
       } catch {
         // Rewriting-phase errors (desugar guards, do-notation, coherence, auto-CLI) are built with
@@ -189,6 +190,64 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case _ => done = true
     }
     if (desc eq typeRef.desc) typeRef else typeRef.copy(desc = desc)
+  }
+
+  /**
+   * `typeRef` with every alias inside it resolved: at the top, under `?`, and in type
+   * arguments and array components. A record's `from re`/`derive!`/`shape` synthesis
+   * picks each component's conversion from its written type, so `port: Port` with
+   * `type Port = Int` must read as `port: Int` there (issue #2507).
+   */
+  private def dealiasDeep(typeRef: AST.TypeNode): AST.TypeNode = {
+    if (typeRef == null) return null
+    def go(desc: AST.TypeDescriptor, seen: Set[String]): AST.TypeDescriptor = desc match {
+      case AST.ReferenceType(name, false)
+          if !seen.contains(name) && !typeParamsInScope.contains(name) && recordAliases.contains(name) =>
+        go(recordAliases(name), seen + name)
+      case AST.NullableType(inner) => go(inner, seen) match {
+        case n: AST.NullableType => n // `Port?` with `type Port = Int?` is just `Int?`
+        case d                   => if (d eq inner) desc else AST.NullableType(d)
+      }
+      case AST.ParameterizedType(base, args) =>
+        val mapped = args.map(go(_, seen))
+        if (mapped.lazyZip(args).forall(_ eq _)) desc else AST.ParameterizedType(base, mapped)
+      case AST.ArrayType(component) =>
+        val c = go(component, seen)
+        if (c eq component) desc else AST.ArrayType(c)
+      case d => d
+    }
+    val desc = go(typeRef.desc, Set.empty)
+    if (desc eq typeRef.desc) typeRef else typeRef.copy(desc = desc)
+  }
+
+  /**
+   * The aliases `dealiasDeep` may expand inside `unit`. An alias target was written under
+   * the imports of the file that declares it, and the expanded text is resolved under the
+   * record's file (the synthesized `parse`/`fromMap` bodies mention it). So only aliases
+   * whose target means the same in both are taken: those declared in `unit` itself, and
+   * those from another file of the module whose target names only primitives and
+   * fully-qualified types. `import { java.sql.Date }` + `type D = Date` in another file
+   * would otherwise read as `java.util.Date` here (#2509).
+   */
+  private var recordAliases: scala.collection.immutable.Map[String, AST.TypeDescriptor] = scala.collection.immutable.Map.empty
+
+  private def recordAliasesOf(
+    unit: AST.CompilationUnit,
+    moduleAliases: scala.collection.immutable.Map[String, AST.TypeDescriptor]
+  ): scala.collection.immutable.Map[String, AST.TypeDescriptor] = {
+    val own: scala.collection.immutable.Map[String, AST.TypeDescriptor] = unit.toplevels.collect {
+      case a: AST.TypeAliasDeclaration if a.typeParameters.isEmpty && a.targetType != null =>
+        a.name -> a.targetType.desc
+    }.toMap
+    def unambiguous(desc: AST.TypeDescriptor): Boolean = desc match {
+      case _: AST.PrimitiveType                 => true
+      case AST.ReferenceType(_, qualified)      => qualified
+      case AST.NullableType(inner)              => unambiguous(inner)
+      case AST.ArrayType(component)             => unambiguous(component)
+      case AST.ParameterizedType(base, args)    => unambiguous(base) && args.forall(unambiguous)
+      case _                                    => false
+    }
+    moduleAliases.filter { case (name, target) => !own.contains(name) && unambiguous(target) } ++ own
   }
 
   // See AST.CompilationUnit.needsBodyRewrite: the only body-level transforms are do-notation
@@ -597,7 +656,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   private def cliKindOf(typeRef: AST.TypeNode): Option[String] =
     ScalarConversions.ofAst(dealiasForCli(typeRef)).map(_.tag)
 
-  /** The scalar kind of a type exactly as written (record `from re`/`derive` synthesis). */
+  /** The scalar kind of a type as written (record synthesis dealiases its components first). */
   private def scalarKindOf(typeRef: AST.TypeNode): Option[String] =
     ScalarConversions.ofAst(typeRef).map(_.tag)
 
@@ -767,7 +826,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
-  def rewriteRecordDeclaration(declaration: AST.RecordDeclaration): RecordDeclaration = withTypeParams(declaration.typeParameters.map(_.name)) {
+  def rewriteRecordDeclaration(written: AST.RecordDeclaration): RecordDeclaration = withTypeParams(written.typeParameters.map(_.name)) {
+    // Components are synthesized from, and checked against, their alias-free types, so
+    // `port: Port` (`type Port = Int`) converts like `port: Int` (issue #2507). The record
+    // itself keeps the types as written (restored below): typing resolves them in the
+    // alias's own scope, so its constructor and accessors are exactly what `main` built.
+    val declaration = written.copy(args = written.args.map(a => a.copy(typeRef = dealiasDeep(a.typeRef))))
     // A componentless record has nothing to derive into, so don't synthesize methods.
     val fromMethods = declaration.fromPattern match {
       case Some(pattern) if declaration.args.nonEmpty => synthesizeFromMethods(declaration, pattern)
@@ -803,11 +867,13 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // class's sections get in rewriteClassDeclaration - otherwise those constructs reach
     // typing unrewritten inside a record method.
     val newSections = declaration.sections.map(rewriteAccessSection)
-    if (all.isEmpty) declaration.copy(sections = newSections)
+    val synthesisArgTypes = declaration.args.map(_.typeRef)
+    if (all.isEmpty) written.copy(sections = newSections)
     // `shapes` is deliberately kept: typing validates each pattern (E0059) and its
     // capture-group count against the components (E0060), which the `from` synthesis gets
     // for free by routing through a regex select pattern and this one does not.
-    else declaration.copy(sections = newSections, synthesizedMethods = all, laws = Nil, examples = Nil)
+    else written.copy(sections = newSections, synthesizedMethods = all, laws = Nil, examples = Nil,
+      synthesisArgTypes = synthesisArgTypes)
   }
 
   /**

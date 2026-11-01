@@ -400,6 +400,9 @@ object TypedAST {
     extends TypedAST.AbstractClassType() with Node with Named {
 
     private var typeParameters_ = typeParameters0
+
+    /** Names of the primary constructor's parameters (set by the body pass), for the E0002 hint. */
+    var primaryParameterNames: scala.collection.immutable.Set[String] = scala.collection.immutable.Set.empty
     private var staticInitializers_ = Array[TypedAST.ActionStatement]()
 
     /**

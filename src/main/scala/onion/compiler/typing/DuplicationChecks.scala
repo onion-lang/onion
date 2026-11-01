@@ -60,7 +60,13 @@ private[compiler] object DuplicationChecks {
       case _ => false
   }
 
-  def checkOverrideContracts(typing: Typing, clazz: ClassDefinition, fallback: Location, skipObject: Boolean = false): Unit = {
+  def checkOverrideContracts(
+    typing: Typing,
+    clazz: ClassDefinition,
+    fallback: Location,
+    skipObject: Boolean = false,
+    memberLocations: scala.collection.immutable.Map[String, Location] = scala.collection.immutable.Map.empty
+  ): Unit = {
     if clazz.isInterface then return
     val allViews = typing.table_.appliedViewsOf(clazz)(AppliedTypeViews.collectAppliedViewsFrom(clazz))
     // Exclude the target class itself to avoid checking methods against themselves
@@ -100,7 +106,9 @@ private[compiler] object DuplicationChecks {
             val specializedRet =
               TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
 
-            val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
+            // A record's synthesized accessor has no AST of its own: point at its component.
+            val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location)
+              .orElse(memberLocations.get(impl.name)).getOrElse(fallback)
 
             // Check if trying to override a final method
             if Modifier.isFinal(contract.modifier) then
@@ -113,12 +121,17 @@ private[compiler] object DuplicationChecks {
               }
             }
 
-            // A JVM override must return the same primitive: widening (Int where Double is
-            // declared) is assignable, but the bridge-less accessor would answer a different method.
-            val primitiveMismatch = (specializedRet, impl.returnType) match
-              case (c: BasicType, i: BasicType) => c != i
-              case _ => false
-            if (primitiveMismatch || !primitiveAwareAssignable(specializedRet, impl.returnType, typing)) {
+            // The JVM overrides by descriptor, and no bridge is emitted for a non-generic
+            // contract, so when either return type is primitive they must be the same type:
+            // `Int` over `Double` or over `Integer` is assignable, but the method would answer
+            // only calls made through its own type (#2372). A type-variable contract is erased
+            // and bridged, so it keeps the assignability rule.
+            val descriptorClash =
+              !contract.returnType.isInstanceOf[TypeVariableType] &&
+                (specializedRet.isBasicType || impl.returnType.isBasicType) && specializedRet != impl.returnType
+            if (descriptorClash) {
+              typing.report(SemanticError.OVERRIDE_RETURN_TYPE_MISMATCH, location, impl.name, impl.returnType, view.raw, specializedRet)
+            } else if (!primitiveAwareAssignable(specializedRet, impl.returnType, typing)) {
               typing.report(SemanticError.INCOMPATIBLE_TYPE, location, specializedRet, impl.returnType)
             }
           }

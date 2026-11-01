@@ -1167,6 +1167,20 @@ Fix: combine the methods into the first block. Distinct concrete
 instantiations of the same generic receiver do not collide
 (`extension List[Int]` and `extension List[String]` can coexist).
 
+### `E0103` — Override changes a primitive return type
+
+A method, or a record component's accessor, overrides an inherited method with a
+different return type, and one of the two types is primitive. The JVM matches an
+override by its exact descriptor, so `Int` does not override `Double` or `JInteger`.
+Calls through the supertype would run the inherited method instead.
+
+```onion
+interface Shape { def area(): JInteger }
+record Circle(area: Int) conforms Shape   // E0103: area(): Int cannot override Shape.area(): JInteger
+```
+
+Fix: give the component or method the inherited type (`area: JInteger`), or rename it.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -1927,6 +1941,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
 | `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
+| `E0103` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
 
 ## See also
 

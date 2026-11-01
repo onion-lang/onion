@@ -1154,6 +1154,21 @@ extension List[Int] { def bar(): Int = 2 }   // E0102: List[int] 用の extensio
 異なる具体的インスタンス化は衝突しません（`extension List[Int]` と
 `extension List[String]` は共存できます）。
 
+### `E0103` — オーバーライドでプリミティブの戻り値型が変わる
+
+メソッド、またはレコードのコンポーネントのアクセサが、継承したメソッドを別の戻り値型でオーバーライドしています。
+しかも、どちらかの型がプリミティブ型です。
+JVM はオーバーライドを正確なディスクリプタ（引数と戻り値の型の組）で照合します。
+そのため `Int` は `Double` や `JInteger` をオーバーライドしません。
+上位型を通した呼び出しでは、継承元のメソッドが実行されてしまいます。
+
+```onion
+interface Shape { def area(): JInteger }
+record Circle(area: Int) conforms Shape   // E0103: area(): Int は Shape.area(): JInteger をオーバーライドできない
+```
+
+対処: コンポーネントやメソッドを継承元と同じ型にするか（`area: Integer`）、名前を変えてください。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -1909,6 +1924,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0100` | this `case` combines more than one type/destructuring/regex/binding pattern with `,` |
 | `E0101` | this lambda takes … parameter(s), but the expected function type … takes … |
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
+| `E0103` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
 
 ## 関連項目
 

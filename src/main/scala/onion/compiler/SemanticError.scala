@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0102) for identification
+ * type checking. Each error has a unique code (E0000-E0103) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -35,10 +35,10 @@ package onion.compiler
  * '''Access Errors (E0013-E0015)'''
  *   - METHOD_NOT_ACCESSIBLE, FIELD_NOT_ACCESSIBLE, CLASS_NOT_ACCESSIBLE
  *
- * '''Inheritance Errors (E0016, E0018, E0023, E0037-E0039, E0068, E0072)'''
+ * '''Inheritance Errors (E0016, E0018, E0023, E0037-E0039, E0068, E0072, E0103)'''
  *   - CYCLIC_INHERITANCE, ILLEGAL_INHERITANCE, INTERFACE_REQUIRED
  *   - UNIMPLEMENTED_ABSTRACT_METHOD, ABSTRACT_CLASS_INSTANTIATION, FINAL_METHOD_OVERRIDE
- *   - OVERRIDE_TARGET_NOT_FOUND, ABSTRACT_METHOD_WITH_BODY
+ *   - OVERRIDE_TARGET_NOT_FOUND, ABSTRACT_METHOD_WITH_BODY, OVERRIDE_RETURN_TYPE_MISMATCH
  *   (E0017, E0024, and E0056 are retired codes, kept unassigned rather than reused.)
  *
  * '''Call and Value-Use Errors (E0019-E0020, E0040-E0041, E0071, E0091-E0092)'''
@@ -336,6 +336,14 @@ object SemanticError {
    * they redefine the same class.
    */
   case object DUPLICATE_EXTENSION_BLOCK extends SemanticError(102)
+
+  /**
+   * A method (or a record component's accessor) overrides an inherited one with a different
+   * return type where either is primitive: `area(): Int` over `area(): Integer` or
+   * `area(): Double`. The JVM matches overrides by descriptor and no bridge is emitted, so
+   * calls through the supertype ran the inherited method instead (issue #2372).
+   */
+  case object OVERRIDE_RETURN_TYPE_MISMATCH extends SemanticError(103)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

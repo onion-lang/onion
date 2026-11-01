@@ -331,7 +331,11 @@ object AST {
   case class TypeParameter(location: Location, name: String, upperBound: Option[TypeNode] = None, constraints: List[TypeNode] = Nil) extends Node
   case class Annotation(location: Location, name: String) extends Node
 
-  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil) extends MemberDeclaration {
+  case class MethodDeclaration(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter] = Nil, throwsTypes: List[TypeNode] = Nil, annotations: List[Annotation] = Nil,
+    /** `requires e` clauses, in source order (RFC #2557). Always empty unless `--contracts` is on. */
+    requires: List[Expression] = Nil,
+    /** `ensures e` clauses, in source order. `result` and `old(e)` may appear in them. */
+    ensures: List[Expression] = Nil) extends MemberDeclaration {
     def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression) =
       this(location, modifiers, name, args, returnType, block, Nil, Nil, Nil)
     def this(location: Location, modifiers: Int, name: String, args: List[Argument], returnType: TypeNode, block: BlockExpression, typeParameters: List[TypeParameter]) =

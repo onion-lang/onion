@@ -12,7 +12,7 @@ Language support for the [Onion programming language](https://github.com/onion-l
   `file"…"`, `http"…"`, and any prefix you define) — with `re"…"` bodies
   highlighted as regular expressions.
 
-  Soft keywords (`tool`, `requires`, `shape`, `law`, `example`, `from`,
+  Soft keywords (`tool`, `requires`, `ensures`, `shape`, `law`, `example`, `from`,
   `derive`) are recognised only where the compiler treats them as keywords, so
   a variable named `shape` stays a variable. The keyword set is checked against
   the compiler's own grammar on every build, so this list cannot silently fall

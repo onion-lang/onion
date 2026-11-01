@@ -1304,6 +1304,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val args = if (accept(K.LPAREN)) { val a = argsList(); expect(K.RPAREN); a } else Nil
     val ty = if (accept(K.COLON)) returnType() else null
     val throwsTypes = if (kind(1) == K.K_THROWS) throwsClause() else Nil
+    val (reqs, enss) = contractClauses()
     kind(1) match {
       case K.ASSIGN =>
         next()
@@ -1314,15 +1315,45 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
         val bodyElems: List[AST.BlockElement] =
           if (isVoidReturnType(ty)) List(e) else List(AST.ReturnExpression(p(t), e))
         AST.MethodDeclaration(p(t), mset, c(t), args, ty,
-          AST.BlockExpression(p(t), bodyElems, leaveAssignScope()), tparams, throwsTypes, anns)
+          AST.BlockExpression(p(t), bodyElems, leaveAssignScope()), tparams, throwsTypes, anns, reqs, enss)
       case K.LBRACE =>
         leaveSection()
         val b = block()
-        AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams, throwsTypes, anns)
+        AST.MethodDeclaration(p(t), mset, c(t), args, ty, b, tparams, throwsTypes, anns, reqs, enss)
       case _ =>
         eosOrBlockEnd()
-        AST.MethodDeclaration(p(t), mset, c(t), args, ty, null, tparams, throwsTypes, anns)
+        AST.MethodDeclaration(p(t), mset, c(t), args, ty, null, tparams, throwsTypes, anns, reqs, enss)
     }
+  }
+
+  /**
+   * Contract clauses after a signature (RFC #2557): any number of `requires e` and `ensures e`,
+   * each on the same line or on a line of its own. `requires` and `ensures` are soft keywords:
+   * they mean this only here, before the body, and stay ordinary names everywhere else.
+   *
+   * A clause expression ends where the body begins, so it is read like the condition of an
+   * `if` (`inConditionOf`): `ensures result == n { ... }` does not take `{ ... }` as a trailing
+   * lambda on `n`. After the clauses, the body's `{` or `=` may sit on its own line.
+   */
+  private def contractClauses(): (List[AST.Expression], List[AST.Expression]) = {
+    val reqs = List.newBuilder[AST.Expression]
+    val enss = List.newBuilder[AST.Expression]
+    var any = false
+    while (contractClauseAhead()) {
+      any = true
+      eols()
+      val keyword = next()
+      val e = inConditionOf(term())
+      if (keyword.image == "requires") reqs += e else enss += e
+    }
+    if (any && (rawKindSkippingEol(0)._1 == K.LBRACE || rawKindSkippingEol(0)._1 == K.ASSIGN)) eols()
+    (reqs.result(), enss.result())
+  }
+
+  /** True when the next token, past any line breaks, is the word `requires` or `ensures`. */
+  private def contractClauseAhead(): Boolean = {
+    val (k, i) = rawKindSkippingEol(0)
+    k == K.ID && { val w = rawAt(i).image; w == "requires" || w == "ensures" }
   }
 
   // ---------------------------------------------------------------- types

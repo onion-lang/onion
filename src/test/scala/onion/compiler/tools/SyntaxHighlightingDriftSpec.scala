@@ -58,9 +58,12 @@ class SyntaxHighlightingDriftSpec extends AnyFunSpec {
   private lazy val softKeywords: Set[String] =
     val explicit = """getToken\(\d+\)\.image\.equals\("([a-zA-Z_][a-zA-Z0-9_]*)"\)""".r
     val helper   = """\bla\d*\("([a-zA-Z_][a-zA-Z0-9_]*)"\)""".r
+    // `softAt(i, "x")` probes token i, which may lie past line breaks (contract clauses).
+    val softAt   = """\bsoftAt\(\w+,\s*"([a-zA-Z_][a-zA-Z0-9_]*)"\)""".r
     val all =
       explicit.findAllMatchIn(grammar).map(_.group(1)).toSet ++
-      helper.findAllMatchIn(grammar).map(_.group(1)).toSet
+      helper.findAllMatchIn(grammar).map(_.group(1)).toSet ++
+      softAt.findAllMatchIn(grammar).map(_.group(1)).toSet
     // `_` is the wildcard pattern, not a keyword; the rest are already hard keywords being
     // re-inspected after the fact (`val` in a var/val declaration, for instance).
     all -- hardKeywords - "_"

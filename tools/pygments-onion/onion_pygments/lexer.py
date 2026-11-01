@@ -120,6 +120,9 @@ class OnionLexer(RegexLexer):
             (r"tool\b(?=\s+[a-zA-Z_]\w*\s*\()", Keyword.Declaration),
             (r"shape\b(?=\s+[a-zA-Z_]\w*\s*=)", Keyword.Declaration),
             (r"requires\b(?=\s*\{)", Keyword),
+            # Contract clauses (RFC #2557): a word that starts a line (or follows a signature) and
+            # is followed by an expression. A variable named `ensures` stays uncoloured.
+            (r"(?:requires|ensures)\b(?=\s+[^\s=,;:.)\]}])", Keyword),
             (r"derive\b(?=!)", Keyword),
             (r"law\b(?=\s+[a-zA-Z_]\w*\s*[({])", Keyword),
             (r"example\b(?=\s*(\{|[a-zA-Z_]\w*\s*\{))", Keyword),

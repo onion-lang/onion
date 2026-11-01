@@ -1,0 +1,128 @@
+package onion.compiler
+
+import onion.compiler.parser.{JJOnionParser, OnionParser}
+
+import java.io.StringReader
+import org.scalatest.funspec.AnyFunSpec
+
+/**
+ * Contract clauses on a method (`requires`, `ensures`; RFC #2557) must parse to the same AST
+ * in the handwritten fast-path parser and in the JavaCC parser.
+ *
+ * `FastPathParserParitySpec` walks `run/` only, and it skips a file the fast path rejects,
+ * so new syntax that appears in no sample is not covered there at all. These programs are
+ * parsed by both, and the fast path must accept them.
+ */
+class ContractSyntaxParitySpec extends AnyFunSpec {
+
+  private def fast(code: String): AST.CompilationUnit =
+    try OnionParser.parse(code)
+    catch { case f: OnionParser.Fail => fail(s"the fast path rejected this program: $f\n$code") }
+
+  private def jj(code: String): AST.CompilationUnit =
+    new JJOnionParser(new StringReader(code)).unit()
+
+  private def methods(node: Any): List[AST.MethodDeclaration] = node match {
+    case m: AST.MethodDeclaration => m :: methods(m.block)
+    case p: Product               => p.productIterator.toList.flatMap(methods)
+    case it: Iterable[?]          => it.toList.flatMap(methods)
+    case _                        => Nil
+  }
+
+  private def both(code: String): List[AST.MethodDeclaration] = {
+    val f = fast(code)
+    assert(f == jj(code), "the fast-path AST differs from the JavaCC AST")
+    methods(f)
+  }
+
+  describe("clauses after a signature") {
+    it("reads requires and ensures on one line") {
+      val ms = both(
+        """class A {
+          |public:
+          |  def f(x: Int): Int requires x > 0 ensures result > x { return x + 1 }
+          |}""".stripMargin)
+      val f = ms.find(_.name == "f").get
+      assert(f.requires.size == 1)
+      assert(f.ensures.size == 1)
+    }
+
+    it("reads one clause per line, with the body brace on its own line") {
+      val ms = both(
+        """class A {
+          |public:
+          |  def f(x: Int): Int
+          |    requires x > 0
+          |    requires x < 100
+          |    ensures result > x
+          |  {
+          |    return x + 1
+          |  }
+          |}""".stripMargin)
+      val f = ms.find(_.name == "f").get
+      assert(f.requires.size == 2)
+      assert(f.ensures.size == 1)
+      assert(f.block != null)
+    }
+
+    it("reads clauses before an expression body") {
+      val ms = both(
+        """class A {
+          |public:
+          |  def f(x: Int): Int
+          |    requires x > 0
+          |    = x + 1
+          |}""".stripMargin)
+      val f = ms.find(_.name == "f").get
+      assert(f.requires.size == 1)
+      assert(f.block != null)
+    }
+
+    it("reads clauses on an interface method that has no body") {
+      val ms = both(
+        """interface I {
+          |  def f(x: Int): Int requires x > 0 ensures result >= 0
+          |  def g(): Int
+          |}""".stripMargin)
+      val f = ms.find(_.name == "f").get
+      val g = ms.find(_.name == "g").get
+      assert(f.requires.size == 1 && f.ensures.size == 1)
+      assert(f.block == null)
+      assert(g.requires.isEmpty && g.ensures.isEmpty)
+    }
+
+    it("does not read a trailing lambda out of the last clause expression") {
+      val ms = both(
+        """class A {
+          |  var n: Int
+          |public:
+          |  def get(): Int ensures result == n { return n }
+          |}""".stripMargin)
+      val get = ms.find(_.name == "get").get
+      assert(get.ensures.size == 1)
+      assert(get.block != null)
+    }
+
+    it("keeps the order of the clauses") {
+      val ms = both(
+        """class A {
+          |public:
+          |  def f(x: Int, y: Int): Int requires x > 0 requires y > 0 ensures result > 0 ensures result > x { return x + y }
+          |}""".stripMargin)
+      val f = ms.find(_.name == "f").get
+      assert(f.requires.size == 2 && f.ensures.size == 2)
+    }
+  }
+
+  describe("the words stay ordinary names") {
+    it("lets a method, a parameter and a call use requires and ensures") {
+      val ms = both(
+        """class A {
+          |public:
+          |  def requires(ensures: Int): Int { return ensures }
+          |  def h(): Int { return requires(1) }
+          |}""".stripMargin)
+      assert(ms.forall(m => m.requires.isEmpty && m.ensures.isEmpty))
+    }
+  }
+}

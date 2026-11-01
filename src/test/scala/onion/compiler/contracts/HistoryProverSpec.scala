@@ -54,4 +54,16 @@ class HistoryProverSpec extends AnyFunSpec {
   it("says Unsupported for what it does not model (a call), never a guess") {
     assert(prove("println(\"x\")") == HistoryProver.Unsupported)
   }
+
+  it("models an Int local: val d = k * 2; n = n + d") {
+    assert(prove("val d = k * 2\n    n = n + d", invariant = "n >= 0 && n < 1000", requires = "requires k >= 0 && k < 100") == HistoryProver.Proved)
+  }
+
+  it("models a trailing return") {
+    assert(prove("n = n + 1\n    return", invariant = "n < 1000") == HistoryProver.Proved)
+  }
+
+  it("refuses a local that shadows a field") {
+    assert(prove("val n = 5\n    n = 6") == HistoryProver.Unsupported)
+  }
 }

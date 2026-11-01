@@ -1967,6 +1967,9 @@ r.contains(9)                // false
 r.toString()                 // "Range(2..<6)"; 空の範囲は "Range(empty)"
 
 foreach i: Int in r { IO::println(i) }   // 2 3 4 5
+
+val evens = (1..10).filter { x -> x % 2 == 0 }   // List[Int]: [2, 4, 6, 8, 10]
+evens.size                   // 5
 ```
 
 ## Iterables モジュール
@@ -1975,10 +1978,10 @@ foreach i: Int in r { IO::println(i) }   // 2 3 4 5
 
 コレクションや配列向けのイテレーションユーティリティ:
 
-- `Iterables::map(list|iterable|set, f)`
+- `Iterables::map(list|iterable|set, f)` - リストやその他の`Iterable`（範囲、`map.values()`）なら`List`、セットなら`Set`を返します
 - `Iterables::mapMap(map, f)` - 各 `Map.Entry` を `f` で変換した新しい `Map` を返す。順序は元の挿入順のまま
 - `Iterables::toList(iterable)` - 任意の `Iterable`（範囲を含む）を `List` に実体化する
-- `Iterables::filter(list|iterable, predicate)`
+- `Iterables::filter(list|iterable, predicate)` - 常に`List`を返します
 - `Iterables::foldl(iterable, init, f)`
 - `Iterables::reduce(list, initial, reducer)`
 - `Iterables::exists(iterable, predicate)`

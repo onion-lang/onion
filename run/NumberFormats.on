@@ -219,7 +219,7 @@ def main(): void {
 
   println("")
   println("=== Primes up to 50 ===")
-  val primes: List[Int] = (1..50).filter { n: Int -> n.isPrime() }.toList()
+  val primes: List[Int] = (1..50).filter { n: Int -> n.isPrime() }
   println("  " + primes)
   println("  Count: #{primes.size()}")
 

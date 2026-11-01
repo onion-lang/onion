@@ -132,6 +132,16 @@ val thread: Thread = new Thread(task)
 thread.start()
 ```
 
+Onion には匿名クラスがありません。Java の `new Runnable() { ... }` は構文エラーになります。
+抽象メソッドが 1 つのインターフェースなら、代わりにラムダを渡します：
+
+```onion
+val thread: Thread = new Thread(() -> println("Task is running"))
+thread.start()
+```
+
+そうでなければ、上のように名前付きクラスを宣言します（クラスなら `extends`、インターフェースなら `conforms`）。
+
 ## Javaクラスの拡張
 
 `:` でJavaクラスを継承できます：

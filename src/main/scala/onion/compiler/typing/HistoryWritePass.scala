@@ -20,6 +20,8 @@ final class HistoryWritePass(typing: Typing) {
   import HistoryWritePass.Repro
   // `counterexamples` runs the same analysis without reporting and collects what the solver found.
   private var collected: scala.collection.mutable.ArrayBuffer[Repro] = null
+  /** Histories the solver proved for a method, as `Class.method: field >= old(field)`. */
+  val proved: scala.collection.mutable.ArrayBuffer[String] = scala.collection.mutable.ArrayBuffer.empty
   private var unitFile: String = null
   private sealed trait Kind
   private case object Raise extends Kind
@@ -94,6 +96,7 @@ final class HistoryWritePass(typing: Typing) {
     } HistoryProver.prove(m, field, op, intFields, invariants) match {
       case HistoryProver.Counterexample(before) =>
         collected += Repro(unitFile, cls, m, field, op, before)
+      case HistoryProver.Proved => proved += s"${cls.name}.${m.name}: $field $op old($field)"
       case _ =>
     }
   }

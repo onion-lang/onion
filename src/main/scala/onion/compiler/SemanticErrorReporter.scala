@@ -784,13 +784,22 @@ class SemanticErrorReporter(threshold: Int) {
       } else if (sameNamedTypeVariables(expected, actual)) {
         // `def m[T](a: T) { t = a }` inside `class K[T]`: two parameters named `T`,
         // so "type T is expected, but type T is used" contradicts itself without this.
-        Some(format(message("suggestion.shadowedTypeParameter"), Seq(typeName(expected))))
+        Some(format(message("suggestion.shadowedTypeParameter"), Seq(typeName(expected match {
+          case n: TypedAST.NullableType => n.innerType
+          case other => other
+        }))))
       } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable &&
           !nonNullStillMisfitsTypeVariable(expected, actual) &&
           // A rejected cast is about the inner types: `(s!! as Integer)` fails the same way.
           castSource.isEmpty) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
-      } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
+      } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] &&
+          // A `T?` slot is a type-variable slot too: `t = u` there is the same mistake as
+          // into a `T`, not a lost type argument (#2332 review).
+          !(expected match {
+            case n: TypedAST.NullableType => n.innerType
+            case other => other
+          }).isInstanceOf[TypedAST.TypeVariableType]) {
         // `(x as Outcome.Ok).value()` yields the raw type variable: a cast to a generic
         // nested class does not restore the scrutinee's type arguments, a pattern does.
         Some(format(message("suggestion.castLosesTypeArguments"), Seq(typeName(actual))))

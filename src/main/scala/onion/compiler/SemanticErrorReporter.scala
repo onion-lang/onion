@@ -754,13 +754,18 @@ class SemanticErrorReporter(threshold: Int) {
     def written(t: TypedAST.Type): String = t match
       case a: TypedAST.ArrayType if listArrayCast.isDefined => onion.compiler.toolbox.TypeFormatting.arrayWrittenForm(a)
       case other => typeName(other)
+    // A set or range is never a List at runtime either, so a cast is no fix for the widening case.
+    val widenToIterable = items.length > 2 && items(2).isInstanceOf[SemanticErrorReporter.WidenToIterableHint]
     val baseMessage = format(
-      message(if (listArrayCast.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      message(if (listArrayCast.isDefined || widenToIterable) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
       Seq(written(expected), written(actual))
     )
     val hint =
       if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
         Some(message("suggestion.hexDigitB"))
+      } else if (widenToIterable) {
+        val widen = items(2).asInstanceOf[SemanticErrorReporter.WidenToIterableHint]
+        Some(format(message("suggestion.widenVarToIterable"), Seq(widen.name, typeName(expected), typeName(widen.wider))))
       } else if (expected != null && actual != null && !expected.isNullable && actual.isNullable) {
         Some(format(message("suggestion.nullableToNonNull"), Seq()))
       } else if (expected != null && actual.isInstanceOf[TypedAST.TypeVariableType] && !expected.isInstanceOf[TypedAST.TypeVariableType]) {
@@ -1051,6 +1056,11 @@ object SemanticErrorReporter {
    * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
    */
   private[compiler] case object HexDigitBHint
+
+  /** An extra (third) item on INCOMPATIBLE_TYPE: the variable `name` is a `List`, the value
+   *  another `Iterable`, and declaring the variable `wider` (`Iterable[E]`) would accept it.
+   *  `var xs = (1..3).map { ... }` is a `List` since #2496, so this is the migration hint. */
+  private[compiler] final case class WidenToIterableHint(name: String, wider: TypedAST.Type)
 
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */

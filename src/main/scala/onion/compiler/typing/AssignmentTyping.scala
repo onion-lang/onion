@@ -52,7 +52,7 @@ final class AssignmentTyping(
     val frame = bind.frameIndex
     val index = bind.index
     val leftType = bind.tp
-    value = processAssignable(node.rhs, leftType, value)
+    value = assignToVariable(id.name, node.rhs, leftType, value)
     if (value != null) new SetLocal(frame, index, leftType, value) else null
   }
 
@@ -310,7 +310,7 @@ final class AssignmentTyping(
     }
     else if (value.`type`.isBottomType) value
     else {
-      val term = processAssignable(node.rhs, field.`type`, value)
+      val term = assignToVariable(field.name, node.rhs, field.`type`, value)
       if (term == null) null else new SetStaticField(owner, field, term)
     }
   }
@@ -359,6 +359,43 @@ final class AssignmentTyping(
 
   private def processAssignable(node: AST.Node, expected: Type, term: Term): Term =
     body.processAssignable(node, expected, term)
+
+  /**
+   * A reassignment of the variable `name`. When the variable is a `List[E]` and the value is
+   * another `Iterable[E]` (a set, a range, `map.values()`), the E0000 also says to declare the
+   * variable `Iterable[E]`: `var xs = (1..3).map { ... }` is a `List` since #2496, so a later
+   * `xs = someSet` stopped compiling.
+   */
+  private def assignToVariable(name: String, rhs: AST.Node, target: Type, value: Term): Term =
+    iterableWideningOf(target, value.`type`) match {
+      case Some(wider) =>
+        bodyContext.report(INCOMPATIBLE_TYPE, rhs, target, value.`type`, SemanticErrorReporter.WidenToIterableHint(name, wider))
+        null
+      case None => processAssignable(rhs, target, value)
+    }
+
+  /** `Iterable[E]` when `target` is `List[E]` and `actual` is an `Iterable[E]` that is not a
+   *  `List`, so it can never be assigned to `target`; otherwise None. */
+  private def iterableWideningOf(target: Type, actual: Type): Option[Type] = {
+    def rawOf(t: Type): Option[ClassType] = t match {
+      case _: TypeVariableType => None
+      case a: AppliedClassType => Some(a.raw)
+      case c: ClassType => Some(c)
+      case _ => None
+    }
+    for {
+      list <- bodyContext.table.load("java.util.List")
+      iterable <- bodyContext.table.load("java.lang.Iterable")
+      targetRaw <- rawOf(target) if targetRaw.name == list.name
+      actualRaw <- rawOf(actual)
+      if !TypeRules.isSuperType(list, actualRaw) && TypeRules.isSuperType(iterable, actualRaw)
+      wider = target match {
+        case a: AppliedClassType if a.typeArguments.length == 1 => AppliedClassType(iterable, scala.collection.immutable.List(a.typeArguments.head))
+        case _ => iterable
+      }
+      if TypeRelations.isAssignableWithBoxing(wider, actual, bodyContext.table)
+    } yield wider
+  }
 
   private def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Boolean, Method] =
     body.tryFindMethod(node, target, name, params)

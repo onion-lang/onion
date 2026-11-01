@@ -16,10 +16,12 @@ package onion.compiler
  * hidden `onion$$jsonShape()` every such record gets (see `Rewriting`), so the outer record
  * needs neither the inner record's shape name nor its declaration order.
  *
- * Rewriting classifies the component's *written* type (it runs before names resolve), and
- * typing classifies the *resolved* one; a component is accepted only when the two agree,
- * so a type alias or a shadowing class named `List` can never make the runtime read
- * something other than what the declaration says (it is E0061 instead).
+ * Rewriting classifies the component's *written* type (it runs before names resolve, but
+ * replaces the module's own `type` aliases first, #2507), and typing classifies the
+ * *resolved* one; a component is accepted only when the two agree, so an alias Rewriting
+ * cannot see (one imported from another module) or a shadowing class named `List` can
+ * never make the runtime read something other than what the declaration says (it is
+ * E0061 instead).
  */
 private[compiler] object JsonShapeComponents {
 

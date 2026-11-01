@@ -1025,7 +1025,9 @@ tool takeRec(p: P): Int requires { console } { IO::println("" + p.x()); return 0
 
 ```onion
 tool greet(csv: String = "") requires { console } {
-  foreach n: String in Strings::split(csv, ",") { IO::println("Hello, " + n) }
+  if csv != "" {
+    foreach n: String in Strings::split(csv, ",") { IO::println("Hello, " + n) }
+  }
 }
 // $ onion greet.on --csv ann,bob
 ```
@@ -1214,6 +1216,19 @@ public:
 
 対処: どちらか一方のメソッドをリネームするか、パラメータ型を変えて正当な
 オーバーロードにしてください。
+
+レコードの成分（コンポーネント）はアクセサを自動生成します。そのため、レコード本体で
+同じ名前の引数なしメソッドは定義できません。戻り値の型や修飾子が違っても同じです。
+
+```onion
+record R(a: Int) {
+public:
+  def a(): Int = 42   // E0010: 成分 a: Int がアクセサ a(): Int を生成済み
+}
+```
+
+対処: メソッドか成分の名前を変えてください。引数のあるメソッド `a(x: Int)` は正当な
+オーバーロードなので、コンパイルできます。
 
 ### `E0025` — コンストラクタの重複
 

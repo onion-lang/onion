@@ -268,7 +268,7 @@ is forbidden is `other.n = 0` on a different object, which no call to `other` wo
 The check needs no solver. `reset` assigns the constant `0` to a field whose history says
 `n >= old(n)`, and `Counter.inc` raises `n`, so `n` can be above `0` when `reset` runs. That is
 a fact about the syntax of the two methods, not a guess about a run. §7.1 gives the full rule,
-including what is *not* reported (a class whose only write is `n = 0` breaks nothing). Anything
+including what the syntax does not report (a class whose only write is `n = 0` needs `invariant n == 0` for the solver to prove it). Anything
 harder waits for the prover.
 
 ### 4.2 Interfaces
@@ -471,7 +471,7 @@ So E0109 is reported only when the syntax settles it. Take the history `n >= old
 |---|---|---|
 | `n = n - c`, with `c` a positive constant | **E0109** | `n - c >= n` is false for every `n` (apart from overflow, §3). No reachability is needed |
 | `n = c`, and some method of the class or its supertypes **raises** `n` (`n = n + k`, `k` positive) | **E0109**, and the message names that method | `n` can exceed `c`, because that method raises it. The reason is a fact in the syntax |
-| `n = c`, and nothing raises `n` | **nothing** | `n` never exceeds its start, so the write cannot lower it. A class whose only write is `n = 0` is fine |
+| `n = c`, and nothing raises `n` | **no syntactic error**; the solver decides | The syntax alone cannot tell where `n` starts. The solver checks the write against the class `invariant`s: with `invariant n == 0` a write of `0` is proved fine; with no invariant, `n` could start above `c`, and the write has a counterexample (below) |
 | any other expression | `Not proved` | The prover decides (stage 7) |
 
 The same reasoning applies to a history `n <= old(n)` with the directions swapped, and to
@@ -794,3 +794,20 @@ more than `law`/`example` gave.
 - The `Shape` round-trip rule is stated once, on the interface, instead of in every file that
   implements it, and the false rule (L2) is never asserted.
 - About 300 build-time test clauses move to one mechanism, after that mechanism works.
+
+---
+
+## Appendix: what is built (stage 2 and the first part of stage 5 to 7)
+
+| Check | Code | How |
+|---|---|---|
+| A history that is not a preorder | E0108 | syntax |
+| A write that breaks a history, including an interface's | E0109 | syntax |
+| A clause that names a mutable object | E0110 | types |
+| A class with a clause that extends a Java class | E0111 | types |
+| A solver counterexample that **running the compiled code reproduces** | E0112 | CDCL SAT + bit-vectors, then a run |
+| A solver counterexample that cannot be run, or does not break when run | W0021 | the same, shown as a warning |
+
+A proved history prints nothing. Showing it (a `verbose` line) needs `verbose` to reach the compiler
+first, and is not built. `Int` is the only type the prover models; a body with a call, a loop, a
+`return` or a local is not modelled and reports nothing.

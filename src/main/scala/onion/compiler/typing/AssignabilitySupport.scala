@@ -164,7 +164,9 @@ private[compiler] final class AssignabilitySupport(
     def containsTypeVariable(typeToCheck: Type): Boolean =
       TypeCheckingHelpers.containsTypeVariable(typeToCheck)
 
-    def structurallyAssignable(expected: Type, actual: Type): Boolean = (expected, actual) match {
+    // `nested` is true inside a type-argument comparison, where type arguments are
+    // invariant and a variable must not widen to its bound.
+    def structurallyAssignable(expected: Type, actual: Type, nested: Boolean = false): Boolean = (expected, actual) match {
       case (_, nt) if nt.isNullType =>
         // The null literal is assignable to any reference (non-basic) target,
         // including a generic type parameterized by a type variable (Node[T]).
@@ -226,8 +228,8 @@ private[compiler] final class AssignabilitySupport(
                         case ub => structurallyAssignable(ub, a)
                       }
                   }
-                case _ if involvesTypeVariable => structurallyAssignable(e, a) && structurallyAssignable(a, e)
-                case _ => structurallyAssignable(e, a)
+                case _ if involvesTypeVariable => structurallyAssignable(e, a, nested = true) && structurallyAssignable(a, e, nested = true)
+                case _ => structurallyAssignable(e, a, nested = true)
               }
             }
         if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
@@ -242,6 +244,11 @@ private[compiler] final class AssignabilitySupport(
           bodyContext.table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
             .collectFirst { case (raw, view) if TypeRelations.sameClass(raw, ae.raw) && argsMatch(view) => true }
             .getOrElse(false)
+      case (ae: TypedAST.AppliedClassType, tv: TypedAST.TypeVariableType)
+          if !nested && TypeRelations.typeVariableFitsAppliedBound(ae, tv, bodyContext.table) =>
+        // `T extends Comparable[T]` is a `Comparable[T]`: the same relation a
+        // call argument uses (#2338).
+        true
       case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>
         actual match {
           case classType: TypedAST.ClassType => TypeRelations.sameClass(ae.raw, classType)

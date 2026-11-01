@@ -156,5 +156,50 @@ class RecordAliasComponentSpec extends AbstractShellSpec {
       assert(out.isRight, out)
       assert(constructorDescriptors(out.toOption.get("Addr")) == List("(Ljava/lang/String;I)V"))
     }
+
+    // #2517: `String` reads as java.lang.String wherever it is written, so an alias to it
+    // from another file expands like a primitive one. It used to stay `Name`, which a json
+    // shape took for a nested record: E0005 about `String.onion$$jsonShape()`.
+    it("reads a String alias in a json shape, a from re\"...\" parser and derive!(Json)") {
+      val out = compileAll(
+        "A.on" -> "type Name = String\n",
+        "B.on" ->
+          """record J(n: Name, m: Name?) {
+            |  shape doc = json
+            |}
+            |record F(n: Name, port: Int) from re"(\S+):(\d+)"
+            |record D(n: Name) derive!(Json)
+            |class Main {
+            |public:
+            |  static def run(): String {
+            |    val j = J::doc().parse("{\"n\": \"x\"}").get()
+            |    val f: F? = F::parse("h:80")
+            |    val d: D? = D::fromJson("{\"n\": \"y\"}")
+            |    return j.n() + " " + j.m() + " " + f?.n() + " " + d?.n() + " " + D::toJson(new D("z"))
+            |  }
+            |}
+            |""".stripMargin)
+      assert(out.isRight, out)
+      val classes = out.toOption.get
+      assert(constructorDescriptors(classes("J")) == List("(Ljava/lang/String;Ljava/lang/String;)V"))
+      val loader = new ClassLoader(getClass.getClassLoader) {
+        override def findClass(name: String): Class[?] = classes.get(name) match {
+          case Some(b) => defineClass(name, b, 0, b.length)
+          case None    => throw new ClassNotFoundException(name)
+        }
+      }
+      val result = loader.loadClass("Main").getMethod("run").invoke(null)
+      assert(result == "x null h y {\"n\":\"z\"}")
+    }
+
+    it("is E0061, not E0005, when the json shape cannot see the alias's target") {
+      val out = compileAll(
+        "A.on" -> "import { java.lang.String as JS; }\ntype Name = JS\n",
+        "B.on" -> "record J(n: Name) {\n  shape doc = json\n}\n")
+      assert(out.isLeft, out)
+      val codes = out.swap.toOption.get.map(_.takeWhile(_ != ' '))
+      assert(codes.contains("E0061"), codes)
+      assert(!codes.contains("E0005"), codes)
+    }
   }
 }

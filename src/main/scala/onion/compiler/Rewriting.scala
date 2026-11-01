@@ -225,9 +225,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    * the imports of the file that declares it, and the expanded text is resolved under the
    * record's file (the synthesized `parse`/`fromMap` bodies mention it). So only aliases
    * whose target means the same in both are taken: those declared in `unit` itself, and
-   * those from another file of the module whose target names only primitives and
-   * fully-qualified types. `import { java.sql.Date }` + `type D = Date` in another file
-   * would otherwise read as `java.util.Date` here (#2509).
+   * those from another file of the module whose target names only primitives,
+   * fully-qualified types and `String`. `import { java.sql.Date }` + `type D = Date` in
+   * another file would otherwise read as `java.util.Date` here (#2509). `String` is safe
+   * because synthesis reads it as java.lang.String wherever it is written
+   * (`ScalarConversions.ofAst`), and typing rejects the component (E0061) if the alias's
+   * own file means another class by it (#2517).
    */
   private var recordAliases: scala.collection.immutable.Map[String, AST.TypeDescriptor] = scala.collection.immutable.Map.empty
 
@@ -241,6 +244,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }.toMap
     def unambiguous(desc: AST.TypeDescriptor): Boolean = desc match {
       case _: AST.PrimitiveType                 => true
+      case AST.ReferenceType("String", _)       => true
       case AST.ReferenceType(_, qualified)      => qualified
       case AST.NullableType(inner)              => unambiguous(inner)
       case AST.ArrayType(component)             => unambiguous(component)

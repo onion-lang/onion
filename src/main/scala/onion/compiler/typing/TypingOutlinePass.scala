@@ -326,14 +326,17 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         // the same components and cannot read them.
         val unsupportedShape: List[(AST.Argument, Type, AST.ShapeClause)] =
           if (hasShapes) node.args.zip(argTypes).zipWithIndex.flatMap { case ((arg, argType), i) =>
-            if (isFromDerivableType(argType)) None
+            // The runtime reads what Rewriting classified from the type it synthesized
+            // from (the written type, with the record file's own aliases expanded,
+            // #2507); accept the component only when that agrees with the resolved type.
+            val resolved = JsonShapeComponents.tagOfType(argType, isJsonRecord)
+            val synthesized = node.synthesisArgTypes.lift(i).getOrElse(arg.typeRef)
+            val jsonReadable = resolved.isDefined && resolved == JsonShapeComponents.tagOfAst(synthesized)
+            // A scalar is readable by every format, except by a json shape that classified
+            // it as something else: an alias Rewriting could not expand (`type N = JS`,
+            // `JS` imported as java.lang.String) reads as a nested record there (#2517).
+            if (isFromDerivableType(argType) && (jsonReadable || !node.shapes.exists(isJsonClause))) None
             else {
-              val resolved = JsonShapeComponents.tagOfType(argType, isJsonRecord)
-              // The runtime reads what Rewriting classified from the type it synthesized
-              // from (the written type, with the record file's own aliases expanded,
-              // #2507); accept the component only when that agrees with the resolved type.
-              val synthesized = node.synthesisArgTypes.lift(i).getOrElse(arg.typeRef)
-              val jsonReadable = resolved.isDefined && resolved == JsonShapeComponents.tagOfAst(synthesized)
               // A nullable scalar (`T?`) is also readable by a regex shape clause: an
               // unmatched optional capture group becomes a real `null`, the same as
               // `from re"..."` (#1967, #1969).

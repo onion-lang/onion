@@ -1159,6 +1159,8 @@ object SemanticErrorReporter {
 
   private def typeName(item: AnyRef): String =
     if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.Type])
+  private def writtenTypeName(item: AnyRef): String =
+    if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.componentWrittenForm(item.asInstanceOf[TypedAST.Type])
   private def classTypeName(item: AnyRef): String =
     if (item == null) "<unknown>" else onion.compiler.toolbox.TypeFormatting.sourceForm(item.asInstanceOf[TypedAST.ClassType])
   private def objectTypeName(item: AnyRef): String =
@@ -1368,6 +1370,11 @@ object SemanticErrorReporter {
     SemanticError.ABSTRACT_CLASS_INSTANTIATION -> ErrorDef(
       "error.semantic.abstractClassInstantiation",
       Seq(items => typeName(items(0)))
+    ),
+    SemanticError.OVERRIDE_RETURN_TYPE_MISMATCH -> ErrorDef(
+      "error.semantic.overrideReturnTypeMismatch",
+      // A boxed wrapper keeps its written name (`JInteger`): `Int` vs `Int` would hide the clash.
+      Seq(items => asString(items(0)), items => writtenTypeName(items(1)), items => typeName(items(2)), items => writtenTypeName(items(3)))
     ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",

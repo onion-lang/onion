@@ -89,10 +89,12 @@ until the code changes; any other block gets one rebuttal round, then a fifth re
 `panel:approved` label is a display aid; the gate ignores it.
 
 A verdict is for the current change when `sha` is the PR's head **or** `diff` equals the
-fingerprint of the PR's change now: a hash of each changed file's name, status and `+`/`-`
-lines (context lines and hunk positions left out). A push that only merges `main` keeps the
-verdict; any push that changes a line the PR adds or removes makes it stale automatically. A
-mark without `diff=`, or a PR with too many files to fingerprint, matches by head SHA alone.
+fingerprint of the PR's change now: a hash of each changed file's name, status and patch,
+with each hunk's line numbers and heading left out but its context lines kept. A push that
+only merges `main` keeps the verdict, unless the merge edits a line next to the PR's change;
+any push that changes, adds, removes or moves a line the PR adds or removes makes it stale
+automatically. A mark without `diff=`, or a PR with too many files to fingerprint, matches
+by head SHA alone.
 A BLOCKED verdict carries over the same way.
 
 ## Required checks

@@ -48,6 +48,11 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     context: LocalContext,
     expected: Type = null
   ): Option[Term] = {
+    // Inside a contract clause, `old(e)` is the value of `e` on entry (RFC #2557). It is a soft
+    // keyword: in any other place `old` is an ordinary name, so a program may define its own.
+    if (node.name == "old" && node.args.length == 1 && context.contractScope.isDefined) {
+      return typeOld(node, context)
+    }
     if (ArgumentHelpers.hasNamedArguments(node.args)) {
       return typeUnqualifiedMethodCallWithNamedArgs(node, context, expected)
     }
@@ -343,6 +348,20 @@ private[compiler] final class UnqualifiedMethodCallSupport(
           )
         } else None
       case _ => None
+    }
+
+  /**
+   * `old(e)` in a contract. It is allowed in a postcondition and in a history; elsewhere it is
+   * E0107. For now `e` is typed as itself: a later stage gives it its own node and the value
+   * saved on entry. The terms are for checking, not yet for code generation.
+   */
+  private def typeOld(node: AST.UnqualifiedMethodCall, context: LocalContext): Option[Term] =
+    context.contractScope match {
+      case Some(ContractScope.Post) | Some(ContractScope.History) =>
+        calls.typed(node.args.head, context)
+      case _ =>
+        bodyContext.report(SemanticError.CONTRACT_MISPLACED, node, "`old(...)` has no earlier state here")
+        None
     }
 
   private def typeUnqualifiedMethodCallWithNamedArgs(

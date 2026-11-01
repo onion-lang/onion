@@ -1201,6 +1201,53 @@ record Circle(area: Int) conforms Shape   // E0104: area(): Int cannot override 
 
 Fix: give the component or method the inherited type (`area: JInteger`), or rename it.
 
+### `E0105` — A contract clause while contracts are off
+
+A `requires`, `ensures`, `invariant` or `history` clause appears in a program compiled with
+`--contracts off`, the default. Contracts are a preview feature (RFC #2557). The clause is an
+error rather than being ignored: a contract that silently does nothing is worse than none.
+
+```onion
+class Counter {
+  var n: Int
+public:
+  def get(): Int ensures result == n { return n }   // E0105: contracts are off
+}
+```
+
+Fix: compile with `--contracts runtime`, or remove the clause.
+
+### `E0106` — A contract that is not pure
+
+A contract expression calls something that does I/O, writes memory, or that the effect
+inference cannot vouch for. A contract states what holds; it may not change anything. A call
+to a method of the program is allowed when that method is pure.
+
+```onion
+import { java.util.* }
+class A {
+public:
+  def f(xs: List[Int]): Int requires xs.add(1) { return 0 }   // E0106: List.add writes to memory
+}
+```
+
+Fix: call a pure method (`xs.size`, `xs.get(0)`), or move the work out of the contract.
+
+### `E0107` — `old(...)` out of place
+
+`old(e)` is the value of `e` on entry to a method. It means that only in an `ensures` or a
+`history`. In a `requires` or an `invariant` there is no earlier state to look at.
+
+```onion
+class A {
+  var n: Int
+public:
+  def f(): void requires old(n) > 0 { }   // E0107
+}
+```
+
+Fix: use the plain value in a `requires`, or move the condition to an `ensures`.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -1963,6 +2010,9 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 | `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
 | `E0104` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
+| `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts runtime`) |
+| `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
+| `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 
 ## See also
 

@@ -1189,6 +1189,53 @@ record Circle(area: Int) conforms Shape   // E0104: area(): Int は Shape.area()
 
 対処: コンポーネントやメソッドを継承元と同じ型にするか（`area: Integer`）、名前を変えてください。
 
+### `E0105` — 契約が無効なのに契約の節がある
+
+`requires`、`ensures`、`invariant`、`history` の節が、`--contracts off`（既定）でコンパイルした
+プログラムにあります。契約はプレビュー機能です（RFC #2557）。節は無視されずエラーになります。
+黙って何もしない契約は、無い方が悪くないからです。
+
+```onion
+class Counter {
+  var n: Int
+public:
+  def get(): Int ensures result == n { return n }   // E0105: 契約が無効
+}
+```
+
+直し方: `--contracts runtime` を付けてコンパイルするか、節を取り除きます。
+
+### `E0106` — 純粋でない契約
+
+契約の式が、I/O をするもの、メモリに書き込むもの、効果推論が保証できないものを呼んでいます。
+契約は「何が成り立つか」を述べるもので、何も変えてはいけません。プログラム自身のメソッドは、
+それが純粋なら呼べます。
+
+```onion
+import { java.util.* }
+class A {
+public:
+  def f(xs: List[Int]): Int requires xs.add(1) { return 0 }   // E0106: List.add はメモリに書き込む
+}
+```
+
+直し方: 純粋なメソッド（`xs.size`、`xs.get(0)`）を呼ぶか、処理を契約の外に出します。
+
+### `E0107` — 置けない場所の `old(...)`
+
+`old(e)` は、メソッドに入った時点での `e` の値です。その意味になるのは `ensures` と `history`
+の中だけです。`requires` や `invariant` には、見に行く以前の状態がありません。
+
+```onion
+class A {
+  var n: Int
+public:
+  def f(): void requires old(n) > 0 { }   // E0107
+}
+```
+
+直し方: `requires` では普通の値を使うか、条件を `ensures` に移します。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -1946,6 +1993,9 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0102` | an extension block for … is already defined (combine the methods for the same type into one block) |
 | `E0103` | `foreach (a, b) in ...` walks the entries of a Map, but this is … (use `foreach p in ... { val (a, b) = p ... }`) |
 | `E0104` | …(): … cannot override ….…(): … (when either return type is primitive, both must be the same type) |
+| `E0105` | the `…` clause is a contract, and contracts are off (compile with `--contracts runtime`) |
+| `E0106` | this contract calls …, which … (a contract may not do I/O or write memory) |
+| `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 
 ## 関連項目
 

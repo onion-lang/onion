@@ -1379,6 +1379,18 @@ object SemanticErrorReporter {
       // A boxed wrapper keeps its written name (`JInteger`): `Int` vs `Int` would hide the clash.
       Seq(items => asString(items(0)), items => writtenTypeName(items(1)), items => typeName(items(2)), items => writtenTypeName(items(3)))
     ),
+    SemanticError.CONTRACTS_NOT_ENABLED -> ErrorDef(
+      "error.semantic.contractsNotEnabled",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.CONTRACT_NOT_PURE -> ErrorDef(
+      "error.semantic.contractNotPure",
+      Seq(items => asString(items(0)), items => asString(items(1)))
+    ),
+    SemanticError.CONTRACT_MISPLACED -> ErrorDef(
+      "error.semantic.contractMisplaced",
+      Seq(items => asString(items(0)))
+    ),
     SemanticError.FINAL_METHOD_OVERRIDE -> ErrorDef(
       "error.semantic.finalMethodOverride",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))

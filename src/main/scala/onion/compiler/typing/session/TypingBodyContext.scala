@@ -17,7 +17,9 @@ final class TypingBodyContext(
   val warningReporter: WarningReporter,
   private val topLevelClassProvider: () => Option[ClassType] = () => None,
   private val problemCountProvider: () => Int = () => 0,
-  private val unitProvider: () => AST.CompilationUnit = () => null
+  private val unitProvider: () => AST.CompilationUnit = () => null,
+  /** Whether contract clauses are accepted (RFC #2557); `Off` makes a clause an error. */
+  val contractMode: ContractMode = ContractMode.Off
 ) {
   /**
    * Names assigned by code that can run at an arbitrary point of the script: every top-level
@@ -86,6 +88,7 @@ object TypingBodyContext {
       warningReporter = typing.warningReporter_,
       topLevelClassProvider = () => typing.loadTopClass,
       problemCountProvider = () => typing.problemCount,
-      unitProvider = () => unitContext.unit
+      unitProvider = () => unitContext.unit,
+      contractMode = typing.contractMode
     )
 }

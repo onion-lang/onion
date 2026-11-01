@@ -64,9 +64,18 @@ object HistoryProver {
 
     // ---- statements ------------------------------------------------------------------------
     private def exec(elements: List[AST.BlockElement], env: Env): Option[Env] =
-      elements.foldLeft(Option(env)) { (acc, el) => acc.flatMap(e => step(el, e)) }
+      elements.zipWithIndex.foldLeft(Option(env)) { case (acc, (el, i)) =>
+        acc.flatMap(e => step(el, e, last = i == elements.size - 1))
+      }
 
-    private def step(el: AST.BlockElement, env: Env): Option[Env] = el match {
+    private def step(el: AST.BlockElement, env: Env, last: Boolean): Option[Env] = el match {
+      // A local of Int type: a fresh name bound to the symbolic value. A name that is already a
+      // field or parameter would shadow it, which the encoding does not track, so it is refused.
+      case AST.LocalVariableDeclaration(_, _, name, typeRef, init) if init != null && (typeRef == null || isInt(typeRef)) =>
+        if (env.contains(name)) None else expr(init, env).map(w => env.updated(name, w))
+      // A `return` as the last statement ends the body; the value must be one the encoder models.
+      case AST.ReturnExpression(_, result) if last =>
+        if (result == null) Some(env) else expr(result, env).map(_ => env)
       case AST.Assignment(_, lhs, rhs) => name(lhs).filter(env.contains).flatMap(n => expr(rhs, env).map(w => env.updated(n, w)))
       case AST.AdditionAssignment(_, lhs, rhs) => update(lhs, env, (a, b) => bb.add(a, b), rhs)
       case AST.SubtractionAssignment(_, lhs, rhs) => update(lhs, env, (a, b) => bb.sub(a, b), rhs)

@@ -63,9 +63,21 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     if (seenFields.contains(field)) typing.report(SemanticError.DUPLICATE_FIELD, ast, field.affiliation, field.name)
     else seenFields.add(field)
 
-  private def registerMethod(ast: AST.Node, method: MethodDefinition): Unit =
-    if (seenMethods.contains(method)) typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
-    else seenMethods.add(method)
+  // Components of the record being checked, by name: each one already generates a public
+  // zero-argument accessor, so a body method of that name would be a duplicate (#2396).
+  private var recordComponents = Map.empty[String, Type]
+
+  private def registerMethod(ast: AST.Node, method: MethodDefinition): Unit = {
+    val redefinedAccessor = if (method.arguments.isEmpty) recordComponents.get(method.name) else None
+    redefinedAccessor match {
+      case Some(componentType) =>
+        typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments,
+          SemanticErrorReporter.RecordAccessorRedefined(componentType))
+      case None =>
+        if (seenMethods.contains(method)) typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
+        else seenMethods.add(method)
+    }
+  }
 
   private def registerConstructor(ast: AST.Node, constructor: ConstructorDefinition): Unit =
     if (seenConstructors.contains(constructor)) typing.report(SemanticError.DUPLICATE_CONSTRUCTOR, ast, constructor.affiliation, constructor.getArgs)
@@ -214,7 +226,9 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     withKernel[ClassDefinition](node) { clazz =>
       resetForTypeDeclaration(clazz)
       checkDuplicateRecordComponents(node, clazz)
-      for (section <- node.sections) processAccessSection(section)
+      recordComponents = node.args.flatMap(arg => Option(clazz.field(arg.name)).map(f => arg.name -> f.`type`)).toMap
+      try for (section <- node.sections) processAccessSection(section)
+      finally recordComponents = Map.empty
       node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
     }
@@ -244,12 +258,13 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     }
   }
 
+  // Compared by erasure: `toString: X` with `X extends String` gets the accessor
+  // `toString()Ljava/lang/String;`, the same as `toString: String` (#2522).
   private def clashesWithGeneratedMethod(name: String, field: FieldRef): Boolean =
     field != null && (name match {
       case "hashCode" => field.`type` == BasicType.INT
       case "toString" =>
-        val t = field.`type` match { case n: NullableType => n.innerType; case t => t }
-        t.isInstanceOf[ObjectType] && t.name == "java.lang.String"
+        onion.compiler.generics.Erasure.asmType(field.`type`).getDescriptor == "Ljava/lang/String;"
       case _ => false
     })
 

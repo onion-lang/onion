@@ -38,6 +38,14 @@ class SuperWildcardTypeVariableSpec extends AbstractShellSpec {
       val r = shell.run(box("def sortWith(c: Comparator[Object]): void { xs.sort(c) }"), "None", Array())
       assert(Shell.Success(2) == r)
     }
+    it("accepts a null-tolerant Comparator[T?] (#2420)") {
+      val r = shell.run(box("def sortWith(c: Comparator[T?]): void { xs.sort(c) }"), "None", Array())
+      assert(Shell.Success(2) == r)
+    }
+    it("accepts a null-tolerant Comparator[Object?] (#2420)") {
+      val r = shell.run(box("def sortWith(c: Comparator[Object?]): void { xs.sort(c) }"), "None", Array())
+      assert(Shell.Success(2) == r)
+    }
   }
   private def strings(typeParams: String, sortWith: String) =
     s"""import { java.util.* }

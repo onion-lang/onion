@@ -60,6 +60,37 @@ private[compiler] object DuplicationChecks {
       case _ => false
   }
 
+  /**
+   * A record skips the `java.lang.Object` contracts in [[checkOverrideContracts]], because a
+   * component may be named like an Object method (`wait: Int`) and the JVM tells the two apart
+   * by descriptor. A body method with the full descriptor of a final Object method (`notify()V`,
+   * `getClass()Ljava/lang/Class;`) does override it, and the class then fails to load (#2533).
+   * Report E0039 for exactly those; a same-named method with another descriptor still runs.
+   */
+  def checkRecordFinalObjectOverrides(
+    typing: Typing,
+    clazz: ClassDefinition,
+    componentNames: Set[String],
+    fallback: Location
+  ): Unit = {
+    val objectView = typing.table_.appliedViewsOf(clazz)(AppliedTypeViews.collectAppliedViewsFrom(clazz))
+      .collectFirst { case (c, view) if c.name == "java.lang.Object" => view }
+    objectView.foreach { view =>
+      val finals = view.raw.methods.filter(m => Modifier.isFinal(m.modifier) && !Modifier.isStatic(m.modifier))
+      if finals.nonEmpty then
+        val finalDescriptors =
+          finals.iterator.map(m => (m.name, Erasure.methodDescriptor(m.returnType, m.arguments))).toSet
+        for (impl <- clazz.methods
+             if !Modifier.isStatic(impl.modifier) && !Modifier.isPrivate(impl.modifier) &&
+               !componentNames.contains(impl.name) &&
+               finalDescriptors.contains((impl.name, Erasure.methodDescriptor(impl.returnType, impl.arguments)))) {
+          val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
+          val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
+          typing.report(SemanticError.FINAL_METHOD_OVERRIDE, location, impl.name, paramDescriptor, view.raw.name)
+        }
+    }
+  }
+
   def checkOverrideContracts(
     typing: Typing,
     clazz: ClassDefinition,

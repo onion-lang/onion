@@ -303,7 +303,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
    * map, preserving prior behavior. (issue #271)
    */
   private def selfClassSubstitution(method: Method): scala.collection.immutable.Map[String, Type] =
-    TypeSubstitution.hierarchySubstitution(bodyContext.definition, method.affiliation)
+    TypeSubstitution.hierarchySubstitution(bodyContext.definition, method.affiliation, selfReceiver = true)
 
   private def rawUnqualifiedCall(
     targetType: ClassType,

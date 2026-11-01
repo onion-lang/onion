@@ -164,7 +164,9 @@ private[compiler] final class AssignabilitySupport(
     def containsTypeVariable(typeToCheck: Type): Boolean =
       TypeCheckingHelpers.containsTypeVariable(typeToCheck)
 
-    def structurallyAssignable(expected: Type, actual: Type): Boolean = (expected, actual) match {
+    // `nested` is true inside a type-argument comparison, where type arguments are
+    // invariant and a variable must not widen to its bound.
+    def structurallyAssignable(expected: Type, actual: Type, nested: Boolean = false): Boolean = (expected, actual) match {
       case (_, nt) if nt.isNullType =>
         // The null literal is assignable to any reference (non-basic) target,
         // including a generic type parameterized by a type variable (Node[T]).
@@ -180,7 +182,7 @@ private[compiler] final class AssignabilitySupport(
         // bound chain passes through `tv`" apart from "both happen to
         // erase to the same root class" (#2259's unsoundness) -- erasing
         // `tv` here first would throw away exactly the identity it needs.
-        TypeRules.isSuperType(tv, actual)
+        TypeRules.isSuperType(tv, actual) && TypeCheckingHelpers.fitsTypeVariable(tv, actual)
       case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
         def argsMatch(view: TypedAST.AppliedClassType): Boolean =
           ae.typeArguments.length == view.typeArguments.length &&
@@ -199,7 +201,9 @@ private[compiler] final class AssignabilitySupport(
               // rules (handled elsewhere), and requiring both directions
               // for it rejected ordinary covariant wildcard uses that
               // never involved a chained bound at all.
-              val involvesTypeVariable = e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType]
+              val involvesTypeVariable =
+                !e.isInstanceOf[TypedAST.WildcardType] &&
+                  (e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType])
               e match {
                 // `Collection[? extends T]` (the JDK's `addAll`) takes a
                 // `List[T]`: the wildcard's own bound decides, one way
@@ -224,8 +228,8 @@ private[compiler] final class AssignabilitySupport(
                         case ub => structurallyAssignable(ub, a)
                       }
                   }
-                case _ if involvesTypeVariable => structurallyAssignable(e, a) && structurallyAssignable(a, e)
-                case _ => structurallyAssignable(e, a)
+                case _ if involvesTypeVariable => structurallyAssignable(e, a, nested = true) && structurallyAssignable(a, e, nested = true)
+                case _ => structurallyAssignable(e, a, nested = true)
               }
             }
         if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
@@ -240,6 +244,11 @@ private[compiler] final class AssignabilitySupport(
           bodyContext.table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
             .collectFirst { case (raw, view) if TypeRelations.sameClass(raw, ae.raw) && argsMatch(view) => true }
             .getOrElse(false)
+      case (ae: TypedAST.AppliedClassType, tv: TypedAST.TypeVariableType)
+          if !nested && TypeRelations.typeVariableFitsAppliedBound(ae, tv, bodyContext.table) =>
+        // `T extends Comparable[T]` is a `Comparable[T]`: the same relation a
+        // call argument uses (#2338).
+        true
       case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>
         actual match {
           case classType: TypedAST.ClassType => TypeRelations.sameClass(ae.raw, classType)
@@ -276,10 +285,16 @@ private[compiler] final class AssignabilitySupport(
         // normalizeMethodCallTarget, MemberSelectionResolutionSupport.
         // normalizeMemberSelectionTarget), which already special-case
         // NullableType up front for their own (dereference-target) cases.
-        // Only when the value without its `?` would fit; otherwise the
-        // mismatch is elsewhere (a type argument, say) and `!!`/`?:` do not help.
+        // A bare `T` slot takes null, so null is not why an `Object?` failed
+        // there; say that it is not a `T` (#2328 review). Otherwise only when
+        // the value without its `?` would fit; else the mismatch is elsewhere
+        // (a type argument, say) and `!!`/`?:` do not help.
         case nullable: NullableType
-            if (if (containsTypeVariable(expected)) structurallyAssignable(expected, nullable.innerType)
+            if !(expected match {
+                  case tv: TypeVariableType => tv.acceptsNullable
+                  case _ => false
+                }) &&
+               (if (containsTypeVariable(expected)) structurallyAssignable(expected, nullable.innerType)
                 else TypeRelations.isAssignableWithBoxing(expected, nullable.innerType, bodyContext.table)) =>
           bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName, "assignment")
         case _ if expected == BasicType.BYTE && ConstantNarrowing.isHexEndingInB(actual) =>

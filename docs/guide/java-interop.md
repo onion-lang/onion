@@ -281,6 +281,16 @@ val thread: Thread = new Thread(task)
 thread.start()
 ```
 
+Onion has no anonymous classes: Java's `new Runnable() { ... }` is a syntax error.
+For an interface with one abstract method, pass a lambda instead:
+
+```onion
+val thread: Thread = new Thread(() -> println("Task is running"))
+thread.start()
+```
+
+Otherwise, declare a named class as above (`extends` for a class, `conforms` for an interface).
+
 ### Comparable Example
 
 ```onion

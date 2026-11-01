@@ -100,7 +100,7 @@ class DiagnosticHintsSpec extends AnyFunSpec {
           |}
         """.stripMargin
       )
-      assert(errors.exists(_.contains("Colls::toList(xs)")), s"expected a Colls::toList hint, got: $errors")
+      assert(errors.exists(_.contains("Colls::toList(arr)")), s"expected a Colls::toList hint, got: $errors")
     }
 
     it("suppresses the toArray hint for a primitive-component List[Int] as Int[] cast, since toArray has no such overload") {

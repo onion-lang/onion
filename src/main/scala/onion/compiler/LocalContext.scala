@@ -130,6 +130,20 @@ class LocalContext {
     this.isMethod = false
   }
 
+  /**
+   * A fresh context for the same method or constructor, with none of its parameters bound.
+   * A default argument is spliced into each call site, where the callee's parameters do not
+   * exist, so it must not see them.
+   */
+  def withoutParameters: LocalContext = {
+    val fresh = new LocalContext
+    fresh.isStatic = isStatic
+    fresh.method = method
+    fresh.constructor = constructor
+    fresh.isMethod = isMethod
+    fresh
+  }
+
   /** Save current method context for later restoration */
   def saveMethodContext(): (TypedAST.Method, Boolean) = (method, isMethod)
 

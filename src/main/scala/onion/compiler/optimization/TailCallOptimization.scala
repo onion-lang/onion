@@ -126,8 +126,52 @@ class TailCallOptimization(config: CompilerConfig)
       case ifStmt: IfStatement =>
         checkStatementForTailCall(ifStmt.thenStatement, method) ||
         (if (ifStmt.elseStatement != null) checkStatementForTailCall(ifStmt.elseStatement, method) else false)
+      case StatementForm(inner) =>
+        statementHasTailCall(inner, method)
       case _ =>
         false
+    }
+  }
+
+  /**
+   * A tail call in statement position, counted exactly as transformStatement rewrites it:
+   * a `return f(..)` reached through blocks, `if`s and select statements. A bare `f(..)`
+   * whose value is discarded is not one; counting it wrapped the method in a loop that
+   * never rewrote the call, so the method never returned (#2405).
+   */
+  private def statementHasTailCall(stmt: ActionStatement, method: MethodDefinition): Boolean = stmt match {
+    case ret: Return => ret.term != null && isSelfCall(ret.term, method)
+    case StatementForm(inner) => statementHasTailCall(inner, method)
+    case block: StatementBlock => block.statements.exists(statementHasTailCall(_, method))
+    case ifStmt: IfStatement =>
+      statementHasTailCall(ifStmt.thenStatement, method) ||
+        (ifStmt.elseStatement != null && statementHasTailCall(ifStmt.elseStatement, method))
+    case _ => false
+  }
+
+  /**
+   * A `select` in statement position is typed as an expression statement around its
+   * lowered statement (so its BOTTOM type still counts for definite return), or, when a
+   * case yields a value, around `{ <that statement>; result }` whose value is discarded.
+   * Its cases' `return f(..)` are tail calls like an `if` statement's (#2405).
+   */
+  private object StatementForm {
+    def unapply(stmt: ActionStatement): Option[ActionStatement] = stmt match {
+      case exprStmt: ExpressionActionStatement =>
+        exprStmt.term match {
+          case st: StatementTerm => Some(st.statement)
+          case begin: Begin if begin.terms.length == 2 && begin.terms(1).isInstanceOf[ResultRefLocal] =>
+            begin.terms(0) match {
+              case st: StatementTerm => Some(st.statement)
+              case _ => None
+            }
+          // A case body of several statements (`val m = n - 1` then `return f(m)`)
+          // is a sequence of statement terms whose value is discarded.
+          case begin: Begin if begin.terms.nonEmpty && begin.terms.forall(_.isInstanceOf[StatementTerm]) =>
+            Some(new StatementBlock(begin.location, begin.terms.toSeq.map(_.asInstanceOf[StatementTerm].statement): _*))
+          case _ => None
+        }
+      case _ => None
     }
   }
 
@@ -473,6 +517,15 @@ class TailCallOptimization(config: CompilerConfig)
         } else null
 
         new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
+
+      case StatementForm(inner) =>
+        val exprStmt = stmt.asInstanceOf[ExpressionActionStatement]
+        val termType = exprStmt.term match {
+          case st: StatementTerm => st.termType
+          case _ => BasicType.VOID
+        }
+        new ExpressionActionStatement(exprStmt.location,
+          new StatementTerm(exprStmt.term.location, transformStatement(inner, method, slots), termType))
 
       case exprStmt: ExpressionActionStatement =>
         // An ExpressionActionStatement whose value is assigned to a local variable

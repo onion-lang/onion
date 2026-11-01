@@ -336,9 +336,9 @@ private[compiler] final class SimpleExpressionTypingSupport(
     } else if (context.isClosure) {
       // Inside a closure 'this'/'self' denotes the enclosing instance,
       // reached through the closure's this$0 field
-      Some(new OuterThis(bodyContext.definition))
+      Some(new OuterThis(bodyContext.definition.selfType))
     } else {
-      Some(new This(node.location, bodyContext.definition))
+      Some(new This(node.location, bodyContext.definition.selfType))
     }
   }
 

@@ -434,6 +434,21 @@ object TypedAST {
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =
       typeParameters_ = typeParameters
 
+    /**
+     * The variables this class's own type parameters denote in its body, in
+     * declaration order; empty for a non-generic class.
+     */
+    private[compiler] var ownTypeVariables: Array[TypedAST.TypeVariableType] = Array()
+
+    /**
+     * The type of `this` in this class's body: the class applied to its own
+     * type variables (`Mid[U]`), or the class itself when it is not generic.
+     * Read raw, an inherited `get(): T` on `id(this)` returned `Object`.
+     */
+    def selfType: TypedAST.ClassType =
+      if (ownTypeVariables.isEmpty || ownTypeVariables.length != typeParameters_.length) this
+      else TypedAST.AppliedClassType(this, ownTypeVariables.toList)
+
     def staticInitializers: Array[TypedAST.ActionStatement] = staticInitializers_
 
     def setStaticInitializers(initializers: Array[TypedAST.ActionStatement]): Unit =
@@ -1226,6 +1241,32 @@ object TypedAST {
     /** Inverse of [[nonNullView]]: the declared variable this view narrows. */
     def widen: TypeVariableType = if (widenTarget == null) this else widenTarget
 
+    /**
+     * For the placeholder that stands in for a parameter while its own bound is
+     * resolved (the `A` inside `[A extends Animal[A]]`), the parameter it became.
+     * Set once, right after that bound is resolved; null for any other variable.
+     */
+    private[compiler] var resolvedParameter: TypeVariableType = null
+
+    /** The declared parameter this variable denotes: itself, or what its placeholder became. */
+    def declared: TypeVariableType = {
+      val w = widen
+      if (w.resolvedParameter == null) w else w.resolvedParameter.widen
+    }
+
+    /**
+     * This variable with a placeholder replaced by the parameter it became,
+     * keeping a non-null view non-null. A member reached through the bound of
+     * `[A extends Animal[A]]` returns the placeholder; read as is, its bound is
+     * the root class, so a third `me()` in `me().me().me()` was not found.
+     */
+    def resolvedView: TypeVariableType = {
+      val w = widen
+      if (w.resolvedParameter == null) this
+      else if (this eq w) w.resolvedParameter
+      else w.resolvedParameter.widen.nonNullView
+    }
+
     def isInterface: Boolean = upperBound.isInterface
     def modifier: Int = upperBound.modifier
     def superClass: TypedAST.ClassType = upperBound.superClass
@@ -1873,6 +1914,14 @@ object TypedAST {
         case _ => // continue with normal logic
       }
 
+      // The same declared parameter, seen through its placeholder: inside
+      // `[A extends Animal[A]]`, `me()` reached through the bound yields the
+      // placeholder `A`, whose own bound is the root class (#2308).
+      (left, right) match {
+        case (l: TypedAST.TypeVariableType, r: TypedAST.TypeVariableType) if l.declared eq r.declared => return true
+        case _ =>
+      }
+
       // A type variable's own bound can itself be another type variable
       // (`[B, T extends B]`) -- a genuine multi-level chain. Only THIS
       // specific shape takes the identity-aware chain walk; an ordinary
@@ -1953,6 +2002,13 @@ object TypedAST {
      * an ordinary, single-level variable instead.
      */
     def isSuperTypeByIdentity(left: TypedAST.Type, right: TypedAST.Type): Boolean = rightVariableChainAccepts(left, right)
+
+    /** `java.lang.Object` itself, the type an unbound type variable erases to. */
+    private def isErasedTop(t: TypedAST.Type): Boolean = t match {
+      case ct: TypedAST.ClassType => !ct.isInstanceOf[TypedAST.AppliedClassType] &&
+        !ct.isInstanceOf[TypedAST.TypeVariableType] && ct.name == "java.lang.Object"
+      case _ => false
+    }
 
     /**
      * Walks a type variable's own bound chain (the `right` side of
@@ -2062,19 +2118,28 @@ object TypedAST {
               case (w: TypedAST.WildcardType, _) if w.lowerBound.isDefined =>
                 actualArg match
                   case aw: TypedAST.WildcardType if aw.lowerBound.isDefined =>
-                    // ? super E ← ? super A: E must be subtype of A (contravariant)
-                    isSuperType(aw.lowerBound.get, w.lowerBound.get)
+                    // ? super E ← ? super A: E must be subtype of A (contravariant).
+                    // A type variable A is a supertype only by identity (#2397).
+                    aw.lowerBound.get match
+                      case at: TypedAST.TypeVariableType if !isErasedTop(w.lowerBound.get) =>
+                        isSuperTypeByIdentity(at, w.lowerBound.get)
+                      case lower => isSuperType(lower, w.lowerBound.get)
                   case aw: TypedAST.WildcardType if aw.lowerBound.isEmpty =>
                     // ? super E ← ? extends A: incompatible
                     false
                   case _ =>
-                    // ? super E ← A: A must be supertype of E. Two type variables
-                    // are related only by identity: erased to Object they would
-                    // otherwise match, and `Comparator[U]` would sort a `List[T]` (#2367).
-                    (actualArg, w.lowerBound.get) match
-                      case (at: TypedAST.TypeVariableType, lt: TypedAST.TypeVariableType) =>
-                        isSuperTypeByIdentity(at, lt)
-                      case (_, lower) => isSuperType(actualArg, lower)
+                    // ? super E ← A: A must be supertype of E. A type variable A is
+                    // a supertype of E only by identity (E is A, or E's bound chain
+                    // reaches A): erased to Object it would otherwise match anything,
+                    // and `Comparator[U]` would sort a `List[T]` (#2367) or a
+                    // `List[String]` (#2397).
+                    // A slot of `? super Object` keeps the erased check: that is what an
+                    // inherited `sort(c)` reached through `this` in `Sub[S] extends
+                    // ArrayList[S]` expects, since `this` carries no type arguments (#2400).
+                    actualArg match
+                      case at: TypedAST.TypeVariableType if !isErasedTop(w.lowerBound.get) =>
+                        isSuperTypeByIdentity(at, w.lowerBound.get)
+                      case _ => isSuperType(actualArg, w.lowerBound.get)
               // Expected: type variable T (respects the variable's
               // nullability: NonNull T rejects nullable actuals)
               case (tv: TypedAST.TypeVariableType, _) =>

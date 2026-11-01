@@ -1311,6 +1311,15 @@ class A extends java.util.ArrayList {
 }
 ```
 
+### `E0112` — a history that breaks when the code runs
+
+The solver found a state in which a method breaks a `history`, and running the compiled code from
+that state confirms it. `n = n + 1` against `history n >= old(n)` breaks at `n = 2147483647`,
+where `n + 1` wraps to a negative number.
+
+Fix: add an `invariant` or a `requires` that rules the state out, or weaken the history. A
+counterexample that does not break when run stays the warning `W0021`.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -2081,6 +2090,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0109` | this write can break the history … on … |
 | `E0110` | an `invariant` or `history` names a field that holds a mutable object |
 | `E0111` | a class with an `invariant` or `history` extends a Java class |
+| `E0112` | this method breaks the history … when run from … |
 
 ## See also
 

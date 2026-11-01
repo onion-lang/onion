@@ -20,6 +20,7 @@ class HistoryWriteSpec extends AnyFunSpec {
 
   private val counter =
     """class Counter {
+      |  invariant n >= 0 && n < 1000000
       |  history n >= old(n)
       |public:
       |  var n: Int
@@ -52,9 +53,10 @@ class HistoryWriteSpec extends AnyFunSpec {
   }
 
   describe("a class whose only write is a constant") {
-    it("is fine, because n never rises above its start") {
+    it("is fine once an invariant says n stays 0, so n never rises above its start") {
       val src =
         """class Flag {
+          |  invariant n == 0
           |  history n >= old(n)
           |public:
           |  var n: Int

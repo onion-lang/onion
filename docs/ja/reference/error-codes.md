@@ -1299,6 +1299,15 @@ class A extends java.util.ArrayList {
 }
 ```
 
+### `E0112` — 実行すると壊れる `history`
+
+ソルバーが、メソッドが `history` を壊す状態を見つけ、コンパイル済みのコードをその状態から実行しても
+壊れることを確かめました。`history n >= old(n)` に対する `n = n + 1` は、`n + 1` が負の数へ
+桁あふれする `n = 2147483647` で壊れます。
+
+直し方: その状態を除く `invariant` か `requires` を足すか、`history` を弱めます。実行しても壊れなかった
+反例は、警告 `W0021` のままです。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -2064,6 +2073,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0109` | this write can break the history … on … |
 | `E0110` | an `invariant` or `history` names a field that holds a mutable object |
 | `E0111` | a class with an `invariant` or `history` extends a Java class |
+| `E0112` | this method breaks the history … when run from … |
 
 ## 関連項目
 

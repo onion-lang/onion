@@ -123,12 +123,6 @@ class WarningReporter(
         s"if the platform value can be null (e.g. a missing Json key), this throws a NullPointerException at runtime")
   }
 
-  def historyNotProved(location: Location, method: String, history: String, before: String): Unit = {
-    report(WarningCategory.HistoryNotProved, location,
-      s"'$method' can break the history '$history': for example when $before. " +
-        s"Add an invariant or a requires that rules this out, or weaken the history")
-  }
-
   def discardedBuilderResult(location: Location, className: String, methodName: String): Unit = {
     report(WarningCategory.DiscardedBuilderResult, location,
       s"the result of '$className.$methodName' is discarded; '$className' is immutable, so this call has no effect " +

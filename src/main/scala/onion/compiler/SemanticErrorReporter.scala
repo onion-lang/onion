@@ -751,12 +751,21 @@ class SemanticErrorReporter(threshold: Int) {
       else if (isListType(expected) && actual.isInstanceOf[TypedAST.ArrayType])
         Some((actual.asInstanceOf[TypedAST.ArrayType], false))
       else None
+    val castSource: Option[SemanticErrorReporter.CastSource] =
+      if (items.length > 2) items(2) match
+        case c: SemanticErrorReporter.CastSource => Some(c)
+        case _ => None
+      else None
+    val sourceNullable = castSource.exists(_.nullable)
+    // The variable the hint names, null-checked when the cast's source was nullable.
+    val sourceRef = castSource.flatMap(c => Option(c.name)).getOrElse("xs") + (if (sourceNullable) "!!" else "")
     def written(t: TypedAST.Type): String = t match
       case a: TypedAST.ArrayType if listArrayCast.isDefined => onion.compiler.toolbox.TypeFormatting.arrayWrittenForm(a)
       case other => typeName(other)
     val baseMessage = format(
-      message(if (listArrayCast.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
-      Seq(written(expected), written(actual))
+      // "Consider a cast" is no advice on an `as` cast that was itself rejected.
+      message(if (listArrayCast.isDefined || castSource.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      Seq(written(expected), written(actual) + (if (sourceNullable) "?" else ""))
     )
     val hint =
       if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
@@ -789,9 +798,9 @@ class SemanticErrorReporter(threshold: Int) {
             // sized `new Int[0][0]` compiles and is just as empty, since the outer (size-0)
             // dimension is the only one that matters to `toArray`.
             val emptyArrayLiteral = onion.compiler.toolbox.TypeFormatting.componentWrittenForm(arrayType.component) + ("[0]" * arrayType.dimension)
-            Some(format(message("suggestion.listAsArrayCast"), Seq(emptyArrayLiteral)))
+            Some(format(message("suggestion.listAsArrayCast"), Seq(emptyArrayLiteral, sourceRef)))
           } else {
-            Some(message("suggestion.arrayAsListCast"))
+            Some(format(message("suggestion.arrayAsListCast"), Seq(sourceRef)))
           }
         case None => None
       }
@@ -1101,6 +1110,13 @@ object SemanticErrorReporter {
    * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
    */
   private[compiler] case object HexDigitBHint
+
+  /**
+   * An extra (third) item on INCOMPATIBLE_TYPE for a rejected `as` cast: how the source is
+   * written when it is a plain name (else null), and whether its type was nullable. The
+   * List/array hint then names that variable and stays null-safe (`xs!!.toArray(..)`).
+   */
+  private[compiler] final case class CastSource(name: String, nullable: Boolean)
 
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */

@@ -28,7 +28,10 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
   def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] = {
     if (config.contracts != ContractMode.Check) return classes
     val units = ctx.debugArtifacts.rewrittenUnits.getOrElse(return classes)
-    val repros = new HistoryWritePass(null).counterexamples(units)
+    val analysis = new HistoryWritePass(null)
+    val repros = analysis.counterexamples(units)
+    // A proved history prints nothing by default; --verbose lists what the solver proved.
+    if (config.verbose) analysis.proved.foreach(p => System.err.println(s"[history] proved: $p"))
     if (repros.isEmpty) return classes
 
     val loader = new OnionClassLoader(classOf[OnionClassLoader].getClassLoader, config.classPath, classes)

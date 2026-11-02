@@ -764,36 +764,7 @@ record R(a: Int, a: Int)   // E0086: duplicated record component a in R
 
 Fix: rename one of the components.
 
-### `E0064` — Law violation
 
-A `law name(p: T) { boolExpr }` clause is checked at build time against
-generated sample values of `p`; a sample that makes the expression false is a
-counterexample, reported with the settings (seed, sample count) that produced
-it so the failure can be reproduced.
-
-```onion
-record Pt(x: Int, y: Int) {
-  law wrong(p: Pt) { p.x() == p.y() }   // E0064: falsified, e.g. by Pt(0, 1)
-}
-```
-
-Fix: correct the law (or the code it's checking) so it holds for every
-generated sample, or remove the law if it doesn't actually hold in general.
-
-### `E0065` — Example failed
-
-A top-level or record-attached `example { boolExpr }` clause evaluated to
-`false` (or threw) at build time. Unlike `law`, an `example` checks one fixed
-case, not a generated family of them.
-
-```onion
-record R(x: Int) {
-  example { new R(1).x() == 2 }   // E0065: evaluated to false
-}
-```
-
-Fix: correct the example's expected value, or fix the code it's asserting
-against.
 
 ### `E0073` — Map cannot be iterated directly
 
@@ -811,34 +782,7 @@ foreach (k, v) in m { println(k + "=" + v) }
 foreach k: String in m.keySet() { println(k) }
 ```
 
-### `E0074` — A law's parameter type cannot be generated
 
-`law` is checked at build time over generated sample values, so every parameter type
-needs a generator. Generatable types are `String`, `Int`, `Long`, `Double`, `Float`,
-`Boolean`, `Short`, `Byte`, and records whose components are all generatable.
-
-```onion
-record Dummy(v: Int) {
-  law overArray(xs: Int[]) { xs != null }   // E0074: no generator for Int[]
-}
-```
-
-Anything else — arrays, `Map`, enums, interfaces, or a class with more than one
-constructor — has no generator. Such a law used to be skipped silently, which made it
-indistinguishable from a law that held; a check that cannot run must not look like one
-that passed. Change the parameter type, or remove the law.
-
-```onion
-record Pt(x: Int, y: Int) {
-  law reflexive(p: Pt) { p == p }          // fine: a flat record is generatable
-}
-```
-
-### `E0075` — A class declaring laws could not be loaded
-
-Laws run against the compiled classes. If a class that declares `law` / `example`
-clauses cannot be loaded, none of its checks ran — reported rather than passed over,
-for the same reason as `E0074`.
 
 ### `E0076` — Unknown shape format
 
@@ -854,40 +798,6 @@ record Pt(x: Int, y: Int) {
 
 For an inline pattern, write `shape name = re"..."`.
 
-### `E0080` — A user-written `Shape` asserts no law
-
-A concrete class implementing `onion.Shape[T]` directly (rather than deriving one via
-`shape`/`from re"..."`) must assert at least one machine-checked `law` or `example` in
-its file that actually exercises it — constructs it, calls or reads one of its members, or
-type-tests against it. A derived shape's round-trip is guaranteed by construction; a
-hand-written one only *claims* it, so the claim must be checked, and a `law`/`example` that
-never touches the class doesn't check anything about it.
-
-```onion
-class FixedWidth conforms Shape[Person] {
-public:
-  def this {}
-  def parse(text: String, origin: Origin): Outcome[Person] { ... }
-  def canPrint(): Boolean = true
-  def print(v: Person): String { ... }
-  def describe(): String = "fixed-width Person"
-}
-// E0080: nothing in this file asserts a law that exercises FixedWidth
-```
-
-Fix: add a top-level `example` (or the class's own `law`) that constructs or calls
-`FixedWidth` — the canonical claim is the round-trip `s.parse(s.print(v)).get() == v`:
-
-```onion
-example fixedWidthL1 {
-  val s = new FixedWidth()
-  val v = new Person("KOTA", 42)
-  s.parse(s.print(v)).get() == v
-}
-```
-
-A parse-only shape (`canPrint(): false`) instead asserts whatever laws its reading
-direction has. A false claim is `E0065`, the same as any other falsified `example`.
 
 ## Capability errors
 
@@ -2056,8 +1966,6 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0061` | record component … has type …, which cannot be derived from a `…` clause |
 | `E0062` | record component … has type …, which derive! cannot serialize |
 | `E0063` | unknown derive! marker `…` |
-| `E0064` | law violation |
-| `E0065` | example failed |
 | `E0066` | raw type … is not allowed; supply type arguments (e.g |
 | `E0067` | method … may reach the end of its body without returning a … |
 | `E0068` | method …(…) is marked override but does not override any method in a base class or interface of … |
@@ -2066,13 +1974,10 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0071` | … is a variable, not a type |
 | `E0072` | abstract method … cannot have a body (the body would be silently ignored) |
 | `E0073` | a Map (…) cannot be iterated directly by foreach |
-| `E0074` | law parameter not generatable |
-| `E0075` | law class not loadable |
 | `E0076` | unknown shape format `…` |
 | `E0077` | tool `…` performs `…` here (calling …) but does not declare it |
 | `E0078` | tool `…` declares capability `…` but nothing in its body can perform it |
 | `E0079` | tool `…` has an invalid capability `…`: … |
-| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law that exercises it |
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |

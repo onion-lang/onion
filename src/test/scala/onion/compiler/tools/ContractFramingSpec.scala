@@ -7,7 +7,7 @@ import org.scalatest.funspec.AnyFunSpec
 /** Framing rule 1 (RFC #2557, design 3.2): a clause names only value-typed fields. */
 class ContractFramingSpec extends AnyFunSpec {
   private def codes(src: String): Seq[String] = {
-    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, checkLaws = false, contracts = ContractMode.Check)
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, runContracts = false, contracts = ContractMode.Check)
     new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "C.on"))) match {
       case CompilationOutcome.Failure(errs) => errs.flatMap(_.errorCode)
       case _                                => Nil

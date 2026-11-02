@@ -26,7 +26,7 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
   private final case class Candidate(owner: Option[String], name: String, arity: Int, sourceFile: String, location: onion.compiler.Location)
 
   def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] = {
-    if (config.contracts != ContractMode.Check) return classes
+    if (config.contracts != ContractMode.Check || !config.runContracts) return classes
     val units = ctx.debugArtifacts.rewrittenUnits.getOrElse(return classes)
     val candidates = units.flatMap(candidatesOf)
     if (candidates.isEmpty) return classes
@@ -89,7 +89,7 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
     method.flatMap { m =>
       m.setAccessible(true)
       val types = m.getParameterTypes
-      val perParam = types.map(t => ArgGenerator.generateValues(t, loader, config.lawSamples, config.lawSeed).orNull)
+      val perParam = types.map(t => ArgGenerator.generateValues(t, loader, config.contractSamples, config.contractSeed).orNull)
       val bad = perParam.indexWhere(_ == null)
       // A parameter that cannot be sampled must not pass silently: that would look like a predicate that held.
       if (bad >= 0) Some(s"not checkable: it cannot sample a parameter of type ${types(bad).getSimpleName}")
@@ -100,7 +100,7 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
   /** `None` when the call returns true; otherwise why not, with the arguments and how to reproduce them. */
   private def call(m: Method, args: Array[AnyRef]): Option[String] = {
     val shown = if (args.isEmpty) "" else args.map(String.valueOf).mkString(" for (", ", ", ")") +
-      s" [--law-seed ${config.lawSeed} --law-samples ${config.lawSamples}]"
+      s" [--contract-seed ${config.contractSeed} --contract-samples ${config.contractSamples}]"
     try {
       if (m.invoke(null, args*).asInstanceOf[java.lang.Boolean]) None else Some("false" + shown)
     } catch {
@@ -121,6 +121,6 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
       val sweep = (0 until arity).flatMap { p =>
         perParam(p).indices.map(k => Array.tabulate(arity)(q => if (q == p) perParam(q)(k) else perParam(q)(0)))
       }.toList
-      (diag ++ sweep).take(config.lawSamples)
+      (diag ++ sweep).take(config.contractSamples)
     }
 }

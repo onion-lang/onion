@@ -152,26 +152,13 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0021` | `history-not-proved` | メソッドが `history` を壊しうる。ソルバーが反例を見つけた |
 | `W0024` | `history-not-checked` | `history` が名指すフィールドにメソッドが書き込むが、`history` が保たれるかをどの検査も決めていない |
 
-### `--no-check-laws`
+### `--contract-seed <n>` / `--contract-samples <n>`
 
-レコードの `law` / `example` 句を実行しません。
-
-既定ではコンパイル時に実行される——つまりコンパイラがそのコードを走らせます。
-実行したくないファイルをコンパイルする場合に指定してください。引き換えに
-`parse ∘ format == id` のような不変条件は検査されなくなります。
+引数を持つ述語（`ensures result` の `static def`）のサンプリングを制御します。偽になったサンプルは、反例を作った設定を報告するので、同じ実行を再現できます。サンプル数を増やすと、探索が広がります。
 
 ```bash
-onionc --no-check-laws MyProgram.on
-```
-
-### `--law-seed <n>` / `--law-samples <n>`
-
-`law` のサンプル生成を制御します。law が反例で否定されたときは、その反例を生んだ設定が
-メッセージに出るので、同じ実行を再現できます。サンプル数を増やせば別の反例を探せます。
-
-```bash
-onionc --law-samples 500 MyProgram.on
-onionc --law-seed 7 MyProgram.on
+onionc --contract-samples 500 MyProgram.on
+onionc --contract-seed 7 MyProgram.on
 ```
 
 ### `--contracts <off|check>`

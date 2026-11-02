@@ -168,7 +168,6 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     case _ => false
   }
 
-  private var topLevelExampleCount: Int = 0
 
   // The non-generic `type` aliases visible to the unit being rewritten, name -> target.
   // The command-line checks run before typing resolves aliases, so they follow these
@@ -288,16 +287,6 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         throw new CompilationException(Seq(CompileError("", declaration.location,
           Message("error.semantic.homogeneousEnumWithTypeParameters", Array[Any](declaration.name)),
           Some(HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS.errorCode))))
-      case ex: AST.TopLevelExample =>
-        // Top-level `example [name] { expr }` (issue #364): the same lowering a record
-        // example gets — a static boolean check method the LawCheckPhase runs at build
-        // time — hosted by the file class like any other top-level function.
-        val suffix = ex.name.getOrElse(topLevelExampleCount.toString)
-        topLevelExampleCount += 1
-        val boolType = AST.TypeNode(ex.location, AST.PrimitiveType(AST.KBoolean), false)
-        newToplevels += rewriteFunctionDeclaration(AST.FunctionDeclaration(
-          ex.location, AST.M_PUBLIC, "onion$$example$$" + suffix, Nil, boolType,
-          wrapReturningBoolean(ex.body), Nil, Nil, Nil))
       case element: AST.BlockElement =>
         // Top-level statements need desugaring too (do-notation et al.);
         // they previously passed through untouched, so a DoExpression
@@ -900,23 +889,18 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val dataMethods = if ((hasJson || hasYaml) && derivable) synthesizeDataMethods(declaration) else Nil
     val jsonMethods = if (hasJson && derivable) synthesizeFormatMethods(declaration, "Json", "Json") :+ synthesizeFromListMethod(declaration, "fromJsonList", "Json") else Nil
     val yamlMethods = if (hasYaml && derivable) synthesizeFormatMethods(declaration, "Yaml", "Yaml") :+ synthesizeFromListMethod(declaration, "fromYamlList", "Yaml") else Nil
-    // law/example clauses (B3): each becomes a boolean static method the compiler runs at
-    // build time (LawCheckPhase). No `derivable` guard — a componentless record can still
-    // carry laws/examples (the law's own params drive generation).
     val shapeMethods = declaration.shapes.flatMap(sc => synthesizeShapeMethod(declaration, sc))
     // A record with a json shape can be a component of another json shape; the nesting
     // record reaches it through this one hidden method rather than by the shape's name.
     val hiddenJsonShape = JsonShapeComponents.firstJsonClause(declaration)
       .filter(sc => shapeMethods.exists(_.name == sc.name))
       .map(sc => synthesizeHiddenJsonShape(declaration, sc)).toList
-    val lawMethods = declaration.laws.map(synthesizeLawMethod)
-    val exampleMethods = declaration.examples.zipWithIndex.map { case (ex, i) => synthesizeExampleMethod(ex, i) }
     // A generic record's synthesized statics take and return `R[T, ...]`, so each one is
     // generic over the record's own type parameters, as a hand-written `static def
-    // mk[T](..): R[T]` would be (#2321). Laws and examples are the user's own code.
+    // mk[T](..): R[T]` would be (#2321).
     val generated = (fromMethods ++ dataMethods ++ jsonMethods ++ yamlMethods ++ shapeMethods ++ hiddenJsonShape)
       .map(m => if (declaration.typeParameters.isEmpty) m else m.copy(typeParameters = declaration.typeParameters.map(_.copy(constraints = Nil))))
-    val all = generated ++ lawMethods ++ exampleMethods
+    val all = generated
     // A record's own user-written methods (e.g. `def f(): ... { do[Option] { ... } }`) need
     // the same body-level rewriting (do-notation desugaring, trait method lowering) that a
     // class's sections get in rewriteClassDeclaration - otherwise those constructs reach
@@ -927,7 +911,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // `shapes` is deliberately kept: typing validates each pattern (E0059) and its
     // capture-group count against the components (E0060), which the `from` synthesis gets
     // for free by routing through a regex select pattern and this one does not.
-    else written.copy(sections = newSections, synthesizedMethods = all, laws = Nil, examples = Nil,
+    else written.copy(sections = newSections, synthesizedMethods = all,
       synthesisArgTypes = synthesisArgTypes)
   }
 
@@ -1159,31 +1143,6 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
     AST.TypeNode(loc, AST.ReferenceType(name, true), false)
   }
-
-  /** `law name(p: T) { expr }` -> `static def onion$$law$$name(p: T): boolean { return expr }`. */
-  private def synthesizeLawMethod(law: AST.LawClause): AST.MethodDeclaration = {
-    val boolType = AST.TypeNode(law.location, AST.PrimitiveType(AST.KBoolean), false)
-    AST.MethodDeclaration(law.location, AST.M_PUBLIC | AST.M_STATIC,
-      "onion$$law$$" + law.name, law.params, boolType, wrapReturningBoolean(law.body))
-  }
-
-  /** `example [name] { expr }` -> `static def onion$$example$$<name|idx>(): boolean { return expr }`. */
-  private def synthesizeExampleMethod(ex: AST.ExampleClause, idx: Int): AST.MethodDeclaration = {
-    val boolType = AST.TypeNode(ex.location, AST.PrimitiveType(AST.KBoolean), false)
-    val suffix = ex.name.getOrElse(idx.toString)
-    AST.MethodDeclaration(ex.location, AST.M_PUBLIC | AST.M_STATIC,
-      "onion$$example$$" + suffix, Nil, boolType, wrapReturningBoolean(ex.body))
-  }
-
-  /** Make a `{ ...; lastExpr }` block return its last expression, so the synthesized boolean
-   *  method yields a value. An already-`return`ed tail is left as-is. */
-  private def wrapReturningBoolean(block: AST.BlockExpression): AST.BlockExpression =
-    block.elements.reverse match {
-      case (_: AST.ReturnExpression) :: _ => block
-      case (last: AST.Expression) :: rest =>
-        AST.BlockExpression(block.location, rest.reverse :+ AST.ReturnExpression(last.location, last))
-      case _ => block
-    }
 
   /**
    * Pattern-attached records: `record Name(c1: T1, ...) from re"..."` derives a typed

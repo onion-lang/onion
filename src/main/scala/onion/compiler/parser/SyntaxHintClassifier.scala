@@ -291,9 +291,9 @@ private[compiler] object SyntaxHintClassifier {
 
   // A record body's clauses end at a newline or a space, so `shape a = json; shape b = ...`
   // fails at the `;`. Anchored to the end of the text before the `;`: a `shape` clause
-  // (`shape name = json` / `re"..."`), or an `example`/`law` clause whose block just closed.
+  // (`shape name = json` / `re"..."`).
   private val RecordClauseBeforeSemicolon =
-    """(?:^|[{;\s])(?:shape\s+[A-Za-z_]\w*\s*=\s*(?:re"[^"]*"|[A-Za-z_]\w*)|(?:example|law)\b[^;]*\})\s*$""".r
+    """(?:^|[{;\s])(?:shape\s+[A-Za-z_]\w*\s*=\s*(?:re"[^"]*"|[A-Za-z_]\w*))\s*$""".r
 
   def classify(
     found: String,

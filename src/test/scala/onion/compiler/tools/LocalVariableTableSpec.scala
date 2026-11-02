@@ -25,7 +25,7 @@ class LocalVariableTableSpec extends AnyFunSpec {
 
   private def classesOf(source: String, debug: Boolean = true): Seq[ClassNode] = {
     val config = new CompilerConfig(
-      Seq("."), null, "UTF-8", "", 10, checkLaws = false, emitDebugInfo = debug)
+      Seq("."), null, "UTF-8", "", 10, runContracts = false, emitDebugInfo = debug)
     val result = new OnionCompiler(config)
       .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "Debug.on")))
     assert(!result.hasErrors, s"compile failed: ${result.allErrors.map(_.message).mkString("; ")}")

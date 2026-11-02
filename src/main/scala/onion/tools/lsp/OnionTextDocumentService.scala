@@ -82,11 +82,11 @@ object OnionTextDocumentService {
   /**
    * Compiler settings for editor validation.
    *
-   * `checkLaws = false` is the load-bearing part: `law` and `example` clauses are
-   * executed by LawCheckPhase, so leaving them on means the editor runs whatever the
-   * file currently says on every keystroke, in a half-typed state (issue #346). Laws
-   * belong to the build -- `onionc`, `onion`, `onion build`, `onion test` -- where they
-   * run once against a file the author considers finished.
+   * `runContracts = false` is the load-bearing part: a closed predicate (`ensures result`) and a
+   * history counterexample are executed by the build, so leaving them on means the editor runs
+   * whatever the file currently says on every keystroke, in a half-typed state (issue #346).
+   * Contract predicates belong to the build -- `onionc`, `onion`, `onion build`, `onion test` --
+   * where they run once against a file the author considers finished.
    */
   def validationConfig: CompilerConfig = validationConfig(None)
 
@@ -109,7 +109,7 @@ object OnionTextDocumentService {
 
   /** @param classpath the document's own classpath, as [[LspProjectClasspath]] answers it */
   def validationConfig(classpath: Seq[String], scriptJars: Seq[String]): CompilerConfig =
-    CompilerConfig(classpath ++ scriptJars, null, "UTF-8", "", 100, checkLaws = false)
+    CompilerConfig(classpath ++ scriptJars, null, "UTF-8", "", 100, runContracts = false)
 }
 
 class OnionTextDocumentService(server: OnionLanguageServer) extends TextDocumentService {

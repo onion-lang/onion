@@ -28,9 +28,8 @@ object CompilerOptions {
   final val PROFILE_OUTPUT: String = "--profile-output"
   final val WARN_LEVEL: String = "--warn"
   final val SUPPRESS_WARNINGS: String = "--Wno"
-  final val NO_CHECK_LAWS: String = "--no-check-laws"
-  final val LAW_SEED: String = "--law-seed"
-  final val LAW_SAMPLES: String = "--law-samples"
+  final val CONTRACT_SEED: String = "--contract-seed"
+  final val CONTRACT_SAMPLES: String = "--contract-samples"
   final val SHOW_EFFECTS: String = "--effects"
   /** `off` (default), `runtime` or `verify`: whether contract clauses are accepted (RFC #2557). */
   final val CONTRACTS: String = "--contracts"
@@ -62,9 +61,8 @@ object CompilerOptions {
     OptionConfig(PROFILE_OUTPUT, true),
     OptionConfig(WARN_LEVEL, true),
     OptionConfig(SUPPRESS_WARNINGS, true),
-    OptionConfig(NO_CHECK_LAWS, false),
-    OptionConfig(LAW_SEED, true),
-    OptionConfig(LAW_SAMPLES, true),
+    OptionConfig(CONTRACT_SEED, true),
+    OptionConfig(CONTRACT_SAMPLES, true),
     OptionConfig(SHOW_EFFECTS, false),
     OptionConfig(CONTRACTS, true)
   )
@@ -73,7 +71,7 @@ object CompilerOptions {
   final val VALUE_OPTIONS: Set[String] = Set(
     CLASSPATH, SCRIPT_SUPER_CLASS, ENCODING, MAX_ERROR,
     PROFILE_FORMAT, PROFILE_OUTPUT, WARN_LEVEL, SUPPRESS_WARNINGS,
-    LAW_SEED, LAW_SAMPLES, CONTRACTS
+    CONTRACT_SEED, CONTRACT_SAMPLES, CONTRACTS
   )
 
   private def printError(message: String): Unit = System.err.println(message)
@@ -99,7 +97,6 @@ object CompilerOptions {
     val classpath = checkClasspath(option.get(CLASSPATH))
     val dumpAst = option.get(DUMP_AST).contains(NoValuedParam)
     val dumpTypedAst = option.get(DUMP_TYPED_AST).contains(NoValuedParam)
-    val checkLaws = !option.get(NO_CHECK_LAWS).contains(NoValuedParam)
     for {
       encoding <- checkEncoding(option.get(ENCODING))
       maxErrorReport <- checkMaxErrorReport(option.get(MAX_ERROR))
@@ -119,10 +116,9 @@ object CompilerOptions {
       dumpAst = dumpAst,
       dumpTypedAst = dumpTypedAst,
       compileProfile = profile,
-      checkLaws = checkLaws,
       emitDebugInfo = emitDebugInfo,
-      lawSeed = longParam(option, LAW_SEED, ArgGenerator.DefaultSeed),
-      lawSamples = intParam(option, LAW_SAMPLES, ArgGenerator.DefaultSamples),
+      contractSeed = longParam(option, CONTRACT_SEED, ArgGenerator.DefaultSeed),
+      contractSamples = intParam(option, CONTRACT_SAMPLES, ArgGenerator.DefaultSamples),
       contracts = contracts
     )
   }

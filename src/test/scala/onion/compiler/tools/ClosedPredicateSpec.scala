@@ -7,7 +7,7 @@ import org.scalatest.funspec.AnyFunSpec
 /** A closed predicate runs when the build runs (RFC #2557, design 7.2): the replacement for `example`. */
 class ClosedPredicateSpec extends AnyFunSpec {
   private def codes(src: String, mode: ContractMode = ContractMode.Check): Seq[String] = {
-    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, checkLaws = false, contracts = mode)
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, contracts = mode)
     new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "C.on"))) match {
       case CompilationOutcome.Failure(errs) => errs.flatMap(_.errorCode)
       case _                                => Nil

@@ -214,8 +214,7 @@ final class ProjectBuilder(
       outputDirectory = stagedClasses.toString,
       maxErrorReports = 10,
       verbose = false,
-      warningLevel = WarningLevel.On,
-      checkLaws = true
+      warningLevel = WarningLevel.On
     )
     val inputs = sources.map { snapshot =>
       new StreamInputSource(

@@ -2091,6 +2091,7 @@ AST.EnumDeclaration enum_decl(int mset) : {
   // which cannot be generic. Accepted here and rejected in Rewriting so the
   // message can say why rather than being a bare syntax error.
   start = "enum" name = id() [tparams=type_params()] ["(" params = args() ")"] "{"
+  { invariantClauses = new ArrayBuffer<AST.Expression>(); historyClauses = new ArrayBuffer<AST.Expression>(); }
   (
     // Scala-3-style HETEROGENEOUS (ADT) enum: one-or-more `case`-keyword cases,
     // each carrying its OWN record-style fields (or none, for a singleton). No
@@ -2113,7 +2114,8 @@ AST.EnumDeclaration enum_decl(int mset) : {
   )
   "}" [";"] {
     return new AST.EnumDeclaration(
-      p(start), mset, c(name), params, toList(constants), toList(sections), tparams
+      p(start), mset, c(name), params, toList(constants), toList(sections), tparams,
+      toList(invariantClauses), toList(historyClauses)
     );
   }
 }

@@ -39,6 +39,26 @@ private[compiler] final class MethodBodySupport(
   }
 
   /**
+   * The clauses of a method with no body: an interface method or an `abstract def` (RFC #2557,
+   * #2577). They are typed in a context holding only the parameters and the object, the same
+   * scopes a concrete method's clauses see, and kept on the method so the purity pass checks
+   * them too. Nothing else about the method changes: it still has no body or frame.
+   */
+  def processBodilessContracts(
+    method: MethodDefinition,
+    args: List[AST.Argument],
+    requires: List[AST.Expression],
+    ensures: List[AST.Expression]
+  ): Unit = {
+    val context = new LocalContext
+    if (method.modifier & AST.M_STATIC) != 0 then context.setStatic(true)
+    context.setMethod(method)
+    bindParameters(context, args, method.arguments, null)
+    if (requires.nonEmpty) method.preconditions = typeContractClauses(requires, context, ContractScope.Pre)
+    if (ensures.nonEmpty) method.postconditions = typePostconditions(method, ensures, context)
+  }
+
+  /**
    * Types contract clauses as Boolean expressions in `context`, marked with `scope` so that
    * `old(e)` and `result` resolve only where they are allowed (RFC #2557). A clause that fails
    * to type is reported and dropped. With `--contracts off` a clause is an error (E0105)
@@ -260,10 +280,14 @@ private[compiler] final class MethodBodySupport(
     receiverType: Type
   ): Unit = {
     val context = prepareExtensionContext(staticMethod, node, receiverType)
+    // An extension method's clauses see the receiver as `this` and the parameters, as a
+    // class method's do (#2577); before, they were parsed and then dropped.
+    if (node.requires.nonEmpty) staticMethod.preconditions = typeContractClauses(node.requires, context, ContractScope.Pre)
     val triesBefore = bodyContext.tryCount
     val extTranslated = translate(node.block, context)
     staticMethod.mayContainTry = bodyContext.tryCount != triesBefore
     checkMissingReturn(staticMethod.returnType, extTranslated, staticMethod.name, node.block)
+    if (node.ensures.nonEmpty) staticMethod.postconditions = typePostconditions(staticMethod, node.ensures, context)
     val translatedBlock = addReturnNode(withPrologue(context, extTranslated), staticMethod.returnType)
     staticMethod.setBlock(translatedBlock)
     staticMethod.setFrame(context.getContextFrame)

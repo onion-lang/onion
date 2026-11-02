@@ -110,12 +110,20 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
         }
       }
     } else if (node.requires.nonEmpty || node.ensures.nonEmpty) {
-      // An abstract or interface method has no body to type the clauses against; they bind its
-      // overrides, which a later stage (RFC #2557) resolves. With contracts off they are still
-      // an error, so a clause is never silently ignored.
-      if (bodyContext.contractMode == ContractMode.Off) {
-        node.requires.foreach(c => typing.report(SemanticError.CONTRACTS_NOT_ENABLED, c, "requires"))
-        node.ensures.foreach(c => typing.report(SemanticError.CONTRACTS_NOT_ENABLED, c, "ensures"))
+      // An abstract or interface method has no body, but its clauses bind every override, so
+      // they are typed against its parameters (and `result`) like a concrete method's: an
+      // undefined name or an impure call is an error here too (#2577). With contracts off
+      // each clause is E0105, so a clause is never silently ignored.
+      typing.kernelNodeOf[MethodDefinition](node) match {
+        case Some(method) =>
+          val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+          typing.openTypeParams(unitContext.currentTypeParams ++ methodTypeParams) {
+            methodBodySupport.processBodilessContracts(method, node.args, node.requires, node.ensures)
+          }
+        case None if bodyContext.contractMode == ContractMode.Off =>
+          node.requires.foreach(c => typing.report(SemanticError.CONTRACTS_NOT_ENABLED, c, "requires"))
+          node.ensures.foreach(c => typing.report(SemanticError.CONTRACTS_NOT_ENABLED, c, "ensures"))
+        case None =>
       }
     }
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
@@ -155,8 +163,10 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     }
   def processInterfaceDeclaration(node: AST.InterfaceDeclaration, context: LocalContext): Unit =
     // Default methods (interface methods with bodies) get typed like
-    // instance methods; signature-only declarations have nothing to do
-    if (node.methods.exists(_.block != null) || node.invariants.nonEmpty || node.histories.nonEmpty) {
+    // instance methods; signature-only declarations have nothing to do,
+    // unless they carry contract clauses, which are typed in the interface's scope
+    if (node.methods.exists(m => m.block != null || m.requires.nonEmpty || m.ensures.nonEmpty) ||
+        node.invariants.nonEmpty || node.histories.nonEmpty) {
       typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
         unitContext.currentDefinition = definition
         typing.find(definition.name).foreach(unitContext.currentMapper = _)
@@ -166,10 +176,6 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
           node.methods.foreach(processMethodDeclaration)
         }
       }
-    } else {
-      // Every method is signature-only: nothing to type, but a contract clause on one must still
-      // be refused when contracts are off, never dropped without a word (RFC #2557).
-      node.methods.foreach(processMethodDeclaration)
     }
   def processEnumDeclaration(node: AST.EnumDeclaration, context: LocalContext): Unit =
     // Lower each constant into a static-initializer assignment:
@@ -178,6 +184,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
       unitContext.currentDefinition = definition
       typing.find(definition.name).foreach(unitContext.currentMapper = _)
+      methodBodySupport.processTypeContracts(definition, node.invariants, node.histories)
       val stringType = typing.loadRequired("java.lang.String")
       definition.constructors.headOption.foreach { ctor =>
         val paramTypes = ctor.getArgs.drop(2)

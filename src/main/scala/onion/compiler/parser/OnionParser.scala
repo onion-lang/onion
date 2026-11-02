@@ -1251,6 +1251,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     expect(K.LBRACE)
     val constants = new ArrayBuffer[AST.EnumConstant]()
     val sections = new ArrayBuffer[AST.AccessSection]()
+    invariantClauses.clear(); historyClauses.clear()
     if (la("case")) {
       while (la("case")) {
         constants += enumCaseConstant()
@@ -1265,7 +1266,8 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     }
     expect(K.RBRACE)
     accept(K.SEMI)
-    AST.EnumDeclaration(p(start), mset, c(name), params, constants.toList, sections.toList, tparams)
+    AST.EnumDeclaration(p(start), mset, c(name), params, constants.toList, sections.toList, tparams,
+      invariantClauses.toList, historyClauses.toList)
   }
 
   private def enumCaseConstant(): AST.EnumConstant = {

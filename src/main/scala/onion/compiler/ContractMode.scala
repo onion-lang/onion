@@ -4,24 +4,24 @@ package onion.compiler
  * How contract clauses (`requires`, `ensures`, `invariant`, `history`) are treated
  * (RFC #2557, `docs/design/contracts.md` section 6).
  *
- * Contracts are a preview feature, so `Off` is the default. With `Off`, a clause in the
- * source is an error rather than being ignored: a contract that silently does nothing
- * is worse than none.
+ * `Check` is the default: the clauses are typed and statically checked. With `Off`, a clause in
+ * the source is an error rather than being ignored: a contract that silently does nothing is
+ * worse than none.
  *
- * A mode is named for what it does. `Check` is what exists: the clauses are typed, and the
- * static checks that need no solver run on them. `Runtime` and `Verify` are reserved for the
- * guards and the proofs; until they exist the command line refuses them, so no mode promises
- * a check it does not make.
+ * A mode is named for what it does. `Check` types the clauses and runs the static checks.
+ * `Runtime` also keeps a guard for what it can: today, each `requires` clause throws
+ * `ContractViolation` when it is false. `Verify` is reserved for the proofs; until it exists the
+ * command line refuses it, so no mode promises a check it does not make.
  */
 enum ContractMode:
   case Off      // Contract clauses are rejected, with a hint to enable the flag
   case Check    // Clauses are typed and statically checked; nothing is enforced at run time
-  case Runtime  // Reserved: guards for what was not proved
+  case Runtime  // Check, plus a run-time guard for each `requires` clause
   case Verify   // Reserved: proofs
 
 object ContractMode:
   /** The names the command line accepts today, lower-case. */
-  val accepted: Seq[ContractMode] = Seq(Off, Check)
+  val accepted: Seq[ContractMode] = Seq(Off, Check, Runtime)
 
   /** The name used on the command line, lower-case. */
   def flagName(mode: ContractMode): String = mode match

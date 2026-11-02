@@ -32,15 +32,32 @@ object HistoryProver {
    * (an obligation, not an assumption), and its `ensures` constrains the result. Any other call is
    * [[Unsupported]].
    */
+  /**
+   * What the prover needs to know about a method it calls: its parameter names, and its contract.
+   * It comes from the AST of a method in the same compilation ([[Callee.of]]) or from the
+   * `@onion.Contract` of a class file built earlier (RFC #2557), which has no body to look at.
+   */
+  final case class Callee(params: List[String], requires: List[AST.Expression], ensures: List[AST.Expression])
+
+  object Callee {
+    /** A method of this compilation. Only an `Int` method over `Int` parameters that states a contract is a callee. */
+    def of(m: AST.MethodDeclaration): Option[Callee] =
+      if (m.args.forall(a => a.typeRef != null && a.typeRef.desc == AST.PrimitiveType(AST.KInt)) &&
+          m.returnType != null && m.returnType.desc == AST.PrimitiveType(AST.KInt) && m.ensures.nonEmpty)
+        Some(Callee(m.args.map(_.name), m.requires, m.ensures))
+      else None
+  }
+
   def prove(method: AST.MethodDeclaration, field: String, op: String, intFields: Set[String],
-            invariants: Seq[AST.Expression], callees: Map[String, AST.MethodDeclaration] = Map.empty): Outcome =
+            invariants: Seq[AST.Expression], callees: Map[String, AST.MethodDeclaration] = Map.empty,
+            external: Map[(String, String), Callee] = Map.empty): Outcome =
     if (method.block == null || !intFields.contains(field)) Unsupported
     else {
-      val first = new Run(method, field, op, intFields, invariants, callees, checkObligations = true)
+      val first = new Run(method, field, op, intFields, invariants, callees, external, checkObligations = true)
       first.run() match {
         // The callee obligations are a separate question, asked in a circuit of its own, so the
         // negated obligation does not stay in the clauses of the history question.
-        case Proved => new Run(method, field, op, intFields, invariants, callees, checkObligations = false).run()
+        case Proved => new Run(method, field, op, intFields, invariants, callees, external, checkObligations = false).run()
         case other  => other
       }
     }
@@ -52,13 +69,14 @@ object HistoryProver {
    * against the effective contract (design 4).
    */
   def proveEnsures(method: AST.MethodDeclaration, ensures: Seq[AST.Expression], assume: Seq[AST.Expression],
-                   intFields: Set[String], callees: Map[String, AST.MethodDeclaration] = Map.empty): Outcome =
+                   intFields: Set[String], callees: Map[String, AST.MethodDeclaration] = Map.empty,
+                   external: Map[(String, String), Callee] = Map.empty): Outcome =
     if (method.block == null || ensures.isEmpty) Unsupported
-    else new Run(method, "", ">=", intFields, assume, callees, checkObligations = false).runEnsures(ensures)
+    else new Run(method, "", ">=", intFields, assume, callees, external, checkObligations = false).runEnsures(ensures)
 
   private final class Run(method: AST.MethodDeclaration, field: String, op: String, intFields: Set[String],
                           invariants: Seq[AST.Expression], callees: Map[String, AST.MethodDeclaration],
-                          checkObligations: Boolean) {
+                          external: Map[(String, String), Callee], checkObligations: Boolean) {
     /** Conditions the solver may assume (a callee's `ensures`) and must establish (its `requires`). */
     private val assumed = scala.collection.mutable.ArrayBuffer.empty[Int]
     private val obligations = scala.collection.mutable.ArrayBuffer.empty[Int]
@@ -70,7 +88,10 @@ object HistoryProver {
 
     def run(): Outcome = {
       val intParams = method.args.filter(a => isInt(a.typeRef)).map(_.name)
-      if (method.args.size != intParams.size) return Unsupported // a non-Int parameter may be read
+      // A non-Int parameter may be read, so it is refused, unless it is the receiver of a call whose
+      // contract a built module gave us: it is not in the environment, so reading it as a value
+      // still ends in Unsupported.
+      if (method.args.exists(a => !isInt(a.typeRef) && !isBuiltReceiver(a))) return Unsupported
       val pre: Env = (intFields.toSeq ++ intParams).map(n => n -> bb.fresh(W)).toMap
       val assumptions = (invariants ++ method.requires).map(cond(_, pre))
       if (assumptions.exists(_.isEmpty)) return Unsupported
@@ -158,6 +179,9 @@ object HistoryProver {
       case AST.Negate(_, t)            => exprPost(t, pre, post).map(bb.neg)
       case other                       => expr(other, post)
     }
+    /** A parameter of a type some built module gave a contract for: only its methods are ever called. */
+    private def isBuiltReceiver(a: AST.Argument): Boolean =
+      Option(a.typeRef).map(_.desc).collect { case AST.ReferenceType(n, _) => n }.exists(n => external.keys.exists(_._1 == n))
 
     private def isInt(t: AST.TypeNode): Boolean = t != null && (t.desc match {
       case AST.PrimitiveType(AST.KInt) => true
@@ -210,6 +234,7 @@ object HistoryProver {
       case AST.Multiplication(_, l, r) => bin(l, r, env)(bb.mul)
       case AST.Negate(_, t) => expr(t, env).map(bb.neg)
       case AST.UnqualifiedMethodCall(_, callee, args, _) => call(callee, args, env)
+      case AST.MethodCall(_, AST.Id(_, receiver), callee, args, _) => memberCall(receiver, callee, args, env)
       case other => name(other).flatMap(env.get)
     }
 
@@ -230,6 +255,26 @@ object HistoryProver {
         val scope: Env = m.args.map(_.name).zip(actuals).toMap + ("result" -> result)
         m.requires.foreach(r => cond(r, scope).foreach(obligations += _))
         m.ensures.foreach(e => cond(e, scope).foreach(assumed += _))
+        result
+      }
+
+    /**
+     * `s.step(k)` where `s` is a parameter whose declared type has a contract from a module built
+     * earlier. The receiver is another object, so the call cannot touch this object's fields, unless
+     * `s` is of this very class (it could then be this object): that case is not modelled.
+     */
+    private def memberCall(receiver: String, name: String, args: List[AST.Expression], env: Env): Option[bb.Word] =
+      for {
+        param <- method.args.find(_.name == receiver)
+        typeName <- Option(param.typeRef).map(_.desc).collect { case AST.ReferenceType(n, _) => n }
+        c <- external.get((typeName, name))
+        if c.params.size == args.size
+        actuals <- sequence(args.map(expr(_, env)))
+      } yield {
+        val result = bb.fresh(W)
+        val scope: Env = c.params.zip(actuals).toMap + ("result" -> result)
+        c.requires.foreach(r => cond(r, scope).foreach(obligations += _))
+        c.ensures.foreach(e => cond(e, scope).foreach(assumed += _))
         result
       }
 

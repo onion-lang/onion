@@ -83,7 +83,7 @@ private[compiler] final class MethodBodySupport(
     val classType = method.classType
     val isStatic = (method.modifier & AST.M_STATIC) != 0
     val bodyMethod = new MethodDefinition(method.location, AST.M_PRIVATE | (if (isStatic) AST.M_STATIC else 0), classType, method.name + "$body",
-      method.arguments, method.returnType, body)
+      method.arguments, method.returnType, body, method.typeParameters, method.throwsTypes, method.isVararg)
     bodyMethod.mayContainTry = method.mayContainTry
     bodyMethod.setFrame(context.getContextFrame)
     bodyMethod.setArgumentsWithDefaults(method.argumentsWithDefaults)
@@ -400,6 +400,15 @@ private[compiler] final class MethodBodySupport(
   ): Unit = {
     constructor.superInitializer = initializer
     constructor.block = addReturnNode(withPrologue(context, translate(block, context)), BasicType.VOID)
+    // A constructor has no `requires` or `ensures`, but the class's `invariant` must hold once the object
+    // is built. The run-time guard does not check that yet, and a check that silently does not run is
+    // worse than none, so the clause is named (RFC #2557, design 7.4).
+    constructor.classType match {
+      case d: ClassDefinition if bodyContext.contractMode == ContractMode.Runtime && d.invariantSources.nonEmpty =>
+        bodyContext.warningReporter.report(WarningCategory.ContractNotEnforced, block.location,
+          s"the invariant of '${d.name}' is not checked when the object is built: a constructor is not guarded yet")
+      case _ =>
+    }
     constructor.frame = context.getContextFrame
     constructor.primaryAssignments = primaryAssignments
   }

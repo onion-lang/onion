@@ -23,7 +23,7 @@ class ContractNotEnforcedWarningSpec extends AnyFunSpec {
        |  { n = n + 1 }
        |}""".stripMargin
 
-  it("warns when the method is generic, which the guard does not split yet") {
+  it("is silent for a generic method: it is guarded too") {
     val src =
       """class Box {
         |public:
@@ -31,8 +31,7 @@ class ContractNotEnforcedWarningSpec extends AnyFunSpec {
         |    ensures result == x
         |  { return x }
         |}""".stripMargin
-    val ws = w26(src)
-    assert(ws.size == 1 && ws.head.contains("generic"), ws.toString)
+    assert(w26(src).isEmpty)
   }
 
   it("is silent for a static method: it is guarded too") {
@@ -55,7 +54,24 @@ class ContractNotEnforcedWarningSpec extends AnyFunSpec {
   }
 
   it("is silent under --contracts check, which guards nothing") {
-    val src = "class Box {\npublic:\n  def keep[T](x: T): T\n    ensures result == x\n  { return x }\n}"
+    val src = "class Calc {\npublic:\n  def twice(x: Int): Int\n    ensures result == x * 2\n  { return x * 2 }\n}"
     assert(w26(src, ContractMode.Check).isEmpty)
+  }
+
+  it("names the invariant a constructor does not check when the object is built") {
+    val src =
+      """class Account {
+        |  invariant balance >= 0
+        |public:
+        |  var balance: Int
+        |  def this { balance = 10 }
+        |}""".stripMargin
+    val ws = w26(src)
+    assert(ws.size == 1 && ws.head.contains("constructor"), ws.toString)
+  }
+
+  it("says nothing about a constructor when the class has no invariant") {
+    val src = "class Plain {\npublic:\n  var n: Int\n  def this { n = 1 }\n}"
+    assert(w26(src).isEmpty)
   }
 }

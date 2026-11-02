@@ -6,7 +6,7 @@ import onion.tools.option.{CommandLineParam, NoValuedParam, ValuedParam}
 import org.scalatest.funspec.AnyFunSpec
 
 /**
- * `--contracts <off|runtime|verify>` (RFC #2557, design section 6).
+ * `--contracts <off|check|runtime>` (RFC #2557, design section 6).
  *
  * Contract clauses are a preview feature. `off` is the default and a clause is then an
  * error, so a contract is never silently ignored.
@@ -32,10 +32,10 @@ class ContractsFlagSpec extends AnyFunSpec {
       assert(mode("off") == Some(ContractMode.Off))
       assert(mode("check") == Some(ContractMode.Check))
       assert(mode("CHECK") == Some(ContractMode.Check))
+      assert(mode("runtime") == Some(ContractMode.Runtime))
     }
 
-    it("refuses runtime and verify until they check something") {
-      assert(mode("runtime").isEmpty)
+    it("refuses verify until it checks something") {
       assert(mode("verify").isEmpty)
     }
 
@@ -45,8 +45,8 @@ class ContractsFlagSpec extends AnyFunSpec {
       assert(err.contains("check"), err)
       assert(err.contains("verify"), err)
       val bad = captureErr(mode("always"))
-      assert(bad.contains("off") && bad.contains("check"), bad)
-      assert(!bad.contains("runtime"), bad)
+      assert(bad.contains("off") && bad.contains("check") && bad.contains("runtime"), bad)
+      assert(!bad.contains("verify"), bad)
     }
 
     it("rejects an unknown value and a missing value") {

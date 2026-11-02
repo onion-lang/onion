@@ -130,9 +130,11 @@ public:
   `o = uo` (`uo: U?`) and `o = "x"` into `o: T?` are `E0000` too (#2332). A constructor
   argument into a `T?` parameter (`new Box[T](u)` with `def this(x: T?)`) is `E0021`, as it
   already was for a `T` parameter.
-- **Not covered yet:** `xs[0] = u`, `m["k"] = u` and a literal `[u]` still accept a `U`, and
-  still throw at run time (#2332). Cast there too, so the code keeps compiling once they are
-  checked.
+- **Indexed assignments and literals:** `xs[0] = u` and `m["k"] = u` into a `List[T]` or a
+  `Map[K, T]` are `E0000`, as `xs.set(0, u)` already was (#2332). So is a literal `[u]`,
+  `[t, u]` or `["k": u]` used as a `List[T]` or `Map[K, T]`; the error names the literal's
+  type (`List[U]`, or `List[Object]` for a mix). Under a `List[Object]` target, `[t, u]` is
+  still fine. Write `[(u as T)]` if the value really is a `T`.
 - **Inherited members are now `U`:** inside `class Mid[U] extends Box[U]`, an inherited
   `get(): T` is a `U` (it was `Object`). `U` may be null, so `get().toString()` is now `E0057`,
   as it already was inside `Box`. Write `get()?.toString()`, `get() ?: fallback`, or give `U` a

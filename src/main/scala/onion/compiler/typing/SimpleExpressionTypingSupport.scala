@@ -21,7 +21,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
   typed: (AST.Expression, LocalContext, Type) => Option[Term],
   typeMemberSelection: (AST.MemberSelection, LocalContext) => Option[Term],
   typeAssignment: (AST.Assignment, LocalContext) => Option[Term],
-  trySelfMethodQuiet: (AST.Id, LocalContext) => Option[Term]
+  trySelfMethodQuiet: (AST.Id, LocalContext) => Option[Term],
+  assignability: AssignabilitySupport
 ) {
   def typeSimple(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
     node match {
@@ -243,6 +244,17 @@ private[compiler] final class SimpleExpressionTypingSupport(
     case _ => null
   }
 
+  /**
+   * Whether a literal's element of type `actual` lets the literal adopt the expected
+   * element type. A slot that mentions a type variable takes only what an assignment
+   * to it takes: `[u]` with `u: U` is not a `List[T]` just because `U` and `T` both
+   * erase to `Object` (#2332). Other slots keep the plain subtype test.
+   */
+  private def fitsLiteralSlot(expected: Type, actual: Type): Boolean =
+    if (TypeCheckingHelpers.containsTypeVariable(expected) && !expected.isInstanceOf[WildcardType])
+      assignability.fitsWithoutConversion(expected, actual)
+    else TypeRules.isAssignable(expected, actual)
+
   private def typeListLiteral(node: AST.ListLiteral, context: LocalContext, expected: Type): Option[Term] = {
     val typedElements = new Array[Term](node.elements.size)
     val expectedElem = expectedListElement(expected)
@@ -301,8 +313,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
         case _ => expectedElem
       }
       def fitsExpectedElement(t: Term): Boolean =
-        TypeRules.isAssignable(expectedElem, t.`type`) ||
-          (expectedNonNull != null && TypeRules.isAssignable(expectedNonNull, normalizeListElementType(t.`type`)))
+        fitsLiteralSlot(expectedElem, t.`type`) ||
+          (expectedNonNull != null && fitsLiteralSlot(expectedNonNull, normalizeListElementType(t.`type`)))
       val finalElementType =
         if (typedElements.isEmpty) (if (expectedElem != null) expectedElem else bodyContext.rootClass)
         // Target-type the literal: if every element fits the expected element type,
@@ -554,8 +566,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
       // non-null boxed inner, matching the primitive `Int?` form (#255).
       def fitsExpected(expected: Type, actual: Term): Boolean = {
         val nonNull = expected match { case n: NullableType => n.innerType; case _ => expected }
-        TypeRules.isAssignable(expected, actual.`type`) ||
-          (nonNull != null && TypeRules.isAssignable(nonNull, normalizeListElementType(actual.`type`)))
+        fitsLiteralSlot(expected, actual.`type`) ||
+          (nonNull != null && fitsLiteralSlot(nonNull, normalizeListElementType(actual.`type`)))
       }
       val finalKeyType =
         if (keys.isEmpty) (if (expectedKey != null) expectedKey else bodyContext.rootClass)
@@ -600,8 +612,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
     else if (left eq right) left
     else if (left.isNullType) right
     else if (right.isNullType) left
-    else if (TypeRules.isSuperType(left, right)) left
-    else if (TypeRules.isSuperType(right, left)) right
+    else if (TypeCheckingHelpers.joinsStrictly(bodyContext.table, left, right)) left
+    else if (TypeCheckingHelpers.joinsStrictly(bodyContext.table, right, left)) right
     else if (!left.isBasicType && !right.isBasicType) bodyContext.rootClass
     else null
 }

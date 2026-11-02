@@ -110,21 +110,12 @@ Suppress specific warning categories by code or name.
 onion --Wno W0001,unused-parameter MyScript.on
 ```
 
-### `--no-check-laws`
+### `--contract-seed <n>` / `--contract-samples <n>`
 
-Do not execute a record's `law` / `example` clauses.
-
-```bash
-onion --no-check-laws MyScript.on
-```
-
-### `--law-seed <n>` / `--law-samples <n>`
-
-Control how `law` clauses are sampled; a falsified law reports the settings that
-produced its counterexample.
+Control how a predicate with parameters (a `static def` that states `ensures result`) is sampled. A failing sample reports the settings that produced it, so the run can be repeated exactly; raising the sample count widens the search.
 
 ```bash
-onion --law-samples 500 MyScript.on
+onion --contract-samples 500 MyScript.on
 ```
 
 ### `--contracts <off|check>`

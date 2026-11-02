@@ -1598,11 +1598,6 @@ AST.Toplevel top_level():{int mset = 0; AST.Toplevel top;}{
   // `tool` is a soft keyword: only `tool name(` opens a tool declaration, so it stays
   // usable as an ordinary identifier everywhere else.
   top=tool_decl()
-| LOOKAHEAD({getToken(1).image.equals("example") && (getToken(2).kind == LBRACE || (getToken(2).kind == ID && getToken(3).kind == LBRACE))})
-  // Top-level `example [name] { expr }` (issue #364): the same build-time check a
-  // record example is, hosted by the file class — how a user-written Shape instance
-  // asserts its laws. `example` stays an ordinary identifier everywhere else.
-  top=top_level_example()
 | LOOKAHEAD(2)
   {enterAssignScope();} top=block_element() {leaveAssignScopeIntoUnit();}
 | LOOKAHEAD("extension")
@@ -1763,14 +1758,6 @@ AST.FunctionDeclaration tool_decl() : {
       scala.collection.immutable.List$.MODULE$.<AST.TypeNode>empty(),
       toList(anns));
   }
-}
-
-AST.TopLevelExample top_level_example() : {
-  Token t, n = null;
-  AST.BlockExpression b;
-}{
-  t=<ID> [ n=id() ] b=block()
-  { return AST.topLevelExample(p(t), n == null ? null : c(n), b); }
 }
 
 /** One capability in a requires clause: an effect name, optionally tied to a
@@ -1954,8 +1941,6 @@ AST.RecordDeclaration record_decl(int mset) : {
   List<AST.TypeParameter> tparams = scala.collection.immutable.List$.MODULE$.<AST.TypeParameter>empty();
   String fromRaw = null;
   ArrayBuffer<String> deriveBuf = new ArrayBuffer<String>();
-  ArrayBuffer<AST.LawClause> lawBuf = new ArrayBuffer<AST.LawClause>();
-  ArrayBuffer<AST.ExampleClause> exBuf = new ArrayBuffer<AST.ExampleClause>();
   ArrayBuffer<AST.ShapeClause> shapeBuf = new ArrayBuffer<AST.ShapeClause>();
   ArrayBuffer<AST.AccessSection> sections = new ArrayBuffer<AST.AccessSection>();
   Token st, srt;
@@ -1980,23 +1965,14 @@ AST.RecordDeclaration record_decl(int mset) : {
     superType = type() {append(superTypes, superType);}
     ("," superType = type() {append(superTypes, superType);})*
   ]
-  // Optional brace body: `record R(...) { access-section* | law* | example* | shape* }`,
-  // mirroring enum bodies so records can carry behaviour (methods) alongside their
-  // `law`/`example`/`shape` clauses (B3), all enclosed together. `law`, `example` and
-  // `shape` are soft keywords recognized only here (each guarded by a LOOKAHEAD on the
-  // token(s) that follow), so they stay usable as ordinary identifiers everywhere else.
-  // `law` and `example` each become a boolean static method the compiler executes at
-  // build time (LawCheckPhase); `law` is property-checked over generated args.
+  // Optional brace body: `record R(...) { access-section* | shape* }`, mirroring enum bodies so
+  // records can carry behaviour (methods) alongside their `shape` clauses, all enclosed together.
+  // `shape` is a soft keyword recognized only here (guarded by a LOOKAHEAD on the tokens that
+  // follow), so it stays usable as an ordinary identifier everywhere else.
   { invariantClauses = new ArrayBuffer<AST.Expression>(); historyClauses = new ArrayBuffer<AST.Expression>(); }
   [ "{" {inRecordBody = true;}
     ( sec=access_section() {append(sections, sec);}
     | LOOKAHEAD({typeClauseAhead()}) type_clause()
-    | LOOKAHEAD({getToken(1).image.equals("law") && getToken(2).kind == ID})
-        <ID> lt=<ID> "(" largs=args() ")" lb=block()
-        { append(lawBuf, new AST.LawClause(p(lt), c(lt), largs, lb)); }
-    | LOOKAHEAD({getToken(1).image.equals("example") && (getToken(2).kind == LBRACE || getToken(2).kind == ID)})
-        et=<ID> { enm = null; } [ LOOKAHEAD({getToken(1).kind == ID}) enm=<ID> ] eb=block()
-        { append(exBuf, AST.exampleClause(p(et), enm == null ? null : c(enm), eb)); }
     | // `shape name = re"..."` — a named boundary for this record. A record may carry several.
       LOOKAHEAD({getToken(1).image.equals("shape") && getToken(2).kind == ID})
         <ID> st=<ID> "="
@@ -2011,7 +1987,7 @@ AST.RecordDeclaration record_decl(int mset) : {
   [";"] {
     return AST.recordDeclarationWithContracts(
       p(t1), mset, c(t2), tparams, args, toList(superTypes), fromRaw, toList(deriveBuf),
-      toList(lawBuf), toList(exBuf), toList(sections), toList(shapeBuf),
+      toList(sections), toList(shapeBuf),
       toList(invariantClauses), toList(historyClauses)
     );
   }

@@ -11,10 +11,10 @@ import java.nio.file.Files
 /**
  * Source files are decoded in the configured `-encoding`, which defaults to UTF-8 rather than
  * the platform charset. The check is a top-level `example`, which the compiler evaluates at
- * build time: a mis-decoded literal has the wrong length, so the example fails (E0065).
+ * build time: a mis-decoded literal has the wrong length, so the predicate fails (E0113).
  */
 class SourceEncodingSpec extends AnyFunSuite with Matchers:
-  private val program = "example { \"日本語\".length() == 3 }\nprintln(\"ok\")\n"
+  private val program = "def length(): Boolean\n  ensures result\n  = \"日本語\".length() == 3\nprintln(\"ok\")\n"
 
   private def errorsCompiling(bytesIn: Charset, configured: String): Seq[String] =
     val file = Files.createTempFile("onion-source-encoding", ".on")
@@ -36,5 +36,5 @@ class SourceEncodingSpec extends AnyFunSuite with Matchers:
   test("-encoding is honored for a source in another charset"):
     errorsCompiling(Charset.forName("Shift_JIS"), "Shift_JIS") shouldBe empty
 
-  test("decoding in the wrong charset is what the example would catch"):
+  test("decoding in the wrong charset is what the predicate would catch"):
     errorsCompiling(Charset.forName("Shift_JIS"), "UTF-8") should not be empty

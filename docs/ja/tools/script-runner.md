@@ -110,20 +110,12 @@ onion --warn error MyScript.on
 onion --Wno W0001,unused-parameter MyScript.on
 ```
 
-### `--no-check-laws`
+### `--contract-seed <n>` / `--contract-samples <n>`
 
-レコードの `law` / `example` 句を実行しません。
-
-```bash
-onion --no-check-laws MyScript.on
-```
-
-### `--law-seed <n>` / `--law-samples <n>`
-
-`law` のサンプル生成を制御します。反例が出たときは、それを生んだ設定がメッセージに出ます。
+引数を持つ述語（`ensures result` の `static def`）のサンプリングを制御します。偽になったサンプルは、反例を作った設定を報告するので、同じ実行を再現できます。サンプル数を増やすと、探索が広がります。
 
 ```bash
-onion --law-samples 500 MyScript.on
+onion --contract-samples 500 MyScript.on
 ```
 
 ### `--contracts <off|check>`

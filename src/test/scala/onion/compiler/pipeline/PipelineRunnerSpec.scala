@@ -26,7 +26,7 @@ class PipelineRunnerSpec extends AnyFunSpec with Matchers {
         "TailCallOptimization",
         "MutualRecursionOptimization",
         "BytecodeGeneration",
-        "LawCheck"
+        "ContractChecks"
       )
     }
 

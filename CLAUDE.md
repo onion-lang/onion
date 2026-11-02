@@ -55,8 +55,7 @@ Onion is a statically-typed, object-oriented programming language that compiles 
 - `--profile-output <target>` - Set where the profile is written
 - `--warn <off|on|error>` - Set warning level
 - `--Wno <codes>` - Suppress specific warnings (e.g., W0001,unused-parameter)
-- `--no-check-laws` - Do not execute record `law`/`example` clauses (they run at compile time by default; the LSP always has them off)
-- `--law-seed <n>` / `--law-samples <n>` - Control law sampling; a falsified law reports the settings that produced its counterexample
+- `--contract-seed <n>` / `--contract-samples <n>` - Control how a predicate with parameters is sampled; a failing sample reports the settings that produced it
 - `--contracts <off|check>` - Accept contract clauses (`requires`/`ensures` on a method, `invariant`/`history` in a class) and check them statically; a preview feature (RFC #2557), on by default (`check`), and with `off` a clause is an error rather than being ignored. `runtime` and `verify` are reserved and refused
 - `--print-classpath` - `onionc` only: print the classpath to run its output with (`-d` dir or `.`, then `-classpath`, then the jars the files' `//> using dep` directives resolve to), platform-separated on stdout, and exit without compiling
 - `--stacktrace` - Print the raw JVM trace for an uncaught runtime error (the default is a diagnostic-style report with the script's own frames only)

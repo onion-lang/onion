@@ -26,7 +26,7 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
   def name: String = "HistoryRepro"
 
   def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] = {
-    if (config.contracts != ContractMode.Check) return classes
+    if (config.contracts != ContractMode.Check || !config.runContracts) return classes
     val units = ctx.debugArtifacts.rewrittenUnits.getOrElse(return classes)
     val analysis = new HistoryWritePass(null)
     val repros = analysis.counterexamples(units)

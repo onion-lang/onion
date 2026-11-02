@@ -298,7 +298,7 @@ object MigrateCommand:
 
     def check(sources: Seq[(Path, String)], classpath: Seq[String]): Report =
       val config = CompilerConfig(classpath, null, "UTF-8", "", 1000,
-        warningLevel = onion.compiler.WarningLevel.Off, checkLaws = false)
+        warningLevel = onion.compiler.WarningLevel.Off)
       try
         val inputs = sources.map((file, text) => StringInputSource(text, file.toString))
         val result = new OnionCompiler(config).compileDetailed(inputs)

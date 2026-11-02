@@ -245,5 +245,5 @@ public:
   と書きます（`static` は付けません）。複数文の本体は、最後に `return` を置くブロックにします。
 - **見えるもの:** 偽の述語は **E0113** になります。サンプルを作れない引数の型も、黙って通さず E0113 です。
   `--contracts` は既定で有効（`check`）です。
-- **シードとサンプル数:** `--law-seed` と `--law-samples` は、引き続きサンプリングを制御します。
+- **シードとサンプル数:** `--law-seed` と `--law-samples` は `--contract-seed` と `--contract-samples` になり、`--no-check-laws` は無くなりました（`--contracts off` を使います）。
 - **`onion.Shape`:** 実装するクラスは、それを使う述語を少なくとも1つ必要とします（なければ E0080）。

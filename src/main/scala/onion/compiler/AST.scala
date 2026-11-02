@@ -45,28 +45,20 @@ object AST {
     location: Location, modifiers: Int, name: String,
     typeParameters: List[TypeParameter], args: List[Argument],
     superInterfaces: List[TypeNode], fromRaw: String, derives: List[String],
-    laws: List[LawClause], examples: List[ExampleClause],
     sections: List[AccessSection], shapes: List[ShapeClause]
   ): RecordDeclaration =
-    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, laws, examples, Nil, sections, shapes)
+    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, Nil, sections, shapes)
 
   /** The same as [[recordDeclaration]], with the `invariant` and `history` clauses of the body (RFC #2557). */
   def recordDeclarationWithContracts(
     location: Location, modifiers: Int, name: String,
     typeParameters: List[TypeParameter], args: List[Argument],
     superInterfaces: List[TypeNode], fromRaw: String, derives: List[String],
-    laws: List[LawClause], examples: List[ExampleClause],
     sections: List[AccessSection], shapes: List[ShapeClause],
     invariants: List[Expression], histories: List[Expression]
   ): RecordDeclaration =
-    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, laws, examples, Nil, sections, shapes, Nil, invariants, histories)
+    RecordDeclaration(location, modifiers, name, typeParameters, args, superInterfaces, Option(fromRaw), derives, Nil, sections, shapes, Nil, invariants, histories)
 
-  /** Java-callable factory for an `example` clause; `name` may be null (unnamed example). */
-  def exampleClause(location: Location, name: String, body: BlockExpression): ExampleClause =
-    ExampleClause(location, Option(name), body)
-  /** Java-callable factory for a top-level `example`; `name` may be null. */
-  def topLevelExample(location: Location, name: String, body: BlockExpression): TopLevelExample =
-    TopLevelExample(location, Option(name), body)
   abstract sealed class TypeDescriptor
   case class PrimitiveType(kind: PrimitiveTypeKind) extends TypeDescriptor {
     override def toString: String = kind.toString
@@ -387,7 +379,7 @@ object AST {
    *                           synthesize the static `parse`/`parseAll` methods (None when absent).
    * @param synthesizedMethods Methods derived from `fromPattern` (filled in during Rewriting).
    */
-  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, laws: List[LawClause] = Nil, examples: List[ExampleClause] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil, sections: List[AccessSection] = Nil, shapes: List[ShapeClause] = Nil, synthesisArgTypes: List[TypeNode] = Nil, invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration
+  case class RecordDeclaration(location: Location, modifiers: Int, name: String, typeParameters: List[TypeParameter], args: List[Argument], superInterfaces: List[TypeNode] = Nil, fromPattern: Option[String] = None, derives: List[String] = Nil, synthesizedMethods: List[MethodDeclaration] = Nil, sections: List[AccessSection] = Nil, shapes: List[ShapeClause] = Nil, synthesisArgTypes: List[TypeNode] = Nil, invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration
   /**
    * A `shape name = re"..."` clause on a record — a named, first-class boundary.
    *
@@ -406,12 +398,6 @@ object AST {
     ShapeClause(location, name, RegexSource(pattern))
   def formatShapeClause(location: Location, name: String, format: String): ShapeClause =
     ShapeClause(location, name, FormatSource(format))
-  /** A `law name(p: T) { boolean-expr }` clause on a record — a compile-time property check. */
-  case class LawClause(location: Location, name: String, params: List[Argument], body: BlockExpression) extends Node
-  /** An `example { boolean-expr }` clause on a record — a compile-time concrete check. */
-  case class ExampleClause(location: Location, name: Option[String], body: BlockExpression) extends Node
-  /** A top-level `example { boolean-expr }`, desugared to a static boolean method in <File>Main. */
-  case class TopLevelExample(location: Location, name: Option[String], body: BlockExpression) extends Toplevel
   /**
    * @param hasPrimary whether the class declared a primary constructor — a parameter list
    *                   after the name, or arguments on the `extends` clause, or both. When it

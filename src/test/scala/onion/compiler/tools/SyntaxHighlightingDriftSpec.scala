@@ -15,7 +15,7 @@ import org.scalatest.funspec.AnyFunSpec
  * Keeping two extra grammars is only defensible because this spec mechanically derives the
  * keyword set from the parser and holds the other two to it. Without that, they rot: the
  * TextMate grammar had drifted to roughly 70% coverage — it was missing `trait`, `instance`,
- * every soft keyword (`tool`, `requires`, `shape`, `law`, `from`, `derive`, `example`), the
+ * every soft keyword (`tool`, `requires`, `shape`, `from`, `derive`), the
  * scheme-prefixed raw literals (`re"…"`, `file"…"`, `http"…"`, which appear 225 times in the
  * docs), the `|>` pipeline operator, and backtick-quoted identifiers. The most distinctive
  * parts of the language were the unhighlighted ones.
@@ -125,7 +125,7 @@ class SyntaxHighlightingDriftSpec extends AnyFunSpec {
         s"no soft keywords extracted from $GrammarPath — the lookahead scan has rotted")
       // These are the language's differentiators; if the extraction stops finding them the
       // guard would pass vacuously, which is worse than failing.
-      for (expected <- Seq("tool", "requires", "shape", "conforms", "from", "law", "in"))
+      for (expected <- Seq("tool", "requires", "shape", "conforms", "from", "in"))
         assert(softKeywords.contains(expected),
           s"expected `$expected` among the extracted soft keywords, got: " +
           softKeywords.toSeq.sorted.mkString(", "))

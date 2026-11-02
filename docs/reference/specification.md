@@ -382,52 +382,56 @@ Supported component types are the eight scalar primitives: `String`, `Int`,
 other type is **E0062**. `derive!` may coexist with `from re"..."` on the
 same record; the two features are independent.
 
-#### `law` / `example` — compile-time specification checks
+#### Contract predicates — compile-time specification checks
 
-A record's brace-enclosed body may contain `law` and `example` clauses,
-alongside any methods. The compiler executes these at build time (during the
-`LawCheckPhase` that runs after type-checking). A failing check is a
-**compile error**, not a runtime error.
+A `static def` that returns `Boolean` and states `ensures result` is a **contract predicate**.
+The compiler runs it at build time (after type-checking, with `--contracts check`, the default).
+A failing predicate is a **compile error**, not a runtime error. At the top level the same
+predicate is a plain `def`.
 
 ```onion
 record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
-  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
-  example { Pt::parse("3,4") == new Pt(3, 4) }
-}
-
-record User(name: String, age: Int) derive!(Json) {
-  law jsonRoundtrip(u: User) { User::fromJson(User::toJson(u)) == u }
-  example { new User("ko", 3).name() == "ko" }
+public:
+  static def roundtrip(p: Pt): Boolean
+    ensures result
+    = Pt::parse(Pt::format(p)) == p
+  static def parsesThreeFour(): Boolean
+    ensures result
+    = Pt::parse("3,4") == new Pt(3, 4)
 }
 ```
 
-**`example { boolExpr }`** — a concrete assertion. The compiler evaluates
-`boolExpr` and requires it to be `true`. If it is `false`, compilation fails
-with **E0065** and a message showing the expression that returned `false`.
+**Without parameters** — a concrete assertion. The compiler evaluates it and requires `true`.
+If it is `false`, or throws, compilation fails with **E0113**.
 
-**`law name(p: T) { boolExpr }`** — a property. The compiler generates a set
-of sample values for the parameter `p` (covering boundary values, negatives,
-and random cases) and checks `boolExpr` for each. If any sample falsifies the
-law, compilation fails with **E0064** and a report that includes the
-counterexample. Parameters may be the same scalar types supported by `derive!`
-(`String`, `Int`, `Long`, `Double`, `Float`, `Boolean`, `Short`, `Byte`) or
-the record type itself.
+**With parameters** — a property. The compiler generates a set of sample values for each
+parameter (boundary values, negatives and random cases) and runs the predicate on them. If
+any sample falsifies it, compilation fails with **E0113** and a report that includes the
+counterexample and the `--contract-seed` / `--contract-samples` that reproduce it. Parameters
+may be the scalar types supported by `derive!` (`String`, `Int`, `Long`, `Double`, `Float`,
+`Boolean`, `Short`, `Byte`) or the record type itself. A parameter type that cannot be
+sampled is also E0113, never a silent skip.
 
-Multiple `law` and `example` clauses may appear on a single record, in any
-order. They coexist freely with `from re"..."` and `derive!(...)`:
+Only `ensures result` itself marks a predicate. A `Boolean` function with another
+postcondition, such as `ensures result == (x > 0)`, describes the function and is not run.
+
+A block body ends with `return`; an expression body uses `= expr`:
 
 ```onion
 record R(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json) {
-  law textRoundtrip(r: R) { R::parse(R::format(r)) == r }
-  law jsonRoundtrip(r: R) { R::fromJson(R::toJson(r)) == r }
-  example { R::parse("0,0") == new R(0, 0) }
+public:
+  static def textRoundtrip(r: R): Boolean
+    ensures result
+    = R::parse(R::format(r)) == r
+  static def jsonRoundtrip(r: R): Boolean
+    ensures result
+    = R::fromJson(R::toJson(r)) == r
 }
 ```
 
-The purpose of `law` / `example` is to bring specifications — not just
-documentation, but machine-verified contracts — inside the language itself.
-The `parse∘format == id` invariant above is checked on every compile, so a
-grammar change that breaks the round-trip fails the build immediately.
+The purpose is to bring specifications — not just documentation, but machine-verified
+contracts — inside the language itself. The `parse∘format == id` property above is checked on
+every compile, so a grammar change that breaks the round-trip fails the build immediately.
 
 ### Enums
 

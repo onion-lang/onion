@@ -18,7 +18,7 @@ class HistoryPreorderSpec extends AnyFunSpec {
          |public:
          |  def get(): Int { return n }
          |}""".stripMargin
-    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, checkLaws = false, contracts = ContractMode.Check)
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, runContracts = false, contracts = ContractMode.Check)
     new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "C.on"))) match {
       case CompilationOutcome.Failure(errs) => errs.flatMap(_.errorCode)
       case _                                => Nil

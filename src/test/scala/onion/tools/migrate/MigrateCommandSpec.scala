@@ -195,7 +195,7 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
          |  $member
          |}
          |""".stripMargin
-    val config = onion.compiler.CompilerConfig(Seq(), null, "UTF-8", "", 10, checkLaws = false)
+    val config = onion.compiler.CompilerConfig(Seq(), null, "UTF-8", "", 10, runContracts = false)
     val classes = new onion.compiler.OnionCompiler(config)
       .compileOrThrow(Seq(onion.compiler.StringInputSource(base, "Base.on")))
     classes.foreach(c => Files.write(dir.resolve(c.className + ".class"), c.content))

@@ -12,7 +12,7 @@ import org.scalatest.funspec.AnyFunSpec
 class ContractTypingSpec extends AnyFunSpec {
 
   private def compile(source: String, mode: ContractMode): Seq[CompileError] = {
-    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, checkLaws = false, contracts = mode)
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, runContracts = false, contracts = mode)
     new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(source), "C.on"))) match {
       case CompilationOutcome.Failure(errs) => errs
       case _                                => Nil

@@ -19,7 +19,7 @@ class MutateEffectSpec extends AnyFunSpec {
   import Effect._
 
   private def compile(source: String) =
-    new OnionCompiler(new CompilerConfig(Seq("."), null, "UTF-8", "", 10, checkLaws = false))
+    new OnionCompiler(new CompilerConfig(Seq("."), null, "UTF-8", "", 10, runContracts = false))
       .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "Mutate.on")))
 
   private def infer(source: String): Map[String, Set[Effect]] = {

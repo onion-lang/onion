@@ -42,8 +42,7 @@ Onionは、JVMバイトコードにコンパイルされる静的型付けのオ
 - `--profile-output <target>` - プロファイルの出力先を設定
 - `--warn <off|on|error>` - 警告レベルを設定
 - `--Wno <codes>` - 特定の警告を抑制 (例: W0001,unused-parameter)
-- `--no-check-laws` - レコードの `law`/`example` 節を実行しない（既定ではコンパイル時に実行される。LSPでは常に無効）
-- `--law-seed <n>` / `--law-samples <n>` - lawのサンプリングを制御。反証されたlawは、その反例を生成した設定を報告する
+- `--contract-seed <n>` / `--contract-samples <n>` - 引数を持つ述語のサンプリングを制御。偽になったサンプルは、それを作った設定を報告する
 - `--contracts <off|check>` - 契約の節（メソッドの `requires`/`ensures`、クラスの `invariant`/`history`）を受け付けて静的に検査する。プレビュー機能（RFC #2557）で既定は off。off のとき節は無視されずエラーになる。`runtime` と `verify` は予約済みで受け付けない
 - `--print-classpath` - `onionc` のみ: 出力を実行するための classpath（`-d` のディレクトリまたは `.`、`-classpath`、ファイルの `//> using dep` ディレクティブが解決する jar の順）をプラットフォームの区切り文字で標準出力に表示し、コンパイルせずに終了する
 - `--stacktrace` - 未捕捉の実行時エラーで生のJVMスタックトレースを表示する（既定ではスクリプト自身のフレームのみを含む診断形式のレポートになる）

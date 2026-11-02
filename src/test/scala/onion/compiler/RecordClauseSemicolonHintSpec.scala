@@ -34,12 +34,6 @@ class RecordClauseSemicolonHintSpec extends AnyFunSpec with Diagrams {
     assert(msgs.head.contains("`;`") && msgs.head.contains("`shape`"), msgs.head)
   }
 
-  it("gives one error with the hint for `;` between two example clauses") {
-    val msgs = compileErrors("record R(a: String) { example e1 { true }; example e2 { true } }\n")
-    assert(msgs.size == 1, s"expected one error, got: $msgs")
-    assert(msgs.head.contains("`shape`"), msgs.head)
-  }
-
   it("still reports a later declaration's own error after the record") {
     val msgs = compileErrors(
       "record R(a: String) { shape doc = json; shape txt = re\"(\\w+)\" }\nval x: Int = \"s\"\n"

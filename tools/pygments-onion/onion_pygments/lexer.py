@@ -127,8 +127,6 @@ class OnionLexer(RegexLexer):
             # starts with `var` or `def`, so only the bare word before an expression is a keyword.
             (r"(?:invariant|history)\b(?=\s+[^\s=,;:.()\]}])", Keyword),
             (r"derive\b(?=!)", Keyword),
-            (r"law\b(?=\s+[a-zA-Z_]\w*\s*[({])", Keyword),
-            (r"example\b(?=\s*(\{|[a-zA-Z_]\w*\s*\{))", Keyword),
             (r"from\b(?=\s+[a-zA-Z_]\w*\")", Keyword),
 
             (words(NAMESPACE_KEYWORDS, suffix=r"\b"), Keyword.Namespace),

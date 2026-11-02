@@ -17,7 +17,7 @@ import java.util.Random
  */
 object ArgGenerator {
 
-  /** Defaults, mirrored by CompilerConfig.lawSamples / lawSeed. */
+  /** Defaults, mirrored by CompilerConfig.contractSamples / contractSeed. */
   val DefaultSamples: Int = 40
   val DefaultSeed: Long = 42L
 

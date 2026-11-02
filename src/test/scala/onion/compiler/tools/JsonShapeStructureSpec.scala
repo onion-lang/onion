@@ -20,10 +20,13 @@ class JsonShapeStructureSpec extends AbstractShellSpec {
       |record Summary(title: String, decisions: List[String], actions: List[Action], risk: Int,
       |               lead: Action?, note: String?, scores: List[Int]?) {
       |  shape doc = json
-      |  example nestedRoundTrip {
+      |public:
+      |  static def nestedRoundTrip(): Boolean
+      |    ensures result
+      |  {
       |    val v = new Summary("t", ["a", "b"], [new Action("sato", "x"), new Action("suzuki", "y")],
       |                        2, new Action("tanaka", "z"), null, [1, 2])
-      |    Summary::doc().parse(Summary::doc().print(v)).get() == v
+      |    return Summary::doc().parse(Summary::doc().print(v)).get() == v
       |  }
       |}
       |""".stripMargin

@@ -262,5 +262,5 @@ public:
   (no `static`). A body with several statements is a block that ends with `return`.
 - **What you see:** a false predicate is **E0113**. A parameter that cannot be sampled is also E0113,
   not a silent skip. `--contracts` is on by default (`check`).
-- **Seed and samples:** `--law-seed` and `--law-samples` still control the sampling.
+- **Seed and samples:** `--law-seed` and `--law-samples` are now `--contract-seed` and `--contract-samples`; `--no-check-laws` is gone (use `--contracts off`).
 - **`onion.Shape`:** a class that implements it needs at least one such predicate that uses it (E0080).

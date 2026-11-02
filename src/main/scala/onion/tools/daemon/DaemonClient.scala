@@ -102,7 +102,7 @@ object DaemonClient {
         sawClasspath = true
         out += a += options(i + 1).split(File.pathSeparator).map(abs(_, cwd)).mkString(File.pathSeparator); i += 1
       } else if ((a == "-encoding" || a == "-maxErrorReport" || a == "-super" || a == "--Wno" || a == "--warn" ||
-                  a == "--law-seed" || a == "--law-samples" || a == "--profile-format") && i + 1 < options.length) {
+                  a == "--contract-seed" || a == "--contract-samples" || a == "--profile-format") && i + 1 < options.length) {
         out += a += options(i + 1); i += 1
       } else if (a == "--profile-output" && i + 1 < options.length) {
         val target = options(i + 1)
@@ -145,7 +145,7 @@ object DaemonClient {
         case "-classpath" if i + 1 < args.length =>
           sawClasspath = true
           out += a += args(i + 1).split(File.pathSeparator).map(abs(_, cwd)).mkString(File.pathSeparator); i += 1
-        case "-encoding" | "-maxErrorReport" | "-super" | "--Wno" | "--warn" | "--law-seed" | "--law-samples" |
+        case "-encoding" | "-maxErrorReport" | "-super" | "--Wno" | "--warn" | "--contract-seed" | "--contract-samples" |
              "--profile-format" if i + 1 < args.length =>
           out += a += args(i + 1); i += 1
         case "--profile-output" if i + 1 < args.length =>

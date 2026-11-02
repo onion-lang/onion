@@ -1232,6 +1232,25 @@ def sums(): Boolean
 
 直し方: 式か、検査しているコードを直します。
 
+### `E0114` — 往復しない `Shape`
+
+`onion.Shape` はどれも契約を持ちます。print できる値 `v` について、`parse(print(v))` が `v` と
+等しくなければなりません。ビルドは shape の値型からサンプルを作って確かめます。戻ってこない値は
+E0114 になり、その値と、再現用の `--contract-seed` / `--contract-samples` を示します。
+
+```onion
+class FixedWidth conforms Shape[Person] {
+public:
+  // ... print は name を 10 桁に詰めるが、切り詰めない ...
+  def printable(v: Person): Boolean =   // 範囲を述べる。既定はすべての値
+    v.name().length() <= 10 && v.name() == v.name().trim()
+}
+```
+
+直し方: `printable` を上書きして print できる値を述べるか、`print` / `parse` を直します。
+`canPrint() == false` の shape は何も求められません。サンプルを作れない値型は、黙って通さず
+警告 `W0022` になります。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -1878,6 +1897,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `W0019` | イミュータブルなビルダーのメソッド（`Http.Request.header` など）の結果が文として捨てられており、呼び出しが何も行わない |
 | `W0020` | `extension` メソッドの名前とアリティが既存のメンバー（自身または継承）と完全に一致している。既存のメンバーが常に優先されるため、その extension メソッドは呼び出されない |
 | `W0021` | メソッドが `history` を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
+| `W0022` | the contract of a Shape was not checked: its value type cannot be sampled |
 | `W0024` | `history` が名指すフィールドにメソッドが書き込むが、`history` が保たれるかをどの検査も決めていない。フィールドが `Int` でない、ソルバーがメソッド本体を扱えない、または `history` が `x >= old(x)`・`x <= old(x)`・`x == old(x)` の形でない場合です。そこでは `history` は保証されません |
 | `W0025` | オーバーライドが継承した契約を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
 
@@ -1996,6 +2016,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0111` | a class with an `invariant` or `history` extends a Java class |
 | `E0112` | this method breaks the history … when run from … |
 | `E0113` | the closed predicate … is … when the build runs it |
+| `E0114` | the Shape … breaks its round-trip contract |
 
 ## 関連項目
 

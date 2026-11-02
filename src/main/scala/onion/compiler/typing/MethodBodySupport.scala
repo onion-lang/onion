@@ -121,7 +121,11 @@ private[compiler] final class MethodBodySupport(
       invariantTerms.map { case (t, s) => guard(t, s, "invariant (on entry)") }
     val post: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") } ++
       invariantTerms.map { case (t, s) => guard(t, s, "invariant (on exit)") } ++
-      historyTerms.zip(definition.historySources).map { case (t, s) => guard(t, s, "history") }
+      historyTerms.zip(definition.historySources).map { case (t, s) =>
+        val g = guard(t, s, "history")
+        definition.historyGuards((method.name, onion.compiler.contracts.ExpressionText.of(s))) = g.asInstanceOf[IfStatement]
+        g
+      }
     // `old(e)` is e on entry: assigned after `requires` holds and before the body runs.
     val saved: Seq[ActionStatement] = saves.toSeq.map { case (slot, term) =>
       new ExpressionActionStatement(term.location, new SetLocal(0, slot, term.`type`, term))

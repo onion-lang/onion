@@ -43,6 +43,25 @@ final class HistoryWritePass(typing: Typing) {
 
   private var reporting = true
 
+  /** Under `--contracts runtime` the compiler keeps a guard only for what it could not prove. */
+  private def dropsProvedGuards: Boolean =
+    typing != null && typing.contractMode == onion.compiler.ContractMode.Runtime
+
+  /**
+   * Take the guard of a proved `history` out of the guarded method. Only a clause that is exactly one
+   * simple relation can be proved, and so only that kind is ever found in the table.
+   */
+  private def dropGuard(className: String, methodName: String, clause: String): Unit =
+    typing.table_.classes.get(className).foreach { definition =>
+      definition.historyGuards.remove((methodName, clause)).foreach { guard =>
+        definition.methods.collect { case m: onion.compiler.TypedAST.MethodDefinition if m.name == methodName => m }
+          .foreach { m =>
+            val kept = m.block.statements.filterNot(_ eq guard)
+            if (kept.length != m.block.statements.length) m.setBlock(new onion.compiler.TypedAST.StatementBlock(m.block.location, kept*))
+          }
+      }
+    }
+
   private def analyze(units: Seq[AST.CompilationUnit], report: Boolean): Unit = {
     reporting = report
     val classes: Map[String, AST.ClassDeclaration] =
@@ -78,7 +97,9 @@ final class HistoryWritePass(typing: Typing) {
         (field, op) <- relations.distinct if field == w.field
         problem <- problemOf(op, w.kind, field, perMethod)
       } if (reporting) typing.report(SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)", problem._1, problem._2)
-      if (!reporting) proveRest(cls, chain, relations.distinct)
+      // After the codegen the solver is asked again to reproduce counterexamples; under `--contracts
+      // runtime` it is asked once here, so a history it proves does not need its run-time guard.
+      if (!reporting || dropsProvedGuards) proveRest(cls, chain, relations.distinct)
     }
     if (!reporting) uncheckedForms(cls, chain, histories)
   }
@@ -147,8 +168,10 @@ final class HistoryWritePass(typing: Typing) {
       (field, op) <- relations
     } HistoryProver.prove(m, field, op, intFields, invariants, callees) match {
       case HistoryProver.Counterexample(before) =>
-        collected += Repro(unitFile, cls, m, field, op, before)
-      case HistoryProver.Proved => proved += s"${cls.name}.${m.name}: $field $op old($field)"
+        if (collected != null) collected += Repro(unitFile, cls, m, field, op, before)
+      case HistoryProver.Proved =>
+        proved += s"${cls.name}.${m.name}: $field $op old($field)"
+        if (dropsProvedGuards) dropGuard(cls.name, m.name, s"$field $op old($field)")
       case HistoryProver.Unsupported if writesIn(m.block).exists(w => w.field == field && !declaredNames(m).contains(field)) =>
         val ty = fieldTypes(chain).get(field)
         unchecked += Unchecked(unitFile, cls, m, field, Some(s"$field $op old($field)"), line = 0,

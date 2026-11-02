@@ -159,7 +159,8 @@ Aliasing is the usual way "one call at a time" breaks. These rules close it in t
    a primitive, `String`, an enum, or a record whose components are value types.
    A field that holds a mutable object (`List`, an array, another class) cannot be named.
 2. A field named by an `invariant` or `history` is written **only through `this`**, in its own
-   class **or in a subclass**. `o.n = 0` with `o` another instance is an error. A write through
+   class **or in a subclass**. `o.n = 0` with `o` another instance is an error (E0110), whatever
+   `o` is declared as, also in a factory that made `o` with `new` and from outside the hierarchy. A write through
    `this` is allowed because it can be checked: that is exactly what the history of §3.3 and
    §4.1 is for. The field must not be visible outside the class and its subclasses (`private`,
    `protected` or `val`), so outside code cannot change it without a call that is checked.
@@ -475,24 +476,17 @@ So E0109 is reported only when the syntax settles it. Take the history `n >= old
 | any other expression | `Not proved` | The prover decides (stage 7) |
 
 **What counts as a write** (#2597, #2599). A write by a method is any assignment, `+=`, `-=`,
-`++` or `--` to the field in its body, including inside a lambda the body creates (the lambda
-may run during the call). For `o.n`, the receiver `o` is resolved where the write is: a lambda's
-own parameter or local counts only inside that lambda. Then, for a class `C` whose history names
-`n`:
+`++` or `--` to the field through `this` (bare `n`, `this.n`, `self.n`), including inside a
+lambda the body creates (the lambda may run during the call). A write the syntax does not
+settle as breaking the history gets W0024 at its line when it is inside a lambda, since the
+solver reads only the method body.
 
-| `o` is declared as | The write `o.n = ...` |
-|---|---|
-| `C` or a subclass (also `C?`, `C[...]`, a type alias of `C`) | a write of this field: E0109 when it breaks the history |
-| a superclass whose own history names `n` | the same: every such object carries the history |
-| any other superclass of `C` | W0024: `o` may or may not be a `C` |
-| a sibling subclass, or an unrelated class with a field `n` | not a write of this field |
-| a local made with `new` in this method (`val o = new C()`, or a `var` never reassigned) | not a write: the object has no state from before the call |
-| unknown to the syntax (`cs[0]`, `mk()`, an untyped lambda parameter, a type parameter, a name declared twice in one scope with different classes) | W0024, never E0109 and never silent |
-
-W0024 is reported at the write's line and says why. A write the syntax does not settle as
-breaking the history also gets W0024 when it is inside a lambda or on another object, since the
-solver reads only the method body. A write from a class outside the
-hierarchy is not yet checked (#2598).
+A write of the field through any other reference is not a history question at all: it is
+E0110 by §3.2 rule 2, whatever the reference's declared type (`o: C`, `cs[0]`, a factory's
+`val c = new C()`, a superclass, a class outside the hierarchy). The type checker has already
+resolved which field a write targets and whether its receiver is `this`, so the rule needs no
+reading of names or scopes. The fix is a method call on that object, whose own writes are
+checked, or a constructor argument.
 
 The same reasoning applies to a history `n <= old(n)` with the directions swapped, and to
 `x == old(x)`, where any write to `x` through a method that is not a constructor is reported.

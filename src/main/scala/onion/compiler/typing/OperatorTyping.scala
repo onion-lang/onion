@@ -505,6 +505,11 @@ final class OperatorTyping(
         new Begin(
           new SetLocal(0, varIndex, ref.target.`type`, ref.target),
           new SetField(
+            // Only diagnostics read it (#2599): the receiver as written, or the bare name.
+            (termNode match {
+              case s: AST.MemberSelection if s.target != null && s.target.location != null => s.target.location
+              case n => n.location
+            }),
             new RefLocal(0, varIndex, ref.target.`type`),
             ref.field,
             new BinaryTerm(binaryKind, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), incrementOne(operand.`type`))

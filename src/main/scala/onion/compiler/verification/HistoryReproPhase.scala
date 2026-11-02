@@ -73,8 +73,6 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
         val reason = (u.reason, u.fieldType) match {
           // A write the checks cannot follow names its line and why (#2599).
           case (Some(("lambda", _)), _)   => Message("warning.historyNotChecked.reason.lambda", u.line.toString)
-          case (Some(("other", r)), _)    => Message("warning.historyNotChecked.reason.other", u.line.toString, r)
-          case (Some(("receiver", r)), _) => Message("warning.historyNotChecked.reason.receiver", u.line.toString, r)
           case (_, Some(t))               => Message("warning.historyNotChecked.reason.type", u.field, t)
           case _                          => Message("warning.historyNotChecked.reason.body")
         }

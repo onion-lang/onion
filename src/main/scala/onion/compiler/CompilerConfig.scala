@@ -31,6 +31,8 @@ case class CompilerConfig(
   runContracts: Boolean = true,
   contractSamples: Int = onion.compiler.verification.ArgGenerator.DefaultSamples,
   contractSeed: Long = onion.compiler.verification.ArgGenerator.DefaultSeed,
+  /** How long the build waits for one contract predicate run before it gives up on it with W0023 (#2601). */
+  contractTimeoutMillis: Long = 10000L,
   // Whether to emit a LocalVariableTable. On by default, because a debugger that can step
   // through `.on` source but shows nothing for any variable is most of the way to useless,
   // and the cost is a few bytes per method. `-g:none` turns it off.

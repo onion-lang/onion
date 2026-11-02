@@ -271,8 +271,8 @@ object EffectInference {
     private def constructor(c: ConstructorRef, location: onion.compiler.Location,
                             args: Array[Term]): scala.Unit = {
       val callee = s"new ${c.affiliation.name}"
-      c match {
-        case cd: ConstructorDefinition if units.contains(cd) =>
+      programConstructor(c) match {
+        case Some(cd) =>
           internalCallees += cd
           rawSites += RawSite(location, callee, None, cd)
         case _ =>
@@ -280,6 +280,19 @@ object EffectInference {
           effects ++= eff
           rawSites += RawSite(location, callee, Some(eff), null,
             c.affiliation.name, null, null, args.toSeq, depth, table.operands(c.affiliation.name, "<init>"))
+      }
+    }
+
+    /** The program's own constructor behind `c`. `new Box[String]()` refers to it through a
+     *  ref on the applied type, which is not the definition itself (#2601). */
+    private def programConstructor(c: ConstructorRef): Option[ConstructorDefinition] = c match {
+      case cd: ConstructorDefinition if units.contains(cd) => Some(cd)
+      case _ => c.affiliation match {
+        case applied: TypedAST.AppliedClassType =>
+          applied.raw.constructors.collectFirst {
+            case cd: ConstructorDefinition if units.contains(cd) && cd.getArgs.sameElements(c.getArgs) => cd
+          }
+        case _ => None
       }
     }
 

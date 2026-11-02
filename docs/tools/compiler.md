@@ -150,6 +150,7 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 | `W0019` | `discarded-builder-result` | The result of an immutable builder method is discarded, so the call has no effect |
 | `W0020` | `extension-method-shadowed` | An extension method's name and arity exactly match an existing member, so the extension is never called |
 | `W0021` | `history-not-proved` | A method can break a history; the solver found a counterexample |
+| `W0023` | `predicate-not-run` | The build did not run a contract predicate: it reaches the outside world, or it did not finish in time |
 | `W0024` | `history-not-checked` | A method writes a field that a history names, and no check settled whether the history still holds |
 
 ### `--contract-seed <n>` / `--contract-samples <n>`

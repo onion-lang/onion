@@ -308,3 +308,24 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     val chain = violation(Array("--contracts", "runtime", path))
     assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("postcondition failed")), chain.map(_.getMessage).toString)
 
+  private def constructed(start: String) =
+    s"""class Account {
+       |  invariant balance >= 0
+       |public:
+       |  var balance: Int
+       |  def this(start: Int) { balance = start }
+       |}
+       |println(new Account($start).balance)
+       |""".stripMargin
+
+  test("--contracts runtime checks the invariant when an object is built: it holds"):
+    val path = writeScript(constructed("10"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("10")
+
+  test("--contracts runtime checks the invariant when an object is built: it does not"):
+    val path = writeScript(constructed("-3"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("invariant (after construction) failed")), chain.map(_.getMessage).toString)
+

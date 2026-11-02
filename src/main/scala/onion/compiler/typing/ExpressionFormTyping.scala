@@ -182,8 +182,11 @@ final class ExpressionFormTyping(
         // (`Int as Object` / `as Number` / `as Comparable` / `as Serializable`)
         // are all valid: codegen boxes the primitive and then checkcasts to the
         // destination. Anything the boxed value is assignable to is accepted.
+        // An applied target is matched against the box's own applied view, so
+        // `5 as Comparable[JInteger]` passes and `5 as Comparable[String]` does not
+        // (#2561), as in the opposite direction (#2551).
         val boxed = Boxing.boxedType(bodyContext.table, bt)
-        (boxed eq ct) || TypeRules.isSuperType(ct, boxed) || ct.isInstanceOf[TypeVariableType]
+        (boxed eq ct) || boxSupertypeAccepts(ct, boxed) || ct.isInstanceOf[TypeVariableType]
       case (ct: ClassType, bt: BasicType) =>
         // Codegen unboxes through `Number.xxxValue()` for a numeric primitive other than
         // Char (and checkcasts to the exact box for Boolean/Char), so a valid source is:

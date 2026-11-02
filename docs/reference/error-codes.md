@@ -1288,8 +1288,9 @@ Only what the syntax settles is reported. Fix: remove the write, or weaken the h
 
 A write counts wherever the method makes it: in a lambda it creates, and on another object of
 the class or a subclass (`o.n = o.n - 1` with `o: Counter`, `o: Counter?`). A write whose
-receiver's class the syntax does not give (`cs[0].n = 7`, an untyped lambda parameter) gets the
-warning W0024 instead, at the write's line.
+receiver's class the syntax does not give (`cs[0].n = 7`, an untyped lambda parameter), or that
+is a superclass of the class, gets the warning W0024 instead, at the write's line. A write to an
+object the method made with `new` (`val c = new Counter(); c.n = 5`) is not counted.
 
 ### `E0110` — an `invariant` or `history` on a mutable object
 

@@ -474,16 +474,24 @@ So E0109 is reported only when the syntax settles it. Take the history `n >= old
 | `n = c`, and nothing raises `n` | **no syntactic error**; the solver decides | The syntax alone cannot tell where `n` starts. The solver checks the write against the class `invariant`s: with `invariant n == 0` a write of `0` is proved fine; with no invariant, `n` could start above `c`, and the write has a counterexample (below) |
 | any other expression | `Not proved` | The prover decides (stage 7) |
 
-**What counts as a write** (#2597). A write by a method is any assignment, `+=`, `-=`, `++` or
-`--` to the field in its body, including inside a lambda the body creates (the lambda may run
-during the call). A write through another reference counts when the reference is declared with
-the class or a subclass: a parameter or local typed with it (also as `C?`, `C[...]` or a type
-alias of `C`), or a local made with `new`. A reference declared with an unrelated class is not a
-write of this field. When the syntax does not settle the class (`cs[0].n`, `mk().n`, an untyped
-lambda parameter, a type parameter, or a name declared twice with different classes), the write
-is never E0109 and never silent: it gets W0024, at the write's line, saying why. A write the
-syntax does not settle as breaking the history also gets W0024 when it is inside a lambda or on
-another object, since the solver reads only the method body. A write from a class outside the
+**What counts as a write** (#2597, #2599). A write by a method is any assignment, `+=`, `-=`,
+`++` or `--` to the field in its body, including inside a lambda the body creates (the lambda
+may run during the call). For `o.n`, the receiver `o` is resolved where the write is: a lambda's
+own parameter or local counts only inside that lambda. Then, for a class `C` whose history names
+`n`:
+
+| `o` is declared as | The write `o.n = ...` |
+|---|---|
+| `C` or a subclass (also `C?`, `C[...]`, a type alias of `C`) | a write of this field: E0109 when it breaks the history |
+| a superclass whose own history names `n` | the same: every such object carries the history |
+| any other superclass of `C` | W0024: `o` may or may not be a `C` |
+| a sibling subclass, or an unrelated class with a field `n` | not a write of this field |
+| a local made with `new` in this method (`val o = new C()`, or a `var` never reassigned) | not a write: the object has no state from before the call |
+| unknown to the syntax (`cs[0]`, `mk()`, an untyped lambda parameter, a type parameter, a name declared twice in one scope with different classes) | W0024, never E0109 and never silent |
+
+W0024 is reported at the write's line and says why. A write the syntax does not settle as
+breaking the history also gets W0024 when it is inside a lambda or on another object, since the
+solver reads only the method body. A write from a class outside the
 hierarchy is not yet checked (#2598).
 
 The same reasoning applies to a history `n <= old(n)` with the directions swapped, and to

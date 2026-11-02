@@ -62,10 +62,10 @@ class HistoryHiddenWriteSpec extends AnyFunSpec {
       assert(o.errors.contains("E0109"), o.toString)
     }
 
-    it("is E0109 for o.t-- and o.t -= 1, and for a local made with new") {
+    it("is E0109 for o.t-- and o.t -= 1, and for a local declared with the class") {
       val o1 = compile(clock("  def other(o: Clock): void { o.t-- }"))
       assert(o1.errors.contains("E0109"), o1.toString)
-      val o2 = compile(clock("  def other(): void { val o = new Clock(); o.t -= 1 }"))
+      val o2 = compile(clock("  def other(p: Clock): void { val o: Clock = p; o.t -= 1 }"))
       assert(o2.errors.contains("E0109"), o2.toString)
     }
 
@@ -117,8 +117,8 @@ class HistoryHiddenWriteSpec extends AnyFunSpec {
       assert(o.w24.exists(m => m.contains("reset") && m.contains("`p`")), o.toString)
     }
 
-    it("is W0024 for a name declared twice with different classes") {
-      val o = compile(clock("  def back(o: Clock, ps: List[Point]): void {\n    ps.forEach { o: Point -> o.t = 0 }\n    o.t = o.t - 1\n  }", extra =
+    it("is W0024 for a name declared twice with different classes in one scope") {
+      val o = compile(clock("  def back(b: Boolean, q: Clock): void {\n    if b { val o: Point = new Point(); o.t = 1 } else { val o: Clock = q; o.t = o.t - 1 }\n  }", extra =
         "class Point {\npublic:\n  var t: Int\n  def this { t = 0 }\n}"))
       assert(o.errors.isEmpty, o.toString)
       assert(o.w24.exists(m => m.contains("back") && m.contains("`o`")), o.toString)
@@ -152,6 +152,102 @@ class HistoryHiddenWriteSpec extends AnyFunSpec {
 
     it("is E0109 through a type alias of the class") {
       val o = compile(clock("  def back(o: C): void { o.t = o.t - 1 }", extra = "type C = Clock"))
+      assert(o.errors.contains("E0109"), o.toString)
+    }
+  }
+
+  // The panel's reproductions on #2599 at b50adc4: the receiver is resolved where the write is,
+  // settled against the class whose history it is, and an object made in the method is fresh.
+  describe("the receiver rule") {
+    val other = "class Other {\npublic:\n  var t: Int\n  def this { t = 5 }\n}"
+    def withPeer(peerType: String, body: String) =
+      s"""class Clock {
+         |protected:
+         |  var t: Int
+         |  history t >= old(t)
+         |public:
+         |  var peer: $peerType
+         |  def this { t = 0 }
+         |  def dec(): void { $body }
+         |}
+         |$other""".stripMargin
+
+    it("does not let a lambda's parameter retype a field outside the lambda") {
+      val o = compile(withPeer("Other", "peer.t = peer.t - 1; val g: (Clock) -> Int = (peer: Clock) -> { 0 }"))
+      assert(!o.errors.contains("E0109"), o.toString)
+    }
+
+    it("does not let a lambda's local hide a write outside the lambda") {
+      val o = compile(withPeer("Clock", "peer.t = peer.t - 1; val f: () -> void = () -> { val peer: Other = new Other() }"))
+      assert(o.errors.contains("E0109"), o.toString)
+    }
+
+    it("uses the lambda's own declaration inside the lambda") {
+      val o = compile(withPeer("Other", "val f: () -> void = () -> { val peer: Clock = self; peer.t = peer.t - 1 }; f()"))
+      assert(o.errors.contains("E0109"), o.toString)
+    }
+
+    val family =
+      """class Base {
+        |public:
+        |  var t: Int
+        |  def this { t = 0 }
+        |}
+        |class Plain extends Base {
+        |public:
+        |  def this { }
+        |}
+        |class Clock extends Base {
+        |  history t >= old(t)
+        |public:
+        |  def this { }
+        |  def tick(): void { t = t + 1 }
+        |  %s
+        |}""".stripMargin
+
+    it("is not a write of the field through a sibling subclass") {
+      val o = compile(family.format("def resetPlain(o: Plain): void { o.t = o.t - 1 }"))
+      assert(!o.errors.contains("E0109"), o.toString)
+      assert(o.w24.isEmpty, o.toString)
+    }
+
+    it("is W0024, not E0109, through a superclass that may or may not be the class") {
+      val o = compile(family.format("def resetBase(o: Base): void { o.t = o.t - 1 }"))
+      assert(!o.errors.contains("E0109"), o.toString)
+      assert(o.w24.exists(m => m.contains("resetBase") && m.contains("`o`")), o.toString)
+    }
+
+    it("is E0109 through a superclass whose own history names the field") {
+      val src =
+        """class Base {
+          |public:
+          |  var t: Int
+          |  history t >= old(t)
+          |  def this { t = 0 }
+          |}
+          |class Clock extends Base {
+          |public:
+          |  def this { }
+          |  def resetBase(o: Base): void { o.t = o.t - 1 }
+          |}""".stripMargin
+      val o = compile(src)
+      assert(o.errors.contains("E0109"), o.toString)
+    }
+
+    // `tick` wraps at Int.MAX_VALUE, which the solver rightly reports (E0112); only E0109 is asserted.
+    val tick = "  def tick(): void { t = t + 1 }\n"
+
+    it("is not a write when the method made the object with new (a factory)") {
+      val o1 = compile(clock(tick + "  static def startingAt5(): Clock { val c = new Clock(); c.t = 5; return c }"))
+      assert(!o1.errors.contains("E0109"), o1.toString)
+      val o2 = compile(clock(tick + "  static def zero(): Clock { val c: Clock = new Clock(); c.t = 0; return c }"))
+      assert(!o2.errors.contains("E0109"), o2.toString)
+      val o3 = compile(clock(tick + "  static def mk(): Clock { var c = new Clock(); c.t = 0; return c }"))
+      assert(!o3.errors.contains("E0109"), o3.toString)
+    }
+
+    it("is a write again once a var made with new is given another object") {
+      val o = compile(clock(tick + "  def mix(q: Clock): void { var c = new Clock(); c = q; c.t = 0 }"))
       assert(o.errors.contains("E0109"), o.toString)
     }
   }

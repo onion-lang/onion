@@ -236,20 +236,12 @@ final class HistoryWritePass(typing: Typing) {
   private def methodsOf(c: AST.ClassDeclaration): Seq[AST.MethodDeclaration] =
     (c.defaultSection.toSeq ++ c.sections).flatMap(_.members).collect { case m: AST.MethodDeclaration => m }
 
-  /** Parameters and locals of a method: a bare name that is one of them is not the field. */
-  private def declaredNames(m: AST.MethodDeclaration): Set[String] = {
-    val names = Set.newBuilder[String]
-    m.args.foreach(a => names += a.name)
-    def visit(n: AST.Node): Unit = {
-      n match {
-        case l: AST.LocalVariableDeclaration => names += l.name
-        case _ =>
-      }
-      ASTWalk.visitChildren(n)(visit)
-    }
-    visit(m.block)
-    names.result()
-  }
+  /**
+   * Parameters and locals of a method: a bare name that is one of them is not the field. A
+   * lambda's own names shadow only inside the lambda, which [[writesIn]] handles (#2599).
+   */
+  private def declaredNames(m: AST.MethodDeclaration): Set[String] =
+    m.args.map(_.name).toSet ++ localsIn(m.block)
 
   /**
    * Every write `m` makes to a field (#2597): in its body, and inside the lambdas it creates,
@@ -258,12 +250,13 @@ final class HistoryWritePass(typing: Typing) {
    * when the syntax does not say which class it is, the write is counted but left unsettled.
    */
   private def writesIn(m: AST.MethodDeclaration, owner: AST.ClassDeclaration): Seq[Write] = {
-    val types = receiverTypes(m, owner)
+    val typeParams = (owner.typeParameters ++ m.typeParameters).map(_.name).toSet
     val chain = hierarchy(owner, classesInScope)
+    val fields = chainFieldNodes(chain).view.mapValues(t => className(t, typeParams).filter(_.nonEmpty)).toMap
     val out = Seq.newBuilder[Write]
-    def visit(n: AST.Node, hidden: Set[String], inLambda: Boolean = false): Unit = {
+    def visit(n: AST.Node, hidden: Set[String], scope: Scope, inLambda: Boolean): Unit = {
       def add(lhs: AST.Expression, node: AST.Node, kind: Slot => Kind): Unit =
-        slotOf(lhs, types, hidden, chain).foreach { s =>
+        slotOf(lhs, scope, hidden, chain).foreach { s =>
           val via =
             if (s.receiver == Unknown) Unsettled(s.text)
             else if (s.receiver.nonEmpty) OtherObject(s.receiver)
@@ -274,69 +267,86 @@ final class HistoryWritePass(typing: Typing) {
       n match {
         case c: AST.ClosureExpression =>
           // Its own parameters and locals shadow a field of the same name inside it.
-          if (c.body != null) visit(c.body, hidden ++ c.args.map(_.name) ++ localsIn(c.body), inLambda = true)
-        case a: AST.Assignment => add(a.lhs, a, s => assignKind(s, a.rhs, types, hidden, chain))
+          if (c.body != null)
+            visit(c.body, hidden ++ c.args.map(_.name) ++ localsIn(c.body), enter(scope, c.args, c.body, typeParams), inLambda = true)
+        case a: AST.Assignment => add(a.lhs, a, s => assignKind(s, a.rhs, scope, hidden, chain))
         case a: AST.AdditionAssignment => add(a.lhs, a, _ => deltaKind(a.rhs, 1))
         case a: AST.SubtractionAssignment => add(a.lhs, a, _ => deltaKind(a.rhs, -1))
         case u: AST.PostIncrement => add(u.term, u, _ => Raise)
         case u: AST.PostDecrement => add(u.term, u, _ => Lower)
         case _ =>
       }
-      if (!n.isInstanceOf[AST.ClosureExpression]) ASTWalk.visitChildren(n)(visit(_, hidden, inLambda))
+      if (!n.isInstanceOf[AST.ClosureExpression]) ASTWalk.visitChildren(n)(visit(_, hidden, scope, inLambda))
     }
-    visit(m.block, Set.empty)
+    visit(m.block, Set.empty, enter(Scope(fields, Set.empty), m.args, m.block, typeParams), inLambda = false)
     out.result()
   }
 
-  private def localsIn(n: AST.Node): Set[String] = {
-    val names = Set.newBuilder[String]
-    def visit(x: AST.Node): Unit = {
-      x match {
-        case l: AST.LocalVariableDeclaration => names += l.name
-        case _ =>
-      }
-      ASTWalk.visitChildren(x)(visit)
+  /** The locals `n` declares, not counting those of the lambdas inside it. */
+  private def localsIn(n: AST.Node): Set[String] = localDecls(n).map(_.name).toSet
+
+  private def localDecls(n: AST.Node): Seq[AST.LocalVariableDeclaration] = {
+    val out = Seq.newBuilder[AST.LocalVariableDeclaration]
+    def visit(x: AST.Node): Unit = x match {
+      case _: AST.ClosureExpression => ()
+      case l: AST.LocalVariableDeclaration => out += l; ASTWalk.visitChildren(x)(visit)
+      case _ => ASTWalk.visitChildren(x)(visit)
     }
-    visit(n)
-    names.result()
+    if (n != null) ASTWalk.visitChildren(n)(visit)
+    out.result()
   }
 
   /**
-   * The class each name a method can write through is declared with: its parameters, its locals
-   * (a declared type, or the class of a `new`) and the fields of its class. `None` is a name
-   * whose class the syntax does not give.
+   * What a name means where a write is made (#2599). `types` is the class each name is declared
+   * with (`None` when the syntax does not give one); `fresh` holds the locals that hold an object
+   * this very method made with `new`, which has no state from before the call to break.
    */
-  private def receiverTypes(m: AST.MethodDeclaration, owner: AST.ClassDeclaration): Map[String, Option[String]] = {
-    val typeParams = (owner.typeParameters ++ m.typeParameters).map(_.name).toSet
+  private final case class Scope(types: Map[String, Option[String]], fresh: Set[String])
+
+  /**
+   * The scope inside a method or lambda body: `outer`, then its parameters, then the locals it
+   * declares outside its own lambdas. A name declared there twice with different classes (a
+   * `val` in two branches) cannot be told apart by name, so neither declaration settles it.
+   */
+  private def enter(outer: Scope, args: Seq[AST.Argument], body: AST.Node, typeParams: Set[String]): Scope = {
     def classOf(t: AST.TypeNode): Option[String] = className(t, typeParams)
-    val fields = chainFieldNodes(hierarchy(owner, classesInScope)).view.mapValues(t => classOf(t).filter(_.nonEmpty)).toMap
     val declared = scala.collection.mutable.LinkedHashMap.empty[String, Option[String]]
-    // A name declared twice with different classes (a lambda parameter, or a `val` in two
-    // branches) cannot be told apart by name, so neither declaration settles it (#2599).
     def declare(name: String, cls: Option[String]): Unit =
       declared(name) = declared.get(name) match {
         case Some(prev) if prev != cls => None
         case _                         => cls
       }
-    m.args.foreach(a => declare(a.name, classOf(a.typeRef)))
-    def visit(n: AST.Node): Unit = {
-      n match {
-        case l: AST.LocalVariableDeclaration =>
-          declare(l.name,
-            if (l.typeRef != null) classOf(l.typeRef)
-            else l.init match {
-              case AST.NewObject(_, t, _) => classOf(t)
-              case _                      => None
-            })
-        case c: AST.ClosureExpression =>
-          c.args.foreach(a => declare(a.name, classOf(a.typeRef)))
-          if (c.body != null) visit(c.body)
+    args.foreach(a => declare(a.name, classOf(a.typeRef)))
+    val locals = localDecls(body)
+    locals.foreach { l =>
+      declare(l.name,
+        if (l.typeRef != null) classOf(l.typeRef)
+        else l.init match {
+          case AST.NewObject(_, t, _) => classOf(t)
+          case _                      => None
+        })
+    }
+    val reassigned = assignedNames(body)
+    val counts = (args.map(_.name) ++ locals.map(_.name)).groupBy(identity).view.mapValues(_.size).toMap
+    val fresh = locals.collect {
+      case l @ AST.LocalVariableDeclaration(_, mods, n, _, _: AST.NewObject)
+        if counts(n) == 1 && ((mods & AST.M_FINAL) != 0 || !reassigned.contains(n)) => n
+    }.toSet
+    Scope(outer.types ++ declared, (outer.fresh -- declared.keySet) ++ fresh)
+  }
+
+  /** Names assigned anywhere in `n` with a plain `x = ...`, lambdas included. */
+  private def assignedNames(n: AST.Node): Set[String] = {
+    val names = Set.newBuilder[String]
+    def visit(x: AST.Node): Unit = {
+      x match {
+        case AST.Assignment(_, AST.Id(_, v), _) => names += v
         case _ =>
       }
-      ASTWalk.visitChildren(n)(visit)
+      ASTWalk.visitChildren(x)(visit)
     }
-    visit(m.block)
-    fields ++ declared
+    if (n != null) visit(n)
+    names.result()
   }
 
   /** The fields declared in the class and its superclasses, with their type nodes. */
@@ -363,31 +373,46 @@ final class HistoryWritePass(typing: Typing) {
     case _                                => Some("")
   }
 
-  private def slotOf(e: AST.Expression, types: Map[String, Option[String]], hidden: Set[String],
+  private def slotOf(e: AST.Expression, scope: Scope, hidden: Set[String],
                      chain: Seq[AST.ClassDeclaration]): Option[Slot] = e match {
     case AST.Id(_, n) if !hidden.contains(n) => Some(Slot("", n, bare = true))
     case AST.UnqualifiedFieldReference(_, n) if !hidden.contains(n) => Some(Slot("", n, bare = true))
     case AST.MemberSelection(_, _: AST.CurrentInstance, n) => Some(Slot("", n, bare = false))
+    // An object this method made has no earlier state, so writing it breaks no history.
+    case AST.MemberSelection(_, AST.Id(_, r), _) if scope.fresh.contains(r) => None
     case AST.MemberSelection(_, AST.Id(_, r), n) =>
-      types.get(r) match {
-        case Some(Some(cls)) =>
-          // Declared with a class: this field's write when that class inherits it, else another's.
-          if (sharesField(cls, n, chain)) Some(Slot(r, n, bare = false)) else None
+      scope.types.get(r) match {
+        case Some(Some(cls)) => receiverOf(cls, n, chain) match {
+          case Some(true)  => Some(Slot(r, n, bare = false))
+          case Some(false) => Some(Slot(Unknown, n, bare = false, text = r))
+          case None        => None
+        }
         case _ => Some(Slot(Unknown, n, bare = false, text = r))
       }
     case AST.MemberSelection(_, target, n) if target != null => Some(Slot(Unknown, n, bare = false, text = shown(target)))
     case _ => None
   }
 
-  /** Whether objects of `cls` carry the `field` that `chain` (the class and its superclasses) declares. */
-  private def sharesField(cls: String, field: String, chain: Seq[AST.ClassDeclaration]): Boolean =
-    chain.find(c => fieldTypes(Seq(c)).contains(field)).exists { declaring =>
-      classesInScope.get(cls).exists(c => hierarchy(c, classesInScope).contains(declaring))
-    }
+  /**
+   * What a write of `field` through a reference declared as `cls` is, for the class `chain.head`
+   * (#2599). `Some(true)`: every such object carries the history, since `cls` is the class or a
+   * subclass, or a class whose own history names the field. `Some(false)`: it may or may not
+   * (`cls` is a superclass that does not bind the field), so the write is W0024. `None`: it is
+   * another object's field (a sibling subclass, an unrelated class).
+   */
+  private def receiverOf(cls: String, field: String, chain: Seq[AST.ClassDeclaration]): Option[Boolean] =
+    for {
+      declaring <- chain.find(c => fieldTypes(Seq(c)).contains(field))
+      decl      <- classesInScope.get(cls)
+      up         = hierarchy(decl, classesInScope)
+      if up.contains(declaring)
+      bound      = up.contains(chain.head) || up.exists(c => chain.contains(c) && c.histories.exists(h => namesIn(h).contains(field)))
+      if bound || chain.contains(decl)
+    } yield bound
 
-  private def assignKind(slot: Slot, rhs: AST.Expression, types: Map[String, Option[String]], hidden: Set[String],
+  private def assignKind(slot: Slot, rhs: AST.Expression, scope: Scope, hidden: Set[String],
                          chain: Seq[AST.ClassDeclaration]): Kind = {
-    def same(e: AST.Expression) = slotOf(e, types, hidden, chain).exists(s => s.receiver == slot.receiver && s.field == slot.field)
+    def same(e: AST.Expression) = slotOf(e, scope, hidden, chain).exists(s => s.receiver == slot.receiver && s.field == slot.field)
     rhs match {
       case e if constant(e).isDefined => SetConst
       case AST.Addition(_, l, r) if same(l) => deltaKind(r, 1)

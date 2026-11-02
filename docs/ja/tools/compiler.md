@@ -152,6 +152,7 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0021` | `history-not-proved` | メソッドが `history` を壊しうる。ソルバーが反例を見つけた |
 | `W0022` | `shape-not-sampled` | Shape の契約を確かめられなかった。値型からサンプルを作れない |
 | `W0024` | `history-not-checked` | `history` が名指すフィールドにメソッドが書き込むが、`history` が保たれるかをどの検査も決めていない |
+| `W0025` | `override-breaks-contract` | オーバーライドが継承した契約を壊しうる。ソルバーが反例を見つけた |
 
 ### `--contract-seed <n>` / `--contract-samples <n>`
 

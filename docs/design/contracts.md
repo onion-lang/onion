@@ -797,7 +797,9 @@ more than `law`/`example` gave.
 
 ---
 
-## Appendix: what is built (stage 2 and the first part of stage 5 to 7)
+## Appendix: what is built, and what is not
+
+**Built** (`--contracts check`, the default):
 
 | Check | Code | How |
 |---|---|---|
@@ -806,8 +808,18 @@ more than `law`/`example` gave.
 | A clause that names a mutable object | E0110 | types |
 | A class with a clause that extends a Java class | E0111 | types |
 | A solver counterexample that **running the compiled code reproduces** | E0112 | CDCL SAT + bit-vectors, then a run |
+| A closed or sampled predicate (`ensures result`) that is false | E0113 | run at build time |
 | A solver counterexample that cannot be run, or does not break when run | W0021 | the same, shown as a warning |
+| An override whose body can break the effective contract | W0025 | the solver, against `pre_eff` / `post_eff` |
 
-A proved history prints nothing. Showing it (a `verbose` line) needs `verbose` to reach the compiler
-first, and is not built. `Int` is the only type the prover models; a body with a call, a loop, a
-`return` or a local is not modelled and reports nothing.
+`--verbose` lists each history the solver proved. The prover models `Int` fields, parameters and
+locals, assignment, `if`, a trailing `return`, and a call to a pure `Int` method that states its
+contract (its `requires` is an obligation, its `ensures` constrains the result). Anything else is
+not modelled and reports nothing.
+
+**Not built:**
+
+- the framing rule 2 (a write through another instance);
+- `ContractTable` and the `Shape` contract;
+- `--contracts runtime` (a guard for what was not proved) and `verify`; both are reserved and refused;
+- calls to a method that writes a field, loops, and types other than `Int`.

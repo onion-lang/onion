@@ -1899,6 +1899,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `W0021` | メソッドが `history` を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
 | `W0022` | the contract of a Shape was not checked: its value type cannot be sampled |
 | `W0024` | `history` が名指すフィールドにメソッドが書き込むが、`history` が保たれるかをどの検査も決めていない。フィールドが `Int` でない、ソルバーがメソッド本体を扱えない、または `history` が `x >= old(x)`・`x <= old(x)`・`x == old(x)` の形でない場合です。そこでは `history` は保証されません |
+| `W0025` | オーバーライドが継承した契約を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
 
 ## 診断コード一覧
 

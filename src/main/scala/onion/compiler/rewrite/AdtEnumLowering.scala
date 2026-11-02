@@ -71,8 +71,11 @@ private[compiler] object AdtEnumLowering {
     // singleton record type and any same-named accessor would collide under `::`
     // resolution (the name `Origin` already denotes the record type), so `new Origin()`
     // is the first-cut construction form (see the class notes / final report).
+    // The body's `invariant`/`history` clauses (RFC #2557) bind every case, so they go on
+    // the sealed interface, where an interface's own clauses are typed.
     val interfaceDecl = AST.InterfaceDeclaration(
-      loc, enumDecl.modifiers | AST.M_SEALED, enumName, Nil, bodyMethods, typeParams
+      loc, enumDecl.modifiers | AST.M_SEALED, enumName, Nil, bodyMethods, typeParams,
+      enumDecl.invariants, enumDecl.histories
     )
 
     // One record per case; singleton -> zero-field record. All implement the enum.

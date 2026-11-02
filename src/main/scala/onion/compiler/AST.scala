@@ -456,5 +456,7 @@ object AST {
     EnumConstant(location, name, Nil, Some(fields))
 
   /** An enum type declaration */
-  case class EnumDeclaration(location: Location, modifiers: Int, name: String, params: List[Argument], constants: List[EnumConstant], sections: List[AccessSection] = Nil, typeParameters: List[TypeParameter] = Nil) extends TypeDeclaration
+  case class EnumDeclaration(location: Location, modifiers: Int, name: String, params: List[Argument], constants: List[EnumConstant], sections: List[AccessSection] = Nil, typeParameters: List[TypeParameter] = Nil,
+    /** The `invariant` and `history` clauses of the body (RFC #2557), as on a class. */
+    invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration
 }

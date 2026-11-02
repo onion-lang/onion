@@ -410,6 +410,9 @@ object TypedAST {
      */
     var invariants: Seq[Term] = Nil
     var histories: Seq[Term] = Nil
+    /** The clauses as written, so a guard can type them again over its own frame (RFC #2557). */
+    var invariantSources: scala.collection.immutable.List[AST.Expression] = scala.collection.immutable.Nil
+    var historySources: scala.collection.immutable.List[AST.Expression] = scala.collection.immutable.Nil
     private var staticInitializers_ = Array[TypedAST.ActionStatement]()
 
     /**

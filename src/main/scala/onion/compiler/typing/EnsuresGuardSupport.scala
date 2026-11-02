@@ -13,7 +13,7 @@ import onion.compiler.TypedAST.*
  * missed would be a silent hole in a guard.
  *
  * Only a method this split is safe for is guarded: an instance method, not generic, not variadic,
- * with an `ensures` that does not use `old(...)` (saving the old values comes later). For any other
+ * An `old(e)` in an `ensures` is saved: evaluated at entry into a local of the guard. For any other
  * method with an `ensures` the clause is not enforced, and the warning W0026 says so.
  */
 private[typing] object EnsuresGuardSupport {
@@ -22,13 +22,5 @@ private[typing] object EnsuresGuardSupport {
     if ((method.modifier & AST.M_STATIC) != 0) Some("it is static")
     else if (method.typeParameters.nonEmpty) Some("it is generic")
     else if (method.isVararg) Some("it takes a variable number of arguments")
-    else if (ensures.exists(mentionsOld)) Some("an ensures clause uses old(...), which is not saved at run time yet")
     else None
-
-  private def mentionsOld(e: AST.Expression): Boolean = e match {
-    case AST.UnqualifiedMethodCall(_, "old", _, _) => true
-    case b: AST.BinaryExpression                  => mentionsOld(b.lhs) || mentionsOld(b.rhs)
-    case u: AST.UnaryExpression                   => mentionsOld(u.term)
-    case _                                        => false
-  }
 }

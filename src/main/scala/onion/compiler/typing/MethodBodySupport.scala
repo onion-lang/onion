@@ -87,7 +87,9 @@ private[compiler] final class MethodBodySupport(
     }.toArray
     val self = new This(method.location, classType)
     val call = new Call(method.location, self, bodyMethod, argTerms)
+    val saves = scala.collection.mutable.ArrayBuffer.empty[(Int, Term)]
     val requiresTerms = if (requires.nonEmpty) typeContractClauses(requires, gctx, ContractScope.Pre) else Nil
+    gctx.oldSaves = Some(saves)
     val (resultSlot, ensuresTerms) =
       if (void) (-1, typeContractClauses(ensures, gctx, ContractScope.Post))
       else gctx.openScope {
@@ -104,9 +106,13 @@ private[compiler] final class MethodBodySupport(
     }
     val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") }
     val post: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") }
+    // `old(e)` is e on entry: assigned after `requires` holds and before the body runs.
+    val saved: Seq[ActionStatement] = saves.toSeq.map { case (slot, term) =>
+      new ExpressionActionStatement(term.location, new SetLocal(0, slot, term.`type`, term))
+    }
     val statements: Seq[ActionStatement] =
-      if (void) pre ++ Seq(new ExpressionActionStatement(method.location, call)) ++ post :+ new Return(method.location, null)
-      else pre ++ Seq(new ExpressionActionStatement(method.location, new SetLocal(0, resultSlot, method.returnType, call))) ++ post :+
+      if (void) pre ++ saved ++ Seq(new ExpressionActionStatement(method.location, call)) ++ post :+ new Return(method.location, null)
+      else pre ++ saved ++ Seq(new ExpressionActionStatement(method.location, new SetLocal(0, resultSlot, method.returnType, call))) ++ post :+
         new Return(method.location, new RefLocal(0, resultSlot, method.returnType))
     method.setBlock(new StatementBlock(method.location, statements*))
     method.setFrame(gctx.getContextFrame)

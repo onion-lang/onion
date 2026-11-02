@@ -147,3 +147,28 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     code shouldBe 0
     out should include("201")
 
+  private def counterProgram(step: String) =
+    s"""class Counter {
+       |public:
+       |  var n: Int
+       |  def this { n = 5 }
+       |  def inc(): void
+       |    ensures n == old(n) + 1
+       |  { n = n + $step }
+       |}
+       |val c = new Counter()
+       |c.inc()
+       |println(c.n)
+       |""".stripMargin
+
+  test("--contracts runtime saves old(e) at entry: n == old(n) + 1 holds for n = n + 1"):
+    val path = writeScript(counterProgram("1"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("6")
+
+  test("--contracts runtime throws when old(e) shows the postcondition is false"):
+    val path = writeScript(counterProgram("2"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("postcondition failed")), chain.map(_.getMessage).toString)
+

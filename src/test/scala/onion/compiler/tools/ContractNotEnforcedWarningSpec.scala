@@ -23,9 +23,20 @@ class ContractNotEnforcedWarningSpec extends AnyFunSpec {
        |  { n = n + 1 }
        |}""".stripMargin
 
-  it("warns when an ensures uses old(...), which is not saved at run time yet") {
-    val ws = w26(counter("n == old(n) + 1"))
-    assert(ws.size == 1 && ws.head.contains("old"), ws.toString)
+  it("warns when the method is static, which the guard does not split yet") {
+    val src =
+      """class Calc {
+        |public:
+        |  static def twice(x: Int): Int
+        |    ensures result == x * 2
+        |  { return x * 2 }
+        |}""".stripMargin
+    val ws = w26(src)
+    assert(ws.size == 1 && ws.head.contains("static"), ws.toString)
+  }
+
+  it("is silent for an ensures that uses old(...): it is saved at entry") {
+    assert(w26(counter("n == old(n) + 1")).isEmpty)
   }
 
   it("is silent when the ensures can be guarded") {
@@ -33,6 +44,7 @@ class ContractNotEnforcedWarningSpec extends AnyFunSpec {
   }
 
   it("is silent under --contracts check, which guards nothing") {
-    assert(w26(counter("n == old(n) + 1"), ContractMode.Check).isEmpty)
+    val src = "class Calc {\npublic:\n  static def twice(x: Int): Int\n    ensures result == x * 2\n  { return x * 2 }\n}"
+    assert(w26(src, ContractMode.Check).isEmpty)
   }
 }

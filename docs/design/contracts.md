@@ -775,12 +775,11 @@ more than `law`/`example` gave.
 
 ## 12. Open questions
 
-- **Decided, not built: a guard on a recursive method (§7.4).** A guard calls `m$body`, so a self-call
+- **Decided and built: a guard on a recursive method (§7.4).** A guard calls `m$body`, so a self-call
   inside the body goes through the guard and is not a tail call. The decision: guard the entry only. A
   self-call inside `m$body` calls `m$body` directly, so tail-call optimization still applies and the
   contract is checked once, on the way in and out of the outermost call. The cost: the `requires` of an
-  inner self-call is not checked at run time. The proof covers it, and a recursive method whose
-  `requires` is not proved gets W0026 naming that gap.
+  inner self-call is not checked at run time. Only the proof covers it. A warning that names this gap is not built.
 - Quantifiers. `forall` over `Int` ranges, or pure recursive helper predicates? Collections need one.
 - `ensures` on an exceptional exit.
 - Mutable aggregates in `invariant`/`history` (`items.size() <= 10`) need an ownership rule. Not in v1.
@@ -857,7 +856,6 @@ becomes an error by default; that flip is not built yet, see below.)
   verification is the default instead.
 - A guard dropped for a proved `invariant` or `requires`. A proved `history` and a proved `ensures` are
   dropped; the other two need the proofs of the work that follows from section 6 below.
-- The recursive-method guard decided in section 12 (guard the entry only). It is a decision, not code.
 - The `invariant` check after a constructor with a `return` of its own, and after a record's
   compiler-written constructor. The warning W0026 names each one.
 

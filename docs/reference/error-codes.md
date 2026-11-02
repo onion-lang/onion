@@ -1918,6 +1918,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0025` | an override can break the contract it inherits: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 | `W0026` | a contract clause is not enforced at run time by `--contracts runtime`, with the reason (a warning, so a clause that is not guarded is never silent) |
 | `W0027` | the contract of a method is trusted, not verified (`@Trusted`): its body is not checked and callers rely on it; each use is listed |
+| `W0028` | a method can break its `ensures`: the solver found values for which the body ends with the clause false |
 
 ## Every diagnostic code
 

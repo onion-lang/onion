@@ -386,20 +386,27 @@ could not be proved (§7.4). It is never the way a contract is *enforced*.
 | LSP | The same static checks that are fast enough for an editor: typing, purity, framing and effective-contract diagnostics. Never runs user code, matching the current `checkLaws = false` (#346). No prover until it fits an editor's latency budget. |
 | `onion test`, the REPL | Run programs; a contract kept as a guard (§7.4) is checked there. |
 
-**`--contracts <off|check>`, and two reserved names.** A mode is named for what it does today
-(this follows the panel's review of PR #2564, which found `runtime` accepted while it checked
-nothing):
+**The default is an error. A contract that is not proved fails the build.** Each clause ends in one of
+three verdicts: `Proved`, `Counterexample` (with the values), or `Not proved` (with the reason, naming
+the form the prover does not model). Anything but `Proved` is a compile error. This is the point of the
+feature: a stated contract that nobody checks is a comment, and a tool that stays quiet when it cannot
+decide teaches people to trust the silence. The escape hatches are explicit, written in the source or on
+the command line, and they leave a trace.
 
-- `off` (default while this is a preview): a contract clause is E0105, with a hint to use `check`.
-- `check`: **what exists.** The clauses are typed, and the static checks of §7.1 run. Nothing is
-  enforced when the program runs.
-- `verify`: reserved for the proofs of §7.3. The command line refuses it, with a message that says
-  to use `check`, until proofs exist.
-- `runtime`: reserved for the guards of §7.4, refused in the same way until they exist.
+- **`@Trusted`** on a method: its contract is taken as given and its body is not checked. Callers may
+  rely on the contract. Use it where the body is out of the prover's reach (a call into Java, a loop it
+  cannot summarise). Every `@Trusted` is listed in the compiler's output, because each one is a claim
+  that nothing verified.
+- **`--contracts check`**: the findings are warnings, not errors. A migration aid, chosen on purpose and
+  visible in the build file; it is not the default.
+- **`--contracts off`**: a contract clause is E0105, as before.
+- **`--contracts runtime`**: also keeps a guard for what was not proved. It is a safety net for code that
+  is `@Trusted` or built with `check`; it does not turn a failed proof into a pass.
 
-A reserved name is not accepted so that no mode promises a check it does not make. When a name
-starts to do something, it is accepted, and it keeps the meaning given here. At the end of the
-preview, `verify` becomes the default, because the design's answer is the static one.
+What this replaces: a counterexample was the warning W0021 and an unproved override the warning W0025,
+because the prover was narrow and an error would have refused too many programs. The prover is still
+narrow, which is why `@Trusted` exists. The fix for a narrow prover is to widen it, or to say `@Trusted`
+out loud, not to stay silent.
 
 **What the build runs.** The static checks run no user code. A **closed predicate** (a `static def`
 with no parameters that returns `Boolean`, the `example` replacement) is run at build time, and

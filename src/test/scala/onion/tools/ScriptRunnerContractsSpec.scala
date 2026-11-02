@@ -9,7 +9,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 /**
- * `--contracts <off|runtime|verify>` reaches the compiler through the real `onion` entry
+ * `--contracts <off|check|runtime>` reaches the compiler through the real `onion` entry
  * point (RFC #2557). `ContractsFlagSpec` checks the option parser and `configFrom`; this
  * checks the command line a person types, which `sbt runScript` once rejected with
  * "--contracts is an invalid argument".
@@ -60,13 +60,44 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     code shouldBe 0
     out should include("true")
 
-  test("--contracts runtime and verify are refused, since nothing is enforced yet"):
+  test("--contracts verify is refused, since no proof mode exists yet"):
     val path = writeScript(withContract)
-    for mode <- Seq("runtime", "verify") do
-      val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", mode, path)))
-      code should not be 0
-      out should include("--contracts")
-      out should include(mode)
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "verify", path)))
+    code should not be 0
+    out should include("--contracts")
+    out should include("verify")
+
+  private val guarded =
+    """class Check {
+      |public:
+      |  static def positive(x: Int): Int
+      |    requires x > 0
+      |  { return x }
+      |}
+      |println(Check::positive(Integer::parseInt(args[0])))
+      |""".stripMargin
+
+  test("--contracts runtime throws ContractViolation when a requires clause is false"):
+    val path = writeScript(guarded)
+    val thrown = intercept[onion.compiler.exceptions.ScriptException]:
+      captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path, "-3")))
+    // the script's own exception is the cause: a ContractViolation, which is an AssertionError
+    val cause = Iterator.iterate[Throwable](thrown)(_.getCause).takeWhile(_ != null).toList
+    assert(cause.exists(_.isInstanceOf[onion.ContractViolation]), cause.map(_.getClass.getName).toString)
+    thrown.getMessage should include("precondition failed")
+    thrown.getMessage should include("requires x > 0")
+
+  test("--contracts runtime lets a call that meets requires through"):
+    val path = writeScript(guarded)
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path, "5")))
+    code shouldBe 0
+    out should include("5")
+
+  test("--contracts check adds no guard: a false requires is not enforced at run time"):
+    val path = writeScript(guarded)
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "check", path, "-3")))
+    code shouldBe 0
+    out should include("-3")
 
   test("an unknown mode is reported against the flag"):
     val path = writeScript(withContract)

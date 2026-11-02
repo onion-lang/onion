@@ -35,11 +35,32 @@ private[compiler] final class MethodBodySupport(
       method.postconditions = typePostconditions(method, ensures, context)
       method.assertsResult = ensures.exists { case AST.Id(_, "result") => true; case _ => false }
     }
-    val translatedBlock = addReturnNode(withPrologue(context, translated), method.returnType)
+    val guarded = withRequiresGuards(method, requires, translated)
+    val translatedBlock = addReturnNode(withPrologue(context, guarded), method.returnType)
     method.setBlock(translatedBlock)
     method.setFrame(context.getContextFrame)
     reportUnused(context)
   }
+
+  /**
+   * `--contracts runtime` (RFC #2557, design 7.4): each `requires` clause becomes a guard at the
+   * top of the body, `if !(clause) throw new ContractViolation("...")`. A violation is the caller's
+   * fault, so it is thrown before any of the body runs. With any other mode the body is unchanged,
+   * so a program compiled without the flag is byte-for-byte what it was.
+   */
+  private def withRequiresGuards(method: MethodDefinition, sources: List[AST.Expression], body: ActionStatement): ActionStatement =
+    if (bodyContext.contractMode != ContractMode.Runtime || method.preconditions.isEmpty) body
+    else {
+      val violation = bodyContext.load("onion.ContractViolation")
+      val ctor = violation.findConstructor(Array[Term](new StringValue(null, "", bodyContext.load("java.lang.String"))))
+      val guards: Seq[ActionStatement] = method.preconditions.zip(sources).map { case (clause, source) =>
+        val message = s"${method.classType.name}.${method.name}() precondition failed: requires ${onion.compiler.contracts.ExpressionText.of(source)}"
+        val text = new StringValue(clause.location, message, bodyContext.load("java.lang.String"))
+        val fail = new Throw(clause.location, new NewObject(clause.location, ctor(0), Array[Term](text)))
+        new IfStatement(clause.location, new UnaryTerm(clause.location, UnaryTerm.Kind.NOT, BasicType.BOOLEAN, clause), fail, null)
+      }
+      new StatementBlock(body.location, (guards :+ body)*)
+    }
 
   /**
    * The clauses of a method with no body: an interface method or an `abstract def` (RFC #2557,

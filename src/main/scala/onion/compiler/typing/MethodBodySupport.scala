@@ -35,10 +35,16 @@ private[compiler] final class MethodBodySupport(
       method.postconditions = typePostconditions(method, ensures, context)
       method.assertsResult = ensures.exists { case AST.Id(_, "result") => true; case _ => false }
     }
-    val splitGuards = bodyContext.contractMode == ContractMode.Runtime && ensures.nonEmpty &&
-      method.postconditions.size == ensures.size && EnsuresGuardSupport.refusal(method, ensures).isEmpty
-    if (bodyContext.contractMode == ContractMode.Runtime && ensures.nonEmpty && !splitGuards)
-      warnNotGuarded(method, block, EnsuresGuardSupport.refusal(method, ensures).getOrElse("the clause could not be typed"))
+    val definition = method.classType match { case d: ClassDefinition => Some(d); case _ => None }
+    val classClauses = definition.exists(d => d.invariantSources.nonEmpty || d.historySources.nonEmpty)
+    // A public instance method of a class with an `invariant` or a `history` is a place where it must
+    // hold, so it is guarded too (RFC #2557, design 7.4). A constructor is not a method here.
+    val needsGuard = ensures.nonEmpty || (classClauses && (method.modifier & AST.M_PUBLIC) != 0)
+    val refusal = EnsuresGuardSupport.refusal(method, ensures)
+    val splitGuards = bodyContext.contractMode == ContractMode.Runtime && needsGuard &&
+      (ensures.isEmpty || method.postconditions.size == ensures.size) && refusal.isEmpty
+    if (bodyContext.contractMode == ContractMode.Runtime && needsGuard && !splitGuards)
+      warnNotGuarded(method, block, refusal.getOrElse("the clause could not be typed"))
     // With an `ensures` the body moves to `m$body` and `m` becomes the guard; otherwise a `requires`
     // is guarded in place at the top of the body.
     val guarded = if (splitGuards) translated else withRequiresGuards(method, requires, translated)
@@ -54,7 +60,7 @@ private[compiler] final class MethodBodySupport(
   /** W0026: a clause that `--contracts runtime` does not enforce. Never silent. */
   private def warnNotGuarded(method: MethodDefinition, at: AST.Node, why: String): Unit =
     bodyContext.warningReporter.report(WarningCategory.ContractNotEnforced, at.location,
-      s"the ensures clause of '${method.name}' is not enforced at run time: $why")
+      s"the contract of '${method.name}' is not enforced at run time: $why")
 
   /**
    * The body keeps `context`'s frame and becomes the private method `name$body`. The method itself
@@ -100,12 +106,22 @@ private[compiler] final class MethodBodySupport(
     val violation = bodyContext.load("onion.ContractViolation")
     val ctor = violation.findConstructor(Array[Term](new StringValue(null, "", strings)))
     def guard(clause: Term, source: AST.Expression, what: String): ActionStatement = {
-      val message = s"${classType.name}.${method.name}() $what failed: ${if (what == "precondition") "requires" else "ensures"} ${onion.compiler.contracts.ExpressionText.of(source)}"
+      val keyword = if (what == "precondition") "requires" else if (what == "postcondition") "ensures" else if (what.startsWith("invariant")) "invariant" else "history"
+      val message = s"${classType.name}.${method.name}() $what failed: $keyword ${onion.compiler.contracts.ExpressionText.of(source)}"
       val fail = new Throw(clause.location, new NewObject(clause.location, ctor(0), Array[Term](new StringValue(clause.location, message, strings))))
       new IfStatement(clause.location, new UnaryTerm(clause.location, UnaryTerm.Kind.NOT, BasicType.BOOLEAN, clause), fail, null)
     }
-    val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") }
-    val post: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") }
+    val definition = classType.asInstanceOf[ClassDefinition]
+    // The class's `invariant`: no local in a typed clause, so the clauses typed once are shared. The
+    // `history` is typed again over this frame, because its `old(field)` is saved at entry. That is
+    // done before `saved` is built, since typing it adds to the saves.
+    val invariantTerms = definition.invariants.zip(definition.invariantSources)
+    val historyTerms = typeContractClauses(definition.historySources, gctx, ContractScope.History)
+    val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") } ++
+      invariantTerms.map { case (t, s) => guard(t, s, "invariant (on entry)") }
+    val post: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") } ++
+      invariantTerms.map { case (t, s) => guard(t, s, "invariant (on exit)") } ++
+      historyTerms.zip(definition.historySources).map { case (t, s) => guard(t, s, "history") }
     // `old(e)` is e on entry: assigned after `requires` holds and before the body runs.
     val saved: Seq[ActionStatement] = saves.toSeq.map { case (slot, term) =>
       new ExpressionActionStatement(term.location, new SetLocal(0, slot, term.`type`, term))
@@ -208,6 +224,8 @@ private[compiler] final class MethodBodySupport(
       context.setStatic(false)
       definition.invariants = typeContractClauses(invariants, context, ContractScope.Invariant)
       definition.histories = typeContractClauses(histories, context, ContractScope.History)
+      definition.invariantSources = invariants
+      definition.historySources = histories
       for (h <- histories) HistoryPreorder.classify(h) match {
         case HistoryPreorder.NotPreorder(reason) => bodyContext.report(SemanticError.HISTORY_NOT_PREORDER, h, reason)
         case _ =>

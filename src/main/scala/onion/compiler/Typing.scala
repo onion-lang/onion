@@ -221,6 +221,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     new onion.compiler.typing.ContractPurityPass(this).run(table_.classes.values.toSeq)
     // RFC #2557: a write that breaks a `history`, decided from the syntax alone.
     new onion.compiler.typing.HistoryWritePass(this).run(source)
+    // RFC #2557 design 4: an override's body against the effective contract.
+    new onion.compiler.typing.OverrideContractPass((file, location, message) => {
+      warningReporter_.setSourceFile(file)
+      warningReporter_.report(WarningCategory.OverrideBreaksContract, location, message)
+    }).run(source)
     // RFC #2557 3.2: an invariant or history may name only value-typed fields.
     new onion.compiler.typing.ContractFramingPass(this).run(table_.classes.values.toSeq)
     diagnostics.finishOrThrow()

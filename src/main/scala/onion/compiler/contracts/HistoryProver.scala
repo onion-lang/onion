@@ -45,6 +45,17 @@ object HistoryProver {
       }
     }
 
+  /**
+   * Prove that `method`'s `ensures` hold, assuming `assume` (the effective precondition and the
+   * class invariants) at entry. `ensures` may name `result` and the parameters; a clause the
+   * encoder does not model makes the answer [[Unsupported]]. Used to check an override's body
+   * against the effective contract (design 4).
+   */
+  def proveEnsures(method: AST.MethodDeclaration, ensures: Seq[AST.Expression], assume: Seq[AST.Expression],
+                   intFields: Set[String], callees: Map[String, AST.MethodDeclaration] = Map.empty): Outcome =
+    if (method.block == null || ensures.isEmpty) Unsupported
+    else new Run(method, "", ">=", intFields, assume, callees, checkObligations = false).runEnsures(ensures)
+
   private final class Run(method: AST.MethodDeclaration, field: String, op: String, intFields: Set[String],
                           invariants: Seq[AST.Expression], callees: Map[String, AST.MethodDeclaration],
                           checkObligations: Boolean) {
@@ -52,6 +63,8 @@ object HistoryProver {
     private val assumed = scala.collection.mutable.ArrayBuffer.empty[Int]
     private val obligations = scala.collection.mutable.ArrayBuffer.empty[Int]
     private var unsupportedCall = false
+    /** The value of a trailing `return e`, once seen: what an `ensures` calls `result`. */
+    private var returned: Option[bb.Word] = None
     private val bb = new BitBlast
     private type Env = Map[String, bb.Word]
 
@@ -88,6 +101,64 @@ object HistoryProver {
       }
     }
 
+    /** The body is run symbolically; `result` is the value of its trailing `return`. */
+    def runEnsures(ensures: Seq[AST.Expression]): Outcome = {
+      val intParams = method.args.filter(a => isInt(a.typeRef)).map(_.name)
+      if (method.args.size != intParams.size) return Unsupported
+      val pre: Env = (intFields.toSeq ++ intParams).map(n => n -> bb.fresh(W)).toMap
+      val assumptions = (invariants ++ method.requires).map(cond(_, pre))
+      if (assumptions.exists(_.isEmpty)) return Unsupported
+      val post = exec(method.block.elements, pre).getOrElse(return Unsupported)
+      val value = returned.getOrElse(return Unsupported)
+      // `old(e)` is e at entry, so it is read from `pre`; a bare name is read from `post`.
+      val goals = ensures.map(e => condPost(e, pre, post + ("result" -> value)))
+      if (goals.exists(_.isEmpty)) return Unsupported
+      assumptions.flatten.foreach(bb.assertTrue)
+      assumed.foreach(bb.assertTrue)
+      bb.assertTrue(goals.flatten.map(g => -g).reduceLeft(bb.or))
+      bb.solve() match {
+        case Sat.Unsatisfiable(proof) => if (Rup.check(bb.numVars, bb.allClauses, proof)) Proved else Unsupported
+        case Sat.Satisfiable(model) =>
+          Counterexample(pre.view.mapValues(w => bb.valueOf(model, w).toInt).toMap)
+      }
+    }
+
+    /** A post-state condition: `old(e)` reads `pre`, everything else reads `post`. */
+    private def condPost(e: AST.Expression, pre: Env, post: Env): Option[Int] = e match {
+      case AST.LogicalAnd(_, l, r) => for (a <- condPost(l, pre, post); b <- condPost(r, pre, post)) yield bb.and(a, b)
+      case AST.LogicalOr(_, l, r)  => for (a <- condPost(l, pre, post); b <- condPost(r, pre, post)) yield bb.or(a, b)
+      case AST.Not(_, t)           => condPost(t, pre, post).map(-_)
+      // `old(c)` of a whole condition: c read entirely at entry
+      case AST.UnqualifiedMethodCall(_, "old", List(inner), _) => cond(inner, pre)
+      case c: AST.BinaryExpression if isCmp(c) =>
+        for (a <- exprPost(c.lhs, pre, post); b <- exprPost(c.rhs, pre, post)) yield compare(c, a, b)
+      case _ => None
+    }
+
+    private def isCmp(c: AST.BinaryExpression): Boolean = c match {
+      case _: AST.LessThan | _: AST.GreaterThan | _: AST.LessOrEqual | _: AST.GreaterOrEqual |
+           _: AST.Equal | _: AST.NotEqual => true
+      case _ => false
+    }
+
+    private def compare(c: AST.BinaryExpression, a: bb.Word, b: bb.Word): Int = c match {
+      case _: AST.LessThan       => bb.slt(a, b)
+      case _: AST.GreaterThan    => bb.slt(b, a)
+      case _: AST.LessOrEqual    => -bb.slt(b, a)
+      case _: AST.GreaterOrEqual => -bb.slt(a, b)
+      case _: AST.Equal          => bb.eq(a, b)
+      case _                     => -bb.eq(a, b)
+    }
+
+    private def exprPost(e: AST.Expression, pre: Env, post: Env): Option[bb.Word] = e match {
+      case AST.UnqualifiedMethodCall(_, "old", List(inner), _) => expr(inner, pre)
+      case AST.Addition(_, l, r)       => for (a <- exprPost(l, pre, post); b <- exprPost(r, pre, post)) yield bb.add(a, b)
+      case AST.Subtraction(_, l, r)    => for (a <- exprPost(l, pre, post); b <- exprPost(r, pre, post)) yield bb.sub(a, b)
+      case AST.Multiplication(_, l, r) => for (a <- exprPost(l, pre, post); b <- exprPost(r, pre, post)) yield bb.mul(a, b)
+      case AST.Negate(_, t)            => exprPost(t, pre, post).map(bb.neg)
+      case other                       => expr(other, post)
+    }
+
     private def isInt(t: AST.TypeNode): Boolean = t != null && (t.desc match {
       case AST.PrimitiveType(AST.KInt) => true
       case _ => false
@@ -106,7 +177,7 @@ object HistoryProver {
         if (env.contains(name)) None else expr(init, env).map(w => env.updated(name, w))
       // A `return` as the last statement ends the body; the value must be one the encoder models.
       case AST.ReturnExpression(_, result) if last =>
-        if (result == null) Some(env) else expr(result, env).map(_ => env)
+        if (result == null) Some(env) else expr(result, env).map { w => returned = Some(w); env }
       case AST.Assignment(_, lhs, rhs) => name(lhs).filter(env.contains).flatMap(n => expr(rhs, env).map(w => env.updated(n, w)))
       case AST.AdditionAssignment(_, lhs, rhs) => update(lhs, env, (a, b) => bb.add(a, b), rhs)
       case AST.SubtractionAssignment(_, lhs, rhs) => update(lhs, env, (a, b) => bb.sub(a, b), rhs)

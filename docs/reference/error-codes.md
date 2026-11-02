@@ -1895,6 +1895,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
 | `W0021` | a method can break a `history`: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 | `W0024` | a method writes a field that a `history` names, and no check settled whether the history still holds: the field is not an `Int`, the solver does not model the method body, or the history is not of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`. Nothing guarantees the history there |
+| `W0025` | an override can break the contract it inherits: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 
 ## Every diagnostic code
 

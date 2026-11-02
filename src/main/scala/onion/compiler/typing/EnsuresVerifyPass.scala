@@ -18,7 +18,8 @@ import onion.compiler.contracts.HistoryProver
  */
 final class EnsuresVerifyPass(
   report: (String, Location, String) => Unit,
-  proved: String => Unit
+  proved: String => Unit,
+  onProved: (String, String, Location) => Unit = (_, _, _) => ()
 ) {
   def run(units: Seq[AST.CompilationUnit]): Unit = {
     val classes: Map[String, (AST.ClassDeclaration, AST.CompilationUnit)] =
@@ -52,6 +53,7 @@ final class EnsuresVerifyPass(
     for (m <- methodsOf(cls) if m.block != null && m.ensures.nonEmpty && !m.annotations.exists(_.name == "Trusted")) {
       HistoryProver.proveEnsures(m, m.ensures, invariants, intFields, callees) match {
         case HistoryProver.Proved =>
+          onProved(cls.name, m.name, m.location)
           proved(s"${cls.name}.${m.name}: ${m.ensures.map(onion.compiler.contracts.ExpressionText.of).mkString(" && ")}")
         case HistoryProver.Counterexample(before) =>
           val shown = before.toSeq.sortBy(_._1).map { case (k, v) => s"$k = $v" }.mkString(", ")

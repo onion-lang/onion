@@ -92,6 +92,7 @@ object HistoryProver {
       // contract a built module gave us: it is not in the environment, so reading it as a value
       // still ends in Unsupported.
       if (method.args.exists(a => !isInt(a.typeRef) && !isBuiltReceiver(a))) return Unsupported
+      if (shadowsField) return Unsupported
       val pre: Env = (intFields.toSeq ++ intParams).map(n => n -> bb.fresh(W)).toMap
       val assumptions = (invariants ++ method.requires).map(cond(_, pre))
       if (assumptions.exists(_.isEmpty)) return Unsupported
@@ -126,6 +127,7 @@ object HistoryProver {
     def runEnsures(ensures: Seq[AST.Expression]): Outcome = {
       val intParams = method.args.filter(a => isInt(a.typeRef)).map(_.name)
       if (method.args.size != intParams.size) return Unsupported
+      if (shadowsField) return Unsupported
       val pre: Env = (intFields.toSeq ++ intParams).map(n => n -> bb.fresh(W)).toMap
       val assumptions = (invariants ++ method.requires).map(cond(_, pre))
       if (assumptions.exists(_.isEmpty)) return Unsupported
@@ -179,6 +181,12 @@ object HistoryProver {
       case AST.Negate(_, t)            => exprPost(t, pre, post).map(bb.neg)
       case other                       => expr(other, post)
     }
+    /**
+     * Fields and parameters share one name space here, so a parameter named like a field would
+     * make `this.n = n` read as a no-op (#2602). Such a method is refused, as a shadowing local is.
+     */
+    private def shadowsField: Boolean = method.args.exists(a => intFields.contains(a.name))
+
     /** A parameter of a type some built module gave a contract for: only its methods are ever called. */
     private def isBuiltReceiver(a: AST.Argument): Boolean =
       Option(a.typeRef).map(_.desc).collect { case AST.ReferenceType(n, _) => n }.exists(n => external.keys.exists(_._1 == n))
@@ -189,9 +197,14 @@ object HistoryProver {
     })
 
     // ---- statements ------------------------------------------------------------------------
-    private def exec(elements: List[AST.BlockElement], env: Env): Option[Env] =
+    /**
+     * `top` is true only for the method's own block: a `return` ends the method only there. One
+     * inside an `if` branch would skip the rest of the body on that path, which the encoding does
+     * not model, so it is refused (#2602).
+     */
+    private def exec(elements: List[AST.BlockElement], env: Env, top: Boolean = true): Option[Env] =
       elements.zipWithIndex.foldLeft(Option(env)) { case (acc, (el, i)) =>
-        acc.flatMap(e => step(el, e, last = i == elements.size - 1))
+        acc.flatMap(e => step(el, e, last = top && i == elements.size - 1))
       }
 
     private def step(el: AST.BlockElement, env: Env, last: Boolean): Option[Env] = el match {
@@ -210,8 +223,8 @@ object HistoryProver {
       case AST.IfExpression(_, c, thenB, elseB) =>
         for {
           cl <- cond(c, env)
-          t <- exec(thenB.elements, env)
-          e <- if (elseB == null) Some(env) else exec(elseB.elements, env)
+          t <- exec(thenB.elements, env, top = false)
+          e <- if (elseB == null) Some(env) else exec(elseB.elements, env, top = false)
         } yield env.keys.map(k => k -> bb.mux(cl, t(k), e(k))).toMap
       case _ => None
     }

@@ -158,6 +158,7 @@ class HistoryHiddenWriteSpec extends AnyFunSpec {
           |  def rewind(c: Clock): void { c.t = c.t - 1 }
           |}""".stripMargin
       rejected(open)
+      rejected(open + "\nval c = new Clock()\nc.t = -5")
       rejected(clock("  def this(o: Clock) { t = 0; o.t = 0 }"))
       rejected(
         """class Account {

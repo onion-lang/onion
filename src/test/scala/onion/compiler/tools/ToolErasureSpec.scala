@@ -15,7 +15,7 @@ import org.scalatest.funspec.AnyFunSpec
 class ToolErasureSpec extends AnyFunSpec {
 
   private def compileBytes(source: String): Array[Byte] = {
-    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, checkLaws = false)
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, runContracts = false)
     val result = new OnionCompiler(config)
       .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "Erasure.on")))
     assert(!result.hasErrors, s"compile failed: ${result.allErrors.map(_.message).mkString("; ")}")

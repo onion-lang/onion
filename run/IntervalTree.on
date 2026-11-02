@@ -21,14 +21,24 @@ public:
   }
   def toStr(): String = "[" + lo + ".." + hi + "]"
 
-  law symmetric(a: Interval, b: Interval) { a.overlaps(b) == b.overlaps(a) }
-  law containsImpliesOverlap(a: Interval, x: Int) {
-    !a.contains(x) || a.overlaps(new Interval(x, x))
-  }
-  example { new Interval(1, 5).overlaps(new Interval(3, 7)) }
-  example { !new Interval(1, 5).overlaps(new Interval(6, 9)) }
-  example { new Interval(1, 5).overlaps(new Interval(5, 9)) }
-  example { new Interval(3, 3).length() == 1 }
+  static def symmetric(a: Interval, b: Interval): Boolean
+    ensures result
+    = a.overlaps(b) == b.overlaps(a)
+  static def containsImpliesOverlap(a: Interval, x: Int): Boolean
+    ensures result
+    = !a.contains(x) || a.overlaps(new Interval(x, x))
+  static def example_1(): Boolean
+    ensures result
+    = new Interval(1, 5).overlaps(new Interval(3, 7))
+  static def example_2(): Boolean
+    ensures result
+    = !new Interval(1, 5).overlaps(new Interval(6, 9))
+  static def example_3(): Boolean
+    ensures result
+    = new Interval(1, 5).overlaps(new Interval(5, 9))
+  static def example_4(): Boolean
+    ensures result
+    = new Interval(3, 3).length() == 1
 }
 
 // ─── Query result ADT ────────────────────────────────────────────────────────

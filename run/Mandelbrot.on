@@ -44,8 +44,12 @@ public:
   def show(): String = if im() >= 0.0 { "#{re()}+#{im()}i" } else { "#{re()}#{im()}i" }
 }
 
-example { new Complex(3.0, 4.0).abs2() == 25.0 }
-example { new Complex(1.0, 0.0).plus(new Complex(0.0, 1.0)).show() == "1.0+1.0i" }
+def example_1(): Boolean
+  ensures result
+  = new Complex(3.0, 4.0).abs2() == 25.0
+def example_2(): Boolean
+  ensures result
+  = new Complex(1.0, 0.0).plus(new Complex(0.0, 1.0)).show() == "1.0+1.0i"
 
 // ── Extension helpers ───────────────────────────────────────────────────────
 

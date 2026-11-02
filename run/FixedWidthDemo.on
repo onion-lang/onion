@@ -39,10 +39,12 @@ public:
   def describe(): String = "fixed-width Person(name 0-9, amount 10-15)"
 }
 
-example fixedWidthL1 {
+def fixedWidthL1(): Boolean
+  ensures result
+{
   val s = new FixedWidth()
   val v = new Person("KOTA", 42)
-  s.parse(s.print(v)).get() == v
+  return s.parse(s.print(v)).get() == v
 }
 
 def main(): void {

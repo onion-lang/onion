@@ -152,27 +152,13 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 | `W0021` | `history-not-proved` | A method can break a history; the solver found a counterexample |
 | `W0024` | `history-not-checked` | A method writes a field that a history names, and no check settled whether the history still holds |
 
-### `--no-check-laws`
+### `--contract-seed <n>` / `--contract-samples <n>`
 
-Do not execute a record's `law` / `example` clauses.
-
-They run at compile time by default, which means the compiler executes that code.
-Turn them off when compiling a file you do not want to run — the trade-off is that
-invariants like `parse ∘ format == id` stop being checked.
+Control how a predicate with parameters (a `static def` that states `ensures result`) is sampled. A failing sample reports the settings that produced it, so the run can be repeated exactly; raising the sample count widens the search.
 
 ```bash
-onionc --no-check-laws MyProgram.on
-```
-
-### `--law-seed <n>` / `--law-samples <n>`
-
-Control how `law` clauses are sampled. A falsified law reports the settings that
-produced its counterexample, so the run can be repeated exactly; raising the sample
-count widens the search for others.
-
-```bash
-onionc --law-samples 500 MyProgram.on
-onionc --law-seed 7 MyProgram.on
+onionc --contract-samples 500 MyProgram.on
+onionc --contract-seed 7 MyProgram.on
 ```
 
 ### `--contracts <off|check>`

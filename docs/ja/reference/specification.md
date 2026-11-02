@@ -359,50 +359,54 @@ record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json, Yaml)
 `Long`、`Double`、`Float`、`Boolean`、`Short`、`Byte`。それ以外の型の成分は **E0062** です。
 `derive!` は `from re"..."` と同じ record で共存できます。2つの機能は独立しています。
 
-#### `law` / `example` — コンパイル時仕様チェック
+#### 契約の述語 — コンパイル時仕様チェック
 
-record 宣言の後に `law` 節と `example` 節を続けることができます。コンパイラは
-これらをビルド時に実行します（型チェック後に実行される `LawCheckPhase`）。
-失敗したチェックは**コンパイルエラー**であり、実行時エラーではありません。
+`Boolean` を返して `ensures result` と述べる `static def` は、**契約の述語**です。
+コンパイラは、型検査の後のビルド時に実行します（`--contracts check`、既定）。
+失敗した述語は実行時エラーではなく**コンパイルエラー**です。トップレベルでは、同じ述語を
+普通の `def` で書きます。
 
 ```onion
 record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
-  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
-  example { Pt::parse("3,4") == new Pt(3, 4) }
-}
-
-record User(name: String, age: Int) derive!(Json) {
-  law jsonRoundtrip(u: User) { User::fromJson(User::toJson(u)) == u }
-  example { new User("ko", 3).name() == "ko" }
+public:
+  static def roundtrip(p: Pt): Boolean
+    ensures result
+    = Pt::parse(Pt::format(p)) == p
+  static def parsesThreeFour(): Boolean
+    ensures result
+    = Pt::parse("3,4") == new Pt(3, 4)
 }
 ```
 
-**`example { boolExpr }`** — 具体的なアサーション。コンパイラは `boolExpr` を評価し、
-`true` を要求します。`false` の場合、**E0065** でコンパイルが失敗し、`false` を返した
-式を示すメッセージが表示されます。
+**引数なし** — 具体的な主張。コンパイラは評価して `true` を要求します。`false` か例外なら、
+**E0113** でコンパイルに失敗します。
 
-**`law name(p: T) { boolExpr }`** — 性質。コンパイラはパラメータ `p` のサンプル値のセット
-（境界値、負数、ランダムケースをカバー）を生成し、それぞれで `boolExpr` をチェックします。
-サンプルのいずれかが law を反証した場合、**E0064** でコンパイルが失敗し、
-反例を含むレポートが表示されます。パラメータは `derive!` と同じスカラー型
-（`String`、`Int`、`Long`、`Double`、`Float`、`Boolean`、`Short`、`Byte`）または
- record 型そのものにできます。
+**引数あり** — 性質。コンパイラは各引数のサンプル値（境界値、負数、ランダム）を生成し、述語を
+実行します。偽になるサンプルがあれば **E0113** で失敗し、反例と、それを再現する
+`--contract-seed` / `--contract-samples` を報告します。引数は `derive!` が扱うスカラー型
+（`String`、`Int`、`Long`、`Double`、`Float`、`Boolean`、`Short`、`Byte`）か、その record 自身の
+型にできます。サンプルを作れない引数の型も E0113 で、黙って読み飛ばしません。
 
-複数の `law` と `example` 節を1つの record に任意の順序で記述できます。これらは
-`from re"..."` や `derive!(...)` と自由に共存します。
+述語の印は `ensures result` そのものだけです。`ensures result == (x > 0)` のような別の
+事後条件を持つ `Boolean` の関数は、関数を説明するもので、実行されません。
+
+複数文の本体は最後に `return` を置きます。式の本体は `= expr` です。
 
 ```onion
 record R(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json) {
-  law textRoundtrip(r: R) { R::parse(R::format(r)) == r }
-  law jsonRoundtrip(r: R) { R::fromJson(R::toJson(r)) == r }
-  example { R::parse("0,0") == new R(0, 0) }
+public:
+  static def textRoundtrip(r: R): Boolean
+    ensures result
+    = R::parse(R::format(r)) == r
+  static def jsonRoundtrip(r: R): Boolean
+    ensures result
+    = R::fromJson(R::toJson(r)) == r
 }
 ```
 
-`law` / `example` の目的は、仕様 — 単なるドキュメントではなく、機械検証された
-契約 — を言語そのものの中に持ち込むことです。上記の `parse∘format == id` という
-不変条件は、すべてのコンパイル時にチェックされるため、ラウンドトリップを破壊する
-文法変更は即座にビルドを失敗させます。
+目的は、仕様 — ドキュメントではなく機械検証される契約 — を言語の内側に持ち込むことです。
+上の `parse∘format == id` の性質はコンパイルのたびに検査されるので、文法の変更で往復が壊れると、
+ビルドがすぐに失敗します。
 
 ### Enums
 

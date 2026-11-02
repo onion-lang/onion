@@ -86,8 +86,12 @@ public:
   def succeeded(): Boolean = status() == JobStatus::Success
   def failed(): Boolean    = status() == JobStatus::Failed
 }
-  example { new JobRun("j", new Timestamp(2024,1,1,0,0), JobStatus::Success, 10).succeeded() }
-  example { !new JobRun("j", new Timestamp(2024,1,1,0,0), JobStatus::Failed, 5).succeeded() }
+def example_1(): Boolean
+  ensures result
+  = new JobRun("j", new Timestamp(2024,1,1,0,0), JobStatus::Success, 10).succeeded()
+def example_2(): Boolean
+  ensures result
+  = !new JobRun("j", new Timestamp(2024,1,1,0,0), JobStatus::Failed, 5).succeeded()
 
 // ─── ScheduledJob ────────────────────────────────────────────────────────────
 

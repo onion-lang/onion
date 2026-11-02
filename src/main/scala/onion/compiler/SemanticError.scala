@@ -39,7 +39,7 @@ package onion.compiler
  *   - CYCLIC_INHERITANCE, ILLEGAL_INHERITANCE, INTERFACE_REQUIRED
  *   - UNIMPLEMENTED_ABSTRACT_METHOD, ABSTRACT_CLASS_INSTANTIATION, FINAL_METHOD_OVERRIDE
  *   - OVERRIDE_TARGET_NOT_FOUND, ABSTRACT_METHOD_WITH_BODY, OVERRIDE_RETURN_TYPE_MISMATCH
- *   (E0017, E0024, and E0056 are retired codes, kept unassigned rather than reused.)
+ *   (E0017, E0024, E0056, E0064, E0065, E0074, E0075, and E0080 are retired codes, kept unassigned rather than reused.)
  *
  * '''Call and Value-Use Errors (E0019-E0020, E0040-E0041, E0071, E0091-E0092)'''
  *   - ILLEGAL_METHOD_CALL, CANNOT_RETURN_VALUE, CANNOT_CALL_METHOD_ON_PRIMITIVE
@@ -74,12 +74,9 @@ package onion.compiler
  *   - RECORD_FROM_COMPONENT_UNSUPPORTED, RECORD_DERIVE_COMPONENT_UNSUPPORTED
  *   - RECORD_DERIVE_UNKNOWN_MARKER, DUPLICATE_RECORD_COMPONENT
  *
- * '''Law and Example Errors (E0064-E0065, E0074-E0075)'''
- *   - LAW_VIOLATION, EXAMPLE_FAILED, LAW_PARAMETER_NOT_GENERATABLE, LAW_CLASS_NOT_LOADABLE
- *
  * '''Shape and Tool Errors (E0076-E0082, E0093-E0095)'''
  *   - SHAPE_FORMAT_UNKNOWN, TOOL_UNDECLARED_EFFECT, TOOL_UNUSED_CAPABILITY
- *   - TOOL_BAD_CAPABILITY, SHAPE_INSTANCE_WITHOUT_LAW, TOOL_PARAMETER_NOT_CLI_CONVERTIBLE
+ *   - TOOL_BAD_CAPABILITY, TOOL_PARAMETER_NOT_CLI_CONVERTIBLE
  *   - DUPLICATE_TOOL_NAME, CLI_FLAG_SPELLING_COLLISION, MAIN_PARAMETER_NOT_CLI_CONVERTIBLE
  *   - MAIN_PARAMETER_MISPLACED_ARRAY
  *
@@ -185,8 +182,6 @@ object SemanticError {
   case object RECORD_FROM_COMPONENT_UNSUPPORTED extends SemanticError(61)
   case object RECORD_DERIVE_COMPONENT_UNSUPPORTED extends SemanticError(62)
   case object RECORD_DERIVE_UNKNOWN_MARKER extends SemanticError(63)
-  case object LAW_VIOLATION extends SemanticError(64)
-  case object EXAMPLE_FAILED extends SemanticError(65)
   case object RAW_TYPE_NOT_ALLOWED extends SemanticError(66)
   case object MISSING_RETURN extends SemanticError(67)
   case object OVERRIDE_TARGET_NOT_FOUND extends SemanticError(68)
@@ -195,13 +190,10 @@ object SemanticError {
   case object STATIC_CALL_ON_INSTANCE extends SemanticError(71)
   case object ABSTRACT_METHOD_WITH_BODY extends SemanticError(72)
   case object MAP_NOT_DIRECTLY_ITERABLE extends SemanticError(73)
-  case object LAW_PARAMETER_NOT_GENERATABLE extends SemanticError(74)
-  case object LAW_CLASS_NOT_LOADABLE extends SemanticError(75)
   case object SHAPE_FORMAT_UNKNOWN extends SemanticError(76)
   case object TOOL_UNDECLARED_EFFECT extends SemanticError(77)
   case object TOOL_UNUSED_CAPABILITY extends SemanticError(78)
   case object TOOL_BAD_CAPABILITY extends SemanticError(79)
-  case object SHAPE_INSTANCE_WITHOUT_LAW extends SemanticError(80)
   case object TOOL_PARAMETER_NOT_CLI_CONVERTIBLE extends SemanticError(81)
   case object DUPLICATE_TOOL_NAME extends SemanticError(82)
   case object UNREACHABLE_CATCH_CLAUSE extends SemanticError(83)

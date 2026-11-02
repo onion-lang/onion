@@ -31,7 +31,10 @@ private[compiler] final class MethodBodySupport(
     method.mayContainTry = bodyContext.tryCount != triesBefore
     checkMissingReturn(method.returnType, translated, method.name, block)
     // Postconditions are typed in the same context once the body is, with `result` bound.
-    if (ensures.nonEmpty) method.postconditions = typePostconditions(method, ensures, context)
+    if (ensures.nonEmpty) {
+      method.postconditions = typePostconditions(method, ensures, context)
+      method.assertsResult = ensures.exists { case AST.Id(_, "result") => true; case _ => false }
+    }
     val translatedBlock = addReturnNode(withPrologue(context, translated), method.returnType)
     method.setBlock(translatedBlock)
     method.setFrame(context.getContextFrame)
@@ -55,7 +58,10 @@ private[compiler] final class MethodBodySupport(
     context.setMethod(method)
     bindParameters(context, args, method.arguments, null)
     if (requires.nonEmpty) method.preconditions = typeContractClauses(requires, context, ContractScope.Pre)
-    if (ensures.nonEmpty) method.postconditions = typePostconditions(method, ensures, context)
+    if (ensures.nonEmpty) {
+      method.postconditions = typePostconditions(method, ensures, context)
+      method.assertsResult = ensures.exists { case AST.Id(_, "result") => true; case _ => false }
+    }
   }
 
   /**

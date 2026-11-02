@@ -20,8 +20,15 @@ enum TxKind {
 // ── Transaction record ────────────────────────────────────────────────────────
 
 record Tx(seq: Int, kind: TxKind, note: String) {
-  example { new Tx(1, new Deposit(500), "init").seq() == 1 }
-  example { new Tx(2, new Withdrawal(100), "atm").note() == "atm" }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Tx(1, new Deposit(500), "init").seq() == 1
+  static def example_2(): Boolean
+    ensures result
+    = new Tx(2, new Withdrawal(100), "atm").note() == "atm"
+
+
 }
 
 // ── Int extension for currency display ───────────────────────────────────────

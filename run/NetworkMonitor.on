@@ -61,10 +61,18 @@ extension String {
 
 record LogEntry(ip: String, method: String, path: String,
                 status: Int, bytes: Int, ms: Int)
-  from re"(\S+) (\w+) (\S+) (\d+) (\d+) (\d+)"
-  example { new LogEntry("1.2.3.4", "GET", "/", 200, 512, 45).status() == 200 }
-  example { LogEntry::parse("10.0.0.1 GET /api/users 200 1024 85") != null }
-  example { LogEntry::parse("bad line") == null }
+  from re"(\S+) (\w+) (\S+) (\d+) (\d+) (\d+)" {
+public:
+  static def example_1(): Boolean
+    ensures result
+    = new LogEntry("1.2.3.4", "GET", "/", 200, 512, 45).status() == 200
+  static def example_2(): Boolean
+    ensures result
+    = LogEntry::parse("10.0.0.1 GET /api/users 200 1024 85") != null
+  static def example_3(): Boolean
+    ensures result
+    = LogEntry::parse("bad line") == null
+}
 
 // ─── Method: data-carrying enum ───────────────────────────────────────────────
 

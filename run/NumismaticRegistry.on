@@ -99,16 +99,18 @@ record Coin(
   weightGrams: Double,
   faceValue:   Double
 ) {
-  example {
-    new Coin("T1", 1921, "Test", MetalComposition::Silver,
+
+
+public:
+  static def example_1(): Boolean
+    ensures result
+    = new Coin("T1", 1921, "Test", MetalComposition::Silver,
       new Circulation("USA", "1 Dollar"), Condition::Fine, 26.73, 1.0).year() == 1921
-  }
-  example {
-    new Coin("T2", 1924, "Test2", MetalComposition::Gold,
+  static def example_2(): Boolean
+    ensures result
+    = new Coin("T2", 1924, "Test2", MetalComposition::Gold,
       new Circulation("USA", "20 Dollars"), Condition::ExtrFine, 33.44, 20.0)
         .isCollectorsGrade()
-  }
-public:
   def decade(): String {
     val d: Int = (year() / 10) * 10
     return d + "s"
@@ -140,14 +142,15 @@ record CollectionEntry(
   purchaseYear:  Int,
   currentValue:  Double
 ) {
-  example {
-    new CollectionEntry(
+
+public:
+  static def example_3(): Boolean
+    ensures result
+    = new CollectionEntry(
       new Coin("T3", 1921, "Morgan", MetalComposition::Silver,
         new Circulation("USA", "1 Dollar"), Condition::VeryFine, 26.73, 1.0),
       35.0, 2008, 125.0
     ).profit() == 90.0
-  }
-public:
   def profit(): Double    = currentValue() - purchasePrice()
   def roi(): Double       =
     if purchasePrice() > 0.0 { profit() / purchasePrice() * 100.0 } else { 0.0 }

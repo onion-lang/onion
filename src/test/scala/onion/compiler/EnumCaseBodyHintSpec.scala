@@ -49,7 +49,7 @@ class EnumCaseBodyHintSpec extends AnyFunSpec with Diagrams {
       val msgs = errorsOf(
         """enum Shape {
           |  case Circle(radius: Double) {
-          |    law positive(r: Double) { r > 0.0 }
+          |    static def positive(r: Double): Boolean = r > 0.0
           |  }
           |  case Square(side: Double)
           |}
@@ -185,7 +185,10 @@ class EnumCaseBodyHintSpec extends AnyFunSpec with Diagrams {
     val enumAndRecord =
       """enum Msg { case Ping(id: Int); case Pong(id: Int) }
         |record Pang(id: Int) derive!(Json) conforms Msg {
-        |  example { new Pang(3).id() == 3 }
+        |public:
+        |  static def idIsKept(): Boolean
+        |    ensures result
+        |    = new Pang(3).id() == 3
         |}
         |""".stripMargin
 
@@ -204,14 +207,17 @@ class EnumCaseBodyHintSpec extends AnyFunSpec with Diagrams {
       assert(result == Right(()), result.left.getOrElse(""))
     }
 
-    it("runs its `example` clause") {
+    it("runs its closed predicate") {
       val msgs = errorsOf(
         """enum Msg { case Ping(id: Int) }
           |record Pang(id: Int) conforms Msg {
-          |  example { new Pang(3).id() == 4 }
+          |public:
+          |  static def idIsFour(): Boolean
+          |    ensures result
+          |    = new Pang(3).id() == 4
           |}
           |""".stripMargin)
-      assert(msgs.contains("E0065"), msgs)
+      assert(msgs.contains("E0113"), msgs)
     }
   }
 }

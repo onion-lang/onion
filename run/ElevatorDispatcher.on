@@ -34,10 +34,21 @@ extension String {
 // Format: HH:MM CALL floor=N dir=UP|DOWN
 
 record CallLogEntry(time: String, floor: Int, dir: String)
-  from re"(\d+:\d+) CALL floor=(\d+) dir=(UP|DOWN)"
-  example { new CallLogEntry("08:00", 5, "UP").floor() == 5 }
-  example { CallLogEntry::parse("08:15 CALL floor=3 dir=DOWN") != null }
-  example { CallLogEntry::parse("garbage") == null }
+  from re"(\d+:\d+) CALL floor=(\d+) dir=(UP|DOWN)" {
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new CallLogEntry("08:00", 5, "UP").floor() == 5
+  static def example_2(): Boolean
+    ensures result
+    = CallLogEntry::parse("08:15 CALL floor=3 dir=DOWN") != null
+  static def example_3(): Boolean
+    ensures result
+    = CallLogEntry::parse("garbage") == null
+
+
+
+}
 
 // ─── Direction: plain enum ───────────────────────────────────────────────────
 

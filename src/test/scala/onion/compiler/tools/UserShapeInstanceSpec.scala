@@ -35,15 +35,17 @@ class UserShapeInstanceSpec extends AbstractShellSpec {
       |  }
       |  def describe(): String = "fixed-width P"
       |}
-      |example l1 {
+      |def l1(): Boolean
+      |  ensures result
+      |{
       |  val s = new FW()
       |  val v = new P("KOTA", 42)
-      |  s.parse(s.print(v)).get() == v
+      |  return s.parse(s.print(v)).get() == v
       |}
       |""".stripMargin
 
   describe("a user-written fixed-width shape") {
-    it("parses, prints, and satisfies its machine-checked L1 example") {
+    it("parses, prints, and satisfies its machine-checked L1 predicate") {
       val r = shell.run(fixedWidth +
         """class Test {
           |public:
@@ -82,107 +84,6 @@ class UserShapeInstanceSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "None", Array())
       assert(Shell.Success("amount/Int") == r, r.toString)
-    }
-  }
-
-  describe("the law gate (E0080)") {
-    it("rejects a Shape instance whose file asserts no law") {
-      val noLaw = fixedWidth.replace(
-        """example l1 {
-          |  val s = new FW()
-          |  val v = new P("KOTA", 42)
-          |  s.parse(s.print(v)).get() == v
-          |}
-          |""".stripMargin, "")
-      val r = shell.run(noLaw +
-        """class Test {
-          |public:
-          |  static def main(args: String[]): Int { return 0 }
-          |}
-          |""".stripMargin, "None", Array())
-      assert(r.isInstanceOf[Shell.Failure], s"expected E0080 failure, got $r")
-    }
-
-    it("a record `law` clause in the same file satisfies the gate too") {
-      val viaRecordLaw = fixedWidth.replace(
-        """example l1 {
-          |  val s = new FW()
-          |  val v = new P("KOTA", 42)
-          |  s.parse(s.print(v)).get() == v
-          |}
-          |""".stripMargin, "")
-        .replace("record P(name: String, amount: Int)",
-          """record P(name: String, amount: Int) {
-            |  example nonEmpty { new FW().print(new P("A", 1)).length() == 16 }
-            |}""".stripMargin)
-      val r = shell.run(viaRecordLaw +
-        """class Test {
-          |public:
-          |  static def main(args: String[]): Int { return 0 }
-          |}
-          |""".stripMargin, "None", Array())
-      assert(Shell.Success(0) == r, r.toString)
-    }
-
-    it("an example that never touches this shape does not satisfy the gate (#2228)") {
-      val unrelatedOnly = fixedWidth.replace(
-        """example l1 {
-          |  val s = new FW()
-          |  val v = new P("KOTA", 42)
-          |  s.parse(s.print(v)).get() == v
-          |}
-          |""".stripMargin,
-        """example unrelatedButTrue { 1 + 1 == 2 }
-          |""".stripMargin)
-      val r = shell.run(unrelatedOnly +
-        """class Test {
-          |public:
-          |  static def main(args: String[]): Int { return 0 }
-          |}
-          |""".stripMargin, "None", Array())
-      assert(r.isInstanceOf[Shell.Failure], s"expected E0080 failure, got $r")
-    }
-
-    it("does not fire on interfaces or on classes unrelated to Shape") {
-      val r = shell.run(
-        """interface Marker { def m(): Int }
-          |class Plain conforms Marker {
-          |public:
-          |  def this {}
-          |  def m(): Int = 1
-          |}
-          |class Test {
-          |public:
-          |  static def main(args: String[]): Int { return new Plain().m() }
-          |}
-          |""".stripMargin, "None", Array())
-      assert(Shell.Success(1) == r, r.toString)
-    }
-  }
-
-  describe("top-level examples (the vehicle for user-shape laws)") {
-    it("a failing top-level example stops the build with E0065") {
-      val r = shell.run(
-        """example wrong { 2 + 2 == 5 }
-          |class Test {
-          |public:
-          |  static def main(args: String[]): Int { return 0 }
-          |}
-          |""".stripMargin, "None", Array())
-      assert(r.isInstanceOf[Shell.Failure], s"expected E0065 failure, got $r")
-    }
-
-    it("`example` stays an ordinary identifier") {
-      val r = shell.run(
-        """class Test {
-          |public:
-          |  static def main(args: String[]): Int {
-          |    val example = 21
-          |    return example * 2
-          |  }
-          |}
-          |""".stripMargin, "None", Array())
-      assert(Shell.Success(42) == r, r.toString)
     }
   }
 }

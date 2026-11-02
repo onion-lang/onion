@@ -759,35 +759,7 @@ record R(a: Int, a: Int)   // E0086: レコード R の成分 a が重複して�
 
 対処: どちらかの成分名を変更してください。
 
-### `E0064` — law の反証
 
-`law name(p: T) { boolExpr }` 句は、ビルド時に `p` の生成されたサンプル値に対して
-チェックされます。式を false にするサンプルは反例であり、再現できるように
-（シードやサンプル数などの）生成設定とともに報告されます。
-
-```onion
-record Pt(x: Int, y: Int) {
-  law wrong(p: Pt) { p.x() == p.y() }   // E0064: 反証された（例: Pt(0, 1)）
-}
-```
-
-対処: あらゆる生成サンプルに対して成り立つように law（またはチェック対象のコード）を
-修正するか、一般には成り立たない law であれば削除してください。
-
-### `E0065` — example の失敗
-
-トップレベルまたはレコードに付随する `example { boolExpr }` 句が、ビルド時に
-`false` と評価された（または例外をスローした）ケースです。`law` と異なり、
-`example` は生成されたサンプル群ではなく、1つの固定ケースをチェックします。
-
-```onion
-record R(x: Int) {
-  example { new R(1).x() == 2 }   // E0065: false と評価された
-}
-```
-
-対処: example が期待する値を修正するか、その example が検証しているコード側を
-修正してください。
 
 ### `E0073` — Map は直接反復できない
 
@@ -805,34 +777,7 @@ foreach (k, v) in m { println(k + "=" + v) }
 foreach k: String in m.keySet() { println(k) }
 ```
 
-### `E0074` — law の引数型からサンプルを生成できない
 
-`law` はビルド時に生成したサンプル値で検査されるため、すべての引数型に生成器が必要です。
-生成できる型は `String`, `Int`, `Long`, `Double`, `Float`, `Boolean`, `Short`, `Byte` と、
-全成分が生成可能なレコードです。
-
-```onion
-record Dummy(v: Int) {
-  law overArray(xs: Int[]) { xs != null }   // E0074: Int[] の生成器がない
-}
-```
-
-それ以外——配列、`Map`、enum、インターフェース、コンストラクタが複数あるクラス——には
-生成器がありません。以前はこうした law が黙って読み飛ばされ、**成立した law と区別が
-つきませんでした**。実行できない検査が「通った検査」に見えてはいけません。
-引数の型を変えるか、law を削除してください。
-
-```onion
-record Pt(x: Int, y: Int) {
-  law reflexive(p: Pt) { p == p }          // OK: flat なレコードは生成可能
-}
-```
-
-### `E0075` — law を持つクラスをロードできなかった
-
-law はコンパイル済みクラスに対して実行されます。`law` / `example` 句を持つクラスを
-ロードできなかった場合、その検査は1つも実行されていません。`E0074` と同じ理由で、
-黙って見逃さずに報告します。
 
 ### `E0076` — 未知の shape フォーマット
 
@@ -848,40 +793,6 @@ record Pt(x: Int, y: Int) {
 
 インラインのパターンを書く場合は `shape name = re"..."` としてください。
 
-### `E0080` — 自作の `Shape` に law がない
-
-`onion.Shape[T]` を（`shape`/`from re"..."` による導出ではなく）直接実装した具象クラスは、
-そのファイル内で機械検査される `law` か `example` を最低1つ、しかも実際にそのクラスに
-触れるもの——構築する、メンバーを呼ぶ/読む、型テストする——を主張しなければなりません。
-導出された shape は round-trip が構造的に保証されますが、手書きのものは**主張するだけ**
-なので、その主張を検査する必要があります。そのクラスに一度も触れない `law`/`example` は、
-そのクラスについて何も検査していません。
-
-```onion
-class FixedWidth conforms Shape[Person] {
-public:
-  def this {}
-  def parse(text: String, origin: Origin): Outcome[Person] { ... }
-  def canPrint(): Boolean = true
-  def print(v: Person): String { ... }
-  def describe(): String = "fixed-width Person"
-}
-// E0080: FixedWidth に触れる law を主張している箇所がこのファイルにない
-```
-
-対処: `FixedWidth` を構築または呼び出すトップレベルの `example`（またはクラス自身の
-`law`）を追加してください——代表的な主張は round-trip `s.parse(s.print(v)).get() == v` です。
-
-```onion
-example fixedWidthL1 {
-  val s = new FixedWidth()
-  val v = new Person("KOTA", 42)
-  s.parse(s.print(v)).get() == v
-}
-```
-
-パース専用の shape（`canPrint(): false`）は、読み取り方向にある law を代わりに主張します。
-主張が偽であれば、他の `example` と同様に `E0065` になります。
 
 ## Capability エラー
 
@@ -2044,8 +1955,6 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0061` | record component … has type …, which cannot be derived from a `…` clause |
 | `E0062` | record component … has type …, which derive! cannot serialize |
 | `E0063` | unknown derive! marker `…` |
-| `E0064` | law violation |
-| `E0065` | example failed |
 | `E0066` | raw type … is not allowed; supply type arguments (e.g |
 | `E0067` | method … may reach the end of its body without returning a … |
 | `E0068` | method …(…) is marked override but does not override any method in a base class or interface of … |
@@ -2054,13 +1963,10 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0071` | … is a variable, not a type |
 | `E0072` | abstract method … cannot have a body (the body would be silently ignored) |
 | `E0073` | a Map (…) cannot be iterated directly by foreach |
-| `E0074` | law parameter not generatable |
-| `E0075` | law class not loadable |
 | `E0076` | unknown shape format `…` |
 | `E0077` | tool `…` performs `…` here (calling …) but does not declare it |
 | `E0078` | tool `…` declares capability `…` but nothing in its body can perform it |
 | `E0079` | tool `…` has an invalid capability `…`: … |
-| `E0080` | class `…` implements onion.Shape but nothing in its file asserts a law that exercises it |
 | `E0081` | tool parameter not cli convertible |
 | `E0082` | duplicate tool name `…` |
 | `E0083` | this catch clause for … can never be reached: an earlier catch clause for … already handles it |

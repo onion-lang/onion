@@ -47,8 +47,12 @@ public:
   def gravityPoints(eff: Double): Double = ftype().ppg() * lbs() * eff / 100.0
   def mcu(gals: Double): Double          = ftype().lovibond() * lbs() / gals
 }
-example { new Fermentable("Pale", FermentableType::PaleMalt, 10.0).gravityPoints(75.0) == 270.0 }
-example { new Fermentable("Crystal60", FermentableType::Crystal60, 0.5).gravityPoints(100.0) == 11.0 }
+def example_1(): Boolean
+  ensures result
+  = new Fermentable("Pale", FermentableType::PaleMalt, 10.0).gravityPoints(75.0) == 270.0
+def example_2(): Boolean
+  ensures result
+  = new Fermentable("Crystal60", FermentableType::Crystal60, 0.5).gravityPoints(100.0) == 11.0
 
 // ── Hop addition ──────────────────────────────────────────────────────────────
 record Hop(name: String, alphaPct: Double, oz: Double, use: HopUse)

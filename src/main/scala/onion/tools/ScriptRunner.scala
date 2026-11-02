@@ -274,9 +274,8 @@ class ScriptRunner {
          |  --profile-output <target>   Send profile to stderr, stdout, or a file path
          |  --warn <off|on|error>       Set warning level
          |  --Wno <codes>               Suppress warnings (e.g., W0001,unused-parameter)
-         |  --no-check-laws             Do not execute record `law`/`example` clauses
-         |  --law-seed <n>              RNG seed for law sample generation
-         |  --law-samples <n>           Number of samples generated per law parameter
+         |  --contract-seed <n>         RNG seed for sampling a predicate with parameters
+         |  --contract-samples <n>      Number of samples generated per predicate parameter
          |  --effects                   Print each method's inferred effect set to stderr
          |  --contracts <off|check>
          |                              Accept contract clauses (requires/ensures/invariant/history) and check them statically; default: off

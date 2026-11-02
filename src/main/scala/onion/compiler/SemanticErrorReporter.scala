@@ -1628,10 +1628,6 @@ object SemanticErrorReporter {
       "error.semantic.unreachableCatchClause",
       Seq(items => typeName(items(0)), items => typeName(items(1)))
     ),
-    SemanticError.SHAPE_INSTANCE_WITHOUT_LAW -> ErrorDef(
-      "error.semantic.shapeInstanceWithoutLaw",
-      Seq(items => asString(items(0)))
-    ),
     SemanticError.STATIC_METHOD_WITHOUT_BODY -> ErrorDef(
       "error.semantic.staticMethodWithoutBody",
       Seq(items => asString(items(0)))

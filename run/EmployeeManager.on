@@ -53,8 +53,12 @@ public:
 }
 
 // Laws that are structurally guaranteed — testing Onion's law system.
-example salaryTotalIsBaseAndBonus { new Salary(500, 100).total() == 600 }
-example salaryAnnualIsTwelveMonths { new Salary(1000, 0).annual() == 12000 }
+def salaryTotalIsBaseAndBonus(): Boolean
+  ensures result
+  = new Salary(500, 100).total() == 600
+def salaryAnnualIsTwelveMonths(): Boolean
+  ensures result
+  = new Salary(1000, 0).annual() == 12000
 
 record DeptSummary(dept: String, headcount: Int, avgBase: Int, topScorer: String)
 

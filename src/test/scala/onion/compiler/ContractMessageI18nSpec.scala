@@ -19,7 +19,7 @@ class ContractMessageI18nSpec extends AnyFunSpec {
   private val japanese = Locale.getDefault.getLanguage == "ja"
 
   private def messages(source: String, code: String): String = {
-    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, checkLaws = false, contracts = ContractMode.Check)
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, runContracts = false, contracts = ContractMode.Check)
     new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(source), "C.on"))) match {
       case CompilationOutcome.Failure(errs) => errs.filter(_.errorCode.contains(code)).map(_.message).mkString("\n")
       case _                                => ""

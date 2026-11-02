@@ -19,7 +19,7 @@ import org.scalatest.funspec.AnyFunSpec
 class DiagnosticSpanSpec extends AnyFunSpec {
 
   private def errors(source: String): Seq[CompileError] =
-    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, checkLaws = false)
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, runContracts = false)
     new OnionCompiler(config)
       .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "Span.on")))
       .allErrors.toSeq

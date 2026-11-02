@@ -52,8 +52,12 @@ public:
   def weightedBits(): Int = code().length() * freq()
 }
 
-example { new CodeEntry("a", "10", 5).weightedBits() == 10 }
-example { new CodeEntry("b", "01", 3).weightedBits() == 6 }
+def example_1(): Boolean
+  ensures result
+  = new CodeEntry("a", "10", 5).weightedBits() == 10
+def example_2(): Boolean
+  ensures result
+  = new CodeEntry("b", "01", 3).weightedBits() == 6
 
 // ── Extension String ──────────────────────────────────────────────────────────
 

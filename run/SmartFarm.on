@@ -59,8 +59,13 @@ public:
 
 // Raw log line: "sensorId value timestamp" — parsed via regex
 record RawReading(sensorId: String, value: Double, ts: Long)
-  from re"(\S+) ([\d.]+) (\d+)"
-  example { RawReading::parse("zone1-T 22.5 1700000000") != null }
+  from re"(\S+) ([\d.]+) (\d+)" {
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = RawReading::parse("zone1-T 22.5 1700000000") != null
+
+}
 
 record Reading(sensorId: String, kind: SensorKind, value: Double, ts: Long) {
 public:

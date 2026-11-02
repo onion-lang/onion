@@ -150,9 +150,12 @@ record Action(owner: String, task: String) {
 
 record Summary(title: String, decisions: List[String], actions: List[Action], lead: Action?) {
   shape doc = json
-  example nested {
+public:
+  static def nested(): Boolean
+    ensures result
+  {
     val v = new Summary("sync", ["ship"], [new Action("sato", "review")], null)
-    Summary::doc().parse(Summary::doc().print(v)).get() == v
+    return Summary::doc().parse(Summary::doc().print(v)).get() == v
   }
 }
 ```
@@ -253,15 +256,18 @@ spelling of every value. `printLossless` reassembles the two:
 ```onion
 record Server(host: String, port: Int, debug: Boolean) {
   shape cfg = config
-  example l2 {
+public:
+  static def l2(): Boolean
+    ensures result
+  {
     val t = "# prod\nhost = h\nport = 007\ndebug = true\n"
     val r = Server::cfg().parseLossless(t).get()
-    Server::cfg().printLossless(r.value(), r.residue()) == t
+    return Server::cfg().printLossless(r.value(), r.residue()) == t
   }
 }
 ```
 
-The `example` clause is the point: L2 is not a comment, it is machine-checked at build
+The `ensures result` predicate is the point: L2 is not a comment, it is machine-checked at build
 time, and a shape that stopped satisfying it would stop compiling. Editing goes through
 the same pair — change one component and only its value slot re-renders; an *unchanged*
 component keeps its original spelling, so `007` stays `007` unless the program actually
@@ -303,16 +309,20 @@ runs this as a tool, so `--plan` shows the read and the write before anything ha
 
 ## Checking a shape at build time
 
-`law` runs at compile time, so the round-trip property can be machine-checked:
+A `static def` that returns `Boolean` and states `ensures result` runs at compile time, so the
+round-trip property can be machine-checked. With parameters it is sampled:
 
 ```onion
 record Pt(x: Int, y: Int) {
   shape text = re"(-?\d+),(-?\d+)"
-  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+public:
+  static def roundtrip(p: Pt): Boolean
+    ensures result
+    = Pt::text().parse(Pt::text().print(p)).get() == p
 }
 ```
 
-A law whose parameter type cannot be sampled is an error (E0074), not a silent skip — a
+A predicate whose parameter type cannot be sampled is an error (E0113), not a silent skip — a
 check that does not run must not look like one that passed.
 
 ## Writing your own shape
@@ -331,22 +341,25 @@ public:
   def describe(): String = "fixed-width Person"
 }
 
-example fixedWidthL1 {
+def fixedWidthL1(): Boolean
+  ensures result
+{
   val s = new FixedWidth()
   val v = new Person("KOTA", 42)
-  s.parse(s.print(v)).get() == v
+  return s.parse(s.print(v)).get() == v
 }
 ```
 
 The combinators — `eachLine`, `sepBy`, `xmap`, `orElse` — come for free, and failures
 speak the same `Outcome`/`Defect` vocabulary as every shipped shape.
 
-The `example` is not optional. A derived shape's laws are guaranteed by construction;
+The predicate is not optional. A derived shape's laws are guaranteed by construction;
 a user-written one *asserts* them instead, so a concrete class implementing
-`onion.Shape` compiles only when its file states at least one machine-checked `law` or
-`example` (**E0080** otherwise). The round-trip `s.parse(s.print(v)).get() == v` is
-the canonical claim; top-level `example [name] { expr }` is the vehicle, and it runs
-at build time like every other law — a false claim is E0065. A parse-only shape says
+`onion.Shape` compiles only when its file states at least one machine-checked predicate
+(`ensures result`) that uses it (**E0080** otherwise). The round-trip
+`s.parse(s.print(v)).get() == v` is the canonical claim; a top-level
+`def name(): Boolean ensures result` is the vehicle, and it runs at build time — a false claim
+is E0113. A parse-only shape says
 so through `canPrint(): false` and asserts whatever laws its reading direction has.
 
 ## When to reach for `Shapes` directly

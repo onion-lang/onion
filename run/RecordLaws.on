@@ -4,8 +4,15 @@
 // before the program ever runs, so a passing build is a machine-checked guarantee.
 
 record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
-  law roundtrip(p: Point) { Point::parse(Point::format(p)) == p }
-  example { Point::parse("3,4") == new Point(3, 4) }
+  public:
+  static def roundtrip(p: Point): Boolean
+    ensures result
+    = Point::parse(Point::format(p)) == p
+  static def example_1(): Boolean
+    ensures result
+    = Point::parse("3,4") == new Point(3, 4)
+
+
 }
 
 class RecordLaws {

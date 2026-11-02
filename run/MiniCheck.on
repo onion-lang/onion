@@ -37,8 +37,15 @@ public:
 // ── TestResult record ─────────────────────────────────────────────────────────
 
 record TestResult(name: String, outcome: TestOutcome) {
-  example passIsOk { new TestResult("p", new Pass(10)).outcome().ok() }
-  example failBad  { !new TestResult("f", new Fail("x", 1)).outcome().ok() }
+  public:
+  static def passIsOk(): Boolean
+    ensures result
+    = new TestResult("p", new Pass(10)).outcome().ok()
+  static def failBad(): Boolean
+    ensures result
+    = !new TestResult("f", new Fail("x", 1)).outcome().ok()
+
+
 }
 
 // ── Extension methods ─────────────────────────────────────────────────────────

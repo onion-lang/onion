@@ -3,9 +3,17 @@
 //            collection pipelines, nullable types, extension methods.
 
 record IpAddress(a: Int, b: Int, c: Int, d: Int)
-  from re"(\d+)\.(\d+)\.(\d+)\.(\d+)"
-  example { IpAddress::parse("192.168.1.1") != null }
-  example { IpAddress::parse("not-an-ip")   == null }
+  from re"(\d+)\.(\d+)\.(\d+)\.(\d+)" {
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = IpAddress::parse("192.168.1.1") != null
+  static def example_2(): Boolean
+    ensures result
+    = IpAddress::parse("not-an-ip")   == null
+
+
+}
 
 extension IpAddress {
   def toLong(): Long {

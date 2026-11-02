@@ -76,8 +76,12 @@ public:
     "  • #{self.name().padRight(22)} #{self.grams().padLeft(4)}g   #{self.kcalTotal().kcal()}"
 }
 
-example { new Ingredient("Flour", 100, 364).kcalTotal() == 364 }
-example { new Ingredient("Sugar",  50, 387).kcalTotal() == 193 }
+def example_1(): Boolean
+  ensures result
+  = new Ingredient("Flour", 100, 364).kcalTotal() == 364
+def example_2(): Boolean
+  ensures result
+  = new Ingredient("Sugar",  50, 387).kcalTotal() == 193
 
 // ─── Recipe record ────────────────────────────────────────────────────────────
 

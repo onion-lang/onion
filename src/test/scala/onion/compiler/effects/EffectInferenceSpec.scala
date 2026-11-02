@@ -12,7 +12,7 @@ class EffectInferenceSpec extends AnyFunSpec {
   import Effect._
 
   private def infer(source: String): Map[String, Set[Effect]] = {
-    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, checkLaws = false)
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, runContracts = false)
     val result = new OnionCompiler(config)
       .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "Effects.on")))
     assert(!result.hasErrors, s"compile failed: ${result.allErrors.map(_.message).mkString("; ")}")

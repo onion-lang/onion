@@ -12,12 +12,24 @@ import {
 // ─── Core complex number record ───────────────────────────────────────────────
 
 record Complex(re: Double, im: Double) {
-  example { new Complex(1.0, 2.0).re() == 1.0 }
-  example { new Complex(0.0, 0.0).absSquared() == 0.0 }
-  example { new Complex(3.0, 4.0).abs() == 5.0 }
-  example { new Complex(1.0, 0.0).conjugate() == new Complex(1.0, 0.0) }
+
+
+
+
 
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new Complex(1.0, 2.0).re() == 1.0
+  static def example_2(): Boolean
+    ensures result
+    = new Complex(0.0, 0.0).absSquared() == 0.0
+  static def example_3(): Boolean
+    ensures result
+    = new Complex(3.0, 4.0).abs() == 5.0
+  static def example_4(): Boolean
+    ensures result
+    = new Complex(1.0, 0.0).conjugate() == new Complex(1.0, 0.0)
   def absSquared(): Double = re() * re() + im() * im()
   def abs(): Double = Math::sqrt(absSquared())
   def conjugate(): Complex = new Complex(re(), 0.0 - im())

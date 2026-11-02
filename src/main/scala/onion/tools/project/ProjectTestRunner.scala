@@ -122,8 +122,7 @@ private object SystemProjectTestBackend extends ProjectTestBackend:
       outputDirectory = workspace.classes.toString,
       maxErrorReports = 10,
       verbose = false,
-      warningLevel = WarningLevel.On,
-      checkLaws = true
+      warningLevel = WarningLevel.On
     )
     val input = StreamInputSource(
       () => InputStreamReader(ByteArrayInputStream(bytes), UTF_8),

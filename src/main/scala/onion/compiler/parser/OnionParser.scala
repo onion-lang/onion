@@ -754,7 +754,6 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     val img = image(1)
     if (img == "break" || img == "continue") return topLevelElement()
     if (k == K.ID && img == "tool" && kind(2) == K.ID && image(3) == "(") return toolDecl()
-    if (k == K.ID && img == "example" && (kind(2) == K.LBRACE || (kind(2) == K.ID && kind(3) == K.LBRACE))) return topLevelExample()
     if (k == K.K_EXTENSION) return extensionDecl()
     if (k == K.K_INSTANCE) return instanceDecl()
     val declStart = isModifierKind(k) || k == K.K_TYPE || k == K.K_CLASS || k == K.K_INTERFACE || k == K.K_TRAIT ||
@@ -904,13 +903,6 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     }
     val b = block()
     AST.FunctionDeclaration(p(t1), 0, c(t2), args, ty, b, Nil, Nil, anns.toList)
-  }
-
-  private def topLevelExample(): AST.TopLevelExample = {
-    val t = expect(K.ID)
-    val n = if (isId(kind(1))) id() else null
-    val b = block()
-    AST.topLevelExample(p(t), if (n == null) null else c(n), b)
   }
 
   private def capability(): String = {
@@ -1148,8 +1140,6 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
       while (accept(K.COMMA)) derives += c(id())
       expect(K.RPAREN)
     }
-    val laws = new ArrayBuffer[AST.LawClause]()
-    val examples = new ArrayBuffer[AST.ExampleClause]()
     val shapes = new ArrayBuffer[AST.ShapeClause]()
     val superTypes = conformsClause()
     val sections = new ArrayBuffer[AST.AccessSection]()
@@ -1162,19 +1152,6 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           sections += accessSection()
         } else if (typeClauseAhead()) {
           typeClause()
-        } else if (kind(1) == K.ID && image(1) == "law" && kind(2) == K.ID) {
-          next()
-          val lt = expect(K.ID)
-          expect(K.LPAREN)
-          val largs = argsList()
-          expect(K.RPAREN)
-          val lb = block()
-          laws += AST.LawClause(p(lt), c(lt), largs, lb)
-        } else if (kind(1) == K.ID && image(1) == "example" && (kind(2) == K.LBRACE || kind(2) == K.ID)) {
-          val et = expect(K.ID)
-          val enm = if (kind(1) == K.ID) expect(K.ID) else null
-          val eb = block()
-          examples += AST.exampleClause(p(et), if (enm == null) null else c(enm), eb)
         } else if (kind(1) == K.ID && image(1) == "shape" && kind(2) == K.ID) {
           next()
           val st = expect(K.ID)
@@ -1193,7 +1170,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     }
     accept(K.SEMI)
     AST.recordDeclarationWithContracts(p(t1), mset, c(t2), tparams, args, superTypes.toList, fromRaw, derives.toList,
-      laws.toList, examples.toList, sections.toList, shapes.toList, invariantClauses.toList, historyClauses.toList)
+      sections.toList, shapes.toList, invariantClauses.toList, historyClauses.toList)
   }
 
   private def interfaceDecl(mset: Int): AST.InterfaceDeclaration = {

@@ -411,6 +411,11 @@ object TypedAST {
     var invariants: Seq[Term] = Nil
     var histories: Seq[Term] = Nil
     /** The clauses as written, so a guard can type them again over its own frame (RFC #2557). */
+    /**
+     * The `history` guards `--contracts runtime` put in each guarded method, by (method name, clause
+     * text). A guard the solver proved is not needed at run time, and is taken out again (RFC #2557).
+     */
+    val historyGuards: scala.collection.mutable.Map[(String, String), IfStatement] = scala.collection.mutable.Map.empty
     var invariantSources: scala.collection.immutable.List[AST.Expression] = scala.collection.immutable.Nil
     var historySources: scala.collection.immutable.List[AST.Expression] = scala.collection.immutable.Nil
     private var staticInitializers_ = Array[TypedAST.ActionStatement]()

@@ -1287,8 +1287,9 @@ public:
 Only what the syntax settles is reported. Fix: remove the write, or weaken the history.
 
 A write counts wherever the method makes it: in a lambda it creates, and on another object of
-the class (`o.n = o.n - 1` with `o: Counter`). A write whose receiver's class the syntax does not
-give (`cs[0].n = 7`) gets the warning W0024 instead.
+the class or a subclass (`o.n = o.n - 1` with `o: Counter`, `o: Counter?`). A write whose
+receiver's class the syntax does not give (`cs[0].n = 7`, an untyped lambda parameter) gets the
+warning W0024 instead, at the write's line.
 
 ### `E0110` — an `invariant` or `history` on a mutable object
 
@@ -1988,7 +1989,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0019` | the result of an immutable builder method (`Http.Request.header`, ...) is discarded as a statement, so the call does nothing |
 | `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
 | `W0021` | a method can break a `history`: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
-| `W0024` | a method writes a field that a `history` names, and no check settled whether the history still holds: the field is not an `Int`, the solver does not model the method body, or the history is not of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`. Nothing guarantees the history there |
+| `W0024` | a method writes a field that a `history` names, and no check settled whether the history still holds: the field is not an `Int`, the solver does not model the method body, the write is in a lambda, on another object or through a receiver whose class is unknown, or the history is not of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`. Nothing guarantees the history there |
 
 ## Every diagnostic code
 

@@ -34,12 +34,22 @@ final class HistoryWritePass(typing: Typing) {
    * A write to `field`. `bare` is a write through the plain name, which a parameter or local of
    * the same name would shadow; `this.t` and `o.t` are not bare.
    */
-  private final case class Write(field: String, kind: Kind, node: AST.Node, bare: Boolean) {
+  private final case class Write(field: String, kind: Kind, node: AST.Node, bare: Boolean, via: Via = Direct) {
     def ofField(m: AST.MethodDeclaration, f: String): Boolean = field == f && !(bare && declaredNames(m).contains(f))
+    /** A write the checker can relate to this class's field; an unsettled one never gets E0109. */
+    def settled: Boolean = !via.isInstanceOf[Unsettled]
   }
+  /** How a write reaches the field: why a check that only reads the method body cannot follow it. */
+  private sealed trait Via
+  private case object Direct extends Via
+  private case object InLambda extends Via
+  private final case class OtherObject(receiver: String) extends Via
+  /** The receiver's class is not given by the syntax (#2599): W0024, never E0109 and never silence. */
+  private final case class Unsettled(receiver: String) extends Via
   /** Where a write goes: `receiver` is "" for this object, a parameter or local's name, or [[Unknown]]. */
-  private final case class Slot(receiver: String, field: String, bare: Boolean)
+  private final case class Slot(receiver: String, field: String, bare: Boolean, text: String = "")
   private val Unknown = "?"
+  private var aliases: Map[String, AST.TypeDescriptor] = Map.empty
   private var classesInScope: Map[String, AST.ClassDeclaration] = Map.empty
 
   /** The solver's counterexamples, for the phase that tries to reproduce them by running the code. */
@@ -62,6 +72,9 @@ final class HistoryWritePass(typing: Typing) {
     val unitOf: Map[String, AST.CompilationUnit] =
       units.flatMap(u => u.toplevels.collect { case c: AST.ClassDeclaration => c.name -> u }).toMap
     classesInScope = classes
+    aliases = units.flatMap(_.toplevels).collect {
+      case a: AST.TypeAliasDeclaration if a.typeParameters.isEmpty && a.targetType != null => a.name -> a.targetType.desc
+    }.toMap
     if (classes.values.exists(_.histories.nonEmpty) || interfaces.values.exists(_.histories.nonEmpty)) {
       for (cls <- classes.values) {
         unitFile = unitOf(cls.name).sourceFile
@@ -85,7 +98,7 @@ final class HistoryWritePass(typing: Typing) {
       for {
         (m, writes) <- methodsOf(cls).filter(_.block != null).map(m => (m, writesIn(m, cls)))
         (field, op) <- relations.distinct
-        w <- writes if w.ofField(m, field)
+        w <- writes if w.settled && w.ofField(m, field)
         problem <- problemOf(op, w.kind, field, perMethod)
       } if (reporting) typing.report(SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)", problem._1, problem._2)
       if (!reporting) proveRest(cls, chain, relations.distinct)
@@ -151,7 +164,17 @@ final class HistoryWritePass(typing: Typing) {
     for {
       m <- methodsOf(cls) if m.block != null && !writesIn(m, cls).exists(w => relations.exists(r => w.ofField(m, r._1)) && brokenSyntactically(w, relations, chain))
       (field, op) <- relations
-    } HistoryProver.prove(m, field, op, intFields, invariants) match {
+    } hiddenWrite(writesIn(m, cls).filter(_.ofField(m, field))) match {
+      // A write the body-only checks cannot follow is said as such, at its own line (#2599).
+      case Some(w) =>
+        unchecked += Unchecked(unitFile, cls, m, field, Some(s"$field $op old($field)"), line = lineOf(w.node),
+          fieldType = None, reason = Some(w.via match {
+            case InLambda          => ("lambda", "")
+            case OtherObject(r)    => ("other", r)
+            case Unsettled(r)      => ("receiver", r)
+            case Direct            => ("body", "")
+          }), at = w.node.location)
+      case None => HistoryProver.prove(m, field, op, intFields, invariants) match {
       case HistoryProver.Counterexample(before) =>
         collected += Repro(unitFile, cls, m, field, op, before)
       case HistoryProver.Proved => proved += s"${cls.name}.${m.name}: $field $op old($field)"
@@ -161,11 +184,18 @@ final class HistoryWritePass(typing: Typing) {
           fieldType = ty.filter(_ != "Int"))
       case _ =>
     }
+    }
   }
+
+  /** The write the solver cannot see, most telling first: an unknown receiver, another object, a lambda. */
+  private def hiddenWrite(ws: Seq[Write]): Option[Write] =
+    ws.find(_.via.isInstanceOf[Unsettled]).orElse(ws.find(_.via.isInstanceOf[OtherObject])).orElse(ws.find(_.via == InLambda))
+
+  private def lineOf(n: AST.Node): Int = Option(n.location).map(_.line).getOrElse(0)
 
   private def brokenSyntactically(w: Write, relations: Seq[(String, String)], chain: Seq[AST.ClassDeclaration]): Boolean = {
     val perMethod = for (c <- chain; m <- methodsOf(c) if m.block != null) yield (m, writesIn(m, c))
-    relations.exists { case (f, op) => f == w.field && problemOf(op, w.kind, f, perMethod).isDefined }
+    w.settled && relations.exists { case (f, op) => f == w.field && problemOf(op, w.kind, f, perMethod).isDefined }
   }
 
   /** `(reason kind, name of the method that makes the write wrong)`, or none when the syntax does not settle it. */
@@ -231,15 +261,20 @@ final class HistoryWritePass(typing: Typing) {
     val types = receiverTypes(m, owner)
     val chain = hierarchy(owner, classesInScope)
     val out = Seq.newBuilder[Write]
-    def visit(n: AST.Node, hidden: Set[String]): Unit = {
+    def visit(n: AST.Node, hidden: Set[String], inLambda: Boolean = false): Unit = {
       def add(lhs: AST.Expression, node: AST.Node, kind: Slot => Kind): Unit =
         slotOf(lhs, types, hidden, chain).foreach { s =>
-          out += Write(s.field, if (s.receiver == Unknown) Other else kind(s), node, s.bare)
+          val via =
+            if (s.receiver == Unknown) Unsettled(s.text)
+            else if (s.receiver.nonEmpty) OtherObject(s.receiver)
+            else if (inLambda) InLambda
+            else Direct
+          out += Write(s.field, if (s.receiver == Unknown) Other else kind(s), node, s.bare, via)
         }
       n match {
         case c: AST.ClosureExpression =>
           // Its own parameters and locals shadow a field of the same name inside it.
-          if (c.body != null) visit(c.body, hidden ++ c.args.map(_.name) ++ localsIn(c.body))
+          if (c.body != null) visit(c.body, hidden ++ c.args.map(_.name) ++ localsIn(c.body), inLambda = true)
         case a: AST.Assignment => add(a.lhs, a, s => assignKind(s, a.rhs, types, hidden, chain))
         case a: AST.AdditionAssignment => add(a.lhs, a, _ => deltaKind(a.rhs, 1))
         case a: AST.SubtractionAssignment => add(a.lhs, a, _ => deltaKind(a.rhs, -1))
@@ -247,7 +282,7 @@ final class HistoryWritePass(typing: Typing) {
         case u: AST.PostDecrement => add(u.term, u, _ => Lower)
         case _ =>
       }
-      if (!n.isInstanceOf[AST.ClosureExpression]) ASTWalk.visitChildren(n)(visit(_, hidden))
+      if (!n.isInstanceOf[AST.ClosureExpression]) ASTWalk.visitChildren(n)(visit(_, hidden, inLambda))
     }
     visit(m.block, Set.empty)
     out.result()
@@ -272,20 +307,29 @@ final class HistoryWritePass(typing: Typing) {
    * whose class the syntax does not give.
    */
   private def receiverTypes(m: AST.MethodDeclaration, owner: AST.ClassDeclaration): Map[String, Option[String]] = {
-    val fields = fieldTypes(hierarchy(owner, classesInScope)).view.mapValues(t => Option(t).filter(_.nonEmpty)).toMap
+    val typeParams = (owner.typeParameters ++ m.typeParameters).map(_.name).toSet
+    def classOf(t: AST.TypeNode): Option[String] = className(t, typeParams)
+    val fields = chainFieldNodes(hierarchy(owner, classesInScope)).view.mapValues(t => classOf(t).filter(_.nonEmpty)).toMap
     val declared = scala.collection.mutable.LinkedHashMap.empty[String, Option[String]]
-    m.args.foreach(a => declared(a.name) = className(a.typeRef))
+    // A name declared twice with different classes (a lambda parameter, or a `val` in two
+    // branches) cannot be told apart by name, so neither declaration settles it (#2599).
+    def declare(name: String, cls: Option[String]): Unit =
+      declared(name) = declared.get(name) match {
+        case Some(prev) if prev != cls => None
+        case _                         => cls
+      }
+    m.args.foreach(a => declare(a.name, classOf(a.typeRef)))
     def visit(n: AST.Node): Unit = {
       n match {
         case l: AST.LocalVariableDeclaration =>
-          declared(l.name) =
-            if (l.typeRef != null) className(l.typeRef)
+          declare(l.name,
+            if (l.typeRef != null) classOf(l.typeRef)
             else l.init match {
-              case AST.NewObject(_, t, _) => className(t)
+              case AST.NewObject(_, t, _) => classOf(t)
               case _                      => None
-            }
+            })
         case c: AST.ClosureExpression =>
-          c.args.foreach(a => declared(a.name) = className(a.typeRef))
+          c.args.foreach(a => declare(a.name, classOf(a.typeRef)))
           if (c.body != null) visit(c.body)
         case _ =>
       }
@@ -295,11 +339,29 @@ final class HistoryWritePass(typing: Typing) {
     fields ++ declared
   }
 
-  private def className(t: AST.TypeNode): Option[String] =
-    if (t == null) None else t.desc match {
-      case AST.ReferenceType(n, _) => Some(n.split('.').last)
-      case _                       => Some("") // a primitive, array or function type: no program class
-    }
+  /** The fields declared in the class and its superclasses, with their type nodes. */
+  private def chainFieldNodes(chain: Seq[AST.ClassDeclaration]): Map[String, AST.TypeNode] =
+    chain.reverse.flatMap(c => (c.defaultSection.toSeq ++ c.sections).flatMap(_.members)).collect {
+      case f: AST.FieldDeclaration => f.name -> f.typeRef
+    }.toMap
+
+  /**
+   * The class a declared type names, seen through `T?`, `C[...]` and a type alias (#2599). `None`
+   * is a type the syntax does not settle (a type parameter, a generic alias); `Some("")` is a type
+   * that is no class (a primitive, array or function type).
+   */
+  private def className(t: AST.TypeNode, typeParams: Set[String]): Option[String] =
+    if (t == null) None else descClass(t.desc, typeParams, Set.empty)
+
+  private def descClass(d: AST.TypeDescriptor, typeParams: Set[String], seen: Set[String]): Option[String] = d match {
+    case AST.NullableType(inner)          => descClass(inner, typeParams, seen)
+    case AST.ParameterizedType(c, _)      => descClass(c, typeParams, seen)
+    case AST.ReferenceType(n, _) if typeParams.contains(n) => None
+    case AST.ReferenceType(n, false) if aliases.contains(n) =>
+      if (seen.contains(n)) None else descClass(aliases(n), typeParams, seen + n)
+    case AST.ReferenceType(n, _)          => Some(n.split('.').last)
+    case _                                => Some("")
+  }
 
   private def slotOf(e: AST.Expression, types: Map[String, Option[String]], hidden: Set[String],
                      chain: Seq[AST.ClassDeclaration]): Option[Slot] = e match {
@@ -311,9 +373,9 @@ final class HistoryWritePass(typing: Typing) {
         case Some(Some(cls)) =>
           // Declared with a class: this field's write when that class inherits it, else another's.
           if (sharesField(cls, n, chain)) Some(Slot(r, n, bare = false)) else None
-        case _ => Some(Slot(Unknown, n, bare = false))
+        case _ => Some(Slot(Unknown, n, bare = false, text = r))
       }
-    case AST.MemberSelection(_, target, n) if target != null => Some(Slot(Unknown, n, bare = false))
+    case AST.MemberSelection(_, target, n) if target != null => Some(Slot(Unknown, n, bare = false, text = shown(target)))
     case _ => None
   }
 
@@ -353,6 +415,18 @@ final class HistoryWritePass(typing: Typing) {
     case _                           => None
   }
 
+  /** A receiver as the user wrote it, for the warning; a form it does not spell is "this expression". */
+  private def shown(e: AST.Expression): String = e match {
+    case AST.Id(_, n)                     => n
+    case AST.UnqualifiedFieldReference(_, n) => n
+    case _: AST.CurrentInstance           => "this"
+    case AST.MemberSelection(_, t, n) if t != null => s"${shown(t)}.$n"
+    case AST.Indexing(_, l, _)            => s"${shown(l)}[...]"
+    case AST.MethodCall(_, null, n, _, _) => s"$n(...)"
+    case AST.MethodCall(_, t, n, _, _)    => s"${shown(t)}.$n(...)"
+    case _                                => "..."
+  }
+
   private def fieldOf(e: AST.Expression): Option[String] = e match {
     case AST.Id(_, n) => Some(n)
     case AST.UnqualifiedFieldReference(_, n) => Some(n)
@@ -372,8 +446,11 @@ object HistoryWritePass {
   /**
    * A write to `field` in `method` that no check settled. `history` is the simple relation the
    * solver could not decide, or none for a history of another form (then `line` names it).
-   * `fieldType` is set when the field is not an `Int`, which the solver does not model.
+   * `fieldType` is set when the field is not an `Int`, which the solver does not model. `reason` is
+   * a write the body-only checks cannot follow (`lambda`, `other` object or unknown `receiver`, with
+   * the receiver as written), reported `at` the write rather than at the method (#2599).
    */
   final case class Unchecked(sourceFile: String, cls: AST.ClassDeclaration, method: AST.MethodDeclaration,
-                             field: String, history: Option[String], line: Int, fieldType: Option[String])
+                             field: String, history: Option[String], line: Int, fieldType: Option[String],
+                             reason: Option[(String, String)] = None, at: onion.compiler.Location = null)
 }

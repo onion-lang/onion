@@ -2,6 +2,7 @@ package onion.compiler.tools
 
 import java.io.StringReader
 import onion.compiler.{CompilerConfig, ContractMode, OnionCompiler, StreamInputSource, WarningLevel}
+import onion.compiler.toolbox.Message
 import org.scalatest.funspec.AnyFunSpec
 
 /**
@@ -10,13 +11,14 @@ import org.scalatest.funspec.AnyFunSpec
  * silent, the same as a proved history.
  */
 class HistoryHiddenWriteSpec extends AnyFunSpec {
-  private final case class Outcome(errors: Seq[String], w24: Seq[String])
+  private final case class Outcome(errors: Seq[String], w24: Seq[String], w24Lines: Seq[Int] = Nil)
 
   private def compile(src: String): Outcome = {
     val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.On, contracts = ContractMode.Check)
     val r = new OnionCompiler(config).compileDetailed(Seq(new StreamInputSource(() => new StringReader(src), "H.on")))
     Outcome(r.diagnostics.errors.flatMap(_.errorCode),
-      r.diagnostics.warnings.filter(_.category.code == "W0024").map(_.message))
+      r.diagnostics.warnings.filter(_.category.code == "W0024").map(_.message),
+      r.diagnostics.warnings.filter(_.category.code == "W0024").map(w => Option(w.location).map(_.line).getOrElse(0)))
   }
 
   private def clock(methods: String, ty: String = "Int", zero: String = "0", extra: String = "") =
@@ -84,6 +86,73 @@ class HistoryHiddenWriteSpec extends AnyFunSpec {
       val o = compile(clock("  def move(p: Point): void { p.t = p.t - 1 }", extra = other))
       assert(o.errors.isEmpty, o.toString)
       assert(o.w24.isEmpty, o.toString)
+    }
+  }
+
+  // The panel's reproductions on #2599: a receiver the checker cannot settle is W0024, never a
+  // false E0109 and never silence; a `T?`, `C[...]` or alias receiver resolves to its class.
+  describe("a receiver the checker cannot settle") {
+    val point = "class Point {\npublic:\n  var t: Int\n  def this { t = 0 }\n}"
+    def eqClock(methods: String, extra: String = "") =
+      s"""class Clock {
+         |protected:
+         |  var t: Int
+         |  history t == old(t)
+         |public:
+         |  def this { t = 0 }
+         |$methods
+         |}
+         |$extra""".stripMargin
+
+    it("is W0024, not E0109, for an untyped lambda parameter of another class") {
+      val o = compile(eqClock("  def reset(ps: List[Point]): void { ps.forEach { p -> p.t = 0 } }", extra = point))
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w24.exists(m => m.contains("reset") && m.contains("`p`")), o.toString)
+      assert(o.w24Lines.contains(7), o.toString)
+    }
+
+    it("is W0024, not E0109, for a local whose class comes from a call") {
+      val o = compile(eqClock("  def mk(): Point = new Point()\n  def reset(): void { val p = mk(); p.t = 5 }", extra = point))
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w24.exists(m => m.contains("reset") && m.contains("`p`")), o.toString)
+    }
+
+    it("is W0024 for a name declared twice with different classes") {
+      val o = compile(clock("  def back(o: Clock, ps: List[Point]): void {\n    ps.forEach { o: Point -> o.t = 0 }\n    o.t = o.t - 1\n  }", extra =
+        "class Point {\npublic:\n  var t: Int\n  def this { t = 0 }\n}"))
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w24.exists(m => m.contains("back") && m.contains("`o`")), o.toString)
+    }
+
+    it("says the write is in a lambda, at the write's line") {
+      val o = compile(clock("  def tick(): void {\n    val f: () -> void = () -> { t = t + 1 }\n    f()\n  }"))
+      val reason = Message("warning.historyNotChecked.reason.lambda", "8")
+      assert(o.w24.exists(_.contains(reason)), o.toString)
+      assert(o.w24Lines.contains(8), o.toString)
+    }
+
+    it("is E0109 through a nullable receiver of the class") {
+      val o = compile(clock("  def back(o: Clock?): void { if o != null { o.t = o.t - 1 } }"))
+      assert(o.errors.contains("E0109"), o.toString)
+    }
+
+    it("is E0109 through a generic receiver of the class") {
+      val src =
+        """class Box[T] {
+          |protected:
+          |  var t: Int
+          |  history t >= old(t)
+          |public:
+          |  def this { t = 0 }
+          |  def back(o: Box[T]): void { o.t = o.t - 1 }
+          |}""".stripMargin
+      val o = compile(src)
+      assert(o.errors.contains("E0109"), o.toString)
+    }
+
+    it("is E0109 through a type alias of the class") {
+      val o = compile(clock("  def back(o: C): void { o.t = o.t - 1 }", extra = "type C = Clock"))
+      assert(o.errors.contains("E0109"), o.toString)
     }
   }
 }

@@ -476,11 +476,15 @@ So E0109 is reported only when the syntax settles it. Take the history `n >= old
 
 **What counts as a write** (#2597). A write by a method is any assignment, `+=`, `-=`, `++` or
 `--` to the field in its body, including inside a lambda the body creates (the lambda may run
-during the call). A write through another reference counts when the reference is declared with a
-class whose objects carry the field: a parameter or local typed with it, or a local made with
-`new`. A reference of another class is not a write of this field. When the syntax does not say
-which class the reference is (`cs[0].n`, an untyped lambda parameter), the write is counted but
-left unsettled, so it gets W0024. A write from a class outside the hierarchy is not yet checked (#2598).
+during the call). A write through another reference counts when the reference is declared with
+the class or a subclass: a parameter or local typed with it (also as `C?`, `C[...]` or a type
+alias of `C`), or a local made with `new`. A reference declared with an unrelated class is not a
+write of this field. When the syntax does not settle the class (`cs[0].n`, `mk().n`, an untyped
+lambda parameter, a type parameter, or a name declared twice with different classes), the write
+is never E0109 and never silent: it gets W0024, at the write's line, saying why. A write the
+syntax does not settle as breaking the history also gets W0024 when it is inside a lambda or on
+another object, since the solver reads only the method body. A write from a class outside the
+hierarchy is not yet checked (#2598).
 
 The same reasoning applies to a history `n <= old(n)` with the directions swapped, and to
 `x == old(x)`, where any write to `x` through a method that is not a constructor is reported.

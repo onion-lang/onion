@@ -29,15 +29,17 @@ final class ContractPurityPass(typing: Typing) {
       val table = typing.effectTable
       val (_, unitEffects) = EffectInference.inferUnits(classes, table)
       for (md <- withContracts; clause <- md.preconditions ++ md.postconditions)
-        check(clause, md.location, classes, unitEffects, table)
+        check(clause, md.location, classes, unitEffects, table, md.affiliation match { case c: ClassDefinition => c; case _ => null })
       for (cd <- typesWithContracts; clause <- cd.invariants ++ cd.histories)
-        check(clause, cd.location, classes, unitEffects, table)
+        check(clause, cd.location, classes, unitEffects, table, cd)
     }
   }
 
   private def check(clause: Term, ownerLocation: Location, classes: Seq[ClassDefinition],
-                    unitEffects: Map[EffectInference.Unit0, Set[Effect]], table: EffectTable.Table): Unit = {
-    val (effects, sites) = EffectInference.termEffects(clause, classes, unitEffects, table)
+                    unitEffects: Map[EffectInference.Unit0, Set[Effect]], table: EffectTable.Table,
+                    owner: ClassDefinition): Unit = {
+    // A clause runs inside its own class, so that class's static initializer has already run.
+    val (effects, sites) = EffectInference.termEffects(clause, classes, unitEffects, table, owner)
     if (effects.nonEmpty) {
       // Name the first call that has an effect; a bare write has no call to name.
       val culprit = sites.find(_.effects.nonEmpty)

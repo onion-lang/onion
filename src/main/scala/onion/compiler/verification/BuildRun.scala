@@ -22,18 +22,27 @@ final class BuildRun(config: CompilerConfig, typed: Seq[TypedAST.ClassDefinition
     case None    => typed
   }
 
-  /** The outside effects of a method, or `unknown` when it cannot be found. */
+  /**
+   * The outside effects of a method, or `unknown` when it cannot be found. The build calls it
+   * from outside its class, so the class's static initializer runs first and counts too.
+   */
   def methodEffects(owner: Option[String], name: String, arity: Int, static: Boolean): Set[Effect] =
-    owners(owner).iterator.flatMap(_.methods).collectFirst {
-      case m: TypedAST.MethodDefinition if m.name == name && m.arguments.length == arity &&
-        Modifier.isStatic(m.modifier) == static => outside(unitEffects.getOrElse(m, Set(Effect.Unknown)))
+    owners(owner).iterator.flatMap(cd => cd.methods.map(cd -> _)).collectFirst {
+      case (cd, m: TypedAST.MethodDefinition) if m.name == name && m.arguments.length == arity &&
+        Modifier.isStatic(m.modifier) == static =>
+        outside(unitEffects.getOrElse(m, Set(Effect.Unknown)) ++ initEffects(cd))
     }.getOrElse(Set(Effect.Unknown))
 
-  /** The outside effects of a class's no-argument constructor; empty when it has none written. */
+  /** The outside effects of a class's no-argument constructor and its static initializer; empty when it has neither. */
   def constructorEffects(owner: String): Set[Effect] =
-    owners(Some(owner)).iterator.flatMap(_.constructors).collectFirst {
-      case c: TypedAST.ConstructorDefinition if c.arguments.isEmpty => outside(unitEffects.getOrElse(c, Set(Effect.Unknown)))
-    }.getOrElse(Set.empty)
+    owners(Some(owner)).iterator.flatMap(cd => cd.constructors.map(cd -> _)).collectFirst {
+      case (cd, c: TypedAST.ConstructorDefinition) if c.arguments.isEmpty =>
+        outside(unitEffects.getOrElse(c, Set(Effect.Unknown)) ++ initEffects(cd))
+    }.getOrElse(owners(Some(owner)).headOption.map(cd => outside(initEffects(cd))).getOrElse(Set.empty))
+
+  private def initEffects(cd: TypedAST.ClassDefinition): Set[Effect] =
+    if (cd.staticInitializers.isEmpty) Set.empty
+    else unitEffects.getOrElse(EffectInference.ClassInit(cd), Set(Effect.Unknown))
 
   private def outside(effects: Set[Effect]): Set[Effect] = effects - Effect.Mutate
 

@@ -1,6 +1,6 @@
 package onion.compiler.effects
 
-import onion.compiler.TypedAST
+import onion.compiler.{Modifier, TypedAST}
 import onion.compiler.TypedAST._
 
 import scala.collection.mutable
@@ -24,7 +24,14 @@ import scala.collection.mutable
 object EffectInference {
 
   /** Inference units are the bodies the compiled sources actually contain. */
-  type Unit0 = AnyRef // MethodDefinition | ConstructorDefinition
+  type Unit0 = AnyRef // MethodDefinition | ConstructorDefinition | ClassInit
+
+  /**
+   * A class's static initializer, as an inference unit of its own. It runs the first time
+   * the class is used from outside, so a call, a field read or a `new` that reaches the class
+   * from another class carries its effects (#2601). It is not a row of `--effects`.
+   */
+  final case class ClassInit(cls: ClassDefinition)
 
   final case class MethodEffects(
     className: String,
@@ -74,16 +81,15 @@ object EffectInference {
     val base = mutable.LinkedHashMap[Unit0, Set[Effect]]()
     val edges = mutable.LinkedHashMap[Unit0, Set[Unit0]]()
     for ((u, _) <- units) {
-      val collector = new Collector(units.keySet, classes, table, inConstructor = u.isInstanceOf[ConstructorDefinition])
-      u match {
-        case md: MethodDefinition =>
-          if (md.getBlock != null) collector.statement(md.getBlock)
-        case ctor: ConstructorDefinition =>
-          if (ctor.block != null) collector.statement(ctor.block)
-          collector.superInit(ctor)
-      }
+      val collector = walk(u, units.keySet, classes, table)
       base(u) = collector.effects.toSet
       edges(u) = collector.internalCallees.toSet
+    }
+    for (cd <- classes if cd.staticInitializers.nonEmpty) {
+      val init = ClassInit(cd)
+      val collector = walk(init, units.keySet, classes, table)
+      base(init) = collector.effects.toSet
+      edges(init) = collector.internalCallees.toSet
     }
 
     // Fixed point: propagate through user-to-user edges until stable.
@@ -102,6 +108,33 @@ object EffectInference {
     (units, result.toMap)
   }
 
+  /** The class a unit's body belongs to; a reference to that class needs no initializer run. */
+  private def ownerOf(unit: Unit0): ClassDefinition = unit match {
+    case md: MethodDefinition    => md.affiliation match { case cd: ClassDefinition => cd; case _ => null }
+    case cd: ConstructorDefinition => cd.affiliation match { case c: ClassDefinition => c; case _ => null }
+    case ClassInit(cls)          => cls
+    case _                       => null
+  }
+
+  /** A collector that has walked `unit`'s body. */
+  private def walk(unit: Unit0, units: collection.Set[Unit0], classes: Seq[ClassDefinition],
+                   table: EffectTable.Table): Collector = {
+    val collector = new Collector(units, classes, table,
+      inConstructor = unit.isInstanceOf[ConstructorDefinition], owner = ownerOf(unit),
+      inClassInit = unit.isInstanceOf[ClassInit])
+    unit match {
+      case md: MethodDefinition =>
+        if (md.getBlock != null) collector.statement(md.getBlock)
+      case ctor: ConstructorDefinition =>
+        if (ctor.block != null) collector.statement(ctor.block)
+        collector.superInit(ctor)
+      case ClassInit(cls) =>
+        cls.staticInitializers.foreach(collector.statement)
+      case _ =>
+    }
+    collector
+  }
+
   /**
    * Every direct call in `body`, with the callee's complete effect set — the table's
    * verdict for external callees, `unitEffects` for program-defined ones. Calls inside
@@ -110,8 +143,9 @@ object EffectInference {
    */
   def callSites(body: ActionStatement, classes: Seq[ClassDefinition],
                 unitEffects: Map[Unit0, Set[Effect]],
-                table: EffectTable.Table = EffectTable.builtin): Seq[CallSite] = {
-    val collector = new Collector(unitEffects.keySet, classes, table)
+                table: EffectTable.Table = EffectTable.builtin,
+                owner: ClassDefinition = null): Seq[CallSite] = {
+    val collector = new Collector(unitEffects.keySet, classes, table, owner = owner)
     collector.statement(body)
     collector.rawSites.toSeq.map { raw =>
       CallSite(raw.location, raw.callee,
@@ -127,8 +161,9 @@ object EffectInference {
    */
   def termEffects(term: Term, classes: Seq[ClassDefinition],
                   unitEffects: Map[Unit0, Set[Effect]],
-                  table: EffectTable.Table = EffectTable.builtin): (Set[Effect], Seq[CallSite]) = {
-    val collector = new Collector(unitEffects.keySet, classes, table)
+                  table: EffectTable.Table = EffectTable.builtin,
+                  owner: ClassDefinition = null): (Set[Effect], Seq[CallSite]) = {
+    val collector = new Collector(unitEffects.keySet, classes, table, owner = owner)
     collector.term(term)
     val sites = collector.rawSites.toSeq.map { raw =>
       CallSite(raw.location, raw.callee,
@@ -204,15 +239,7 @@ object EffectInference {
   /** [[BodyFacts]] for one inference unit; `units` is the set of program-defined bodies. */
   def bodyFacts(unit: Unit0, units: collection.Set[Unit0], classes: Seq[ClassDefinition],
                 table: EffectTable.Table = EffectTable.builtin): BodyFacts = {
-    val collector = new Collector(units, classes, table, inConstructor = unit.isInstanceOf[ConstructorDefinition])
-    unit match {
-      case md: MethodDefinition =>
-        if (md.getBlock != null) collector.statement(md.getBlock)
-      case ctor: ConstructorDefinition =>
-        if (ctor.block != null) collector.statement(ctor.block)
-        collector.superInit(ctor)
-      case _ =>
-    }
+    val collector = walk(unit, units, classes, table)
     val sites = collector.rawSites.iterator.collect {
       case r if r.resolved.isDefined =>
         val methodName = if (r.member == null) "<init>" else r.member.name
@@ -230,7 +257,8 @@ object EffectInference {
    * because a missed node here means a silently dropped effect.
    */
   private final class Collector(units: collection.Set[Unit0], classes: Seq[ClassDefinition],
-                                table: EffectTable.Table, inConstructor: Boolean = false) {
+                                table: EffectTable.Table, inConstructor: Boolean = false,
+                                owner: ClassDefinition = null, inClassInit: Boolean = false) {
     val effects = mutable.Set[Effect]()
     val internalCallees = mutable.LinkedHashSet[Unit0]()
     val rawSites = mutable.Buffer[RawSite]()
@@ -251,10 +279,53 @@ object EffectInference {
     private val userClasses: Map[String, ClassDefinition] =
       classes.map(c => c.name -> c).toMap
 
+    /**
+     * The first use of a program class from another class runs its static initializer, so
+     * the use carries the initializer's effects (#2601). Uses from inside the class itself
+     * come after the class is initialized, and need nothing.
+     */
+    private def initializes(cls: TypedAST.ObjectType, location: onion.compiler.Location): scala.Unit =
+      if (cls != null) userClasses.get(cls.name).foreach { cd =>
+        if (cd.staticInitializers.nonEmpty && (owner == null || cd.name != owner.name)) {
+          val init = ClassInit(cd)
+          if (internalCallees.add(init))
+            rawSites += RawSite(location, s"${cd.name} (static initializer)", None, init)
+        }
+      }
+
+    /** Whether `cls` is `ancestor` or extends or conforms to it, by erased name. */
+    private def inherits(cls: TypedAST.ClassType, ancestor: String): Boolean = {
+      val seen = mutable.Set[String]()
+      def go(c: TypedAST.ClassType): Boolean =
+        c != null && seen.add(c.name) && (c.name == ancestor || go(c.superClass) || c.interfaces.exists(go))
+      go(cls)
+    }
+
+    private val overrideCache = mutable.Map[(String, String, Int), Seq[MethodDefinition]]()
+
+    /**
+     * The program's own methods a virtual call to `m` can run instead of `m`: those of the
+     * same name and arity in a class that extends or conforms to `m`'s class. A call through
+     * an interface or an overridable method has the union of their effects (#2601).
+     */
+    private def overridesOf(m: TypedAST.Method): Seq[MethodDefinition] =
+      if (m.affiliation == null || Modifier.isStatic(m.modifier) || Modifier.isPrivate(m.modifier)) Nil
+      else {
+        val arity = m.arguments.length
+        overrideCache.getOrElseUpdate((m.affiliation.name, m.name, arity),
+          classes.filter(cd => cd.name != m.affiliation.name && inherits(cd, m.affiliation.name)).flatMap { cd =>
+            cd.methods.collect {
+              case om: MethodDefinition if (om ne m) && units.contains(om) && om.name == m.name &&
+                om.arguments.length == arity && !Modifier.isStatic(om.modifier) => om
+            }
+          })
+      }
+
     private def method(m: TypedAST.Method, location: onion.compiler.Location,
                        target: Term, args: Array[Term]): scala.Unit = {
       // A top-level function is named as written, not through its synthetic owner.
       val callee = onion.compiler.toolbox.TypeFormatting.methodReference(m.affiliation, m.name)
+      if (Modifier.isStatic(m.modifier)) initializes(m.affiliation, location)
       m match {
         case md: MethodDefinition if units.contains(md) =>
           internalCallees += md
@@ -266,11 +337,18 @@ object EffectInference {
           rawSites += RawSite(location, callee, Some(eff), null,
             m.affiliation.name, m, target, args.toSeq, depth, table.operands(m.affiliation.name, m.name))
       }
+      // A call on a receiver dispatches: any override the program defines may run instead.
+      if (target != null) for (om <- overridesOf(m)) {
+        internalCallees += om
+        rawSites += RawSite(location,
+          onion.compiler.toolbox.TypeFormatting.methodReference(om.affiliation, om.name), None, om)
+      }
     }
 
     private def constructor(c: ConstructorRef, location: onion.compiler.Location,
                             args: Array[Term]): scala.Unit = {
       val callee = s"new ${c.affiliation.name}"
+      initializes(c.affiliation, location)
       programConstructor(c) match {
         case Some(cd) =>
           internalCallees += cd
@@ -375,7 +453,11 @@ object EffectInference {
         // A constructor filling in its own `this` is initialisation: nobody else holds the
         // object yet, so `new C(..)` stays pure. Writing any other object is a mutation.
         if (!(inConstructor && s.target.isInstanceOf[This])) effects += Effect.Mutate
-      case s: SetStaticField => term(s.value); effects += Effect.Mutate
+      case s: SetStaticField =>
+        initializes(s.target, here(s.location)); term(s.value)
+        // A static initializer filling in its own class's fields is initialisation, as a
+        // constructor filling in `this` is: nobody can see the class before it finishes.
+        if (!(inClassInit && owner != null && s.target != null && s.target.name == owner.name)) effects += Effect.Mutate
       case s: SetLocal      =>
         // A write whose relative frame equals the closure depth targets the body's own
         // frame (frame 0 from the body itself, 1 from a closure directly inside it, ...).
@@ -385,7 +467,8 @@ object EffectInference {
       case m: MapLiteral    => m.keys.foreach(term); m.values.foreach(term)
       case n: NewArray      => n.parameters.foreach(term)
       case n: NewArrayWithValues => n.values.foreach(term)
-      case _: RefLocal | _: RefStaticField | _: This | _: OuterThis => ()
+      case r: RefStaticField => initializes(r.target, here(r.location))
+      case _: RefLocal | _: This | _: OuterThis => ()
       // An omitted argument runs its default method: the call has that method's effects.
       case d: DefaultArgument => method(d.method, entry, null, Array.empty)
       case _: BoolValue | _: ByteValue | _: ShortValue | _: IntValue | _: LongValue => ()

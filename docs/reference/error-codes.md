@@ -1246,6 +1246,8 @@ Fix: correct the expression, or the code it checks.
 The build runs a predicate only when its effects are at most `mutate`. One that prints, reads or
 writes files, or calls something the effect table cannot vouch for (`unknown`) is not run: it
 gets the warning `W0023` instead. So does one that does not finish within 10 seconds.
+The effects count everything a run can reach: an override or interface implementation the
+program defines, and the static initializer of a class the predicate uses.
 
 ## Declaration errors
 

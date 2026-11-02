@@ -51,6 +51,91 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
     }
   }
 
+  describe("a closed predicate whose effect hides behind dispatch or a static initializer") {
+    it("is not run when it calls an interface method a program class implements with an effect") {
+      val o = compile(
+        """interface Sayer { def say(): Boolean }
+          |class Loud conforms Sayer {
+          |public:
+          |  def this {}
+          |  def say(): Boolean { IO::println("IFACE RAN"); return true }
+          |}
+          |def mk(): Sayer = new Loud()
+          |def p(): Boolean ensures result { val s: Sayer = mk(); return s.say() }""".stripMargin)
+      assert(!o.stdout.contains("IFACE RAN"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("console")), o.toString)
+    }
+
+    it("is not run when it calls a method a subclass overrides with an effect") {
+      val o = compile(
+        """class Base {
+          |public:
+          |  def this {}
+          |  def say(): Boolean = true
+          |}
+          |class Loud extends Base {
+          |public:
+          |  def this {}
+          |  override def say(): Boolean { IO::println("OVERRIDE RAN"); return true }
+          |}
+          |def mk(): Base = new Loud()
+          |def p(): Boolean ensures result { val s: Base = mk(); return s.say() }""".stripMargin)
+      assert(!o.stdout.contains("OVERRIDE RAN"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("console")), o.toString)
+    }
+
+    it("is not run when its own class's static initializer has an effect") {
+      val o = compile(
+        """class H {
+          |  static val X: Int = H::noisy()
+          |public:
+          |  static def noisy(): Int { IO::println("STATIC INIT RAN"); return 1 }
+          |  static def p(): Boolean ensures result { return true }
+          |}""".stripMargin)
+      assert(!o.stdout.contains("STATIC INIT RAN"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("console")), o.toString)
+    }
+
+    it("is not run when it uses another class whose static initializer has an effect") {
+      val o = compile(
+        """class Other {
+          |  static val X: Int = Other::noisy()
+          |public:
+          |  static def noisy(): Int { IO::println("OTHER INIT RAN"); return 1 }
+          |  static def one(): Int = 1
+          |}
+          |def p(): Boolean ensures result { return Other::one() == 1 }""".stripMargin)
+      assert(!o.stdout.contains("OTHER INIT RAN"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("console")), o.toString)
+    }
+
+    it("still runs through an interface whose implementations only touch memory: a false one is E0113") {
+      val o = compile(
+        """interface Sayer { def say(): Boolean }
+          |class Quiet conforms Sayer {
+          |public:
+          |  def this {}
+          |  def say(): Boolean = true
+          |}
+          |def mk(): Sayer = new Quiet()
+          |def q(): Boolean ensures result { val s: Sayer = mk(); return !s.say() }""".stripMargin)
+      assert(o.errors.contains("E0113"), o.toString)
+      assert(o.w23.isEmpty, o.toString)
+    }
+
+    it("still runs when it reads an enum constant (an enum's own initializer is not an effect)") {
+      val o = compile(
+        """enum Color { RED, GREEN }
+          |def red(): Boolean ensures result = Color::RED == Color::GREEN""".stripMargin)
+      assert(o.errors.contains("E0113"), o.toString)
+      assert(o.w23.isEmpty, o.toString)
+    }
+  }
+
   describe("a closed predicate that only touches memory") {
     it("still runs: a false one is E0113") {
       val o = compile(

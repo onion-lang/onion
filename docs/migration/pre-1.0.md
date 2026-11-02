@@ -233,3 +233,34 @@ ys = new java.util.TreeSet[Int]()
   throws `NoSuchMethodError` until it is compiled again.
 - **Still fine:** `.toList()` after such a pipeline still works, and the result still fits an
   `Iterable` parameter or variable.
+
+## `example` and `law` are now contract predicates
+
+A check that runs when the build runs is a `static def` that returns `Boolean` and states
+`ensures result`. A predicate with parameters is sampled, as `law` was.
+
+```onion
+// Before
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
+  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
+  example { Pt::parse("3,4") == new Pt(3, 4) }
+}
+
+// Now
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
+public:
+  static def roundtrip(p: Pt): Boolean
+    ensures result
+    = Pt::parse(Pt::format(p)) == p
+  static def parsesThreeFour(): Boolean
+    ensures result
+    = Pt::parse("3,4") == new Pt(3, 4)
+}
+```
+
+- **What changed:** `example` and `law` are removed. At the top level, write `def name(): Boolean ensures result = expr`
+  (no `static`). A body with several statements is a block that ends with `return`.
+- **What you see:** a false predicate is **E0113**. A parameter that cannot be sampled is also E0113,
+  not a silent skip. `--contracts` is on by default (`check`).
+- **Seed and samples:** `--law-seed` and `--law-samples` still control the sampling.
+- **`onion.Shape`:** a class that implements it needs at least one such predicate that uses it (E0080).

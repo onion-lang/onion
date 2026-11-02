@@ -457,8 +457,10 @@ enum Msg {
 }
 
 record Pang(id: Int) derive!(Json) conforms Msg {   // derive!/from は conforms の前
-  example { new Pang(3).id() == 3 }
 public:
+  static def idIsKept(): Boolean
+    ensures result
+    = new Pang(3).id() == 3
   def label(): String = "pang " + id()   // メソッドは public: の下に書きます
 }
 

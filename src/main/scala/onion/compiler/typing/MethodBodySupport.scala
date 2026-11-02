@@ -39,7 +39,8 @@ private[compiler] final class MethodBodySupport(
     val classClauses = definition.exists(d => d.invariantSources.nonEmpty || d.historySources.nonEmpty)
     // A public instance method of a class with an `invariant` or a `history` is a place where it must
     // hold, so it is guarded too (RFC #2557, design 7.4). A constructor is not a method here.
-    val needsGuard = ensures.nonEmpty || (classClauses && (method.modifier & AST.M_PUBLIC) != 0)
+    val isStatic = (method.modifier & AST.M_STATIC) != 0
+    val needsGuard = ensures.nonEmpty || (classClauses && !isStatic && (method.modifier & AST.M_PUBLIC) != 0)
     val refusal = EnsuresGuardSupport.refusal(method, ensures)
     val splitGuards = bodyContext.contractMode == ContractMode.Runtime && needsGuard &&
       (ensures.isEmpty || method.postconditions.size == ensures.size) && refusal.isEmpty
@@ -76,7 +77,8 @@ private[compiler] final class MethodBodySupport(
     context: LocalContext
   ): Unit = {
     val classType = method.classType
-    val bodyMethod = new MethodDefinition(method.location, AST.M_PRIVATE, classType, method.name + "$body",
+    val isStatic = (method.modifier & AST.M_STATIC) != 0
+    val bodyMethod = new MethodDefinition(method.location, AST.M_PRIVATE | (if (isStatic) AST.M_STATIC else 0), classType, method.name + "$body",
       method.arguments, method.returnType, body)
     bodyMethod.mayContainTry = method.mayContainTry
     bodyMethod.setFrame(context.getContextFrame)
@@ -91,8 +93,10 @@ private[compiler] final class MethodBodySupport(
       val b = gctx.lookup(a.name)
       new RefLocal(b.frameIndex, b.index, b.tp): Term
     }.toArray
-    val self = new This(method.location, classType)
-    val call = new Call(method.location, self, bodyMethod, argTerms)
+    // A static method calls its body statically; there is no object, so no `this` to pass.
+    val call: Term =
+      if (isStatic) new CallStatic(method.location, classType, bodyMethod, argTerms)
+      else new Call(method.location, new This(method.location, classType), bodyMethod, argTerms)
     val saves = scala.collection.mutable.ArrayBuffer.empty[(Int, Term)]
     val requiresTerms = if (requires.nonEmpty) typeContractClauses(requires, gctx, ContractScope.Pre) else Nil
     gctx.oldSaves = Some(saves)
@@ -115,13 +119,14 @@ private[compiler] final class MethodBodySupport(
     // The class's `invariant`: no local in a typed clause, so the clauses typed once are shared. The
     // `history` is typed again over this frame, because its `old(field)` is saved at entry. That is
     // done before `saved` is built, since typing it adds to the saves.
-    val invariantTerms = definition.invariants.zip(definition.invariantSources)
-    val historyTerms = typeContractClauses(definition.historySources, gctx, ContractScope.History)
+    // A class's `invariant` and `history` speak about an object, so a static method has neither.
+    val invariantTerms = if (isStatic) Seq.empty else definition.invariants.zip(definition.invariantSources)
+    val historyTerms = if (isStatic) Nil else typeContractClauses(definition.historySources, gctx, ContractScope.History)
     val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") } ++
       invariantTerms.map { case (t, s) => guard(t, s, "invariant (on entry)") }
     val post: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") } ++
       invariantTerms.map { case (t, s) => guard(t, s, "invariant (on exit)") } ++
-      historyTerms.zip(definition.historySources).map { case (t, s) =>
+      historyTerms.zip(if (isStatic) Nil else definition.historySources).map { case (t, s) =>
         val g = guard(t, s, "history")
         definition.historyGuards((method.name, onion.compiler.contracts.ExpressionText.of(s))) = g.asInstanceOf[IfStatement]
         g

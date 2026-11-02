@@ -223,3 +223,33 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     val chain = violation(Array("--contracts", "runtime", path))
     assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("history failed")), chain.map(_.getMessage).toString)
 
+  private def staticProgram(arg: String) =
+    s"""class Calc {
+       |public:
+       |  static def half(x: Int): Int
+       |    requires x >= 0
+       |    ensures result <= x
+       |  {
+       |    if x > 100 { return x + 1 }
+       |    return x / 2
+       |  }
+       |}
+       |println(Calc::half($arg))
+       |""".stripMargin
+
+  test("--contracts runtime guards a static method: a true ensures passes"):
+    val path = writeScript(staticProgram("10"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("5")
+
+  test("--contracts runtime guards a static method: a false ensures throws"):
+    val path = writeScript(staticProgram("200"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("postcondition failed")), chain.map(_.getMessage).toString)
+
+  test("--contracts runtime guards a static method: a false requires throws"):
+    val path = writeScript(staticProgram("-4"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("precondition failed")), chain.map(_.getMessage).toString)
+

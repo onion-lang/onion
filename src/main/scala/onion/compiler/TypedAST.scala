@@ -870,6 +870,9 @@ object TypedAST {
     var postconditions: Seq[Term] = Nil
     /** Whether an `ensures` clause is exactly `result`: the method asserts it returns true (a closed predicate). */
     var assertsResult: Boolean = false
+    /** The clauses as text, for the `.class` file (RFC #2557): only the ones that read back as the same clause. */
+    var contractRequiresText: Seq[String] = Nil
+    var contractEnsuresText: Seq[String] = Nil
     private var closure: Boolean = false
     private var frame: LocalFrame = _
     private var argsWithDefaults_ : Array[MethodArgument] = null

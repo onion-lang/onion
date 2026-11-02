@@ -41,11 +41,16 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
       |println(Check::positive(3))
       |""".stripMargin
 
-  test("without the flag a contract clause is E0105, not ignored"):
+  test("with --contracts off a contract clause is E0105, not ignored"):
     val path = writeScript(withContract)
-    val (code, out) = captureOut(new ScriptRunner().run(Array(path)))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "off", path)))
     code should not be 0
     out should include("E0105")
+
+  test("without the flag the clause is accepted: check is the default"):
+    val path = writeScript(withContract)
+    val (code, _) = captureOut(new ScriptRunner().run(Array(path)))
+    code shouldBe 0
 
   test("--contracts check accepts the clause and runs the script"):
     val path = writeScript(withContract)

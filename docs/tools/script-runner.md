@@ -130,8 +130,8 @@ onion --law-samples 500 MyScript.on
 ### `--contracts <off|check>`
 
 Accept contract clauses (`requires` and `ensures` on a method, `invariant` and `history` in a
-class) and check them statically. This is a preview feature (RFC #2557). The default is `off`,
-and with `off` a clause is an error that names this flag, so a contract is never silently ignored.
+class) and check them statically. This is a preview feature (RFC #2557). The default is `check`.
+With `--contracts off` a clause is an error that names this flag, so a contract is never silently ignored.
 
 `check` types the clauses and runs the static checks that need no solver. **Nothing is enforced
 when the program runs.** `runtime` (guards for what was not proved) and `verify` (proofs) are

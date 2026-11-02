@@ -151,6 +151,7 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 | `W0020` | `extension-method-shadowed` | An extension method's name and arity exactly match an existing member, so the extension is never called |
 | `W0021` | `history-not-proved` | A method can break a history; the solver found a counterexample |
 | `W0024` | `history-not-checked` | A method writes a field that a history names, and no check settled whether the history still holds |
+| `W0026` | `contract-not-enforced` | A contract clause is not enforced at run time by `--contracts runtime` |
 
 ### `--contract-seed <n>` / `--contract-samples <n>`
 
@@ -161,15 +162,17 @@ onionc --contract-samples 500 MyProgram.on
 onionc --contract-seed 7 MyProgram.on
 ```
 
-### `--contracts <off|check>`
+### `--contracts <off|check|runtime>`
 
 Accept contract clauses (`requires` and `ensures` on a method, `invariant` and `history` in a
 class) and check them statically. This is a preview feature (RFC #2557). The default is `check`.
 With `--contracts off` a clause is an error that names this flag, so a contract is never silently ignored.
 
-`check` types the clauses and runs the static checks that need no solver. **Nothing is enforced
-when the program runs.** `runtime` (guards for what was not proved) and `verify` (proofs) are
-reserved names: the command line refuses them until they check something.
+`check` types the clauses and runs the static checks. **Nothing is enforced when the program
+runs.** `runtime` does the same and also keeps a guard for each `requires` clause: when one is false,
+the method throws `onion.ContractViolation` (an `AssertionError`) before its body runs, with the
+clause and the method in the message. Guards for `ensures`, `invariant` and `history` are not built
+yet. `verify` (proofs) is a reserved name: the command line refuses it until it checks something.
 
 ```bash
 onionc --contracts check MyProgram.on

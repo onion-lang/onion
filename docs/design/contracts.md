@@ -562,6 +562,15 @@ ContractViolation: Counter.inc() の事後条件が満たされませんでし�
   ensures n == old(n) + 1     n = 5, old(n) = 3
 ```
 
+**How the guards are built.** A guarded method is split in two. The original body becomes a private
+method `m$body`, unchanged, and `m` becomes the guard: check `requires`, save every `old(e)`, call
+`m$body`, check `ensures` on the result, return it. Every `return` stays inside `m$body`, so none can
+slip past the check. The alternative, rewriting each `return` in the body into "store the result,
+check, return", was rejected: it has to reach every statement form (loops, `try`, `select`), and one
+form missed is a `return` that leaves the method unchecked, which is a silent hole in a guard.
+The cost is one extra frame in a stack trace and the loss of the tail call on `m`, which the design
+already accepts.
+
 A guard is a plain `AssertionError` subclass, so a violation can be told from an ordinary
 exception; it has no code of its own. A guard on a recursive method is not a tail call, so only
 the guarded methods lose the tail-call optimization; the rest of the program is compiled as it was.

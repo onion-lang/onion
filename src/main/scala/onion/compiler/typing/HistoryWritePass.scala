@@ -16,7 +16,7 @@ import onion.compiler.contracts.HistoryProver
  * Constructors are not checked: a history relates the states around a call, and a constructor
  * has no earlier state.
  */
-final class HistoryWritePass(typing: Typing) {
+final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.compiler.TypedAST.ClassType] = _ => None) {
   import HistoryWritePass.{Repro, Unchecked}
   // `counterexamples` runs the same analysis without reporting and collects what the solver found.
   private var collected: scala.collection.mutable.ArrayBuffer[Repro] = null
@@ -55,6 +55,25 @@ final class HistoryWritePass(typing: Typing) {
 
   private var reporting = true
 
+  /** Under `--contracts runtime` the compiler keeps a guard only for what it could not prove. */
+  private def dropsProvedGuards: Boolean =
+    typing != null && typing.contractMode == onion.compiler.ContractMode.Runtime
+
+  /**
+   * Take the guard of a proved `history` out of the guarded method. Only a clause that is exactly one
+   * simple relation can be proved, and so only that kind is ever found in the table.
+   */
+  private def dropGuard(className: String, methodName: String, clause: String): Unit =
+    typing.table_.classes.get(className).foreach { definition =>
+      definition.historyGuards.remove((methodName, clause)).foreach { guard =>
+        definition.methods.collect { case m: onion.compiler.TypedAST.MethodDefinition if m.name == methodName => m }
+          .foreach { m =>
+            val kept = m.block.statements.filterNot(_ eq guard)
+            if (kept.length != m.block.statements.length) m.setBlock(new onion.compiler.TypedAST.StatementBlock(m.block.location, kept*))
+          }
+      }
+    }
+
   private def analyze(units: Seq[AST.CompilationUnit], report: Boolean): Unit = {
     reporting = report
     val classes: Map[String, AST.ClassDeclaration] =
@@ -89,7 +108,9 @@ final class HistoryWritePass(typing: Typing) {
         w <- writes if w.ofField(m, field)
         problem <- problemOf(op, w.kind, field, perMethod)
       } if (reporting) typing.report(SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)", problem._1, problem._2)
-      if (!reporting) proveRest(cls, chain, relations.distinct)
+      // After the codegen the solver is asked again to reproduce counterexamples; under `--contracts
+      // runtime` it is asked once here, so a history it proves does not need its run-time guard.
+      if (!reporting || dropsProvedGuards) proveRest(cls, chain, relations.distinct)
     }
     if (!reporting) uncheckedForms(cls, chain, histories)
   }
@@ -149,6 +170,9 @@ final class HistoryWritePass(typing: Typing) {
       case f: AST.FieldDeclaration if f.typeRef != null && f.typeRef.desc == AST.PrimitiveType(AST.KInt) => f.name
     }.toSet
     val invariants = chain.flatMap(_.invariants)
+    // The methods a body may call: this class's and its superclasses' own, nearest first.
+    val callees: Map[String, AST.MethodDeclaration] =
+      chain.reverse.flatMap(methodsOf).map(m => m.name -> m).toMap
     for {
       m <- methodsOf(cls) if m.block != null && !writesIn(m, cls).exists(w => relations.exists(r => w.ofField(m, r._1)) && brokenSyntactically(w, relations, chain))
       (field, op) <- relations
@@ -157,10 +181,12 @@ final class HistoryWritePass(typing: Typing) {
       case Some(w) =>
         unchecked += Unchecked(unitFile, cls, m, field, Some(s"$field $op old($field)"), line = lineOf(w.node),
           fieldType = None, reason = Some(("lambda", "")), at = w.node.location)
-      case None => HistoryProver.prove(m, field, op, intFields, invariants) match {
+      case None => HistoryProver.prove(m, field, op, intFields, invariants, callees, builtCallees(m)) match {
       case HistoryProver.Counterexample(before) =>
-        collected += Repro(unitFile, cls, m, field, op, before)
-      case HistoryProver.Proved => proved += s"${cls.name}.${m.name}: $field $op old($field)"
+        if (collected != null) collected += Repro(unitFile, cls, m, field, op, before)
+      case HistoryProver.Proved =>
+        proved += s"${cls.name}.${m.name}: $field $op old($field)"
+        if (dropsProvedGuards) dropGuard(cls.name, m.name, s"$field $op old($field)")
       case HistoryProver.Unsupported if writesIn(m, cls).exists(_.ofField(m, field)) =>
         val ty = fieldTypes(chain).get(field)
         unchecked += Unchecked(unitFile, cls, m, field, Some(s"$field $op old($field)"), line = 0,
@@ -174,6 +200,22 @@ final class HistoryWritePass(typing: Typing) {
   private def hiddenWrite(ws: Seq[Write]): Option[Write] = ws.find(_.inLambda)
 
   private def lineOf(n: AST.Node): Int = Option(n.location).map(_.line).getOrElse(0)
+
+  /**
+   * The contracts of methods of types built in an earlier compilation, for the parameters of `m`
+   * (RFC #2557, across modules). They are read from the `@onion.Contract` in each class file; a
+   * type with none, or one this compilation defines itself, contributes nothing.
+   */
+  private def builtCallees(m: AST.MethodDeclaration): Map[(String, String), HistoryProver.Callee] =
+    (for {
+      a <- m.args
+      typeName <- Option(a.typeRef).map(_.desc).collect { case AST.ReferenceType(n, _) => n }.toList.distinct
+      classType <- builtType(typeName).toList
+      method <- classType.methods
+      ref <- Some(method).collect { case r: onion.compiler.environment.AsmRefs.AsmMethodRef => r }
+      c = ref.contract if !c.isEmpty
+      callee <- Some(HistoryProver.Callee(c.params, c.requires, c.ensures))
+    } yield (typeName, method.name) -> callee).toMap
 
   private def brokenSyntactically(w: Write, relations: Seq[(String, String)], chain: Seq[AST.ClassDeclaration]): Boolean = {
     val perMethod = for (c <- chain; m <- methodsOf(c) if m.block != null) yield (m, writesIn(m, c))

@@ -17,11 +17,13 @@ import onion.compiler.contracts.HistoryProver
  * has no earlier state.
  */
 final class HistoryWritePass(typing: Typing) {
-  import HistoryWritePass.Repro
+  import HistoryWritePass.{Repro, Unchecked}
   // `counterexamples` runs the same analysis without reporting and collects what the solver found.
   private var collected: scala.collection.mutable.ArrayBuffer[Repro] = null
   /** Histories the solver proved for a method, as `Class.method: field >= old(field)`. */
   val proved: scala.collection.mutable.ArrayBuffer[String] = scala.collection.mutable.ArrayBuffer.empty
+  /** Writes that neither the syntax nor the solver settled (W0024): never left silent (#2574). */
+  val unchecked: scala.collection.mutable.ArrayBuffer[Unchecked] = scala.collection.mutable.ArrayBuffer.empty
   private var unitFile: String = null
   private sealed trait Kind
   private case object Raise extends Kind
@@ -78,6 +80,53 @@ final class HistoryWritePass(typing: Typing) {
       } if (reporting) typing.report(SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)", problem._1, problem._2)
       if (!reporting) proveRest(cls, chain, relations.distinct)
     }
+    if (!reporting) uncheckedForms(cls, chain, histories)
+  }
+
+  /**
+   * A history (or a conjunct of one) that is not `x >= old(x)`, `x <= old(x)` or `x == old(x)` is
+   * checked by nothing yet. Each method that writes a field it names is told so, with its line.
+   */
+  private def uncheckedForms(cls: AST.ClassDeclaration, chain: Seq[AST.ClassDeclaration], histories: Seq[AST.Expression]): Unit = {
+    val fields = fieldTypes(chain).keySet
+    for {
+      h <- histories
+      c <- conjuncts(h) if HistoryPreorder.simpleRelations(c).isEmpty
+      named = namesIn(c).filter(fields.contains)
+      m <- methodsOf(cls) if m.block != null
+      shadowed = declaredNames(m)
+      w <- writesIn(m.block).find(w => named.contains(w.field) && !shadowed.contains(w.field))
+    } unchecked += Unchecked(unitFile, cls, m, w.field, None, line = Option(h.location).map(_.line).getOrElse(0), fieldType = None)
+  }
+
+  private def conjuncts(e: AST.Expression): Seq[AST.Expression] = e match {
+    case AST.LogicalAnd(_, l, r) => conjuncts(l) ++ conjuncts(r)
+    case other                   => Seq(other)
+  }
+
+  private def namesIn(e: AST.Node): Set[String] = {
+    val names = Set.newBuilder[String]
+    def visit(n: AST.Node): Unit = {
+      n match {
+        case e: AST.Expression => fieldOf(e).foreach(names += _)
+        case _ =>
+      }
+      ASTWalk.visitChildren(n)(visit)
+    }
+    visit(e)
+    names.result()
+  }
+
+  /** The fields declared in the class and its superclasses, with how each type is spelled. */
+  private def fieldTypes(chain: Seq[AST.ClassDeclaration]): Map[String, String] =
+    chain.reverse.flatMap(c => (c.defaultSection.toSeq ++ c.sections).flatMap(_.members)).collect {
+      case f: AST.FieldDeclaration => f.name -> typeName(f.typeRef)
+    }.toMap
+
+  private def typeName(t: AST.TypeNode): String = if (t == null) "" else t.desc match {
+    case AST.PrimitiveType(k)    => k.name.capitalize
+    case AST.ReferenceType(n, _) => n.split('.').last
+    case other                   => other.toString
   }
 
   /**
@@ -97,6 +146,10 @@ final class HistoryWritePass(typing: Typing) {
       case HistoryProver.Counterexample(before) =>
         collected += Repro(unitFile, cls, m, field, op, before)
       case HistoryProver.Proved => proved += s"${cls.name}.${m.name}: $field $op old($field)"
+      case HistoryProver.Unsupported if writesIn(m.block).exists(w => w.field == field && !declaredNames(m).contains(field)) =>
+        val ty = fieldTypes(chain).get(field)
+        unchecked += Unchecked(unitFile, cls, m, field, Some(s"$field $op old($field)"), line = 0,
+          fieldType = ty.filter(_ != "Int"))
       case _ =>
     }
   }
@@ -177,18 +230,29 @@ final class HistoryWritePass(typing: Typing) {
   }
 
   private def assignKind(field: String, rhs: AST.Expression): Kind = rhs match {
-    case AST.IntegerLiteral(_, _, _) => SetConst
+    case e if constant(e).isDefined => SetConst
     case AST.Addition(_, l, r) if fieldOf(l).contains(field) => deltaKind(r, 1)
     case AST.Subtraction(_, l, r) if fieldOf(l).contains(field) => deltaKind(r, -1)
     case _ => Other
   }
 
   /** `sign` is +1 for adding `e` and -1 for subtracting it. Only a constant is classified. */
-  private def deltaKind(e: AST.Expression, sign: Int): Kind = e match {
-    case AST.IntegerLiteral(_, k, _) =>
+  private def deltaKind(e: AST.Expression, sign: Int): Kind = constant(e) match {
+    case Some(k) =>
       val d = sign * k
       if (d > 0) Raise else if (d < 0) Lower else Other
-    case _ => Other
+    case None => Other
+  }
+
+  /** A numeric literal's value, whatever its width: `1`, `1L`, `1.5`, `1.5f`, `1S`, `1B` (#2574). */
+  private def constant(e: AST.Expression): Option[Double] = e match {
+    case AST.IntegerLiteral(_, k, _) => Some(k.toDouble)
+    case AST.LongLiteral(_, k)       => Some(k.toDouble)
+    case AST.DoubleLiteral(_, k) if !k.isNaN => Some(k)
+    case AST.FloatLiteral(_, k) if !k.isNaN  => Some(k.toDouble)
+    case AST.ShortLiteral(_, k)      => Some(k.toDouble)
+    case AST.ByteLiteral(_, k)       => Some(k.toDouble)
+    case _                           => None
   }
 
   private def fieldOf(e: AST.Expression): Option[String] = e match {
@@ -206,4 +270,12 @@ object HistoryWritePass {
     def history: String = s"$field $op old($field)"
     def shown: String = before.toSeq.sortBy(_._1).map { case (k, v) => s"$k = $v" }.mkString(", ")
   }
+
+  /**
+   * A write to `field` in `method` that no check settled. `history` is the simple relation the
+   * solver could not decide, or none for a history of another form (then `line` names it).
+   * `fieldType` is set when the field is not an `Int`, which the solver does not model.
+   */
+  final case class Unchecked(sourceFile: String, cls: AST.ClassDeclaration, method: AST.MethodDeclaration,
+                             field: String, history: Option[String], line: Int, fieldType: Option[String])
 }

@@ -42,6 +42,7 @@ enum WarningCategory(val code: String, val description: String):
   case DiscardedBuilderResult extends WarningCategory("W0019", "The result of an immutable builder method is discarded, so the call has no effect")
   case ExtensionMethodShadowed extends WarningCategory("W0020", "An extension method's name and arity exactly match an existing member, so the extension is never called")
   case HistoryNotProved extends WarningCategory("W0021", "A method can break a history; the solver found a counterexample")
+  case HistoryNotChecked extends WarningCategory("W0024", "A method writes a field that a history names, and no check settled whether the history still holds")
 
 object WarningCategory:
   private val aliases: Map[String, WarningCategory] = Map(
@@ -67,7 +68,8 @@ object WarningCategory:
     "foreign-effect-entry" -> WarningCategory.LibraryEffectTableForeignClass,
     "discarded-builder-result" -> WarningCategory.DiscardedBuilderResult,
     "extension-method-shadowed" -> WarningCategory.ExtensionMethodShadowed,
-    "history-not-proved" -> WarningCategory.HistoryNotProved
+    "history-not-proved" -> WarningCategory.HistoryNotProved,
+    "history-not-checked" -> WarningCategory.HistoryNotChecked
   )
 
   def fromString(value: String): Option[WarningCategory] =

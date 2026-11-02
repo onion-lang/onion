@@ -1,6 +1,6 @@
 package onion.compiler.verification
 
-import onion.compiler.{CompileError, CompileWarning, CompiledClass, CompilerConfig, ContractMode, Location, OnionClassLoader, SemanticError, WarningCategory}
+import onion.compiler.{CompileError, CompileWarning, CompiledClass, CompilerConfig, ContractMode, Location, OnionClassLoader, SemanticError, WarningCategory, WarningLevel}
 import onion.compiler.exceptions.CompilationException
 import onion.compiler.pipeline.{CompilerPhase, PhaseContext}
 import onion.compiler.toolbox.Message
@@ -32,6 +32,8 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
     val repros = analysis.counterexamples(units)
     // A proved history prints nothing by default; --verbose lists what the solver proved.
     if (config.verbose) analysis.proved.foreach(p => System.err.println(s"[history] proved: $p"))
+    // What nothing settled is said, never left to look like a proof (#2574).
+    ctx.addWarnings(shown(analysis.unchecked.toSeq.map(notChecked)))
     if (repros.isEmpty) return classes
 
     val loader = new OnionClassLoader(classOf[OnionClassLoader].getClassLoader, config.classPath, classes)
@@ -54,9 +56,28 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
         }
       }
     } finally thread.setContextClassLoader(previous)
-    ctx.addWarnings(warnings.toSeq)
+    ctx.addWarnings(shown(warnings.toSeq))
     if (errors.nonEmpty) throw new CompilationException(errors.toSeq)
     classes
+  }
+
+  /** This phase runs after typing's warning filter, so it applies `--warn off` and `--Wno` itself. */
+  private def shown(ws: Seq[CompileWarning]): Seq[CompileWarning] =
+    if (config.warningLevel == WarningLevel.Off) Nil
+    else ws.filterNot(w => config.suppressedWarnings.contains(w.category))
+
+  private def notChecked(u: HistoryWritePass.Unchecked): CompileWarning = {
+    val method = s"${u.cls.name}.${u.method.name}"
+    val message = u.history match {
+      case Some(h) =>
+        val reason = u.fieldType match {
+          case Some(t) => Message("warning.historyNotChecked.reason.type", u.field, t)
+          case None    => Message("warning.historyNotChecked.reason.body")
+        }
+        Message("warning.historyNotChecked", Array[Any](method, u.field, h, reason))
+      case None => Message("warning.historyNotChecked.form", Array[Any](method, u.field, u.line.toString))
+    }
+    CompileWarning(u.sourceFile, u.method.location, WarningCategory.HistoryNotChecked, message)
   }
 
   /** Whether running the method from the solver's state breaks the history. False when it cannot be run. */

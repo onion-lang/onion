@@ -253,3 +253,58 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     val chain = violation(Array("--contracts", "runtime", path))
     assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("precondition failed")), chain.map(_.getMessage).toString)
 
+  private def genericProgram(body: String) =
+    s"""class Box {
+       |public:
+       |  def keep[T](x: T): T
+       |    ensures result == x
+       |  { $body }
+       |}
+       |println(new Box().keep("hello"))
+       |""".stripMargin
+
+  test("--contracts runtime guards a generic method: a true ensures passes"):
+    val path = writeScript(genericProgram("return x"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("hello")
+
+  test("--contracts runtime guards a generic method: a false ensures throws"):
+    val path = writeScript(
+      """class Box {
+        |public:
+        |  def pick[T](x: T, y: T): T
+        |    ensures result == x
+        |  { return y }
+        |}
+        |println(new Box().pick("a", "b"))
+        |""".stripMargin)
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("postcondition failed")), chain.map(_.getMessage).toString)
+
+  private def variadicProgram(arg: String) =
+    s"""class Sum {
+       |public:
+       |  def total(xs: Int...): Int
+       |    requires xs.length > 0
+       |    ensures result >= 0
+       |  {
+       |    var s = 0
+       |    foreach x: Int in xs { s = s + x }
+       |    return s
+       |  }
+       |}
+       |println(new Sum().total($arg))
+       |""".stripMargin
+
+  test("--contracts runtime guards a variadic method: a true contract passes"):
+    val path = writeScript(variadicProgram("1, 2, 3"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("6")
+
+  test("--contracts runtime guards a variadic method: a false ensures throws"):
+    val path = writeScript(variadicProgram("1, -5"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("postcondition failed")), chain.map(_.getMessage).toString)
+

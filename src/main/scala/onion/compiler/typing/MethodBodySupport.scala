@@ -25,7 +25,10 @@ private[compiler] final class MethodBodySupport(
   ): Unit = {
     val context = prepareMethodContext(method, args, block)
     // Preconditions see the parameters and the object, before the body runs.
-    if (requires.nonEmpty) method.preconditions = typeContractClauses(requires, context, ContractScope.Pre)
+    if (requires.nonEmpty) {
+      method.preconditions = typeContractClauses(requires, context, ContractScope.Pre)
+      method.contractRequiresText = requires.flatMap(onion.compiler.contracts.ContractText.write)
+    }
     val triesBefore = bodyContext.tryCount
     val translated = translate(block, context)
     method.mayContainTry = bodyContext.tryCount != triesBefore
@@ -33,6 +36,7 @@ private[compiler] final class MethodBodySupport(
     // Postconditions are typed in the same context once the body is, with `result` bound.
     if (ensures.nonEmpty) {
       method.postconditions = typePostconditions(method, ensures, context)
+      method.contractEnsuresText = ensures.flatMap(onion.compiler.contracts.ContractText.write)
       method.assertsResult = ensures.exists { case AST.Id(_, "result") => true; case _ => false }
     }
     val guarded = withRequiresGuards(method, requires, translated)

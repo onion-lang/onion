@@ -290,6 +290,26 @@ object AsmRefs {
   }
 
   class AsmMethodRef(method: MethodNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType], onionCompiled: Boolean = false) extends TypedAST.Method {
+
+    /**
+     * The `@onion.Contract` an Onion compilation wrote on this method (RFC #2557): its clauses as
+     * expressions, parsed back from the text. A clause that does not parse is dropped, never
+     * guessed, so a module may pass on fewer contracts than it had but never a different one.
+     */
+    lazy val contract: onion.compiler.contracts.ContractClauses = {
+      import scala.jdk.CollectionConverters._
+      val note = Option(method.invisibleAnnotations).map(_.asScala).getOrElse(Nil)
+        .find(_.desc == "Lonion/Contract;")
+      def clauses(name: String): List[onion.compiler.AST.Expression] =
+        note.flatMap(a => Option(a.values)).map(_.asScala.toList.grouped(2).collect {
+          case List(key: String, values: java.util.List[?]) if key == name => values.asScala.toList.map(_.toString)
+        }.flatten.toList).getOrElse(Nil).flatMap(onion.compiler.contracts.ContractText.read)
+      def texts(name: String): List[String] =
+        note.flatMap(a => Option(a.values)).map(_.asScala.toList.grouped(2).collect {
+          case List(key: String, values: java.util.List[?]) if key == name => values.asScala.toList.map(_.toString)
+        }.flatten.toList).getOrElse(Nil)
+      onion.compiler.contracts.ContractClauses(clauses("requires"), clauses("ensures"), texts("params"))
+    }
     // A class file that javac (or any non-Onion compiler) wrote -- the JDK and every
     // hand-written src/main/java/onion/* stdlib class. A separately compiled Onion class
     // records its parameters' nullness (NullabilityMetadata), so it is not Java origin.

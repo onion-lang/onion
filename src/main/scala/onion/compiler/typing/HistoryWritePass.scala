@@ -16,7 +16,7 @@ import onion.compiler.contracts.HistoryProver
  * Constructors are not checked: a history relates the states around a call, and a constructor
  * has no earlier state.
  */
-final class HistoryWritePass(typing: Typing) {
+final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.compiler.TypedAST.ClassType] = _ => None) {
   import HistoryWritePass.{Repro, Unchecked}
   // `counterexamples` runs the same analysis without reporting and collects what the solver found.
   private var collected: scala.collection.mutable.ArrayBuffer[Repro] = null
@@ -145,7 +145,7 @@ final class HistoryWritePass(typing: Typing) {
     for {
       m <- methodsOf(cls) if m.block != null && !writesIn(m.block).exists(w => relations.exists(_._1 == w.field) && brokenSyntactically(w, relations, chain))
       (field, op) <- relations
-    } HistoryProver.prove(m, field, op, intFields, invariants, callees) match {
+    } HistoryProver.prove(m, field, op, intFields, invariants, callees, builtCallees(m)) match {
       case HistoryProver.Counterexample(before) =>
         collected += Repro(unitFile, cls, m, field, op, before)
       case HistoryProver.Proved => proved += s"${cls.name}.${m.name}: $field $op old($field)"
@@ -156,6 +156,22 @@ final class HistoryWritePass(typing: Typing) {
       case _ =>
     }
   }
+
+  /**
+   * The contracts of methods of types built in an earlier compilation, for the parameters of `m`
+   * (RFC #2557, across modules). They are read from the `@onion.Contract` in each class file; a
+   * type with none, or one this compilation defines itself, contributes nothing.
+   */
+  private def builtCallees(m: AST.MethodDeclaration): Map[(String, String), HistoryProver.Callee] =
+    (for {
+      a <- m.args
+      typeName <- Option(a.typeRef).map(_.desc).collect { case AST.ReferenceType(n, _) => n }.toList.distinct
+      classType <- builtType(typeName).toList
+      method <- classType.methods
+      ref <- Some(method).collect { case r: onion.compiler.environment.AsmRefs.AsmMethodRef => r }
+      c = ref.contract if !c.isEmpty
+      callee <- Some(HistoryProver.Callee(c.params, c.requires, c.ensures))
+    } yield (typeName, method.name) -> callee).toMap
 
   private def brokenSyntactically(w: Write, relations: Seq[(String, String)], chain: Seq[AST.ClassDeclaration]): Boolean = {
     val perMethod = for (c <- chain; m <- methodsOf(c) if m.block != null) yield (m, writesIn(m.block))

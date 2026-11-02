@@ -139,10 +139,13 @@ final class HistoryWritePass(typing: Typing) {
       case f: AST.FieldDeclaration if f.typeRef != null && f.typeRef.desc == AST.PrimitiveType(AST.KInt) => f.name
     }.toSet
     val invariants = chain.flatMap(_.invariants)
+    // The methods a body may call: this class's and its superclasses' own, nearest first.
+    val callees: Map[String, AST.MethodDeclaration] =
+      chain.reverse.flatMap(methodsOf).map(m => m.name -> m).toMap
     for {
       m <- methodsOf(cls) if m.block != null && !writesIn(m.block).exists(w => relations.exists(_._1 == w.field) && brokenSyntactically(w, relations, chain))
       (field, op) <- relations
-    } HistoryProver.prove(m, field, op, intFields, invariants) match {
+    } HistoryProver.prove(m, field, op, intFields, invariants, callees) match {
       case HistoryProver.Counterexample(before) =>
         collected += Repro(unitFile, cls, m, field, op, before)
       case HistoryProver.Proved => proved += s"${cls.name}.${m.name}: $field $op old($field)"

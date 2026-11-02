@@ -25,13 +25,33 @@ object HistoryProver {
   private val W = 32
 
   /** Prove `field op old(field)` (`op` is `>=`, `<=` or `==`) for `method`, assuming the class `invariants`. */
+  /**
+   * `callees` are the methods of the class (and its supertypes) a body may call. A call is
+   * modelled only for a callee that returns `Int`, has a body that reads and writes no field, and
+   * states its contract: the result is a fresh word, the callee's `requires` must hold at the call
+   * (an obligation, not an assumption), and its `ensures` constrains the result. Any other call is
+   * [[Unsupported]].
+   */
   def prove(method: AST.MethodDeclaration, field: String, op: String, intFields: Set[String],
-            invariants: Seq[AST.Expression]): Outcome =
+            invariants: Seq[AST.Expression], callees: Map[String, AST.MethodDeclaration] = Map.empty): Outcome =
     if (method.block == null || !intFields.contains(field)) Unsupported
-    else new Run(method, field, op, intFields, invariants).run()
+    else {
+      val first = new Run(method, field, op, intFields, invariants, callees, checkObligations = true)
+      first.run() match {
+        // The callee obligations are a separate question, asked in a circuit of its own, so the
+        // negated obligation does not stay in the clauses of the history question.
+        case Proved => new Run(method, field, op, intFields, invariants, callees, checkObligations = false).run()
+        case other  => other
+      }
+    }
 
   private final class Run(method: AST.MethodDeclaration, field: String, op: String, intFields: Set[String],
-                          invariants: Seq[AST.Expression]) {
+                          invariants: Seq[AST.Expression], callees: Map[String, AST.MethodDeclaration],
+                          checkObligations: Boolean) {
+    /** Conditions the solver may assume (a callee's `ensures`) and must establish (its `requires`). */
+    private val assumed = scala.collection.mutable.ArrayBuffer.empty[Int]
+    private val obligations = scala.collection.mutable.ArrayBuffer.empty[Int]
+    private var unsupportedCall = false
     private val bb = new BitBlast
     private type Env = Map[String, bb.Word]
 
@@ -49,6 +69,17 @@ object HistoryProver {
         case _    => bb.eq(after, before)
       }
       assumptions.flatten.foreach(bb.assertTrue)
+      assumed.foreach(bb.assertTrue)
+      if (checkObligations) {
+        // Can a callee's `requires` fail at a call, given the invariants, the caller's `requires`
+        // and the callees' `ensures`? If so the call is not understood: Unsupported, never a guess.
+        if (obligations.isEmpty) return Proved
+        bb.assertTrue(obligations.map(o => -o).reduceLeft(bb.or))
+        return bb.solve() match {
+          case Sat.Unsatisfiable(proof) => if (Rup.check(bb.numVars, bb.allClauses, proof)) Proved else Unsupported
+          case _                        => Unsupported
+        }
+      }
       bb.assertTrue(-holds)
       bb.solve() match {
         case Sat.Unsatisfiable(proof) => if (Rup.check(bb.numVars, bb.allClauses, proof)) Proved else Unsupported
@@ -107,7 +138,49 @@ object HistoryProver {
       case AST.Subtraction(_, l, r) => bin(l, r, env)(bb.sub)
       case AST.Multiplication(_, l, r) => bin(l, r, env)(bb.mul)
       case AST.Negate(_, t) => expr(t, env).map(bb.neg)
+      case AST.UnqualifiedMethodCall(_, callee, args, _) => call(callee, args, env)
       case other => name(other).flatMap(env.get)
+    }
+
+    /**
+     * A call to a pure, contract-bearing `Int` method of the class. The result is a fresh word;
+     * the callee's `requires` become obligations and its `ensures` become assumptions, both over
+     * the actual arguments. Nothing else about the callee is used, so nothing is guessed.
+     */
+    private def call(name: String, args: List[AST.Expression], env: Env): Option[bb.Word] =
+      for {
+        m <- callees.get(name)
+        if m.args.size == args.size && isInt(m.returnType) && m.args.forall(a => isInt(a.typeRef))
+        if m.ensures.nonEmpty && readsNoField(m)
+        actuals <- sequence(args.map(expr(_, env)))
+      } yield {
+        val result = bb.fresh(W)
+        // the callee's own scope: its parameters bound to the actuals, `result` to the fresh word
+        val scope: Env = m.args.map(_.name).zip(actuals).toMap + ("result" -> result)
+        m.requires.foreach(r => cond(r, scope).foreach(obligations += _))
+        m.ensures.foreach(e => cond(e, scope).foreach(assumed += _))
+        result
+      }
+
+    private def sequence[A](xs: List[Option[A]]): Option[List[A]] =
+      if (xs.forall(_.isDefined)) Some(xs.map(_.get)) else None
+
+    /** The callee's body must not touch the object: no field is read or written. */
+    private def readsNoField(m: AST.MethodDeclaration): Boolean =
+      m.block != null && !intFields.exists(f => mentions(m.block, f)) && !m.args.exists(_ => false)
+
+    private def mentions(n: AST.Node, field: String): Boolean = {
+      var found = false
+      def visit(x: AST.Node): Unit = {
+        x match {
+          case AST.Id(_, `field`) | AST.UnqualifiedFieldReference(_, `field`) => found = true
+          case AST.MemberSelection(_, _: AST.CurrentInstance, `field`) => found = true
+          case _ =>
+        }
+        if (!found) onion.compiler.ASTWalk.visitChildren(x)(visit)
+      }
+      visit(n)
+      found
     }
 
     private def bin(l: AST.Expression, r: AST.Expression, env: Env)(f: (bb.Word, bb.Word) => bb.Word): Option[bb.Word] =

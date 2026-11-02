@@ -34,6 +34,8 @@ class UserShapeInstanceSpec extends AbstractShellSpec {
       |    return name.toString() + amt
       |  }
       |  def describe(): String = "fixed-width P"
+      |  def printable(v: P): Boolean =
+      |    v.name().length() <= 10 && v.name() == v.name().trim() && v.amount() >= 0 && v.amount() <= 999999
       |}
       |def l1(): Boolean
       |  ensures result

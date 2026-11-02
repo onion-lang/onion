@@ -143,6 +143,11 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
         val recordTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
         typing.openTypeParams(typing.emptyTypeParams ++ recordTypeParams) {
           methodBodySupport.processTypeContracts(definition, node.invariants, node.histories)
+          // A record is built by a constructor the compiler writes, which assigns the components and
+          // runs no user code, so the `invariant` is not checked when one is built. Say so.
+          if (bodyContext.contractMode == ContractMode.Runtime && node.invariants.nonEmpty)
+            bodyContext.warningReporter.report(WarningCategory.ContractNotEnforced, node.location,
+              s"the invariant of '${node.name}' is not checked when the record is built: its constructor is written by the compiler")
           node.synthesizedMethods.foreach(processMethodDeclaration)
           // Type the bodies of user-defined members from the record body,
           // mirroring processEnumDeclaration.

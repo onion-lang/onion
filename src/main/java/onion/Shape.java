@@ -61,6 +61,17 @@ public interface Shape<T> {
      */
     String print(T value);
 
+    /**
+     * Whether {@code value} is one this shape can print and read back. The round-trip law L1
+     * holds on this domain, not on every value of {@code T}: a fixed-width shape cannot print a
+     * name longer than its column. The default is every value; a shape that has a narrower
+     * domain overrides this. The build checks {@code parse(print(v)) == Ok(v)} for each sampled
+     * {@code v} that is printable (RFC #2557, design section 5.1).
+     */
+    default boolean printable(T value) {
+        return true;
+    }
+
     /** A description of what this shape reads, for diagnostics. */
     String describe();
 

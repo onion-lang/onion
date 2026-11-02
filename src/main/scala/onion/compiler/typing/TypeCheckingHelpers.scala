@@ -58,6 +58,12 @@ private[typing] object TypeCheckingHelpers {
   // `isSuperType` alone, read through a type variable's bound, called `T` a
   // supertype of `String`; a branch join then typed `if c { t } else { "s" }`
   // as `T` and rejected its own else-branch, even under an `Object` target.
+  /** Whether `other` joins into `upper` as `lub` reads it: a type variable takes only its
+   *  own values, and type arguments that mention one must match. Collection literals use
+   *  it to join their elements, so `[t, u]` in `S[T, U]` is not a `List[T]` (#2332). */
+  def joinsStrictly(table: ClassTable, upper: Type, other: Type): Boolean =
+    joinsInto(upper, other) && argumentsFit(table, upper, other)
+
   private def joinsInto(upper: Type, other: Type): Boolean =
     TypeRules.isSuperType(upper, other) && (upper match {
       case tv: TypeVariableType => fitsTypeVariable(tv, other)
@@ -77,7 +83,8 @@ private[typing] object TypeCheckingHelpers {
   // both, as on `main` before the retry existed.
   // A bare `T` may hold null, so its bound joins as nullable: otherwise
   // `(if c { t } else { "s" }).toString()` lost E0057 and threw at run time.
-  private def boundOf(t: Type): Type = t match {
+  // Collection literals join their elements through it too (#2589 review).
+  def boundOf(t: Type): Type = t match {
     case tv: TypeVariableType =>
       if (tv.nullability == Nullability.Nullable) NullableType.of(joinBound(tv)) else joinBound(tv)
     case n: NullableType => n.innerType match {

@@ -38,6 +38,132 @@ private[compiler] final class AssignabilitySupport(
     }
   }
 
+  private def containsTypeVariable(typeToCheck: Type): Boolean =
+    TypeCheckingHelpers.containsTypeVariable(typeToCheck)
+
+  /**
+   * Whether a value of type `actual` may fill a slot of type `expected` with no
+   * conversion: the rule `processAssignable` applies, as a plain test. A type
+   * variable is checked by identity, not by erasure, so a `U` is not a `T` (#2332).
+   * Collection literals use it to decide whether to adopt the expected element type.
+   */
+  def fitsWithoutConversion(expected: Type, actual: Type): Boolean =
+    if (containsTypeVariable(expected)) structurallyAssignable(expected, actual)
+    else TypeRelations.isAssignableWithBoxing(expected, actual, bodyContext.table)
+
+  // `nested` is true inside a type-argument comparison, where type arguments are
+  // invariant and a variable must not widen to its bound.
+  private def structurallyAssignable(expected: Type, actual: Type, nested: Boolean = false): Boolean = (expected, actual) match {
+    case (_, nt) if nt.isNullType =>
+      // The null literal is assignable to any reference (non-basic) target,
+      // including a generic type parameterized by a type variable (Node[T]).
+      // The nullability concern is already handled by the W0012
+      // nullToNonNullable warning emitted above, so this must not become a
+      // hard INCOMPATIBLE_TYPE error — matching the non-type-variable path
+      // (TypeRelations.isAssignableWithBoxing) which accepts null here (#283).
+      !expected.isBasicType
+    case (tv: TypedAST.TypeVariableType, _) =>
+      // Pass `tv` itself, not its erased `upperBound`: when `actual` is
+      // itself a type variable (e.g. `T` in `[B, T extends B]`), only
+      // `isSuperType`'s own identity-aware chain walk can tell "T's
+      // bound chain passes through `tv`" apart from "both happen to
+      // erase to the same root class" (#2259's unsoundness) -- erasing
+      // `tv` here first would throw away exactly the identity it needs.
+      TypeRules.isSuperType(tv, actual) && TypeCheckingHelpers.fitsTypeVariable(tv, actual)
+    case (en: NullableType, _) if en.innerType.isInstanceOf[TypedAST.TypeVariableType] =>
+      // A `T?` slot takes what a `T` slot takes, plus null (handled above)
+      // and an `S?` whose `S` fits `T`. Falling through to the erased check
+      // let a `U`, a `String` or an `Object` into it (#2332).
+      val inner = actual match {
+        case an: NullableType => an.innerType
+        case other => other
+      }
+      structurallyAssignable(en.innerType, inner, nested)
+    case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
+      def argsMatch(view: TypedAST.AppliedClassType): Boolean =
+        ae.typeArguments.length == view.typeArguments.length &&
+          ae.typeArguments.zip(view.typeArguments).forall { case (e, a) =>
+            // Type arguments are invariant: List[T] is not a List[B] even
+            // when T extends B (a mutable List[B] view could then store
+            // something that only fits B, corrupting the underlying
+            // List[T]). Checking only one direction let a type-variable
+            // argument through covariantly via isSuperType's chain walk
+            // above (#2259 review repro: returning a `List[T]` field as
+            // `List[B]` compiled, then a `List[B].add` of a non-T value
+            // threw a ClassCastException on the real `List[T]`).
+            // Scoped to a plain type variable on either side -- a
+            // wildcard (`Function1[T, ?]`) already has its own,
+            // deliberately one-directional covariant/contravariant
+            // rules (handled elsewhere), and requiring both directions
+            // for it rejected ordinary covariant wildcard uses that
+            // never involved a chained bound at all.
+            val involvesTypeVariable =
+              !e.isInstanceOf[TypedAST.WildcardType] &&
+                (e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType])
+            e match {
+              // `Collection[? extends T]` (the JDK's `addAll`) takes a
+              // `List[T]`: the wildcard's own bound decides, one way
+              // (#2341). `? super L` is the mirror image.
+              case w: TypedAST.WildcardType if !a.isInstanceOf[TypedAST.WildcardType] =>
+                // A bound that is itself a type variable is abstract: only
+                // that variable (or one whose bound chain reaches it)
+                // fits. A concrete type, `Object` or an unrelated `U`
+                // must not pass just because it erases to the same
+                // class, or `xs.addAll(o)` with `o: List[Object]`
+                // would pollute a `List[T]`.
+                // `? super L` with a variable on either side (`T`, `T?`): the one
+                // rule overload resolution also uses (#2367, #2399).
+                def variableLike(t: Type): Boolean = t match {
+                  case _: TypedAST.TypeVariableType => true
+                  case n: NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
+                  case _ => false
+                }
+                w.lowerBound match {
+                  case Some(lb) if variableLike(lb) || variableLike(a) => TypeRules.superWildcardAccepts(a, lb)
+                  case Some(lb) => structurallyAssignable(a, lb)
+                  case None =>
+                    w.upperBound match {
+                      case tv: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(tv, a)
+                      case ub => structurallyAssignable(ub, a)
+                    }
+                }
+              case _ if involvesTypeVariable => structurallyAssignable(e, a, nested = true) && structurallyAssignable(a, e, nested = true)
+              case _ => structurallyAssignable(e, a, nested = true)
+            }
+          }
+      if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
+      else
+        // Different raw classes: find aa's applied view of ae.raw in its
+        // hierarchy (ArrayList[T] exposes List[T]) and compare the type
+        // arguments structurally, so a generic subtype is assignable to its
+        // generic supertype when the arguments match (#269). Without this, a
+        // type-variable-parameterized subtype (matched via this path because
+        // the expected type contains a type variable) was rejected even though
+        // the concrete-argument form is accepted by the normal hierarchy check.
+        bodyContext.table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
+          .collectFirst { case (raw, view) if TypeRelations.sameClass(raw, ae.raw) && argsMatch(view) => true }
+          .getOrElse(false)
+    case (ae: TypedAST.AppliedClassType, tv: TypedAST.TypeVariableType)
+        if !nested && TypeRelations.typeVariableFitsAppliedBound(ae, tv, bodyContext.table) =>
+      // `T extends Comparable[T]` is a `Comparable[T]`: the same relation a
+      // call argument uses (#2338).
+      true
+    case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>
+      actual match {
+        case classType: TypedAST.ClassType => TypeRelations.sameClass(ae.raw, classType)
+        case _ => false
+      }
+    case _ =>
+      // Boxing-aware terminal comparison: erased generic slots hold boxed
+      // types, so a closure whose result is a primitive `int` still fills a
+      // `Function1[T, Integer]`'s return position (issue #319). Plain
+      // isAssignable is not boxing-aware and false-negatives on Integer vs int,
+      // yielding the self-contradictory "Function1[T,Int] expected, ... used"
+      // when `map` is applied to a raw List. isAssignableWithBoxing keeps the
+      // same acceptance for reference types while adding primitive<->boxed.
+      TypeRelations.isAssignableWithBoxing(expected, actual, bodyContext.table)
+  }
+
   def processAssignable(node: AST.Node, expected: Type, actual: Term, suppressNullWarning: Boolean = false): Term = {
     if (actual == null) return null
     // Target-type an empty collection literal ([] / [:]) to the expected
@@ -161,125 +287,7 @@ private[compiler] final class AssignabilitySupport(
       }
     }
 
-    def containsTypeVariable(typeToCheck: Type): Boolean =
-      TypeCheckingHelpers.containsTypeVariable(typeToCheck)
-
-    // `nested` is true inside a type-argument comparison, where type arguments are
-    // invariant and a variable must not widen to its bound.
-    def structurallyAssignable(expected: Type, actual: Type, nested: Boolean = false): Boolean = (expected, actual) match {
-      case (_, nt) if nt.isNullType =>
-        // The null literal is assignable to any reference (non-basic) target,
-        // including a generic type parameterized by a type variable (Node[T]).
-        // The nullability concern is already handled by the W0012
-        // nullToNonNullable warning emitted above, so this must not become a
-        // hard INCOMPATIBLE_TYPE error — matching the non-type-variable path
-        // (TypeRelations.isAssignableWithBoxing) which accepts null here (#283).
-        !expected.isBasicType
-      case (tv: TypedAST.TypeVariableType, _) =>
-        // Pass `tv` itself, not its erased `upperBound`: when `actual` is
-        // itself a type variable (e.g. `T` in `[B, T extends B]`), only
-        // `isSuperType`'s own identity-aware chain walk can tell "T's
-        // bound chain passes through `tv`" apart from "both happen to
-        // erase to the same root class" (#2259's unsoundness) -- erasing
-        // `tv` here first would throw away exactly the identity it needs.
-        TypeRules.isSuperType(tv, actual) && TypeCheckingHelpers.fitsTypeVariable(tv, actual)
-      case (en: NullableType, _) if en.innerType.isInstanceOf[TypedAST.TypeVariableType] =>
-        // A `T?` slot takes what a `T` slot takes, plus null (handled above)
-        // and an `S?` whose `S` fits `T`. Falling through to the erased check
-        // let a `U`, a `String` or an `Object` into it (#2332).
-        val inner = actual match {
-          case an: NullableType => an.innerType
-          case other => other
-        }
-        structurallyAssignable(en.innerType, inner, nested)
-      case (ae: TypedAST.AppliedClassType, aa: TypedAST.AppliedClassType) =>
-        def argsMatch(view: TypedAST.AppliedClassType): Boolean =
-          ae.typeArguments.length == view.typeArguments.length &&
-            ae.typeArguments.zip(view.typeArguments).forall { case (e, a) =>
-              // Type arguments are invariant: List[T] is not a List[B] even
-              // when T extends B (a mutable List[B] view could then store
-              // something that only fits B, corrupting the underlying
-              // List[T]). Checking only one direction let a type-variable
-              // argument through covariantly via isSuperType's chain walk
-              // above (#2259 review repro: returning a `List[T]` field as
-              // `List[B]` compiled, then a `List[B].add` of a non-T value
-              // threw a ClassCastException on the real `List[T]`).
-              // Scoped to a plain type variable on either side -- a
-              // wildcard (`Function1[T, ?]`) already has its own,
-              // deliberately one-directional covariant/contravariant
-              // rules (handled elsewhere), and requiring both directions
-              // for it rejected ordinary covariant wildcard uses that
-              // never involved a chained bound at all.
-              val involvesTypeVariable =
-                !e.isInstanceOf[TypedAST.WildcardType] &&
-                  (e.isInstanceOf[TypedAST.TypeVariableType] || a.isInstanceOf[TypedAST.TypeVariableType])
-              e match {
-                // `Collection[? extends T]` (the JDK's `addAll`) takes a
-                // `List[T]`: the wildcard's own bound decides, one way
-                // (#2341). `? super L` is the mirror image.
-                case w: TypedAST.WildcardType if !a.isInstanceOf[TypedAST.WildcardType] =>
-                  // A bound that is itself a type variable is abstract: only
-                  // that variable (or one whose bound chain reaches it)
-                  // fits. A concrete type, `Object` or an unrelated `U`
-                  // must not pass just because it erases to the same
-                  // class, or `xs.addAll(o)` with `o: List[Object]`
-                  // would pollute a `List[T]`.
-                  // `? super L` with a variable on either side (`T`, `T?`): the one
-                  // rule overload resolution also uses (#2367, #2399).
-                  def variableLike(t: Type): Boolean = t match {
-                    case _: TypedAST.TypeVariableType => true
-                    case n: NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
-                    case _ => false
-                  }
-                  w.lowerBound match {
-                    case Some(lb) if variableLike(lb) || variableLike(a) => TypeRules.superWildcardAccepts(a, lb)
-                    case Some(lb) => structurallyAssignable(a, lb)
-                    case None =>
-                      w.upperBound match {
-                        case tv: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(tv, a)
-                        case ub => structurallyAssignable(ub, a)
-                      }
-                  }
-                case _ if involvesTypeVariable => structurallyAssignable(e, a, nested = true) && structurallyAssignable(a, e, nested = true)
-                case _ => structurallyAssignable(e, a, nested = true)
-              }
-            }
-        if (TypeRelations.sameClass(ae.raw, aa.raw)) argsMatch(aa)
-        else
-          // Different raw classes: find aa's applied view of ae.raw in its
-          // hierarchy (ArrayList[T] exposes List[T]) and compare the type
-          // arguments structurally, so a generic subtype is assignable to its
-          // generic supertype when the arguments match (#269). Without this, a
-          // type-variable-parameterized subtype (matched via this path because
-          // the expected type contains a type variable) was rejected even though
-          // the concrete-argument form is accepted by the normal hierarchy check.
-          bodyContext.table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
-            .collectFirst { case (raw, view) if TypeRelations.sameClass(raw, ae.raw) && argsMatch(view) => true }
-            .getOrElse(false)
-      case (ae: TypedAST.AppliedClassType, tv: TypedAST.TypeVariableType)
-          if !nested && TypeRelations.typeVariableFitsAppliedBound(ae, tv, bodyContext.table) =>
-        // `T extends Comparable[T]` is a `Comparable[T]`: the same relation a
-        // call argument uses (#2338).
-        true
-      case (ae: TypedAST.AppliedClassType, _) if containsTypeVariable(ae) =>
-        actual match {
-          case classType: TypedAST.ClassType => TypeRelations.sameClass(ae.raw, classType)
-          case _ => false
-        }
-      case _ =>
-        // Boxing-aware terminal comparison: erased generic slots hold boxed
-        // types, so a closure whose result is a primitive `int` still fills a
-        // `Function1[T, Integer]`'s return position (issue #319). Plain
-        // isAssignable is not boxing-aware and false-negatives on Integer vs int,
-        // yielding the self-contradictory "Function1[T,Int] expected, ... used"
-        // when `map` is applied to a raw List. isAssignableWithBoxing keeps the
-        // same acceptance for reference types while adding primitive<->boxed.
-        TypeRelations.isAssignableWithBoxing(expected, actual, bodyContext.table)
-    }
-
-    val isCompatible =
-      if (containsTypeVariable(expected)) structurallyAssignable(expected, actual.`type`)
-      else TypeRelations.isAssignableWithBoxing(expected, actual.`type`, bodyContext.table)
+    val isCompatible = fitsWithoutConversion(expected, actual.`type`)
 
     if (!isCompatible) {
       actual.`type` match {

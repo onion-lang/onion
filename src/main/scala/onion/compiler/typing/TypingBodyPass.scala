@@ -34,7 +34,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     typed(_, _, _),
     typeMemberSelection(_, _),
     typeAssignment(_, _),
-    trySelfMethodQuiet(_, _)
+    trySelfMethodQuiet(_, _),
+    assignabilitySupport
   )
   private val declarationBodySupport = new DeclarationBodySupport(
     typing,

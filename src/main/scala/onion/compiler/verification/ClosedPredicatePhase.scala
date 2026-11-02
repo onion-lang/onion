@@ -23,7 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]] {
   def name: String = "ClosedPredicate"
 
-  private final case class Candidate(owner: Option[String], name: String, sourceFile: String, location: onion.compiler.Location)
+  private final case class Candidate(owner: Option[String], name: String, arity: Int, sourceFile: String, location: onion.compiler.Location)
 
   def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] = {
     if (config.contracts != ContractMode.Check) return classes
@@ -54,21 +54,21 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
 
   private def candidatesOf(unit: AST.CompilationUnit): Seq[Candidate] =
     unit.toplevels.flatMap {
-      case f: AST.FunctionDeclaration if f.args.isEmpty && isBoolean(f.returnType) && f.ensures.nonEmpty =>
-        Seq(Candidate(None, f.name, unit.sourceFile, f.location))
+      case f: AST.FunctionDeclaration if isBoolean(f.returnType) && f.ensures.nonEmpty =>
+        Seq(Candidate(None, f.name, f.args.size, unit.sourceFile, f.location))
       case c: AST.ClassDeclaration =>
         (c.defaultSection.toSeq ++ c.sections).flatMap(_.members).collect {
-          case m: AST.MethodDeclaration if qualifies(m) => Candidate(Some(c.name), m.name, unit.sourceFile, m.location)
+          case m: AST.MethodDeclaration if qualifies(m) => Candidate(Some(c.name), m.name, m.args.size, unit.sourceFile, m.location)
         }
       case r: AST.RecordDeclaration =>
         r.sections.flatMap(_.members).collect {
-          case m: AST.MethodDeclaration if qualifies(m) => Candidate(Some(r.name), m.name, unit.sourceFile, m.location)
+          case m: AST.MethodDeclaration if qualifies(m) => Candidate(Some(r.name), m.name, m.args.size, unit.sourceFile, m.location)
         }
       case _ => Nil
     }
 
   private def qualifies(m: AST.MethodDeclaration): Boolean =
-    Modifier.isStatic(m.modifiers) && m.args.isEmpty && isBoolean(m.returnType) && m.ensures.nonEmpty
+    Modifier.isStatic(m.modifiers) && isBoolean(m.returnType) && m.ensures.nonEmpty
 
   /** `None` when the predicate holds (or cannot be found); the reason when it is false or throws. */
   private def runOne(c: Candidate, classes: Seq[CompiledClass], loader: ClassLoader): Option[String] = {
@@ -78,20 +78,45 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
     }
     val method: Option[Method] = owners.iterator.flatMap { cc =>
       try Class.forName(cc.className, false, loader).getDeclaredMethods.iterator
-          .find(m => m.getName == c.name && m.getParameterCount == 0 && java.lang.reflect.Modifier.isStatic(m.getModifiers) &&
+          .find(m => m.getName == c.name && m.getParameterCount == c.arity && java.lang.reflect.Modifier.isStatic(m.getModifiers) &&
             (m.getReturnType == java.lang.Boolean.TYPE))
       catch { case _: Throwable => None }
     }.nextOption()
     method.flatMap { m =>
-      try {
-        m.setAccessible(true)
-        if (m.invoke(null).asInstanceOf[java.lang.Boolean]) None else Some("false")
-      } catch {
-        case e: java.lang.reflect.InvocationTargetException =>
-          val cause = Option(e.getCause).getOrElse(e)
-          Some(s"threw ${cause.getClass.getSimpleName}: ${cause.getMessage}")
-        case e: Throwable => Some(s"threw ${e.getClass.getSimpleName}")
-      }
+      m.setAccessible(true)
+      val types = m.getParameterTypes
+      val perParam = types.map(t => ArgGenerator.generateValues(t, loader, config.lawSamples, config.lawSeed).orNull)
+      val bad = perParam.indexWhere(_ == null)
+      // A parameter that cannot be sampled must not pass silently: that would look like a predicate that held.
+      if (bad >= 0) Some(s"not checkable: it cannot sample a parameter of type ${types(bad).getSimpleName}")
+      else combos(perParam).iterator.map(args => call(m, args)).collectFirst { case Some(why) => why }
     }
   }
+
+  /** `None` when the call returns true; otherwise why not, with the arguments and how to reproduce them. */
+  private def call(m: Method, args: Array[AnyRef]): Option[String] = {
+    val shown = if (args.isEmpty) "" else args.map(String.valueOf).mkString(" for (", ", ", ")") +
+      s" [--law-seed ${config.lawSeed} --law-samples ${config.lawSamples}]"
+    try {
+      if (m.invoke(null, args*).asInstanceOf[java.lang.Boolean]) None else Some("false" + shown)
+    } catch {
+      case e: java.lang.reflect.InvocationTargetException =>
+        val cause = Option(e.getCause).getOrElse(e)
+        Some(s"threw ${cause.getClass.getSimpleName}: ${cause.getMessage}$shown")
+      case e: Throwable => Some(s"threw ${e.getClass.getSimpleName}$shown")
+    }
+  }
+
+  /** No parameters: one call. Otherwise a diagonal over the samples plus a one-at-a-time boundary sweep, capped. */
+  private def combos(perParam: Array[List[AnyRef]]): List[Array[AnyRef]] =
+    if (perParam.isEmpty) List(Array.empty[AnyRef])
+    else {
+      val arity = perParam.length
+      val minLen = perParam.map(_.length).min
+      val diag = (0 until minLen).map(i => Array.tabulate(arity)(p => perParam(p)(i))).toList
+      val sweep = (0 until arity).flatMap { p =>
+        perParam(p).indices.map(k => Array.tabulate(arity)(q => if (q == p) perParam(q)(k) else perParam(q)(0)))
+      }.toList
+      (diag ++ sweep).take(config.lawSamples)
+    }
 }

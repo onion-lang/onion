@@ -45,9 +45,17 @@ enum RunwayStatus(code: String, label: String) {
 
 // A ground-control log line: "AAL123 TAXI 09R 1422" (callsign, action, runway, hhmm)
 record ClearanceLog(callsign: String, action: String, runway: String, hhmm: Int)
-  from re"(\S+) (\S+) (\S+) (\d+)"
-  example { ClearanceLog::parse("AAL123 TAXI 09R 1422") != null }
-  example { ClearanceLog::parse("not a valid line") == null }
+  from re"(\S+) (\S+) (\S+) (\d+)" {
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = ClearanceLog::parse("AAL123 TAXI 09R 1422") != null
+  static def example_2(): Boolean
+    ensures result
+    = ClearanceLog::parse("not a valid line") == null
+
+
+}
 
 // ─── Extension methods ────────────────────────────────────────────────────────
 

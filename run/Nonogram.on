@@ -46,10 +46,19 @@ extension String {
 // ─── Clue: run-lengths for one row or column ─────────────────────────────────
 
 record Clue(groups: List[Int]) {
-  example { new Clue([3, 2]).minLength() == 6 }
-  example { new Clue([]).minLength() == 0 }
-  example { new Clue([1]).minLength() == 1 }
+
+
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new Clue([3, 2]).minLength() == 6
+  static def example_2(): Boolean
+    ensures result
+    = new Clue([]).minLength() == 0
+  static def example_3(): Boolean
+    ensures result
+    = new Clue([1]).minLength() == 1
   def minLength(): Int {
     if groups().isEmpty() { return 0 }
     val sum: Int = groups().fold(0) { acc, n -> acc + n }

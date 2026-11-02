@@ -98,10 +98,14 @@ public:
 // ─── Task record ──────────────────────────────────────────────────────────────
 
 record Task(id: Int, title: String, priority: Priority, status: Status, estHrs: Int, owner: String) {
-  example {
+  public:
+  static def example_1(): Boolean
+    ensures result
+  {
     val t = new Task(1, "Setup CI", Priority::High, new Todo(), 4, "alice")
-    t.id() == 1 && t.estHrs() == 4 && !t.status().isDone()
+    return t.id() == 1 && t.estHrs() == 4 && !t.status().isDone()
   }
+
 }
 
 // ─── Milestone class ──────────────────────────────────────────────────────────

@@ -82,11 +82,14 @@ public:
 // ─── Records ──────────────────────────────────────────────────────────────────
 
 record CipherConfig(name: String, keyStr: String) {
-  example {
-    val cc: CipherConfig = new CipherConfig("Caesar-13", "13")
-    cc.name().length() > 0
-  }
+
 public:
+  static def example_1(): Boolean
+    ensures result
+  {
+    val cc: CipherConfig = new CipherConfig("Caesar-13", "13")
+    return cc.name().length() > 0
+  }
   def keyInt(): Int {
     try {
       return java.lang.Integer::parseInt(keyStr())
@@ -97,21 +100,27 @@ public:
 }
 
 record CipherResult(original: String, result: String, op: CipherOp, cipherName: String) {
-  example {
-    val cr: CipherResult = new CipherResult("HELLO", "URYYB", new Encrypt(), "ROT13")
-    cr.original().length() == cr.result().length()
-  }
+
 public:
+  static def example_2(): Boolean
+    ensures result
+  {
+    val cr: CipherResult = new CipherResult("HELLO", "URYYB", new Encrypt(), "ROT13")
+    return cr.original().length() == cr.result().length()
+  }
   def summary(): String =
     "#{cipherName()} #{op().label()}: '#{original().truncate(30)}' → '#{result().truncate(30)}'"
 }
 
 record FreqEntry(ch: String, count: Int, total: Int) {
-  example {
-    val fe: FreqEntry = new FreqEntry("E", 15, 100)
-    fe.count() <= fe.total()
-  }
+
 public:
+  static def example_3(): Boolean
+    ensures result
+  {
+    val fe: FreqEntry = new FreqEntry("E", 15, 100)
+    return fe.count() <= fe.total()
+  }
   def freq(): Double = if total() <= 0 { 0.0 } else { (count() as Double) / (total() as Double) }
   def bar(width: Int): String {
     val filled: Int = (freq() * width.doubleValue() + 0.5) as Int
@@ -128,8 +137,13 @@ public:
 
 // ─── Generic ranked wrapper ───────────────────────────────────────────────────
 
-record Ranked[T](rank: Int, item: T, score: Double)
-  example { new Ranked[String](1, "E", 12.7).rank() == 1 }
+record Ranked[T](rank: Int, item: T, score: Double) {
+  public:
+  static def example_4(): Boolean
+    ensures result
+    = new Ranked[String](1, "E", 12.7).rank() == 1
+
+}
 
 // ─── Interface Cipher ─────────────────────────────────────────────────────────
 

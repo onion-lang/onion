@@ -79,8 +79,15 @@ public:
 // ─── Records ──────────────────────────────────────────────────────────────────
 
 record Airport(code: String, city: String, country: String) {
-  example { new Airport("JFK", "New York", "USA").code() == "JFK" }
-  example { new Airport("LHR", "London", "UK").city() == "London" }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Airport("JFK", "New York", "USA").code() == "JFK"
+  static def example_2(): Boolean
+    ensures result
+    = new Airport("LHR", "London", "UK").city() == "London"
+
+
 }
 
 record Passenger(id: String, firstName: String, lastName: String, email: String) {

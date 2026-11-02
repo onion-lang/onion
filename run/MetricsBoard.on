@@ -25,18 +25,26 @@ enum Severity {
 
 record DataPoint(name: String, ts: Long, value: Double) {
   shape doc = json
-  example roundtrip {
+  public:
+  static def roundtrip(): Boolean
+    ensures result
+  {
     val p = new DataPoint("cpu", 1000L, 42.5)
-    DataPoint::doc().parse(DataPoint::doc().print(p)).isOk()
+    return DataPoint::doc().parse(DataPoint::doc().print(p)).isOk()
   }
+
 }
 
 record Alert(metric: String, threshold: Double, message: String) {
   shape doc = json
-  example roundtrip {
+  public:
+  static def roundtrip(): Boolean
+    ensures result
+  {
     val a = new Alert("cpu_pct", 80.0, "high")
-    Alert::doc().parse(Alert::doc().print(a)).isOk()
+    return Alert::doc().parse(Alert::doc().print(a)).isOk()
   }
+
 }
 
 // ── extension methods ─────────────────────────────────────────────────────────

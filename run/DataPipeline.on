@@ -29,9 +29,11 @@ enum StageResult {
 // ── records ───────────────────────────────────────────────────────────────────
 
 record Sale(id: Int, region: Region, product: String, tier: ProductTier, amount: Double) {
-  example validAmount {
-    new Sale(1, Region::APAC, "Widget", ProductTier::STANDARD, 99.99).amount() > 0.0
-  }
+  public:
+  static def validAmount(): Boolean
+    ensures result
+    = new Sale(1, Region::APAC, "Widget", ProductTier::STANDARD, 99.99).amount() > 0.0
+
 }
 
 record RegionStats(
@@ -42,12 +44,15 @@ record RegionStats(
   maxSale: Double,
   topProduct: String
 ) {
-  example nonEmpty {
-    val s = new RegionStats(Region::APAC, 5, 250.0, 50.0, 120.0, "Widget")
-    s.count() > 0 && s.total() >= s.avg()
-  }
+
 
   public:
+  static def nonEmpty(): Boolean
+    ensures result
+  {
+    val s = new RegionStats(Region::APAC, 5, 250.0, 50.0, 120.0, "Widget")
+    return s.count() > 0 && s.total() >= s.avg()
+  }
   def label(): String = select region {
     case Region::APAC:  "APAC"
     case Region::EMEA:  "EMEA"
@@ -57,9 +62,11 @@ record RegionStats(
 }
 
 record BatchSummary(regions: Int, totalSales: Int, grandTotal: Double, topRegion: String) {
-  example positive {
-    new BatchSummary(2, 20, 1000.0, "AMER").grandTotal() > 0.0
-  }
+  public:
+  static def positive(): Boolean
+    ensures result
+    = new BatchSummary(2, 20, 1000.0, "AMER").grandTotal() > 0.0
+
 }
 
 // ── extension methods ─────────────────────────────────────────────────────────

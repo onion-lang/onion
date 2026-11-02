@@ -120,8 +120,12 @@ record RawObs(
   notes:       String
 ) from re"(\d{4}-\d{2}-\d{2}),([A-Z][A-Z0-9]+),(\d+),(\d),(HIT|MISS|PART),(.*)"
 
-example { RawObs::parse("2024-03-15,M42,45,1,HIT,Excellent detail") != null }
-example { RawObs::parse("bad-line") == null }
+def example_1(): Boolean
+  ensures result
+  = RawObs::parse("2024-03-15,M42,45,1,HIT,Excellent detail") != null
+def example_2(): Boolean
+  ensures result
+  = RawObs::parse("bad-line") == null
 
 // ─── Observation ─────────────────────────────────────────────────────────────
 

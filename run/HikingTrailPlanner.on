@@ -114,30 +114,48 @@ public:
 
 // ─── Records ──────────────────────────────────────────────────────────────────
 
-record Waypoint(name: String, elevation: Double, distFromStart: Double)
-  example {
+record Waypoint(name: String, elevation: Double, distFromStart: Double) {
+  public:
+  static def example_1(): Boolean
+    ensures result
+  {
     val wp: Waypoint = new Waypoint("Summit", 2450.0, 8.5)
-    wp.elevation() > wp.distFromStart()
+    return wp.elevation() > wp.distFromStart()
   }
 
+}
+
 record ElevationProfile(gain: Double, loss: Double, maxElev: Double, minElev: Double) {
-  example {
-    val ep: ElevationProfile = new ElevationProfile(400.0, 50.0, 1200.0, 800.0)
-    ep.gain() > ep.loss()
-  }
+
 public:
+  static def example_2(): Boolean
+    ensures result
+  {
+    val ep: ElevationProfile = new ElevationProfile(400.0, 50.0, 1200.0, 800.0)
+    return ep.gain() > ep.loss()
+  }
   def netChange(): Double = gain() - loss()
   def range(): Double = maxElev() - minElev()
   def summary(): String = "+#{gain().formatElev()} / -#{loss().formatElev()}  net: #{netChange().formatElev()}"
 }
 
-record TrailStats(trailCount: Int, totalDist: Double, avgElev: Double, hardestDiff: String)
-  example { new TrailStats(5, 42.3, 1200.0, "Hard").trailCount() == 5 }
+record TrailStats(trailCount: Int, totalDist: Double, avgElev: Double, hardestDiff: String) {
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = new TrailStats(5, 42.3, 1200.0, "Hard").trailCount() == 5
+
+}
 
 // ─── Generic ranked wrapper ───────────────────────────────────────────────────
 
-record Ranked[T](rank: Int, item: T, score: Double)
-  example { new Ranked[String](1, "Summit Loop", 9.2).rank() == 1 }
+record Ranked[T](rank: Int, item: T, score: Double) {
+  public:
+  static def example_4(): Boolean
+    ensures result
+    = new Ranked[String](1, "Summit Loop", 9.2).rank() == 1
+
+}
 
 // ─── Trail class ─────────────────────────────────────────────────────────────
 

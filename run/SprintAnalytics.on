@@ -91,8 +91,15 @@ public:
 
 record RawEntry(id: String, title: String, estimate: Int)
   from re"(\w+-\d+)\|([^|]+)\|(\d+)" {
-  example { RawEntry::parse("SP-001|Implement login|5")?.id() == "SP-001" }
-  example { RawEntry::parse("bad line") == null }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = RawEntry::parse("SP-001|Implement login|5")?.id() == "SP-001"
+  static def example_2(): Boolean
+    ensures result
+    = RawEntry::parse("bad line") == null
+
+
 }
 
 // ── Story record ──────────────────────────────────────────────────────────────

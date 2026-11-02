@@ -45,18 +45,33 @@ public:
 // ── FASTA header record with regex parser ────────────────────────────────────
 
 record FastaHeader(id: String, description: String)
-  from re"([A-Za-z0-9._|]+)\s+(.*)"
-  example { FastaHeader::parse("NM_001234 Homo sapiens gene mRNA") != null }
-  example {
+  from re"([A-Za-z0-9._|]+)\s+(.*)" {
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = FastaHeader::parse("NM_001234 Homo sapiens gene mRNA") != null
+  static def example_2(): Boolean
+    ensures result
+  {
     val h: FastaHeader? = FastaHeader::parse("NP_005219 EGFR protein")
-    h != null && h.id() == "NP_005219"
+    return h != null && h.id() == "NP_005219"
   }
+
+
+}
 
 // ── Sequence region record ───────────────────────────────────────────────────
 
 record SequenceRegion(start: Int, end: Int, label: String) {
-  example { new SequenceRegion(5, 20, "exon").end() == 20 }
-  example { new SequenceRegion(0, 30, "intron").start() == 0 }
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = new SequenceRegion(5, 20, "exon").end() == 20
+  static def example_4(): Boolean
+    ensures result
+    = new SequenceRegion(0, 30, "intron").start() == 0
+
+
 }
 
 def regionLength(r: SequenceRegion): Int = r.end() - r.start()
@@ -70,8 +85,15 @@ def regionDisplay(r: SequenceRegion): String =
 // ── Motif match record ───────────────────────────────────────────────────────
 
 record MotifMatch(motif: String, position: Int) {
-  example { new MotifMatch("ATG", 3).position() == 3 }
-  example { new MotifMatch("ATG", 0).motif() == "ATG" }
+  public:
+  static def example_5(): Boolean
+    ensures result
+    = new MotifMatch("ATG", 3).position() == 3
+  static def example_6(): Boolean
+    ensures result
+    = new MotifMatch("ATG", 0).motif() == "ATG"
+
+
 }
 
 // ── GC classification ADT ────────────────────────────────────────────────────

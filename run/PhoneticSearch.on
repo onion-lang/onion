@@ -131,15 +131,25 @@ enum SearchMode {
 // ─── Records ─────────────────────────────────────────────────────────────────
 
 record Person(id: Int, name: String, city: String, occupation: String) {
-  example { new Person(1, "Alice", "London", "engineer").name() == "Alice" }
-  example { new Person(2, "Bob", "Paris", "artist").city() == "Paris" }
+
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new Person(1, "Alice", "London", "engineer").name() == "Alice"
+  static def example_2(): Boolean
+    ensures result
+    = new Person(2, "Bob", "Paris", "artist").city() == "Paris"
   def soundexCode(): String = name().soundex()
   def summary(): String = "#{id()}. #{name()} (#{city()}, #{occupation()}) [#{soundexCode()}]"
 }
 
 record SearchResult(person: Person, score: String) {
-  example { new SearchResult(new Person(1,"A","B","C"), "exact").score() == "exact" }
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = new SearchResult(new Person(1,"A","B","C"), "exact").score() == "exact"
+
 }
 
 // ─── Database ────────────────────────────────────────────────────────────────

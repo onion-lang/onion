@@ -68,12 +68,15 @@ extension String {
 // ── Core bond record ──────────────────────────────────────────────────────────
 
 record Bond(isin: String, name: String, faceValue: Double, couponRate: Double, periodsLeft: Int, bondType: BondType, rating: Rating) {
-  example {
+
+public:
+  static def example_1(): Boolean
+    ensures result
+  {
     val b = new Bond("US001", "T", 1000.0, 0.04, 10, BondType::Government, new Investment())
     val p: Double = b.price(0.04)
-    p > 999.0 && p < 1001.0
+    return p > 999.0 && p < 1001.0
   }
-public:
   def semiCoupon(): Double = faceValue() * couponRate() / 2.0
 
   def price(ytm: Double): Double {

@@ -44,17 +44,35 @@ public:
 // ─── Records ─────────────────────────────────────────────────────────────────
 
 record Habit(id: Int, name: String, description: String, frequency: Frequency, targetDays: Int) {
-  example { new Habit(1, "Run", "Morning jog", Frequency::DAILY, 30).targetDays() == 30 }
-  example { new Habit(2, "Read", "30 min book", Frequency::WEEKDAYS, 20).name() == "Read" }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Habit(1, "Run", "Morning jog", Frequency::DAILY, 30).targetDays() == 30
+  static def example_2(): Boolean
+    ensures result
+    = new Habit(2, "Read", "30 min book", Frequency::WEEKDAYS, 20).name() == "Read"
+
+
 }
 
 record CheckIn(habitId: Int, result: CheckResult) {
-  example { new CheckIn(1, new Success(5, "3 km")).habitId() == 1 }
-  example { new CheckIn(1, new Missed(3)).result().isSuccess() == false }
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = new CheckIn(1, new Success(5, "3 km")).habitId() == 1
+  static def example_4(): Boolean
+    ensures result
+    = new CheckIn(1, new Missed(3)).result().isSuccess() == false
+
+
 }
 
 record Streak(habitId: Int, start: Int, length: Int) {
-  example { new Streak(1, 1, 5).length() == 5 }
+  public:
+  static def example_5(): Boolean
+    ensures result
+    = new Streak(1, 1, 5).length() == 5
+
 }
 
 // ─── Extension methods ────────────────────────────────────────────────────────

@@ -25,9 +25,15 @@ enum ScanSeverity {
 // ── Records ───────────────────────────────────────────────────────────────────
 
 record Digest(algorithm: String, hex: String) {
-  example { new Digest("sha256", "abc123").algorithm() == "sha256" }
-  example { new Digest("sha256", "abc123").hex() == "abc123" }
+
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new Digest("sha256", "abc123").algorithm() == "sha256"
+  static def example_2(): Boolean
+    ensures result
+    = new Digest("sha256", "abc123").hex() == "abc123"
   def full(): String = "#{algorithm()}:#{hex()}"
   def short(): String {
     if hex().length() <= 12 { return full() }
@@ -36,7 +42,11 @@ public:
 }
 
 record Layer(digest: Digest, size: Long, mediaType: String) {
-  example { new Layer(new Digest("sha256", "dead"), 4096L, "application/octet-stream").size() == 4096L }
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = new Layer(new Digest("sha256", "dead"), 4096L, "application/octet-stream").size() == 4096L
+
 }
 
 record Vulnerability(id: String, severity: ScanSeverity, description: String, fixable: Boolean)
@@ -52,7 +62,11 @@ public:
 }
 
 record ManifestRef(repo: String, tag: String, digest: Digest, totalSize: Long, layers: List[Layer]) {
-  example { new ManifestRef("lib/nginx", "latest", new Digest("sha256", "cafe"), 102400L, []).repo() == "lib/nginx" }
+  public:
+  static def example_4(): Boolean
+    ensures result
+    = new ManifestRef("lib/nginx", "latest", new Digest("sha256", "cafe"), 102400L, []).repo() == "lib/nginx"
+
 }
 
 // ── Extension methods ─────────────────────────────────────────────────────────

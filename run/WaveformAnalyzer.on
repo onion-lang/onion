@@ -41,12 +41,15 @@ extension Int {
 
 record SignalStats(name: String, n: Int, rms: Double, peak: Double,
                   mean: Double, zcr: Double) {
-  example {
-    val st = new SignalStats("test", 100, 0.707, 1.0, 0.0, 0.4)
-    st.n() == 100 && st.rms() > 0.0
-  }
+
 
   public:
+  static def example_1(): Boolean
+    ensures result
+  {
+    val st = new SignalStats("test", 100, 0.707, 1.0, 0.0, 0.4)
+    return st.n() == 100 && st.rms() > 0.0
+  }
   def label(): String =
     "  #{name()} n=#{n()}  rms=#{rms().f4()}  peak=#{peak().f4()}  " +
     "mean=#{mean().f4()}  zcr=#{zcr().f4()}"

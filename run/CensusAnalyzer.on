@@ -66,9 +66,15 @@ public:
 record Person(name: String, age: Int, city: String, occupation: String, income: Int)
   from re"(\w+),(\d+),(\w+),(\w+),(\d+)"
 
-example { Person::parse("Alice,34,Portland,Engineer,95000") != null }
-example { Person::parse("Bob,19,Seattle,Student,8000") != null }
-example { Person::parse("badline") == null }
+def example_1(): Boolean
+  ensures result
+  = Person::parse("Alice,34,Portland,Engineer,95000") != null
+def example_2(): Boolean
+  ensures result
+  = Person::parse("Bob,19,Seattle,Student,8000") != null
+def example_3(): Boolean
+  ensures result
+  = Person::parse("badline") == null
 
 // ─── PersonExt — computed properties via a wrapper ───────────────────────────
 

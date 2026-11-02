@@ -78,27 +78,54 @@ public:
 // ── Records ───────────────────────────────────────────────────────────────
 
 record SurveyResponse(questionKey: String, answer: String) {
-  example { new SurveyResponse("q1", "5").questionKey() == "q1" }
-  example { new SurveyResponse("q2", "yes").answer() == "yes" }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new SurveyResponse("q1", "5").questionKey() == "q1"
+  static def example_2(): Boolean
+    ensures result
+    = new SurveyResponse("q2", "yes").answer() == "yes"
+
+
 }
 
 // Summary records (scalar fields only, so derive!(Json) works)
 
 record RatingSummary(key: String, label: String, count: Int, avg: Double, lo: Int, hi: Int)
-  derive!(Json)
-  example { new RatingSummary("q1", "Overall", 10, 4.2, 1, 5).count() == 10 }
+  derive!(Json) {
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = new RatingSummary("q1", "Overall", 10, 4.2, 1, 5).count() == 10
+
+}
 
 record YesNoSummary(key: String, label: String, total: Int, yesCount: Int)
-  derive!(Json)
-  example { new YesNoSummary("q2", "Helpful?", 20, 15).total() == 20 }
+  derive!(Json) {
+  public:
+  static def example_4(): Boolean
+    ensures result
+    = new YesNoSummary("q2", "Helpful?", 20, 15).total() == 20
+
+}
 
 record ChoiceSummary(key: String, label: String, total: Int, topChoice: String, topCount: Int)
-  derive!(Json)
-  example { new ChoiceSummary("q3", "Freq", 30, "Daily", 12).total() == 30 }
+  derive!(Json) {
+  public:
+  static def example_5(): Boolean
+    ensures result
+    = new ChoiceSummary("q3", "Freq", 30, "Daily", 12).total() == 30
+
+}
 
 record OpenSummary(key: String, label: String, filled: Int, total: Int)
-  derive!(Json)
-  example { new OpenSummary("q4", "Comments", 18, 20).filled() <= new OpenSummary("q4", "Comments", 18, 20).total() }
+  derive!(Json) {
+  public:
+  static def example_6(): Boolean
+    ensures result
+    = new OpenSummary("q4", "Comments", 18, 20).filled() <= new OpenSummary("q4", "Comments", 18, 20).total()
+
+}
 
 // ── Validation helpers ────────────────────────────────────────────────────
 

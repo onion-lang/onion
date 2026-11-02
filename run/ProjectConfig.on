@@ -49,57 +49,81 @@ extension Int {
 
 record DbConfig(host: String, port: Int, database: String, maxPool: Int) {
   shape cfg = config
-  example roundTripDb {
+  public:
+  static def roundTripDb(): Boolean
+    ensures result
+  {
     val t = "# Database\nhost = localhost\nport = 5432\ndatabase = myapp\nmaxPool = 10\n"
     val r = DbConfig::cfg().parseLossless(t).get()
-    DbConfig::cfg().printLossless(r.value(), r.residue()) == t
+    return DbConfig::cfg().printLossless(r.value(), r.residue()) == t
   }
-  example editPortDb {
+  static def editPortDb(): Boolean
+    ensures result
+  {
     val t = "# Database\nhost = example.com\nport = 5432\ndatabase = prod\nmaxPool = 20\n"
     val r = DbConfig::cfg().parseLossless(t).get()
     val out = r.edit { v -> v.copy(port = 5433) }.render()
-    out == "# Database\nhost = example.com\nport = 5433\ndatabase = prod\nmaxPool = 20\n"
+    return out == "# Database\nhost = example.com\nport = 5433\ndatabase = prod\nmaxPool = 20\n"
   }
+
+
 }
 
 // ─── ServerConfig ─────────────────────────────────────────────────────────────
 
 record ServerConfig(host: String, port: Int, workers: Int, timeout: Int) {
   shape cfg = config
-  example roundTripSrv {
+  public:
+  static def roundTripSrv(): Boolean
+    ensures result
+  {
     val t = "# Server\nhost = 0.0.0.0\nport = 8080\nworkers = 4\ntimeout = 30\n"
     val r = ServerConfig::cfg().parseLossless(t).get()
-    ServerConfig::cfg().printLossless(r.value(), r.residue()) == t
+    return ServerConfig::cfg().printLossless(r.value(), r.residue()) == t
   }
-  example editWorkersSrv {
+  static def editWorkersSrv(): Boolean
+    ensures result
+  {
     val t = "# Server\nhost = 0.0.0.0\nport = 8080\nworkers = 4\ntimeout = 30\n"
     val r = ServerConfig::cfg().parseLossless(t).get()
     val out = r.edit { v -> v.copy(workers = 8) }.render()
-    out == "# Server\nhost = 0.0.0.0\nport = 8080\nworkers = 8\ntimeout = 30\n"
+    return out == "# Server\nhost = 0.0.0.0\nport = 8080\nworkers = 8\ntimeout = 30\n"
   }
+
+
 }
 
 // ─── FeatureFlags ─────────────────────────────────────────────────────────────
 
 record FeatureFlags(darkMode: Boolean, betaSearch: Boolean, analytics: Boolean, debugLog: Boolean) {
   shape cfg = config
-  example roundTripFlags {
+  public:
+  static def roundTripFlags(): Boolean
+    ensures result
+  {
     val t = "# Flags\ndarkMode = false\nbetaSearch = false\nanalytics = true\ndebugLog = false\n"
     val r = FeatureFlags::cfg().parseLossless(t).get()
-    FeatureFlags::cfg().printLossless(r.value(), r.residue()) == t
+    return FeatureFlags::cfg().printLossless(r.value(), r.residue()) == t
   }
-  example toggleDarkMode {
+  static def toggleDarkMode(): Boolean
+    ensures result
+  {
     val t = "# Flags\ndarkMode = false\nbetaSearch = false\nanalytics = true\ndebugLog = false\n"
     val r = FeatureFlags::cfg().parseLossless(t).get()
     val out = r.edit { v -> v.copy(darkMode = true) }.render()
-    out == "# Flags\ndarkMode = true\nbetaSearch = false\nanalytics = true\ndebugLog = false\n"
+    return out == "# Flags\ndarkMode = true\nbetaSearch = false\nanalytics = true\ndebugLog = false\n"
   }
-  example toggleAnalytics {
+  static def toggleAnalytics(): Boolean
+    ensures result
+  {
     val t = "# Flags\ndarkMode = false\nbetaSearch = false\nanalytics = true\ndebugLog = false\n"
     val r = FeatureFlags::cfg().parseLossless(t).get()
     val out = r.edit { v -> v.copy(analytics = false) }.render()
-    out == "# Flags\ndarkMode = false\nbetaSearch = false\nanalytics = false\ndebugLog = false\n"
+    return out == "# Flags\ndarkMode = false\nbetaSearch = false\nanalytics = false\ndebugLog = false\n"
   }
+
+
+
 }
 
 // ─── Default file contents ────────────────────────────────────────────────────

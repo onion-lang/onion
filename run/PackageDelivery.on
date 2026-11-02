@@ -24,19 +24,34 @@ enum PackageStatus {
 // ── Records ───────────────────────────────────────────────────────────────────
 
 record Address(street: String, city: String, zip: String) {
-  example { new Address("1 Oak St", "Portland", "97201").city() == "Portland" }
-  example { new Address("2 Elm Ave", "Seattle", "98101").zip() == "98101" }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Address("1 Oak St", "Portland", "97201").city() == "Portland"
+  static def example_2(): Boolean
+    ensures result
+    = new Address("2 Elm Ave", "Seattle", "98101").zip() == "98101"
+
+
 }
 
 record Customer(id: Int, name: String, email: String, address: Address) {
-  example {
+  public:
+  static def example_3(): Boolean
+    ensures result
+  {
     val addr = new Address("10 Pine St", "Denver", "80203")
-    new Customer(42, "Alice", "alice@example.com", addr).name() == "Alice"
+    return new Customer(42, "Alice", "alice@example.com", addr).name() == "Alice"
   }
+
 }
 
 record RouteStop(hub: String, arrivalTime: Int) {
-  example { new RouteStop("PDX Hub", 480).hub() == "PDX Hub" }
+  public:
+  static def example_4(): Boolean
+    ensures result
+    = new RouteStop("PDX Hub", 480).hub() == "PDX Hub"
+
 }
 
 // ── Int extension for display ─────────────────────────────────────────────────

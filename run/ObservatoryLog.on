@@ -56,10 +56,12 @@ def toKind(code: String, detail: String): ObjectKind? =
 // A quick sanity check that magnitude really does order brightness the
 // astronomical way round: smaller (even negative) numbers are brighter.
 // Checked at build time, not just asserted in a test file elsewhere.
-example brighterObjectHasLowerMagnitude {
+def brighterObjectHasLowerMagnitude(): Boolean
+  ensures result
+{
   val sirius = new Sighting("21:00", "Sirius", "S", "A0", -1.46, 5)
   val rigel = new Sighting("21:05", "Rigel", "S", "B8", 0.13, 5)
-  sirius.magnitude() < rigel.magnitude()
+  return sirius.magnitude() < rigel.magnitude()
 }
 
 // ---- synthetic log, generated in-memory so the sample runs anywhere ----

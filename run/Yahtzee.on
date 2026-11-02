@@ -86,8 +86,11 @@ public:
 // ─── Die record ───────────────────────────────────────────────────────────────
 
 record Die(face: Int, kind: DieKind) {
-  example { new Die(3, DieKind::Standard).face() == 3 }
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new Die(3, DieKind::Standard).face() == 3
   def show(): String = "[" + face() + "]"
   static def roll(rng: LCG): Die {
     return new Die(rng.nextInt(6) + 1, DieKind::Standard)

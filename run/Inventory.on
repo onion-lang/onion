@@ -76,14 +76,25 @@ def txLabel(k: TxKind): String = select k {
 // ── Records ───────────────────────────────────────────────────────────────────
 
 record Item(sku: String, name: String, category: Category, price: Double, stock: Int) {
-  example { new Item("X1", "T", new Food(7), 1.99, 10).stock() == 10 }
-  example { new Item("X1", "T", new Food(7), 1.99, 10).price() == 1.99 }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Item("X1", "T", new Food(7), 1.99, 10).stock() == 10
+  static def example_2(): Boolean
+    ensures result
+    = new Item("X1", "T", new Food(7), 1.99, 10).price() == 1.99
+
+
 }
 
 record Transaction(sku: String, kind: TxKind)
 
 record StockAlert(sku: String, name: String, stock: Int, threshold: Int) {
-  example { new StockAlert("S1", "Bread", 2, 5).stock() < new StockAlert("S1", "Bread", 2, 5).threshold() }
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = new StockAlert("S1", "Bread", 2, 5).stock() < new StockAlert("S1", "Bread", 2, 5).threshold()
+
 }
 
 // ── Inventory class ───────────────────────────────────────────────────────────

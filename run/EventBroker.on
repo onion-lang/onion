@@ -31,8 +31,15 @@ public:
 // ─── TopicInfo ───────────────────────────────────────────────────────────────
 
 record TopicInfo(name: String, maxHistory: Int) {
-  example { new TopicInfo("payments", 10).name() == "payments" }
-  example { new TopicInfo("x", 5).maxHistory() == 5 }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new TopicInfo("payments", 10).name() == "payments"
+  static def example_2(): Boolean
+    ensures result
+    = new TopicInfo("x", 5).maxHistory() == 5
+
+
 }
 
 // ─── Message ADT ─────────────────────────────────────────────────────────────
@@ -84,7 +91,11 @@ public:
 // ─── DeadLetter ──────────────────────────────────────────────────────────────
 
 record DeadLetter(msg: Message, reason: String) {
-  example { new DeadLetter(new ControlMessage("x","y"), "test").reason() == "test" }
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = new DeadLetter(new ControlMessage("x","y"), "test").reason() == "test"
+
 }
 
 // ─── MatchEvent ──────────────────────────────────────────────────────────────

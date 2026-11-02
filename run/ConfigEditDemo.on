@@ -20,19 +20,26 @@ record Server(host: String, port: Int, debug: Boolean) {
   shape cfg = config
   // L2, machine-checked at build time: an unedited document reproduces byte for
   // byte. If ConfigShape ever loses this property, this file stops compiling.
-  example l2 {
+  public:
+  static def l2(): Boolean
+    ensures result
+  {
     val t = "# prod\nhost = h\nport = 007\ndebug = true\n"
     val r = Server::cfg().parseLossless(t).get()
-    Server::cfg().printLossless(r.value(), r.residue()) == t
+    return Server::cfg().printLossless(r.value(), r.residue()) == t
   }
-  // And the law the lens adds on top: editing one field re-renders only that
-  // field's value slot. The 007 spelling of the untouched port survives.
-  example editTouchesOneSlot {
+  static def editTouchesOneSlot(): Boolean
+    ensures result
+  {
     val t = "# prod\nhost = a.example\nport = 007\ndebug = false\n"
     val r = Server::cfg().parseLossless(t).get()
     val out = r.edit { v -> v.copy(debug = true) }.render()
-    out == "# prod\nhost = a.example\nport = 007\ndebug = true\n"
+    return out == "# prod\nhost = a.example\nport = 007\ndebug = true\n"
   }
+
+  // And the law the lens adds on top: editing one field re-renders only that
+  // field's value slot. The 007 spelling of the untouched port survives.
+
 }
 
 tool setport(path: String, port: Int, backup: Boolean = false): Int

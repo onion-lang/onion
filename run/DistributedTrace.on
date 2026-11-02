@@ -41,9 +41,15 @@ record Span(
   status:    SpanStatus,
   tags:      Map[String, String]
 ) {
-  example { new Span("s1","t1",null,"svc","op", SpanKind::Internal, 0L, 10L, new Ok(), [:]).spanId() == "s1" }
-  example { new Span("s2","t1","s1","svc","op", SpanKind::Server,  5L, 20L, new Ok(), [:]).parentId() == "s1" }
+
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new Span("s1","t1",null,"svc","op", SpanKind::Internal, 0L, 10L, new Ok(), [:]).spanId() == "s1"
+  static def example_2(): Boolean
+    ensures result
+    = new Span("s2","t1","s1","svc","op", SpanKind::Server,  5L, 20L, new Ok(), [:]).parentId() == "s1"
   def endMs(): Long = startMs() + durationMs()
   def isRoot(): Boolean = parentId() == null
   def isSlow(thresholdMs: Long): Boolean = durationMs() >= thresholdMs
@@ -58,8 +64,11 @@ record ServiceNode(
   errorCount: Int,
   totalMs: Long
 ) {
-  example { new ServiceNode("api", 3, 0, 150L).errorRate() == 0.0 }
+
 public:
+  static def example_3(): Boolean
+    ensures result
+    = new ServiceNode("api", 3, 0, 150L).errorRate() == 0.0
   def avgMs(): Long = if spanCount() == 0 { 0L } else { totalMs() / spanCount() }
   def errorRate(): Double =
     if spanCount() == 0 { 0.0 } else { (errorCount() * 100.0) / spanCount() }

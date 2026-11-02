@@ -72,10 +72,12 @@ public:
 // back into each original constraint must not exceed its right-hand side
 // (within a small numeric tolerance for the floating-point pivot
 // arithmetic). Checked against a fixed sample LP at build time.
-example feasibleAtOptimum {
+def feasibleAtOptimum(): Boolean
+  ensures result
+{
   val p: LpProblem = new LpProblem([3.0, 2.0], [[1.0, 1.0], [1.0, 3.0]], [4.0, 6.0])
   val r: LpResult = Simplex::solve(p)
-  select r.outcome() {
+  return select r.outcome() {
     case o is Optimal: {
       var ok: Boolean = true
       foreach row: Int in 0..<p.a().size {

@@ -9,9 +9,17 @@
 // the build (E0065).
 record Access(ip: String, status: Int)
   from re"(\S+) (-?\d+)"
-  derive!(Json, Yaml)
-  example { Access::parse("1.2.3.4 200") == new Access("1.2.3.4", 200) }
-  example { Access::format(new Access("1.2.3.4", 200)) == "1.2.3.4 200" }
+  derive!(Json, Yaml) {
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = Access::parse("1.2.3.4 200") == new Access("1.2.3.4", 200)
+  static def example_2(): Boolean
+    ensures result
+    = Access::format(new Access("1.2.3.4", 200)) == "1.2.3.4 200"
+
+
+}
 
 def main(): void {
   val a = Access::parse("10.0.0.1 404")

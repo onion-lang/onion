@@ -27,8 +27,15 @@ extension Double {
 
 // An attribute (feature column): name and zero-based index in feature vector
 record Attribute(name: String, index: Int) {
-  example { new Attribute("Outlook", 0).index() == 0 }
-  example { new Attribute("Wind",    3).name()  == "Wind" }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Attribute("Outlook", 0).index() == 0
+  static def example_2(): Boolean
+    ensures result
+    = new Attribute("Wind",    3).name()  == "Wind"
+
+
 }
 
 // A labelled training example: parallel ArrayList of string features + label

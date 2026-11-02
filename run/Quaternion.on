@@ -19,16 +19,22 @@ extension Double {
 // ─── Vec3: an immutable 3-component vector ───────────────────────────────────
 
 record Vec3(x: Double, y: Double, z: Double) {
-  example unitXNorm {
+
+
+public:
+  static def unitXNorm(): Boolean
+    ensures result
+  {
     val v = new Vec3(1.0, 0.0, 0.0)
-    v.norm().approxEq(1.0)
+    return v.norm().approxEq(1.0)
   }
-  example addCommutativity {
+  static def addCommutativity(): Boolean
+    ensures result
+  {
     val a = new Vec3(1.0, 2.0, 3.0)
     val b = new Vec3(4.0, 5.0, 6.0)
-    a.plus(b).approxEqVec(b.plus(a))
+    return a.plus(b).approxEqVec(b.plus(a))
   }
-public:
   def approxEqVec(o: Vec3): Boolean =
     x().approxEq(o.x()) && y().approxEq(o.y()) && z().approxEq(o.z())
 
@@ -55,29 +61,41 @@ public:
 
 record Quaternion(w: Double, x: Double, y: Double, z: Double) {
   // |q|^2  must be positive for any non-zero quaternion
-  law normPos(w: Double, x: Double, y: Double, z: Double) {
-    val q = new Quaternion(w, x, y, z)
-    q.normSq() >= 0.0
-  }
+
   // A unit quaternion's norm is 1.0
-  example unitNorm {
-    val q = Quaternion::fromAxisAngle(new Vec3(0.0, 1.0, 0.0), JMath::PI / 4.0)
-    q.norm().approxEq(1.0)
-  }
+
   // q * q_inv == identity (for non-zero q)
-  example inverseIsIdentity {
+
+  // double rotation = half angle rotation squared
+
+public:
+  static def normPos(w: Double, x: Double, y: Double, z: Double): Boolean
+    ensures result
+  {
+    val q = new Quaternion(w, x, y, z)
+    return q.normSq() >= 0.0
+  }
+  static def unitNorm(): Boolean
+    ensures result
+  {
+    val q = Quaternion::fromAxisAngle(new Vec3(0.0, 1.0, 0.0), JMath::PI / 4.0)
+    return q.norm().approxEq(1.0)
+  }
+  static def inverseIsIdentity(): Boolean
+    ensures result
+  {
     val q = new Quaternion(0.5, 0.5, 0.5, 0.5)
     val id = q.times(q.inverse())
-    id.approxEqQ(Quaternion::identity())
+    return id.approxEqQ(Quaternion::identity())
   }
-  // double rotation = half angle rotation squared
-  example doubleAngle {
+  static def doubleAngle(): Boolean
+    ensures result
+  {
     val axis = new Vec3(0.0, 0.0, 1.0)
     val q30  = Quaternion::fromAxisAngle(axis, JMath::PI / 6.0)
     val q60  = Quaternion::fromAxisAngle(axis, JMath::PI / 3.0)
-    q30.times(q30).approxEqQ(q60)
+    return q30.times(q30).approxEqQ(q60)
   }
-public:
   // ─── arithmetic ────────────────────────────────────────────────────────────
   def plus(o: Quaternion): Quaternion =
     new Quaternion(w() + o.w(), x() + o.x(), y() + o.y(), z() + o.z())

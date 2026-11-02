@@ -48,4 +48,9 @@ class ClosedPredicateSpec extends AnyFunSpec {
     val src = "import { java.util.* }\ndef f(x: Thread): Boolean\n  ensures result\n  = true\n"
     assert(codes(src).contains("E0113"))
   }
+
+  it("leaves a Boolean function with a real postcondition alone") {
+    val src = "def positive(x: Int): Boolean\n  ensures result == (x > 0)\n  = x > 0\n"
+    assert(!codes(src).contains("E0113"))
+  }
 }

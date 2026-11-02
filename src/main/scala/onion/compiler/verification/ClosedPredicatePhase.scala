@@ -11,7 +11,7 @@ import scala.collection.mutable.ArrayBuffer
 /**
  * Runs the closed predicates of a program at build time (RFC #2557, design 7.2): the replacement
  * for `example`. A closed predicate is a `static def` with no parameters that returns `Boolean`
- * and carries an `ensures` clause, in a class, record or at the top level:
+ * and carries the clause `ensures result`, in a class, record or at the top level:
  *
  * {{{
  * def example_1(): Boolean ensures result = 1 + 1 == 2
@@ -50,11 +50,15 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
     classes
   }
 
+  /** Only `ensures result` itself marks a predicate. `ensures result == (x > 0)` describes a function and is left alone. */
+  private def assertsResult(clauses: List[AST.Expression]): Boolean =
+    clauses.exists { case AST.Id(_, "result") => true; case _ => false }
+
   private def isBoolean(t: AST.TypeNode): Boolean = t != null && t.desc == AST.PrimitiveType(AST.KBoolean)
 
   private def candidatesOf(unit: AST.CompilationUnit): Seq[Candidate] =
     unit.toplevels.flatMap {
-      case f: AST.FunctionDeclaration if isBoolean(f.returnType) && f.ensures.nonEmpty =>
+      case f: AST.FunctionDeclaration if isBoolean(f.returnType) && assertsResult(f.ensures) =>
         Seq(Candidate(None, f.name, f.args.size, unit.sourceFile, f.location))
       case c: AST.ClassDeclaration =>
         (c.defaultSection.toSeq ++ c.sections).flatMap(_.members).collect {
@@ -68,7 +72,7 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
     }
 
   private def qualifies(m: AST.MethodDeclaration): Boolean =
-    Modifier.isStatic(m.modifiers) && isBoolean(m.returnType) && m.ensures.nonEmpty
+    Modifier.isStatic(m.modifiers) && isBoolean(m.returnType) && assertsResult(m.ensures)
 
   /** `None` when the predicate holds (or cannot be found); the reason when it is false or throws. */
   private def runOne(c: Candidate, classes: Seq[CompiledClass], loader: ClassLoader): Option[String] = {

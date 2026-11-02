@@ -172,3 +172,54 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     val chain = violation(Array("--contracts", "runtime", path))
     assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("postcondition failed")), chain.map(_.getMessage).toString)
 
+  private def accountProgram(withdraw: String) =
+    s"""class Account {
+       |  invariant balance >= 0
+       |  history balance <= old(balance) || balance >= 0
+       |public:
+       |  var balance: Int
+       |  def this { balance = 10 }
+       |  def withdraw(x: Int): void { $withdraw }
+       |}
+       |val a = new Account()
+       |a.withdraw(Integer::parseInt(args[0]))
+       |println(a.balance)
+       |""".stripMargin
+
+  test("--contracts runtime keeps an invariant that holds"):
+    val path = writeScript(accountProgram("balance = balance - x"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path, "4")))
+    code shouldBe 0
+    out should include("6")
+
+  test("--contracts runtime throws when a method leaves the invariant false"):
+    val path = writeScript(accountProgram("balance = balance - x"))
+    val chain = violation(Array("--contracts", "runtime", path, "50"))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("invariant (on exit) failed")), chain.map(_.getMessage).toString)
+
+  private def monotone(body: String) =
+    s"""class Counter {
+       |  history n >= old(n)
+       |public:
+       |  var n: Int
+       |  def this { n = 5 }
+       |  def change(): void { $body }
+       |}
+       |val c = new Counter()
+       |c.change()
+       |println(c.n)
+       |""".stripMargin
+
+  test("--contracts runtime keeps a history that holds"):
+    val path = writeScript(monotone("n = n + 1"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("6")
+
+  // `n = n - 1` is caught at compile time (E0109). A step the compiler cannot see through is not,
+  // and it is exactly what the run-time guard is for.
+  test("--contracts runtime throws when a method breaks the history in a way the compiler cannot see"):
+    val path = writeScript(monotone("n = n - Integer::parseInt(\"1\")"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("history failed")), chain.map(_.getMessage).toString)
+

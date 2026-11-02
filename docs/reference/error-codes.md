@@ -1286,6 +1286,10 @@ public:
 
 Only what the syntax settles is reported. Fix: remove the write, or weaken the history.
 
+A write counts wherever the method makes it: in a lambda it creates, and on another object of
+the class (`o.n = o.n - 1` with `o: Counter`). A write whose receiver's class the syntax does not
+give (`cs[0].n = 7`) gets the warning W0024 instead.
+
 ### `E0110` — an `invariant` or `history` on a mutable object
 
 A clause may name only fields of a primitive, `String`, enum or record type. A `List` or another

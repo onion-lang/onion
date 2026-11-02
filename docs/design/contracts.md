@@ -474,6 +474,14 @@ So E0109 is reported only when the syntax settles it. Take the history `n >= old
 | `n = c`, and nothing raises `n` | **no syntactic error**; the solver decides | The syntax alone cannot tell where `n` starts. The solver checks the write against the class `invariant`s: with `invariant n == 0` a write of `0` is proved fine; with no invariant, `n` could start above `c`, and the write has a counterexample (below) |
 | any other expression | `Not proved` | The prover decides (stage 7) |
 
+**What counts as a write** (#2597). A write by a method is any assignment, `+=`, `-=`, `++` or
+`--` to the field in its body, including inside a lambda the body creates (the lambda may run
+during the call). A write through another reference counts when the reference is declared with a
+class whose objects carry the field: a parameter or local typed with it, or a local made with
+`new`. A reference of another class is not a write of this field. When the syntax does not say
+which class the reference is (`cs[0].n`, an untyped lambda parameter), the write is counted but
+left unsettled, so it gets W0024. A write from a class outside the hierarchy is not yet checked (#2598).
+
 The same reasoning applies to a history `n <= old(n)` with the directions swapped, and to
 `x == old(x)`, where any write to `x` through a method that is not a constructor is reported.
 

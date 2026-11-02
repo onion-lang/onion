@@ -39,6 +39,11 @@ private[compiler] final class MethodBodySupport(
       method.contractEnsuresText = ensures.flatMap(onion.compiler.contracts.ContractText.write)
       method.assertsResult = ensures.exists { case AST.Id(_, "result") => true; case _ => false }
     }
+    // `@Trusted` (RFC #2557): the contract is relied on and not verified. Every use is listed, because
+    // each is a claim that nothing checked.
+    if (method.annotations.contains("Trusted") && (requires.nonEmpty || ensures.nonEmpty))
+      bodyContext.warningReporter.report(WarningCategory.ContractTrusted, block.location,
+        s"the contract of '${method.name}' is trusted, not verified: its body is not checked, and callers rely on it")
     val definition = method.classType match { case d: ClassDefinition => Some(d); case _ => None }
     val classClauses = definition.exists(d => d.invariantSources.nonEmpty || d.historySources.nonEmpty)
     // A public instance method of a class with an `invariant` or a `history` is a place where it must

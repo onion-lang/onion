@@ -152,6 +152,7 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0021` | `history-not-proved` | メソッドが `history` を壊しうる。ソルバーが反例を見つけた |
 | `W0024` | `history-not-checked` | `history` が名指すフィールドにメソッドが書き込むが、`history` が保たれるかをどの検査も決めていない |
 | `W0026` | `contract-not-enforced` | `--contracts runtime` が実行時に守らない契約の節がある |
+| `W0027` | `contract-trusted` | `@Trusted` により、検証されない契約を前提にしている |
 
 ### `--contract-seed <n>` / `--contract-samples <n>`
 

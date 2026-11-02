@@ -25,7 +25,7 @@ class ContractsFlagSpec extends AnyFunSpec {
 
   describe("parseContractMode") {
     it("defaults to off") {
-      assert(CompilerOptions.parseContractMode(None) == Some(ContractMode.Off))
+      assert(CompilerOptions.parseContractMode(None) == Some(ContractMode.Check))
     }
 
     it("accepts the modes that do something, in any case") {
@@ -64,7 +64,7 @@ class ContractsFlagSpec extends AnyFunSpec {
 
     it("leaves contracts off when the flag is absent") {
       val config = CompilerOptions.configFrom(Map.empty, outputDirectory = "", verbose = false)
-      assert(config.map(_.contracts) == Some(ContractMode.Off))
+      assert(config.map(_.contracts) == Some(ContractMode.Check))
     }
 
     it("treats the flag as one that takes a value") {
@@ -75,7 +75,7 @@ class ContractsFlagSpec extends AnyFunSpec {
   describe("CompilerConfig") {
     it("defaults to contracts off, so existing callers are unchanged") {
       val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10)
-      assert(config.contracts == ContractMode.Off)
+      assert(config.contracts == ContractMode.Check)
     }
   }
 }

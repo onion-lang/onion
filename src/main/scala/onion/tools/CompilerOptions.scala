@@ -259,7 +259,7 @@ object CompilerOptions {
     case Some(NoValuedParam) =>
       printError(Message("error.command.noArgument", CONTRACTS))
       None
-    case None => Some(ContractMode.Off)
+    case None => Some(ContractMode.Check)
   }
 
   def parseSuppressedWarnings(param: Option[CommandLineParam]): Option[Set[WarningCategory]] = param match {

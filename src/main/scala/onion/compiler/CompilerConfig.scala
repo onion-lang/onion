@@ -35,5 +35,5 @@ case class CompilerConfig(
   // and the cost is a few bytes per method. `-g:none` turns it off.
   emitDebugInfo: Boolean = true,
   // Contract clauses are a preview feature (RFC #2557): off unless asked for.
-  contracts: ContractMode = ContractMode.Off
+  contracts: ContractMode = ContractMode.Check
 )

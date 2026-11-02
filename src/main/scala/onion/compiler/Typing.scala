@@ -226,6 +226,14 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       warningReporter_.setSourceFile(file)
       warningReporter_.report(WarningCategory.OverrideBreaksContract, location, message)
     }).run(source)
+    // RFC #2557 design 6: the `ensures` of every method, proved against its body.
+    new onion.compiler.typing.EnsuresVerifyPass(
+      (file, location, message) => {
+        warningReporter_.setSourceFile(file)
+        warningReporter_.report(WarningCategory.EnsuresNotProved, location, message)
+      },
+      p => if (config.verbose) System.err.println(s"[ensures] proved: $p")
+    ).run(source)
     // RFC #2557 3.2: an invariant or history may name only value-typed fields.
     new onion.compiler.typing.ContractFramingPass(this).run(table_.classes.values.toSeq)
     diagnostics.finishOrThrow()

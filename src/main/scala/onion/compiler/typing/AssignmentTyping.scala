@@ -100,11 +100,11 @@ final class AssignmentTyping(
           // `list[i] = v` and `map[k] = v` work.
           tryFindMethod(node, objType, "set", Array[Term](index, value)) match {
             case Right(method) =>
-              if (value.`type`.isBottomType) value else new Call(target, method, params)
+              if (value.`type`.isBottomType) value else indexedCall(indexing, node.rhs, target, method, params)
             case Left(_) =>
               tryFindMethod(node, objType, "put", Array[Term](index, value)) match {
                 case Right(method) =>
-                  if (value.`type`.isBottomType) value else new Call(target, method, params)
+                  if (value.`type`.isBottomType) value else indexedCall(indexing, node.rhs, target, method, params)
                 case Left(_) =>
                   bodyContext.report(METHOD_NOT_FOUND, node, target.`type`, "set", types(params))
                   if (value.`type`.isBottomType) value else null
@@ -125,6 +125,24 @@ final class AssignmentTyping(
       }
     }
   }
+
+  /**
+   * `xs[i] = v` / `m[k] = v` as the `set`/`put` call it stands for, with the index and
+   * the value checked against that method's parameters as the receiver instantiates
+   * them, the way `xs.set(i, v)` is (#2332): a `U` must not fit the `T` of a
+   * `List[T]` just because both erase to `Object`. A generic `set[X]` keeps the
+   * resolution-time check only. No W0012 for a `null` value: the indexed form never
+   * had one.
+   */
+  private def indexedCall(indexing: AST.Indexing, rhs: AST.Node, target: Term, method: Method, params: Array[Term]): Term =
+    if (method.typeParameters.nonEmpty || method.argumentCount != params.length) new Call(target, method, params)
+    else {
+      val subst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
+      val slots = TypeSubst.paramArgs(method, subst, scala.collection.immutable.Map.empty)
+      val index = body.processAssignable(indexing.rhs, slots(0), params(0), suppressNullWarning = true)
+      val value = body.processAssignable(rhs, slots(1), params(1), suppressNullWarning = true)
+      if (index == null || value == null) null else new Call(target, method, Array[Term](index, value))
+    }
 
   def processMemberAssign(node: AST.Assignment, context: LocalContext): Term = {
     node match {

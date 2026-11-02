@@ -44,6 +44,7 @@ enum WarningCategory(val code: String, val description: String):
   case HistoryNotProved extends WarningCategory("W0021", "A method can break a history; the solver found a counterexample")
   case ShapeNotSampled extends WarningCategory("W0022", "The contract of a Shape was not checked: its value type cannot be sampled")
   case ContractNotEnforced extends WarningCategory("W0026", "A contract clause is not enforced at run time by --contracts runtime")
+  case ContractTrusted extends WarningCategory("W0027", "A contract is relied on without being verified (@Trusted)")
   case HistoryNotChecked extends WarningCategory("W0024", "A method writes a field that a history names, and no check settled whether the history still holds")
   case OverrideBreaksContract extends WarningCategory("W0025", "An override can break the contract it inherits; the solver found a counterexample")
 
@@ -75,7 +76,8 @@ object WarningCategory:
     "shape-not-sampled" -> WarningCategory.ShapeNotSampled,
     "history-not-checked" -> WarningCategory.HistoryNotChecked,
     "override-breaks-contract" -> WarningCategory.OverrideBreaksContract,
-    "contract-not-enforced" -> WarningCategory.ContractNotEnforced
+    "contract-not-enforced" -> WarningCategory.ContractNotEnforced,
+    "contract-trusted" -> WarningCategory.ContractTrusted
   )
 
   def fromString(value: String): Option[WarningCategory] =

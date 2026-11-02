@@ -39,6 +39,11 @@ private[compiler] final class MethodBodySupport(
       method.contractEnsuresText = ensures.flatMap(onion.compiler.contracts.ContractText.write)
       method.assertsResult = ensures.exists { case AST.Id(_, "result") => true; case _ => false }
     }
+    // `@Trusted` (RFC #2557): the contract is relied on and not verified. Every use is listed, because
+    // each is a claim that nothing checked.
+    if (method.annotations.contains("Trusted") && (requires.nonEmpty || ensures.nonEmpty))
+      bodyContext.warningReporter.report(WarningCategory.ContractTrusted, block.location,
+        s"the contract of '${method.name}' is trusted, not verified: its body is not checked, and callers rely on it")
     val definition = method.classType match { case d: ClassDefinition => Some(d); case _ => None }
     val classClauses = definition.exists(d => d.invariantSources.nonEmpty || d.historySources.nonEmpty)
     // A public instance method of a class with an `invariant` or a `history` is a place where it must
@@ -399,18 +404,52 @@ private[compiler] final class MethodBodySupport(
     primaryAssignments: Int = 0
   ): Unit = {
     constructor.superInitializer = initializer
-    constructor.block = addReturnNode(withPrologue(context, translate(block, context)), BasicType.VOID)
+    val body = translate(block, context)
     // A constructor has no `requires` or `ensures`, but the class's `invariant` must hold once the object
-    // is built. The run-time guard does not check that yet, and a check that silently does not run is
-    // worse than none, so the clause is named (RFC #2557, design 7.4).
-    constructor.classType match {
+    // is built (RFC #2557, design 7.4). It is checked after the body, so a body with a `return` of its own
+    // is not guarded: that path would leave without the check, and a check that silently does not run is
+    // worse than none. It is named by the warning W0026 instead.
+    val checked = constructor.classType match {
       case d: ClassDefinition if bodyContext.contractMode == ContractMode.Runtime && d.invariantSources.nonEmpty =>
-        bodyContext.warningReporter.report(WarningCategory.ContractNotEnforced, block.location,
-          s"the invariant of '${d.name}' is not checked when the object is built: a constructor is not guarded yet")
-      case _ =>
+        if (containsReturn(block)) {
+          bodyContext.warningReporter.report(WarningCategory.ContractNotEnforced, block.location,
+            s"the invariant of '${d.name}' is not checked when the object is built: the constructor has a return of its own")
+          body
+        } else {
+          val guards = d.invariants.zip(d.invariantSources).map { case (t, s) =>
+            invariantGuard(d, "<init>", t, s, "invariant (after construction)")
+          }
+          new StatementBlock(body.location, (body +: guards)*)
+        }
+      case _ => body
     }
+    constructor.block = addReturnNode(withPrologue(context, checked), BasicType.VOID)
     constructor.frame = context.getContextFrame
     constructor.primaryAssignments = primaryAssignments
+  }
+
+  /** Whether a `return` appears anywhere in the body, in a nested statement or not. */
+  private def containsReturn(block: AST.BlockExpression): Boolean = {
+    var found = false
+    def visit(n: AST.Node): Unit = {
+      n match {
+        case _: AST.ReturnExpression => found = true
+        case _ =>
+      }
+      if (!found) ASTWalk.visitChildren(n)(visit)
+    }
+    visit(block)
+    found
+  }
+
+  /** `if !(clause) throw new ContractViolation("Class.method() <what> failed: invariant <clause>")`. */
+  private def invariantGuard(classType: ClassType, methodName: String, clause: Term, source: AST.Expression, what: String): ActionStatement = {
+    val strings = bodyContext.load("java.lang.String")
+    val violation = bodyContext.load("onion.ContractViolation")
+    val ctor = violation.findConstructor(Array[Term](new StringValue(null, "", strings)))
+    val message = s"${classType.name}.$methodName() $what failed: invariant ${onion.compiler.contracts.ExpressionText.of(source)}"
+    val fail = new Throw(clause.location, new NewObject(clause.location, ctor(0), Array[Term](new StringValue(clause.location, message, strings))))
+    new IfStatement(clause.location, new UnaryTerm(clause.location, UnaryTerm.Kind.NOT, BasicType.BOOLEAN, clause), fail, null)
   }
 
   def reportConstructorOnly(context: LocalContext): Unit =

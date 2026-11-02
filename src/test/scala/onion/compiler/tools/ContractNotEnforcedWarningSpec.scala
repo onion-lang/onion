@@ -58,7 +58,7 @@ class ContractNotEnforcedWarningSpec extends AnyFunSpec {
     assert(w26(src, ContractMode.Check).isEmpty)
   }
 
-  it("names the invariant a constructor does not check when the object is built") {
+  it("is silent about the invariant of a class whose constructor it checks") {
     val src =
       """class Account {
         |  invariant balance >= 0
@@ -66,8 +66,29 @@ class ContractNotEnforcedWarningSpec extends AnyFunSpec {
         |  var balance: Int
         |  def this { balance = 10 }
         |}""".stripMargin
+    assert(w26(src).isEmpty)
+  }
+
+  it("names the invariant of a constructor that has a return of its own") {
+    val src =
+      """class Account {
+        |  invariant balance >= 0
+        |public:
+        |  var balance: Int
+        |  def this(early: Boolean) {
+        |    balance = 10
+        |    if early { return }
+        |    balance = 20
+        |  }
+        |}""".stripMargin
     val ws = w26(src)
-    assert(ws.size == 1 && ws.head.contains("constructor"), ws.toString)
+    assert(ws.size == 1 && ws.head.contains("return of its own"), ws.toString)
+  }
+
+  it("names the invariant of a record, whose constructor the compiler writes") {
+    val src = "record Range(lo: Int, hi: Int) {\n  invariant lo <= hi\n}"
+    val ws = w26(src)
+    assert(ws.size == 1 && ws.head.contains("record"), ws.toString)
   }
 
   it("says nothing about a constructor when the class has no invariant") {

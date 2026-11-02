@@ -365,7 +365,26 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     // Just visit the method without any code (abstract method needs visitEnd but no code)
     val mv = cw.visitMethod(access, node.name, desc, methodSignature, exceptions)
     NullabilityMetadata.emitParameters(mv, node.arguments)
+    emitContract(mv, node)
     mv.visitEnd()
+
+  /**
+   * `@onion.Contract` on a method with contract clauses (RFC #2557): the clauses as text, so a
+   * module compiled later against this class file can read them. Nothing is written when there
+   * is no clause that reads back as itself.
+   */
+  private def emitContract(mv: org.objectweb.asm.MethodVisitor, node: MethodDefinition): Unit =
+    if node.contractRequiresText.nonEmpty || node.contractEnsuresText.nonEmpty then
+      val av = mv.visitAnnotation("Lonion/Contract;", false)
+      def array(name: String, values: Seq[String]): Unit =
+        if values.nonEmpty then
+          val a = av.visitArray(name)
+          values.foreach(a.visit(null, _))
+          a.visitEnd()
+      array("params", node.argumentsWithDefaults.map(_.name).toSeq)
+      array("requires", node.contractRequiresText)
+      array("ensures", node.contractEnsuresText)
+      av.visitEnd()
 
   /**
    * Writes the LocalVariableTable, unless `-g:none` asked for a smaller class file.
@@ -394,6 +413,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       GenericSignatureEncoder.methodSignature(node.typeParameters, node.arguments, node.returnType)
     val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes, exceptions, methodSignature)
     NullabilityMetadata.emitParameters(gen, node.arguments)
+    emitContract(gen, node)
 
     // Bounds for every LocalVariableTable entry. Marked before anything else is emitted,
     // so the range covers the whole body. Each slot is allocated fresh (newLocal never

@@ -358,7 +358,15 @@ private[compiler] final class UnqualifiedMethodCallSupport(
   private def typeOld(node: AST.UnqualifiedMethodCall, context: LocalContext): Option[Term] =
     context.contractScope match {
       case Some(ContractScope.Post) | Some(ContractScope.History) =>
-        calls.typed(node.args.head, context)
+        val inner = calls.typed(node.args.head, context)
+        // Under the run-time guard the value on entry is kept: a local, assigned before the body runs.
+        (inner, context.oldSaves) match {
+          case (Some(term), Some(saves)) =>
+            val slot = context.add("old$" + saves.size, term.`type`, false)
+            saves += ((slot, term))
+            Some(new RefLocal(0, slot, term.`type`))
+          case _ => inner
+        }
       case _ =>
         bodyContext.report(SemanticError.CONTRACT_MISPLACED, node, context.contractScope.fold("")(_.toString))
         None

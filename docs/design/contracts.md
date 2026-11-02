@@ -815,7 +815,9 @@ more than `law`/`example` gave.
 
 ## Appendix: what is built, and what is not
 
-**Built** (`--contracts check`, the default):
+**Built.** The default mode is `check`: the clauses are typed and checked, and what is found is a
+warning or an error as listed. (Section 6 records the decision that a contract that is not proved
+becomes an error by default; that flip is not built yet, see below.)
 
 | Check | Code | How |
 |---|---|---|
@@ -825,17 +827,48 @@ more than `law`/`example` gave.
 | A class with a clause that extends a Java class | E0111 | types |
 | A solver counterexample that **running the compiled code reproduces** | E0112 | CDCL SAT + bit-vectors, then a run |
 | A closed or sampled predicate (`ensures result`) that is false | E0113 | run at build time |
+| A `Shape` that does not round-trip a value it says it can print | E0114 | sampled, against `printable` |
 | A solver counterexample that cannot be run, or does not break when run | W0021 | the same, shown as a warning |
+| A `Shape` whose value type cannot be sampled | W0022 | reported, never a silent pass |
+| A method that writes a field a history names, and no check settled it | W0024 | reported |
 | An override whose body can break the effective contract | W0025 | the solver, against `pre_eff` / `post_eff` |
+| A clause `--contracts runtime` cannot guard | W0026 | reported with the reason, never silent |
+| A contract relied on without being verified (`@Trusted`) | W0027 | each use is listed |
 
-`--verbose` lists each history the solver proved. The prover models `Int` fields, parameters and
-locals, assignment, `if`, a trailing `return`, and a call to a pure `Int` method that states its
-contract (its `requires` is an obligation, its `ensures` constrains the result). Anything else is
-not modelled and reports nothing.
+- **The prover** models `Int` fields, parameters and locals, assignment, `if`, a trailing `return`, and a
+  call to a pure `Int` method that states its contract (its `requires` is an obligation, its `ensures`
+  constrains the result). `--verbose` lists each history it proved. Anything else is not modelled.
+- **Across modules.** A method's `requires` and `ensures` are written into its class file
+  (`@onion.Contract`: the parameter names and the clauses as text), so a module built later can use
+  them. A clause that would not read back as the same clause is not written.
+- **`--contracts runtime`** guards `requires`, `ensures` (with `old(e)` saved at entry), and a class's
+  `invariant` and `history`, on an instance, static, generic or variadic method, and the `invariant` after
+  a class constructor. A guarded method is split: the body becomes the private `m$body` and `m` is the
+  guard. A `history` the solver proved has no guard. It is a safety net, and it never turns a failed
+  proof into a pass.
 
-**Not built:**
+**Not built, by design:**
 
-- the framing rule 2 (a write through another instance);
-- `ContractTable` and the `Shape` contract;
-- `--contracts runtime` (a guard for what was not proved) and `verify`; both are reserved and refused;
-- calls to a method that writes a field, loops, and types other than `Int`.
+- `--contracts verify` as a separate mode. It is reserved and refused; the decision in section 6 is that
+  verification is the default instead.
+- A guard dropped for a proved `invariant`, `ensures` or `requires`. Only a proved `history` is dropped,
+  since that is the one the prover decides at compile time.
+- The `invariant` check after a constructor with a `return` of its own, and after a record's
+  compiler-written constructor. The warning W0026 names each one.
+
+**Not built, the work that follows from section 6:**
+
+- the default flip itself: an unproved contract, and a counterexample, as a compile error, with
+  `--contracts check` to lower them to warnings and `@Trusted` to skip a body;
+- a proof of `ensures` as a contract of every method (the prover can check one, for an override), of the
+  `invariant` (established by a constructor, kept by each method), and of a caller meeting a callee's
+  `requires`.
+
+**Not built, because the prover is narrow:** a call to a method that writes a field, a loop, and any type
+other than `Int`. A body with one of these reports nothing today, and is a compile error once the default
+flips unless it is `@Trusted`.
+
+**Not built, a separate piece of work:** the framing rule 2 (a write through another instance); a
+`ContractTable` read from a library jar (the built-in `Shape` entry is built); the effective contract of
+an override against a superclass built earlier, a built class's `history` inherited, and a class's
+`invariant` and `history` written into its class file.

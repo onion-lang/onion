@@ -151,6 +151,7 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 | `W0020` | `extension-method-shadowed` | An extension method's name and arity exactly match an existing member, so the extension is never called |
 | `W0021` | `history-not-proved` | A method can break a history; the solver found a counterexample |
 | `W0024` | `history-not-checked` | A method writes a field that a history names, and no check settled whether the history still holds |
+| `W0026` | `contract-not-enforced` | A contract clause is not enforced at run time by `--contracts runtime` |
 
 ### `--contract-seed <n>` / `--contract-samples <n>`
 

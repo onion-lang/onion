@@ -104,3 +104,46 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "always", path)))
     code should not be 0
     out should include("--contracts")
+
+  private val ensuresProgram =
+    """class Calc {
+      |public:
+      |  def half(x: Int): Int
+      |    requires x >= 0
+      |    ensures result <= x
+      |  {
+      |    if x > 100 { return x + 1 }
+      |    return x / 2
+      |  }
+      |}
+      |println(new Calc().half(Integer::parseInt(args[0])))
+      |""".stripMargin
+
+  private def violation(args: Array[String]) =
+    val thrown = intercept[onion.compiler.exceptions.ScriptException]:
+      captureOut(new ScriptRunner().run(args))
+    Iterator.iterate[Throwable](thrown)(_.getCause).takeWhile(_ != null).toList
+
+  test("--contracts runtime lets a result that meets ensures through"):
+    val path = writeScript(ensuresProgram)
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path, "10")))
+    code shouldBe 0
+    out should include("5")
+
+  test("--contracts runtime throws ContractViolation when ensures is false, on any return"):
+    val path = writeScript(ensuresProgram)
+    val chain = violation(Array("--contracts", "runtime", path, "200"))
+    assert(chain.exists(_.isInstanceOf[onion.ContractViolation]), chain.map(_.getClass.getName).toString)
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("postcondition failed")), chain.map(_.getMessage).toString)
+
+  test("--contracts runtime still guards requires on a method that also has ensures"):
+    val path = writeScript(ensuresProgram)
+    val chain = violation(Array("--contracts", "runtime", path, "-4"))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("precondition failed")), chain.map(_.getMessage).toString)
+
+  test("--contracts check adds no guard for ensures"):
+    val path = writeScript(ensuresProgram)
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "check", path, "200")))
+    code shouldBe 0
+    out should include("201")
+

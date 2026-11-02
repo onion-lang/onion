@@ -89,6 +89,68 @@ class LiteralTypeVariableSlotSpec extends AbstractShellSpec {
     assert(errorCodes(src) == Seq(Some("E0000")))
   }
 
+  describe("an untargeted literal mixing a bounded type variable with a concrete value") {
+    // The element join retries through the variable's bound, as `if`/`else` does,
+    // instead of falling back to `Object` (#2589 review).
+    it("joins [x, 1] as a List of the bound, so its members stay callable") {
+      val src =
+        """def total[T extends Number](x: T): Int {
+          |  var s = 0
+          |  foreach n in [x, 1] { s += n.intValue() }
+          |  return s
+          |}
+          |def pick[T extends Number](x: T, c: Boolean): Int {
+          |  val v = if c { x } else { 1 }
+          |  return v.intValue()
+          |}
+          |def main(args: String[]): Int { return total(5L) * 10 + pick(5L, false) }
+          |""".stripMargin
+      assert(shell.run(src, "None", Array()) == Shell.Success(61))
+    }
+
+    it("joins [new Dog(), t] as a List of the bound, whichever element comes first") {
+      val src =
+        """class Animal {
+          |public:
+          |  def this { }
+          |  def legs(): Int = 4
+          |}
+          |class Dog extends Animal {
+          |public:
+          |  def this { }
+          |}
+          |def count[T extends Animal](t: T): Int {
+          |  var s = 0
+          |  foreach a in [new Dog(), t] { s += a.legs() }
+          |  foreach b in [t, new Dog()] { s += b.legs() }
+          |  return s
+          |}
+          |def main(args: String[]): Int { return count(new Animal()) }
+          |""".stripMargin
+      assert(shell.run(src, "None", Array()) == Shell.Success(16))
+    }
+
+    it("joins a map literal's values the same way") {
+      val src =
+        """def sum[T extends Number](x: T): Int {
+          |  var s = 0
+          |  foreach (k, v) in ["a": x, "b": 1] { s += v.intValue() }
+          |  return s
+          |}
+          |def main(args: String[]): Int { return sum(5L) }
+          |""".stripMargin
+      assert(shell.run(src, "None", Array()) == Shell.Success(6))
+    }
+
+    it("still rejects reading the joined element back as a T (E0000)") {
+      val src =
+        """def bad[T extends Number](x: T): T { val r = [x, 1]; return r[1] }
+          |def main(args: String[]): Int { return 0 }
+          |""".stripMargin
+      assert(errorCodes(src) == Seq(Some("E0000")))
+    }
+  }
+
   it("still runs generic and concrete literals") {
     val src =
       """class Box[T] {

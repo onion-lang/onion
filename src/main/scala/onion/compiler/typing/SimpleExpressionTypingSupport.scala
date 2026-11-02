@@ -614,6 +614,15 @@ private[compiler] final class SimpleExpressionTypingSupport(
     else if (right.isNullType) left
     else if (TypeCheckingHelpers.joinsStrictly(bodyContext.table, left, right)) left
     else if (TypeCheckingHelpers.joinsStrictly(bodyContext.table, right, left)) right
-    else if (!left.isBasicType && !right.isBasicType) bodyContext.rootClass
-    else null
+    else {
+      // Neither joins into the other: retry through a type variable's bound, as the
+      // `if`/`else` join does, so `[x, 1]` with `T extends Number` is a
+      // `List[Number]`, not a `List[Object]` (#2589 review).
+      val leftBound = TypeCheckingHelpers.boundOf(left)
+      val rightBound = if (leftBound == null) TypeCheckingHelpers.boundOf(right) else null
+      if (leftBound != null) mergeListElementType(leftBound, right)
+      else if (rightBound != null) mergeListElementType(left, rightBound)
+      else if (!left.isBasicType && !right.isBasicType) bodyContext.rootClass
+      else null
+    }
 }

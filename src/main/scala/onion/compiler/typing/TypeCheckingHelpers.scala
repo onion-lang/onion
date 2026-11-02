@@ -83,7 +83,8 @@ private[typing] object TypeCheckingHelpers {
   // both, as on `main` before the retry existed.
   // A bare `T` may hold null, so its bound joins as nullable: otherwise
   // `(if c { t } else { "s" }).toString()` lost E0057 and threw at run time.
-  private def boundOf(t: Type): Type = t match {
+  // Collection literals join their elements through it too (#2589 review).
+  def boundOf(t: Type): Type = t match {
     case tv: TypeVariableType =>
       if (tv.nullability == Nullability.Nullable) NullableType.of(joinBound(tv)) else joinBound(tv)
     case n: NullableType => n.innerType match {

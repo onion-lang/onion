@@ -133,7 +133,7 @@ public:
 - **Indexed assignments and literals:** `xs[0] = u` and `m["k"] = u` into a `List[T]` or a
   `Map[K, T]` are `E0000`, as `xs.set(0, u)` already was (#2332). So is a literal `[u]`,
   `[t, u]` or `["k": u]` used as a `List[T]` or `Map[K, T]`; the error names the literal's
-  type (`List[U]`, or `List[Object]` for a mix). Under a `List[Object]` target, `[t, u]` is
+  type (`List[U]`, or `List[Object?]` for a mix). Under a `List[Object]` target, `[t, u]` is
   still fine. Write `[(u as T)]` if the value really is a `T`.
 - **Inherited members are now `U`:** inside `class Mid[U] extends Box[U]`, an inherited
   `get(): T` is a `U` (it was `Object`). `U` may be null, so `get().toString()` is now `E0057`,

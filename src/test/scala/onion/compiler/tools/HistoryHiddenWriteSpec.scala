@@ -51,6 +51,27 @@ class HistoryHiddenWriteSpec extends AnyFunSpec {
       assert(o.w24.exists(m => m.contains("tick") && m.contains("t >= old(t)")), o.toString)
     }
 
+    // Panel 14:56 on #2599: `t++` in a lambda was a false E0110, while `t = t + 1` passed.
+    for (spelling <- Seq("t++", "this.t++", "self.t++"))
+      it(s"counts $spelling as a write through this (W0024, not E0110)") {
+        val o = compile(clock(s"  def tick(): void { val f: () -> void = () -> { $spelling }; f() }"))
+        assert(o.errors.isEmpty, o.toString)
+        assert(o.w24.exists(_.contains("tick")), o.toString)
+      }
+
+    for (spelling <- Seq("t--", "this.t--", "self.t--"))
+      it(s"is E0109 alone for $spelling, as for t = t - 1") {
+        val o = compile(clock(s"  def back(): void { val f: () -> void = () -> { $spelling }; f() }"))
+        assert(o.errors == Seq("E0109"), o.toString)
+      }
+
+    it("counts t++ in an invariant class's lambda as a write through this") {
+      val src = "class Counter {\n  var n: Int\n  invariant n >= 0\npublic:\n  def this { n = 0 }\n" +
+        "  def tick(): void { val f: () -> void = () -> { n++ }; f() }\n}"
+      val o = compile(src)
+      assert(!o.errors.contains("E0110"), o.toString)
+    }
+
     it("is not a write of the field when the lambda declares its own t") {
       val o = compile(clock("  def back(): void { val f: () -> void = () -> { var t: Int = 5; t = t - 1 }; f() }"))
       assert(o.errors.isEmpty, o.toString)

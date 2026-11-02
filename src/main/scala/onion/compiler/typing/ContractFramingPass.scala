@@ -48,21 +48,9 @@ final class ContractFramingPass(typing: Typing) {
     if (named.nonEmpty) {
       def isThis(t: Term): Boolean = t.isInstanceOf[This] || t.isInstanceOf[OuterThis]
       def scan(body: ActionStatement): Unit = if (body != null) {
-        // `t++` and `this.t++` are lowered to `tmp = this; tmp.t = tmp.t + 1`: that write is through `this`.
-        val viaThisTemp = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap[SetField, java.lang.Boolean])
         TermWalk.existsIn(body, intoClosures = true) {
-          case b: Begin if b.terms.length >= 2 =>
-            (b.terms(0), b.terms(1)) match {
-              case (s: SetLocal, w: SetField) if s.frame == 0 && isThis(s.value) =>
-                w.target match {
-                  case r: RefLocal if r.frame == 0 && r.index == s.index => viaThisTemp.add(w)
-                  case _ =>
-                }
-              case _ =>
-            }
-            false
           case w: SetField if w.field.affiliation != null && named.contains((w.field.affiliation.name, w.field.name)) &&
-              !isThis(w.target) && !viaThisTemp.contains(w) =>
+              !isThis(w.target) =>
             typing.report(SemanticError.CONTRACT_FIELD_NOT_VALUE, w.location, w.field.name, w.field.affiliation.name, "write")
             false
           case _ => false

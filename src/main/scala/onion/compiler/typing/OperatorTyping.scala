@@ -501,15 +501,25 @@ final class OperatorTyping(
           bodyContext.report(CANNOT_ASSIGN_TO_VAL, termNode, ref.field.name)
           return None
         }
+        // Only diagnostics read it (#2599): the receiver as written, or the bare name.
+        val receiverLocation = termNode match {
+          case s: AST.MemberSelection if s.target != null && s.target.location != null => s.target.location
+          case n => n.location
+        }
+        ref.target match {
+          // `t++`, `this.t++`, `self.t++`: `this` has no side effect, so the write goes through it
+          // directly and stays visibly a write through `this`, also once a lambda body is split
+          // into statements (#2599).
+          case _: This | _: OuterThis =>
+            return Some(new SetField(receiverLocation, ref.target, ref.field,
+              new BinaryTerm(binaryKind, operand.`type`, new RefField(ref.target, ref.field), incrementOne(operand.`type`))))
+          case _ =>
+        }
         val varIndex = context.add(context.newName, ref.target.`type`)
         new Begin(
           new SetLocal(0, varIndex, ref.target.`type`, ref.target),
           new SetField(
-            // Only diagnostics read it (#2599): the receiver as written, or the bare name.
-            (termNode match {
-              case s: AST.MemberSelection if s.target != null && s.target.location != null => s.target.location
-              case n => n.location
-            }),
+            receiverLocation,
             new RefLocal(0, varIndex, ref.target.`type`),
             ref.field,
             new BinaryTerm(binaryKind, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), incrementOne(operand.`type`))

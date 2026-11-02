@@ -35,4 +35,22 @@ class ClosedPredicateSpec extends AnyFunSpec {
   it("does nothing when contracts are off") {
     assert(!codes("def sums(): Boolean\n  = 1 + 1 == 3\n", ContractMode.Off).contains("E0113"))
   }
+
+  it("samples a predicate with parameters: a true law holds for every sample") {
+    assert(codes("def commutes(a: Int, b: Int): Boolean\n  ensures result\n  = a + b == b + a\n").isEmpty)
+  }
+
+  it("falsifies a predicate with parameters, with a counterexample (E0113)") {
+    assert(codes("def small(a: Int): Boolean\n  ensures result\n  = a < 1000\n").contains("E0113"))
+  }
+
+  it("does not pass silently when a parameter type cannot be sampled") {
+    val src = "import { java.util.* }\ndef f(x: Thread): Boolean\n  ensures result\n  = true\n"
+    assert(codes(src).contains("E0113"))
+  }
+
+  it("leaves a Boolean function with a real postcondition alone") {
+    val src = "def positive(x: Int): Boolean\n  ensures result == (x > 0)\n  = x > 0\n"
+    assert(!codes(src).contains("E0113"))
+  }
 }

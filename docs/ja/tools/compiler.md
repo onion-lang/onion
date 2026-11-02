@@ -161,15 +161,17 @@ onionc --contract-samples 500 MyProgram.on
 onionc --contract-seed 7 MyProgram.on
 ```
 
-### `--contracts <off|check>`
+### `--contracts <off|check|runtime>`
 
 契約の節（メソッドの `requires` と `ensures`、クラスの `invariant` と `history`）を受け付けて、
 静的に検査します。これはプレビュー機能です（RFC #2557）。既定は `check` で、`off` のとき節は
 このフラグを示すエラーになります。契約が黙って無視されることはありません。
 
-`check` は節を型付けして、ソルバーの要らない静的検査を行います。**プログラムの実行時には
-何も強制されません。** `runtime`（証明できなかった分の保険）と `verify`（証明）は予約された
-名前で、何かを検査するようになるまで、コマンドラインは受け付けません。
+`check` は節を型付けして、静的検査を行います。**プログラムの実行時には何も強制されません。**
+`runtime` は同じ検査に加えて、各 `requires` 節を実行時に守ります。偽のとき、メソッドは本体を
+実行する前に `onion.ContractViolation`（`AssertionError`）を投げ、メッセージに節とメソッドを
+示します。`ensures`、`invariant`、`history` のガードはまだ作られていません。`verify`（証明）は
+予約された名前で、何かを検査するようになるまで、コマンドラインは受け付けません。
 
 ```bash
 onionc --contracts check MyProgram.on

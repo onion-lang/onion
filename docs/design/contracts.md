@@ -775,8 +775,12 @@ more than `law`/`example` gave.
 
 ## 12. Open questions
 
-- A guard (§7.4) on a recursive method is not a tail call, so it defeats tail-call optimization on
-  that method. Guard only the entry, or document the limit?
+- **Decided, not built: a guard on a recursive method (§7.4).** A guard calls `m$body`, so a self-call
+  inside the body goes through the guard and is not a tail call. The decision: guard the entry only. A
+  self-call inside `m$body` calls `m$body` directly, so tail-call optimization still applies and the
+  contract is checked once, on the way in and out of the outermost call. The cost: the `requires` of an
+  inner self-call is not checked at run time. The proof covers it, and a recursive method whose
+  `requires` is not proved gets W0026 naming that gap.
 - Quantifiers. `forall` over `Int` ranges, or pure recursive helper predicates? Collections need one.
 - `ensures` on an exceptional exit.
 - Mutable aggregates in `invariant`/`history` (`items.size() <= 10`) need an ownership rule. Not in v1.
@@ -844,15 +848,16 @@ becomes an error by default; that flip is not built yet, see below.)
 - **`--contracts runtime`** guards `requires`, `ensures` (with `old(e)` saved at entry), and a class's
   `invariant` and `history`, on an instance, static, generic or variadic method, and the `invariant` after
   a class constructor. A guarded method is split: the body becomes the private `m$body` and `m` is the
-  guard. A `history` the solver proved has no guard. It is a safety net, and it never turns a failed
+  guard. A `history` or an `ensures` the solver proved has no guard. It is a safety net, and it never turns a failed
   proof into a pass.
 
 **Not built, by design:**
 
 - `--contracts verify` as a separate mode. It is reserved and refused; the decision in section 6 is that
   verification is the default instead.
-- A guard dropped for a proved `invariant`, `ensures` or `requires`. Only a proved `history` is dropped,
-  since that is the one the prover decides at compile time.
+- A guard dropped for a proved `invariant` or `requires`. A proved `history` and a proved `ensures` are
+  dropped; the other two need the proofs of the work that follows from section 6 below.
+- The recursive-method guard decided in section 12 (guard the entry only). It is a decision, not code.
 - The `invariant` check after a constructor with a `return` of its own, and after a record's
   compiler-written constructor. The warning W0026 names each one.
 

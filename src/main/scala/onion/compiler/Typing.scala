@@ -207,6 +207,18 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private val typeSupport = new TypingTypeSupport(this)
 
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
+  /** Under `--contracts runtime` a proved `ensures` needs no guard: take it out of the guarded method. */
+  private def dropProvedEnsuresGuard(className: String, methodName: String, location: Location): Unit =
+    if (config.contracts == ContractMode.Runtime)
+      table_.classes.get(className).foreach { definition =>
+        definition.ensuresGuards.remove((methodName, location)).foreach { guards =>
+          definition.methods.collect { case m: MethodDefinition if m.name == methodName && m.location == location => m }.foreach { m =>
+            val kept = m.block.statements.filterNot(st => guards.exists(_ eq st))
+            if (kept.length != m.block.statements.length) m.setBlock(new StatementBlock(m.block.location, kept*))
+          }
+        }
+      }
+
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
     for(unit <- source) processOutline(unit)
@@ -232,7 +244,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         warningReporter_.setSourceFile(file)
         warningReporter_.report(WarningCategory.EnsuresNotProved, location, message)
       },
-      p => if (config.verbose) System.err.println(s"[ensures] proved: $p")
+      p => if (config.verbose) System.err.println(s"[ensures] proved: $p"),
+      (className, methodName, location) => dropProvedEnsuresGuard(className, methodName, location)
     ).run(source)
     // RFC #2557 3.2: an invariant or history may name only value-typed fields.
     new onion.compiler.typing.ContractFramingPass(this).run(table_.classes.values.toSeq)

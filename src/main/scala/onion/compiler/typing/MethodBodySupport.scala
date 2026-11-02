@@ -133,7 +133,10 @@ private[compiler] final class MethodBodySupport(
     val historyTerms = if (isStatic) Nil else typeContractClauses(definition.historySources, gctx, ContractScope.History)
     val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") } ++
       invariantTerms.map { case (t, s) => guard(t, s, "invariant (on entry)") }
-    val post: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") } ++
+    val ensuresGuards: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") }
+    if (ensuresGuards.nonEmpty && !isStatic)
+      definition.ensuresGuards((method.name, method.location)) = ensuresGuards.map(_.asInstanceOf[IfStatement])
+    val post: Seq[ActionStatement] = ensuresGuards ++
       invariantTerms.map { case (t, s) => guard(t, s, "invariant (on exit)") } ++
       historyTerms.zip(if (isStatic) Nil else definition.historySources).map { case (t, s) =>
         val g = guard(t, s, "history")

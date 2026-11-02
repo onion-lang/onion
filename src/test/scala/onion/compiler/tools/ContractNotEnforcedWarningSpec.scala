@@ -23,7 +23,19 @@ class ContractNotEnforcedWarningSpec extends AnyFunSpec {
        |  { n = n + 1 }
        |}""".stripMargin
 
-  it("warns when the method is static, which the guard does not split yet") {
+  it("warns when the method is generic, which the guard does not split yet") {
+    val src =
+      """class Box {
+        |public:
+        |  def keep[T](x: T): T
+        |    ensures result == x
+        |  { return x }
+        |}""".stripMargin
+    val ws = w26(src)
+    assert(ws.size == 1 && ws.head.contains("generic"), ws.toString)
+  }
+
+  it("is silent for a static method: it is guarded too") {
     val src =
       """class Calc {
         |public:
@@ -31,8 +43,7 @@ class ContractNotEnforcedWarningSpec extends AnyFunSpec {
         |    ensures result == x * 2
         |  { return x * 2 }
         |}""".stripMargin
-    val ws = w26(src)
-    assert(ws.size == 1 && ws.head.contains("static"), ws.toString)
+    assert(w26(src).isEmpty)
   }
 
   it("is silent for an ensures that uses old(...): it is saved at entry") {
@@ -44,7 +55,7 @@ class ContractNotEnforcedWarningSpec extends AnyFunSpec {
   }
 
   it("is silent under --contracts check, which guards nothing") {
-    val src = "class Calc {\npublic:\n  static def twice(x: Int): Int\n    ensures result == x * 2\n  { return x * 2 }\n}"
+    val src = "class Box {\npublic:\n  def keep[T](x: T): T\n    ensures result == x\n  { return x }\n}"
     assert(w26(src, ContractMode.Check).isEmpty)
   }
 }

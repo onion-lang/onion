@@ -43,10 +43,11 @@ object PipelineRunner {
       lawCheck = {
         val histories = new onion.compiler.verification.HistoryReproPhase(config)
         val closed = new onion.compiler.verification.ClosedPredicatePhase(config)
+        val shapes = new onion.compiler.verification.ShapeContractPhase(config)
         new CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]] {
           override def name: String = "ContractChecks"
           override def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] =
-            closed.run(histories.run(classes, ctx), ctx)
+            shapes.run(closed.run(histories.run(classes, ctx), ctx), ctx)
         }
       }
     )

@@ -42,6 +42,7 @@ enum WarningCategory(val code: String, val description: String):
   case DiscardedBuilderResult extends WarningCategory("W0019", "The result of an immutable builder method is discarded, so the call has no effect")
   case ExtensionMethodShadowed extends WarningCategory("W0020", "An extension method's name and arity exactly match an existing member, so the extension is never called")
   case HistoryNotProved extends WarningCategory("W0021", "A method can break a history; the solver found a counterexample")
+  case ShapeNotSampled extends WarningCategory("W0022", "The contract of a Shape was not checked: its value type cannot be sampled")
   case HistoryNotChecked extends WarningCategory("W0024", "A method writes a field that a history names, and no check settled whether the history still holds")
 
 object WarningCategory:
@@ -69,6 +70,7 @@ object WarningCategory:
     "discarded-builder-result" -> WarningCategory.DiscardedBuilderResult,
     "extension-method-shadowed" -> WarningCategory.ExtensionMethodShadowed,
     "history-not-proved" -> WarningCategory.HistoryNotProved,
+    "shape-not-sampled" -> WarningCategory.ShapeNotSampled,
     "history-not-checked" -> WarningCategory.HistoryNotChecked
   )
 

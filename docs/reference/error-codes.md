@@ -1243,6 +1243,25 @@ def sums(): Boolean
 
 Fix: correct the expression, or the code it checks.
 
+### `E0114` — a `Shape` that does not round-trip
+
+Every `onion.Shape` has a contract: `parse(print(v))` must equal `v` for each value the shape can
+print. The build samples values of the shape's value type and checks it. A value that does not
+come back is E0114, with the value and the `--contract-seed` / `--contract-samples` to reproduce it.
+
+```onion
+class FixedWidth conforms Shape[Person] {
+public:
+  // ... print pads `name` to 10 columns and does not cut it ...
+  def printable(v: Person): Boolean =   // states the domain; the default admits every value
+    v.name().length() <= 10 && v.name() == v.name().trim()
+}
+```
+
+Fix: override `printable` to say which values the shape can print, or fix `print` / `parse`.
+A shape with `canPrint() == false` owes nothing. A value type that cannot be sampled is the
+warning `W0022`, never a silent pass.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -1894,6 +1913,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0019` | the result of an immutable builder method (`Http.Request.header`, ...) is discarded as a statement, so the call does nothing |
 | `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
 | `W0021` | a method can break a `history`: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
+| `W0022` | the contract of a Shape was not checked: its value type cannot be sampled |
 | `W0024` | a method writes a field that a `history` names, and no check settled whether the history still holds: the field is not an `Int`, the solver does not model the method body, or the history is not of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`. Nothing guarantees the history there |
 
 ## Every diagnostic code
@@ -2011,6 +2031,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0111` | a class with an `invariant` or `history` extends a Java class |
 | `E0112` | this method breaks the history … when run from … |
 | `E0113` | the closed predicate … is … when the build runs it |
+| `E0114` | the Shape … breaks its round-trip contract |
 
 ## See also
 

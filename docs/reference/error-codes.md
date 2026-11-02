@@ -1320,6 +1320,19 @@ where `n + 1` wraps to a negative number.
 Fix: add an `invariant` or a `requires` that rules the state out, or weaken the history. A
 counterexample that does not break when run stays the warning `W0021`.
 
+### `E0113` — a closed predicate that is false
+
+A `static def` with no parameters that returns `Boolean` and has an `ensures` clause is run when
+the build runs. It must return `true`. This replaces a false `example`.
+
+```onion
+def sums(): Boolean
+  ensures result
+  = 1 + 1 == 3   // E0113: false when the build runs it
+```
+
+Fix: correct the expression, or the code it checks.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -2091,6 +2104,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0110` | an `invariant` or `history` names a field that holds a mutable object |
 | `E0111` | a class with an `invariant` or `history` extends a Java class |
 | `E0112` | this method breaks the history … when run from … |
+| `E0113` | the closed predicate … is … when the build runs it |
 
 ## See also
 

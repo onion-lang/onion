@@ -1308,6 +1308,19 @@ class A extends java.util.ArrayList {
 直し方: その状態を除く `invariant` か `requires` を足すか、`history` を弱めます。実行しても壊れなかった
 反例は、警告 `W0021` のままです。
 
+### `E0113` — 偽になる閉じた述語
+
+引数がなく、`Boolean` を返し、`ensures` を持つ `static def` は、ビルド時に実行されます。
+`true` を返さなければなりません。偽の `example` の置き換えです。
+
+```onion
+def sums(): Boolean
+  ensures result
+  = 1 + 1 == 3   // E0113: ビルドで実行すると偽です
+```
+
+直し方: 式か、検査しているコードを直します。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -2074,6 +2087,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0110` | an `invariant` or `history` names a field that holds a mutable object |
 | `E0111` | a class with an `invariant` or `history` extends a Java class |
 | `E0112` | this method breaks the history … when run from … |
+| `E0113` | the closed predicate … is … when the build runs it |
 
 ## 関連項目
 

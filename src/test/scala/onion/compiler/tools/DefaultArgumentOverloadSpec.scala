@@ -122,4 +122,34 @@ class DefaultArgumentOverloadSpec extends AbstractShellSpec {
       assert(Shell.Success("Bs1,Bs2") == result)
     }
   }
+
+  describe("E0077 names a default by its method (#2548 panel block)") {
+    it("says `calling stamp`, never the synthesized `stamp$default$1...`") {
+      val errs = errors(
+        """
+          |def stamp(n: Long = System::currentTimeMillis()): Long = n
+          |tool now(): Long { return stamp() }
+        """)
+      val e0077 = errs.filter(_.errorCode.contains("E0077"))
+      assert(e0077.nonEmpty, errs.map(_.message).mkString("\n"))
+      assert(!errs.exists(_.message.contains("$default$")), errs.map(_.message).mkString("\n"))
+      assert(e0077.exists(_.message.contains("stamp")), errs.map(_.message).mkString("\n"))
+    }
+
+    it("names a class method's default as `Owner::method`") {
+      val errs = errors(
+        """
+          |class Clock {
+          |public:
+          |  def this {}
+          |  def stamp(n: Long = System::currentTimeMillis()): Long = n
+          |}
+          |tool now(): Long { return new Clock().stamp() }
+        """)
+      val e0077 = errs.filter(_.errorCode.contains("E0077"))
+      assert(e0077.nonEmpty, errs.map(_.message).mkString("\n"))
+      assert(!errs.exists(_.message.contains("$default$")), errs.map(_.message).mkString("\n"))
+      assert(e0077.exists(_.message.contains("Clock::stamp")), errs.map(_.message).mkString("\n"))
+    }
+  }
 }

@@ -182,10 +182,8 @@ object RuntimeErrorReporter {
    * synthesized method (`f$default$1$A`); its frame is shown as the method it belongs to
    * (`f`), never under a name the user did not write (#2548).
    */
-  def sourceMethodName(name: String): String = {
-    val i = name.indexOf("$default$")
-    if (i > 0) name.substring(0, i) else name
-  }
+  def sourceMethodName(name: String): String =
+    onion.compiler.toolbox.TypeFormatting.sourceMethodName(name)
 
   private def scriptPath(scriptName: String): Option[java.nio.file.Path] =
     try Option(java.nio.file.Paths.get(scriptName)).filter(_.getFileName != null)

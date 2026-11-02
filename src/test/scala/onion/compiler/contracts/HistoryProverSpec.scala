@@ -66,4 +66,41 @@ class HistoryProverSpec extends AnyFunSpec {
   it("refuses a local that shadows a field") {
     assert(prove("val n = 5\n    n = 6") == HistoryProver.Unsupported)
   }
+
+  private def proveWithHelper(helper: String, body: String, invariant: String = "n >= 0 && n < 1000", fRequires: String = ""): HistoryProver.Outcome = {
+    val src =
+      s"""class C {
+         |  invariant $invariant
+         |  history n >= old(n)
+         |public:
+         |  var n: Int
+         |$helper
+         |  def f(k: Int): void $fRequires { $body }
+         |}""".stripMargin
+    val cls = OnionParser.parse(src).toplevels.collectFirst { case c: AST.ClassDeclaration => c }.get
+    val methods = (cls.defaultSection.toSeq ++ cls.sections).flatMap(_.members).collect { case m: AST.MethodDeclaration => m }
+    HistoryProver.prove(methods.find(_.name == "f").get, "n", ">=", Set("n"), cls.invariants, methods.map(m => m.name -> m).toMap)
+  }
+
+  it("uses a pure callee's contract: n = n + step(k) is proved once k satisfies step's requires") {
+    val helper = "  def step(x: Int): Int\n    requires x >= 0 && x < 100\n    ensures result >= 0 && result < 100\n  { return x }"
+    assert(proveWithHelper(helper, "n = n + step(k)", fRequires = "requires k >= 0 && k < 100") == HistoryProver.Proved)
+  }
+
+  it("finds the counterexample when the callee's contract allows a negative result") {
+    val helper = "  def step(x: Int): Int\n    requires x >= 0 && x < 100\n    ensures result > -100 && result < 100\n  { return x }"
+    assert(proveWithHelper(helper, "n = n + step(k)", fRequires = "requires k >= 0 && k < 100")
+      .isInstanceOf[HistoryProver.Counterexample])
+  }
+
+  it("does not use a callee that states no contract (Unsupported, never a guess)") {
+    val helper = "  def step(x: Int): Int { return x }"
+    assert(proveWithHelper(helper, "n = n + step(k)") == HistoryProver.Unsupported)
+  }
+
+  it("refuses the call when the callee's requires can fail at the call site") {
+    val helper = "  def step(x: Int): Int\n    requires x >= 0\n    ensures result >= 0\n  { return x }"
+    // k is unconstrained, so step's requires (x >= 0) is not established: the call is not understood
+    assert(proveWithHelper(helper, "n = n + step(k)") == HistoryProver.Unsupported)
+  }
 }

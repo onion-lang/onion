@@ -35,11 +35,81 @@ private[compiler] final class MethodBodySupport(
       method.postconditions = typePostconditions(method, ensures, context)
       method.assertsResult = ensures.exists { case AST.Id(_, "result") => true; case _ => false }
     }
-    val guarded = withRequiresGuards(method, requires, translated)
+    val splitGuards = bodyContext.contractMode == ContractMode.Runtime && ensures.nonEmpty &&
+      method.postconditions.size == ensures.size && EnsuresGuardSupport.refusal(method, ensures).isEmpty
+    if (bodyContext.contractMode == ContractMode.Runtime && ensures.nonEmpty && !splitGuards)
+      warnNotGuarded(method, block, EnsuresGuardSupport.refusal(method, ensures).getOrElse("the clause could not be typed"))
+    // With an `ensures` the body moves to `m$body` and `m` becomes the guard; otherwise a `requires`
+    // is guarded in place at the top of the body.
+    val guarded = if (splitGuards) translated else withRequiresGuards(method, requires, translated)
     val translatedBlock = addReturnNode(withPrologue(context, guarded), method.returnType)
-    method.setBlock(translatedBlock)
-    method.setFrame(context.getContextFrame)
+    if (splitGuards) splitIntoBodyAndGuard(method, args, block, requires, ensures, translatedBlock, context)
+    else {
+      method.setBlock(translatedBlock)
+      method.setFrame(context.getContextFrame)
+    }
     reportUnused(context)
+  }
+
+  /** W0026: a clause that `--contracts runtime` does not enforce. Never silent. */
+  private def warnNotGuarded(method: MethodDefinition, at: AST.Node, why: String): Unit =
+    bodyContext.warningReporter.report(WarningCategory.ContractNotEnforced, at.location,
+      s"the ensures clause of '${method.name}' is not enforced at run time: $why")
+
+  /**
+   * The body keeps `context`'s frame and becomes the private method `name$body`. The method itself
+   * gets a new frame with the same parameters in the same slots, and the guard as its body.
+   */
+  private def splitIntoBodyAndGuard(
+    method: MethodDefinition,
+    args: List[AST.Argument],
+    block: AST.BlockExpression,
+    requires: List[AST.Expression],
+    ensures: List[AST.Expression],
+    body: StatementBlock,
+    context: LocalContext
+  ): Unit = {
+    val classType = method.classType
+    val bodyMethod = new MethodDefinition(method.location, AST.M_PRIVATE, classType, method.name + "$body",
+      method.arguments, method.returnType, body)
+    bodyMethod.mayContainTry = method.mayContainTry
+    bodyMethod.setFrame(context.getContextFrame)
+    bodyMethod.setArgumentsWithDefaults(method.argumentsWithDefaults)
+    classType.asInstanceOf[ClassDefinition].add(bodyMethod)
+
+    // The guard: a fresh context with the same parameters, so `requires` and `ensures` are typed over
+    // its own frame (and `result` gets a slot of its own).
+    val gctx = prepareMethodContext(method, args, block)
+    val void = method.returnType == BasicType.VOID
+    val argTerms: Array[Term] = args.map { a =>
+      val b = gctx.lookup(a.name)
+      new RefLocal(b.frameIndex, b.index, b.tp): Term
+    }.toArray
+    val self = new This(method.location, classType)
+    val call = new Call(method.location, self, bodyMethod, argTerms)
+    val requiresTerms = if (requires.nonEmpty) typeContractClauses(requires, gctx, ContractScope.Pre) else Nil
+    val (resultSlot, ensuresTerms) =
+      if (void) (-1, typeContractClauses(ensures, gctx, ContractScope.Post))
+      else gctx.openScope {
+        val slot = gctx.add("result", method.returnType, false)
+        (slot, typeContractClauses(ensures, gctx, ContractScope.Post))
+      }
+    val strings = bodyContext.load("java.lang.String")
+    val violation = bodyContext.load("onion.ContractViolation")
+    val ctor = violation.findConstructor(Array[Term](new StringValue(null, "", strings)))
+    def guard(clause: Term, source: AST.Expression, what: String): ActionStatement = {
+      val message = s"${classType.name}.${method.name}() $what failed: ${if (what == "precondition") "requires" else "ensures"} ${onion.compiler.contracts.ExpressionText.of(source)}"
+      val fail = new Throw(clause.location, new NewObject(clause.location, ctor(0), Array[Term](new StringValue(clause.location, message, strings))))
+      new IfStatement(clause.location, new UnaryTerm(clause.location, UnaryTerm.Kind.NOT, BasicType.BOOLEAN, clause), fail, null)
+    }
+    val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") }
+    val post: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") }
+    val statements: Seq[ActionStatement] =
+      if (void) pre ++ Seq(new ExpressionActionStatement(method.location, call)) ++ post :+ new Return(method.location, null)
+      else pre ++ Seq(new ExpressionActionStatement(method.location, new SetLocal(0, resultSlot, method.returnType, call))) ++ post :+
+        new Return(method.location, new RefLocal(0, resultSlot, method.returnType))
+    method.setBlock(new StatementBlock(method.location, statements*))
+    method.setFrame(gctx.getContextFrame)
   }
 
   /**

@@ -148,9 +148,12 @@ record Action(owner: String, task: String) {
 
 record Summary(title: String, decisions: List[String], actions: List[Action], lead: Action?) {
   shape doc = json
-  example nested {
+public:
+  static def nested(): Boolean
+    ensures result
+  {
     val v = new Summary("sync", ["ship"], [new Action("sato", "review")], null)
-    Summary::doc().parse(Summary::doc().print(v)).get() == v
+    return Summary::doc().parse(Summary::doc().print(v)).get() == v
   }
 }
 ```
@@ -252,15 +255,18 @@ val api  = http"https://example.com/p".read(Person::doc())
 ```onion
 record Server(host: String, port: Int, debug: Boolean) {
   shape cfg = config
-  example l2 {
+public:
+  static def l2(): Boolean
+    ensures result
+  {
     val t = "# prod\nhost = h\nport = 007\ndebug = true\n"
     val r = Server::cfg().parseLossless(t).get()
-    Server::cfg().printLossless(r.value(), r.residue()) == t
+    return Server::cfg().printLossless(r.value(), r.residue()) == t
   }
 }
 ```
 
-この `example` 節こそが要点です：L2 はコメントではなく、ビルド時に機械検査され、
+この `ensures result` の述語こそが要点です：L2 はコメントではなく、ビルド時に機械検査され、
 満たさなくなった shape はコンパイルが通らなくなります。編集も同じ対を通ります ——
 1つのコンポーネントを変えるとその値スロットだけが再描画され、*変えていない*
 コンポーネントは元の綴りを保ちます。プログラムが実際に port を変えない限り、`007` は
@@ -302,16 +308,19 @@ Files::writeText(path, out)
 
 ## ビルド時に shape を検査する
 
-`law` はコンパイル時に実行されるので、往復の性質を機械検査できます。
+`Boolean` を返して `ensures result` と述べる `static def` は、コンパイル時に実行されます。往復の性質を機械検査できます。引数があるときはサンプリングで実行されます。
 
 ```onion
 record Pt(x: Int, y: Int) {
   shape text = re"(-?\d+),(-?\d+)"
-  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+public:
+  static def roundtrip(p: Pt): Boolean
+    ensures result
+    = Pt::text().parse(Pt::text().print(p)).get() == p
 }
 ```
 
-引数の型からサンプルを生成できない law はエラー（E0074）になります。読み飛ばしません。
+引数の型からサンプルを生成できない述語はエラー（E0113）になります。読み飛ばしません。
 実行されない検査が「通った検査」に見えてはいけないからです。
 
 ## 自分の shape を書く
@@ -330,22 +339,25 @@ public:
   def describe(): String = "fixed-width Person"
 }
 
-example fixedWidthL1 {
+def fixedWidthL1(): Boolean
+  ensures result
+{
   val s = new FixedWidth()
   val v = new Person("KOTA", 42)
-  s.parse(s.print(v)).get() == v
+  return s.parse(s.print(v)).get() == v
 }
 ```
 
 コンビネータ —— `eachLine`、`sepBy`、`xmap`、`orElse` —— は無償で付いてきて、失敗は
 同梱 shape と同じ `Outcome`/`Defect` の語彙で語られます。
 
-この `example` は任意ではありません。導出された shape の法則は構成から保証されますが、
+この述語は任意ではありません。導出された shape の法則は構成から保証されますが、
 ユーザーが書いた shape は法則を*主張*する側です。だから `onion.Shape` を実装する具象
-クラスは、そのファイルが機械検査される `law` か `example` を少なくとも1つ述べている
-ときだけコンパイルされます（なければ **E0080**）。代表的な主張は round-trip
-`s.parse(s.print(v)).get() == v` で、トップレベル `example [name] { expr }` がその
-乗り物です。他の law と同じくビルド時に実行され、偽の主張は E0065 になります。
+クラスは、そのファイルが機械検査される述語（`ensures result`）でその shape を使うものを
+少なくとも1つ述べているときだけコンパイルされます（なければ **E0080**）。代表的な主張は
+round-trip `s.parse(s.print(v)).get() == v` で、トップレベルの
+`def name(): Boolean ensures result` がその乗り物です。ビルド時に実行され、偽の主張は
+E0113 になります。
 parse 専用の shape は `canPrint(): false` でそう言い、読む方向の法則を主張します。
 
 ## `Shapes` を直接使うとき

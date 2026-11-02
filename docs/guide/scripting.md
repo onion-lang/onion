@@ -145,8 +145,13 @@ time** — the specification lives in the language, not a separate test suite:
 
 ```onion
 record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
-  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
-  example { Pt::parse("3,4") == new Pt(3, 4) }
+public:
+  static def roundtrip(p: Pt): Boolean
+    ensures result
+    = Pt::parse(Pt::format(p)) == p
+  static def parsesThreeFour(): Boolean
+    ensures result
+    = Pt::parse("3,4") == new Pt(3, 4)
 }
 ```
 

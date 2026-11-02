@@ -216,3 +216,34 @@ ys = new java.util.TreeSet[Int]()
 - **動作が変わるもの:** `Iterable` と `List` の両方に多重定義や拡張メソッドがある場合、結果に対する呼び出しは `List` の方を選びます。以前の選択を保つには、どちらかの名前を変えてください。
 - **再コンパイルが必要なもの:** 古い `onion.jar` に対してコンパイルしたクラスがこれらのメソッドを呼ぶと、再コンパイルするまで `NoSuchMethodError` を投げます。
 - **そのまま動くもの:** このようなパイプラインの後の `.toList()` は、これまでどおり動きます。結果は `Iterable` の引数や変数にもそのまま渡せます。
+
+## `example` と `law` は契約の述語になりました
+
+ビルド時に実行される検査は、`Boolean` を返して `ensures result` と述べる `static def` で書きます。
+引数のある述語は、`law` と同じようにサンプリングして実行されます。
+
+```onion
+// Before
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
+  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
+  example { Pt::parse("3,4") == new Pt(3, 4) }
+}
+
+// Now
+record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
+public:
+  static def roundtrip(p: Pt): Boolean
+    ensures result
+    = Pt::parse(Pt::format(p)) == p
+  static def parsesThreeFour(): Boolean
+    ensures result
+    = Pt::parse("3,4") == new Pt(3, 4)
+}
+```
+
+- **変わったこと:** `example` と `law` を削除しました。トップレベルでは `def name(): Boolean ensures result = expr`
+  と書きます（`static` は付けません）。複数文の本体は、最後に `return` を置くブロックにします。
+- **見えるもの:** 偽の述語は **E0113** になります。サンプルを作れない引数の型も、黙って通さず E0113 です。
+  `--contracts` は既定で有効（`check`）です。
+- **シードとサンプル数:** `--law-seed` と `--law-samples` は、引き続きサンプリングを制御します。
+- **`onion.Shape`:** 実装するクラスは、それを使う述語を少なくとも1つ必要とします（なければ E0080）。

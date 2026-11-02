@@ -280,7 +280,10 @@ val list: java.util.ArrayList[String] = new java.util.ArrayList[String]()
 record Pt(x: Int, y: Int) {
   shape text = re"(-?\d+),(-?\d+)"
   shape doc  = json
-  law roundtrip(p: Pt) { Pt::text().parse(Pt::text().print(p)).get() == p }
+public:
+  static def roundtrip(p: Pt): Boolean
+    ensures result
+    = Pt::text().parse(Pt::text().print(p)).get() == p
 }
 ```
 

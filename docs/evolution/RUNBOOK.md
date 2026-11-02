@@ -56,7 +56,14 @@ anything in this file.
    Roadmap by nothing. The Sensor may send **one** notification a day, carrying the digest's
    Look here, and only when an ultrahigh PR's veto window is open or a P0/P1 is open; the
    Strategist sends one with the Direction proposal. No other run notifies, except
-   for a P0 or a mistake that touched shared state. Never a status ping, never placeholder text.
+   for a P0, a mistake that touched shared state, or a **silent role**. Never a status ping,
+   never placeholder text.
+   A silent role is either: no panel verdict for 6 hours while a PR waits for one, or no
+   episode from any role for 6 hours. The first run that sees it comments once on the Roadmap
+   (when the last verdict or episode was, what is waiting) and sends one notification; later
+   runs see the comment and do not repeat it. In W44 the panel was silent from 10-27 08:13 to
+   10-31 11:40 UTC; 38 Maintainer runs recorded "queue saturated" and none said so, until Kota
+   cleared the queue by hand on 11-01 and five regressions followed (retro #2584).
 6. **Perspective taking.** Before you publish anything a person will read (a PR, an issue, an
    error message, a doc, a digest), read it once as each of:
    - someone writing their first Onion script, who knows Java or Python but not Onion
@@ -303,6 +310,13 @@ restarts the four lenses. A PR you did not open still counts.
    `panel:changes`. Open any bet that changes this file as its own `meta` PR in the same run
    and link it from the proposal. End the run with one `PushNotification` that summarises the
    bets (§0.5); Kota redirects by commenting, and that comment wins.
+
+   If the panel blocks the proposal and lists what would clear it, and the Strategist run has
+   ended, the next run with no P0 (any role) applies **exactly those edits** to the proposal's
+   body, comments which ones, and leaves everything else alone; the panel then decides again.
+   A block it cannot satisfy by those edits alone waits for the next Strategist. In W44 the
+   panel blocked #2439 forty minutes after it opened, with three small fixes; nobody applied
+   them, so no proposal was active all week.
 5. **Consolidate (sleep).** Read the week's episodes in the memory repo.
    - Update `insights.md`: add, sharpen or retire hunches, each citing its episodes.
    - Move episodes that no longer matter to `archive/`. Never delete one.
@@ -365,8 +379,10 @@ compatibility (PRINCIPLES.md §2, §3, §9).
    - a `### Breaking` entry in the PR's `changelog.d/` fragment
    - a section in `docs/migration/pre-1.0.md` and `docs/ja/migration/pre-1.0.md`
    - a hint diagnostic that points from the old spelling to the new one
-   - an `onion migrate` rewrite rule, once that tool exists; building it is the first item
-     of the audit
+   - an `onion migrate` rewrite rule. The tool exists since #2443 (10-27). A PR with a
+     `### Breaking` entry and no rule says why no mechanical rewrite exists, and its hint
+     shows the edit instead; the Compatibility lens blocks one that does neither. In W44 four
+     breaks (#2430, #2447, #2496, #2332) shipped with no rule and no reason
 4. **Time box: about 8 weeks from the audit's creation.** The phase is done when every audit
    item is closed, no `breaking` RFC is open, two weekly releases in a row had no Breaking
    entry, and dogfood is green.

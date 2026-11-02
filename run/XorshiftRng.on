@@ -157,7 +157,11 @@ def sampleDist(dist: Dist, rng: Rng): Double = select dist {
 // ─── Statistics record ───────────────────────────────────────────────────────
 
 record SampleStats(lbl: String, n: Int, mean: Double, stdDev: Double, minV: Double, maxV: Double) {
-  example nonNegN { new SampleStats("t", 10, 0.5, 0.1, 0.0, 1.0).n() > 0 }
+  public:
+  static def nonNegN(): Boolean
+    ensures result
+    = new SampleStats("t", 10, 0.5, 0.1, 0.0, 1.0).n() > 0
+
 }
 
 def computeStats(lbl: String, samples: List[Double]): SampleStats {
@@ -184,11 +188,14 @@ def computeStats(lbl: String, samples: List[Double]): SampleStats {
 // ─── Chi-square uniformity test ───────────────────────────────────────────────
 
 record ChiResult(rngLbl: String, bins: Int, stat: Double, df: Int) {
-  example positiveStatOk {
-    val r = new ChiResult("t", 10, 5.0, 9)
-    r.stat() >= 0.0
-  }
+
 public:
+  static def positiveStatOk(): Boolean
+    ensures result
+  {
+    val r = new ChiResult("t", 10, 5.0, 9)
+    return r.stat() >= 0.0
+  }
   def verdict(): String =
     if stat() < (df() as Double) * 2.0 { "PASS" } else { "FAIL" }
 }

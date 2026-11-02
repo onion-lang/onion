@@ -13,16 +13,22 @@ import {
 // ─── 2-D vector ──────────────────────────────────────────────────────────────
 
 record Vec2(x: Double, y: Double) {
-  example vec2_add_zero {
+
+
+public:
+  static def vec2_add_zero(): Boolean
+    ensures result
+  {
     val v = new Vec2(3.0, 4.0)
     val z = new Vec2(0.0, 0.0)
-    v.add(z).x() == 3.0 && v.add(z).y() == 4.0
+    return v.add(z).x() == 3.0 && v.add(z).y() == 4.0
   }
-  example vec2_scale_zero {
+  static def vec2_scale_zero(): Boolean
+    ensures result
+  {
     val v = new Vec2(5.0, 12.0)
-    v.scale(0.0).x() == 0.0 && v.scale(0.0).y() == 0.0
+    return v.scale(0.0).x() == 0.0 && v.scale(0.0).y() == 0.0
   }
-public:
   def add(other: Vec2): Vec2 = new Vec2(x() + other.x(), y() + other.y())
   def sub(other: Vec2): Vec2 = new Vec2(x() - other.x(), y() - other.y())
   def scale(s: Double): Vec2 = new Vec2(x() * s, y() * s)

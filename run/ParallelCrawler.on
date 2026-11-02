@@ -34,12 +34,23 @@ public:
 // ─── Records ─────────────────────────────────────────────────────────────────
 
 record Resource(id: Int, url: String, category: String, timeoutMs: Long) {
-  example { new Resource(1, "https://a.com/", "home", 500L).category() == "home" }
-  example { new Resource(2, "https://b.org/api", "api", 200L).timeoutMs() == 200L }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Resource(1, "https://a.com/", "home", 500L).category() == "home"
+  static def example_2(): Boolean
+    ensures result
+    = new Resource(2, "https://b.org/api", "api", 200L).timeoutMs() == 200L
+
+
 }
 
 record FetchResult(resource: Resource, status: FetchStatus, elapsedMs: Long) {
-  example { new FetchResult(new Resource(1, "u", "c", 100L), new Error("u", "fail"), 5L).elapsedMs() == 5L }
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = new FetchResult(new Resource(1, "u", "c", 100L), new Error("u", "fail"), 5L).elapsedMs() == 5L
+
 }
 
 // ─── Extension methods ────────────────────────────────────────────────────────

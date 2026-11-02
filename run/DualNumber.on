@@ -40,31 +40,39 @@ public:
 
   // ── Compile-time property checks ──────────────────────────────────────────
   // d/dx [x^2] at x=2 → re=4, eps=4
-  example {
+  static def example_1(): Boolean
+    ensures result
+  {
     val x: Dual = new Dual(2.0, 1.0)
     val sq: Dual = x * x
-    sq.re() == 4.0 && sq.eps() == 4.0
+    return sq.re() == 4.0 && sq.eps() == 4.0
   }
   // d/dx [x^3] at x=3 → re=27, eps=27  (3*3^2 = 27)
-  example {
+  static def example_2(): Boolean
+    ensures result
+  {
     val x: Dual = new Dual(3.0, 1.0)
     val cube: Dual = x * x * x
-    cube.re() == 27.0 && cube.eps() == 27.0
+    return cube.re() == 27.0 && cube.eps() == 27.0
   }
   // d/dx [sin x] at x=0 → eps=cos(0)=1
-  example {
+  static def example_3(): Boolean
+    ensures result
+  {
     val x: Dual = new Dual(0.0, 1.0)
     val s: Dual = x.dsin()
-    s.re() == 0.0 && s.eps() == 1.0
+    return s.re() == 0.0 && s.eps() == 1.0
   }
   // (a+b).re == a.re + b.re for all doubles
-  law addRealPart(a: Double, b: Double) {
-    (new Dual(a, 0.0) + new Dual(b, 0.0)).re() == a + b
-  }
+  static def addRealPart(a: Double, b: Double): Boolean
+    ensures result
+    = (new Dual(a, 0.0) + new Dual(b, 0.0)).re() == a + b
   // product rule: d/dx [x*x] = 2x
-  law productRule(x: Double) {
+  static def productRule(x: Double): Boolean
+    ensures result
+  {
     val d: Dual = new Dual(x, 1.0) * new Dual(x, 1.0)
-    d.eps() == x + x
+    return d.eps() == x + x
   }
 }
 

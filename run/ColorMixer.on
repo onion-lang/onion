@@ -40,10 +40,19 @@ enum BlendMode { Normal, Multiply, Screen, Overlay }
 // ── RGB colour record ─────────────────────────────────────────────────────────
 
 record Color(r: Int, g: Int, b: Int) {
-  example { new Color(255, 0, 0).r() == 255 }
-  example { new Color(0, 255, 0).g() == 255 }
-  example { new Color(0, 0, 255).b() == 255 }
+
+
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new Color(255, 0, 0).r() == 255
+  static def example_2(): Boolean
+    ensures result
+    = new Color(0, 255, 0).g() == 255
+  static def example_3(): Boolean
+    ensures result
+    = new Color(0, 0, 255).b() == 255
   def hex(): String = "#" + r.hexByte() + g.hexByte() + b.hexByte()
 
   def luminance(): Double =

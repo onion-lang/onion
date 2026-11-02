@@ -76,8 +76,11 @@ public:
 // ─── Records ────────────────────────────────────────────────────────────────
 
 record FileCoverage(path: String, total: Int, covered: Int) {
-  example { new FileCoverage("X.on", 10, 7).pct() > 0.0 }
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new FileCoverage("X.on", 10, 7).pct() > 0.0
   def pct(): Double = if total == 0 { 0.0 } else { (covered * 100.0) / total }
   def level(): CoverageLevel = CoverageLevel::fromPct(pct())
   def uncovered(): Int = total - covered

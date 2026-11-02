@@ -39,14 +39,25 @@ enum TxType {
 
 // ─── Transaction record ────────────────────────────────────────────────────────
 record Transaction(id: Int, kind: TxType, memo: String) {
-  example { new Transaction(1, new Coinbase(50), "block reward").id() == 1 }
-  example { new Transaction(2, new Freeze("alice"), "penalize").memo() == "penalize" }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Transaction(1, new Coinbase(50), "block reward").id() == 1
+  static def example_2(): Boolean
+    ensures result
+    = new Transaction(2, new Freeze("alice"), "penalize").memo() == "penalize"
+
+
 }
 
 // ─── Block record ─────────────────────────────────────────────────────────────
 record Block(index: Int, prevHash: String, txs: List[Object],
              nonce: Int, hash: String) {
-  example { new Block(0, "0", [], 0, "genesis").index() == 0 }
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = new Block(0, "0", [], 0, "genesis").index() == 0
+
 }
 
 // ─── Mining outcome enum ───────────────────────────────────────────────────────

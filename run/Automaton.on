@@ -26,8 +26,11 @@ extension Int {
 // A Wolfram rule is an 8-bit integer 0-255. Each triple of cells (l, c, r)
 // maps a 3-bit neighbourhood index to the next center value.
 record Rule(number: Int) {
-  example { new Rule(30).number() == 30 }
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new Rule(30).number() == 30
   def name(): String = "Rule " + number()
 
   // Apply the rule to one neighbourhood (l, c, r) — next center value.

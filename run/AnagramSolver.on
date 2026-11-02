@@ -113,8 +113,15 @@ public:
 // ─── WordBank record ─────────────────────────────────────────────────────────
 
 record WordScore(word: String, score: Int) {
-  example { new WordScore("QUIZ", 22).score() == 22 }
-  example { new WordScore("HELLO", 8).word() == "HELLO"  }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new WordScore("QUIZ", 22).score() == 22
+  static def example_2(): Boolean
+    ensures result
+    = new WordScore("HELLO", 8).word() == "HELLO"
+
+
 }
 
 // ─── AnagramIndex class ──────────────────────────────────────────────────────

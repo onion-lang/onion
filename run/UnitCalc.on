@@ -44,25 +44,32 @@ public:
 
 record Measure(symbol: String, name: String, dim: Dimension, toSI: Double, offsetToSI: Double) {
   // law: converting to SI and back must be identity (within floating-point tolerance)
-  example roundTrip {
+  public:
+  static def roundTrip(): Boolean
+    ensures result
+  {
     val u = new Measure("m", "metre", new Length(), 1.0, 0.0)
     val v = 42.5
     val si = v * u.toSI() + u.offsetToSI()
     val back = (si - u.offsetToSI()) / u.toSI()
-    OnionMath::abs(back - v) < 1e-9
+    return OnionMath::abs(back - v) < 1e-9
   }
+
 }
 
 // ── Quantity ──────────────────────────────────────────────────────────────────
 
 record Quantity(value: Double, unit: Measure) {
-  example positiveLength {
-    val m = new Measure("m", "metre", new Length(), 1.0, 0.0)
-    val q = new Quantity(5.0, m)
-    q.value() > 0.0
-  }
+
 
 public:
+  static def positiveLength(): Boolean
+    ensures result
+  {
+    val m = new Measure("m", "metre", new Length(), 1.0, 0.0)
+    val q = new Quantity(5.0, m)
+    return q.value() > 0.0
+  }
   def toSI(): Double = value() * unit().toSI() + unit().offsetToSI()
 
   def convertTo(target: Measure): Quantity? {

@@ -15,8 +15,15 @@ enum GradeCategory {
 
 // ── Records ───────────────────────────────────────────────────────────────────
 record Student(name: String, subject: String, score: Int) {
-  example { new Student("Test", "Math", 75).score() == 75 }
-  example { new Student("Test", "Math", 75).subject() == "Math" }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Student("Test", "Math", 75).score() == 75
+  static def example_2(): Boolean
+    ensures result
+    = new Student("Test", "Math", 75).subject() == "Math"
+
+
 }
 
 record SubjectSummary(

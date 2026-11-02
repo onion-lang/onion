@@ -860,6 +860,8 @@ object TypedAST {
      */
     var preconditions: Seq[Term] = Nil
     var postconditions: Seq[Term] = Nil
+    /** Whether an `ensures` clause is exactly `result`: the method asserts it returns true (a closed predicate). */
+    var assertsResult: Boolean = false
     private var closure: Boolean = false
     private var frame: LocalFrame = _
     private var argsWithDefaults_ : Array[MethodArgument] = null

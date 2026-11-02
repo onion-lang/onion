@@ -84,11 +84,20 @@ record OptionContract(
   vol:    Double,
   tenor:  Double
 ) {
-  example { new OptionContract(new CallOpt(), 100.0, 100.0, 0.05, 0.20, 1.0).spot() > 0.0 }
-  example { new OptionContract(new PutOpt(), 50.0, 55.0, 0.03, 0.15, 0.5).strike() > 0.0 }
-  example { new OptionContract(new CallOpt(), 100.0, 100.0, 0.05, 0.20, 1.0).vol() > 0.0 }
+
+
+
 
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new OptionContract(new CallOpt(), 100.0, 100.0, 0.05, 0.20, 1.0).spot() > 0.0
+  static def example_2(): Boolean
+    ensures result
+    = new OptionContract(new PutOpt(), 50.0, 55.0, 0.03, 0.15, 0.5).strike() > 0.0
+  static def example_3(): Boolean
+    ensures result
+    = new OptionContract(new CallOpt(), 100.0, 100.0, 0.05, 0.20, 1.0).vol() > 0.0
   def label(): String {
     val k: String = kind().label()
     return k + " S=#{spot().fmt2()} K=#{strike().fmt2()} r=#{rate().fmt2()} v=#{vol().fmt2()} T=#{tenor().fmt2()}"
@@ -105,8 +114,15 @@ record Greeks(
   vega:  Double,
   rho:   Double
 ) {
-  example { new Greeks(10.0, 0.5, 0.02, -0.01, 20.0, 5.0).gamma() >= 0.0 }
-  example { new Greeks(10.0, 0.5, 0.02, -0.01, 20.0, 5.0).vega()  >= 0.0 }
+  public:
+  static def example_4(): Boolean
+    ensures result
+    = new Greeks(10.0, 0.5, 0.02, -0.01, 20.0, 5.0).gamma() >= 0.0
+  static def example_5(): Boolean
+    ensures result
+    = new Greeks(10.0, 0.5, 0.02, -0.01, 20.0, 5.0).vega()  >= 0.0
+
+
 }
 
 // ─── Pricer interface ─────────────────────────────────────────────────────────

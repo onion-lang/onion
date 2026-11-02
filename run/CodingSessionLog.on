@@ -97,8 +97,15 @@ record Session(
   linesChanged: Int,
   notes:        String?
 ) {
-  example { new Session(1, "2024-01-15", Language::SCALA, new Feature(), 90, 120, null).velocity() == 80 }
-  example { new Session(2, "2024-01-16", Language::JAVA,  new BugFix(),  60, 30,  "fix NPE").velocity() == 30 }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Session(1, "2024-01-15", Language::SCALA, new Feature(), 90, 120, null).velocity() == 80
+  static def example_2(): Boolean
+    ensures result
+    = new Session(2, "2024-01-16", Language::JAVA,  new BugFix(),  60, 30,  "fix NPE").velocity() == 30
+
+
 }
 
 extension Session {

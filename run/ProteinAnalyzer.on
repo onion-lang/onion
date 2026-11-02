@@ -68,12 +68,12 @@ public:
     "#{code1()} #{code3()} #{polarity().symbol()} #{aaClass().abbrev()} MW=#{mw()}Da"
 }
 
-example {
-  new AminoAcid("Glycine","G","Gly",57.05,new Nonpolar(),AaClass::Aliphatic).isCharged() == false
-}
-example {
-  new AminoAcid("Lysine","K","Lys",128.17,new PositiveCharge(),AaClass::Basic).isCharged() == true
-}
+def example_1(): Boolean
+  ensures result
+  = new AminoAcid("Glycine","G","Gly",57.05,new Nonpolar(),AaClass::Aliphatic).isCharged() == false
+def example_2(): Boolean
+  ensures result
+  = new AminoAcid("Lysine","K","Lys",128.17,new PositiveCharge(),AaClass::Basic).isCharged() == true
 
 // ── Standard amino acid table ────────────────────────────────────────────────
 

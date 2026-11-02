@@ -21,9 +21,15 @@ enum Seg {
 // ── Parse result ──────────────────────────────────────────────────────────────
 
 record GlobPattern(raw: String, segs: List[Seg]) {
-  example { GlobPattern::parse("*.txt").raw() == "*.txt" }
-  example { GlobPattern::parse("?").segs().size == 1 }
+
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = GlobPattern::parse("*.txt").raw() == "*.txt"
+  static def example_2(): Boolean
+    ensures result
+    = GlobPattern::parse("?").segs().size == 1
   static def parse(raw: String): GlobPattern = parseGlob(raw)
 }
 

@@ -95,8 +95,11 @@ record Event(
   message:     String,
   timestampMs: Long
 ) {
-  example positiveTs { new Event("t", new Inf(), new Sys(), "s", "m", 1L).timestampMs() > 0L }
+
 public:
+  static def positiveTs(): Boolean
+    ensures result
+    = new Event("t", new Inf(), new Sys(), "s", "m", 1L).timestampMs() > 0L
   def display(): String =
     "[#{severity().label()}][#{category().tag()}] #{topic().padRight(14)} #{source().padRight(10)} #{message()}"
 }

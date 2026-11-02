@@ -7,9 +7,15 @@ import { java.lang.Math }
 
 // ─── City ─────────────────────────────────────────────────────────────────────
 record City(name: String, x: Double, y: Double) {
-  example { new City("A", 0.0, 0.0).x() == 0.0 }
-  example { new City("X", 3.0, 4.0).distTo(new City("Y", 0.0, 0.0)) == 5.0 }
+
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new City("A", 0.0, 0.0).x() == 0.0
+  static def example_2(): Boolean
+    ensures result
+    = new City("X", 3.0, 4.0).distTo(new City("Y", 0.0, 0.0)) == 5.0
   def distTo(o: City): Double {
     val dx: Double = x() - o.x()
     val dy: Double = y() - o.y()

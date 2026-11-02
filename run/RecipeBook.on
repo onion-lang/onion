@@ -93,7 +93,9 @@ public:
   def display(): String = "#{amount().display()} #{name()}"
   def scale(factor: Double): Ingredient = new Ingredient(name(), amount().scaleTo(factor))
 }
-  example { new Ingredient("flour", new Grams(200)).display() == "200g flour" }
+def example_1(): Boolean
+  ensures result
+  = new Ingredient("flour", new Grams(200)).display() == "200g flour"
 
 record NutritionInfo(calories: Int, proteinG: Double, carbsG: Double, fatG: Double) {
 public:

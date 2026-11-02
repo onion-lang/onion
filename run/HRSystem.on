@@ -81,14 +81,21 @@ record Employee(
   yearsExp: Int,
   rating: Rating
 ) {
-  example {
+  public:
+  static def example_1(): Boolean
+    ensures result
+  {
     val e = new Employee(1, "Alice", "Eng", new FullTime(40), 120000.0, 5, Rating::Excellent)
-    e.yearsExp() == 5 && e.annualSalary() == 120000.0
+    return e.yearsExp() == 5 && e.annualSalary() == 120000.0
   }
-  example {
+  static def example_2(): Boolean
+    ensures result
+  {
     val e = new Employee(2, "Bob", "HR", new PartTime(20), 60000.0, 2, Rating::Good)
-    e.empType().isFullTime() == false
+    return e.empType().isFullTime() == false
   }
+
+
 }
 
 record PayRaise(
@@ -98,10 +105,14 @@ record PayRaise(
   raisePercent: Double,
   newSalary: Double
 ) {
-  example {
+  public:
+  static def example_3(): Boolean
+    ensures result
+  {
     val r = new PayRaise(1, "Alice", 100000.0, 0.10, 110000.0)
-    r.newSalary() - r.currentSalary() == 10000.0
+    return r.newSalary() - r.currentSalary() == 10000.0
   }
+
 }
 
 record DeptStats(

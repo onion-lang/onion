@@ -59,8 +59,11 @@ extension String {
 enum Title { GM, IM, FM, CM, NONE }
 
 record ChessPlayer(playerName: String, rating: Int, title: Title, wins: Int, losses: Int) {
-  example { new ChessPlayer("Magnus", 2850, Title::GM, 312, 48).winRate() > 80 }
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new ChessPlayer("Magnus", 2850, Title::GM, 312, 48).winRate() > 80
   def winRate(): Int {
     val total: Int = wins() + losses()
     if total == 0 { return 0 }
@@ -97,8 +100,11 @@ instance Formattable[ChessPlayer] {
 
 // ─── Domain 2: Racing driver ─────────────────────────────────────────────────
 record Driver(driverName: String, team: String, points: Int, fastestLaps: Int, dnfs: Int) {
-  example { new Driver("Hamilton", "Mercedes", 287, 6, 1).reliability() > 80 }
+
 public:
+  static def example_2(): Boolean
+    ensures result
+    = new Driver("Hamilton", "Mercedes", 287, 6, 1).reliability() > 80
   // reliability: penalise DNFs relative to total race events
   def reliability(): Int {
     val total: Int = fastestLaps() + dnfs() + 15

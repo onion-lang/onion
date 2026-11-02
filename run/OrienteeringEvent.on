@@ -61,22 +61,27 @@ public:
 // ── records ────────────────────────────────────────────────────────────────
 
 record Control(code: String, description: String, pointValue: Int) {
-  example { new Control("101", "Hilltop boulder", 5).pointValue() == 5 }
+
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new Control("101", "Hilltop boulder", 5).pointValue() == 5
   def label(): String = code().rpad(5) + description().rpad(28) + "" + pointValue() + " pts"
 }
 
 record EntryRecord(bibNumber: Int, name: String, club: String,
     courseClass: CourseClass, result: CompetitorResult) {
-  example {
-    new EntryRecord(1, "Alice", "FjordOK", CourseClass::Elite,
-      new Finished(2895, 18)).finishSeconds() == 2895
-  }
-  example {
-    new EntryRecord(2, "Bob", "LakeOK", CourseClass::Novice,
-      new DidNotFinish(4)).finishSeconds() == 999999
-  }
+
+
 public:
+  static def example_2(): Boolean
+    ensures result
+    = new EntryRecord(1, "Alice", "FjordOK", CourseClass::Elite,
+      new Finished(2895, 18)).finishSeconds() == 2895
+  static def example_3(): Boolean
+    ensures result
+    = new EntryRecord(2, "Bob", "LakeOK", CourseClass::Novice,
+      new DidNotFinish(4)).finishSeconds() == 999999
   def finishSeconds(): Int = select result() {
     case f is Finished: f.totalSeconds()
     else:               999999

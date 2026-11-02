@@ -59,9 +59,19 @@ record ReviewMetrics(
   teamworkScore: Int,
   innovationScore: Int
 ) {
-  example { new ReviewMetrics(4, 4, 4, 4).average() == 4 }
-  example { new ReviewMetrics(5, 3, 4, 4).average() == 4 }
-  example { new ReviewMetrics(1, 1, 1, 1).average() == 1 }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new ReviewMetrics(4, 4, 4, 4).average() == 4
+  static def example_2(): Boolean
+    ensures result
+    = new ReviewMetrics(5, 3, 4, 4).average() == 4
+  static def example_3(): Boolean
+    ensures result
+    = new ReviewMetrics(1, 1, 1, 1).average() == 1
+
+
+
 }
 
 extension ReviewMetrics {

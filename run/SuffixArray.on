@@ -45,17 +45,25 @@ extension Int {
 // ─── Records ──────────────────────────────────────────────────────────────────
 
 record SearchResult(pattern: String, count: Int, positions: List[Int]) {
-  example e1 {
+  public:
+  static def e1(): Boolean
+    ensures result
+  {
     val r = new SearchResult("ab", 2, [0, 4])
-    r.pattern() == "ab" && r.count() == 2
+    return r.pattern() == "ab" && r.count() == 2
   }
+
 }
 
 record LcpEntry(left: Int, right: Int, length: Int) {
-  example e1 {
+  public:
+  static def e1(): Boolean
+    ensures result
+  {
     val e = new LcpEntry(0, 1, 3)
-    e.length() >= 0
+    return e.length() >= 0
   }
+
 }
 
 // ─── Result enum for comparison ───────────────────────────────────────────────

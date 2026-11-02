@@ -113,15 +113,27 @@ public:
 
 // ─── Records ──────────────────────────────────────────────────────────────────
 record TerrainCell(x: Int, y: Int, height: Double, biome: Biome) {
-  example { new TerrainCell(0, 0, 0.5, new Plains()).biome().elevation() == 3 }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new TerrainCell(0, 0, 0.5, new Plains()).biome().elevation() == 3
+
 }
 
 record BiomeStat(biomeLabel: String, count: Int, barLen: Int) {
-  example { new BiomeStat("Ocean", 10, 5).count() == 10 }
+  public:
+  static def example_2(): Boolean
+    ensures result
+    = new BiomeStat("Ocean", 10, 5).count() == 10
+
 }
 
 record PathResult(found: Boolean, steps: Int) {
-  example { !new PathResult(false, -1).found() }
+  public:
+  static def example_3(): Boolean
+    ensures result
+    = !new PathResult(false, -1).found()
+
 }
 
 // ─── Height-map helpers ───────────────────────────────────────────────────────

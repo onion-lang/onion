@@ -33,7 +33,11 @@ public:
 
 // ── Records ───────────────────────────────────────────────────────────────────
 record CodeEntry(symbol: String, freq: Int, code: String, bits: Int) {
-  example { new CodeEntry("a", 3, "10", 2).bits() == 2 }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new CodeEntry("a", 3, "10", 2).bits() == 2
+
 }
 
 record EncodeStats(

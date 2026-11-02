@@ -76,8 +76,15 @@ record Subscription(
   costCents: Int,
   active: Boolean
 ) {
-  example { new Subscription(1, "Spotify", Category::STREAMING, new Monthly(), 999, true).id() == 1 }
-  example { new Subscription(2, "test",    Category::CLOUD,     new Annual(),  0,   false).costCents() >= 0 }
+  public:
+  static def example_1(): Boolean
+    ensures result
+    = new Subscription(1, "Spotify", Category::STREAMING, new Monthly(), 999, true).id() == 1
+  static def example_2(): Boolean
+    ensures result
+    = new Subscription(2, "test",    Category::CLOUD,     new Annual(),  0,   false).costCents() >= 0
+
+
 }
 
 record CategorySummary(

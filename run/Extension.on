@@ -245,18 +245,27 @@ extension List[String] {
 // ─── Records and enums that lean on these extensions ─────────────────────────
 
 record IntRange(lo: Int, hi: Int) {
-  example { new IntRange(1, 10).lo() == 1 }
-  example { new IntRange(1, 10).size() == 10 }
+
+
 
 public:
+  static def example_1(): Boolean
+    ensures result
+    = new IntRange(1, 10).lo() == 1
+  static def example_2(): Boolean
+    ensures result
+    = new IntRange(1, 10).size() == 10
   def size(): Int = (hi() - lo() + 1).abs()
   def contains(n: Int): Boolean = n >= lo() && n <= hi()
   def midpoint(): Double = (lo() + hi()).doubleValue() / 2.0
 }
 
 record DescriptiveStats(count: Int, sum: Double, min: Double, max: Double) {
-  example { new DescriptiveStats(2, 3.0, 1.0, 2.0).mean() == 1.5 }
+
 public:
+  static def example_3(): Boolean
+    ensures result
+    = new DescriptiveStats(2, 3.0, 1.0, 2.0).mean() == 1.5
   def mean(): Double  = if count() == 0 { 0.0 } else { (sum() / count().doubleValue()).round(4) }
   def range(): Double = (max() - min()).round(4)
 }

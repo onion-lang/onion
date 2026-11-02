@@ -29,7 +29,7 @@ final class ShapeInstanceLawPass(typing: Typing) {
   def run(classes: Seq[ClassDefinition]): Unit = {
     val lawsByFile: Map[String, Seq[MethodDefinition]] = classes.iterator
       .flatMap(cd => cd.methods.collect {
-        case m: MethodDefinition if m.name.startsWith(LawPrefix) || m.name.startsWith(ExamplePrefix) => m
+        case m: MethodDefinition if m.name.startsWith(LawPrefix) || m.name.startsWith(ExamplePrefix) || m.assertsResult => m
       })
       .toSeq
       .groupBy(m => Option(m.classType).flatMap(ct => Option(fileOf(ct, classes))).getOrElse(""))

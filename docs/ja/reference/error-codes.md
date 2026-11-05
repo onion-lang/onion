@@ -1102,7 +1102,7 @@ record Circle(area: Int) conforms Shape   // E0104: area(): Int は Shape.area()
 
 ### `E0105` — 契約が無効なのに契約の節がある
 
-`requires`、`ensures`、`invariant`、`history` の節が、`--contracts off`（既定）でコンパイルした
+`requires`、`ensures`、`invariant`、`history` の節が、`--contracts off`（既定は `check`）でコンパイルした
 プログラムにあります。契約はプレビュー機能です（RFC #2557）。節は無視されずエラーになります。
 黙って何もしない契約は、無い方が悪くないからです。
 
@@ -1171,11 +1171,12 @@ history を壊します。
 
 ```onion
 class Counter {
+protected:
   var n: Int
   history n >= old(n)
 public:
   def this { n = 0 }
-  def inc(): void { n = n + 1 }
+  def inc(): void requires n < 2147483647 { n = n + 1 }
 }
 class ResettableCounter extends Counter {
 public:
@@ -1205,7 +1206,7 @@ Java の親クラスは状態を変えるメソッドを持ちえて、コンパ
 継承してよいのは `Object` か Onion のクラスだけです。
 
 ```onion
-class A extends java.util.ArrayList {
+class A extends java.util.ArrayList[String] {
   invariant size >= 0   // E0111
 }
 ```

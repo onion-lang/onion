@@ -1114,7 +1114,7 @@ Fix: give the component or method the inherited type (`area: JInteger`), or rena
 ### `E0105` — A contract clause while contracts are off
 
 A `requires`, `ensures`, `invariant` or `history` clause appears in a program compiled with
-`--contracts off`, the default. Contracts are a preview feature (RFC #2557). The clause is an
+`--contracts off` (the default is `check`). Contracts are a preview feature (RFC #2557). The clause is an
 error rather than being ignored: a contract that silently does nothing is worse than none.
 
 ```onion
@@ -1182,11 +1182,12 @@ constant while another method raises `n`, can break it. This is the case a subty
 
 ```onion
 class Counter {
+protected:
   var n: Int
   history n >= old(n)
 public:
   def this { n = 0 }
-  def inc(): void { n = n + 1 }
+  def inc(): void requires n < 2147483647 { n = n + 1 }
 }
 class ResettableCounter extends Counter {
 public:
@@ -1216,7 +1217,7 @@ A Java superclass can have methods that change state, and the compiler can neith
 guard them. Extend only `Object` or an Onion class.
 
 ```onion
-class A extends java.util.ArrayList {
+class A extends java.util.ArrayList[String] {
   invariant size >= 0   // E0111
 }
 ```

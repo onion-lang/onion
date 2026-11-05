@@ -310,7 +310,7 @@ private[compiler] final class MethodBodySupport(
       case _ =>
     bindParameters(context, args, paramTypes, block)
     constructor.setArgumentsWithDefaults(
-      buildArgumentsWithDefaults(args, paramTypes, context, DefaultOwner("init", constructor.modifier | AST.M_STATIC, Array())))
+      buildArgumentsWithDefaults(args, paramTypes, context.recordUsage, DefaultOwner("init", constructor.modifier | AST.M_STATIC, Array())))
     context
   }
 
@@ -508,10 +508,29 @@ private[compiler] final class MethodBodySupport(
     val arguments = method.arguments
     markCapturedVariables(context, args, block)
     bindParameters(context, args, arguments, block)
-    method.setArgumentsWithDefaults(
-      buildArgumentsWithDefaults(args, arguments, context, DefaultOwner(method.name, method.modifier, method.typeParameters)))
+    predefinedDefaults.get(method) match
+      case Some((withDefaults, used)) =>
+        used.foreach(context.recordUsage)
+        method.setArgumentsWithDefaults(withDefaults)
+      case None =>
+        method.setArgumentsWithDefaults(
+          buildArgumentsWithDefaults(args, arguments, context.recordUsage, DefaultOwner(method.name, method.modifier, method.typeParameters)))
     context
   }
+
+  /** Methods whose defaults were typed ahead of the bodies, with the parameter names those defaults read. */
+  private val predefinedDefaults = scala.collection.mutable.HashMap.empty[MethodDefinition, (Array[TypedAST.MethodArgument], Set[String])]
+
+  /**
+   * Types a method's defaults before any body of its class is typed, so a call written above the
+   * method (`def run() = g()` ... `def g(n: Int = 5)`) already sees them (#2637).
+   */
+  def predefineDefaults(method: MethodDefinition, args: List[AST.Argument]): Unit =
+    if args.exists(_.defaultValue != null) && !predefinedDefaults.contains(method) then
+      val used = scala.collection.mutable.Set.empty[String]
+      val withDefaults = buildArgumentsWithDefaults(args, method.arguments, used += _, DefaultOwner(method.name, method.modifier, method.typeParameters))
+      method.setArgumentsWithDefaults(withDefaults)
+      predefinedDefaults(method) = (withDefaults, used.toSet)
 
   private def prepareExtensionContext(
     staticMethod: MethodDefinition,
@@ -543,7 +562,7 @@ private[compiler] final class MethodBodySupport(
     addSharedParameterCopies(context, node.args, arguments.tail, shared)
 
     staticMethod.setArgumentsWithDefaults(
-      buildArgumentsWithDefaults(extArgs, arguments, context, DefaultOwner(staticMethod.name, staticMethod.modifier, staticMethod.typeParameters, staticMethod.classType.asInstanceOf[ClassDefinition])))
+      buildArgumentsWithDefaults(extArgs, arguments, context.recordUsage, DefaultOwner(staticMethod.name, staticMethod.modifier, staticMethod.typeParameters, staticMethod.classType.asInstanceOf[ClassDefinition])))
     context
   }
 
@@ -649,14 +668,14 @@ private[compiler] final class MethodBodySupport(
   private def buildArgumentsWithDefaults(
     args: List[AST.Argument],
     types: Array[Type],
-    calleeContext: LocalContext,
+    recordUsage: String => Unit,
     owner: DefaultOwner
   ): Array[TypedAST.MethodArgument] =
     args.zipWithIndex.map { case (arg, i) =>
       // A default is checked like `val x: T = e` (issue #2541): an out-of-range `200` for a
       // `Byte` or a `3.7` for a `Short` is E0000 here, not a truncated value or a VerifyError.
       val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        synthesizeDefault(args, types, calleeContext, owner, i, expr)
+        synthesizeDefault(args, types, recordUsage, owner, i, expr)
       }
       TypedAST.MethodArgument(arg.name, types(i), defaultTerm)
     }.toArray
@@ -664,7 +683,7 @@ private[compiler] final class MethodBodySupport(
   private def synthesizeDefault(
     args: List[AST.Argument],
     types: Array[Type],
-    calleeContext: LocalContext,
+    recordUsage: String => Unit,
     owner: DefaultOwner,
     i: Int,
     expr: AST.Expression
@@ -687,7 +706,7 @@ private[compiler] final class MethodBodySupport(
     val problemsBefore = bodyContext.problemCount
     val value = typed(expr, context, types(i)).map(term => processAssignable(expr, types(i), term)).filter(_ != null)
     // A parameter read only by a later default is used (no W0006).
-    context.usedNames.foreach(calleeContext.recordUsage)
+    context.usedNames.foreach(recordUsage)
     value match
       case Some(term) =>
         method.mayContainTry = bodyContext.tryCount != triesBefore

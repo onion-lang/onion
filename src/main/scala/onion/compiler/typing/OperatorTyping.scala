@@ -501,15 +501,21 @@ final class OperatorTyping(
           bodyContext.report(CANNOT_ASSIGN_TO_VAL, termNode, ref.field.name)
           return None
         }
-        val varIndex = context.add(context.newName, ref.target.`type`)
-        new Begin(
-          new SetLocal(0, varIndex, ref.target.`type`, ref.target),
+        // Bind the receiver once, read the old value into a temp, write old+1 and
+        // yield the old value, as the local, static and array cases do.
+        val tgtVar = context.add(context.newName, ref.target.`type`)
+        val oldVar = context.add(context.newName, operand.`type`)
+        def tgt = new RefLocal(0, tgtVar, ref.target.`type`)
+        new Begin(Array[Term](
+          new SetLocal(0, tgtVar, ref.target.`type`, ref.target),
+          new SetLocal(0, oldVar, operand.`type`, new RefField(tgt, ref.field)),
           new SetField(
-            new RefLocal(0, varIndex, ref.target.`type`),
+            tgt,
             ref.field,
-            new BinaryTerm(binaryKind, operand.`type`, new RefField(new RefLocal(0, varIndex, ref.target.`type`), ref.field), incrementOne(operand.`type`))
-          )
-        )
+            new BinaryTerm(binaryKind, operand.`type`, new RefLocal(0, oldVar, operand.`type`), incrementOne(operand.`type`))
+          ),
+          new RefLocal(0, oldVar, operand.`type`)
+        ))
       case ref: RefStaticField =>
         // Post-increment/decrement on a static field (`C::count++`, and a top-level
         // `var` which is promoted to a static field). A static field has no receiver,

@@ -8,6 +8,17 @@ private[typing] object TypeRelations {
   def sameClass(left: ClassType, right: ClassType): Boolean =
     (left eq right) || (left.name == right.name)
 
+  /** `expected` is a supertype of the box `boxed`. The box is a raw class, which an applied
+   *  type accepts by erasure, so an applied `expected` is matched against the box's own view
+   *  of that class: `Comparable[JInteger]` fits `Integer`, `Comparable[String]` does not
+   *  (#2561, #2594). */
+  def boxSupertypeAccepts(table: ClassTable, expected: ClassType, boxed: ClassType): Boolean = expected match {
+    case applied: AppliedClassType =>
+      val views = table.appliedViewsOf(boxed)(AppliedTypeViews.collectAppliedViewsFrom(boxed))
+      views.exists { case (raw, view) => sameClass(raw, applied.raw) && TypeRules.isSuperType(applied, view) }
+    case _ => TypeRules.isSuperType(expected, boxed)
+  }
+
   /** A bare, Onion-declared type variable (`[T]`, or `[T extends B?]`): its type
    *  arguments may be nullable, so `null` is a valid `T` and W0012 does not apply
    *  (#2500). `[T extends B]`, and the non-null view after a smart cast, do not. */
@@ -60,7 +71,14 @@ private[typing] object TypeRelations {
     if TypeRules.isAssignable(expected, actual) then true
     else if !expected.isBasicType && actual.isBasicType then
       val basicType = actual.asInstanceOf[BasicType]
-      basicType != BasicType.VOID && TypeRules.isAssignable(expected, Boxing.boxedType(table, basicType))
+      basicType != BasicType.VOID && {
+        val boxed = Boxing.boxedType(table, basicType)
+        // An applied target is matched against the box's own view, not by erasure:
+        // `val y: Comparable[String] = 5` is rejected (#2594).
+        expected match
+          case applied: AppliedClassType => boxSupertypeAccepts(table, applied, boxed)
+          case _ => TypeRules.isAssignable(expected, boxed)
+      }
     else if expected.isBasicType && !actual.isBasicType then
       val basicType = expected.asInstanceOf[BasicType]
       basicType != BasicType.VOID && TypeRules.isAssignable(Boxing.boxedType(table, basicType), actual)

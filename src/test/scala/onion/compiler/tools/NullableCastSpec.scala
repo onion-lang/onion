@@ -162,4 +162,28 @@ class NullableCastSpec extends AbstractShellSpec {
       assert(Shell.Success(1301) == r)
     }
   }
+
+  describe("assigning a primitive to an applied supertype of its box (#2594)") {
+    it("rejects a type argument the box can never have") {
+      for (src <- Seq(
+        "val y: Comparable[String] = 5",
+        "val y: Comparable[JInteger] = 5L",
+        "val y: Comparable[String] = true"
+      )) {
+        val msgs = compileErrors(s"def main(args: String[]): void {\n  $src\n}\n")
+        assert(msgs.contains("E0000") || msgs.contains("E0001"), s"expected an error for <$src>, got: $msgs")
+      }
+    }
+    it("still boxes to the box's own applied view and to plain supertypes") {
+      val r = shell.run(
+        """def main(args: String[]): Int {
+          |  val c: Comparable[JInteger] = 5
+          |  val n: Number = 3
+          |  val o: Object = 2
+          |  return c.compareTo(4) + n.intValue() * 100 + (if o.hashCode() == 2 { 1000 } else { 0 })
+          |}
+          |""".stripMargin, "AssignToAppliedBoxView.on", Array())
+      assert(Shell.Success(1301) == r)
+    }
+  }
 }

@@ -1102,7 +1102,7 @@ record Circle(area: Int) conforms Shape   // E0104: area(): Int は Shape.area()
 
 ### `E0105` — 契約が無効なのに契約の節がある
 
-`requires`、`ensures`、`invariant`、`history` の節が、`--contracts off`（既定）でコンパイルした
+`requires`、`ensures`、`invariant`、`history` の節が、`--contracts off`（既定は `check`）でコンパイルした
 プログラムにあります。契約はプレビュー機能です（RFC #2557）。節は無視されずエラーになります。
 黙って何もしない契約は、無い方が悪くないからです。
 
@@ -1171,11 +1171,12 @@ history を壊します。
 
 ```onion
 class Counter {
+protected:
   var n: Int
   history n >= old(n)
 public:
   def this { n = 0 }
-  def inc(): void { n = n + 1 }
+  def inc(): void requires n < 2147483647 { n = n + 1 }
 }
 class ResettableCounter extends Counter {
 public:
@@ -1205,7 +1206,7 @@ Java の親クラスは状態を変えるメソッドを持ちえて、コンパ
 継承してよいのは `Object` か Onion のクラスだけです。
 
 ```onion
-class A extends java.util.ArrayList {
+class A extends java.util.ArrayList[String] {
   invariant size >= 0   // E0111
 }
 ```
@@ -1898,6 +1899,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `W0020` | `extension` メソッドの名前とアリティが既存のメンバー（自身または継承）と完全に一致している。既存のメンバーが常に優先されるため、その extension メソッドは呼び出されない |
 | `W0021` | メソッドが `history` を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
 | `W0022` | the contract of a Shape was not checked: its value type cannot be sampled |
+| `W0023` | ビルドが実行するはずの述語を実行しなかった。述語のエフェクトに I/O、またはエフェクト表が保証できないもの（`unknown`）が含まれる。警告は述語とエフェクトを示す |
 | `W0024` | `history` が名指すフィールドにメソッドが書き込むが、`history` が保たれるかをどの検査も決めていない。フィールドが `Int` でない、ソルバーがメソッド本体を扱えない、または `history` が `x >= old(x)`・`x <= old(x)`・`x == old(x)` の形でない場合です。そこでは `history` は保証されません |
 | `W0025` | オーバーライドが継承した契約を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
 | `W0026` | `--contracts runtime` が実行時に守らない契約の節がある。理由を示す（守られない節が黙って残ることはない） |

@@ -1114,7 +1114,7 @@ Fix: give the component or method the inherited type (`area: JInteger`), or rena
 ### `E0105` — A contract clause while contracts are off
 
 A `requires`, `ensures`, `invariant` or `history` clause appears in a program compiled with
-`--contracts off`, the default. Contracts are a preview feature (RFC #2557). The clause is an
+`--contracts off` (the default is `check`). Contracts are a preview feature (RFC #2557). The clause is an
 error rather than being ignored: a contract that silently does nothing is worse than none.
 
 ```onion
@@ -1182,11 +1182,12 @@ constant while another method raises `n`, can break it. This is the case a subty
 
 ```onion
 class Counter {
+protected:
   var n: Int
   history n >= old(n)
 public:
   def this { n = 0 }
-  def inc(): void { n = n + 1 }
+  def inc(): void requires n < 2147483647 { n = n + 1 }
 }
 class ResettableCounter extends Counter {
 public:
@@ -1216,7 +1217,7 @@ A Java superclass can have methods that change state, and the compiler can neith
 guard them. Extend only `Object` or an Onion class.
 
 ```onion
-class A extends java.util.ArrayList {
+class A extends java.util.ArrayList[String] {
   invariant size >= 0   // E0111
 }
 ```
@@ -1914,6 +1915,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
 | `W0021` | a method can break a `history`: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 | `W0022` | the contract of a Shape was not checked: its value type cannot be sampled |
+| `W0023` | a predicate the build would run was not run: its effects include I/O or something the effect table cannot vouch for (`unknown`); the warning names the predicate and the effect |
 | `W0024` | a method writes a field that a `history` names, and no check settled whether the history still holds: the field is not an `Int`, the solver does not model the method body, or the history is not of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`. Nothing guarantees the history there |
 | `W0025` | an override can break the contract it inherits: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 | `W0026` | a contract clause is not enforced at run time by `--contracts runtime`, with the reason (a warning, so a clause that is not guarded is never silent) |

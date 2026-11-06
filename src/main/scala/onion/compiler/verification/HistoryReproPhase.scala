@@ -28,7 +28,10 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
   def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] = {
     if (config.contracts != ContractMode.Check || !config.runContracts) return classes
     val units = ctx.debugArtifacts.rewrittenUnits.getOrElse(return classes)
-    val analysis = new HistoryWritePass(null)
+    // The classes this module is built against: their `@onion.Contract` is how a contract crosses a
+    // module boundary (RFC #2557). A type this compilation defines itself is read from its own AST.
+    val table = new onion.compiler.ClassTable(config.classPath.mkString(java.io.File.pathSeparator), Some(onion.compiler.ClassTable.shared))
+    val analysis = new HistoryWritePass(null, name => table.load(name))
     val repros = analysis.counterexamples(units)
     // A proved history prints nothing by default; --verbose lists what the solver proved.
     if (config.verbose) analysis.proved.foreach(p => System.err.println(s"[history] proved: $p"))

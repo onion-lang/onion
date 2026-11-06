@@ -7,18 +7,41 @@ import org.scalatest.funspec.AnyFunSpec
 /** Proving a history for one method with the bit-vector solver (RFC #2557, design 7.3). */
 class HistoryProverSpec extends AnyFunSpec {
   private def prove(body: String, invariant: String = "", requires: String = "", op: String = ">=",
-                    history: String = "n >= old(n)"): HistoryProver.Outcome = {
+                    history: String = "n >= old(n)", params: String = "k: Int"): HistoryProver.Outcome = {
     val inv = if (invariant.isEmpty) "" else s"  invariant $invariant\n"
     val src =
       s"""class C {
          |  history $history
          |$inv  var n: Int
          |public:
-         |  def f(k: Int): void $requires { $body }
+         |  def f($params): void $requires { $body }
          |}""".stripMargin
     val cls = OnionParser.parse(src).toplevels.collectFirst { case c: AST.ClassDeclaration => c }.get
     val m = (cls.defaultSection.toSeq ++ cls.sections).flatMap(_.members).collectFirst { case m: AST.MethodDeclaration => m }.get
     HistoryProver.prove(m, "n", op, Set("n"), cls.invariants)
+  }
+
+  // #2602: a proof must hold for every run, or there is no proof.
+  it("refuses a parameter named like the field: this.n = n is not a no-op") {
+    assert(prove("this.n = n", invariant = "n >= 0 && n < 1000", params = "n: Int") == HistoryProver.Unsupported)
+  }
+
+  it("refuses a return that ends only an if branch: the rest of the body is skipped on that path") {
+    val outcome = prove("if k > 0 { n = n - k\n return }\n    n = n + k", invariant = "n >= 0 && n < 1000",
+      requires = "requires k >= 0 && k < 1000")
+    assert(outcome != HistoryProver.Proved)
+  }
+
+  it("does not take one branch's return value for the method's result") {
+    val src =
+      """class C {
+        |public:
+        |  var n: Int
+        |  def f(k: Int): Int ensures result == 2 { if k > 0 { return 1 } else { return 2 } }
+        |}""".stripMargin
+    val cls = OnionParser.parse(src).toplevels.collectFirst { case c: AST.ClassDeclaration => c }.get
+    val m = (cls.defaultSection.toSeq ++ cls.sections).flatMap(_.members).collectFirst { case m: AST.MethodDeclaration => m }.get
+    assert(HistoryProver.proveEnsures(m, m.ensures, Nil, Set("n")) != HistoryProver.Proved)
   }
 
   it("proves n = n + k when k is known to be non-negative and the sum cannot overflow") {

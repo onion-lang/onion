@@ -248,6 +248,7 @@ onion.Json#*=pure
 onion.Json$Value#*=pure
 onion.Json$JsonParseException#*=pure
 onion.ConfigShape#*=pure
+onion.Contract#*=pure
 onion.ContractViolation#*=pure
 onion.Lossless#*=pure
 onion.LineShape#*=pure

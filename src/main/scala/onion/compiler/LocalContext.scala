@@ -59,6 +59,12 @@ class LocalContext {
   var isClosure: Boolean                     = false
   /** Set while a contract clause is typed; None everywhere else (RFC #2557). */
   var contractScope: Option[ContractScope]   = None
+  /**
+   * Set only while the guard of a method is typed under `--contracts runtime` (RFC #2557): every
+   * `old(e)` in an `ensures` is then evaluated once at entry into a local of its own, and the clause
+   * refers to that local. The pairs are the slot and the typed `e`, in the order they were met.
+   */
+  var oldSaves: Option[scala.collection.mutable.ArrayBuffer[(Int, TypedAST.Term)]] = None
   var isStatic: Boolean                      = false
   var isGlobal: Boolean                      = false
   // Top-level `val`/`var` declarations become static fields (which get a

@@ -410,6 +410,16 @@ object TypedAST {
      */
     var invariants: Seq[Term] = Nil
     var histories: Seq[Term] = Nil
+    /** The clauses as written, so a guard can type them again over its own frame (RFC #2557). */
+    /**
+     * The `history` guards `--contracts runtime` put in each guarded method, by (method name, clause
+     * text). A guard the solver proved is not needed at run time, and is taken out again (RFC #2557).
+     */
+    val historyGuards: scala.collection.mutable.Map[(String, String), IfStatement] = scala.collection.mutable.Map.empty
+    /** The `ensures` guards of a guarded method, keyed by its name and source location (an overload has its own). */
+    val ensuresGuards: scala.collection.mutable.Map[(String, Location), Seq[IfStatement]] = scala.collection.mutable.Map.empty
+    var invariantSources: scala.collection.immutable.List[AST.Expression] = scala.collection.immutable.Nil
+    var historySources: scala.collection.immutable.List[AST.Expression] = scala.collection.immutable.Nil
     private var staticInitializers_ = Array[TypedAST.ActionStatement]()
 
     /**
@@ -862,6 +872,9 @@ object TypedAST {
     var postconditions: Seq[Term] = Nil
     /** Whether an `ensures` clause is exactly `result`: the method asserts it returns true (a closed predicate). */
     var assertsResult: Boolean = false
+    /** The clauses as text, for the `.class` file (RFC #2557): only the ones that read back as the same clause. */
+    var contractRequiresText: Seq[String] = Nil
+    var contractEnsuresText: Seq[String] = Nil
     private var closure: Boolean = false
     private var frame: LocalFrame = _
     private var argsWithDefaults_ : Array[MethodArgument] = null

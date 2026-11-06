@@ -231,6 +231,12 @@ class TailCallOptimization(config: CompilerConfig)
     }
   }
 
+  /**
+   * A guarded method `m` runs its body as `m$body` (RFC #2557, design 7.4 and 12). A call to `m` from
+   * inside `m$body` is a self-call: it becomes the loop, so the guard is entered once, from outside.
+   */
+  private def namesSelf(target: String, own: String): Boolean = target == own || own == target + "$body"
+
   private def isSelfCall(term: Term, method: MethodDefinition): Boolean = {
     if (config.verbose) {
       trace(s"[TCO]   Checking term type: ${term.getClass.getSimpleName}")
@@ -247,7 +253,7 @@ class TailCallOptimization(config: CompilerConfig)
             // self-recursion, and rewriting it into a loop would keep updating this
             // method's own locals while never advancing to the new receiver.
             val isSelf = call.target.isInstanceOf[This] &&
-            targetMethod.name == method.name &&
+            namesSelf(targetMethod.name, method.name) &&
             targetMethod.classType.name == method.classType.name &&
             argumentTypesMatch(targetMethod.arguments, method.arguments)
             if (config.verbose) {
@@ -259,7 +265,7 @@ class TailCallOptimization(config: CompilerConfig)
       case call: CallStatic =>
         call.method match {
           case targetMethod: MethodDefinition =>
-            val isSelf = targetMethod.name == method.name &&
+            val isSelf = namesSelf(targetMethod.name, method.name) &&
             call.target.name == method.classType.name &&
             argumentTypesMatch(targetMethod.arguments, method.arguments)
             if (config.verbose) {

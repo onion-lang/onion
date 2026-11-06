@@ -5,10 +5,10 @@
 // whole shape vocabulary for free — Outcome/Defect failure reporting, eachLine and the
 // other combinators, and a place to state its laws.
 //
-// The deal that keeps the story honest: a class implementing Shape must assert its
-// laws. Delete the `example fixedWidthL1` below and this file stops compiling with
-// E0080 — a shape whose round-trip nobody checks is exactly the ad-hoc parser Shape
-// exists to replace. The example runs at build time; a false claim is E0065.
+// The deal that keeps the story honest: every Shape has a contract, parse(print(v)) == v for
+// the values it can print. `printable` states which values those are. Delete it and this file
+// stops compiling with E0114 — a name longer than its column does not round-trip. The build
+// checks the contract by sampling; the closed predicate below checks one value by hand.
 
 record Person(name: String, amount: Int)
 
@@ -37,6 +37,11 @@ public:
     return name.toString() + amt
   }
   def describe(): String = "fixed-width Person(name 0-9, amount 10-15)"
+  // The round-trip holds on this domain: a name longer than its column is not cut, and parse
+  // trims, so a name with a space at either end does not come back. The build checks
+  // parse(print(v)) == v for each value this admits (the Shape contract).
+  def printable(v: Person): Boolean =
+    v.name().length() <= 10 && v.name() == v.name().trim() && v.amount() >= 0 && v.amount() <= 999999
 }
 
 def fixedWidthL1(): Boolean

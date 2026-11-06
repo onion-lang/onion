@@ -535,6 +535,14 @@ Not every shape can render. A regex with a `\s+` separator has no unique renderi
 the shape is read-only and `canPrint()` says so before `print` is called — rather than
 the method silently not existing.
 
+### printable
+
+`printable(v)` says whether a value is one the shape can print and read back. The round-trip L1
+holds on this domain, not on every value of `T`: a fixed-width shape cannot print a name longer
+than its column. The default admits every value; override it to state a narrower domain. The
+build samples values and checks `parse(print(v)) == Ok(v)` for each one `printable` admits; a
+value that does not come back is **E0114**.
+
 ### describe
 
 `describe()` names what a shape reads, for use in diagnostics — `re"\d+-\d+"` for a

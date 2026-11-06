@@ -386,20 +386,27 @@ could not be proved (§7.4). It is never the way a contract is *enforced*.
 | LSP | The same static checks that are fast enough for an editor: typing, purity, framing and effective-contract diagnostics. Never runs user code, matching the current `checkLaws = false` (#346). No prover until it fits an editor's latency budget. |
 | `onion test`, the REPL | Run programs; a contract kept as a guard (§7.4) is checked there. |
 
-**`--contracts <off|check>`, and two reserved names.** A mode is named for what it does today
-(this follows the panel's review of PR #2564, which found `runtime` accepted while it checked
-nothing):
+**The default is an error. A contract that is not proved fails the build.** Each clause ends in one of
+three verdicts: `Proved`, `Counterexample` (with the values), or `Not proved` (with the reason, naming
+the form the prover does not model). Anything but `Proved` is a compile error. This is the point of the
+feature: a stated contract that nobody checks is a comment, and a tool that stays quiet when it cannot
+decide teaches people to trust the silence. The escape hatches are explicit, written in the source or on
+the command line, and they leave a trace.
 
-- `off` (default while this is a preview): a contract clause is E0105, with a hint to use `check`.
-- `check`: **what exists.** The clauses are typed, and the static checks of §7.1 run. Nothing is
-  enforced when the program runs.
-- `verify`: reserved for the proofs of §7.3. The command line refuses it, with a message that says
-  to use `check`, until proofs exist.
-- `runtime`: reserved for the guards of §7.4, refused in the same way until they exist.
+- **`@Trusted`** on a method: its contract is taken as given and its body is not checked. Callers may
+  rely on the contract. Use it where the body is out of the prover's reach (a call into Java, a loop it
+  cannot summarise). Every `@Trusted` is listed in the compiler's output, because each one is a claim
+  that nothing verified.
+- **`--contracts check`**: the findings are warnings, not errors. A migration aid, chosen on purpose and
+  visible in the build file; it is not the default.
+- **`--contracts off`**: a contract clause is E0105, as before.
+- **`--contracts runtime`**: also keeps a guard for what was not proved. It is a safety net for code that
+  is `@Trusted` or built with `check`; it does not turn a failed proof into a pass.
 
-A reserved name is not accepted so that no mode promises a check it does not make. When a name
-starts to do something, it is accepted, and it keeps the meaning given here. At the end of the
-preview, `verify` becomes the default, because the design's answer is the static one.
+What this replaces: a counterexample was the warning W0021 and an unproved override the warning W0025,
+because the prover was narrow and an error would have refused too many programs. The prover is still
+narrow, which is why `@Trusted` exists. The fix for a narrow prover is to widen it, or to say `@Trusted`
+out loud, not to stay silent.
 
 **What the build runs.** The static checks run no user code. A **closed predicate** (a `static def`
 with no parameters that returns `Boolean`, the `example` replacement) is run at build time, and
@@ -768,8 +775,11 @@ more than `law`/`example` gave.
 
 ## 12. Open questions
 
-- A guard (§7.4) on a recursive method is not a tail call, so it defeats tail-call optimization on
-  that method. Guard only the entry, or document the limit?
+- **Decided and built: a guard on a recursive method (§7.4).** A guard calls `m$body`, so a self-call
+  inside the body goes through the guard and is not a tail call. The decision: guard the entry only. A
+  self-call inside `m$body` calls `m$body` directly, so tail-call optimization still applies and the
+  contract is checked once, on the way in and out of the outermost call. The cost: the `requires` of an
+  inner self-call is not checked at run time. Only the proof covers it. A warning that names this gap is not built.
 - Quantifiers. `forall` over `Int` ranges, or pure recursive helper predicates? Collections need one.
 - `ensures` on an exceptional exit.
 - Mutable aggregates in `invariant`/`history` (`items.size() <= 10`) need an ownership rule. Not in v1.
@@ -806,7 +816,11 @@ more than `law`/`example` gave.
 
 ---
 
-## Appendix: what is built (stage 2 and the first part of stage 5 to 7)
+## Appendix: what is built, and what is not
+
+**Built.** The default mode is `check`: the clauses are typed and checked, and what is found is a
+warning or an error as listed. (Section 6 records the decision that a contract that is not proved
+becomes an error by default; that flip is not built yet, see below.)
 
 | Check | Code | How |
 |---|---|---|
@@ -815,8 +829,49 @@ more than `law`/`example` gave.
 | A clause that names a mutable object | E0110 | types |
 | A class with a clause that extends a Java class | E0111 | types |
 | A solver counterexample that **running the compiled code reproduces** | E0112 | CDCL SAT + bit-vectors, then a run |
+| A closed or sampled predicate (`ensures result`) that is false | E0113 | run at build time |
+| A `Shape` that does not round-trip a value it says it can print | E0114 | sampled, against `printable` |
 | A solver counterexample that cannot be run, or does not break when run | W0021 | the same, shown as a warning |
+| A `Shape` whose value type cannot be sampled | W0022 | reported, never a silent pass |
+| A method that writes a field a history names, and no check settled it | W0024 | reported |
+| An override whose body can break the effective contract | W0025 | the solver, against `pre_eff` / `post_eff` |
+| A clause `--contracts runtime` cannot guard | W0026 | reported with the reason, never silent |
+| A contract relied on without being verified (`@Trusted`) | W0027 | each use is listed |
 
-A proved history prints nothing. Showing it (a `verbose` line) needs `verbose` to reach the compiler
-first, and is not built. `Int` is the only type the prover models; a body with a call, a loop, a
-`return` or a local is not modelled and reports nothing.
+- **The prover** models `Int` fields, parameters and locals, assignment, `if`, a trailing `return`, and a
+  call to a pure `Int` method that states its contract (its `requires` is an obligation, its `ensures`
+  constrains the result). `--verbose` lists each history it proved. Anything else is not modelled.
+- **Across modules.** A method's `requires` and `ensures` are written into its class file
+  (`@onion.Contract`: the parameter names and the clauses as text), so a module built later can use
+  them. A clause that would not read back as the same clause is not written.
+- **`--contracts runtime`** guards `requires`, `ensures` (with `old(e)` saved at entry), and a class's
+  `invariant` and `history`, on an instance, static, generic or variadic method, and the `invariant` after
+  a class constructor. A guarded method is split: the body becomes the private `m$body` and `m` is the
+  guard. A `history` or an `ensures` the solver proved has no guard. It is a safety net, and it never turns a failed
+  proof into a pass.
+
+**Not built, by design:**
+
+- `--contracts verify` as a separate mode. It is reserved and refused; the decision in section 6 is that
+  verification is the default instead.
+- A guard dropped for a proved `invariant` or `requires`. A proved `history` and a proved `ensures` are
+  dropped; the other two need the proofs of the work that follows from section 6 below.
+- The `invariant` check after a constructor with a `return` of its own, and after a record's
+  compiler-written constructor. The warning W0026 names each one.
+
+**Not built, the work that follows from section 6:**
+
+- the default flip itself: an unproved contract, and a counterexample, as a compile error, with
+  `--contracts check` to lower them to warnings and `@Trusted` to skip a body;
+- a proof of `ensures` as a contract of every method (the prover can check one, for an override), of the
+  `invariant` (established by a constructor, kept by each method), and of a caller meeting a callee's
+  `requires`.
+
+**Not built, because the prover is narrow:** a call to a method that writes a field, a loop, and any type
+other than `Int`. A body with one of these reports nothing today, and is a compile error once the default
+flips unless it is `@Trusted`.
+
+**Not built, a separate piece of work:** the framing rule 2 (a write through another instance); a
+`ContractTable` read from a library jar (the built-in `Shape` entry is built); the effective contract of
+an override against a superclass built earlier, a built class's `history` inherited, and a class's
+`invariant` and `history` written into its class file.

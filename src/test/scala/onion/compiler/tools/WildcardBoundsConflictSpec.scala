@@ -50,5 +50,28 @@ class WildcardBoundsConflictSpec extends AbstractShellSpec {
           |""".stripMargin
       assert(errorCodes(src).isEmpty)
     }
+
+    it("rejects a List[Object] source for a List[T?] destination") {
+      val src =
+        """import { java.util.* }
+          |class G[T] {
+          |public:
+          |  def c(o: List[Object], x: List[T?]): void { Collections::copy(x, o) }
+          |}
+          |""".stripMargin
+      assert(errorCodes(src).nonEmpty)
+    }
+
+    it("still accepts a List[T] or List[T?] source for a List[T?] destination") {
+      val src =
+        """import { java.util.* }
+          |class G[T] {
+          |public:
+          |  def a(o: List[T], x: List[T?]): void { Collections::copy(x, o) }
+          |  def b(o: List[T?], x: List[T?]): void { Collections::copy(x, o) }
+          |}
+          |""".stripMargin
+      assert(errorCodes(src).isEmpty)
+    }
   }
 }

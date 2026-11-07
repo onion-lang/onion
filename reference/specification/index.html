@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -4089,10 +4089,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#law-example-compile-time-specification-checks" class="md-nav__link">
+  <a href="#contract-predicates-compile-time-specification-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        law / example — compile-time specification checks
+        Contract predicates — compile-time specification checks
       
     </span>
   </a>
@@ -4925,6 +4925,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../design/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../design/onion-v0.5-audit/" class="md-nav__link">
         
   
@@ -5371,10 +5399,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#law-example-compile-time-specification-checks" class="md-nav__link">
+  <a href="#contract-predicates-compile-time-specification-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        law / example — compile-time specification checks
+        Contract predicates — compile-time specification checks
       
     </span>
   </a>
@@ -6024,43 +6052,46 @@ Round-trips hold for scalar components: <code>fromJson(toJson(v)) == v</code>.</
 <code>Long</code>, <code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Short</code>, <code>Byte</code>. A component of any
 other type is <strong>E0062</strong>. <code>derive!</code> may coexist with <code>from re"..."</code> on the
 same record; the two features are independent.</p>
-<h4 id="law-example-compile-time-specification-checks"><code>law</code> / <code>example</code> — compile-time specification checks<a class="headerlink" href="#law-example-compile-time-specification-checks" title="Permanent link">&para;</a></h4>
-<p>A record's brace-enclosed body may contain <code>law</code> and <code>example</code> clauses,
-alongside any methods. The compiler executes these at build time (during the
-<code>LawCheckPhase</code> that runs after type-checking). A failing check is a
-<strong>compile error</strong>, not a runtime error.</p>
+<h4 id="contract-predicates-compile-time-specification-checks">Contract predicates — compile-time specification checks<a class="headerlink" href="#contract-predicates-compile-time-specification-checks" title="Permanent link">&para;</a></h4>
+<p>A <code>static def</code> that returns <code>Boolean</code> and states <code>ensures result</code> is a <strong>contract predicate</strong>.
+The compiler runs it at build time (after type-checking, with <code>--contracts check</code>, the default).
+A failing predicate is a <strong>compile error</strong>, not a runtime error. At the top level the same
+predicate is a plain <code>def</code>.</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">,</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="k">law</span><span class="w"> </span><span class="nf">roundtrip</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">Pt</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">Pt</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Pt</span><span class="o">::</span><span class="nf">format</span><span class="p">(</span><span class="n">p</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="k">example</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">Pt</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="s2">"3,4"</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="p">}</span>
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="kd">record</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">age</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="k">derive</span><span class="o">!</span><span class="p">(</span><span class="nb">Json</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span><span class="k">law</span><span class="w"> </span><span class="nf">jsonRoundtrip</span><span class="p">(</span><span class="n">u</span><span class="p">:</span><span class="w"> </span><span class="nc">User</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">User</span><span class="o">::</span><span class="nf">fromJson</span><span class="p">(</span><span class="nc">User</span><span class="o">::</span><span class="nf">toJson</span><span class="p">(</span><span class="n">u</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">  </span><span class="k">example</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">User</span><span class="p">(</span><span class="s2">"ko"</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">).</span><span class="nf">name</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"ko"</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">roundtrip</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">Pt</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nc">Pt</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Pt</span><span class="o">::</span><span class="nf">format</span><span class="p">(</span><span class="n">p</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">parsesThreeFour</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">    </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nc">Pt</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="s2">"3,4"</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span>
 </span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="p">}</span>
 </span></code></pre></div>
-<p><strong><code>example { boolExpr }</code></strong> — a concrete assertion. The compiler evaluates
-<code>boolExpr</code> and requires it to be <code>true</code>. If it is <code>false</code>, compilation fails
-with <strong>E0065</strong> and a message showing the expression that returned <code>false</code>.</p>
-<p><strong><code>law name(p: T) { boolExpr }</code></strong> — a property. The compiler generates a set
-of sample values for the parameter <code>p</code> (covering boundary values, negatives,
-and random cases) and checks <code>boolExpr</code> for each. If any sample falsifies the
-law, compilation fails with <strong>E0064</strong> and a report that includes the
-counterexample. Parameters may be the same scalar types supported by <code>derive!</code>
-(<code>String</code>, <code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Short</code>, <code>Byte</code>) or
-the record type itself.</p>
-<p>Multiple <code>law</code> and <code>example</code> clauses may appear on a single record, in any
-order. They coexist freely with <code>from re"..."</code> and <code>derive!(...)</code>:</p>
+<p><strong>Without parameters</strong> — a concrete assertion. The compiler evaluates it and requires <code>true</code>.
+If it is <code>false</code>, or throws, compilation fails with <strong>E0113</strong>.</p>
+<p><strong>With parameters</strong> — a property. The compiler generates a set of sample values for each
+parameter (boundary values, negatives and random cases) and runs the predicate on them. If
+any sample falsifies it, compilation fails with <strong>E0113</strong> and a report that includes the
+counterexample and the <code>--contract-seed</code> / <code>--contract-samples</code> that reproduce it. Parameters
+may be the scalar types supported by <code>derive!</code> (<code>String</code>, <code>Int</code>, <code>Long</code>, <code>Double</code>, <code>Float</code>,
+<code>Boolean</code>, <code>Short</code>, <code>Byte</code>) or the record type itself. A parameter type that cannot be
+sampled is also E0113, never a silent skip.</p>
+<p>Only <code>ensures result</code> itself marks a predicate. A <code>Boolean</code> function with another
+postcondition, such as <code>ensures result == (x &gt; 0)</code>, describes the function and is not run.</p>
+<p>A block body ends with <code>return</code>; an expression body uses <code>= expr</code>:</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">,</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span><span class="w"> </span><span class="k">derive</span><span class="o">!</span><span class="p">(</span><span class="nb">Json</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="k">law</span><span class="w"> </span><span class="nf">textRoundtrip</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="nc">R</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">R</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="nc">R</span><span class="o">::</span><span class="nf">format</span><span class="p">(</span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="k">law</span><span class="w"> </span><span class="nf">jsonRoundtrip</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="nc">R</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">R</span><span class="o">::</span><span class="nf">fromJson</span><span class="p">(</span><span class="nc">R</span><span class="o">::</span><span class="nf">toJson</span><span class="p">(</span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span><span class="k">example</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">R</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="s2">"0,0"</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="p">}</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">textRoundtrip</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="nc">R</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nc">R</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="nc">R</span><span class="o">::</span><span class="nf">format</span><span class="p">(</span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">r</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">jsonRoundtrip</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="nc">R</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">    </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nc">R</span><span class="o">::</span><span class="nf">fromJson</span><span class="p">(</span><span class="nc">R</span><span class="o">::</span><span class="nf">toJson</span><span class="p">(</span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">r</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>The purpose of <code>law</code> / <code>example</code> is to bring specifications — not just
-documentation, but machine-verified contracts — inside the language itself.
-The <code>parse∘format == id</code> invariant above is checked on every compile, so a
-grammar change that breaks the round-trip fails the build immediately.</p>
+<p>The purpose is to bring specifications — not just documentation, but machine-verified
+contracts — inside the language itself. The <code>parse∘format == id</code> property above is checked on
+every compile, so a grammar change that breaks the round-trip fails the build immediately.</p>
 <h3 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">&para;</a></h3>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kd">enum</span><span class="w"> </span><span class="nc">Color</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">RED</span><span class="p">,</span><span class="w"> </span><span class="nc">GREEN</span><span class="p">,</span><span class="w"> </span><span class="nc">BLUE</span><span class="w"> </span><span class="p">}</span>
 </span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
@@ -6433,7 +6464,7 @@ or a miscompilation, please file a minimal reproducer.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>

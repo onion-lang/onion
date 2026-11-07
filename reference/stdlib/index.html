@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -4514,6 +4514,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#printable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        printable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#describe" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6655,6 +6666,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../design/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../design/onion-v0.5-audit/" class="md-nav__link">
         
   
@@ -7491,6 +7530,17 @@
     <span class="md-ellipsis">
       
         canPrint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#printable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        printable
       
     </span>
   </a>
@@ -9536,6 +9586,12 @@ language and one that claims to be.</p>
 <p>Not every shape can render. A regex with a <code>\s+</code> separator has no unique rendering, so
 the shape is read-only and <code>canPrint()</code> says so before <code>print</code> is called — rather than
 the method silently not existing.</p>
+<h3 id="printable">printable<a class="headerlink" href="#printable" title="Permanent link">&para;</a></h3>
+<p><code>printable(v)</code> says whether a value is one the shape can print and read back. The round-trip L1
+holds on this domain, not on every value of <code>T</code>: a fixed-width shape cannot print a name longer
+than its column. The default admits every value; override it to state a narrower domain. The
+build samples values and checks <code>parse(print(v)) == Ok(v)</code> for each one <code>printable</code> admits; a
+value that does not come back is <strong>E0114</strong>.</p>
 <h3 id="describe">describe<a class="headerlink" href="#describe" title="Permanent link">&para;</a></h3>
 <p><code>describe()</code> names what a shape reads, for use in diagnostics — <code>re"\d+-\d+"</code> for a
 regex shape, for instance. It is what an <code>UnsupportedOperationException</code> from <code>print</code>
@@ -11692,7 +11748,7 @@ that might be null.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>

@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -4459,6 +4459,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../design/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../design/onion-v0.5-audit/" class="md-nav__link">
         
   
@@ -4885,6 +4913,10 @@ the closure, not the one that eventually invokes it — invoking a function valu
 <code>pure</code> in the table — because the creation site is the one the checker can always see.
 And any call that neither the table nor the compiled sources can account for
 contributes <code>unknown</code> rather than being dropped.</p>
+<p>A default argument works the same way. Its effects are charged to each caller that
+omits the argument, not to the method that declares it, so <code>--effects</code> has no line for
+the default itself: with <code>def f(n: Long = System::currentTimeMillis())</code>, <code>f</code> is <code>pure</code>
+and a caller of <code>f()</code> carries <code>clock</code>.</p>
 <p>The result is an over-approximation in the other direction too: the analysis reports
 what a body <em>can</em> do, not what it will do on a given run. A branch that never executes
 still contributes its effects. That is the correct direction for the question the
@@ -5017,7 +5049,7 @@ is one the program can reach, but an operand that is not a literal is reported a
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>

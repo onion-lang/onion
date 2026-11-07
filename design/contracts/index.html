@@ -1,0 +1,6705 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A statically-typed, object-oriented programming language for the JVM">
+      
+      
+        <meta name="author" content="Onion Language Team">
+      
+      
+        <link rel="canonical" href="https://onion-lang.org/design/contracts/">
+      
+      
+        <link rel="prev" href="../typed-boundaries/">
+      
+      
+        <link rel="next" href="../onion-v0.5-audit/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+    
+    
+      
+        <title>Contracts (proposal) - Onion Programming Language</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#contracts-static-verification-for-onion" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Onion Programming Language" class="md-header__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Onion Programming Language
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Contracts (proposal)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/onion-lang/onion" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    onion-lang/onion
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../ja/" class="md-tabs__link">
+          
+  
+  
+  日本語
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../guide/overview/" class="md-tabs__link">
+          
+  
+  
+  Language Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../examples/overview/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tools/compiler/" class="md-tabs__link">
+          
+  
+  
+  Tools
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../batteries/llm/" class="md-tabs__link">
+          
+  
+  
+  Batteries
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/specification/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../contributing/development/" class="md-tabs__link">
+          
+  
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../typed-boundaries/" class="md-tabs__link">
+          
+  
+  
+  Design Notes
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Onion Programming Language" class="md-nav__button md-logo" aria-label="Onion Programming Language" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Onion Programming Language
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/onion-lang/onion" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    onion-lang/onion
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    日本語
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    日本語
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    はじめに
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    はじめに
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    インストール
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/getting-started/hello-world/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hello World
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    クイックスタート
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    言語ガイド
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    言語ガイド
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    言語概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/basic-syntax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    基本構文
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/variables-and-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    変数と型
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/null-safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Null安全
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/control-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    制御フロー
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    関数
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/lambda-expressions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ラムダ式
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/classes-and-objects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    クラスとオブジェクト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/inheritance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    継承
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/collections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    コレクション
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/type-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    型クラス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/java-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Javaとの相互運用
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/shapes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tool と capability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/guide/scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    スクリプティング
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    サンプル集
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    サンプル集
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/examples/basic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    基本例
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/examples/oop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    オブジェクト指向の例
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/examples/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tool
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/examples/functional/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    関数型の例
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/examples/scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    スクリプティングとCLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/examples/json-http/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSONとHTTP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/examples/async/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    非同期・並行処理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/examples/error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    エラーハンドリング
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ツール
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ツール
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/tools/compiler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    コンパイラ（onionc）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/tools/script-runner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    スクリプトランナー（onion）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    プロジェクトCLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/tools/repl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REPL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/tools/language-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    言語サーバー
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    バッテリー
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    バッテリー
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/batteries/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM（Claude）
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リファレンス
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    リファレンス
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/reference/specification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    言語仕様
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/reference/stdlib/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    標準ライブラリ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/reference/effects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    効果
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    APIドキュメント (oniondoc)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/reference/compiler-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    コンパイラアーキテクチャ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/reference/error-codes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    エラーコード
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/migration/pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.0 への移行
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7_8" id="__nav_2_7_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    コンパイラ内部
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_7_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    コンパイラ内部
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/compiler/tail-call-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    末尾呼び出し最適化
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    コントリビューション
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    コントリビューション
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/contributing/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    開発ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/contributing/building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ソースからビルド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    シンタックスハイライト
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リリース手順
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/CLAUDE_ja/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Claude Code ガイダンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    デザインノート
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    デザインノート
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/GENERICS_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ジェネリクス設計
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/parser-refactoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    パーサーリファクタリング
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ja/quality-bar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    品質基準
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/hello-world/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hello World
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Language Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/basic-syntax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Basic Syntax
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/variables-and-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Variables and Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/control-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Control Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/classes-and-objects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Classes and Objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/inheritance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inheritance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/null-safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Null Safety
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/lambda-expressions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lambda Expressions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/collections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/type-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Type Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/shapes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shapes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools and Capabilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/java-interop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Java Interoperability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/basic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Basic Programs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/oop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Object-Oriented Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/functional/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Functional Programming
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/scripting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scripting & CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/json-http/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON & HTTP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/async/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Async & Concurrency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/compiler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compiler (onionc)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/script-runner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Script Runner (onion)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/project-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/repl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REPL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/language-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batteries
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Batteries
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../batteries/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM (Claude)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/specification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/stdlib/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standard Library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/effects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    APIドキュメント (oniondoc)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/compiler-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compiler Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/error-codes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Codes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migration/pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating to 1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_8" id="__nav_8_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compiler Internals
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Compiler Internals
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../compiler/tail-call-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tail Call Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building from Source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/syntax-highlighting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Syntax Highlighting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../typed-boundaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Typed Boundaries (thesis)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts (proposal)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-positioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Positioning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Positioning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-why-now" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Why now
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-constraints-this-document-holds-itself-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design constraints this document holds itself to
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-core-in-three-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The core, in three concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-syntax-and-meaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Syntax and meaning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Syntax and meaning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-contract-expressions-are-pure-and-pure-gets-stricter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Contract expressions are pure — and "pure" gets stricter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-what-a-contract-may-talk-about-framing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 What a contract may talk about (framing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-where-the-clauses-may-appear-and-how-they-parse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Where the clauses may appear, and how they parse
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-subtyping-liskov-and-wing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Subtyping: Liskov and Wing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Subtyping: Liskov and Wing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-the-case-only-a-history-catches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 The case only a history catches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Interfaces
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-library-types-contracttable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Library types: ContractTable
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Library types: ContractTable">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-the-shape-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 The Shape contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-where-contracts-are-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Where contracts are checked
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-how-a-contract-is-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. How a contract is checked
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. How a contract is checked">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-static-checks-without-a-solver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Static checks without a solver
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-closed-and-parameterized-predicates-the-law-and-example-replacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Closed and parameterized predicates (the law and example replacement)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-proofs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Proofs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-running-the-program-confirming-and-guarding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Running the program: confirming and guarding
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-the-solver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. The solver
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-error-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Error model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-compatibility-the-breaking-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Compatibility — the breaking change
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-staging-and-reversibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Staging and reversibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-rejected-alternatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Rejected alternatives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-what-this-buys-concretely" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. What this buys, concretely
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-what-is-built-and-what-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix: what is built, and what is not
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../onion-v0.5-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5 Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap: v0.6-v0.8 (shipped)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../readme-rewrite-proposal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    README Rewrite Proposal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../type-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Type Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../GENERICS_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generics Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../parser-refactoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parser Refactoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quality-bar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality Bar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-positioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Positioning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Positioning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-why-now" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Why now
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-constraints-this-document-holds-itself-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design constraints this document holds itself to
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-core-in-three-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The core, in three concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-syntax-and-meaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Syntax and meaning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Syntax and meaning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-contract-expressions-are-pure-and-pure-gets-stricter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Contract expressions are pure — and "pure" gets stricter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-what-a-contract-may-talk-about-framing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 What a contract may talk about (framing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-where-the-clauses-may-appear-and-how-they-parse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Where the clauses may appear, and how they parse
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-subtyping-liskov-and-wing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Subtyping: Liskov and Wing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Subtyping: Liskov and Wing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-the-case-only-a-history-catches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 The case only a history catches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Interfaces
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-library-types-contracttable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Library types: ContractTable
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Library types: ContractTable">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-the-shape-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 The Shape contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-where-contracts-are-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Where contracts are checked
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-how-a-contract-is-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. How a contract is checked
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. How a contract is checked">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-static-checks-without-a-solver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Static checks without a solver
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-closed-and-parameterized-predicates-the-law-and-example-replacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Closed and parameterized predicates (the law and example replacement)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-proofs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Proofs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-running-the-program-confirming-and-guarding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Running the program: confirming and guarding
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-the-solver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. The solver
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-error-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Error model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-compatibility-the-breaking-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Compatibility — the breaking change
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-staging-and-reversibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Staging and reversibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-rejected-alternatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Rejected alternatives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-what-this-buys-concretely" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. What this buys, concretely
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-what-is-built-and-what-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix: what is built, and what is not
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="contracts-static-verification-for-onion">Contracts — static verification for Onion<a class="headerlink" href="#contracts-static-verification-for-onion" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>proposed.</strong> Nothing here is implemented. RFC: <a href="https://github.com/onion-lang/onion/issues/2557">#2557</a>.
+Onion is in <code>consolidation</code> mode and has one known user, so the removal of <code>law</code>/<code>example</code>
+needs no transition period. It still lands <strong>after</strong> its replacement works (§11).</p>
+<p>Code blocks show <strong>proposed</strong> syntax. <code>docs/design/</code> is outside the scope of
+<code>DocExamplesCompileSpec</code>, so nothing here is compile-checked.</p>
+<hr />
+<h2 id="1-positioning">1. Positioning<a class="headerlink" href="#1-positioning" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>A method says what it needs and what it gives back. A class says what stays true.
+The compiler proves it, tests it, or says it could not.</strong></p>
+</blockquote>
+<p>Onion today has one way to state a property: <code>law</code> and <code>example</code>. Both are <strong>build-time
+tests</strong>. The compiler runs the generated code on sampled inputs and reports a failure. It
+never proves anything.</p>
+<p>The evidence from <code>run/</code> (610 programs):</p>
+<ul>
+<li>111 use them: 307 clauses, of which 299 are <code>example</code> and 8 are <code>law</code>.</li>
+<li>About 255 of the <code>example</code> clauses are closed boolean checks such as
+  <code>example { new X(1).f() == 2 }</code>. They are unit tests, not properties.</li>
+<li>No clause says what a <em>method</em> promises or what a <em>class</em> keeps true.</li>
+<li>Nothing can say how an object may change over time. That is the gap Liskov and Wing (1994)
+  call a <em>history property</em>.</li>
+</ul>
+<p>This document replaces <code>law</code> and <code>example</code> with <strong>contracts</strong>. They are tested first and
+proved later, and the removal waits until the test tier works.</p>
+<h3 id="11-why-now">1.1 Why now<a class="headerlink" href="#11-why-now" title="Permanent link">&para;</a></h3>
+<p>Checking a program against its contracts statically is old (Hoare logic; Eiffel's Design by
+Contract, 1986; Liskov and Wing, 1994; later JML, Spec#, Dafny, SPARK). It has lived in research
+and in a few niches, and it has not become a normal feature of a general-purpose language.
+Five things made it impractical. Each one has changed, or is changed by this design.</p>
+<table>
+<thead>
+<tr>
+<th>What kept it impractical</th>
+<th>What is different here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>The annotations cost more than the code.</strong> A person wrote a contract, often a loop invariant too, by hand.</td>
+<td>A model writes the code and its contract together. Onion's own development is run by a loop of AI agents (<code>docs/evolution/</code>), so the writers and the users of contracts are the same.</td>
+</tr>
+<tr>
+<td><strong>A failure was opaque.</strong> "Postcondition might not hold", with a solver term to decode.</td>
+<td>An error is a run that reproduces. A broken history shows the call sequence that breaks it (§9).</td>
+</tr>
+<tr>
+<td><strong>All or nothing.</strong> A contract was either proved, or worth nothing.</td>
+<td>Four verdicts (§2). Tests come first, so a contract is useful before any prover exists.</td>
+</tr>
+<tr>
+<td><strong>The toolchain was heavy.</strong> An external solver, in a version that drifts.</td>
+<td>An in-house solver in <code>onion.jar</code>, with checkable answers (§8). It is the last tier, and optional.</td>
+</tr>
+<tr>
+<td><strong>It was bolted onto languages that did not fit.</strong> Free aliasing, unspecified overflow.</td>
+<td>The JVM integer is exact, and Onion is young and pre-1.0. It can restrict what a contract may name (§3.2) before habits form, and it can break compatibility to do so.</td>
+</tr>
+</tbody>
+</table>
+<p>One reason is new, and it is the main one. <strong>Code is now written faster than it is reviewed.</strong>
+A short contract is a smaller thing to review than the body it governs, for a person or for a
+model, and the compiler holds the rest of the code to it. Reading a method's promise is cheaper
+than reading the method.</p>
+<p>What this does not claim: that verification is now easy, or that a contract is always right.
+A weak contract proves nothing useful, and a model can write one. So the verdicts say which
+contracts were proved and which were only sampled, and a counterexample often exposes the hole
+in the contract itself (the <code>Counter</code> in §3 needs <code>requires n &lt; 2147483647</code>).</p>
+<h3 id="design-constraints-this-document-holds-itself-to">Design constraints this document holds itself to<a class="headerlink" href="#design-constraints-this-document-holds-itself-to" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Constraint</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One mechanism for stating a property, not two (once the replacement works)</td>
+<td>PRINCIPLES 2</td>
+</tr>
+<tr>
+<td>A reported error can always be reproduced by running the program</td>
+<td>PRINCIPLES 1</td>
+</tr>
+<tr>
+<td>Stage the feature; each stage is useful on its own</td>
+<td>PRINCIPLES 6, 9</td>
+</tr>
+<tr>
+<td>Every diagnostic has a code, a location and a fix hint, in en and ja</td>
+<td>PRINCIPLES 7</td>
+</tr>
+<tr>
+<td>The formatter, LSP and highlighting learn the new syntax in the same change</td>
+<td>PRINCIPLES 8</td>
+</tr>
+<tr>
+<td>A stable feature is never replaced by a preview one</td>
+<td>PRINCIPLES 3, 6</td>
+</tr>
+<tr>
+<td><code>onion.jar</code> stays self-contained and small</td>
+<td>CLAUDE.md</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-the-core-in-three-concepts">2. The core, in three concepts<a class="headerlink" href="#2-the-core-in-three-concepts" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Contract clauses</strong>: <code>requires</code>, <code>ensures</code>, <code>invariant</code>, <code>history</code>.</li>
+<li><strong>Verification condition (VC)</strong>: a formula that is valid exactly when a contract holds.</li>
+<li><strong>Verdict</strong>: one of four.</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Verdict</th>
+<th>Meaning</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Proved</td>
+<td>The VC is unsatisfiable and the answer passed an independent check (§8)</td>
+<td>A guard for a postcondition or invariant may be dropped (§7.3); a <code>requires</code> keeps its guard</td>
+</tr>
+<tr>
+<td>Counterexample</td>
+<td>A static check or a proof shows the contract broken, and for a proof the run of §7.4 reproduces it</td>
+<td>Error</td>
+</tr>
+<tr>
+<td>Sampled</td>
+<td>Not proved. N inputs were tried and none broke it</td>
+<td>Silent. <code>--contracts-report</code> lists them</td>
+</tr>
+<tr>
+<td>Not proved</td>
+<td>No proof, and nothing was found against it: the solver gave up, the construct is not modelled, the type cannot be generated, or a model could not be reached by a run</td>
+<td>A note in <code>--contracts-report</code>; and <code>W0021</code> once proofs exist (stage 6). See "One rule for Not proved" in §6</td>
+</tr>
+</tbody>
+</table>
+<p><code>Sampled</code> is what <code>law</code> gave. It stays a first-class verdict, because <code>Double</code>, strings and
+anything the prover does not model will never reach <code>Proved</code>.</p>
+<p>The promise: <strong>every error can be reproduced by running the program, and every "proved" has
+passed an independent check.</strong> A tool that reports a false error is ignored. A tool that
+reports a false proof is dangerous. This design prefers silence to either.</p>
+<hr />
+<h2 id="3-syntax-and-meaning">3. Syntax and meaning<a class="headerlink" href="#3-syntax-and-meaning" title="Permanent link">&para;</a></h2>
+<p><code>requires</code>, <code>ensures</code>, <code>invariant</code>, <code>history</code>, <code>old</code> and <code>result</code> are <strong>soft keywords</strong>: they
+mean something only in the positions below, and stay ordinary names everywhere else.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Counter</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kd">protected</span><span class="p">:</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w">                            </span><span class="c1">// protected: a subclass may write it (section 4.1)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="k">invariant</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="k">history</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="nf">old</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="w">                   </span><span class="c1">// once raised, never lowered</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">inc</span><span class="p">():</span><span class="w"> </span><span class="kt">void</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="k">requires</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">2147483647</span><span class="w">             </span><span class="c1">// Int wraps on the JVM; ask for headroom</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="k">ensures</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nf">old</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">get</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">}</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Clause</th>
+<th>Where</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>requires e</code></td>
+<td>after the signature, before the body</td>
+<td><code>e</code> holds on entry. The caller must establish it.</td>
+</tr>
+<tr>
+<td><code>ensures e</code></td>
+<td>same</td>
+<td><code>e</code> holds on normal return. <code>result</code> is the return value; <code>old(e)</code> is <code>e</code> evaluated on entry.</td>
+</tr>
+<tr>
+<td><code>invariant e</code></td>
+<td>class or record body</td>
+<td><code>e</code> holds after every constructor, and on entry to and exit from every public method.</td>
+</tr>
+<tr>
+<td><code>invariant e</code></td>
+<td>before a loop body</td>
+<td><code>e</code> holds before each iteration. Used by the prover only.</td>
+</tr>
+<tr>
+<td><code>history e</code></td>
+<td>class or record body</td>
+<td>A relation between two states of one object. <code>old(x)</code> is the earlier state, a bare <code>x</code> the later one.</td>
+</tr>
+</tbody>
+</table>
+<p>Several clauses of one kind combine by conjunction.</p>
+<p><strong>Integers wrap.</strong> <code>Int</code> and <code>Long</code> are 32 and 64 bits and wrap as on the JVM, in programs and
+in contracts alike. A contract is not about mathematical integers. Without <code>requires n &lt;
+2147483647</code>, <code>inc()</code> at the maximum makes <code>n</code> negative and breaks both <code>invariant</code> and <code>history</code>.
+The compiler finds exactly that (§7).</p>
+<p><strong><code>old(e)</code></strong> evaluates <code>e</code> on entry and keeps the value. If <code>e</code> is a reference, the value is
+the reference, not a copy of the object it points to. <code>old(xs.size())</code> keeps a number;
+<code>old(xs)</code> keeps nothing useful.</p>
+<h3 id="31-contract-expressions-are-pure-and-pure-gets-stricter">3.1 Contract expressions are pure — and "pure" gets stricter<a class="headerlink" href="#31-contract-expressions-are-pure-and-pure-gets-stricter" title="Permanent link">&para;</a></h3>
+<p>A contract may use: integer and boolean operators, comparisons, <code>null</code> checks, parameters,
+<code>result</code>, <code>old(...)</code>, the object's own fields, and calls to methods that are <strong>pure</strong>.</p>
+<p>Today an empty effect set means <em>no I/O</em>. It does not mean <em>no mutation</em>: the effect table marks
+<code>List</code>, <code>ArrayList</code>, <code>HashMap</code> and <code>StringBuilder</code> as <code>#*=pure</code>, so <code>ensures xs.add(1)</code> would
+pass. This design adds one effect, <strong><code>mutate</code></strong>:</p>
+<ul>
+<li>A write to a field or array element, or a call to something that does one, carries <code>mutate</code>.
+  This is deliberately conservative: it does not try to tell a write to an object the expression
+  created itself from a write to anything else. A clause must have no <code>mutate</code> at all; the build
+  is more lenient about what it runs (§6).</li>
+<li>Library mutators are re-marked in the effect table (<code>List.add</code>, <code>StringBuilder.append</code>, ...).</li>
+<li>A contract expression must have <strong>no effect at all, including <code>mutate</code></strong>.</li>
+<li><code>onionc --effects</code> prints the new effect. <code>modifies</code>, which the prover needs for framing
+  (§7), is read from the same inference.</li>
+</ul>
+<p>This is a prerequisite of stage 1, because a contract that mutates is not a contract.</p>
+<h3 id="32-what-a-contract-may-talk-about-framing">3.2 What a contract may talk about (framing)<a class="headerlink" href="#32-what-a-contract-may-talk-about-framing" title="Permanent link">&para;</a></h3>
+<p>Aliasing is the usual way "one call at a time" breaks. These rules close it in the first version.</p>
+<ol>
+<li><code>invariant</code> and <code>history</code> may name only fields of <code>this</code> whose type is a <strong>value type</strong>:
+   a primitive, <code>String</code>, an enum, or a record whose components are value types.
+   A field that holds a mutable object (<code>List</code>, an array, another class) cannot be named.</li>
+<li>A field named by an <code>invariant</code> or <code>history</code> is written <strong>only through <code>this</code></strong>, in its own
+   class <strong>or in a subclass</strong>. <code>o.n = 0</code> with <code>o</code> another instance is an error (E0110), whatever
+   <code>o</code> is declared as, also in a factory that made <code>o</code> with <code>new</code> and from outside the hierarchy. A write through
+   <code>this</code> is allowed because it can be checked: that is exactly what the history of §3.3 and
+   §4.1 is for. The field must not be visible outside the class and its subclasses (<code>private</code>,
+   <code>protected</code> or <code>val</code>), so outside code cannot change it without a call that is checked.</li>
+<li><strong>Rules 1 and 2 apply to everything a contract reads, transitively.</strong> A contract that calls a
+   pure method <code>p()</code> is read as if <code>p</code>'s body were written in the clause: a field <code>p</code> reads
+   must follow rules 1 and 2 too. Reading through a method is not a way around them.</li>
+<li>A class with an <code>invariant</code> or <code>history</code> may not extend a Java class other than <code>Object</code>,
+   because a Java superclass can have mutators the compiler can neither prove nor wrap.</li>
+<li><code>requires</code> and <code>ensures</code> may mention parameters of any type, through pure methods.</li>
+<li>A call is <strong>atomic</strong>: no callback re-enters the object halfway, and no other thread
+   interleaves. This is an <strong>assumption</strong>, not a check, and every <code>Proved</code> is scoped to it: a
+   proof says "if calls are atomic, then...". Invariants and histories are promised only at call
+   boundaries.</li>
+</ol>
+<p>Rules 1 to 4 are checks: breaking one is a diagnostic (§9). Rule 6 is the one thing a proof
+assumes without proving.</p>
+<h3 id="33-history">3.3 <code>history</code><a class="headerlink" href="#33-history" title="Permanent link">&para;</a></h3>
+<p><code>history e</code> says: for any two states <code>s</code> and <code>t</code> of one object, where <code>t</code> is reachable from
+<code>s</code> by method calls, <code>e</code> holds with <code>old(x)</code> read in <code>s</code> and <code>x</code> read in <code>t</code>.</p>
+<p>It is checked <strong>one call at a time</strong>: it behaves as an implicit <code>ensures</code> on every public
+method. That is sound when the relation is a preorder.</p>
+<blockquote>
+<p><strong>Lemma.</strong> If <code>φ(a, a)</code> (reflexive) and <code>φ(a, b) ∧ φ(b, c) ⇒ φ(a, c)</code> (transitive), and every
+call from state <code>a</code> to state <code>b</code> satisfies <code>φ(a, b)</code>, then <code>φ(s, t)</code> holds for every reachable
+pair. Proof: induction on the number of calls between <code>s</code> and <code>t</code>.</p>
+</blockquote>
+<p>The compiler checks reflexivity and transitivity. <code>n &gt;= old(n)</code> passes. <code>n == old(n) + 1</code>
+is reported: it is not transitive, so it cannot describe a whole history.</p>
+<h3 id="34-where-the-clauses-may-appear-and-how-they-parse">3.4 Where the clauses may appear, and how they parse<a class="headerlink" href="#34-where-the-clauses-may-appear-and-how-they-parse" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Not on a <code>tool</code>.</strong> A <code>tool</code> keeps <code>requires { cap }</code> for capabilities and takes no
+  contract clauses in the first version; a contract on a tool is an error that suggests a
+  helper method. So <code>requires</code> never means two things on one declaration.</li>
+<li><strong>A clause expression ends at the <code>{</code> or the <code>=</code> that opens the body, and is never an
+  assignment.</strong> It follows the same rule as the condition of <code>if c {</code>: <code>ensures result == n { return n }</code>
+  is not read as a trailing lambda on <code>n</code>, and <code>def f(x: Int): Int requires x &gt; 0 = x + 1</code> is a
+  precondition <code>x &gt; 0</code> followed by the body <code>= x + 1</code>, not the assignment <code>0 = x + 1</code>. To pass a
+  lambda inside a clause, parenthesize the call. The parser already has the first context
+  (<code>conditionContexts</code>), and reads a clause below the assignment level for the second.
+  (An earlier draft of this document missed the <code>=</code> case; the panel reproduced it, and it is
+  fixed and tested in both parsers.)</li>
+</ul>
+<hr />
+<h2 id="4-subtyping-liskov-and-wing">4. Subtyping: Liskov and Wing<a class="headerlink" href="#4-subtyping-liskov-and-wing" title="Permanent link">&para;</a></h2>
+<p>Liskov and Wing, <em>A Behavioral Notion of Subtyping</em> (ACM TOPLAS 16(6), 1994), define when a
+subtype may stand in for its supertype. Their rules, and what this design does with each:</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>In Onion</th>
+<th>Checked by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Signature</td>
+<td>The existing override check</td>
+<td><code>typing/DuplicationChecks.scala</code></td>
+</tr>
+<tr>
+<td>Methods: preconditions weaken, postconditions strengthen</td>
+<td><strong>By construction</strong>, below</td>
+<td>The override's body is verified against the effective contract</td>
+</tr>
+<tr>
+<td>Invariant: the subtype preserves the supertype's invariant</td>
+<td><code>inv_eff = inv_sub ∧ inv_super</code></td>
+<td>Tests / VC</td>
+</tr>
+<tr>
+<td>History (their "constraint"): the subtype preserves the supertype's history, <strong>including through methods the supertype does not have</strong></td>
+<td><code>hist_eff = hist_sub ∧ hist_super</code>, applied to every public method</td>
+<td>Tests / VC</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Effective contract of an override</strong>, in the style of Eiffel's <code>require else</code> / <code>ensure then</code>
+(Meyer):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pre_eff  = pre_super  ∨ pre_sub
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>post_eff = (old(pre_super) ⇒ post_super) ∧ (old(pre_sub) ⇒ post_sub)
+</span></code></pre></div>
+<p>So <code>pre_super ⇒ pre_eff</code> holds without proof, and <code>post_eff ⇒ post_super</code> holds whenever
+<code>pre_super</code> held on entry, which is what a caller of the supertype guarantees. A programmer
+cannot write an override that is unsound by the methods rule. An override without clauses of
+its own simply inherits.</p>
+<p>A method the subclass <strong>inherits without overriding</strong> is verified again against <code>inv_sub</code> and
+<code>hist_sub</code>, in the subclass's context: the callees it reaches through overridable methods use
+the effective contracts there.</p>
+<p>This design does <strong>not</strong> reproduce the paper's abstraction functions. They are needed when a
+subtype represents its state differently. A subclass in Onion shares its superclass's fields,
+and an interface states its contract through pure observer methods, so the identity mapping
+is enough.</p>
+<h3 id="41-the-case-only-a-history-catches">4.1 The case only a history catches<a class="headerlink" href="#41-the-case-only-a-history-catches" title="Permanent link">&para;</a></h3>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">ResettableCounter</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">Counter</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">():</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kp">this</span><span class="p">.</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Every inherited pre/postcondition still holds, and <code>reset</code> has no contract of its own. A tool
+that checks only pre/postconditions accepts this class. The compiler reports it (full text in §9).</p>
+<p>This example was run, not only written. On the compiler as it is today:</p>
+<table>
+<thead>
+<tr>
+<th><code>Counter.n</code> is</th>
+<th><code>reset()</code> writes <code>n = 0</code></th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>var n</code> (private)</td>
+<td>in the subclass</td>
+<td><strong>E0014</strong>, the field is not accessible. The subclass cannot write it, so there is nothing to catch</td>
+</tr>
+<tr>
+<td><code>protected var n</code></td>
+<td>in the subclass</td>
+<td>compiles. This is the case a history exists for</td>
+</tr>
+</tbody>
+</table>
+<p>So the field is <code>protected</code>. That is also what §3.2 rule 2 says: a write through <code>this</code>, in a
+subclass, is allowed, and it is <strong>checked</strong> against the history instead of being forbidden. What
+is forbidden is <code>other.n = 0</code> on a different object, which no call to <code>other</code> would ever check.</p>
+<p>The check needs no solver. <code>reset</code> assigns the constant <code>0</code> to a field whose history says
+<code>n &gt;= old(n)</code>, and <code>Counter.inc</code> raises <code>n</code>, so <code>n</code> can be above <code>0</code> when <code>reset</code> runs. That is
+a fact about the syntax of the two methods, not a guess about a run. §7.1 gives the full rule,
+including what the syntax does not report (a class whose only write is <code>n = 0</code> needs <code>invariant n == 0</code> for the solver to prove it). Anything
+harder waits for the prover.</p>
+<h3 id="42-interfaces">4.2 Interfaces<a class="headerlink" href="#42-interfaces" title="Permanent link">&para;</a></h3>
+<p>An interface has no fields. Its contracts use pure observer methods, which must be public:</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">interface</span><span class="w"> </span><span class="nc">Point</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">x</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="k">history</span><span class="w"> </span><span class="nf">x</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nf">old</span><span class="p">(</span><span class="nf">x</span><span class="p">())</span><span class="w">               </span><span class="c1">// immutable</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p">}</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="kd">class</span><span class="w"> </span><span class="nc">MovablePoint</span><span class="w"> </span><span class="k">conforms</span><span class="w"> </span><span class="nc">Point</span><span class="w"> </span><span class="p">{</span><span class="w">     </span><span class="c1">// error on move(): breaks Point's history</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">px</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">px</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">x</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">px</span><span class="w">                     </span><span class="c1">// public, as the interface requires (private is E0037)</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">move</span><span class="p">(</span><span class="n">dx</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">px</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">px</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">dx</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">}</span>
+</span></code></pre></div>
+<hr />
+<h2 id="5-library-types-contracttable">5. Library types: <code>ContractTable</code><a class="headerlink" href="#5-library-types-contracttable" title="Permanent link">&para;</a></h2>
+<p>Java classes cannot carry these clauses. Contracts for them live in a <strong>contract table</strong>, built
+the same way as the effect table: a built-in table, plus an optional table shipped inside a
+library jar. A malformed table is a warning, not an error.</p>
+<h3 id="51-the-shape-contract">5.1 The <code>Shape</code> contract<a class="headerlink" href="#51-the-shape-contract" title="Permanent link">&para;</a></h3>
+<p><code>onion.Shape</code> documents two laws and says one of them is false in general (<code>Shape.java</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Law</th>
+<th>Statement</th>
+<th>Contract?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L1 round-trip</td>
+<td><code>parse(print(v)) == Ok(v)</code>, wherever <code>print</code> exists</td>
+<td><strong>Yes, for the values the shape can print</strong></td>
+</tr>
+<tr>
+<td>L2 normalization</td>
+<td><code>print(parse(t)) == t</code></td>
+<td><strong>No.</strong> It is false in general, so it is never asserted</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The law holds only on a domain, so the contract names the domain.</strong> <code>run/FixedWidthDemo.on</code> is
+the proof. Its <code>print</code> pads <code>name</code> to 10 columns and does not cut it, so
+<code>print(Person("Christopher", 42))</code> is 17 columns, and <code>parse</code> answers <code>Bad</code> because it wants 16.
+The shape is correct; its printable domain is names of at most 10 characters and amounts of
+0 to 999999. A contract that asked for the round-trip on every <code>Person</code> would turn this file,
+which builds today, into an error.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// ContractTable entry for onion.Shape[T]. printable(v) defaults to true.</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">print</span><span class="p">(</span><span class="n">v</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="k">requires</span><span class="w"> </span><span class="nf">canPrint</span><span class="p">()</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nf">printable</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="k">ensures</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="n">result</span><span class="p">).</span><span class="nf">isOk</span><span class="p">()</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="n">result</span><span class="p">).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">v</span>
+</span></code></pre></div>
+<p><code>printable(v)</code> is a method a shape may override to state which values it can print. Its default
+is <code>true</code>, which asks for the round-trip on every value.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">FixedWidth</span><span class="w"> </span><span class="k">conforms</span><span class="w"> </span><span class="nb">Shape</span><span class="p">[</span><span class="nc">Person</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="c1">// ... parse, print and describe as before ...</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">printable</span><span class="p">(</span><span class="n">v</span><span class="p">:</span><span class="w"> </span><span class="nc">Person</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="n">v</span><span class="p">.</span><span class="nf">name</span><span class="p">().</span><span class="nf">length</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">10</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">v</span><span class="p">.</span><span class="nf">name</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">v</span><span class="p">.</span><span class="nf">name</span><span class="p">().</span><span class="nf">trim</span><span class="p">()</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">v</span><span class="p">.</span><span class="nf">amount</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">v</span><span class="p">.</span><span class="nf">amount</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">999999</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><strong>The <code>trim</code> condition is not decoration; it was measured.</strong> <code>parse</code> trims the name, so a name
+with a space at either end does not come back. Run against the real <code>FixedWidth</code> of
+<code>run/FixedWidthDemo.on</code>, with ten names and an amount of 42:</p>
+<table>
+<thead>
+<tr>
+<th>Domain</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>length at most 10, amount 0 to 999999</td>
+<td><strong>4 fail</strong>: <code>"  x  "</code>, <code>" AB"</code>, <code>"AB "</code>, <code>"\t"</code></td>
+</tr>
+<tr>
+<td>the same, and <code>name == name.trim()</code></td>
+<td><strong>0 fail</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The first draft of this section had only the first row and was wrong. Every value the sampler
+draws as a fixed string (<code>"  x  "</code>, <code>"\t"</code>) hits it, so the domain has to say so.</p>
+<ul>
+<li><strong>Not weaker than E0080.</strong> E0080 made a shape assert its round-trip <em>somewhere</em>. Here, a shape
+  that says nothing is held to the round-trip on <strong>every</strong> value, which is stricter. Stating the
+  domain is how a correct shape avoids a false error, and the domain is written once, in the
+  shape, not in each file that tests it.</li>
+<li><strong>When <code>T</code> cannot be generated</strong> (an interface, an array, a class with several constructors), the
+  contract cannot be sampled. The verdict is <code>Not proved</code> and the warning <code>W0022</code> is reported, on
+  by default from stage 3, naming the shape and the type. It is never silently passed: E0080
+  refused such a shape outright, and the shape is still held to the contract (it can be tested
+  by a closed predicate, §7.2); only the automatic sampling is skipped.</li>
+<li>A <strong>non-invertible</strong> shape has <code>canPrint() == false</code>. Its <code>print</code> precondition is never met, so it
+  owes nothing.</li>
+<li>The usual verdict is <code>Sampled</code>: the body is string work the prover does not model. A shape
+  over fixed-width integers can be <code>Proved</code>.</li>
+<li><code>Outcome</code> is read with <code>isOk()</code> and <code>get()</code>, the methods it has today.</li>
+</ul>
+<p>E0080 is removed only after this entry works (§11).</p>
+<p><strong>After migration, <code>run/FixedWidthDemo.on</code></strong> drops its <code>example fixedWidthL1</code>. The <code>FixedWidth</code>
+class gains the <code>printable</code> method above, and nothing else changes. Its round-trip is then
+checked against the <code>Shape</code> contract, for the values it can print.</p>
+<p>What is established today, and what is not: the probe above shows that every value the
+<code>printable</code> method admits round-trips through the real class. The compiler does not yet draw
+those values by itself (that is stage 3), so "the migrated file passes sampling" is a claim
+about stage 3 and is not made here.</p>
+<hr />
+<h2 id="6-where-contracts-are-checked">6. Where contracts are checked<a class="headerlink" href="#6-where-contracts-are-checked" title="Permanent link">&para;</a></h2>
+<p><strong>The check is static.</strong> A contract is read by the compiler, and the answer comes at compile
+time. Running the program is the last resort, used to confirm a counterexample or to guard what
+could not be proved (§7.4). It is never the way a contract is <em>enforced</em>.</p>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>onion build</code>, <code>onionc</code>, <code>onion script.on</code></td>
+<td>The static checks of §7.1 and §7.2, with <code>--contracts check</code>; once proofs exist (stage 6), <code>--contracts verify</code> adds those of §7.3. <strong>No user code runs for the check itself</strong> (see "What the build runs" below).</td>
+</tr>
+<tr>
+<td>LSP</td>
+<td>The same static checks that are fast enough for an editor: typing, purity, framing and effective-contract diagnostics. Never runs user code, matching the current <code>checkLaws = false</code> (#346). No prover until it fits an editor's latency budget.</td>
+</tr>
+<tr>
+<td><code>onion test</code>, the REPL</td>
+<td>Run programs; a contract kept as a guard (§7.4) is checked there.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The default is an error. A contract that is not proved fails the build.</strong> Each clause ends in one of
+three verdicts: <code>Proved</code>, <code>Counterexample</code> (with the values), or <code>Not proved</code> (with the reason, naming
+the form the prover does not model). Anything but <code>Proved</code> is a compile error. This is the point of the
+feature: a stated contract that nobody checks is a comment, and a tool that stays quiet when it cannot
+decide teaches people to trust the silence. The escape hatches are explicit, written in the source or on
+the command line, and they leave a trace.</p>
+<ul>
+<li><strong><code>@Trusted</code></strong> on a method: its contract is taken as given and its body is not checked. Callers may
+  rely on the contract. Use it where the body is out of the prover's reach (a call into Java, a loop it
+  cannot summarise). Every <code>@Trusted</code> is listed in the compiler's output, because each one is a claim
+  that nothing verified.</li>
+<li><strong><code>--contracts check</code></strong>: the findings are warnings, not errors. A migration aid, chosen on purpose and
+  visible in the build file; it is not the default.</li>
+<li><strong><code>--contracts off</code></strong>: a contract clause is E0105, as before.</li>
+<li><strong><code>--contracts runtime</code></strong>: also keeps a guard for what was not proved. It is a safety net for code that
+  is <code>@Trusted</code> or built with <code>check</code>; it does not turn a failed proof into a pass.</li>
+</ul>
+<p>What this replaces: a counterexample was the warning W0021 and an unproved override the warning W0025,
+because the prover was narrow and an error would have refused too many programs. The prover is still
+narrow, which is why <code>@Trusted</code> exists. The fix for a narrow prover is to widen it, or to say <code>@Trusted</code>
+out loud, not to stay silent.</p>
+<p><strong>What the build runs.</strong> The static checks run no user code. A <strong>closed predicate</strong> (a <code>static def</code>
+with no parameters that returns <code>Boolean</code>, the <code>example</code> replacement) is run at build time, and
+so is a <strong>sampled</strong> parameterized predicate. Two different questions decide whether one runs:</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Applies to</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>May a <strong>clause</strong> call it? (§3.1)</td>
+<td><code>requires</code>, <code>ensures</code>, <code>invariant</code>, <code>history</code></td>
+<td>The effect set must be empty, <code>mutate</code> included: a contract states what holds, and may not write</td>
+</tr>
+<tr>
+<td>May the <strong>build run</strong> it?</td>
+<td>a closed or sampled predicate</td>
+<td>The effect set may contain <strong><code>mutate</code></strong> and nothing from the outside world. The build's concern is I/O, not memory: a predicate that builds a list and reads it is the ordinary case, and it ran as an <code>example</code> before</td>
+</tr>
+</tbody>
+</table>
+<p>So a predicate that only writes to memory runs. One whose effects include <code>read</code>, <code>write</code>,
+<code>net</code>, <code>exec</code>, <code>env</code>, <code>clock</code>, <code>rand</code> or <code>console</code> is <strong>not run</strong>, and says so: the warning
+<code>W0023</code> names the predicate and the effect. One that calls something the effect table cannot
+vouch for (<code>unknown</code>) gets the same warning. <strong>Nothing stops running silently.</strong> In
+<code>run/</code>, 10 checks in 9 files (for example <code>ShoppingCart.on:86</code>, <code>GlobMatcher.on:24</code>,
+<code>Mandelbrot.on:48</code>) have <code>mutate</code> through the methods they call, and they run under this rule;
+under the stricter one of the first draft they would not have.</p>
+<p>A run is bounded by <code>--contract-timeout</code>. A predicate that does not finish is <code>Not proved</code>,
+with the note naming it, so a non-terminating one cannot hang the build.</p>
+<p>A write to a <strong>static</strong> field by a predicate is not stopped by this rule and can reach another
+predicate in the same build. Predicates are run one at a time, each in a fresh class loader, so
+the static state starts clean for each.</p>
+<p><strong>One rule for <code>Not proved</code>.</strong> It is a verdict, and what is shown depends on the stage, not on
+the section you read:</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>What <code>Not proved</code> shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 to 2</td>
+<td>Nothing applies yet: there is no proof and no sampling</td>
+</tr>
+<tr>
+<td>3 to 5</td>
+<td>A line in <code>--contracts-report</code>. <strong>Exception: a <code>Shape</code> whose type cannot be generated</strong> gets the warning <code>W0022</code>, on by default, because E0080 used to refuse that shape and the replacement must not be quieter than the error it replaces</td>
+</tr>
+<tr>
+<td>6 onward</td>
+<td>The same report line, and <code>W0021</code> under <code>--contracts verify</code></td>
+</tr>
+</tbody>
+</table>
+<p>So <code>W0021</code> is not what a user sees before proofs exist. §2, §6 and §7.4 all mean this table.</p>
+<p><strong>The default per stage.</strong> <code>--contracts</code> is <code>off</code> in stages 1 and 2, because the checks do not
+exist yet. It becomes <strong><code>check</code> at the end of stage 3</strong>, before <code>law</code> and <code>example</code> are removed
+in stage 4: when they go, the form they migrate to is already accepted and checked by default,
+so no migrated file needs a flag. <code>verify</code> becomes the default when proofs exist (stage 6).</p>
+<p><strong>Flags that replace the old ones:</strong> <code>--contract-samples &lt;n&gt;</code> and <code>--contract-seed &lt;n&gt;</code>
+(sampling), <code>--contract-timeout &lt;seconds&gt;</code> (prover), <code>--contracts-report</code> (list <code>Sampled</code>).</p>
+<hr />
+<h2 id="7-how-a-contract-is-checked">7. How a contract is checked<a class="headerlink" href="#7-how-a-contract-is-checked" title="Permanent link">&para;</a></h2>
+<p>Three layers, in the order they are built. Each one is useful before the next exists.</p>
+<h3 id="71-static-checks-without-a-solver">7.1 Static checks without a solver<a class="headerlink" href="#71-static-checks-without-a-solver" title="Permanent link">&para;</a></h3>
+<p>These look at the syntax and the types of the program. They need no proof, and they catch real
+mistakes.</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>What it decides</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Effective contract of an override</strong> (§4)</td>
+<td><code>pre_eff = pre_super ∨ pre_sub</code>, <code>post_eff = (old(pre_super) ⇒ post_super) ∧ (old(pre_sub) ⇒ post_sub)</code>. An override that restates a precondition more strictly is read as a weakening, so the methods rule holds by construction</td>
+</tr>
+<tr>
+<td><strong>A history is a preorder</strong> (§3.3)</td>
+<td>Reflexive and transitive, for the relations of the form <code>x &gt;= old(x)</code>, <code>x &lt;= old(x)</code>, <code>x == old(x)</code>, and <code>old(b) ==&gt; b</code>. <code>n == old(n) + 1</code> is E0108</td>
+</tr>
+<tr>
+<td><strong>Framing</strong> (§3.2)</td>
+<td>Rules 1 to 4, transitively through pure methods</td>
+</tr>
+<tr>
+<td><strong>A write that breaks a history</strong> (§4.1)</td>
+<td>E0109 only for what needs no reachability. See "When E0109 is reported" below</td>
+</tr>
+<tr>
+<td><strong>Purity and placement</strong> (§3.1)</td>
+<td>E0106, E0107</td>
+</tr>
+</tbody>
+</table>
+<p><strong>When E0109 is reported.</strong> A write breaks a history only if the old value can be one it breaks
+on, and whether a value is reachable is a question about the program, not about one line of it.
+So E0109 is reported only when the syntax settles it. Take the history <code>n &gt;= old(n)</code>:</p>
+<table>
+<thead>
+<tr>
+<th>The write</th>
+<th>Result</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>n = n - c</code>, with <code>c</code> a positive constant</td>
+<td><strong>E0109</strong></td>
+<td><code>n - c &gt;= n</code> is false for every <code>n</code> (apart from overflow, §3). No reachability is needed</td>
+</tr>
+<tr>
+<td><code>n = c</code>, and some method of the class or its supertypes <strong>raises</strong> <code>n</code> (<code>n = n + k</code>, <code>k</code> positive)</td>
+<td><strong>E0109</strong>, and the message names that method</td>
+<td><code>n</code> can exceed <code>c</code>, because that method raises it. The reason is a fact in the syntax</td>
+</tr>
+<tr>
+<td><code>n = c</code>, and nothing raises <code>n</code></td>
+<td><strong>no syntactic error</strong>; the solver decides</td>
+<td>The syntax alone cannot tell where <code>n</code> starts. The solver checks the write against the class <code>invariant</code>s: with <code>invariant n == 0</code> a write of <code>0</code> is proved fine; with no invariant, <code>n</code> could start above <code>c</code>, and the write has a counterexample (below)</td>
+</tr>
+<tr>
+<td>any other expression</td>
+<td><code>Not proved</code></td>
+<td>The prover decides (stage 7)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What counts as a write</strong> (#2597, #2599). A write by a method is any assignment, <code>+=</code>, <code>-=</code>,
+<code>++</code> or <code>--</code> to the field through <code>this</code> (bare <code>n</code>, <code>this.n</code>, <code>self.n</code>), including inside a
+lambda the body creates (the lambda may run during the call). A write the syntax does not
+settle as breaking the history gets W0024 at its line when it is inside a lambda, since the
+solver reads only the method body.</p>
+<p>A write of the field through any other reference is not a history question at all: it is
+E0110 by §3.2 rule 2, whatever the reference's declared type (<code>o: C</code>, <code>cs[0]</code>, a factory's
+<code>val c = new C()</code>, a superclass, a class outside the hierarchy). The type checker has already
+resolved which field a write targets and whether its receiver is <code>this</code>, so the rule needs no
+reading of names or scopes. The fix is a method call on that object, whose own writes are
+checked, or a constructor argument.</p>
+<p>The same reasoning applies to a history <code>n &lt;= old(n)</code> with the directions swapped, and to
+<code>x == old(x)</code>, where any write to <code>x</code> through a method that is not a constructor is reported.</p>
+<p>For <code>ResettableCounter</code> (§4.1) the second row applies: <code>reset</code> writes <code>0</code>, and <code>Counter.inc</code>
+raises <code>n</code>. The error names <code>inc</code> as the reason. This is the first thing a user can see work,
+with no solver and no run.</p>
+<h3 id="72-closed-and-parameterized-predicates-the-law-and-example-replacement">7.2 Closed and parameterized predicates (the <code>law</code> and <code>example</code> replacement)<a class="headerlink" href="#72-closed-and-parameterized-predicates-the-law-and-example-replacement" title="Permanent link">&para;</a></h3>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">roundTrip</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">Point</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nc">Point</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Point</span><span class="o">::</span><span class="nf">format</span><span class="p">(</span><span class="n">p</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span>
+</span></code></pre></div>
+<ul>
+<li>A predicate with <strong>parameters</strong> is a property over all inputs. The prover tries first (§7.3).
+  Until then, and for what the prover does not model, sampled inputs look for a counterexample
+  (<code>ArgGenerator</code>) and the verdict is <code>Sampled</code>.</li>
+<li>A predicate with <strong>no</strong> parameters is closed. It usually calls other methods, which a prover
+  cannot unfold, so it is decided by running it at build time, as <code>example</code> is today, under the
+  rule in §6.</li>
+</ul>
+<p>No new keyword is added. A <code>check</code> sugar would be <code>law</code> under another name.</p>
+<h3 id="73-proofs">7.3 Proofs<a class="headerlink" href="#73-proofs" title="Permanent link">&para;</a></h3>
+<ol>
+<li>After typing and before tail-call optimization, a new phase reads each method's effective
+   contract. Running before TCO matters: the body is still a loop.</li>
+<li><strong>Verification conditions.</strong> Weakest precondition over the typed tree. A call is handled
+   modularly: assert the callee's effective precondition, forget what it may <code>modify</code> (§3.1),
+   assume its postcondition.</li>
+<li><strong>Encoding.</strong> <code>Int</code> and <code>Long</code> are 32/64-bit vectors, so wrap-around matches the JVM. A pure
+   method with an expression body is inlined to a fixed depth, or is an uninterpreted function.</li>
+<li>The solver (§8) answers.</li>
+</ol>
+<p>A proved postcondition or invariant may drop its guard (§7.4). A proved <code>requires</code> may not: a
+public method can be called from another compilation unit or from Java, where the caller was
+never checked, so a precondition is the one thing the callee cannot assume away.</p>
+<h3 id="74-running-the-program-confirming-and-guarding">7.4 Running the program: confirming and guarding<a class="headerlink" href="#74-running-the-program-confirming-and-guarding" title="Permanent link">&para;</a></h3>
+<p>Running is the last layer, and it has two jobs.</p>
+<p><strong>Confirming a counterexample.</strong> A prover's model gives field values and arguments. To keep
+"every error can be reproduced":</p>
+<ol>
+<li><strong>Reachable first.</strong> Build the object with a constructor and a bounded call sequence that
+   steers towards the model, then call the method.</li>
+<li><strong>If no sequence is found, the model is not an error.</strong> The state satisfies the invariant but
+   nothing shows it can be reached. The verdict is <code>Not proved</code>, with a note that names the state
+   (<em>"n = 2147483647 satisfies the invariant, and inc() would break it, but no call sequence
+   reaching it was found"</em>). It is a hint to strengthen the invariant, not an accusation. This
+   keeps §2's rule that the tool prefers silence to a false error.</li>
+<li>If the run does not break the contract, the verdict is <code>Not proved</code>, not an error.</li>
+</ol>
+<p>The <code>Counter</code> without headroom shows it: <code>n = 2147483647</code> satisfies <code>n &gt;= 0</code>, and <code>inc()</code> makes
+it <code>-2147483648</code>. A call sequence that gets there exists (2 billion calls to <code>inc</code>), and the
+replay finds a shorter route by writing through the constructor of a test subclass only when the
+field is reachable that way; otherwise it reports the note above.</p>
+<p><strong>Guarding what was not proved (<code>--contracts runtime</code>).</strong> The compiler may keep a guard for a
+contract it could not prove. A violated guard throws <code>ContractViolation</code>, an <code>AssertionError</code>
+subclass, with the clause, the method, the values, and the source line:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ContractViolation: Counter.inc() postcondition failed at Counter.on:12
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  ensures n == old(n) + 1     n = 5, old(n) = 3
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>ContractViolation: Counter.inc() の事後条件が満たされませんでした（Counter.on:12）
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  ensures n == old(n) + 1     n = 5, old(n) = 3
+</span></code></pre></div>
+<p><strong>How the guards are built.</strong> A guarded method is split in two. The original body becomes a private
+method <code>m$body</code>, unchanged, and <code>m</code> becomes the guard: check <code>requires</code>, save every <code>old(e)</code>, call
+<code>m$body</code>, check <code>ensures</code> on the result, return it. Every <code>return</code> stays inside <code>m$body</code>, so none can
+slip past the check. The alternative, rewriting each <code>return</code> in the body into "store the result,
+check, return", was rejected: it has to reach every statement form (loops, <code>try</code>, <code>select</code>), and one
+form missed is a <code>return</code> that leaves the method unchecked, which is a silent hole in a guard.
+The cost is one extra frame in a stack trace and the loss of the tail call on <code>m</code>, which the design
+already accepts.</p>
+<p>A guard is a plain <code>AssertionError</code> subclass, so a violation can be told from an ordinary
+exception; it has no code of its own. A guard on a recursive method is not a tail call, so only
+the guarded methods lose the tail-call optimization; the rest of the program is compiled as it was.</p>
+<p>Not modelled, so never <code>Proved</code>: <code>Double</code> and <code>Float</code>, strings beyond equality and length,
+reflection, and anything behind a Java call that is not in the effect table.</p>
+<hr />
+<h2 id="8-the-solver">8. The solver<a class="headerlink" href="#8-the-solver" title="Permanent link">&para;</a></h2>
+<p>The solver is written in-house and bundled in <code>onion.jar</code>. "As strong as z3 or cvc5" is a
+direction, not the first milestone. The first milestone is the fragment that VCs need,
+solved exactly and with answers that can be checked.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Content</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1</td>
+<td>CDCL SAT: two watched literals, VSIDS, restarts, 1-UIP learning, Tseitin transform</td>
+<td>2–3 k lines</td>
+</tr>
+<tr>
+<td>S2</td>
+<td>Bit-blasting of 32/64-bit vectors and booleans onto S1</td>
+<td>about 2 k lines</td>
+</tr>
+<tr>
+<td>S3</td>
+<td>Uninterpreted functions (Ackermann reduction) and arrays for fields</td>
+<td>about 1 k lines</td>
+</tr>
+<tr>
+<td>S4</td>
+<td>Mathematical integers (simplex, branch and bound)</td>
+<td>only if S2 proves too slow</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why a hand-written solver can be trusted:</strong></p>
+<ul>
+<li><strong>UNSAT is certified.</strong> S1 emits a DRAT proof; a separate checker of about 200 lines verifies
+  it. If the check fails, the verdict is <code>Not proved</code>.</li>
+<li><strong>SAT is certified.</strong> The model is substituted into the formula, then replayed (§7.3).</li>
+<li><strong>A fuzz spec</strong> builds random formulas over 4–6 bit vectors and compares the solver with
+  exhaustive search. It needs no external tool. An optional CI job compares against z3.</li>
+</ul>
+<p>What the checkers cannot see is a bug in VC generation or in the bit-blaster. The fuzz spec and
+the replay are the guard there.</p>
+<p><strong>The case for building it (PRINCIPLES 9).</strong> The static checks of §7.1 already catch a write that
+breaks a history, with no solver. They decide only what the syntax settles: a constant, or the
+field plus or minus a constant. Only a proof can (a) settle a write the syntax cannot, (b) cover
+<code>2^32</code> inputs rather than 40, (c) establish a history for <strong>all</strong> call sequences rather than the
+ones that were tried, and (d) let a guard be dropped. The cost is bounded by staging: stages 1 to 4
+are the static checks and sampling, with no solver. If the solver stages are cut, that is what
+remains, and it is already more than <code>law</code>/<code>example</code> gave.</p>
+<p>The solver sits behind a <code>Solver</code> interface, so an external z3 or cvc5 can be added later as
+another backend.</p>
+<hr />
+<h2 id="9-error-model">9. Error model<a class="headerlink" href="#9-error-model" title="Permanent link">&para;</a></h2>
+<p>E0105 to E0107 are <strong>fixed</strong>: they landed with the syntax (#2564). The rest are provisional and
+are assigned when each stage lands.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Diagnostic</th>
+<th>Stage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>E0105</strong></td>
+<td>A contract clause while contracts are off (<code>--contracts off</code>)</td>
+<td>1, landed</td>
+</tr>
+<tr>
+<td><strong>E0106</strong></td>
+<td>A contract that is not pure (it does I/O, writes memory, or calls something unvouched for)</td>
+<td>1, landed</td>
+</tr>
+<tr>
+<td><strong>E0107</strong></td>
+<td><code>old(...)</code> where there is no earlier state (anywhere but an <code>ensures</code> or a <code>history</code>)</td>
+<td>1, landed</td>
+</tr>
+<tr>
+<td><strong>E0109</strong></td>
+<td><strong>History broken by a method</strong> (below)</td>
+<td>2</td>
+</tr>
+<tr>
+<td>E0108</td>
+<td>A history is not reflexive or not transitive (shows the failing triple)</td>
+<td>2</td>
+</tr>
+<tr>
+<td>E0110</td>
+<td>A field named by a contract is written through another object, or is not a value type (§3.2)</td>
+<td>2</td>
+</tr>
+<tr>
+<td>E0111</td>
+<td>Contract not allowed here (on a <code>tool</code>, or on a class that extends a Java class)</td>
+<td>2</td>
+</tr>
+<tr>
+<td>E0112</td>
+<td>Precondition may not hold at a call (names the callee and the arguments found)</td>
+<td>6</td>
+</tr>
+<tr>
+<td>E0113</td>
+<td>Postcondition does not hold (shows <code>old</code> and <code>result</code>)</td>
+<td>6</td>
+</tr>
+<tr>
+<td>E0114</td>
+<td>Invariant not preserved by a method or constructor</td>
+<td>6</td>
+</tr>
+<tr>
+<td>W0021</td>
+<td>Contract not proved</td>
+<td>6</td>
+</tr>
+</tbody>
+</table>
+<p>The history error comes from the static check of §7.1, so it <strong>names the write</strong>, not a run:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>reset.on:12:5: [E0109] ResettableCounter.reset() breaks the history of Counter: n &gt;= old(n)
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  `this.n = 0` sets n to 0, but the history says n never decreases.
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  hint: a subclass may add methods, but each must keep every history of its superclass.
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>        Remove the write to `n`, or relax the history in Counter.
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>reset.on:12:5: [E0109] ResettableCounter.reset() は Counter の history `n &gt;= old(n)` を破ります
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  `this.n = 0` は n を 0 にしますが、history は n が減らないことを求めています。
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  ヒント: サブクラスはメソッドを足せますが、スーパークラスの history はすべて保たなければ
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>          なりません。`n` への代入を外すか、Counter の history を緩めてください。
+</span></code></pre></div>
+<p>When a write is too hard for the static check (it is not a constant or the field plus or minus
+a constant), the prover decides (stage 7), and a counterexample is confirmed by running the
+program (§7.4); only then does the message add <code>reproduced by: new ResettableCounter(); inc();
+inc(); inc(); reset()</code>.</p>
+<p>Each has an en and ja message and a hint, and is added to <code>docs/reference/error-codes.md</code> and
+its ja mirror.</p>
+<hr />
+<h2 id="10-compatibility-the-breaking-change">10. Compatibility — the breaking change<a class="headerlink" href="#10-compatibility-the-breaking-change" title="Permanent link">&para;</a></h2>
+<p>One known user. No transition period. The removal lands in <strong>one PR, at stage 4</strong>, after
+every replacement exists (§11).</p>
+<p><strong>Removed</strong>
+- <code>law</code> and <code>example</code>, in a record body and at the top level.
+- <code>--no-check-laws</code>, <code>--law-seed</code>, <code>--law-samples</code>, including their parsing in <code>DaemonClient</code>.
+- E0064, E0065, E0074, E0075, E0080. These numbers are <strong>not reused</strong>.
+- The compiler pieces behind them: <code>LawCheckPhase</code>, <code>CheckMethodIndex</code>, <code>CounterexampleText</code>,
+  <code>ShapeInstanceLawPass</code>, the grammar and AST nodes, the <code>Rewriting</code> synthesis.
+  <code>ArgGenerator</code> stays: it feeds sampling.</p>
+<p><strong>Must change in the same PR</strong>
+- <code>docs/quality-bar.md</code> and its ja mirror: removing five codes makes <code>declared</code> smaller than the
+  recorded figure, which <code>QualityBarSpec</code> row 7 rejects (<code>recorded &lt;= declared</code>).
+- <code>ProjectBuilder</code> and <code>ProjectTestRunner</code>, which force laws on today (§6 gives the new modes).
+- Everything that relied on E0080: <code>run/FixedWidthDemo.on</code>, <code>UserShapeInstanceSpec</code>,
+  <code>docs/guide/shapes.md</code> (en/ja), <code>docs/getting-started/quick-start.md</code>.</p>
+<p><strong><code>onion migrate</code>, with one before and after for each place <code>law</code> and <code>example</code> appear</strong></p>
+<p>A <code>law</code> in a record body becomes a pure predicate method of the record, and an <code>example</code> a
+closed one. The method is <code>static</code>, <code>Boolean</code>, and its body is the old block's expression.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1">// before: in a record body</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Point</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="n">law</span><span class="w"> </span><span class="nf">roundTrip</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">Point</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">Point</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Point</span><span class="o">::</span><span class="nf">format</span><span class="p">(</span><span class="n">p</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="n">example</span><span class="w"> </span><span class="n">origin</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Point</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">).</span><span class="nf">x</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="p">}</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="c1">// after</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Point</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">roundTrip</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">Point</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">    </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nc">Point</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Point</span><span class="o">::</span><span class="nf">format</span><span class="p">(</span><span class="n">p</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">origin</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Point</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">).</span><span class="nf">x</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="p">}</span>
+</span></code></pre></div>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1">// before: at the top level, unnamed</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">example</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1">// after: a top-level function, numbered</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="kd">def</span><span class="w"> </span><span class="nf">example_1</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">2</span>
+</span></code></pre></div>
+<p>The <code>= body</code> form is why a clause must end at <code>=</code> (§3.4).</p>
+<p>Cases the rule handles explicitly:</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>unnamed <code>example</code> in a record body</td>
+<td><code>example_1</code>, <code>example_2</code>, ... in source order, skipping names already taken</td>
+</tr>
+<tr>
+<td>a record with no <code>{}</code> body</td>
+<td>the rule adds <code>{ public: ... }</code> after the component list</td>
+</tr>
+<tr>
+<td>a block with more than one statement</td>
+<td><strong>not rewritten</strong>; the rule says why. Only a file that compiles after the rewrite is changed</td>
+</tr>
+<tr>
+<td><code>law</code> with a counterexample-only use (<code>--law-seed</code>)</td>
+<td>rewritten; the seed flags are gone, sampling uses <code>--contract-seed</code></td>
+</tr>
+</tbody>
+</table>
+<p>Running it twice changes nothing the second time.</p>
+<p><strong>What replaces E0064 and E0065.</strong> From stage 3 a falsified sampled predicate reports a
+<strong>new</strong> code (taken from the end of the list, never 64 or 65). It names the predicate and the
+counterexample, in English and Japanese, with the same seed and sample count so the run can be
+repeated. A false closed predicate reports the same code without a counterexample.
+The old codes are retired only at stage 4.</p>
+<p><strong>The RUNBOOK §5.3 package</strong>
+- A <code>### Breaking</code> fragment in <code>changelog.d/</code>.
+- A section in <code>docs/migration/pre-1.0.md</code> and its ja mirror.
+- A hint at the old spelling, pointing to the replacement and to <code>onion migrate</code>.
+- An <code>onion migrate</code> rule (token-level, applied only when the result compiles). It is also run
+  once over the 111 files in <code>run/</code> and the result committed.</p>
+<p><strong>Also updated:</strong> the VS Code grammar, the Pygments lexer, <code>CLAUDE.md</code> and <code>CLAUDE_ja.md</code>, about
+15 docs pages, 7 specs deleted and about 18 edited.</p>
+<hr />
+<h2 id="11-staging-and-reversibility">11. Staging and reversibility<a class="headerlink" href="#11-staging-and-reversibility" title="Permanent link">&para;</a></h2>
+<p>The default of <code>--contracts</code> is <code>off</code> at stages 1 and 2 and <code>check</code> from stage 3, so the
+replacement is already running before <code>law</code>/<code>example</code> go. Stages 5 to 8 do not change it
+until stage 6 (<code>verify</code>).</p>
+<p>The order is <strong>static checks first, and additive first</strong>: nothing is removed until what replaces
+it has a defined verdict, and the checks that need no solver come before the solver.
+Each stage is its own PR and is useful alone.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Content</th>
+<th><code>law</code>/<code>example</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>mutate</code> effect; <code>--contracts</code>; syntax and typing of <code>requires</code>, <code>ensures</code>, <code>invariant</code>, <code>history</code>; the purity check. A clause is E0105 while contracts are off. <strong>Landed</strong> (#2563, #2564)</td>
+<td>kept</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Static checks without a solver</strong> (§7.1): the framing rules (§3.2), the effective contract of an override, a history is a preorder, a write that breaks a history. <code>ResettableCounter.reset</code> is reported here</td>
+<td>kept</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>ContractTable</code>, the <code>Shape</code> contract and its <code>printable</code> domain (§5.1); closed and parameterized predicates (§7.2), with sampling and the <code>Sampled</code> verdict; the successor diagnostic for E0064/E0065; <strong><code>--contracts check</code> becomes the default</strong></td>
+<td>kept (E0080 still on)</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>The breaking PR:</strong> migration rule, <code>run/</code> migrated, <code>law</code>/<code>example</code>/E0080 removed, docs and flags. Lands inside the 8-week consolidation window (RUNBOOK §5.4)</td>
+<td><strong>removed</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Solver S1 and S2, with the DRAT checker and the fuzz spec</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Proofs (§7.3): VCs for straight-line code and loop invariants. <code>--contracts verify</code> becomes the default, <code>W0021</code> on</td>
+<td>—</td>
+</tr>
+<tr>
+<td>7</td>
+<td>History VCs; confirming a counterexample by running (§7.4); guide and sample (en/ja)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Guards for what was not proved (<code>--contracts runtime</code>, §7.4); solver S3</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The time box.</strong> Stage 4 must land before the consolidation phase ends (RUNBOOK §5.4: about 8
+weeks, every audit item closed, no open <code>breaking</code> RFC, two weekly releases without a Breaking
+entry, dogfood green). After the switch to <code>mode: stable</code>, removing <code>law</code>/<code>example</code> would need a
+panel-approved RFC and the <code>breaking</code> label for each change to the frozen corpus, which is the
+heavier path. Stages 5 to 8 add features and are not tied to the window.</p>
+<p>If stages 5 to 8 are never finished, stages 1 to 4 still give contracts, the static checks of
+§7.1 (including the Liskov–Wing history check), inheritance of contracts, and sampling. That is
+more than <code>law</code>/<code>example</code> gave.</p>
+<hr />
+<h2 id="12-open-questions">12. Open questions<a class="headerlink" href="#12-open-questions" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Decided and built: a guard on a recursive method (§7.4).</strong> A guard calls <code>m$body</code>, so a self-call
+  inside the body goes through the guard and is not a tail call. The decision: guard the entry only. A
+  self-call inside <code>m$body</code> calls <code>m$body</code> directly, so tail-call optimization still applies and the
+  contract is checked once, on the way in and out of the outermost call. The cost: the <code>requires</code> of an
+  inner self-call is not checked at run time. Only the proof covers it. A warning that names this gap is not built.</li>
+<li>Quantifiers. <code>forall</code> over <code>Int</code> ranges, or pure recursive helper predicates? Collections need one.</li>
+<li><code>ensures</code> on an exceptional exit.</li>
+<li>Mutable aggregates in <code>invariant</code>/<code>history</code> (<code>items.size() &lt;= 10</code>) need an ownership rule. Not in v1.</li>
+<li><code>onion --effects</code>: it prints <code>mutate</code>, since the effect is real; a <code>tool</code>'s <code>--contract</code> and
+  <code>--plan</code> output does not, since <code>mutate</code> is not a capability. Is that split what users expect?</li>
+</ul>
+<hr />
+<h2 id="13-rejected-alternatives">13. Rejected alternatives<a class="headerlink" href="#13-rejected-alternatives" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keep <code>law</code>/<code>example</code> and add contracts, for good</td>
+<td>Two mechanisms for one purpose (PRINCIPLES 2). They go at stage 4</td>
+</tr>
+<tr>
+<td>Remove <code>law</code>/<code>example</code> first</td>
+<td>A stable feature would be replaced by a preview one (PRINCIPLES 3, 6)</td>
+</tr>
+<tr>
+<td>A <code>check</code> keyword that replaces <code>law</code></td>
+<td>It is <code>law</code> renamed; no complexity removed (PRINCIPLES 9)</td>
+</tr>
+<tr>
+<td><strong>Static checks plus sampling, no solver</strong></td>
+<td>Not rejected: it is stages 1–4 (§11). The solver is the extra, and §8 gives the case for it</td>
+</tr>
+<tr>
+<td>Proofs by an external z3/cvc5 only</td>
+<td>Nothing is proved where no solver is installed</td>
+</tr>
+<tr>
+<td>Runtime assertions as the check</td>
+<td>The answer comes after a run, not at compile time, and a history across call sequences is never seen. Kept only as a guard for what was not proved (§7.4)</td>
+</tr>
+<tr>
+<td>String annotations <code>@Requires("...")</code></td>
+<td>The expression is not typed; no editor support; <code>Annotation</code> has no arguments</td>
+</tr>
+<tr>
+<td>Refinement types</td>
+<td>A far larger change to the type system</td>
+</tr>
+<tr>
+<td>Liskov–Wing abstraction functions</td>
+<td>Needed only when a subtype changes its representation (§4)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="14-what-this-buys-concretely">14. What this buys, concretely<a class="headerlink" href="#14-what-this-buys-concretely" title="Permanent link">&para;</a></h2>
+<ul>
+<li>A subtype that breaks its supertype's history is rejected, with the call sequence that shows
+  it (§4.1, §9). Pre/postcondition checkers miss this.</li>
+<li>A contract that is proved needs no guard (a <code>requires</code> excepted, §7.3).</li>
+<li>A broken contract comes with a reproducible counterexample, not a statistic.</li>
+<li>The <code>Shape</code> round-trip rule is stated once, on the interface, instead of in every file that
+  implements it, and the false rule (L2) is never asserted.</li>
+<li>About 300 build-time test clauses move to one mechanism, after that mechanism works.</li>
+</ul>
+<hr />
+<h2 id="appendix-what-is-built-and-what-is-not">Appendix: what is built, and what is not<a class="headerlink" href="#appendix-what-is-built-and-what-is-not" title="Permanent link">&para;</a></h2>
+<p><strong>Built.</strong> The default mode is <code>check</code>: the clauses are typed and checked, and what is found is a
+warning or an error as listed. (Section 6 records the decision that a contract that is not proved
+becomes an error by default; that flip is not built yet, see below.)</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Code</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A history that is not a preorder</td>
+<td>E0108</td>
+<td>syntax</td>
+</tr>
+<tr>
+<td>A write that breaks a history, including an interface's</td>
+<td>E0109</td>
+<td>syntax</td>
+</tr>
+<tr>
+<td>A clause that names a mutable object</td>
+<td>E0110</td>
+<td>types</td>
+</tr>
+<tr>
+<td>A class with a clause that extends a Java class</td>
+<td>E0111</td>
+<td>types</td>
+</tr>
+<tr>
+<td>A solver counterexample that <strong>running the compiled code reproduces</strong></td>
+<td>E0112</td>
+<td>CDCL SAT + bit-vectors, then a run</td>
+</tr>
+<tr>
+<td>A closed or sampled predicate (<code>ensures result</code>) that is false</td>
+<td>E0113</td>
+<td>run at build time</td>
+</tr>
+<tr>
+<td>A <code>Shape</code> that does not round-trip a value it says it can print</td>
+<td>E0114</td>
+<td>sampled, against <code>printable</code></td>
+</tr>
+<tr>
+<td>A solver counterexample that cannot be run, or does not break when run</td>
+<td>W0021</td>
+<td>the same, shown as a warning</td>
+</tr>
+<tr>
+<td>A <code>Shape</code> whose value type cannot be sampled</td>
+<td>W0022</td>
+<td>reported, never a silent pass</td>
+</tr>
+<tr>
+<td>A method that writes a field a history names, and no check settled it</td>
+<td>W0024</td>
+<td>reported</td>
+</tr>
+<tr>
+<td>An override whose body can break the effective contract</td>
+<td>W0025</td>
+<td>the solver, against <code>pre_eff</code> / <code>post_eff</code></td>
+</tr>
+<tr>
+<td>A clause <code>--contracts runtime</code> cannot guard</td>
+<td>W0026</td>
+<td>reported with the reason, never silent</td>
+</tr>
+<tr>
+<td>A contract relied on without being verified (<code>@Trusted</code>)</td>
+<td>W0027</td>
+<td>each use is listed</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>The prover</strong> models <code>Int</code> fields, parameters and locals, assignment, <code>if</code>, a trailing <code>return</code>, and a
+  call to a pure <code>Int</code> method that states its contract (its <code>requires</code> is an obligation, its <code>ensures</code>
+  constrains the result). <code>--verbose</code> lists each history it proved. Anything else is not modelled.</li>
+<li><strong>Across modules.</strong> A method's <code>requires</code> and <code>ensures</code> are written into its class file
+  (<code>@onion.Contract</code>: the parameter names and the clauses as text), so a module built later can use
+  them. A clause that would not read back as the same clause is not written.</li>
+<li><strong><code>--contracts runtime</code></strong> guards <code>requires</code>, <code>ensures</code> (with <code>old(e)</code> saved at entry), and a class's
+  <code>invariant</code> and <code>history</code>, on an instance, static, generic or variadic method, and the <code>invariant</code> after
+  a class constructor. A guarded method is split: the body becomes the private <code>m$body</code> and <code>m</code> is the
+  guard. A <code>history</code> or an <code>ensures</code> the solver proved has no guard. It is a safety net, and it never turns a failed
+  proof into a pass.</li>
+</ul>
+<p><strong>Not built, by design:</strong></p>
+<ul>
+<li><code>--contracts verify</code> as a separate mode. It is reserved and refused; the decision in section 6 is that
+  verification is the default instead.</li>
+<li>A guard dropped for a proved <code>invariant</code> or <code>requires</code>. A proved <code>history</code> and a proved <code>ensures</code> are
+  dropped; the other two need the proofs of the work that follows from section 6 below.</li>
+<li>The <code>invariant</code> check after a constructor with a <code>return</code> of its own, and after a record's
+  compiler-written constructor. The warning W0026 names each one.</li>
+</ul>
+<p><strong>Not built, the work that follows from section 6:</strong></p>
+<ul>
+<li>the default flip itself: an unproved contract, and a counterexample, as a compile error, with
+  <code>--contracts check</code> to lower them to warnings and <code>@Trusted</code> to skip a body;</li>
+<li>a proof of <code>ensures</code> as a contract of every method (the prover can check one, for an override), of the
+  <code>invariant</code> (established by a constructor, kept by each method), and of a caller meeting a callee's
+  <code>requires</code>.</li>
+</ul>
+<p><strong>Not built, because the prover is narrow:</strong> a call to a method that writes a field, a loop, and any type
+other than <code>Int</code>. A body with one of these reports nothing today, and is a compile error once the default
+flips unless it is <code>@Trusted</code>.</p>
+<p><strong>Not built, a separate piece of work:</strong> the framing rule 2 (a write through another instance); a
+<code>ContractTable</code> read from a library jar (the built-in <code>Shape</code> entry is built); the effective contract of
+an override against a superclass built earlier, a built class's <code>history</code> inherited, and a class's
+<code>invariant</code> and <code>history</code> written into its class file.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../typed-boundaries/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Typed Boundaries (thesis)">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Typed Boundaries (thesis)
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../onion-v0.5-audit/" class="md-footer__link md-footer__link--next" aria-label="Next: v0.5 Audit">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                v0.5 Audit
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/onion-lang/onion" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+    
+  </body>
+</html>

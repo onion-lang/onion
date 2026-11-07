@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -4602,6 +4602,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../design/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../design/onion-v0.5-audit/" class="md-nav__link">
         
   
@@ -5126,11 +5154,14 @@ shape の成分には次の型が使えます。</p>
 </span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
 </span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Summary</span><span class="p">(</span><span class="n">title</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">decisions</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">String</span><span class="p">],</span><span class="w"> </span><span class="n">actions</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">Action</span><span class="p">],</span><span class="w"> </span><span class="n">lead</span><span class="p">:</span><span class="w"> </span><span class="nc">Action</span><span class="p">?)</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">json</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="k">example</span><span class="w"> </span><span class="n">nested</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Summary</span><span class="p">(</span><span class="s2">"sync"</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="s2">"ship"</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="k">new</span><span class="w"> </span><span class="nc">Action</span><span class="p">(</span><span class="s2">"sato"</span><span class="p">,</span><span class="w"> </span><span class="s2">"review"</span><span class="p">)],</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span>
-</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">().</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">().</span><span class="nf">print</span><span class="p">(</span><span class="n">v</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">v</span>
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="p">}</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">nested</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">  </span><span class="p">{</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Summary</span><span class="p">(</span><span class="s2">"sync"</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="s2">"ship"</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="k">new</span><span class="w"> </span><span class="nc">Action</span><span class="p">(</span><span class="s2">"sato"</span><span class="p">,</span><span class="w"> </span><span class="s2">"review"</span><span class="p">)],</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">().</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Summary</span><span class="o">::</span><span class="nf">doc</span><span class="p">().</span><span class="nf">print</span><span class="p">(</span><span class="n">v</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">v</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>入れ子のレコードは、宣言順で<strong>最初の</strong> json shape を通して読まれます。json shape を複数
 持つレコードは、入れ子で使わせたいものを先頭に書きます。レコードの宣言位置は問わず、
@@ -5204,14 +5235,17 @@ shape の成分には次の型が使えます。</p>
 <code>printLossless</code> が2つを再組立てします：</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Server</span><span class="p">(</span><span class="n">host</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="n">port</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">debug</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">cfg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span>
-</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="k">example</span><span class="w"> </span><span class="n">l2</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"# prod</span><span class="se">\n</span><span class="s2">host = h</span><span class="se">\n</span><span class="s2">port = 007</span><span class="se">\n</span><span class="s2">debug = true</span><span class="se">\n</span><span class="s2">"</span>
-</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Server</span><span class="o">::</span><span class="nf">cfg</span><span class="p">().</span><span class="nf">parseLossless</span><span class="p">(</span><span class="n">t</span><span class="p">).</span><span class="nf">get</span><span class="p">()</span>
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">    </span><span class="nc">Server</span><span class="o">::</span><span class="nf">cfg</span><span class="p">().</span><span class="nf">printLossless</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="nf">value</span><span class="p">(),</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="nf">residue</span><span class="p">())</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">t</span>
-</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="p">}</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">l2</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span><span class="p">{</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"# prod</span><span class="se">\n</span><span class="s2">host = h</span><span class="se">\n</span><span class="s2">port = 007</span><span class="se">\n</span><span class="s2">debug = true</span><span class="se">\n</span><span class="s2">"</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Server</span><span class="o">::</span><span class="nf">cfg</span><span class="p">().</span><span class="nf">parseLossless</span><span class="p">(</span><span class="n">t</span><span class="p">).</span><span class="nf">get</span><span class="p">()</span>
+</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nc">Server</span><span class="o">::</span><span class="nf">cfg</span><span class="p">().</span><span class="nf">printLossless</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="nf">value</span><span class="p">(),</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="nf">residue</span><span class="p">())</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">t</span>
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>この <code>example</code> 節こそが要点です：L2 はコメントではなく、ビルド時に機械検査され、
+<p>この <code>ensures result</code> の述語こそが要点です：L2 はコメントではなく、ビルド時に機械検査され、
 満たさなくなった shape はコンパイルが通らなくなります。編集も同じ対を通ります ——
 1つのコンポーネントを変えるとその値スロットだけが再描画され、<em>変えていない</em>
 コンポーネントは元の綴りを保ちます。プログラムが実際に port を変えない限り、<code>007</code> は
@@ -5259,13 +5293,16 @@ shape の成分には次の型が使えます。</p>
 <p>実行後の <code>diff</code> は変更行をちょうど1行だけ示します。デモ（<code>run/ConfigEditDemo.on</code>）は
 これを tool として実行するので、何かが起きる前に <code>--plan</code> が読み書きを見せてくれます。</p>
 <h2 id="shape_2">ビルド時に shape を検査する<a class="headerlink" href="#shape_2" title="Permanent link">&para;</a></h2>
-<p><code>law</code> はコンパイル時に実行されるので、往復の性質を機械検査できます。</p>
+<p><code>Boolean</code> を返して <code>ensures result</code> と述べる <code>static def</code> は、コンパイル時に実行されます。往復の性質を機械検査できます。引数があるときはサンプリングで実行されます。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Pt</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="kd">shape</span><span class="w"> </span><span class="n">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">,</span><span class="o">(</span><span class="sr">-</span><span class="o">?</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="k">law</span><span class="w"> </span><span class="nf">roundtrip</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">Pt</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nc">Pt</span><span class="o">::</span><span class="nf">text</span><span class="p">().</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Pt</span><span class="o">::</span><span class="nf">text</span><span class="p">().</span><span class="nf">print</span><span class="p">(</span><span class="n">p</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="p">}</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">roundtrip</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">Pt</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">    </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nc">Pt</span><span class="o">::</span><span class="nf">text</span><span class="p">().</span><span class="nf">parse</span><span class="p">(</span><span class="nc">Pt</span><span class="o">::</span><span class="nf">text</span><span class="p">().</span><span class="nf">print</span><span class="p">(</span><span class="n">p</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">p</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>引数の型からサンプルを生成できない law はエラー（E0074）になります。読み飛ばしません。
+<p>引数の型からサンプルを生成できない述語はエラー（E0113）になります。読み飛ばしません。
 実行されない検査が「通った検査」に見えてはいけないからです。</p>
 <h2 id="shape_3">自分の shape を書く<a class="headerlink" href="#shape_3" title="Permanent link">&para;</a></h2>
 <p>同梱の導出（<code>re""</code>、<code>json</code>、<code>yaml</code>、<code>config</code>）は意図的に閉じた集合です —— 法則が
@@ -5280,20 +5317,23 @@ shape の成分には次の型が使えます。</p>
 </span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">describe</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"fixed-width Person"</span>
 </span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="p">}</span>
 </span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>
-</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="k">example</span><span class="w"> </span><span class="n">fixedWidthL1</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">FixedWidth</span><span class="p">()</span>
-</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Person</span><span class="p">(</span><span class="s2">"KOTA"</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">)</span>
-</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="w">  </span><span class="n">s</span><span class="p">.</span><span class="nf">parse</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="nf">print</span><span class="p">(</span><span class="n">v</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">v</span>
-</span><span id="__span-18-14"><a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="p">}</span>
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="kd">def</span><span class="w"> </span><span class="nf">fixedWidthL1</span><span class="p">():</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="w">  </span><span class="k">ensures</span><span class="w"> </span><span class="n">result</span>
+</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="p">{</span>
+</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">FixedWidth</span><span class="p">()</span>
+</span><span id="__span-18-14"><a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Person</span><span class="p">(</span><span class="s2">"KOTA"</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">)</span>
+</span><span id="__span-18-15"><a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="nf">parse</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="nf">print</span><span class="p">(</span><span class="n">v</span><span class="p">)).</span><span class="nf">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">v</span>
+</span><span id="__span-18-16"><a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>コンビネータ —— <code>eachLine</code>、<code>sepBy</code>、<code>xmap</code>、<code>orElse</code> —— は無償で付いてきて、失敗は
 同梱 shape と同じ <code>Outcome</code>/<code>Defect</code> の語彙で語られます。</p>
-<p>この <code>example</code> は任意ではありません。導出された shape の法則は構成から保証されますが、
+<p>この述語は任意ではありません。導出された shape の法則は構成から保証されますが、
 ユーザーが書いた shape は法則を<em>主張</em>する側です。だから <code>onion.Shape</code> を実装する具象
-クラスは、そのファイルが機械検査される <code>law</code> か <code>example</code> を少なくとも1つ述べている
-ときだけコンパイルされます（なければ <strong>E0080</strong>）。代表的な主張は round-trip
-<code>s.parse(s.print(v)).get() == v</code> で、トップレベル <code>example [name] { expr }</code> がその
-乗り物です。他の law と同じくビルド時に実行され、偽の主張は E0065 になります。
+クラスは、そのファイルが機械検査される述語（<code>ensures result</code>）でその shape を使うものを
+少なくとも1つ述べているときだけコンパイルされます（なければ <strong>E0080</strong>）。代表的な主張は
+round-trip <code>s.parse(s.print(v)).get() == v</code> で、トップレベルの
+<code>def name(): Boolean ensures result</code> がその乗り物です。ビルド時に実行され、偽の主張は
+E0113 になります。
 parse 専用の shape は <code>canPrint(): false</code> でそう言い、読む方向の法則を主張します。</p>
 <h2 id="shapes"><code>Shapes</code> を直接使うとき<a class="headerlink" href="#shapes" title="Permanent link">&para;</a></h2>
 <p><code>onion.Shapes</code> は <code>shape name = ...</code> が導出するのと同じ4つの構築を、通常の API として
@@ -5426,7 +5466,7 @@ parse 専用の shape は <code>canPrint(): false</code> でそう言い、読�
       <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>

@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -2521,6 +2521,17 @@
     <span class="md-ellipsis">
       
         canPrint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#printable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        printable
       
     </span>
   </a>
@@ -6582,6 +6593,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../design/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts (proposal)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../design/onion-v0.5-audit/" class="md-nav__link">
         
   
@@ -7346,6 +7385,17 @@
     <span class="md-ellipsis">
       
         canPrint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#printable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        printable
       
     </span>
   </a>
@@ -9331,6 +9381,12 @@ L1 のみで、どちらなのかを明言することが「可逆な言語」�
 <p>すべての shape が書き戻せるわけではありません。<code>\s+</code> を区切りに使う正規表現には一意な
 書き戻し方が無いため read-only になり、<code>canPrint()</code> が <code>print</code> を呼ぶ前にそう伝えます——
 メソッドが黙って存在しない、という形にはしません。</p>
+<h3 id="printable">printable<a class="headerlink" href="#printable" title="Permanent link">&para;</a></h3>
+<p><code>printable(v)</code> は、その値が shape で print して読み戻せる値かどうかを答えます。往復 L1 は
+<code>T</code> のすべての値ではなく、この範囲で成り立ちます。固定幅の shape は、桁より長い名前を
+print できません。既定はすべての値を認めます。範囲が狭いときは上書きして述べます。ビルドは
+値を作って、<code>printable</code> が認める各値について <code>parse(print(v)) == Ok(v)</code> を確かめます。
+戻ってこない値は <strong>E0114</strong> です。</p>
 <h3 id="describe">describe<a class="headerlink" href="#describe" title="Permanent link">&para;</a></h3>
 <p><code>describe()</code> は診断用にその shape が何を読むのかを名付けます——正規表現ベースの shape
 なら <code>re"\d+-\d+"</code> のように。<code>print</code>/<code>printLossless</code> が投げる <code>UnsupportedOperationException</code>
@@ -11443,7 +11499,7 @@ EOF を通知します。<code>close()</code> は冪等で、<code>conn.isClosed
       <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>

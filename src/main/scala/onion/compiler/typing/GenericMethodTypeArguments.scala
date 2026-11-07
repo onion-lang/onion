@@ -209,6 +209,12 @@ private[typing] object GenericMethodTypeArguments {
       if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArg(right))
       else TypeRules.isSuperType(left, right)
 
+    // A limit that is an Onion type variable takes only its own values, not whatever fits its bound.
+    def fitsBothLimits(upper: Type, lower: Type): Boolean = isSuperTypeForBounds(upper, lower) && (upper match {
+      case tv: TypeVariableType => TypeCheckingHelpers.fitsTypeVariable(tv, lower)
+      case _ => true
+    })
+
     def isAssignableForBounds(left: Type, right: Type): Boolean =
       if (!left.isBasicType && right.isBasicType) TypeRules.isAssignable(left, boxedTypeArg(right))
       else TypeRules.isAssignable(left, right)
@@ -446,6 +452,14 @@ private[typing] object GenericMethodTypeArguments {
                 failedBound += name
                 bound0
               }
+
+        // `? super U` fixed an upper limit and `? extends U` a lower one: some U must fit both
+        // (`Collections::copy(List[T], List[Object])` has none, #2431).
+        for (upper <- upperConstraints.get(name); lower <- lowerConstraints.get(name)
+             if !failedBound(name) && !fitsBothLimits(upper, lower)) {
+          reportError(callNode, INCOMPATIBLE_TYPE, upper, lower)
+          failedBound += name
+        }
 
         val inferredType0 =
           inferred.get(name)

@@ -247,3 +247,40 @@ public:
   `--contracts` は既定で有効（`check`）です。
 - **シードとサンプル数:** `--law-seed` と `--law-samples` は `--contract-seed` と `--contract-samples` になり、`--no-check-laws` は無くなりました（`--contracts off` を使います）。
 - **`onion.Shape`:** 実装するクラスは、それを使う述語を少なくとも1つ必要とします（なければ E0080）。
+
+## `invariant` や `history` が名指すフィールドは `this` を通してしか書けなくなりました
+
+契約はプレビュー機能です（RFC #2557）。クラスの `invariant` や `history` が名指すフィールドは、
+そのクラス自身のコードから `this` を通してだけ書けます。ほかのオブジェクトを通した書き込みは E0110 です。
+
+```onion
+class Clock {
+public:
+  var t: Int
+  history t >= old(t)
+  def this { t = 0 }
+  def this(start: Int) { t = start }
+  def advanceTo(k: Int): void { if k > t { t = k } }
+}
+
+// Before: compiled. Now: E0110 at `c`
+//   val c = new Clock(); c.t = 5
+// Now: pass the value to a constructor
+val c = new Clock(5)
+
+// Before: compiled. Now: E0110 at `o`
+//   def sync(o: Clock): void { o.t = 9 }
+// Now: call a method of that object; its own writes are checked
+def sync(o: Clock): void { o.advanceTo(9) }
+sync(c)
+println(c.t)   // 9
+```
+
+- **変わったこと:** 各オブジェクトは自分の `invariant` と `history` を持ち、呼び出し1回ごとに検査されます。
+  そのオブジェクトのメソッドの外からの書き込みは、この検査では追えません。
+- **見えるもの:** `E0110`（契約フィールドへの書き込みを禁じるエラー）が出ます。キャレットは受け手（`o`、`c`、`cs[0]`）を指します。
+  メッセージは、そのオブジェクトのメソッドを呼ぶか、コンストラクタで値を設定するよう促します。
+- **そのまま動くもの:** クラス自身のメソッドでの `t = v`、`this.t = v`、`self.t = v`、`t++`、`t += 1` です。ラムダの中でも同じです。
+  `o.t` を読むことは、どこからでもできます。
+- **`onion migrate` の書き換え規則はありません（意図的です）:** 直すには受け手のクラスにメソッドかコンストラクタを足します。
+  どれが合うかは設計の判断です。

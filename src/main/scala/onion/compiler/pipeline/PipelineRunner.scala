@@ -35,7 +35,9 @@ object PipelineRunner {
         override def name: String = "MutualRecursionOptimization"
         override def run(input: Seq[TypedAST.ClassDefinition], ctx: PhaseContext): Seq[TypedAST.ClassDefinition] = {
           val result = process(input)
-          ctx.addWarnings(collectedWarnings)
+          // Honour --warn off and --Wno like every other warning (#2654).
+          if (config.warningLevel != WarningLevel.Off)
+            ctx.addWarnings(collectedWarnings.filterNot(w => config.suppressedWarnings.contains(w.category)))
           result
         }
       },

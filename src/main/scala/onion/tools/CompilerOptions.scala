@@ -183,7 +183,12 @@ object CompilerOptions {
     }
     reporter.getWarnings.filterNot(w => already((w.category, w.sourceFile, w.location)))
       .foreach(w => System.err.println(DiagnosticRenderer.formatWarning(w)))
-    onion.compiler.effects.EffectInference.infer(classes, loaded.table).foreach { me => System.err.println(me.render) }
+    // A default argument's synthesized method (`f$default$1$A`) is not listed: its effects
+    // are charged to each caller that omits the argument, and its name is not one the user
+    // wrote (#2548).
+    onion.compiler.effects.EffectInference.infer(classes, loaded.table)
+      .filterNot(_.methodName.contains("$default$"))
+      .foreach { me => System.err.println(me.render) }
   }
 
   /** `--dump-ast`: the parsed AST, to stderr. Available even if a later phase fails. */

@@ -501,20 +501,36 @@ final class OperatorTyping(
           bodyContext.report(CANNOT_ASSIGN_TO_VAL, termNode, ref.field.name)
           return None
         }
-        // Bind the receiver once, read the old value into a temp, write old+1 and
-        // yield the old value, as the local, static and array cases do.
-        val tgtVar = context.add(context.newName, ref.target.`type`)
+        // Only diagnostics read it (#2599): the receiver as written, or the bare name.
+        val receiverLocation = termNode match {
+          case s: AST.MemberSelection if s.target != null && s.target.location != null => s.target.location
+          case n => n.location
+        }
+        // Read the old value into a temp, write old+1 and yield the old value, as the
+        // local, static and array cases do.
         val oldVar = context.add(context.newName, operand.`type`)
+        def old = new RefLocal(0, oldVar, operand.`type`)
+        def bumped = new BinaryTerm(binaryKind, operand.`type`, old, incrementOne(operand.`type`))
+        ref.target match {
+          // `t++`, `this.t++`, `self.t++`: `this` has no side effect, so the write goes through it
+          // directly and stays visibly a write through `this`, also once a lambda body is split
+          // into statements (#2599).
+          case _: This | _: OuterThis =>
+            return Some(new Begin(Array[Term](
+              new SetLocal(0, oldVar, operand.`type`, new RefField(ref.target, ref.field)),
+              new SetField(receiverLocation, ref.target, ref.field, bumped),
+              old
+            )))
+          case _ =>
+        }
+        // Bind the receiver once.
+        val tgtVar = context.add(context.newName, ref.target.`type`)
         def tgt = new RefLocal(0, tgtVar, ref.target.`type`)
         new Begin(Array[Term](
           new SetLocal(0, tgtVar, ref.target.`type`, ref.target),
           new SetLocal(0, oldVar, operand.`type`, new RefField(tgt, ref.field)),
-          new SetField(
-            tgt,
-            ref.field,
-            new BinaryTerm(binaryKind, operand.`type`, new RefLocal(0, oldVar, operand.`type`), incrementOne(operand.`type`))
-          ),
-          new RefLocal(0, oldVar, operand.`type`)
+          new SetField(receiverLocation, tgt, ref.field, bumped),
+          old
         ))
       case ref: RefStaticField =>
         // Post-increment/decrement on a static field (`C::count++`, and a top-level

@@ -7,6 +7,135 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.151.0] - 2026-11-07
+
+### Breaking
+
+- **A field an `invariant` or `history` names is written only through `this` (E0110, #2599).**
+  - Before: `o.t = o.t - 1` (with `o: Clock`), `cs[0].t = 7` or a factory's `val c = new Clock(); c.t = 5` compiled silently.
+  - Now: E0110 at `o`. Call a method of that object, or pass the value to a constructor. Contracts are a preview feature (RFC #2557); `docs/migration/pre-1.0.md` shows both rewrites.
+- **`--contracts` now defaults to `check`.**
+  - Before: a contract clause (`requires`, `ensures`, `invariant`, `history`) was E0105 unless you passed `--contracts check`.
+  - Now: clauses are accepted. `--contracts off` restores the old behaviour.
+- **The docs and guides show `example` and `law` as contract predicates.**
+  - A new migration-guide section gives the Before / Now form.
+  - `example`/`law` still compile; the next change removes them.
+- **`law` and `example` are removed; use a contract predicate.**
+  - Before: `law name(p: T) { e }` and `example { e }` in a record body or at the top level.
+  - Now: `static def name(p: T): Boolean ensures result = e` (top level: `def name(...)`). A failing one is E0113. See the migration guide.
+  - Removed: the flag `--no-check-laws` (use `--contracts off`), and the codes E0064, E0065, E0074, E0075 and E0080 (numbers are not reused).
+  - Renamed: `--law-seed` and `--law-samples` are `--contract-seed` and `--contract-samples`.
+- **The `run/` samples no longer use `example` or `law`.**
+  - Before: `example { e }` in a record body or at the top level.
+  - Now: `static def name(): Boolean ensures result = e` (a block body ends with `return`).
+  - The build runs these predicates; a parameterized one is sampled. `law` and `example` still compile for now and are removed in a later change.
+- **A literal `[u]` or `["k": u]` is no longer a `List[T]` or `Map[K, T]` when `u` is not a `T` (#2332).**
+  - Before: `xs = [u]`, `take([t, u])` or `m = ["k": u]` compiled, then threw `ClassCastException` where a `T` was read back.
+  - Now: `E0000 type List[T] is expected, but type List[U] is used.` (`List[Object?]` for a mix). Write `[(u as T)]` if the value really is a `T`.
+  - No `onion migrate` rule: the value is not a `T`, so an inserted cast would only bring back the same exception. See `docs/migration/pre-1.0.md`.
+
+### Added
+
+- **Warning `W0024` (`history-not-checked`): a write that no history check settled is named, not left silent (#2574).**
+  - Before: `t = t + 1L` (overflow not checked) or `history old(open) == false || open` compiled exactly like a proved history.
+  - Now: `` `Clock.tick` writes `t`, but nothing checks the history `t >= old(t)` for it, so it may not hold: the checker models only `Int` fields, and `t` is a `Long`. `` Under `--contracts check` only; `--Wno W0024` turns it off.
+- **A closed predicate runs when the build runs; a false one is E0113.**
+  - A no-parameter `static def` returning `Boolean` with an `ensures` clause, in a class, record or at the top level.
+  - The replacement for `example`. Needs `--contracts check`.
+- **`--contracts runtime` checks a class's `invariant` when its constructor finishes.**
+  - `new Account(-3)` throws `ContractViolation` when `invariant balance >= 0` does not hold.
+  - A constructor with a `return` of its own, and a record's compiler-written constructor, are named by the warning W0026.
+- **A contract crosses a module boundary.**
+  - A method with `requires` / `ensures` gets `@onion.Contract` in its class file: the parameter names and the clauses as text. A clause that would not read back as the same clause is left out.
+  - A module built later against that class file reads the contracts and uses them: `n = n + s.step(k)` is proved from the `step` contract written in the other module. A built type with no contract, or a weaker one, proves nothing.
+- **`--contracts runtime` guards `ensures`.**
+  - A false `ensures` throws `onion.ContractViolation` from any `return` of the method; the message names the clause and the method.
+  - A clause it cannot enforce yet (`old(...)`, a static, generic or variadic method) is the warning W0026, never silent.
+- **`--contracts runtime` guards a generic and a variadic method.**
+  - Their `requires` and `ensures` are checked like any other method's.
+  - The class's `invariant` is not yet checked when a constructor finishes; the warning W0026 names it.
+- **`--contracts runtime` guards `invariant` and `history`.**
+  - A class's `invariant` is checked on entry to and on exit from each public instance method; its `history` on exit, against `old(field)` saved at entry.
+  - A step the compiler cannot see through (one that calls something) is caught here when it breaks a `history`.
+- **`--contracts runtime` saves `old(e)` at entry.**
+  - `ensures n == old(n) + 1` is checked against the value of `n` when the method was entered, not the value after the body ran.
+- **W0025: an override can break the contract it inherits.**
+  - The effective contract is `pre_super or pre_sub` and `(old(pre_super) => post_super) and (old(pre_sub) => post_sub)`; the override body is checked against it.
+  - A counterexample is a warning, not an error: it may rest on an integer wrap-around the program never reaches.
+- **A closed predicate may take parameters; the build samples it.**
+  - `def commutes(a: Int, b: Int): Boolean ensures result = a + b == b + a` is run on sampled values; a failing sample is E0113 with the arguments and `--law-seed`/`--law-samples` to reproduce it.
+  - A parameter type that cannot be sampled is E0113, not a silent pass. This is the replacement for `law`.
+- **A history is proved through a call to a pure method that states its contract.**
+  - `n = n + step(k)` is proved (or gets a counterexample) from `step`'s `requires` and `ensures`; `--verbose` lists the proof.
+  - A callee with no contract, or whose `requires` can fail at the call, is not used: the history is left unproved, never guessed.
+- **`--contracts runtime` guards each `requires` clause.**
+  - A false `requires` throws `onion.ContractViolation` (an `AssertionError`) before the method body runs; the message names the clause and the method.
+  - `--contracts check` (the default) is unchanged and adds no guard. Guards for `ensures`, `invariant` and `history` are not built yet. `verify` is still refused.
+- **A `Shape` that does not round-trip a value it says it can print is E0114.**
+  - The contract is `parse(print(v)) == Ok(v)` for each value `canPrint()` and `printable(v)` admit; the build samples the value type.
+  - `Shape` gains `printable(v)` (default: every value). `run/FixedWidthDemo.on` states its domain with it.
+  - A value type that cannot be sampled is the warning W0022, never a silent pass.
+- **`--contracts runtime` guards a static method.**
+  - `requires` and `ensures` of a static method are checked like an instance method's; the class's `invariant` and `history` are not, since they speak about an object.
+  - A generic or variadic method is still unguarded, with the warning W0026.
+- **`@Trusted` on a method marks its contract as relied on, not verified.**
+  - Each use is listed with the warning W0027, so what nothing checked is visible.
+  - The body is not skipped by any check yet; that comes with the change that makes an unproved contract an error.
+- **A method's `ensures` is now proved against its body.**
+  - Proved: `--verbose` prints `[ensures] proved: C.m`.
+  - Counterexample: new warning `W0028`, with the values that break it.
+  - `@Trusted` methods are skipped.
+
+### Changed
+
+- **`--contracts runtime` keeps a guard only for what was not proved.**
+  - A `history` the solver proves has no run-time guard. The guards for `invariant`, `ensures` and `requires` stay, since nothing proves them yet.
+- **`--contracts runtime` no longer checks an `ensures` the compiler proved.**
+  - Before: every `ensures` became a run-time check.
+  - Now: only an `ensures` that was not proved keeps its check.
+
+### Fixed
+
+- **The contracts docs match the shipped behaviour.**
+  - Before: error-codes said `--contracts off` is the default, and the E0109/E0111 samples did not compile.
+  - Now: the default is named `check` and the samples compile as written.
+- **The history solver no longer "proves" two methods whose run breaks the history.**
+  - `def set(n: Int) { this.n = n }`: the parameter `n` was read as the field, so the write looked like a no-op.
+  - `if k > 0 { n = n - k; return }` followed by `n = n + k`: the path through the `return` was not seen.
+  - Before: `--verbose` printed `[history] proved`, and `--contracts runtime` dropped the guard.
+  - Now: neither is proved. The `return` method gets W0024, and `--contracts runtime` throws `ContractViolation`.
+  - Not yet: the setter gets no warning (W0024 comes with #2599), and the runtime guard still misses it (#2633).
+- **A write that breaks a `history` is caught inside a lambda (#2597).**
+  - Before: `() -> { t = t - 1 }` against `history t >= old(t)` compiled with no error and no warning.
+  - Now: E0109, as for `t = t - 1` in the method body. A lambda's write the checker cannot settle (`t = t + 1`, `t++`) gets W0024 at its line.
+- **A contract clause on an extension method, an enum, an interface method or an `abstract def` is checked (#2577).**
+  - Before: the clause was dropped. An extension method's or an enum's clause compiled even with contracts off, and with `--contracts check` an undefined name compiled in all four places.
+  - Now: with contracts off each clause is E0105, as everywhere else. With `--contracts check` it is typed like a class method's clause (E0002, E0106, E0107).
+- **A `history` on a `Long` or `Double` field is checked against writes, like one on an `Int` (#2574).**
+  - Before: `t = t - 1L` against `history t >= old(t)` compiled with no error.
+  - Now: E0109, as for `t = t - 1` on an `Int` field.
+- **`(5 as Comparable[String])` is a compile error (E0000).**
+  - Before: it compiled, then threw ClassCastException when used.
+  - Now: a primitive casts to an applied type only if its box has that type, e.g. `5 as Comparable[JInteger]`.
+- **A subclass method with the same name no longer takes over an inherited default (#2548).**
+  - Before (v0.150.0): `sh.scale(5)` printed `500`, the subclass's default, and an overload whose default had another type was `E0104` naming `f$default$2`.
+  - Now: `5`, and the overload compiles. Through a parent type, `a.f()` uses the parent's default again, as in v0.149.0.
+- **A default argument is named by its method in runtime errors, `--effects` and `E0077`.**
+  - Before: `called from a.on:5 (f$default$1)`, `--effects` listed `A#f$default$1()`, and E0077 said `(calling stamp$default$1)`.
+  - Now: `called from a.on:5 (f)`, E0077 says `(calling stamp)`, and `--effects` lists no default; its effects go to each caller that omits it.
+- **`xs[i] = u` into a `List[T]` is checked like `xs.set(i, u)` (#2332).**
+  - Before: an unrelated `U`, an `Object` or a `String` compiled into a `List[T]` or a `Map[K, T]` through `[]`, then threw ClassCastException where the `T` was read.
+  - Now: E0000, the same error `xs.set(i, u)` and `m.put(k, u)` already gave. A map key is checked too.
+- **A self-recursive method with `ensures` keeps tail-call optimization under `--contracts runtime`.**
+  - Before: the guard made each self-call a non-tail call; deep recursion overflowed the stack.
+  - Now: only the entry is guarded. The `requires` of an inner self-call is not checked at run time.
+
+### Documentation
+
+- **The Japanese Java-interop guide says `extends` inherits a Java class (#2532).**
+  - Before: the text said `:`, retired syntax, above an example that uses `extends`.
+  - Now: text and example agree, as in the English guide.
+
 ## [0.150.0] - 2026-11-01
 
 ### Breaking

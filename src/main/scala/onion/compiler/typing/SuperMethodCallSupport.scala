@@ -45,20 +45,23 @@ private[compiler] final class SuperMethodCallSupport(
    * synthetic method `access$super$f$..` whose body is the `super.f(..)`, and the closure calls it
    * on the enclosing instance. An omitted default stays in the accessor's body, so it is still
    * computed by the superclass's default method; the accessor takes only the arguments written.
-   * It is public: a trait's accessor is an interface method, which the JVM requires to be public.
+   * The accessor is private and synthetic, so no outside caller can use it to skip an override;
+   * the closure reaches it as a nestmate (JEP 181), on a trait's interface too. Its name carries
+   * the holding class, so two traits mixed into one class never collide on it.
    */
   private def superCallThroughAccessor(contextClass: ClassDefinition, method: Method, params: Array[Term]): Term = {
     val explicit = params.indices.filterNot(i => params(i).isInstanceOf[DefaultArgument])
     val mask = params.indices.map(i => if (explicit.contains(i)) '1' else '0').mkString
     val owner = method.affiliation.name.replace('.', '_')
     val signature = method.arguments.map(_.name).mkString(",").hashCode.toHexString
-    val name = "access$super$" + method.name + "$" + owner + "$" + signature + "$" + mask
+    val holder = contextClass.name.replace('.', '_')
+    val name = "access$super$" + method.name + "$" + owner + "$" + signature + "$" + mask + "$" + holder
     val argTypes: Array[Type] = explicit.map(i => method.arguments(i)).toArray
     val existing = contextClass.methods(name)
     val accessor: MethodDefinition =
       if (existing.nonEmpty) existing(0).asInstanceOf[MethodDefinition]
       else {
-        val acc = new MethodDefinition(null, Modifier.PUBLIC, contextClass, name, argTypes, method.returnType, null, method.typeParameters)
+        val acc = new MethodDefinition(null, Modifier.PRIVATE | Modifier.SYNTHETIC, contextClass, name, argTypes, method.returnType, null, method.typeParameters)
         val ctx = new LocalContext
         ctx.setMethod(acc)
         val slots = explicit.zipWithIndex.map { case (i, k) => ctx.add("p" + k, method.arguments(i), false) }

@@ -85,5 +85,57 @@ class SuperCallInClosureSpec extends AbstractShellSpec {
           |""")
       assert(Shell.Success("true") == result)
     }
+
+    it("gives two traits that call the same super method in a lambda their own accessor") {
+      val result = run(
+        """
+          |trait T1 {
+          |  def g1(): String {
+          |    val h: () -> String = () -> super.toString()
+          |    return "T1:" + h().startsWith("C@")
+          |  }
+          |}
+          |trait T2 {
+          |  def g2(): String {
+          |    val h: () -> String = () -> super.toString()
+          |    return "T2:" + h().startsWith("C@")
+          |  }
+          |}
+          |class C conforms T1, T2 {
+          |public:
+          |  def this {}
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String = new C().g1() + " " + new C().g2()
+          |}
+          |""")
+      assert(Shell.Success("T1:true T2:true") == result)
+    }
+
+    it("gives a subclass that repeats the super call in a lambda its own accessor") {
+      val result = run(program(
+        "  def g(): Int {\n    val h: () -> Int = () -> super.f(3)\n    return h()\n  }\n}\n" +
+          "class D extends B {\npublic:\n  def this {}\n  override def f(n: Int): Int = n * 100\n" +
+          "  def k(): Int {\n    val h: () -> Int = () -> super.f(3)\n    return h()\n  }",
+        "\"\" + new D().g() + \" \" + new D().k()"))
+      assert(Shell.Success("3 30") == result)
+    }
+
+    it("keeps the accessor private and synthetic, so outside code cannot skip an override") {
+      val result = run(program(
+        "  def g(): Int {\n    val h: () -> Int = () -> super.f(3)\n    return h()\n  }",
+        "\"\" + new B().g() + \" \" + Colls::toList(new B().getClass().getDeclaredMethods())" +
+          ".filter { m -> m.getName().startsWith(\"access$\") }" +
+          ".map { m -> java.lang.reflect.Modifier::isPrivate(m.getModifiers()) && m.isSynthetic() }"))
+      assert(Shell.Success("3 [true]") == result)
+    }
+
+    it("binds named arguments by name in a lambda") {
+      val result = run(program(
+        "  def g(): Int {\n    val h: () -> Int = () -> super.d(b = 2, a = 1)\n    return h()\n  }",
+        "\"\" + new B().g()"))
+      assert(Shell.Success("3") == result)
+    }
   }
 }

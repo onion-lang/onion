@@ -2,7 +2,7 @@
 
 - **A write that breaks a `history` is caught inside a lambda (#2597).**
   - Before: `() -> { t = t - 1 }` against `history t >= old(t)` compiled with no error and no warning.
-  - Now: E0109, as for `t = t - 1` in the method body. A lambda's write the checker cannot settle (`t = t + 1`, `t++`) gets W0024 at its line, so a `--warn error` build stops there.
+  - Now: E0109, as for `t = t - 1` in the method body. A lambda's write the checker cannot settle (`t = t + 1`, `t++`) gets W0024 at its line.
 
 ### Breaking
 

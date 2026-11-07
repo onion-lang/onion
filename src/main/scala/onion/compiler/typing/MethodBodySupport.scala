@@ -692,7 +692,10 @@ private[compiler] final class MethodBodySupport(
     val isStatic = (owner.modifier & AST.M_STATIC) != 0
     val access = owner.modifier & (AST.M_PUBLIC | AST.M_PROTECTED | AST.M_PRIVATE)
     val prefixTypes = types.take(i)
-    val name = defaultMethodName(definition, s"${owner.name}$$default$$${i + 1}", prefixTypes)
+    // The declaring class is part of the name, so no subclass method ever overrides a default
+    // (#2548): a call uses the default of the method it resolves to at compile time.
+    val classTag = definition.name.replace('.', '$')
+    val name = defaultMethodName(definition, s"${owner.name}$$default$$${i + 1}$$$classTag", prefixTypes)
     val method = new MethodDefinition(
       expr.location, access | (if isStatic then AST.M_STATIC else 0), definition, name,
       prefixTypes, types(i), null, owner.typeParameters)

@@ -38,8 +38,22 @@ object TypeFormatting {
    * A method as a diagnostic names it: `Owner::name`, or just `name` for a top-level
    * function, whose owner is a synthetic class the user never wrote.
    */
-  def methodReference(owner: TypedAST.ClassType, name: String): String =
-    if (owner == null || isTopLevelContainer(owner)) name else s"${owner.name}::$name"
+  def methodReference(owner: TypedAST.ClassType, name: String): String = {
+    val written = sourceMethodName(name)
+    if (owner == null || isTopLevelContainer(owner)) written else s"${owner.name}::$written"
+  }
+
+  private val DefaultArgumentMethod = """(.+)\$default\$\d+(?:\$.*)?""".r
+
+  /**
+   * The name the user wrote for a method. A default argument is computed by a synthesized
+   * method (`f$default$1$A`); a diagnostic, `--effects` or a runtime frame names it after
+   * the method it belongs to (`f`), never under a name the user did not write (#2548).
+   */
+  def sourceMethodName(name: String): String = name match {
+    case DefaultArgumentMethod(method) => method
+    case _ => name
+  }
 
   /** Like [[sourceForm]], but an array of a boxed wrapper keeps the name a program writes for
     * it (`JInteger[]`): `Int[]` would be a different, primitive array type. */

@@ -1197,7 +1197,11 @@ public:
 
 Only what the syntax settles is reported. Fix: remove the write, or weaken the history.
 
-### `E0110` — an `invariant` or `history` on a mutable object
+A write counts wherever the method makes it, also inside a lambda it creates. A write in a
+lambda that the syntax does not settle gets the warning W0024 at its line. A write through
+another object (`o.n = 0`) is E0110, below.
+
+### `E0110` — an `invariant` or `history` on a mutable object, or its field written through another object
 
 A clause may name only fields of a primitive, `String`, enum or record type. A `List` or another
 class can change without this class running, so the clause could not be checked one call at a time.
@@ -1210,6 +1214,25 @@ class A {
 ```
 
 Fix: name a value-typed field, or a pure method that reads the object.
+
+A field a clause names is written only through `this` (bare `n`, `this.n` or `self.n`). A write
+through any other reference is E0110, whatever its declared type, because no check of one call
+at a time can follow it:
+
+```onion
+class Counter {
+protected:
+  var n: Int
+  history n >= old(n)
+public:
+  def this { n = 0 }
+  def copyFrom(o: Counter): void { o.n = n }                      // E0110
+  static def at(k: Int): Counter { val c = new Counter(); c.n = k; return c }   // E0110
+}
+```
+
+Fix: call a method of that object, whose own writes are checked, or set the value in a
+constructor (`def this(k: Int) { n = k }`).
 
 ### `E0111` — an `invariant` or `history` on a class with a Java superclass
 
@@ -1915,7 +1938,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
 | `W0021` | a method can break a `history`: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 | `W0022` | the contract of a Shape was not checked: its value type cannot be sampled |
-| `W0024` | a method writes a field that a `history` names, and no check settled whether the history still holds: the field is not an `Int`, the solver does not model the method body, or the history is not of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`. Nothing guarantees the history there |
+| `W0024` | a method writes a field that a `history` names, and no check settled whether the history still holds: the field is not an `Int`, the solver does not model the method body, the write is in a lambda, or the history is not of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`. Nothing guarantees the history there |
 | `W0025` | an override can break the contract it inherits: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 | `W0026` | a contract clause is not enforced at run time by `--contracts runtime`, with the reason (a warning, so a clause that is not guarded is never silent) |
 | `W0027` | the contract of a method is trusted, not verified (`@Trusted`): its body is not checked and callers rely on it; each use is listed |
@@ -2032,7 +2055,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 | `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
 | `E0109` | this write can break the history … on … |
-| `E0110` | an `invariant` or `history` names a field that holds a mutable object |
+| `E0110` | an `invariant` or `history` names a field that holds a mutable object, or such a field is written through another object |
 | `E0111` | a class with an `invariant` or `history` extends a Java class |
 | `E0112` | this method breaks the history … when run from … |
 | `E0113` | the closed predicate … is … when the build runs it |

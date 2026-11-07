@@ -1186,7 +1186,11 @@ public:
 
 構文だけで決まるものだけを報告します。直し方: その書き込みをなくすか、history を弱めます。
 
-### `E0110` — 可変オブジェクトに対する `invariant` / `history`
+書き込みは、メソッドのどこで起きても数えます。メソッドが作るラムダの中も対象です。
+ラムダの中の書き込みで、構文から決まらないものには、その行に警告 W0024 を出します。
+別のオブジェクトを通した書き込み (`o.n = 0`) は、下の E0110 です。
+
+### `E0110` — 可変オブジェクトに対する `invariant` / `history`、または別のオブジェクトを通したそのフィールドへの書き込み
 
 契約が名指しできるのは、基本型・`String`・enum・record のフィールドだけです。`List` や別のクラスは、
 このクラスのコードが動かなくても変わりうるので、一回の呼び出しごとの検査ができません。
@@ -1199,6 +1203,25 @@ class A {
 ```
 
 直し方: 値型のフィールドを使うか、そのオブジェクトを読む純粋なメソッドを使います。
+
+契約が名指すフィールドには、`this` を通してだけ書き込めます (`n`、`this.n`、`self.n`)。
+ほかの参照を通した書き込みは、宣言された型にかかわらず E0110 です。
+一回の呼び出しごとの検査では、その書き込みを追えないからです。
+
+```onion
+class Counter {
+protected:
+  var n: Int
+  history n >= old(n)
+public:
+  def this { n = 0 }
+  def copyFrom(o: Counter): void { o.n = n }                      // E0110
+  static def at(k: Int): Counter { val c = new Counter(); c.n = k; return c }   // E0110
+}
+```
+
+直し方: そのオブジェクトのメソッドを呼びます (そのメソッドの書き込みは検査されます)。
+または、コンストラクタで値を設定します (`def this(k: Int) { n = k }`)。
 
 ### `E0111` — Java の親クラスを持つクラスの `invariant` / `history`
 
@@ -1899,7 +1922,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `W0020` | `extension` メソッドの名前とアリティが既存のメンバー（自身または継承）と完全に一致している。既存のメンバーが常に優先されるため、その extension メソッドは呼び出されない |
 | `W0021` | メソッドが `history` を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
 | `W0022` | the contract of a Shape was not checked: its value type cannot be sampled |
-| `W0024` | `history` が名指すフィールドにメソッドが書き込むが、`history` が保たれるかをどの検査も決めていない。フィールドが `Int` でない、ソルバーがメソッド本体を扱えない、または `history` が `x >= old(x)`・`x <= old(x)`・`x == old(x)` の形でない場合です。そこでは `history` は保証されません |
+| `W0024` | `history` が名指すフィールドにメソッドが書き込むが、`history` が保たれるかをどの検査も決めていない。フィールドが `Int` でない、ソルバーがメソッド本体を扱えない、書き込みがラムダの中にある、または `history` が `x >= old(x)`・`x <= old(x)`・`x == old(x)` の形でない場合です。そこでは `history` は保証されません |
 | `W0025` | オーバーライドが継承した契約を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
 | `W0026` | `--contracts runtime` が実行時に守らない契約の節がある。理由を示す（守られない節が黙って残ることはない） |
 | `W0027` | メソッドの契約は `@Trusted` により、検証されず信じられている。本体は検査されず、呼び出し側はそれを前提にする。使うたびに一覧される |
@@ -2016,7 +2039,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 | `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
 | `E0109` | this write can break the history … on … |
-| `E0110` | an `invariant` or `history` names a field that holds a mutable object |
+| `E0110` | an `invariant` or `history` names a field that holds a mutable object, or such a field is written through another object |
 | `E0111` | a class with an `invariant` or `history` extends a Java class |
 | `E0112` | this method breaks the history … when run from … |
 | `E0113` | the closed predicate … is … when the build runs it |

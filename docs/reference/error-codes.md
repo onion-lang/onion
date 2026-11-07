@@ -1247,8 +1247,16 @@ Fix: correct the expression, or the code it checks.
 The build runs a predicate only when its effects are at most `mutate`. One that prints, reads or
 writes files, or calls something the effect table cannot vouch for (`unknown`) is not run: it
 gets the warning `W0023` instead. So does one that does not finish within 10 seconds.
-The effects count everything a run can reach: an override or interface implementation the
-program defines, and the static initializer of a class the predicate uses.
+The effects count everything a run can reach:
+
+- every overload with the predicate's name and parameter count
+- an override or interface implementation the program defines
+- a method the library calls back on a program value: `toString` from `+` and `#{}`,
+  `hashCode` from a map literal, `equals` from `==`, `getMessage` of a thrown exception
+- the static initializer of each class the predicate uses, and of its superclasses
+
+When the effect is not in the predicate's own body, `W0023` names where it is: the call, or
+the class whose static initializer has it.
 
 ### `E0114` — a `Shape` that does not round-trip
 

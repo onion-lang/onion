@@ -178,6 +178,144 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
     }
   }
 
+  // The rule on #2601: the build runs a predicate only when everything a call to it can run
+  // (every overload it may be, what library code calls back, every static initializer) stays
+  // within `mutate`.
+  describe("a closed predicate whose effect the library calls back, or a superclass initializer runs") {
+    it("is not run when string concatenation calls a toString with an effect, and W0023 names it") {
+      val o = compile(
+        """class T {
+          |public:
+          |  def this {}
+          |  def toString(): String { IO::println("TOSTRING RAN"); return "t" }
+          |}
+          |class C {
+          |public:
+          |  static def p(): Boolean ensures result { return ("" + new T()) == "t" }
+          |}""".stripMargin)
+      assert(!o.stdout.contains("TOSTRING RAN"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("T::toString")), o.toString)
+    }
+
+    it("is not run when interpolation, a map literal key, `==` or a thrown exception reach an effect") {
+      val bodies = Seq(
+        "toString(): String" -> """return "#{new Q()}" == "q"""",
+        "hashCode(): Int" -> """val m = [new Q(): 1]; return m.size == 1""",
+        "equals(o: Object): Boolean" -> """val a: Object = new Q(); return a == new Q()""",
+        "toString(): String" -> """val xs = [new Q()]; return xs.toString() == "[q]"""")
+      for ((sig, body) <- bodies) {
+        val ret = if (sig.endsWith("String")) "\"q\"" else if (sig.endsWith("Int")) "1" else "true"
+        val o = compile(
+          s"""class Q {
+             |public:
+             |  def this {}
+             |  def $sig { IO::println("CALLBACK RAN"); return $ret }
+             |}
+             |class C {
+             |public:
+             |  static def p(): Boolean ensures result { $body }
+             |}""".stripMargin)
+        assert(!o.stdout.contains("CALLBACK RAN"), s"$body: $o")
+        assert(o.w23.exists(_.contains("`p`")), s"$body: $o")
+      }
+      val thrown = compile(
+        """class Ex extends RuntimeException("x") {
+          |public:
+          |  def getMessage(): String { IO::println("MSG RAN"); return "m" }
+          |}
+          |class C {
+          |public:
+          |  static def p(): Boolean ensures result { throw new Ex() }
+          |}""".stripMargin)
+      assert(!thrown.stdout.contains("MSG RAN"), thrown.toString)
+      assert(thrown.w23.exists(_.contains("Ex::getMessage")), thrown.toString)
+    }
+
+    it("still runs when the toString it reaches only touches memory: a false one is E0113") {
+      val o = compile(
+        """class P {
+          |public:
+          |  def this {}
+          |  def toString(): String { return "p" }
+          |}
+          |class C {
+          |public:
+          |  static def p(): Boolean ensures result { return ("" + new P()) == "q" }
+          |}""".stripMargin)
+      assert(o.errors.contains("E0113"), o.toString)
+      assert(o.w23.isEmpty, o.toString)
+    }
+
+    it("still runs string concatenation when only an unrelated class's callback has an effect") {
+      val o = compile(
+        """class R conforms AutoCloseable {
+          |public:
+          |  def this {}
+          |  def close(): void { IO::println("CLOSE RAN") }
+          |}
+          |class C {
+          |public:
+          |  static def p(): Boolean ensures result { val s: String = "a"; return (s + "b") == "abc" }
+          |}""".stripMargin)
+      assert(o.errors.contains("E0113"), o.toString)
+      assert(o.w23.isEmpty, o.toString)
+    }
+
+    it("is not run when a superclass's static initializer has an effect, and W0023 names that class") {
+      val o = compile(
+        """class A {
+          |  static val X: Int = A::noisy()
+          |public:
+          |  static def noisy(): Int { IO::println("SUPER INIT RAN"); return 1 }
+          |  def this {}
+          |}
+          |class B extends A {
+          |public:
+          |  def this {}
+          |  static def p(): Boolean ensures result { return true }
+          |}""".stripMargin)
+      assert(!o.stdout.contains("SUPER INIT RAN"), o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("`A`")), o.toString)
+    }
+
+    it("names the static initializer when the predicate's own body is pure") {
+      val o = compile(
+        """class Cfg {
+          |  static val N: Int = Cfg::loud()
+          |public:
+          |  static def loud(): Int { IO::println("CFG INIT"); return 2 }
+          |  static def ok(): Boolean ensures result = 1 + 1 == 2
+          |}""".stripMargin)
+      assert(!o.stdout.contains("CFG INIT"), o.toString)
+      assert(o.w23.exists(w => w.contains("`ok`") && w.contains("`Cfg`")), o.toString)
+    }
+
+    it("still runs when a static initializer only fills its own class's fields: a false one is E0113") {
+      val o = compile(
+        """class K {
+          |  static val N: Int = 3
+          |  static val L: List[Int] = [1, 2]
+          |public:
+          |  static def p(): Boolean ensures result { return K::N == 4 }
+          |}""".stripMargin)
+      assert(o.errors.contains("E0113"), o.toString)
+      assert(o.w23.isEmpty, o.toString)
+    }
+
+    it("is not run when an overload with the same name and arity has an effect, in either order") {
+      val first =
+        """  static def p(x: Int): Int { return x }
+          |  static def p(s: String): Boolean ensures result { IO::println("OVERLOAD RAN"); return true }""".stripMargin
+      val second = first.split("\n").reverse.mkString("\n")
+      for (members <- Seq(first, second)) {
+        val o = compile(s"class C {\npublic:\n$members\n}")
+        assert(!o.stdout.contains("OVERLOAD RAN"), o.toString)
+        assert(o.w23.exists(_.contains("`p`")), o.toString)
+      }
+    }
+  }
+
   describe("the E0112 replay of a history counterexample") {
     it("does not run a constructor with an outside effect") {
       val o = compile(

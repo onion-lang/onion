@@ -33,6 +33,19 @@ object EffectInference {
    */
   final case class ClassInit(cls: ClassDefinition)
 
+  /**
+   * A program method that library code calls back on a value it was handed (`toString` from
+   * string concatenation, `hashCode` from a map literal, ...). It carries the method's
+   * effects except `mutate`: what such a method changes is its own business, and only the
+   * outside world is what a caller must hear about (#2601).
+   */
+  final case class Callback(method: MethodDefinition)
+
+  private def effectsOf(result: collection.Map[Unit0, Set[Effect]], d: Unit0): Set[Effect] = d match {
+    case Callback(md) => result.getOrElse(md, Set.empty) - Effect.Mutate
+    case other        => result.getOrElse(other, Set.empty)
+  }
+
   final case class MethodEffects(
     className: String,
     methodName: String,
@@ -98,15 +111,54 @@ object EffectInference {
     while (changed) {
       changed = false
       for ((u, deps) <- edges) {
-        val merged = deps.foldLeft(result(u))((acc, d) => acc ++ result.getOrElse(d, Set.empty))
+        val merged = deps.foldLeft(result(u))((acc, d) => acc ++ effectsOf(result, d))
         if (merged.size != result(u).size) {
           result(u) = merged
           changed = true
         }
       }
     }
+    for (deps <- edges.values; d <- deps) d match {
+      case cb: Callback => result(cb) = effectsOf(result, cb)
+      case _ =>
+    }
     (units, result.toMap)
   }
+
+  private val callbackCache =
+    new java.util.WeakHashMap[Seq[ClassDefinition], Map[String, Seq[MethodDefinition]]]()
+
+  /**
+   * Per program class, its instance methods that override a method of a library type
+   * (`toString`, `hashCode`, `equals`, `compareTo`, `iterator`, `run`, ...): the methods
+   * library code can call back on a program value it was handed (#2601).
+   */
+  private[effects] def libraryCallbacks(classes: Seq[ClassDefinition]): Map[String, Seq[MethodDefinition]] =
+    callbackCache.synchronized {
+      val cached = callbackCache.get(classes)
+      if (cached != null) cached
+      else {
+        val program = classes.map(_.name).toSet
+        def libraryHas(c: TypedAST.ClassType, name: String, arity: Int, seen: mutable.Set[String]): Boolean =
+          c != null && seen.add(c.name) && (
+            if (program.contains(c.name)) libraryHas(c.superClass, name, arity, seen) || c.interfaces.exists(libraryHas(_, name, arity, seen))
+            else c.methods(name).exists(_.arguments.length == arity) ||
+              libraryHas(c.superClass, name, arity, seen) || c.interfaces.exists(libraryHas(_, name, arity, seen)))
+        // `toString`, `hashCode` and `equals` come from `Object` even when no supertype is recorded.
+        def fromObject(name: String, arity: Int): Boolean =
+          (name == "toString" && arity == 0) || (name == "hashCode" && arity == 0) || (name == "equals" && arity == 1)
+        val result = classes.map { cd =>
+          cd.name -> cd.methods.collect {
+            case md: MethodDefinition if md.getBlock != null && !Modifier.isStatic(md.modifier) && !Modifier.isPrivate(md.modifier) &&
+              (fromObject(md.name, md.arguments.length) ||
+                libraryHas(cd.superClass, md.name, md.arguments.length, mutable.Set()) ||
+                cd.interfaces.exists(libraryHas(_, md.name, md.arguments.length, mutable.Set()))) => md
+          }.toSeq
+        }.filter(_._2.nonEmpty).toMap
+        callbackCache.put(classes, result)
+        result
+      }
+    }
 
   /** The class a unit's body belongs to; a reference to that class needs no initializer run. */
   private def ownerOf(unit: Unit0): ClassDefinition = unit match {
@@ -247,7 +299,7 @@ object EffectInference {
           r.tableOperands)
     }.toSeq
     BodyFacts(sites, collector.localWrites.toSeq, collector.unsitedEffects.toSet,
-      collector.internalCallees.toSeq)
+      collector.internalCallees.toSeq.map { case Callback(md) => md; case other => other }.distinct)
   }
 
   /**
@@ -285,13 +337,74 @@ object EffectInference {
      * come after the class is initialized, and need nothing.
      */
     private def initializes(cls: TypedAST.ObjectType, location: onion.compiler.Location): scala.Unit =
-      if (cls != null) userClasses.get(cls.name).foreach { cd =>
-        if (cd.staticInitializers.nonEmpty && (owner == null || cd.name != owner.name)) {
-          val init = ClassInit(cd)
-          if (internalCallees.add(init))
-            rawSites += RawSite(location, s"${cd.name} (static initializer)", None, init)
-        }
+      if (cls != null) for (cd <- programChain(cls.name) if cd.staticInitializers.nonEmpty && !ownerInitialized(cd.name)) {
+        val init = ClassInit(cd)
+        if (internalCallees.add(init))
+          rawSites += RawSite(location, s"${cd.name} (static initializer)", None, init)
       }
+
+    /** `name`'s program class and each program superclass: the JVM initializes a superclass first. */
+    private def programChain(name: String): Seq[ClassDefinition] = {
+      val out = mutable.Buffer[ClassDefinition]()
+      var next = userClasses.get(name)
+      while (next.isDefined && !out.exists(_ eq next.get)) {
+        out += next.get
+        next = Option(next.get.superClass).flatMap(sc => userClasses.get(sc.name))
+      }
+      out.toSeq
+    }
+
+    /** The owner and its superclasses are initialized before the owner's own code runs. */
+    private lazy val ownerChainNames: Set[String] =
+      if (owner == null) Set.empty else programChain(owner.name).map(_.name).toSet
+    private def ownerInitialized(name: String): Boolean = ownerChainNames.contains(name)
+
+    private lazy val libraryCallbacks: Map[String, Seq[MethodDefinition]] =
+      EffectInference.libraryCallbacks(classes).map { case (k, ms) => k -> ms.filter(units.contains) }
+
+    /** The program classes `v` can be an instance of; a cast (string concatenation casts to `Object`) narrows nothing. */
+    private def valueClasses(v: Term): Seq[ClassDefinition] = v match {
+      case a: AsInstanceOf if a.target != null =>
+        val outer = compatible(a.`type`).toSet
+        valueClasses(a.target).filter(outer.contains)
+      case _ => compatible(v.`type`)
+    }
+
+    /** What an operator or a map literal can call on an object operand: `+` `toString`, `==` `equals`, `<` `compareTo`, a key `hashCode`. */
+    private val operatorCallbacks = Set("toString", "equals", "compareTo", "hashCode")
+
+    private val compatibleCache = mutable.Map[String, Seq[ClassDefinition]]()
+
+    /** The program classes a value of type `tp` can be an instance of, including through type arguments. */
+    private def compatible(tp: TypedAST.Type, seen: Set[TypedAST.Type] = Set.empty): Seq[ClassDefinition] =
+      if (tp == null || seen.contains(tp)) Nil
+      else tp match {
+        case n: TypedAST.NullableType   => compatible(n.unwrap, seen + tp)
+        case a: TypedAST.ArrayType      => compatible(a.component, seen + tp)
+        case ap: TypedAST.AppliedClassType =>
+          (compatible(ap.raw, seen + tp) ++ ap.typeArguments.toSeq.flatMap(compatible(_, seen + tp))).distinct
+        case tv: TypedAST.TypeVariableType =>
+          if (tv.upperBound == null) classes else compatible(tv.upperBound, seen + tp)
+        case c: TypedAST.ClassType =>
+          compatibleCache.getOrElseUpdate(c.name, classes.filter(cd => inherits(cd, c.name) || c.name == "java.lang.Object"))
+        case _ => Nil
+      }
+
+    /**
+     * Program values handed to library code can be called back: string concatenation calls
+     * `toString`, a map literal `hashCode`, `==` `equals`, and any library method may call
+     * what the value's class overrides. So the hand-off carries those overrides' effects
+     * (#2601, rule 3 on the issue).
+     */
+    private def toLibrary(values: Iterable[Term], location: onion.compiler.Location,
+                          only: Set[String] = null): scala.Unit =
+      if (libraryCallbacks.nonEmpty) for {
+        v <- values if v != null
+        cd <- valueClasses(v)
+        md <- libraryCallbacks.getOrElse(cd.name, Nil) if only == null || only.contains(md.name)
+      } if (internalCallees.add(Callback(md)))
+          rawSites += RawSite(location,
+            onion.compiler.toolbox.TypeFormatting.methodReference(md.affiliation, md.name), None, Callback(md))
 
     /** Whether `cls` is `ancestor` or extends or conforms to it, by erased name. */
     private def inherits(cls: TypedAST.ClassType, ancestor: String): Boolean = {
@@ -336,6 +449,7 @@ object EffectInference {
           effects ++= eff
           rawSites += RawSite(location, callee, Some(eff), null,
             m.affiliation.name, m, target, args.toSeq, depth, table.operands(m.affiliation.name, m.name))
+          toLibrary(Option(target).toSeq ++ args.toSeq, location)
       }
       // A call on a receiver dispatches: any override the program defines may run instead.
       if (target != null) for (om <- overridesOf(m)) {
@@ -358,6 +472,7 @@ object EffectInference {
           effects ++= eff
           rawSites += RawSite(location, callee, Some(eff), null,
             c.affiliation.name, null, null, args.toSeq, depth, table.operands(c.affiliation.name, "<init>"))
+          toLibrary(args.toSeq, location)
       }
     }
 
@@ -403,7 +518,7 @@ object EffectInference {
       case i: IfStatement               => term(i.condition); statement(i.thenStatement); statement(i.elseStatement)
       case l: ConditionalLoop           => term(l.condition); statement(l.stmt); statement(l.update)
       case r: Return                    => if (r.term != null) term(r.term)
-      case t: Throw                     => term(t.term)
+      case t: Throw                     => term(t.term); toLibrary(Seq(t.term), here(t.location))
       case s2: Synchronized             => term(s2.term); statement(s2.statement)
       case t: Try =>
         t.resources.foreach { case (_, r) => term(r) }
@@ -435,7 +550,10 @@ object EffectInference {
         depth += 1
         try statement(n.block) finally depth -= 1
       case b: Begin         => b.terms.foreach(term)
-      case b: BinaryTerm    => term(b.lhs); term(b.rhs)
+      case b: BinaryTerm    =>
+        term(b.lhs); term(b.rhs)
+        // `+` on a string, `==` and `<` on objects compile to library calls on the operands.
+        toLibrary(Seq(b.lhs, b.rhs).filter(o => o.`type` != null && !o.`type`.isBasicType), entry, operatorCallbacks)
       case u: UnaryTerm     => term(u.operand)
       case a: ArrayLength   => term(a.target)
       case r: RefArray      => term(r.target); term(r.index)
@@ -464,7 +582,7 @@ object EffectInference {
         if (s.frame == depth) localWrites += ((s.index, s.value, depth))
         term(s.value)
       case l: ListLiteral   => l.elements.foreach(term)
-      case m: MapLiteral    => m.keys.foreach(term); m.values.foreach(term)
+      case m: MapLiteral    => m.keys.foreach(term); m.values.foreach(term); toLibrary(m.keys.toSeq, entry, operatorCallbacks)
       case n: NewArray      => n.parameters.foreach(term)
       case n: NewArrayWithValues => n.values.foreach(term)
       case r: RefStaticField => initializes(r.target, here(r.location))

@@ -1,6 +1,6 @@
 package onion.compiler.effects
 
-import onion.compiler.TypedAST
+import onion.compiler.{Modifier, TypedAST}
 import onion.compiler.TypedAST._
 
 import scala.collection.mutable
@@ -24,7 +24,27 @@ import scala.collection.mutable
 object EffectInference {
 
   /** Inference units are the bodies the compiled sources actually contain. */
-  type Unit0 = AnyRef // MethodDefinition | ConstructorDefinition
+  type Unit0 = AnyRef // MethodDefinition | ConstructorDefinition | ClassInit
+
+  /**
+   * A class's static initializer, as an inference unit of its own. It runs the first time
+   * the class is used from outside, so a call, a field read or a `new` that reaches the class
+   * from another class carries its effects (#2601). It is not a row of `--effects`.
+   */
+  final case class ClassInit(cls: ClassDefinition)
+
+  /**
+   * A program method that library code calls back on a value it was handed (`toString` from
+   * string concatenation, `hashCode` from a map literal, ...). It carries the method's
+   * effects except `mutate`: what such a method changes is its own business, and only the
+   * outside world is what a caller must hear about (#2601).
+   */
+  final case class Callback(method: MethodDefinition)
+
+  private def effectsOf(result: collection.Map[Unit0, Set[Effect]], d: Unit0): Set[Effect] = d match {
+    case Callback(md) => result.getOrElse(md, Set.empty) - Effect.Mutate
+    case other        => result.getOrElse(other, Set.empty)
+  }
 
   final case class MethodEffects(
     className: String,
@@ -74,16 +94,15 @@ object EffectInference {
     val base = mutable.LinkedHashMap[Unit0, Set[Effect]]()
     val edges = mutable.LinkedHashMap[Unit0, Set[Unit0]]()
     for ((u, _) <- units) {
-      val collector = new Collector(units.keySet, classes, table, inConstructor = u.isInstanceOf[ConstructorDefinition])
-      u match {
-        case md: MethodDefinition =>
-          if (md.getBlock != null) collector.statement(md.getBlock)
-        case ctor: ConstructorDefinition =>
-          if (ctor.block != null) collector.statement(ctor.block)
-          collector.superInit(ctor)
-      }
+      val collector = walk(u, units.keySet, classes, table)
       base(u) = collector.effects.toSet
       edges(u) = collector.internalCallees.toSet
+    }
+    for (cd <- classes if cd.staticInitializers.nonEmpty) {
+      val init = ClassInit(cd)
+      val collector = walk(init, units.keySet, classes, table)
+      base(init) = collector.effects.toSet
+      edges(init) = collector.internalCallees.toSet
     }
 
     // Fixed point: propagate through user-to-user edges until stable.
@@ -92,14 +111,80 @@ object EffectInference {
     while (changed) {
       changed = false
       for ((u, deps) <- edges) {
-        val merged = deps.foldLeft(result(u))((acc, d) => acc ++ result.getOrElse(d, Set.empty))
+        val merged = deps.foldLeft(result(u))((acc, d) => acc ++ effectsOf(result, d))
         if (merged.size != result(u).size) {
           result(u) = merged
           changed = true
         }
       }
     }
+    for (deps <- edges.values; d <- deps) d match {
+      case cb: Callback => result(cb) = effectsOf(result, cb)
+      case _ =>
+    }
     (units, result.toMap)
+  }
+
+  private val callbackCache =
+    new java.util.WeakHashMap[Seq[ClassDefinition], Map[String, Seq[MethodDefinition]]]()
+
+  /**
+   * Per program class, its instance methods that override a method of a library type
+   * (`toString`, `hashCode`, `equals`, `compareTo`, `iterator`, `run`, ...): the methods
+   * library code can call back on a program value it was handed (#2601).
+   */
+  private[effects] def libraryCallbacks(classes: Seq[ClassDefinition]): Map[String, Seq[MethodDefinition]] =
+    callbackCache.synchronized {
+      val cached = callbackCache.get(classes)
+      if (cached != null) cached
+      else {
+        val program = classes.map(_.name).toSet
+        def libraryHas(c: TypedAST.ClassType, name: String, arity: Int, seen: mutable.Set[String]): Boolean =
+          c != null && seen.add(c.name) && (
+            if (program.contains(c.name)) libraryHas(c.superClass, name, arity, seen) || c.interfaces.exists(libraryHas(_, name, arity, seen))
+            else c.methods(name).exists(_.arguments.length == arity) ||
+              libraryHas(c.superClass, name, arity, seen) || c.interfaces.exists(libraryHas(_, name, arity, seen)))
+        // `toString`, `hashCode` and `equals` come from `Object` even when no supertype is recorded.
+        def fromObject(name: String, arity: Int): Boolean =
+          (name == "toString" && arity == 0) || (name == "hashCode" && arity == 0) || (name == "equals" && arity == 1)
+        val result = classes.map { cd =>
+          cd.name -> cd.methods.collect {
+            case md: MethodDefinition if md.getBlock != null && !Modifier.isStatic(md.modifier) && !Modifier.isPrivate(md.modifier) &&
+              (fromObject(md.name, md.arguments.length) ||
+                libraryHas(cd.superClass, md.name, md.arguments.length, mutable.Set()) ||
+                cd.interfaces.exists(libraryHas(_, md.name, md.arguments.length, mutable.Set()))) => md
+          }.toSeq
+        }.filter(_._2.nonEmpty).toMap
+        callbackCache.put(classes, result)
+        result
+      }
+    }
+
+  /** The class a unit's body belongs to; a reference to that class needs no initializer run. */
+  private def ownerOf(unit: Unit0): ClassDefinition = unit match {
+    case md: MethodDefinition    => md.affiliation match { case cd: ClassDefinition => cd; case _ => null }
+    case cd: ConstructorDefinition => cd.affiliation match { case c: ClassDefinition => c; case _ => null }
+    case ClassInit(cls)          => cls
+    case _                       => null
+  }
+
+  /** A collector that has walked `unit`'s body. */
+  private def walk(unit: Unit0, units: collection.Set[Unit0], classes: Seq[ClassDefinition],
+                   table: EffectTable.Table): Collector = {
+    val collector = new Collector(units, classes, table,
+      inConstructor = unit.isInstanceOf[ConstructorDefinition], owner = ownerOf(unit),
+      inClassInit = unit.isInstanceOf[ClassInit])
+    unit match {
+      case md: MethodDefinition =>
+        if (md.getBlock != null) collector.statement(md.getBlock)
+      case ctor: ConstructorDefinition =>
+        if (ctor.block != null) collector.statement(ctor.block)
+        collector.superInit(ctor)
+      case ClassInit(cls) =>
+        cls.staticInitializers.foreach(collector.statement)
+      case _ =>
+    }
+    collector
   }
 
   /**
@@ -110,8 +195,9 @@ object EffectInference {
    */
   def callSites(body: ActionStatement, classes: Seq[ClassDefinition],
                 unitEffects: Map[Unit0, Set[Effect]],
-                table: EffectTable.Table = EffectTable.builtin): Seq[CallSite] = {
-    val collector = new Collector(unitEffects.keySet, classes, table)
+                table: EffectTable.Table = EffectTable.builtin,
+                owner: ClassDefinition = null): Seq[CallSite] = {
+    val collector = new Collector(unitEffects.keySet, classes, table, owner = owner)
     collector.statement(body)
     collector.rawSites.toSeq.map { raw =>
       CallSite(raw.location, raw.callee,
@@ -127,8 +213,9 @@ object EffectInference {
    */
   def termEffects(term: Term, classes: Seq[ClassDefinition],
                   unitEffects: Map[Unit0, Set[Effect]],
-                  table: EffectTable.Table = EffectTable.builtin): (Set[Effect], Seq[CallSite]) = {
-    val collector = new Collector(unitEffects.keySet, classes, table)
+                  table: EffectTable.Table = EffectTable.builtin,
+                  owner: ClassDefinition = null): (Set[Effect], Seq[CallSite]) = {
+    val collector = new Collector(unitEffects.keySet, classes, table, owner = owner)
     collector.term(term)
     val sites = collector.rawSites.toSeq.map { raw =>
       CallSite(raw.location, raw.callee,
@@ -204,15 +291,7 @@ object EffectInference {
   /** [[BodyFacts]] for one inference unit; `units` is the set of program-defined bodies. */
   def bodyFacts(unit: Unit0, units: collection.Set[Unit0], classes: Seq[ClassDefinition],
                 table: EffectTable.Table = EffectTable.builtin): BodyFacts = {
-    val collector = new Collector(units, classes, table, inConstructor = unit.isInstanceOf[ConstructorDefinition])
-    unit match {
-      case md: MethodDefinition =>
-        if (md.getBlock != null) collector.statement(md.getBlock)
-      case ctor: ConstructorDefinition =>
-        if (ctor.block != null) collector.statement(ctor.block)
-        collector.superInit(ctor)
-      case _ =>
-    }
+    val collector = walk(unit, units, classes, table)
     val sites = collector.rawSites.iterator.collect {
       case r if r.resolved.isDefined =>
         val methodName = if (r.member == null) "<init>" else r.member.name
@@ -220,7 +299,7 @@ object EffectInference {
           r.tableOperands)
     }.toSeq
     BodyFacts(sites, collector.localWrites.toSeq, collector.unsitedEffects.toSet,
-      collector.internalCallees.toSeq)
+      collector.internalCallees.toSeq.map { case Callback(md) => md; case other => other }.distinct)
   }
 
   /**
@@ -230,7 +309,8 @@ object EffectInference {
    * because a missed node here means a silently dropped effect.
    */
   private final class Collector(units: collection.Set[Unit0], classes: Seq[ClassDefinition],
-                                table: EffectTable.Table, inConstructor: Boolean = false) {
+                                table: EffectTable.Table, inConstructor: Boolean = false,
+                                owner: ClassDefinition = null, inClassInit: Boolean = false) {
     val effects = mutable.Set[Effect]()
     val internalCallees = mutable.LinkedHashSet[Unit0]()
     val rawSites = mutable.Buffer[RawSite]()
@@ -251,10 +331,114 @@ object EffectInference {
     private val userClasses: Map[String, ClassDefinition] =
       classes.map(c => c.name -> c).toMap
 
+    /**
+     * The first use of a program class from another class runs its static initializer, so
+     * the use carries the initializer's effects (#2601). Uses from inside the class itself
+     * come after the class is initialized, and need nothing.
+     */
+    private def initializes(cls: TypedAST.ObjectType, location: onion.compiler.Location): scala.Unit =
+      if (cls != null) for (cd <- programChain(cls.name) if cd.staticInitializers.nonEmpty && !ownerInitialized(cd.name)) {
+        val init = ClassInit(cd)
+        if (internalCallees.add(init))
+          rawSites += RawSite(location, s"${cd.name} (static initializer)", None, init)
+      }
+
+    /** `name`'s program class and each program superclass: the JVM initializes a superclass first. */
+    private def programChain(name: String): Seq[ClassDefinition] = {
+      val out = mutable.Buffer[ClassDefinition]()
+      var next = userClasses.get(name)
+      while (next.isDefined && !out.exists(_ eq next.get)) {
+        out += next.get
+        next = Option(next.get.superClass).flatMap(sc => userClasses.get(sc.name))
+      }
+      out.toSeq
+    }
+
+    /** The owner and its superclasses are initialized before the owner's own code runs. */
+    private lazy val ownerChainNames: Set[String] =
+      if (owner == null) Set.empty else programChain(owner.name).map(_.name).toSet
+    private def ownerInitialized(name: String): Boolean = ownerChainNames.contains(name)
+
+    private lazy val libraryCallbacks: Map[String, Seq[MethodDefinition]] =
+      EffectInference.libraryCallbacks(classes).map { case (k, ms) => k -> ms.filter(units.contains) }
+
+    /** The program classes `v` can be an instance of; a cast (string concatenation casts to `Object`) narrows nothing. */
+    private def valueClasses(v: Term): Seq[ClassDefinition] = v match {
+      case a: AsInstanceOf if a.target != null =>
+        val outer = compatible(a.`type`).toSet
+        valueClasses(a.target).filter(outer.contains)
+      case _ => compatible(v.`type`)
+    }
+
+    /** What an operator or a map literal can call on an object operand: `+` `toString`, `==` `equals`, `<` `compareTo`, a key `hashCode`. */
+    private val operatorCallbacks = Set("toString", "equals", "compareTo", "hashCode")
+
+    private val compatibleCache = mutable.Map[String, Seq[ClassDefinition]]()
+
+    /** The program classes a value of type `tp` can be an instance of, including through type arguments. */
+    private def compatible(tp: TypedAST.Type, seen: Set[TypedAST.Type] = Set.empty): Seq[ClassDefinition] =
+      if (tp == null || seen.contains(tp)) Nil
+      else tp match {
+        case n: TypedAST.NullableType   => compatible(n.unwrap, seen + tp)
+        case a: TypedAST.ArrayType      => compatible(a.component, seen + tp)
+        case ap: TypedAST.AppliedClassType =>
+          (compatible(ap.raw, seen + tp) ++ ap.typeArguments.toSeq.flatMap(compatible(_, seen + tp))).distinct
+        case tv: TypedAST.TypeVariableType =>
+          if (tv.upperBound == null) classes else compatible(tv.upperBound, seen + tp)
+        case c: TypedAST.ClassType =>
+          compatibleCache.getOrElseUpdate(c.name, classes.filter(cd => inherits(cd, c.name) || c.name == "java.lang.Object"))
+        case _ => Nil
+      }
+
+    /**
+     * Program values handed to library code can be called back: string concatenation calls
+     * `toString`, a map literal `hashCode`, `==` `equals`, and any library method may call
+     * what the value's class overrides. So the hand-off carries those overrides' effects
+     * (#2601, rule 3 on the issue).
+     */
+    private def toLibrary(values: Iterable[Term], location: onion.compiler.Location,
+                          only: Set[String] = null): scala.Unit =
+      if (libraryCallbacks.nonEmpty) for {
+        v <- values if v != null
+        cd <- valueClasses(v)
+        md <- libraryCallbacks.getOrElse(cd.name, Nil) if only == null || only.contains(md.name)
+      } if (internalCallees.add(Callback(md)))
+          rawSites += RawSite(location,
+            onion.compiler.toolbox.TypeFormatting.methodReference(md.affiliation, md.name), None, Callback(md))
+
+    /** Whether `cls` is `ancestor` or extends or conforms to it, by erased name. */
+    private def inherits(cls: TypedAST.ClassType, ancestor: String): Boolean = {
+      val seen = mutable.Set[String]()
+      def go(c: TypedAST.ClassType): Boolean =
+        c != null && seen.add(c.name) && (c.name == ancestor || go(c.superClass) || c.interfaces.exists(go))
+      go(cls)
+    }
+
+    private val overrideCache = mutable.Map[(String, String, Int), Seq[MethodDefinition]]()
+
+    /**
+     * The program's own methods a virtual call to `m` can run instead of `m`: those of the
+     * same name and arity in a class that extends or conforms to `m`'s class. A call through
+     * an interface or an overridable method has the union of their effects (#2601).
+     */
+    private def overridesOf(m: TypedAST.Method): Seq[MethodDefinition] =
+      if (m.affiliation == null || Modifier.isStatic(m.modifier) || Modifier.isPrivate(m.modifier)) Nil
+      else {
+        val arity = m.arguments.length
+        overrideCache.getOrElseUpdate((m.affiliation.name, m.name, arity),
+          classes.filter(cd => cd.name != m.affiliation.name && inherits(cd, m.affiliation.name)).flatMap { cd =>
+            cd.methods.collect {
+              case om: MethodDefinition if (om ne m) && units.contains(om) && om.name == m.name &&
+                om.arguments.length == arity && !Modifier.isStatic(om.modifier) => om
+            }
+          })
+      }
+
     private def method(m: TypedAST.Method, location: onion.compiler.Location,
                        target: Term, args: Array[Term]): scala.Unit = {
       // A top-level function is named as written, not through its synthetic owner.
       val callee = onion.compiler.toolbox.TypeFormatting.methodReference(m.affiliation, m.name)
+      if (Modifier.isStatic(m.modifier)) initializes(m.affiliation, location)
       m match {
         case md: MethodDefinition if units.contains(md) =>
           internalCallees += md
@@ -265,14 +449,22 @@ object EffectInference {
           effects ++= eff
           rawSites += RawSite(location, callee, Some(eff), null,
             m.affiliation.name, m, target, args.toSeq, depth, table.operands(m.affiliation.name, m.name))
+          toLibrary(Option(target).toSeq ++ args.toSeq, location)
+      }
+      // A call on a receiver dispatches: any override the program defines may run instead.
+      if (target != null) for (om <- overridesOf(m)) {
+        internalCallees += om
+        rawSites += RawSite(location,
+          onion.compiler.toolbox.TypeFormatting.methodReference(om.affiliation, om.name), None, om)
       }
     }
 
     private def constructor(c: ConstructorRef, location: onion.compiler.Location,
                             args: Array[Term]): scala.Unit = {
       val callee = s"new ${c.affiliation.name}"
-      c match {
-        case cd: ConstructorDefinition if units.contains(cd) =>
+      initializes(c.affiliation, location)
+      programConstructor(c) match {
+        case Some(cd) =>
           internalCallees += cd
           rawSites += RawSite(location, callee, None, cd)
         case _ =>
@@ -280,6 +472,20 @@ object EffectInference {
           effects ++= eff
           rawSites += RawSite(location, callee, Some(eff), null,
             c.affiliation.name, null, null, args.toSeq, depth, table.operands(c.affiliation.name, "<init>"))
+          toLibrary(args.toSeq, location)
+      }
+    }
+
+    /** The program's own constructor behind `c`. `new Box[String]()` refers to it through a
+     *  ref on the applied type, which is not the definition itself (#2601). */
+    private def programConstructor(c: ConstructorRef): Option[ConstructorDefinition] = c match {
+      case cd: ConstructorDefinition if units.contains(cd) => Some(cd)
+      case _ => c.affiliation match {
+        case applied: TypedAST.AppliedClassType =>
+          applied.raw.constructors.collectFirst {
+            case cd: ConstructorDefinition if units.contains(cd) && cd.getArgs.sameElements(c.getArgs) => cd
+          }
+        case _ => None
       }
     }
 
@@ -312,7 +518,7 @@ object EffectInference {
       case i: IfStatement               => term(i.condition); statement(i.thenStatement); statement(i.elseStatement)
       case l: ConditionalLoop           => term(l.condition); statement(l.stmt); statement(l.update)
       case r: Return                    => if (r.term != null) term(r.term)
-      case t: Throw                     => term(t.term)
+      case t: Throw                     => term(t.term); toLibrary(Seq(t.term), here(t.location))
       case s2: Synchronized             => term(s2.term); statement(s2.statement)
       case t: Try =>
         t.resources.foreach { case (_, r) => term(r) }
@@ -344,7 +550,10 @@ object EffectInference {
         depth += 1
         try statement(n.block) finally depth -= 1
       case b: Begin         => b.terms.foreach(term)
-      case b: BinaryTerm    => term(b.lhs); term(b.rhs)
+      case b: BinaryTerm    =>
+        term(b.lhs); term(b.rhs)
+        // `+` on a string, `==` and `<` on objects compile to library calls on the operands.
+        toLibrary(Seq(b.lhs, b.rhs).filter(o => o.`type` != null && !o.`type`.isBasicType), entry, operatorCallbacks)
       case u: UnaryTerm     => term(u.operand)
       case a: ArrayLength   => term(a.target)
       case r: RefArray      => term(r.target); term(r.index)
@@ -362,17 +571,22 @@ object EffectInference {
         // A constructor filling in its own `this` is initialisation: nobody else holds the
         // object yet, so `new C(..)` stays pure. Writing any other object is a mutation.
         if (!(inConstructor && s.target.isInstanceOf[This])) effects += Effect.Mutate
-      case s: SetStaticField => term(s.value); effects += Effect.Mutate
+      case s: SetStaticField =>
+        initializes(s.target, here(s.location)); term(s.value)
+        // A static initializer filling in its own class's fields is initialisation, as a
+        // constructor filling in `this` is: nobody can see the class before it finishes.
+        if (!(inClassInit && owner != null && s.target != null && s.target.name == owner.name)) effects += Effect.Mutate
       case s: SetLocal      =>
         // A write whose relative frame equals the closure depth targets the body's own
         // frame (frame 0 from the body itself, 1 from a closure directly inside it, ...).
         if (s.frame == depth) localWrites += ((s.index, s.value, depth))
         term(s.value)
       case l: ListLiteral   => l.elements.foreach(term)
-      case m: MapLiteral    => m.keys.foreach(term); m.values.foreach(term)
+      case m: MapLiteral    => m.keys.foreach(term); m.values.foreach(term); toLibrary(m.keys.toSeq, entry, operatorCallbacks)
       case n: NewArray      => n.parameters.foreach(term)
       case n: NewArrayWithValues => n.values.foreach(term)
-      case _: RefLocal | _: RefStaticField | _: This | _: OuterThis => ()
+      case r: RefStaticField => initializes(r.target, here(r.location))
+      case _: RefLocal | _: This | _: OuterThis => ()
       // An omitted argument runs its default method: the call has that method's effects.
       case d: DefaultArgument => method(d.method, entry, null, Array.empty)
       case _: BoolValue | _: ByteValue | _: ShortValue | _: IntValue | _: LongValue => ()

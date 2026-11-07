@@ -46,9 +46,14 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
     val errors = ArrayBuffer.empty[CompileError]
     val warnings = ArrayBuffer.empty[CompileWarning]
     try {
+      val build = new BuildRun(config, ctx.debugArtifacts.typedClasses.getOrElse(Nil))
       for (r <- repros) {
         val location = r.method.location
-        if (reproduce(r, loader)) {
+        // A replay runs the constructor and the method; it runs only when neither reaches the
+        // outside world, and only for as long as the build waits (#2601). Otherwise it stays W0021.
+        val runnable = build.constructorEffects(r.cls.name).isEmpty &&
+          build.methodEffects(Some(r.cls.name), r.method.name, r.method.args.size, static = false).isEmpty
+        if (runnable && build.timed(loader)(reproduce(r, loader)).contains(Right(true))) {
           errors += CompileError(r.sourceFile, location,
             Message("error.semantic.historyReproduced", Array[Any](r.method.name, r.history, r.shown)),
             Some(SemanticError.HISTORY_REPRODUCED.errorCode))

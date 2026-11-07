@@ -1,6 +1,6 @@
 package onion.compiler.verification
 
-import onion.compiler.{AST, CompileError, CompiledClass, CompilerConfig, ContractMode, Modifier, OnionClassLoader, SemanticError}
+import onion.compiler.{AST, CompileError, CompileWarning, CompiledClass, CompilerConfig, ContractMode, Modifier, OnionClassLoader, SemanticError, WarningCategory, WarningLevel}
 import onion.compiler.exceptions.CompilationException
 import onion.compiler.pipeline.{CompilerPhase, PhaseContext}
 import onion.compiler.toolbox.Message
@@ -19,6 +19,8 @@ import scala.collection.mutable.ArrayBuffer
  *
  * A predicate that returns `false` is `E0113`; one that throws is also `E0113`, naming the
  * exception. Only with `--contracts check`. The predicate runs once, in a class loader of its own.
+ * One whose effects reach the outside world, or that does not finish in time, is not run and
+ * gets W0023 instead (#2601, [[BuildRun]]).
  */
 final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]] {
   def name: String = "ClosedPredicate"
@@ -36,19 +38,35 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
     val previous = thread.getContextClassLoader
     thread.setContextClassLoader(loader)
     val errors = ArrayBuffer.empty[CompileError]
+    val warnings = ArrayBuffer.empty[CompileWarning]
+    val build = new BuildRun(config, ctx.debugArtifacts.typedClasses.getOrElse(Nil))
+    def notRun(c: Candidate, message: String): Unit =
+      warnings += CompileWarning(c.sourceFile, c.location, WarningCategory.PredicateNotRun, message)
     try {
       for (c <- candidates) {
-        val outcome = runOne(c, classes, loader)
-        outcome.foreach { why =>
-          errors += CompileError(c.sourceFile, c.location,
-            Message("error.semantic.closedPredicateFalse", Array[Any](c.name, why)),
-            Some(SemanticError.CLOSED_PREDICATE_FALSE.errorCode))
+        // The build runs only what cannot reach the outside world (#2601); the rest is said, not run.
+        val (effects, from) = build.source(c.owner, c.name, c.arity, static = true)
+        if (effects.nonEmpty) notRun(c, BuildRun.notRunMessage(c.name, effects, from))
+        else build.timed(loader)(runOne(c, classes, loader)) match {
+          case None =>
+            notRun(c, Message("warning.predicateNotRun.timeout", c.name, config.contractTimeoutMillis.toString))
+          case Some(Left(e)) =>
+            errors += falseOrThrew(c, s"threw ${e.getClass.getSimpleName}: ${e.getMessage}")
+          case Some(Right(outcome)) =>
+            outcome.foreach(why => errors += falseOrThrew(c, why))
         }
       }
     } finally thread.setContextClassLoader(previous)
+    if (config.warningLevel != WarningLevel.Off)
+      ctx.addWarnings(warnings.toSeq.filterNot(w => config.suppressedWarnings.contains(w.category)))
     if (errors.nonEmpty) throw new CompilationException(errors.toSeq)
     classes
   }
+
+  private def falseOrThrew(c: Candidate, why: String): CompileError =
+    CompileError(c.sourceFile, c.location,
+      Message("error.semantic.closedPredicateFalse", Array[Any](c.name, why)),
+      Some(SemanticError.CLOSED_PREDICATE_FALSE.errorCode))
 
   /** Only `ensures result` itself marks a predicate. `ensures result == (x > 0)` describes a function and is left alone. */
   private def assertsResult(clauses: List[AST.Expression]): Boolean =

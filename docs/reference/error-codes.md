@@ -1267,6 +1267,20 @@ def sums(): Boolean
 
 Fix: correct the expression, or the code it checks.
 
+The build runs a predicate only when its effects are at most `mutate`. One that prints, reads or
+writes files, or calls something the effect table cannot vouch for (`unknown`) is not run: it
+gets the warning `W0023` instead. So does one that does not finish within 10 seconds.
+The effects count everything a run can reach:
+
+- every overload with the predicate's name and parameter count
+- an override or interface implementation the program defines
+- a method the library calls back on a program value: `toString` from `+` and `#{}`,
+  `hashCode` from a map literal, `equals` from `==`, `getMessage` of a thrown exception
+- the static initializer of each class the predicate uses, and of its superclasses
+
+When the effect is not in the predicate's own body, `W0023` names where it is: the call, or
+the class whose static initializer has it.
+
 ### `E0114` — a `Shape` that does not round-trip
 
 Every `onion.Shape` has a contract: `parse(print(v))` must equal `v` for each value the shape can
@@ -1937,6 +1951,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0019` | the result of an immutable builder method (`Http.Request.header`, ...) is discarded as a statement, so the call does nothing |
 | `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
 | `W0021` | a method can break a `history`: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
+| `W0023` | the build did not run a contract predicate: its effects go beyond `mutate` (it prints, does I/O, or calls something `unknown`), or it did not finish within 10 seconds |
 | `W0022` | the contract of a Shape was not checked: its value type cannot be sampled |
 | `W0024` | a method writes a field that a `history` names, and no check settled whether the history still holds: the field is not an `Int`, the solver does not model the method body, the write is in a lambda, or the history is not of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`. Nothing guarantees the history there |
 | `W0025` | an override can break the contract it inherits: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |

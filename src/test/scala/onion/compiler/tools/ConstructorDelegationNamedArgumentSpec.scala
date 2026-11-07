@@ -108,4 +108,73 @@ class ConstructorDelegationNamedArgumentSpec extends AbstractShellSpec {
       assert(Shell.Failure(-1) == run(decls, "\"x\""))
     }
   }
+
+  // Panel block at 4b9d347: a constructor's parameter names were only known once its body
+  // was typed, so a named delegation to one declared later failed with E0043.
+  describe("A named delegation to a constructor declared later") {
+    def runAlone(src: String) = shell.run(src, "None", Array())
+
+    it("binds `: this(z = 1, w = 2)` to the primary constructor") {
+      val src =
+        """class R(val z: Int, val w: Int) {
+          |public:
+          |  def this() : this(w = 2, z = 1) { }
+          |}
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String { val q = new R(); return "" + q.z + q.w }
+          |}
+          |""".stripMargin
+      assert(Shell.Success("12") == runAlone(src))
+    }
+
+    it("fills the primary constructor's default") {
+      val src =
+        """class R(val z: Int, val w: Int = 9) {
+          |public:
+          |  def this() : this(z = 1) { }
+          |}
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String { val q = new R(); return "" + q.z + q.w }
+          |}
+          |""".stripMargin
+      assert(Shell.Success("19") == runAlone(src))
+    }
+
+    it("binds `extends A(b = 7, a = x)` when A comes after the subclass") {
+      val src =
+        """class C(x: Int) extends B(b = 7, a = x) {
+          |}
+          |class B {
+          |  val s: String
+          |public:
+          |  def this(a: Int, b: Int) { s = "" + a + b }
+          |  def show(): String = s
+          |}
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String = new C(3).show()
+          |}
+          |""".stripMargin
+      assert(Shell.Success("37") == runAlone(src))
+    }
+
+    it("binds `: this(q = 1L, r = 4)` written above its target") {
+      val src =
+        """class K {
+          |  val s: String
+          |public:
+          |  def this(t: String) : this(r = 4, q = 1L) { }
+          |  def this(q: Long, r: Int) { s = "" + q + r }
+          |  def show(): String = s
+          |}
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String = new K("t").show()
+          |}
+          |""".stripMargin
+      assert(Shell.Success("14") == runAlone(src))
+    }
+  }
 }

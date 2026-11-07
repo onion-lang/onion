@@ -311,8 +311,13 @@ private[compiler] final class MethodBodySupport(
       case b: AST.BlockExpression => markCapturedVariables(context, args, b)
       case _ =>
     bindParameters(context, args, paramTypes, block)
-    constructor.setArgumentsWithDefaults(
-      buildArgumentsWithDefaults(args, paramTypes, context.recordUsage, DefaultOwner("init", constructor.modifier | AST.M_STATIC, Array())))
+    predefinedConstructorDefaults.get(constructor) match
+      case Some((withDefaults, used)) =>
+        used.foreach(context.recordUsage)
+        constructor.setArgumentsWithDefaults(withDefaults)
+      case None =>
+        constructor.setArgumentsWithDefaults(
+          buildArgumentsWithDefaults(args, paramTypes, context.recordUsage, constructorDefaultOwner(constructor)))
     context
   }
 
@@ -546,6 +551,23 @@ private[compiler] final class MethodBodySupport(
       val withDefaults = buildArgumentsWithDefaults(args, method.arguments, used += _, DefaultOwner(method.name, method.modifier, method.typeParameters))
       method.setArgumentsWithDefaults(withDefaults)
       predefinedDefaults(method) = (withDefaults, used.toSet)
+
+  private val predefinedConstructorDefaults = scala.collection.mutable.HashMap.empty[ConstructorDefinition, (Array[TypedAST.MethodArgument], Set[String])]
+
+  private def constructorDefaultOwner(constructor: ConstructorDefinition): DefaultOwner =
+    DefaultOwner("init", constructor.modifier | AST.M_STATIC, Array())
+
+  /**
+   * Types a constructor's defaults before any body of its class is typed, so a delegation
+   * written above it (`def this() : this(z = 1)` with the primary `(z: Int, w: Int = 2)`)
+   * already sees them, as [[predefineDefaults]] does for methods.
+   */
+  def predefineConstructorDefaults(constructor: ConstructorDefinition, args: List[AST.Argument]): Unit =
+    if args.exists(_.defaultValue != null) && !predefinedConstructorDefaults.contains(constructor) then
+      val used = scala.collection.mutable.Set.empty[String]
+      val withDefaults = buildArgumentsWithDefaults(args, constructor.getArgs, used += _, constructorDefaultOwner(constructor))
+      constructor.setArgumentsWithDefaults(withDefaults)
+      predefinedConstructorDefaults(constructor) = (withDefaults, used.toSet)
 
   private def prepareExtensionContext(
     staticMethod: MethodDefinition,

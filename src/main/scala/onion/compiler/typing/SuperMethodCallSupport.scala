@@ -37,6 +37,7 @@ private[compiler] final class SuperMethodCallSupport(
    * synthetic method `access$super$f$..` whose body is the `super.f(..)`, and the closure calls it
    * on the enclosing instance. An omitted default stays in the accessor's body, so it is still
    * computed by the superclass's default method; the accessor takes only the arguments written.
+   * It is public: a trait's accessor is an interface method, which the JVM requires to be public.
    */
   private def superCallThroughAccessor(contextClass: ClassDefinition, method: Method, params: Array[Term]): Term = {
     val explicit = params.indices.filterNot(i => params(i).isInstanceOf[DefaultArgument])
@@ -49,7 +50,7 @@ private[compiler] final class SuperMethodCallSupport(
     val accessor: MethodDefinition =
       if (existing.nonEmpty) existing(0).asInstanceOf[MethodDefinition]
       else {
-        val acc = new MethodDefinition(null, 0, contextClass, name, argTypes, method.returnType, null, method.typeParameters)
+        val acc = new MethodDefinition(null, Modifier.PUBLIC, contextClass, name, argTypes, method.returnType, null, method.typeParameters)
         val ctx = new LocalContext
         ctx.setMethod(acc)
         val slots = explicit.zipWithIndex.map { case (i, k) => ctx.add("p" + k, method.arguments(i), false) }

@@ -64,5 +64,26 @@ class SuperCallInClosureSpec extends AbstractShellSpec {
         "\"\" + new B().g(6)"))
       assert(Shell.Success("8") == result)
     }
+
+    it("works in a trait's method, whose accessor lives on an interface") {
+      val result = run(
+        """
+          |trait T {
+          |  def g(): String {
+          |    val h: () -> String = () -> super.toString()
+          |    return h()
+          |  }
+          |}
+          |class C conforms T {
+          |public:
+          |  def this {}
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String = "" + new C().g().startsWith("C@")
+          |}
+          |""")
+      assert(Shell.Success("true") == result)
+    }
   }
 }

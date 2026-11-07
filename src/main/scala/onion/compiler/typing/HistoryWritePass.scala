@@ -184,6 +184,13 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
       case None => HistoryProver.prove(m, field, op, intFields, invariants, callees, builtCallees(m)) match {
       case HistoryProver.Counterexample(before) =>
         if (collected != null) collected += Repro(unitFile, cls, m, field, op, before)
+      // A proof may lean on a class invariant only once something checks that invariant: until
+      // then a constructor can break it unseen (#2602). So the solver is asked again without the
+      // invariants; a proof that needs them is W0024, and the runtime guard stays.
+      case HistoryProver.Proved if invariants.nonEmpty &&
+          HistoryProver.prove(m, field, op, intFields, Nil, callees, builtCallees(m)) != HistoryProver.Proved =>
+        unchecked += Unchecked(unitFile, cls, m, field, Some(s"$field $op old($field)"), line = 0,
+          fieldType = None, reason = Some(("invariant", "")))
       case HistoryProver.Proved =>
         proved += s"${cls.name}.${m.name}: $field $op old($field)"
         if (dropsProvedGuards) dropGuard(cls.name, m.name, s"$field $op old($field)")
@@ -364,7 +371,7 @@ object HistoryWritePass {
    * solver could not decide, or none for a history of another form (then `line` names it).
    * `fieldType` is set when the field is not an `Int`, which the solver does not model. `reason` is
    * a write the body-only checks cannot follow (`lambda`), reported `at` the write rather than at
-   * the method (#2599).
+   * the method (#2599), or a proof that holds only by assuming a class invariant (`invariant`, #2602).
    */
   final case class Unchecked(sourceFile: String, cls: AST.ClassDeclaration, method: AST.MethodDeclaration,
                              field: String, history: Option[String], line: Int, fieldType: Option[String],

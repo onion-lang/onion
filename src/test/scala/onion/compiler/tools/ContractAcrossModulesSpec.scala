@@ -60,7 +60,7 @@ class ContractAcrossModulesSpec extends AnyFunSpec {
         |  def this { n = 0 }
         |  def add(s: Step, k: Int): void
         |    requires k >= 0 && k < 100
-        |  { n = n + s.step(k) }
+        |  { if n < 1000 { n = n + s.step(k) } }
         |}""".stripMargin
     val (r, err) = compileAgainst(dir, b)
     assert(!r.hasErrors, r.diagnostics.toString)
@@ -77,7 +77,7 @@ class ContractAcrossModulesSpec extends AnyFunSpec {
       |  def this { n = 0 }
       |  def add(s: Step, k: Int): void
       |    requires k >= 0 && k < 100
-      |  { n = n + s.step(k) }
+      |  { if n < 1000 { n = n + s.step(k) } }
       |}""".stripMargin
 
   it("does not prove it when module A's contract allows a negative result") {

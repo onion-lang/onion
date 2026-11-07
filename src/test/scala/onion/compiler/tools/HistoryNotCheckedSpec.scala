@@ -94,9 +94,41 @@ class HistoryNotCheckedSpec extends AnyFunSpec {
           |public:
           |  var n: Int
           |  def this { n = 0 }
-          |  def inc(): void { n = n + 1 }
+          |  def inc(): void { if n < 1000000 { n = n + 1 } }
           |}""".stripMargin
       assert(compile(src) == Outcome(Nil, Nil))
+    }
+
+    // #2602: nothing checks an invariant yet, so a proof that needs one is no proof.
+    it("is given when the proof holds only by assuming the class invariant") {
+      val src =
+        """class Counter {
+          |  invariant n >= 0 && n < 1000000
+          |  history n >= old(n)
+          |public:
+          |  var n: Int
+          |  def this { n = 0 }
+          |  def inc(): void { n = n + 1 }
+          |}""".stripMargin
+      val o = compile(src)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w24.size == 1 && o.w24.head.contains("Counter.inc") && o.w24.head.contains("invariant"), o.toString)
+    }
+
+    it("is given when a constructor breaks the invariant the proof would rest on (#2602 case 3)") {
+      val src =
+        """class Counter {
+          |  invariant n >= 0 && n < 10
+          |  history n >= old(n)
+          |protected:
+          |  var n: Int
+          |public:
+          |  def this { n = 2147483647 }
+          |  def inc(): void { n = n + 1 }
+          |  def get(): Int = n
+          |}""".stripMargin
+      val o = compile(src)
+      assert(o.w24.size == 1 && o.w24.head.contains("Counter.inc"), o.toString)
     }
 
     it("is turned off by --Wno W0024") {

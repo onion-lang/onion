@@ -35,12 +35,17 @@ class GuardOnlyUnprovedSpec extends AnyFunSpec {
   }
 
   it("takes the history guard out when the solver proves the history") {
-    val bytes = classBytes(counter("invariant n >= 0 && n < 1000", "n = n + 1"), ContractMode.Runtime)
+    val bytes = classBytes(counter("invariant n >= 0 && n < 1000", "if n < 1000 { n = n + 1 }"), ContractMode.Runtime)
     assert(!bytes.contains("history failed"), "a proved history needs no run-time guard")
   }
 
-  it("still guards the invariant, which nothing proves yet, when the history is proved") {
+  it("keeps the history guard when the proof needs the invariant, which nothing checks yet (#2602)") {
     val bytes = classBytes(counter("invariant n >= 0 && n < 1000", "n = n + 1"), ContractMode.Runtime)
+    assert(bytes.contains("history failed"), "a proof that rests on an unchecked invariant must keep its guard")
+  }
+
+  it("still guards the invariant, which nothing proves yet, when the history is proved") {
+    val bytes = classBytes(counter("invariant n >= 0 && n < 1000", "if n < 1000 { n = n + 1 }"), ContractMode.Runtime)
     assert(bytes.contains("invariant (on exit) failed"))
   }
 }

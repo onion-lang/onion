@@ -35,6 +35,8 @@ private[compiler] final class DeclarationBodySupport(
               methodBodySupport.predefineDefaults(method, m.args)
             }
           }
+        case c: AST.ConstructorDeclaration =>
+          typing.kernelNodeOf[ConstructorDefinition](c).foreach(methodBodySupport.predefineConstructorDefaults(_, c.args))
         case _ =>
       }
       for (section <- node.defaultSection ++ node.sections; member <- section.members) {

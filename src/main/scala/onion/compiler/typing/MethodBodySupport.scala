@@ -14,7 +14,9 @@ private[compiler] final class MethodBodySupport(
   typedTerms: (Array[AST.Expression], LocalContext) => Array[Term],
   translate: (AST.BlockElement, LocalContext) => ActionStatement,
   addReturnNode: (ActionStatement, Type) => StatementBlock,
-  processAssignable: (AST.Node, Type, Term) => Term
+  processAssignable: (AST.Node, Type, Term) => Term,
+  resolveConstructorWithNamedArgs: (AST.Node, List[AST.Expression], ClassType, LocalContext) =>
+    Option[(ConstructorDefinition, Array[Term], Array[AST.Node])]
 ) {
   def processMethodLikeBody(
     method: MethodDefinition,
@@ -309,43 +311,61 @@ private[compiler] final class MethodBodySupport(
       case b: AST.BlockExpression => markCapturedVariables(context, args, b)
       case _ =>
     bindParameters(context, args, paramTypes, block)
-    constructor.setArgumentsWithDefaults(
-      buildArgumentsWithDefaults(args, paramTypes, context.recordUsage, DefaultOwner("init", constructor.modifier | AST.M_STATIC, Array())))
+    predefinedConstructorDefaults.get(constructor) match
+      case Some((withDefaults, used)) =>
+        used.foreach(context.recordUsage)
+        constructor.setArgumentsWithDefaults(withDefaults)
+      case None =>
+        constructor.setArgumentsWithDefaults(
+          buildArgumentsWithDefaults(args, paramTypes, context.recordUsage, constructorDefaultOwner(constructor)))
     context
   }
 
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
     typing.kernelNodeOf[ConstructorDefinition](node).foreach { constructor =>
       val context = prepareConstructorContext(constructor, node.args, node.block)
-      val params0 = context.withArgumentSlots(typedTerms(node.superInits.toArray, context))
+      val targetClass = if node.selfDelegation then bodyContext.definition else bodyContext.definition.superClass
       // The object does not exist while its super/self initializer arguments are being
       // evaluated. A field read there -- `def this : this(seed)` where `seed` is a field,
       // or an explicit `this` -- is a GETFIELD on `uninitializedThis`, which the JVM
       // verifier rejects; it used to surface as an internal error at class load. Closure
       // bodies are exempt: they capture `this` and run later, when it does exist.
-      if params0 != null then
-        params0.zip(node.superInits).collectFirst {
-          case (term, source) if TermWalk.exists(term) { case _: This => true; case _ => false } => source
+      def reportThisBeforeDelegation(terms: Array[Term], sources: Seq[AST.Node]): Unit =
+        terms.zip(sources).collectFirst {
+          case (term, source) if term != null && source != null &&
+            TermWalk.exists(term) { case _: This => true; case _ => false } => source
         }.foreach(source => bodyContext.report(THIS_BEFORE_CONSTRUCTOR_DELEGATION, source, bodyContext.definition))
-      val targetClass = if node.selfDelegation then bodyContext.definition else bodyContext.definition.superClass
-      val matched0 = targetClass.findConstructor(params0)
-      // Exact matching is substitution-blind: an applied Box[Int] still exposes
-      // the constructor as Box(T) over the erased bound (Object), so a primitive
-      // argument (Int) does not match. Retry against the type-argument-
-      // substituted signatures with primitive boxing so that
-      // `class IntBox(v: Int) : Box[Int](v)` boxes v into T, mirroring what the
-      // `new Box[Int](42)` path already does (ConstructionTyping.findConstructorWithBoxing).
-      val (matched, params) =
-        if matched0.nonEmpty || params0 == null then (matched0, params0)
-        else findSuperConstructorWithBoxing(targetClass, params0)
-      if matched.length == 0 then
-        bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
-      else if matched.length > 1 then
-        bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
+      if ArgumentHelpers.hasNamedArguments(node.superInits) then
+        // `extends A(b = 7, a = 3)` / `: this(b = 8)`: bind by name and fill defaults,
+        // exactly as `new A(b = 7, a = 3)` does; the positional path below would put
+        // 7 into `a` (#2659).
+        context.withArgumentSlots(resolveConstructorWithNamedArgs(node, node.superInits, targetClass, context)).foreach {
+          case (ctor, params, sources) =>
+            reportThisBeforeDelegation(params, sources.toSeq)
+            val init = new Super(targetClass, ctor.getArgs, params, node.selfDelegation)
+            finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
+        }
       else
-        warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
-        val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
-        finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
+        val params0 = context.withArgumentSlots(typedTerms(node.superInits.toArray, context))
+        if params0 != null then reportThisBeforeDelegation(params0, node.superInits)
+        val matched0 = targetClass.findConstructor(params0)
+        // Exact matching is substitution-blind: an applied Box[Int] still exposes
+        // the constructor as Box(T) over the erased bound (Object), so a primitive
+        // argument (Int) does not match. Retry against the type-argument-
+        // substituted signatures with primitive boxing so that
+        // `class IntBox(v: Int) : Box[Int](v)` boxes v into T, mirroring what the
+        // `new Box[Int](42)` path already does (ConstructionTyping.findConstructorWithBoxing).
+        val (matched, params) =
+          if matched0.nonEmpty || params0 == null then (matched0, params0)
+          else findSuperConstructorWithBoxing(targetClass, params0)
+        if matched.length == 0 then
+          bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
+        else if matched.length > 1 then
+          bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
+        else
+          warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
+          val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
+          finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
     }
 
@@ -531,6 +551,23 @@ private[compiler] final class MethodBodySupport(
       val withDefaults = buildArgumentsWithDefaults(args, method.arguments, used += _, DefaultOwner(method.name, method.modifier, method.typeParameters))
       method.setArgumentsWithDefaults(withDefaults)
       predefinedDefaults(method) = (withDefaults, used.toSet)
+
+  private val predefinedConstructorDefaults = scala.collection.mutable.HashMap.empty[ConstructorDefinition, (Array[TypedAST.MethodArgument], Set[String])]
+
+  private def constructorDefaultOwner(constructor: ConstructorDefinition): DefaultOwner =
+    DefaultOwner("init", constructor.modifier | AST.M_STATIC, Array())
+
+  /**
+   * Types a constructor's defaults before any body of its class is typed, so a delegation
+   * written above it (`def this() : this(z = 1)` with the primary `(z: Int, w: Int = 2)`)
+   * already sees them, as [[predefineDefaults]] does for methods.
+   */
+  def predefineConstructorDefaults(constructor: ConstructorDefinition, args: List[AST.Argument]): Unit =
+    if args.exists(_.defaultValue != null) && !predefinedConstructorDefaults.contains(constructor) then
+      val used = scala.collection.mutable.Set.empty[String]
+      val withDefaults = buildArgumentsWithDefaults(args, constructor.getArgs, used += _, constructorDefaultOwner(constructor))
+      constructor.setArgumentsWithDefaults(withDefaults)
+      predefinedConstructorDefaults(constructor) = (withDefaults, used.toSet)
 
   private def prepareExtensionContext(
     staticMethod: MethodDefinition,

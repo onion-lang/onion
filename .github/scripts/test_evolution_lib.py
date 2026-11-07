@@ -82,9 +82,28 @@ class FingerprintTest(unittest.TestCase):
     """A verdict follows the PR's own change, not the head SHA: merging main must not void it."""
     base = [f("src/A.scala", patch="@@ -1,3 +1,3 @@\n ctx\n-old\n+new\n ctx2")]
 
-    def test_context_lines_and_hunk_positions_do_not_matter(self):
-        moved = [f("src/A.scala", patch="@@ -40,3 +52,3 @@ class Other\n different ctx\n-old\n+new\n more ctx")]
-        self.assertEqual(ev.diff_fingerprint(self.base), ev.diff_fingerprint(moved))
+    def test_hunk_positions_do_not_matter(self):
+        # Merging main shifts the hunk and can change the heading git puts after `@@`.
+        shifted = [f("src/A.scala", patch="@@ -40,3 +52,3 @@ class Other\n ctx\n-old\n+new\n ctx2")]
+        self.assertEqual(ev.diff_fingerprint(self.base), ev.diff_fingerprint(shifted))
+
+    def test_context_lines_matter(self):
+        # The same +/- lines next to different code are a different change (#2578).
+        moved = [f("src/A.scala", patch="@@ -40,3 +52,3 @@\n different ctx\n-old\n+new\n more ctx")]
+        self.assertNotEqual(ev.diff_fingerprint(self.base), ev.diff_fingerprint(moved))
+
+    def test_a_guard_removed_from_another_function_changes_it(self):
+        # #2578's repro: the same guard removed from read_report, then from delete_all.
+        h1 = [f("app.py", patch="@@ -1,6 +1,4 @@\n def read_report(user):\n-    if not user.ok:\n"
+                               "-        raise Denied()\n     return report()\n def delete_all(user):\n     if not user.ok:")]
+        h2 = [f("app.py", patch="@@ -4,6 +4,4 @@\n def delete_all(user):\n-    if not user.ok:\n"
+                               "-        raise Denied()\n     wipe()\n")]
+        self.assertNotEqual(ev.diff_fingerprint(h1), ev.diff_fingerprint(h2))
+
+    def test_a_line_moved_to_another_hunk_changes_it(self):
+        one = [f("a.py", patch="@@ -1,2 +1,3 @@\n x\n+guard()\n y\n@@ -9,2 +10,2 @@\n z\n w")]
+        two = [f("a.py", patch="@@ -1,2 +1,2 @@\n x\n y\n@@ -9,2 +9,3 @@\n z\n+guard()\n w")]
+        self.assertNotEqual(ev.diff_fingerprint(one), ev.diff_fingerprint(two))
 
     def test_a_changed_line_changes_it(self):
         other = [f("src/A.scala", patch="@@ -1,3 +1,3 @@\n ctx\n-old\n+newer\n ctx2")]

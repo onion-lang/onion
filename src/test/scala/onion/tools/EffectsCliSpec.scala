@@ -45,6 +45,27 @@ class EffectsCliSpec extends AnyFunSuite with Matchers:
     err should include("App#f")
     err should include("read")
 
+  test("--effects lists no synthesized default-argument method (#2548)"):
+    val output = Files.createTempDirectory("onion-effects-cli")
+    // A top-level `def` puts the file's name in a class name, so give it a plain one.
+    val src = Files.createTempDirectory("onion-effects-cli").resolve("eff.on")
+    Files.writeString(src,
+      """class A {
+        |public:
+        |  def this {}
+        |  def f(n: Long = System::currentTimeMillis()): Long = n
+        |}
+        |def g(s: String = IO::readLine()): String = s
+        |""".stripMargin, StandardCharsets.UTF_8)
+
+    val (exitCode, err) = captureErr:
+      new CompilerFrontend().run(Array("-d", output.toString, "--effects", src.toString))
+
+    withClue(err) { exitCode shouldBe 0 }
+    err should include("A#f(")
+    err should include("#g(")
+    err should not include "$default$"
+
   test("CompilerFrontend without --effects prints nothing about effects"):
     val output = Files.createTempDirectory("onion-effects-cli")
     val src = Files.createTempFile("onion-effects-cli", ".on")

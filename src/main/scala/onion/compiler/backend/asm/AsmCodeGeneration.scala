@@ -250,17 +250,32 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     if ctor.superInitializer != null then
       val superArgTypes = ctor.superInitializer.arguments.map(asmType)
-      if ctor.superInitializer.terms.exists(TermContainsTry.contains) then
+      val superTerms = ctor.superInitializer.terms
+      if superTerms.exists(t => t.isInstanceOf[DefaultArgument] || TermContainsTry.contains(t)) then
         // `this` is `uninitializedThis` until this super/self-delegation call
         // completes, and (like visitNewObject's freshly-`new`'d instance) that
         // special verifier type cannot survive being spilled into a local
         // across a try/catch merge. So `this` is not loaded until every
         // argument has been evaluated into a plain local first.
-        val slots = new Array[Int](ctor.superInitializer.terms.length)
+        //
+        // An omitted argument (`extends A(b = 7)`, #2659) is a DefaultArgument: it
+        // calls the constructor's static default method with the arguments before it,
+        // which are already in their locals by then.
+        val slots = new Array[Int](superTerms.length)
         var i = 0
-        while i < ctor.superInitializer.terms.length do
-          val arg = ctor.superInitializer.terms(i)
-          emitExpressionWithContext(gen, arg, className, localVars)
+        while i < superTerms.length do
+          val arg = superTerms(i)
+          arg match
+            case d: DefaultArgument =>
+              val method = d.method
+              if (method.modifier & Modifier.STATIC) == 0 then
+                throw new IllegalStateException(s"constructor default ${method.name} is not static")
+              for j <- 0 until d.index do gen.loadLocal(slots(j))
+              val defaultArgTypes = method.arguments.map(asmType)
+              val descriptor = AsmType.getMethodDescriptor(asmType(method.returnType), defaultArgTypes*)
+              gen.visitMethodInsn(Opcodes.INVOKESTATIC, AsmUtil.internalName(method.classType.name), method.name, descriptor, method.classType.isInterface)
+            case _ =>
+              emitExpressionWithContext(gen, arg, className, localVars)
           adaptValueOnStack(gen, arg.`type`, superArgTypes(i))
           val slot = gen.newLocal(superArgTypes(i))
           gen.storeLocal(slot)

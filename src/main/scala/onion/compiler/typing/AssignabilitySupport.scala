@@ -209,7 +209,13 @@ private[compiler] final class AssignabilitySupport(
         return null
       }
       val boxed = Boxing.boxing(bodyContext.table, actual)
-      if (TypeRules.isAssignable(expected, boxed.`type`)) {
+      // A boxed `Integer` fits a `T` slot only by the rule a reference does (#2328):
+      // read by erasure, `T` is `Object`, so `def zero(): T = 0` or a default
+      // `n: T = 3` compiled and threw in a caller using `T = String` (#2534, #2652).
+      val fits =
+        if (containsTypeVariable(expected)) structurallyAssignable(expected, boxed.`type`)
+        else TypeRules.isAssignable(expected, boxed.`type`)
+      if (fits) {
         return if (expected == boxed.`type`) boxed else new AsInstanceOf(node.location, boxed, expected)
       }
     }

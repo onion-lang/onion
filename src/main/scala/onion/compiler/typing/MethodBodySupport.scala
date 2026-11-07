@@ -14,7 +14,9 @@ private[compiler] final class MethodBodySupport(
   typedTerms: (Array[AST.Expression], LocalContext) => Array[Term],
   translate: (AST.BlockElement, LocalContext) => ActionStatement,
   addReturnNode: (ActionStatement, Type) => StatementBlock,
-  processAssignable: (AST.Node, Type, Term) => Term
+  processAssignable: (AST.Node, Type, Term) => Term,
+  resolveConstructorWithNamedArgs: (AST.Node, List[AST.Expression], ClassType, LocalContext) =>
+    Option[(ConstructorDefinition, Array[Term], Array[AST.Node])]
 ) {
   def processMethodLikeBody(
     method: MethodDefinition,
@@ -317,35 +319,48 @@ private[compiler] final class MethodBodySupport(
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
     typing.kernelNodeOf[ConstructorDefinition](node).foreach { constructor =>
       val context = prepareConstructorContext(constructor, node.args, node.block)
-      val params0 = context.withArgumentSlots(typedTerms(node.superInits.toArray, context))
+      val targetClass = if node.selfDelegation then bodyContext.definition else bodyContext.definition.superClass
       // The object does not exist while its super/self initializer arguments are being
       // evaluated. A field read there -- `def this : this(seed)` where `seed` is a field,
       // or an explicit `this` -- is a GETFIELD on `uninitializedThis`, which the JVM
       // verifier rejects; it used to surface as an internal error at class load. Closure
       // bodies are exempt: they capture `this` and run later, when it does exist.
-      if params0 != null then
-        params0.zip(node.superInits).collectFirst {
-          case (term, source) if TermWalk.exists(term) { case _: This => true; case _ => false } => source
+      def reportThisBeforeDelegation(terms: Array[Term], sources: Seq[AST.Node]): Unit =
+        terms.zip(sources).collectFirst {
+          case (term, source) if term != null && source != null &&
+            TermWalk.exists(term) { case _: This => true; case _ => false } => source
         }.foreach(source => bodyContext.report(THIS_BEFORE_CONSTRUCTOR_DELEGATION, source, bodyContext.definition))
-      val targetClass = if node.selfDelegation then bodyContext.definition else bodyContext.definition.superClass
-      val matched0 = targetClass.findConstructor(params0)
-      // Exact matching is substitution-blind: an applied Box[Int] still exposes
-      // the constructor as Box(T) over the erased bound (Object), so a primitive
-      // argument (Int) does not match. Retry against the type-argument-
-      // substituted signatures with primitive boxing so that
-      // `class IntBox(v: Int) : Box[Int](v)` boxes v into T, mirroring what the
-      // `new Box[Int](42)` path already does (ConstructionTyping.findConstructorWithBoxing).
-      val (matched, params) =
-        if matched0.nonEmpty || params0 == null then (matched0, params0)
-        else findSuperConstructorWithBoxing(targetClass, params0)
-      if matched.length == 0 then
-        bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
-      else if matched.length > 1 then
-        bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
+      if ArgumentHelpers.hasNamedArguments(node.superInits) then
+        // `extends A(b = 7, a = 3)` / `: this(b = 8)`: bind by name and fill defaults,
+        // exactly as `new A(b = 7, a = 3)` does; the positional path below would put
+        // 7 into `a` (#2659).
+        context.withArgumentSlots(resolveConstructorWithNamedArgs(node, node.superInits, targetClass, context)).foreach {
+          case (ctor, params, sources) =>
+            reportThisBeforeDelegation(params, sources.toSeq)
+            val init = new Super(targetClass, ctor.getArgs, params, node.selfDelegation)
+            finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
+        }
       else
-        warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
-        val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
-        finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
+        val params0 = context.withArgumentSlots(typedTerms(node.superInits.toArray, context))
+        if params0 != null then reportThisBeforeDelegation(params0, node.superInits)
+        val matched0 = targetClass.findConstructor(params0)
+        // Exact matching is substitution-blind: an applied Box[Int] still exposes
+        // the constructor as Box(T) over the erased bound (Object), so a primitive
+        // argument (Int) does not match. Retry against the type-argument-
+        // substituted signatures with primitive boxing so that
+        // `class IntBox(v: Int) : Box[Int](v)` boxes v into T, mirroring what the
+        // `new Box[Int](42)` path already does (ConstructionTyping.findConstructorWithBoxing).
+        val (matched, params) =
+          if matched0.nonEmpty || params0 == null then (matched0, params0)
+          else findSuperConstructorWithBoxing(targetClass, params0)
+        if matched.length == 0 then
+          bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
+        else if matched.length > 1 then
+          bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
+        else
+          warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
+          val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
+          finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
     }
 

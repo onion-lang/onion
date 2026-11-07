@@ -130,6 +130,10 @@ final class PipelineRunner(phases: CompilationPhases) {
             // CompilationException (caught by runPhase) and fails compilation.
             runPhase(phases.lawCheck, classes, ctx)(_ => ()) match {
               case None => result(Seq.empty, ctx, request)
+              case Some(_) if request.config.warningLevel == WarningLevel.Error && ctx.diagnostics.warnings.nonEmpty =>
+                // W0021/W0024/W0025 come from this phase, after the checks above (#2595).
+                ctx.addErrors(promoteWarnings(ctx.diagnostics.warnings))
+                result(Seq.empty, ctx, request)
               case Some(checked) => result(checked, ctx, request)
             }
         }

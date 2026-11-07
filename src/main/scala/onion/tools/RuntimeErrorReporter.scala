@@ -161,7 +161,7 @@ object RuntimeErrorReporter {
     val shown = rest.take(10)
     shown.foreach { f =>
       sb.append("  " + Message("runtime.calledFrom",
-        Array[Any](f.getFileName, Integer.valueOf(f.getLineNumber), f.getMethodName)) + "\n")
+        Array[Any](f.getFileName, Integer.valueOf(f.getLineNumber), sourceMethodName(f.getMethodName))) + "\n")
     }
     if (rest.length > shown.length) {
       sb.append("  " + Message("runtime.moreFrames",
@@ -176,6 +176,14 @@ object RuntimeErrorReporter {
     }
     sb.toString
   }
+
+  /**
+   * The name the user wrote for a frame's method. A default argument is computed by a
+   * synthesized method (`f$default$1$A`); its frame is shown as the method it belongs to
+   * (`f`), never under a name the user did not write (#2548).
+   */
+  def sourceMethodName(name: String): String =
+    onion.compiler.toolbox.TypeFormatting.sourceMethodName(name)
 
   private def scriptPath(scriptName: String): Option[java.nio.file.Path] =
     try Option(java.nio.file.Paths.get(scriptName)).filter(_.getFileName != null)

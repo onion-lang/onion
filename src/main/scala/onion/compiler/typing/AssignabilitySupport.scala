@@ -209,7 +209,14 @@ private[compiler] final class AssignabilitySupport(
         return null
       }
       val boxed = Boxing.boxing(bodyContext.table, actual)
-      if (TypeRules.isAssignable(expected, boxed.`type`)) {
+      // An applied target (`Comparable[String]`) is matched against the box's own view of
+      // it, not by erasure: `val y: Comparable[String] = 5` is rejected (#2594).
+      val appliedTargetFits = expected match {
+        case applied: AppliedClassType =>
+          TypeRelations.boxSupertypeAccepts(bodyContext.table, applied, boxed.`type`.asInstanceOf[ClassType])
+        case _ => true
+      }
+      if (appliedTargetFits && TypeRules.isAssignable(expected, boxed.`type`)) {
         return if (expected == boxed.`type`) boxed else new AsInstanceOf(node.location, boxed, expected)
       }
     }

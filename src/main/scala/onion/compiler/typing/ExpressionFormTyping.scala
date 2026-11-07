@@ -291,12 +291,8 @@ final class ExpressionFormTyping(
   // type accepts by erasure, so an applied `ct` is matched against the box's own view
   // of that class instead: `Comparable[JInteger]` fits `Integer`, `Comparable[String]`
   // does not.
-  private def boxSupertypeAccepts(ct: ClassType, boxed: ClassType): Boolean = ct match {
-    case applied: AppliedClassType =>
-      val views = bodyContext.table.appliedViewsOf(boxed)(AppliedTypeViews.collectAppliedViewsFrom(boxed))
-      views.exists { case (raw, view) => TypeRelations.sameClass(raw, applied.raw) && TypeRules.isSuperType(applied, view) }
-    case _ => TypeRules.isSuperType(ct, boxed)
-  }
+  private def boxSupertypeAccepts(ct: ClassType, boxed: ClassType): Boolean =
+    TypeRelations.boxSupertypeAccepts(bodyContext.table, ct, boxed)
 
   // The numeric primitives codegen unboxes through `java.lang.Number` (not Char).
   private val numericCastTypes: Seq[BasicType] =

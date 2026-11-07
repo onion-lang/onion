@@ -185,5 +185,19 @@ class NullableCastSpec extends AbstractShellSpec {
           |""".stripMargin, "AssignToAppliedBoxView.on", Array())
       assert(Shell.Success(1301) == r)
     }
+    it("accepts the box's own view with a nullable type argument") {
+      val r = shell.run(
+        """import { java.util.*; java.lang.Integer as JInteger }
+          |def f(c: Comparable[JInteger?]): Int = c.compareTo(1)
+          |def main(args: String[]): Int {
+          |  val xs: List[Comparable[JInteger?]] = new ArrayList[Comparable[JInteger?]]()
+          |  xs.add(5)
+          |  val v: Comparable[JInteger?] = 7
+          |  val w = 8 as Comparable[JInteger?]
+          |  return f(5) + xs.size() * 10 + v.compareTo(7) * 100 + w.compareTo(1) * 1000
+          |}
+          |""".stripMargin, "AssignToNullableArgBoxView.on", Array())
+      assert(Shell.Success(1011) == r)
+    }
   }
 }

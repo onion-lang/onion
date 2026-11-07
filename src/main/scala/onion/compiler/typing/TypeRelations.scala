@@ -11,11 +11,19 @@ private[typing] object TypeRelations {
   /** `expected` is a supertype of the box `boxed`. The box is a raw class, which an applied
    *  type accepts by erasure, so an applied `expected` is matched against the box's own view
    *  of that class: `Comparable[JInteger]` fits `Integer`, `Comparable[String]` does not
-   *  (#2561, #2594). */
+   *  (#2561, #2594). A nullable type argument is matched by its non-null form:
+   *  `Comparable[JInteger?]` fits `Integer`, as a `JInteger` value already does. */
   def boxSupertypeAccepts(table: ClassTable, expected: ClassType, boxed: ClassType): Boolean = expected match {
     case applied: AppliedClassType =>
       val views = table.appliedViewsOf(boxed)(AppliedTypeViews.collectAppliedViewsFrom(boxed))
-      views.exists { case (raw, view) => sameClass(raw, applied.raw) && TypeRules.isSuperType(applied, view) }
+      lazy val nonNullArgs = AppliedClassType(applied.raw, applied.typeArguments.toList.map {
+        case n: NullableType => n.innerType
+        case t => t
+      })
+      views.exists { case (raw, view) =>
+        sameClass(raw, applied.raw) &&
+          (TypeRules.isSuperType(applied, view) || TypeRules.isSuperType(nonNullArgs, view))
+      }
     case _ => TypeRules.isSuperType(expected, boxed)
   }
 

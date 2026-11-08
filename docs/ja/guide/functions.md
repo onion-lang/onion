@@ -42,6 +42,28 @@ greet(greeting = "Hi", name = "kota") // 名前付き引数（順序自由）
 
 自分自身や、後ろの引数を参照するデフォルト値は `E0002` です。
 
+デフォルト値は、コンパイル時に呼び出しが解決されたメソッドのものが使われます。実行時のオブジェクトのクラスでは決まりません:
+
+```onion
+class A {
+public:
+  def this {}
+  def f(n: Int = 5): Int = n
+}
+class B extends A {
+public:
+  def this {}
+  override def f(n: Int = 9): Int = n * 100
+}
+
+val b = new B()
+val a: A = b
+a.f()   // 500: A のデフォルト値（5）で B の f を呼ぶ
+b.f()   // 900: B のデフォルト値（9）
+```
+
+サブクラスに同じ名前のメソッドがあっても、継承したデフォルト値が置き換わることはありません。
+
 ## 可変長引数（Varargs）
 
 末尾の `Type...` パラメータで可変個の引数を配列として受け取ります：

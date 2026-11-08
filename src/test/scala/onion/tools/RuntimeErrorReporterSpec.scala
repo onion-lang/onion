@@ -75,6 +75,16 @@ class RuntimeErrorReporterSpec extends AnyFunSpec {
       assert(out.contains("29"), s"expected the elided-frame count:\n$out")
     }
 
+    it("names a default argument's frame by its method, never the synthesized name (#2548)") {
+      val out = RuntimeErrorReporter.render(
+        withTrace(new RuntimeException("bad default"),
+          ("A", "boom", "d.on", 4),
+          ("A", "f$default$1$A", "d.on", 5),
+          ("dMain", "main", "d.on", 7)), "d.on")
+      assert(!out.contains("$default$"), out)
+      assert(out.contains("d.on:5 (f)"), out)
+    }
+
     it("explains a stack overflow instead of just naming it") {
       val out = RuntimeErrorReporter.render(
         withTrace(new StackOverflowError(), ("cMain", "f", "c.on", 1)), "c.on")

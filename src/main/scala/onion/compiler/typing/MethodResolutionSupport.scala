@@ -124,6 +124,35 @@ private[compiler] final class MethodResolutionSupport(
       true
   }
 
+  /**
+   * Whether every reference argument fills its slot by the rule the argument check after
+   * selection applies (`AssignabilitySupport.fitsWithoutConversion`), for each slot whose
+   * type mentions a class type variable. `applicable` reads such a variable through its
+   * bound, which accepts `List[Number]` for `List[T]` with `T extends Number`. Slots typed
+   * by the method's own type parameters are inferred per call, so they are left to
+   * `applicable`; primitives, null and empty collection literals are converted later and
+   * are left alone too.
+   */
+  def typeVariableSlotsFit(method: Method): Boolean = {
+    val expected = specializedArgs(method)
+    val methodTypeParams = table.typeParamNamesOf(method)
+    val argsWithTypeParams =
+      if methodTypeParams.nonEmpty then methodArgsWithTypeParams(method) else expected
+    val fixed = if method.isVararg then expected.length - 1 else expected.length
+    var i = 0
+    while i < params.length && i < fixed do
+      val slot = expected(i)
+      val actual = params(i).`type`
+      val checked =
+        TypeCheckingHelpers.containsTypeVariable(slot) &&
+          !(methodTypeParams.nonEmpty && containsMethodTypeParam(argsWithTypeParams(i), methodTypeParams)) &&
+          actual != null && !actual.isBasicType && !actual.isNullType && !actual.isBottomType &&
+          !TypeRules.emptyCollectionLiteralAccepts(slot, params(i))
+      if checked && !AssignabilitySupport.fitsWithoutConversion(slot, actual, table) then return false
+      i += 1
+    true
+  }
+
   val specificityComparator: java.util.Comparator[Method] =
     new java.util.Comparator[Method] {
       override def compare(m1: Method, m2: Method): Int = {

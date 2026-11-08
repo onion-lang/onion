@@ -147,4 +147,26 @@ class EffectInferenceSpec extends AnyFunSpec {
       assert(EffectTable.effectsOrUnknown("onion.Files", "readText") == Set(Read))
     }
   }
+
+  describe("super.f() in a lambda (#2636)") {
+    it("does not list the synthetic accessor, and charges its effect to the caller") {
+      val eff = infer(
+        """class A {
+          |public:
+          |  def this {}
+          |  def f(p: String): String = Files::readText(p)
+          |}
+          |class B extends A {
+          |public:
+          |  def this {}
+          |  override def f(p: String): String = p
+          |  def g(p: String): String {
+          |    val h: () -> String = () -> super.f(p)
+          |    return h()
+          |  }
+          |}""".stripMargin)
+      assert(!eff.keys.exists(_.contains("access$")), eff.keys.toString)
+      assert(eff("B#g").contains(Read))
+    }
+  }
 }

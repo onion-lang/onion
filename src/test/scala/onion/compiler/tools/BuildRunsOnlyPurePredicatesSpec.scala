@@ -476,4 +476,89 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
       assert(o.errors.contains("E0112"), o.toString)
     }
   }
+
+  describe("a predicate whose parameter is a program class (panel block on #2610)") {
+    it("is not run when building a sample argument runs a constructor with an effect") {
+      val o = compile(
+        """class Pt {
+          |  val x: Int
+          |public:
+          |  def this(x: Int) { IO::println("LEAK-argctor"); this.x = x }
+          |}
+          |static def p(pt: Pt): Boolean ensures result = true
+          |IO::println("hi")""".stripMargin)
+      assert(!o.stdout.contains("LEAK-argctor"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("Pt") && w.contains("console")), o.toString)
+    }
+
+    it("is not run when the parameter's class has a static initializer with an effect") {
+      val o = compile(
+        """class H {
+          |public:
+          |  static def say(): Int { IO::println("LEAK-clinit"); return 1 }
+          |}
+          |class Pt {
+          |  static val Z: Int = H::say()
+          |  val x: Int
+          |public:
+          |  def this(x: Int) { this.x = x }
+          |}
+          |static def p(pt: Pt): Boolean ensures result = true""".stripMargin)
+      assert(!o.stdout.contains("LEAK-clinit"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("Pt")), o.toString)
+    }
+
+    it("is not run when a component's class, sampled in turn, has a constructor with an effect") {
+      val o = compile(
+        """class In {
+          |  val v: Int
+          |public:
+          |  def this(v: Int) { IO::println("LEAK-inner"); this.v = v }
+          |}
+          |class Out {
+          |  val i: In
+          |public:
+          |  def this(i: In) { this.i = i }
+          |}
+          |static def p(o: Out): Boolean ensures result = true""".stripMargin)
+      assert(!o.stdout.contains("LEAK-inner"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("In")), o.toString)
+    }
+
+    it("still runs when the parameter's constructor only touches memory, and reports a false one") {
+      val o = compile(
+        """class Pt {
+          |public:
+          |  val x: Int
+          |  def this(x: Int) { this.x = x }
+          |}
+          |static def p(pt: Pt): Boolean ensures result = pt.x < 0""".stripMargin)
+      assert(o.w23.isEmpty, o.toString)
+      assert(o.errors.contains("E0113"), o.toString)
+    }
+  }
+
+  describe("a predicate that reaches another class's static initializer with an effect") {
+    it("gets the initializer wording, naming the class, not a call") {
+      val o = compile(
+        """class Noisy {
+          |  static val X: Int = { IO::println("CLINIT"); 1 }
+          |public:
+          |  static def get(): Int = 1
+          |}
+          |def q(): Boolean
+          |  ensures result {
+          |  return Noisy::get() == 1
+          |}""".stripMargin)
+      assert(!o.stdout.contains("CLINIT"), o.toString)
+      assert(o.w23.size == 1, o.toString)
+      val w = o.w23.head
+      assert(!w.contains("(static initializer)"), o.toString)
+      assert(w.contains("`Noisy`"), o.toString)
+      assert(w.contains(onion.compiler.toolbox.Message("warning.predicateNotRun.initializer", Array[Any]("q", "console", "Noisy"))), o.toString)
+    }
+  }
 }

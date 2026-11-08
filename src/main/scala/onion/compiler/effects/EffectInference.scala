@@ -58,7 +58,9 @@ object EffectInference {
 
   /** One direct call in a body: where it is, what it calls, and the callee's full
    *  effect set. `location` may be null for synthesized nodes — callers fall back. */
-  final case class CallSite(location: onion.compiler.Location, callee: String, effects: Set[Effect])
+  /** `initializerOf` names the class when the site is the first use of a program class that runs its static initializer. */
+  final case class CallSite(location: onion.compiler.Location, callee: String, effects: Set[Effect],
+                            initializerOf: Option[String] = None)
 
   /** Per-method rendering for `--effects`. */
   def infer(classes: Seq[ClassDefinition],
@@ -207,7 +209,8 @@ object EffectInference {
     collector.statement(body)
     collector.rawSites.toSeq.map { raw =>
       CallSite(raw.location, raw.callee,
-        raw.resolved.getOrElse(unitEffects.getOrElse(raw.internal, Set(Effect.Unknown))))
+        raw.resolved.getOrElse(unitEffects.getOrElse(raw.internal, Set(Effect.Unknown))),
+        raw.internal match { case ClassInit(cd) => Some(cd.name); case _ => None })
     }
   }
 

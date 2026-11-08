@@ -2,7 +2,7 @@
 
 - **Compiling no longer runs a contract predicate that prints, does I/O or never ends (#2601).**
   - Before: `ensures result` predicates and `E0112` replays ran whatever they called, including overrides the library calls back (`toString`, `fillInStackTrace`). `onionc` printed, exited, or hung.
-  - Now: only a predicate whose effects are at most `mutate` runs. Others, and any run past 10 seconds, get the new warning `W0023`, which names the call or static initializer that has the effect.
+  - Now: only a predicate whose effects are at most `mutate` runs. Others, and any run past 10 seconds, get the new warning `W0023`, which names the call, static initializer or parameter class that has the effect. Making a sample argument of a program class counts too.
 
 ### Breaking
 

@@ -51,9 +51,49 @@ final class BuildRun(config: CompilerConfig, typed: Seq[TypedAST.ClassDefinition
     def fromCall = found.iterator.flatMap { case (cd, m) =>
       if (m.getBlock == null) Iterator.empty
       else EffectInference.callSites(m.getBlock, typed, unitEffects, table, cd, callbacks = true).iterator
-        .collectFirst { case site if outside(site.effects).nonEmpty => Right(site.callee) }
+        .collectFirst { case site if outside(site.effects).nonEmpty => site.initializerOf.toLeft(site.callee) }
     }.nextOption()
     (all, if (all.isEmpty) None else fromInit.orElse(fromCall))
+  }
+
+  /**
+   * The outside effects of making sample arguments for a predicate's parameters, and the first
+   * program class they come from (the panel's block on #2610). A parameter of a program class is
+   * built by calling its constructor, which first runs its static initializers; a component of a
+   * program class is built the same way, in turn; and a failing sample is shown with its
+   * `toString`. Every constructor counts, so the check never looks at a different one than the
+   * sampler calls. Empty when no parameter is of a program class.
+   */
+  def sampleEffects(owner: Option[String], name: String, arity: Int, static: Boolean): (Set[Effect], Option[String]) = {
+    val params = owners(owner).flatMap(cd => cd.methods.collect {
+      case m: TypedAST.MethodDefinition if m.name == name && m.arguments.length == arity &&
+        Modifier.isStatic(m.modifier) == static => m
+    }).flatMap(_.arguments.toSeq)
+    val seen = scala.collection.mutable.LinkedHashSet[TypedAST.ClassDefinition]()
+    def visit(t: TypedAST.Type): scala.Unit = t match {
+      case ot: TypedAST.ObjectType => byName.get(ot.name).foreach { cd =>
+        if (seen.add(cd)) cd.constructors.foreach {
+          case c: TypedAST.ConstructorDefinition => c.arguments.foreach(visit)
+          case _ =>
+        }
+      }
+      case _ =>
+    }
+    params.foreach(visit)
+    val perClass = seen.toSeq.map(cd => cd -> classSampleEffects(cd))
+    (perClass.flatMap(_._2).toSet, perClass.collectFirst { case (cd, eff) if eff.nonEmpty => cd.name })
+  }
+
+  /** A sampled class's constructors, its static initializers, and its `toString`. */
+  private def classSampleEffects(cd: TypedAST.ClassDefinition): Set[Effect] = {
+    val ctors = cd.constructors.toSeq.collect {
+      case c: TypedAST.ConstructorDefinition => outside(unitEffects.getOrElse(c, Set(Effect.Unknown)))
+    }.flatten
+    val shown = chain(cd).flatMap(_.methods.collect {
+      case m: TypedAST.MethodDefinition if m.name == "toString" && m.arguments.isEmpty &&
+        !Modifier.isStatic(m.modifier) && unitEffects.contains(m) => outside(unitEffects(m))
+    }.flatten)
+    (ctors ++ chain(cd).flatMap(initOf) ++ shown).toSet
   }
 
   /** The outside effects of a class's no-argument constructor and its static initializers; empty when it has neither. */
@@ -108,4 +148,8 @@ object BuildRun {
     case Some(Right(call)) => onion.compiler.toolbox.Message("warning.predicateNotRun.call", Array[Any](name, render(effects), call))
     case None              => onion.compiler.toolbox.Message("warning.predicateNotRun.effects", name, render(effects))
   }
+
+  /** W0023's text for a predicate whose sample arguments of program class `cls` cannot be made without an outside effect. */
+  def notSampledMessage(name: String, effects: Set[Effect], cls: String): String =
+    onion.compiler.toolbox.Message("warning.predicateNotRun.sample", Array[Any](name, render(effects), cls))
 }

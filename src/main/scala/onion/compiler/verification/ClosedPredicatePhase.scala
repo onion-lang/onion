@@ -47,7 +47,9 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
       for (c <- candidates) {
         // The build runs only what cannot reach the outside world (#2601); the rest is said, not run.
         val (effects, from) = build.source(c.owner, c.name, c.arity, static = true)
+        val (sampled, sampledFrom) = build.sampleEffects(c.owner, c.name, c.arity, static = true)
         if (effects.nonEmpty) notRun(c, BuildRun.notRunMessage(c.name, effects, from))
+        else if (sampled.nonEmpty) notRun(c, BuildRun.notSampledMessage(c.name, sampled, sampledFrom.getOrElse("?")))
         else build.timed(loader)(runOne(c, classes, loader)) match {
           case None =>
             notRun(c, Message("warning.predicateNotRun.timeout", c.name, config.contractTimeoutMillis.toString))

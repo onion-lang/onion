@@ -340,6 +340,8 @@ private[compiler] final class MethodBodySupport(
         // exactly as `new A(b = 7, a = 3)` does; the positional path below would put
         // 7 into `a` (#2659).
         context.withArgumentSlots(resolveConstructorWithNamedArgs(node, node.superInits, targetClass, context)).foreach {
+          case (ctor, _, _) if !superConstructorAccessible(node, ctor) =>
+            reportInaccessibleSuperConstructor(node, ctor)
           case (ctor, params, sources) =>
             reportThisBeforeDelegation(params, sources.toSeq)
             val init = new Super(targetClass, ctor.getArgs, params, node.selfDelegation)

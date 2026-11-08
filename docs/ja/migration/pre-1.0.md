@@ -322,3 +322,25 @@ public:
 
 - **表示されるもの:** デフォルト値の位置で **E0000**（型が違う）または **E0002**（名前が見つからない）になります。
 - **`onion migrate` の規則はありません:** どのデフォルト値のつもりだったかは利用者にしかわからないためです。直すか、取り除いてください。
+## `toString` / `hashCode` / `equals` を上書きするレコードのメソッドは、型を変えられなくなりました
+
+これまでレコードの本体では、`Object` のメソッドを別の戻り値の型で定義し直せました。クラスではできません。`toString(): Int` は生成された `toString()` を黙って消していました。`toString(): String?` は `null` を `println` まで届けていました。レコードもクラスと同じ規則に従うようになりました。
+
+```onion
+// 以前: コンパイルでき、println(new R("")) は null を表示
+record R(name: String) {
+public:
+  def toString(): String? = if name == "" { null } else { name }
+}
+
+// 現在: toString の位置で E0000。String を返してください。
+record R(name: String) {
+public:
+  def toString(): String = if name == "" { "(none)" } else { name }
+}
+```
+
+- **表示されるもの:**
+  - 戻り値の型が別の参照型（`String?`、`Object`、`CharSequence`）のときは、メソッドの位置で **E0000** になります。ヒントは、null になりうる値に `?:` を使うよう勧めます。
+  - どちらかの戻り値の型がプリミティブ型（`toString(): Int`、`hashCode(): Long`）のときは **E0104** になります。
+- **`onion migrate` の規則はありません:** `null` の代わりに何を返すかは利用者が決めるためです。

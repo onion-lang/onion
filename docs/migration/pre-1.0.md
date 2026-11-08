@@ -345,3 +345,28 @@ public:
 
 - **What you see:** **E0000** (wrong type) or **E0002** (unknown name) at the default.
 - **No `onion migrate` rule:** only you know which default was meant. Fix it, or remove it.
+## A record method that overrides `toString`, `hashCode` or `equals` must keep its type
+
+A record body could redefine an `Object` method with another return type. A class could not.
+`toString(): Int` silently dropped the generated `toString()`, and `toString(): String?` let a
+`null` reach `println`. A record now follows the class rule.
+
+```onion
+// Before: compiled; println(new R("")) printed null
+record R(name: String) {
+public:
+  def toString(): String? = if name == "" { null } else { name }
+}
+
+// Now: E0000 at toString. Return a String.
+record R(name: String) {
+public:
+  def toString(): String = if name == "" { "(none)" } else { name }
+}
+```
+
+- **What you see:**
+  - **E0000** at the method when the return type is another reference type (`String?`,
+    `Object`, `CharSequence`). Its hint suggests `?:` for a nullable value.
+  - **E0104** when either return type is primitive (`toString(): Int`, `hashCode(): Long`).
+- **No `onion migrate` rule:** what to return instead of `null` is your choice.

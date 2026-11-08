@@ -54,8 +54,7 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
             Some(SemanticError.HISTORY_REPRODUCED.errorCode))
         } else {
           warnings += CompileWarning(r.sourceFile, location, WarningCategory.HistoryNotProved,
-            s"'${r.method.name}' can break the history '${r.history}': for example when ${r.shown}. " +
-              "Add an invariant or a requires that rules this out, or weaken the history")
+            Message("warning.historyNotProved", Array[Any](r.method.name, r.history, r.shown)))
         }
       }
     } finally thread.setContextClassLoader(previous)

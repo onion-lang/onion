@@ -223,6 +223,34 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     val chain = violation(Array("--contracts", "runtime", path))
     assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("history failed")), chain.map(_.getMessage).toString)
 
+  // A class clause names the object's fields, so a parameter that shares a field's name does not
+  // stand in for it (#2633): `set(n)` with the parameter called `n` is the common setter shape.
+  private def setter(arg: String) =
+    s"""class Counter {
+       |  history n >= old(n)
+       |protected:
+       |  var n: Int
+       |public:
+       |  def this { n = 10 }
+       |  def set(n: Int): void { this.n = n }
+       |  def get(): Int = n
+       |}
+       |val c = new Counter()
+       |c.set(Integer::parseInt("$arg"))
+       |println(c.get())
+       |""".stripMargin
+
+  test("--contracts runtime: a history reads the field, not a parameter with its name (#2633)"):
+    val path = writeScript(setter("3"))
+    val chain = violation(Array("--contracts", "runtime", path))
+    assert(chain.exists(t => t.getMessage != null && t.getMessage.contains("history failed")), chain.map(_.getMessage).toString)
+
+  test("--contracts runtime: a setter whose parameter shares the field's name keeps a history that holds"):
+    val path = writeScript(setter("12"))
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    code shouldBe 0
+    out should include("12")
+
   private def staticProgram(arg: String) =
     s"""class Calc {
        |public:

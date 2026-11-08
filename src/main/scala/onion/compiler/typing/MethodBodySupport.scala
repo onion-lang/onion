@@ -132,7 +132,9 @@ private[compiler] final class MethodBodySupport(
     // done before `saved` is built, since typing it adds to the saves.
     // A class's `invariant` and `history` speak about an object, so a static method has neither.
     val invariantTerms = if (isStatic) Seq.empty else definition.invariants.zip(definition.invariantSources)
-    val historyTerms = if (isStatic) Nil else typeContractClauses(definition.historySources, gctx, ContractScope.History)
+    // Its names are the object's fields, so a parameter with a field's name is hidden from it (#2633).
+    val historyTerms = if (isStatic) Nil else
+      gctx.withHidden(args.map(_.name).toSet)(typeContractClauses(definition.historySources, gctx, ContractScope.History))
     val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") } ++
       invariantTerms.map { case (t, s) => guard(t, s, "invariant (on entry)") }
     val ensuresGuards: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") }

@@ -208,7 +208,18 @@ class LocalContext {
 
   def inLoop: Boolean = loopDepth > 0
 
+  // Names a clause typed here must not see (#2633): a class's `history`, re-typed over a
+  // method's guard frame, speaks about the object's fields, not the method's parameters.
+  private var hiddenNames: Set[String] = Set.empty
+
+  def withHidden[A](names: Set[String])(body: => A): A = {
+    val saved = hiddenNames
+    hiddenNames = saved ++ names
+    try body finally hiddenNames = saved
+  }
+
   def lookup(name: String): ClosureLocalBinding = {
+    if hiddenNames.contains(name) then return null
     if readingArgumentSlots then
       val slot = contextFrame.lookup(name + "#arg")
       if slot != null then return slot
@@ -235,7 +246,7 @@ class LocalContext {
    */
   def allNames: Set[String] = {
     if (contextFrame == null) Set.empty
-    else contextFrame.allNames.filterNot(_.contains("#")) // synthetic slots (`n#arg`) are not names a user can write
+    else contextFrame.allNames.filterNot(n => n.contains("#") || hiddenNames.contains(n)) // synthetic slots (`n#arg`) are not names a user can write
   }
 
   /**

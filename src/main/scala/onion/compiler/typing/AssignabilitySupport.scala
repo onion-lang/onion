@@ -113,9 +113,16 @@ private[compiler] final class AssignabilitySupport(
       // A boxed `Integer` fits a `T` slot only by the rule a reference does (#2328):
       // read by erasure, `T` is `Object`, so `def zero(): T = 0` or a default
       // `n: T = 3` compiled and threw in a caller using `T = String` (#2534, #2652).
+      // An applied target (`Comparable[String]`) is matched against the box's own view of
+      // it, not by erasure: `val y: Comparable[String] = 5` is rejected (#2594).
+      val appliedTargetFits = expected match {
+        case applied: AppliedClassType =>
+          TypeRelations.boxSupertypeAccepts(bodyContext.table, applied, boxed.`type`.asInstanceOf[ClassType])
+        case _ => true
+      }
       val fits =
         if (containsTypeVariable(expected)) structurallyAssignable(expected, boxed.`type`)
-        else TypeRules.isAssignable(expected, boxed.`type`)
+        else appliedTargetFits && TypeRules.isAssignable(expected, boxed.`type`)
       if (fits) {
         return if (expected == boxed.`type`) boxed else new AsInstanceOf(node.location, boxed, expected)
       }

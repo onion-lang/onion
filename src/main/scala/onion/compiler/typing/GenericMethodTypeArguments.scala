@@ -348,6 +348,11 @@ private[typing] object GenericMethodTypeArguments {
               views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match
                 case Some(view) => unifyWithApplied(view)
                 case None =>
+            // A primitive argument is passed boxed, so an applied formal reads T off the
+            // box's own view: `id(5)` against `Comparable[T]` binds T = Integer, as Java
+            // infers, instead of leaving T to default to Object (#2594).
+            case bt: BasicType if bt != BasicType.VOID && !bt.isNullType =>
+              unify(apf, typing.boxedTypeArgument(bt), position, returnContext)
             case _ =>
         case _ =>
     }
@@ -395,7 +400,32 @@ private[typing] object GenericMethodTypeArguments {
         // revert to the arg-side binding; the outer assignment handles the nullable
         // promotion without invalidating the receiver type (List[Shape] vs List[Shape?]).
         val inferredBeforeReturn = inferred.toMap
-        unify(formalReturn, expectedReturn, callNode, returnContext = true)
+        // The arguments come first: when they fix every type parameter of the return
+        // type and that return already fits the expected type, the expected type adds
+        // nothing. `val n: Number = id(5)` keeps T = Integer, as javac infers, instead
+        // of conflicting with it (#2594). `val s: Comparable[String] = id(5)` does not
+        // fit, so it still unifies and is rejected.
+        // `isAssignable` reads an applied target by erasure, so `Integer` would "fit"
+        // `Comparable[String]`. A raw class reaching an applied type must have that type
+        // among its own views: `val c: Comparable[String] = id(5)` stays an error (#2594).
+        def appliedViewFits(expected: Type, actual: Type): Boolean = {
+          val target = expected match
+            case n: NullableType => n.innerType
+            case t => t
+          (target, actual) match
+            case (applied: AppliedClassType, raw: ClassType) if !raw.isInstanceOf[AppliedClassType] =>
+              TypeRelations.boxSupertypeAccepts(typing.table_, applied, raw)
+            case _ => true
+        }
+        val returnFitsArgs = {
+          val names = typeParamsIn(formalReturn, paramNames)
+          names.nonEmpty && names.forall(inferred.contains) && {
+            val argReturn = TypeSubstitution.substituteType(formalReturn, classSubst, inferred.toMap, defaultToBound = false)
+            !expectedReturn.isBasicType && TypeRules.isAssignable(expectedReturn, argReturn) &&
+              appliedViewFits(expectedReturn, argReturn)
+          }
+        }
+        if (!returnFitsArgs) unify(formalReturn, expectedReturn, callNode, returnContext = true)
         for ((name, before) <- inferredBeforeReturn) {
           inferred.get(name).foreach { after =>
             if ((after ne before) && (mergeNullability(before, after) eq after))

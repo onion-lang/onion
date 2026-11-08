@@ -40,4 +40,26 @@ class OverrideContractSpec extends AnyFunSpec {
     val src = "class Base {\npublic:\n  def f(x: Int): Int { return x }\n}\nclass Sub extends Base {\npublic:\n  def f(x: Int): Int { return x + 1 }\n}"
     assert(w25(src).isEmpty)
   }
+
+  private def bare(subBody: String) =
+    s"""class Base {
+       |public:
+       |  def twice(x: Int): Int
+       |    requires x >= 0 && x < 1000
+       |    ensures result == x * 2
+       |  { return x * 2 }
+       |}
+       |class Sub extends Base {
+       |public:
+       |  def twice(x: Int): Int { $subBody }
+       |}""".stripMargin
+
+  it("warns about an override with no contract of its own whose body breaks the base's ensures (#2639)") {
+    val ws = w25(bare("return 0 - 1"))
+    assert(ws.size == 1 && ws.head.contains("'twice'"), ws.toString)
+  }
+
+  it("accepts an override with no contract of its own that keeps the base's ensures (#2639)") {
+    assert(w25(bare("return x + x")).isEmpty)
+  }
 }

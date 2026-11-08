@@ -49,4 +49,25 @@ class HistoryNotProvedWarningSpec extends AnyFunSpec {
     val o = compile(src)
     assert(!o.errors.contains("E0112"), o.toString)
   }
+
+  it("fails the build under --warn error when the warning is W0021 (#2595)") {
+    val src =
+      """class Counter {
+        |  history n >= old(n)
+        |public:
+        |  var n: Int
+        |  def this(s: Int) { n = s }
+        |  def inc(): void { n = n + 1 }
+        |}""".stripMargin
+    def run(level: WarningLevel) = {
+      val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = level, contracts = ContractMode.Check)
+      new OnionCompiler(config).compileDetailed(Seq(new StreamInputSource(() => new StringReader(src), "W.on")))
+    }
+    val on = run(WarningLevel.On)
+    assert(on.diagnostics.warnings.exists(_.category.code == "W0021"), on.diagnostics.warnings.toString)
+    assert(on.diagnostics.errors.isEmpty && on.classes.nonEmpty)
+    val strict = run(WarningLevel.Error)
+    assert(strict.diagnostics.errors.nonEmpty, "W0021 must fail the build under --warn error")
+    assert(strict.classes.isEmpty)
+  }
 }

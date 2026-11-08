@@ -428,18 +428,33 @@ val pairs = do[List] {
 // [1a, 1b, 2a, 2b]
 ```
 
-### Mixing with Local Declarations and Side Effects
+### Intermediate Values and Side Effects
 
-You can mix bindings with local declarations and side-effecting statements:
+A do block holds only `x <- expr` binds and a final `yield`. It has no `val`/`var` and no bare statements.
+
+- To name an intermediate value, bind it: `doubled <- Option::some(x * 2)`.
+- To run a side effect, put it in the `yield` block, before the result.
 
 ```onion
+def parseNumber(s: String): Option[Int] = Option::some(JInteger::parseInt(s))
+def validateRange(n: Int): Option[Int] = if n < 100 { Option::some(n) } else { Option::none() }
+
 val result: Option[Int] = do[Option] {
-  x <- parseNumber(input)
-  val doubled = x * 2        // Local declaration
+  x <- parseNumber("21")
+  doubled <- Option::some(x * 2)   // an intermediate value
   y <- validateRange(doubled)
-  println("Valid: " + y) // Side effect
-  yield y
+  yield {
+    println("Valid: " + y)         // a side effect
+    y
+  }
 }
+println(result.get())
+```
+
+Output:
+```
+Valid: 42
+42
 ```
 
 ### Error Short-Circuiting

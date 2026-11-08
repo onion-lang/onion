@@ -523,6 +523,26 @@ final class ConstructionTyping(
    * `VerifyError` at class-load time). Found via `MutationFuzzSpec` mutating
    * a decimal literal down to an `Int` in `run/GameStore.on`.
    */
+  /** `new R(5)` for a `Long?`/`Long` slot: widen the Int to the slot's own
+   *  primitive before boxing, as `val a: Long? = 5` does (#2697). Boxing it
+   *  straight in put an Integer where a Long was expected (VerifyError). */
+  private def widenToBoxedSlot(p: Term, formal: Type): Term = {
+    val slotType = formal match {
+      case n: NullableType => n.innerType
+      case other => other
+    }
+    val slotPrimitive = slotType match {
+      case bt: BasicType => Some(bt)
+      case other => Boxing.unboxedType(bodyContext.table, other)
+    }
+    val from = p.`type`
+    slotPrimitive match {
+      case Some(slot) if slot != BasicType.VOID && slot != BasicType.BOOLEAN && slot != from && TypeRules.isAssignable(slot, from) =>
+        new AsInstanceOf(p.location, p, slot)
+      case _ => p
+    }
+  }
+
   private def adaptToFormals(parameters: Array[Term], formals: Array[Type]): Array[Term] =
     if (parameters.length != formals.length) parameters
     else {
@@ -533,7 +553,7 @@ final class ConstructionTyping(
         val p = parameters(i)
         val f = formals(i)
         out(i) =
-          if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
+          if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, widenToBoxedSlot(p, f))
           else f match {
             case bt: BasicType if p.isBasicType && bt != p.`type` => new AsInstanceOf(p.location, p, bt)
             case _ => p
@@ -823,10 +843,38 @@ final class ConstructionTyping(
     node: AST.NewObject,
     typeRef: ClassType,
     context: LocalContext
-  ): Option[Term] = {
+  ): Option[Term] =
+    resolveConstructorWithNamedArgs(node, node.args, typeRef, context).map { case (ctor, params, _) =>
+      typeRef match {
+        case applied: TypedAST.AppliedClassType =>
+          val appliedCtor = new TypedAST.ConstructorRef {
+            def modifier: Int = ctor.modifier
+            def affiliation: TypedAST.ClassType = applied
+            def name: String = ctor.name
+            def getArgs: Array[TypedAST.Type] = ctor.getArgs
+          }
+          new NewObject(appliedCtor, params)
+        case _ =>
+          new NewObject(ctor, params)
+      }
+    }
+
+  /**
+   * Resolves a constructor of `typeRef` for an argument list with named
+   * arguments, binding each by name and filling omitted ones from their
+   * defaults. Shared by `new A(b = 1)` and the delegations `extends A(b = 1)`
+   * and `: this(b = 1)`, which used to bind them by position (#2659).
+   * Returns the constructor, its full argument list, and the source node of
+   * each argument (null where a default was filled in).
+   */
+  def resolveConstructorWithNamedArgs(
+    node: AST.Node,
+    args: List[AST.Expression],
+    typeRef: ClassType,
+    context: LocalContext
+  ): Option[(ConstructorDefinition, Array[Term], Array[AST.Node])] = {
     // Extract named argument info
-    val namedInfo = extractNamedArgInfo(node.args)
-    val (_, _) = namedInfo
+    val namedInfo = extractNamedArgInfo(args)
 
     // Filter constructors by named argument compatibility
     val candidates = filterConstructorsByNamedArgs(typeRef.constructors.toIndexedSeq, namedInfo)
@@ -837,7 +885,7 @@ final class ConstructionTyping(
           val paramNameSets = typeRef.constructors.collect {
             case cd: ConstructorDefinition => cd.argumentsWithDefaults.map(_.name).toSet
           }
-          node.args.collectFirst {
+          args.collectFirst {
             case named: AST.NamedArgument if !paramNameSets.exists(_.contains(named.name)) => named
           }
         case None => None
@@ -850,7 +898,7 @@ final class ConstructionTyping(
           bodyContext.report(UNKNOWN_PARAMETER_NAME, named, named.name, paramNames)
         case None =>
           // Type the arguments anyway to provide better error messages
-          val parameters = typedTerms(node.args.toArray.filterNot(_.isInstanceOf[AST.NamedArgument]), context)
+          val parameters = typedTerms(args.toArray.filterNot(_.isInstanceOf[AST.NamedArgument]), context)
           bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef,
             if (parameters != null) types(parameters) else Array.empty[Type],
             typeRef.constructors)
@@ -871,20 +919,8 @@ final class ConstructionTyping(
     val ctor = candidates.head.asInstanceOf[ConstructorDefinition]
 
     // Process named arguments and fill defaults
-    processNamedArgsForConstructor(node, node.args, typeRef, ctor, context).map { params =>
-      typeRef match {
-        case applied: TypedAST.AppliedClassType =>
-          val appliedCtor = new TypedAST.ConstructorRef {
-            def modifier: Int = ctor.modifier
-            def affiliation: TypedAST.ClassType = applied
-            def name: String = ctor.name
-            def getArgs: Array[TypedAST.Type] = ctor.getArgs
-          }
-          new NewObject(appliedCtor, params)
-        case _ =>
-          new NewObject(ctor, params)
-      }
-    }
+    val sources = new Array[AST.Node](ctor.argumentsWithDefaults.length)
+    processNamedArgsForConstructor(node, args, typeRef, ctor, context, sources).map(params => (ctor, params, sources))
   }
 
   /**
@@ -948,7 +984,8 @@ final class ConstructionTyping(
     args: List[AST.Expression],
     typeRef: ClassType,
     ctor: ConstructorDefinition,
-    context: LocalContext
+    context: LocalContext,
+    sources: Array[AST.Node]
   ): Option[Array[Term]] = {
     val argsWithDefaults = ctor.argumentsWithDefaults
     val paramNames = argsWithDefaults.map(_.name)
@@ -957,7 +994,6 @@ final class ConstructionTyping(
       TypeSubstitution.substituteType(a.argType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
     val result = new Array[Term](argsWithDefaults.length)
     val filled = new Array[Boolean](argsWithDefaults.length)
-    val sources = new Array[AST.Node](argsWithDefaults.length)
 
     var positionalIndex = 0
     var sawNamed = false

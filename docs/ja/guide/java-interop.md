@@ -144,7 +144,7 @@ thread.start()
 
 ## Javaクラスの拡張
 
-`:` でJavaクラスを継承できます：
+`extends` でJavaクラスを継承できます：
 
 ```onion
 import {

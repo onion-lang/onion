@@ -681,7 +681,7 @@ final class ConstructionTyping(
         }
       } else {
         val p = prelim(i)
-        finalParams(i) = if (!formals(i).isBasicType && p.isBasicType) Boxing.boxForSlot(bodyContext.table, p, formals(i)) else p
+        finalParams(i) = Boxing.adaptArgument(bodyContext.table, p, formals(i))
       }
     }
 
@@ -781,7 +781,7 @@ final class ConstructionTyping(
         }
       } else {
         val p = prelim(i)
-        finalParams(i) = if (!formals(i).isBasicType && p.isBasicType) Boxing.boxForSlot(bodyContext.table, p, formals(i)) else p
+        finalParams(i) = Boxing.adaptArgument(bodyContext.table, p, formals(i))
       }
     }
 

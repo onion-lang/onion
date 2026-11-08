@@ -51,5 +51,30 @@ class NullableArgSitesSpec extends AbstractShellSpec {
       val d = "class P3(val v: Double)\nclass Q3 extends P3(2)"
       assert(Shell.Success(2.0) == run(d, "Double", "(new Q3()).v"))
     }
+    // The lambda-argument constructor paths adapt each argument through the
+    // same step as `new P(5)` (panel on #2703: they only boxed).
+    it("a constructor call with an untyped lambda argument widens it") {
+      val d = "record R(x: Long, f: (Int) -> Int)"
+      assert(Shell.Success(6L) == run(d, "Long", "(new R(5, (y) -> y + 1)).x() + 1L"))
+    }
+    it("a constructor call with a typed lambda argument widens it") {
+      val d = "record R(x: Long, f: (Int) -> Int)"
+      assert(Shell.Success(6L) == run(d, "Long", "(new R(5, (y: Int) -> y + 1)).x() + 1L"))
+    }
+    it("a constructor call with a lambda argument and a Double slot widens it") {
+      val d = "record R(x: Double, f: (Int) -> Int)"
+      assert(Shell.Success(5.0) == run(d, "Double", "(new R(5, (y) -> y + 1)).x()"))
+    }
+    it("a class constructor call with a lambda argument widens it") {
+      val d = "class K(val x: Long, val f: (Int) -> Int)"
+      assert(Shell.Success(5L) == run(d, "Long", "(new K(5, (y) -> y + 1)).x"))
+    }
+  }
+
+  describe("an Int argument for a generic parent's type-argument slot") {
+    it("a superclass constructor call widens it to the type argument") {
+      val d = "class Box[T](val v: T)\nclass LB extends Box[Long?](5)"
+      assert(Shell.Success(5L) == run(d, "Long", "(new LB()).v ?: 0L"))
+    }
   }
 }

@@ -411,11 +411,9 @@ private[compiler] final class MethodBodySupport(
     if (candidates.length != 1) (candidates, params)
     else {
       val formals = substitutedArgs(candidates(0))
-      val adapted = params.zip(formals).map { (p, f) =>
-        if (!f.isBasicType && p.isBasicType) Boxing.boxForSlot(bodyContext.table, p, f)
-        else p
-      }
-      (candidates, adapted)
+      // Adapt against the substituted formals: the erased ones (`Object` for
+      // `Box[Long?]`) would box `5` as an Integer, not a Long.
+      (candidates, Boxing.adaptArguments(bodyContext.table, params, formals))
     }
   }
 

@@ -251,6 +251,47 @@ class ScriptRunnerContractsSpec extends AnyFunSuite with Matchers:
     code shouldBe 0
     out should include("12")
 
+  // Only the method's parameter is hidden from the history, not its name: a local the clause binds
+  // itself under that name still resolves to that local (panel block on #2728).
+  test("--contracts runtime: a val inside the history may share a parameter's name"):
+    val path = writeScript(
+      """class Holder {
+        |  history n >= old(n) && (if n > 0 { val k = n; k > 0 } else { true })
+        |protected:
+        |  var n: Int
+        |public:
+        |  def this { n = 1 }
+        |  def raise(k: Int): void requires k >= n { n = k }
+        |  def get(): Int = n
+        |}
+        |val h = new Holder()
+        |h.raise(5); println(h.get())
+        |""".stripMargin)
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    out should not include "E0002"
+    code shouldBe 0
+    out should include("5")
+
+  test("--contracts runtime: a lambda parameter inside the history may share a parameter's name"):
+    val path = writeScript(
+      """class Counter {
+        |  history n >= old(n) && ((n: Int) -> n <= 0).call(0 - n)
+        |protected:
+        |  var n: Int
+        |public:
+        |  def this { n = 10 }
+        |  def raise(n: Int): void
+        |    requires n >= this.n
+        |  { this.n = n }
+        |  def get(): Int = n
+        |}
+        |val c = new Counter(); c.raise(30); println(c.get())
+        |""".stripMargin)
+    val (code, out) = captureOut(new ScriptRunner().run(Array("--contracts", "runtime", path)))
+    out should not include "ContractViolation"
+    code shouldBe 0
+    out should include("30")
+
   private def staticProgram(arg: String) =
     s"""class Calc {
        |public:

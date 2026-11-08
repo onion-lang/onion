@@ -38,7 +38,7 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
         else
           val sameName = ownByName.getOrElse(rawMethod.name, Nil)
           val specializedArgs = if sameName.isEmpty then null else rawMethod.arguments.map(substituteClassParams)
-          val implOpt = if sameName.isEmpty then None else sameName.find { m =>
+          val candidates = if sameName.isEmpty then Nil else sameName.filter { m =>
             m.arguments.length == specializedArgs.length && (
               if subst.isEmpty then
                 // A non-generic supertype: only a covariant return override, as
@@ -50,6 +50,16 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))
             )
           }
+          // The override is the overload whose parameters are the substituted type
+          // arguments (`n(x: JInteger)` for `n(x: T)` at `T = JInteger`), as in
+          // Java; a primitive one (`n(x: Int)`) is bridged to only when no closer
+          // candidate exists (#2559).
+          val implOpt =
+            if candidates.isEmpty then None
+            else
+              def exactCount(m: TypedAST.Method): Int =
+                m.arguments.indices.count(i => m.arguments(i).name == specializedArgs(i).name)
+              Some(candidates.reduceLeft((a, b) => if exactCount(b) > exactCount(a) then b else a))
 
           implOpt.foreach { impl =>
             // In an interface only a default method (one with a body) has code to bridge to.

@@ -565,10 +565,22 @@ final class SelectExpressionTyping(
       case typePattern @ AST.TypePattern(_, name, typeRef) =>
         val mappedType = typing.mapFrom(typeRef).getOrElse(break((null, NoBindings, false, None)))
 
-        if (!mappedType.isObjectType) {
+        val primitiveName = mappedType match {
+          case bt: BasicType if bt != BasicType.VOID && conditionType.isObjectType => Some(bt)
+          case _ => None
+        }
+
+        if (primitiveName.isEmpty && !mappedType.isObjectType) {
           bodyContext.report(INCOMPATIBLE_TYPE, typePattern, bodyContext.table.rootClass, mappedType)
           break((null, NoBindings, false, None))
         }
+
+        if (primitiveName.isDefined) {
+          // A primitive name (`case n is Long:`) tests the boxed wrapper, as `o is Long`
+          // does, and binds the unboxed value (#2721).
+          bindingInfo = SingleBinding(name, primitiveName.get)
+          new InstanceOf(new RefLocal(bind), primitiveName.get)
+        } else {
 
         // Create instanceof check. The check itself is on the erased class:
         // the JVM has no type arguments at runtime, so `x is Some` can only
@@ -582,6 +594,7 @@ final class SelectExpressionTyping(
         bindingInfo = SingleBinding(name, TypeSubst.specializeFromScrutinee(mappedType, conditionType, typing))
 
         instanceOfCheck
+        }
 
       case AST.BindingPattern(loc, name) =>
         // Simple binding pattern - matches everything and binds the value

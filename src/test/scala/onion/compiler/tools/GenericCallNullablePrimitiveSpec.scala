@@ -41,6 +41,21 @@ class GenericCallNullablePrimitiveSpec extends AbstractShellSpec {
           |    return a.toString()""".stripMargin
       assert(Shell.Success("[10, 1]") == run(body, "String"))
     }
+    it("T fixed only by an expected Int? stays unboxed, so a lambda's x!! still picks remove(int)") {
+      val feed =
+        """  static def feed[T](v: Object, f: (T) -> String): T {
+          |    f(v as T)
+          |    return null
+          |  }""".stripMargin
+      val body =
+        """    val a = new java.util.ArrayList[Int]()
+          |    a.add(10)
+          |    a.add(20)
+          |    a.add(1)
+          |    val r: Int? = feed(1) { x -> a.remove(x!!).toString() }
+          |    return a.toString()""".stripMargin
+      assert(Shell.Success("[10, 1]") == run(body, "String", feed))
+    }
     it("an Int? argument into an Int? result") {
       assert(Shell.Success(3) == run("    val w: Int? = 3\n    val r: Int? = ident(w)\n    return r ?: -1", "Int"))
     }

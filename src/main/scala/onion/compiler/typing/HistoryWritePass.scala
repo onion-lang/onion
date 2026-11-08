@@ -30,7 +30,19 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
   private case object Lower extends Kind
   private case object SetConst extends Kind
   private case object Other extends Kind
-  private final case class Write(field: String, kind: Kind, node: AST.Node)
+  /**
+   * A write to `field`. `bare` is a write through the plain name, which a parameter or local of
+   * the same name would shadow; `this.t` and `o.t` are not bare.
+   */
+  private final case class Write(field: String, kind: Kind, node: AST.Node, bare: Boolean, inLambda: Boolean = false) {
+    def ofField(m: AST.MethodDeclaration, f: String): Boolean = field == f && !(bare && declaredNames(m).contains(f))
+  }
+  /**
+   * A write of this object's field: `bare` is the plain name, `this.t` and `self.t` are not bare.
+   * A write through any other receiver is not followed here: it is E0110 (design 3.2, rule 2;
+   * [[ContractFramingPass]]), whatever its receiver's class.
+   */
+  private final case class Slot(field: String, bare: Boolean)
 
   /** The solver's counterexamples, for the phase that tries to reproduce them by running the code. */
   def counterexamples(units: Seq[AST.CompilationUnit]): Seq[Repro] = {
@@ -89,12 +101,11 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     } yield (field, op)
     if (relations.nonEmpty) {
       val perMethod: Seq[(AST.MethodDeclaration, Seq[Write])] =
-        for (c <- chain; m <- methodsOf(c) if m.block != null) yield (m, writesIn(m.block))
+        for (c <- chain; m <- methodsOf(c) if m.block != null) yield (m, writesIn(m, c))
       for {
-        (m, writes) <- methodsOf(cls).filter(_.block != null).map(m => (m, writesIn(m.block)))
-        shadowed = declaredNames(m)
-        w <- writes if !shadowed.contains(w.field)
-        (field, op) <- relations.distinct if field == w.field
+        (m, writes) <- methodsOf(cls).filter(_.block != null).map(m => (m, writesIn(m, cls)))
+        (field, op) <- relations.distinct
+        w <- writes if w.ofField(m, field)
         problem <- problemOf(op, w.kind, field, perMethod)
       } if (reporting) typing.report(SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)", problem._1, problem._2)
       // After the codegen the solver is asked again to reproduce counterexamples; under `--contracts
@@ -115,8 +126,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
       c <- conjuncts(h) if HistoryPreorder.simpleRelations(c).isEmpty
       named = namesIn(c).filter(fields.contains)
       m <- methodsOf(cls) if m.block != null
-      shadowed = declaredNames(m)
-      w <- writesIn(m.block).find(w => named.contains(w.field) && !shadowed.contains(w.field))
+      w <- writesIn(m, cls).find(w => named.exists(w.ofField(m, _)))
     } unchecked += Unchecked(unitFile, cls, m, w.field, None, line = Option(h.location).map(_.line).getOrElse(0), fieldType = None)
   }
 
@@ -164,21 +174,40 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     val callees: Map[String, AST.MethodDeclaration] =
       chain.reverse.flatMap(methodsOf).map(m => m.name -> m).toMap
     for {
-      m <- methodsOf(cls) if m.block != null && !writesIn(m.block).exists(w => relations.exists(_._1 == w.field) && brokenSyntactically(w, relations, chain))
+      m <- methodsOf(cls) if m.block != null && !writesIn(m, cls).exists(w => relations.exists(r => w.ofField(m, r._1)) && brokenSyntactically(w, relations, chain))
       (field, op) <- relations
-    } HistoryProver.prove(m, field, op, intFields, invariants, callees, builtCallees(m)) match {
+    } hiddenWrite(writesIn(m, cls).filter(_.ofField(m, field))) match {
+      // A write in a lambda, which the body-only checks cannot follow, is said as such at its line (#2599).
+      case Some(w) =>
+        unchecked += Unchecked(unitFile, cls, m, field, Some(s"$field $op old($field)"), line = lineOf(w.node),
+          fieldType = None, reason = Some(("lambda", "")), at = w.node.location)
+      case None => HistoryProver.prove(m, field, op, intFields, invariants, callees, builtCallees(m)) match {
       case HistoryProver.Counterexample(before) =>
         if (collected != null) collected += Repro(unitFile, cls, m, field, op, before)
+      // A proof may lean on a class invariant only once something checks that invariant: until
+      // then a constructor can break it unseen (#2602). So the solver is asked again without the
+      // invariants; a proof that needs them is W0024, and the runtime guard stays. Only a method
+      // that writes the field can break the history, so one that only reads it is not asked (#2671).
+      case HistoryProver.Proved if invariants.nonEmpty && writesIn(m, cls).exists(_.ofField(m, field)) &&
+          HistoryProver.prove(m, field, op, intFields, Nil, callees, builtCallees(m)) != HistoryProver.Proved =>
+        unchecked += Unchecked(unitFile, cls, m, field, Some(s"$field $op old($field)"), line = 0,
+          fieldType = None, reason = Some(("invariant", "")))
       case HistoryProver.Proved =>
         proved += s"${cls.name}.${m.name}: $field $op old($field)"
         if (dropsProvedGuards) dropGuard(cls.name, m.name, s"$field $op old($field)")
-      case HistoryProver.Unsupported if writesIn(m.block).exists(w => w.field == field && !declaredNames(m).contains(field)) =>
+      case HistoryProver.Unsupported if writesIn(m, cls).exists(_.ofField(m, field)) =>
         val ty = fieldTypes(chain).get(field)
         unchecked += Unchecked(unitFile, cls, m, field, Some(s"$field $op old($field)"), line = 0,
           fieldType = ty.filter(_ != "Int"))
       case _ =>
     }
+    }
   }
+
+  /** A write the solver cannot see: one inside a lambda. */
+  private def hiddenWrite(ws: Seq[Write]): Option[Write] = ws.find(_.inLambda)
+
+  private def lineOf(n: AST.Node): Int = Option(n.location).map(_.line).getOrElse(0)
 
   /**
    * The contracts of methods of types built in an earlier compilation, for the parameters of `m`
@@ -197,7 +226,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     } yield (typeName, method.name) -> callee).toMap
 
   private def brokenSyntactically(w: Write, relations: Seq[(String, String)], chain: Seq[AST.ClassDeclaration]): Boolean = {
-    val perMethod = for (c <- chain; m <- methodsOf(c) if m.block != null) yield (m, writesIn(m.block))
+    val perMethod = for (c <- chain; m <- methodsOf(c) if m.block != null) yield (m, writesIn(m, c))
     relations.exists { case (f, op) => f == w.field && problemOf(op, w.kind, f, perMethod).isDefined }
   }
 
@@ -239,43 +268,73 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
   private def methodsOf(c: AST.ClassDeclaration): Seq[AST.MethodDeclaration] =
     (c.defaultSection.toSeq ++ c.sections).flatMap(_.members).collect { case m: AST.MethodDeclaration => m }
 
-  /** Parameters and locals of a method: a bare name that is one of them is not the field. */
-  private def declaredNames(m: AST.MethodDeclaration): Set[String] = {
-    val names = Set.newBuilder[String]
-    m.args.foreach(a => names += a.name)
-    def visit(n: AST.Node): Unit = {
-      n match {
-        case l: AST.LocalVariableDeclaration => names += l.name
-        case _ =>
-      }
-      ASTWalk.visitChildren(n)(visit)
-    }
-    visit(m.block)
-    names.result()
-  }
+  /**
+   * Parameters and locals of a method: a bare name that is one of them is not the field. A
+   * lambda's own names shadow only inside the lambda, which [[writesIn]] handles (#2599).
+   */
+  private def declaredNames(m: AST.MethodDeclaration): Set[String] =
+    m.args.map(_.name).toSet ++ localsIn(m.block)
 
-  private def writesIn(block: AST.Node): Seq[Write] = {
+  /**
+   * Every write `m` makes to a field of this object (#2597): in its body, and inside the lambdas
+   * it creates, since a lambda may run during the call.
+   */
+  private def writesIn(m: AST.MethodDeclaration, owner: AST.ClassDeclaration): Seq[Write] = {
     val out = Seq.newBuilder[Write]
-    def visit(n: AST.Node): Unit = {
+    def visit(n: AST.Node, hidden: Set[String], inLambda: Boolean): Unit = {
+      def add(lhs: AST.Expression, node: AST.Node, kind: Slot => Kind): Unit =
+        slotOf(lhs, hidden).foreach(s => out += Write(s.field, kind(s), node, s.bare, inLambda))
       n match {
-        case a: AST.Assignment => fieldOf(a.lhs).foreach(f => out += Write(f, assignKind(f, a.rhs), a))
-        case a: AST.AdditionAssignment => fieldOf(a.lhs).foreach(f => out += Write(f, deltaKind(a.rhs, 1), a))
-        case a: AST.SubtractionAssignment => fieldOf(a.lhs).foreach(f => out += Write(f, deltaKind(a.rhs, -1), a))
-        case u: AST.PostIncrement => fieldOf(u.term).foreach(f => out += Write(f, Raise, u))
-        case u: AST.PostDecrement => fieldOf(u.term).foreach(f => out += Write(f, Lower, u))
+        case c: AST.ClosureExpression =>
+          // Its own parameters and locals shadow a field of the same name inside it.
+          if (c.body != null) visit(c.body, hidden ++ c.args.map(_.name) ++ localsIn(c.body), inLambda = true)
+        case a: AST.Assignment => add(a.lhs, a, s => assignKind(s, a.rhs, hidden))
+        case a: AST.AdditionAssignment => add(a.lhs, a, _ => deltaKind(a.rhs, 1))
+        case a: AST.SubtractionAssignment => add(a.lhs, a, _ => deltaKind(a.rhs, -1))
+        // `*=`, `/=`, `%=` and the bitwise forms move the field either way; the solver decides (#2603).
+        case a: (AST.MultiplicationAssignment | AST.DivisionAssignment | AST.ModuloAssignment |
+                 AST.BitAndAssignment | AST.BitOrAssignment | AST.XorAssignment | AST.LeftShiftAssignment |
+                 AST.MathRightShiftAssignment | AST.LogicalRightShiftAssignment) =>
+          add(a.lhs, a, _ => Other)
+        case u: AST.PostIncrement => add(u.term, u, _ => Raise)
+        case u: AST.PostDecrement => add(u.term, u, _ => Lower)
         case _ =>
       }
-      ASTWalk.visitChildren(n)(visit)
+      if (!n.isInstanceOf[AST.ClosureExpression]) ASTWalk.visitChildren(n)(visit(_, hidden, inLambda))
     }
-    visit(block)
+    visit(m.block, Set.empty, inLambda = false)
     out.result()
   }
 
-  private def assignKind(field: String, rhs: AST.Expression): Kind = rhs match {
-    case e if constant(e).isDefined => SetConst
-    case AST.Addition(_, l, r) if fieldOf(l).contains(field) => deltaKind(r, 1)
-    case AST.Subtraction(_, l, r) if fieldOf(l).contains(field) => deltaKind(r, -1)
-    case _ => Other
+  /** The locals `n` declares, not counting those of the lambdas inside it. */
+  private def localsIn(n: AST.Node): Set[String] = localDecls(n).map(_.name).toSet
+
+  private def localDecls(n: AST.Node): Seq[AST.LocalVariableDeclaration] = {
+    val out = Seq.newBuilder[AST.LocalVariableDeclaration]
+    def visit(x: AST.Node): Unit = x match {
+      case _: AST.ClosureExpression => ()
+      case l: AST.LocalVariableDeclaration => out += l; ASTWalk.visitChildren(x)(visit)
+      case _ => ASTWalk.visitChildren(x)(visit)
+    }
+    if (n != null) ASTWalk.visitChildren(n)(visit)
+    out.result()
+  }
+
+  private def slotOf(e: AST.Expression, hidden: Set[String]): Option[Slot] = e match {
+    case AST.Id(_, n) if !hidden.contains(n) => Some(Slot(n, bare = true))
+    case AST.UnqualifiedFieldReference(_, n) if !hidden.contains(n) => Some(Slot(n, bare = true))
+    case AST.MemberSelection(_, _: AST.CurrentInstance, n) => Some(Slot(n, bare = false))
+    case _ => None
+  }
+
+  private def assignKind(slot: Slot, rhs: AST.Expression, hidden: Set[String]): Kind = {
+    def same(e: AST.Expression) = slotOf(e, hidden).exists(_.field == slot.field)
+    rhs match {
+      case e if constant(e).isDefined => SetConst
+      case AST.Addition(_, l, r) if same(l) => deltaKind(r, 1)
+      case AST.Subtraction(_, l, r) if same(l) => deltaKind(r, -1)
+      case _ => Other
+    }
   }
 
   /** `sign` is +1 for adding `e` and -1 for subtracting it. Only a constant is classified. */
@@ -316,8 +375,11 @@ object HistoryWritePass {
   /**
    * A write to `field` in `method` that no check settled. `history` is the simple relation the
    * solver could not decide, or none for a history of another form (then `line` names it).
-   * `fieldType` is set when the field is not an `Int`, which the solver does not model.
+   * `fieldType` is set when the field is not an `Int`, which the solver does not model. `reason` is
+   * a write the body-only checks cannot follow (`lambda`), reported `at` the write rather than at
+   * the method (#2599), or a proof that holds only by assuming a class invariant (`invariant`, #2602).
    */
   final case class Unchecked(sourceFile: String, cls: AST.ClassDeclaration, method: AST.MethodDeclaration,
-                             field: String, history: Option[String], line: Int, fieldType: Option[String])
+                             field: String, history: Option[String], line: Int, fieldType: Option[String],
+                             reason: Option[(String, String)] = None, at: onion.compiler.Location = null)
 }

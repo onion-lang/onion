@@ -54,8 +54,7 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
             Some(SemanticError.HISTORY_REPRODUCED.errorCode))
         } else {
           warnings += CompileWarning(r.sourceFile, location, WarningCategory.HistoryNotProved,
-            s"'${r.method.name}' can break the history '${r.history}': for example when ${r.shown}. " +
-              "Add an invariant or a requires that rules this out, or weaken the history")
+            Message("warning.historyNotProved", Array[Any](r.method.name, r.history, r.shown)))
         }
       }
     } finally thread.setContextClassLoader(previous)
@@ -73,14 +72,17 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
     val method = s"${u.cls.name}.${u.method.name}"
     val message = u.history match {
       case Some(h) =>
-        val reason = u.fieldType match {
-          case Some(t) => Message("warning.historyNotChecked.reason.type", u.field, t)
-          case None    => Message("warning.historyNotChecked.reason.body")
+        val reason = (u.reason, u.fieldType) match {
+          // A write the checks cannot follow names its line and why (#2599).
+          case (Some(("lambda", _)), _)   => Message("warning.historyNotChecked.reason.lambda", u.line.toString)
+          case (Some(("invariant", _)), _) => Message("warning.historyNotChecked.reason.invariant")
+          case (_, Some(t))               => Message("warning.historyNotChecked.reason.type", u.field, t)
+          case _                          => Message("warning.historyNotChecked.reason.body")
         }
         Message("warning.historyNotChecked", Array[Any](method, u.field, h, reason))
       case None => Message("warning.historyNotChecked.form", Array[Any](method, u.field, u.line.toString))
     }
-    CompileWarning(u.sourceFile, u.method.location, WarningCategory.HistoryNotChecked, message)
+    CompileWarning(u.sourceFile, Option(u.at).getOrElse(u.method.location), WarningCategory.HistoryNotChecked, message)
   }
 
   /** Whether running the method from the solver's state breaks the history. False when it cannot be run. */

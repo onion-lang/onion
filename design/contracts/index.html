@@ -5715,7 +5715,7 @@ is forbidden is <code>other.n = 0</code> on a different object, which no call to
 <p>The check needs no solver. <code>reset</code> assigns the constant <code>0</code> to a field whose history says
 <code>n &gt;= old(n)</code>, and <code>Counter.inc</code> raises <code>n</code>, so <code>n</code> can be above <code>0</code> when <code>reset</code> runs. That is
 a fact about the syntax of the two methods, not a guess about a run. §7.1 gives the full rule,
-including what the syntax does not report (a class whose only write is <code>n = 0</code> needs <code>invariant n == 0</code> for the solver to prove it). Anything
+including what the syntax does not report (a class whose only write is <code>n = 0</code> needs <code>invariant n == 0</code>, and until the invariant itself is proved that proof is W0024, #2602). Anything
 harder waits for the prover.</p>
 <h3 id="42-interfaces">4.2 Interfaces<a class="headerlink" href="#42-interfaces" title="Permanent link">&para;</a></h3>
 <p>An interface has no fields. Its contracts use pure observer methods, which must be public:</p>
@@ -6004,7 +6004,7 @@ So E0109 is reported only when the syntax settles it. Take the history <code>n &
 <tr>
 <td><code>n = c</code>, and nothing raises <code>n</code></td>
 <td><strong>no syntactic error</strong>; the solver decides</td>
-<td>The syntax alone cannot tell where <code>n</code> starts. The solver checks the write against the class <code>invariant</code>s: with <code>invariant n == 0</code> a write of <code>0</code> is proved fine; with no invariant, <code>n</code> could start above <code>c</code>, and the write has a counterexample (below)</td>
+<td>The syntax alone cannot tell where <code>n</code> starts. The solver checks the write against the class <code>invariant</code>s: with <code>invariant n == 0</code> a write of <code>0</code> holds, but until something proves the invariant itself at compile time (planned) a proof that needs it is W0024 and keeps its guard (#2602); with no invariant, <code>n</code> could start above <code>c</code>, and the write has a counterexample (below)</td>
 </tr>
 <tr>
 <td>any other expression</td>

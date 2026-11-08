@@ -133,6 +133,30 @@ object Boxing {
    * Returns the primitive type that the given reference type can be unboxed to.
    * Returns None if the type cannot be unboxed.
    */
+  /** Box a primitive argument for a reference-typed parameter slot. An `Int`
+   *  for a `Long?`/`Long`/`Double?` slot is widened to the slot's primitive
+   *  first, so the box is a `Long`, not an `Integer` (#2697, #2701). Every
+   *  argument site (`new`, `super(...)`, `this(...)`, `copy`, lambda-argument
+   *  retyping) goes through here, so the rule has one home. */
+  def boxForSlot(table: ClassTable, term: TypedAST.Term, formal: TypedAST.Type): TypedAST.Term = {
+    val slotType = formal match {
+      case n: TypedAST.NullableType => n.innerType
+      case other => other
+    }
+    val slotPrimitive = slotType match {
+      case bt: TypedAST.BasicType => Some(bt)
+      case other => unboxedType(table, other)
+    }
+    val from = term.`type`
+    val widened = slotPrimitive match {
+      case Some(slot) if slot != TypedAST.BasicType.VOID && slot != TypedAST.BasicType.BOOLEAN && slot != from &&
+          TypedAST.TypeRules.isAssignable(slot, from) =>
+        new TypedAST.AsInstanceOf(term.location, term, slot)
+      case _ => term
+    }
+    boxing(table, widened)
+  }
+
   def unboxedType(table: ClassTable, `type`: TypedAST.Type): Option[TypedAST.BasicType] = {
     if (!`type`.isObjectType) None
     else {

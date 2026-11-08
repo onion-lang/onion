@@ -364,9 +364,22 @@ private[compiler] final class MethodBodySupport(
           bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
         else
           warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
-          val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
+          val init = new Super(targetClass, matched(0).getArgs, widenIntoNullableSlots(params, matched(0).getArgs), node.selfDelegation)
           finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
+    }
+
+  /** `extends P(5)` / `this(5)` for a `Long?` parameter: the constructor matched
+   *  by numeric widening, so the Int must be widened to the slot's primitive and
+   *  boxed here, as `new P(5)` does (#2701). Other arguments are left alone. */
+  private def widenIntoNullableSlots(params: Array[Term], formals: Array[Type]): Array[Term] =
+    if (params == null || params.length != formals.length) params
+    else params.zip(formals).map { (p, f) =>
+      val slotIsBox = f match {
+        case n: NullableType => n.innerType.isBasicType || Boxing.unboxedType(bodyContext.table, n.innerType).isDefined
+        case other => Boxing.unboxedType(bodyContext.table, other).isDefined
+      }
+      if (p.isBasicType && !f.isBasicType && slotIsBox) Boxing.boxForSlot(bodyContext.table, p, f) else p
     }
 
   /** W0012 for a `null` argument to an Onion-declared super/self constructor's
@@ -412,7 +425,7 @@ private[compiler] final class MethodBodySupport(
     else {
       val formals = substitutedArgs(candidates(0))
       val adapted = params.zip(formals).map { (p, f) =>
-        if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
+        if (!f.isBasicType && p.isBasicType) Boxing.boxForSlot(bodyContext.table, p, f)
         else p
       }
       (candidates, adapted)

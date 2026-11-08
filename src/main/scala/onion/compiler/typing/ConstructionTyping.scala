@@ -523,26 +523,6 @@ final class ConstructionTyping(
    * `VerifyError` at class-load time). Found via `MutationFuzzSpec` mutating
    * a decimal literal down to an `Int` in `run/GameStore.on`.
    */
-  /** `new R(5)` for a `Long?`/`Long` slot: widen the Int to the slot's own
-   *  primitive before boxing, as `val a: Long? = 5` does (#2697). Boxing it
-   *  straight in put an Integer where a Long was expected (VerifyError). */
-  private def widenToBoxedSlot(p: Term, formal: Type): Term = {
-    val slotType = formal match {
-      case n: NullableType => n.innerType
-      case other => other
-    }
-    val slotPrimitive = slotType match {
-      case bt: BasicType => Some(bt)
-      case other => Boxing.unboxedType(bodyContext.table, other)
-    }
-    val from = p.`type`
-    slotPrimitive match {
-      case Some(slot) if slot != BasicType.VOID && slot != BasicType.BOOLEAN && slot != from && TypeRules.isAssignable(slot, from) =>
-        new AsInstanceOf(p.location, p, slot)
-      case _ => p
-    }
-  }
-
   private def adaptToFormals(parameters: Array[Term], formals: Array[Type]): Array[Term] =
     if (parameters.length != formals.length) parameters
     else {
@@ -553,7 +533,7 @@ final class ConstructionTyping(
         val p = parameters(i)
         val f = formals(i)
         out(i) =
-          if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, widenToBoxedSlot(p, f))
+          if (!f.isBasicType && p.isBasicType) Boxing.boxForSlot(bodyContext.table, p, f)
           else f match {
             case bt: BasicType if p.isBasicType && bt != p.`type` => new AsInstanceOf(p.location, p, bt)
             case _ => p
@@ -718,7 +698,7 @@ final class ConstructionTyping(
         }
       } else {
         val p = prelim(i)
-        finalParams(i) = if (!formals(i).isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p) else p
+        finalParams(i) = if (!formals(i).isBasicType && p.isBasicType) Boxing.boxForSlot(bodyContext.table, p, formals(i)) else p
       }
     }
 
@@ -818,7 +798,7 @@ final class ConstructionTyping(
         }
       } else {
         val p = prelim(i)
-        finalParams(i) = if (!formals(i).isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p) else p
+        finalParams(i) = if (!formals(i).isBasicType && p.isBasicType) Boxing.boxForSlot(bodyContext.table, p, formals(i)) else p
       }
     }
 

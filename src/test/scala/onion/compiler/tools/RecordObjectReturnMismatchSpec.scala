@@ -30,6 +30,11 @@ class RecordObjectReturnMismatchSpec extends AbstractShellSpec {
       assert(codes(body("  def equals(o: Object): Int = 1")) == Seq(Some("E0104")))
     }
 
+    it("rejects a reference return toString cannot override, String? included, with E0000 (as a class)") {
+      assert(codes(body("  def toString(): String? = if name == \"\" { null } else { name }")) == Seq(Some("E0000")))
+      assert(codes(body("  def toString(): Object = name")) == Seq(Some("E0000")))
+    }
+
     it("still accepts a matching toString and a different-parameter overload") {
       assert(codes(body("  def toString(): String = \"r\"")).isEmpty)
       assert(codes(body("  def equals(o: Object, n: Int): Int = 1")).isEmpty)

@@ -312,7 +312,11 @@ final class ExpressionFormTyping(
     for {
       target <- typed(node.target, context)
       destinationType <- typing.mapFrom(node.typeRef, bodyContext.mapper)
-    } yield new InstanceOf(target, destinationType)
+    } yield {
+      // `instanceof` tests a reference; a primitive operand is tested boxed.
+      val operand = if (target.isBasicType && !(target.`type` eq BasicType.VOID)) Boxing.boxing(bodyContext.table, target) else target
+      new InstanceOf(operand, destinationType)
+    }
 
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =
     body.typed(node, context, expected)

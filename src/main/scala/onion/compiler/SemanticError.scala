@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0114) for identification
+ * type checking. Each error has a unique code (E0000-E0115) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -87,8 +87,8 @@ package onion.compiler
  * '''Enum Errors (E0098-E0099)'''
  *   - ADT_ENUM_MIXES_SHARED_PARAMS, HOMOGENEOUS_ENUM_WITH_TYPE_PARAMETERS
  *
- * '''Contract Errors (E0105-E0114)'''
- *   - CONTRACTS_NOT_ENABLED, CONTRACT_NOT_PURE, CONTRACT_MISPLACED, HISTORY_NOT_PREORDER, HISTORY_BROKEN_BY_WRITE, CONTRACT_FIELD_NOT_VALUE, CONTRACT_JAVA_SUPERCLASS, HISTORY_REPRODUCED, CLOSED_PREDICATE_FALSE, SHAPE_CONTRACT_BROKEN
+ * '''Contract Errors (E0105-E0114), and E0115'''
+ *   - CONTRACTS_NOT_ENABLED, CONTRACT_NOT_PURE, CONTRACT_MISPLACED, HISTORY_NOT_PREORDER, HISTORY_BROKEN_BY_WRITE, CONTRACT_FIELD_NOT_VALUE, CONTRACT_JAVA_SUPERCLASS, HISTORY_REPRODUCED, CLOSED_PREDICATE_FALSE, SHAPE_CONTRACT_BROKEN, SUPER_CALL_ABSTRACT_METHOD
  *
  * '''Pattern Matching Errors, continued (E0100)'''
  *   - MULTIPLE_BINDING_PATTERNS_IN_CASE
@@ -398,6 +398,11 @@ object SemanticError {
    * is not `Ok(v)` although `canPrint()` and `printable(v)` hold. Raised by the ShapeContract phase.
    */
   case object SHAPE_CONTRACT_BROKEN extends SemanticError(114)
+  /**
+   * `super.f()` where the superclass's `f` has no body: the call compiled, then failed at run time with
+   * AbstractMethodError (issue #2656). Java rejects it as well.
+   */
+  case object SUPER_CALL_ABSTRACT_METHOD extends SemanticError(115)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

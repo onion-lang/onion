@@ -1632,6 +1632,10 @@ object SemanticErrorReporter {
       "error.semantic.staticMethodWithoutBody",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.SUPER_CALL_ABSTRACT_METHOD -> ErrorDef(
+      "error.semantic.superCallAbstractMethod",
+      Seq(items => asString(items(0)), items => typeName(items(1)))
+    ),
     SemanticError.PRIVATE_ABSTRACT_METHOD -> ErrorDef(
       "error.semantic.privateAbstractMethod",
       Seq(items => asString(items(0)))

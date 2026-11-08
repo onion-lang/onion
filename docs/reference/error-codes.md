@@ -1262,6 +1262,27 @@ Fix: override `printable` to say which values the shape can print, or fix `print
 A shape with `canPrint() == false` owes nothing. A value type that cannot be sampled is the
 warning `W0022`, never a silent pass.
 
+
+### `E0115` — `super` call to an abstract method
+
+`super.f()` runs the superclass's own body. If `f` is abstract there, or is left open by an
+abstract class that implements an interface, there is no body to run. Without this error the
+call compiled and threw `AbstractMethodError`.
+
+```onion
+abstract class Base {
+public:
+  abstract def f(): Int
+}
+class Child extends Base {
+public:
+  override def f(): Int = 2
+  def g(): Int = super.f()   // E0115
+}
+```
+
+Fix: call the override on `self` (`f()`), or give the superclass method a body.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -2036,6 +2057,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0112` | this method breaks the history … when run from … |
 | `E0113` | the closed predicate … is … when the build runs it |
 | `E0114` | the Shape … breaks its round-trip contract |
+| `E0115` | `super.…(...)` calls an abstract method of … |
 
 ## See also
 

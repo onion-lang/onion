@@ -1251,6 +1251,27 @@ public:
 `canPrint() == false` の shape は何も求められません。サンプルを作れない値型は、黙って通さず
 警告 `W0022` になります。
 
+
+### `E0115` — abstract メソッドへの `super` 呼び出し
+
+`super.f()` はスーパークラス自身の本体を実行します。そこで `f` が abstract だと、実行する本体がありません。
+インターフェースを実装した abstract クラスが残した未実装メソッドも同じです。このエラーがないころは、
+コンパイルは通り、実行時に `AbstractMethodError` になりました。
+
+```onion
+abstract class Base {
+public:
+  abstract def f(): Int
+}
+class Child extends Base {
+public:
+  override def f(): Int = 2
+  def g(): Int = super.f()   // E0115
+}
+```
+
+直し方: `self` 側のオーバーライドを呼ぶ（`f()`）か、スーパークラスのメソッドに本体を与えます。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -2020,6 +2041,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0112` | this method breaks the history … when run from … |
 | `E0113` | the closed predicate … is … when the build runs it |
 | `E0114` | the Shape … breaks its round-trip contract |
+| `E0115` | `super.…(...)` calls an abstract method of … |
 
 ## 関連項目
 

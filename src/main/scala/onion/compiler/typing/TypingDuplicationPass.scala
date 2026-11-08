@@ -258,6 +258,12 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
         if (clashesWithGeneratedMethod(arg.name, field))
           typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type],
             SemanticErrorReporter.RecordComponentClash(field.`type`, overridesFinal = arg.name == "getClass"))
+        else if (changesObjectMethodReturn(arg.name, field))
+          // `hashCode: Long` gives the accessor `hashCode()J`: the JVM loads it next to
+          // Object's `hashCode()I`, so one object answers two different hashCode() calls
+          // (#2546). Java rejects `record R(long hashCode)` as well.
+          typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type],
+            SemanticErrorReporter.RecordComponentClash(field.`type`, otherReturnType = true))
       }
     }
   }
@@ -272,6 +278,10 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       case "getClass" => erasedDescriptor(field) == "Ljava/lang/Class;"
       case _ => false
     })
+
+  // A component named like a no-argument Object method but typed differently.
+  private def changesObjectMethodReturn(name: String, field: FieldRef): Boolean =
+    field != null && (name == "hashCode" || name == "toString")
 
   private def erasedDescriptor(field: FieldRef): String =
     onion.compiler.generics.Erasure.asmType(field.`type`).getDescriptor

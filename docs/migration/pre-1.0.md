@@ -264,3 +264,19 @@ public:
   not a silent skip. `--contracts` is on by default (`check`).
 - **Seed and samples:** `--law-seed` and `--law-samples` are now `--contract-seed` and `--contract-samples`; `--no-check-laws` is gone (use `--contracts off`).
 - **`onion.Shape`:** a class that implements it needs at least one such predicate that uses it (E0080).
+
+## A record component named `hashCode` or `toString` must not change that method's type
+
+`record R(hashCode: Long)` gave one object two `hashCode()` answers: the accessor, and the
+`Int` one a `HashMap` uses. It is now an error, as `hashCode: Int` and `toString: String` were.
+
+```onion
+// Before: compiled, r.hashCode() = 5, (r as Object).hashCode() = 36
+record R(hashCode: Long)
+
+// Now: E0010. Rename the component.
+record R(code: Long)
+```
+
+- **What you see:** **E0010** at the component, for `hashCode` or `toString` of any type.
+- **No `onion migrate` rule:** the new name and the code that reads it are your choice.

@@ -247,3 +247,18 @@ public:
   `--contracts` は既定で有効（`check`）です。
 - **シードとサンプル数:** `--law-seed` と `--law-samples` は `--contract-seed` と `--contract-samples` になり、`--no-check-laws` は無くなりました（`--contracts off` を使います）。
 - **`onion.Shape`:** 実装するクラスは、それを使う述語を少なくとも1つ必要とします（なければ E0080）。
+
+## `hashCode` / `toString` という名前の成分は、そのメソッドの型を変えられなくなりました
+
+`record R(hashCode: Long)` は、1つのオブジェクトが `hashCode()` に2通りの答えを返していました。アクセサの値と、`HashMap` が使う `Int` の値です。`hashCode: Int` や `toString: String` と同じく、エラーになりました。
+
+```onion
+// 以前: コンパイルでき、r.hashCode() は 5、(r as Object).hashCode() は 36
+record R(hashCode: Long)
+
+// 現在: E0010。成分の名前を変えてください。
+record R(code: Long)
+```
+
+- **表示されるもの:** `hashCode` または `toString` の成分は、型にかかわらず成分の位置で **E0010** になります。
+- **`onion migrate` の規則はありません:** 新しい名前と、それを読むコードは利用者が決めるためです。

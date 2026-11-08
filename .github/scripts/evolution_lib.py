@@ -220,10 +220,12 @@ VERDICT = re.compile(r"^verdict:\s*(APPROVED|BLOCKED)\s*$", re.M)
 
 
 def diff_fingerprint(files):
-    """A hash of the PR's own change: per file, its name, status and the +/- lines of its patch.
+    """A hash of the PR's own change: per file, its name, status and every line of its patch.
 
-    Context lines and `@@` positions are left out, so merging `main` into the branch does not
-    change it unless the merge alters a line the PR itself adds or removes. A file with no patch
+    Only each `@@` header is reduced to a hunk separator: its line numbers and heading move
+    when `main` is merged in, so such a merge keeps the hash. The context lines stay in, so
+    the same +/- lines next to other code are another change (#2578); a merge that edits a
+    line next to a hunk changes the hash too, which only means a fresh review. A file with no patch
     (binary, or too large) is told apart by its blob sha. None when the files API was cut off
     (`FILES_API_LIMIT`): then the diff cannot be judged and only an exact head matches."""
     if len(files) >= FILES_API_LIMIT:
@@ -236,8 +238,7 @@ def diff_fingerprint(files):
             h.update(f"B\0{fl.get('sha', '')}\n".encode())
             continue
         for line in patch.split("\n"):
-            if line[:1] in ("+", "-"):
-                h.update(line.encode() + b"\n")
+            h.update(b"@@\n" if line.startswith("@@") else line.encode() + b"\n")
     return h.hexdigest()
 
 

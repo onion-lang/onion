@@ -159,7 +159,8 @@ Aliasing is the usual way "one call at a time" breaks. These rules close it in t
    a primitive, `String`, an enum, or a record whose components are value types.
    A field that holds a mutable object (`List`, an array, another class) cannot be named.
 2. A field named by an `invariant` or `history` is written **only through `this`**, in its own
-   class **or in a subclass**. `o.n = 0` with `o` another instance is an error. A write through
+   class **or in a subclass**. `o.n = 0` with `o` another instance is an error (E0110), whatever
+   `o` is declared as, also in a factory that made `o` with `new` and from outside the hierarchy. A write through
    `this` is allowed because it can be checked: that is exactly what the history of §3.3 and
    §4.1 is for. The field must not be visible outside the class and its subclasses (`private`,
    `protected` or `val`), so outside code cannot change it without a call that is checked.
@@ -480,6 +481,19 @@ So E0109 is reported only when the syntax settles it. Take the history `n >= old
 | `n = c`, and some method of the class or its supertypes **raises** `n` (`n = n + k`, `k` positive) | **E0109**, and the message names that method | `n` can exceed `c`, because that method raises it. The reason is a fact in the syntax |
 | `n = c`, and nothing raises `n` | **no syntactic error**; the solver decides | The syntax alone cannot tell where `n` starts. The solver checks the write against the class `invariant`s: with `invariant n == 0` a write of `0` is proved fine; with no invariant, `n` could start above `c`, and the write has a counterexample (below) |
 | any other expression | `Not proved` | The prover decides (stage 7) |
+
+**What counts as a write** (#2597, #2599). A write by a method is any assignment, `+=`, `-=`,
+`++` or `--` to the field through `this` (bare `n`, `this.n`, `self.n`), including inside a
+lambda the body creates (the lambda may run during the call). A write the syntax does not
+settle as breaking the history gets W0024 at its line when it is inside a lambda, since the
+solver reads only the method body.
+
+A write of the field through any other reference is not a history question at all: it is
+E0110 by §3.2 rule 2, whatever the reference's declared type (`o: C`, `cs[0]`, a factory's
+`val c = new C()`, a superclass, a class outside the hierarchy). The type checker has already
+resolved which field a write targets and whether its receiver is `this`, so the rule needs no
+reading of names or scopes. The fix is a method call on that object, whose own writes are
+checked, or a constructor argument.
 
 The same reasoning applies to a history `n <= old(n)` with the directions swapped, and to
 `x == old(x)`, where any write to `x` through a method that is not a constructor is reported.

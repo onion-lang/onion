@@ -155,7 +155,15 @@ private[compiler] object MethodResolution {
     // Narrowing (Onion's `takesByte(100)`) only rescues a call nothing else accepts.
     val applicableMethods =
       val strict = all.iterator.filter(m => support.applicable(m, narrowConstants = false)).toList
-      if strict.nonEmpty then strict else all.iterator.filter(support.applicable).toList
+      val found = if strict.nonEmpty then strict else all.iterator.filter(support.applicable).toList
+      // A slot typed by a class type variable (`List[T]` inside `N[T]`) is matched above
+      // through T's bound, so `List[Number]` passes it; the argument check after selection
+      // does not. Prefer the overloads that check would accept (Java picks `f(Object)`,
+      // #2555); when none does, keep them all so the error stays the one it was.
+      if found.length < 2 then found
+      else
+        val fitting = found.filter(support.typeVariableSlotsFit)
+        if fitting.nonEmpty then fitting else found
     if applicableMethods.isEmpty then return new Array[Method](0)
     if applicableMethods.length == 1 then return Array(applicableMethods.head)
 

@@ -209,16 +209,13 @@ private[typing] object GenericMethodTypeArguments {
       if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArg(right))
       else TypeRules.isSuperType(left, right)
 
-    // A limit that is an Onion type variable (`T` or `T?`) takes only its own values, not
-    // whatever fits its bound.
-    def fitsBothLimits(upper: Type, lower: Type): Boolean = isSuperTypeForBounds(upper, lower) && (upper match {
-      case tv: TypeVariableType => TypeCheckingHelpers.fitsTypeVariable(tv, lower)
-      case n: NullableType => n.innerType match {
-        case tv: TypeVariableType => TypeCheckingHelpers.fitsTypeVariable(tv, lower)
-        case _ => true
-      }
-      case _ => true
-    })
+    // A limit takes a value only as the shared join rule does: a type variable (`T`, `T?`)
+    // takes only its own values, and type arguments that mention one must match, at any
+    // depth (`List[List[T]]` does not take an `ArrayList[Object]`, #2431).
+    def fitsBothLimits(upper: Type, lower: Type): Boolean = {
+      val l = if (!upper.isBasicType && lower.isBasicType) boxedTypeArg(lower) else lower
+      TypeCheckingHelpers.joinsStrictly(typing.table_, upper, l)
+    }
 
     def isAssignableForBounds(left: Type, right: Type): Boolean =
       if (!left.isBasicType && right.isBasicType) TypeRules.isAssignable(left, boxedTypeArg(right))

@@ -75,7 +75,7 @@ class ClosedPredicateSpec extends AnyFunSpec {
     new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "C.on"))) match {
       case CompilationOutcome.Failure(errs) =>
         val e = errs.find(_.errorCode.contains("E0113")).getOrElse(fail("no E0113"))
-        assert(e.message.contains("returned false"))
+        assert(e.message.contains("false"), e.message) // "returned false" (en) / "false を返しました" (ja)
       case _ => fail("a false predicate must be E0113")
     }
   }

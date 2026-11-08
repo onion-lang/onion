@@ -348,6 +348,11 @@ private[typing] object GenericMethodTypeArguments {
               views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match
                 case Some(view) => unifyWithApplied(view)
                 case None =>
+            // A primitive argument is passed boxed, so an applied formal reads T off the
+            // box's own view: `id(5)` against `Comparable[T]` binds T = Integer, as Java
+            // infers, instead of leaving T to default to Object (#2594).
+            case bt: BasicType if bt != BasicType.VOID && !bt.isNullType =>
+              unify(apf, typing.boxedTypeArgument(bt), position, returnContext)
             case _ =>
         case _ =>
     }

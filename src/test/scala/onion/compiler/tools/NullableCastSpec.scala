@@ -199,5 +199,22 @@ class NullableCastSpec extends AbstractShellSpec {
           |""".stripMargin, "AssignToNullableArgBoxView.on", Array())
       assert(Shell.Success(1011) == r)
     }
+    it("binds an unpinned T from the box's own view of a primitive argument") {
+      val r = shell.run(
+        """def id[T](c: Comparable[T]): Comparable[T] = c
+          |def f[T](c: Comparable[T]): Int = 1
+          |def main(args: String[]): Int {
+          |  val r = id(5)
+          |  val l = id(9L)
+          |  return r.compareTo(5) + l.compareTo(9L) + f(5) * 10 + id(3).compareTo(1) * 100
+          |}
+          |""".stripMargin, "BindTFromBoxView.on", Array())
+      assert(Shell.Success(110) == r)
+    }
+    it("still rejects a use at a type argument the box does not have") {
+      val msgs = compileErrors(
+        "def id[T](c: Comparable[T]): Comparable[T] = c\ndef main(args: String[]): void {\n  val s: Comparable[String] = id(5)\n}\n")
+      assert(msgs.contains("E0000") || msgs.contains("E0005"), s"expected an error, got: $msgs")
+    }
   }
 }

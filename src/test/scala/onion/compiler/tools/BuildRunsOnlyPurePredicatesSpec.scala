@@ -384,6 +384,72 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
     }
   }
 
+  describe("calls the language inserts, and what the callback rule reaches") {
+    it("does not run a predicate whose try-with-resources closes a resource with an effect") {
+      val o = compile(
+        """class R conforms AutoCloseable {
+          |public:
+          |  def this {}
+          |  def close(): void { IO::println("CLOSE RAN") }
+          |}
+          |def p(): Boolean ensures result {
+          |  try (val r = new R()) { }
+          |  return true
+          |}""".stripMargin)
+      assert(!o.stdout.contains("CLOSE RAN"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("p") && w.contains("console")), o.toString)
+    }
+
+    it("counts a resource's close() in a tool, since the language calls it") {
+      val o = compile(
+        """class R conforms AutoCloseable {
+          |public:
+          |  def this {}
+          |  def close(): void { IO::println("CLOSE RAN") }
+          |}
+          |tool use(): Int {
+          |  try (val r = new R()) { }
+          |  return 1
+          |}""".stripMargin)
+      assert(o.errors.contains("E0077"), o.toString)
+    }
+
+    it("keeps the library-callback over-approximation out of tool capability checks") {
+      val o = compile(
+        """class Item {
+          |public:
+          |  val n: Int
+          |  def this(n: Int) { this.n = n }
+          |  override def toString(): String { IO::println("dbg"); return "item" }
+          |}
+          |tool count(k: Int): Int {
+          |  val xs = new java.util.ArrayList[Item]()
+          |  xs.add(new Item(k))
+          |  return xs.size
+          |}""".stripMargin)
+      assert(o.errors.isEmpty, o.toString)
+      assert(!o.stdout.contains("dbg"), o.toString)
+    }
+
+    it("still skips a predicate that hands such an object to library code") {
+      val o = compile(
+        """class Item {
+          |public:
+          |  def this {}
+          |  override def toString(): String { IO::println("dbg"); return "item" }
+          |}
+          |def p(): Boolean ensures result {
+          |  val xs = new java.util.ArrayList[Item]()
+          |  xs.add(new Item())
+          |  return xs.size == 1
+          |}""".stripMargin)
+      assert(!o.stdout.contains("dbg"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(_.contains("Item::toString")), o.toString)
+    }
+  }
+
   describe("the E0112 replay of a history counterexample") {
     it("does not run a constructor with an outside effect") {
       val o = compile(

@@ -79,7 +79,8 @@ object EffectInference {
    * effect set. Exposed for [[onion.compiler.typing.CapabilityCheckPass]], which needs
    * to resolve callees by definition object.
    */
-  def inferUnits(classes: Seq[ClassDefinition], table: EffectTable.Table = EffectTable.builtin)
+  def inferUnits(classes: Seq[ClassDefinition], table: EffectTable.Table = EffectTable.builtin,
+                 callbacks: Boolean = false)
       : (mutable.LinkedHashMap[Unit0, (String, String, Seq[String])], Map[Unit0, Set[Effect]]) = {
     val units = mutable.LinkedHashMap[Unit0, (String, String, Seq[String])]()
     for (cd <- classes) {
@@ -99,13 +100,13 @@ object EffectInference {
     val base = mutable.LinkedHashMap[Unit0, Set[Effect]]()
     val edges = mutable.LinkedHashMap[Unit0, Set[Unit0]]()
     for ((u, _) <- units) {
-      val collector = walk(u, units.keySet, classes, table)
+      val collector = walk(u, units.keySet, classes, table, callbacks)
       base(u) = collector.effects.toSet
       edges(u) = collector.internalCallees.toSet
     }
     for (cd <- classes if cd.staticInitializers.nonEmpty) {
       val init = ClassInit(cd)
-      val collector = walk(init, units.keySet, classes, table)
+      val collector = walk(init, units.keySet, classes, table, callbacks)
       base(init) = collector.effects.toSet
       edges(init) = collector.internalCallees.toSet
     }
@@ -175,10 +176,10 @@ object EffectInference {
 
   /** A collector that has walked `unit`'s body. */
   private def walk(unit: Unit0, units: collection.Set[Unit0], classes: Seq[ClassDefinition],
-                   table: EffectTable.Table): Collector = {
+                   table: EffectTable.Table, callbacks: Boolean = false): Collector = {
     val collector = new Collector(units, classes, table,
       inConstructor = unit.isInstanceOf[ConstructorDefinition], owner = ownerOf(unit),
-      inClassInit = unit.isInstanceOf[ClassInit])
+      inClassInit = unit.isInstanceOf[ClassInit], callbacks = callbacks)
     unit match {
       case md: MethodDefinition =>
         if (md.getBlock != null) collector.statement(md.getBlock)
@@ -201,8 +202,8 @@ object EffectInference {
   def callSites(body: ActionStatement, classes: Seq[ClassDefinition],
                 unitEffects: Map[Unit0, Set[Effect]],
                 table: EffectTable.Table = EffectTable.builtin,
-                owner: ClassDefinition = null): Seq[CallSite] = {
-    val collector = new Collector(unitEffects.keySet, classes, table, owner = owner)
+                owner: ClassDefinition = null, callbacks: Boolean = false): Seq[CallSite] = {
+    val collector = new Collector(unitEffects.keySet, classes, table, owner = owner, callbacks = callbacks)
     collector.statement(body)
     collector.rawSites.toSeq.map { raw =>
       CallSite(raw.location, raw.callee,
@@ -219,8 +220,8 @@ object EffectInference {
   def termEffects(term: Term, classes: Seq[ClassDefinition],
                   unitEffects: Map[Unit0, Set[Effect]],
                   table: EffectTable.Table = EffectTable.builtin,
-                  owner: ClassDefinition = null): (Set[Effect], Seq[CallSite]) = {
-    val collector = new Collector(unitEffects.keySet, classes, table, owner = owner)
+                  owner: ClassDefinition = null, callbacks: Boolean = false): (Set[Effect], Seq[CallSite]) = {
+    val collector = new Collector(unitEffects.keySet, classes, table, owner = owner, callbacks = callbacks)
     collector.term(term)
     val sites = collector.rawSites.toSeq.map { raw =>
       CallSite(raw.location, raw.callee,
@@ -315,7 +316,8 @@ object EffectInference {
    */
   private final class Collector(units: collection.Set[Unit0], classes: Seq[ClassDefinition],
                                 table: EffectTable.Table, inConstructor: Boolean = false,
-                                owner: ClassDefinition = null, inClassInit: Boolean = false) {
+                                owner: ClassDefinition = null, inClassInit: Boolean = false,
+                                callbacks: Boolean = false) {
     val effects = mutable.Set[Effect]()
     val internalCallees = mutable.LinkedHashSet[Unit0]()
     val rawSites = mutable.Buffer[RawSite]()
@@ -400,21 +402,41 @@ object EffectInference {
      * `toString`, a map literal `hashCode`, `==` `equals`, and any library method may call
      * what the value's class overrides. So the hand-off carries those overrides' effects
      * (#2601, rule 3 on the issue).
+     *
+     * This over-approximates (`ArrayList.add` never calls `toString`), which costs the build
+     * only a predicate it does not run. A `tool`'s capability check or `--effects` would
+     * instead report an effect the code does not have, so only the build turns it on.
      */
     private def toLibrary(values: Iterable[Term], location: onion.compiler.Location,
                           only: Set[String] = null): scala.Unit =
-      if (libraryCallbacks.nonEmpty)
+      if (callbacks && libraryCallbacks.nonEmpty)
         for (v <- values if v != null) handOff(valueClasses(v), location, only)
 
     /** Library code holds an instance of one of `owners`: it may call any library method they override. */
     private def handOff(owners: Seq[ClassDefinition], location: onion.compiler.Location,
                         only: Set[String] = null): scala.Unit =
-      for {
+      if (callbacks) for {
         cd <- owners
         md <- libraryCallbacks.getOrElse(cd.name, Nil) if only == null || only.contains(md.name)
       } if (internalCallees.add(Callback(md)))
           rawSites += RawSite(location,
             onion.compiler.toolbox.TypeFormatting.methodReference(md.affiliation, md.name), None, Callback(md))
+
+    /**
+     * The program `close()` methods a try-with-resources can call on `resource`: those of
+     * every program class the value can be an instance of. A library class's own `close()`
+     * is not counted here, as before.
+     */
+    private def closes(resource: Term, location: onion.compiler.Location): scala.Unit =
+      if (resource != null) for {
+        cd <- compatible(resource.`type`)
+        md <- cd.methods.collect {
+          case m: MethodDefinition if m.name == "close" && m.arguments.isEmpty &&
+            !Modifier.isStatic(m.modifier) && units.contains(m) => m
+        }
+      } if (internalCallees.add(md))
+          rawSites += RawSite(location,
+            onion.compiler.toolbox.TypeFormatting.methodReference(md.affiliation, md.name), None, md)
 
     /** Whether `cls` is `ancestor` or extends or conforms to it, by erased name. */
     private def inherits(cls: TypedAST.ClassType, ancestor: String): Boolean = {
@@ -542,6 +564,8 @@ object EffectInference {
       case t: Try =>
         t.resources.foreach { case (_, r) => term(r) }
         statement(t.tryStatement)
+        // Leaving the block calls each resource's `close()`: a program class's own runs then.
+        t.resources.foreach { case (_, r) => closes(r, here(t.location)) }
         t.catchStatements.foreach(statement)
         statement(t.finallyStatement)
       case _: Break | _: Continue | _: NOP => ()

@@ -16,7 +16,7 @@ import onion.compiler.effects.{Effect, EffectInference, EffectTable}
 final class BuildRun(config: CompilerConfig, typed: Seq[TypedAST.ClassDefinition]) {
   private lazy val table: EffectTable.Table = EffectTable.forClasspath(config.classPath).table
   private lazy val unitEffects: Map[EffectInference.Unit0, Set[Effect]] =
-    EffectInference.inferUnits(typed, table)._2
+    EffectInference.inferUnits(typed, table, callbacks = true)._2
 
   private def owners(owner: Option[String]): Seq[TypedAST.ClassDefinition] = owner match {
     case Some(o) => typed.filter(cd => cd.name == o || cd.name.endsWith("." + o))
@@ -50,7 +50,7 @@ final class BuildRun(config: CompilerConfig, typed: Seq[TypedAST.ClassDefinition
     val fromInit = initEffects.collectFirst { case (cd, eff) if eff.nonEmpty => Left(cd.name) }
     def fromCall = found.iterator.flatMap { case (cd, m) =>
       if (m.getBlock == null) Iterator.empty
-      else EffectInference.callSites(m.getBlock, typed, unitEffects, table, cd).iterator
+      else EffectInference.callSites(m.getBlock, typed, unitEffects, table, cd, callbacks = true).iterator
         .collectFirst { case site if outside(site.effects).nonEmpty => Right(site.callee) }
     }.nextOption()
     (all, if (all.isEmpty) None else fromInit.orElse(fromCall))

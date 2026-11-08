@@ -6,5 +6,6 @@
 
 ### Breaking
 
-- **A `tool` that lists `unknown` only because it builds its own generic class is now `E0078`.**
-  - `new Box[String]()` of a program class is now seen as the program's own constructor, not an unlisted call. Remove `unknown` from `requires`.
+- **A `tool`'s `requires` is checked against more of what its body runs.** The error names the capability to add or remove.
+  - `E0077`: a call that can dispatch to a program override, a static initializer the tool's code triggers, and a try-with-resources `close()` now count.
+  - `E0078`: `new Box[String]()` of a program class is no longer an unlisted call, so an `unknown` kept only for it is now unused.

@@ -320,3 +320,29 @@ record R(code: Long)
 - **What you see:** **E0010** at the component, for `hashCode`, `toString` or `getClass` of any
   type, in a record or an `enum` case.
 - **No `onion migrate` rule:** the new name and the code that reads it are your choice.
+
+## A record method that overrides `toString`, `hashCode` or `equals` must keep its type
+
+A record body could redefine an `Object` method with another return type. A class could not.
+`toString(): Int` silently dropped the generated `toString()`, and `toString(): String?` let a
+`null` reach `println`. A record now follows the class rule.
+
+```onion
+// Before: compiled; println(new R("")) printed null
+record R(name: String) {
+public:
+  def toString(): String? = if name == "" { null } else { name }
+}
+
+// Now: E0000 at toString. Return a String.
+record R(name: String) {
+public:
+  def toString(): String = if name == "" { "(none)" } else { name }
+}
+```
+
+- **What you see:**
+  - **E0000** at the method when the return type is another reference type (`String?`,
+    `Object`, `CharSequence`). Its hint suggests `?:` for a nullable value.
+  - **E0104** when either return type is primitive (`toString(): Int`, `hashCode(): Long`).
+- **No `onion migrate` rule:** what to return instead of `null` is your choice.

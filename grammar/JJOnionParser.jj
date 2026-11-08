@@ -929,7 +929,19 @@ public class JJOnionParser implements Parser {
         continue;
       }
       i++;
-      b.append(unescapeChar(s.charAt(i)));
+      char e = s.charAt(i);
+      if(e >= '0' && e <= '7'){
+        // Octal escape, as in Java: \0..\377 (up to three digits when the first is 0-3).
+        int v = e - '0';
+        int max = e <= '3' ? 2 : 1;
+        for(int n = 0; n < max && i + 1 < len && s.charAt(i + 1) >= '0' && s.charAt(i + 1) <= '7'; n++){
+          i++;
+          v = v * 8 + (s.charAt(i) - '0');
+        }
+        b.append((char)v);
+      }else{
+        b.append(unescapeChar(e));
+      }
     }
     return new String(b);
   }

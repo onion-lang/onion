@@ -28,6 +28,7 @@ object Modifier {
   final val ENUM = 4096
   final val SYNTHETIC_RECORD = 8192  // Auto-generated record methods
   final val SYNTHETIC_INTERFACE_FORWARD = 16384  // Forwards to a superinterface's default method
+  final val SYNTHETIC = 32768  // Compiler-generated member the source never names (ACC_SYNTHETIC)
 
   def check(modifier: Int, bitFlag: Int): Boolean = {
      (modifier & bitFlag) != 0
@@ -91,6 +92,10 @@ object Modifier {
 
   def isSyntheticInterfaceForward(modifier: Int): Boolean = {
      check(modifier, SYNTHETIC_INTERFACE_FORWARD)
+  }
+
+  def isSynthetic(modifier: Int): Boolean = {
+     check(modifier, SYNTHETIC)
   }
 
 }

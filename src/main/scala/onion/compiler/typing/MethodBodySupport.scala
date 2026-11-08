@@ -183,13 +183,13 @@ private[compiler] final class MethodBodySupport(
    * works through any receiver, and every override inherits it.
    */
   def processBodilessDefaults(method: MethodDefinition, args: List[AST.Argument]): Unit =
-    if args.exists(_.defaultValue != null) then
+    if args.exists(_.defaultValue != null) && !predefinedDefaults.contains(method) then
       val context = new LocalContext
       if (method.modifier & AST.M_STATIC) != 0 then context.setStatic(true)
       context.setMethod(method)
       bindParameters(context, args, method.arguments, null)
       method.setArgumentsWithDefaults(
-        buildArgumentsWithDefaults(args, method.arguments, context, DefaultOwner(method.name, method.modifier, method.typeParameters)))
+        buildArgumentsWithDefaults(args, method.arguments, context.recordUsage, DefaultOwner(method.name, method.modifier, method.typeParameters)))
 
   /**
    * The clauses of a method with no body: an interface method or an `abstract def` (RFC #2557,

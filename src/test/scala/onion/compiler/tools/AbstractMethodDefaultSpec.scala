@@ -33,6 +33,31 @@ class AbstractMethodDefaultSpec extends AbstractShellSpec {
       assert(Shell.Success("5,7") == result)
     }
 
+    it("lets a call written above the abstract method omit the argument") {
+      val result = shell.run(
+        """
+          |abstract class A {
+          |public:
+          |  def this {}
+          |  def run(): Int = f()
+          |  abstract def f(n: Int = 9): Int
+          |}
+          |class B extends A {
+          |public:
+          |  def this {}
+          |  def f(n: Int): Int = n + 1
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String = "" + (new B()).run()
+          |}
+          |""".stripMargin,
+        "AbstractDefaultAbove.on",
+        Array()
+      )
+      assert(Shell.Success("10") == result)
+    }
+
     it("lets a call through an interface omit the argument") {
       val result = shell.run(
         """

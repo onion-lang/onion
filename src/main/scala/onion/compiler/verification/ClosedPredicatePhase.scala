@@ -23,7 +23,12 @@ import scala.collection.mutable.ArrayBuffer
 final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]] {
   def name: String = "ClosedPredicate"
 
-  private final case class Candidate(owner: Option[String], name: String, arity: Int, sourceFile: String, location: onion.compiler.Location)
+  /**
+   * `owner` is the class to look in; for a top-level function it is the unit's own top-level class.
+   * `topLevelState` is true when that unit declares top-level `val`/`var`s: the script's `start`
+   * method sets them, and the build does not run it, so a predicate reading one sees it unset.
+   */
+  private final case class Candidate(owner: Option[String], name: String, arity: Int, sourceFile: String, location: onion.compiler.Location, topLevel: Boolean = false, topLevelState: Boolean = false)
 
   def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] = {
     if (config.contracts != ContractMode.Check || !config.runContracts) return classes
@@ -59,7 +64,8 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
   private def candidatesOf(unit: AST.CompilationUnit): Seq[Candidate] =
     unit.toplevels.flatMap {
       case f: AST.FunctionDeclaration if isBoolean(f.returnType) && assertsResult(f.ensures) =>
-        Seq(Candidate(None, f.name, f.args.size, unit.sourceFile, f.location))
+        Seq(Candidate(Some(topClassOf(unit)), f.name, f.args.size, unit.sourceFile, f.location,
+          topLevel = true, topLevelState = unit.toplevels.exists(t => t.isInstanceOf[AST.GlobalVariableDeclaration] || t.isInstanceOf[AST.LocalVariableDeclaration])))
       case c: AST.ClassDeclaration =>
         (c.defaultSection.toSeq ++ c.sections).flatMap(_.members).collect {
           case m: AST.MethodDeclaration if qualifies(m) => Candidate(Some(c.name), m.name, m.args.size, unit.sourceFile, m.location)
@@ -71,12 +77,19 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
       case _ => Nil
     }
 
+  /** The class the compiler gives a unit's top-level code (`<file>Main`, inside the unit's module). */
+  private def topClassOf(unit: AST.CompilationUnit): String = {
+    val simple = onion.compiler.toolbox.Paths.cutExtension(unit.sourceFile) + "Main"
+    if (unit.module != null) unit.module.name + "." + simple else simple
+  }
+
   private def qualifies(m: AST.MethodDeclaration): Boolean =
     Modifier.isStatic(m.modifiers) && isBoolean(m.returnType) && assertsResult(m.ensures)
 
   /** `None` when the predicate holds (or cannot be found); the reason when it is false or throws. */
   private def runOne(c: Candidate, classes: Seq[CompiledClass], loader: ClassLoader): Option[String] = {
     val owners = c.owner match {
+      case Some(o) if c.topLevel => classes.filter(_.className == o)
       case Some(o) => classes.filter(cc => cc.className == o || cc.className.endsWith("." + o))
       case None    => classes
     }
@@ -94,6 +107,11 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
       // A parameter that cannot be sampled must not pass silently: that would look like a predicate that held.
       if (bad >= 0) Some(s"not checkable: it cannot sample a parameter of type ${types(bad).getSimpleName}")
       else combos(perParam).iterator.map(args => call(m, args)).collectFirst { case Some(why) => why }
+        .map { why =>
+          if (c.topLevelState && why.startsWith("returned false"))
+            "not checkable: it may read a top-level val or var, which the build has not set (a script sets them when it starts). Put the predicate in a class or object"
+          else why
+        }
     }
   }
 

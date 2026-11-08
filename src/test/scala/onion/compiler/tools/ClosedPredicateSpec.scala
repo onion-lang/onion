@@ -44,6 +44,22 @@ class ClosedPredicateSpec extends AnyFunSpec {
     assert(codes(src).contains("E0113"))
   }
 
+  it("runs a top-level predicate, not a same-named static method of another class (#2604)") {
+    val src = "class Other {\npublic:\n  static def check(): Boolean\n    = false\n}\ndef check(): Boolean\n  ensures result\n  = true\n"
+    assert(codes(src).isEmpty)
+  }
+
+  it("does not call a top-level predicate false when the script's own top-level val is not set yet (#2604)") {
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, contracts = ContractMode.Check)
+    val src = "val limit = 3\ndef within(): Boolean\n  ensures result\n  = limit == 3\n"
+    new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "C.on"))) match {
+      case CompilationOutcome.Failure(errs) =>
+        val e = errs.find(_.errorCode.contains("E0113")).getOrElse(fail("no E0113"))
+        assert(!e.message.contains("returned false"))
+      case _ => succeed
+    }
+  }
+
   it("does nothing when contracts are off") {
     assert(!codes("def sums(): Boolean\n  = 1 + 1 == 3\n", ContractMode.Off).contains("E0113"))
   }

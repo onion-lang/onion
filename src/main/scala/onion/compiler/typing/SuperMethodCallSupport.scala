@@ -9,6 +9,10 @@ private[compiler] final class SuperMethodCallSupport(
   calls: MethodCallTyping
 ) {
   def typeSuperMethodCall(node: AST.SuperMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
+    if (context.isStatic) {
+      bodyContext.report(SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE, node)
+      return None
+    }
     val parameters = calls.typedTerms(node.args.toArray, context)
     if (parameters == null) return None
     val contextClass = bodyContext.definition

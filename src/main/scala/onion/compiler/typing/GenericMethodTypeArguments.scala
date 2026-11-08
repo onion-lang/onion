@@ -271,6 +271,10 @@ private[typing] object GenericMethodTypeArguments {
             // A smart-cast non-null view of a variable still binds the
             // declared variable, so occurrences across arguments stay eq
             case tva: TypedAST.TypeVariableType => tva.widen
+            // `Int?` as an expected return: box inside the `?`, so it merges
+            // with the boxed `Integer` the arguments gave (issue #2666)
+            case n: TypedAST.NullableType if n.innerType.isBasicType && n.innerType != BasicType.VOID =>
+              TypedAST.NullableType.of(typing.boxedTypeArgument(n.innerType))
             case other => other
           }
           inferred.get(tv.name) match {

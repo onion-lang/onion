@@ -320,3 +320,28 @@ record R(code: Long)
 - **What you see:** **E0010** at the component, for `hashCode`, `toString` or `getClass` of any
   type, in a record or an `enum` case.
 - **No `onion migrate` rule:** the new name and the code that reads it are your choice.
+
+## A default on an abstract or interface method is type-checked
+
+A default on an `abstract def` or an interface method now works: a call may omit that
+argument. So the default is now type-checked like any other default. Before, it was never used,
+and a wrong one compiled.
+
+```onion
+// Before: compiled, because the default was never used
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = "x"): Int
+}
+
+// Now: E0000 at "x". Give a default of the parameter's type.
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = 0): Int
+}
+```
+
+- **What you see:** **E0000** (wrong type) or **E0002** (unknown name) at the default.
+- **No `onion migrate` rule:** only you know which default was meant. Fix it, or remove it.

@@ -180,7 +180,8 @@ private[compiler] final class MethodBodySupport(
   /**
    * An abstract or interface method has no body, but a parameter may still declare a default
    * (#2638): the default is a method of the declaring class, so a call that omits the argument
-   * works through any receiver, and every override inherits it.
+   * works through a receiver typed as the declaring class or interface. A call through a
+   * subclass that overrides without a default still needs the argument, as for a concrete method.
    */
   def processBodilessDefaults(method: MethodDefinition, args: List[AST.Argument]): Unit =
     if args.exists(_.defaultValue != null) && !predefinedDefaults.contains(method) then

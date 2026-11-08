@@ -129,15 +129,12 @@ object Boxing {
     new TypedAST.CallStatic(aBoxedType, valueOfMethod, args)
   }
 
-  /**
-   * Returns the primitive type that the given reference type can be unboxed to.
-   * Returns None if the type cannot be unboxed.
-   */
   /** Box a primitive argument for a reference-typed parameter slot. An `Int`
    *  for a `Long?`/`Long`/`Double?` slot is widened to the slot's primitive
    *  first, so the box is a `Long`, not an `Integer` (#2697, #2701). Every
    *  argument site (`new`, `super(...)`, `this(...)`, `copy`, lambda-argument
-   *  retyping) goes through here, so the rule has one home. */
+   *  retyping) and `val l: Long? = 5` go through here, so the rule has one
+   *  home. */
   def boxForSlot(table: ClassTable, term: TypedAST.Term, formal: TypedAST.Type): TypedAST.Term = {
     val slotType = formal match {
       case n: TypedAST.NullableType => n.innerType
@@ -157,6 +154,36 @@ object Boxing {
     boxing(table, widened)
   }
 
+  /** Adapt already-matched arguments to their formal types: box a primitive
+   *  for a reference formal (`boxForSlot`), and insert the numeric conversion
+   *  when both sides are primitive but differ. `new P(5)`, `extends P(5)` and
+   *  `this(5)` all go through here (#2701). Without the conversion an `Int`
+   *  for a `Long`/`Double` formal left a 1-slot value where the descriptor
+   *  declares a 2-slot one (VerifyError, or a corrupt stack map in ASM). */
+  def adaptArguments(table: ClassTable, parameters: Array[TypedAST.Term], formals: Array[TypedAST.Type]): Array[TypedAST.Term] =
+    if (parameters == null || parameters.length != formals.length) parameters
+    else {
+      // An index loop: zip + map built two arrays (and a ClassTag each) per call.
+      val out = new Array[TypedAST.Term](parameters.length)
+      var i = 0
+      while (i < parameters.length) {
+        val p = parameters(i)
+        val f = formals(i)
+        out(i) =
+          if (!f.isBasicType && p.isBasicType) boxForSlot(table, p, f)
+          else f match {
+            case bt: TypedAST.BasicType if p.isBasicType && bt != p.`type` => new TypedAST.AsInstanceOf(p.location, p, bt)
+            case _ => p
+          }
+        i += 1
+      }
+      out
+    }
+
+  /**
+   * Returns the primitive type that the given reference type can be unboxed to.
+   * Returns None if the type cannot be unboxed.
+   */
   def unboxedType(table: ClassTable, `type`: TypedAST.Type): Option[TypedAST.BasicType] = {
     if (!`type`.isObjectType) None
     else {

@@ -524,24 +524,7 @@ final class ConstructionTyping(
    * a decimal literal down to an `Int` in `run/GameStore.on`.
    */
   private def adaptToFormals(parameters: Array[Term], formals: Array[Type]): Array[Term] =
-    if (parameters.length != formals.length) parameters
-    else {
-      // An index loop: zip + map built two arrays (and a ClassTag each) per constructor call.
-      val out = new Array[Term](parameters.length)
-      var i = 0
-      while (i < parameters.length) {
-        val p = parameters(i)
-        val f = formals(i)
-        out(i) =
-          if (!f.isBasicType && p.isBasicType) Boxing.boxForSlot(bodyContext.table, p, f)
-          else f match {
-            case bt: BasicType if p.isBasicType && bt != p.`type` => new AsInstanceOf(p.location, p, bt)
-            case _ => p
-          }
-        i += 1
-      }
-      out
-    }
+    Boxing.adaptArguments(bodyContext.table, parameters, formals)
 
   /** W0012 for a `null` argument to an Onion-declared constructor's non-null
    *  parameter, as a method call already warns (#2464). A Java constructor's

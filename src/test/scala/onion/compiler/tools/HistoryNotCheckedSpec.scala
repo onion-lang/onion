@@ -131,6 +131,27 @@ class HistoryNotCheckedSpec extends AnyFunSpec {
       assert(o.w24.size == 1 && o.w24.head.contains("Counter.inc"), o.toString)
     }
 
+    // #2671 panel: only a method that writes the field can break its history. A call whose
+    // `requires` needs the invariant does not make a read-only method's proof unchecked.
+    it("is not given to a method that never writes the field, even when a call in it needs the invariant") {
+      val src =
+        """class C {
+          |  invariant n >= 0 && n < 10
+          |  history n >= old(n)
+          |protected:
+          |  var n: Int
+          |  var m: Int
+          |public:
+          |  def this { n = 0; m = 0 }
+          |  def step(k: Int): Int requires k >= 0 && k < 100 ensures result >= 0 && result < 100 { return k }
+          |  def readOnly(): void { m = step(n) }
+          |  def get(): Int = m
+          |}""".stripMargin
+      val o = compile(src)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w24.isEmpty, o.toString)
+    }
+
     it("is turned off by --Wno W0024") {
       val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.On,
         suppressedWarnings = Set(onion.compiler.WarningCategory.HistoryNotChecked), contracts = ContractMode.Check)

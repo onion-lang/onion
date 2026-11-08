@@ -269,7 +269,7 @@ is forbidden is `other.n = 0` on a different object, which no call to `other` wo
 The check needs no solver. `reset` assigns the constant `0` to a field whose history says
 `n >= old(n)`, and `Counter.inc` raises `n`, so `n` can be above `0` when `reset` runs. That is
 a fact about the syntax of the two methods, not a guess about a run. §7.1 gives the full rule,
-including what the syntax does not report (a class whose only write is `n = 0` needs `invariant n == 0` for the solver to prove it). Anything
+including what the syntax does not report (a class whose only write is `n = 0` needs `invariant n == 0`, and until the invariant itself is checked that proof is W0024, #2602). Anything
 harder waits for the prover.
 
 ### 4.2 Interfaces
@@ -479,7 +479,7 @@ So E0109 is reported only when the syntax settles it. Take the history `n >= old
 |---|---|---|
 | `n = n - c`, with `c` a positive constant | **E0109** | `n - c >= n` is false for every `n` (apart from overflow, §3). No reachability is needed |
 | `n = c`, and some method of the class or its supertypes **raises** `n` (`n = n + k`, `k` positive) | **E0109**, and the message names that method | `n` can exceed `c`, because that method raises it. The reason is a fact in the syntax |
-| `n = c`, and nothing raises `n` | **no syntactic error**; the solver decides | The syntax alone cannot tell where `n` starts. The solver checks the write against the class `invariant`s: with `invariant n == 0` a write of `0` holds, but until something checks the invariant itself (planned as E0114) a proof that needs it is W0024 and keeps its guard (#2602); with no invariant, `n` could start above `c`, and the write has a counterexample (below) |
+| `n = c`, and nothing raises `n` | **no syntactic error**; the solver decides | The syntax alone cannot tell where `n` starts. The solver checks the write against the class `invariant`s: with `invariant n == 0` a write of `0` holds, but until something checks the invariant itself (planned) a proof that needs it is W0024 and keeps its guard (#2602); with no invariant, `n` could start above `c`, and the write has a counterexample (below) |
 | any other expression | `Not proved` | The prover decides (stage 7) |
 
 **What counts as a write** (#2597, #2599). A write by a method is any assignment, `+=`, `-=`,

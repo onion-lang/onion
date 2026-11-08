@@ -186,8 +186,9 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
         if (collected != null) collected += Repro(unitFile, cls, m, field, op, before)
       // A proof may lean on a class invariant only once something checks that invariant: until
       // then a constructor can break it unseen (#2602). So the solver is asked again without the
-      // invariants; a proof that needs them is W0024, and the runtime guard stays.
-      case HistoryProver.Proved if invariants.nonEmpty &&
+      // invariants; a proof that needs them is W0024, and the runtime guard stays. Only a method
+      // that writes the field can break the history, so one that only reads it is not asked (#2671).
+      case HistoryProver.Proved if invariants.nonEmpty && writesIn(m, cls).exists(_.ofField(m, field)) &&
           HistoryProver.prove(m, field, op, intFields, Nil, callees, builtCallees(m)) != HistoryProver.Proved =>
         unchecked += Unchecked(unitFile, cls, m, field, Some(s"$field $op old($field)"), line = 0,
           fieldType = None, reason = Some(("invariant", "")))

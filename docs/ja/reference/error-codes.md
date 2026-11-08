@@ -1102,7 +1102,7 @@ record Circle(area: Int) conforms Shape   // E0104: area(): Int は Shape.area()
 
 ### `E0105` — 契約が無効なのに契約の節がある
 
-`requires`、`ensures`、`invariant`、`history` の節が、`--contracts off`（既定）でコンパイルした
+`requires`、`ensures`、`invariant`、`history` の節が、`--contracts off`（既定は `check`）でコンパイルした
 プログラムにあります。契約はプレビュー機能です（RFC #2557）。節は無視されずエラーになります。
 黙って何もしない契約は、無い方が悪くないからです。
 
@@ -1171,11 +1171,12 @@ history を壊します。
 
 ```onion
 class Counter {
+protected:
   var n: Int
   history n >= old(n)
 public:
   def this { n = 0 }
-  def inc(): void { n = n + 1 }
+  def inc(): void requires n < 2147483647 { n = n + 1 }
 }
 class ResettableCounter extends Counter {
 public:
@@ -1185,7 +1186,11 @@ public:
 
 構文だけで決まるものだけを報告します。直し方: その書き込みをなくすか、history を弱めます。
 
-### `E0110` — 可変オブジェクトに対する `invariant` / `history`
+書き込みは、メソッドのどこで起きても数えます。メソッドが作るラムダの中も対象です。
+ラムダの中の書き込みで、構文から決まらないものには、その行に警告 W0024 を出します。
+別のオブジェクトを通した書き込み (`o.n = 0`) は、下の E0110 です。
+
+### `E0110` — 可変オブジェクトに対する `invariant` / `history`、または別のオブジェクトを通したそのフィールドへの書き込み
 
 契約が名指しできるのは、基本型・`String`・enum・record のフィールドだけです。`List` や別のクラスは、
 このクラスのコードが動かなくても変わりうるので、一回の呼び出しごとの検査ができません。
@@ -1199,13 +1204,32 @@ class A {
 
 直し方: 値型のフィールドを使うか、そのオブジェクトを読む純粋なメソッドを使います。
 
+契約が名指すフィールドには、`this` を通してだけ書き込めます (`n`、`this.n`、`self.n`)。
+ほかの参照を通した書き込みは、宣言された型にかかわらず E0110 です。
+一回の呼び出しごとの検査では、その書き込みを追えないからです。
+
+```onion
+class Counter {
+protected:
+  var n: Int
+  history n >= old(n)
+public:
+  def this { n = 0 }
+  def copyFrom(o: Counter): void { o.n = n }                      // E0110
+  static def at(k: Int): Counter { val c = new Counter(); c.n = k; return c }   // E0110
+}
+```
+
+直し方: そのオブジェクトのメソッドを呼びます (そのメソッドの書き込みは検査されます)。
+または、コンストラクタで値を設定します (`def this(k: Int) { n = k }`)。
+
 ### `E0111` — Java の親クラスを持つクラスの `invariant` / `history`
 
 Java の親クラスは状態を変えるメソッドを持ちえて、コンパイラはそれを証明も監視もできません。
 継承してよいのは `Object` か Onion のクラスだけです。
 
 ```onion
-class A extends java.util.ArrayList {
+class A extends java.util.ArrayList[String] {
   invariant size >= 0   // E0111
 }
 ```
@@ -1250,6 +1274,27 @@ public:
 直し方: `printable` を上書きして print できる値を述べるか、`print` / `parse` を直します。
 `canPrint() == false` の shape は何も求められません。サンプルを作れない値型は、黙って通さず
 警告 `W0022` になります。
+
+
+### `E0115` — abstract メソッドへの `super` 呼び出し
+
+`super.f()` はスーパークラス自身の本体を実行します。そこで `f` が abstract だと、実行する本体がありません。
+インターフェースを実装した abstract クラスが残した未実装メソッドも同じです。このエラーがないころは、
+コンパイルは通り、実行時に `AbstractMethodError` になりました。
+
+```onion
+abstract class Base {
+public:
+  abstract def f(): Int
+}
+class Child extends Base {
+public:
+  override def f(): Int = 2
+  def g(): Int = super.f()   // E0115
+}
+```
+
+直し方: `self` 側のオーバーライドを呼ぶ（`f()`）か、スーパークラスのメソッドに本体を与えます。
 
 ## 宣言エラー
 
@@ -1898,7 +1943,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `W0020` | `extension` メソッドの名前とアリティが既存のメンバー（自身または継承）と完全に一致している。既存のメンバーが常に優先されるため、その extension メソッドは呼び出されない |
 | `W0021` | メソッドが `history` を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
 | `W0022` | the contract of a Shape was not checked: its value type cannot be sampled |
-| `W0024` | `history` が名指すフィールドにメソッドが書き込むが、`history` が保たれるかをどの検査も決めていない。フィールドが `Int` でない、ソルバーがメソッド本体を扱えない、または `history` が `x >= old(x)`・`x <= old(x)`・`x == old(x)` の形でない場合です。そこでは `history` は保証されません |
+| `W0024` | `history` が名指すフィールドにメソッドが書き込むが、`history` が保たれるかをどの検査も決めていない。フィールドが `Int` でない、ソルバーがメソッド本体を扱えない、書き込みがラムダの中にある、証明にクラスの `invariant` が必要（invariant はまだコンパイル時に証明されないので、コンストラクタが破る可能性がある）、または `history` が `x >= old(x)`・`x <= old(x)`・`x == old(x)` の形でない場合です。そこでは `history` は保証されません |
 | `W0025` | オーバーライドが継承した契約を壊しうる。ソルバーが反例を見つけた（整数の桁あふれなど、プログラムが到達しないことがあるので警告） |
 | `W0026` | `--contracts runtime` が実行時に守らない契約の節がある。理由を示す（守られない節が黙って残ることはない） |
 | `W0027` | メソッドの契約は `@Trusted` により、検証されず信じられている。本体は検査されず、呼び出し側はそれを前提にする。使うたびに一覧される |
@@ -2015,11 +2060,12 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 | `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
 | `E0109` | this write can break the history … on … |
-| `E0110` | an `invariant` or `history` names a field that holds a mutable object |
+| `E0110` | an `invariant` or `history` names a field that holds a mutable object, or such a field is written through another object |
 | `E0111` | a class with an `invariant` or `history` extends a Java class |
 | `E0112` | this method breaks the history … when run from … |
 | `E0113` | the closed predicate … is … when the build runs it |
 | `E0114` | the Shape … breaks its round-trip contract |
+| `E0115` | `super.…(...)` calls an abstract method of … |
 
 ## 関連項目
 

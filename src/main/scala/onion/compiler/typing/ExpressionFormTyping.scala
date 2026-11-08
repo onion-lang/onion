@@ -27,6 +27,11 @@ final class ExpressionFormTyping(
   def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] =
     constructionTyping.typeNewArrayWithValues(node, context)
 
+  def resolveConstructorWithNamedArgs(
+    node: AST.Node, args: List[AST.Expression], typeRef: ClassType, context: LocalContext
+  ): Option[(ConstructorDefinition, Array[Term], Array[AST.Node])] =
+    constructionTyping.resolveConstructorWithNamedArgs(node, args, typeRef, context)
+
   def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] =
     constructionTyping.typeNewObject(node, context, expected)
 
@@ -291,12 +296,8 @@ final class ExpressionFormTyping(
   // type accepts by erasure, so an applied `ct` is matched against the box's own view
   // of that class instead: `Comparable[JInteger]` fits `Integer`, `Comparable[String]`
   // does not.
-  private def boxSupertypeAccepts(ct: ClassType, boxed: ClassType): Boolean = ct match {
-    case applied: AppliedClassType =>
-      val views = bodyContext.table.appliedViewsOf(boxed)(AppliedTypeViews.collectAppliedViewsFrom(boxed))
-      views.exists { case (raw, view) => TypeRelations.sameClass(raw, applied.raw) && TypeRules.isSuperType(applied, view) }
-    case _ => TypeRules.isSuperType(ct, boxed)
-  }
+  private def boxSupertypeAccepts(ct: ClassType, boxed: ClassType): Boolean =
+    TypeRelations.boxSupertypeAccepts(bodyContext.table, ct, boxed)
 
   // The numeric primitives codegen unboxes through `java.lang.Number` (not Char).
   private val numericCastTypes: Seq[BasicType] =

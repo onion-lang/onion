@@ -173,6 +173,35 @@ Output:
 true
 ```
 
+### 途中の値と副作用
+
+do ブロックに書けるのは `x <- expr` のバインドと、最後の `yield` だけです。`val`/`var` や、単独の文は書けません。
+
+- 途中の値に名前を付けるときは、バインドします：`doubled <- Option::some(x * 2)`。
+- 副作用を実行するときは、`yield` のブロックの中で、結果の前に書きます。
+
+```onion
+def parseNumber(s: String): Option[Int] = Option::some(JInteger::parseInt(s))
+def validateRange(n: Int): Option[Int] = if n < 100 { Option::some(n) } else { Option::none() }
+
+val result: Option[Int] = do[Option] {
+  x <- parseNumber("21")
+  doubled <- Option::some(x * 2)   // 途中の値
+  y <- validateRange(doubled)
+  yield {
+    println("Valid: " + y)         // 副作用
+    y
+  }
+}
+println(result.get())
+```
+
+Output:
+```
+Valid: 42
+42
+```
+
 ## 次のステップ
 
 - [関数](functions.md) - 関数定義とラムダ

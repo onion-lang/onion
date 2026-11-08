@@ -1007,6 +1007,9 @@ class SemanticErrorReporter(threshold: Int) {
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordAccessorRedefined] =>
         reportRecordAccessorRedefined(position, items)
+      // E0110's second form (design 3.2, rule 2; #2599): a contract field written through another object.
+      case SemanticError.CONTRACT_FIELD_NOT_VALUE if items.length > 2 && items(2) == "write" =>
+        problem(position, format(message("error.semantic.contractFieldWrittenOutside"), Seq(asString(items(0)), asString(items(1)))))
 
       // Data-driven cases
       case _ =>
@@ -1632,6 +1635,10 @@ object SemanticErrorReporter {
     SemanticError.STATIC_METHOD_WITHOUT_BODY -> ErrorDef(
       "error.semantic.staticMethodWithoutBody",
       Seq(items => asString(items(0)))
+    ),
+    SemanticError.SUPER_CALL_ABSTRACT_METHOD -> ErrorDef(
+      "error.semantic.superCallAbstractMethod",
+      Seq(items => asString(items(0)), items => typeName(items(1)))
     ),
     SemanticError.PRIVATE_ABSTRACT_METHOD -> ErrorDef(
       "error.semantic.privateAbstractMethod",

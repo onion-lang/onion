@@ -836,6 +836,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     for (args <- argsOption) {
       val modifier = node.modifiers | access_
       val constructor = new ConstructorDefinition(node.location, modifier, definition_, args.toArray, null, null)
+      // The parameter names are known now, so a named call or delegation typed before this
+      // constructor's body (`: this(z = 1)` above the primary, `extends A(a = x)` above `A`)
+      // binds them. The body pass replaces this with the typed defaults.
+      constructor.setArgumentsWithDefaults(node.args.zip(args).map { (arg, tp) =>
+        TypedAST.MethodArgument(arg.name, tp, None)
+      }.toArray)
       put(node, constructor)
       definition_.add(constructor)
     }

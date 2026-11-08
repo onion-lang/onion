@@ -13,6 +13,10 @@ import org.scalatest.funspec.AnyFunSpec
  * stale/mislabeled heading, not a missing feature to implement. Guards that the
  * heading and lead-in for that section actually describe its content (local
  * declarations + side effects), not regular expressions.
+ *
+ * #2668: a do block has no `val`, so the section now binds its intermediate value
+ * (`doubled <- Option::some(x * 2)`) instead; `DoNotationIntermediateValuesDocSpec`
+ * runs it. The marker and the bind check follow that rewrite.
  */
 class DoNotationDocRegexHeadingMismatchSpec extends AnyFunSpec {
 
@@ -21,11 +25,11 @@ class DoNotationDocRegexHeadingMismatchSpec extends AnyFunSpec {
 
   private val doc = read("docs/guide/control-flow.md")
 
-  // Identifies the section by its actual content (the "Local declaration" comment
+  // Identifies the section by its actual content (the "an intermediate value" comment
   // in the do-block example), independent of whatever the heading currently says.
-  private val markerLine = "// Local declaration"
+  private val markerLine = "// an intermediate value"
 
-  describe("docs/guide/control-flow.md do-notation section mixing binds with local declarations") {
+  describe("docs/guide/control-flow.md do-notation section mixing binds with intermediate values") {
     it("has a heading/lead-in that does not claim to be about regular expressions") {
       val lines = doc.linesIterator.toSeq
       val markerIdx = lines.indexWhere(_.contains(markerLine))
@@ -52,8 +56,8 @@ class DoNotationDocRegexHeadingMismatchSpec extends AnyFunSpec {
       assert(fenceStart >= 0 && fenceEnd >= 0, "could not find the fenced code block around the example")
       val body = lines.slice(fenceStart + 1, fenceEnd).mkString("\n")
       assert(!body.contains("re\""), s"example claimed to mix regex but contains no re\"...\" literal:\n$body")
-      assert(body.contains("val ") && body.contains("<-"),
-        s"expected the example to mix a local `val` declaration with a `<-` bind:\n$body")
+      assert(body.contains("<-") && body.contains("yield"),
+        s"expected the example to mix `<-` binds with a final `yield`:\n$body")
     }
   }
 }

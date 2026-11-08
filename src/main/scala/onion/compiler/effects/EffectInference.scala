@@ -1,5 +1,6 @@
 package onion.compiler.effects
 
+import onion.compiler.Modifier
 import onion.compiler.TypedAST
 import onion.compiler.TypedAST._
 
@@ -44,7 +45,12 @@ object EffectInference {
   def infer(classes: Seq[ClassDefinition],
             table: EffectTable.Table = EffectTable.builtin): Seq[MethodEffects] = {
     val (units, sets) = inferUnits(classes, table)
-    units.iterator.map { case (u, (cls, name, args)) =>
+    // A synthetic accessor (`super.f()` in a lambda) still carries its effects into the method
+    // that calls it, but it is not a method the program wrote, so it is not listed.
+    units.iterator.filterNot {
+      case (md: MethodDefinition, _) => Modifier.isSynthetic(md.modifier)
+      case _ => false
+    }.map { case (u, (cls, name, args)) =>
       MethodEffects(cls, name, args, sets(u))
     }.toSeq
   }

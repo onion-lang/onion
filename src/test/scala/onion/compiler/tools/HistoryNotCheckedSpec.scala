@@ -94,9 +94,62 @@ class HistoryNotCheckedSpec extends AnyFunSpec {
           |public:
           |  var n: Int
           |  def this { n = 0 }
-          |  def inc(): void { n = n + 1 }
+          |  def inc(): void { if n < 1000000 { n = n + 1 } }
           |}""".stripMargin
       assert(compile(src) == Outcome(Nil, Nil))
+    }
+
+    // #2602: nothing proves an invariant yet, so a proof that needs one is no proof.
+    it("is given when the proof holds only by assuming the class invariant") {
+      val src =
+        """class Counter {
+          |  invariant n >= 0 && n < 1000000
+          |  history n >= old(n)
+          |public:
+          |  var n: Int
+          |  def this { n = 0 }
+          |  def inc(): void { n = n + 1 }
+          |}""".stripMargin
+      val o = compile(src)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w24.size == 1 && o.w24.head.contains("Counter.inc") && o.w24.head.contains("invariant"), o.toString)
+    }
+
+    it("is given when a constructor breaks the invariant the proof would rest on (#2602 case 3)") {
+      val src =
+        """class Counter {
+          |  invariant n >= 0 && n < 10
+          |  history n >= old(n)
+          |protected:
+          |  var n: Int
+          |public:
+          |  def this { n = 2147483647 }
+          |  def inc(): void { n = n + 1 }
+          |  def get(): Int = n
+          |}""".stripMargin
+      val o = compile(src)
+      assert(o.w24.size == 1 && o.w24.head.contains("Counter.inc"), o.toString)
+    }
+
+    // #2671 panel: only a method that writes the field can break its history. A call whose
+    // `requires` needs the invariant does not make a read-only method's proof unchecked.
+    it("is not given to a method that never writes the field, even when a call in it needs the invariant") {
+      val src =
+        """class C {
+          |  invariant n >= 0 && n < 10
+          |  history n >= old(n)
+          |protected:
+          |  var n: Int
+          |  var m: Int
+          |public:
+          |  def this { n = 0; m = 0 }
+          |  def step(k: Int): Int requires k >= 0 && k < 100 ensures result >= 0 && result < 100 { return k }
+          |  def readOnly(): void { m = step(n) }
+          |  def get(): Int = m
+          |}""".stripMargin
+      val o = compile(src)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w24.isEmpty, o.toString)
     }
 
     it("is turned off by --Wno W0024") {

@@ -13,10 +13,10 @@ class HistoryProvedVerboseSpec extends AnyFunSpec {
       |public:
       |  var n: Int
       |  def this { n = 0 }
-      |  def inc(): void { n = n + 1 }
+      |  def inc(): void { if n < 1000000 { n = n + 1 } }
       |}""".stripMargin
 
-  private def stderrOf(verbose: Boolean): String = {
+  private def stderrOf(verbose: Boolean, src: String = src): String = {
     val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, verbose = verbose, contracts = ContractMode.Check)
     val buffer = new ByteArrayOutputStream()
     val old = System.err
@@ -28,6 +28,19 @@ class HistoryProvedVerboseSpec extends AnyFunSpec {
 
   it("names the proved history under --verbose") {
     assert(stderrOf(verbose = true).contains("[history] proved: Counter.inc: n >= old(n)"))
+  }
+
+  it("does not call a history proved when the proof needs the unchecked invariant (#2602)") {
+    val broken =
+      """class Counter {
+        |  invariant n >= 0 && n < 10
+        |  history n >= old(n)
+        |public:
+        |  var n: Int
+        |  def this { n = 2147483647 }
+        |  def inc(): void { n = n + 1 }
+        |}""".stripMargin
+    assert(!stderrOf(verbose = true, broken).contains("[history] proved: Counter.inc"))
   }
 
   it("prints nothing about a proof without --verbose") {

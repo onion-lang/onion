@@ -90,6 +90,25 @@ private[compiler] object DuplicationChecks {
           val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
           typing.report(SemanticError.FINAL_METHOD_OVERRIDE, location, impl.name, paramDescriptor, view.raw.name)
         }
+
+      // A body method with an overridable Object method's name and parameters but an
+      // incompatible return (`def toString(): Int`) lost the generated method or gave two
+      // answers (#2713). A class gets E0104 for it; so does a record. A component's own
+      // accessor is left to E0010, and a compatible (covariant) return is a normal override.
+      val overridable = view.raw.methods.filter(m =>
+        !Modifier.isFinal(m.modifier) && !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier))
+      for (contract <- overridable;
+           impl <- clazz.methods
+           if impl.name == contract.name && !Modifier.isStatic(impl.modifier) && !Modifier.isPrivate(impl.modifier) &&
+             !(impl.arguments.isEmpty && componentNames.contains(impl.name)) &&
+             erasedParamDescriptor(impl.arguments) == erasedParamDescriptor(contract.arguments) &&
+             impl.returnType != contract.returnType) {
+        val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
+        if (impl.returnType.isBasicType || contract.returnType.isBasicType)
+          typing.report(SemanticError.OVERRIDE_RETURN_TYPE_MISMATCH, location, impl.name, impl.returnType, view.raw, contract.returnType)
+        else if (!primitiveAwareAssignable(contract.returnType, impl.returnType, typing))
+          typing.report(SemanticError.INCOMPATIBLE_TYPE, location, contract.returnType, impl.returnType)
+      }
     }
   }
 

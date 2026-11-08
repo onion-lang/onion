@@ -400,7 +400,19 @@ private[typing] object GenericMethodTypeArguments {
         // revert to the arg-side binding; the outer assignment handles the nullable
         // promotion without invalidating the receiver type (List[Shape] vs List[Shape?]).
         val inferredBeforeReturn = inferred.toMap
-        unify(formalReturn, expectedReturn, callNode, returnContext = true)
+        // The arguments come first: when they fix every type parameter of the return
+        // type and that return already fits the expected type, the expected type adds
+        // nothing. `val n: Number = id(5)` keeps T = Integer, as javac infers, instead
+        // of conflicting with it (#2594). `val s: Comparable[String] = id(5)` does not
+        // fit, so it still unifies and is rejected.
+        val returnFitsArgs = {
+          val names = typeParamsIn(formalReturn, paramNames)
+          names.nonEmpty && names.forall(inferred.contains) && {
+            val argReturn = TypeSubstitution.substituteType(formalReturn, classSubst, inferred.toMap, defaultToBound = false)
+            !expectedReturn.isBasicType && TypeRules.isAssignable(expectedReturn, argReturn)
+          }
+        }
+        if (!returnFitsArgs) unify(formalReturn, expectedReturn, callNode, returnContext = true)
         for ((name, before) <- inferredBeforeReturn) {
           inferred.get(name).foreach { after =>
             if ((after ne before) && (mergeNullability(before, after) eq after))

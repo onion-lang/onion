@@ -403,9 +403,14 @@ object EffectInference {
      */
     private def toLibrary(values: Iterable[Term], location: onion.compiler.Location,
                           only: Set[String] = null): scala.Unit =
-      if (libraryCallbacks.nonEmpty) for {
-        v <- values if v != null
-        cd <- valueClasses(v)
+      if (libraryCallbacks.nonEmpty)
+        for (v <- values if v != null) handOff(valueClasses(v), location, only)
+
+    /** Library code holds an instance of one of `owners`: it may call any library method they override. */
+    private def handOff(owners: Seq[ClassDefinition], location: onion.compiler.Location,
+                        only: Set[String] = null): scala.Unit =
+      for {
+        cd <- owners
         md <- libraryCallbacks.getOrElse(cd.name, Nil) if only == null || only.contains(md.name)
       } if (internalCallees.add(Callback(md)))
           rawSites += RawSite(location,
@@ -470,6 +475,11 @@ object EffectInference {
       initializes(c.affiliation, location)
       programConstructor(c) match {
         case Some(cd) =>
+          // Built on a library superclass, the new object reaches library code before the
+          // program's constructor body runs; name its overrides here, where the call is.
+          val chain = programChain(c.affiliation.name)
+          if (chain.nonEmpty && Option(chain.last.superClass).exists(_.name != "java.lang.Object"))
+            handOff(chain.take(1), location)
           internalCallees += cd
           rawSites += RawSite(location, callee, None, cd)
         case _ =>
@@ -512,6 +522,10 @@ object EffectInference {
           case None =>
             val eff = table.effectsOrUnknown(superName, "<init>")
             effects ++= eff; unsitedEffects ++= eff
+            // The library constructor receives `this` (`Exception()` calls `fillInStackTrace()`)
+            // and its arguments, so it can call back whatever the object's class overrides (#2601).
+            if (superName != "java.lang.Object") handOff(compatible(ctor.classType), ctor.location)
+            toLibrary(sup.terms.toSeq, ctor.location)
         }
       }
     }
@@ -547,7 +561,13 @@ object EffectInference {
       case c: SafeCall      => term(c.target); c.parameters.foreach(term); method(c.method, entry, c.target, c.parameters)
       case c: SafeStaticExtensionCall => term(c.target); c.parameters.foreach(term); method(c.method, entry, null, Array.empty)
       case c: CallStatic    => c.parameters.foreach(term); method(c.method, entry, null, c.parameters)
-      case c: CallSuper     => term(c.target); c.params.foreach(term); method(c.method, entry, null, Array.empty)
+      case c: CallSuper     =>
+        term(c.target); c.params.foreach(term); method(c.method, entry, null, Array.empty)
+        // `super.m()` into library code hands it `this`, which it can call back (#2601).
+        c.method match {
+          case md: MethodDefinition if units.contains(md) => ()
+          case _ => toLibrary(Seq(c.target) ++ c.params, entry)
+        }
       case n: NewObject     => n.parameters.foreach(term); constructor(n.constructor, entry, n.parameters)
       case n: NewClosure    =>
         // Absorbed at the creation site. The closure body is one frame deeper, which

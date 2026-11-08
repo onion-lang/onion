@@ -316,6 +316,74 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
     }
   }
 
+  describe("a closed predicate that hands its own object to library code") {
+    it("is not run when a library superclass constructor calls an override with an effect") {
+      val o = compile(
+        """class E extends Exception {
+          |public:
+          |  def this {}
+          |  override def fillInStackTrace(): Throwable { IO::println("FILLIN RAN"); return self }
+          |}
+          |def p(): Boolean ensures result { val e = new E(); return true }""".stripMargin)
+      assert(!o.stdout.contains("FILLIN RAN"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("fillInStackTrace")), o.toString)
+    }
+
+    it("is not run through a primary constructor that passes arguments to the library superclass") {
+      val o = compile(
+        """class E(m: String) extends Exception(m) {
+          |public:
+          |  override def fillInStackTrace(): Throwable { IO::println("FILLIN RAN"); return self }
+          |}
+          |def p(): Boolean ensures result { val e = new E("x"); return true }""".stripMargin)
+      assert(!o.stdout.contains("FILLIN RAN"), o.toString)
+      assert(o.w23.exists(_.contains("`p`")), o.toString)
+    }
+
+    it("is not run when `super.m()` into library code calls an override with an effect") {
+      val o = compile(
+        """class Bag extends java.util.AbstractList[String] {
+          |public:
+          |  def this {}
+          |  override def get(i: Int): String { IO::println("GET RAN"); return "x" }
+          |  override def size(): Int { return 1 }
+          |  def show(): String { return super.toString() }
+          |}
+          |def p(): Boolean ensures result { return new Bag().show() == "[x]" }""".stripMargin)
+      assert(!o.stdout.contains("GET RAN"), o.toString)
+      assert(o.w23.exists(_.contains("`p`")), o.toString)
+    }
+
+    it("still runs when the overrides the library can reach only touch memory: a false one is E0113") {
+      val o = compile(
+        """class E extends Exception {
+          |public:
+          |  def this {}
+          |  override def fillInStackTrace(): Throwable { return self }
+          |}
+          |def p(): Boolean ensures result { val e = new E(); return false }""".stripMargin)
+      assert(o.errors.contains("E0113"), o.toString)
+      assert(o.w23.isEmpty, o.toString)
+    }
+
+    it("fails the build under `--warn error`") {
+      val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.Error,
+        contracts = ContractMode.Check)
+      val src = """def helper(): Boolean { IO::println("B RAN"); return true }
+                  |def p(): Boolean ensures result { return helper() }""".stripMargin
+      val out = new ByteArrayOutputStream()
+      val saved = System.out
+      val r =
+        try {
+          System.setOut(new PrintStream(out, true, "UTF-8"))
+          new OnionCompiler(config).compileDetailed(Seq(new StreamInputSource(() => new StringReader(src), "P.on")))
+        } finally System.setOut(saved)
+      assert(!out.toString("UTF-8").contains("B RAN"))
+      assert(r.diagnostics.errors.nonEmpty, r.diagnostics.toString)
+    }
+  }
+
   describe("the E0112 replay of a history counterexample") {
     it("does not run a constructor with an outside effect") {
       val o = compile(

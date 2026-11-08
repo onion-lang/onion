@@ -28,8 +28,11 @@ class ClosedPredicateSpec extends AnyFunSpec {
     new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "C.on"))) match {
       case CompilationOutcome.Failure(errs) =>
         val e = errs.find(_.errorCode.contains("E0113")).getOrElse(fail("no E0113"))
-        assert(e.message.contains("threw"))
-        assert(!e.message.contains("is threw"))
+        if (java.util.Locale.getDefault.getLanguage == "ja") assert(e.message.contains("投げました"), e.message)
+        else {
+          assert(e.message.contains("threw"))
+          assert(!e.message.contains("is threw"))
+        }
       case other => fail(s"expected failure, got $other")
     }
   }

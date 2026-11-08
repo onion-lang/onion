@@ -41,7 +41,8 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
         val outcome = runOne(c, classes, loader)
         outcome.foreach { why =>
           errors += CompileError(c.sourceFile, c.location,
-            Message("error.semantic.closedPredicateFalse", Array[Any](c.name, why)),
+            Message(if (c.arity == 0) "error.semantic.closedPredicateFalse" else "error.semantic.sampledPredicateFalse",
+              Array[Any](c.name, why)),
             Some(SemanticError.CLOSED_PREDICATE_FALSE.errorCode))
         }
       }
@@ -92,22 +93,24 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
       val perParam = types.map(t => ArgGenerator.generateValues(t, loader, config.contractSamples, config.contractSeed).orNull)
       val bad = perParam.indexWhere(_ == null)
       // A parameter that cannot be sampled must not pass silently: that would look like a predicate that held.
-      if (bad >= 0) Some(s"not checkable: it cannot sample a parameter of type ${types(bad).getSimpleName}")
+      if (bad >= 0) Some(Message("error.semantic.predicateReason.unsampleable", types(bad).getSimpleName))
       else combos(perParam).iterator.map(args => call(m, args)).collectFirst { case Some(why) => why }
     }
   }
 
   /** `None` when the call returns true; otherwise why not, with the arguments and how to reproduce them. */
   private def call(m: Method, args: Array[AnyRef]): Option[String] = {
-    val shown = if (args.isEmpty) "" else args.map(String.valueOf).mkString(" for (", ", ", ")") +
-      s" [--contract-seed ${config.contractSeed} --contract-samples ${config.contractSamples}]"
+    val shown = if (args.isEmpty) ""
+      else Message("error.semantic.predicateReason.at",
+        Array[Any](args.map(String.valueOf).mkString(", "), config.contractSeed.toString, config.contractSamples.toString))
     try {
-      if (m.invoke(null, args*).asInstanceOf[java.lang.Boolean]) None else Some("returned false" + shown)
+      if (m.invoke(null, args*).asInstanceOf[java.lang.Boolean]) None else Some(Message("error.semantic.predicateReason.false", shown))
     } catch {
       case e: java.lang.reflect.InvocationTargetException =>
         val cause = Option(e.getCause).getOrElse(e)
-        Some(s"threw ${cause.getClass.getSimpleName}: ${cause.getMessage}$shown")
-      case e: Throwable => Some(s"threw ${e.getClass.getSimpleName}$shown")
+        Some(Message("error.semantic.predicateReason.threw",
+          Array[Any](cause.getClass.getSimpleName, String.valueOf(cause.getMessage), shown)))
+      case e: Throwable => Some(Message("error.semantic.predicateReason.threwBare", e.getClass.getSimpleName, shown))
     }
   }
 

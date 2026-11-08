@@ -45,18 +45,35 @@ class ClosedPredicateSpec extends AnyFunSpec {
   }
 
   it("runs a top-level predicate, not a same-named static method of another class (#2604)") {
-    val src = "class Other {\npublic:\n  static def check(): Boolean\n    = false\n}\ndef check(): Boolean\n  ensures result\n  = true\n"
-    assert(codes(src).isEmpty)
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, contracts = ContractMode.Check)
+    val src = "class Other {\npublic:\n  static def check(): Boolean = false\n}\ndef check(): Boolean\n  ensures result\n  = true\n"
+    new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "C.on"))) match {
+      case CompilationOutcome.Failure(errs) => fail(errs.map(_.message).mkString("\n"))
+      case _                                => succeed
+    }
   }
 
-  it("does not call a top-level predicate false when the script's own top-level val is not set yet (#2604)") {
+  it("runs a top-level predicate from its own file when another file declares a same-named method first (#2604)") {
     val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, contracts = ContractMode.Check)
-    val src = "val limit = 3\ndef within(): Boolean\n  ensures result\n  = limit == 3\n"
+    val other = "class Other {\npublic:\n  static def check(): Boolean = false\n}\n"
+    val pred = "def check(): Boolean\n  ensures result\n  = true\n"
+    val outcome = new OnionCompiler(config).compile(Seq(
+      new StreamInputSource(() => new StringReader(other), "A.on"),
+      new StreamInputSource(() => new StringReader(pred), "B.on")))
+    outcome match {
+      case CompilationOutcome.Failure(errs) => fail(errs.map(_.message).mkString("\n"))
+      case _                                => succeed
+    }
+  }
+
+  it("keeps the real reason for a false top-level predicate in a file with an unrelated top-level val (#2604)") {
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10, contracts = ContractMode.Check)
+    val src = "val unused = 1\ndef sums(): Boolean\n  ensures result\n  = 1 + 1 == 3\nprintln(\"ran\")\n"
     new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "C.on"))) match {
       case CompilationOutcome.Failure(errs) =>
         val e = errs.find(_.errorCode.contains("E0113")).getOrElse(fail("no E0113"))
-        assert(!e.message.contains("returned false"))
-      case _ => succeed
+        assert(e.message.contains("returned false"))
+      case _ => fail("a false predicate must be E0113")
     }
   }
 

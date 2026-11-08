@@ -56,6 +56,29 @@ class NullableCastSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a cast between two different nullable primitive types (#2542)") {
+    it("rejects Int? as Long? and Long? as Int? at compile time") {
+      for ((from, to) <- Seq(("Int", "Long"), ("Long", "Int"), ("Int", "Double"), ("Double", "Int"))) {
+        val msgs = compileErrors(
+          s"def main(args: String[]): void {\n  val i: $from? = null\n  val l: $to? = (i as $to?)\n}\n")
+        assert(msgs.contains("E0000"), s"expected E0000 for $from? as $to?, got: $msgs")
+      }
+    }
+    it("still accepts a nullable primitive cast to itself, to its box, or to Object") {
+      val r = shell.run(
+        """def main(args: String[]): Int {
+          |  val i: Int? = 3
+          |  val a: Int? = (i as Int?)
+          |  val b: Int = (i as Int)
+          |  val c: Object = (i as Object)
+          |  val d = (c as Int?)
+          |  return (a as Int) + b + (d as Int)
+          |}
+          |""".stripMargin, "NullablePrimitiveSelfCast.on", Array())
+      assert(Shell.Success(9) == r)
+    }
+  }
+
   describe("a cast from a box supertype or a numeric box to a primitive (#2551)") {
     it("narrows a nullable supertype of the box, then unboxes") {
       val r = shell.run(

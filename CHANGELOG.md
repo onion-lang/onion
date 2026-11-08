@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.152.0] - 2026-11-08
+
+### Fixed
+
+- **`new R(5)` for `record R(x: Long?)` compiles and runs.**
+  - Before: `VerifyError` at run time.
+  - Now: the `Int` is widened to `Long`, then boxed, as `new R(5L)` and `f(5)` already did.
+- **E0113 no longer tells a predicate with parameters that it has none (#2687).**
+  - Before: `def pos(x: Int): Boolean ensures result = x > 0` said "A predicate with no parameters ...". In `ja`, the reason (`returned false`, `threw ...`) stayed English.
+  - Now: a sampled predicate gets its own sentence ("must return true for every sampled argument"), and the reason is written in the message language.
+- **`val a: Long? = 5` and `val d: Double? = 5` work (#2684).**
+  - Before: compiled, then threw `ClassCastException` (an `Integer` was put in the `Long?` slot).
+  - Now: the `Int` is widened first, as `val a: Long = 5` does.
+- **`val a: Int? = ident(5)` compiles when `ident` is generic (#2666).**
+  - Before: E0000 "type Int is expected, but type Int? is used". `String?` worked.
+  - Now: a generic call's result goes into `Int?`/`Long?`/`Double?`, as it does into `String?`.
+- **`extends A(b = 7, a = 3)` and `: this(b = 8, a = 4)` bind arguments by name (#2659).**
+  - Before: the names were ignored, so `a` got 7 with no error; `extends A(b = 7)` was E0021.
+  - Now: they bind as `new A(b = 7, a = 3)` does, an omitted argument takes its default, and an unknown or repeated name is E0043/E0044.
+  - A Java superclass constructor has no parameter names, so `extends Thread(name = "x")` is now E0021, as `new Thread(name = "x")` already was. It used to compile by binding the argument by position.
+- **`super.f()` on an abstract method is a compile error, E0115 (#2656).**
+  - Before: it compiled, then threw `AbstractMethodError` when the line ran.
+  - Now: E0115 at the call, as in Java. A superclass method with a body is unaffected.
+- **`super.f()` in a `static def` is a compile error (#2655).**
+  - Before: an internal compiler error (`no 'this' pointer within static method`).
+  - Now: E0050, as for `this` in a static method.
+- **`--Wno W0016` and `--warn off` silence the W0016 `@TailRecursive` warning (#2654).**
+  - Before: both warnings were printed anyway.
+  - Now: W0016 follows the same switches as every other warning.
+- **A primitive in a `T` slot is a compile error, not a ClassCastException later (#2534, #2652).**
+  - Before: `def zero(): T = 0`, `t = 5` and a default `def id(n: T = 3)` compiled; a caller with `T = String` then failed at run time on its own line.
+  - Now: each is E0000 `type T is expected, but type Int is used`, as a `String` there already was. `new Box[JInteger](3)` and `val o: Object = 5` still compile.
+- **`super.d(b = 5)` sets `b`, as `this.d(b = 5)` does (#2650).**
+  - Before: the name was ignored and `5` went into the first parameter; no error.
+  - Now: named arguments on a `super` call bind by name, in any order, and an unknown name is an error.
+- **`obj.n++` on an instance field yields the old value, as in Java.**
+  - Before: `val id = k.n++` gave the new value (5 -> 6), unlike a local, static field or array element.
+  - Now: it gives 5; `n--` likewise.
+- **A default argument works when its method is declared later in the same class (#2637).**
+  - Before: in `class A { def run(): Int = g()  def g(n: Int = 5): Int = n }`, `g()` was E0005, with `available: g(Int)` right below.
+  - Now: it compiles and `g()` uses `5`, as if `g` were declared first. Top-level functions, records and other classes still need the declaration first (#2653).
+- **`super.f()` inside a lambda runs (#2636).**
+  - Before: it compiled, then failed with `VerifyError: Bad invokespecial instruction`.
+  - Now: it calls the superclass's `f`, as in Java. Omitted default arguments work too.
+- **Two contract messages read correctly (#2605).**
+  - Before: a predicate that threw gave E0113 "is threw ..."; W0021 was English-only, with single quotes and no final period.
+  - Now: E0113 says `(threw X: ...)`; W0021 is translated and styled like the other warnings.
+- **A top-level build-time predicate runs in its own script, not in another class (#2604).**
+  - Before: `def check(): Boolean ensures result` at top level could run a same-named static `check()` of another class, so the result depended on that class (and, across files, on file order).
+  - Now: the build runs the predicate the script declares.
+- **A `history` now sees `*=`, `/=`, `%=` and the bitwise compound assignments (#2603).**
+  - Before: under `history n >= old(n)`, `def neg(): void { n *= -1 }` compiled with no diagnostic, and the run took `n` from 10 to -10.
+  - Now: `n *= -1` is E0112 (the run reproduces the break), and `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`, `>>>=` get the warning W0024, since the solver does not model them.
+- **A `history` proved only by assuming the class `invariant` is now W0024, not "proved".**
+  - Before: `--verbose` printed `[history] proved` and `--contracts runtime` dropped the guard, even when a constructor broke the invariant (`n = 2147483647` with `invariant n < 10`).
+  - Now: W0024 says the proof needs the invariant, which nothing proves yet, and the runtime guard stays.
+- **`--warn error` fails the build on W0021, W0024 and W0025 (#2595).**
+  - Before: these warnings are found after type checking, so the build printed them and exited 0.
+  - Now: they are errors under `--warn error`, as every other warning is.
+- **A call through `G[JInteger]` runs `n(x: JInteger)`, not `n(x: Int)`, when a class declares both (#2559).**
+  - Before: `val g: G[JInteger] = new C; g.n(4)` ran the `Int` overload, with no warning.
+  - Now: it runs the `JInteger` override, as Java does. `n(Int)` is still used when it is the only candidate.
+- **Inside a generic class, `f(xs)` picks `f(o: Object)` when `xs` does not fit `f(xs: List[T])` (#2555).**
+  - Before: in `class N[T extends Number]`, a `List[Number]` passed through `this` or `me: N[T]` chose `f(List[T])` and failed with E0000.
+  - Now: `f(Object)` is chosen, as in Java. A `List[T]` still takes `f(List[T])`.
+- **`"\101"` is `"A"`, as in Java (#2529).**
+  - Before: the escape compiled, but the digits stayed in the string (`"a\001b".length()` was 5).
+  - Now: `\0`..`\377` decode in strings and character literals.
+
 ## [0.151.0] - 2026-11-07
 
 ### Breaking

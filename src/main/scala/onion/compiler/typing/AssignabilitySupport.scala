@@ -92,6 +92,23 @@ private[compiler] final class AssignabilitySupport(
         bodyContext.report(IS_NOT_BOXABLE_TYPE, node, basicType)
         return null
       }
+      // `Long? <- 5`: widen to the slot's own primitive, then box, as the
+      // non-nullable `Long <- 5` does. Boxing the Int straight into the slot
+      // put an Integer where a Long was expected (#2684).
+      val slotType = expected match {
+        case n: NullableType => n.innerType
+        case other => other
+      }
+      val slotPrimitive = slotType match {
+        case bt: BasicType => Some(bt) // `Long?` wraps the primitive itself
+        case other => Boxing.unboxedType(bodyContext.table, other)
+      }
+      slotPrimitive match {
+        case Some(slot) if slot != BasicType.VOID && slot != BasicType.BOOLEAN && slot != basicType && TypeRules.isAssignable(slot, basicType) =>
+          val widened = new AsInstanceOf(node.location, actual, slot)
+          return new AsInstanceOf(node.location, Boxing.boxing(bodyContext.table, widened), expected)
+        case _ =>
+      }
       val boxed = Boxing.boxing(bodyContext.table, actual)
       // A boxed `Integer` fits a `T` slot only by the rule a reference does (#2328):
       // read by erasure, `T` is `Object`, so `def zero(): T = 0` or a default

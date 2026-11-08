@@ -450,6 +450,37 @@ final class OperatorTyping(
     case _ => new IntValue(1)
   }
 
+  /** `xs[i]++` / `xs[i]--` on a `List` or `Map` element (#2587): the same lowering as
+    * `xs[i] += 1`, with the receiver and index evaluated once, and the old value as the result. */
+  private def typePostUpdateIndexed(node: AST.Expression, indexing: AST.Indexing, binaryKind: BinaryKind, context: LocalContext): Option[Term] = {
+    val target = typed(indexing.lhs, context).getOrElse(null)
+    if (target == null) return None
+    val index = typed(indexing.rhs, context).getOrElse(null)
+    if (index == null) return None
+    val loc = node.location
+    val arrName = context.newName
+    val arrVar = context.add(arrName, target.`type`)
+    val idxName = context.newName
+    val idxVar = context.add(idxName, index.`type`)
+    val oldName = context.newName
+    val slot = AST.Indexing(indexing.location, AST.Id(loc, arrName), AST.Id(loc, idxName))
+    val read = typed(slot, context).getOrElse(null)
+    if (read == null) return None
+    val oldVar = context.add(oldName, read.`type`)
+    val one = AST.IntegerLiteral(loc, 1)
+    val oldId = AST.Id(loc, oldName)
+    val updated = if (binaryKind == ADD) AST.Addition(loc, oldId, one) else AST.Subtraction(loc, oldId, one)
+    val write = typed(AST.Assignment(loc, slot, updated), context).getOrElse(null)
+    if (write == null) return None
+    Some(new Begin(Array[Term](
+      new SetLocal(0, arrVar, target.`type`, target),
+      new SetLocal(0, idxVar, index.`type`, index),
+      new SetLocal(0, oldVar, read.`type`, read),
+      write,
+      new RefLocal(0, oldVar, read.`type`)
+    )))
+  }
+
   def typePostUpdate(node: AST.Expression, termNode: AST.Expression, symbol: String, binaryKind: BinaryKind, context: LocalContext): Option[Term] = {
     val operand = typed(termNode, context).getOrElse(null)
     if (operand == null) return None
@@ -469,6 +500,11 @@ final class OperatorTyping(
         // for the indexing form (mirrors `obj?[index] = value`).
         bodyContext.report(LVALUE_REQUIRED, node, "indexing")
         return None
+      case _ =>
+    }
+    termNode match {
+      case indexing: AST.Indexing if !operand.isInstanceOf[RefArray] && hasNumericType(tryUnboxAny(operand)) =>
+        return typePostUpdateIndexed(node, indexing, binaryKind, context)
       case _ =>
     }
     if ((!operand.isBasicType) || !hasNumericType(operand)) {

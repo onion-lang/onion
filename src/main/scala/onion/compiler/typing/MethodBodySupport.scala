@@ -178,6 +178,21 @@ private[compiler] final class MethodBodySupport(
     }
 
   /**
+   * An abstract or interface method has no body, but a parameter may still declare a default
+   * (#2638): the default is a method of the declaring class, so a call that omits the argument
+   * works through a receiver typed as the declaring class or interface. A call through a
+   * subclass that overrides without a default still needs the argument, as for a concrete method.
+   */
+  def processBodilessDefaults(method: MethodDefinition, args: List[AST.Argument]): Unit =
+    if args.exists(_.defaultValue != null) && !predefinedDefaults.contains(method) then
+      val context = new LocalContext
+      if (method.modifier & AST.M_STATIC) != 0 then context.setStatic(true)
+      context.setMethod(method)
+      bindParameters(context, args, method.arguments, null)
+      method.setArgumentsWithDefaults(
+        buildArgumentsWithDefaults(args, method.arguments, context.recordUsage, DefaultOwner(method.name, method.modifier, method.typeParameters)))
+
+  /**
    * The clauses of a method with no body: an interface method or an `abstract def` (RFC #2557,
    * #2577). They are typed in a context holding only the parameters and the object, the same
    * scopes a concrete method's clauses see, and kept on the method so the purity pass checks
@@ -340,6 +355,8 @@ private[compiler] final class MethodBodySupport(
         // exactly as `new A(b = 7, a = 3)` does; the positional path below would put
         // 7 into `a` (#2659).
         context.withArgumentSlots(resolveConstructorWithNamedArgs(node, node.superInits, targetClass, context)).foreach {
+          case (ctor, _, _) if !superConstructorAccessible(node, ctor) =>
+            reportInaccessibleSuperConstructor(node, ctor)
           case (ctor, params, sources) =>
             reportThisBeforeDelegation(params, sources.toSeq)
             val init = new Super(targetClass, ctor.getArgs, params, node.selfDelegation)
@@ -362,12 +379,22 @@ private[compiler] final class MethodBodySupport(
           bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
         else if matched.length > 1 then
           bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
+        else if !superConstructorAccessible(node, matched(0)) then
+          reportInaccessibleSuperConstructor(node, matched(0))
         else
           warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
-          val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
+          val init = new Super(targetClass, matched(0).getArgs, Boxing.adaptArguments(bodyContext.table, params, matched(0).getArgs), node.selfDelegation)
           finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
     }
+
+  /** A private parent constructor resolved for `extends A(..)` used to compile, then fail
+   *  with IllegalAccessError (#2662). `: this(..)` reaches the class's own constructors. */
+  private def superConstructorAccessible(node: AST.ConstructorDeclaration, ctor: ConstructorRef): Boolean =
+    node.selfDelegation || MemberAccess.isMemberAccessible(ctor, bodyContext.definition)
+
+  private def reportInaccessibleSuperConstructor(node: AST.ConstructorDeclaration, ctor: ConstructorRef): Unit =
+    bodyContext.report(METHOD_NOT_ACCESSIBLE, node, ctor.affiliation, "new", ctor.getArgs, bodyContext.definition)
 
   /** W0012 for a `null` argument to an Onion-declared super/self constructor's
    *  non-null parameter, as `new P(null)` already warns (#2477). A Java
@@ -411,11 +438,9 @@ private[compiler] final class MethodBodySupport(
     if (candidates.length != 1) (candidates, params)
     else {
       val formals = substitutedArgs(candidates(0))
-      val adapted = params.zip(formals).map { (p, f) =>
-        if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
-        else p
-      }
-      (candidates, adapted)
+      // Adapt against the substituted formals: the erased ones (`Object` for
+      // `Box[Long?]`) would box `5` as an Integer, not a Long.
+      (candidates, Boxing.adaptArguments(bodyContext.table, params, formals))
     }
   }
 

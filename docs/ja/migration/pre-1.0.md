@@ -285,6 +285,7 @@ println(c.t)   // 9
 - **`onion migrate` の書き換え規則はありません（意図的です）:** 直すには受け手のクラスにメソッドかコンストラクタを足します。
   どれが合うかは設計の判断です。
 
+<<<<<<< HEAD
 ## `tool` の `requires` が、本体の実行内容をより多く数えるようになりました
 
 `onionc` は `tool` の `requires { ... }` を、本体が持つ効果（外の世界への作用）と照らし合わせます。
@@ -324,3 +325,65 @@ tool go(): Int requires { console } {
   これを数えるのは、ビルドが契約の述語を実行してよいかの検査だけです。
 - **`onion migrate` の書き換え規則はありません（意図的です）:** 直し方は、呼ばれるコードが何をするかで決まります。
   エラーがそれぞれ直し方を示します。その能力を足すか、使われない能力を外してください。
+=======
+## `hashCode` / `toString` / `getClass` という名前の成分は、そのメソッドの型を変えられなくなりました
+
+`record R(hashCode: Long)` は、1つのオブジェクトが `hashCode()` に2通りの答えを返していました。アクセサの値と、`HashMap` が使う `Int` の値です。`getClass: Int` も `getClass()` で同じことが起きていました。`hashCode: Int`、`toString: String`、`getClass: Class` と同じく、どちらもエラーになりました。
+
+```onion
+// 以前: コンパイルでき、r.hashCode() は 5、(r as Object).hashCode() は 36
+record R(hashCode: Long)
+
+// 現在: E0010。成分の名前を変えてください。
+record R(code: Long)
+```
+
+- **表示されるもの:** `hashCode`、`toString`、`getClass` の成分は、型にかかわらず成分の位置で **E0010** になります。レコードでも `enum` の case でも同じです。
+- **`onion migrate` の規則はありません:** 新しい名前と、それを読むコードは利用者が決めるためです。
+
+## 抽象メソッドとインターフェースのメソッドのデフォルト値が型検査されるようになりました
+
+`abstract def` やインターフェースのメソッドのデフォルト値が使えるようになりました。呼び出しでその引数を省略できます。そのため、ほかのデフォルト値と同じく型検査されます。以前は使われることがなかったので、誤ったデフォルト値でもコンパイルできていました。
+
+```onion
+// 以前: デフォルト値が使われないので、コンパイルできていました
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = "x"): Int
+}
+
+// 現在: "x" の位置で E0000。引数の型のデフォルト値を書いてください。
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = 0): Int
+}
+```
+
+- **表示されるもの:** デフォルト値の位置で **E0000**（型が違う）または **E0002**（名前が見つからない）になります。
+- **`onion migrate` の規則はありません:** どのデフォルト値のつもりだったかは利用者にしかわからないためです。直すか、取り除いてください。
+
+## `toString` / `hashCode` / `equals` を上書きするレコードのメソッドは、型を変えられなくなりました
+
+これまでレコードの本体では、`Object` のメソッドを別の戻り値の型で定義し直せました。クラスではできません。`toString(): Int` は生成された `toString()` を黙って消していました。`toString(): String?` は `null` を `println` まで届けていました。レコードもクラスと同じ規則に従うようになりました。
+
+```onion
+// 以前: コンパイルでき、println(new R("")) は null を表示
+record R(name: String) {
+public:
+  def toString(): String? = if name == "" { null } else { name }
+}
+
+// 現在: toString の位置で E0000。String を返してください。
+record R(name: String) {
+public:
+  def toString(): String = if name == "" { "(none)" } else { name }
+}
+```
+
+- **表示されるもの:**
+  - 戻り値の型が別の参照型（`String?`、`Object`、`CharSequence`）のときは、メソッドの位置で **E0000** になります。ヒントは、null になりうる値に `?:` を使うよう勧めます。
+  - どちらかの戻り値の型がプリミティブ型（`toString(): Int`、`hashCode(): Long`）のときは **E0104** になります。
+- **`onion migrate` の規則はありません:** `null` の代わりに何を返すかは利用者が決めるためです。
+>>>>>>> origin/main

@@ -93,29 +93,24 @@ private[compiler] final class AssignabilitySupport(
         return null
       }
       // `Long? <- 5`: widen to the slot's own primitive, then box, as the
-      // non-nullable `Long <- 5` does. Boxing the Int straight into the slot
-      // put an Integer where a Long was expected (#2684).
-      val slotType = expected match {
-        case n: NullableType => n.innerType
-        case other => other
-      }
-      val slotPrimitive = slotType match {
-        case bt: BasicType => Some(bt) // `Long?` wraps the primitive itself
-        case other => Boxing.unboxedType(bodyContext.table, other)
-      }
-      slotPrimitive match {
-        case Some(slot) if slot != BasicType.VOID && slot != BasicType.BOOLEAN && slot != basicType && TypeRules.isAssignable(slot, basicType) =>
-          val widened = new AsInstanceOf(node.location, actual, slot)
-          return new AsInstanceOf(node.location, Boxing.boxing(bodyContext.table, widened), expected)
-        case _ =>
-      }
-      val boxed = Boxing.boxing(bodyContext.table, actual)
+      // non-nullable `Long <- 5` does (#2684). The rule lives in `boxForSlot`;
+      // a widened box is already the slot's own type.
+      val boxed = Boxing.boxForSlot(bodyContext.table, actual, expected)
+      if (boxed.`type` != Boxing.boxedType(bodyContext.table, basicType))
+        return new AsInstanceOf(node.location, boxed, expected)
       // A boxed `Integer` fits a `T` slot only by the rule a reference does (#2328):
       // read by erasure, `T` is `Object`, so `def zero(): T = 0` or a default
       // `n: T = 3` compiled and threw in a caller using `T = String` (#2534, #2652).
+      // An applied target (`Comparable[String]`) is matched against the box's own view of
+      // it, not by erasure: `val y: Comparable[String] = 5` is rejected (#2594).
+      val appliedTargetFits = expected match {
+        case applied: AppliedClassType =>
+          TypeRelations.boxSupertypeAccepts(bodyContext.table, applied, boxed.`type`.asInstanceOf[ClassType])
+        case _ => true
+      }
       val fits =
         if (containsTypeVariable(expected)) structurallyAssignable(expected, boxed.`type`)
-        else TypeRules.isAssignable(expected, boxed.`type`)
+        else appliedTargetFits && TypeRules.isAssignable(expected, boxed.`type`)
       if (fits) {
         return if (expected == boxed.`type`) boxed else new AsInstanceOf(node.location, boxed, expected)
       }

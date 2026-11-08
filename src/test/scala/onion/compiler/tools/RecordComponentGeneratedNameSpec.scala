@@ -25,6 +25,12 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
       assert(codes("record H(hashCode: Int)\nprintln(new H(3).hashCode())").contains(Some("E0010")))
     }
 
+    it("rejects hashCode or toString of another type, which would give one object two answers (#2546)") {
+      assert(codes("record R(hashCode: Long)\nprintln(new R(5L).hashCode())").contains(Some("E0010")))
+      assert(codes("record R(toString: Int)\nprintln(new R(5))").contains(Some("E0010")))
+      assert(codes("record R(hashCode: String?)\nprintln(\"x\")").contains(Some("E0010")))
+    }
+
     it("rejects toString at compile time") {
       assert(codes("record T(toString: String)\nprintln(new T(\"x\").toString())").contains(Some("E0010")))
     }
@@ -53,8 +59,10 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
       assert(codes("record G(getClass: Class[String]?)").contains(Some("E0010")))
     }
 
-    it("accepts a getClass component of another type") {
-      assert(codes("record G(getClass: Int)\nprintln(new G(1).getClass())").isEmpty)
+    it("rejects a getClass component of another type, which would answer getClass() two ways (#2546)") {
+      assert(codes("record G(getClass: Int)\nprintln(new G(1).getClass())").contains(Some("E0010")))
+      assert(codes("record G(getClass: String?)\nprintln(\"x\")").contains(Some("E0010")))
+      assert(codes("enum E { case A(getClass: Long) }\nprintln(\"x\")").contains(Some("E0010")))
     }
 
     it("says getClass: Class would override the final Object.getClass(), which no record generates") {
@@ -68,7 +76,7 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
 
     it("rejects getClass typed by a type parameter that erases to Class") {
       assert(codes("record G[T extends Class[String]](getClass: T)\nprintln(\"ok\")").contains(Some("E0010")))
-      assert(codes("record G[T](getClass: T)\nprintln(new G[Int](1).getClass())").isEmpty)
+      assert(codes("record G[T](getClass: T)\nprintln(new G[Int](1).getClass())").contains(Some("E0010")))
     }
 
     it("rejects toString typed by a type parameter bounded by String, which erases to String (#2522)") {
@@ -77,28 +85,36 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
       assert(codes("record T[Y extends String, X extends Y](toString: X)").contains(Some("E0010")))
     }
 
-    it("accepts toString typed by a type parameter that erases to something else") {
-      assert(codes("record T[X](toString: X)\nprintln(new T[String](\"a\").toString())").isEmpty)
-      assert(codes("record T[X extends CharSequence](toString: X)\nprintln(new T[String](\"a\"))").isEmpty)
+    // #2546: the accessor `hashCode(): Long` sits next to Object's `hashCode(): Int`, so one
+    // object answers hashCode() two ways (a HashMap uses the one the user never sees).
+    it("rejects toString typed by a type parameter that erases to something else") {
+      assert(codes("record T[X](toString: X)\nprintln(new T[String](\"a\").toString())").contains(Some("E0010")))
+      assert(codes("record T[X extends CharSequence](toString: X)\nprintln(new T[String](\"a\"))").contains(Some("E0010")))
     }
 
-    it("accepts a component whose type gives the accessor a different signature") {
-      assert(codes("record T(toString: Int)\nprintln(new T(5).toString())").isEmpty)
-      assert(codes("record H(hashCode: String)\nprintln(new H(\"a\").hashCode())").isEmpty)
+    it("rejects a component whose type gives the accessor another return type") {
+      assert(codes("record T(toString: Int)\nprintln(new T(5).toString())").contains(Some("E0010")))
+      assert(codes("record H(hashCode: String)\nprintln(new H(\"a\").hashCode())").contains(Some("E0010")))
     }
 
-    it("runs a record whose accessor only shares the generated method's name") {
-      val src =
-        """record T(toString: Int)
-          |class Main {
-          |public:
-          |  static def main(args: String[]): String {
-          |    val t = new T(5)
-          |    return t.toString() + " " + t
-          |  }
-          |}
-          |""".stripMargin
-      assert(shell.run(src, "None", Array()) == Shell.Success("5 T(toString=5)"))
+    it("names the clash in the default locale") {
+      val msgs = errors("record R(hashCode: Long)").filter(_.errorCode.contains("E0010")).map(_.message)
+      assert(msgs.size == 1 && msgs.head.contains("hashCode(): Long"), msgs)
+    }
+
+    // Any type is E0010 now, so no clash message may still offer "give it another type".
+    it("only says to rename the component, in en and ja") {
+      val keys = Seq("recordComponentClashesGeneratedMethod", "recordComponentOverridesFinalMethod", "recordComponentOtherReturnType")
+      for (file <- Seq("/errorMessage.properties", "/errorMessage_ja.properties")) {
+        val props = new java.util.Properties()
+        val in = getClass.getResourceAsStream(file)
+        try props.load(new java.io.InputStreamReader(in, "UTF-8")) finally in.close()
+        for (k <- keys) {
+          val text = props.getProperty("error.semantic." + k)
+          assert(text != null, s"$file $k")
+          assert(!text.contains("another type") && !text.contains("名前か型"), s"$file $k: $text")
+        }
+      }
     }
 
     it("still accepts ordinary and Object-method-like names") {

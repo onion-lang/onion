@@ -218,6 +218,7 @@ object HistoryProver {
       case AST.Assignment(_, lhs, rhs) => name(lhs).filter(env.contains).flatMap(n => expr(rhs, env).map(w => env.updated(n, w)))
       case AST.AdditionAssignment(_, lhs, rhs) => update(lhs, env, (a, b) => bb.add(a, b), rhs)
       case AST.SubtractionAssignment(_, lhs, rhs) => update(lhs, env, (a, b) => bb.sub(a, b), rhs)
+      case AST.MultiplicationAssignment(_, lhs, rhs) => update(lhs, env, (a, b) => bb.mul(a, b), rhs)
       case AST.PostIncrement(_, t) => update(t, env, (a, b) => bb.add(a, b), AST.IntegerLiteral(null, 1))
       case AST.PostDecrement(_, t) => update(t, env, (a, b) => bb.sub(a, b), AST.IntegerLiteral(null, 1))
       case AST.IfExpression(_, c, thenB, elseB) =>

@@ -27,6 +27,18 @@ private[compiler] final class DeclarationBodySupport(
       definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {
         case ctor: AST.ConstructorDeclaration if ctor.primary => ctor.args.map(_.name)
       }.flatten.toSet
+      // A default must be known before a call to its method is typed, wherever the method sits.
+      for (section <- node.defaultSection ++ node.sections; member <- section.members) member match {
+        case m: AST.MethodDeclaration if m.block != null && !AST.hasModifier(m.modifiers, AST.M_ABSTRACT) =>
+          typing.kernelNodeOf[MethodDefinition](m).foreach { method =>
+            typing.openTypeParams(unitContext.currentTypeParams ++ typing.declaredTypeParams_.getOrElse(m, Seq())) {
+              methodBodySupport.predefineDefaults(method, m.args)
+            }
+          }
+        case c: AST.ConstructorDeclaration =>
+          typing.kernelNodeOf[ConstructorDefinition](c).foreach(methodBodySupport.predefineConstructorDefaults(_, c.args))
+        case _ =>
+      }
       for (section <- node.defaultSection ++ node.sections; member <- section.members) {
         member match {
           case field: AST.FieldDeclaration =>

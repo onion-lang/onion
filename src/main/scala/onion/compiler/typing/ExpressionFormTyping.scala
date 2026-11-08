@@ -27,6 +27,11 @@ final class ExpressionFormTyping(
   def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] =
     constructionTyping.typeNewArrayWithValues(node, context)
 
+  def resolveConstructorWithNamedArgs(
+    node: AST.Node, args: List[AST.Expression], typeRef: ClassType, context: LocalContext
+  ): Option[(ConstructorDefinition, Array[Term], Array[AST.Node])] =
+    constructionTyping.resolveConstructorWithNamedArgs(node, args, typeRef, context)
+
   def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] =
     constructionTyping.typeNewObject(node, context, expected)
 

@@ -285,9 +285,9 @@ println(c.t)   // 9
 - **`onion migrate` の書き換え規則はありません（意図的です）:** 直すには受け手のクラスにメソッドかコンストラクタを足します。
   どれが合うかは設計の判断です。
 
-## `hashCode` / `toString` という名前の成分は、そのメソッドの型を変えられなくなりました
+## `hashCode` / `toString` / `getClass` という名前の成分は、そのメソッドの型を変えられなくなりました
 
-`record R(hashCode: Long)` は、1つのオブジェクトが `hashCode()` に2通りの答えを返していました。アクセサの値と、`HashMap` が使う `Int` の値です。`hashCode: Int` や `toString: String` と同じく、エラーになりました。
+`record R(hashCode: Long)` は、1つのオブジェクトが `hashCode()` に2通りの答えを返していました。アクセサの値と、`HashMap` が使う `Int` の値です。`getClass: Int` も `getClass()` で同じことが起きていました。`hashCode: Int`、`toString: String`、`getClass: Class` と同じく、どちらもエラーになりました。
 
 ```onion
 // 以前: コンパイルでき、r.hashCode() は 5、(r as Object).hashCode() は 36
@@ -297,5 +297,5 @@ record R(hashCode: Long)
 record R(code: Long)
 ```
 
-- **表示されるもの:** `hashCode` または `toString` の成分は、型にかかわらず成分の位置で **E0010** になります。
+- **表示されるもの:** `hashCode`、`toString`、`getClass` の成分は、型にかかわらず成分の位置で **E0010** になります。レコードでも `enum` の case でも同じです。
 - **`onion migrate` の規則はありません:** 新しい名前と、それを読むコードは利用者が決めるためです。

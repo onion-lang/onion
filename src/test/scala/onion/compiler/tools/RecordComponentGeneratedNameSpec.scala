@@ -59,8 +59,10 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
       assert(codes("record G(getClass: Class[String]?)").contains(Some("E0010")))
     }
 
-    it("accepts a getClass component of another type") {
-      assert(codes("record G(getClass: Int)\nprintln(new G(1).getClass())").isEmpty)
+    it("rejects a getClass component of another type, which would answer getClass() two ways (#2546)") {
+      assert(codes("record G(getClass: Int)\nprintln(new G(1).getClass())").contains(Some("E0010")))
+      assert(codes("record G(getClass: String?)\nprintln(\"x\")").contains(Some("E0010")))
+      assert(codes("enum E { case A(getClass: Long) }\nprintln(\"x\")").contains(Some("E0010")))
     }
 
     it("says getClass: Class would override the final Object.getClass(), which no record generates") {
@@ -74,7 +76,7 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
 
     it("rejects getClass typed by a type parameter that erases to Class") {
       assert(codes("record G[T extends Class[String]](getClass: T)\nprintln(\"ok\")").contains(Some("E0010")))
-      assert(codes("record G[T](getClass: T)\nprintln(new G[Int](1).getClass())").isEmpty)
+      assert(codes("record G[T](getClass: T)\nprintln(new G[Int](1).getClass())").contains(Some("E0010")))
     }
 
     it("rejects toString typed by a type parameter bounded by String, which erases to String (#2522)") {
@@ -95,9 +97,24 @@ class RecordComponentGeneratedNameSpec extends AbstractShellSpec {
       assert(codes("record H(hashCode: String)\nprintln(new H(\"a\").hashCode())").contains(Some("E0010")))
     }
 
-    it("names the clash and says to rename, in en and ja") {
+    it("names the clash in the default locale") {
       val msgs = errors("record R(hashCode: Long)").filter(_.errorCode.contains("E0010")).map(_.message)
       assert(msgs.size == 1 && msgs.head.contains("hashCode(): Long"), msgs)
+    }
+
+    // Any type is E0010 now, so no clash message may still offer "give it another type".
+    it("only says to rename the component, in en and ja") {
+      val keys = Seq("recordComponentClashesGeneratedMethod", "recordComponentOverridesFinalMethod", "recordComponentOtherReturnType")
+      for (file <- Seq("/errorMessage.properties", "/errorMessage_ja.properties")) {
+        val props = new java.util.Properties()
+        val in = getClass.getResourceAsStream(file)
+        try props.load(new java.io.InputStreamReader(in, "UTF-8")) finally in.close()
+        for (k <- keys) {
+          val text = props.getProperty("error.semantic." + k)
+          assert(text != null, s"$file $k")
+          assert(!text.contains("another type") && !text.contains("名前か型"), s"$file $k: $text")
+        }
+      }
     }
 
     it("still accepts ordinary and Object-method-like names") {

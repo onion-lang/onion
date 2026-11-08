@@ -1,5 +1,5 @@
 ### Breaking
 
-- **`record R(hashCode: Long)` and `record R(toString: Int)` are E0010, as `hashCode: Int` already was.**
-  - Before: they compiled, and `r.hashCode()` and `(r as Object).hashCode()` gave different answers.
+- **A record component named `hashCode`, `toString` or `getClass` is E0010, whatever its type.**
+  - Before: `record R(hashCode: Long)` compiled, and `r.hashCode()` and `(r as Object).hashCode()` gave different answers.
   - Now: rename the component. See `docs/migration/pre-1.0.md`.

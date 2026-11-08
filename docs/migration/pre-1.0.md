@@ -303,10 +303,11 @@ println(c.t)   // 9
 - **No `onion migrate` rule, on purpose:** the fix adds a method or a constructor to the
   receiver's class, and which one fits is a design choice.
 
-## A record component named `hashCode` or `toString` must not change that method's type
+## A record component named `hashCode`, `toString` or `getClass` must not change that method's type
 
 `record R(hashCode: Long)` gave one object two `hashCode()` answers: the accessor, and the
-`Int` one a `HashMap` uses. It is now an error, as `hashCode: Int` and `toString: String` were.
+`Int` one a `HashMap` uses. `getClass: Int` did the same to `getClass()`. Both are now errors,
+as `hashCode: Int`, `toString: String` and `getClass: Class` were.
 
 ```onion
 // Before: compiled, r.hashCode() = 5, (r as Object).hashCode() = 36
@@ -316,5 +317,6 @@ record R(hashCode: Long)
 record R(code: Long)
 ```
 
-- **What you see:** **E0010** at the component, for `hashCode` or `toString` of any type.
+- **What you see:** **E0010** at the component, for `hashCode`, `toString` or `getClass` of any
+  type, in a record or an `enum` case.
 - **No `onion migrate` rule:** the new name and the code that reads it are your choice.

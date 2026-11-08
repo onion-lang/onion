@@ -253,7 +253,8 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
         // The accessor of `hashCode: Int` or `toString: String` has the same signature as the
         // method the record generates itself: a ClassFormatError at load (#2391). The accessor
         // of `getClass: Class` would override the final Object.getClass() (#2512). Any other
-        // type gives the accessor a different descriptor, which the JVM accepts.
+        // type loads, but sits next to Object's method of the same name, so one object would
+        // answer that call two ways (#2546): rejected too.
         val field = clazz.field(arg.name)
         if (clashesWithGeneratedMethod(arg.name, field))
           typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type],
@@ -279,9 +280,10 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       case _ => false
     })
 
-  // A component named like a no-argument Object method but typed differently.
+  // A component named like Object's hashCode(), toString() or getClass() but typed
+  // differently: `getClass: Int` answers 5 to r.getClass() and R to (r as Object).getClass().
   private def changesObjectMethodReturn(name: String, field: FieldRef): Boolean =
-    field != null && (name == "hashCode" || name == "toString")
+    field != null && (name == "hashCode" || name == "toString" || name == "getClass")
 
   private def erasedDescriptor(field: FieldRef): String =
     onion.compiler.generics.Erasure.asmType(field.`type`).getDescriptor

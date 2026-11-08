@@ -178,6 +178,21 @@ private[compiler] final class MethodBodySupport(
     }
 
   /**
+   * An abstract or interface method has no body, but a parameter may still declare a default
+   * (#2638): the default is a method of the declaring class, so a call that omits the argument
+   * works through a receiver typed as the declaring class or interface. A call through a
+   * subclass that overrides without a default still needs the argument, as for a concrete method.
+   */
+  def processBodilessDefaults(method: MethodDefinition, args: List[AST.Argument]): Unit =
+    if args.exists(_.defaultValue != null) && !predefinedDefaults.contains(method) then
+      val context = new LocalContext
+      if (method.modifier & AST.M_STATIC) != 0 then context.setStatic(true)
+      context.setMethod(method)
+      bindParameters(context, args, method.arguments, null)
+      method.setArgumentsWithDefaults(
+        buildArgumentsWithDefaults(args, method.arguments, context.recordUsage, DefaultOwner(method.name, method.modifier, method.typeParameters)))
+
+  /**
    * The clauses of a method with no body: an interface method or an `abstract def` (RFC #2557,
    * #2577). They are typed in a context holding only the parameters and the object, the same
    * scopes a concrete method's clauses see, and kept on the method so the purity pass checks

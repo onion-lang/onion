@@ -99,7 +99,7 @@ class HistoryNotCheckedSpec extends AnyFunSpec {
       assert(compile(src) == Outcome(Nil, Nil))
     }
 
-    // #2602: nothing checks an invariant yet, so a proof that needs one is no proof.
+    // #2602: nothing proves an invariant yet, so a proof that needs one is no proof.
     it("is given when the proof holds only by assuming the class invariant") {
       val src =
         """class Counter {

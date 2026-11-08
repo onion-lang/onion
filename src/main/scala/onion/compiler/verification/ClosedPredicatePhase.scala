@@ -23,7 +23,8 @@ import scala.collection.mutable.ArrayBuffer
 final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]] {
   def name: String = "ClosedPredicate"
 
-  private final case class Candidate(owner: Option[String], name: String, arity: Int, sourceFile: String, location: onion.compiler.Location)
+  /** `owner` is the class to look in; for a top-level function (`topLevel`) it is the unit's own top-level class. */
+  private final case class Candidate(owner: Option[String], name: String, arity: Int, sourceFile: String, location: onion.compiler.Location, topLevel: Boolean = false)
 
   def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] = {
     if (config.contracts != ContractMode.Check || !config.runContracts) return classes
@@ -60,7 +61,7 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
   private def candidatesOf(unit: AST.CompilationUnit): Seq[Candidate] =
     unit.toplevels.flatMap {
       case f: AST.FunctionDeclaration if isBoolean(f.returnType) && assertsResult(f.ensures) =>
-        Seq(Candidate(None, f.name, f.args.size, unit.sourceFile, f.location))
+        Seq(Candidate(Some(topClassOf(unit)), f.name, f.args.size, unit.sourceFile, f.location, topLevel = true))
       case c: AST.ClassDeclaration =>
         (c.defaultSection.toSeq ++ c.sections).flatMap(_.members).collect {
           case m: AST.MethodDeclaration if qualifies(m) => Candidate(Some(c.name), m.name, m.args.size, unit.sourceFile, m.location)
@@ -72,12 +73,19 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
       case _ => Nil
     }
 
+  /** The class the compiler gives a unit's top-level code (`<file>Main`, inside the unit's module). */
+  private def topClassOf(unit: AST.CompilationUnit): String = {
+    val simple = onion.compiler.toolbox.Paths.cutExtension(unit.sourceFile) + "Main"
+    if (unit.module != null) unit.module.name + "." + simple else simple
+  }
+
   private def qualifies(m: AST.MethodDeclaration): Boolean =
     Modifier.isStatic(m.modifiers) && isBoolean(m.returnType) && assertsResult(m.ensures)
 
   /** `None` when the predicate holds (or cannot be found); the reason when it is false or throws. */
   private def runOne(c: Candidate, classes: Seq[CompiledClass], loader: ClassLoader): Option[String] = {
     val owners = c.owner match {
+      case Some(o) if c.topLevel => classes.filter(_.className == o)
       case Some(o) => classes.filter(cc => cc.className == o || cc.className.endsWith("." + o))
       case None    => classes
     }

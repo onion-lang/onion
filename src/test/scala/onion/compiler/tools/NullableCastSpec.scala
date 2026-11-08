@@ -231,5 +231,26 @@ class NullableCastSpec extends AbstractShellSpec {
         "def id[T](c: Comparable[T]): Comparable[T] = c\ndef main(args: String[]): void {\n  val s: Comparable[String] = id(5)\n}\n")
       assert(msgs.contains("E0000") || msgs.contains("E0005"), s"expected an error, got: $msgs")
     }
+    it("does not let T from a primitive argument reach an applied type its box lacks") {
+      for (src <- Seq(
+        "def id[T](x: T): T = x\ndef main(args: String[]): void {\n  val c: Comparable[String] = id(5)\n}\n",
+        "def id[T](x: T): T = x\ndef main(args: String[]): void {\n  val c: Comparable[String]? = id(5)\n}\n",
+        "def first[T](c: Comparable[T]): T = c as T\ndef main(args: String[]): void {\n  val c: Comparable[String] = first(5)\n}\n"
+      )) {
+        val msgs = compileErrors(src)
+        assert(msgs.contains("E0000") || msgs.contains("E0005"), s"expected an error for <$src>, got: $msgs")
+      }
+    }
+    it("still lets T from a primitive argument reach the box's own applied view") {
+      val r = shell.run(
+        """import { java.lang.Integer as JInteger }
+          |def id[T](x: T): T = x
+          |def main(args: String[]): Int {
+          |  val c: Comparable[JInteger] = id(5)
+          |  return c.compareTo(4)
+          |}
+          |""".stripMargin, "ArgTToOwnBoxView.on", Array())
+      assert(Shell.Success(1) == r)
+    }
   }
 }

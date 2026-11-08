@@ -405,11 +405,24 @@ private[typing] object GenericMethodTypeArguments {
         // nothing. `val n: Number = id(5)` keeps T = Integer, as javac infers, instead
         // of conflicting with it (#2594). `val s: Comparable[String] = id(5)` does not
         // fit, so it still unifies and is rejected.
+        // `isAssignable` reads an applied target by erasure, so `Integer` would "fit"
+        // `Comparable[String]`. A raw class reaching an applied type must have that type
+        // among its own views: `val c: Comparable[String] = id(5)` stays an error (#2594).
+        def appliedViewFits(expected: Type, actual: Type): Boolean = {
+          val target = expected match
+            case n: NullableType => n.innerType
+            case t => t
+          (target, actual) match
+            case (applied: AppliedClassType, raw: ClassType) if !raw.isInstanceOf[AppliedClassType] =>
+              TypeRelations.boxSupertypeAccepts(typing.table_, applied, raw)
+            case _ => true
+        }
         val returnFitsArgs = {
           val names = typeParamsIn(formalReturn, paramNames)
           names.nonEmpty && names.forall(inferred.contains) && {
             val argReturn = TypeSubstitution.substituteType(formalReturn, classSubst, inferred.toMap, defaultToBound = false)
-            !expectedReturn.isBasicType && TypeRules.isAssignable(expectedReturn, argReturn)
+            !expectedReturn.isBasicType && TypeRules.isAssignable(expectedReturn, argReturn) &&
+              appliedViewFits(expectedReturn, argReturn)
           }
         }
         if (!returnFitsArgs) unify(formalReturn, expectedReturn, callNode, returnContext = true)

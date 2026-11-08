@@ -283,6 +283,11 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
         case a: AST.Assignment => add(a.lhs, a, s => assignKind(s, a.rhs, hidden))
         case a: AST.AdditionAssignment => add(a.lhs, a, _ => deltaKind(a.rhs, 1))
         case a: AST.SubtractionAssignment => add(a.lhs, a, _ => deltaKind(a.rhs, -1))
+        // `*=`, `/=`, `%=` and the bitwise forms move the field either way; the solver decides (#2603).
+        case a: (AST.MultiplicationAssignment | AST.DivisionAssignment | AST.ModuloAssignment |
+                 AST.BitAndAssignment | AST.BitOrAssignment | AST.XorAssignment | AST.LeftShiftAssignment |
+                 AST.MathRightShiftAssignment | AST.LogicalRightShiftAssignment) =>
+          add(a.lhs, a, _ => Other)
         case u: AST.PostIncrement => add(u.term, u, _ => Raise)
         case u: AST.PostDecrement => add(u.term, u, _ => Lower)
         case _ =>

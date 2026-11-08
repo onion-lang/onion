@@ -342,6 +342,9 @@ private[compiler] final class MethodBodySupport(
         bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
       else if matched.length > 1 then
         bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
+      else if !node.selfDelegation && !MemberAccess.isMemberAccessible(matched(0), bodyContext.definition) then
+        // A private parent constructor resolved here used to compile, then fail with IllegalAccessError (#2662).
+        bodyContext.report(METHOD_NOT_ACCESSIBLE, node, matched(0).affiliation, "new", matched(0).getArgs, bodyContext.definition)
       else
         warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
         val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)

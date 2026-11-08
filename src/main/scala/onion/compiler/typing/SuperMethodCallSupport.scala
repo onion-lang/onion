@@ -16,6 +16,10 @@ private[compiler] final class SuperMethodCallSupport(
   private val overloadSupport = new CallOverloadSupport(calls.typing, calls)
 
   def typeSuperMethodCall(node: AST.SuperMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
+    if (context.isStatic) {
+      bodyContext.report(SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE, node)
+      return None
+    }
     if (ArgumentHelpers.hasNamedArguments(node.args)) return typeWithNamedArgs(node, context, expected)
     val parameters = calls.typedTerms(node.args.toArray, context)
     if (parameters == null) return None

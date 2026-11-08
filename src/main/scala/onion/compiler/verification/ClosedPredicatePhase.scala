@@ -102,7 +102,7 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
     val shown = if (args.isEmpty) "" else args.map(String.valueOf).mkString(" for (", ", ", ")") +
       s" [--contract-seed ${config.contractSeed} --contract-samples ${config.contractSamples}]"
     try {
-      if (m.invoke(null, args*).asInstanceOf[java.lang.Boolean]) None else Some("false" + shown)
+      if (m.invoke(null, args*).asInstanceOf[java.lang.Boolean]) None else Some("returned false" + shown)
     } catch {
       case e: java.lang.reflect.InvocationTargetException =>
         val cause = Option(e.getCause).getOrElse(e)

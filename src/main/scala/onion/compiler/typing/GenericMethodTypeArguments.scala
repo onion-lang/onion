@@ -272,8 +272,13 @@ private[typing] object GenericMethodTypeArguments {
             // declared variable, so occurrences across arguments stay eq
             case tva: TypedAST.TypeVariableType => tva.widen
             // `Int?` as an expected return: box inside the `?`, so it merges
-            // with the boxed `Integer` the arguments gave (issue #2666)
-            case n: TypedAST.NullableType if n.innerType.isBasicType && n.innerType != BasicType.VOID =>
+            // with the boxed `Integer` the arguments gave (issue #2666). Only
+            // there: an `Int?` argument keeps T unboxed, as before, since T
+            // decides overloads later (`remove(ident(w)!!)` is remove(int)),
+            // and a return that repeats the argument's own `Int?` stays as is.
+            case n: TypedAST.NullableType
+                if returnContext && n.innerType.isBasicType && n.innerType != BasicType.VOID &&
+                  !inferred.get(tv.name).exists(_ eq n) =>
               TypedAST.NullableType.of(typing.boxedTypeArgument(n.innerType))
             case other => other
           }

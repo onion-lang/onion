@@ -383,7 +383,7 @@ private[compiler] final class MethodBodySupport(
           reportInaccessibleSuperConstructor(node, matched(0))
         else
           warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
-          val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
+          val init = new Super(targetClass, matched(0).getArgs, Boxing.adaptArguments(bodyContext.table, params, matched(0).getArgs), node.selfDelegation)
           finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
     }
@@ -438,11 +438,9 @@ private[compiler] final class MethodBodySupport(
     if (candidates.length != 1) (candidates, params)
     else {
       val formals = substitutedArgs(candidates(0))
-      val adapted = params.zip(formals).map { (p, f) =>
-        if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
-        else p
-      }
-      (candidates, adapted)
+      // Adapt against the substituted formals: the erased ones (`Object` for
+      // `Box[Long?]`) would box `5` as an Integer, not a Long.
+      (candidates, Boxing.adaptArguments(bodyContext.table, params, formals))
     }
   }
 

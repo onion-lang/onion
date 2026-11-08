@@ -340,6 +340,8 @@ private[compiler] final class MethodBodySupport(
         // exactly as `new A(b = 7, a = 3)` does; the positional path below would put
         // 7 into `a` (#2659).
         context.withArgumentSlots(resolveConstructorWithNamedArgs(node, node.superInits, targetClass, context)).foreach {
+          case (ctor, _, _) if !superConstructorAccessible(node, ctor) =>
+            reportInaccessibleSuperConstructor(node, ctor)
           case (ctor, params, sources) =>
             reportThisBeforeDelegation(params, sources.toSeq)
             val init = new Super(targetClass, ctor.getArgs, params, node.selfDelegation)
@@ -362,12 +364,22 @@ private[compiler] final class MethodBodySupport(
           bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
         else if matched.length > 1 then
           bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
+        else if !superConstructorAccessible(node, matched(0)) then
+          reportInaccessibleSuperConstructor(node, matched(0))
         else
           warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
           val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
           finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
     }
+
+  /** A private parent constructor resolved for `extends A(..)` used to compile, then fail
+   *  with IllegalAccessError (#2662). `: this(..)` reaches the class's own constructors. */
+  private def superConstructorAccessible(node: AST.ConstructorDeclaration, ctor: ConstructorRef): Boolean =
+    node.selfDelegation || MemberAccess.isMemberAccessible(ctor, bodyContext.definition)
+
+  private def reportInaccessibleSuperConstructor(node: AST.ConstructorDeclaration, ctor: ConstructorRef): Unit =
+    bodyContext.report(METHOD_NOT_ACCESSIBLE, node, ctor.affiliation, "new", ctor.getArgs, bodyContext.definition)
 
   /** W0012 for a `null` argument to an Onion-declared super/self constructor's
    *  non-null parameter, as `new P(null)` already warns (#2477). A Java

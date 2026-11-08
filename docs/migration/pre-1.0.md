@@ -345,6 +345,7 @@ public:
 
 - **What you see:** **E0000** (wrong type) or **E0002** (unknown name) at the default.
 - **No `onion migrate` rule:** only you know which default was meant. Fix it, or remove it.
+
 ## A record method that overrides `toString`, `hashCode` or `equals` must keep its type
 
 A record body could redefine an `Object` method with another return type. A class could not.

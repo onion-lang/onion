@@ -679,12 +679,37 @@ private[compiler] object SyntaxHintClassifier {
       depth == 1
     }.map(_.group(1).trim)
 
+  // `text` without `//` and `/* */` comments (an unterminated `/*` runs to the end);
+  // a comment marker inside a string literal is text, not a comment (#2669).
+  private def stripComments(text: String): String = {
+    val out = new StringBuilder
+    var i = 0
+    var quote = ' '
+    while (i < text.length) {
+      val c = text.charAt(i)
+      val next = if (i + 1 < text.length) text.charAt(i + 1) else ' '
+      if (quote != ' ') {
+        out += c
+        if (c == '\\' && i + 1 < text.length) { out += next; i += 1 }
+        else if (c == quote) quote = ' '
+        i += 1
+      } else if (c == '"' || c == '\'') { quote = c; out += c; i += 1 }
+      else if (c == '/' && next == '/') i = text.length
+      else if (c == '/' && next == '*') {
+        val end = text.indexOf("*/", i + 2)
+        i = if (end < 0) text.length else end + 2
+        out += ' '
+      } else { out += c; i += 1 }
+    }
+    out.toString
+  }
+
   // A `val y = e` in a do block (#2465). Computing `e` inside the `yield` works for every
   // monad; a bind form is named only for the monads whose unit infers there (`Option::some`,
   // `Future::successful`, a one-element list). `Result::successful(e)` cannot pin the error
   // type, so `do[Result]` and a user monad get the `yield` advice alone.
   private def doBlockLetHint(monad: String, context: String): Option[SyntaxHint] = {
-    val statement = context.takeWhile(c => c != ';' && c != '\n' && c != '\r' && c != '}').trim
+    val statement = stripComments(context.takeWhile(c => c != ';' && c != '\n' && c != '\r' && c != '}')).trim
     val (name, expr) = statement match {
       case LetStatement(n, e) => (n, e.trim)
       case _ => ("y", "expr")

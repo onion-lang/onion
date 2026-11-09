@@ -303,6 +303,48 @@ println(c.t)   // 9
 - **No `onion migrate` rule, on purpose:** the fix adds a method or a constructor to the
   receiver's class, and which one fits is a design choice.
 
+## A `tool`'s `requires` sees more of what it runs
+
+`onionc` checks a `tool`'s `requires { ... }` clause against the effects its body has. It now
+counts four things it missed before. A tool that relied on a miss gets `E0077` (an effect
+missing from `requires`) or `E0078` (a capability nothing uses).
+
+```onion
+class Base {
+public:
+  def this {}
+  def run(): Int = 1
+}
+class Loud extends Base {
+public:
+  def this {}
+  override def run(): Int { IO::println("loud"); return 2 }
+}
+
+// Before: compiled. Now: E0077 at `b.run()`, "calling Loud::run"
+//   tool go(): Int { val b: Base = new Base(); return b.run() }
+// Now: declare what an override can do
+tool go(): Int requires { console } {
+  val b: Base = new Base()
+  return b.run()
+}
+```
+
+| What the tool does | Before | Now |
+|---|---|---|
+| Calls a method a program class overrides (`b.run()` above) | only the called method counted | every program override counts too (`E0077`) |
+| Uses a class whose static initializer has an effect | not counted | counted (`E0077`) |
+| `try (val r = new R()) { }` where `R` is a program class | `close()` not counted | `R::close` counts (`E0077`) |
+| `new Box[String]()` of a program class | `unknown` | the constructor's own effects; an `unknown` kept only for it is `E0078` |
+
+- **What you see:** `E0077` names the call and the capability to add. `E0078` names the
+  capability to remove.
+- **Not affected:** what a library method might call back on an object you pass it
+  (`list.add(item)` and `Item::toString`). Only the build's own check of contract predicates
+  counts that.
+- **No `onion migrate` rule, on purpose:** the fix depends on what the called code does.
+  Each error names the edit: add that capability, or remove the unused one.
+
 ## A record component named `hashCode`, `toString` or `getClass` must not change that method's type
 
 `record R(hashCode: Long)` gave one object two `hashCode()` answers: the accessor, and the

@@ -431,9 +431,15 @@ time is not waited for: `W0023` names it, so a non-terminating one cannot hang t
 An `E0112` replay that is not run, or not waited for, keeps its `W0021` and also gets `W0023`,
 which says why.
 
-This rule covers the closed-predicate check and the `E0112` replay. One build-time runner is
-not under it yet: the `E0114` Shape check still calls a user `Shape`'s `parse`/`print` with no
-effect check (#2733).
+This rule covers every build-time runner: the closed-predicate check, the `E0112` replay and
+the `E0114` Shape round-trip check. For a user `Shape`, the check looks at everything the
+round-trip calls: the constructor, `canPrint`, `printable` (including a default from a program
+interface), `print`, `parse`, and making a sample of the value type. It calls them through
+`onion.Shape` itself, so a static method or an unrelated overload with the same name is never
+run. If any of them reaches an
+effect beyond `mutate`, the shape is not run at build time; `W0023` names the shape and where
+the effect is, and its round-trip is not checked (#2733). A round-trip that does not finish in
+time is given up on with `W0023`, the same as a predicate.
 
 A record's generated `toString`, `hashCode` and `equals` count as calling the same method on
 each component (or as calling the interface default they forward to), so a record handed to a

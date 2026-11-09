@@ -157,7 +157,7 @@ object EffectInference {
           (name == "toString" && arity == 0) || (name == "hashCode" && arity == 0) || (name == "equals" && arity == 1)
         val result = classes.map { cd =>
           cd.name -> cd.methods.collect {
-            case md: MethodDefinition if md.getBlock != null && !Modifier.isStatic(md.modifier) && !Modifier.isPrivate(md.modifier) &&
+            case md: MethodDefinition if (md.getBlock != null || isRecordObjectMethod(md)) && !Modifier.isStatic(md.modifier) && !Modifier.isPrivate(md.modifier) &&
               (fromObject(md.name, md.arguments.length) ||
                 libraryHas(cd.superClass, md.name, md.arguments.length, mutable.Set()) ||
                 cd.interfaces.exists(libraryHas(_, md.name, md.arguments.length, mutable.Set()))) => md
@@ -167,6 +167,18 @@ object EffectInference {
         result
       }
     }
+
+  /**
+   * A record's generated `toString`, `hashCode` or `equals`. It has no body to walk, but it
+   * calls the same method on each reference component, so it runs whatever those overrides
+   * run (#2601).
+   */
+  private def isRecordObjectMethod(md: MethodDefinition): Boolean =
+    md.getBlock == null && (md.modifier & Modifier.SYNTHETIC_RECORD) != 0 && (md.affiliation match {
+      case cd: ClassDefinition => cd.isRecord
+      case _                   => false
+    }) && ((md.name == "toString" && md.arguments.isEmpty) || (md.name == "hashCode" && md.arguments.isEmpty) ||
+      (md.name == "equals" && md.arguments.length == 1))
 
   /** The class a unit's body belongs to; a reference to that class needs no initializer run. */
   private def ownerOf(unit: Unit0): ClassDefinition = unit match {
@@ -185,6 +197,7 @@ object EffectInference {
     unit match {
       case md: MethodDefinition =>
         if (md.getBlock != null) collector.statement(md.getBlock)
+        else if (isRecordObjectMethod(md)) collector.recordObjectMethod(md)
       case ctor: ConstructorDefinition =>
         if (ctor.block != null) collector.statement(ctor.block)
         collector.superInit(ctor)
@@ -440,6 +453,29 @@ object EffectInference {
       } if (internalCallees.add(md))
           rawSites += RawSite(location,
             onion.compiler.toolbox.TypeFormatting.methodReference(md.affiliation, md.name), None, md)
+
+    /**
+     * The edges of a record's generated `toString`/`hashCode`/`equals`: the same method of
+     * every program class a reference component can be an instance of, as a virtual call on
+     * the component would reach. A nested record's generated method is one of them, so the
+     * fixed point follows records inside records.
+     */
+    def recordObjectMethod(md: MethodDefinition): scala.Unit = md.affiliation match {
+      case rec: ClassDefinition =>
+        val arity = md.arguments.length
+        for {
+          (_, tp) <- rec.recordComponents.toSeq.flatMap(_.toSeq)
+          if !tp.isInstanceOf[TypedAST.BasicType] && !tp.isInstanceOf[TypedAST.ArrayType]
+          cd <- compatible(tp)
+          om <- cd.methods.collect {
+            case m: MethodDefinition if (m ne md) && units.contains(m) && m.name == md.name &&
+              m.arguments.length == arity && !Modifier.isStatic(m.modifier) => m
+          }
+        } if (internalCallees.add(om))
+            rawSites += RawSite(md.location,
+              onion.compiler.toolbox.TypeFormatting.methodReference(om.affiliation, om.name), None, om)
+      case _ =>
+    }
 
     /** Whether `cls` is `ancestor` or extends or conforms to it, by erased name. */
     private def inherits(cls: TypedAST.ClassType, ancestor: String): Boolean = {

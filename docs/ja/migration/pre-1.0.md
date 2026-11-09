@@ -285,7 +285,6 @@ println(c.t)   // 9
 - **`onion migrate` の書き換え規則はありません（意図的です）:** 直すには受け手のクラスにメソッドかコンストラクタを足します。
   どれが合うかは設計の判断です。
 
-<<<<<<< HEAD
 ## `tool` の `requires` が、本体の実行内容をより多く数えるようになりました
 
 `onionc` は `tool` の `requires { ... }` を、本体が持つ効果（外の世界への作用）と照らし合わせます。
@@ -325,7 +324,7 @@ tool go(): Int requires { console } {
   これを数えるのは、ビルドが契約の述語を実行してよいかの検査だけです。
 - **`onion migrate` の書き換え規則はありません（意図的です）:** 直し方は、呼ばれるコードが何をするかで決まります。
   エラーがそれぞれ直し方を示します。その能力を足すか、使われない能力を外してください。
-=======
+
 ## `hashCode` / `toString` / `getClass` という名前の成分は、そのメソッドの型を変えられなくなりました
 
 `record R(hashCode: Long)` は、1つのオブジェクトが `hashCode()` に2通りの答えを返していました。アクセサの値と、`HashMap` が使う `Int` の値です。`getClass: Int` も `getClass()` で同じことが起きていました。`hashCode: Int`、`toString: String`、`getClass: Class` と同じく、どちらもエラーになりました。
@@ -386,4 +385,3 @@ public:
   - 戻り値の型が別の参照型（`String?`、`Object`、`CharSequence`）のときは、メソッドの位置で **E0000** になります。ヒントは、null になりうる値に `?:` を使うよう勧めます。
   - どちらかの戻り値の型がプリミティブ型（`toString(): Int`、`hashCode(): Long`）のときは **E0104** になります。
 - **`onion migrate` の規則はありません:** `null` の代わりに何を返すかは利用者が決めるためです。
->>>>>>> origin/main

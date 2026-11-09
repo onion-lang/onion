@@ -561,4 +561,42 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
       assert(w.contains(onion.compiler.toolbox.Message("warning.predicateNotRun.initializer", Array[Any]("q", "console", "Noisy"))), o.toString)
     }
   }
+
+  describe("a record handed to library code, whose generated methods call a component's override") {
+    it("is not run when the map literal's hashCode reaches a component's hashCode that exits") {
+      val o = compile(
+        """class Quit { public: def this {} def hashCode(): Int { System::exit(3); return 1 } }
+          |record Key(q: Quit)
+          |static def ok(): Boolean ensures result = [new Key(new Quit()): 1].size == 1""".stripMargin)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(_.contains("`ok`")), o.toString)
+    }
+
+    it("is not run when string concatenation reaches a component's toString that prints") {
+      val o = compile(
+        """class Loud { public: def this {} def toString(): String { IO::println("TOSTRING RAN AT BUILD"); return "L" } }
+          |record Box(l: Loud)
+          |static def ok(): Boolean ensures result = ("" + new Box(new Loud())).length > 0""".stripMargin)
+      assert(!o.stdout.contains("TOSTRING RAN AT BUILD"), o.toString)
+      assert(o.w23.exists(_.contains("`ok`")), o.toString)
+    }
+
+    it("is not run when == reaches a component's equals through a nested record") {
+      val o = compile(
+        """class Eq { public: def this {} def equals(o: Object): Boolean { IO::println("EQUALS RAN AT BUILD"); return true } }
+          |record Inner(e: Eq)
+          |record Outer(i: Inner)
+          |static def ok(): Boolean ensures result = new Outer(new Inner(new Eq())) == new Outer(new Inner(new Eq()))""".stripMargin)
+      assert(!o.stdout.contains("EQUALS RAN AT BUILD"), o.toString)
+      assert(o.w23.exists(_.contains("`ok`")), o.toString)
+    }
+
+    it("still runs when the components' methods only touch memory, and reports a false one") {
+      val o = compile(
+        """record Pt(x: Int, name: String)
+          |static def ok(): Boolean ensures result = [new Pt(1, "a"): 1].size == 2""".stripMargin)
+      assert(o.w23.isEmpty, o.toString)
+      assert(o.errors.nonEmpty, o.toString)
+    }
+  }
 }

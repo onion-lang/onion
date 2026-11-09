@@ -223,10 +223,23 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
       // Collect method names declared in user-provided body sections so we can
       // skip generating a synthetic where the user has supplied an override.
+      val userMethods: List[AST.MethodDeclaration] =
+        node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m }
+      // `toString`/`hashCode`/`equals` are replaced only by a method with the
+      // `Object` signature (#2717). An overload (`toString(n: Int)`) or a static or
+      // private method of that name leaves the generated method in place.
+      def isObjectArg(a: AST.Argument): Boolean = a.typeRef.desc match {
+        case AST.ReferenceType(n, _) => n == "Object" || n == "java.lang.Object"
+        case _                       => false
+      }
+      def overridesObjectMethod(m: AST.MethodDeclaration): Boolean =
+        !Modifier.isStatic(m.modifiers) && !Modifier.isPrivate(m.modifiers) && (m.name match {
+          case "equals"              => m.args.length == 1 && isObjectArg(m.args.head)
+          case "hashCode" | "toString" => m.args.isEmpty
+          case _                     => true
+        })
       val userDefinedMethodNames: Set[String] =
-        node.sections.flatMap(_.members).collect {
-          case m: AST.MethodDeclaration => m.name
-        }.toSet
+        userMethods.filter(overridesObjectMethod).map(_.name).toSet
 
       // A record whose declared super interface already supplies a concrete
       // (default) method of the same name/arity needs a REAL forwarding method

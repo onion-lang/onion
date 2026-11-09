@@ -243,10 +243,30 @@ private[compiler] final class MethodBodySupport(
       context.contractScope = Some(scope)
       try clauses.flatMap { c =>
         typed(c, context, BasicType.BOOLEAN).flatMap { t =>
-          Option(processAssignable(c, BasicType.BOOLEAN, t))
+          if (isCondition(t.`type`)) Option(processAssignable(c, BasicType.BOOLEAN, t))
+          else {
+            // Not a condition at all (`requires x` with `x: Int`): say what a clause is,
+            // rather than "consider a cast" (#2605).
+            bodyContext.report(INCOMPATIBLE_TYPE, c, BasicType.BOOLEAN, t.`type`, SemanticErrorReporter.ContractClauseHint(word))
+            None
+          }
         }
       } finally context.contractScope = saved
     }
+  }
+
+  /**
+   * Whether a clause's type can be a condition: `Boolean`, a boxed `java.lang.Boolean`, either
+   * one nullable (which then gets the null-safety error), or a type that never completes.
+   * Anything else goes to the contract-clause hint.
+   */
+  private def isCondition(tpe: Type): Boolean = {
+    val inner = tpe match {
+      case n: NullableType => n.innerType
+      case other => other
+    }
+    inner.isBottomType || inner.isNullType ||
+      TypeRelations.isAssignableWithBoxing(BasicType.BOOLEAN, inner, bodyContext.table)
   }
 
   /**

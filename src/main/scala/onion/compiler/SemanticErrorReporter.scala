@@ -767,16 +767,23 @@ class SemanticErrorReporter(threshold: Int) {
     def written(t: TypedAST.Type): String = t match
       case a: TypedAST.ArrayType if listArrayCast.isDefined => onion.compiler.toolbox.TypeFormatting.arrayWrittenForm(a)
       case other => typeName(other)
+    val contractClause: Option[SemanticErrorReporter.ContractClauseHint] =
+      if (items.length > 2) items(2) match
+        case c: SemanticErrorReporter.ContractClauseHint => Some(c)
+        case _ => None
+      else None
     // A set or range is never a List at runtime either, so a cast is no fix for the widening case.
     val widenToIterable = items.length > 2 && items(2).isInstanceOf[SemanticErrorReporter.WidenToIterableHint]
     val baseMessage = format(
       // "Consider a cast" is no advice on an `as` cast that was itself rejected, nor on the
       // widening case (a set or range is never a List at runtime either).
-      message(if (listArrayCast.isDefined || widenToIterable || castSource.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      message(if (listArrayCast.isDefined || widenToIterable || castSource.isDefined || contractClause.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
       Seq(written(expected), written(actual) + (if (sourceNullable) "?" else ""))
     )
     val hint =
-      if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
+      if (contractClause.isDefined) {
+        Some(format(message("suggestion.contractClauseBoolean"), Seq(contractClause.get.keyword)))
+      } else if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
         Some(message("suggestion.hexDigitB"))
       } else if (widenToIterable) {
         val widen = items(2).asInstanceOf[SemanticErrorReporter.WidenToIterableHint]
@@ -1166,6 +1173,13 @@ object SemanticErrorReporter {
    * List/array hint then names that variable and stays null-safe (`xs!!.toArray(..)`).
    */
   private[compiler] final case class CastSource(name: String, nullable: Boolean)
+
+  /**
+   * An extra (third) item on INCOMPATIBLE_TYPE: the value is a contract clause (`requires`,
+   * `ensures`, `invariant`, `history`; the word is `keyword`) that is not a Boolean condition
+   * (#2605). No cast makes an `Int` a condition, so the message shows one instead.
+   */
+  private[compiler] final case class ContractClauseHint(keyword: String)
 
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */

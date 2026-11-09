@@ -47,7 +47,7 @@ object Migrator:
     def changed: Boolean = edits.nonEmpty
 
   def migrate(source: String): Result =
-    val clauses = LawExampleToPredicate.find(source)
+    val (clauses, clauseNotes) = LawExampleToPredicate.find(source)
     val insideClause = (offset: Int) => clauses.exists(c => offset >= c.offset && offset < c.offset + c.length)
     val (last, notLast) = RetToYield.find(source).filterNot((offset, _) => insideClause(offset)).partition(_._2)
     val notes = notLast.map { (offset, _) =>
@@ -61,7 +61,7 @@ object Migrator:
       Edit(offset, 3, "yield", line, column, "ret -> yield")
     }
     val all = (edits ++ clauses).sortBy(_.offset)
-    Result(apply(source, all), all, notes)
+    Result(apply(source, all), all, (notes ++ clauseNotes).sortBy(n => (n.line, n.column)))
 
   /** `source` with only the clause edits of `result` applied: what the `ret` edits are checked against. */
   def withClausesOnly(source: String, result: Result): String =
@@ -211,10 +211,15 @@ object Migrator:
     private enum Bracket:
       case Paren, Square, Brace, RecordBody
 
+    private val SectionLabels = Set("public", "protected", "private")
+
+    /** Before an `example` that names a value, so a top-level `example { e }` may be its call. */
+    private val Declarers = Set("def", "val", "var", "::", "as")
+
     /** After these, a header's next line still continues it. */
     private val HeaderWords = Set("from", "derive", "conforms", "{")
 
-    def find(source: String): Seq[Edit] =
+    def find(source: String): (Seq[Edit], Seq[Note]) =
       val tokens =
         try codeTokens(source)
         catch case _: Exception => IndexedSeq.empty
@@ -225,6 +230,16 @@ object Migrator:
       // How many unnamed examples each record body (by its `{` index) and the file have had.
       val unnamed = mutable.Map[Int, Int]().withDefaultValue(0)
       val bodies = mutable.Stack[Int]()
+      val notes = mutable.Buffer[Note]()
+      // The access section in force in each record body (by its `{` index); members default to private.
+      val sections = mutable.Map[Int, String]().withDefaultValue("private")
+      // Each record clause's edit index, the section it sat in, and its closing `}`'s index.
+      val inRecordClauses = mutable.Buffer[(Int, String, Int)]()
+      // A file that declares or imports a name `example` may call it as `example { e }` at the
+      // top level, so no top-level `example` there is taken for the old clause (#2765).
+      val exampleIsName = tokens.indices.exists { j =>
+        j > 0 && tokens(j).kind == K.ID && tokens(j).image == "example" && Declarers.contains(tokens(j - 1).image)
+      }
       var i = 0
       while i < tokens.length do
         val token = tokens(i)
@@ -235,7 +250,16 @@ object Migrator:
         val clause =
           if token.kind != K.ID || !(atTop || inRecord) then None
           else if image == "law" && inRecord then lawAt(tokens, i)
-          else if image == "example" && (inRecord || startsStatement(previous, token)) then exampleAt(tokens, i)
+          else if image == "example" && (inRecord || startsStatement(previous, token)) then
+            exampleAt(tokens, i).filter { _ =>
+              val call = !inRecord && exampleIsName
+              if call then
+                val (line, column) = start(source, token).map(lineColumnOf(source, _)).getOrElse((token.beginLine, token.beginColumn))
+                notes += Note(line, column,
+                  "this `example` is a name, not the old `example` clause: the file declares or imports " +
+                    "`example`, so `example { ... }` at the top level is its call; left as written")
+              !call
+            }
           else None
         clause match
           case Some((nameIndex, params, open, close)) =>
@@ -249,7 +273,10 @@ object Migrator:
               e.clause &&
                 start(source, token).exists(at => at >= e.offset + e.length && source.substring(e.offset + e.length, at).isBlank)
             }
-            render(source, tokens, i, name, params, open, close, inRecord, labelled).foreach(edits += _)
+            render(source, tokens, i, name, params, open, close, inRecord, labelled).foreach { e =>
+              if inRecord then inRecordClauses += ((edits.length, sections(scope), close))
+              edits += e
+            }
             i = close + 1
           case None =>
             recordHeader.foreach { depth =>
@@ -269,9 +296,36 @@ object Migrator:
                   if stack.pop() == Bracket.RecordBody && bodies.nonEmpty then bodies.pop()
                 recordHeader.foreach(depth => if stack.size < depth then recordHeader = None)
               case _ => ()
+            if inRecord && SectionLabels.contains(image) && tokens.lift(i + 1).exists(_.image == ":") then
+              sections(bodies.head) = image
             if token.kind == K.K_RECORD then recordHeader = Some(stack.size)
             i += 1
-      edits.toSeq
+      restoreSections(source, tokens, edits, inRecordClauses.toSeq)
+      (edits.toSeq, notes.toSeq)
+
+    /**
+     * A record clause's predicate goes under an inserted `public:`. Unless what follows it is
+     * another clause, a section label or the body's end, the section that was in force is
+     * labelled again after it, so the members after the clause keep their access (#2765).
+     */
+    private def restoreSections(
+      source: String,
+      tokens: IndexedSeq[Token],
+      edits: mutable.Buffer[Edit],
+      clauses: Seq[(Int, String, Int)]
+    ): Unit =
+      clauses.foreach { (index, section, close) =>
+        val next = tokens.lift(close + 1)
+        val nextIsClause = next.flatMap(start(source, _)).exists(at => edits.exists(e => e.clause && e.offset == at))
+        val nextIsLabel = next.exists(t => SectionLabels.contains(t.image)) && tokens.lift(close + 2).exists(_.image == ":")
+        if section != "public" && !nextIsClause && !nextIsLabel && !next.exists(_.image == "}") then
+          val e = edits(index)
+          val lineStart = source.lastIndexOf('\n', e.offset - 1) + 1
+          val before = source.substring(lineStart, e.offset)
+          val ownLine = before.forall(c => c == ' ' || c == '\t')
+          val restored = if ownLine then s"\n$before$section:" else s" $section:"
+          edits(index) = e.copy(replacement = e.replacement + restored)
+      }
 
     /** A token at the header's own depth that cannot be part of `record N[T](...) from .. derive!(..) conforms T, U`. */
     private def endsHeader(token: Token, previous: Option[Token]): Boolean =

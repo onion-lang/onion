@@ -808,3 +808,61 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
 
     invoke(root, file.toString).exitCode shouldBe 0
     read(file) shouldBe source
+
+  test("a top-level call of a declared example function is not rewritten when a record has an old clause"):
+    val source =
+      """record P(x: Int) {
+        |  example { new P(1).x() == 1 }
+        |}
+        |def example(f: () -> Boolean): void {
+        |  IO::println("ran: " + f())
+        |}
+        |example { true }
+        |IO::println("ok")
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 0
+    val migrated = read(file)
+    migrated should include("static def example1(): Boolean")
+    migrated should include("\nexample { true }\n")
+    migrated should not include "def example2"
+    Shell(Seq()).run(migrated, "old.on", Array()) shouldBe a[Shell.Success]
+
+  test("a clause in a private: section leaves the members after it private"):
+    val source =
+      """record P(x: Int) {
+        |private:
+        |  example { new P(1).x() == 1 }
+        |  def secret(): Int = 42
+        |}
+        |println(new P(2).secret())
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    // Rewritten, `secret` stays private, so the outside call still does not compile:
+    // migrate cannot tell, and leaves the file as written rather than opening `secret`.
+    invoke(root, file.toString).exitCode should not be 0
+
+    read(file) shouldBe source
+
+  test("a clause before any section label leaves the default-private members after it private"):
+    val source =
+      """record P(x: Int) {
+        |  example { new P(1).x() == 1 }
+        |  def secret(): Int = 42
+        |public:
+        |  def open(): Int = secret()
+        |}
+        |println(new P(2).open())
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    invoke(root, file.toString).exitCode shouldBe 0
+
+    val migrated = read(file)
+    val afterPredicate = migrated.substring(migrated.indexOf("example1"))
+    afterPredicate.indexOf("private:") should (be >= 0 and be < afterPredicate.indexOf("def secret"))
+    Shell(Seq()).run(migrated, "old.on", Array()) shouldBe a[Shell.Success]

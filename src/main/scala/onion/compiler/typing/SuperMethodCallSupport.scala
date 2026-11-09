@@ -99,7 +99,12 @@ private[compiler] final class SuperMethodCallSupport(
       calls.reportMethodNotFound(node, contextClass, node.name, Array[Type]())
       return None
     }
-    overloadSupport.selectNamedArgumentMethod(candidates, node.args) match {
+    val pretyped = new java.util.IdentityHashMap[AST.Expression, Term]()
+    val selection = overloadSupport.selectNamedArgumentMethod(candidates, node.args, context, m => TypeSubstitution.hierarchySubstitution(contextClass.superClass, m.affiliation, selfReceiver = true), pretyped) match {
+      case Some(found) => found
+      case None => return None
+    }
+    selection match {
       case CandidateSelection.NoMatch =>
         ArgumentHelpers.findUnknownNamedArg(candidates.asScala, node.args) match {
           case Some(named) =>
@@ -113,7 +118,7 @@ private[compiler] final class SuperMethodCallSupport(
         None
       case CandidateSelection.Selected(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(contextClass.superClass, method.affiliation, selfReceiver = true)
-        calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
+        calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
             expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
             finalParams =>

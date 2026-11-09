@@ -318,7 +318,12 @@ private[compiler] final class StaticMethodCallSupport(
       return None
     }
 
-    overloadSupport.selectNamedArgumentMethod(candidates, node.args) match {
+    val pretyped = new java.util.IdentityHashMap[AST.Expression, Term]()
+    val selection = overloadSupport.selectNamedArgumentMethod(candidates, node.args, context, _ => TypeSubstitution.classSubstitution(typeRef), pretyped) match {
+      case Some(found) => found
+      case None => return None
+    }
+    selection match {
       case CandidateSelection.NoMatch =>
         ArgumentHelpers.findUnknownNamedArg(candidates.asScala, node.args) match {
           case Some(named) =>
@@ -333,7 +338,7 @@ private[compiler] final class StaticMethodCallSupport(
       case CandidateSelection.Selected(method) =>
         if (!ensureStaticMethodAccessible(node, method)) return None
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
-        calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
+        calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
             expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
             finalParams => new CallStatic(typeRef, method, finalParams)

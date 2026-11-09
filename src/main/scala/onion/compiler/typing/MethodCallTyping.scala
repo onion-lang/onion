@@ -433,9 +433,10 @@ final class MethodCallTyping(
     node: AST.Node,
     args: List[AST.Expression],
     method: Method,
-    context: LocalContext
+    context: LocalContext,
+    pretyped: java.util.IdentityHashMap[AST.Expression, Term] = null
   ): Option[Array[Term]] =
-    callArgumentTypingSupport.processNamedArguments(node, args, method, context)
+    callArgumentTypingSupport.processNamedArguments(node, args, method, context, pretyped)
 
   /**
    * Record `copy` sugar: `p.copy()` (full clone, zero args) and

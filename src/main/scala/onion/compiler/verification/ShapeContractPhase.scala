@@ -1,6 +1,6 @@
 package onion.compiler.verification
 
-import onion.compiler.{CompileError, CompileWarning, CompiledClass, CompilerConfig, ContractMode, OnionClassLoader, SemanticError, WarningCategory}
+import onion.compiler.{CompileError, CompileWarning, CompiledClass, CompilerConfig, ContractMode, OnionClassLoader, SemanticError, WarningCategory, WarningLevel}
 import onion.compiler.contracts.ContractTable
 import onion.compiler.exceptions.CompilationException
 import onion.compiler.pipeline.{CompilerPhase, PhaseContext}
@@ -38,13 +38,15 @@ final class ShapeContractPhase(config: CompilerConfig) extends CompilerPhase[Seq
     thread.setContextClassLoader(loader)
     val errors = ArrayBuffer.empty[CompileError]
     val warnings = ArrayBuffer.empty[CompileWarning]
+    val build = new BuildRun(config, ctx.debugArtifacts.typedClasses.getOrElse(Nil))
     try {
       for (cc <- classes) {
         val clazz = try Some(Class.forName(cc.className, false, loader)) catch { case _: Throwable => None }
-        clazz.filter(isConcreteShape).foreach(check(_, cc, loader, errors, warnings))
+        clazz.filter(isConcreteShape).foreach(check(_, cc, loader, build, errors, warnings))
       }
     } finally thread.setContextClassLoader(previous)
-    ctx.addWarnings(warnings.toSeq)
+    if (config.warningLevel != WarningLevel.Off)
+      ctx.addWarnings(warnings.toSeq.filterNot(w => config.suppressedWarnings.contains(w.category)))
     if (errors.nonEmpty) throw new CompilationException(errors.toSeq)
     classes
   }
@@ -58,7 +60,7 @@ final class ShapeContractPhase(config: CompilerConfig) extends CompilerPhase[Seq
       case p: ParameterizedType if p.getRawType.getTypeName == ShapeName => p.getActualTypeArguments.head
     }.collect { case k: Class[?] => k }
 
-  private def check(c: Class[?], cc: CompiledClass, loader: ClassLoader,
+  private def check(c: Class[?], cc: CompiledClass, loader: ClassLoader, build: BuildRun,
                     errors: ArrayBuffer[CompileError], warnings: ArrayBuffer[CompileWarning]): Unit = {
     val simple = c.getSimpleName
     val file = cc.className
@@ -66,6 +68,12 @@ final class ShapeContractPhase(config: CompilerConfig) extends CompilerPhase[Seq
       warnings += CompileWarning(file, null, WarningCategory.ShapeNotSampled,
         s"the contract of Shape '$simple' was not checked: $why")
     val tpe = valueType(c).getOrElse { warn("its value type is not a plain class"); return }
+    // The build runs only what cannot reach the outside world (#2733, #2601): the rest is said, not run.
+    shapeEffects(c, cc, tpe, build).foreach { case (effects, where) =>
+      warnings += CompileWarning(file, null, WarningCategory.PredicateNotRun,
+        onion.compiler.toolbox.Message("warning.shapeNotRun.effects", Array[Any](simple, BuildRun.render(effects), where)))
+      return
+    }
     val shape = try {
       val ctor = c.getDeclaredConstructor()
       ctor.setAccessible(true)
@@ -90,6 +98,24 @@ final class ShapeContractPhase(config: CompilerConfig) extends CompilerPhase[Seq
         }
       case _ => warn("it does not declare parse and print")
     }
+  }
+
+  /**
+   * The outside effects of everything the round-trip calls (the constructor, `canPrint`,
+   * `printable`, `print`, `parse` and making and showing a sample of the value type), with the
+   * first place they come from. `None` when the build may run it.
+   */
+  private def shapeEffects(c: Class[?], cc: CompiledClass, tpe: Class[?], build: BuildRun): Option[(Set[onion.compiler.effects.Effect], String)] = {
+    val parts: Seq[(String, Set[onion.compiler.effects.Effect])] =
+      Seq("its constructor" -> build.constructorEffects(cc.className)) ++
+        Seq(entry.canPrint, entry.printable, entry.print, entry.parse).flatMap { n =>
+          // Every overload the program declares counts (`parse` takes the text and an origin). `printable`
+          // is usually the interface's own default, which is library code with no effect, so only a
+          // class's own method is looked at.
+          c.getMethods.filter(m => m.getName == n && !m.isBridge && !m.getDeclaringClass.isInterface)
+            .map(m => s"`$n`" -> build.methodEffects(Some(m.getDeclaringClass.getName), n, m.getParameterCount, static = false)).toSeq
+        } :+ (s"making a sample `${tpe.getSimpleName}`" -> build.sampleEffectsOfClass(tpe.getName)._1)
+    parts.collectFirst { case (where, effects) if effects.nonEmpty => (effects, where) }
   }
 
   /** `None` when `v` is not printable or round-trips; otherwise how it failed. */

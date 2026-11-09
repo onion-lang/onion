@@ -82,6 +82,29 @@ final class BuildRun(config: CompilerConfig, typed: Seq[TypedAST.ClassDefinition
       case _ =>
     }
     params.foreach(visit)
+    summarize(seen)
+  }
+
+  /** The `sampleEffects` of a value type the build samples directly, as `Shape[T]`'s round-trip does (#2733). */
+  def sampleEffectsOfClass(className: String): (Set[Effect], Option[String]) = {
+    val seen = scala.collection.mutable.LinkedHashSet[TypedAST.ClassDefinition]()
+    def visit(cd: TypedAST.ClassDefinition): scala.Unit =
+      if (seen.add(cd)) cd.constructors.foreach {
+        case c: TypedAST.ConstructorDefinition => c.arguments.foreach {
+          case ot: TypedAST.ObjectType => byName.get(ot.name).foreach(visit)
+          case nt: TypedAST.NullableType => nt.innerType match {
+            case ot: TypedAST.ObjectType => byName.get(ot.name).foreach(visit)
+            case _ =>
+          }
+          case _ =>
+        }
+        case _ =>
+      }
+    byName.get(className).foreach(visit)
+    summarize(seen)
+  }
+
+  private def summarize(seen: scala.collection.mutable.LinkedHashSet[TypedAST.ClassDefinition]): (Set[Effect], Option[String]) = {
     val perClass = seen.toSeq.map(cd => cd -> classSampleEffects(cd))
     (perClass.flatMap(_._2).toSet, perClass.collectFirst { case (cd, eff) if eff.nonEmpty => cd.name })
   }

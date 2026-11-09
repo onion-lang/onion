@@ -431,9 +431,10 @@ time is not waited for: `W0023` names it, so a non-terminating one cannot hang t
 An `E0112` replay that is not run, or not waited for, keeps its `W0021` and also gets `W0023`,
 which says why.
 
-This rule covers the closed-predicate check and the `E0112` replay. One build-time runner is
-not under it yet: the `E0114` Shape check still calls a user `Shape`'s `parse`/`print` with no
-effect check (#2733).
+This rule covers every build-time runner: the closed-predicate check, the `E0112` replay and
+the `E0114` Shape round-trip check. A user `Shape` whose `parse` or `print` reaches an effect
+beyond `mutate` is not run at build time; `W0023` names the shape and the method, and its
+round-trip is not checked (#2733).
 
 A record's generated `toString`, `hashCode` and `equals` count as calling the same method on
 each component (or as calling the interface default they forward to), so a record handed to a

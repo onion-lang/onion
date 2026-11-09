@@ -129,6 +129,13 @@ object Boxing {
     new TypedAST.CallStatic(aBoxedType, valueOfMethod, args)
   }
 
+  /** The operand of a reference-type test (`x is T`, `case s is T:`, a nested
+   *  `Wrap(n is T)`) or of a cast to a reference type: a primitive value is
+   *  boxed first, since `instanceof`/`checkcast` need a reference (#2726).
+   *  Every such site goes through here, so the rule has one home. */
+  def asReference(table: ClassTable, node: TypedAST.Term): TypedAST.Term =
+    if (node.isBasicType && !(node.`type` eq TypedAST.BasicType.VOID)) boxing(table, node) else node
+
   /** Box a primitive argument for a reference-typed parameter slot. An `Int`
    *  for a `Long?`/`Long`/`Double?` slot is widened to the slot's primitive
    *  first, so the box is a `Long`, not an `Integer` (#2697, #2701). Every

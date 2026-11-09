@@ -295,6 +295,10 @@ private[compiler] object SyntaxHintClassifier {
   private val RecordClauseBeforeSemicolon =
     """(?:^|[{;\s])(?:shape\s+[A-Za-z_]\w*\s*=\s*(?:re"[^"]*"|[A-Za-z_]\w*))\s*$""".r
 
+  // A statement that starts with the contract keyword `requires` or `ensures` and an operand.
+  private val ContractClauseStatement =
+    """^\s*(requires|ensures)\s+\S""".r
+
   def classify(
     found: String,
     expected: String,
@@ -629,6 +633,12 @@ private[compiler] object SyntaxHintClassifier {
             RustStyleMacroCall.findFirstMatchIn(sourceLine).isDefined =>
         val matched = RustStyleMacroCall.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.rust_style_macro_call", matched.group(1))
+      // `requires e` / `ensures e` as a statement in a body: the clauses belong after the
+      // signature, so the generic call-parentheses hint below would send the user the wrong way.
+      case _
+          if expected.contains("<EOL>") && expected.contains(";") && expected.contains("<EOF>") &&
+            ContractClauseStatement.findFirstMatchIn(sourceLine).isDefined =>
+        hint("error.parsing.hint.contract_clause_in_body", ContractClauseStatement.findFirstMatchIn(sourceLine).get.group(1))
       // A complete statement was expected right where a second bare token follows its
       // leading identifier with nothing in between -- most often a call whose arguments
       // were written without parentheses (a Python 2 `print "x"` or Ruby `puts x` habit).

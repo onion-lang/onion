@@ -38,5 +38,45 @@ class RecordObjectMethodOverloadSpec extends AbstractShellSpec {
     it("an explicit toString() override still wins") {
       assert(run("  override def toString(): String = \"custom\"", "\"\" + new R(\"a\")") == Shell.Success("custom"))
     }
+    it("equals(o: Object?) still replaces the generated equals") {
+      assert(run("  override def equals(o: Object?): Boolean = true",
+        "\"\" + (new R(\"a\") == new R(\"b\"))") == Shell.Success("true"))
+    }
+    it("equals(o: JObject), an alias of Object, still replaces it") {
+      val src =
+        """
+          |import { java.lang.Object as JObject; }
+          |record R(name: String) {
+          |public:
+          |  override def equals(o: JObject): Boolean = true
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + (new R("a") == new R("b"))
+          |  }
+          |}
+          |""".stripMargin
+      assert(shell.run(src, "RecordObjectMethodAlias.on", Array()) == Shell.Success("true"))
+    }
+    it("equals(o: T) in a generic record (erases to Object) still replaces it") {
+      val src =
+        """
+          |record R[T](name: T) {
+          |public:
+          |  def equals(o: T): Boolean = true
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + (new R("a") == new R("b"))
+          |  }
+          |}
+          |""".stripMargin
+      assert(shell.run(src, "RecordObjectMethodGeneric.on", Array()) == Shell.Success("true"))
+    }
+    it("copy(n: Int) beside a String component keeps the generated copy") {
+      assert(run("  def copy(n: Int): Int = n", "(new R(\"a\").copy(\"b\")).name()") == Shell.Success("b"))
+    }
   }
 }

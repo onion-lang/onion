@@ -225,21 +225,24 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // skip generating a synthetic where the user has supplied an override.
       val userMethods: List[AST.MethodDeclaration] =
         node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m }
-      // `toString`/`hashCode`/`equals` are replaced only by a method with the
-      // `Object` signature (#2717). An overload (`toString(n: Int)`) or a static or
-      // private method of that name leaves the generated method in place.
-      def isObjectArg(a: AST.Argument): Boolean = a.typeRef.desc match {
-        case AST.ReferenceType(n, _) => n == "Object" || n == "java.lang.Object"
-        case _                       => false
+      // `toString`/`hashCode`/`equals`/`copy` are replaced only by a method with the
+      // generated method's erased signature (#2717), the test the override and
+      // duplicate checks use: `equals(o: Object?)`, an alias of Object and an erased
+      // `T` all count; an overload (`toString(n: Int)`) does not.
+      def erasedArgDescriptors(m: AST.MethodDeclaration): Option[List[String]] =
+        typing.withSuppressedReporting {
+          openTypeParams(typeParams_ ++ createTypeParams(m.typeParameters)) { typesOf(m.args) }
+        }.map(_.map(t => onion.compiler.generics.Erasure.asmType(t).getDescriptor))
+      val objectDesc = "Ljava/lang/Object;"
+      val componentDescs: List[String] = argTypes.map(t => onion.compiler.generics.Erasure.asmType(t).getDescriptor).toList
+      def replacesGenerated(m: AST.MethodDeclaration): Boolean = m.name match {
+        case "equals"                => m.args.length == 1 && erasedArgDescriptors(m).contains(List(objectDesc))
+        case "hashCode" | "toString" => m.args.isEmpty
+        case "copy"                  => m.args.length == node.args.length && erasedArgDescriptors(m).contains(componentDescs)
+        case _                       => true
       }
-      def overridesObjectMethod(m: AST.MethodDeclaration): Boolean =
-        !Modifier.isStatic(m.modifiers) && !Modifier.isPrivate(m.modifiers) && (m.name match {
-          case "equals"              => m.args.length == 1 && isObjectArg(m.args.head)
-          case "hashCode" | "toString" => m.args.isEmpty
-          case _                     => true
-        })
       val userDefinedMethodNames: Set[String] =
-        userMethods.filter(overridesObjectMethod).map(_.name).toSet
+        userMethods.filter(replacesGenerated).map(_.name).toSet
 
       // A record whose declared super interface already supplies a concrete
       // (default) method of the same name/arity needs a REAL forwarding method

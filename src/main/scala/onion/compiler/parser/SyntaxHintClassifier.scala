@@ -295,6 +295,10 @@ private[compiler] object SyntaxHintClassifier {
   private val RecordClauseBeforeSemicolon =
     """(?:^|[{;\s])(?:shape\s+[A-Za-z_]\w*\s*=\s*(?:re"[^"]*"|[A-Za-z_]\w*))\s*$""".r
 
+  // A statement that starts with the contract keyword `requires` or `ensures` and an operand.
+  private val ContractClauseStatement =
+    """^\s*(requires|ensures)\s+\S""".r
+
   def classify(
     found: String,
     expected: String,
@@ -629,6 +633,12 @@ private[compiler] object SyntaxHintClassifier {
             RustStyleMacroCall.findFirstMatchIn(sourceLine).isDefined =>
         val matched = RustStyleMacroCall.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.rust_style_macro_call", matched.group(1))
+      // `requires e` / `ensures e` as a statement in a body: the clauses belong after the
+      // signature, so the generic call-parentheses hint below would send the user the wrong way.
+      case _
+          if expected.contains("<EOL>") && expected.contains(";") && expected.contains("<EOF>") &&
+            ContractClauseStatement.findFirstMatchIn(sourceLine).isDefined =>
+        hint("error.parsing.hint.contract_clause_in_body", ContractClauseStatement.findFirstMatchIn(sourceLine).get.group(1))
       // A complete statement was expected right where a second bare token follows its
       // leading identifier with nothing in between -- most often a call whose arguments
       // were written without parentheses (a Python 2 `print "x"` or Ruby `puts x` habit).
@@ -679,12 +689,37 @@ private[compiler] object SyntaxHintClassifier {
       depth == 1
     }.map(_.group(1).trim)
 
+  // `text` without `//` and `/* */` comments (an unterminated `/*` runs to the end);
+  // a comment marker inside a string literal is text, not a comment (#2669).
+  private def stripComments(text: String): String = {
+    val out = new StringBuilder
+    var i = 0
+    var quote = ' '
+    while (i < text.length) {
+      val c = text.charAt(i)
+      val next = if (i + 1 < text.length) text.charAt(i + 1) else ' '
+      if (quote != ' ') {
+        out += c
+        if (c == '\\' && i + 1 < text.length) { out += next; i += 1 }
+        else if (c == quote) quote = ' '
+        i += 1
+      } else if (c == '"' || c == '\'') { quote = c; out += c; i += 1 }
+      else if (c == '/' && next == '/') i = text.length
+      else if (c == '/' && next == '*') {
+        val end = text.indexOf("*/", i + 2)
+        i = if (end < 0) text.length else end + 2
+        out += ' '
+      } else { out += c; i += 1 }
+    }
+    out.toString
+  }
+
   // A `val y = e` in a do block (#2465). Computing `e` inside the `yield` works for every
   // monad; a bind form is named only for the monads whose unit infers there (`Option::some`,
   // `Future::successful`, a one-element list). `Result::successful(e)` cannot pin the error
   // type, so `do[Result]` and a user monad get the `yield` advice alone.
   private def doBlockLetHint(monad: String, context: String): Option[SyntaxHint] = {
-    val statement = context.takeWhile(c => c != ';' && c != '\n' && c != '\r' && c != '}').trim
+    val statement = stripComments(context.takeWhile(c => c != ';' && c != '\n' && c != '\r' && c != '}')).trim
     val (name, expr) = statement match {
       case LetStatement(n, e) => (n, e.trim)
       case _ => ("y", "expr")

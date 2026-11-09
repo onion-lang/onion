@@ -285,6 +285,46 @@ println(c.t)   // 9
 - **`onion migrate` の書き換え規則はありません（意図的です）:** 直すには受け手のクラスにメソッドかコンストラクタを足します。
   どれが合うかは設計の判断です。
 
+## `tool` の `requires` が、本体の実行内容をより多く数えるようになりました
+
+`onionc` は `tool` の `requires { ... }` を、本体が持つ効果（外の世界への作用）と照らし合わせます。
+これまで見落としていた4つを数えるようになりました。
+見落としに頼っていた tool は `E0077`（`requires` に足りない効果）か `E0078`（使われない能力）になります。
+
+```onion
+class Base {
+public:
+  def this {}
+  def run(): Int = 1
+}
+class Loud extends Base {
+public:
+  def this {}
+  override def run(): Int { IO::println("loud"); return 2 }
+}
+
+// Before: compiled. Now: E0077 at `b.run()`, "calling Loud::run"
+//   tool go(): Int { val b: Base = new Base(); return b.run() }
+// Now: declare what an override can do
+tool go(): Int requires { console } {
+  val b: Base = new Base()
+  return b.run()
+}
+```
+
+| tool がすること | 以前 | 今 |
+|---|---|---|
+| プログラムのクラスがオーバーライドするメソッドを呼ぶ（上の `b.run()`） | 呼んだメソッドだけを数えた | プログラム中のオーバーライドもすべて数える（`E0077`） |
+| static 初期化子に効果があるクラスを使う | 数えなかった | 数える（`E0077`） |
+| `R` がプログラムのクラスである `try (val r = new R()) { }` | `close()` を数えなかった | `R::close` を数える（`E0077`） |
+| プログラムのジェネリッククラスの `new Box[String]()` | `unknown` | コンストラクタ自身の効果。これのためだけの `unknown` は `E0078` |
+
+- **見えるもの:** `E0077` は呼び出しと、足すべき能力を示します。`E0078` は、外すべき能力を示します。
+- **影響しないもの:** 渡したオブジェクトに対してライブラリが呼び返すかもしれないもの（`list.add(item)` と `Item::toString`）は数えません。
+  これを数えるのは、ビルドが契約の述語を実行してよいかの検査だけです。
+- **`onion migrate` の書き換え規則はありません（意図的です）:** 直し方は、呼ばれるコードが何をするかで決まります。
+  エラーがそれぞれ直し方を示します。その能力を足すか、使われない能力を外してください。
+
 ## `hashCode` / `toString` / `getClass` という名前の成分は、そのメソッドの型を変えられなくなりました
 
 `record R(hashCode: Long)` は、1つのオブジェクトが `hashCode()` に2通りの答えを返していました。アクセサの値と、`HashMap` が使う `Int` の値です。`getClass: Int` も `getClass()` で同じことが起きていました。`hashCode: Int`、`toString: String`、`getClass: Class` と同じく、どちらもエラーになりました。

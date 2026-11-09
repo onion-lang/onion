@@ -35,6 +35,16 @@ class DoBlockLetHintSpec extends AbstractShellSpec {
       assert(msgs.contains("y <- Option::some(x + 1)"), msgs)
     }
 
+    it("leaves a trailing comment out of the suggested bind (#2669)") {
+      val line = "val a = Option::some(1)\nval s = do[Option] {\n  x <- a\n  val y = x + 1 // add one\n  yield y\n}\n"
+      val msgs = messages(line).mkString("\n")
+      assert(msgs.contains("y <- Option::some(x + 1)") && !msgs.contains("add one"), msgs)
+      val block = messages("val a = Option::some(1)\nval s = do[Option] {\n  x <- a\n  val y = x + 1 /* add */\n  yield y\n}\n").mkString("\n")
+      assert(block.contains("y <- Option::some(x + 1)") && !block.contains("add"), block)
+      val str = messages("val a = Option::some(\"u\")\nval s = do[Option] {\n  x <- a\n  val y = x + \"//x\" // c\n  yield y\n}\n").mkString("\n")
+      assert(str.contains("""x + "//x")""") && !str.contains(" c)"), str)
+    }
+
     it("names Future::successful in do[Future], and that form compiles") {
       val msgs = messages(prelude + "val s = do[Future] { x <- f; val y = x + 1; yield y * 10 }\n").mkString("\n")
       assert(msgs.contains("y <- Future::successful(x + 1)"), msgs)

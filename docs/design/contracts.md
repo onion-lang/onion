@@ -426,8 +426,18 @@ vouch for (`unknown`) gets the same warning. **Nothing stops running silently.**
 `Mandelbrot.on:48`) have `mutate` through the methods they call, and they run under this rule;
 under the stricter one of the first draft they would not have.
 
-A run is bounded by `--contract-timeout`. A predicate that does not finish is `Not proved`,
-with the note naming it, so a non-terminating one cannot hang the build.
+A run is bounded by a fixed 10 s; no flag changes it yet. A predicate that does not finish in
+time is not waited for: `W0023` names it, so a non-terminating one cannot hang the build.
+An `E0112` replay that is not run, or not waited for, keeps its `W0021` and also gets `W0023`,
+which says why.
+
+This rule covers the closed-predicate check and the `E0112` replay. One build-time runner is
+not under it yet: the `E0114` Shape check still calls a user `Shape`'s `parse`/`print` with no
+effect check (#2733).
+
+A record's generated `toString`, `hashCode` and `equals` count as calling the same method on
+each component (or as calling the interface default they forward to), so a record handed to a
+map literal or to string concatenation carries what those methods do.
 
 A write to a **static** field by a predicate is not stopped by this rule and can reach another
 predicate in the same build. Predicates are run one at a time, each in a fresh class loader, so

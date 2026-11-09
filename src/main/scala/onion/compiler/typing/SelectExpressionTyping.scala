@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.toolbox.Boxing
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.typing.session.TypingBodyContext
 
@@ -373,7 +374,9 @@ final class SelectExpressionTyping(
             def buildAccessor(base: Term, path: List[AccessStep]): Term = path match {
               case Nil => base
               case AccessStep(castType, getter) :: rest =>
-                val cast = new AsInstanceOf(base, castType)
+                // A nested type pattern on a primitive component (`Wrap(n is Object)`)
+                // ends with a cast to the tested reference type: box first (#2726).
+                val cast = new AsInstanceOf(Boxing.asReference(bodyContext.table, base), castType)
                 if (getter == null) buildAccessor(cast, rest)
                 else {
                   val call = new Call(cast, getter, Array.empty)
@@ -585,7 +588,7 @@ final class SelectExpressionTyping(
         // Create instanceof check. The check itself is on the erased class:
         // the JVM has no type arguments at runtime, so `x is Some` can only
         // test membership of `Some`.
-        val instanceOfCheck = new InstanceOf(new RefLocal(bind), mappedType.asInstanceOf[ObjectType])
+        val instanceOfCheck = new InstanceOf(Boxing.asReference(bodyContext.table, new RefLocal(bind)), mappedType.asInstanceOf[ObjectType])
 
         // Store type pattern info (name and type) - variable will be registered later.
         // The *binding* can be more precise than the check: matching a

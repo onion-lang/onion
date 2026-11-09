@@ -24,16 +24,105 @@ private[compiler] final class CallOverloadSupport(
   typing: Typing,
   calls: MethodCallTyping
 ) {
+  /**
+   * Picks the overload a call with named arguments means. Parameter names come first: an
+   * overload must have every name used and a value for each parameter without a default.
+   * When more than one overload is left, the arguments' types decide, as for a positional
+   * call (#2756): `f(name = "s")` beside `f(name: Long)` and `f(name: String)` is the
+   * `String` one. Each argument is then typed once, here, and kept in `pretyped` for
+   * [[MethodCallTyping.processNamedArguments]] to reuse. None when an argument fails to
+   * type (its error is already reported).
+   */
   def selectNamedArgumentMethod(
     candidates: JTreeSet[Method],
-    args: List[AST.Expression]
-  ): CandidateSelection[Method] = {
+    args: List[AST.Expression],
+    context: LocalContext,
+    classSubstFor: Method => scala.collection.immutable.Map[String, Type],
+    pretyped: java.util.IdentityHashMap[AST.Expression, Term]
+  ): Option[CandidateSelection[Method]] = {
     val info = extractNamedArgInfo(args)
-    val applicable = filterByNamedArgs(candidates, info)
+    val byName = filterByNamedArgs(candidates, info)
 
-    if (applicable.isEmpty) CandidateSelection.NoMatch
-    else if (applicable.length > 1) CandidateSelection.Ambiguous(applicable(0), applicable(1))
-    else CandidateSelection.Selected(applicable.head)
+    if (byName.isEmpty) Some(CandidateSelection.NoMatch)
+    else if (byName.length == 1) Some(CandidateSelection.Selected(byName.head))
+    else {
+      val complete = byName.filter(method => coversRequiredParameters(method, args, info))
+      if (complete.length == 1) Some(CandidateSelection.Selected(complete.head))
+      else if (complete.isEmpty) Some(CandidateSelection.Ambiguous(byName(0), byName(1)))
+      else narrowNamedByArgumentTypes(complete, args, info, context, classSubstFor, pretyped)
+    }
+  }
+
+  /** The parameter slot each argument fills, in the order written; -1 for a name the method lacks. */
+  private def namedArgumentSlots(method: Method, args: List[AST.Expression], info: ArgumentHelpers.NamedArgInfo): List[Int] = {
+    val paramNames = method.argumentsWithDefaults.map(_.name)
+    args.zipWithIndex.map {
+      case (named: AST.NamedArgument, _) => paramNames.indexOf(named.name)
+      case (_, index) => if (index < info.positionalCount) index else -1
+    }
+  }
+
+  private def coversRequiredParameters(method: Method, args: List[AST.Expression], info: ArgumentHelpers.NamedArgInfo): Boolean = {
+    val filled = namedArgumentSlots(method, args, info).toSet
+    method.argumentsWithDefaults.indices.forall(i => filled.contains(i) || method.argumentsWithDefaults(i).defaultValue.isDefined)
+  }
+
+  private def narrowNamedByArgumentTypes(
+    applicable: List[Method],
+    args: List[AST.Expression],
+    info: ArgumentHelpers.NamedArgInfo,
+    context: LocalContext,
+    classSubstFor: Method => scala.collection.immutable.Map[String, Type],
+    pretyped: java.util.IdentityHashMap[AST.Expression, Term]
+  ): Option[CandidateSelection[Method]] = {
+    val ambiguous = CandidateSelection.Ambiguous(applicable(0), applicable(1))
+    // A vararg overload's slots do not map one to one; keep today's answer for it.
+    if (applicable.exists(_.isVararg)) return Some(ambiguous)
+
+    val values = args.map {
+      case named: AST.NamedArgument => named.value
+      case positional => positional
+    }
+    var failed = false
+    val terms = values.map { value =>
+      calls.typed(value, context, null) match {
+        case Some(term) => pretyped.put(value, term); term
+        case None => failed = true; null
+      }
+    }
+    if (failed) return None
+
+    val fitting = applicable.flatMap { method =>
+      val slots = namedArgumentSlots(method, args, info)
+      val formals = TypeSubst.args(method, classSubstFor(method), scala.collection.immutable.Map.empty)
+      val projected = slots.map(slot => if (slot >= 0 && slot < formals.length) formals(slot) else null).toArray
+      val fits = projected.indices.forall { i =>
+        val formal = projected(i)
+        formal != null && (
+          TypeCheckingHelpers.containsTypeVariable(formal) ||
+            calls.isAssignableWithBoxing(formal, terms(i).`type`) ||
+            TypeRules.emptyCollectionLiteralAccepts(formal, terms(i))
+        )
+      }
+      Option.when(fits)(ApplicableMethod(method, projected, scala.collection.immutable.Map.empty))
+    }
+
+    fitting match {
+      case Nil => Some(ambiguous)
+      case only :: Nil => Some(CandidateSelection.Selected(only.method))
+      case several =>
+        selectMostSpecificApplicable(several, argTypes = terms.map(_.`type`).toArray) match {
+          case CandidateSelection.Selected(best) =>
+            // Two overloads can take the same types in a different order (`k(a: Int, b: String)`
+            // and `k(b: String, a: Int)` called as `k(a = 1, b = "x")`): neither is more specific.
+            several.find(other => (other ne best) && isMoreSpecific(other.expectedArgs, best.expectedArgs, Nil)) match {
+              case Some(tie) => Some(CandidateSelection.Ambiguous(best.method, tie.method))
+              case None => Some(CandidateSelection.Selected(best.method))
+            }
+          case CandidateSelection.Ambiguous(a, b) => Some(CandidateSelection.Ambiguous(a.method, b.method))
+          case CandidateSelection.NoMatch => Some(ambiguous)
+        }
+    }
   }
 
   def collectStaticApplicables(

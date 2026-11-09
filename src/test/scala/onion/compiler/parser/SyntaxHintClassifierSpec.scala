@@ -1264,6 +1264,19 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       hint.messageKey shouldBe "error.parsing.hint.law_example_outside_record"
       hint.arguments shouldBe Seq("example")
     }
+
+    it("tells a `requires` or `ensures` inside a method body that the clause goes in the header") {
+      Seq("requires", "ensures").foreach { word =>
+        val hint = classify(
+          found = "x",
+          expected = "<EOF>, <EOL>, \";\"",
+          sourceLine = s"  $word x > 0"
+        )
+
+        hint.messageKey shouldBe "error.parsing.hint.contract_clause_in_body"
+        hint.arguments shouldBe Seq(word)
+      }
+    }
   }
 
   private def classify(

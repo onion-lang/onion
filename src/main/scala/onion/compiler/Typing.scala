@@ -181,6 +181,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     warnings = new WarningReporter(config.warningLevel, config.suppressedWarnings)
   )
   private[compiler] val session = new TypingSession(config, globalState, emptyTypeParams)
+  /** (trait FQCN, instance class simple name) -> the instance class declared for it, across
+    * every unit of this run; a second one is E0097 (TypingDuplicationPass, #2770). */
+  private[compiler] val traitInstances = scala.collection.mutable.HashMap.empty[(String, String), String]
   /** Whether contract clauses are accepted (RFC #2557). */
   private[compiler] def contractMode: ContractMode = config.contracts
 

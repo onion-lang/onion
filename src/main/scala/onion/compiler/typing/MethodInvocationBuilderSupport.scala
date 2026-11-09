@@ -60,12 +60,14 @@ private[compiler] final class MethodInvocationBuilderSupport(
 
   /** The instance class for `Trait[Concrete]`. An `instance` lowers to a class in its own
     * unit's package, so look in the caller's package first, then beside the trait, then
-    * beside the type argument. A candidate counts only if it really implements this trait:
-    * another trait that merely shares the simple name must not capture the slot (#2769). */
+    * beside the type argument, then in the default package. A candidate counts only if it
+    * really implements this trait: another trait that merely shares the simple name must not
+    * capture the slot (#2769). At most one candidate can match, because a second instance for
+    * the same (trait, type) is rejected as E0097 (TypingDuplicationPass). */
   private def findInstanceClass(traitClass: ClassType, concrete: Type): Option[ClassType] = {
     val mangled = instanceClassName(traitClass, concrete)
     val module = typing.unit_.module
-    val packages = List(if (module != null) module.name else null, packageOf(traitClass.name), packageOf(concrete.name)).distinct
+    val packages = List(if (module != null) module.name else null, packageOf(traitClass.name), packageOf(concrete.name), null).distinct
     val traitRaw = traitClass match { case a: AppliedClassType => a.raw; case c => c }
     packages.iterator
       .flatMap(p => typing.load(typing.createFQCN(p, mangled)))

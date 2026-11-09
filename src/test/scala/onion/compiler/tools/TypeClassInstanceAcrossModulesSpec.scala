@@ -34,7 +34,9 @@ class TypeClassInstanceAcrossModulesSpec extends AnyFunSpec {
       |}""".stripMargin
 
   /** Compile the sources together, run `Main.main`, and return what it printed, or the errors. */
-  private def compileAndRun(sources: (String, String)*): Either[String, String] = {
+  private def compileAndRun(sources: (String, String)*): Either[String, String] = compileAndRunMain("Main", sources*)
+
+  private def compileAndRunMain(mainClass: String, sources: (String, String)*): Either[String, String] = {
     val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10)
     val inputs = sources.map { case (name, src) => new StreamInputSource(() => new StringReader(src), name) }
     new OnionCompiler(config).compile(inputs) match {
@@ -49,7 +51,7 @@ class TypeClassInstanceAcrossModulesSpec extends AnyFunSpec {
         val buffer = new ByteArrayOutputStream()
         val old = System.out
         System.setOut(new PrintStream(buffer, true, "UTF-8"))
-        try loader.loadClass("Main").getMethod("main", classOf[Array[String]]).invoke(null, Array[String]())
+        try loader.loadClass(mainClass).getMethod("main", classOf[Array[String]]).invoke(null, Array[String]())
         finally System.setOut(old)
         Right(buffer.toString("UTF-8").trim)
       case CompilationOutcome.Failure(errors) => Left(errors.map(_.toString).mkString("\n"))
@@ -90,5 +92,54 @@ class TypeClassInstanceAcrossModulesSpec extends AnyFunSpec {
   it("still reports a missing instance as an error, not a crash") {
     val r = compileAndRun("lib.on" -> lib, "main.on" -> main("val xs: List[Long] = [1L, 2L]\n    println(Agg::total(xs))"))
     assert(r.isLeft && r.left.toOption.get.contains("E0003"), r)
+  }
+
+  // Panel block on #2770, repro 1: the trait is in a module, its instance in a default-package
+  // file, and the caller in a third module. This printed 7 before #2769 and must still.
+  it("finds an instance declared in the default package for a module's trait") {
+    val tr =
+      """module tb;
+        |trait Numeric[T] {
+        |  def zero(): T
+        |  def plus(a: T, b: T): T
+        |}
+        |class Agg {
+        |public:
+        |  static def total[T: Numeric](xs: List[T]): T {
+        |    var acc: T = Numeric[T]::zero()
+        |    foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
+        |    return acc
+        |  }
+        |}""".stripMargin
+    val inst =
+      """import { tb.Numeric }
+        |instance Numeric[Int] {
+        |  def zero(): Int = 0
+        |  def plus(a: Int, b: Int): Int = a + b
+        |}""".stripMargin
+    val app =
+      """module app;
+        |import { tb.Agg }
+        |class Main {
+        |public:
+        |  static def main(args: String[]): void {
+        |    val xs: List[Int] = [1, 2, 4]
+        |    println(Agg::total(xs))
+        |  }
+        |}""".stripMargin
+    assert(compileAndRunMain("app.Main", "tr.on" -> tr, "inst.on" -> inst, "main.on" -> app) == Right("7"))
+  }
+
+  // Panel block on #2770, repro 2: a second instance of numlib.Numeric[Int], declared in another
+  // package, is a duplicate (E0097), not a silent second dictionary that the call site picks.
+  it("rejects a second instance of the same trait and type in another package") {
+    val dup =
+      """import { numlib.Numeric }
+        |instance Numeric[Integer] {
+        |  def zero(): Integer = 1000
+        |  def plus(a: Integer, b: Integer): Integer = a + b
+        |}""".stripMargin
+    val r = compileAndRun("lib.on" -> lib, "dup.on" -> dup, "main.on" -> main("println(Agg::inside())"))
+    assert(r.isLeft && r.left.toOption.get.contains("E0097"), r)
   }
 }

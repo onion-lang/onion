@@ -223,10 +223,27 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
       // Collect method names declared in user-provided body sections so we can
       // skip generating a synthetic where the user has supplied an override.
+      val userMethods: List[AST.MethodDeclaration] =
+        node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m }
+      // `toString`/`hashCode`/`equals` are replaced only by a method with the
+      // generated method's erased signature (#2717), the test the override and
+      // duplicate checks use: `equals(o: Object?)`, an alias of Object and an erased
+      // `T` all count; an overload (`toString(n: Int)`) does not.
+      // Any method named `copy` still replaces the generated `copy`: a call such as
+      // `copy()` or `copy(name = v)` can reach a user overload, so keeping both would
+      // let the generated shallow copy win silently (#2743 panel, run/MatrixLab.on).
+      def erasedArgDescriptors(m: AST.MethodDeclaration): Option[List[String]] =
+        typing.withSuppressedReporting {
+          openTypeParams(typeParams_ ++ createTypeParams(m.typeParameters)) { typesOf(m.args) }
+        }.map(_.map(t => onion.compiler.generics.Erasure.asmType(t).getDescriptor))
+      val objectDesc = "Ljava/lang/Object;"
+      def replacesGenerated(m: AST.MethodDeclaration): Boolean = m.name match {
+        case "equals"                => m.args.length == 1 && erasedArgDescriptors(m).contains(List(objectDesc))
+        case "hashCode" | "toString" => m.args.isEmpty
+        case _                       => true
+      }
       val userDefinedMethodNames: Set[String] =
-        node.sections.flatMap(_.members).collect {
-          case m: AST.MethodDeclaration => m.name
-        }.toSet
+        userMethods.filter(replacesGenerated).map(_.name).toSet
 
       // A record whose declared super interface already supplies a concrete
       // (default) method of the same name/arity needs a REAL forwarding method

@@ -35,8 +35,8 @@ anything in this file.
    `gh repo clone onion-lang/evolution-memory ../evolution-memory`). Read its `self.md` and
    `insights.md`. Once you know what you are about to work on, recall related episodes from
    its root: `onion tools/memory.on recall "<issue keywords>"`, with the jar you build for the
-   work anyway (`sbt -batch assembly`; in a cloud checkout `sbt` is at
-   `/root/.local/sbt-launcher/bin`, not on PATH). Act on what past runs learned; do not repeat
+   work anyway (`sbt -batch assembly`; in a cloud checkout, see "No sbt in the cloud image" under
+   Known pitfalls). Act on what past runs learned; do not repeat
    their mistakes. Recall *before* choosing what to probe or fix, not only before writing the
    episode: in W41 three runs probed `tool`/`--plan` in turn, each discovering afterwards that
    the others had.
@@ -120,11 +120,15 @@ panel can review only grows the queue: on 2026-11-01 there were 24 open PRs, the
 takes 3 per run, and every push, even a plain merge of `main`, voids its verdict and
 restarts the four lenses. A PR you did not open still counts.
 
-**At the cap with a silent panel, stop at §0.** If the WIP cap holds and no panel verdict has
-been posted for 6 hours, do §0 and step 1 only. Build nothing, push nothing, write a one-line
-episode and stop. Drain work cannot land without a verdict, and a push voids the next one.
-The usual cause is a usage limit (W42, W44, W45). From 11-02 to 11-07, 40 Maintainer
-episodes were titled "wip-cap-…-drain-only", and none of them moved a PR.
+**At the cap with a silent panel, spend nothing on drain.** The panel is silent when the
+newest `<!-- panel v1` comment on any PR is more than 6 hours old while a PR waits for one
+(§0.5's "silent role"). If the WIP cap holds and the panel is silent, do §0, step 1 (a red
+`main` still gets its fix, built and pushed), and step 2's auto-merge and release items (a
+due release still goes out, with its `risk:low` cut PR). Push nothing to a PR that needs a
+verdict: it cannot land without one, and a push voids the next. Then write the episode
+(§0.11, a short `--body` is enough) and stop. The usual cause is a usage limit (W42, W44,
+W45). From 11-02 to 11-07, 40 Maintainer episodes were titled "wip-cap-…-drain-only", and
+none of them moved a PR.
 
 1. **Health first.** Check whether `main` is red, looking only at the test workflows:
    `gh run list --branch main --workflow scala.yml --limit 3` and the same for
@@ -477,10 +481,12 @@ compatibility (PRINCIPLES.md §2, §3, §9).
   and `gh api search/...` fail (GraphQL 403), and `gh api --paginate` fails on the second page.
   Use `gh api repos/onion-lang/onion/...` with `page=N` by hand, or the GitHub MCP tools.
   Dedupe by listing issues with `state=all&since=<date>` and grepping, since search is blocked.
-- **No sbt in the cloud image is not a stand-down.** Since about 11-05 the image has no
-  `/root/.local/sbt-launcher/bin`, and the environment has no setup script. 33 W45 episodes
-  are titled "no-sbt-…" and built nothing. This recipe built the jar on 11-09 in 5 rounds,
-  seeding 11 Maven 429s along the way:
+- **No sbt in the cloud image is not a stand-down.** The repository's SessionStart hook
+  (`.claude/hooks/session-start.sh`, cloud sessions only) installs sbt into
+  `/root/.local/sbt-launcher/bin` when its download succeeds; it did on 11-09 12:26. When the
+  download fails (GitHub 504, Maven 429), that directory is missing, and the environment has
+  no setup script to retry it. 33 W45 episodes are titled "no-sbt-…" and built nothing. This
+  recipe built the jar on 11-09 in 5 rounds, seeding 11 Maven 429s along the way:
   ```bash
   mkdir -p /root/sbtdl && cd /root/sbtdl
   curl -sSfL -o sbt.tgz https://github.com/sbt/sbt/releases/download/v1.10.7/sbt-1.10.7.tgz
@@ -488,9 +494,8 @@ compatibility (PRINCIPLES.md §2, §3, §9).
   bash <memory checkout>/tools/converge-sbt.sh <onion checkout> 25 assembly   # no -batch
   ```
   The script runs the launcher jar directly, so pass sbt commands with no `-batch` (the
-  launcher rejects it). It retries until coursier's cache holds every artifact. Its
-  neighbour `unblock-sbt.sh` handles the rarer stale-`boot/` case. The same steps belong
-  in the environment's setup script; only Kota can approve that.
+  launcher rejects it). It retries until coursier's cache holds every artifact. The same
+  steps belong in the environment's setup script; only Kota can approve that.
 - **Memory pushes:** `git push origin HEAD:main` in `../evolution-memory`; a plain push from a
   cloud session goes to a `claude/*` branch.
 - **sbt 2 can serve stale classes** after an edit, so a correct fix looks like it did nothing.

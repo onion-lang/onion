@@ -24,7 +24,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   private val additionTyping = new AdditionTyping(bodyContext, this)
   private val methodLookupSupport = new MethodLookupSupport(typing, bodyContext)
   private val classInitializerSupport = new ClassInitializerSupport(typing, typed(_, _, _), processAssignable(_, _, _))
-  private val methodBodySupport = new MethodBodySupport(typing, unitContext, bodyContext, typed(_, _, _), typedTerms, translate, addReturnNode, processAssignable(_, _, _))
+  private val methodBodySupport = new MethodBodySupport(typing, unitContext, bodyContext, typed(_, _, _), typedTerms, translate, addReturnNode, processAssignable(_, _, _),
+    expressionFormTyping.resolveConstructorWithNamedArgs(_, _, _, _))
   private val entryPointSupport = new EntryPointSupport(typing, addReturnNode)
   private val assignabilitySupport = new AssignabilitySupport(bodyContext)
   private val expressionDispatchSupport = new ExpressionDispatchSupport(this)
@@ -109,7 +110,18 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
           }
         }
       }
-    } else if (node.requires.nonEmpty || node.ensures.nonEmpty) {
+    } else {
+      typing.kernelNodeOf[MethodDefinition](node).foreach { method =>
+        val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+        typing.openTypeParams(unitContext.currentTypeParams ++ methodTypeParams) {
+          methodBodySupport.processBodilessDefaults(method, node.args)
+        }
+      }
+      processBodilessClauses(node)
+    }
+
+  private def processBodilessClauses(node: AST.MethodDeclaration): Unit =
+    if (node.requires.nonEmpty || node.ensures.nonEmpty) {
       // An abstract or interface method has no body, but its clauses bind every override, so
       // they are typed against its parameters (and `result`) like a concrete method's: an
       // undefined name or an impure call is an error here too (#2577). With contracts off
@@ -170,7 +182,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     // Default methods (interface methods with bodies) get typed like
     // instance methods; signature-only declarations have nothing to do,
     // unless they carry contract clauses, which are typed in the interface's scope
-    if (node.methods.exists(m => m.block != null || m.requires.nonEmpty || m.ensures.nonEmpty) ||
+    if (node.methods.exists(m => m.block != null || m.requires.nonEmpty || m.ensures.nonEmpty || m.args.exists(_.defaultValue != null)) ||
         node.invariants.nonEmpty || node.histories.nonEmpty) {
       typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
         unitContext.currentDefinition = definition

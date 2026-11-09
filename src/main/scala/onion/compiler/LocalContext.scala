@@ -208,7 +208,39 @@ class LocalContext {
 
   def inLoop: Boolean = loopDepth > 0
 
+  // Bindings a clause typed here must not see (#2633): a class's `history`, re-typed over a
+  // method's guard frame, speaks about the object's fields, not the method's parameters. The
+  // bindings are hidden, not their names, so a `val`, `case` or lambda parameter that the clause
+  // itself binds under a parameter's name still resolves to itself.
+  private var hiddenBindings: Set[(LocalFrame, Int)] = Set.empty
+
+  private def frameAt(frameIndex: Int): LocalFrame = {
+    var f = contextFrame
+    var i = frameIndex
+    while (i > 0 && f != null) { f = f.parent; i -= 1 }
+    f
+  }
+
+  private def isHidden(binding: ClosureLocalBinding): Boolean =
+    binding != null && hiddenBindings.nonEmpty && hiddenBindings.exists { case (frame, index) =>
+      (frame eq frameAt(binding.frameIndex)) && index == binding.index
+    }
+
+  /** Types `body` with the bindings `names` resolve to now hidden: a lookup that reaches one finds nothing. */
+  def withHidden[A](names: Set[String])(body: => A): A = {
+    val saved = hiddenBindings
+    hiddenBindings = saved ++ names.flatMap { n =>
+      Option(contextFrame.lookup(n)).map(b => (frameAt(b.frameIndex), b.index))
+    }
+    try body finally hiddenBindings = saved
+  }
+
   def lookup(name: String): ClosureLocalBinding = {
+    val found = lookupVisible(name)
+    if isHidden(found) then null else found
+  }
+
+  private def lookupVisible(name: String): ClosureLocalBinding = {
     if readingArgumentSlots then
       val slot = contextFrame.lookup(name + "#arg")
       if slot != null then return slot
@@ -235,7 +267,7 @@ class LocalContext {
    */
   def allNames: Set[String] = {
     if (contextFrame == null) Set.empty
-    else contextFrame.allNames.filterNot(_.contains("#")) // synthetic slots (`n#arg`) are not names a user can write
+    else contextFrame.allNames.filterNot(n => n.contains("#") || isHidden(contextFrame.lookup(n))) // synthetic slots (`n#arg`) are not names a user can write
   }
 
   /**

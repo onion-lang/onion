@@ -27,6 +27,11 @@ final class ExpressionFormTyping(
   def typeNewArrayWithValues(node: AST.NewArrayWithValues, context: LocalContext): Option[Term] =
     constructionTyping.typeNewArrayWithValues(node, context)
 
+  def resolveConstructorWithNamedArgs(
+    node: AST.Node, args: List[AST.Expression], typeRef: ClassType, context: LocalContext
+  ): Option[(ConstructorDefinition, Array[Term], Array[AST.Node])] =
+    constructionTyping.resolveConstructorWithNamedArgs(node, args, typeRef, context)
+
   def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] =
     constructionTyping.typeNewObject(node, context, expected)
 
@@ -173,6 +178,10 @@ final class ExpressionFormTyping(
       // (#2388; arrays first, #2309). `null` itself fits every nullable type, a nullable
       // primitive (`null as Int?`) too.
       case (_: NullType, _: NullableType) => true
+      // A nullable primitive holds a boxed value, and a box never converts to another
+      // box (`Integer as Long` fails), so `Int? as Long?` is checked as the boxes (#2542).
+      case (n: NullableType, d: NullableType) if n.innerType.isBasicType && d.innerType.isBasicType =>
+        n.innerType eq d.innerType
       case (n: NullableType, _) => isValidCast(n.innerType, destination)
       case (_, n: NullableType) => isValidCast(source, n.innerType)
       case (_: NullType, _: BasicType) =>
@@ -291,12 +300,8 @@ final class ExpressionFormTyping(
   // type accepts by erasure, so an applied `ct` is matched against the box's own view
   // of that class instead: `Comparable[JInteger]` fits `Integer`, `Comparable[String]`
   // does not.
-  private def boxSupertypeAccepts(ct: ClassType, boxed: ClassType): Boolean = ct match {
-    case applied: AppliedClassType =>
-      val views = bodyContext.table.appliedViewsOf(boxed)(AppliedTypeViews.collectAppliedViewsFrom(boxed))
-      views.exists { case (raw, view) => TypeRelations.sameClass(raw, applied.raw) && TypeRules.isSuperType(applied, view) }
-    case _ => TypeRules.isSuperType(ct, boxed)
-  }
+  private def boxSupertypeAccepts(ct: ClassType, boxed: ClassType): Boolean =
+    TypeRelations.boxSupertypeAccepts(bodyContext.table, ct, boxed)
 
   // The numeric primitives codegen unboxes through `java.lang.Number` (not Char).
   private val numericCastTypes: Seq[BasicType] =

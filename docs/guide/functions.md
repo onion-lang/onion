@@ -66,6 +66,29 @@ A default is evaluated in the called method, each time an argument is omitted. I
 
 A default that names its own or a later parameter is `E0002`.
 
+A default belongs to the method the call resolves to when it compiles, not to the object's
+class at run time:
+
+```onion
+class A {
+public:
+  def this {}
+  def f(n: Int = 5): Int = n
+}
+class B extends A {
+public:
+  def this {}
+  override def f(n: Int = 9): Int = n * 100
+}
+
+val b = new B()
+val a: A = b
+a.f()   // 500: A's default (5), then B's f
+b.f()   // 900: B's default (9)
+```
+
+A subclass method with the same name never replaces an inherited default.
+
 ### Varargs
 
 A trailing `Type...` parameter collects extra arguments into an array;

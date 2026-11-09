@@ -150,7 +150,19 @@ object OnionParser {
       else {
         i += 1
         if (i >= len) throw theFail
-        b.append(unescapeChar(s.charAt(i)))
+        val e = s.charAt(i)
+        if (e >= '0' && e <= '7') {
+          // Octal escape, as in Java: \0..\377 (up to three digits when the first is 0-3).
+          var v = e - '0'
+          val max = if (e <= '3') 2 else 1
+          var n = 0
+          while (n < max && i + 1 < len && s.charAt(i + 1) >= '0' && s.charAt(i + 1) <= '7') {
+            i += 1
+            v = v * 8 + (s.charAt(i) - '0')
+            n += 1
+          }
+          b.append(v.toChar)
+        } else b.append(unescapeChar(e))
       }
       i += 1
     }

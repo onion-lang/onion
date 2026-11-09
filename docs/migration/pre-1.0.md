@@ -264,3 +264,110 @@ public:
   not a silent skip. `--contracts` is on by default (`check`).
 - **Seed and samples:** `--law-seed` and `--law-samples` are now `--contract-seed` and `--contract-samples`; `--no-check-laws` is gone (use `--contracts off`).
 - **`onion.Shape`:** a class that implements it needs at least one such predicate that uses it (E0080).
+
+## A field an `invariant` or `history` names is written only through `this`
+
+Contracts are a preview feature (RFC #2557). A field that a class's `invariant` or `history`
+names may be written only by that class's own code, through `this`. A write through any other
+object is E0110.
+
+```onion
+class Clock {
+public:
+  var t: Int
+  history t >= old(t)
+  def this { t = 0 }
+  def this(start: Int) { t = start }
+  def advanceTo(k: Int): void { if k > t { t = k } }
+}
+
+// Before: compiled. Now: E0110 at `c`
+//   val c = new Clock(); c.t = 5
+// Now: pass the value to a constructor
+val c = new Clock(5)
+
+// Before: compiled. Now: E0110 at `o`
+//   def sync(o: Clock): void { o.t = 9 }
+// Now: call a method of that object; its own writes are checked
+def sync(o: Clock): void { o.advanceTo(9) }
+sync(c)
+println(c.t)   // 9
+```
+
+- **What changed:** each object keeps its own `invariant` and `history`, checked one call at a
+  time. A write from outside that object's methods is one no such check can follow.
+- **What you see:** `E0110`, with the caret on the receiver (`o`, `c`, `cs[0]`). The message
+  says to call a method of that object or set the value in a constructor.
+- **Still fine:** `t = v`, `this.t = v`, `self.t = v`, `t++` and `t += 1` in the class's own
+  methods, also inside a lambda. Reading `o.t` from anywhere is fine too.
+- **No `onion migrate` rule, on purpose:** the fix adds a method or a constructor to the
+  receiver's class, and which one fits is a design choice.
+
+## A record component named `hashCode`, `toString` or `getClass` must not change that method's type
+
+`record R(hashCode: Long)` gave one object two `hashCode()` answers: the accessor, and the
+`Int` one a `HashMap` uses. `getClass: Int` did the same to `getClass()`. Both are now errors,
+as `hashCode: Int`, `toString: String` and `getClass: Class` were.
+
+```onion
+// Before: compiled, r.hashCode() = 5, (r as Object).hashCode() = 36
+record R(hashCode: Long)
+
+// Now: E0010. Rename the component.
+record R(code: Long)
+```
+
+- **What you see:** **E0010** at the component, for `hashCode`, `toString` or `getClass` of any
+  type, in a record or an `enum` case.
+- **No `onion migrate` rule:** the new name and the code that reads it are your choice.
+
+## A default on an abstract or interface method is type-checked
+
+A default on an `abstract def` or an interface method now works: a call may omit that
+argument. So the default is now type-checked like any other default. Before, it was never used,
+and a wrong one compiled.
+
+```onion
+// Before: compiled, because the default was never used
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = "x"): Int
+}
+
+// Now: E0000 at "x". Give a default of the parameter's type.
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = 0): Int
+}
+```
+
+- **What you see:** **E0000** (wrong type) or **E0002** (unknown name) at the default.
+- **No `onion migrate` rule:** only you know which default was meant. Fix it, or remove it.
+
+## A record method that overrides `toString`, `hashCode` or `equals` must keep its type
+
+A record body could redefine an `Object` method with another return type. A class could not.
+`toString(): Int` silently dropped the generated `toString()`, and `toString(): String?` let a
+`null` reach `println`. A record now follows the class rule.
+
+```onion
+// Before: compiled; println(new R("")) printed null
+record R(name: String) {
+public:
+  def toString(): String? = if name == "" { null } else { name }
+}
+
+// Now: E0000 at toString. Return a String.
+record R(name: String) {
+public:
+  def toString(): String = if name == "" { "(none)" } else { name }
+}
+```
+
+- **What you see:**
+  - **E0000** at the method when the return type is another reference type (`String?`,
+    `Object`, `CharSequence`). Its hint suggests `?:` for a nullable value.
+  - **E0104** when either return type is primitive (`toString(): Int`, `hashCode(): Long`).
+- **No `onion migrate` rule:** what to return instead of `null` is your choice.

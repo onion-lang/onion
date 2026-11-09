@@ -36,4 +36,19 @@ class IsPrimitiveWrapperSpec extends AbstractShellSpec {
       assert(Shell.Success("truefalse") == r)
     }
   }
+
+  describe("`case n is Long:` type pattern (#2721)") {
+    it("matches the wrapper and binds the unboxed value") {
+      val r = run(
+        """    val o: Object = 5L
+          |    val p: Object = 2
+          |    val q: Number = 2.5
+          |    val a = select o { case n is Long: "long " + (n + 1L); else: "other" }
+          |    val b = select p { case n is Long: "long"; case i is Int: "int " + (i * 2); else: "other" }
+          |    val c = select q { case d is Double: "double " + (d + 0.5); else: "other" }
+          |    val e = select "s" as Object { case n is Long: "long"; else: "other" }
+          |    return a + "," + b + "," + c + "," + e""".stripMargin)
+      assert(Shell.Success("long 6,int 4,double 3.0,other") == r)
+    }
+  }
 }

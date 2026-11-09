@@ -247,3 +247,101 @@ public:
   `--contracts` は既定で有効（`check`）です。
 - **シードとサンプル数:** `--law-seed` と `--law-samples` は `--contract-seed` と `--contract-samples` になり、`--no-check-laws` は無くなりました（`--contracts off` を使います）。
 - **`onion.Shape`:** 実装するクラスは、それを使う述語を少なくとも1つ必要とします（なければ E0080）。
+
+## `invariant` や `history` が名指すフィールドは `this` を通してしか書けなくなりました
+
+契約はプレビュー機能です（RFC #2557）。クラスの `invariant` や `history` が名指すフィールドは、
+そのクラス自身のコードから `this` を通してだけ書けます。ほかのオブジェクトを通した書き込みは E0110 です。
+
+```onion
+class Clock {
+public:
+  var t: Int
+  history t >= old(t)
+  def this { t = 0 }
+  def this(start: Int) { t = start }
+  def advanceTo(k: Int): void { if k > t { t = k } }
+}
+
+// Before: compiled. Now: E0110 at `c`
+//   val c = new Clock(); c.t = 5
+// Now: pass the value to a constructor
+val c = new Clock(5)
+
+// Before: compiled. Now: E0110 at `o`
+//   def sync(o: Clock): void { o.t = 9 }
+// Now: call a method of that object; its own writes are checked
+def sync(o: Clock): void { o.advanceTo(9) }
+sync(c)
+println(c.t)   // 9
+```
+
+- **変わったこと:** 各オブジェクトは自分の `invariant` と `history` を持ち、呼び出し1回ごとに検査されます。
+  そのオブジェクトのメソッドの外からの書き込みは、この検査では追えません。
+- **見えるもの:** `E0110`（契約フィールドへの書き込みを禁じるエラー）が出ます。キャレットは受け手（`o`、`c`、`cs[0]`）を指します。
+  メッセージは、そのオブジェクトのメソッドを呼ぶか、コンストラクタで値を設定するよう促します。
+- **そのまま動くもの:** クラス自身のメソッドでの `t = v`、`this.t = v`、`self.t = v`、`t++`、`t += 1` です。ラムダの中でも同じです。
+  `o.t` を読むことは、どこからでもできます。
+- **`onion migrate` の書き換え規則はありません（意図的です）:** 直すには受け手のクラスにメソッドかコンストラクタを足します。
+  どれが合うかは設計の判断です。
+
+## `hashCode` / `toString` / `getClass` という名前の成分は、そのメソッドの型を変えられなくなりました
+
+`record R(hashCode: Long)` は、1つのオブジェクトが `hashCode()` に2通りの答えを返していました。アクセサの値と、`HashMap` が使う `Int` の値です。`getClass: Int` も `getClass()` で同じことが起きていました。`hashCode: Int`、`toString: String`、`getClass: Class` と同じく、どちらもエラーになりました。
+
+```onion
+// 以前: コンパイルでき、r.hashCode() は 5、(r as Object).hashCode() は 36
+record R(hashCode: Long)
+
+// 現在: E0010。成分の名前を変えてください。
+record R(code: Long)
+```
+
+- **表示されるもの:** `hashCode`、`toString`、`getClass` の成分は、型にかかわらず成分の位置で **E0010** になります。レコードでも `enum` の case でも同じです。
+- **`onion migrate` の規則はありません:** 新しい名前と、それを読むコードは利用者が決めるためです。
+
+## 抽象メソッドとインターフェースのメソッドのデフォルト値が型検査されるようになりました
+
+`abstract def` やインターフェースのメソッドのデフォルト値が使えるようになりました。呼び出しでその引数を省略できます。そのため、ほかのデフォルト値と同じく型検査されます。以前は使われることがなかったので、誤ったデフォルト値でもコンパイルできていました。
+
+```onion
+// 以前: デフォルト値が使われないので、コンパイルできていました
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = "x"): Int
+}
+
+// 現在: "x" の位置で E0000。引数の型のデフォルト値を書いてください。
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = 0): Int
+}
+```
+
+- **表示されるもの:** デフォルト値の位置で **E0000**（型が違う）または **E0002**（名前が見つからない）になります。
+- **`onion migrate` の規則はありません:** どのデフォルト値のつもりだったかは利用者にしかわからないためです。直すか、取り除いてください。
+
+## `toString` / `hashCode` / `equals` を上書きするレコードのメソッドは、型を変えられなくなりました
+
+これまでレコードの本体では、`Object` のメソッドを別の戻り値の型で定義し直せました。クラスではできません。`toString(): Int` は生成された `toString()` を黙って消していました。`toString(): String?` は `null` を `println` まで届けていました。レコードもクラスと同じ規則に従うようになりました。
+
+```onion
+// 以前: コンパイルでき、println(new R("")) は null を表示
+record R(name: String) {
+public:
+  def toString(): String? = if name == "" { null } else { name }
+}
+
+// 現在: toString の位置で E0000。String を返してください。
+record R(name: String) {
+public:
+  def toString(): String = if name == "" { "(none)" } else { name }
+}
+```
+
+- **表示されるもの:**
+  - 戻り値の型が別の参照型（`String?`、`Object`、`CharSequence`）のときは、メソッドの位置で **E0000** になります。ヒントは、null になりうる値に `?:` を使うよう勧めます。
+  - どちらかの戻り値の型がプリミティブ型（`toString(): Int`、`hashCode(): Long`）のときは **E0104** になります。
+- **`onion migrate` の規則はありません:** `null` の代わりに何を返すかは利用者が決めるためです。

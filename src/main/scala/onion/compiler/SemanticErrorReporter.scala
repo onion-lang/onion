@@ -1007,6 +1007,9 @@ class SemanticErrorReporter(threshold: Int) {
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordAccessorRedefined] =>
         reportRecordAccessorRedefined(position, items)
+      // E0110's second form (design 3.2, rule 2; #2599): a contract field written through another object.
+      case SemanticError.CONTRACT_FIELD_NOT_VALUE if items.length > 2 && items(2) == "write" =>
+        problem(position, format(message("error.semantic.contractFieldWrittenOutside"), Seq(asString(items(0)), asString(items(1)))))
 
       // Data-driven cases
       case _ =>
@@ -1035,7 +1038,8 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportRecordComponentClash(position: Location, items: Array[AnyRef]): Unit = {
     val clash = items(3).asInstanceOf[SemanticErrorReporter.RecordComponentClash]
     val key =
-      if (clash.overridesFinal) "error.semantic.recordComponentOverridesFinalMethod"
+      if (clash.otherReturnType) "error.semantic.recordComponentOtherReturnType"
+      else if (clash.overridesFinal) "error.semantic.recordComponentOverridesFinalMethod"
       else "error.semantic.recordComponentClashesGeneratedMethod"
     problem(position, format(
       message(key),
@@ -1158,7 +1162,7 @@ object SemanticErrorReporter {
    *  accessor colliding with a method the record generates, so the error says so (#2391).
    *  `overridesFinal`: the accessor would instead override a final `Object` method, which no
    *  record generates (`getClass: Class`, #2512), so the error names that method. */
-  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type, overridesFinal: Boolean = false)
+  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type, overridesFinal: Boolean = false, otherReturnType: Boolean = false)
 
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record body method
    *  `a()` that redefines component `a`'s generated accessor, so the error says so (#2396). */
@@ -1631,6 +1635,10 @@ object SemanticErrorReporter {
     SemanticError.STATIC_METHOD_WITHOUT_BODY -> ErrorDef(
       "error.semantic.staticMethodWithoutBody",
       Seq(items => asString(items(0)))
+    ),
+    SemanticError.SUPER_CALL_ABSTRACT_METHOD -> ErrorDef(
+      "error.semantic.superCallAbstractMethod",
+      Seq(items => asString(items(0)), items => typeName(items(1)))
     ),
     SemanticError.PRIVATE_ABSTRACT_METHOD -> ErrorDef(
       "error.semantic.privateAbstractMethod",

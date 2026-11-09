@@ -3,7 +3,8 @@ package onion.compiler.tools
 import onion.tools.Shell
 
 /** #2717: only a method with the `Object` signature replaces a record's generated
-  * `toString`/`hashCode`/`equals`; an overload leaves the generated one in place. */
+  * `toString`/`hashCode`/`equals`; an overload leaves the generated one in place.
+  * Any method named `copy` replaces the generated `copy`, as before. */
 class RecordObjectMethodOverloadSpec extends AbstractShellSpec {
   private def run(body: String, expr: String): Shell.Result =
     shell.run(
@@ -75,8 +76,24 @@ class RecordObjectMethodOverloadSpec extends AbstractShellSpec {
           |""".stripMargin
       assert(shell.run(src, "RecordObjectMethodGeneric.on", Array()) == Shell.Success("true"))
     }
-    it("copy(n: Int) beside a String component keeps the generated copy") {
-      assert(run("  def copy(n: Int): Int = n", "(new R(\"a\").copy(\"b\")).name()") == Shell.Success("b"))
+    it("a user copy() still replaces the generated copy, as on main") {
+      val src =
+        """
+          |record R(x: Int) {
+          |public:
+          |  def copy(): R = new R(99)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new R(1).copy()
+          |  }
+          |}
+          |""".stripMargin
+      assert(shell.run(src, "RecordUserCopy.on", Array()) == Shell.Success("R(x=99)"))
+    }
+    it("a user copy(v: Object) beside a String component replaces the generated copy") {
+      assert(run("  def copy(v: Object): String = \"user\"", "new R(\"a\").copy(\"b\")") == Shell.Success("user"))
     }
   }
 }

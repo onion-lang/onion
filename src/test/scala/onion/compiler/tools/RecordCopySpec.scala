@@ -178,5 +178,29 @@ class RecordCopySpec extends AbstractShellSpec {
       )
       assert(Shell.Success("user:s,tag:3,user:t") == result)
     }
+
+    it("picks the record's own copy overload by argument type when two share a parameter name (#2705)") {
+      // Both overloads name their parameter `name`; the argument's type picks
+      // one, for `.copy` and `?.copy` alike.
+      val result = shell.run(
+        """
+          |record U(name: Int) {
+          |public:
+          |  def copy(name: Long): String = "long:" + name
+          |  def copy(name: String): String = "str:" + name
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val u = new U(1)
+          |    return u.copy(name = "s") + "," + u?.copy(name = "t") + "," + u.copy(name = 5L)
+          |  }
+          |}
+          |""".stripMargin,
+        "TwoUserCopies.on",
+        Array()
+      )
+      assert(Shell.Success("str:s,str:t,long:5") == result)
+    }
   }
 }

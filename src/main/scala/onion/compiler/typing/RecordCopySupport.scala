@@ -72,16 +72,26 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
                 // throws when the copy runs (#2705). This also boxes a primitive
                 // for a reference component, widening first (`copy(b = 5)` on
                 // `b: Long?` stores a Long).
-                if (declaresCopy && !term.`type`.isNullType && !calls.isAssignableWithBoxing(expectedType, term.`type`)) break(None)
-                val assigned = calls.processAssignable(expr, expectedType, term)
-                if (assigned == null) break(Some(None))
-                // A nullable component (`port: Int?`) is declared `T?` in the raw
-                // signature; a non-null argument must be viewed as `T?` to match it
-                // (copy(port = 8080) -- #1993). null and `T?` terms already match.
-                fullParams(i) = expectedType match {
-                  case _: NullableType if !assigned.`type`.isNullable && !assigned.`type`.isNullType =>
-                    TypeSubst.withCast(assigned, expectedType)
-                  case _ => assigned
+                if (declaresCopy && !term.`type`.isNullType && !calls.isAssignableWithBoxing(expectedType, term.`type`)) {
+                  // Not a component value: one of the record's own `copy` overloads
+                  // decides, found by the argument's own type below. Two overloads
+                  // `copy(name: Long)` / `copy(name: String)` take `copy(name = "s")`
+                  // as `copy(String)`; ordinary named-argument resolution would call
+                  // them ambiguous, since it matches by parameter names only.
+                  fullParams(i) =
+                    if (!expectedType.isBasicType && term.isBasicType) onion.compiler.toolbox.Boxing.boxForSlot(calls.typing.table_, term, expectedType)
+                    else term
+                } else {
+                  val assigned = calls.processAssignable(expr, expectedType, term)
+                  if (assigned == null) break(Some(None))
+                  // A nullable component (`port: Int?`) is declared `T?` in the raw
+                  // signature; a non-null argument must be viewed as `T?` to match it
+                  // (copy(port = 8080) -- #1993). null and `T?` terms already match.
+                  fullParams(i) = expectedType match {
+                    case _: NullableType if !assigned.`type`.isNullable && !assigned.`type`.isNullType =>
+                      TypeSubst.withCast(assigned, expectedType)
+                    case _ => assigned
+                  }
                 }
               case None => break(Some(None)) // the argument's own error is reported
             }

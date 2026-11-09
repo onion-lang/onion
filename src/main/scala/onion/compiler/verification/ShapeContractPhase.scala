@@ -69,18 +69,36 @@ final class ShapeContractPhase(config: CompilerConfig) extends CompilerPhase[Seq
         s"the contract of Shape '$simple' was not checked: $why")
     val tpe = valueType(c).getOrElse { warn("its value type is not a plain class"); return }
     // The build runs only what cannot reach the outside world (#2733, #2601): the rest is said, not run.
-    shapeEffects(c, cc, tpe, build).foreach { case (effects, where) =>
-      warnings += CompileWarning(file, null, WarningCategory.PredicateNotRun,
-        onion.compiler.toolbox.Message("warning.shapeNotRun.effects", Array[Any](simple, BuildRun.render(effects), where)))
+    shapeEffects(c, cc, tpe, build).foreach { msg =>
+      warnings += CompileWarning(file, null, WarningCategory.PredicateNotRun, msg)
       return
     }
+    // A run that does not finish in time is given up on, so a looping `parse` cannot hang the build.
+    // The run only computes its finding; it is recorded here, so a run given up on adds nothing later.
+    build.timed(loader)(runRoundTrip(c, tpe, loader)) match {
+      case None =>
+        warnings += CompileWarning(file, null, WarningCategory.PredicateNotRun,
+          Message("warning.shapeNotRun.timeout", Array[Any](simple, config.contractTimeoutMillis.toString)))
+      case Some(Left(_)) => warn("it threw while being checked")
+      case Some(Right(None)) =>
+      case Some(Right(Some(Left(why)))) => warn(why)
+      case Some(Right(Some(Right(why)))) =>
+        errors += CompileError(file, null,
+          Message("error.semantic.shapeContractBroken", Array[Any](simple, why,
+            s"--contract-seed ${config.contractSeed} --contract-samples ${config.contractSamples}")),
+          Some(SemanticError.SHAPE_CONTRACT_BROKEN.errorCode))
+    }
+  }
+
+  /** `None` when the round-trip holds or is not checkable now; `Left` why it was not checked; `Right` how it broke. */
+  private def runRoundTrip(c: Class[?], tpe: Class[?], loader: ClassLoader): Option[Either[String, String]] = {
     val shape = try {
       val ctor = c.getDeclaredConstructor()
       ctor.setAccessible(true)
       ctor.newInstance().asInstanceOf[AnyRef]
-    } catch { case _: Throwable => warn("it has no no-argument constructor"); return }
+    } catch { case _: Throwable => return Some(Left("it has no no-argument constructor")) }
     val values = ArgGenerator.generateValues(tpe, loader, config.contractSamples, config.contractSeed)
-      .getOrElse { warn(s"values of type ${tpe.getSimpleName} cannot be sampled"); return }
+      .getOrElse { return Some(Left(s"values of type ${tpe.getSimpleName} cannot be sampled")) }
     val canPrint = c.getMethod(entry.canPrint)
     val print = c.getMethods.find(m => m.getName == entry.print && m.getParameterCount == 1 && !m.isBridge)
     val printable = c.getMethods.find(m => m.getName == entry.printable && m.getParameterCount == 1 && !m.isBridge)
@@ -88,34 +106,38 @@ final class ShapeContractPhase(config: CompilerConfig) extends CompilerPhase[Seq
     (print, parse) match {
       case (Some(p), Some(r)) =>
         val canPrintNow: Boolean = try canPrint.invoke(shape).asInstanceOf[java.lang.Boolean].booleanValue catch { case _: Throwable => false }
-        if (!canPrintNow) return
-        val outcome = values.iterator.map(v => roundTrip(shape, p, r, printable, v)).collectFirst { case Some(why) => why }
-        outcome.foreach { why =>
-          errors += CompileError(file, null,
-            Message("error.semantic.shapeContractBroken", Array[Any](simple, why,
-              s"--contract-seed ${config.contractSeed} --contract-samples ${config.contractSamples}")),
-            Some(SemanticError.SHAPE_CONTRACT_BROKEN.errorCode))
-        }
-      case _ => warn("it does not declare parse and print")
+        if (!canPrintNow) None
+        else values.iterator.map(v => roundTrip(shape, p, r, printable, v)).collectFirst { case Some(why) => Right(why) }
+      case _ => Some(Left("it does not declare parse and print"))
     }
   }
 
   /**
-   * The outside effects of everything the round-trip calls (the constructor, `canPrint`,
-   * `printable`, `print`, `parse` and making and showing a sample of the value type), with the
-   * first place they come from. `None` when the build may run it.
+   * W0023's text when something the round-trip calls (the constructor, `canPrint`, `printable`,
+   * `print`, `parse`, or making and showing a sample of the value type) has an effect beyond
+   * `mutate`, naming the first place it comes from. `None` when the build may run it.
    */
-  private def shapeEffects(c: Class[?], cc: CompiledClass, tpe: Class[?], build: BuildRun): Option[(Set[onion.compiler.effects.Effect], String)] = {
-    val parts: Seq[(String, Set[onion.compiler.effects.Effect])] =
-      Seq("its constructor" -> build.constructorEffects(cc.className)) ++
-        Seq(entry.canPrint, entry.printable, entry.print, entry.parse).flatMap { n =>
-          // Every overload the program declares counts (`parse` takes the text and an origin). `printable`
-          // is usually the interface's own default, which is library code with no effect, so only a
-          // class's own method is looked at.
-          c.getMethods.filter(m => m.getName == n && !m.isBridge && !m.getDeclaringClass.isInterface)
-            .map(m => s"`$n`" -> build.methodEffects(Some(m.getDeclaringClass.getName), n, m.getParameterCount, static = false)).toSeq
-        } :+ (s"making a sample `${tpe.getSimpleName}`" -> build.sampleEffectsOfClass(tpe.getName)._1)
-    parts.collectFirst { case (where, effects) if effects.nonEmpty => (effects, where) }
+  private def shapeEffects(c: Class[?], cc: CompiledClass, tpe: Class[?], build: BuildRun): Option[String] = {
+    val simple = c.getSimpleName
+    def notRun(effects: Set[onion.compiler.effects.Effect], where: String) =
+      Message("warning.shapeNotRun.effects", Array[Any](simple, BuildRun.render(effects), where))
+    val ctor = build.constructorEffects(cc.className)
+    if (ctor.nonEmpty) return Some(notRun(ctor, Message("warning.shapeNotRun.where.constructor")))
+    // The value type first: a `parse` that builds a value inherits its constructor's effect, and the
+    // place to fix that is the value type, not the shape.
+    val (sample, from) = build.sampleEffectsOfClass(tpe.getName)
+    if (sample.nonEmpty) {
+      val cls = from.map(_.split('.').last).getOrElse(tpe.getSimpleName)
+      return Some(Message("warning.shapeNotRun.sample", Array[Any](simple, BuildRun.render(sample), cls)))
+    }
+    // Every overload counts (`parse` takes the text and an origin). A method declared on a library
+    // interface (`onion.Shape`'s own `printable`) is library code with no effect; a default from a
+    // program interface is the program's code and is checked like any other (panel block at e8fef6a).
+    Seq(entry.canPrint, entry.printable, entry.print, entry.parse).iterator.flatMap { n =>
+      c.getMethods.iterator.filter(m => m.getName == n && !m.isBridge &&
+        (!m.getDeclaringClass.isInterface || build.isProgramClass(m.getDeclaringClass.getName)))
+        .map(m => n -> build.methodEffects(Some(m.getDeclaringClass.getName), n, m.getParameterCount, static = false))
+    }.collectFirst { case (n, effects) if effects.nonEmpty => notRun(effects, s"`$n`") }
   }
 
   /** `None` when `v` is not printable or round-trips; otherwise how it failed. */

@@ -132,6 +132,9 @@ final class BuildRun(config: CompilerConfig, typed: Seq[TypedAST.ClassDefinition
 
   private lazy val byName: Map[String, TypedAST.ClassDefinition] = typed.map(cd => cd.name -> cd).toMap
 
+  /** Whether `name` is a class or interface of the program being compiled (not a library one). */
+  def isProgramClass(name: String): Boolean = byName.contains(name)
+
   /** A class and each program superclass: the JVM initializes the superclass first. */
   private def chain(cd: TypedAST.ClassDefinition): Seq[TypedAST.ClassDefinition] = {
     val out = scala.collection.mutable.Buffer[TypedAST.ClassDefinition]()

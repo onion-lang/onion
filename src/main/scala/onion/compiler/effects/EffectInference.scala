@@ -171,10 +171,11 @@ object EffectInference {
   /**
    * A record's generated `toString`, `hashCode` or `equals`. It has no body to walk, but it
    * calls the same method on each reference component, so it runs whatever those overrides
-   * run (#2601).
+   * run; or, when an interface the record conforms to has a default for it, it forwards to
+   * that default (#2601).
    */
   private def isRecordObjectMethod(md: MethodDefinition): Boolean =
-    md.getBlock == null && (md.modifier & Modifier.SYNTHETIC_RECORD) != 0 && (md.affiliation match {
+    md.getBlock == null && (md.modifier & (Modifier.SYNTHETIC_RECORD | Modifier.SYNTHETIC_INTERFACE_FORWARD)) != 0 && (md.affiliation match {
       case cd: ClassDefinition => cd.isRecord
       case _                   => false
     }) && ((md.name == "toString" && md.arguments.isEmpty) || (md.name == "hashCode" && md.arguments.isEmpty) ||
@@ -461,6 +462,17 @@ object EffectInference {
      * fixed point follows records inside records.
      */
     def recordObjectMethod(md: MethodDefinition): scala.Unit = md.affiliation match {
+      case rec: ClassDefinition if (md.modifier & Modifier.SYNTHETIC_INTERFACE_FORWARD) != 0 =>
+        val arity = md.arguments.length
+        val seen = mutable.Set[String]()
+        def defaults(c: TypedAST.ClassType): Seq[MethodDefinition] =
+          if (c == null || !seen.add(c.name)) Nil
+          else c.methods(md.name).toSeq.collect {
+            case m: MethodDefinition if m.getBlock != null && units.contains(m) && m.arguments.length == arity => m
+          } ++ c.interfaces.toSeq.flatMap(defaults)
+        for (om <- rec.interfaces.toSeq.flatMap(defaults)) if (internalCallees.add(om))
+          rawSites += RawSite(md.location,
+            onion.compiler.toolbox.TypeFormatting.methodReference(om.affiliation, om.name), None, om)
       case rec: ClassDefinition =>
         val arity = md.arguments.length
         for {

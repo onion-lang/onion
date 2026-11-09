@@ -434,8 +434,8 @@ not under it yet: the `E0114` Shape check still calls a user `Shape`'s `parse`/`
 effect check (#2733).
 
 A record's generated `toString`, `hashCode` and `equals` count as calling the same method on
-each component, so a record handed to a map literal or to string concatenation carries what its
-components' overrides do.
+each component (or as calling the interface default they forward to), so a record handed to a
+map literal or to string concatenation carries what those methods do.
 
 A write to a **static** field by a predicate is not stopped by this rule and can reach another
 predicate in the same build. Predicates are run one at a time, each in a fresh class loader, so

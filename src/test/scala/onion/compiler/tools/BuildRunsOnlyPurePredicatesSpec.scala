@@ -591,6 +591,17 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
       assert(o.w23.exists(_.contains("`ok`")), o.toString)
     }
 
+    it("is not run when the record's toString forwards to an interface default that prints") {
+      val o = compile(
+        """interface Show {
+          |  def toString(): String { IO::println("DEFAULT TOSTRING RAN AT BUILD"); return "s" }
+          |}
+          |record R(x: Int) conforms Show
+          |static def ok(): Boolean ensures result = ("" + new R(1)).length > 0""".stripMargin)
+      assert(!o.stdout.contains("DEFAULT TOSTRING RAN AT BUILD"), o.toString)
+      assert(o.w23.exists(_.contains("`ok`")), o.toString)
+    }
+
     it("still runs when the components' methods only touch memory, and reports a false one") {
       val o = compile(
         """record Pt(x: Int, name: String)

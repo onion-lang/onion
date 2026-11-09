@@ -202,5 +202,40 @@ class RecordCopySpec extends AbstractShellSpec {
       )
       assert(Shell.Success("str:s,str:t,long:5") == result)
     }
+
+    it("a fitting argument picks the user copy overload by its own type, not the component's (#2705)") {
+      // A user `copy` is an ordinary method; only the generated copy checks components.
+      val result = shell.run(
+        """
+          |record A(a: Long) {
+          |public:
+          |  def copy(a: Int): String = "int:" + a
+          |  def copy(a: Long): String = "long:" + a
+          |}
+          |record D(a: Double) {
+          |public:
+          |  def copy(a: Int): String = "int:" + a
+          |  def copy(a: Double): String = "dbl:" + a
+          |}
+          |record O(a: Object) {
+          |public:
+          |  def copy(a: Object): String = "obj:" + a
+          |  def copy(a: String): String = "str:" + a
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val x = new A(1L)
+          |    val d = new D(1.0)
+          |    val o = new O("z")
+          |    return x.copy(a = 5) + "," + d.copy(a = 5) + "," + d?.copy(a = 5) + "," + o.copy(a = "s")
+          |  }
+          |}
+          |""".stripMargin,
+        "FittingUserCopies.on",
+        Array()
+      )
+      assert(Shell.Success("int:5,int:5,int:5,str:s") == result)
+    }
   }
 }

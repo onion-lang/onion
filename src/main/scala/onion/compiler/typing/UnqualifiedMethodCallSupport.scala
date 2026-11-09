@@ -78,7 +78,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, receiver, targetType) {
         (method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
       } match {
-        case some @ Some(_) => return some
+        case Some(result) => return result
         case None =>
       }
     }
@@ -384,7 +384,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       val recordCopy = calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, receiver, targetType) {
         (method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
       }
-      if (recordCopy.isDefined) return recordCopy
+      recordCopy match { case Some(result) => return result; case None => }
     }
 
     val candidates = new JTreeSet[Method](new MethodComparator)

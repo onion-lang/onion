@@ -12,6 +12,10 @@ import scala.util.boundary.break
  * (`InstanceMethodCallSupport`) and the safe-navigation path
  * (`SafeNavigationTypingSupport`), which differ only in how the resolved
  * `copy` method is wrapped into a call term (`Call` vs `SafeCall`).
+ *
+ * The result is `None` when the call is not record-copy sugar (the caller
+ * takes its regular path), `Some(None)` when it is and an error was reported,
+ * and `Some(Some(term))` when it typed.
  */
 private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
 
@@ -23,7 +27,7 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
     context: LocalContext,
     target: Term,
     targetType: ObjectType
-  )(buildRawCall: (Method, Array[Term]) => Term): Option[Term] = {
+  )(buildRawCall: (Method, Array[Term]) => Term): Option[Option[Term]] = {
     if (name != "copy") return None
     val definition = targetType match {
       case d: ClassDefinition => d
@@ -34,7 +38,7 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
         }
       case _ => return None
     }
-    boundary[Option[Term]] {
+    boundary[Option[Option[Term]]] {
       val components = definition.recordComponents.getOrElse(break(None))
 
       val named = scala.collection.mutable.LinkedHashMap[String, AST.Expression]()
@@ -44,7 +48,7 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
       }
       for (argName <- named.keys if !components.exists(_._1 == argName)) {
         calls.reportMethodNotFound(node, targetType, s"copy(${argName} = ...)", Array[Type]())
-        break(None) // reported; abort typing
+        break(Some(None)) // reported; the regular path would add a second error
       }
 
       val classSubst = TypeSubstitution.classSubstitution(targetType)
@@ -57,20 +61,22 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
           case Some(expr) =>
             calls.typed(expr, context, expectedType) match {
               case Some(term) =>
-                // Box primitives against reference-typed components so the
-                // raw signature (copy(A, B)) still matches: copy(second = 42)
-                val boxed =
-                  if (!expectedType.isBasicType && term.isBasicType) onion.compiler.toolbox.Boxing.boxForSlot(calls.typing.table_, term, expectedType)
-                  else term
+                // The argument must fit the component as an assignment would:
+                // `copy(b = "s")` on `b: Long?` is a type error, not a cast that
+                // throws when the copy runs (#2705). This also boxes a primitive
+                // for a reference component, widening first (`copy(b = 5)` on
+                // `b: Long?` stores a Long).
+                val assigned = calls.processAssignable(expr, expectedType, term)
+                if (assigned == null) break(Some(None))
                 // A nullable component (`port: Int?`) is declared `T?` in the raw
                 // signature; a non-null argument must be viewed as `T?` to match it
                 // (copy(port = 8080) -- #1993). null and `T?` terms already match.
                 fullParams(i) = expectedType match {
-                  case _: NullableType if !boxed.`type`.isNullable && !boxed.`type`.isNullType =>
-                    TypeSubst.withCast(boxed, expectedType)
-                  case _ => boxed
+                  case _: NullableType if !assigned.`type`.isNullable && !assigned.`type`.isNullType =>
+                    TypeSubst.withCast(assigned, expectedType)
+                  case _ => assigned
                 }
-              case None => break(None)
+              case None => break(Some(None)) // the argument's own error is reported
             }
           case None =>
             targetType.findMethod(cname, Array[Term]()) match {
@@ -93,7 +99,10 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
           calls.buildResolvedCall(node, method, fullParams, typeArgs, classSubst, null)(
             expectedArgs => calls.processParamsWithExpected(node, fullParams, expectedArgs),
             finalParams => buildRawCall(method, finalParams)
-          )
+          ) match {
+            case built @ Some(_) => Some(built)
+            case None => None
+          }
         case _ => None
       }
     }

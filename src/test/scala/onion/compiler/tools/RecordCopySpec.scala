@@ -111,5 +111,48 @@ class RecordCopySpec extends AbstractShellSpec {
       )
       assert(Shell.Success("8080,t,null,h") == result)
     }
+
+    it("rejects a named argument whose type does not fit the component (#2705)") {
+      // Each one compiled and then threw ClassCastException when the copy ran.
+      val cases = Seq(
+        "record N(a: Int, b: Long?)" -> "new N(1, 2L).copy(b = \"s\")",
+        "record N(a: Int, b: Long?)" -> "new N(1, 2L).copy(b = 1.5)",
+        "record N(a: Int, b: String)" -> "new N(1, \"x\").copy(b = 3)",
+        "record N(a: Int, b: String?)" -> "new N(1, \"x\").copy(b = 3)"
+      )
+      for ((decl, call) <- cases) {
+        val codes = errors(s"$decl\nval n = $call\nIO::println(n.b())\n").map(_._1)
+        // One error at the argument: no second E0043 "unknown parameter name" from
+        // the regular named-argument path, which knows nothing of components.
+        assert(codes == Seq(Some("E0000")), s"$call gave $codes")
+      }
+    }
+
+    it("reports an unknown component once (#2705)") {
+      val codes = errors("record N(a: Int, b: String)\nval n = new N(1, \"x\").copy(z = 3)\n").map(_._1)
+      assert(codes == Seq(Some("E0005")))
+    }
+
+    it("still widens, boxes and accepts null for fitting arguments (#2705)") {
+      val result = shell.run(
+        """
+          |record N(a: Int, b: Long?, c: String?, d: Long, e: Object?)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val n = new N(1, 2L, null, 3L, null)
+          |    val s: String? = "z"
+          |    val b: Long? = n.copy(b = 5).b()
+          |    return b + "," + n.copy(b = null).b() + "," + n.copy(c = s).c() + "," +
+          |      n.copy(d = 7).d() + "," + n.copy(a = 9).a() + "," + n.copy(e = 5).e() + "," +
+          |      n?.copy(c = "q")?.c()
+          |  }
+          |}
+          |""".stripMargin,
+        "FittingCopy.on",
+        Array()
+      )
+      assert(Shell.Success("5,null,z,7,9,5,q") == result)
+    }
   }
 }

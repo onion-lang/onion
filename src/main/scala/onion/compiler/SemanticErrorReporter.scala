@@ -1004,6 +1004,12 @@ class SemanticErrorReporter(threshold: Int) {
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordComponentClash] =>
         reportRecordComponentClash(position, items)
+      case SemanticError.DUPLICATE_GENERATED_METHOD
+          if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.GeneratedMethodClashesComponent] =>
+        val clash = items(3).asInstanceOf[SemanticErrorReporter.GeneratedMethodClashesComponent]
+        problem(position, format(
+          message("error.semantic.generatedMethodClashesComponent"),
+          Seq(typeName(items(0)), asString(items(1)), typeName(clash.componentType))))
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordAccessorRedefined] =>
         reportRecordAccessorRedefined(position, items)
@@ -1167,6 +1173,11 @@ object SemanticErrorReporter {
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record body method
    *  `a()` that redefines component `a`'s generated accessor, so the error says so (#2396). */
   private[compiler] final case class RecordAccessorRedefined(componentType: TypedAST.Type)
+
+  /** An extra (fourth) item on DUPLICATE_GENERATED_METHOD: a clause (`shape x = ...`,
+   *  `derive!`) generates a no-argument method named like component `x`, whose accessor
+   *  `x()` already exists (#2531). */
+  private[compiler] final case class GeneratedMethodClashesComponent(componentType: TypedAST.Type)
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.

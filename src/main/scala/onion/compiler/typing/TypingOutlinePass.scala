@@ -382,20 +382,34 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         // The `from` synthesis inherits E0059/E0060 by lowering to a regex select pattern;
         // a shape lowers to a Shapes.regex call, so the same two checks are made here.
         val badShapes = if (hasShapes) node.shapes.filterNot(sc => checkShapePattern(sc, node.args.length)) else Nil
-        if (unsupportedFrom.isEmpty && unsupportedData.isEmpty && unsupportedShape.isEmpty && badShapes.isEmpty)
+        // A generated method with no arguments named like a component (`shape x = ...` next
+        // to component `x`) would sit beside that component's accessor `x()`, and no call
+        // could tell the two apart (#2531). Reported here, before any body is typed, so the
+        // clause's error comes first and the clashing method is never registered: a call
+        // `R::x()` then sees only the accessor instead of an E0005 listing `x(), x()`.
+        val componentTypeByName = node.args.map(_.name).zip(argTypes).toMap
+        val clashing = derivedMethods.filter(m => m.args.isEmpty && componentTypeByName.contains(m.name))
+        clashing.distinctBy(_.name).foreach { m =>
+          report(SemanticError.DUPLICATE_GENERATED_METHOD, m, definition_, m.name, Array.empty[Type],
+            SemanticErrorReporter.GeneratedMethodClashesComponent(componentTypeByName(m.name)))
+        }
+        if (unsupportedFrom.isEmpty && unsupportedData.isEmpty && unsupportedShape.isEmpty && badShapes.isEmpty && clashing.isEmpty)
           derivedMethods.foreach(processMethodDeclaration(_))
         else
-          // Every path into this branch has reported an error (E0059/E0060/E0061/E0062), so
-          // compilation stops before codegen. Register the synthesized methods' signatures
+          // Every path into this branch has reported an error (E0026/E0059/E0060/E0061/E0062),
+          // so compilation stops before codegen. Register the synthesized methods' signatures
           // anyway -- `R::doc()`, `R::parse(s)`, `R::fromJson(s)` -- so each call site still
           // resolves instead of cascading into an E0005 "not found" per use. The bodies are
           // never typed: without a kernel binding the body and duplication passes skip them.
-          derivedMethods.foreach(processMethodDeclaration(_, signatureOnly = true))
+          val clashingNames = clashing.map(_.name).toSet
+          definition_.clashedGeneratedMethodNames = clashingNames
+          derivedMethods.filterNot(m => m.args.isEmpty && clashingNames.contains(m.name))
+            .foreach(processMethodDeclaration(_, signatureOnly = true))
           // Rewriting synthesizes no accessor at all for a shape whose component types it
           // cannot classify from the written types (`xs: Map[String, String]`) or whose
           // format is unknown; give those the accessor's signature too.
           val synthesized = derivedMethods.map(_.name).toSet
-          node.shapes.filterNot(sc => synthesized.contains(sc.name)).foreach { sc =>
+          node.shapes.filterNot(sc => synthesized.contains(sc.name) || clashingNames.contains(sc.name)).foreach { sc =>
             processMethodDeclaration(shapeAccessorSignature(node, sc), signatureOnly = true)
           }
       }

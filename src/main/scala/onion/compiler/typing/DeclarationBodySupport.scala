@@ -64,10 +64,27 @@ private[compiler] final class DeclarationBodySupport(
         }
       }
       reportDelegationCycles(node, definition)
+      checkImplicitSuperConstructor(node, definition)
       classInitializerSupport.injectInstanceInitializers(definition, instanceInitializers.toSeq)
       if (staticInitializers.nonEmpty) {
         definition.setStaticInitializers(staticInitializers.toArray)
       }
+    }
+  }
+
+  /** A class that declares no constructor gets one that calls `super()`. When the superclass has
+   *  no accessible no-arg constructor, that call used to compile and then throw NoSuchMethodError
+   *  on `new C()` (#2664), e.g. when every parameter of the parent's only constructor has a default.
+   *  An explicit `def this { }` already reports E0021 for it; the implicit one reports it too. */
+  private def checkImplicitSuperConstructor(node: AST.ClassDeclaration, definition: ClassDefinition): Unit = {
+    val declaresConstructor = (node.defaultSection ++ node.sections).exists(_.members.exists(_.isInstanceOf[AST.ConstructorDeclaration]))
+    val parent = definition.superClass
+    if (!declaresConstructor && parent != null) {
+      val matched = parent.findConstructor(Array.empty[Term])
+      if (matched.length == 0)
+        bodyContext.report(SemanticError.CONSTRUCTOR_NOT_FOUND, node, parent, Array.empty[Type], parent.constructors)
+      else if (matched.length == 1 && !MemberAccess.isMemberAccessible(matched(0), definition))
+        bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, matched(0).affiliation, "new", matched(0).getArgs, definition)
     }
   }
 

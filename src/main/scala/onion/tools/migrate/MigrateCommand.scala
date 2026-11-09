@@ -104,8 +104,8 @@ object MigrateCommand:
       out.println(s"${display(file)}:$line:$column: note: $message")
     val compilesAsWritten = (file: Path, result: Migrator.Result) =>
       result.edits.foreach(e => note(file, e.line, e.column,
-        "the file compiles as written, so this `ret` is a name, " +
-          "not the old do-block keyword; left as written"))
+        s"the file compiles as written, so this ${e.subject} is a name, " +
+          s"not ${oldSpelling(e)}; left as written"))
 
     var changed = 0
     var undecided = 0
@@ -148,14 +148,14 @@ object MigrateCommand:
       failed = true
       val why = stopped match
         case Some(_) => "The compiler reports another error, so it cannot tell, and onion migrate left it as written."
-        case None => "The file does not compile with `yield` there either, so onion migrate left it as written."
+        case None => "The file does not compile rewritten either, so onion migrate left it as written."
       result.edits.foreach { e =>
-        err.println(s"${display(file)}:${e.line}:${e.column}: this `ret` may be the old do-block keyword. " + why)
+        err.println(s"${display(file)}:${e.line}:${e.column}: this ${e.subject} may be ${oldSpelling(e)}. " + why)
       }
       stopped match
         case Some(p) => err.println(s"  the other error: ${p.render(display)}")
-        case None => problems.headOption.foreach(p => err.println(s"  first error with `yield`: ${p.render(display)}"))
-      err.println("  Fix that error and run onion migrate again, or change the `ret` by hand. " +
+        case None => problems.headOption.foreach(p => err.println(s"  first error rewritten: ${p.render(display)}"))
+      err.println("  Fix that error and run onion migrate again, or make the change by hand. " +
         "If the file uses classes from other files, name those files too, or pass -classpath.")
 
     /** A named file was left out of the joint compile; it may declare this `ret`. */
@@ -163,11 +163,11 @@ object MigrateCommand:
       undecided += 1
       failed = true
       result.edits.foreach { e =>
-        err.println(s"${display(file)}:${e.line}:${e.column}: this `ret` may be the old do-block keyword. " +
-          "Another named file could not be migrated, and it may declare `ret`, so onion migrate left this one as written.")
+        err.println(s"${display(file)}:${e.line}:${e.column}: this ${e.subject} may be ${oldSpelling(e)}. " +
+          s"Another named file could not be migrated, and it may declare ${e.subject}, so onion migrate left this one as written.")
       }
       leftOut.foreach(skippedFile => err.println(s"  left out: ${display(skippedFile)}"))
-      err.println("  Fix the error reported for that file and run onion migrate again, or change the `ret` by hand.")
+      err.println("  Fix the error reported for that file and run onion migrate again, or make the change by hand.")
 
     files.foreach { file =>
       try
@@ -250,15 +250,41 @@ object MigrateCommand:
     else if check && changed > 0 then 1
     else 0
 
+  /** What a rule's edit replaced, for messages. */
+  private def oldSpelling(edit: Migrator.Edit): String =
+    if edit.clause then s"the old ${edit.subject} clause" else "the old do-block keyword"
+
   /**
-   * The migrated text lexes to the original tokens and comments, except that exactly as many
-   * rewrites as there are edits were made inside them. A rewrite may sit inside a string
-   * token, in the code of a `#{...}`, so a token is compared by walking both images.
+   * The migrated text lexes to the original tokens and comments, except for the rewrites.
+   *  - A clause edit (`law`, `example`) replaces whole tokens: the text with only those edits
+   *    applied must lex to the untouched pieces' tokens with each replacement's tokens between.
+   *  - Every other edit is checked against that text: exactly as many rewrites as there are
+   *    such edits were made inside its tokens. A rewrite may sit inside a string token, in the
+   *    code of a `#{...}`, so a token is compared by walking both images.
    */
   private def preserved(source: String, result: Migrator.Result): Boolean =
-    val before = Migrator.signature(source)
+    try clausesPreserved(source, result) && tokensPreserved(source, result)
+    catch case _: Exception => false
+
+  private def clausesPreserved(source: String, result: Migrator.Result): Boolean =
+    val clauses = result.edits.filter(_.clause).sortBy(_.offset)
+    clauses.isEmpty || {
+      val expected = mutable.Buffer[String]()
+      var cursor = 0
+      clauses.foreach { e =>
+        expected ++= Migrator.signature(source.substring(cursor, e.offset))
+        expected ++= Migrator.signature(e.replacement)
+        cursor = e.offset + e.length
+      }
+      expected ++= Migrator.signature(source.substring(cursor))
+      Migrator.signature(Migrator.withClausesOnly(source, result)) == expected.toSeq
+    }
+
+  private def tokensPreserved(source: String, result: Migrator.Result): Boolean =
+    val tokenEdits = result.edits.filterNot(_.clause)
+    val before = Migrator.signature(Migrator.withClausesOnly(source, result))
     val after = Migrator.signature(result.text)
-    val rewrites = result.edits.map(e => (source.substring(e.offset, e.offset + e.length), e.replacement)).distinct
+    val rewrites = tokenEdits.map(e => (source.substring(e.offset, e.offset + e.length), e.replacement)).distinct
     /** How many rewrites turn `b` into `a`, or `None` if something else differs. */
     def rewritesBetween(b: String, a: String): Option[Int] =
       var i = 0
@@ -279,7 +305,7 @@ object MigrateCommand:
       if ok then Some(count) else None
     before.length == after.length && {
       val counts = before.zip(after).map((b, a) => rewritesBetween(b, a))
-      counts.forall(_.isDefined) && counts.flatten.sum == result.edits.length
+      counts.forall(_.isDefined) && counts.flatten.sum == tokenEdits.length
     }
 
   /** Compiles source texts together, writing nothing and running nothing. */

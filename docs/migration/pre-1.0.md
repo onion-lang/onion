@@ -263,7 +263,11 @@ public:
 - **What you see:** a false predicate is **E0113**. A parameter that cannot be sampled is also E0113,
   not a silent skip. `--contracts` is on by default (`check`).
 - **Seed and samples:** `--law-seed` and `--law-samples` are now `--contract-seed` and `--contract-samples`; `--no-check-laws` is gone (use `--contracts off`).
-- **`onion.Shape`:** a class that implements it needs at least one such predicate that uses it (E0080).
+- **`onion.Shape`:** a class that implements it no longer needs a predicate in its file (E0080 is retired).
+- **Update a whole project:** `onion migrate src/` rewrites each `law` and `example` into this form.
+  - A body of one expression becomes `= expr`; a longer body keeps its block, with `return` before the last statement.
+  - An `example` with no name is named `example1`, `example2`, ... Rename it if you like.
+  - A file that would not compile after the rewrite is left as written, and the command names the line.
 
 ## A field an `invariant` or `history` names is written only through `this`
 

@@ -707,3 +707,104 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     invoke(root, "--frobnicate", "x.on").exitCode shouldBe 2
     invoke(root, "x.on", "-classpath").exitCode shouldBe 2
     invoke(root, root.resolve("missing.on").toString).exitCode shouldBe 2
+
+  // `law` and `example` (#2609 removed them; #2740 adds the rule).
+
+  private val OldLaws =
+    """// laws, the old way
+      |record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
+      |  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
+      |  example { Pt::parse("3,4") == new Pt(3, 4) }
+      |public:
+      |  static def main(args: String[]): Int = new Pt(40, 2).x() + 2
+      |}
+      |""".stripMargin
+
+  test("a record's law and example become contract predicates under one public: section"):
+    val (root, file) = script(OldLaws)
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 0
+    read(file) shouldBe
+      """// laws, the old way
+        |record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
+        |  public:
+        |    static def roundtrip(p: Pt): Boolean
+        |      ensures result
+        |      = Pt::parse(Pt::format(p)) == p
+        |    static def example1(): Boolean
+        |      ensures result
+        |      = Pt::parse("3,4") == new Pt(3, 4)
+        |public:
+        |  static def main(args: String[]): Int = new Pt(40, 2).x() + 2
+        |}
+        |""".stripMargin
+    result.stdout should include("old.on:3:3: law -> contract predicate `roundtrip`")
+    result.stdout should include("old.on:4:3: example -> contract predicate `example1`")
+    Shell(Seq()).run(read(file), "old.on", Array()) shouldBe Shell.Success(42)
+
+  test("a top-level example becomes a def, and a block body returns its last statement"):
+    val source =
+      """example two { 1 + 1 == 2 }
+        |example {
+        |  val s = "a #{1}"
+        |  s == "a 1"   // the last one
+        |}
+        |IO::println("ran")
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    invoke(root, file.toString).exitCode shouldBe 0
+
+    read(file) shouldBe
+      """def two(): Boolean
+        |  ensures result
+        |  = 1 + 1 == 2
+        |def example1(): Boolean
+        |  ensures result
+        |  {
+        |  val s = "a #{1}"
+        |  return s == "a 1"   // the last one
+        |}
+        |IO::println("ran")
+        |""".stripMargin
+    Shell(Seq()).run(read(file), "old.on", Array()) shouldBe a[Shell.Success]
+
+  test("a migrated example that is false still fails the build"):
+    val (root, file) = script("example wrong { 1 + 1 == 3 }\nIO::println(1)\n")
+
+    invoke(root, file.toString)
+
+    read(file) should not include "def wrong"
+    Shell(Seq()).run(
+      "def wrong(): Boolean\n  ensures result\n  = 1 + 1 == 3\nIO::println(1)\n", "w.on", Array()
+    ) shouldBe Shell.Failure(-1)
+
+  test("a function named example, called with a trailing lambda, is left alone"):
+    val source =
+      """def example(f: () -> Boolean): Boolean = f()
+        |example { 1 == 1 }
+        |IO::println("ok")
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 0
+    read(file) shouldBe source
+    result.stdout should include("is a name, not the old `example` clause")
+
+  test("law and example outside a record body or the top level are not touched"):
+    val source =
+      """class C {
+        |public:
+        |  def law(x: Int): Int = x
+        |  def example(): Int = law(1)
+        |}
+        |IO::println(new C().example())
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    invoke(root, file.toString).exitCode shouldBe 0
+    read(file) shouldBe source

@@ -77,6 +77,8 @@ final class BuildRun(config: CompilerConfig, typed: Seq[TypedAST.ClassDefinition
           case _ =>
         }
       }
+      // The sampler builds a `Foo?` the same way as a `Foo` (panel block on #2610 at f22b1e3).
+      case nt: TypedAST.NullableType => visit(nt.innerType)
       case _ =>
     }
     params.foreach(visit)
@@ -148,6 +150,14 @@ object BuildRun {
     case Some(Right(call)) => onion.compiler.toolbox.Message("warning.predicateNotRun.call", Array[Any](name, render(effects), call))
     case None              => onion.compiler.toolbox.Message("warning.predicateNotRun.effects", name, render(effects))
   }
+
+  /** W0023's text for an `E0112` replay of `method` that was not run because it has outside effects. */
+  def replayNotRunMessage(method: String, history: String, effects: Set[Effect]): String =
+    onion.compiler.toolbox.Message("warning.replayNotRun.effects", Array[Any](method, history, render(effects)))
+
+  /** W0023's text for an `E0112` replay of `method` that did not finish within `millis`. */
+  def replayTimeoutMessage(method: String, history: String, millis: Long): String =
+    onion.compiler.toolbox.Message("warning.replayNotRun.timeout", Array[Any](method, history, millis.toString))
 
   /** W0023's text for a predicate whose sample arguments of program class `cls` cannot be made without an outside effect. */
   def notSampledMessage(name: String, effects: Set[Effect], cls: String): String =

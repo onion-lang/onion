@@ -2,7 +2,9 @@
 
 - **Compiling no longer runs a contract predicate that prints, does I/O or never ends (#2601).**
   - Before: `ensures result` predicates and `E0112` replays ran whatever they called, including overrides the library calls back (`toString`, `fillInStackTrace`). `onionc` printed, exited, or hung.
-  - Now: only a predicate whose effects are at most `mutate` runs. Others, and any run past 10 seconds, get the new warning `W0023`, which names the call, static initializer or parameter class that has the effect. Making a sample argument of a program class counts too, and so does a record's generated `toString`/`hashCode`/`equals`, which calls its components' overrides.
+  - Now: only a predicate whose effects are at most `mutate` runs. Others, and any run past 10 seconds, get the new warning `W0023`, which names the call, static initializer or parameter class that has the effect. Making a sample argument of a program class (`Foo` or `Foo?`) counts too, and so does a record's generated `toString`/`hashCode`/`equals`, which calls its components' overrides.
+  - An `E0112` replay that is not run, or not waited for, gives `W0023` beside its `W0021`.
+  - A `--warn error` build fails on a new `W0023`. Fix: move the effect out of the predicate, or pass `--Wno W0023`.
 
 ### Breaking
 

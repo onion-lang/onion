@@ -1277,9 +1277,12 @@ The effects count everything a run can reach:
 - a method the library calls back on a program value: `toString` from `+` and `#{}`,
   `hashCode` from a map literal, `equals` from `==`, `getMessage` of a thrown exception
 - the static initializer of each class the predicate uses, and of its superclasses
-- for a parameter of a program class: that class's constructors, static initializers and
-  `toString`, which the build runs to make sample arguments, and the same for the classes of
-  their parameters
+- for a parameter of a program class (`Foo` or `Foo?`): that class's constructors, static
+  initializers and `toString`, which the build runs to make sample arguments, and the same for
+  the classes of their parameters
+
+An `E0112` replay follows the same rule. When it is not run, or does not finish in time, the
+`W0021` for that method stays, and `W0023` says why the build did not confirm it.
 
 When the effect is not in the predicate's own body, `W0023` names where it is: the call, the
 class whose static initializer has it, or the parameter's class.

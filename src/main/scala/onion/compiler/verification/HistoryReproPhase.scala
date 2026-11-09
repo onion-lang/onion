@@ -51,9 +51,19 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
         val location = r.method.location
         // A replay runs the constructor and the method; it runs only when neither reaches the
         // outside world, and only for as long as the build waits (#2601). Otherwise it stays W0021.
-        val runnable = build.constructorEffects(r.cls.name).isEmpty &&
-          build.methodEffects(Some(r.cls.name), r.method.name, r.method.args.size, static = false).isEmpty
-        if (runnable && build.timed(loader)(reproduce(r, loader)).contains(Right(true))) {
+        // A replay that is not run, or not waited for, also gets W0023 saying why (panel block on #2610).
+        val effects = build.constructorEffects(r.cls.name) ++
+          build.methodEffects(Some(r.cls.name), r.method.name, r.method.args.size, static = false)
+        def notRun(message: String): Unit =
+          warnings += CompileWarning(r.sourceFile, location, WarningCategory.PredicateNotRun, message)
+        val replayed =
+          if (effects.nonEmpty) { notRun(BuildRun.replayNotRunMessage(r.method.name, r.history, effects)); false }
+          else build.timed(loader)(reproduce(r, loader)) match {
+            case None =>
+              notRun(BuildRun.replayTimeoutMessage(r.method.name, r.history, config.contractTimeoutMillis)); false
+            case Some(result) => result.contains(true)
+          }
+        if (replayed) {
           errors += CompileError(r.sourceFile, location,
             Message("error.semantic.historyReproduced", Array[Any](r.method.name, r.history, r.shown)),
             Some(SemanticError.HISTORY_REPRODUCED.errorCode))

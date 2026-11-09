@@ -475,6 +475,36 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
           |}""".stripMargin)
       assert(o.errors.contains("E0112"), o.toString)
     }
+
+    it("says with W0023 that a replay was not run because the constructor has an effect (panel block on #2610)") {
+      val o = compile(
+        """class Counter {
+          |  history n >= old(n)
+          |public:
+          |  var n: Int
+          |  def this { IO::println("CTOR RAN"); n = 0 }
+          |  def inc(): void { n = n + 1 }
+          |}""".stripMargin)
+      assert(!o.stdout.contains("CTOR RAN"), o.toString)
+      assert(o.w23.exists(w => w.contains("`inc`") && w.contains("console")), o.toString)
+    }
+
+    it("says with W0023 that a replay did not finish in time") {
+      val o = compile(
+        """class Counter {
+          |  history n >= old(n)
+          |public:
+          |  var n: Int
+          |  def this { Spin::spin(); n = 0 }
+          |  def inc(): void { n = n + 1 }
+          |}
+          |class Spin {
+          |public:
+          |  static def spin(): void { var k: Long = 0L; while k >= 0L { k = k + 1L } }
+          |}""".stripMargin, timeoutMillis = 300L)
+      assert(!o.errors.contains("E0112"), o.toString)
+      assert(o.w23.exists(w => w.contains("`inc`") && w.contains("300")), o.toString)
+    }
   }
 
   describe("a predicate whose parameter is a program class (panel block on #2610)") {
@@ -538,6 +568,43 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
           |static def p(pt: Pt): Boolean ensures result = pt.x < 0""".stripMargin)
       assert(o.w23.isEmpty, o.toString)
       assert(o.errors.contains("E0113"), o.toString)
+    }
+  }
+
+  describe("a predicate whose parameter is a nullable program class (panel block on #2610 at f22b1e3)") {
+    it("is not run when a `Foo?` parameter's constructor has an effect") {
+      val o = compile(
+        """class Foo {
+          |  val x: Int
+          |public:
+          |  def this(x: Int) { this.x = x; IO::println("FOO CTOR RAN AT BUILD") }
+          |  def get(): Int = x
+          |}
+          |class P {
+          |public:
+          |  static def ok(f: Foo?): Boolean
+          |    ensures result {
+          |    return true
+          |  }
+          |}""".stripMargin)
+      assert(!o.stdout.contains("FOO CTOR RAN AT BUILD"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`ok`") && w.contains("Foo") && w.contains("console")), o.toString)
+    }
+
+    it("is not run when a nested `Noisy?` record component's constructor has an effect") {
+      val o = compile(
+        """class Noisy {
+          |  val v: Int
+          |public:
+          |  def this(v: Int) { IO::println("NOISY CTOR RAN AT BUILD"); this.v = v }
+          |}
+          |record Holder(z: Noisy?)
+          |record Outer(h: Holder?)
+          |static def p(o: Outer): Boolean ensures result = true""".stripMargin)
+      assert(!o.stdout.contains("NOISY CTOR RAN AT BUILD"), o.toString)
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("Noisy")), o.toString)
     }
   }
 

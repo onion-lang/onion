@@ -428,6 +428,8 @@ under the stricter one of the first draft they would not have.
 
 A run is bounded by a fixed 10 s; no flag changes it yet. A predicate that does not finish in
 time is not waited for: `W0023` names it, so a non-terminating one cannot hang the build.
+An `E0112` replay that is not run, or not waited for, keeps its `W0021` and also gets `W0023`,
+which says why.
 
 This rule covers the closed-predicate check and the `E0112` replay. One build-time runner is
 not under it yet: the `E0114` Shape check still calls a user `Shape`'s `parse`/`print` with no

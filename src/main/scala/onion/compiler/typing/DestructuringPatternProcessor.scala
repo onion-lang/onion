@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.toolbox.Boxing
 
 import scala.util.boundary, boundary.break
 
@@ -87,7 +88,7 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
         def buildAccessorForCondition(base: Term, path: List[AccessStep]): Term = path match {
           case Nil => base
           case AccessStep(castType, getter) :: rest =>
-            val cast = new AsInstanceOf(base, castType)
+            val cast = new AsInstanceOf(Boxing.asReference(typing.table_, base), castType)
             if (getter == null) buildAccessorForCondition(cast, rest)
             else {
               val call = new Call(cast, getter, Array.empty)
@@ -96,7 +97,7 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
         }
 
         val fieldAccess = buildAccessorForCondition(new RefLocal(bind), currentPath)
-        val nestedInstanceOf = new InstanceOf(fieldAccess, nestedType.asInstanceOf[ObjectType])
+        val nestedInstanceOf = new InstanceOf(Boxing.asReference(typing.table_, fieldAccess), nestedType.asInstanceOf[ObjectType])
         nestedConditions += nestedInstanceOf
 
         // Process nested field patterns recursively
@@ -125,12 +126,12 @@ private[typing] class DestructuringPatternProcessor(private val typing: Typing) 
         def buildAccessor(base: Term, path: List[AccessStep]): Term = path match {
           case Nil => base
           case AccessStep(castType, getter) :: rest =>
-            val cast = new AsInstanceOf(base, castType)
+            val cast = new AsInstanceOf(Boxing.asReference(typing.table_, base), castType)
             if (getter == null) buildAccessor(cast, rest)
             else buildAccessor(new Call(cast, getter, Array.empty), rest)
         }
         nestedConditions +=
-          new InstanceOf(buildAccessor(new RefLocal(bind), currentPath), mappedType.asInstanceOf[ObjectType])
+          new InstanceOf(Boxing.asReference(typing.table_, buildAccessor(new RefLocal(bind), currentPath)), mappedType.asInstanceOf[ObjectType])
         // The field is declared at its component type, so the binding's access
         // path needs a final cast-only step down to the narrowed type. Without
         // it the loaded value keeps the wider static type while the binding

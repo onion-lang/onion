@@ -1,11 +1,13 @@
 package onion.compiler.tools
 
+import onion.tools.Shell
 import onion.compiler.{OnionCompiler, CompilerConfig, StreamInputSource, CompilationOutcome}
 import java.io.StringReader
 
 /**
- * A generic call whose `? super U` and `? extends U` arguments leave no `U` that fits both is
- * an error, as in Java. `Collections::copy(x: List[T], o: List[Object])` inside `G[T]` used to
+ * A generic method applies only if some `U` satisfies all its limits (#2431): a call whose
+ * `? super U` and `? extends U` arguments leave no `U` that fits both does not select it, so
+ * another overload is chosen or the call is E0005, as in Java. `Collections::copy(x: List[T], o: List[Object])` inside `G[T]` used to
  * compile, then throw a ClassCastException when `x[0]` was read back (#2431).
  */
 class WildcardBoundsConflictSpec extends AbstractShellSpec {
@@ -26,7 +28,7 @@ class WildcardBoundsConflictSpec extends AbstractShellSpec {
           |  def f(o: List[Object], x: List[T]): void { Collections::copy(x, o) }
           |}
           |""".stripMargin
-      assert(errorCodes(src).nonEmpty)
+      assert(errorCodes(src) == Seq("E0005"))
     }
 
     it("still accepts a source that is a T") {
@@ -59,7 +61,7 @@ class WildcardBoundsConflictSpec extends AbstractShellSpec {
           |  def c(o: List[Object], x: List[T?]): void { Collections::copy(x, o) }
           |}
           |""".stripMargin
-      assert(errorCodes(src).nonEmpty)
+      assert(errorCodes(src) == Seq("E0005"))
     }
 
     it("still accepts a List[T] or List[T?] source for a List[T?] destination") {
@@ -81,7 +83,42 @@ class WildcardBoundsConflictSpec extends AbstractShellSpec {
           |  def f(o: List[ArrayList[Object]], x: List[List[T]]): void { Collections::copy(x, o) }
           |}
           |""".stripMargin
-      assert(errorCodes(src).nonEmpty)
+      assert(errorCodes(src) == Seq("E0005"))
+    }
+
+    it("falls back to another overload when the generic one has no U (third block, repro 2)") {
+      val result = shell.run(
+        """import { java.util.* }
+          |class H {
+          |public:
+          |  static def mv[U](dst: List[? super U], src: List[? extends U]): String = "generic"
+          |  static def mv(dst: Object, src: Object): String = "obj"
+          |}
+          |class G[T] {
+          |public:
+          |  def b(x: List[T], o: List[Object]): String = H::mv(x, o)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String = new G[String]().b(new ArrayList[String](), new ArrayList[Object]())
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("obj") == result)
+    }
+
+    it("reads a wildcard limit as its bound: max over a List[String?] with a lambda (third block, repro 1)") {
+      val result = shell.run(
+        """import { java.util.* }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs: List[String?] = ["b", "a", null]
+          |    val m: String? = Collections::max(xs, (a, b) -> (a ?: "").compareTo(b ?: ""))
+          |    return m ?: "none"
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("b") == result)
     }
 
     it("still accepts a List[List[T]] source for a List[List[T]] destination (nested)") {

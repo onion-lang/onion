@@ -154,5 +154,29 @@ class RecordCopySpec extends AbstractShellSpec {
       )
       assert(Shell.Success("5,null,z,7,9,5,q") == result)
     }
+
+    it("calls a record's own copy overload when the named arguments do not fit the components (#2705)") {
+      // A record that declares `copy` gets no generated one; a call that is not
+      // component-shaped is an ordinary call to the declared overloads.
+      val result = shell.run(
+        """
+          |record U(name: Int) {
+          |public:
+          |  def copy(name: String): String = "user:" + name
+          |  def copy(tag: Int): String = "tag:" + tag
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val u = new U(1)
+          |    return u.copy(name = "s") + "," + u.copy(tag = 3) + "," + u?.copy(name = "t")
+          |  }
+          |}
+          |""".stripMargin,
+        "UserCopy.on",
+        Array()
+      )
+      assert(Shell.Success("user:s,tag:3,user:t") == result)
+    }
   }
 }

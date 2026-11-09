@@ -40,6 +40,11 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
     }
     boundary[Option[Option[Term]]] {
       val components = definition.recordComponents.getOrElse(break(None))
+      // A record that declares its own `copy` gets no generated one (TypingOutlinePass).
+      // A call that does not fit the components is then an ordinary call to the
+      // declared overloads, so it falls back to the regular path instead of
+      // reporting here: `copy(name = "s")` with `def copy(name: String)` (#2705).
+      val declaresCopy = !definition.methods("copy").exists(m => (m.modifier & Modifier.SYNTHETIC_RECORD) != 0)
 
       val named = scala.collection.mutable.LinkedHashMap[String, AST.Expression]()
       args.foreach {
@@ -47,6 +52,7 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
         case _ => break(None) // positional args (or a mix): use the regular path
       }
       for (argName <- named.keys if !components.exists(_._1 == argName)) {
+        if (declaresCopy) break(None)
         calls.reportMethodNotFound(node, targetType, s"copy(${argName} = ...)", Array[Type]())
         break(Some(None)) // reported; the regular path would add a second error
       }
@@ -66,6 +72,7 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
                 // throws when the copy runs (#2705). This also boxes a primitive
                 // for a reference component, widening first (`copy(b = 5)` on
                 // `b: Long?` stores a Long).
+                if (declaresCopy && !term.`type`.isNullType && !calls.isAssignableWithBoxing(expectedType, term.`type`)) break(None)
                 val assigned = calls.processAssignable(expr, expectedType, term)
                 if (assigned == null) break(Some(None))
                 // A nullable component (`port: Int?`) is declared `T?` in the raw

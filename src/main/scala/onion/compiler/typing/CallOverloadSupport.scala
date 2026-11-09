@@ -62,7 +62,8 @@ private[compiler] final class CallOverloadSupport(
           // errors so a discarded bounded overload cannot leak its constraint
           // onto the call (issue #298). The selected method is re-inferred with
           // errors on in buildResolvedCall/resolveMethodTypeArgs.
-          Some(GenericMethodTypeArguments.infer(typing, node, method, params, classSubst, expected, reportErrors = false))
+          // A candidate whose limits leave no type argument does not apply (#2431).
+          GenericMethodTypeArguments.inferApplicable(typing, node, method, params, classSubst, expected)
       }
       methodSubstOpt.flatMap { methodSubst =>
         val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
@@ -96,14 +97,16 @@ private[compiler] final class CallOverloadSupport(
       else {
         // Applicability collection: suppress bound errors so a discarded bounded
         // overload cannot leak its constraint onto the call (issue #298).
-        val methodSubst = GenericMethodTypeArguments.infer(typing, node, method, knownParams, classSubst, expected, reportErrors = false)
-        val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
-        Option.when(
-          knownParamIndices.forall { case (index, term) =>
-            isApplicableAtIndex(method, expectedArgs, index, term.`type`) ||
-              (index < expectedArgs.length && TypeRules.emptyCollectionLiteralAccepts(expectedArgs(index), term))
-          }
-        )(ApplicableMethod(method, expectedArgs, methodSubst))
+        // A candidate whose limits leave no type argument does not apply (#2431).
+        GenericMethodTypeArguments.inferApplicable(typing, node, method, knownParams, classSubst, expected).flatMap { methodSubst =>
+          val expectedArgs = TypeSubst.args(method, classSubst, methodSubst)
+          Option.when(
+            knownParamIndices.forall { case (index, term) =>
+              isApplicableAtIndex(method, expectedArgs, index, term.`type`) ||
+                (index < expectedArgs.length && TypeRules.emptyCollectionLiteralAccepts(expectedArgs(index), term))
+            }
+          )(ApplicableMethod(method, expectedArgs, methodSubst))
+        }
       }
     }.toList
   }

@@ -174,6 +174,27 @@ private[typing] object GenericMethodTypeArguments {
     else new Constraints(typing, callNode, method, args, classSubst, expectedReturn, reportErrors).withDefaults()
 
   /**
+   * `infer` for overload selection: `None` when this call leaves no type argument that meets
+   * every limit it places on it, so the method does not apply. "A generic method applies only
+   * if some `U` satisfies all its limits" (#2431): `Collections::copy(List[T], List[Object])`
+   * has none, and another overload is chosen instead, or the call is E0005.
+   */
+  def inferApplicable(
+    typing: Typing,
+    callNode: AST.Node,
+    method: Method,
+    args: Array[Term],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    expectedReturn: Type
+  ): Option[scala.collection.immutable.Map[String, Type]] =
+    if (method.typeParameters.isEmpty) Some(scala.collection.immutable.Map.empty)
+    else {
+      val constraints = new Constraints(typing, callNode, method, args, classSubst, expectedReturn, reportErrors = false)
+      val subst = constraints.withDefaults()
+      Option.unless(constraints.limitsConflict)(subst)
+    }
+
+  /**
    * The type-argument constraints one call places on a generic method: every formal
    * parameter (and the expected return type, when known) unified against the actual, into
    * direct bindings (`inferred`), lower bounds from wildcard uppers and upper bounds from
@@ -208,6 +229,24 @@ private[typing] object GenericMethodTypeArguments {
     def isSuperTypeForBounds(left: Type, right: Type): Boolean =
       if (!left.isBasicType && right.isBasicType) TypeRules.isSuperType(left, boxedTypeArg(right))
       else TypeRules.isSuperType(left, right)
+
+    // A limit takes a value only as the shared join rule does: a type variable (`T`, `T?`)
+    // takes only its own values, and type arguments that mention one must match, at any
+    // depth (`List[List[T]]` does not take an `ArrayList[Object]`, #2431).
+    // A wildcard limit counts as its bound: `? super String?` (a lambda's `Comparator[? super T]`)
+    // is the limit `String?`; `?` and `? extends X` limit nothing from above.
+    def fitsBothLimits(upper0: Type, lower: Type): Boolean = {
+      val upper = upper0 match
+        case w: TypedAST.WildcardType => w.lowerBound.orNull
+        case t => t
+      upper == null || {
+        val l = if (!upper.isBasicType && lower.isBasicType) boxedTypeArg(lower) else lower
+        TypeCheckingHelpers.joinsStrictly(typing.table_, upper, l)
+      }
+    }
+
+    /** Set by `withDefaults()`: some type parameter has an upper and a lower limit no type meets. */
+    var limitsConflict: Boolean = false
 
     def isAssignableForBounds(left: Type, right: Type): Boolean =
       if (!left.isBasicType && right.isBasicType) TypeRules.isAssignable(left, boxedTypeArg(right))
@@ -491,6 +530,15 @@ private[typing] object GenericMethodTypeArguments {
                 failedBound += name
                 bound0
               }
+
+        // `? super U` fixed an upper limit and `? extends U` a lower one: some U must fit both
+        // (`Collections::copy(List[T], List[Object])` has none, #2431).
+        for (upper <- upperConstraints.get(name); lower <- lowerConstraints.get(name)
+             if !failedBound(name) && !fitsBothLimits(upper, lower)) {
+          reportError(callNode, INCOMPATIBLE_TYPE, upper, lower)
+          limitsConflict = true
+          failedBound += name
+        }
 
         val inferredType0 =
           inferred.get(name)

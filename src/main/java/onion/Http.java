@@ -106,12 +106,14 @@ public final class Http {
     // ========== Response with Status ==========
 
     /**
-     * Response object containing status code, body, and headers.
+     * Response object containing status code, body, and headers. Read them with
+     * {@code status()}, {@code body()} and {@code headers()}; in Onion, {@code r.status}
+     * calls the same method (#2738).
      */
     public static class Response {
-        public final int status;
-        public final String body;
-        public final List<String> headers;
+        private final int status;
+        private final String body;
+        private final List<String> headers;
 
         public Response(int status, String body, List<String> headers) {
             this.status = status;
@@ -119,17 +121,17 @@ public final class Http {
             this.headers = headers;
         }
 
-        /** The status code; same as the {@code status} field, spelled like a record accessor. */
+        /** The status code. */
         public int status() {
             return status;
         }
 
-        /** The response body; same as the {@code body} field. */
+        /** The response body. */
         public String body() {
             return body;
         }
 
-        /** The raw header lines; same as the {@code headers} field. */
+        /** The raw header lines. */
         public List<String> headers() {
             return headers;
         }

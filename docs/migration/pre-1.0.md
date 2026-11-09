@@ -413,3 +413,20 @@ public:
     `Object`, `CharSequence`). Its hint suggests `?:` for a nullable value.
   - **E0104** when either return type is primitive (`toString(): Int`, `hashCode(): Long`).
 - **No `onion migrate` rule:** what to return instead of `null` is your choice.
+
+## `Http.Response` reads through `status()`, `body()` and `headers()` only
+
+`Http.Response` had public fields and accessor methods with the same names. The fields are
+now private, as in `Server.Response` and `Proc.Result`.
+
+```onion
+val r = Http::getResponse("https://example.com")
+println(r.status)     // still compiles: calls status()
+println(r.status())   // the same call
+```
+
+- **Onion source:** nothing to change. With no field to read, `r.status` calls `status()`.
+- **What you see:** an `IllegalAccessError` when you run a `.class` file built by an older
+  `onionc` that read the field. Recompile it.
+- **Java code:** write `r.status()`, `r.body()` and `r.headers()`.
+- **No `onion migrate` rule:** every Onion spelling still compiles, so there is nothing to rewrite.

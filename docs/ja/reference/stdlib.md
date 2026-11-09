@@ -2434,7 +2434,8 @@ Http::postResponse(url, body): Response
 Http::postResponse(url, body, headers): Response
 ```
 
-`Response` は `status: Int`、`body: String`、`headers: List` のフィールドと、
+`Response` は `status(): Int`、`body(): String`、`headers(): List` のアクセサ
+（括弧なしの `r.status` も同じメソッドを呼ぶ）と、
 `isOk(): Boolean`（2xx）・`isError(): Boolean`（4xx/5xx）のヘルパー、
 `header(name): String?`（そのヘッダーの最初の値。大文字小文字を区別しない）を持つ。
 ボディだけでなくステータスコードやヘッダーが必要なときに使う。

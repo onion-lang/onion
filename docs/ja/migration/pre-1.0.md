@@ -385,3 +385,18 @@ public:
   - 戻り値の型が別の参照型（`String?`、`Object`、`CharSequence`）のときは、メソッドの位置で **E0000** になります。ヒントは、null になりうる値に `?:` を使うよう勧めます。
   - どちらかの戻り値の型がプリミティブ型（`toString(): Int`、`hashCode(): Long`）のときは **E0104** になります。
 - **`onion migrate` の規則はありません:** `null` の代わりに何を返すかは利用者が決めるためです。
+
+## `Http.Response` は `status()` / `body()` / `headers()` だけで読むようになりました
+
+`Http.Response` には、同じ名前の公開フィールドとアクセサメソッドがありました。フィールドは非公開になりました。`Server.Response` や `Proc.Result` と同じです。
+
+```onion
+val r = Http::getResponse("https://example.com")
+println(r.status)     // これまでどおりコンパイルできる: status() を呼ぶ
+println(r.status())   // 同じ呼び出し
+```
+
+- **Onion のソース:** 変更は不要です。読めるフィールドがないので、`r.status` は `status()` を呼びます。
+- **表示されるもの:** 古い `onionc` がフィールドを読むように生成した `.class` ファイルを実行すると、`IllegalAccessError` になります。再コンパイルしてください。
+- **Java のコード:** `r.status()`、`r.body()`、`r.headers()` と書いてください。
+- **`onion migrate` の規則はありません:** Onion の書き方はどれもそのままコンパイルできるため、書き換えるものがありません。

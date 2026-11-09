@@ -2283,8 +2283,9 @@ Http::postResponse(url, body): Response
 Http::postResponse(url, body, headers): Response
 ```
 
-`Response` has `status: Int`, `body: String`, and `headers: List` fields,
-plus `isOk(): Boolean` (2xx) and `isError(): Boolean` (4xx/5xx) helpers, and
+`Response` has `status(): Int`, `body(): String` and `headers(): List` accessors
+(`r.status` with no parentheses calls the same method), plus `isOk(): Boolean`
+(2xx) and `isError(): Boolean` (4xx/5xx) helpers, and
 `header(name): String?` (the first value of that header, any case) — use
 these when the status code or headers matter, not just the body.
 

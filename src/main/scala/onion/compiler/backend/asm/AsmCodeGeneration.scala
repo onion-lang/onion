@@ -23,6 +23,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     if Modifier.isFinal(mod) then access |= Opcodes.ACC_FINAL
     if Modifier.isAbstract(mod) then access |= Opcodes.ACC_ABSTRACT
     if Modifier.isSynchronized(mod) then access |= Opcodes.ACC_SYNCHRONIZED
+    if Modifier.isSynthetic(mod) then access |= Opcodes.ACC_SYNTHETIC
     access
 
   // Delegate to companion object

@@ -17,6 +17,12 @@ private[compiler] final class MethodCallReportingSupport(
     extensionReceiverHint: ObjectType = null,
     calledStatically: Boolean = false
   ): Unit = {
+    // `R::x()` where the clause `shape x = ...` clashed with component `x`: E0026 at the
+    // clause already says what to rename, and the call is fixed by that rename (#2531).
+    targetType match {
+      case cd: ClassDefinition if argTypes.isEmpty && cd.clashedGeneratedMethodNames.contains(name) => return
+      case _ =>
+    }
     // A same-named field that exists but isn't accessible from here (e.g. Concurrent.Lock's
     // private `lock`) is not a usable fix for "method not found" -- the paren-less-field hint
     // in SemanticErrorReporter would just steer the user into a second, equally unhelpful

@@ -302,3 +302,114 @@ println(c.t)   // 9
   methods, also inside a lambda. Reading `o.t` from anywhere is fine too.
 - **No `onion migrate` rule, on purpose:** the fix adds a method or a constructor to the
   receiver's class, and which one fits is a design choice.
+
+## A `tool`'s `requires` sees more of what it runs
+
+`onionc` checks a `tool`'s `requires { ... }` clause against the effects its body has. It now
+counts four things it missed before. A tool that relied on a miss gets `E0077` (an effect
+missing from `requires`) or `E0078` (a capability nothing uses).
+
+```onion
+class Base {
+public:
+  def this {}
+  def run(): Int = 1
+}
+class Loud extends Base {
+public:
+  def this {}
+  override def run(): Int { IO::println("loud"); return 2 }
+}
+
+// Before: compiled. Now: E0077 at `b.run()`, "calling Loud::run"
+//   tool go(): Int { val b: Base = new Base(); return b.run() }
+// Now: declare what an override can do
+tool go(): Int requires { console } {
+  val b: Base = new Base()
+  return b.run()
+}
+```
+
+| What the tool does | Before | Now |
+|---|---|---|
+| Calls a method a program class overrides (`b.run()` above) | only the called method counted | every program override counts too (`E0077`) |
+| Uses a class whose static initializer has an effect | not counted | counted (`E0077`) |
+| `try (val r = new R()) { }` where `R` is a program class | `close()` not counted | `R::close` counts (`E0077`) |
+| `new Box[String]()` of a program class | `unknown` | the constructor's own effects; an `unknown` kept only for it is `E0078` |
+
+- **What you see:** `E0077` names the call and the capability to add. `E0078` names the
+  capability to remove.
+- **Not affected:** what a library method might call back on an object you pass it
+  (`list.add(item)` and `Item::toString`). Only the build's own check of contract predicates
+  counts that.
+- **No `onion migrate` rule, on purpose:** the fix depends on what the called code does.
+  Each error names the edit: add that capability, or remove the unused one.
+
+## A record component named `hashCode`, `toString` or `getClass` must not change that method's type
+
+`record R(hashCode: Long)` gave one object two `hashCode()` answers: the accessor, and the
+`Int` one a `HashMap` uses. `getClass: Int` did the same to `getClass()`. Both are now errors,
+as `hashCode: Int`, `toString: String` and `getClass: Class` were.
+
+```onion
+// Before: compiled, r.hashCode() = 5, (r as Object).hashCode() = 36
+record R(hashCode: Long)
+
+// Now: E0010. Rename the component.
+record R(code: Long)
+```
+
+- **What you see:** **E0010** at the component, for `hashCode`, `toString` or `getClass` of any
+  type, in a record or an `enum` case.
+- **No `onion migrate` rule:** the new name and the code that reads it are your choice.
+
+## A default on an abstract or interface method is type-checked
+
+A default on an `abstract def` or an interface method now works: a call may omit that
+argument. So the default is now type-checked like any other default. Before, it was never used,
+and a wrong one compiled.
+
+```onion
+// Before: compiled, because the default was never used
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = "x"): Int
+}
+
+// Now: E0000 at "x". Give a default of the parameter's type.
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = 0): Int
+}
+```
+
+- **What you see:** **E0000** (wrong type) or **E0002** (unknown name) at the default.
+- **No `onion migrate` rule:** only you know which default was meant. Fix it, or remove it.
+
+## A record method that overrides `toString`, `hashCode` or `equals` must keep its type
+
+A record body could redefine an `Object` method with another return type. A class could not.
+`toString(): Int` silently dropped the generated `toString()`, and `toString(): String?` let a
+`null` reach `println`. A record now follows the class rule.
+
+```onion
+// Before: compiled; println(new R("")) printed null
+record R(name: String) {
+public:
+  def toString(): String? = if name == "" { null } else { name }
+}
+
+// Now: E0000 at toString. Return a String.
+record R(name: String) {
+public:
+  def toString(): String = if name == "" { "(none)" } else { name }
+}
+```
+
+- **What you see:**
+  - **E0000** at the method when the return type is another reference type (`String?`,
+    `Object`, `CharSequence`). Its hint suggests `?:` for a nullable value.
+  - **E0104** when either return type is primitive (`toString(): Int`, `hashCode(): Long`).
+- **No `onion migrate` rule:** what to return instead of `null` is your choice.

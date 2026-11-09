@@ -269,7 +269,7 @@ is forbidden is `other.n = 0` on a different object, which no call to `other` wo
 The check needs no solver. `reset` assigns the constant `0` to a field whose history says
 `n >= old(n)`, and `Counter.inc` raises `n`, so `n` can be above `0` when `reset` runs. That is
 a fact about the syntax of the two methods, not a guess about a run. §7.1 gives the full rule,
-including what the syntax does not report (a class whose only write is `n = 0` needs `invariant n == 0` for the solver to prove it). Anything
+including what the syntax does not report (a class whose only write is `n = 0` needs `invariant n == 0`, and until the invariant itself is proved that proof is W0024, #2602). Anything
 harder waits for the prover.
 
 ### 4.2 Interfaces
@@ -426,8 +426,18 @@ vouch for (`unknown`) gets the same warning. **Nothing stops running silently.**
 `Mandelbrot.on:48`) have `mutate` through the methods they call, and they run under this rule;
 under the stricter one of the first draft they would not have.
 
-A run is bounded by `--contract-timeout`. A predicate that does not finish is `Not proved`,
-with the note naming it, so a non-terminating one cannot hang the build.
+A run is bounded by a fixed 10 s; no flag changes it yet. A predicate that does not finish in
+time is not waited for: `W0023` names it, so a non-terminating one cannot hang the build.
+An `E0112` replay that is not run, or not waited for, keeps its `W0021` and also gets `W0023`,
+which says why.
+
+This rule covers the closed-predicate check and the `E0112` replay. One build-time runner is
+not under it yet: the `E0114` Shape check still calls a user `Shape`'s `parse`/`print` with no
+effect check (#2733).
+
+A record's generated `toString`, `hashCode` and `equals` count as calling the same method on
+each component (or as calling the interface default they forward to), so a record handed to a
+map literal or to string concatenation carries what those methods do.
 
 A write to a **static** field by a predicate is not stopped by this rule and can reach another
 predicate in the same build. Predicates are run one at a time, each in a fresh class loader, so
@@ -479,7 +489,7 @@ So E0109 is reported only when the syntax settles it. Take the history `n >= old
 |---|---|---|
 | `n = n - c`, with `c` a positive constant | **E0109** | `n - c >= n` is false for every `n` (apart from overflow, §3). No reachability is needed |
 | `n = c`, and some method of the class or its supertypes **raises** `n` (`n = n + k`, `k` positive) | **E0109**, and the message names that method | `n` can exceed `c`, because that method raises it. The reason is a fact in the syntax |
-| `n = c`, and nothing raises `n` | **no syntactic error**; the solver decides | The syntax alone cannot tell where `n` starts. The solver checks the write against the class `invariant`s: with `invariant n == 0` a write of `0` is proved fine; with no invariant, `n` could start above `c`, and the write has a counterexample (below) |
+| `n = c`, and nothing raises `n` | **no syntactic error**; the solver decides | The syntax alone cannot tell where `n` starts. The solver checks the write against the class `invariant`s: with `invariant n == 0` a write of `0` holds, but until something proves the invariant itself at compile time (planned) a proof that needs it is W0024 and keeps its guard (#2602); with no invariant, `n` could start above `c`, and the write has a counterexample (below) |
 | any other expression | `Not proved` | The prover decides (stage 7) |
 
 **What counts as a write** (#2597, #2599). A write by a method is any assignment, `+=`, `-=`,

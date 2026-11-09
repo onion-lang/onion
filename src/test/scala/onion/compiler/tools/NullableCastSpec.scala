@@ -56,6 +56,29 @@ class NullableCastSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a cast between two different nullable primitive types (#2542)") {
+    it("rejects Int? as Long? and Long? as Int? at compile time") {
+      for ((from, to) <- Seq(("Int", "Long"), ("Long", "Int"), ("Int", "Double"), ("Double", "Int"))) {
+        val msgs = compileErrors(
+          s"def main(args: String[]): void {\n  val i: $from? = null\n  val l: $to? = (i as $to?)\n}\n")
+        assert(msgs.contains("E0000"), s"expected E0000 for $from? as $to?, got: $msgs")
+      }
+    }
+    it("still accepts a nullable primitive cast to itself, to its box, or to Object") {
+      val r = shell.run(
+        """def main(args: String[]): Int {
+          |  val i: Int? = 3
+          |  val a: Int? = (i as Int?)
+          |  val b: Int = (i as Int)
+          |  val c: Object = (i as Object)
+          |  val d = (c as Int?)
+          |  return (a as Int) + b + (d as Int)
+          |}
+          |""".stripMargin, "NullablePrimitiveSelfCast.on", Array())
+      assert(Shell.Success(9) == r)
+    }
+  }
+
   describe("a cast from a box supertype or a numeric box to a primitive (#2551)") {
     it("narrows a nullable supertype of the box, then unboxes") {
       val r = shell.run(
@@ -160,6 +183,97 @@ class NullableCastSpec extends AbstractShellSpec {
           |}
           |""".stripMargin, "PrimToAppliedBoxView.on", Array())
       assert(Shell.Success(1301) == r)
+    }
+  }
+
+  describe("assigning a primitive to an applied supertype of its box (#2594)") {
+    it("rejects a type argument the box can never have") {
+      for (src <- Seq(
+        "val y: Comparable[String] = 5",
+        "val y: Comparable[JInteger] = 5L",
+        "val y: Comparable[String] = true"
+      )) {
+        val msgs = compileErrors(s"def main(args: String[]): void {\n  $src\n}\n")
+        assert(msgs.contains("E0000") || msgs.contains("E0001"), s"expected an error for <$src>, got: $msgs")
+      }
+    }
+    it("still boxes to the box's own applied view and to plain supertypes") {
+      val r = shell.run(
+        """def main(args: String[]): Int {
+          |  val c: Comparable[JInteger] = 5
+          |  val n: Number = 3
+          |  val o: Object = 2
+          |  return c.compareTo(4) + n.intValue() * 100 + (if o.hashCode() == 2 { 1000 } else { 0 })
+          |}
+          |""".stripMargin, "AssignToAppliedBoxView.on", Array())
+      assert(Shell.Success(1301) == r)
+    }
+    it("accepts the box's own view with a nullable type argument") {
+      val r = shell.run(
+        """import { java.util.*; java.lang.Integer as JInteger }
+          |def f(c: Comparable[JInteger?]): Int = c.compareTo(1)
+          |def main(args: String[]): Int {
+          |  val xs: List[Comparable[JInteger?]] = new ArrayList[Comparable[JInteger?]]()
+          |  xs.add(5)
+          |  val v: Comparable[JInteger?] = 7
+          |  val w = 8 as Comparable[JInteger?]
+          |  return f(5) + xs.size() * 10 + v.compareTo(7) * 100 + w.compareTo(1) * 1000
+          |}
+          |""".stripMargin, "AssignToNullableArgBoxView.on", Array())
+      assert(Shell.Success(1011) == r)
+    }
+    it("binds an unpinned T from the box's own view of a primitive argument") {
+      val r = shell.run(
+        """def id[T](c: Comparable[T]): Comparable[T] = c
+          |def f[T](c: Comparable[T]): Int = 1
+          |def main(args: String[]): Int {
+          |  val r = id(5)
+          |  val l = id(9L)
+          |  return r.compareTo(5) + l.compareTo(9L) + f(5) * 10 + id(3).compareTo(1) * 100
+          |}
+          |""".stripMargin, "BindTFromBoxView.on", Array())
+      assert(Shell.Success(110) == r)
+    }
+    it("keeps T from the arguments when its return already fits a wider expected type") {
+      val r = shell.run(
+        """def first[T](c: Comparable[T]): T = c as T
+          |def firstOrNull[T](c: Comparable[T]): T? = c as T
+          |def id[T](x: T): T = x
+          |def main(args: String[]): Int {
+          |  val n: Number = first(5)
+          |  val m: Number? = firstOrNull(6)
+          |  val k: Number = id(7)
+          |  val o: Object = first(8)
+          |  return n.intValue() + (m?.intValue() ?: 0) * 10 + k.intValue() * 100 + (if o.hashCode() == 8 { 1000 } else { 0 })
+          |}
+          |""".stripMargin, "KeepArgTUnderWiderExpected.on", Array())
+      assert(Shell.Success(1765) == r)
+    }
+    it("still rejects a use at a type argument the box does not have") {
+      val msgs = compileErrors(
+        "def id[T](c: Comparable[T]): Comparable[T] = c\ndef main(args: String[]): void {\n  val s: Comparable[String] = id(5)\n}\n")
+      assert(msgs.contains("E0000") || msgs.contains("E0005"), s"expected an error, got: $msgs")
+    }
+    it("does not let T from a primitive argument reach an applied type its box lacks") {
+      for (src <- Seq(
+        "def id[T](x: T): T = x\ndef main(args: String[]): void {\n  val c: Comparable[String] = id(5)\n}\n",
+        "def id[T](x: T): T = x\ndef main(args: String[]): void {\n  val c: Comparable[String]? = id(5)\n}\n",
+        "def first[T](c: Comparable[T]): T = c as T\ndef main(args: String[]): void {\n  val c: Comparable[String] = first(5)\n}\n"
+      )) {
+        val msgs = compileErrors(src)
+        assert(msgs.contains("E0000") || msgs.contains("E0005"), s"expected an error for <$src>, got: $msgs")
+      }
+    }
+    it("still lets T from a primitive argument reach the box's own applied view") {
+      val r = shell.run(
+        """import { java.lang.Integer as JInteger }
+          |def id[T](x: T): T = x
+          |def main(args: String[]): Int {
+          |  val c: Comparable[JInteger] = id(5)
+          |  return c.compareTo(4)
+          |}
+          |""".stripMargin, "ArgTToOwnBoxView.on", Array())
+      assert(Shell.Success(1) == r)
     }
   }
 }

@@ -1,6 +1,6 @@
 package onion.compiler.verification
 
-import onion.compiler.{AST, CompileError, CompiledClass, CompilerConfig, ContractMode, Modifier, OnionClassLoader, SemanticError}
+import onion.compiler.{AST, CompileError, CompileWarning, CompiledClass, CompilerConfig, ContractMode, Modifier, OnionClassLoader, SemanticError, WarningCategory, WarningLevel}
 import onion.compiler.exceptions.CompilationException
 import onion.compiler.pipeline.{CompilerPhase, PhaseContext}
 import onion.compiler.toolbox.Message
@@ -19,11 +19,14 @@ import scala.collection.mutable.ArrayBuffer
  *
  * A predicate that returns `false` is `E0113`; one that throws is also `E0113`, naming the
  * exception. Only with `--contracts check`. The predicate runs once, in a class loader of its own.
+ * One whose effects reach the outside world, or that does not finish in time, is not run and
+ * gets W0023 instead (#2601, [[BuildRun]]).
  */
 final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[Seq[CompiledClass], Seq[CompiledClass]] {
   def name: String = "ClosedPredicate"
 
-  private final case class Candidate(owner: Option[String], name: String, arity: Int, sourceFile: String, location: onion.compiler.Location)
+  /** `owner` is the class to look in; for a top-level function (`topLevel`) it is the unit's own top-level class. */
+  private final case class Candidate(owner: Option[String], name: String, arity: Int, sourceFile: String, location: onion.compiler.Location, topLevel: Boolean = false)
 
   def run(classes: Seq[CompiledClass], ctx: PhaseContext): Seq[CompiledClass] = {
     if (config.contracts != ContractMode.Check || !config.runContracts) return classes
@@ -36,19 +39,38 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
     val previous = thread.getContextClassLoader
     thread.setContextClassLoader(loader)
     val errors = ArrayBuffer.empty[CompileError]
+    val warnings = ArrayBuffer.empty[CompileWarning]
+    val build = new BuildRun(config, ctx.debugArtifacts.typedClasses.getOrElse(Nil))
+    def notRun(c: Candidate, message: String): Unit =
+      warnings += CompileWarning(c.sourceFile, c.location, WarningCategory.PredicateNotRun, message)
     try {
       for (c <- candidates) {
-        val outcome = runOne(c, classes, loader)
-        outcome.foreach { why =>
-          errors += CompileError(c.sourceFile, c.location,
-            Message("error.semantic.closedPredicateFalse", Array[Any](c.name, why)),
-            Some(SemanticError.CLOSED_PREDICATE_FALSE.errorCode))
+        // The build runs only what cannot reach the outside world (#2601); the rest is said, not run.
+        val (effects, from) = build.source(c.owner, c.name, c.arity, static = true)
+        val (sampled, sampledFrom) = build.sampleEffects(c.owner, c.name, c.arity, static = true)
+        if (effects.nonEmpty) notRun(c, BuildRun.notRunMessage(c.name, effects, from))
+        else if (sampled.nonEmpty) notRun(c, BuildRun.notSampledMessage(c.name, sampled, sampledFrom.getOrElse("?")))
+        else build.timed(loader)(runOne(c, classes, loader)) match {
+          case None =>
+            notRun(c, Message("warning.predicateNotRun.timeout", c.name, config.contractTimeoutMillis.toString))
+          case Some(Left(e)) =>
+            errors += falseOrThrew(c, s"threw ${e.getClass.getSimpleName}: ${e.getMessage}")
+          case Some(Right(outcome)) =>
+            outcome.foreach(why => errors += falseOrThrew(c, why))
         }
       }
     } finally thread.setContextClassLoader(previous)
+    if (config.warningLevel != WarningLevel.Off)
+      ctx.addWarnings(warnings.toSeq.filterNot(w => config.suppressedWarnings.contains(w.category)))
     if (errors.nonEmpty) throw new CompilationException(errors.toSeq)
     classes
   }
+
+  private def falseOrThrew(c: Candidate, why: String): CompileError =
+    CompileError(c.sourceFile, c.location,
+      Message(if (c.arity == 0) "error.semantic.closedPredicateFalse" else "error.semantic.sampledPredicateFalse",
+        Array[Any](c.name, why)),
+      Some(SemanticError.CLOSED_PREDICATE_FALSE.errorCode))
 
   /** Only `ensures result` itself marks a predicate. `ensures result == (x > 0)` describes a function and is left alone. */
   private def assertsResult(clauses: List[AST.Expression]): Boolean =
@@ -59,7 +81,7 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
   private def candidatesOf(unit: AST.CompilationUnit): Seq[Candidate] =
     unit.toplevels.flatMap {
       case f: AST.FunctionDeclaration if isBoolean(f.returnType) && assertsResult(f.ensures) =>
-        Seq(Candidate(None, f.name, f.args.size, unit.sourceFile, f.location))
+        Seq(Candidate(Some(topClassOf(unit)), f.name, f.args.size, unit.sourceFile, f.location, topLevel = true))
       case c: AST.ClassDeclaration =>
         (c.defaultSection.toSeq ++ c.sections).flatMap(_.members).collect {
           case m: AST.MethodDeclaration if qualifies(m) => Candidate(Some(c.name), m.name, m.args.size, unit.sourceFile, m.location)
@@ -71,12 +93,19 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
       case _ => Nil
     }
 
+  /** The class the compiler gives a unit's top-level code (`<file>Main`, inside the unit's module). */
+  private def topClassOf(unit: AST.CompilationUnit): String = {
+    val simple = onion.compiler.toolbox.Paths.cutExtension(unit.sourceFile) + "Main"
+    if (unit.module != null) unit.module.name + "." + simple else simple
+  }
+
   private def qualifies(m: AST.MethodDeclaration): Boolean =
     Modifier.isStatic(m.modifiers) && isBoolean(m.returnType) && assertsResult(m.ensures)
 
   /** `None` when the predicate holds (or cannot be found); the reason when it is false or throws. */
   private def runOne(c: Candidate, classes: Seq[CompiledClass], loader: ClassLoader): Option[String] = {
     val owners = c.owner match {
+      case Some(o) if c.topLevel => classes.filter(_.className == o)
       case Some(o) => classes.filter(cc => cc.className == o || cc.className.endsWith("." + o))
       case None    => classes
     }
@@ -92,22 +121,24 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
       val perParam = types.map(t => ArgGenerator.generateValues(t, loader, config.contractSamples, config.contractSeed).orNull)
       val bad = perParam.indexWhere(_ == null)
       // A parameter that cannot be sampled must not pass silently: that would look like a predicate that held.
-      if (bad >= 0) Some(s"not checkable: it cannot sample a parameter of type ${types(bad).getSimpleName}")
+      if (bad >= 0) Some(Message("error.semantic.predicateReason.unsampleable", types(bad).getSimpleName))
       else combos(perParam).iterator.map(args => call(m, args)).collectFirst { case Some(why) => why }
     }
   }
 
   /** `None` when the call returns true; otherwise why not, with the arguments and how to reproduce them. */
   private def call(m: Method, args: Array[AnyRef]): Option[String] = {
-    val shown = if (args.isEmpty) "" else args.map(String.valueOf).mkString(" for (", ", ", ")") +
-      s" [--contract-seed ${config.contractSeed} --contract-samples ${config.contractSamples}]"
+    val shown = if (args.isEmpty) ""
+      else Message("error.semantic.predicateReason.at",
+        Array[Any](args.map(String.valueOf).mkString(", "), config.contractSeed.toString, config.contractSamples.toString))
     try {
-      if (m.invoke(null, args*).asInstanceOf[java.lang.Boolean]) None else Some("false" + shown)
+      if (m.invoke(null, args*).asInstanceOf[java.lang.Boolean]) None else Some(Message("error.semantic.predicateReason.false", shown))
     } catch {
       case e: java.lang.reflect.InvocationTargetException =>
         val cause = Option(e.getCause).getOrElse(e)
-        Some(s"threw ${cause.getClass.getSimpleName}: ${cause.getMessage}$shown")
-      case e: Throwable => Some(s"threw ${e.getClass.getSimpleName}$shown")
+        Some(Message("error.semantic.predicateReason.threw",
+          Array[Any](cause.getClass.getSimpleName, String.valueOf(cause.getMessage), shown)))
+      case e: Throwable => Some(Message("error.semantic.predicateReason.threwBare", e.getClass.getSimpleName, shown))
     }
   }
 

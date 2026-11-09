@@ -16,13 +16,46 @@ import java.io.StringReader
  */
 class IneffectiveTailRecursiveWarningSpec extends AnyFunSpec {
 
-  private def compileWarnings(source: String, level: WarningLevel = WarningLevel.On) = {
-    val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = level)
+  private def compileWarnings(
+    source: String,
+    level: WarningLevel = WarningLevel.On,
+    suppressed: Set[onion.compiler.WarningCategory] = Set.empty
+  ) = {
+    val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = level, suppressedWarnings = suppressed)
     new OnionCompiler(config)
       .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "W.on")))
   }
 
   describe("W0016 ineffective @TailRecursive") {
+    val publicGroup =
+      """
+        |class Parity {
+        |public:
+        |  @TailRecursive
+        |  def isEven(n: Int): Boolean {
+        |    if n == 0 { return true }
+        |    return isOdd(n - 1)
+        |  }
+        |  @TailRecursive
+        |  def isOdd(n: Int): Boolean {
+        |    if n == 0 { return false }
+        |    return isEven(n - 1)
+        |  }
+        |}
+        |""".stripMargin
+
+    it("is silenced by --Wno W0016 (#2654)") {
+      val result = compileWarnings(publicGroup, suppressed = Set(onion.compiler.WarningCategory.IneffectiveTailRecursive))
+      assert(!result.hasErrors)
+      assert(!result.diagnostics.warnings.exists(_.category.code == "W0016"))
+    }
+
+    it("is silenced by --warn off (#2654)") {
+      val result = compileWarnings(publicGroup, level = WarningLevel.Off)
+      assert(!result.hasErrors)
+      assert(!result.diagnostics.warnings.exists(_.category.code == "W0016"))
+    }
+
     it("warns when the annotated group is not private") {
       val result = compileWarnings(
         """

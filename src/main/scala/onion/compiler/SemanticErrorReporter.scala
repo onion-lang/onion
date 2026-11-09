@@ -1004,6 +1004,12 @@ class SemanticErrorReporter(threshold: Int) {
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordComponentClash] =>
         reportRecordComponentClash(position, items)
+      case SemanticError.DUPLICATE_GENERATED_METHOD
+          if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.GeneratedMethodClashesComponent] =>
+        val clash = items(3).asInstanceOf[SemanticErrorReporter.GeneratedMethodClashesComponent]
+        problem(position, format(
+          message("error.semantic.generatedMethodClashesComponent"),
+          Seq(typeName(items(0)), asString(items(1)), typeName(clash.componentType))))
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordAccessorRedefined] =>
         reportRecordAccessorRedefined(position, items)
@@ -1038,7 +1044,8 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportRecordComponentClash(position: Location, items: Array[AnyRef]): Unit = {
     val clash = items(3).asInstanceOf[SemanticErrorReporter.RecordComponentClash]
     val key =
-      if (clash.overridesFinal) "error.semantic.recordComponentOverridesFinalMethod"
+      if (clash.otherReturnType) "error.semantic.recordComponentOtherReturnType"
+      else if (clash.overridesFinal) "error.semantic.recordComponentOverridesFinalMethod"
       else "error.semantic.recordComponentClashesGeneratedMethod"
     problem(position, format(
       message(key),
@@ -1161,11 +1168,16 @@ object SemanticErrorReporter {
    *  accessor colliding with a method the record generates, so the error says so (#2391).
    *  `overridesFinal`: the accessor would instead override a final `Object` method, which no
    *  record generates (`getClass: Class`, #2512), so the error names that method. */
-  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type, overridesFinal: Boolean = false)
+  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type, overridesFinal: Boolean = false, otherReturnType: Boolean = false)
 
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record body method
    *  `a()` that redefines component `a`'s generated accessor, so the error says so (#2396). */
   private[compiler] final case class RecordAccessorRedefined(componentType: TypedAST.Type)
+
+  /** An extra (fourth) item on DUPLICATE_GENERATED_METHOD: a clause (`shape x = ...`,
+   *  `derive!`) generates a no-argument method named like component `x`, whose accessor
+   *  `x()` already exists (#2531). */
+  private[compiler] final case class GeneratedMethodClashesComponent(componentType: TypedAST.Type)
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.
@@ -1634,6 +1646,10 @@ object SemanticErrorReporter {
     SemanticError.STATIC_METHOD_WITHOUT_BODY -> ErrorDef(
       "error.semantic.staticMethodWithoutBody",
       Seq(items => asString(items(0)))
+    ),
+    SemanticError.SUPER_CALL_ABSTRACT_METHOD -> ErrorDef(
+      "error.semantic.superCallAbstractMethod",
+      Seq(items => asString(items(0)), items => typeName(items(1)))
     ),
     SemanticError.PRIVATE_ABSTRACT_METHOD -> ErrorDef(
       "error.semantic.privateAbstractMethod",

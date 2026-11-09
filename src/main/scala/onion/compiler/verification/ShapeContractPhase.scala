@@ -99,10 +99,16 @@ final class ShapeContractPhase(config: CompilerConfig) extends CompilerPhase[Seq
     } catch { case _: Throwable => return Some(Left("it has no no-argument constructor")) }
     val values = ArgGenerator.generateValues(tpe, loader, config.contractSamples, config.contractSeed)
       .getOrElse { return Some(Left(s"values of type ${tpe.getSimpleName} cannot be sampled")) }
-    val canPrint = c.getMethod(entry.canPrint)
-    val print = c.getMethods.find(m => m.getName == entry.print && m.getParameterCount == 1 && !m.isBridge)
-    val printable = c.getMethods.find(m => m.getName == entry.printable && m.getParameterCount == 1 && !m.isBridge)
-    val parse = c.getMethods.find(m => m.getName == entry.parse && m.getParameterCount == 1 && !m.isBridge)
+    // The round-trip calls the interface's own methods, so the JVM dispatches each call to the
+    // instance method that implements it (or the library default). That is exactly what
+    // `shapeEffects` checks: a static method or an unrelated overload of the same name is never
+    // run (panel block at 9ba150d).
+    val iface = c.getInterfaces.find(_.getName == ShapeName).get
+    def own(name: String, params: Class[?]*) = try Some(iface.getMethod(name, params*)) catch { case _: NoSuchMethodException => None }
+    val canPrint = iface.getMethod(entry.canPrint)
+    val print = own(entry.print, classOf[Object])
+    val printable = own(entry.printable, classOf[Object])
+    val parse = own(entry.parse, classOf[String])
     (print, parse) match {
       case (Some(p), Some(r)) =>
         val canPrintNow: Boolean = try canPrint.invoke(shape).asInstanceOf[java.lang.Boolean].booleanValue catch { case _: Throwable => false }
@@ -130,11 +136,11 @@ final class ShapeContractPhase(config: CompilerConfig) extends CompilerPhase[Seq
       val cls = from.map(_.split('.').last).getOrElse(tpe.getSimpleName)
       return Some(Message("warning.shapeNotRun.sample", Array[Any](simple, BuildRun.render(sample), cls)))
     }
-    // Every overload counts (`parse` takes the text and an origin). A method declared on a library
-    // interface (`onion.Shape`'s own `printable`) is library code with no effect; a default from a
-    // program interface is the program's code and is checked like any other (panel block at e8fef6a).
+    // Every instance overload counts (`parse` takes the text and an origin); a static method is
+    // never run, so it does not. A method declared on a library interface (`onion.Shape`'s own
+    // `printable`) is library code with no effect; a default from a program interface is the program's code and is checked like any other (panel block at e8fef6a).
     Seq(entry.canPrint, entry.printable, entry.print, entry.parse).iterator.flatMap { n =>
-      c.getMethods.iterator.filter(m => m.getName == n && !m.isBridge &&
+      c.getMethods.iterator.filter(m => m.getName == n && !m.isBridge && !Modifier.isStatic(m.getModifiers) &&
         (!m.getDeclaringClass.isInterface || build.isProgramClass(m.getDeclaringClass.getName)))
         .map(m => n -> build.methodEffects(Some(m.getDeclaringClass.getName), n, m.getParameterCount, static = false))
     }.collectFirst { case (n, effects) if effects.nonEmpty => notRun(effects, s"`$n`") }

@@ -113,4 +113,39 @@ class ShapeBuildRunsOnlyPureSpec extends AnyFunSpec {
     if (java.util.Locale.getDefault.getLanguage == "ja") assert(msg.contains("`P` の外"), msg)
     else assert(msg.contains("out of `P`"), msg)
   }
+
+  private val withStaticParse =
+    """record P(n: Int)
+      |class Loud conforms Shape[P] {
+      |public:
+      |  def this {}
+      |  def parse(text: String, origin: Origin): Outcome[P] = Outcome::ok(new P(Integer::parseInt(text)))
+      |  def parse(n: Int): Outcome[P] = Outcome::ok(new P(n))
+      |  def canPrint(): Boolean = true
+      |  def print(v: P): String = "" + v.n()
+      |  static def parse(text: String): Outcome[P] {
+      |    IO::println("LEAK-static")
+      |    return Outcome::ok(new P(Integer::parseInt(text)))
+      |  }
+      |  def describe(): String = "loud"
+      |}
+      |IO::println("hi")
+      |""".stripMargin
+
+  it("never runs a static method that shares a Shape method's name (panel block at 9ba150d)") {
+    val (out, errs, _) = build(withStaticParse)
+    assert(!out.contains("LEAK"), out)
+    assert(!errs.contains("E0114"), errs)
+  }
+
+  it("checks a correct shape with an extra one-argument parse overload without a false E0114") {
+    val src = withStaticParse.linesIterator.filterNot(l =>
+      l.contains("static def parse") || l.contains("LEAK-static") || l.contains("return Outcome::ok(new P(Integer::parseInt(text)))") ||
+        l == "  }").mkString("\n")
+    assert(!src.contains("static") && src.contains("def parse(n: Int)"), src)
+    val (_, errs, warns) = build(src)
+    assert(!errs.contains("E0114"), errs)
+    assert(!warns.contains("W0023"), warns)
+    assert(!warns.contains("W0022"), warns)
+  }
 }

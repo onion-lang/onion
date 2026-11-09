@@ -56,8 +56,24 @@ private[compiler] final class MethodInvocationBuilderSupport(
   private def instanceClassName(traitClass: ClassType, concrete: Type): String =
     simpleName(traitClass.name) + "$$" + boxedSimpleName(concrete.name)
 
+  private def packageOf(n: String): String = { val i = n.lastIndexOf('.'); if (i >= 0) n.substring(0, i) else null }
+
+  /** The instance class for `Trait[Concrete]`. An `instance` lowers to a class in its own
+    * unit's package, so look in the caller's package first, then beside the trait, then
+    * beside the type argument. A candidate counts only if it really implements this trait:
+    * another trait that merely shares the simple name must not capture the slot (#2769). */
+  private def findInstanceClass(traitClass: ClassType, concrete: Type): Option[ClassType] = {
+    val mangled = instanceClassName(traitClass, concrete)
+    val module = typing.unit_.module
+    val packages = List(if (module != null) module.name else null, packageOf(traitClass.name), packageOf(concrete.name)).distinct
+    val traitRaw = traitClass match { case a: AppliedClassType => a.raw; case c => c }
+    packages.iterator
+      .flatMap(p => typing.load(typing.createFQCN(p, mangled)))
+      .find(c => TypeRules.isSuperType(traitRaw, c))
+  }
+
   private def dictionaryInstanceTerm(node: AST.Node, traitClass: ClassType, concrete: Type): Option[Term] =
-    typing.load(instanceClassName(traitClass, concrete)).flatMap { instanceClass =>
+    findInstanceClass(traitClass, concrete).flatMap { instanceClass =>
       val ctors = instanceClass.findConstructor(Array[Term]())
       if (ctors.isEmpty) None else Some(new NewObject(node.location, ctors(0), Array[Term]()))
     }

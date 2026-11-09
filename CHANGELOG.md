@@ -7,6 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.153.0] - 2026-11-09
+
+### Breaking
+
+- **A record method `def toString(): String?` is E0000, as in a class (#2713).**
+  - Before: it compiled, and a `null` result reached `println`.
+  - Now: return a `String`, e.g. `name ?: ""`. See `docs/migration/pre-1.0.md`.
+- **A default on an abstract or interface method is now type-checked (#2638).**
+  - Before: `abstract def f(n: Int = "x"): Int` or `def g(n: Int = undefinedThing): Int` in an interface compiled, because the default was never used.
+  - Now: E0000 or E0002 at the default. Fix the default. See `docs/migration/pre-1.0.md`.
+- **A `tool`'s `requires` is checked against more of what its body runs.** The error names the capability to add or remove.
+  - `E0077`: a call that can dispatch to a program override, a static initializer the tool's code triggers, and a try-with-resources `close()` now count.
+  - `E0078`: `new Box[String]()` of a program class is no longer an unlisted call, so an `unknown` kept only for it is now unused.
+- **`onionc --effects` rows include the same new sources.** A method that triggers another class's printing static initializer, or calls a record whose component's `toString` prints, now shows `console` instead of `pure`.
+- **A record component named `hashCode`, `toString` or `getClass` is E0010, whatever its type.**
+  - Before: `record R(hashCode: Long)` compiled, and `r.hashCode()` and `(r as Object).hashCode()` gave different answers.
+  - Now: rename the component. See `docs/migration/pre-1.0.md`.
+
+### Fixed
+
+- **`x is JLong` and `case s is String:` on a primitive value no longer crash with `VerifyError`.**
+  - Before: the program compiled, then the JVM rejected the class.
+  - Now: the value is boxed first, so `5L is JLong` is `true` and `5 is String` is `false`.
+  - The same holds nested in a record pattern: `case Wrap(n is Object):` on a `Wrap(v: Int)`.
+- **`case n is Long:` works in `select`, like `o is Long` (#2721).**
+  - Before: E0000 "type Object is expected, but type Long is used".
+  - Now: it matches a boxed `Long` and binds `n` as a `Long`. Same for `Int`, `Double` and the other primitive names.
+- **A record method named `toString`, `hashCode` or `equals` with other parameters no longer removes the generated one.**
+  - Before: `def toString(n: Int): Int` made `println(r)` print `R@80`.
+  - Now: only a method with the `Object` signature replaces it (`equals(o: Object?)`, and `equals(o: T)` with a type parameter `T`, count); an overload leaves it in place.
+  - `copy` is unchanged: any body method named `copy` still replaces the generated one.
+- **A record method like `def toString(): Int` is E0104 (#2713).**
+  - Before: it compiled, and the generated `toString()` was lost (`println(r)` printed `R@80`). `hashCode(): Long` gave two answers.
+  - Now: E0104 at the method, the same error a class gets.
+- **A record `copy` argument of the wrong type is a compile error (#2705).**
+  - Before: `n.copy(b = "s")` on `b: Long?` compiled, then threw `ClassCastException` when it ran.
+  - Now: a type-mismatch error (E0000) at the argument. `copy(z = 1)` with no component `z` reports one error, not two. A record that declares its own `copy` overloads still calls the one that fits.
+- **An `Int` for a `Long` or `Long?` parameter works in `extends P(5)`, `this(5)`, `copy(b = 9)` and with a lambda argument (#2701, #2704).**
+  - Before: `VerifyError` or `ClassCastException` at run time.
+  - Now: the `Int` is widened to `Long` (or `Double`), as in `new P(5)`.
+- **The `val` hint in a `do` block no longer copies a trailing comment into its fix.**
+  - Before: `val y = x + 1 // add one` hinted `Option::some(x + 1 // add one)`, which does not compile.
+  - Now: the hint is `y <- Option::some(x + 1)`.
+- **`class C extends A` with no constructor is a compile error when `A` has no no-arg constructor (#2664).**
+  - Before: it compiled, then `new C()` threw `NoSuchMethodError`. This happened when every parameter of `A`'s only constructor had a default.
+  - Now: E0021 at the class (E0013 if `A()` is private), as an explicit `def this { }` already reports. To pass arguments, write `extends A(...)`.
+- **`class C extends A(1)` with a private `A` constructor is a compile error (#2662).**
+  - Before: it compiled, then crashed with `IllegalAccessError`.
+  - Now: `E0013`, as for `new A(1)`, with the hint to put the constructor under `protected:` or `public:`.
+- **An override with no contract of its own is checked against the `ensures` it inherits.**
+  - Before: `override def f(k: Int): Int { return 0 - 1 }` under a base `ensures result >= 0` built with no word.
+  - Now: W0025 names the counterexample. The `--contracts runtime` guard for such an override is still open (#2639).
+- **A default on an abstract or interface method can be omitted at the call (#2638).**
+  - Before: `abstract def f(n: Int = 5): Int` compiled, then `a.f()` was E0005.
+  - Now: when `a` is typed as the declaring class or interface, `a.f()` calls the implementation with `5`.
+- **`--contracts runtime` catches a `history` broken by a setter whose parameter has the field's name (#2633).**
+  - Before: `history n >= old(n)` with `def set(n: Int) { this.n = n }` read the parameter, so `set(3)` passed.
+  - Now: the guard reads the field, and `set(3)` throws `ContractViolation`.
+- **`new IllegalArgumentException("x")` is pure in a `tool` and in contract predicates (#2611).**
+  - Before: effect `unknown`, so a `tool` that throws it needed `unknown`, and a predicate that reached it was not run (W0023).
+  - Now: the common `java.lang` exceptions are pure, like `RuntimeException`.
+- **`requires x > 0` inside a method body now says where the clause goes (#2605).**
+  - Before: the hint said to write `requires(...)` as a call, which sends you the wrong way.
+  - Now: the hint says `requires`/`ensures` follow the signature, before the body: `def half(x: Int): Int requires x > 0 { ... }`.
+- **Compiling no longer runs a contract predicate that prints, does I/O or never ends (#2601).**
+  - Before: `ensures result` predicates and `E0112` replays ran whatever they called, including overrides the library calls back (`toString`, `fillInStackTrace`). `onionc` printed, exited, or hung.
+  - Now: only a predicate whose effects are at most `mutate` runs. Others, and any run past 10 seconds, get the new warning `W0023`, which names the call, static initializer or parameter class that has the effect. Making a sample argument of a program class (`Foo` or `Foo?`) counts too, and so does a record's generated `toString`/`hashCode`/`equals`, which calls its components' overrides.
+  - An `E0112` replay that is not run, or not waited for, gives `W0023` beside its `W0021`.
+  - A `--warn error` build fails on a new `W0023`. Fix: move the effect out of the predicate, or pass `--Wno W0023`.
+- **`val y: Comparable[String] = 5` is a compile error, not a runtime `ClassCastException`.**
+  - Before: it compiled, then threw when `y` was used. `Comparable[Object]` slots and a `T` inferred as `Object` (`g(o, 5)` with `def g[T](b: T, a: Comparable[T])`) were accepted the same way; Java rejects them too.
+  - Now: the type argument is checked against the box's own (`Comparable[JInteger]`), as `5 as Comparable[String]` already was. With overloads `f(Comparable[String])` and `f(Object)`, `f(5)` now picks `f(Object)`.
+- **`val n: Number = id(5)` compiles, as in Java.**
+  - Before: E0000 when a generic call's expected type (`Number`) was wider than the `T` its arguments give (`Integer`).
+  - Now: the arguments decide `T`, and the result is checked against the expected type.
+- **`ns[0]++` and `counts[k]--` work on a `List` or `Map` element (#2587).**
+  - Before: E0001 "operator ++ is not applicable for type Int", though `ns[0] += 1` worked.
+  - Now: `ns[0]++` means `ns[0] += 1`, and its value is the old element, as for an array.
+- **`(i as Long?)` on an `Int?` is a compile error, not a crash at run time.**
+  - Before: it compiled, then always threw `ClassCastException`.
+  - Now: E0000 at the cast, as Java rejects `(Long) anInteger`. `Int? as Int` and `Int? as Object` still work.
+- **A `shape` named like a record component is rejected at the `shape` clause (#2531).**
+  - Before: `record Pt(x: Int) { shape x = re"..." }` compiled, then `Pt::x()` was E0005 listing `x(), x()`.
+  - Now: one E0026 at the clause names the clash and says to rename one; the call site reports nothing more.
+- **`Collections::copy(x, o)` with `x: List[T]` and `o: List[Object]` no longer compiles inside `G[T]` (#2431).**
+  - Before: it compiled, then `x[0]` threw `ClassCastException`.
+  - Now: E0005 at the call, with its `available:` line; a fitting overload beside it is chosen instead, as in Java.
+
+### Documentation
+
+- **The guide's longer do-block example compiles (#2668).**
+  - Before: it used a `val` and a bare `println`, both rejected inside a do block.
+  - Now: it binds the intermediate value and prints in the `yield` block; the Japanese guide has the same section.
+
 ## [0.152.0] - 2026-11-08
 
 ### Fixed

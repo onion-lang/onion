@@ -229,8 +229,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       recordComponents = node.args.flatMap(arg => Option(clazz.field(arg.name)).map(f => arg.name -> f.`type`)).toMap
       try for (section <- node.sections) processAccessSection(section)
       finally recordComponents = Map.empty
-      val componentTypes = node.args.flatMap(arg => Option(clazz.field(arg.name)).map(f => arg.name -> f.`type`)).toMap
-      node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration(_, componentTypes))
+      node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
       DuplicationChecks.checkOverrideContracts(
         typing, clazz, node.location, skipObject = true, memberLocations = node.args.map(a => a.name -> a.location).toMap)
       DuplicationChecks.checkRecordFinalObjectOverrides(typing, clazz, node.args.map(_.name).toSet, node.location)
@@ -289,16 +288,9 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private def erasedDescriptor(field: FieldRef): String =
     onion.compiler.generics.Erasure.asmType(field.`type`).getDescriptor
 
-  private def processSynthesizedMethodDeclaration(
-      node: AST.MethodDeclaration, componentTypes: Map[String, Type] = Map.empty): Unit =
+  private def processSynthesizedMethodDeclaration(node: AST.MethodDeclaration): Unit =
     withKernel[MethodDefinition](node) { method =>
-      // A generated method with no arguments named like a component (`shape x = ...` next to
-      // component `x`) would sit beside that component's accessor `x()` (#2531).
-      val clashing = if (method.arguments.isEmpty) componentTypes.get(method.name) else None
-      if (clashing.isDefined)
-        typing.report(SemanticError.DUPLICATE_GENERATED_METHOD, node, method.affiliation, method.name, method.arguments,
-          SemanticErrorReporter.GeneratedMethodClashesComponent(clashing.get))
-      else if (seenMethods.contains(method))
+      if (seenMethods.contains(method))
         typing.report(SemanticError.DUPLICATE_GENERATED_METHOD, node, method.affiliation, generatedMethodLabel(method.name), method.arguments)
       else seenMethods.add(method)
     }

@@ -26,6 +26,39 @@ class ShapeNamedLikeComponentSpec extends AbstractShellSpec {
       assert(results.exists(_._2.contains("x")))
     }
 
+    it("reports only E0026 at the clause when the program also calls it (panel repro)") {
+      val results = errors(
+        """
+          |record Pt(x: Int, y: Int) {
+          |  shape x = re"(\d+),(\d+)"
+          |}
+          |println(Pt::x().parse("1,2"))
+          |""".stripMargin)
+      assert(results.map(_._1) == Seq(Some("E0026")))
+    }
+
+    it("reports only E0026 for a json shape named like a component") {
+      val results = errors(
+        """
+          |record Pt(x: Int, y: Int) {
+          |  shape y = json
+          |}
+          |println(new Pt(1, 2).y())
+          |""".stripMargin)
+      assert(results.map(_._1) == Seq(Some("E0026")))
+    }
+
+    it("reports the clash once for two clauses of the same name") {
+      val results = errors(
+        """
+          |record Pt(x: Int, y: Int) {
+          |  shape x = re"(\d+),(\d+)"
+          |  shape x = json
+          |}
+          |""".stripMargin)
+      assert(results.map(_._1) == Seq(Some("E0026")))
+    }
+
     it("still accepts a shape with another name") {
       assert(errors(
         """

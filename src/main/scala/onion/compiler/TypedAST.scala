@@ -403,6 +403,10 @@ object TypedAST {
 
     /** Names of the primary constructor's parameters (set by the body pass), for the E0002 hint. */
     var primaryParameterNames: scala.collection.immutable.Set[String] = scala.collection.immutable.Set.empty
+    /** Generated no-argument methods left out because they clash with a component's accessor
+     *  (`shape x = ...` next to component `x`, #2531). E0026 is reported at the clause, so a
+     *  call `R::x()` reports nothing more. Set by the outline pass. */
+    var clashedGeneratedMethodNames: scala.collection.immutable.Set[String] = scala.collection.immutable.Set.empty
     /**
      * The typed `invariant` and `history` clauses of the body (RFC #2557), in source order.
      * Empty unless `--contracts` is on. In a `history`, `old(e)` is typed as `e` itself:

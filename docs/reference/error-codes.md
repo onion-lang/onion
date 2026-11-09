@@ -1402,6 +1402,21 @@ public:
 Fix: rename the method or the component. A method `a(x: Int)` with parameters is a
 genuine overload and compiles.
 
+Every record also generates public instance methods `equals(Object)`, `hashCode()` and
+`toString()`. A body method with one of those signatures replaces the generated one only
+when it is a public or protected instance method. A `static` one, or a private one, is
+E0010, because `==` and string conversion could not call it:
+
+```onion
+record R(name: String) {
+public:
+  static def toString(): String = "s"   // E0010: clashes with the generated toString()
+}
+```
+
+Fix: remove `static` (or move the method under `public:`) to replace the generated
+method, or rename it.
+
 ### `E0025` — Duplicate constructor
 
 Two constructors on the same class have identical parameter types, so

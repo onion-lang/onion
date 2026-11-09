@@ -1013,6 +1013,13 @@ class SemanticErrorReporter(threshold: Int) {
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordAccessorRedefined] =>
         reportRecordAccessorRedefined(position, items)
+      case SemanticError.DUPLICATE_METHOD
+          if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordObjectMethodClash] =>
+        val clash = items(3).asInstanceOf[SemanticErrorReporter.RecordObjectMethodClash]
+        val args = typeNames(asTypeArray(items(2)))
+        problem(position, format(
+          message(if (clash.isStatic) "error.semantic.recordObjectMethodStatic" else "error.semantic.recordObjectMethodPrivate"),
+          Seq(typeName(items(0)), asString(items(1)), args)))
       // E0110's second form (design 3.2, rule 2; #2599): a contract field written through another object.
       case SemanticError.CONTRACT_FIELD_NOT_VALUE if items.length > 2 && items(2) == "write" =>
         problem(position, format(message("error.semantic.contractFieldWrittenOutside"), Seq(asString(items(0)), asString(items(1)))))
@@ -1173,6 +1180,11 @@ object SemanticErrorReporter {
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record body method
    *  `a()` that redefines component `a`'s generated accessor, so the error says so (#2396). */
   private[compiler] final case class RecordAccessorRedefined(componentType: TypedAST.Type)
+
+  /** An extra (fourth) item on DUPLICATE_METHOD: a `static` or private record body method with
+   *  the signature of the generated `equals(Object)`, `hashCode()` or `toString()`. It cannot
+   *  replace the public instance method `==` and string conversion call (#2746, #2754). */
+  private[compiler] final case class RecordObjectMethodClash(isStatic: Boolean)
 
   /** An extra (fourth) item on DUPLICATE_GENERATED_METHOD: a clause (`shape x = ...`,
    *  `derive!`) generates a no-argument method named like component `x`, whose accessor

@@ -67,12 +67,29 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   // zero-argument accessor, so a body method of that name would be a duplicate (#2396).
   private var recordComponents = Map.empty[String, Type]
 
+  // True while the body of a record is checked: every record generates public instance
+  // `equals(Object)`, `hashCode()` and `toString()`, and only a public or protected instance
+  // method of that signature replaces one (TypingOutlinePass, #2746, #2754).
+  private var inRecordBody = false
+
+  private def clashesWithGeneratedObjectMethod(method: MethodDefinition): Boolean =
+    inRecordBody && (Modifier.isStatic(method.modifier) || Modifier.isPrivate(method.modifier)) && (method.name match {
+      case "equals" =>
+        method.arguments.length == 1 &&
+          onion.compiler.generics.Erasure.asmType(method.arguments(0)).getDescriptor == "Ljava/lang/Object;"
+      case "hashCode" | "toString" => method.arguments.isEmpty
+      case _ => false
+    })
+
   private def registerMethod(ast: AST.Node, method: MethodDefinition): Unit = {
     val redefinedAccessor = if (method.arguments.isEmpty) recordComponents.get(method.name) else None
     redefinedAccessor match {
       case Some(componentType) =>
         typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments,
           SemanticErrorReporter.RecordAccessorRedefined(componentType))
+      case None if clashesWithGeneratedObjectMethod(method) =>
+        typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments,
+          SemanticErrorReporter.RecordObjectMethodClash(Modifier.isStatic(method.modifier)))
       case None =>
         if (seenMethods.contains(method)) typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
         else seenMethods.add(method)
@@ -227,8 +244,9 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       resetForTypeDeclaration(clazz)
       checkDuplicateRecordComponents(node, clazz)
       recordComponents = node.args.flatMap(arg => Option(clazz.field(arg.name)).map(f => arg.name -> f.`type`)).toMap
+      inRecordBody = true
       try for (section <- node.sections) processAccessSection(section)
-      finally recordComponents = Map.empty
+      finally { recordComponents = Map.empty; inRecordBody = false }
       node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
       DuplicationChecks.checkOverrideContracts(
         typing, clazz, node.location, skipObject = true, memberLocations = node.args.map(a => a.name -> a.location).toMap)

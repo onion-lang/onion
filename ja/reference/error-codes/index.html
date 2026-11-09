@@ -8436,6 +8436,17 @@ history を壊します。</p>
 </span><span id="__span-75-3"><a id="__codelineno-75-3" name="__codelineno-75-3" href="#__codelineno-75-3"></a><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">3</span><span class="w">   </span><span class="c1">// E0113: ビルドで実行すると偽です</span>
 </span></code></pre></div>
 <p>直し方: 式か、検査しているコードを直します。</p>
+<p>ビルドが実行するのは、効果が <code>mutate</code> までの述語だけです。出力する述語、ファイルを読み書きする述語、効果表が保証できないもの（<code>unknown</code>）を呼ぶ述語は実行されません。代わりに警告 <code>W0023</code> が出ます。10 秒以内に終わらない述語も同じです。
+効果には、実行が届くものすべてを数えます。</p>
+<ul>
+<li>述語と同じ名前、同じ引数の数を持つすべてのオーバーロード</li>
+<li>プログラムが定義したオーバーライドやインターフェースの実装</li>
+<li>ライブラリがプログラムの値に対して呼び返すメソッド。<code>+</code> と <code>#{}</code> からの <code>toString</code>、マップリテラルからの <code>hashCode</code>、<code>==</code> からの <code>equals</code>、投げた例外の <code>getMessage</code> です</li>
+<li>述語が使う各クラスとそのスーパークラスの静的初期化子（static initializer）</li>
+<li>引数がプログラムのクラス（<code>Foo</code> または <code>Foo?</code>）のとき、そのクラスのコンストラクタ、静的初期化子、<code>toString</code>。ビルドは見本の引数を作るときにこれらを動かします。コンストラクタの引数のクラスも同じです</li>
+</ul>
+<p><code>E0112</code> の再現も同じ規則に従います。再現が実行されないとき、または時間内に終わらないときは、そのメソッドの <code>W0021</code> が残ります。<code>W0023</code> が、ビルドが確かめなかった理由を示します。</p>
+<p>効果が述語自身の本体にないときは、<code>W0023</code> がその場所を示します。呼び出し、効果を持つ静的初期化子のクラス、または引数のクラスです。</p>
 <h3 id="e0114-shape"><code>E0114</code> — 往復しない <code>Shape</code><a class="headerlink" href="#e0114-shape" title="Permanent link">&para;</a></h3>
 <p><code>onion.Shape</code> はどれも契約を持ちます。print できる値 <code>v</code> について、<code>parse(print(v))</code> が <code>v</code> と
 等しくなければなりません。ビルドは shape の値型からサンプルを作って確かめます。戻ってこない値は
@@ -8986,6 +8997,10 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 <tr>
 <td><code>W0022</code></td>
 <td>the contract of a Shape was not checked: its value type cannot be sampled</td>
+</tr>
+<tr>
+<td><code>W0023</code></td>
+<td>ビルドが契約の述語を実行しなかった。効果が <code>mutate</code> を超える（出力、入出力、<code>unknown</code> の呼び出し）か、10 秒以内に終わらなかった</td>
 </tr>
 <tr>
 <td><code>W0024</code></td>

@@ -5907,8 +5907,16 @@ vouch for (<code>unknown</code>) gets the same warning. <strong>Nothing stops ru
 <code>run/</code>, 10 checks in 9 files (for example <code>ShoppingCart.on:86</code>, <code>GlobMatcher.on:24</code>,
 <code>Mandelbrot.on:48</code>) have <code>mutate</code> through the methods they call, and they run under this rule;
 under the stricter one of the first draft they would not have.</p>
-<p>A run is bounded by <code>--contract-timeout</code>. A predicate that does not finish is <code>Not proved</code>,
-with the note naming it, so a non-terminating one cannot hang the build.</p>
+<p>A run is bounded by a fixed 10 s; no flag changes it yet. A predicate that does not finish in
+time is not waited for: <code>W0023</code> names it, so a non-terminating one cannot hang the build.
+An <code>E0112</code> replay that is not run, or not waited for, keeps its <code>W0021</code> and also gets <code>W0023</code>,
+which says why.</p>
+<p>This rule covers the closed-predicate check and the <code>E0112</code> replay. One build-time runner is
+not under it yet: the <code>E0114</code> Shape check still calls a user <code>Shape</code>'s <code>parse</code>/<code>print</code> with no
+effect check (#2733).</p>
+<p>A record's generated <code>toString</code>, <code>hashCode</code> and <code>equals</code> count as calling the same method on
+each component (or as calling the interface default they forward to), so a record handed to a
+map literal or to string concatenation carries what those methods do.</p>
 <p>A write to a <strong>static</strong> field by a predicate is not stopped by this rule and can reach another
 predicate in the same build. Predicates are run one at a time, each in a fresh class loader, so
 the static state starts clean for each.</p>

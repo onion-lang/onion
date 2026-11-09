@@ -4143,6 +4143,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-tools-requires-sees-more-of-what-it-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A tool's requires sees more of what it runs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-record-component-named-hashcode-tostring-or-getclass-must-not-change-that-methods-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A record component named hashCode, toString or getClass must not change that method's type
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-default-on-an-abstract-or-interface-method-is-type-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A default on an abstract or interface method is type-checked
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-record-method-that-overrides-tostring-hashcode-or-equals-must-keep-its-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A record method that overrides toString, hashCode or equals must keep its type
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4874,6 +4918,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-tools-requires-sees-more-of-what-it-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A tool's requires sees more of what it runs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-record-component-named-hashcode-tostring-or-getclass-must-not-change-that-methods-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A record component named hashCode, toString or getClass must not change that method's type
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-default-on-an-abstract-or-interface-method-is-type-checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A default on an abstract or interface method is type-checked
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-record-method-that-overrides-tostring-hashcode-or-equals-must-keep-its-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A record method that overrides toString, hashCode or equals must keep its type
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5232,6 +5320,129 @@ object is E0110.</p>
   methods, also inside a lambda. Reading <code>o.t</code> from anywhere is fine too.</li>
 <li><strong>No <code>onion migrate</code> rule, on purpose:</strong> the fix adds a method or a constructor to the
   receiver's class, and which one fits is a design choice.</li>
+</ul>
+<h2 id="a-tools-requires-sees-more-of-what-it-runs">A <code>tool</code>'s <code>requires</code> sees more of what it runs<a class="headerlink" href="#a-tools-requires-sees-more-of-what-it-runs" title="Permanent link">&para;</a></h2>
+<p><code>onionc</code> checks a <code>tool</code>'s <code>requires { ... }</code> clause against the effects its body has. It now
+counts four things it missed before. A tool that relied on a miss gets <code>E0077</code> (an effect
+missing from <code>requires</code>) or <code>E0078</code> (a capability nothing uses).</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">run</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p">}</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Loud</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="kd">override</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">run</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="s2">"loud"</span><span class="p">);</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="p">}</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="c1">// Before: compiled. Now: E0077 at `b.run()`, "calling Loud::run"</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="c1">//   tool go(): Int { val b: Base = new Base(); return b.run() }</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="c1">// Now: declare what an override can do</span>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="kd">tool</span><span class="w"> </span><span class="nf">go</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="k">requires</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">console</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Base</span><span class="p">()</span>
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="nf">run</span><span class="p">()</span>
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="p">}</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>What the tool does</th>
+<th>Before</th>
+<th>Now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Calls a method a program class overrides (<code>b.run()</code> above)</td>
+<td>only the called method counted</td>
+<td>every program override counts too (<code>E0077</code>)</td>
+</tr>
+<tr>
+<td>Uses a class whose static initializer has an effect</td>
+<td>not counted</td>
+<td>counted (<code>E0077</code>)</td>
+</tr>
+<tr>
+<td><code>try (val r = new R()) { }</code> where <code>R</code> is a program class</td>
+<td><code>close()</code> not counted</td>
+<td><code>R::close</code> counts (<code>E0077</code>)</td>
+</tr>
+<tr>
+<td><code>new Box[String]()</code> of a program class</td>
+<td><code>unknown</code></td>
+<td>the constructor's own effects; an <code>unknown</code> kept only for it is <code>E0078</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>What you see:</strong> <code>E0077</code> names the call and the capability to add. <code>E0078</code> names the
+  capability to remove.</li>
+<li><strong>Not affected:</strong> what a library method might call back on an object you pass it
+  (<code>list.add(item)</code> and <code>Item::toString</code>). Only the build's own check of contract predicates
+  counts that.</li>
+<li><strong>No <code>onion migrate</code> rule, on purpose:</strong> the fix depends on what the called code does.
+  Each error names the edit: add that capability, or remove the unused one.</li>
+</ul>
+<h2 id="a-record-component-named-hashcode-tostring-or-getclass-must-not-change-that-methods-type">A record component named <code>hashCode</code>, <code>toString</code> or <code>getClass</code> must not change that method's type<a class="headerlink" href="#a-record-component-named-hashcode-tostring-or-getclass-must-not-change-that-methods-type" title="Permanent link">&para;</a></h2>
+<p><code>record R(hashCode: Long)</code> gave one object two <code>hashCode()</code> answers: the accessor, and the
+<code>Int</code> one a <code>HashMap</code> uses. <code>getClass: Int</code> did the same to <code>getClass()</code>. Both are now errors,
+as <code>hashCode: Int</code>, <code>toString: String</code> and <code>getClass: Class</code> were.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1">// Before: compiled, r.hashCode() = 5, (r as Object).hashCode() = 36</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">hashCode</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="p">)</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1">// Now: E0010. Rename the component.</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">code</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="p">)</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <strong>E0010</strong> at the component, for <code>hashCode</code>, <code>toString</code> or <code>getClass</code> of any
+  type, in a record or an <code>enum</code> case.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> the new name and the code that reads it are your choice.</li>
+</ul>
+<h2 id="a-default-on-an-abstract-or-interface-method-is-type-checked">A default on an abstract or interface method is type-checked<a class="headerlink" href="#a-default-on-an-abstract-or-interface-method-is-type-checked" title="Permanent link">&para;</a></h2>
+<p>A default on an <code>abstract def</code> or an interface method now works: a call may omit that
+argument. So the default is now type-checked like any other default. Before, it was never used,
+and a wrong one compiled.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1">// Before: compiled, because the default was never used</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kd">abstract</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="kd">abstract</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"x"</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="p">}</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="c1">// Now: E0000 at "x". Give a default of the parameter's type.</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="kd">abstract</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">  </span><span class="kd">abstract</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <strong>E0000</strong> (wrong type) or <strong>E0002</strong> (unknown name) at the default.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> only you know which default was meant. Fix it, or remove it.</li>
+</ul>
+<h2 id="a-record-method-that-overrides-tostring-hashcode-or-equals-must-keep-its-type">A record method that overrides <code>toString</code>, <code>hashCode</code> or <code>equals</code> must keep its type<a class="headerlink" href="#a-record-method-that-overrides-tostring-hashcode-or-equals-must-keep-its-type" title="Permanent link">&para;</a></h2>
+<p>A record body could redefine an <code>Object</code> method with another return type. A class could not.
+<code>toString(): Int</code> silently dropped the generated <code>toString()</code>, and <code>toString(): String?</code> let a
+<code>null</code> reach <code>println</code>. A record now follows the class rule.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1">// Before: compiled; println(new R("")) printed null</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">toString</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="p">?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">""</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="p">}</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1">// Now: E0000 at toString. Return a String.</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">toString</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">""</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"(none)"</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong></li>
+<li><strong>E0000</strong> at the method when the return type is another reference type (<code>String?</code>,
+    <code>Object</code>, <code>CharSequence</code>). Its hint suggests <code>?:</code> for a nullable value.</li>
+<li><strong>E0104</strong> when either return type is primitive (<code>toString(): Int</code>, <code>hashCode(): Long</code>).</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> what to return instead of <code>null</code> is your choice.</li>
 </ul>
 
 

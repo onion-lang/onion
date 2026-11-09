@@ -2229,6 +2229,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#tool-requires" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tool の requires が、本体の実行内容をより多く数えるようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hashcode-tostring-getclass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hashCode / toString / getClass という名前の成分は、そのメソッドの型を変えられなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        抽象メソッドとインターフェースのメソッドのデフォルト値が型検査されるようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tostring-hashcode-equals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        toString / hashCode / equals を上書きするレコードのメソッドは、型を変えられなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4895,6 +4939,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#tool-requires" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tool の requires が、本体の実行内容をより多く数えるようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hashcode-tostring-getclass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hashCode / toString / getClass という名前の成分は、そのメソッドの型を変えられなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        抽象メソッドとインターフェースのメソッドのデフォルト値が型検査されるようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tostring-hashcode-equals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        toString / hashCode / equals を上書きするレコードのメソッドは、型を変えられなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5235,6 +5323,119 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
   <code>o.t</code> を読むことは、どこからでもできます。</li>
 <li><strong><code>onion migrate</code> の書き換え規則はありません（意図的です）:</strong> 直すには受け手のクラスにメソッドかコンストラクタを足します。
   どれが合うかは設計の判断です。</li>
+</ul>
+<h2 id="tool-requires"><code>tool</code> の <code>requires</code> が、本体の実行内容をより多く数えるようになりました<a class="headerlink" href="#tool-requires" title="Permanent link">&para;</a></h2>
+<p><code>onionc</code> は <code>tool</code> の <code>requires { ... }</code> を、本体が持つ効果（外の世界への作用）と照らし合わせます。
+これまで見落としていた4つを数えるようになりました。
+見落としに頼っていた tool は <code>E0077</code>（<code>requires</code> に足りない効果）か <code>E0078</code>（使われない能力）になります。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">run</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p">}</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Loud</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="kd">override</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">run</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="s2">"loud"</span><span class="p">);</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="p">}</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="c1">// Before: compiled. Now: E0077 at `b.run()`, "calling Loud::run"</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="c1">//   tool go(): Int { val b: Base = new Base(); return b.run() }</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="c1">// Now: declare what an override can do</span>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="kd">tool</span><span class="w"> </span><span class="nf">go</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="k">requires</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">console</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Base</span><span class="p">()</span>
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="nf">run</span><span class="p">()</span>
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="p">}</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>tool がすること</th>
+<th>以前</th>
+<th>今</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>プログラムのクラスがオーバーライドするメソッドを呼ぶ（上の <code>b.run()</code>）</td>
+<td>呼んだメソッドだけを数えた</td>
+<td>プログラム中のオーバーライドもすべて数える（<code>E0077</code>）</td>
+</tr>
+<tr>
+<td>static 初期化子に効果があるクラスを使う</td>
+<td>数えなかった</td>
+<td>数える（<code>E0077</code>）</td>
+</tr>
+<tr>
+<td><code>R</code> がプログラムのクラスである <code>try (val r = new R()) { }</code></td>
+<td><code>close()</code> を数えなかった</td>
+<td><code>R::close</code> を数える（<code>E0077</code>）</td>
+</tr>
+<tr>
+<td>プログラムのジェネリッククラスの <code>new Box[String]()</code></td>
+<td><code>unknown</code></td>
+<td>コンストラクタ自身の効果。これのためだけの <code>unknown</code> は <code>E0078</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>見えるもの:</strong> <code>E0077</code> は呼び出しと、足すべき能力を示します。<code>E0078</code> は、外すべき能力を示します。</li>
+<li><strong>影響しないもの:</strong> 渡したオブジェクトに対してライブラリが呼び返すかもしれないもの（<code>list.add(item)</code> と <code>Item::toString</code>）は数えません。
+  これを数えるのは、ビルドが契約の述語を実行してよいかの検査だけです。</li>
+<li><strong><code>onion migrate</code> の書き換え規則はありません（意図的です）:</strong> 直し方は、呼ばれるコードが何をするかで決まります。
+  エラーがそれぞれ直し方を示します。その能力を足すか、使われない能力を外してください。</li>
+</ul>
+<h2 id="hashcode-tostring-getclass"><code>hashCode</code> / <code>toString</code> / <code>getClass</code> という名前の成分は、そのメソッドの型を変えられなくなりました<a class="headerlink" href="#hashcode-tostring-getclass" title="Permanent link">&para;</a></h2>
+<p><code>record R(hashCode: Long)</code> は、1つのオブジェクトが <code>hashCode()</code> に2通りの答えを返していました。アクセサの値と、<code>HashMap</code> が使う <code>Int</code> の値です。<code>getClass: Int</code> も <code>getClass()</code> で同じことが起きていました。<code>hashCode: Int</code>、<code>toString: String</code>、<code>getClass: Class</code> と同じく、どちらもエラーになりました。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1">// 以前: コンパイルでき、r.hashCode() は 5、(r as Object).hashCode() は 36</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">hashCode</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="p">)</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1">// 現在: E0010。成分の名前を変えてください。</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">code</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="p">)</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> <code>hashCode</code>、<code>toString</code>、<code>getClass</code> の成分は、型にかかわらず成分の位置で <strong>E0010</strong> になります。レコードでも <code>enum</code> の case でも同じです。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> 新しい名前と、それを読むコードは利用者が決めるためです。</li>
+</ul>
+<h2 id="_3">抽象メソッドとインターフェースのメソッドのデフォルト値が型検査されるようになりました<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p><code>abstract def</code> やインターフェースのメソッドのデフォルト値が使えるようになりました。呼び出しでその引数を省略できます。そのため、ほかのデフォルト値と同じく型検査されます。以前は使われることがなかったので、誤ったデフォルト値でもコンパイルできていました。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1">// 以前: デフォルト値が使われないので、コンパイルできていました</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kd">abstract</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="kd">abstract</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"x"</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="p">}</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="c1">// 現在: "x" の位置で E0000。引数の型のデフォルト値を書いてください。</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="kd">abstract</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">  </span><span class="kd">abstract</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> デフォルト値の位置で <strong>E0000</strong>（型が違う）または <strong>E0002</strong>（名前が見つからない）になります。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> どのデフォルト値のつもりだったかは利用者にしかわからないためです。直すか、取り除いてください。</li>
+</ul>
+<h2 id="tostring-hashcode-equals"><code>toString</code> / <code>hashCode</code> / <code>equals</code> を上書きするレコードのメソッドは、型を変えられなくなりました<a class="headerlink" href="#tostring-hashcode-equals" title="Permanent link">&para;</a></h2>
+<p>これまでレコードの本体では、<code>Object</code> のメソッドを別の戻り値の型で定義し直せました。クラスではできません。<code>toString(): Int</code> は生成された <code>toString()</code> を黙って消していました。<code>toString(): String?</code> は <code>null</code> を <code>println</code> まで届けていました。レコードもクラスと同じ規則に従うようになりました。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1">// 以前: コンパイルでき、println(new R("")) は null を表示</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">toString</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="p">?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">""</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="p">}</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1">// 現在: toString の位置で E0000。String を返してください。</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="kd">record</span><span class="w"> </span><span class="nc">R</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">toString</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">""</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"(none)"</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong></li>
+<li>戻り値の型が別の参照型（<code>String?</code>、<code>Object</code>、<code>CharSequence</code>）のときは、メソッドの位置で <strong>E0000</strong> になります。ヒントは、null になりうる値に <code>?:</code> を使うよう勧めます。</li>
+<li>どちらかの戻り値の型がプリミティブ型（<code>toString(): Int</code>、<code>hashCode(): Long</code>）のときは <strong>E0104</strong> になります。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> <code>null</code> の代わりに何を返すかは利用者が決めるためです。</li>
 </ul>
 
 

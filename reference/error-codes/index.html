@@ -8426,6 +8426,24 @@ the build runs. It must return <code>true</code>. This replaces a false <code>ex
 </span><span id="__span-75-3"><a id="__codelineno-75-3" name="__codelineno-75-3" href="#__codelineno-75-3"></a><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">3</span><span class="w">   </span><span class="c1">// E0113: false when the build runs it</span>
 </span></code></pre></div>
 <p>Fix: correct the expression, or the code it checks.</p>
+<p>The build runs a predicate only when its effects are at most <code>mutate</code>. One that prints, reads or
+writes files, or calls something the effect table cannot vouch for (<code>unknown</code>) is not run: it
+gets the warning <code>W0023</code> instead. So does one that does not finish within 10 seconds.
+The effects count everything a run can reach:</p>
+<ul>
+<li>every overload with the predicate's name and parameter count</li>
+<li>an override or interface implementation the program defines</li>
+<li>a method the library calls back on a program value: <code>toString</code> from <code>+</code> and <code>#{}</code>,
+  <code>hashCode</code> from a map literal, <code>equals</code> from <code>==</code>, <code>getMessage</code> of a thrown exception</li>
+<li>the static initializer of each class the predicate uses, and of its superclasses</li>
+<li>for a parameter of a program class (<code>Foo</code> or <code>Foo?</code>): that class's constructors, static
+  initializers and <code>toString</code>, which the build runs to make sample arguments, and the same for
+  the classes of their parameters</li>
+</ul>
+<p>An <code>E0112</code> replay follows the same rule. When it is not run, or does not finish in time, the
+<code>W0021</code> for that method stays, and <code>W0023</code> says why the build did not confirm it.</p>
+<p>When the effect is not in the predicate's own body, <code>W0023</code> names where it is: the call, the
+class whose static initializer has it, or the parameter's class.</p>
 <h3 id="e0114-a-shape-that-does-not-round-trip"><code>E0114</code> — a <code>Shape</code> that does not round-trip<a class="headerlink" href="#e0114-a-shape-that-does-not-round-trip" title="Permanent link">&para;</a></h3>
 <p>Every <code>onion.Shape</code> has a contract: <code>parse(print(v))</code> must equal <code>v</code> for each value the shape can
 print. The build samples values of the shape's value type and checks it. A value that does not
@@ -8981,6 +8999,10 @@ pass reports it yet -- it can never actually appear in a build log.</p>
 <tr>
 <td><code>W0022</code></td>
 <td>the contract of a Shape was not checked: its value type cannot be sampled</td>
+</tr>
+<tr>
+<td><code>W0023</code></td>
+<td>the build did not run a contract predicate: its effects go beyond <code>mutate</code> (it prints, does I/O, or calls something <code>unknown</code>), or it did not finish within 10 seconds</td>
 </tr>
 <tr>
 <td><code>W0024</code></td>

@@ -111,5 +111,131 @@ class RecordCopySpec extends AbstractShellSpec {
       )
       assert(Shell.Success("8080,t,null,h") == result)
     }
+
+    it("rejects a named argument whose type does not fit the component (#2705)") {
+      // Each one compiled and then threw ClassCastException when the copy ran.
+      val cases = Seq(
+        "record N(a: Int, b: Long?)" -> "new N(1, 2L).copy(b = \"s\")",
+        "record N(a: Int, b: Long?)" -> "new N(1, 2L).copy(b = 1.5)",
+        "record N(a: Int, b: String)" -> "new N(1, \"x\").copy(b = 3)",
+        "record N(a: Int, b: String?)" -> "new N(1, \"x\").copy(b = 3)"
+      )
+      for ((decl, call) <- cases) {
+        val codes = errors(s"$decl\nval n = $call\nIO::println(n.b())\n").map(_._1)
+        // One error at the argument: no second E0043 "unknown parameter name" from
+        // the regular named-argument path, which knows nothing of components.
+        assert(codes == Seq(Some("E0000")), s"$call gave $codes")
+      }
+    }
+
+    it("reports an unknown component once (#2705)") {
+      val codes = errors("record N(a: Int, b: String)\nval n = new N(1, \"x\").copy(z = 3)\n").map(_._1)
+      assert(codes == Seq(Some("E0005")))
+    }
+
+    it("still widens, boxes and accepts null for fitting arguments (#2705)") {
+      val result = shell.run(
+        """
+          |record N(a: Int, b: Long?, c: String?, d: Long, e: Object?)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val n = new N(1, 2L, null, 3L, null)
+          |    val s: String? = "z"
+          |    val b: Long? = n.copy(b = 5).b()
+          |    return b + "," + n.copy(b = null).b() + "," + n.copy(c = s).c() + "," +
+          |      n.copy(d = 7).d() + "," + n.copy(a = 9).a() + "," + n.copy(e = 5).e() + "," +
+          |      n?.copy(c = "q")?.c()
+          |  }
+          |}
+          |""".stripMargin,
+        "FittingCopy.on",
+        Array()
+      )
+      assert(Shell.Success("5,null,z,7,9,5,q") == result)
+    }
+
+    it("calls a record's own copy overload when the named arguments do not fit the components (#2705)") {
+      // A record that declares `copy` gets no generated one; a call that is not
+      // component-shaped is an ordinary call to the declared overloads.
+      val result = shell.run(
+        """
+          |record U(name: Int) {
+          |public:
+          |  def copy(name: String): String = "user:" + name
+          |  def copy(tag: Int): String = "tag:" + tag
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val u = new U(1)
+          |    return u.copy(name = "s") + "," + u.copy(tag = 3) + "," + u?.copy(name = "t")
+          |  }
+          |}
+          |""".stripMargin,
+        "UserCopy.on",
+        Array()
+      )
+      assert(Shell.Success("user:s,tag:3,user:t") == result)
+    }
+
+    it("picks the record's own copy overload by argument type when two share a parameter name (#2705)") {
+      // Both overloads name their parameter `name`; the argument's type picks
+      // one, for `.copy` and `?.copy` alike.
+      val result = shell.run(
+        """
+          |record U(name: Int) {
+          |public:
+          |  def copy(name: Long): String = "long:" + name
+          |  def copy(name: String): String = "str:" + name
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val u = new U(1)
+          |    return u.copy(name = "s") + "," + u?.copy(name = "t") + "," + u.copy(name = 5L)
+          |  }
+          |}
+          |""".stripMargin,
+        "TwoUserCopies.on",
+        Array()
+      )
+      assert(Shell.Success("str:s,str:t,long:5") == result)
+    }
+
+    it("a fitting argument picks the user copy overload by its own type, not the component's (#2705)") {
+      // A user `copy` is an ordinary method; only the generated copy checks components.
+      val result = shell.run(
+        """
+          |record A(a: Long) {
+          |public:
+          |  def copy(a: Int): String = "int:" + a
+          |  def copy(a: Long): String = "long:" + a
+          |}
+          |record D(a: Double) {
+          |public:
+          |  def copy(a: Int): String = "int:" + a
+          |  def copy(a: Double): String = "dbl:" + a
+          |}
+          |record O(a: Object) {
+          |public:
+          |  def copy(a: Object): String = "obj:" + a
+          |  def copy(a: String): String = "str:" + a
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val x = new A(1L)
+          |    val d = new D(1.0)
+          |    val o = new O("z")
+          |    return x.copy(a = 5) + "," + d.copy(a = 5) + "," + d?.copy(a = 5) + "," + o.copy(a = "s")
+          |  }
+          |}
+          |""".stripMargin,
+        "FittingUserCopies.on",
+        Array()
+      )
+      assert(Shell.Success("int:5,int:5,int:5,str:s") == result)
+    }
   }
 }

@@ -451,7 +451,7 @@ final class MethodCallTyping(
     context: LocalContext,
     target: Term,
     targetType: ObjectType
-  )(buildRawCall: (Method, Array[Term]) => Term): Option[Term] =
+  )(buildRawCall: (Method, Array[Term]) => Term): Option[Option[Term]] =
     recordCopySupport.tryRecordCopy(node, name, args, typeArgs, context, target, targetType)(buildRawCall)
 
   // hasNamedArguments delegated to ArgumentHelpers object

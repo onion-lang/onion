@@ -68,7 +68,7 @@ private[compiler] final class InstanceMethodCallSupport(
       calls.tryRecordCopy(node, name, node.args, node.typeArgs, context, target, targetType) {
         (method, finalParams) => new Call(target, method, finalParams)
       } match {
-        case some @ Some(_) => return some
+        case Some(result) => return result
         case None =>
       }
     }
@@ -171,7 +171,7 @@ private[compiler] final class InstanceMethodCallSupport(
     val recordCopy = calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, target, targetType) {
       (method, finalParams) => new Call(target, method, finalParams)
     }
-    if (recordCopy.isDefined) return recordCopy
+    recordCopy match { case Some(result) => return result; case None => }
 
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(targetType, node.name, candidates, calls.isInstanceMethod)

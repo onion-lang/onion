@@ -225,6 +225,18 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // skip generating a synthetic where the user has supplied an override.
       val userMethods: List[AST.MethodDeclaration] =
         node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m }
+      // A method under no access section, or under `private:`, is private; with `static`
+      // it is a class method. Neither can stand in for the public instance
+      // `equals`/`hashCode`/`toString` that `==` and string conversion call (#2746, #2754),
+      // so the generated method stays and the duplication pass reports the clash.
+      val publicInstanceMethods: Set[AST.MethodDeclaration] =
+        node.sections.flatMap { section =>
+          section.members.collect {
+            case m: AST.MethodDeclaration
+                if ((m.modifiers | section.modifiers) & (AST.M_PUBLIC | AST.M_PROTECTED)) != 0 &&
+                  ((m.modifiers | section.modifiers) & AST.M_STATIC) == 0 => m
+          }
+        }.toSet
       // `toString`/`hashCode`/`equals` are replaced only by a method with the
       // generated method's erased signature (#2717), the test the override and
       // duplicate checks use: `equals(o: Object?)`, an alias of Object and an erased
@@ -238,8 +250,8 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         }.map(_.map(t => onion.compiler.generics.Erasure.asmType(t).getDescriptor))
       val objectDesc = "Ljava/lang/Object;"
       def replacesGenerated(m: AST.MethodDeclaration): Boolean = m.name match {
-        case "equals"                => m.args.length == 1 && erasedArgDescriptors(m).contains(List(objectDesc))
-        case "hashCode" | "toString" => m.args.isEmpty
+        case "equals"                => m.args.length == 1 && publicInstanceMethods.contains(m) && erasedArgDescriptors(m).contains(List(objectDesc))
+        case "hashCode" | "toString" => m.args.isEmpty && publicInstanceMethods.contains(m)
         case _                       => true
       }
       val userDefinedMethodNames: Set[String] =

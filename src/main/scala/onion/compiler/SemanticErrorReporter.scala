@@ -1460,7 +1460,8 @@ object SemanticErrorReporter {
         items => {
           val reason = format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
           if (items.length < 7) reason
-          else reason + " " + format(message("error.semantic.historyBrokenByWrite.inherited"), Seq(asString(items(4)), asString(items(5)), asString(items(6))))
+          // A Japanese sentence ends in `。` and takes no space after it.
+          else reason + (if (reason.endsWith("\u3002")) "" else " ") + format(message("error.semantic.historyBrokenByWrite.inherited"), Seq(asString(items(4)), asString(items(5)), asString(items(6))))
         }
       )
     ),

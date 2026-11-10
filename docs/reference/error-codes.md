@@ -1204,7 +1204,9 @@ another object (`o.n = 0`) is E0110, below.
 A history declared in a subclass also binds the methods the subclass inherits without
 overriding them. If `class Up extends Base` declares `history n >= old(n)`, an inherited
 `Base.dec` that lowers `n` is E0109 at its write. Fix: override `dec` in `Up`, or declare the
-history in `Base`. An inherited write the syntax does not settle gets W0024.
+history in `Base` and make `dec` keep it. A private method counts too: it is checked when an
+inherited method calls it, and the error names that method. An inherited write the syntax does
+not settle gets W0024.
 
 ### `E0110` — an `invariant` or `history` on a mutable object, or its field written through another object
 

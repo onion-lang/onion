@@ -91,7 +91,7 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
           // A write the checks cannot follow names its line and why (#2599).
           case (Some(("lambda", _)), _)   => Message("warning.historyNotChecked.reason.lambda", u.line.toString)
           case (Some(("invariant", _)), _) => Message("warning.historyNotChecked.reason.invariant")
-          case (Some(("inherited", sub)), _) => Message("warning.historyNotChecked.reason.inherited", sub, u.method.name)
+          case (Some(("inherited", sub)), _) => Message("warning.historyNotChecked.reason.inherited", sub, Option(u.via).getOrElse(u.method.name))
           case (_, Some(t))               => Message("warning.historyNotChecked.reason.type", u.field, t)
           case _                          => Message("warning.historyNotChecked.reason.body")
         }

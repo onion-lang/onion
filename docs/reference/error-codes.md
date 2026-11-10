@@ -1201,6 +1201,11 @@ A write counts wherever the method makes it, also inside a lambda it creates. A 
 lambda that the syntax does not settle gets the warning W0024 at its line. A write through
 another object (`o.n = 0`) is E0110, below.
 
+A history declared in a subclass also binds the methods the subclass inherits without
+overriding them. If `class Up extends Base` declares `history n >= old(n)`, an inherited
+`Base.dec` that lowers `n` is E0109 at its write. Fix: override `dec` in `Up`, or declare the
+history in `Base`. An inherited write the syntax does not settle gets W0024.
+
 ### `E0110` — an `invariant` or `history` on a mutable object, or its field written through another object
 
 A clause may name only fields of a primitive, `String`, enum or record type. A `List` or another

@@ -25,6 +25,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
   /** Writes that neither the syntax nor the solver settled (W0024): never left silent (#2574). */
   val unchecked: scala.collection.mutable.ArrayBuffer[Unchecked] = scala.collection.mutable.ArrayBuffer.empty
   private var unitFile: String = null
+  private var unitOf: Map[String, AST.CompilationUnit] = Map.empty
   private sealed trait Kind
   private case object Raise extends Kind
   private case object Lower extends Kind
@@ -80,8 +81,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
       units.flatMap(_.toplevels).collect { case c: AST.ClassDeclaration => c.name -> c }.toMap
     val interfaces: Map[String, AST.InterfaceDeclaration] =
       units.flatMap(_.toplevels).collect { case i: AST.InterfaceDeclaration => i.name -> i }.toMap
-    val unitOf: Map[String, AST.CompilationUnit] =
-      units.flatMap(u => u.toplevels.collect { case c: AST.ClassDeclaration => c.name -> u }).toMap
+    unitOf = units.flatMap(u => u.toplevels.collect { case c: AST.ClassDeclaration => c.name -> u }).toMap
     if (classes.values.exists(_.histories.nonEmpty) || interfaces.values.exists(_.histories.nonEmpty)) {
       for (cls <- classes.values) {
         unitFile = unitOf(cls.name).sourceFile
@@ -94,7 +94,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
                      interfaces: Map[String, AST.InterfaceDeclaration]): Unit = {
     val chain = hierarchy(cls, classes)
     // An interface's history binds every implementor (design 4.2), like a superclass's.
-    val histories = chain.flatMap(_.histories) ++ interfaceHistories(chain.flatMap(_.superInterfaces), interfaces, Set.empty)
+    val histories = historiesOf(chain, interfaces)
     val relations = for {
       h <- histories
       (field, op) <- HistoryPreorder.simpleRelations(h)
@@ -113,6 +113,62 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
       if (!reporting || dropsProvedGuards) proveRest(cls, chain, relations.distinct)
     }
     if (!reporting) uncheckedForms(cls, chain, histories)
+    checkInherited(cls, chain, histories, classes, interfaces)
+  }
+
+  /**
+   * A history binds every method callable on the class, so also the methods it inherits without
+   * overriding them (#2603). Each is checked against the histories the class adds; one its own
+   * class already declares is checked there. A write the syntax settles is E0109 at the write; any
+   * other is W0024, since the solver does not prove an inherited body against a subclass's history.
+   */
+  private def checkInherited(cls: AST.ClassDeclaration, chain: Seq[AST.ClassDeclaration], histories: Seq[AST.Expression],
+                             classes: Map[String, AST.ClassDeclaration], interfaces: Map[String, AST.InterfaceDeclaration]): Unit = {
+    lazy val perMethod: Seq[(AST.MethodDeclaration, Seq[Write])] =
+      for (c <- chain; m <- methodsOf(c) if m.block != null) yield (m, writesIn(m, c))
+    for ((owner, m) <- inheritedMethods(cls, chain)) {
+      val ownerHistories = historiesOf(hierarchy(owner, classes), interfaces)
+      val added = histories.filterNot(h => ownerHistories.exists(_ eq h))
+      val writes = writesIn(m, owner)
+      val file = unitOf.get(owner.name).map(_.sourceFile).orNull
+      for ((field, op) <- added.flatMap(HistoryPreorder.simpleRelations).distinct) {
+        val mine = writes.filter(_.ofField(m, field))
+        val broken = mine.flatMap(w => problemOf(op, w.kind, field, perMethod).map(w -> _))
+        if (reporting) broken.foreach { case (w, problem) =>
+          typing.report(SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)",
+            problem._1, problem._2, cls.name, m.name, owner.name)
+        }
+        // A raise under `>=` (a lowering under `<=`, a constant nothing undoes) is settled by the syntax.
+        else if (broken.isEmpty) mine.find(_.kind == Other).foreach { w =>
+          unchecked += Unchecked(file, owner, m, field, Some(s"$field $op old($field)"), line = lineOf(w.node),
+            fieldType = None, reason = Some(("inherited", cls.name)), at = w.node.location)
+        }
+      }
+      if (!reporting) {
+        val fields = fieldTypes(chain).keySet
+        for {
+          h <- added
+          c <- conjuncts(h) if HistoryPreorder.simpleRelations(c).isEmpty
+          named = namesIn(c).filter(fields.contains)
+          w <- writes.find(w => named.exists(w.ofField(m, _)))
+        } unchecked += Unchecked(file, owner, m, w.field, None, line = lineOf(h), fieldType = None, at = w.node.location)
+      }
+    }
+  }
+
+  /** The histories that bind a class: its own, its superclasses', and its interfaces'. */
+  private def historiesOf(chain: Seq[AST.ClassDeclaration], interfaces: Map[String, AST.InterfaceDeclaration]): Seq[AST.Expression] =
+    chain.flatMap(_.histories) ++ interfaceHistories(chain.flatMap(_.superInterfaces), interfaces, Set.empty)
+
+  /** The superclasses' methods `cls` inherits without overriding (same name and arity), nearest first. */
+  private def inheritedMethods(cls: AST.ClassDeclaration, chain: Seq[AST.ClassDeclaration]): Seq[(AST.ClassDeclaration, AST.MethodDeclaration)] = {
+    def sig(m: AST.MethodDeclaration) = (m.name, m.args.size)
+    var overridden = methodsOf(cls).map(sig).toSet
+    chain.drop(1).flatMap { c =>
+      val here = methodsOf(c).filter(m => m.block != null && !overridden(sig(m)))
+      overridden ++= methodsOf(c).map(sig)
+      here.map(c -> _)
+    }
   }
 
   /**

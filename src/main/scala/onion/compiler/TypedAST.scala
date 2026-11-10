@@ -778,7 +778,12 @@ object TypedAST {
     }
   }
 
-  class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: TypedAST.Type)  extends Term(location) {
+  class RefLocal(location: Location, val frame: Int, index0: Int, val `type`: TypedAST.Type)  extends Term(location) {
+    private var slot: Int = index0
+    def index: Int = slot
+    /** Moves this read to another local slot; see `MutualRecursionOptimization` (#2800). */
+    private[compiler] def relocate(newIndex: Int): Unit = slot = newIndex
+
     def this(bind: ClosureLocalBinding) = {
       this(null, bind.frameIndex, bind.index, bind.tp)
     }
@@ -791,7 +796,12 @@ object TypedAST {
   /** The compiler temporary an if/select/try expression yields; never a user variable. */
   class ResultRefLocal(bind: ClosureLocalBinding) extends RefLocal(bind)
 
-  class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: TypedAST.Type, val value: TypedAST.Term) extends Term(location) {
+  class SetLocal(location: Location, val frame: Int, index0: Int, val `type`: TypedAST.Type, val value: TypedAST.Term) extends Term(location) {
+    private var slot: Int = index0
+    def index: Int = slot
+    /** Moves this store to another local slot; see `MutualRecursionOptimization` (#2800). */
+    private[compiler] def relocate(newIndex: Int): Unit = slot = newIndex
+
     def this(bind: ClosureLocalBinding, value: TypedAST.Term) = {
       this(null, bind.frameIndex, bind.index, bind.tp, value)
     }

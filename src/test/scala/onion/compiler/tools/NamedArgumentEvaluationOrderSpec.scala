@@ -192,6 +192,68 @@ class NamedArgumentEvaluationOrderSpec extends AbstractShellSpec {
       assert(result.asInstanceOf[Shell.Success].value.toString.startsWith("1220:"))
     }
 
+    // #2800 panel, round 4: a reordered call anywhere in a member, not only the tail call,
+    // keeps the group a loop. `main` optimized all three before named arguments ran in
+    // written order.
+    def runGroup(members: String, entry: String): Shell.Result =
+      shell.run(
+        s"""class M {
+           |private:
+           |  static val sb: StringBuilder = new StringBuilder()
+           |  static def id(x: Int): Int { return x }
+           |  static def t(x: Int): Int { sb.append(x); return x }
+           |  static def mix(a: Int, b: Int): Int { return a + b - a }
+           |  static def cat(a: String, b: String): String { return a + b }
+           |  static def lmix(a: Long, b: Long): Long { return a * 10L + b }
+           |$members
+           |public:
+           |  static def main(args: String[]): String = $entry
+           |}
+           |""".stripMargin,
+        "None",
+        Array()
+      )
+
+    it("stays a loop with a reordered call in a member's condition") {
+      assert(runGroup(
+        """  static @TailRecursive def ev(n: Int, s: Int): Int = if n == 0 { s } else { od(n - 1, s) }
+          |  static @TailRecursive def od(n: Int, s: Int): Int {
+          |    if n == 0 { return s }
+          |    if mix(b = id(s), a = id(n)) < 0 { return -1 }
+          |    return ev(n - 1, s + 1)
+          |  }""".stripMargin,
+        """"" + ev(4, 0) + ":" + ev(10000000, 0)""") == Shell.Success("2:5000000"))
+    }
+
+    it("stays a loop with a reordered call inside a tail-call argument") {
+      assert(runGroup(
+        """  static @TailRecursive def ev(n: Int, s: Int): Int = if n == 0 { s } else { od(n - 1, s) }
+          |  static @TailRecursive def od(n: Int, s: Int): Int = if n == 0 { s } else { ev(n - 1, mix(b = id(s + 1), a = id(n))) }""".stripMargin,
+        """"" + ev(4, 0) + ":" + ev(10000000, 0)""") == Shell.Success("2:5000000"))
+    }
+
+    it("stays a loop with a reordered call inside a reordered tail call") {
+      assert(runGroup(
+        """  static @TailRecursive def ev(n: Int, s: Int): Int = if n == 0 { s } else { od(n - 1, s) }
+          |  static @TailRecursive def od(n: Int, s: Int): Int = if n == 0 { s } else { ev(s = mix(b = id(s + 1), a = id(s)), n = n - 1) }""".stripMargin,
+        """"" + ev(4, 0) + ":" + ev(10000000, 0)""") == Shell.Success("2:5000000"))
+    }
+
+    it("keeps reordered calls of different types in different members apart, in written order") {
+      assert(runGroup(
+        """  static @TailRecursive def a(n: Int, s: Int): String {
+          |    if n == 0 { return sb.toString() }
+          |    if cat(b = "" + t(1), a = "" + t(2)).length() < 0 { return "" }
+          |    return b(n - 1, s)
+          |  }
+          |  static @TailRecursive def b(n: Int, s: Int): String {
+          |    if n == 0 { return sb.toString() }
+          |    if lmix(b = 0L + t(3), a = 0L + t(4)) < 0L { return "" }
+          |    return a(n - 1, s)
+          |  }""".stripMargin,
+        """a(2, 0) + ":" + a(1000000, 0).length()""") == Shell.Success("1234:2000004"))
+    }
+
     it("still evaluates arguments with side effects in written order") {
       assert(run(
         """    val log = new Log()

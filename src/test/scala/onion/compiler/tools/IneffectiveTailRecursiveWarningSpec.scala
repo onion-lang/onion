@@ -56,7 +56,7 @@ class IneffectiveTailRecursiveWarningSpec extends AnyFunSpec {
       assert(!result.diagnostics.warnings.exists(_.category.code == "W0016"))
     }
 
-    it("names an out-of-order nested call, not a local the user never declared (#2800)") {
+    it("does not fire for an out-of-order nested call in a member (#2800)") {
       val result = compileWarnings(
         """
           |class M {
@@ -69,9 +69,7 @@ class IneffectiveTailRecursiveWarningSpec extends AnyFunSpec {
           |""".stripMargin)
       assert(!result.hasErrors)
       val w16 = result.diagnostics.warnings.filter(_.category.code == "W0016")
-      assert(w16.nonEmpty)
-      assert(w16.forall(_.message.contains("out of parameter order")), w16.map(_.message))
-      assert(!w16.exists(_.message.contains("declares a local variable")), w16.map(_.message))
+      assert(w16.isEmpty, w16.map(_.message))
     }
 
     it("warns when the annotated group is not private") {

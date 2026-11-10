@@ -63,3 +63,15 @@ jobs:
       env:
         SBT_OPTS: "-Xmx10G -XX:+UseG1GC -Xss16m -Duser.language=ja -Duser.country=JP"
       run: sbt -v +test
+
+  # The evolution loop's own gate logic (risk tiers, panel verdicts, the diff fingerprint,
+  # vetoes). The gate workflows run it from the base branch and never test it, so a PR that
+  # breaks a case here would otherwise go green (#2581). Python only: no sbt, no secrets.
+  gate-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Test the evolution gate logic
+      run: python3 .github/scripts/test_evolution_lib.py -v

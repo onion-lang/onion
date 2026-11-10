@@ -248,12 +248,15 @@ private[compiler] final class SimpleExpressionTypingSupport(
    * Whether a literal's element of type `actual` lets the literal adopt the expected
    * element type. A slot that mentions a type variable takes only what an assignment
    * to it takes: `[u]` with `u: U` is not a `List[T]` just because `U` and `T` both
-   * erase to `Object` (#2332). Other slots keep the plain subtype test.
+   * erase to `Object` (#2332). Other slots keep the plain subtype test, less what
+   * the element's own view of the slot's interface contradicts (#2649).
    */
   private def fitsLiteralSlot(expected: Type, actual: Type): Boolean =
     if (TypeCheckingHelpers.containsTypeVariable(expected) && !expected.isInstanceOf[WildcardType])
       assignability.fitsWithoutConversion(expected, actual)
-    else TypeRules.isAssignable(expected, actual)
+    // `[b]` with `b: JInteger` is no `List[Comparable[String]]`: the element's own view
+    // of `Comparable` says `Integer` (#2649), whatever the erasure allows.
+    else TypeRules.isAssignable(expected, actual) && !TypeRelations.ownViewRejects(bodyContext.table, expected, actual)
 
   private def typeListLiteral(node: AST.ListLiteral, context: LocalContext, expected: Type): Option[Term] = {
     val typedElements = new Array[Term](node.elements.size)

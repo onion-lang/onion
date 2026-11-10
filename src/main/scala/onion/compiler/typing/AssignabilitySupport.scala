@@ -103,7 +103,11 @@ private[compiler] final class AssignabilitySupport(
       // `n: T = 3` compiled and threw in a caller using `T = String` (#2534, #2652).
       // An applied target (`Comparable[String]`) is matched against the box's own view of
       // it, not by erasure: `val y: Comparable[String] = 5` is rejected (#2594).
-      val appliedTargetFits = expected match {
+      // A nullable target (`Comparable[String]?`) is the same check on its inner type (#2649).
+      val appliedTargetFits = (expected match {
+        case n: NullableType => n.innerType
+        case other => other
+      }) match {
         case applied: AppliedClassType =>
           TypeRelations.boxSupertypeAccepts(bodyContext.table, applied, boxed.`type`.asInstanceOf[ClassType])
         case _ => true

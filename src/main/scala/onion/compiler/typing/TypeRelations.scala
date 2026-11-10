@@ -27,6 +27,25 @@ private[typing] object TypeRelations {
     case _ => TypeRules.isSuperType(expected, boxed)
   }
 
+  /** A plain class's own view of an interface fixes its type arguments: `Integer` is a
+   *  `Comparable[Integer]` and nothing else, and no subclass can implement `Comparable`
+   *  a second time. So an applied `expected` whose erasure the class reaches, but whose
+   *  arguments its view contradicts (`Comparable[String]` for an `Integer` or a `JInteger`
+   *  value), can hold no value of it (#2649). Only a concrete view decides: a raw generic
+   *  class, a type variable on either side, or the class itself leave the old rule alone. */
+  def ownViewRejects(table: ClassTable, expected: Type, actual: Type): Boolean = (expected, actual) match
+    case (e: NullableType, a: NullableType) => ownViewRejects(table, e.innerType, a.innerType)
+    case (e: NullableType, _) => ownViewRejects(table, e.innerType, actual)
+    case (_, a: NullableType) => ownViewRejects(table, expected, a.innerType)
+    case (_, _: AppliedClassType) | (_, _: TypeVariableType) => false
+    case (e: AppliedClassType, a: ClassType)
+        if !sameClass(e.raw, a) && !TypeCheckingHelpers.containsTypeVariable(e) =>
+      val views = table.appliedViewsOf(a)(AppliedTypeViews.collectAppliedViewsFrom(a))
+        .collect { case (raw, view) if sameClass(raw, e.raw) => view }
+      views.nonEmpty && views.forall(v => !TypeCheckingHelpers.containsTypeVariable(v)) &&
+        !boxSupertypeAccepts(table, e, a)
+    case _ => false
+
   /** A bare, Onion-declared type variable (`[T]`, or `[T extends B?]`): its type
    *  arguments may be nullable, so `null` is a valid `T` and W0012 does not apply
    *  (#2500). `[T extends B]`, and the non-null view after a smart cast, do not. */
@@ -76,15 +95,19 @@ private[typing] object TypeRelations {
     case _ => isAssignableWithBoxing(expected, actual, table, topLevel = false) && isAssignableWithBoxing(actual, expected, table, topLevel = false)
 
   def isAssignableWithBoxing(expected: Type, actual: Type, table: ClassTable, topLevel: Boolean = true): Boolean =
-    if TypeRules.isAssignable(expected, actual) then true
+    if ownViewRejects(table, expected, actual) then false
+    else if TypeRules.isAssignable(expected, actual) then true
     else if !expected.isBasicType && actual.isBasicType then
       val basicType = actual.asInstanceOf[BasicType]
       basicType != BasicType.VOID && {
         val boxed = Boxing.boxedType(table, basicType)
         // An applied target is matched against the box's own view, not by erasure:
         // `val y: Comparable[String] = 5` is rejected (#2594).
+        // A nullable target (`Comparable[String]?`) checks its inner type the same way (#2649).
         expected match
           case applied: AppliedClassType => boxSupertypeAccepts(table, applied, boxed)
+          case n: NullableType if n.innerType.isInstanceOf[AppliedClassType] =>
+            boxSupertypeAccepts(table, n.innerType.asInstanceOf[AppliedClassType], boxed)
           case _ => TypeRules.isAssignable(expected, boxed)
       }
     else if expected.isBasicType && !actual.isBasicType then

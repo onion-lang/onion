@@ -1,6 +1,6 @@
 package onion.compiler.typing
 
-import onion.compiler.{Modifier, SemanticError, Typing}
+import onion.compiler.{AST, Location, Modifier, SemanticError, Typing}
 import onion.compiler.TypedAST.*
 import onion.compiler.TermWalk
 
@@ -65,14 +65,38 @@ final class ContractFramingPass(typing: Typing) {
   }
 
   private def checkFields(classes: Seq[ClassDefinition]): Unit =
-    for (cd <- classes; clause <- cd.invariants ++ cd.histories)
+    for {
+      cd <- classes
+      (clause, source) <- cd.invariants.zipAll(cd.invariantSources, null, null) ++
+        cd.histories.zipAll(cd.historySources, null, null)
+      if clause != null
+    }
       TermWalk.exists(clause) {
         case r: RefField =>
-          if (!isValueType(r.field.`type`))
-            typing.report(SemanticError.CONTRACT_FIELD_NOT_VALUE, r.location, r.field.name, r.field.`type`.name)
+          if (!isValueType(r.field.`type`)) {
+            val location = if (r.location != null) r.location else fieldLocation(source, r.field.name)
+            typing.report(SemanticError.CONTRACT_FIELD_NOT_VALUE, location, r.field.name, r.field.`type`.name)
+          }
           false
         case _ => false
       }
+
+  /**
+   * Where a clause's source names `field` (#2605, item 1): a typed field read carries no
+   * location, so the error would print `file::` with no line. The first `field`, `this.field`
+   * or `self.field` in the clause, else the clause itself.
+   */
+  private def fieldLocation(source: AST.Expression, field: String): Location = {
+    def find(node: Any): Option[Location] = node match {
+      case AST.Id(loc, `field`) if loc != null => Some(loc)
+      case AST.UnqualifiedFieldReference(loc, `field`) if loc != null => Some(loc)
+      case AST.MemberSelection(loc, _: AST.CurrentInstance, `field`) if loc != null => Some(loc)
+      case p: Product => p.productIterator.map(find).collectFirst { case Some(l) => l }
+      case xs: Iterable[?] => xs.iterator.map(find).collectFirst { case Some(l) => l }
+      case _ => None
+    }
+    if (source == null) null else find(source).getOrElse(source.location)
+  }
 
   private def isValueType(t: Type): Boolean = t match {
     case _: BasicType => true

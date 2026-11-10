@@ -43,8 +43,34 @@ private[typing] object TypeRelations {
       val views = table.appliedViewsOf(a)(AppliedTypeViews.collectAppliedViewsFrom(a))
         .collect { case (raw, view) if sameClass(raw, e.raw) => view }
       views.nonEmpty && views.forall(v => !TypeCheckingHelpers.containsTypeVariable(v)) &&
-        !boxSupertypeAccepts(table, e, a)
+        !boxSupertypeAccepts(table, e, a) && views.forall(v => argumentsDisjoint(e, v))
     case _ => false
+
+  /** Some type argument of `expected` and of the class's own `view` can share no value:
+   *  `Comparable[String]` against `Comparable[Integer]`. Related arguments
+   *  (`Iterable[Object]` against `Iterable[String]`, `Map[String, String]` against
+   *  `Properties`' `Map[Object, Object]`) are left to the old rule: such a value can
+   *  still work at run time, so rejecting it would be a break, not a fix (#2649). */
+  private def argumentsDisjoint(expected: AppliedClassType, view: AppliedClassType): Boolean =
+    expected.typeArguments.length == view.typeArguments.length &&
+      expected.typeArguments.indices.exists(i => provablyDisjoint(expected.typeArguments(i), view.typeArguments(i)))
+
+  private def provablyDisjoint(left: Type, right: Type): Boolean =
+    def core(t: Type): Type = t match
+      case n: NullableType => n.innerType
+      case other => other
+    def erased(c: ClassType): ClassType = c match
+      case ap: AppliedClassType => ap.raw
+      case other => other
+    (core(left), core(right)) match
+      case (_: TypeVariableType, _) | (_, _: TypeVariableType) => false
+      case (l: ClassType, r: ClassType) =>
+        val (le, re) = (erased(l), erased(r))
+        // A non-final class and an interface can meet in a subclass (JLS 5.5.1).
+        def mayMeet(x: ClassType, y: ClassType): Boolean =
+          x.isInterface && !java.lang.reflect.Modifier.isFinal(y.modifier)
+        !TypeRules.isSuperType(le, re) && !TypeRules.isSuperType(re, le) && !mayMeet(le, re) && !mayMeet(re, le)
+      case _ => false
 
   /** A bare, Onion-declared type variable (`[T]`, or `[T extends B?]`): its type
    *  arguments may be nullable, so `null` is a valid `T` and W0012 does not apply

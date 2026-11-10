@@ -394,7 +394,17 @@ final class ConstructionTyping(
       }
     }
 
-    val constructors0 = typeRef.findConstructor(parameters0)
+    // The exact match goes by erasure; drop a constructor whose parameter the argument's
+    // own view contradicts, as a method call already does: `new D(b)` with `b: JInteger`
+    // and `def this(c: Comparable[String])` compiled and threw (#2649).
+    def ownViewAccepts(ctors: Array[TypedAST.ConstructorRef], params: Array[Term]): Array[TypedAST.ConstructorRef] =
+      ctors.filter { c =>
+        val formals = c.getArgs
+        formals.length != params.length || formals.indices.forall { i =>
+          params(i) == null || !TypeRelations.ownViewRejects(bodyContext.table, formals(i), params(i).`type`)
+        }
+      }
+    val constructors0 = ownViewAccepts(typeRef.findConstructor(parameters0), parameters0)
     // Exact matching is substitution-blind (an applied Pair[String, Integer]
     // still exposes (A, B)): retry against the substituted signatures with
     // boxing so 'new Pair[String, Integer]("x", 42)' boxes 42
@@ -454,7 +464,7 @@ final class ConstructionTyping(
     val parameters = retyped.getOrElse(parameters0)
     val constructors = retyped match {
       case Some(newParams) =>
-        val exact = typeRef.findConstructor(newParams)
+        val exact = ownViewAccepts(typeRef.findConstructor(newParams), newParams)
         if (exact.nonEmpty) exact else findConstructorWithBoxing(typeRef, newParams)
       case None => constructors1
     }

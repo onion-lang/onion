@@ -387,7 +387,15 @@ private[compiler] final class MethodBodySupport(
       else
         val params0 = context.withArgumentSlots(typedTerms(node.superInits.toArray, context))
         if params0 != null then reportThisBeforeDelegation(params0, node.superInits)
-        val matched0 = targetClass.findConstructor(params0)
+        // Same own-view guard as `new` (#2649): `: Base(b)` with `b: JInteger` into
+        // `def this(c: Comparable[String])` must not match by erasure.
+        val matched0 = if params0 == null then targetClass.findConstructor(params0) else
+          targetClass.findConstructor(params0).filter { c =>
+            val formals = c.getArgs
+            formals.length != params0.length || formals.indices.forall { i =>
+              params0(i) == null || !TypeRelations.ownViewRejects(bodyContext.table, formals(i), params0(i).`type`)
+            }
+          }
         // Exact matching is substitution-blind: an applied Box[Int] still exposes
         // the constructor as Box(T) over the erased bound (Object), so a primitive
         // argument (Int) does not match. Retry against the type-argument-

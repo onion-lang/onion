@@ -1,5 +1,5 @@
 ### Fixed
 
 - **`val y: Comparable[String] = b` with `b: JInteger` is a compile error (#2649).**
-  - Before: it compiled, then threw `ClassCastException` at the first `compareTo`. So did `b as Comparable[String]`, `"s" as Comparable[JInteger]`, `[b]` or `[5]` as a `List[Comparable[String]]`, `o ?: 5`, and a `Comparable[String]?` target.
-  - Now: E0000. A class whose own view is `Comparable[Integer]` fits only that view, as a primitive `5` already did (#2594). `Comparable[JInteger]`, `Object` and `Number` still take it.
+  - Before: it compiled, then threw `ClassCastException` at the first `compareTo`. So did `b as Comparable[String]`, `"s" as Comparable[JInteger]`, `[b]` or `[5]` as a `List[Comparable[String]]`, a `Comparable[String]?` target, `o ?: 5`, and `new D(b)` / `new R(b)` / `extends Base(b)` into a `Comparable[String]` parameter.
+  - Now: E0000 (E0001 for `?:`, E0005 for a method argument, E0021 for a constructor argument). It applies only when the type arguments can share no value (`String` vs `Integer`). `Comparable[JInteger]`, `Object`, `Number`, and related arguments (`new Properties()` as `Map[String, String]`) still compile.

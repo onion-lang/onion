@@ -311,6 +311,23 @@ class NullableCastSpec extends AbstractShellSpec {
         assert(msgs.contains("E0021"), s"expected E0021 for <$decl>, got $msgs")
       }
     }
+    it("rejects an interface type argument that a final class's own argument can never meet") {
+      for (body <- Seq(
+        "val b: JInteger = 5\n  val s: Comparable[CharSequence] = b",
+        "val b: JInteger = 5\n  val s = (b as Comparable[CharSequence])",
+        "val s: Comparable[Runnable] = \"s\"",
+        "val q: Comparable[Runnable] = new Q()"
+      )) {
+        val msgs = compileErrors(
+          s"${imports}final class Q conforms Comparable[Q] { public: def compareTo(o: Q): Int = 0 }\ndef main(args: String[]): void {\n  $body\n}\n")
+        assert(msgs.nonEmpty, s"expected a compile error for <$body>")
+      }
+    }
+    it("still accepts an interface type argument against a non-final class's own argument") {
+      val msgs = compileErrors(
+        s"${imports}def main(args: String[]): void {\n  val c: Comparable[CharSequence] = new Date()\n}\n")
+      assert(msgs.isEmpty, s"expected no compile error, got $msgs")
+    }
     it("leaves related type arguments to the old rule (no break)") {
       val r = shell.run(
         imports +

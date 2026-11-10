@@ -68,7 +68,7 @@ private[typing] object TypeRelations {
         val (le, re) = (erased(l), erased(r))
         // A non-final class and an interface can meet in a subclass (JLS 5.5.1).
         def mayMeet(x: ClassType, y: ClassType): Boolean =
-          x.isInterface && !java.lang.reflect.Modifier.isFinal(y.modifier)
+          x.isInterface && !onion.compiler.Modifier.isFinal(y.modifier)
         !TypeRules.isSuperType(le, re) && !TypeRules.isSuperType(re, le) && !mayMeet(le, re) && !mayMeet(re, le)
       case _ => false
 

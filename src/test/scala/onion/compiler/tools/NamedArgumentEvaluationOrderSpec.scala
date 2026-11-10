@@ -153,6 +153,45 @@ class NamedArgumentEvaluationOrderSpec extends AbstractShellSpec {
       assert(result == Shell.Success("true"))
     }
 
+    // #2800 panel, round 3: a reordered argument that calls something needs a temporary.
+    // The state machine evaluates a tail call's arguments into its own slots, in written
+    // order, so the group stays a loop instead of falling back with W0016.
+    it("still becomes a loop when a reordered tail-call argument calls a method") {
+      val result = shell.run(
+        """class M {
+          |private:
+          |  static def id(i: Int): Int = i
+          |  static @TailRecursive def ev(n: Int, s: Int): Boolean = if n == 0 { true } else { od(n - 1, s) }
+          |  static @TailRecursive def od(n: Int, s: Int): Boolean = if n == 0 { false } else { ev(s = id(s), n = n - 1) }
+          |public:
+          |  static def main(args: String[]): String = "" + ev(100000000, 0)
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result == Shell.Success("true"))
+    }
+
+    it("evaluates a reordered tail call's arguments in written order inside the loop") {
+      val result = shell.run(
+        """class M {
+          |private:
+          |  static val sb: StringBuilder = new StringBuilder()
+          |  static def t(i: Int): Int { sb.append(i); return i }
+          |  static @TailRecursive def a(n: Int, s: Int): String = if n == 0 { sb.toString() } else { b(n - 1, s) }
+          |  static @TailRecursive def b(n: Int, s: Int): String = if n == 0 { sb.toString() } else { a(s = t(s + 1), n = t(n - 1)) }
+          |public:
+          |  static def main(args: String[]): String = a(4, 0) + ":" + a(200001, 0).length()
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Success])
+      assert(result.asInstanceOf[Shell.Success].value.toString.startsWith("1220:"))
+    }
+
     it("still evaluates arguments with side effects in written order") {
       assert(run(
         """    val log = new Log()

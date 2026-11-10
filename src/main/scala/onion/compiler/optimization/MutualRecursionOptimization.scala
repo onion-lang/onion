@@ -294,9 +294,21 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // introduces starting at exactly that index once every member's body is spliced
     // into one shared frame -- producing invalid bytecode (a JVM VerifyError at
     // class-load time) instead of either compiling correctly or failing to compile.
+    // The temporaries that hold a tail call's out-of-order named arguments are the one
+    // exception: the transition stores those values in its own slots instead (#2800).
     val paramCountForLocals = group.head.arguments.length
-    val declaresExtraLocal = group.find(m => referencesLocalBeyondParams(m.getBlock, paramCountForLocals))
+    val declaresExtraLocal = group.find { m =>
+      val temporaries = argumentTemporaries(m.getBlock, group, paramCountForLocals)
+      referencesLocalBeyondParams(m.getBlock, paramCountForLocals, temporaries)
+    }
     declaresExtraLocal.foreach { method =>
+      // A nested call that names arguments out of order gets temporaries too; say so
+      // rather than blame the user for a local they never declared.
+      val extra = localsBeyondParams(method.getBlock, paramCountForLocals)
+      if (extra.nonEmpty && extra.subsetOf(callArgumentTemporaries(method.getBlock, paramCountForLocals)))
+        break(Some(s"a call in method ${method.name} names arguments out of parameter order, and running " +
+          "them in written order needs a temporary the generated state machine method has no slot for " +
+          "(write that call's arguments in parameter order)"))
       break(Some(s"method ${method.name} declares a local variable beyond its parameter list, " +
         "which the generated state machine method cannot give a non-overlapping slot"))
     }
@@ -363,12 +375,120 @@ class MutualRecursionOptimization(config: CompilerConfig)
    * `validateGroup` for why such a local cannot safely share the merged state machine's
    * frame.
    */
-  private def referencesLocalBeyondParams(body: StatementBlock, paramCount: Int): Boolean =
+  private def referencesLocalBeyondParams(body: StatementBlock, paramCount: Int, except: Set[Int]): Boolean =
     TermWalk.existsIn(body) {
-      case ref: TypedAST.RefLocal => ref.frame == 0 && ref.index >= paramCount
-      case set: TypedAST.SetLocal => set.frame == 0 && set.index >= paramCount
+      case ref: TypedAST.RefLocal => ref.frame == 0 && ref.index >= paramCount && !except(ref.index)
+      case set: TypedAST.SetLocal => set.frame == 0 && set.index >= paramCount && !except(set.index)
       case _                      => false
     }
+
+  private def localsBeyondParams(body: StatementBlock, paramCount: Int): Set[Int] = {
+    val found = mutable.Set[Int]()
+    TermWalk.existsIn(body) {
+      case ref: TypedAST.RefLocal if ref.frame == 0 && ref.index >= paramCount => found += ref.index; false
+      case set: TypedAST.SetLocal if set.frame == 0 && set.index >= paramCount => found += set.index; false
+      case _ => false
+    }
+    found.toSet
+  }
+
+  /** The temporaries of every call in `body` whose named arguments are out of order. */
+  private def callArgumentTemporaries(body: StatementBlock, paramCount: Int): Set[Int] = {
+    val found = mutable.Set[Int]()
+    def add(params: Array[Term]): Boolean = {
+      if (params != null) argumentStores(params, paramCount).foreach(found ++= _._2)
+      false
+    }
+    TermWalk.existsIn(body) {
+      case c: Call       => add(c.parameters)
+      case c: SafeCall   => add(c.parameters)
+      case c: CallStatic => add(c.parameters)
+      case c: CallSuper  => add(c.params)
+      case n: NewObject  => add(n.parameters)
+      case _             => false
+    }
+    found.toSet
+  }
+
+  /**
+   * The local slots `body` uses only to hold out-of-order named arguments of the tail
+   * calls `transformMethodBodyForStateMachine` turns into state transitions. Those calls
+   * are the `return`s it reaches through blocks and `if` branches.
+   */
+  private def argumentTemporaries(body: StatementBlock, group: Seq[MethodDefinition], paramCount: Int): Set[Int] = {
+    def inGroup(target: Method): Boolean = target match {
+      case m: MethodDefinition => group.exists(_ eq m)
+      case _                   => false
+    }
+    def tailCallParams(term: Term): Option[Array[Term]] = term match {
+      case call: Call if inGroup(call.method)             => Some(call.parameters)
+      case call: CallStatic if inGroup(call.method)       => Some(call.parameters)
+      case _                                              => None
+    }
+    def visit(stmt: ActionStatement): Set[Int] = stmt match {
+      case ret: Return if ret.term != null =>
+        tailCallParams(ret.term)
+          .filterNot(_.exists(_.isInstanceOf[DefaultArgument]))
+          .flatMap(params => argumentStores(params, paramCount))
+          .map(_._2)
+          .getOrElse(Set.empty)
+      case block: StatementBlock => block.statements.toSeq.flatMap(visit).toSet
+      case ifStmt: IfStatement =>
+        visit(ifStmt.thenStatement) ++ (if (ifStmt.elseStatement != null) visit(ifStmt.elseStatement) else Set.empty)
+      case _ => Set.empty
+    }
+    visit(body)
+  }
+
+  /**
+   * A tail call's arguments as `(parameter index, value)` pairs, in the order the call
+   * evaluates them, with the temporaries' slots.
+   *
+   * Named arguments written out of parameter order arrive stored in temporaries
+   * (`ArgumentHelpers.evaluateInWrittenOrder`): one argument is a `Begin` of
+   * `SetLocal(temporary, value)` stores, in written order, and each reordered parameter
+   * reads its temporary. The values go straight to their parameters instead, in the same
+   * order, so the temporaries disappear. `None` when the arguments use a local slot in
+   * any other way; the check that follows then reports it.
+   */
+  private def argumentStores(params: Array[Term], paramCount: Int): Option[(Seq[(Int, Term)], Set[Int])] = {
+    def isTemporaryStore(t: Term): Boolean = t match {
+      case set: SetLocal => set.frame == 0 && set.index >= paramCount
+      case _             => false
+    }
+    val begins = params.indices.filter { i =>
+      params(i) match {
+        case b: Begin => b.terms.length >= 2 && b.terms.init.forall(isTemporaryStore)
+        case _        => false
+      }
+    }
+    if (begins.isEmpty) return Some((params.indices.map(i => (i, params(i))), Set.empty))
+    if (begins.size > 1) return None
+    val first = begins.head
+    val begin = params(first).asInstanceOf[Begin]
+    val stores = begin.terms.init.map(_.asInstanceOf[SetLocal]).toSeq
+    val temporaries = stores.map(_.index)
+    if (temporaries.distinct.size != temporaries.size) return None
+    def readsTemporary(t: Term): Option[Int] = t match {
+      case ref: RefLocal if ref.frame == 0 && temporaries.contains(ref.index) => Some(ref.index)
+      case _                                                                   => None
+    }
+    // Each temporary is read by exactly one parameter: `first` (through the Begin's last
+    // term) or another one, directly.
+    val slotOf: Map[Int, Int] = params.indices.flatMap { i =>
+      readsTemporary(if (i == first) begin.terms.last else params(i)).map(_ -> i)
+    }.toMap
+    val reads = params.indices.count(i => readsTemporary(if (i == first) begin.terms.last else params(i)).isDefined)
+    if (slotOf.size != temporaries.size || reads != temporaries.size) return None
+    val steps = params.indices.flatMap { i =>
+      if (i == first)
+        stores.map(set => (slotOf(set.index), set.value)) ++
+          (if (readsTemporary(begin.terms.last).isEmpty) Seq((first, begin.terms.last)) else Nil)
+      else if (readsTemporary(params(i)).isDefined) Nil
+      else Seq((i, params(i)))
+    }
+    Some((steps, temporaries.toSet))
+  }
 
   /**
    * Check if method is private
@@ -822,9 +942,11 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // Temporary variables come after state loop variable
     val tempOffset = stateLoopVarIndex + 1
 
-    // Step 1: Assign new argument values to temporary variables
-    for (i <- newArgs.indices) {
-      val newValue = newArgs(i)
+    // Step 1: Assign new argument values to temporary variables, in the order the call
+    // evaluates them (named arguments run in written order, #2800)
+    val stores = argumentStores(newArgs, stateLoopVarIndex).map(_._1)
+      .getOrElse(newArgs.indices.map(i => (i, newArgs(i))))
+    for ((i, newValue) <- stores) {
       val tempIndex = tempOffset + i
       val paramType = paramTypes(i)
 

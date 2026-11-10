@@ -138,23 +138,24 @@ private[compiler] final class DeclarationBodySupport(
   }
 
   /**
-   * Every name the defaults mention as a variable, a call (bare, qualified or static) or a
-   * constructed type. The scan walks every field of every node, closures and trailing lambdas
+   * Every name the defaults mention: any node's `name` (a variable, a call of any form, a
+   * member) and every type they name. The scan walks every field of every node, closures and trailing lambdas
    * included, so no node kind can hide a read (panel round 2 on #2798). A false match only
    * keeps a default in source order, as on `main`.
    */
   private def mentionedNames(args: List[AST.Argument]): Set[String] = {
     val names = scala.collection.mutable.Set.empty[String]
     def visit(x: Any): Unit = x match {
-      case id: AST.Id => names += id.name
-      case call: AST.UnqualifiedMethodCall => names += call.name; call.productIterator.foreach(visit)
-      case call: AST.MethodCall => names += call.name; call.productIterator.foreach(visit)
-      case call: AST.SafeMethodCall => names += call.name; call.productIterator.foreach(visit)
-      case call: AST.StaticMethodCall => names += call.name; call.productIterator.foreach(visit)
       case ref: AST.ReferenceType => names += ref.name.split('.').last
       case _: Location => ()
       case xs: IterableOnce[?] => xs.iterator.foreach(visit)
-      case p: Product => p.productIterator.foreach(visit)
+      // Any node's `name` field counts, so no call form (`super.g()`, a trait call, a member
+      // selection, ...) can hide a dependency (panel round 4 on #2798).
+      case p: Product =>
+        p.productElementNames.zip(p.productIterator).foreach {
+          case ("name", name: String) => names += name
+          case (_, child) => visit(child)
+        }
       case _ => ()
     }
     args.foreach(a => if (a.defaultValue != null) visit(a.defaultValue))

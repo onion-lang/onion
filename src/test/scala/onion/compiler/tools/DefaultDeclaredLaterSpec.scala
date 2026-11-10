@@ -297,6 +297,24 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
           |println(f())
         """) == "10")
     }
+
+    it("is held back when it calls an inherited held-back default through super") {
+      assert(output(
+        """
+          |val k = 5
+          |class Base {
+          |public:
+          |  def this {}
+          |  def g(b: Int = k): Int = b
+          |}
+          |class Sub extends Base {
+          |public:
+          |  def this {}
+          |  def f(a: Int = super.g()): Int = a
+          |}
+          |println(new Sub().f())
+        """) == "5")
+    }
   }
 
   describe("a default that omits another method's default") {

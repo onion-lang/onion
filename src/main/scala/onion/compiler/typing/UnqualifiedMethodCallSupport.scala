@@ -143,7 +143,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       }.toSet
       typeUnqualifiedCallWithClosures(node, context, expected, closureIndices)
     } else if (methods.length == 0) {
-      staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected) match {
+      staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected, context) match {
         case MethodFallbackLookup.Found(term) =>
           checkRegexLiteral(node, term)
           Some(term)
@@ -249,7 +249,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         // callable value or static import is genuinely absent).
         val params0 = calls.typedTerms(node.args.toArray, context)
         if (params0 == null) return None
-        staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params0, expected) match {
+        staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params0, expected, context) match {
           case MethodFallbackLookup.Found(term) =>
             checkRegexLiteral(node, term)
             Some(term)

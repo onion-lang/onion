@@ -323,12 +323,52 @@ object AsmRefs {
     private val parsed =
       if (method.signature != null) mapper.parseMethod(method.signature, method.desc)
       else null
-    override val typeParameters: Array[TypedAST.TypeParameter] =
-      if (parsed == null) Array()
-      else parsed.typeParameters.clone()
     private val argTypes: Array[TypedAST.Type] = markNullable(method,
       if (parsed == null) Type.getArgumentTypes(method.desc).map(bridge.toOnionType)
       else parsed.arguments)
+    // The trailing parameters an Onion compilation marked as type-class dictionaries (#2768):
+    // each is `Trait[T]?` for one `[T: Trait]` constraint, in declaration order.
+    private val dictionaryIndices: Array[Int] = {
+      val marks = method.invisibleParameterAnnotations
+      if (marks == null || marks.length != argTypes.length) Array()
+      else argTypes.indices.filter { i =>
+        val list = marks(i)
+        list != null && {
+          val it = list.iterator
+          var found = false
+          while (it.hasNext && !found) found = it.next().desc == onion.compiler.backend.asm.NullabilityMetadata.DictionaryDescriptor
+          found
+        }
+      }.toArray
+    }
+    override val typeParameters: Array[TypedAST.TypeParameter] = {
+      val tps = if (parsed == null) Array[TypedAST.TypeParameter]() else parsed.typeParameters.clone()
+      dictionaryIndices.foreach { i =>
+        val dictionary = argTypes(i) match {
+          case n: TypedAST.NullableType => n.innerType
+          case other => other
+        }
+        dictionary match {
+          case a: TypedAST.AppliedClassType if a.typeArguments.length == 1 =>
+            a.typeArguments(0) match {
+              case tv: TypedAST.TypeVariableType =>
+                val at = tps.indexWhere(_.name == tv.name)
+                if (at >= 0) tps(at) = tps(at).copy(constraints = tps(at).constraints :+ a.raw)
+              case _ =>
+            }
+          case _ =>
+        }
+      }
+      tps
+    }
+    // A dictionary is never written at a call: the typer fills it, so it counts as defaulted.
+    private lazy val withDefaults: Array[TypedAST.MethodArgument] =
+      argTypes.indices.map { i =>
+        val default = if (dictionaryIndices.contains(i)) Some(new TypedAST.NullValue(null)) else None
+        TypedAST.MethodArgument(s"arg$i", argTypes(i), default)
+      }.toArray
+    override def argumentsWithDefaults: Array[TypedAST.MethodArgument] =
+      if (dictionaryIndices.isEmpty) super.argumentsWithDefaults else withDefaults
     // Keep the stored signature isolated from callers. Count-only queries need
     // not allocate the defensive array.
     override def arguments: Array[TypedAST.Type] = argTypes.clone()

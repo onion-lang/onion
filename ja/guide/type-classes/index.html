@@ -4883,7 +4883,10 @@
 </span></code></pre></div>
 <p><code>(trait, 型)</code> ごとにインスタンスは <strong>1つまで</strong>です（コヒーレンス）。プリミティブと
 ボックス型は同じ型として扱われるので、<code>Numeric[Int]</code> と <code>Numeric[Integer]</code> は同一
-インスタンスです。両方を宣言するとエラーになります。</p>
+インスタンスです。両方を宣言するとエラーになります。この規則はプログラム全体で成り立ちます。
+別の <code>module</code> に2つ目の <code>instance Numeric[Int]</code> を書いても、同じエラー（E0097）です。</p>
+<p>インスタンスが見つかるのは、次のどこかで宣言したときです。それを必要とするコードのモジュール、
+trait のモジュール、型のモジュール、または <code>module</code> 行のないファイルです。</p>
 <h2 id="_4">制約付きジェネリック<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <p><code>[T: Numeric]</code> と書くと「<code>T</code> は <code>Numeric</code> インスタンスを持つ」ことを要求できます。
 本体では <code>Numeric[T]::method(...)</code> の形でトレイトのメソッドを呼びます。</p>

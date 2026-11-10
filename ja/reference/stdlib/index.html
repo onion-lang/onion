@@ -10877,7 +10877,8 @@ null なプラットフォーム型の <code>List</code> に対して直接呼�
 </span><span id="__span-149-3"><a id="__codelineno-149-3" name="__codelineno-149-3" href="#__codelineno-149-3"></a>Http::postResponse(url, body): Response
 </span><span id="__span-149-4"><a id="__codelineno-149-4" name="__codelineno-149-4" href="#__codelineno-149-4"></a>Http::postResponse(url, body, headers): Response
 </span></code></pre></div>
-<p><code>Response</code> は <code>status: Int</code>、<code>body: String</code>、<code>headers: List</code> のフィールドと、
+<p><code>Response</code> は <code>status(): Int</code>、<code>body(): String</code>、<code>headers(): List</code> のアクセサ
+（括弧なしの <code>r.status</code> も同じメソッドを呼ぶ）と、
 <code>isOk(): Boolean</code>（2xx）・<code>isError(): Boolean</code>（4xx/5xx）のヘルパー、
 <code>header(name): String?</code>（そのヘッダーの最初の値。大文字小文字を区別しない）を持つ。
 ボディだけでなくステータスコードやヘッダーが必要なときに使う。</p>

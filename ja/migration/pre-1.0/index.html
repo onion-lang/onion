@@ -2273,6 +2273,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#httpresponse-status-body-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Http.Response は status() / body() / headers() だけで読むようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-trait-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1つの trait と型に対するインスタンスは、モジュールをまたいでも1つだけになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4983,6 +5005,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#httpresponse-status-body-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Http.Response は status() / body() / headers() だけで読むようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-trait-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1つの trait と型に対するインスタンスは、モジュールをまたいでも1つだけになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5288,7 +5332,11 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li><strong>見えるもの:</strong> 偽の述語は <strong>E0113</strong> になります。サンプルを作れない引数の型も、黙って通さず E0113 です。
   <code>--contracts</code> は既定で有効（<code>check</code>）です。</li>
 <li><strong>シードとサンプル数:</strong> <code>--law-seed</code> と <code>--law-samples</code> は <code>--contract-seed</code> と <code>--contract-samples</code> になり、<code>--no-check-laws</code> は無くなりました（<code>--contracts off</code> を使います）。</li>
-<li><strong><code>onion.Shape</code>:</strong> 実装するクラスは、それを使う述語を少なくとも1つ必要とします（なければ E0080）。</li>
+<li><strong><code>onion.Shape</code>:</strong> 実装するクラスのファイルに述語は不要になりました（E0080 は廃止です）。</li>
+<li><strong>プロジェクト全体の更新:</strong> <code>onion migrate src/</code> は、<code>law</code> と <code>example</code> をこの形に書き換えます。</li>
+<li>式1つの本体は <code>= expr</code> になります。それより長い本体はブロックのまま残し、最後の文の前に <code>return</code> を置きます。</li>
+<li>名前のない <code>example</code> は <code>example1</code>、<code>example2</code>、... と名付けます。名前は自由に変えてかまいません。</li>
+<li>書き換えてもコンパイルできないファイルは元のまま残し、その行を表示します。</li>
 </ul>
 <h2 id="invariant-history-this"><code>invariant</code> や <code>history</code> が名指すフィールドは <code>this</code> を通してしか書けなくなりました<a class="headerlink" href="#invariant-history-this" title="Permanent link">&para;</a></h2>
 <p>契約はプレビュー機能です（RFC #2557）。クラスの <code>invariant</code> や <code>history</code> が名指すフィールドは、
@@ -5436,6 +5484,45 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li>戻り値の型が別の参照型（<code>String?</code>、<code>Object</code>、<code>CharSequence</code>）のときは、メソッドの位置で <strong>E0000</strong> になります。ヒントは、null になりうる値に <code>?:</code> を使うよう勧めます。</li>
 <li>どちらかの戻り値の型がプリミティブ型（<code>toString(): Int</code>、<code>hashCode(): Long</code>）のときは <strong>E0104</strong> になります。</li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> <code>null</code> の代わりに何を返すかは利用者が決めるためです。</li>
+</ul>
+<h2 id="httpresponse-status-body-headers"><code>Http.Response</code> は <code>status()</code> / <code>body()</code> / <code>headers()</code> だけで読むようになりました<a class="headerlink" href="#httpresponse-status-body-headers" title="Permanent link">&para;</a></h2>
+<p><code>Http.Response</code> には、同じ名前の公開フィールドとアクセサメソッドがありました。フィールドは非公開になりました。<code>Server.Response</code> や <code>Proc.Result</code> と同じです。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Http</span><span class="o">::</span><span class="nf">getResponse</span><span class="p">(</span><span class="s2">"https://example.com"</span><span class="p">)</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nf">println</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="n">status</span><span class="p">)</span><span class="w">     </span><span class="c1">// これまでどおりコンパイルできる: status() を呼ぶ</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="nf">println</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="nf">status</span><span class="p">())</span><span class="w">   </span><span class="c1">// 同じ呼び出し</span>
+</span></code></pre></div>
+<ul>
+<li><strong>Onion のソース:</strong> 変更は不要です。読めるフィールドがないので、<code>r.status</code> は <code>status()</code> を呼びます。</li>
+<li><strong>表示されるもの:</strong> 古い <code>onionc</code> がフィールドを読むように生成した <code>.class</code> ファイルを実行すると、<code>IllegalAccessError</code> になります。再コンパイルしてください。</li>
+<li><strong>Java のコード:</strong> <code>r.status()</code>、<code>r.body()</code>、<code>r.headers()</code> と書いてください。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> Onion の書き方はどれもそのままコンパイルできるため、書き換えるものがありません。</li>
+</ul>
+<h2 id="1-trait-1">1つの trait と型に対するインスタンスは、モジュールをまたいでも1つだけになりました<a class="headerlink" href="#1-trait-1" title="Permanent link">&para;</a></h2>
+<p>ある trait のある型に対する <code>instance</code> は、プログラム全体で1回だけ宣言できます。
+これまでは、別の <code>module</code> に2つ目を書いてもコンパイルでき、<code>module</code> 行のないファイルのものだけが使われていました。
+今は2つ目がエラーになります。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1">// shapes.on</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kn">module</span><span class="w"> </span><span class="n">shapes</span><span class="p">;</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="kd">trait</span><span class="w"> </span><span class="nc">Show</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="p">}</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="kd">instance</span><span class="w"> </span><span class="nc">Show</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lib "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">x</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="p">}</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1">// app.on: 以前はコンパイルできた。今は E0097。このインスタンスか shapes.on のものを削除する。</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="kn">module</span><span class="w"> </span><span class="n">app</span><span class="p">;</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">shapes</span><span class="p">.</span><span class="nc">Show</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="kd">instance</span><span class="w"> </span><span class="nc">Show</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">x</span>
+</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> 2つ目のインスタンスで <strong>E0097</strong> <code>instance shapes.Show[java.lang.Integer] is already defined</code>。</li>
+<li><strong>直し方:</strong> インスタンスを1つだけ残し、もう1つを削除してください。</li>
+<li><strong>同じパッケージの2つのファイル</strong>（どちらも <code>module</code> 行なし）では、これまでどおり <strong>E0008</strong> <code>duplicated class definition Show$$Integer</code> になります。直し方は同じです。</li>
+<li><strong>型の型引数:</strong> E0097 は外側の型だけを比べます。そのため <code>Show[List[String]]</code> と <code>Show[List[Integer]]</code> は同じインスタンスとみなされ、衝突します。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> どちらのインスタンスを残すかは、あなたが決めることです。</li>
 </ul>
 
 

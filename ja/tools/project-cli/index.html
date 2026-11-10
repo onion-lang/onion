@@ -5265,6 +5265,16 @@ Gitリポジトリの初期化は行われず、既存のパスを上書きす�
 <td><code>ret a + b</code></td>
 <td><code>yield a + b</code></td>
 </tr>
+<tr>
+<td>レコードの <code>law</code>（0.151.0 で削除）</td>
+<td><code>law rt(p: Pt) { e }</code></td>
+<td><code>public: static def rt(p: Pt): Boolean ensures result = e</code></td>
+</tr>
+<tr>
+<td>レコード内またはトップレベルの <code>example</code></td>
+<td><code>example { e }</code></td>
+<td><code>static def example1(): Boolean ensures result = e</code>（トップレベルは <code>def</code>）</td>
+</tr>
 </tbody>
 </table>
 <p><code>do</code> ブロックの最後の節（clause、<code>do</code> ブロック内の一つの式や束縛）の先頭にある <code>ret</code> は、古いキーワードかもしれません。別の場所で宣言された <code>ret</code> という名前（継承したメソッドやフィールド）と、それに続く別の節かもしれません。区別できるのはコンパイラだけです。</p>
@@ -5291,6 +5301,10 @@ Gitリポジトリの初期化は行われず、既存のパスを上書きす�
 </tbody>
 </table>
 <p>後ろに別の節が続く <code>ret</code>（<code>ret(a); yield a</code>）は、常に <code>note:</code> を表示してそのまま残します。古いキーワードは最後の節にしか書けなかったので、これは呼び出しです。</p>
+<p><code>law</code> と <code>example</code> も同じ条件で書き換えます。そのままではコンパイルできず、書き換えるとコンパイルできるときだけです。
+トップレベルの <code>example { e }</code> は、今の文法では関数 <code>example</code> の呼び出しとしても読めます。その呼び出しがコンパイルできるファイルは変更しません。
+<code>::*</code> のインポートがあるファイルのトップレベルの <code>example</code> も変更しません。そのインポートが関数 <code>example</code> を持ち込むかもしれないからです。<code>note:</code> でそう表示します。
+偽の述語は書き換えても偽のままです。書き換え後は E0113 になるので、そのファイルは書き換えずに、その節の行を示して報告します。</p>
 <p>変更ごとの説明は <a href="../../migration/pre-1.0/">1.0 への移行</a> を参照してください。</p>
 <h3 id="onion-doc"><code>onion doc</code><a class="headerlink" href="#onion-doc" title="Permanent link">&para;</a></h3>
 <p>API ドキュメントを HTML で生成します。プロジェクト内で引数なしに実行すると、<code>src/</code> 配下の

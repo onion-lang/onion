@@ -5064,6 +5064,13 @@ ground type.</p>
   implementing the interface with a <code>public static final INSTANCE</code>, private ctor,
   concrete primitive-typed methods plus auto-generated <code>ACC_BRIDGE</code> erased
   methods. Coherence-key name mangling <code>&lt;traitFqn&gt;$$&lt;erasedTypeKey&gt;</code>.</li>
+<li><strong>As implemented (v1, #2770):</strong> the class is named <code>&lt;TraitSimpleName&gt;$$&lt;TypeSimpleName&gt;</code>
+    and lives in the package of the unit that declares the <code>instance</code> (Rewriting lowers it
+    before the trait resolves, so the trait's package is not known yet). A call site looks
+    for that name in four packages, in order: the caller's module, the trait's, the type
+    argument's, and the default package. A candidate counts only if its <code>Trait[X]</code>
+    interface is this trait and <code>X</code> is exactly the requested type (fully qualified, boxed),
+    so <code>Show$$Point</code> declared for <code>pa.Point</code> is never passed for a <code>pb.Point</code>.</li>
 <li><strong>Constrained method</strong> gets <strong>trailing</strong> hidden params
   <code>$dict$Numeric$T : onion.dict.Numeric</code>, one per <code>(typeParam, constraint)</code> in a
   deterministic order (trailing minimizes disruption to arg emission and value-param
@@ -5083,8 +5090,10 @@ ground type.</p>
 </ul>
 <h2 id="coherence-orphan-rules">Coherence &amp; orphan rules<a class="headerlink" href="#coherence-orphan-rules" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>One instance per <code>(trait, erased head-type key)</code>.</strong> v1 keys by the erased head
-  constructor, so <code>Numeric[List[Int]]</code> and <code>Numeric[List[String]]</code> collide
+<li><strong>One instance per <code>(trait, erased head-type key)</code>.</strong> As implemented, the key is the
+  trait's and the type argument's fully qualified names, across every file compiled
+  together (E0097), so <code>Show[a.Foo]</code> and <code>Show[b.Foo]</code> are two instances. v1 keys by
+  the erased head constructor, so <code>Numeric[List[Int]]</code> and <code>Numeric[List[String]]</code> collide
   (documented limitation until parametric instances land). Normalize primitive vs
   boxed so <code>Numeric[Int]</code> and <code>Numeric[Integer]</code> are one key.</li>
 <li><strong>Orphan rule (v1):</strong> an <code>instance</code> is allowed only if the trait <strong>or</strong> the head

@@ -10910,8 +10910,9 @@ List extensions that chain into a pipeline:</p>
 </span><span id="__span-147-3"><a id="__codelineno-147-3" name="__codelineno-147-3" href="#__codelineno-147-3"></a>Http::postResponse(url, body): Response
 </span><span id="__span-147-4"><a id="__codelineno-147-4" name="__codelineno-147-4" href="#__codelineno-147-4"></a>Http::postResponse(url, body, headers): Response
 </span></code></pre></div>
-<p><code>Response</code> has <code>status: Int</code>, <code>body: String</code>, and <code>headers: List</code> fields,
-plus <code>isOk(): Boolean</code> (2xx) and <code>isError(): Boolean</code> (4xx/5xx) helpers, and
+<p><code>Response</code> has <code>status(): Int</code>, <code>body(): String</code> and <code>headers(): List</code> accessors
+(<code>r.status</code> with no parentheses calls the same method), plus <code>isOk(): Boolean</code>
+(2xx) and <code>isError(): Boolean</code> (4xx/5xx) helpers, and
 <code>header(name): String?</code> (the first value of that header, any case) — use
 these when the status code or headers matter, not just the body.</p>
 <h3 id="request-builder">Request Builder<a class="headerlink" href="#request-builder" title="Permanent link">&para;</a></h3>

@@ -5911,9 +5911,15 @@ under the stricter one of the first draft they would not have.</p>
 time is not waited for: <code>W0023</code> names it, so a non-terminating one cannot hang the build.
 An <code>E0112</code> replay that is not run, or not waited for, keeps its <code>W0021</code> and also gets <code>W0023</code>,
 which says why.</p>
-<p>This rule covers the closed-predicate check and the <code>E0112</code> replay. One build-time runner is
-not under it yet: the <code>E0114</code> Shape check still calls a user <code>Shape</code>'s <code>parse</code>/<code>print</code> with no
-effect check (#2733).</p>
+<p>This rule covers every build-time runner: the closed-predicate check, the <code>E0112</code> replay and
+the <code>E0114</code> Shape round-trip check. For a user <code>Shape</code>, the check looks at everything the
+round-trip calls: the constructor, <code>canPrint</code>, <code>printable</code> (including a default from a program
+interface), <code>print</code>, <code>parse</code>, and making a sample of the value type. It calls them through
+<code>onion.Shape</code> itself, so a static method or an unrelated overload with the same name is never
+run. If any of them reaches an
+effect beyond <code>mutate</code>, the shape is not run at build time; <code>W0023</code> names the shape and where
+the effect is, and its round-trip is not checked (#2733). A round-trip that does not finish in
+time is given up on with <code>W0023</code>, the same as a predicate.</p>
 <p>A record's generated <code>toString</code>, <code>hashCode</code> and <code>equals</code> count as calling the same method on
 each component (or as calling the interface default they forward to), so a record handed to a
 map literal or to string concatenation carries what those methods do.</p>

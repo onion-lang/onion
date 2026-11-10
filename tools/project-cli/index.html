@@ -5256,6 +5256,16 @@ files in place and prints each change:</p>
 <td><code>ret a + b</code></td>
 <td><code>yield a + b</code></td>
 </tr>
+<tr>
+<td>A record's <code>law</code> (removed in 0.151.0)</td>
+<td><code>law rt(p: Pt) { e }</code></td>
+<td><code>public: static def rt(p: Pt): Boolean ensures result = e</code></td>
+</tr>
+<tr>
+<td>An <code>example</code>, in a record or at the top level</td>
+<td><code>example { e }</code></td>
+<td><code>static def example1(): Boolean ensures result = e</code> (top level: <code>def</code>)</td>
+</tr>
 </tbody>
 </table>
 <p>A <code>ret</code> that starts the last clause of a <code>do</code> block may be the old keyword, or a name <code>ret</code>
@@ -5285,6 +5295,12 @@ compiler can tell:</p>
 </table>
 <p>A <code>ret</code> with another clause after it (<code>ret(a); yield a</code>) is always left alone, with a <code>note:</code>:
 the old keyword was only legal last, so it is a call.</p>
+<p>A <code>law</code> or <code>example</code> is rewritten the same way: only when the file does not compile as written
+and does compile rewritten. A top-level <code>example { e }</code> also reads today as a call of a function
+<code>example</code>, so a file where that call compiles is left alone. So is a top-level <code>example</code> in a
+file with a <code>::*</code> import, which may bring in such a function; a <code>note:</code> says so. A false
+predicate stays false: it is E0113 after the rewrite, so such a file is reported at that
+clause's line, not rewritten.</p>
 <p>See <a href="../../migration/pre-1.0/">Migrating to 1.0</a> for each change.</p>
 <h3 id="onion-doc"><code>onion doc</code><a class="headerlink" href="#onion-doc" title="Permanent link">&para;</a></h3>
 <p>Generates API documentation as HTML. With no arguments inside a project it documents the

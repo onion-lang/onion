@@ -4187,6 +4187,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#httpresponse-reads-through-status-body-and-headers-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Http.Response reads through status(), body() and headers() only
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-instance-per-trait-and-type-across-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One instance per trait and type, across modules
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4962,6 +4984,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#httpresponse-reads-through-status-body-and-headers-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Http.Response reads through status(), body() and headers() only
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-instance-per-trait-and-type-across-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One instance per trait and type, across modules
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5284,7 +5328,11 @@ already a list.</p>
 <li><strong>What you see:</strong> a false predicate is <strong>E0113</strong>. A parameter that cannot be sampled is also E0113,
   not a silent skip. <code>--contracts</code> is on by default (<code>check</code>).</li>
 <li><strong>Seed and samples:</strong> <code>--law-seed</code> and <code>--law-samples</code> are now <code>--contract-seed</code> and <code>--contract-samples</code>; <code>--no-check-laws</code> is gone (use <code>--contracts off</code>).</li>
-<li><strong><code>onion.Shape</code>:</strong> a class that implements it needs at least one such predicate that uses it (E0080).</li>
+<li><strong><code>onion.Shape</code>:</strong> a class that implements it no longer needs a predicate in its file (E0080 is retired).</li>
+<li><strong>Update a whole project:</strong> <code>onion migrate src/</code> rewrites each <code>law</code> and <code>example</code> into this form.</li>
+<li>A body of one expression becomes <code>= expr</code>; a longer body keeps its block, with <code>return</code> before the last statement.</li>
+<li>An <code>example</code> with no name is named <code>example1</code>, <code>example2</code>, ... Rename it if you like.</li>
+<li>A file that would not compile after the rewrite is left as written, and the command names the line.</li>
 </ul>
 <h2 id="a-field-an-invariant-or-history-names-is-written-only-through-this">A field an <code>invariant</code> or <code>history</code> names is written only through <code>this</code><a class="headerlink" href="#a-field-an-invariant-or-history-names-is-written-only-through-this" title="Permanent link">&para;</a></h2>
 <p>Contracts are a preview feature (RFC #2557). A field that a class's <code>invariant</code> or <code>history</code>
@@ -5443,6 +5491,50 @@ and a wrong one compiled.</p>
     <code>Object</code>, <code>CharSequence</code>). Its hint suggests <code>?:</code> for a nullable value.</li>
 <li><strong>E0104</strong> when either return type is primitive (<code>toString(): Int</code>, <code>hashCode(): Long</code>).</li>
 <li><strong>No <code>onion migrate</code> rule:</strong> what to return instead of <code>null</code> is your choice.</li>
+</ul>
+<h2 id="httpresponse-reads-through-status-body-and-headers-only"><code>Http.Response</code> reads through <code>status()</code>, <code>body()</code> and <code>headers()</code> only<a class="headerlink" href="#httpresponse-reads-through-status-body-and-headers-only" title="Permanent link">&para;</a></h2>
+<p><code>Http.Response</code> had public fields and accessor methods with the same names. The fields are
+now private, as in <code>Server.Response</code> and <code>Proc.Result</code>.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Http</span><span class="o">::</span><span class="nf">getResponse</span><span class="p">(</span><span class="s2">"https://example.com"</span><span class="p">)</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nf">println</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="n">status</span><span class="p">)</span><span class="w">     </span><span class="c1">// still compiles: calls status()</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="nf">println</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="nf">status</span><span class="p">())</span><span class="w">   </span><span class="c1">// the same call</span>
+</span></code></pre></div>
+<ul>
+<li><strong>Onion source:</strong> nothing to change. With no field to read, <code>r.status</code> calls <code>status()</code>.</li>
+<li><strong>What you see:</strong> an <code>IllegalAccessError</code> when you run a <code>.class</code> file built by an older
+  <code>onionc</code> that read the field. Recompile it.</li>
+<li><strong>Java code:</strong> write <code>r.status()</code>, <code>r.body()</code> and <code>r.headers()</code>.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> every Onion spelling still compiles, so there is nothing to rewrite.</li>
+</ul>
+<h2 id="one-instance-per-trait-and-type-across-modules">One instance per trait and type, across modules<a class="headerlink" href="#one-instance-per-trait-and-type-across-modules" title="Permanent link">&para;</a></h2>
+<p>An <code>instance</code> of one trait for one type may be declared only once in the whole program.
+Before, a second one in another <code>module</code> compiled, and only the one in a file without a
+<code>module</code> line was ever used. Now the second one is an error.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1">// shapes.on</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kn">module</span><span class="w"> </span><span class="n">shapes</span><span class="p">;</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="kd">trait</span><span class="w"> </span><span class="nc">Show</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="p">}</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="kd">instance</span><span class="w"> </span><span class="nc">Show</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lib "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">x</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="p">}</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1">// app.on: Before, compiled. Now E0097. Delete this instance, or the one in shapes.on.</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="kn">module</span><span class="w"> </span><span class="n">app</span><span class="p">;</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">shapes</span><span class="p">.</span><span class="nc">Show</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="kd">instance</span><span class="w"> </span><span class="nc">Show</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">x</span>
+</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <strong>E0097</strong> <code>instance shapes.Show[java.lang.Integer] is already defined</code>, at
+  the second instance.</li>
+<li><strong>Fix:</strong> keep one instance and delete the other.</li>
+<li><strong>Two files in the same package</strong> (both without a <code>module</code> line) still give <strong>E0008</strong>
+  <code>duplicated class definition Show$$Integer</code>. The fix is the same.</li>
+<li><strong>Type arguments of the type:</strong> E0097 compares only the outer type, so <code>Show[List[String]]</code>
+  and <code>Show[List[Integer]]</code> are one instance and clash.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> which instance to keep is your choice.</li>
 </ul>
 
 

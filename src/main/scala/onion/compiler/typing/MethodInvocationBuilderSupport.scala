@@ -129,7 +129,7 @@ private[compiler] final class MethodInvocationBuilderSupport(
    * instance is a clean error (not a runtime null). Non-constrained methods are
    * untouched.
    */
-  private def injectDictionaries(
+  private[typing] def injectDictionaries(
     node: AST.Node,
     method: Method,
     finalParams: Array[Term],

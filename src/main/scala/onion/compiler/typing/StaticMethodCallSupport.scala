@@ -123,7 +123,7 @@ private[compiler] final class StaticMethodCallSupport(
       def finalizeSelection(selected: ApplicableMethod): Option[Term] = {
         if (!ensureStaticMethodAccessible(node, selected.method)) return None
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
-        calls.buildResolvedCall(node, selected.method, parameters, node.typeArgs, classSubst, expected)(
+        calls.buildResolvedCall(node, selected.method, parameters, node.typeArgs, classSubst, expected, context)(
           expectedArgs => calls.prepareCallParams(node, node.args, selected.method, parameters, expectedArgs),
           finalParams => new CallStatic(typeRef, selected.method, finalParams)
         )
@@ -339,7 +339,7 @@ private[compiler] final class StaticMethodCallSupport(
         if (!ensureStaticMethodAccessible(node, method)) return None
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
-          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
+          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
             expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
             finalParams => new CallStatic(typeRef, method, finalParams)
           )

@@ -216,6 +216,17 @@ final class MethodCallTyping(
   ): Option[Term] =
     methodInvocationBuilderSupport.buildResolvedCall(node, method, params, typeArgs, classSubst, expected, context)(prepareParams, buildRawCall)
 
+  /** Fills a `[T: Trait]` method's trailing dictionary slots (see MethodInvocationBuilderSupport). */
+  private[typing] def injectDictionaries(
+    node: AST.Node,
+    method: Method,
+    finalParams: Array[Term],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    methodSubst: scala.collection.immutable.Map[String, Type],
+    context: LocalContext
+  ): Option[Array[Term]] =
+    methodInvocationBuilderSupport.injectDictionaries(node, method, finalParams, classSubst, methodSubst, context)
+
   private[typing] def castCall(
     call: Term,
     method: Method,

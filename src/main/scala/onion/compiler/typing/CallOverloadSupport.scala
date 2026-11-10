@@ -275,14 +275,23 @@ private[compiler] final class CallOverloadSupport(
     }
   }
 
+  /**
+   * A static call to `method`, defaults filled. A `[T: Trait]` method also gets its dictionaries
+   * here (#2768): left as their `null` defaults, the body failed at run time. None, with an error
+   * reported, when one cannot be found.
+   */
   def buildStaticCall(
+    node: AST.Node,
     typeRef: ClassType,
     method: Method,
     params: Array[Term],
     classSubst: scala.collection.immutable.Map[String, Type],
-    methodSubst: scala.collection.immutable.Map[String, Type]
+    methodSubst: scala.collection.immutable.Map[String, Type],
+    context: LocalContext
   ): Option[Term] =
-    fillDefaultArguments(params, method).map { finalParams =>
+    fillDefaultArguments(params, method)
+      .flatMap(filled => calls.injectDictionaries(node, method, filled, classSubst, methodSubst, context))
+      .map { finalParams =>
       val call = new CallStatic(typeRef, method, finalParams)
       val castType = TypeSubst.result(method.returnType, classSubst, methodSubst)
       TypeSubst.withCast(call, castType)

@@ -243,5 +243,26 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
           |println(new K().run())
         """) == "3")
     }
+
+    it("still compiles when the val is read only inside a lambda or a trailing lambda") {
+      // Panel round 2 on #2798: the scan did not look inside closures, so these were E0002.
+      assert(output(
+        """
+          |val k = 5
+          |val xs = [1, 2, 3]
+          |val name = "n"
+          |def f(fn: () -> Int = () -> k + 1): Int = fn()
+          |def j(n: Int = [1, 2].map { x -> x + xs.size }.size): Int = n
+          |def s(t: String = "#{name}!"): String = t
+          |class C {
+          |public:
+          |  def h(fn: () -> Int = () -> k + 1): Int = fn()
+          |}
+          |println(f())
+          |println(j())
+          |println(s())
+          |println(new C().h())
+        """) == "6,2,n!,6")
+    }
   }
 }

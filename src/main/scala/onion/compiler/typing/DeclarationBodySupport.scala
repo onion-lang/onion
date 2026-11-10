@@ -132,11 +132,20 @@ private[compiler] final class DeclarationBodySupport(
     unitContext.currentMapper = null
   }
 
+  /**
+   * Whether any default mentions one of `names`, as a variable or as a bare call. The scan walks
+   * every field of every node, closures and trailing lambdas included, so no node kind can hide
+   * a read (panel round 2 on #2798). A false positive only keeps a default in source order.
+   */
   private def readsAny(args: List[AST.Argument], names: Set[String]): Boolean = names.nonEmpty && {
     var found = false
-    def visit(n: AST.Node): Unit = n match {
+    def visit(x: Any): Unit = if (!found) x match {
       case id: AST.Id if names.contains(id.name) => found = true
-      case other => ASTWalk.visitChildren(other)(visit)
+      case call: AST.UnqualifiedMethodCall if names.contains(call.name) => found = true
+      case _: Location => ()
+      case xs: IterableOnce[?] => xs.iterator.foreach(visit)
+      case p: Product => p.productIterator.foreach(visit)
+      case _ => ()
     }
     args.foreach(a => if (a.defaultValue != null) visit(a.defaultValue))
     found

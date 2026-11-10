@@ -9,6 +9,7 @@
 
 ### Breaking
 
-- **Two instances of one trait for one type are E0097 even in different files or modules.**
-  - Before: both compiled, and the call site's package silently decided which one ran.
-  - Now: the second one is `E0097 instance ... is already defined`.
+- **Two instances of one trait for one type are E0097 even in different modules.**
+  - Before: both compiled; only the one in a file without `module` was ever used.
+  - Now: the second one is `E0097 instance ... is already defined`. Keep one and delete the other (`docs/migration/pre-1.0.md`).
+  - E0097 compares the type's outer name, so `Show[List[String]]` and `Show[List[Integer]]` in one program now clash too.

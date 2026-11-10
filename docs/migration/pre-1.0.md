@@ -430,3 +430,36 @@ println(r.status())   // the same call
   `onionc` that read the field. Recompile it.
 - **Java code:** write `r.status()`, `r.body()` and `r.headers()`.
 - **No `onion migrate` rule:** every Onion spelling still compiles, so there is nothing to rewrite.
+
+## One instance per trait and type, across modules
+
+An `instance` of one trait for one type may be declared only once in the whole program.
+Before, a second one in another `module` compiled, and only the one in a file without a
+`module` line was ever used. Now the second one is an error.
+
+```onion
+// shapes.on
+module shapes;
+trait Show[T] {
+  def show(x: T): String
+}
+instance Show[Int] {
+  def show(x: Int): String = "lib " + x
+}
+
+// app.on: Before, compiled. Now E0097. Delete this instance, or the one in shapes.on.
+module app;
+import { shapes.Show }
+instance Show[Int] {
+  def show(x: Int): String = "app " + x
+}
+```
+
+- **What you see:** **E0097** `instance shapes.Show[java.lang.Integer] is already defined`, at
+  the second instance.
+- **Fix:** keep one instance and delete the other.
+- **Two files in the same package** (both without a `module` line) still give **E0008**
+  `duplicated class definition Show$$Integer`. The fix is the same.
+- **Type arguments of the type:** E0097 compares only the outer type, so `Show[List[String]]`
+  and `Show[List[Integer]]` are one instance and clash.
+- **No `onion migrate` rule:** which instance to keep is your choice.

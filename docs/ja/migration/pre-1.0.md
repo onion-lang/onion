@@ -400,3 +400,33 @@ println(r.status())   // 同じ呼び出し
 - **表示されるもの:** 古い `onionc` がフィールドを読むように生成した `.class` ファイルを実行すると、`IllegalAccessError` になります。再コンパイルしてください。
 - **Java のコード:** `r.status()`、`r.body()`、`r.headers()` と書いてください。
 - **`onion migrate` の規則はありません:** Onion の書き方はどれもそのままコンパイルできるため、書き換えるものがありません。
+
+## 1つの trait と型に対するインスタンスは、モジュールをまたいでも1つだけになりました
+
+ある trait のある型に対する `instance` は、プログラム全体で1回だけ宣言できます。
+これまでは、別の `module` に2つ目を書いてもコンパイルでき、`module` 行のないファイルのものだけが使われていました。
+今は2つ目がエラーになります。
+
+```onion
+// shapes.on
+module shapes;
+trait Show[T] {
+  def show(x: T): String
+}
+instance Show[Int] {
+  def show(x: Int): String = "lib " + x
+}
+
+// app.on: 以前はコンパイルできた。今は E0097。このインスタンスか shapes.on のものを削除する。
+module app;
+import { shapes.Show }
+instance Show[Int] {
+  def show(x: Int): String = "app " + x
+}
+```
+
+- **表示されるもの:** 2つ目のインスタンスで **E0097** `instance shapes.Show[java.lang.Integer] is already defined`。
+- **直し方:** インスタンスを1つだけ残し、もう1つを削除してください。
+- **同じパッケージの2つのファイル**（どちらも `module` 行なし）では、これまでどおり **E0008** `duplicated class definition Show$$Integer` になります。直し方は同じです。
+- **型の型引数:** E0097 は外側の型だけを比べます。そのため `Show[List[String]]` と `Show[List[Integer]]` は同じインスタンスとみなされ、衝突します。
+- **`onion migrate` の規則はありません:** どちらのインスタンスを残すかは、あなたが決めることです。

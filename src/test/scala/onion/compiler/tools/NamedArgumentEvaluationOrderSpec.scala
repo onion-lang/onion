@@ -136,6 +136,39 @@ class NamedArgumentEvaluationOrderSpec extends AbstractShellSpec {
 
   // A field initializer is emitted into every constructor. Its temporaries (and its own
   // block locals) used to land in the constructor's parameter slots (#2800 panel).
+  describe("an @TailRecursive group") {
+    it("still becomes a loop when a tail call names side-effect-free arguments out of order") {
+      val result = shell.run(
+        """class M {
+          |private:
+          |  static @TailRecursive def isOdd(n: Int, steps: Int): Boolean = if n == 0 { false } else { isEven(n - 1, steps + 1) }
+          |  static @TailRecursive def isEven(n: Int, steps: Int): Boolean = if n == 0 { true } else { isOdd(steps = steps + 1, n = n - 1) }
+          |public:
+          |  static def main(args: String[]): String = "" + isEven(100000000, 0)
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result == Shell.Success("true"))
+    }
+
+    it("still evaluates arguments with side effects in written order") {
+      assert(run(
+        """    val log = new Log()
+          |    val r = sub(b = log.n(1) + 1, a = log.n(9))
+          |    return log.sb.toString() + ":" + r""".stripMargin) == Shell.Success("19:7"))
+    }
+
+    it("leaves side-effect-free arguments where they are") {
+      assert(run(
+        """    var x: Int = 10
+          |    val y: Int = 3
+          |    val r = sub(b = y * 2, a = -x + 20)
+          |    return "" + r""".stripMargin) == Shell.Success("4"))
+    }
+  }
+
   describe("a field initializer's locals") {
     def runClass(classes: String, body: String): Shell.Result =
       shell.run(

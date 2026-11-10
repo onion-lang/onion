@@ -153,11 +153,14 @@ private[typing] object ArgumentHelpers {
    * in that order, which ran `y()` before `x()`. When the written order differs,
    * each explicit argument that is not a constant is stored in a temporary, in
    * written order, at the first explicit slot; every slot then reads its
-   * temporary. The receiver still runs first, and omitted defaults still run
-   * after the explicit arguments, as in Kotlin.
+   * temporary. The receiver still runs first. An omitted default keeps its slot's
+   * place: one before the first explicit slot runs before every explicit argument,
+   * the others after them (#2801).
    *
-   * Returns `params` unchanged when the arguments are already in order, or when
-   * the shape is one this does not handle (a vararg array, a missing context).
+   * Returns `params` unchanged when the arguments are already in order, when every
+   * reordered argument is side-effect-free (so order cannot be observed), or when
+   * the shape is one this does not handle (a vararg array, a missing context, a
+   * void- or bottom-typed argument).
    */
   def evaluateInWrittenOrder(
     args: Seq[AST.Expression],
@@ -174,6 +177,10 @@ private[typing] object ArgumentHelpers {
     if (order == order.sorted) return params
     if (order.exists(i => params(i) == null || params(i).`type` == null || params(i).`type`.isBottomType ||
         params(i).`type` == TypedAST.BasicType.VOID)) return params
+    // Arguments that cannot run code, throw or write anything give the same result in any
+    // order. Leaving them in place keeps a call free of temporaries, which an
+    // `@TailRecursive` group needs (#2800).
+    if (order.forall(i => isSideEffectFree(params(i)))) return params
 
     val result = params.clone()
     val stores = scala.collection.mutable.ArrayBuffer[Term]()
@@ -190,6 +197,23 @@ private[typing] object ArgumentHelpers {
     val first = order.min
     result(first) = new TypedAST.Begin((stores :+ result(first)).toArray)
     result
+  }
+
+  /**
+   * Whether `term` only reads locals and computes on primitives: no call, no field or
+   * array access, no store, nothing that can throw. Division and remainder are left out
+   * (an integer division by zero throws), and so is `==` on references (it calls `equals`).
+   */
+  private def isSideEffectFree(term: Term): Boolean = term match {
+    case _ if isConstant(term) => true
+    case _: TypedAST.RefLocal => true
+    case u: TypedAST.UnaryTerm => u.`type`.isBasicType && isSideEffectFree(u.operand)
+    case b: TypedAST.BinaryTerm =>
+      import TypedAST.BinaryTerm.Kind
+      b.kind != Kind.DIVIDE && b.kind != Kind.MOD && b.kind != Kind.ELVIS &&
+        b.`type`.isBasicType && b.lhs.`type`.isBasicType && b.rhs.`type`.isBasicType &&
+        isSideEffectFree(b.lhs) && isSideEffectFree(b.rhs)
+    case _ => false
   }
 
   private def isConstant(term: Term): Boolean = term match {

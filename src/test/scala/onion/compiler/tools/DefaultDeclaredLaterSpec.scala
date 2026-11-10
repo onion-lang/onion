@@ -264,5 +264,58 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
           |println(new C().h())
         """) == "6,2,n!,6")
     }
+
+    it("is held back when it calls a method whose default reads a top-level val") {
+      // Panel round 3 on #2798: `f`'s default was typed early, before `g`'s held-back default
+      // existed, so `g()` was E0005. All three forms print on `main`.
+      assert(output(
+        """
+          |val k = 5
+          |def g(b: Int = k): Int = b
+          |def f(a: Int = g()): Int = a
+          |println(f())
+        """) == "5")
+      assert(output(
+        """
+          |val k = 5
+          |class A {
+          |public:
+          |  def g(b: Int = k): Int = b
+          |}
+          |class B {
+          |public:
+          |  def f(a: Int = new A().g()): Int = a
+          |}
+          |println(new B().f())
+        """) == "5")
+      assert(output(
+        """
+          |var k = 5
+          |def g(b: Int = k): Int = b
+          |k = 9
+          |def f(a: Int = g() + 1): Int = a
+          |println(f())
+        """) == "10")
+    }
+  }
+
+  describe("a default that omits another method's default") {
+    it("compiles whichever of the two is declared first") {
+      assert(output(
+        """
+          |def f(a: Int = g()): Int = a
+          |def g(b: Int = 2): Int = b
+          |class C {
+          |public:
+          |  def p(a: Int = new D().q() + 1): Int = a
+          |}
+          |class D {
+          |public:
+          |  def q(b: Int = 4): Int = b
+          |}
+          |println(f())
+          |println(new C().p())
+        """) == "2,5")
+    }
   }
 }

@@ -27,8 +27,9 @@ private[compiler] final class DeclarationBodySupport(
       definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {
         case ctor: AST.ConstructorDeclaration if ctor.primary => ctor.args.map(_.name)
       }.flatten.toSet
-      // Most defaults were typed ahead by predefineUnitDefaults; one that reads a top-level
-      // `val`/`var` waits until here, so a call above it in this class still sees it (#2637).
+      // Most defaults were typed ahead by DefaultScheduling. A held-back one (it reads a top-level
+      // `val`/`var`, or calls a method whose default does) waits until here, so a call above it
+      // in this class still sees it (#2637).
       for (section <- node.defaultSection ++ node.sections; member <- section.members) member match {
         case m: AST.MethodDeclaration => predefineMethodDefaults(m)
         case c: AST.ConstructorDeclaration =>
@@ -69,86 +70,95 @@ private[compiler] final class DeclarationBodySupport(
   }
 
   /**
-   * Types the defaults of every method and constructor in this unit, before any body of any unit
-   * is typed (#2653). A call can then omit a default declared later in the file, in another type,
-   * or in another file, as #2637 already allowed within one class body.
+   * The defaults of every method and constructor in this unit, one job per declaration, for
+   * [[DefaultScheduling]] to type before any body of any unit (#2653). A call can then omit a
+   * default declared later in the file, in another type, or in another file, as #2637 already
+   * allowed within one class body. A job that is never run is typed in source order instead.
    */
-  def predefineUnitDefaults(unit: AST.CompilationUnit): Unit = {
+  def unitDefaultJobs(unit: AST.CompilationUnit): Seq[DefaultScheduling.Job] = {
     val topLevelVariables = unit.toplevels.collect {
       case v: AST.LocalVariableDeclaration => v.name
       case v: AST.GlobalVariableDeclaration => v.name
     }.toSet
-    // A top-level `val`/`var` becomes a field only when the body pass reaches it, so a default
-    // that reads one, in any kind of declaration, is still typed in source order, after it.
-    def readsTopLevel(args: List[AST.Argument]): Boolean = readsAny(args, topLevelVariables)
-    for (toplevel <- unit.toplevels) toplevel match {
+    def job(name: String, args: List[AST.Argument])(body: => Unit): Option[DefaultScheduling.Job] =
+      if (!args.exists(_.defaultValue != null)) None
+      else {
+        val mentions = mentionedNames(args)
+        // A top-level `val`/`var` becomes a field only when the body pass reaches it, so a default
+        // that reads one, in any kind of declaration, stays in source order, after it.
+        Some(DefaultScheduling.Job(name, mentions - name, (mentions & topLevelVariables).nonEmpty, () => {
+          body
+          unitContext.currentDefinition = null
+          unitContext.currentMapper = null
+        }))
+      }
+    def typeParams(node: AST.Node): Seq[TypeParam] = typing.declaredTypeParams_.getOrElse(node, Seq())
+    def methodJobs(node: AST.TypeDeclaration, params: Seq[TypeParam], methods: Seq[AST.MethodDeclaration]) =
+      methods.flatMap(m => job(m.name, m.args)(inDefinition(node, params)(_ => predefineMethodDefaults(m))))
+    unit.toplevels.flatMap {
       case node: AST.ClassDeclaration =>
-        inDefinition(node, typing.declaredTypeParams_.getOrElse(node, Seq())) { _ =>
-          for (section <- node.defaultSection ++ node.sections; member <- section.members) member match {
-            case m: AST.MethodDeclaration if !readsTopLevel(m.args) => predefineMethodDefaults(m)
-            case c: AST.ConstructorDeclaration if !readsTopLevel(c.args) =>
+        val members = (node.defaultSection ++ node.sections).toSeq.flatMap(_.members)
+        methodJobs(node, typeParams(node), members.collect { case m: AST.MethodDeclaration => m }) ++
+          members.collect { case c: AST.ConstructorDeclaration => c }.flatMap { c =>
+            job(node.name, c.args)(inDefinition(node, typeParams(node)) { _ =>
               typing.kernelNodeOf[ConstructorDefinition](c).foreach(methodBodySupport.predefineConstructorDefaults(_, c.args))
-            case _ =>
+            })
           }
-        }
       case node: AST.RecordDeclaration =>
-        inDefinition(node, typing.declaredTypeParams_.getOrElse(node, Seq())) { _ =>
-          node.synthesizedMethods.filterNot(m => readsTopLevel(m.args)).foreach(predefineMethodDefaults)
-          for (section <- node.sections; member <- section.members) member match {
-            case m: AST.MethodDeclaration if !readsTopLevel(m.args) => predefineMethodDefaults(m)
-            case _ =>
-          }
-        }
+        methodJobs(node, typeParams(node),
+          node.synthesizedMethods ++ node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m })
       case node: AST.EnumDeclaration =>
-        inDefinition(node, Seq()) { _ =>
-          for (section <- node.sections; member <- section.members) member match {
-            case m: AST.MethodDeclaration if !readsTopLevel(m.args) => predefineMethodDefaults(m)
-            case _ =>
-          }
-        }
+        methodJobs(node, Seq(), node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m })
       case node: AST.InterfaceDeclaration =>
-        inDefinition(node, typing.declaredTypeParams_.getOrElse(node, Seq())) { _ =>
-          node.methods.filterNot(m => readsTopLevel(m.args)).foreach(predefineMethodDefaults)
-        }
+        methodJobs(node, typeParams(node), node.methods)
       case node: AST.ExtensionDeclaration =>
-        typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
-          unitContext.currentDefinition = definition
-          typing.find(definition.name).foreach(unitContext.currentMapper = _)
-          typing.mapFromExtensionReceiver(node.receiverType).foreach { receiverType =>
-            node.methods.filterNot(m => readsTopLevel(m.args)).foreach(methodBodySupport.predefineExtensionDefaults(_, receiverType, definition))
+        node.methods.flatMap { m =>
+          job(m.name, m.args) {
+            typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+              unitContext.currentDefinition = definition
+              typing.find(definition.name).foreach(unitContext.currentMapper = _)
+              typing.mapFromExtensionReceiver(node.receiverType).foreach { receiverType =>
+                methodBodySupport.predefineExtensionDefaults(m, receiverType, definition)
+              }
+            }
           }
         }
-      case node: AST.FunctionDeclaration if node.block != null && !readsTopLevel(node.args) =>
-        typing.kernelNodeOf[MethodDefinition](node).foreach { function =>
-          typing.loadTopClass.collect { case cd: ClassDefinition => cd }.foreach(unitContext.currentDefinition = _)
-          typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
-          typing.openTypeParams(typing.emptyTypeParams ++ typing.declaredTypeParams_.getOrElse(node, Seq())) {
-            methodBodySupport.predefineDefaults(function, node.args)
+      case node: AST.FunctionDeclaration if node.block != null =>
+        job(node.name, node.args) {
+          typing.kernelNodeOf[MethodDefinition](node).foreach { function =>
+            typing.loadTopClass.collect { case cd: ClassDefinition => cd }.foreach(unitContext.currentDefinition = _)
+            typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
+            typing.openTypeParams(typing.emptyTypeParams ++ typeParams(node)) {
+              methodBodySupport.predefineDefaults(function, node.args)
+            }
           }
-        }
-      case _ =>
+        }.toSeq
+      case _ => Seq()
     }
-    unitContext.currentDefinition = null
-    unitContext.currentMapper = null
   }
 
   /**
-   * Whether any default mentions one of `names`, as a variable or as a bare call. The scan walks
-   * every field of every node, closures and trailing lambdas included, so no node kind can hide
-   * a read (panel round 2 on #2798). A false positive only keeps a default in source order.
+   * Every name the defaults mention as a variable, a call (bare, qualified or static) or a
+   * constructed type. The scan walks every field of every node, closures and trailing lambdas
+   * included, so no node kind can hide a read (panel round 2 on #2798). A false match only
+   * keeps a default in source order, as on `main`.
    */
-  private def readsAny(args: List[AST.Argument], names: Set[String]): Boolean = names.nonEmpty && {
-    var found = false
-    def visit(x: Any): Unit = if (!found) x match {
-      case id: AST.Id if names.contains(id.name) => found = true
-      case call: AST.UnqualifiedMethodCall if names.contains(call.name) => found = true
+  private def mentionedNames(args: List[AST.Argument]): Set[String] = {
+    val names = scala.collection.mutable.Set.empty[String]
+    def visit(x: Any): Unit = x match {
+      case id: AST.Id => names += id.name
+      case call: AST.UnqualifiedMethodCall => names += call.name; call.productIterator.foreach(visit)
+      case call: AST.MethodCall => names += call.name; call.productIterator.foreach(visit)
+      case call: AST.SafeMethodCall => names += call.name; call.productIterator.foreach(visit)
+      case call: AST.StaticMethodCall => names += call.name; call.productIterator.foreach(visit)
+      case ref: AST.ReferenceType => names += ref.name.split('.').last
       case _: Location => ()
       case xs: IterableOnce[?] => xs.iterator.foreach(visit)
       case p: Product => p.productIterator.foreach(visit)
       case _ => ()
     }
     args.foreach(a => if (a.defaultValue != null) visit(a.defaultValue))
-    found
+    names.toSet
   }
 
   private def inDefinition(node: AST.TypeDeclaration, typeParams: Seq[TypeParam])(body: ClassDefinition => Unit): Unit =

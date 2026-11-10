@@ -196,8 +196,10 @@ the old keyword was only legal last, so it is a call.
 
 A `law` or `example` is rewritten the same way: only when the file does not compile as written
 and does compile rewritten. A top-level `example { e }` also reads today as a call of a function
-`example`, so a file where that call compiles is left alone. A false predicate stays false: it
-is E0113 after the rewrite, so such a file is reported, not rewritten.
+`example`, so a file where that call compiles is left alone. So is a top-level `example` in a
+file with a `::*` import, which may bring in such a function; a `note:` says so. A false
+predicate stays false: it is E0113 after the rewrite, so such a file is reported at that
+clause's line, not rewritten.
 
 See [Migrating to 1.0](../migration/pre-1.0.md) for each change.
 

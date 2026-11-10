@@ -63,6 +63,30 @@ object Migrator:
     val all = (edits ++ clauses).sortBy(_.offset)
     Result(apply(source, all), all, (notes ++ clauseNotes).sortBy(n => (n.line, n.column)))
 
+  /**
+   * Where the character at `line`:`column` of `result.text` was in `source`, and the edit whose
+   * replacement holds it, if one does: a compile of the rewritten text reports positions in
+   * that text, which was never written to disk (#2765). A position inside an edit maps to the
+   * edit's own start. `None` when no character sits at that position.
+   */
+  def origin(source: String, result: Result, line: Int, column: Int): Option[(Int, Int, Option[Edit])] =
+    offsetOf(result.text, line, column).map { at =>
+      var delta = 0
+      var found: Option[Either[Int, Edit]] = None
+      result.edits.sortBy(_.offset).foreach { e =>
+        if found.isEmpty then
+          val from = e.offset + delta
+          if at < from then found = Some(Left(at - delta))
+          else if at < from + e.replacement.length then found = Some(Right(e))
+          else delta += e.replacement.length - e.length
+      }
+      found.getOrElse(Left(at - delta)) match
+        case Left(offset) =>
+          val (l, c) = lineColumnOf(source, offset)
+          (l, c, None)
+        case Right(e) => (e.line, e.column, Some(e))
+    }
+
   /** `source` with only the clause edits of `result` applied: what the `ret` edits are checked against. */
   def withClausesOnly(source: String, result: Result): String =
     apply(source, result.edits.filter(_.clause))
@@ -240,6 +264,11 @@ object Migrator:
       val exampleIsName = tokens.indices.exists { j =>
         j > 0 && tokens(j).kind == K.ID && tokens(j).image == "example" && Declarers.contains(tokens(j - 1).image)
       }
+      // A wildcard static import (`import { lib.Lib::* }`) may bring in an `example` no token
+      // here names, so a top-level `example` there is left alone too (#2765).
+      val wildcardImport = !exampleIsName && tokens.indices.exists { j =>
+        j > 0 && tokens(j).image == "*" && tokens(j - 1).image == "::"
+      }
       var i = 0
       while i < tokens.length do
         val token = tokens(i)
@@ -252,12 +281,17 @@ object Migrator:
           else if image == "law" && inRecord then lawAt(tokens, i)
           else if image == "example" && (inRecord || startsStatement(previous, token)) then
             exampleAt(tokens, i).filter { _ =>
-              val call = !inRecord && exampleIsName
+              val call = !inRecord && (exampleIsName || wildcardImport)
               if call then
                 val (line, column) = start(source, token).map(lineColumnOf(source, _)).getOrElse((token.beginLine, token.beginColumn))
                 notes += Note(line, column,
-                  "this `example` is a name, not the old `example` clause: the file declares or imports " +
-                    "`example`, so `example { ... }` at the top level is its call; left as written")
+                  if exampleIsName then
+                    "this `example` is a name, not the old `example` clause: the file declares or imports " +
+                      "`example`, so `example { ... }` at the top level is its call; left as written"
+                  else
+                    "this `example` may be a call: the file has a `::*` import, which may bring in a function " +
+                      "`example`; left as written. If it is the old `example` clause, " +
+                      "write `def name(): Boolean ensures result = ...` instead")
               !call
             }
           else None

@@ -146,17 +146,33 @@ object MigrateCommand:
     ): Unit =
       undecided += 1
       failed = true
-      val why = stopped match
-        case Some(_) => "The compiler reports another error, so it cannot tell, and onion migrate left it as written."
-        case None => "The file does not compile rewritten either, so onion migrate left it as written."
-      result.edits.foreach { e =>
-        err.println(s"${display(file)}:${e.line}:${e.column}: this ${e.subject} may be ${oldSpelling(e)}. " + why)
-      }
-      stopped match
-        case Some(p) => err.println(s"  the other error: ${p.render(display)}")
-        case None => problems.headOption.foreach(p => err.println(s"  first error rewritten: ${p.render(display)}"))
-      err.println("  Fix that error and run onion migrate again, or make the change by hand. " +
-        "If the file uses classes from other files, name those files too, or pass -classpath.")
+      // An error inside a rewritten clause is that clause's own: name it, and only it (#2765).
+      val inClauses = (problems ++ stopped).distinct.flatMap { p =>
+        p.clause.filter(_ => p.file.contains(file.toString)).map(e => (e, p))
+      }.distinctBy(_._1.offset).sortBy(_._1.offset)
+      if inClauses.nonEmpty then
+        inClauses.foreach { (e, p) =>
+          val where = s"${display(file)}:${e.line}:${e.column}"
+          if p.code.contains(FalsePredicate) then
+            err.println(s"$where: this ${e.subject} is false ($FalsePredicate): it does not hold when the build runs it, " +
+              "so onion migrate left the file as written.")
+          else
+            err.println(s"$where: this ${e.subject}, rewritten as a contract predicate, does not compile, " +
+              s"so onion migrate left the file as written: ${p.message}")
+        }
+        err.println("  Fix or remove it, then run onion migrate again, or make the change by hand.")
+      else
+        val why = stopped match
+          case Some(_) => "The compiler reports another error, so it cannot tell, and onion migrate left it as written."
+          case None => "The file does not compile rewritten either, so onion migrate left it as written."
+        result.edits.foreach { e =>
+          err.println(s"${display(file)}:${e.line}:${e.column}: this ${e.subject} may be ${oldSpelling(e)}. " + why)
+        }
+        stopped match
+          case Some(p) => err.println(s"  the other error: ${p.render(display)}")
+          case None => problems.headOption.foreach(p => err.println(s"  first error rewritten: ${p.render(display)}"))
+        err.println("  Fix that error and run onion migrate again, or make the change by hand. " +
+          "If the file uses classes from other files, name those files too, or pass -classpath.")
 
     /** A named file was left out of the joint compile; it may declare this `ret`. */
     def notRead(file: Path, result: Migrator.Result): Unit =
@@ -200,6 +216,17 @@ object MigrateCommand:
           failed = true
     }
 
+    // A compile reports positions in the text it compiled. For a file it read rewritten, that
+    // text is not on disk, so each position is mapped back to the file as written (#2765).
+    def located(report: Compile.Report, rewritten: Path => Boolean): Compile.Report =
+      report.copy(problems = report.problems.map { p =>
+        pending.collectFirst {
+          case (file, (source, result)) if rewritten(file) && p.file.contains(file.toString) => (source, result)
+        }.flatMap((source, result) => Migrator.origin(source, result, p.line, p.column)) match
+          case Some((line, column, edit)) => p.copy(line = line, column = column, clause = edit.filter(_.clause))
+          case None => p
+      })
+
     val failing = (problems: Seq[Compile.Problem], file: Path) =>
       problems.filter(p => p.file.forall(_ == file.toString))
     val atPlace = (p: Compile.Problem, result: Migrator.Result) =>
@@ -218,13 +245,16 @@ object MigrateCommand:
           case Some((source, result)) => file -> (if rewritten(file) || unparsed(file) then result.text else source)
           case None => file -> text
       }
-      val asWritten = Compile.check(unit(Set.empty), classpath)
+      val asWritten = located(Compile.check(unit(Set.empty), classpath), unparsed)
       val other = asWritten.problems.find { p =>
         !pending.exists { case (file, (_, result)) => !unparsed(file) && p.file.contains(file.toString) && atPlace(p, result) }
       }
       val decides = asWritten.typed && other.isEmpty
       val candidates = pending.keySet.filter(file => !unparsed(file) && failing(asWritten.problems, file).nonEmpty).toSet
-      val withYield = if decides && candidates.nonEmpty then Compile.check(unit(candidates), classpath) else asWritten
+      val withYield =
+        if decides && candidates.nonEmpty then
+          located(Compile.check(unit(candidates), classpath), file => candidates(file) || unparsed(file))
+        else asWritten
       pending.foreach { case (file, (source, result)) =>
         val mine = failing(asWritten.problems, file)
         if mine.isEmpty && !unparsed(file) && asWritten.typed then compilesAsWritten(file, result)
@@ -249,6 +279,8 @@ object MigrateCommand:
     if failed then 1
     else if check && changed > 0 then 1
     else 0
+
+  private val FalsePredicate = "E0113"
 
   /** What a rule's edit replaced, for messages. */
   private def oldSpelling(edit: Migrator.Edit): String =
@@ -311,7 +343,8 @@ object MigrateCommand:
   /** Compiles source texts together, writing nothing and running nothing. */
   private object Compile:
     /** One compile error; `file` is the name it was compiled under, when the error has one. */
-    final case class Problem(file: Option[String], line: Int, column: Int, message: String):
+    final case class Problem(file: Option[String], line: Int, column: Int, message: String, code: Option[String] = None,
+      clause: Option[Migrator.Edit] = None):
       def render(display: Path => String): String =
         file.fold(message)(f => s"${display(Path.of(f))}:$line:$column: $message")
 
@@ -330,7 +363,7 @@ object MigrateCommand:
         val result = new OnionCompiler(config).compileDetailed(inputs)
         val problems = result.allErrors.map { e =>
           val location = Option(e.location)
-          Problem(Option(e.sourceFile), location.fold(0)(_.line), location.fold(0)(_.column), e.message)
+          Problem(Option(e.sourceFile), location.fold(0)(_.line), location.fold(0)(_.column), e.message, e.errorCode)
         }
         Report(problems, result.timings.exists(_.name == TypingPhaseName))
       catch

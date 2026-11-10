@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.154.0] - 2026-11-10
+
+### Breaking
+
+- **Two instances of one trait for one type are E0097 even in different modules.**
+  - Before: both compiled; only the one in a file without `module` was ever used.
+  - Now: the second one is `E0097 instance ... is already defined`. Keep one and delete the other (`docs/migration/pre-1.0.md`).
+  - E0097 compares the type's outer name, so `Show[List[String]]` and `Show[List[Integer]]` in one program now clash too.
+- **`Http.Response` has no public fields; `status()`, `body()` and `headers()` are its one spelling (#2738).**
+  - Before: `r.status` read a public field and `r.status()` called a method that returned it.
+  - Now: the fields are private. Onion source is unchanged: `r.status` calls `status()`. Recompile `.class` files built by an older `onionc` that read the fields, and change Java code from `r.status` to `r.status()`.
+
+### Added
+
+- **`onion migrate` rewrites `law` and `example` into contract predicates (#2740).**
+  - Before: a script from 0.150.0 or older that used them stopped compiling, and `onion migrate` left it alone.
+  - Now: `law n(p: T) { e }` becomes `static def n(p: T): Boolean ensures result = e`, and a top-level `example` becomes a `def`. Run `onion migrate src/`.
+
+### Fixed
+
+- **A failed `await()` says why the task failed (#2771).**
+  - Before: `Future::async { Integer::parseInt("nope") }.await()` reported `RuntimeException: Future.await() failed`.
+  - Now: `Future.await() failed (For input string: "nope")`. `awaitTimeout(ms)` does the same; the cause is still the task's exception.
+- **A type-class instance declared in a `module` is found, and a same-named trait cannot capture it (#2769).**
+  - Before: calling a `[T: Numeric]` method from a `module` was E0003 "instance Numeric[Integer] is not found". With a second `trait Numeric` elsewhere, the program compiled and then threw `IncompatibleClassChangeError`.
+  - Now: the compiler looks for the instance beside the caller, the trait, the type argument and in the default package, and uses only one that implements that trait.
+- **An instance for one `Foo` is no longer passed where another package's `b.Foo` is needed.**
+  - Before: with the instance in the default package, the program compiled, then threw `ClassCastException`.
+  - Now: E0003, instance not found.
+- **A `[T: Numeric]` method from a class file or jar can be called (#2768).**
+  - Before: `onionc -d out lib.on`, then `Agg::total(xs)` from another compilation was E0005, with a hint naming `total$default$2$…`.
+  - Now: the instance is found and passed, as within one compilation, so type-class libraries work from `-classpath`.
+- **A statically imported `[T: Trait]` method gets its instance (#2768).**
+  - Before: `import { Agg::* }` then `total(xs)` compiled, then failed with "null value used".
+  - Now: it runs; a type with no instance is a compile error naming the instance.
+- **`c.f(name = "s")` compiles when `f(name: Long)` and `f(name: String)` both exist (#2756).**
+  - Before: E0006, because a named argument chose an overload by parameter name only.
+  - Now: the argument's type picks `f(name: String)`, as for the positional call `c.f("s")`. Two overloads that fit equally well are still E0006.
+- **A `static` or private `equals`/`hashCode`/`toString` in a record is now a compile error (E0010).**
+  - Before: it compiled and dropped the generated method, so `==` threw `IncompatibleClassChangeError` or `IllegalAccessError`, and printing gave `R@80`.
+  - Now: E0010 names the clash and says to remove `static` (or move the method under `public:`), or rename it. A public or protected instance method still replaces the generated one.
+- **Compiling no longer runs a `Shape` that prints or does I/O (#2733).**
+  - Before: the `E0114` round-trip check called a user shape's `parse`/`print` on every sample, so `onionc` printed, wrote files or exited.
+  - Now: a shape whose constructor, `canPrint`, `printable`, `parse`, `print` or sample value has an effect beyond `mutate` is not run, and a round-trip that does not finish in time is given up on. Warning `W0023` names why.
+  - A `--warn error` build fails on it. Fix: move the effect out of the shape, or pass `--Wno W0023`.
+- **A correct `Shape` with an extra one-argument overload (`def parse(n: Int)`) no longer gets a false `E0114`.**
+  - Before: the check could call that overload, or a `static def parse`, instead of the shape's own `parse(String)`.
+  - Now: it calls only the methods that implement `onion.Shape`.
+- **A contract clause that is not a condition says so (#2605).**
+  - Before: `requires x` with `x: Int` gave E0000 "... Consider a cast or check return type."
+  - Now: still E0000, with a hint that `requires` takes a Boolean condition, and an example (`requires n > 0`). The same for `ensures`, `invariant` and `history`, in en and ja.
+- **E0110 points at the field an `invariant` or `history` names (#2605).**
+  - Before: `C.on:: [E0110] ...`, with no line and no snippet.
+  - Now: `C.on:4:13: [E0110] ...`, underlining `xs` in `invariant xs.size >= 0`.
+- **A subclass's `history` now checks the methods it inherits without overriding (#2603).**
+  - Before: `class Up extends Base { history n >= old(n) }` compiled cleanly while an inherited `Base.dec` lowered `n`.
+  - Now: E0109 at that write, with the fix (override `dec` in `Up`, or declare the history in `Base`). A write the syntax does not settle is W0024.
+- **An F-bounded parameter can fill another F-bound (#2338).**
+  - Before: `class Holder[A extends Animal[A], C extends Animal[C]]`, `G::f(xs)` from inside `g[U extends Comparable[U]]`, and `derive!(Json)` on `record B[T extends Comparable[T]]` were E0000/E0005.
+  - Now: they compile. `U extends Comparable[String]` passed to `f[T extends Comparable[T]]` is still rejected.
+
 ## [0.153.0] - 2026-11-09
 
 ### Breaking

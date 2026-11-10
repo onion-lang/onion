@@ -318,6 +318,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
   def report(error: SemanticError, location: Location, items: AnyRef*): Unit =
     diagnostics.report(error, location, items)
+  /** Like [[report]], in the file `sourceFile` rather than the unit being typed. */
+  def reportIn(sourceFile: String, error: SemanticError, node: AST.Node, items: AnyRef*): Unit =
+    diagnostics.reportIn(sourceFile, error, node.location, items)
 
   def reportUnusedVariables(context: LocalContext): Unit =
     diagnostics.reportUnusedVariables(context)

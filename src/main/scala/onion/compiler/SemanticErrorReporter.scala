@@ -1452,11 +1452,17 @@ object SemanticErrorReporter {
     ),
     SemanticError.HISTORY_BROKEN_BY_WRITE -> ErrorDef(
       "error.semantic.historyBrokenByWrite",
-      // items: field, history as source text, reason kind (lower | set | any), the method that raises the field (or "").
+      // items: field, history as source text, reason kind (lower | set | any), the method that raises the field (or "");
+      // for an inherited method (#2603) also the class that declares the history, the method, and the class it comes from.
       Seq(
         items => asString(items(0)),
         items => asString(items(1)),
-        items => format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
+        items => {
+          val reason = format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
+          if (items.length < 7) reason
+          // A Japanese sentence ends in `。` and takes no space after it.
+          else reason + (if (reason.endsWith("\u3002")) "" else " ") + format(message("error.semantic.historyBrokenByWrite.inherited"), Seq(asString(items(4)), asString(items(5)), asString(items(6))))
+        }
       )
     ),
     SemanticError.CONTRACT_FIELD_NOT_VALUE -> ErrorDef(

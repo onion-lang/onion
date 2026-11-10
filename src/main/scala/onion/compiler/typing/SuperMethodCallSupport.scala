@@ -120,7 +120,8 @@ private[compiler] final class SuperMethodCallSupport(
         val classSubst = TypeSubstitution.hierarchySubstitution(contextClass.superClass, method.affiliation, selfReceiver = true)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
+              .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams =>
               if (context.isClosure) superCallThroughAccessor(contextClass, method, finalParams)
               else new CallSuper(new This(contextClass), method, finalParams)

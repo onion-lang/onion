@@ -201,7 +201,8 @@ private[compiler] final class InstanceMethodCallSupport(
         val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
+              .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams => new Call(target, method, finalParams)
           )
         }

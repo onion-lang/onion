@@ -416,7 +416,8 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         val classSubst = selfClassSubstitution(method)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
+              .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams => rawUnqualifiedCall(targetType, method, finalParams, context)
           )
         }

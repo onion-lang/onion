@@ -1,6 +1,7 @@
 package onion.compiler.typing
 
-import onion.compiler.AST
+import onion.compiler.{AST, ClosureLocalBinding, LocalContext}
+import onion.compiler.TypedAST
 import onion.compiler.TypedAST.{Method, Term}
 
 import java.util.{TreeSet => JTreeSet}
@@ -143,4 +144,58 @@ private[typing] object ArgumentHelpers {
         }
       case _ => false
     }
+
+  /**
+   * Makes a call's explicit arguments run in the order they are written (#2767).
+   *
+   * Named arguments bind by name, so `f(b = x(), a = y())` fills slot `a` from
+   * the second argument. `params` is in parameter order, and the JVM evaluates it
+   * in that order, which ran `y()` before `x()`. When the written order differs,
+   * each explicit argument that is not a constant is stored in a temporary, in
+   * written order, at the first explicit slot; every slot then reads its
+   * temporary. The receiver still runs first, and omitted defaults still run
+   * after the explicit arguments, as in Kotlin.
+   *
+   * Returns `params` unchanged when the arguments are already in order, or when
+   * the shape is one this does not handle (a vararg array, a missing context).
+   */
+  def evaluateInWrittenOrder(
+    args: Seq[AST.Expression],
+    paramNames: Seq[String],
+    params: Array[Term],
+    context: LocalContext
+  ): Array[Term] = {
+    if (context == null || !args.exists(_.isInstanceOf[AST.NamedArgument])) return params
+    val positional = args.takeWhile(!_.isInstanceOf[AST.NamedArgument]).size
+    val order: Seq[Int] = (0 until positional) ++ args.drop(positional).collect {
+      case named: AST.NamedArgument => paramNames.indexOf(named.name)
+    }
+    if (order.exists(i => i < 0 || i >= params.length) || order.distinct.size != order.size) return params
+    if (order == order.sorted) return params
+    if (order.exists(i => params(i) == null || params(i).`type` == null || params(i).`type`.isBottomType ||
+        params(i).`type` == TypedAST.BasicType.VOID)) return params
+
+    val result = params.clone()
+    val stores = scala.collection.mutable.ArrayBuffer[Term]()
+    order.foreach { i =>
+      val term = params(i)
+      if (!isConstant(term)) {
+        val tp = term.`type`
+        val bind = new ClosureLocalBinding(0, context.add(context.newName, tp, isMutable = false), tp, isMutable = false)
+        stores += new TypedAST.SetLocal(bind, term)
+        result(i) = new TypedAST.RefLocal(bind)
+      }
+    }
+    if (stores.isEmpty) return params
+    val first = order.min
+    result(first) = new TypedAST.Begin((stores :+ result(first)).toArray)
+    result
+  }
+
+  private def isConstant(term: Term): Boolean = term match {
+    case _: TypedAST.IntValue | _: TypedAST.LongValue | _: TypedAST.DoubleValue | _: TypedAST.FloatValue |
+         _: TypedAST.ShortValue | _: TypedAST.ByteValue | _: TypedAST.CharacterValue | _: TypedAST.BoolValue |
+         _: TypedAST.StringValue | _: TypedAST.NullValue => true
+    case _ => false
+  }
 }

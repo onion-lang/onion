@@ -817,7 +817,8 @@ final class ConstructionTyping(
     typeRef: ClassType,
     context: LocalContext
   ): Option[Term] =
-    resolveConstructorWithNamedArgs(node, node.args, typeRef, context).map { case (ctor, params, _) =>
+    resolveConstructorWithNamedArgs(node, node.args, typeRef, context).map { case (ctor, resolved, _) =>
+      val params = ArgumentHelpers.evaluateInWrittenOrder(node.args, ctor.argumentsWithDefaults.toSeq.map(_.name), resolved, context)
       typeRef match {
         case applied: TypedAST.AppliedClassType =>
           val appliedCtor = new TypedAST.ConstructorRef {

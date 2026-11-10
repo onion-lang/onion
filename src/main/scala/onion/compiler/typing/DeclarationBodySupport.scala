@@ -27,6 +27,14 @@ private[compiler] final class DeclarationBodySupport(
       definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {
         case ctor: AST.ConstructorDeclaration if ctor.primary => ctor.args.map(_.name)
       }.flatten.toSet
+      // Most defaults were typed ahead by predefineUnitDefaults; one that reads a top-level
+      // `val`/`var` waits until here, so a call above it in this class still sees it (#2637).
+      for (section <- node.defaultSection ++ node.sections; member <- section.members) member match {
+        case m: AST.MethodDeclaration => predefineMethodDefaults(m)
+        case c: AST.ConstructorDeclaration =>
+          typing.kernelNodeOf[ConstructorDefinition](c).foreach(methodBodySupport.predefineConstructorDefaults(_, c.args))
+        case _ =>
+      }
       for (section <- node.defaultSection ++ node.sections; member <- section.members) {
         member match {
           case field: AST.FieldDeclaration =>
@@ -70,46 +78,47 @@ private[compiler] final class DeclarationBodySupport(
       case v: AST.LocalVariableDeclaration => v.name
       case v: AST.GlobalVariableDeclaration => v.name
     }.toSet
+    // A top-level `val`/`var` becomes a field only when the body pass reaches it, so a default
+    // that reads one, in any kind of declaration, is still typed in source order, after it.
+    def readsTopLevel(args: List[AST.Argument]): Boolean = readsAny(args, topLevelVariables)
     for (toplevel <- unit.toplevels) toplevel match {
       case node: AST.ClassDeclaration =>
         inDefinition(node, typing.declaredTypeParams_.getOrElse(node, Seq())) { _ =>
           for (section <- node.defaultSection ++ node.sections; member <- section.members) member match {
-            case m: AST.MethodDeclaration => predefineMethodDefaults(m)
-            case c: AST.ConstructorDeclaration =>
+            case m: AST.MethodDeclaration if !readsTopLevel(m.args) => predefineMethodDefaults(m)
+            case c: AST.ConstructorDeclaration if !readsTopLevel(c.args) =>
               typing.kernelNodeOf[ConstructorDefinition](c).foreach(methodBodySupport.predefineConstructorDefaults(_, c.args))
             case _ =>
           }
         }
       case node: AST.RecordDeclaration =>
         inDefinition(node, typing.declaredTypeParams_.getOrElse(node, Seq())) { _ =>
-          node.synthesizedMethods.foreach(predefineMethodDefaults)
+          node.synthesizedMethods.filterNot(m => readsTopLevel(m.args)).foreach(predefineMethodDefaults)
           for (section <- node.sections; member <- section.members) member match {
-            case m: AST.MethodDeclaration => predefineMethodDefaults(m)
+            case m: AST.MethodDeclaration if !readsTopLevel(m.args) => predefineMethodDefaults(m)
             case _ =>
           }
         }
       case node: AST.EnumDeclaration =>
         inDefinition(node, Seq()) { _ =>
           for (section <- node.sections; member <- section.members) member match {
-            case m: AST.MethodDeclaration => predefineMethodDefaults(m)
+            case m: AST.MethodDeclaration if !readsTopLevel(m.args) => predefineMethodDefaults(m)
             case _ =>
           }
         }
       case node: AST.InterfaceDeclaration =>
         inDefinition(node, typing.declaredTypeParams_.getOrElse(node, Seq())) { _ =>
-          node.methods.foreach(predefineMethodDefaults)
+          node.methods.filterNot(m => readsTopLevel(m.args)).foreach(predefineMethodDefaults)
         }
       case node: AST.ExtensionDeclaration =>
         typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
           unitContext.currentDefinition = definition
           typing.find(definition.name).foreach(unitContext.currentMapper = _)
           typing.mapFromExtensionReceiver(node.receiverType).foreach { receiverType =>
-            node.methods.foreach(methodBodySupport.predefineExtensionDefaults(_, receiverType, definition))
+            node.methods.filterNot(m => readsTopLevel(m.args)).foreach(methodBodySupport.predefineExtensionDefaults(_, receiverType, definition))
           }
         }
-      // A top-level `val`/`var` becomes a field only when the body pass reaches it, so a
-      // default that reads one is still typed in source order, after it.
-      case node: AST.FunctionDeclaration if node.block != null && !readsAny(node.args, topLevelVariables) =>
+      case node: AST.FunctionDeclaration if node.block != null && !readsTopLevel(node.args) =>
         typing.kernelNodeOf[MethodDefinition](node).foreach { function =>
           typing.loadTopClass.collect { case cd: ClassDefinition => cd }.foreach(unitContext.currentDefinition = _)
           typing.find(typing.topClass).foreach(unitContext.currentMapper = _)

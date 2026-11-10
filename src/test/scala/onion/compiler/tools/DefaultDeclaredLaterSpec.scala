@@ -200,4 +200,48 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
       assert(compiles(callee, caller))
     }
   }
+
+  describe("a default that reads a top-level val") {
+
+    it("still compiles in a class method, a constructor, a record method and an extension") {
+      assert(output(
+        """
+          |val base = 5
+          |val greeting = "hi"
+          |class K {
+          |public:
+          |  def f(n: Int = base): Int = n
+          |}
+          |class C {
+          |public:
+          |  val x: Int
+          |  def this(x: Int = base * 2) { this.x = x }
+          |}
+          |record R(v: Int) {
+          |public:
+          |  def f(n: Int = base + v): Int = n
+          |}
+          |extension String {
+          |  def tag(t: String = greeting): String = t + self
+          |}
+          |println(new K().f())
+          |println(new C().x)
+          |println(new R(1).f())
+          |println("x".tag())
+        """) == "5,10,6,hix")
+    }
+
+    it("is still seen by a call above it in the same class") {
+      assert(output(
+        """
+          |val base = 3
+          |class K {
+          |public:
+          |  def run(): Int = g()
+          |  def g(n: Int = base): Int = n
+          |}
+          |println(new K().run())
+        """) == "3")
+    }
+  }
 }

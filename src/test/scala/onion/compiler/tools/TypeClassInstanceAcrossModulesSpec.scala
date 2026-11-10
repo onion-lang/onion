@@ -142,4 +142,82 @@ class TypeClassInstanceAcrossModulesSpec extends AnyFunSpec {
     val r = compileAndRun("lib.on" -> lib, "dup.on" -> dup, "main.on" -> main("println(Agg::inside())"))
     assert(r.isLeft && r.left.toOption.get.contains("E0097"), r)
   }
+
+  // Panel block on #2770 round 2, repro 1: `Show[a.Foo]` and `Show[b.Foo]` are two instances,
+  // even though both lower to a class named `Show$$Foo`.
+  it("keeps instances for two types that share a simple name apart") {
+    val tc =
+      """module tc;
+        |trait Show[T] { def show(a: T): String }""".stripMargin
+    def side(p: String, user: String) =
+      s"""module $p;
+         |import { tc.Show }
+         |class Foo
+         |instance Show[Foo] { def show(f: Foo): String = "$p.Foo" }
+         |class $user {
+         |public:
+         |  static def run(): String = Show[Foo]::show(new Foo())
+         |}""".stripMargin
+    val app =
+      """import { a.UseA; b.UseB }
+        |class Main {
+        |public:
+        |  static def main(args: String[]): void {
+        |    println(UseA::run())
+        |    println(UseB::run())
+        |  }
+        |}""".stripMargin
+    val r = compileAndRun("tc.on" -> tc, "a.on" -> side("a", "UseA"), "b.on" -> side("b", "UseB"), "main.on" -> app)
+    assert(r.map(_.replace("\r\n", "\n")) == Right("a.Foo\nb.Foo"), r)
+  }
+
+  // Panel block on #2770 round 2, repro 2: the instance for `pa.Point` is not passed for a
+  // `pb.Point` (that compiled, then threw ClassCastException); no instance is found instead.
+  it("does not pass the instance of another type that shares the simple name") {
+    val tr =
+      """module tr;
+        |trait Show[T] { def show(x: T): String }
+        |class Util {
+        |public:
+        |  static def render[T: Show](x: T): String = Show[T]::show(x)
+        |}""".stripMargin
+    val pb =
+      """module pb;
+        |record Point(x: Int, y: Int)""".stripMargin
+    val pa =
+      """module pa;
+        |import { tr.Show; tr.Util }
+        |record Point(name: String)
+        |instance Show[Point] { def show(p: Point): String = "pa.Point " + p.name() }
+        |class Main {
+        |public:
+        |  static def main(args: String[]): void { println(Util::render(new pb.Point(1, 2))) }
+        |}""".stripMargin
+    val r = compileAndRunMain("pa.Main", "tr.on" -> tr, "pb.on" -> pb, "pa.on" -> pa)
+    assert(r.isLeft && r.left.toOption.get.contains("E0003"), r)
+  }
+
+  // Twin from the same verdict: a default-package `instance Show[Foo]` is not passed for a `b.Foo`.
+  it("does not pass a default-package instance for another package's same-named type") {
+    val tr =
+      """module tr;
+        |trait Show[T] { def show(x: T): String }
+        |class Util {
+        |public:
+        |  static def render[T: Show](x: T): String = Show[T]::show(x)
+        |}""".stripMargin
+    val b =
+      """module b;
+        |class Foo""".stripMargin
+    val app =
+      """import { tr.Show; tr.Util }
+        |class Foo
+        |instance Show[Foo] { def show(f: Foo): String = "Foo" }
+        |class Main {
+        |public:
+        |  static def main(args: String[]): void { println(Util::render(new b.Foo())) }
+        |}""".stripMargin
+    val r = compileAndRun("tr.on" -> tr, "b.on" -> b, "main.on" -> app)
+    assert(r.isLeft && r.left.toOption.get.contains("E0003"), r)
+  }
 }

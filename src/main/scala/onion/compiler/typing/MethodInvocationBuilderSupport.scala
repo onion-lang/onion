@@ -69,10 +69,24 @@ private[compiler] final class MethodInvocationBuilderSupport(
     val module = typing.unit_.module
     val packages = List(if (module != null) module.name else null, packageOf(traitClass.name), packageOf(concrete.name), null).distinct
     val traitRaw = traitClass match { case a: AppliedClassType => a.raw; case c => c }
+    val wanted = TraitInstanceKeys.typeArgumentName(concrete)
     packages.iterator
       .flatMap(p => typing.load(typing.createFQCN(p, mangled)))
-      .find(c => TypeRules.isSuperType(traitRaw, c))
+      .find(c => TypeRules.isSuperType(traitRaw, c) && declaredFor(c, traitRaw, wanted))
   }
+
+  /** Whether `candidate` is the instance for `wanted`, not one declared for another type that
+    * shares its simple name (`pa.Point` vs `pb.Point`): its `Trait[X]` interface must name
+    * exactly `wanted` as X. A class read without generic information (a raw interface) is
+    * taken on its name, as before. */
+  private def declaredFor(candidate: ClassType, traitRaw: ClassType, wanted: String): Boolean =
+    candidate.interfaces.collectFirst {
+      case a: AppliedClassType if a.raw.name == traitRaw.name => a.typeArguments.headOption
+      case c if c.name == traitRaw.name => None
+    } match {
+      case Some(Some(arg)) => TraitInstanceKeys.typeArgumentName(arg) == wanted
+      case _ => true
+    }
 
   private def dictionaryInstanceTerm(node: AST.Node, traitClass: ClassType, concrete: Type): Option[Term] =
     findInstanceClass(traitClass, concrete).flatMap { instanceClass =>

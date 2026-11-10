@@ -230,7 +230,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
     }
 
-  /** At most one `instance` per (trait, type) in the whole program, whatever package each one
+  /** At most one `instance` per (trait, type argument) in the whole program, whatever package each one
     * is declared in. An `instance` lowers to a class named `<Trait>$$<Type>` (Rewriting; `$` is
     * not an identifier character, so only an instance has such a name) in its own unit's
     * package, so two of them in different packages are two classes, and the call site's package
@@ -239,8 +239,13 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private def checkTraitInstanceCoherence(node: AST.ClassDeclaration, clazz: ClassDefinition): Unit =
     if (node.name.contains("$$") && node.superClass == null && node.superInterfaces.size == 1) {
       clazz.interfaces.headOption.foreach { traitType =>
-        val traitRaw = traitType match { case a: AppliedClassType => a.raw; case c => c }
-        val key = (traitRaw.name, node.name)
+        val (traitRaw, typeArg) = traitType match {
+          case a: AppliedClassType => (a.raw, a.typeArguments.headOption.map(TraitInstanceKeys.typeArgumentName))
+          case c => (c, None)
+        }
+        // Keyed on the type argument's full name: `Show[a.Foo]` and `Show[b.Foo]` are two
+        // instances even though both lower to `Show$$Foo`.
+        val key = (traitRaw.name, typeArg.getOrElse(node.name))
         if (typing.traitInstances.contains(key))
           typing.report(SemanticError.DUPLICATE_TRAIT_INSTANCE, node, traitType.displayName)
         else typing.traitInstances(key) = clazz.name

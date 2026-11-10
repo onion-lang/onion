@@ -3,11 +3,39 @@ package onion.compiler.tools
 import onion.tools.Shell
 
 /**
- * A method's defaults are known to every call in its class, whatever the order of the
- * declarations: `def run() = g()` above `def g(n: Int = 5)` compiled to E0005 (#2637).
+ * A method's defaults are known to every call, whatever the order of the declarations:
+ * `def run() = g()` above `def g(n: Int = 5)` compiled to E0005 in one class (#2637), and at
+ * the top level, across classes, records, enums, interfaces, extensions and files (#2653).
  */
 class DefaultDeclaredLaterSpec extends AbstractShellSpec {
   private def run(src: String): Shell.Result = shell.run(src.stripMargin, "None", Array())
+
+  /** Runs a script and returns what it printed, failing the test if it did not compile. */
+  private def output(src: String): String = {
+    val buf = new java.io.ByteArrayOutputStream()
+    val ps = new java.io.PrintStream(buf, true, "UTF-8")
+    val saved = System.out
+    val result =
+      try {
+        System.setOut(ps)
+        Console.withOut(ps)(shell.run(src.stripMargin, "DefaultDeclaredLaterScript.on", Array()))
+      } finally System.setOut(saved)
+    val out = new String(buf.toByteArray, "UTF-8")
+    assert(result.isInstanceOf[Shell.Success], s"$result\n$out")
+    out.linesIterator.toList.mkString(",")
+  }
+
+  private def compiles(files: (String, String)*): Boolean = {
+    import onion.compiler.*
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    val sources = files.map { case (name, src) =>
+      new StreamInputSource(() => new java.io.StringReader(src.stripMargin), name)
+    }
+    new OnionCompiler(config).compile(sources) match {
+      case CompilationOutcome.Success(_) => true
+      case CompilationOutcome.Failure(errors) => fail(errors.map(_.message).mkString("\n"))
+    }
+  }
 
   describe("a call above the method that declares the default") {
     it("omits a default of a public method declared later") {
@@ -45,6 +73,131 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
           |}
         """)
       assert(Shell.Success("1,3,22") == result)
+    }
+  }
+
+  describe("a call above the declaration, outside one class body (#2653)") {
+    it("omits a default of a top-level function declared later") {
+      assert(output(
+        """
+          |def run(): Int = g()
+          |def g(n: Int = 7): Int = n
+          |println(run())
+        """) == "7")
+    }
+
+    it("still reads a top-level val or var declared above the function") {
+      assert(output(
+        """
+          |val k = 5
+          |var label = "x"
+          |def f(x: Int = k, s: String = label): String = s + x
+          |println(f())
+          |label = "y"
+          |println(f())
+        """) == "x5,y5")
+    }
+
+    it("omits a default of a method, static method or constructor of a class declared later") {
+      assert(output(
+        """
+          |class D {
+          |public:
+          |  def this {}
+          |  def run(): String = "" + new E().g() + "," + E::s() + "," + new B().a
+          |}
+          |class E {
+          |public:
+          |  def this {}
+          |  def g(n: Int = 9): Int = n
+          |  static def s(n: Int = 8): Int = n
+          |}
+          |class B {
+          |public:
+          |  val a: Int
+          |  def this(a: Int = 7) { this.a = a }
+          |}
+          |println(new D().run())
+        """) == "9,8,7")
+    }
+
+    it("passes a named argument into a later class, and delegates by name to a later superclass") {
+      assert(output(
+        """
+          |class D {
+          |public:
+          |  def this {}
+          |  def run(): void { new E().g(n = 2) }
+          |}
+          |class E {
+          |public:
+          |  def this {}
+          |  def g(m: Int = 1, n: Int = 9): void { println("g" + m + n) }
+          |}
+          |class C(x: Int) extends A(b = x) { }
+          |class A {
+          |public:
+          |  def this(a: Int = 5, b: Int = 6) { println("A" + a + b) }
+          |}
+          |new D().run()
+          |new C(3)
+        """) == "g12,A53")
+    }
+
+    it("omits a default declared later in a record, an enum and an interface") {
+      assert(output(
+        """
+          |record R(x: Int) {
+          |public:
+          |  def run(): Int = g()
+          |  def g(n: Int = 4): Int = n + x()
+          |}
+          |enum Color {
+          |  RED
+          |public:
+          |  def run(): Int = g()
+          |  def g(n: Int = 3): Int = n
+          |}
+          |interface I {
+          |  def run(): Int = g()
+          |  def g(n: Int = 2): Int = n
+          |}
+          |class K conforms I {
+          |public:
+          |  def this {}
+          |}
+          |println(new R(10).run())
+          |println(Color::RED.run())
+          |println(new K().run())
+        """) == "14,3,2")
+    }
+
+    it("omits a default of an extension method declared later") {
+      assert(output(
+        """
+          |def run(): String = "ab".twice()
+          |extension String {
+          |  def twice(sep: String = "-"): String = self + sep + self
+          |}
+          |println(run())
+        """) == "ab-ab")
+    }
+
+    it("compiles a call into another file's default in either file order") {
+      val caller = "A.on" -> """
+          |class UsesDefault {
+          |public:
+          |  static def run(): Int = Later::g()
+          |}
+        """
+      val callee = "B.on" -> """
+          |class Later {
+          |public:
+          |  static def g(n: Int = 7): Int = n
+          |}
+        """
+      assert(compiles(caller, callee))
+      assert(compiles(callee, caller))
     }
   }
 }

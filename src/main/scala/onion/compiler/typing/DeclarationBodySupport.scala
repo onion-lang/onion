@@ -27,18 +27,6 @@ private[compiler] final class DeclarationBodySupport(
       definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {
         case ctor: AST.ConstructorDeclaration if ctor.primary => ctor.args.map(_.name)
       }.flatten.toSet
-      // A default must be known before a call to its method is typed, wherever the method sits.
-      for (section <- node.defaultSection ++ node.sections; member <- section.members) member match {
-        case m: AST.MethodDeclaration if m.block == null || !AST.hasModifier(m.modifiers, AST.M_ABSTRACT) =>
-          typing.kernelNodeOf[MethodDefinition](m).foreach { method =>
-            typing.openTypeParams(unitContext.currentTypeParams ++ typing.declaredTypeParams_.getOrElse(m, Seq())) {
-              methodBodySupport.predefineDefaults(method, m.args)
-            }
-          }
-        case c: AST.ConstructorDeclaration =>
-          typing.kernelNodeOf[ConstructorDefinition](c).foreach(methodBodySupport.predefineConstructorDefaults(_, c.args))
-        case _ =>
-      }
       for (section <- node.defaultSection ++ node.sections; member <- section.members) {
         member match {
           case field: AST.FieldDeclaration =>
@@ -71,6 +59,95 @@ private[compiler] final class DeclarationBodySupport(
       }
     }
   }
+
+  /**
+   * Types the defaults of every method and constructor in this unit, before any body of any unit
+   * is typed (#2653). A call can then omit a default declared later in the file, in another type,
+   * or in another file, as #2637 already allowed within one class body.
+   */
+  def predefineUnitDefaults(unit: AST.CompilationUnit): Unit = {
+    val topLevelVariables = unit.toplevels.collect {
+      case v: AST.LocalVariableDeclaration => v.name
+      case v: AST.GlobalVariableDeclaration => v.name
+    }.toSet
+    for (toplevel <- unit.toplevels) toplevel match {
+      case node: AST.ClassDeclaration =>
+        inDefinition(node, typing.declaredTypeParams_.getOrElse(node, Seq())) { _ =>
+          for (section <- node.defaultSection ++ node.sections; member <- section.members) member match {
+            case m: AST.MethodDeclaration => predefineMethodDefaults(m)
+            case c: AST.ConstructorDeclaration =>
+              typing.kernelNodeOf[ConstructorDefinition](c).foreach(methodBodySupport.predefineConstructorDefaults(_, c.args))
+            case _ =>
+          }
+        }
+      case node: AST.RecordDeclaration =>
+        inDefinition(node, typing.declaredTypeParams_.getOrElse(node, Seq())) { _ =>
+          node.synthesizedMethods.foreach(predefineMethodDefaults)
+          for (section <- node.sections; member <- section.members) member match {
+            case m: AST.MethodDeclaration => predefineMethodDefaults(m)
+            case _ =>
+          }
+        }
+      case node: AST.EnumDeclaration =>
+        inDefinition(node, Seq()) { _ =>
+          for (section <- node.sections; member <- section.members) member match {
+            case m: AST.MethodDeclaration => predefineMethodDefaults(m)
+            case _ =>
+          }
+        }
+      case node: AST.InterfaceDeclaration =>
+        inDefinition(node, typing.declaredTypeParams_.getOrElse(node, Seq())) { _ =>
+          node.methods.foreach(predefineMethodDefaults)
+        }
+      case node: AST.ExtensionDeclaration =>
+        typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+          unitContext.currentDefinition = definition
+          typing.find(definition.name).foreach(unitContext.currentMapper = _)
+          typing.mapFromExtensionReceiver(node.receiverType).foreach { receiverType =>
+            node.methods.foreach(methodBodySupport.predefineExtensionDefaults(_, receiverType, definition))
+          }
+        }
+      // A top-level `val`/`var` becomes a field only when the body pass reaches it, so a
+      // default that reads one is still typed in source order, after it.
+      case node: AST.FunctionDeclaration if node.block != null && !readsAny(node.args, topLevelVariables) =>
+        typing.kernelNodeOf[MethodDefinition](node).foreach { function =>
+          typing.loadTopClass.collect { case cd: ClassDefinition => cd }.foreach(unitContext.currentDefinition = _)
+          typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
+          typing.openTypeParams(typing.emptyTypeParams ++ typing.declaredTypeParams_.getOrElse(node, Seq())) {
+            methodBodySupport.predefineDefaults(function, node.args)
+          }
+        }
+      case _ =>
+    }
+    unitContext.currentDefinition = null
+    unitContext.currentMapper = null
+  }
+
+  private def readsAny(args: List[AST.Argument], names: Set[String]): Boolean = names.nonEmpty && {
+    var found = false
+    def visit(n: AST.Node): Unit = n match {
+      case id: AST.Id if names.contains(id.name) => found = true
+      case other => ASTWalk.visitChildren(other)(visit)
+    }
+    args.foreach(a => if (a.defaultValue != null) visit(a.defaultValue))
+    found
+  }
+
+  private def inDefinition(node: AST.TypeDeclaration, typeParams: Seq[TypeParam])(body: ClassDefinition => Unit): Unit =
+    typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+      unitContext.currentDefinition = definition
+      typing.find(definition.name).foreach(unitContext.currentMapper = _)
+      typing.openTypeParams(typing.emptyTypeParams ++ typeParams)(body(definition))
+    }
+
+  /** An explicitly `abstract` method with a body is an error the body pass reports; its defaults wait for that. */
+  private def predefineMethodDefaults(m: AST.MethodDeclaration): Unit =
+    if (m.block == null || !AST.hasModifier(m.modifiers, AST.M_ABSTRACT))
+      typing.kernelNodeOf[MethodDefinition](m).foreach { method =>
+        typing.openTypeParams(unitContext.currentTypeParams ++ typing.declaredTypeParams_.getOrElse(m, Seq())) {
+          methodBodySupport.predefineDefaults(method, m.args)
+        }
+      }
 
   /** A class that declares no constructor gets one that calls `super()`. When the superclass has
    *  no accessible no-arg constructor, that call used to compile and then throw NoSuchMethodError

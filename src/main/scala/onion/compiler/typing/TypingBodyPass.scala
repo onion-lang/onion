@@ -63,6 +63,9 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   )
   def run(): Unit = runUnit()
 
+  /** Types this unit's defaults; [[Typing.processBody]] calls it for every unit before any [[run]] (#2653). */
+  def predefineDefaults(): Unit = declarationBodySupport.predefineUnitDefaults(unit)
+
   def createEqualsForRef(lhs: Term, rhs: Term): Term =
     operatorTyping.createEquals(EQUAL, lhs, rhs)
 

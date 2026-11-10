@@ -1718,6 +1718,10 @@ object SemanticErrorReporter {
       "error.semantic.duplicateTypeAlias",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.DUPLICATE_TRAIT_INSTANCE -> ErrorDef(
+      "error.semantic.duplicateTraitInstance",
+      Seq(items => asString(items(0)))
+    ),
     SemanticError.MULTIPLE_BINDING_PATTERNS_IN_CASE -> ErrorDef(
       "error.semantic.multipleBindingPatternsInCase",
       Seq()

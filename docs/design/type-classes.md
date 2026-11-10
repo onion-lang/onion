@@ -103,6 +103,13 @@ ground type.
   implementing the interface with a `public static final INSTANCE`, private ctor,
   concrete primitive-typed methods plus auto-generated `ACC_BRIDGE` erased
   methods. Coherence-key name mangling `<traitFqn>$$<erasedTypeKey>`.
+  - **As implemented (v1, #2770):** the class is named `<TraitSimpleName>$$<TypeSimpleName>`
+    and lives in the package of the unit that declares the `instance` (Rewriting lowers it
+    before the trait resolves, so the trait's package is not known yet). A call site looks
+    for that name in four packages, in order: the caller's module, the trait's, the type
+    argument's, and the default package. A candidate counts only if its `Trait[X]`
+    interface is this trait and `X` is exactly the requested type (fully qualified, boxed),
+    so `Show$$Point` declared for `pa.Point` is never passed for a `pb.Point`.
 - **Constrained method** gets **trailing** hidden params
   `$dict$Numeric$T : onion.dict.Numeric`, one per `(typeParam, constraint)` in a
   deterministic order (trailing minimizes disruption to arg emission and value-param
@@ -122,8 +129,10 @@ ground type.
 
 ## Coherence & orphan rules
 
-- **One instance per `(trait, erased head-type key)`.** v1 keys by the erased head
-  constructor, so `Numeric[List[Int]]` and `Numeric[List[String]]` collide
+- **One instance per `(trait, erased head-type key)`.** As implemented, the key is the
+  trait's and the type argument's fully qualified names, across every file compiled
+  together (E0097), so `Show[a.Foo]` and `Show[b.Foo]` are two instances. v1 keys by
+  the erased head constructor, so `Numeric[List[Int]]` and `Numeric[List[String]]` collide
   (documented limitation until parametric instances land). Normalize primitive vs
   boxed so `Numeric[Int]` and `Numeric[Integer]` are one key.
 - **Orphan rule (v1):** an `instance` is allowed only if the trait **or** the head

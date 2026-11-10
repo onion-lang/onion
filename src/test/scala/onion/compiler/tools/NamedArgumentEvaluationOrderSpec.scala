@@ -133,4 +133,100 @@ class NamedArgumentEvaluationOrderSpec extends AbstractShellSpec {
           |    return log.sb.toString() + ":" + r""".stripMargin) == Shell.Success("S:S!"))
     }
   }
+
+  // A field initializer is emitted into every constructor. Its temporaries (and its own
+  // block locals) used to land in the constructor's parameter slots (#2800 panel).
+  describe("a field initializer's locals") {
+    def runClass(classes: String, body: String): Shell.Result =
+      shell.run(
+        s"""
+           |class Log {
+           |public:
+           |  static val sb: StringBuilder = new StringBuilder()
+           |  static def t(s: String): String { sb.append(s); return s }
+           |  static def f(a: String, b: String): String = a + b
+           |}
+           |$classes
+           |class Test {
+           |public:
+           |  static def main(args: String[]): String {
+           |$body
+           |  }
+           |}
+           |""".stripMargin,
+        "None",
+        Array()
+      )
+
+    it("does not overwrite a String constructor parameter") {
+      assert(runClass(
+        """class Box {
+          |public:
+          |  val s: String = Log::f(b = Log::t("B"), a = Log::t("A"))
+          |  val n: String
+          |  def this(n: String) { this.n = n }
+          |}""".stripMargin,
+        """    val b = new Box("hello")
+          |    return Log::sb.toString() + ":" + b.s + ":" + b.n""".stripMargin) == Shell.Success("BA:AB:hello"))
+    }
+
+    it("does not clash with a Long or Int primary constructor parameter") {
+      assert(runClass(
+        """class LBox(val n: Long) {
+          |public:
+          |  val s: String = Log::f(b = Log::t("B"), a = Log::t("A"))
+          |}
+          |class IBox(val n: Int) {
+          |public:
+          |  val s: String = Log::f(b = Log::t("D"), a = Log::t("C"))
+          |}""".stripMargin,
+        """    val l = new LBox(7L)
+          |    val i = new IBox(3)
+          |    return Log::sb.toString() + ":" + l.s + l.n + ":" + i.s + i.n""".stripMargin) == Shell.Success("BADC:AB7:CD3"))
+    }
+
+    it("keeps a block local in an initializer apart from the constructor's parameters") {
+      assert(runClass(
+        """class Box {
+          |public:
+          |  val s: String = if true { val t: String = "local"; t } else { "no" }
+          |  val n: String
+          |  def this(n: String) { this.n = n }
+          |}
+          |class LBox(val n: Long) {
+          |public:
+          |  val s: String = if true { val t: String = "local"; t } else { "no" }
+          |}""".stripMargin,
+        """    val b = new Box("hello")
+          |    val l = new LBox(7L)
+          |    return b.s + ":" + b.n + ":" + l.s + ":" + l.n""".stripMargin) == Shell.Success("local:hello:local:7"))
+    }
+
+    it("keeps a local captured and mutated by a closure in an initializer apart") {
+      assert(runClass(
+        """class Ctr {
+          |public:
+          |  val inc: () -> Int = if true { var c: Int = 0; val f: () -> Int = () -> { c += 1; c }; f } else { () -> 0 }
+          |  val tag: String
+          |  def this(tag: String) { this.tag = tag }
+          |}""".stripMargin,
+        """    val k = new Ctr("t")
+          |    val g = k.inc
+          |    g()
+          |    return "" + g() + ":" + k.tag""".stripMargin) == Shell.Success("2:t"))
+    }
+
+    it("keeps two initializers' locals of different types apart") {
+      assert(runClass(
+        """class Two(val k: Int) {
+          |public:
+          |  val a: Long = if true { val x: Long = 40L; x + 2L } else { 0L }
+          |  val b: String = if true { val y: String = "y"; y + k } else { "" }
+          |  static val c: Long = if true { val x: Long = 1L; x } else { 0L }
+          |  static val d: String = if true { val y: String = "s"; y } else { "" }
+          |}""".stripMargin,
+        """    val t = new Two(5)
+          |    return "" + t.a + ":" + t.b + ":" + Two::c + ":" + Two::d""".stripMargin) == Shell.Success("42:y5:1:s"))
+    }
+  }
 }

@@ -60,10 +60,12 @@ final class ContractPurityPass(typing: Typing) {
     }
   }
 
-  /** The method a call site names: `add` for `java.util.List::add`, `f` for a top-level `f`. */
+  /** The method a call site names: `add` for `java.util.List.add` or `K::add`, `f` for a top-level `f`. */
   private def methodName(callee: String): String = {
     val i = callee.lastIndexOf("::")
-    if (i >= 0) callee.substring(i + 2) else callee
+    if (i >= 0) callee.substring(i + 2)
+    else if (callee.startsWith("new ")) callee
+    else callee.substring(callee.lastIndexOf('.') + 1)
   }
 
   /** The location of the first call to `name` in a clause's source, left to right. */

@@ -325,7 +325,7 @@ public:
   override def run(): Int { IO::println("loud"); return 2 }
 }
 
-// Before: compiled. Now: E0077 at `b.run()`, "calling Loud::run"
+// Before: compiled. Now: E0077 at `b.run()`, "calling Loud.run"
 //   tool go(): Int { val b: Base = new Base(); return b.run() }
 // Now: declare what an override can do
 tool go(): Int requires { console } {

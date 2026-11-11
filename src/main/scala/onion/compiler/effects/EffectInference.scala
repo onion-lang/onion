@@ -462,7 +462,7 @@ object EffectInference {
         md <- libraryCallbacks.getOrElse(cd.name, Nil) if only == null || only.contains(md.name)
       } if (internalCallees.add(Callback(md)))
           rawSites += RawSite(location,
-            onion.compiler.toolbox.TypeFormatting.methodReference(md.affiliation, md.name), None, Callback(md))
+            onion.compiler.toolbox.TypeFormatting.methodReference(md), None, Callback(md))
 
     /**
      * The program `close()` methods a try-with-resources can call on `resource`: those of
@@ -478,7 +478,7 @@ object EffectInference {
         }
       } if (internalCallees.add(md))
           rawSites += RawSite(location,
-            onion.compiler.toolbox.TypeFormatting.methodReference(md.affiliation, md.name), None, md)
+            onion.compiler.toolbox.TypeFormatting.methodReference(md), None, md)
 
     /**
      * The edges of a record's generated `toString`/`hashCode`/`equals`: the same method of
@@ -497,7 +497,7 @@ object EffectInference {
           } ++ c.interfaces.toSeq.flatMap(defaults)
         for (om <- rec.interfaces.toSeq.flatMap(defaults)) if (internalCallees.add(om))
           rawSites += RawSite(md.location,
-            onion.compiler.toolbox.TypeFormatting.methodReference(om.affiliation, om.name), None, om)
+            onion.compiler.toolbox.TypeFormatting.methodReference(om), None, om)
       case rec: ClassDefinition =>
         val arity = md.arguments.length
         for {
@@ -510,7 +510,7 @@ object EffectInference {
           }
         } if (internalCallees.add(om))
             rawSites += RawSite(md.location,
-              onion.compiler.toolbox.TypeFormatting.methodReference(om.affiliation, om.name), None, om)
+              onion.compiler.toolbox.TypeFormatting.methodReference(om), None, om)
       case _ =>
     }
 
@@ -545,7 +545,7 @@ object EffectInference {
     private def method(m: TypedAST.Method, location: onion.compiler.Location,
                        target: Term, args: Array[Term]): scala.Unit = {
       // A top-level function is named as written, not through its synthetic owner.
-      val callee = onion.compiler.toolbox.TypeFormatting.methodReference(m.affiliation, m.name)
+      val callee = onion.compiler.toolbox.TypeFormatting.methodReference(m)
       if (Modifier.isStatic(m.modifier)) initializes(m.affiliation, location)
       m match {
         case md: MethodDefinition if units.contains(md) =>
@@ -563,7 +563,7 @@ object EffectInference {
       if (target != null) for (om <- overridesOf(m)) {
         internalCallees += om
         rawSites += RawSite(location,
-          onion.compiler.toolbox.TypeFormatting.methodReference(om.affiliation, om.name), None, om)
+          onion.compiler.toolbox.TypeFormatting.methodReference(om), None, om)
       }
     }
 

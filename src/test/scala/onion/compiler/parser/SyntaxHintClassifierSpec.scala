@@ -1277,6 +1277,19 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
         hint.arguments shouldBe Seq(word)
       }
     }
+
+    it("tells a `requires` or `ensures` in a class body that it belongs to a method, or is an `invariant`") {
+      Seq("requires", "ensures").foreach { word =>
+        val hint = classify(
+          found = word,
+          expected = "\"val\", \"var\", \"forward\", \"def\", \"invariant\", \"history\", \"public\", \"private\", \"protected\"",
+          sourceLine = s"  $word n >= 0"
+        )
+
+        hint.messageKey shouldBe "error.parsing.hint.contract_clause_in_class_body"
+        hint.arguments shouldBe Seq(word)
+      }
+    }
   }
 
   private def classify(

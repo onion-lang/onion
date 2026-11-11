@@ -247,6 +247,17 @@ class ContractTypingSpec extends AnyFunSpec {
       assert(codes(src).isEmpty, codes(src).toString)
     }
 
+    // #2816: a StringBuilder part is appended as an Object (JDK StringBuilder is final, its
+    // toString only reads), not through the package-private append(AbstractStringBuilder)
+    it("accepts an interpolated StringBuilder part, as an Object part") {
+      val src =
+        """class K {
+          |public:
+          |  static def g(sb: StringBuilder): Int requires "#{sb}" != "" { return 1 }
+          |}""".stripMargin
+      assert(codes(src).isEmpty, codes(src).toString)
+    }
+
     it("still rejects a write inside an interpolation") {
       val src =
         """import { java.util.* }

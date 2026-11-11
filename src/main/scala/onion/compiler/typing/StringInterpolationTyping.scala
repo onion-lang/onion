@@ -72,10 +72,18 @@ final class StringInterpolationTyping(
       if (i < typedExprs.length) {
         // A null literal would otherwise match append(char[]) and NPE at runtime;
         // cast it to Object so append(Object) renders it as "null"
-        val expr =
+        val typedExpr =
           if (typedExprs(i).`type`.isNullType) new AsInstanceOf(typedExprs(i), bodyContext.rootClass)
           else typedExprs(i)
-        val appendMethods = appendFor(sbType, expr)
+        // The most specific `append` can be one the program may not call: a StringBuilder part
+        // matches AbstractStringBuilder's package-private append(AbstractStringBuilder), whose
+        // result type the next append rejects (VerifyError, #2816). Append it as an Object then.
+        val direct = appendFor(sbType, typedExpr)
+        val expr =
+          if (direct.nonEmpty && !MemberAccess.isMemberAccessible(direct(0), bodyContext.definition))
+            new AsInstanceOf(typedExpr, bodyContext.rootClass)
+          else typedExpr
+        val appendMethods = if (expr eq typedExpr) direct else appendFor(sbType, expr)
         if (appendMethods.nonEmpty) {
           result = new Call(result, appendMethods(0), Array(expr))
         } else {

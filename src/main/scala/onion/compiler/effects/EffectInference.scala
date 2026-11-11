@@ -394,6 +394,19 @@ object EffectInference {
       case _ => compatible(v.`type`)
     }
 
+    /** `append(x)` on a chain that starts at `new StringBuilder()`, as interpolation lowers to. */
+    private def freshBuilderAppend(c: Call): Boolean =
+      c.method != null && c.method.name == "append" && c.parameters.length == 1 &&
+        c.method.affiliation != null && c.method.affiliation.name == "java.lang.StringBuilder" &&
+        freshBuilder(c.target)
+
+    private def freshBuilder(t: Term): Boolean = t match {
+      case n: NewObject => n.parameters.isEmpty && n.constructor.affiliation != null &&
+        n.constructor.affiliation.name == "java.lang.StringBuilder"
+      case c: Call      => freshBuilderAppend(c)
+      case _            => false
+    }
+
     /** What an operator or a map literal can call on an object operand: `+` `toString`, `==` `equals`, `<` `compareTo`, a key `hashCode`. */
     private val operatorCallbacks = Set("toString", "equals", "compareTo", "hashCode")
 
@@ -632,6 +645,12 @@ object EffectInference {
       val entry = currentLoc
       t match {
       case null => ()
+      case c: Call if freshBuilderAppend(c) =>
+        // String interpolation: appends to a builder the expression made itself, so no
+        // memory anyone else can see changes. Like `+`, an object part may have its
+        // `toString` called back (#2605).
+        term(c.target); c.parameters.foreach(term)
+        toLibrary(c.parameters.toSeq.filter(o => o.`type` != null && !o.`type`.isBasicType), entry, operatorCallbacks)
       case c: Call          => term(c.target); c.parameters.foreach(term); method(c.method, entry, c.target, c.parameters)
       case c: SafeCall      => term(c.target); c.parameters.foreach(term); method(c.method, entry, c.target, c.parameters)
       case c: SafeStaticExtensionCall => term(c.target); c.parameters.foreach(term); method(c.method, entry, null, Array.empty)

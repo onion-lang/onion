@@ -200,6 +200,27 @@ class ContractTypingSpec extends AnyFunSpec {
       assert(codes(src).contains("E0106"), codes(src).toString)
     }
 
+    // #2605: interpolation was E0106 naming StringBuilder::append, a call the user never wrote.
+    it("accepts string interpolation, as it accepts concatenation") {
+      val src =
+        """class K {
+          |public:
+          |  static def f(n: Int): Int requires "n#{n}" != "" { return n }
+          |  static def g(n: Int): Int requires ("n" + n) != "" { return n }
+          |}""".stripMargin
+      assert(codes(src).isEmpty, codes(src).toString)
+    }
+
+    it("still rejects a write inside an interpolation") {
+      val src =
+        """import { java.util.* }
+          |class A {
+          |public:
+          |  def f(xs: List[Int]): Int requires "#{xs.add(1)}" != "" { return 0 }
+          |}""".stripMargin
+      assert(codes(src).contains("E0106"), codes(src).toString)
+    }
+
     it("accepts reading a collection") {
       val src =
         """import { java.util.* }

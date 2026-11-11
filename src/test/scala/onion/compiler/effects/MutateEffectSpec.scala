@@ -146,6 +146,30 @@ class MutateEffectSpec extends AnyFunSpec {
       assert(eff("A#b") == Set.empty[Effect])
     }
 
+    // `"#{n}!"` lowers to appends on a builder the expression creates itself; nothing the
+    // caller can see changes, as with `"" + n + "!"` (#2605).
+    it("does not count string interpolation as a mutation") {
+      val eff = infer(
+        """class A {
+          |public:
+          |  static def pad(n: Int): String = "#{n}!"
+          |  static def two(a: String, b: Object): String = "a=#{a}, b=#{b}"
+          |  static def plus(n: Int): String = "" + n + "!"
+          |}""".stripMargin)
+      assert(eff("A#pad") == Set.empty[Effect])
+      assert(eff("A#two") == Set.empty[Effect])
+      assert(eff("A#plus") == Set.empty[Effect])
+    }
+
+    it("still counts an interpolated call that writes") {
+      val eff = infer(
+        """class A {
+          |public:
+          |  static def f(sb: StringBuilder): String = "#{sb.append("x")}"
+          |}""".stripMargin)
+      assert(eff("A#f").contains(Mutate), eff("A#f"))
+    }
+
     it("defaults an unlisted method of a mutable class to a mutation, not to pure") {
       assert(EffectTable.effectsOrUnknown("java.util.List", "aMethodAddedInSomeFutureJdk") == Set(Mutate))
       assert(EffectTable.effectsOrUnknown("java.util.List", "add") == Set(Mutate))

@@ -24,9 +24,7 @@ private[compiler] final class DeclarationBodySupport(
       methodBodySupport.processTypeContracts(definition, node.invariants, node.histories)
       val instanceInitializers = Buffer[ActionStatement]()
       val staticInitializers = Buffer[ActionStatement]()
-      definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {
-        case ctor: AST.ConstructorDeclaration if ctor.primary => ctor.args.map(_.name)
-      }.flatten.toSet
+      recordPrimaryParameterNames(node, definition)
       // Most defaults were typed ahead by DefaultScheduling. A held-back one (it reads a top-level
       // `val`/`var`, or calls a method whose default does) waits until here, so a call above it
       // in this class still sees it (#2637).
@@ -159,11 +157,32 @@ private[compiler] final class DeclarationBodySupport(
       case _ => ()
     }
     args.foreach(a => if (a.defaultValue != null) visit(a.defaultValue))
+    // A `type` alias names its target too, so `new BB()` through `type BB = B` mentions `B`
+    // (panel round 5 on #2798). Expanding until nothing new appears covers alias chains.
+    val aliasTargets = typing.typeAliases_.values.toSeq.groupMap(_.node.name)(_.node.targetType)
+    val expanded = scala.collection.mutable.Set.empty[String]
+    var pending = names.toSet.intersect(aliasTargets.keySet)
+    while (pending.nonEmpty) {
+      expanded ++= pending
+      pending.foreach(alias => aliasTargets(alias).foreach(visit))
+      pending = names.toSet.intersect(aliasTargets.keySet) -- expanded
+    }
     names.toSet
   }
 
+  /** A plain primary-constructor parameter is not a field; E0002 on one hints so (#2515). */
+  private def recordPrimaryParameterNames(node: AST.ClassDeclaration, definition: ClassDefinition): Unit =
+    definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {
+      case ctor: AST.ConstructorDeclaration if ctor.primary => ctor.args.map(_.name)
+    }.flatten.toSet
+
   private def inDefinition(node: AST.TypeDeclaration, typeParams: Seq[TypeParam])(body: ClassDefinition => Unit): Unit =
     typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+      // A default typed ahead of the body pass still gets the constructor-parameter hint (panel round 5 on #2798).
+      node match {
+        case c: AST.ClassDeclaration => recordPrimaryParameterNames(c, definition)
+        case _ =>
+      }
       unitContext.currentDefinition = definition
       typing.find(definition.name).foreach(unitContext.currentMapper = _)
       typing.openTypeParams(typing.emptyTypeParams ++ typeParams)(body(definition))

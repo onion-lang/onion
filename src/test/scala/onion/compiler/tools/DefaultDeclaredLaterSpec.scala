@@ -315,6 +315,48 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
           |println(new Sub().f())
         """) == "5")
     }
+
+    it("is held back when it constructs a held-back class through a type alias") {
+      assert(output(
+        """
+          |val k = 5
+          |class B {
+          |public:
+          |  val a: Int
+          |  def this(a: Int = k) { this.a = a }
+          |}
+          |type BB = B
+          |def f(x: Int = new BB().a): Int = x
+          |class C {
+          |public:
+          |  def this {}
+          |  def g(x: Int = new BB().a + 1): Int = x
+          |}
+          |println(f())
+          |println(new C().g())
+        """) == "5,6")
+    }
+  }
+
+  describe("a default that reads a plain constructor parameter") {
+    it("still hints that the parameter is not a field") {
+      import onion.compiler.*
+      val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+      val src =
+        """class P(v: Int) {
+          |public:
+          |  def get(d: Int = v): Int = d
+          |}
+          |println(new P(1).get())
+          |""".stripMargin
+      val source = new StreamInputSource(() => new java.io.StringReader(src), "P.on")
+      new OnionCompiler(config).compile(Seq(source)) match {
+        case CompilationOutcome.Success(_) => fail("expected E0002")
+        case CompilationOutcome.Failure(errors) =>
+          val text = errors.map(_.message).mkString("\n")
+          assert(text.contains("`val v`"), text)
+      }
+    }
   }
 
   describe("a default that omits another method's default") {

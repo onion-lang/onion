@@ -44,5 +44,20 @@ class ParseErrorHintSpec extends AbstractShellSpec {
         assert(msgs.contains("invariant n >= 0"), msgs)
       }
     }
+
+    // An interface body also expects only `}` there, but takes neither `public:` nor a method
+    // body, so the record/enum advice would itself be a syntax error (panel on #2830).
+    val interfaceBodies = Seq(
+      "interface I {\n  requires 1 > 0\n}\n",
+      "record R(n: Int) {\n  invariant n >= 0\n}\ninterface I {\n  ensures 1 > 0\n}\n",
+      "record R(n: Int)\ninterface I {\n  requires 1 > 0\n}\n"
+    )
+    interfaceBodies.foreach { src =>
+      it(s"gives no record/enum advice in an interface body: ${src.replace("\n", " ").trim}") {
+        val msgs = messages(src).mkString("\n")
+        assert(msgs.nonEmpty)
+        assert(!msgs.contains("public: def half(): Int"), msgs)
+      }
+    }
   }
 }

@@ -1293,7 +1293,26 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
 
     it("tells a `requires` or `ensures` in a record or enum body that it belongs to a method, or is an `invariant`") {
       Seq("requires", "ensures").foreach { word =>
-        val hint = classify(found = word, expected = "\"}\"", sourceLine = s"  $word n >= 0")
+        Seq("record Pos(n: Int) {\n", "enum E[T] {\n  A, B\n", "enum S { case A(n: Int)\n").foreach { before =>
+          val hint = classify(found = word, expected = "\"}\"", sourceLine = s"  $word n >= 0", precedingText = before)
+
+          hint.messageKey shouldBe "error.parsing.hint.contract_clause_in_type_body"
+          hint.arguments shouldBe Seq(word)
+        }
+      }
+    }
+
+    it("gives no record/enum contract-clause hint outside a record or enum body") {
+      Seq("interface I {\n", "record R(n: Int)\ninterface I {\n", "record R(n: Int) { }\nclass C {\n  def f(): void {\n", "").foreach { before =>
+        SyntaxHintClassifier.classify(
+          "requires", "\"}\"", "requires 1 > 0", "  requires 1 > 0", before
+        ).map(_.messageKey) should not be Some("error.parsing.hint.contract_clause_in_type_body")
+      }
+    }
+
+    it("keeps the record/enum hint's arguments") {
+      Seq("requires", "ensures").foreach { word =>
+        val hint = classify(found = word, expected = "\"}\"", sourceLine = s"  $word n >= 0", precedingText = "record P(n: Int) {\n")
 
         hint.messageKey shouldBe "error.parsing.hint.contract_clause_in_type_body"
         hint.arguments shouldBe Seq(word)
@@ -1305,9 +1324,10 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
     found: String,
     expected: String = "",
     context: String = "",
-    sourceLine: String = ""
+    sourceLine: String = "",
+    precedingText: String = ""
   ): SyntaxHint =
     SyntaxHintClassifier
-      .classify(found, expected, context, sourceLine)
+      .classify(found, expected, context, sourceLine, precedingText)
       .getOrElse(fail("expected a syntax hint"))
 }

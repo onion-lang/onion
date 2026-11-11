@@ -482,7 +482,7 @@ final class ConstructionTyping(
             parameters0.length >= cd.minArguments
         case _ => false
       }
-      if (defaultsCandidate) break(typeNewObjectWithNamedArgs(node, typeRef, context))
+      if (defaultsCandidate) break(typeNewObjectWithNamedArgs(node, typeRef, context, parameters0))
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
       None
     } else if (constructors.length > 1) {
@@ -815,9 +815,10 @@ final class ConstructionTyping(
   private def typeNewObjectWithNamedArgs(
     node: AST.NewObject,
     typeRef: ClassType,
-    context: LocalContext
+    context: LocalContext,
+    positional: Array[Term] = null
   ): Option[Term] =
-    resolveConstructorWithNamedArgs(node, node.args, typeRef, context).map { case (ctor, resolved, _) =>
+    resolveConstructorWithNamedArgs(node, node.args, typeRef, context, positional).map { case (ctor, resolved, _) =>
       val params = ArgumentHelpers.evaluateInWrittenOrder(node.args, ctor.argumentsWithDefaults.toSeq.map(_.name), resolved, context)
       typeRef match {
         case applied: TypedAST.AppliedClassType =>
@@ -840,18 +841,47 @@ final class ConstructionTyping(
    * and `: this(b = 1)`, which used to bind them by position (#2659).
    * Returns the constructor, its full argument list, and the source node of
    * each argument (null where a default was filled in).
+   *
+   * `positional`, when given, holds the already-typed arguments of an
+   * all-positional call. Two constructors that both take that many arguments
+   * once their defaults are filled are then told apart by type, as a method
+   * call is: `new A(7)` picks `A(a: Int, b: Int = 2)` over `A(s: String)`
+   * (#2660).
    */
   def resolveConstructorWithNamedArgs(
     node: AST.Node,
     args: List[AST.Expression],
     typeRef: ClassType,
-    context: LocalContext
+    context: LocalContext,
+    positional: Array[Term] = null
   ): Option[(ConstructorDefinition, Array[Term], Array[AST.Node])] = {
     // Extract named argument info
     val namedInfo = extractNamedArgInfo(args)
 
     // Filter constructors by named argument compatibility
-    val candidates = filterConstructorsByNamedArgs(typeRef.constructors.toIndexedSeq, namedInfo)
+    val byCount = filterConstructorsByNamedArgs(typeRef.constructors.toIndexedSeq, namedInfo)
+    val candidates =
+      if (byCount.length <= 1 || positional == null || positional.contains(null) ||
+          namedInfo._2.nonEmpty || positional.length != namedInfo._1) byCount
+      else {
+        val classSubst = TypeSubstitution.classSubstitution(typeRef)
+        val byType = byCount.filter {
+          case cd: ConstructorDefinition =>
+            positional.indices.forall { i =>
+              val formal = TypeSubstitution.substituteType(cd.argumentsWithDefaults(i).argType, classSubst,
+                scala.collection.immutable.Map.empty, defaultToBound = false)
+              formalAccepts(formal, positional(i))
+            }
+          case _ => false
+        }
+        // No candidate takes the arguments: `extends A(true)` is "not found",
+        // not "ambiguous between A(Int, Int) and A(String)".
+        if (byType.isEmpty) {
+          bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(positional), typeRef.constructors)
+          return None
+        }
+        byType
+      }
 
     if (candidates.isEmpty) {
       val unknownNamed = typeRef.constructors.collectFirst { case cd: ConstructorDefinition => cd } match {

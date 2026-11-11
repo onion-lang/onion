@@ -15,7 +15,7 @@ private[compiler] final class MethodBodySupport(
   translate: (AST.BlockElement, LocalContext) => ActionStatement,
   addReturnNode: (ActionStatement, Type) => StatementBlock,
   processAssignable: (AST.Node, Type, Term) => Term,
-  resolveConstructorWithNamedArgs: (AST.Node, List[AST.Expression], ClassType, LocalContext) =>
+  resolveConstructorWithNamedArgs: (AST.Node, List[AST.Expression], ClassType, LocalContext, Array[Term]) =>
     Option[(ConstructorDefinition, Array[Term], Array[AST.Node])]
 ) {
   def processMethodLikeBody(
@@ -381,11 +381,10 @@ private[compiler] final class MethodBodySupport(
           case (term, source) if term != null && source != null &&
             TermWalk.exists(term) { case _: This => true; case _ => false } => source
         }.foreach(source => bodyContext.report(THIS_BEFORE_CONSTRUCTOR_DELEGATION, source, bodyContext.definition))
-      if ArgumentHelpers.hasNamedArguments(node.superInits) then
-        // `extends A(b = 7, a = 3)` / `: this(b = 8)`: bind by name and fill defaults,
-        // exactly as `new A(b = 7, a = 3)` does; the positional path below would put
-        // 7 into `a` (#2659).
-        context.withArgumentSlots(resolveConstructorWithNamedArgs(node, node.superInits, targetClass, context)).foreach {
+      // `extends A(b = 7, a = 3)` / `: this(b = 8)`, and `extends A(7)` with `b`
+      // omitted: bind by name and fill defaults, exactly as `new A(...)` does.
+      def delegateFillingDefaults(positional: Array[Term]): Unit =
+        context.withArgumentSlots(resolveConstructorWithNamedArgs(node, node.superInits, targetClass, context, positional)).foreach {
           case (ctor, _, _) if !superConstructorAccessible(node, ctor) =>
             reportInaccessibleSuperConstructor(node, ctor)
           case (ctor, params, sources) =>
@@ -393,6 +392,9 @@ private[compiler] final class MethodBodySupport(
             val init = new Super(targetClass, ctor.getArgs, params, node.selfDelegation)
             finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
         }
+      if ArgumentHelpers.hasNamedArguments(node.superInits) then
+        // The positional path below would put 7 into `a` (#2659).
+        delegateFillingDefaults(null)
       else
         val params0 = context.withArgumentSlots(typedTerms(node.superInits.toArray, context))
         if params0 != null then reportThisBeforeDelegation(params0, node.superInits)
@@ -414,7 +416,19 @@ private[compiler] final class MethodBodySupport(
         val (matched, params) =
           if matched0.nonEmpty || params0 == null then (matched0, params0)
           else findSuperConstructorWithBoxing(targetClass, params0)
-        if matched.length == 0 then
+        // A constructor with defaults takes fewer positional arguments than it
+        // declares: `extends A(7)` / `: this(4)` into `def this(a: Int = 1, b: Int = 2)`
+        // fills `b`, as `new A(7)` does (#2660).
+        def defaultsCandidate: Boolean = targetClass.constructors.exists {
+          case cd: ConstructorDefinition =>
+            cd.argumentsWithDefaults != null &&
+              params0.length < cd.argumentsWithDefaults.length &&
+              params0.length >= cd.minArguments
+          case _ => false
+        }
+        if matched.length == 0 && params0 != null && !params0.contains(null) && defaultsCandidate then
+          delegateFillingDefaults(params0)
+        else if matched.length == 0 then
           bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
         else if matched.length > 1 then
           bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))

@@ -321,7 +321,12 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class CallSuper(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, val params: Array[TypedAST.Term]) extends Term(location) {
+  /**
+   * `super.m(..)`. `interfaceOwner` is set when the call reaches a default
+   * method of one of the class's own interfaces (Java's `I.super.m()`): the
+   * JVM then needs that direct superinterface as the owner (#2675).
+   */
+  class CallSuper(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, val params: Array[TypedAST.Term], val interfaceOwner: TypedAST.ClassType = null) extends Term(location) {
     def this(target: TypedAST.Term, method: TypedAST.Method, params: Array[TypedAST.Term]) = {
       this(null, target, method, params)
     }

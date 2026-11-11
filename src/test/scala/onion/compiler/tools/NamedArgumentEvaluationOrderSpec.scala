@@ -363,4 +363,41 @@ class NamedArgumentEvaluationOrderSpec extends AbstractShellSpec {
           |    return "" + t.a + ":" + t.b + ":" + Two::c + ":" + Two::d""".stripMargin) == Shell.Success("42:y5:1:s"))
     }
   }
+
+  describe("line numbers of a reordered call") {
+    // A reordered call can start at the method's first instruction. The method's own
+    // `def` line was recorded at that instruction too, and the JVM reports the first
+    // entry it finds there, so a failure in the call said "called from" the `def` line.
+    def callerLine(callLine: String): Shell.Result =
+      shell.run(
+        s"""class Probe {
+           |public:
+           |  static def boom(): Int { throw new RuntimeException("boom") }
+           |  static def f(a: String, b: Int): String = a + b
+           |  static def call(): String {
+           |$callLine
+           |  }
+           |  static def main(args: String[]): String {
+           |    try { call() } catch e: RuntimeException { return "line " + e.getStackTrace()[1].getLineNumber() }
+           |    return "no exception"
+           |  }
+           |}
+           |""".stripMargin,
+        "None",
+        Array()
+      )
+
+    it("reports the call's line, not the def line, for a reordered first statement") {
+      assert(callerLine("""    return f(b = boom(), a = "A")""") == Shell.Success("line 6"))
+    }
+
+    it("reports the call's line for a call written in order") {
+      assert(callerLine("""    return f("A", boom())""") == Shell.Success("line 6"))
+    }
+
+    it("reports the call's line when the throwing call is the method's first instruction") {
+      assert(callerLine("""    IO::println(boom())
+          |    return "unreached"""".stripMargin) == Shell.Success("line 6"))
+    }
+  }
 }

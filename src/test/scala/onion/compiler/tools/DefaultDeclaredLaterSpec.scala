@@ -359,6 +359,48 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a default that calls a same-named method or constructor (panel round 7 on #2798)") {
+    it("is held back when the overload it calls is held back") {
+      assert(output(
+        """
+          |val k = 5
+          |def g(s: String, b: Int = k): Int = s.length() + b
+          |def g(n: Int, d: Int = g("xy")): Int = n + d
+          |println(g(100))
+        """) == "107")
+    }
+
+    it("is held back when the other constructor it calls is held back") {
+      assert(output(
+        """
+          |val k = 5
+          |class C {
+          |public:
+          |  val v: Int
+          |  def this(s: String, b: Int = k) { this.v = s.length() + b }
+          |  def this(n: Int, d: Int = new C("xy").v) { this.v = n + d }
+          |}
+          |println(new C(100, 1).v)
+        """) == "101")
+    }
+
+    it("is held back when another class's same-named method it calls is held back") {
+      assert(output(
+        """
+          |val k = 5
+          |class A {
+          |public:
+          |  def g(b: Int = k): Int = b
+          |}
+          |class B {
+          |public:
+          |  def g(n: Int, d: Int = new A().g()): Int = n + d
+          |}
+          |println(new B().g(100))
+        """) == "105")
+    }
+  }
+
   describe("a call above a held-back default") {
     def errorsOf(src: String): String = {
       import onion.compiler.*
@@ -396,6 +438,32 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
         """)
       assert(text.contains("E0021"), text)
       assert(text.contains("`k`"), text)
+    }
+
+    it("gives no such hint when an argument has the wrong type") {
+      val text = errorsOf(
+        """
+          |def run(): Int = g("s")
+          |val base = 7
+          |def g(a: Int, n: Int = base): Int = a + n
+        """)
+      assert(text.contains("E0005"), text)
+      assert(!text.contains("`base`"), text)
+    }
+
+    it("gives no such hint for a constructor when an argument has the wrong type") {
+      val text = errorsOf(
+        """
+          |def make(): Int = new K("s").a
+          |class K {
+          |public:
+          |  val a: Int
+          |  def this(x: Int, y: Int = k) { this.a = x + y }
+          |}
+          |val k = 5
+        """)
+      assert(text.contains("E0021"), text)
+      assert(!text.contains("`k`"), text)
     }
 
     it("gives no such hint when the argument is passed") {

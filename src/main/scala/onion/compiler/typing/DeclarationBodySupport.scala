@@ -93,7 +93,10 @@ private[compiler] final class DeclarationBodySupport(
             case _ =>
           }
         }
-        Some(DefaultScheduling.Job(name, mentions - name, mentions & topLevelVariables, hold, () => {
+        // The declaration's own name stays among its mentions: a call to a same-named overload,
+        // another constructor or another class's `g` must see that one held back (panel round 7
+        // on #2798). Only the job itself is excluded, in DefaultScheduling.
+        Some(DefaultScheduling.Job(name, mentions, mentions & topLevelVariables, hold, () => {
           body
           unitContext.currentDefinition = null
           unitContext.currentMapper = null

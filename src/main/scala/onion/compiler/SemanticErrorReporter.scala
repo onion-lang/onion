@@ -272,7 +272,7 @@ class SemanticErrorReporter(threshold: Int) {
       if (!hexDigitB) suggestion
       else Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + message("suggestion.hexDigitB"))
     val heldBack = sameName.collectFirst {
-      case m: TypedAST.MethodDefinition if m.defaultsPending && argTypes.length < m.arguments.length => m.defaultsHeldBackBy
+      case m: TypedAST.MethodDefinition if m.defaultsPending && fitsLeadingParameters(m.arguments, argTypes) => m.defaultsHeldBackBy
     }
     problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withHexDigitB, name, heldBack)))
   }
@@ -282,6 +282,14 @@ class SemanticErrorReporter(threshold: Int) {
    * them yet. Say so after any other suggestion, naming what holds them back, since nothing
    * else at the call site explains why the default is not there.
    */
+  /**
+   * The given arguments fit the leading parameters and leave some out, so only the missing
+   * defaults stop the call. A type error gets no held-back hint: following it would not fix
+   * the call (panel round 7 on #2798).
+   */
+  private def fitsLeadingParameters(params: Array[TypedAST.Type], argTypes: Array[TypedAST.Type]): Boolean =
+    argTypes.length < params.length && argTypes.indices.forall(i => argPassable(params(i), argTypes(i)))
+
   private def withHeldBackDefault(suggestion: Option[String], name: String, heldBy: Option[String]): Option[String] =
     heldBy match {
       case None => suggestion
@@ -704,7 +712,7 @@ class SemanticErrorReporter(threshold: Int) {
       } else None
     } else None
     val heldBack = if (items.length > 2) items(2).asInstanceOf[Array[TypedAST.ConstructorRef]].collectFirst {
-      case c: TypedAST.ConstructorDefinition if c.defaultsPending && argTypes.length < c.arguments.length => c.defaultsHeldBackBy
+      case c: TypedAST.ConstructorDefinition if c.defaultsPending && fitsLeadingParameters(c.arguments, argTypes) => c.defaultsHeldBackBy
     } else None
 
     problem(position, appendSuggestion(baseMessage, withHeldBackDefault(suggestion, s"new ${typeName(typeRef)}", heldBack)))

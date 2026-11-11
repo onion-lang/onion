@@ -653,10 +653,34 @@ private[compiler] final class MethodBodySupport(
     }
     addSharedParameterCopies(context, node.args, arguments.tail, shared)
 
-    staticMethod.setArgumentsWithDefaults(
-      buildArgumentsWithDefaults(extArgs, arguments, context.recordUsage, DefaultOwner(staticMethod.name, staticMethod.modifier, staticMethod.typeParameters, staticMethod.classType.asInstanceOf[ClassDefinition])))
+    predefinedDefaults.get(staticMethod) match
+      case Some((withDefaults, used)) =>
+        used.foreach(context.recordUsage)
+        staticMethod.setArgumentsWithDefaults(withDefaults)
+      case None =>
+        staticMethod.setArgumentsWithDefaults(
+          buildArgumentsWithDefaults(extArgs, arguments, context.recordUsage, extensionDefaultOwner(staticMethod)))
     context
   }
+
+  private def extensionDefaultOwner(staticMethod: MethodDefinition): DefaultOwner =
+    DefaultOwner(staticMethod.name, staticMethod.modifier, staticMethod.typeParameters, staticMethod.classType.asInstanceOf[ClassDefinition])
+
+  /** Types an extension method's defaults before any body is typed, as [[predefineDefaults]] does for a method (#2653). */
+  def predefineExtensionDefaults(node: AST.MethodDeclaration, receiverType: Type, definition: ClassDefinition): Unit =
+    if node.block != null && node.args.exists(_.defaultValue != null) then
+      typing.kernelNodeOf[ExtensionMethodDefinition](node).foreach { extMethod =>
+        val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+        typing.openTypeParams(unitContext.currentTypeParams ++ methodTypeParams) {
+          val staticMethod = findStaticExtensionMethod(definition, node, extMethod, receiverType)
+          if staticMethod != null && !predefinedDefaults.contains(staticMethod) then
+            val used = scala.collection.mutable.Set.empty[String]
+            val withDefaults = buildArgumentsWithDefaults(
+              receiverArgument(node, receiverType) :: node.args, staticMethod.arguments, used += _, extensionDefaultOwner(staticMethod))
+            staticMethod.setArgumentsWithDefaults(withDefaults)
+            predefinedDefaults(staticMethod) = (withDefaults, used.toSet)
+        }
+      }
 
   private def findStaticExtensionMethod(
     definition: ClassDefinition,

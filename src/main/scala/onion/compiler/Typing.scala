@@ -225,7 +225,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
     for(unit <- source) processOutline(unit)
-    for(unit <- source) processTyping(unit)
+    // Every unit's defaults are typed before any body, so a call may omit a default
+    // declared later in its file or in another file (#2653).
+    val bodyPasses = source.map(unit => unit -> new onion.compiler.typing.TypingBodyPass(this, session.activate(unit)))
+    val defaultJobs = bodyPasses.flatMap { case (unit, pass) => pass.defaultJobs().map(unit -> _) }
+    onion.compiler.typing.DefaultScheduling.run(defaultJobs)(u => session.activate(u))
+    for((unit, pass) <- bodyPasses) { session.activate(unit); pass.run() }
     for(unit <- source) processDuplication(unit)
     // Pass 5 (issue #357): capability boundaries. Needs every unit typed first —
     // effect inference is cross-unit — and runs before finishOrThrow so violations
@@ -265,6 +270,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).run()
   def processTyping(unit: AST.CompilationUnit): Unit = {
     val pass = new onion.compiler.typing.TypingBodyPass(this, session.activate(unit))
+    onion.compiler.typing.DefaultScheduling.run(pass.defaultJobs().map(unit -> _))(u => session.activate(u))
+    session.activate(unit)
     pass.run()
   }
 

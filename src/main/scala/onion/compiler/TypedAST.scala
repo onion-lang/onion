@@ -622,6 +622,18 @@ object TypedAST {
     def setArgumentsWithDefaults(args: Array[MethodArgument]): Unit =
       argsWithDefaults_ = args
 
+    /** The top-level `val`/`var`s that keep this constructor's defaults in source order (#2653), or null. */
+    var defaultsHeldBackBy: Seq[String] = null
+
+    /** The held-back functions between this constructor and [[defaultsHeldBackBy]], in declaration order to follow. */
+    var defaultsHeldBackVia: Seq[String] = Seq()
+
+    /** The first parameter from which every later one has a default in the source; set with [[defaultsHeldBackBy]]. */
+    var defaultsOmittableFrom: Int = Int.MaxValue
+
+    /** Its defaults are held back and not typed yet, so a call above it cannot omit them. */
+    def defaultsPending: Boolean = defaultsHeldBackBy != null && argumentsWithDefaults.forall(_.defaultValue.isEmpty)
+
     def argumentsWithDefaults: Array[MethodArgument] =
       if (argsWithDefaults_ != null) argsWithDefaults_
       else arguments.zipWithIndex.map { case (tp, i) => MethodArgument(s"arg$i", tp, None) }
@@ -945,6 +957,18 @@ object TypedAST {
 
     /** Set the arguments with default values */
     def setArgumentsWithDefaults(args: Array[MethodArgument]): Unit = argsWithDefaults_ = args
+
+    /** The top-level `val`/`var`s that keep this method's defaults in source order (#2653), or null. */
+    var defaultsHeldBackBy: Seq[String] = null
+
+    /** The held-back functions between this method and [[defaultsHeldBackBy]], in declaration order to follow. */
+    var defaultsHeldBackVia: Seq[String] = Seq()
+
+    /** The first parameter from which every later one has a default in the source; set with [[defaultsHeldBackBy]]. */
+    var defaultsOmittableFrom: Int = Int.MaxValue
+
+    /** Its defaults are held back and not typed yet, so a call above it cannot omit them. */
+    def defaultsPending: Boolean = defaultsHeldBackBy != null && argumentsWithDefaults.forall(_.defaultValue.isEmpty)
 
     /** Get arguments with names and optional default values */
     override def argumentsWithDefaults: Array[MethodArgument] =

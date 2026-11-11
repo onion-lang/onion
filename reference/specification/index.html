@@ -5860,7 +5860,9 @@ automatic. Narrowing requires <code>as</code> (or the legacy <code>$</code>):</p
 </span></code></pre></div>
 <p>Call sites may pass arguments by name (<code>f(b = 2, a = 1)</code>); omitted
 parameters fill from defaults. Methods, constructors and records all
-support named arguments and defaults.</p>
+support named arguments and defaults.
+Arguments run in the order they are written; <code>copy(..)</code>, <code>extends A(..)</code>
+and <code>: this(..)</code> still run them in parameter order (#2801).</p>
 <h3 id="classes">Classes<a class="headerlink" href="#classes" title="Permanent link">&para;</a></h3>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Name</span><span class="w"> </span><span class="p">[</span><span class="nc">TypeParams</span><span class="p">]</span><span class="w"> </span><span class="p">[(</span><span class="n">primary</span><span class="w"> </span><span class="n">params</span><span class="p">)]</span><span class="w"> </span><span class="p">[</span><span class="k">extends</span><span class="w"> </span><span class="nc">Super</span><span class="p">[(</span><span class="n">args</span><span class="p">)]]</span><span class="w"> </span><span class="p">[</span><span class="k">conforms</span><span class="w"> </span><span class="nc">I1</span><span class="p">,</span><span class="w"> </span><span class="nc">I2</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="n">sections</span>

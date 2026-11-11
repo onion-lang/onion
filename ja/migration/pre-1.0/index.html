@@ -2295,6 +2295,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        デフォルト値を持つオーバーロードより上にある呼び出しは、下にある呼び出しと同じものを選ぶようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5027,6 +5038,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        デフォルト値を持つオーバーロードより上にある呼び出しは、下にある呼び出しと同じものを選ぶようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5523,6 +5545,47 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li><strong>同じパッケージの2つのファイル</strong>（どちらも <code>module</code> 行なし）では、これまでどおり <strong>E0008</strong> <code>duplicated class definition Show$$Integer</code> になります。直し方は同じです。</li>
 <li><strong>型の型引数:</strong> E0097 は外側の型だけを比べます。そのため <code>Show[List[String]]</code> と <code>Show[List[Integer]]</code> は同じインスタンスとみなされ、衝突します。</li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> どちらのインスタンスを残すかは、あなたが決めることです。</li>
+</ul>
+<h2 id="_4">デフォルト値を持つオーバーロードより上にある呼び出しは、下にある呼び出しと同じものを選ぶようになりました<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>ファイルの後ろで宣言されたデフォルト値も、呼び出しで省略できるようになりました (#2653)。
+そのため、オーバーロードより上に書いた呼び出しにもデフォルト値が見えます。
+その結果、下に書いた呼び出しと同じオーバーロードを選びます。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">run</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">pick</span><span class="p">()</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">pick</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"zero"</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="kd">def</span><span class="w"> </span><span class="nf">pick</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"one"</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="nf">println</span><span class="p">(</span><span class="nf">run</span><span class="p">())</span><span class="w">   </span><span class="c1">// 以前: zero。今: one。run() を pick より下に書いたときと同じ</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>オーバーロード（呼び出しより下で宣言）</th>
+<th>呼び出し</th>
+<th>以前</th>
+<th>今</th>
+<th>以前の結果を保つには</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pick()</code>、<code>pick(n: Int = 1)</code></td>
+<td><code>pick()</code></td>
+<td><code>zero</code></td>
+<td><code>one</code></td>
+<td>どちらかのメソッドの名前を変える</td>
+</tr>
+<tr>
+<td><code>f(n: Long)</code>、<code>f(n: Int, a: Int = 1)</code>、<code>f(n: Int, b: String = "")</code></td>
+<td><code>f(1)</code></td>
+<td><code>long</code></td>
+<td>E0006</td>
+<td><code>f(1L)</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>表示されるもの:</strong> メッセージなしで別のオーバーロードが実行されます。または呼び出しで <strong>E0006</strong> <code>method call is applicable for both …</code> になります。</li>
+<li><strong>これまでどおり動くもの:</strong> オーバーロードより下にある呼び出しと、すべての引数を渡す呼び出しです。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> どのオーバーロードを呼ぶつもりだったかは、書いた人にしか分かりません。引数を渡す（<code>f(1L)</code>、<code>f(1, 1)</code>）か、どちらかのメソッドの名前を変えてください。</li>
 </ul>
 
 

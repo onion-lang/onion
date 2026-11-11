@@ -5875,7 +5875,9 @@
 </span></code></pre></div>
 <p>呼び出し側は名前付き引数を渡せます（<code>f(b = 2, a = 1)</code>）。省略されたパラメータは
 デフォルトから埋められます。メソッド、コンストラクタ、records はすべて
-名前付き引数とデフォルトをサポートします。</p>
+名前付き引数とデフォルトをサポートします。
+引数は書いた順に評価されます。ただし <code>copy(..)</code>、<code>extends A(..)</code>、
+<code>: this(..)</code> では、まだパラメータ順に評価されます（#2801）。</p>
 <h3 id="_13">クラス<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Name</span><span class="w"> </span><span class="p">[</span><span class="nc">TypeParams</span><span class="p">]</span><span class="w"> </span><span class="p">[(</span><span class="n">primary</span><span class="w"> </span><span class="n">params</span><span class="p">)]</span><span class="w"> </span><span class="p">[</span><span class="k">extends</span><span class="w"> </span><span class="nc">Super</span><span class="p">[(</span><span class="n">args</span><span class="p">)]]</span><span class="w"> </span><span class="p">[</span><span class="k">conforms</span><span class="w"> </span><span class="nc">I1</span><span class="p">,</span><span class="w"> </span><span class="nc">I2</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="n">sections</span>

@@ -23,6 +23,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     if Modifier.isFinal(mod) then access |= Opcodes.ACC_FINAL
     if Modifier.isAbstract(mod) then access |= Opcodes.ACC_ABSTRACT
     if Modifier.isSynchronized(mod) then access |= Opcodes.ACC_SYNCHRONIZED
+    if Modifier.isSynthetic(mod) then access |= Opcodes.ACC_SYNTHETIC
     access
 
   // Delegate to companion object
@@ -250,17 +251,32 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     if ctor.superInitializer != null then
       val superArgTypes = ctor.superInitializer.arguments.map(asmType)
-      if ctor.superInitializer.terms.exists(TermContainsTry.contains) then
+      val superTerms = ctor.superInitializer.terms
+      if superTerms.exists(t => t.isInstanceOf[DefaultArgument] || TermContainsTry.contains(t)) then
         // `this` is `uninitializedThis` until this super/self-delegation call
         // completes, and (like visitNewObject's freshly-`new`'d instance) that
         // special verifier type cannot survive being spilled into a local
         // across a try/catch merge. So `this` is not loaded until every
         // argument has been evaluated into a plain local first.
-        val slots = new Array[Int](ctor.superInitializer.terms.length)
+        //
+        // An omitted argument (`extends A(b = 7)`, #2659) is a DefaultArgument: it
+        // calls the constructor's static default method with the arguments before it,
+        // which are already in their locals by then.
+        val slots = new Array[Int](superTerms.length)
         var i = 0
-        while i < ctor.superInitializer.terms.length do
-          val arg = ctor.superInitializer.terms(i)
-          emitExpressionWithContext(gen, arg, className, localVars)
+        while i < superTerms.length do
+          val arg = superTerms(i)
+          arg match
+            case d: DefaultArgument =>
+              val method = d.method
+              if (method.modifier & Modifier.STATIC) == 0 then
+                throw new IllegalStateException(s"constructor default ${method.name} is not static")
+              for j <- 0 until d.index do gen.loadLocal(slots(j))
+              val defaultArgTypes = method.arguments.map(asmType)
+              val descriptor = AsmType.getMethodDescriptor(asmType(method.returnType), defaultArgTypes*)
+              gen.visitMethodInsn(Opcodes.INVOKESTATIC, AsmUtil.internalName(method.classType.name), method.name, descriptor, method.classType.isInterface)
+            case _ =>
+              emitExpressionWithContext(gen, arg, className, localVars)
           adaptValueOnStack(gen, arg.`type`, superArgTypes(i))
           val slot = gen.newLocal(superArgTypes(i))
           gen.storeLocal(slot)
@@ -364,9 +380,34 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
     // Just visit the method without any code (abstract method needs visitEnd but no code)
     val mv = cw.visitMethod(access, node.name, desc, methodSignature, exceptions)
-    NullabilityMetadata.emitParameters(mv, node.arguments)
+    NullabilityMetadata.emitParameters(mv, node.arguments, dictionaryCount(node))
     emitContract(mv, node)
     mv.visitEnd()
+
+  /**
+   * How many trailing type-class dictionary parameters a `[T: Trait]` method carries
+   * (Rewriting adds one `Trait[T]?` per type parameter and trait, in order). Counted only when
+   * the trailing parameters really are those: a default argument's helper method shares the
+   * type parameters but not the dictionaries.
+   */
+  private def dictionaryCount(node: MethodDefinition): Int =
+    val tps = node.typeParameters
+    val args = node.arguments
+    if tps == null || args == null then return 0
+    val wanted = tps.toSeq.flatMap(tp => tp.constraints.map(c => (tp.name, c.name)))
+    if wanted.isEmpty || wanted.size > args.length then return 0
+    def isDictionary(arg: TypedAST.Type, tpName: String, traitName: String): Boolean =
+      val inner = arg match
+        case n: TypedAST.NullableType => n.innerType
+        case other                    => other
+      inner match
+        case a: TypedAST.AppliedClassType =>
+          a.raw.name == traitName && (a.typeArguments.toSeq match
+            case Seq(tv: TypedAST.TypeVariableType) => tv.name == tpName
+            case _                                  => false)
+        case _ => false
+    val trailing = args.toSeq.takeRight(wanted.size)
+    if trailing.zip(wanted).forall { case (arg, (tp, tr)) => isDictionary(arg, tp, tr) } then wanted.size else 0
 
   /**
    * `@onion.Contract` on a method with contract clauses (RFC #2557): the clauses as text, so a
@@ -412,7 +453,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val methodSignature =
       GenericSignatureEncoder.methodSignature(node.typeParameters, node.arguments, node.returnType)
     val gen = MethodEmitter.newGenerator(cw, access, node.name, returnType, argTypes, exceptions, methodSignature)
-    NullabilityMetadata.emitParameters(gen, node.arguments)
+    NullabilityMetadata.emitParameters(gen, node.arguments, dictionaryCount(node))
     emitContract(gen, node)
 
     // Bounds for every LocalVariableTable entry. Marked before anything else is emitted,
@@ -420,10 +461,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     // reuses one), so whole-method scope cannot describe two variables at once.
     val methodStart = gen.mark()
 
-    // Emit line number for method declaration
-    if node.location != null then
-      val label = gen.mark()
-      gen.visitLineNumber(node.location.line, label)
+    // The method's own line covers any code before its first statement. It is recorded
+    // after the body, and only when the first statement does not start at the same
+    // instruction: two entries there made a failure in that statement say it came from
+    // the `def` line (#2800).
+    val declarationLine = gen.mark()
 
     val isStatic = (node.modifier & Modifier.STATIC) != 0
     val localVars = new LocalVarContext(gen)
@@ -505,6 +547,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
     else
       gen.returnValue()
+    if node.location != null && !gen.hasLineNumberAt(declarationLine) then
+      gen.visitLineNumber(node.location.line, declarationLine)
     emitLocalVariableTable(gen, localVars, methodStart)
     try gen.endMethod()
     catch

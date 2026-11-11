@@ -160,6 +160,11 @@ the closure, not the one that eventually invokes it — invoking a function valu
 And any call that neither the table nor the compiled sources can account for
 contributes `unknown` rather than being dropped.
 
+A default argument works the same way. Its effects are charged to each caller that
+omits the argument, not to the method that declares it, so `--effects` has no line for
+the default itself: with `def f(n: Long = System::currentTimeMillis())`, `f` is `pure`
+and a caller of `f()` carries `clock`.
+
 The result is an over-approximation in the other direction too: the analysis reports
 what a body *can* do, not what it will do on a given run. A branch that never executes
 still contributes its effects. That is the correct direction for the question the

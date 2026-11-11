@@ -46,16 +46,30 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
     val errors = ArrayBuffer.empty[CompileError]
     val warnings = ArrayBuffer.empty[CompileWarning]
     try {
+      val build = new BuildRun(config, ctx.debugArtifacts.typedClasses.getOrElse(Nil))
       for (r <- repros) {
         val location = r.method.location
-        if (reproduce(r, loader)) {
+        // A replay runs the constructor and the method; it runs only when neither reaches the
+        // outside world, and only for as long as the build waits (#2601). Otherwise it stays W0021.
+        // A replay that is not run, or not waited for, also gets W0023 saying why (panel block on #2610).
+        val effects = build.constructorEffects(r.cls.name) ++
+          build.methodEffects(Some(r.cls.name), r.method.name, r.method.args.size, static = false)
+        def notRun(message: String): Unit =
+          warnings += CompileWarning(r.sourceFile, location, WarningCategory.PredicateNotRun, message)
+        val replayed =
+          if (effects.nonEmpty) { notRun(BuildRun.replayNotRunMessage(r.method.name, r.history, effects)); false }
+          else build.timed(loader)(reproduce(r, loader)) match {
+            case None =>
+              notRun(BuildRun.replayTimeoutMessage(r.method.name, r.history, config.contractTimeoutMillis)); false
+            case Some(result) => result.contains(true)
+          }
+        if (replayed) {
           errors += CompileError(r.sourceFile, location,
             Message("error.semantic.historyReproduced", Array[Any](r.method.name, r.history, r.shown)),
             Some(SemanticError.HISTORY_REPRODUCED.errorCode))
         } else {
           warnings += CompileWarning(r.sourceFile, location, WarningCategory.HistoryNotProved,
-            s"'${r.method.name}' can break the history '${r.history}': for example when ${r.shown}. " +
-              "Add an invariant or a requires that rules this out, or weaken the history")
+            Message("warning.historyNotProved", Array[Any](r.method.name, r.history, r.shown)))
         }
       }
     } finally thread.setContextClassLoader(previous)
@@ -73,14 +87,18 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
     val method = s"${u.cls.name}.${u.method.name}"
     val message = u.history match {
       case Some(h) =>
-        val reason = u.fieldType match {
-          case Some(t) => Message("warning.historyNotChecked.reason.type", u.field, t)
-          case None    => Message("warning.historyNotChecked.reason.body")
+        val reason = (u.reason, u.fieldType) match {
+          // A write the checks cannot follow names its line and why (#2599).
+          case (Some(("lambda", _)), _)   => Message("warning.historyNotChecked.reason.lambda", u.line.toString)
+          case (Some(("invariant", _)), _) => Message("warning.historyNotChecked.reason.invariant")
+          case (Some(("inherited", sub)), _) => Message("warning.historyNotChecked.reason.inherited", sub, Option(u.via).getOrElse(u.method.name))
+          case (_, Some(t))               => Message("warning.historyNotChecked.reason.type", u.field, t)
+          case _                          => Message("warning.historyNotChecked.reason.body")
         }
         Message("warning.historyNotChecked", Array[Any](method, u.field, h, reason))
       case None => Message("warning.historyNotChecked.form", Array[Any](method, u.field, u.line.toString))
     }
-    CompileWarning(u.sourceFile, u.method.location, WarningCategory.HistoryNotChecked, message)
+    CompileWarning(u.sourceFile, Option(u.at).getOrElse(u.method.location), WarningCategory.HistoryNotChecked, message)
   }
 
   /** Whether running the method from the solver's state breaks the history. False when it cannot be run. */

@@ -78,7 +78,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, receiver, targetType) {
         (method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
       } match {
-        case some @ Some(_) => return some
+        case Some(result) => return result
         case None =>
       }
     }
@@ -143,7 +143,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       }.toSet
       typeUnqualifiedCallWithClosures(node, context, expected, closureIndices)
     } else if (methods.length == 0) {
-      staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected) match {
+      staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected, context) match {
         case MethodFallbackLookup.Found(term) =>
           checkRegexLiteral(node, term)
           Some(term)
@@ -240,8 +240,18 @@ private[compiler] final class UnqualifiedMethodCallSupport(
           node, name, node.args, node.typeArgs, top, context, expected, untypedClosureIndices
         )
       case _ =>
-        // No target class holds a method of this name. The remaining fallbacks
-        // (static-import, callable-value) and the not-found diagnostic cannot
+        // A static-imported function types its lambda as `Type::name(...)` does, when exactly
+        // one imported type has an overload that fits the other arguments (#2667).
+        staticImportMethodCallSupport.soleImportedTypeFor(node, context, expected, untypedClosureIndices) match {
+          case Some(None) => return None
+          case Some(Some((typeRef, typedArgs))) =>
+            return staticCalls.typeStaticCallWithBidirectionalInferenceCore(
+              node, name, node.args, node.typeArgs, typeRef, context, expected, untypedClosureIndices, typedArgs
+            )
+          case None =>
+        }
+        // Otherwise no target class holds a method of this name. The remaining fallbacks
+        // (an ambiguous static import, callable-value) and the not-found diagnostic cannot
         // benefit from bidirectional inference on the closure, so report the
         // closure's parameter type as usual by delegating to the eager path,
         // which yields the standard not-found error for the arguments it can
@@ -249,7 +259,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         // callable value or static import is genuinely absent).
         val params0 = calls.typedTerms(node.args.toArray, context)
         if (params0 == null) return None
-        staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params0, expected) match {
+        staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params0, expected, context) match {
           case MethodFallbackLookup.Found(term) =>
             checkRegexLiteral(node, term)
             Some(term)
@@ -384,7 +394,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       val recordCopy = calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, receiver, targetType) {
         (method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
       }
-      if (recordCopy.isDefined) return recordCopy
+      recordCopy match { case Some(result) => return result; case None => }
     }
 
     val candidates = new JTreeSet[Method](new MethodComparator)
@@ -394,7 +404,12 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       return None
     }
 
-    overloadSupport.selectNamedArgumentMethod(candidates, node.args) match {
+    val pretyped = new java.util.IdentityHashMap[AST.Expression, Term]()
+    val selection = overloadSupport.selectNamedArgumentMethod(candidates, node.args, context, selfClassSubstitution(_), pretyped) match {
+      case Some(found) => found
+      case None => return None
+    }
+    selection match {
       case CandidateSelection.NoMatch =>
         ArgumentHelpers.findUnknownNamedArg(candidates.asScala, node.args) match {
           case Some(named) =>
@@ -409,9 +424,10 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       case CandidateSelection.Selected(method) =>
         if (!ensureInstanceAvailable(node, method, context)) return None
         val classSubst = selfClassSubstitution(method)
-        calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
+        calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
+              .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams => rawUnqualifiedCall(targetType, method, finalParams, context)
           )
         }

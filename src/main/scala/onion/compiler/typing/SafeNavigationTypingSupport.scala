@@ -76,7 +76,7 @@ private[compiler] final class SafeNavigationTypingSupport(
       calls.tryRecordCopy(node, name, node.args, node.typeArgs, context, target, targetType) {
         (method, finalParams) => new SafeCall(node.location, target, method, finalParams)
       } match {
-        case some @ Some(_) => return some
+        case Some(result) => return result
         case None =>
       }
     }
@@ -116,7 +116,7 @@ private[compiler] final class SafeNavigationTypingSupport(
     val recordCopy = calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, target, targetType) {
       (method, finalParams) => new SafeCall(node.location, target, method, finalParams)
     }
-    if (recordCopy.isDefined) return recordCopy
+    recordCopy match { case Some(result) => return result; case None => }
 
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(targetType, node.name, candidates, calls.isInstanceMethod)
@@ -125,7 +125,12 @@ private[compiler] final class SafeNavigationTypingSupport(
       return None
     }
 
-    overloadSupport.selectNamedArgumentMethod(candidates, node.args) match {
+    val pretyped = new java.util.IdentityHashMap[AST.Expression, Term]()
+    val selection = overloadSupport.selectNamedArgumentMethod(candidates, node.args, context, m => TypeSubstitution.hierarchySubstitution(targetType, m.affiliation), pretyped) match {
+      case Some(found) => found
+      case None => return None
+    }
+    selection match {
       case CandidateSelection.NoMatch =>
         ArgumentHelpers.findUnknownNamedArg(candidates.asScala, node.args) match {
           case Some(named) =>
@@ -139,9 +144,10 @@ private[compiler] final class SafeNavigationTypingSupport(
         None
       case CandidateSelection.Selected(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(targetType, method.affiliation)
-        calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
+        calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
+              .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams => new SafeCall(node.location, target, method, finalParams)
           )
         }

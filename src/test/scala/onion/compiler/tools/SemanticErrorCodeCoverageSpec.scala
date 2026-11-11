@@ -522,6 +522,22 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |}
           |""".stripMargin)
     }
+    it("E0050 `super.f()` in a static method, also inside a lambda") {
+      failsWith("E0050",
+        """class Base {
+          |public:
+          |  static def s(): Int { return super.hashCode() }
+          |  static def main(args: String[]): Int { return 0 }
+          |}
+          |""".stripMargin)
+      failsWith("E0050",
+        """class Base {
+          |public:
+          |  static def s(): Int { val f: () -> Int = () -> super.hashCode(); return f() }
+          |  static def main(args: String[]): Int { return 0 }
+          |}
+          |""".stripMargin)
+    }
     it("E0073 a Map is not directly iterable") {
       failsWith("E0073",
         """class Test {

@@ -219,7 +219,9 @@ final class AssignmentTyping(
           if (value.`type`.isBottomType) return value
           val term = processAssignable(expression, expected, value)
           if (term == null) return null
-          return new SetField(target, field, term)
+          // The receiver's location, which only diagnostics read (codegen emits no line for a
+          // field write): E0110 points at `o` in `o.t = ...` (#2599).
+          return new SetField(Option(selection.target).map(_.location).orElse(Option(selection.location)).orNull, target, field, term)
         }
         if (field != null) {
           // The field exists but is not accessible from here (the accessible case

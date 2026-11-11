@@ -67,12 +67,29 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   // zero-argument accessor, so a body method of that name would be a duplicate (#2396).
   private var recordComponents = Map.empty[String, Type]
 
+  // True while the body of a record is checked: every record generates public instance
+  // `equals(Object)`, `hashCode()` and `toString()`, and only a public or protected instance
+  // method of that signature replaces one (TypingOutlinePass, #2746, #2754).
+  private var inRecordBody = false
+
+  private def clashesWithGeneratedObjectMethod(method: MethodDefinition): Boolean =
+    inRecordBody && (Modifier.isStatic(method.modifier) || Modifier.isPrivate(method.modifier)) && (method.name match {
+      case "equals" =>
+        method.arguments.length == 1 &&
+          onion.compiler.generics.Erasure.asmType(method.arguments(0)).getDescriptor == "Ljava/lang/Object;"
+      case "hashCode" | "toString" => method.arguments.isEmpty
+      case _ => false
+    })
+
   private def registerMethod(ast: AST.Node, method: MethodDefinition): Unit = {
     val redefinedAccessor = if (method.arguments.isEmpty) recordComponents.get(method.name) else None
     redefinedAccessor match {
       case Some(componentType) =>
         typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments,
           SemanticErrorReporter.RecordAccessorRedefined(componentType))
+      case None if clashesWithGeneratedObjectMethod(method) =>
+        typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments,
+          SemanticErrorReporter.RecordObjectMethodClash(Modifier.isStatic(method.modifier)))
       case None =>
         if (seenMethods.contains(method)) typing.report(SemanticError.DUPLICATE_METHOD, ast, method.affiliation, method.name, method.arguments)
         else seenMethods.add(method)
@@ -203,6 +220,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private def processClassDeclaration(node: AST.ClassDeclaration): Unit =
     withKernel[ClassDefinition](node) { clazz =>
       resetForTypeDeclaration(clazz)
+      checkTraitInstanceCoherence(node, clazz)
       for (defaultSection <- node.defaultSection) processAccessSection(defaultSection)
       for (section <- node.sections) processAccessSection(section)
       generateForwardedMethods()
@@ -210,6 +228,28 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       DuplicationChecks.checkOverrideTargets(typing, clazz, node.location)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
+    }
+
+  /** At most one `instance` per (trait, type argument) in the whole program, whatever package each one
+    * is declared in. An `instance` lowers to a class named `<Trait>$$<Type>` (Rewriting; `$` is
+    * not an identifier character, so only an instance has such a name) in its own unit's
+    * package, so two of them in different packages are two classes, and the call site's package
+    * would decide which one a `[T: Trait]` dictionary gets (#2770). Rewriting already rejects a
+    * duplicate within one unit. */
+  private def checkTraitInstanceCoherence(node: AST.ClassDeclaration, clazz: ClassDefinition): Unit =
+    if (node.name.contains("$$") && node.superClass == null && node.superInterfaces.size == 1) {
+      clazz.interfaces.headOption.foreach { traitType =>
+        val (traitRaw, typeArg) = traitType match {
+          case a: AppliedClassType => (a.raw, a.typeArguments.headOption.map(TraitInstanceKeys.typeArgumentName))
+          case c => (c, None)
+        }
+        // Keyed on the type argument's full name: `Show[a.Foo]` and `Show[b.Foo]` are two
+        // instances even though both lower to `Show$$Foo`.
+        val key = (traitRaw.name, typeArg.getOrElse(node.name))
+        if (typing.traitInstances.contains(key))
+          typing.report(SemanticError.DUPLICATE_TRAIT_INSTANCE, node, traitType.displayName)
+        else typing.traitInstances(key) = clazz.name
+      }
     }
 
   // A record can declare `conforms Interface`, but its only methods are the synthesized
@@ -227,8 +267,9 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       resetForTypeDeclaration(clazz)
       checkDuplicateRecordComponents(node, clazz)
       recordComponents = node.args.flatMap(arg => Option(clazz.field(arg.name)).map(f => arg.name -> f.`type`)).toMap
+      inRecordBody = true
       try for (section <- node.sections) processAccessSection(section)
-      finally recordComponents = Map.empty
+      finally { recordComponents = Map.empty; inRecordBody = false }
       node.synthesizedMethods.foreach(processSynthesizedMethodDeclaration)
       DuplicationChecks.checkOverrideContracts(
         typing, clazz, node.location, skipObject = true, memberLocations = node.args.map(a => a.name -> a.location).toMap)
@@ -253,11 +294,18 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
         // The accessor of `hashCode: Int` or `toString: String` has the same signature as the
         // method the record generates itself: a ClassFormatError at load (#2391). The accessor
         // of `getClass: Class` would override the final Object.getClass() (#2512). Any other
-        // type gives the accessor a different descriptor, which the JVM accepts.
+        // type loads, but sits next to Object's method of the same name, so one object would
+        // answer that call two ways (#2546): rejected too.
         val field = clazz.field(arg.name)
         if (clashesWithGeneratedMethod(arg.name, field))
           typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type],
             SemanticErrorReporter.RecordComponentClash(field.`type`, overridesFinal = arg.name == "getClass"))
+        else if (changesObjectMethodReturn(arg.name, field))
+          // `hashCode: Long` gives the accessor `hashCode()J`: the JVM loads it next to
+          // Object's `hashCode()I`, so one object answers two different hashCode() calls
+          // (#2546). Java rejects `record R(long hashCode)` as well.
+          typing.report(SemanticError.DUPLICATE_METHOD, arg, clazz, arg.name, Array.empty[Type],
+            SemanticErrorReporter.RecordComponentClash(field.`type`, otherReturnType = true))
       }
     }
   }
@@ -272,6 +320,11 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       case "getClass" => erasedDescriptor(field) == "Ljava/lang/Class;"
       case _ => false
     })
+
+  // A component named like Object's hashCode(), toString() or getClass() but typed
+  // differently: `getClass: Int` answers 5 to r.getClass() and R to (r as Object).getClass().
+  private def changesObjectMethodReturn(name: String, field: FieldRef): Boolean =
+    field != null && (name == "hashCode" || name == "toString" || name == "getClass")
 
   private def erasedDescriptor(field: FieldRef): String =
     onion.compiler.generics.Erasure.asmType(field.`type`).getDescriptor

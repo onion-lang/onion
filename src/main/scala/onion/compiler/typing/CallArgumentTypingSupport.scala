@@ -151,8 +151,13 @@ private[compiler] final class CallArgumentTypingSupport(
     node: AST.Node,
     args: List[AST.Expression],
     method: Method,
-    context: LocalContext
+    context: LocalContext,
+    pretyped: java.util.IdentityHashMap[AST.Expression, Term] = null
   ): Option[Array[Term]] = {
+    // Arguments overload selection already typed (#2756) are not typed a second time.
+    def typed(expr: AST.Expression, context: LocalContext, expected: Type): Option[Term] =
+      if (pretyped != null && pretyped.containsKey(expr)) Some(pretyped.get(expr))
+      else CallArgumentTypingSupport.this.typed(expr, context, expected)
     val argsWithDefaults = method.argumentsWithDefaults
     val paramNames = argsWithDefaults.map(_.name)(using onion.compiler.TypedAST.stringTag)
     val result = new Array[Term](argsWithDefaults.length)

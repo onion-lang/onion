@@ -246,4 +246,213 @@ public:
 - **見えるもの:** 偽の述語は **E0113** になります。サンプルを作れない引数の型も、黙って通さず E0113 です。
   `--contracts` は既定で有効（`check`）です。
 - **シードとサンプル数:** `--law-seed` と `--law-samples` は `--contract-seed` と `--contract-samples` になり、`--no-check-laws` は無くなりました（`--contracts off` を使います）。
-- **`onion.Shape`:** 実装するクラスは、それを使う述語を少なくとも1つ必要とします（なければ E0080）。
+- **`onion.Shape`:** 実装するクラスのファイルに述語は不要になりました（E0080 は廃止です）。
+- **プロジェクト全体の更新:** `onion migrate src/` は、`law` と `example` をこの形に書き換えます。
+  - 式1つの本体は `= expr` になります。それより長い本体はブロックのまま残し、最後の文の前に `return` を置きます。
+  - 名前のない `example` は `example1`、`example2`、... と名付けます。名前は自由に変えてかまいません。
+  - 書き換えてもコンパイルできないファイルは元のまま残し、その行を表示します。
+
+## `invariant` や `history` が名指すフィールドは `this` を通してしか書けなくなりました
+
+契約はプレビュー機能です（RFC #2557）。クラスの `invariant` や `history` が名指すフィールドは、
+そのクラス自身のコードから `this` を通してだけ書けます。ほかのオブジェクトを通した書き込みは E0110 です。
+
+```onion
+class Clock {
+public:
+  var t: Int
+  history t >= old(t)
+  def this { t = 0 }
+  def this(start: Int) { t = start }
+  def advanceTo(k: Int): void { if k > t { t = k } }
+}
+
+// Before: compiled. Now: E0110 at `c`
+//   val c = new Clock(); c.t = 5
+// Now: pass the value to a constructor
+val c = new Clock(5)
+
+// Before: compiled. Now: E0110 at `o`
+//   def sync(o: Clock): void { o.t = 9 }
+// Now: call a method of that object; its own writes are checked
+def sync(o: Clock): void { o.advanceTo(9) }
+sync(c)
+println(c.t)   // 9
+```
+
+- **変わったこと:** 各オブジェクトは自分の `invariant` と `history` を持ち、呼び出し1回ごとに検査されます。
+  そのオブジェクトのメソッドの外からの書き込みは、この検査では追えません。
+- **見えるもの:** `E0110`（契約フィールドへの書き込みを禁じるエラー）が出ます。キャレットは受け手（`o`、`c`、`cs[0]`）を指します。
+  メッセージは、そのオブジェクトのメソッドを呼ぶか、コンストラクタで値を設定するよう促します。
+- **そのまま動くもの:** クラス自身のメソッドでの `t = v`、`this.t = v`、`self.t = v`、`t++`、`t += 1` です。ラムダの中でも同じです。
+  `o.t` を読むことは、どこからでもできます。
+- **`onion migrate` の書き換え規則はありません（意図的です）:** 直すには受け手のクラスにメソッドかコンストラクタを足します。
+  どれが合うかは設計の判断です。
+
+## `tool` の `requires` が、本体の実行内容をより多く数えるようになりました
+
+`onionc` は `tool` の `requires { ... }` を、本体が持つ効果（外の世界への作用）と照らし合わせます。
+これまで見落としていた4つを数えるようになりました。
+見落としに頼っていた tool は `E0077`（`requires` に足りない効果）か `E0078`（使われない能力）になります。
+
+```onion
+class Base {
+public:
+  def this {}
+  def run(): Int = 1
+}
+class Loud extends Base {
+public:
+  def this {}
+  override def run(): Int { IO::println("loud"); return 2 }
+}
+
+// Before: compiled. Now: E0077 at `b.run()`, "calling Loud::run"
+//   tool go(): Int { val b: Base = new Base(); return b.run() }
+// Now: declare what an override can do
+tool go(): Int requires { console } {
+  val b: Base = new Base()
+  return b.run()
+}
+```
+
+| tool がすること | 以前 | 今 |
+|---|---|---|
+| プログラムのクラスがオーバーライドするメソッドを呼ぶ（上の `b.run()`） | 呼んだメソッドだけを数えた | プログラム中のオーバーライドもすべて数える（`E0077`） |
+| static 初期化子に効果があるクラスを使う | 数えなかった | 数える（`E0077`） |
+| `R` がプログラムのクラスである `try (val r = new R()) { }` | `close()` を数えなかった | `R::close` を数える（`E0077`） |
+| プログラムのジェネリッククラスの `new Box[String]()` | `unknown` | コンストラクタ自身の効果。これのためだけの `unknown` は `E0078` |
+
+- **見えるもの:** `E0077` は呼び出しと、足すべき能力を示します。`E0078` は、外すべき能力を示します。
+- **影響しないもの:** 渡したオブジェクトに対してライブラリが呼び返すかもしれないもの（`list.add(item)` と `Item::toString`）は数えません。
+  これを数えるのは、ビルドが契約の述語を実行してよいかの検査だけです。
+- **`onion migrate` の書き換え規則はありません（意図的です）:** 直し方は、呼ばれるコードが何をするかで決まります。
+  エラーがそれぞれ直し方を示します。その能力を足すか、使われない能力を外してください。
+
+## `hashCode` / `toString` / `getClass` という名前の成分は、そのメソッドの型を変えられなくなりました
+
+`record R(hashCode: Long)` は、1つのオブジェクトが `hashCode()` に2通りの答えを返していました。アクセサの値と、`HashMap` が使う `Int` の値です。`getClass: Int` も `getClass()` で同じことが起きていました。`hashCode: Int`、`toString: String`、`getClass: Class` と同じく、どちらもエラーになりました。
+
+```onion
+// 以前: コンパイルでき、r.hashCode() は 5、(r as Object).hashCode() は 36
+record R(hashCode: Long)
+
+// 現在: E0010。成分の名前を変えてください。
+record R(code: Long)
+```
+
+- **表示されるもの:** `hashCode`、`toString`、`getClass` の成分は、型にかかわらず成分の位置で **E0010** になります。レコードでも `enum` の case でも同じです。
+- **`onion migrate` の規則はありません:** 新しい名前と、それを読むコードは利用者が決めるためです。
+
+## 抽象メソッドとインターフェースのメソッドのデフォルト値が型検査されるようになりました
+
+`abstract def` やインターフェースのメソッドのデフォルト値が使えるようになりました。呼び出しでその引数を省略できます。そのため、ほかのデフォルト値と同じく型検査されます。以前は使われることがなかったので、誤ったデフォルト値でもコンパイルできていました。
+
+```onion
+// 以前: デフォルト値が使われないので、コンパイルできていました
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = "x"): Int
+}
+
+// 現在: "x" の位置で E0000。引数の型のデフォルト値を書いてください。
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = 0): Int
+}
+```
+
+- **表示されるもの:** デフォルト値の位置で **E0000**（型が違う）または **E0002**（名前が見つからない）になります。
+- **`onion migrate` の規則はありません:** どのデフォルト値のつもりだったかは利用者にしかわからないためです。直すか、取り除いてください。
+
+## `toString` / `hashCode` / `equals` を上書きするレコードのメソッドは、型を変えられなくなりました
+
+これまでレコードの本体では、`Object` のメソッドを別の戻り値の型で定義し直せました。クラスではできません。`toString(): Int` は生成された `toString()` を黙って消していました。`toString(): String?` は `null` を `println` まで届けていました。レコードもクラスと同じ規則に従うようになりました。
+
+```onion
+// 以前: コンパイルでき、println(new R("")) は null を表示
+record R(name: String) {
+public:
+  def toString(): String? = if name == "" { null } else { name }
+}
+
+// 現在: toString の位置で E0000。String を返してください。
+record R(name: String) {
+public:
+  def toString(): String = if name == "" { "(none)" } else { name }
+}
+```
+
+- **表示されるもの:**
+  - 戻り値の型が別の参照型（`String?`、`Object`、`CharSequence`）のときは、メソッドの位置で **E0000** になります。ヒントは、null になりうる値に `?:` を使うよう勧めます。
+  - どちらかの戻り値の型がプリミティブ型（`toString(): Int`、`hashCode(): Long`）のときは **E0104** になります。
+- **`onion migrate` の規則はありません:** `null` の代わりに何を返すかは利用者が決めるためです。
+
+## `Http.Response` は `status()` / `body()` / `headers()` だけで読むようになりました
+
+`Http.Response` には、同じ名前の公開フィールドとアクセサメソッドがありました。フィールドは非公開になりました。`Server.Response` や `Proc.Result` と同じです。
+
+```onion
+val r = Http::getResponse("https://example.com")
+println(r.status)     // これまでどおりコンパイルできる: status() を呼ぶ
+println(r.status())   // 同じ呼び出し
+```
+
+- **Onion のソース:** 変更は不要です。読めるフィールドがないので、`r.status` は `status()` を呼びます。
+- **表示されるもの:** 古い `onionc` がフィールドを読むように生成した `.class` ファイルを実行すると、`IllegalAccessError` になります。再コンパイルしてください。
+- **Java のコード:** `r.status()`、`r.body()`、`r.headers()` と書いてください。
+- **`onion migrate` の規則はありません:** Onion の書き方はどれもそのままコンパイルできるため、書き換えるものがありません。
+
+## 1つの trait と型に対するインスタンスは、モジュールをまたいでも1つだけになりました
+
+ある trait のある型に対する `instance` は、プログラム全体で1回だけ宣言できます。
+これまでは、別の `module` に2つ目を書いてもコンパイルでき、`module` 行のないファイルのものだけが使われていました。
+今は2つ目がエラーになります。
+
+```onion
+// shapes.on
+module shapes;
+trait Show[T] {
+  def show(x: T): String
+}
+instance Show[Int] {
+  def show(x: Int): String = "lib " + x
+}
+
+// app.on: 以前はコンパイルできた。今は E0097。このインスタンスか shapes.on のものを削除する。
+module app;
+import { shapes.Show }
+instance Show[Int] {
+  def show(x: Int): String = "app " + x
+}
+```
+
+- **表示されるもの:** 2つ目のインスタンスで **E0097** `instance shapes.Show[java.lang.Integer] is already defined`。
+- **直し方:** インスタンスを1つだけ残し、もう1つを削除してください。
+- **同じパッケージの2つのファイル**（どちらも `module` 行なし）では、これまでどおり **E0008** `duplicated class definition Show$$Integer` になります。直し方は同じです。
+- **型の型引数:** E0097 は外側の型だけを比べます。そのため `Show[List[String]]` と `Show[List[Integer]]` は同じインスタンスとみなされ、衝突します。
+- **`onion migrate` の規則はありません:** どちらのインスタンスを残すかは、あなたが決めることです。
+
+## デフォルト値を持つオーバーロードより上にある呼び出しは、下にある呼び出しと同じものを選ぶようになりました
+
+ファイルの後ろで宣言されたデフォルト値も、呼び出しで省略できるようになりました (#2653)。
+そのため、オーバーロードより上に書いた呼び出しにもデフォルト値が見えます。
+その結果、下に書いた呼び出しと同じオーバーロードを選びます。
+
+```onion
+def run(): String = pick()
+def pick(): String = "zero"
+def pick(n: Int = 1): String = "one"
+println(run())   // 以前: zero。今: one。run() を pick より下に書いたときと同じ
+```
+
+| オーバーロード（呼び出しより下で宣言） | 呼び出し | 以前 | 今 | 以前の結果を保つには |
+|---|---|---|---|---|
+| `pick()`、`pick(n: Int = 1)` | `pick()` | `zero` | `one` | どちらかのメソッドの名前を変える |
+| `f(n: Long)`、`f(n: Int, a: Int = 1)`、`f(n: Int, b: String = "")` | `f(1)` | `long` | E0006 | `f(1L)` |
+
+- **表示されるもの:** メッセージなしで別のオーバーロードが実行されます。または呼び出しで **E0006** `method call is applicable for both …` になります。
+- **これまでどおり動くもの:** オーバーロードより下にある呼び出しと、すべての引数を渡す呼び出しです。
+- **`onion migrate` の規則はありません:** どのオーバーロードを呼ぶつもりだったかは、書いた人にしか分かりません。引数を渡す（`f(1L)`、`f(1, 1)`）か、どちらかのメソッドの名前を変えてください。

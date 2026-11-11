@@ -184,5 +184,26 @@ class StringInterpolationSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("issue #124 and #tag") == result)
     }
+
+    // #2816: a StringBuilder part matched AbstractStringBuilder's package-private
+    // append(AbstractStringBuilder), whose result the next append could not take (VerifyError)
+    it("interpolates a StringBuilder part (#2816)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def f(s: StringBuilder): String = "[#{s}]"
+          |  static def main(args: String[]): String {
+          |    val sb = new StringBuilder("hi")
+          |    val buf = new StringBuffer("buf")
+          |    return f(sb) + "#{sb}" + " #{buf}|#{sb}#{sb}"
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("[hi]hi buf|hihi") == result)
+    }
   }
 }

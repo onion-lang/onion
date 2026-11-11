@@ -7,6 +7,405 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.155.0] - 2026-11-11
+
+### Breaking
+
+- **A call above overloads with defaults now picks what a call below them picks (#2653).**
+  - Before: with `pick()` and `pick(n: Int = 1)` declared below it, `pick()` called `pick()`; below them it called `pick(n: Int = 1)`.
+  - Now: `pick()` calls `pick(n: Int = 1)` wherever it is written. Likewise `f(1)` against `f(n: Long)`, `f(n: Int, a: Int = 1)` and `f(n: Int, b: String = "")` is E0006 above them too, as it already was below.
+  - To keep the old result, pass the argument or rename a method; there is no `onion migrate` rule. See `docs/migration/pre-1.0.md`.
+
+### Fixed
+
+- **`v.total`, `a + b` and `v[i]` fill an omitted default argument (#2803).**
+  - Before: each compiled, then failed to load with `VerifyError: Bad type on operand stack`.
+  - Now: the default is passed, as with `v.total()`. Also `v[i] = x`, `a += b` and `a < b`.
+- **Named arguments run in the order they are written (#2767).**
+  - Before: `f(b = t("B"), a = t("A"))` ran `t("A")` first, in parameter order.
+  - Now: `t("B")` runs first, as in Kotlin, Scala and C#. This covers method, `super`, safe (`?.`) and `new` calls.
+  - Still in parameter order: `extends A(..)`, `: this(..)` and `copy(..)` (#2801).
+- **A local inside a field initializer no longer overwrites a constructor parameter (#2800).**
+  - Before: `val s: String = if true { val t = "x"; t } else { "" }` in a class with `def this(n: String)` set `n` to `"x"`; with a `Long` parameter, `new` threw `VerifyError`.
+  - Now: the initializer's locals get their own slots.
+- **A runtime error in a method's first statement reports that statement's line (#2800).**
+  - Before: `static def main(..) { IO::println(boom()) }` said `called from x.on:6`, the `def` line.
+  - Now: it says `called from x.on:7`, the line of the call.
+- **`onionc` no longer hangs on a method with `requires`/`ensures` (#2748).**
+  - Before: `ensures result >= 0` on `bal - n`, with `requires n > 0 && n <= bal`, hung the build, even under `--contracts off`.
+  - Now: it is proved in under a second. A formula the prover cannot settle is given up after about two seconds and left unproved (under `--contracts runtime` it keeps its run-time check).
+  - Under `--contracts off` the prover does not run; the clause is only reported as E0105.
+- **A call can omit a default declared later in the file, or in another file (#2653).**
+  - Before: `def run() = g()` above `def g(n: Int = 7)` was E0005 outside one class body. The same held for calls into a later class, record, enum, interface, `extension` or file, for `new B()` with a later `def this(a: Int = 7)` (E0021), and for a default that omits a later method's default (`def f(a: Int = g())` above `def g(b: Int = 2)`).
+  - Now: declaration order no longer matters for most defaults.
+  - Exception: a default that reads a top-level `val`/`var`, directly or through another default, still needs its function declared above the call. The E0005/E0021 at such a call now lists what to move above it, in order (for example `base`, `g`).
+  - Two defaults that call each other are typed in declaration order, as before.
+- **`val y: Comparable[String] = b` with `b: JInteger` is a compile error (#2649).**
+  - Before: it compiled, then threw `ClassCastException` at the first `compareTo`. So did `b as Comparable[String]`, `"s" as Comparable[JInteger]`, `[b]` or `[5]` as a `List[Comparable[String]]`, a `Comparable[String]?` target, `o ?: 5`, and `new D(b)` / `new R(b)` / `extends Base(b)` into a `Comparable[String]` parameter.
+  - Now: E0000 (E0001 for `?:`, E0005 for a method argument, E0021 for a constructor argument). It applies only when the type arguments can share no value (`String` vs `Integer`; an interface such as `CharSequence` vs the final `Integer`). `Comparable[JInteger]`, `Object`, `Number`, and related arguments (`new Properties()` as `Map[String, String]`) still compile.
+- **E0106 (a contract that is not pure) points at the call that has the effect.**
+  - Before: `def f(xs: List[Int]): Int ensures xs.add(1)` reported `1:1`, under `def`; an `invariant` or `history` pointed at its `class` line or at an `&&`.
+  - Now: `1:38`, under `add(1)`. The same for `requires`, `invariant` and `history`.
+- **String interpolation is allowed in a contract, as `+` is.**
+  - Before: `requires "n#{n}" != ""` was E0106, naming `StringBuilder::append`, a call you never wrote. `--effects` reported such a method as `mutate`.
+  - Now: it compiles, and `--effects` reports it `pure`. A write inside `#{...}` is still E0106, and so is a `CharSequence` part, whose `length()`/`charAt()` the append calls.
+- **`requires null` gets the contract-clause hint, not cast advice.**
+  - Before: E0000 ending in "Consider a cast or check return type".
+  - Now: E0000 with the hint that `requires` takes a Boolean condition (`requires n > 0`). The same for `ensures`, `invariant` and `history`, in en and ja.
+
+## [0.154.0] - 2026-11-10
+
+### Breaking
+
+- **Two instances of one trait for one type are E0097 even in different modules.**
+  - Before: both compiled; only the one in a file without `module` was ever used.
+  - Now: the second one is `E0097 instance ... is already defined`. Keep one and delete the other (`docs/migration/pre-1.0.md`).
+  - E0097 compares the type's outer name, so `Show[List[String]]` and `Show[List[Integer]]` in one program now clash too.
+- **`Http.Response` has no public fields; `status()`, `body()` and `headers()` are its one spelling (#2738).**
+  - Before: `r.status` read a public field and `r.status()` called a method that returned it.
+  - Now: the fields are private. Onion source is unchanged: `r.status` calls `status()`. Recompile `.class` files built by an older `onionc` that read the fields, and change Java code from `r.status` to `r.status()`.
+
+### Added
+
+- **`onion migrate` rewrites `law` and `example` into contract predicates (#2740).**
+  - Before: a script from 0.150.0 or older that used them stopped compiling, and `onion migrate` left it alone.
+  - Now: `law n(p: T) { e }` becomes `static def n(p: T): Boolean ensures result = e`, and a top-level `example` becomes a `def`. Run `onion migrate src/`.
+
+### Fixed
+
+- **A failed `await()` says why the task failed (#2771).**
+  - Before: `Future::async { Integer::parseInt("nope") }.await()` reported `RuntimeException: Future.await() failed`.
+  - Now: `Future.await() failed (For input string: "nope")`. `awaitTimeout(ms)` does the same; the cause is still the task's exception.
+- **A type-class instance declared in a `module` is found, and a same-named trait cannot capture it (#2769).**
+  - Before: calling a `[T: Numeric]` method from a `module` was E0003 "instance Numeric[Integer] is not found". With a second `trait Numeric` elsewhere, the program compiled and then threw `IncompatibleClassChangeError`.
+  - Now: the compiler looks for the instance beside the caller, the trait, the type argument and in the default package, and uses only one that implements that trait.
+- **An instance for one `Foo` is no longer passed where another package's `b.Foo` is needed.**
+  - Before: with the instance in the default package, the program compiled, then threw `ClassCastException`.
+  - Now: E0003, instance not found.
+- **A `[T: Numeric]` method from a class file or jar can be called (#2768).**
+  - Before: `onionc -d out lib.on`, then `Agg::total(xs)` from another compilation was E0005, with a hint naming `total$default$2$…`.
+  - Now: the instance is found and passed, as within one compilation, so type-class libraries work from `-classpath`.
+- **A statically imported `[T: Trait]` method gets its instance (#2768).**
+  - Before: `import { Agg::* }` then `total(xs)` compiled, then failed with "null value used".
+  - Now: it runs; a type with no instance is a compile error naming the instance.
+- **`c.f(name = "s")` compiles when `f(name: Long)` and `f(name: String)` both exist (#2756).**
+  - Before: E0006, because a named argument chose an overload by parameter name only.
+  - Now: the argument's type picks `f(name: String)`, as for the positional call `c.f("s")`. Two overloads that fit equally well are still E0006.
+- **A `static` or private `equals`/`hashCode`/`toString` in a record is now a compile error (E0010).**
+  - Before: it compiled and dropped the generated method, so `==` threw `IncompatibleClassChangeError` or `IllegalAccessError`, and printing gave `R@80`.
+  - Now: E0010 names the clash and says to remove `static` (or move the method under `public:`), or rename it. A public or protected instance method still replaces the generated one.
+- **Compiling no longer runs a `Shape` that prints or does I/O (#2733).**
+  - Before: the `E0114` round-trip check called a user shape's `parse`/`print` on every sample, so `onionc` printed, wrote files or exited.
+  - Now: a shape whose constructor, `canPrint`, `printable`, `parse`, `print` or sample value has an effect beyond `mutate` is not run, and a round-trip that does not finish in time is given up on. Warning `W0023` names why.
+  - A `--warn error` build fails on it. Fix: move the effect out of the shape, or pass `--Wno W0023`.
+- **A correct `Shape` with an extra one-argument overload (`def parse(n: Int)`) no longer gets a false `E0114`.**
+  - Before: the check could call that overload, or a `static def parse`, instead of the shape's own `parse(String)`.
+  - Now: it calls only the methods that implement `onion.Shape`.
+- **A contract clause that is not a condition says so (#2605).**
+  - Before: `requires x` with `x: Int` gave E0000 "... Consider a cast or check return type."
+  - Now: still E0000, with a hint that `requires` takes a Boolean condition, and an example (`requires n > 0`). The same for `ensures`, `invariant` and `history`, in en and ja.
+- **E0110 points at the field an `invariant` or `history` names (#2605).**
+  - Before: `C.on:: [E0110] ...`, with no line and no snippet.
+  - Now: `C.on:4:13: [E0110] ...`, underlining `xs` in `invariant xs.size >= 0`.
+- **A subclass's `history` now checks the methods it inherits without overriding (#2603).**
+  - Before: `class Up extends Base { history n >= old(n) }` compiled cleanly while an inherited `Base.dec` lowered `n`.
+  - Now: E0109 at that write, with the fix (override `dec` in `Up`, or declare the history in `Base`). A write the syntax does not settle is W0024.
+- **An F-bounded parameter can fill another F-bound (#2338).**
+  - Before: `class Holder[A extends Animal[A], C extends Animal[C]]`, `G::f(xs)` from inside `g[U extends Comparable[U]]`, and `derive!(Json)` on `record B[T extends Comparable[T]]` were E0000/E0005.
+  - Now: they compile. `U extends Comparable[String]` passed to `f[T extends Comparable[T]]` is still rejected.
+
+## [0.153.0] - 2026-11-09
+
+### Breaking
+
+- **A record method `def toString(): String?` is E0000, as in a class (#2713).**
+  - Before: it compiled, and a `null` result reached `println`.
+  - Now: return a `String`, e.g. `name ?: ""`. See `docs/migration/pre-1.0.md`.
+- **A default on an abstract or interface method is now type-checked (#2638).**
+  - Before: `abstract def f(n: Int = "x"): Int` or `def g(n: Int = undefinedThing): Int` in an interface compiled, because the default was never used.
+  - Now: E0000 or E0002 at the default. Fix the default. See `docs/migration/pre-1.0.md`.
+- **A `tool`'s `requires` is checked against more of what its body runs.** The error names the capability to add or remove.
+  - `E0077`: a call that can dispatch to a program override, a static initializer the tool's code triggers, and a try-with-resources `close()` now count.
+  - `E0078`: `new Box[String]()` of a program class is no longer an unlisted call, so an `unknown` kept only for it is now unused.
+- **`onionc --effects` rows include the same new sources.** A method that triggers another class's printing static initializer, or calls a record whose component's `toString` prints, now shows `console` instead of `pure`.
+- **A record component named `hashCode`, `toString` or `getClass` is E0010, whatever its type.**
+  - Before: `record R(hashCode: Long)` compiled, and `r.hashCode()` and `(r as Object).hashCode()` gave different answers.
+  - Now: rename the component. See `docs/migration/pre-1.0.md`.
+
+### Fixed
+
+- **`x is JLong` and `case s is String:` on a primitive value no longer crash with `VerifyError`.**
+  - Before: the program compiled, then the JVM rejected the class.
+  - Now: the value is boxed first, so `5L is JLong` is `true` and `5 is String` is `false`.
+  - The same holds nested in a record pattern: `case Wrap(n is Object):` on a `Wrap(v: Int)`.
+- **`case n is Long:` works in `select`, like `o is Long` (#2721).**
+  - Before: E0000 "type Object is expected, but type Long is used".
+  - Now: it matches a boxed `Long` and binds `n` as a `Long`. Same for `Int`, `Double` and the other primitive names.
+- **A record method named `toString`, `hashCode` or `equals` with other parameters no longer removes the generated one.**
+  - Before: `def toString(n: Int): Int` made `println(r)` print `R@80`.
+  - Now: only a method with the `Object` signature replaces it (`equals(o: Object?)`, and `equals(o: T)` with a type parameter `T`, count); an overload leaves it in place.
+  - `copy` is unchanged: any body method named `copy` still replaces the generated one.
+- **A record method like `def toString(): Int` is E0104 (#2713).**
+  - Before: it compiled, and the generated `toString()` was lost (`println(r)` printed `R@80`). `hashCode(): Long` gave two answers.
+  - Now: E0104 at the method, the same error a class gets.
+- **A record `copy` argument of the wrong type is a compile error (#2705).**
+  - Before: `n.copy(b = "s")` on `b: Long?` compiled, then threw `ClassCastException` when it ran.
+  - Now: a type-mismatch error (E0000) at the argument. `copy(z = 1)` with no component `z` reports one error, not two. A record that declares its own `copy` overloads still calls the one that fits.
+- **An `Int` for a `Long` or `Long?` parameter works in `extends P(5)`, `this(5)`, `copy(b = 9)` and with a lambda argument (#2701, #2704).**
+  - Before: `VerifyError` or `ClassCastException` at run time.
+  - Now: the `Int` is widened to `Long` (or `Double`), as in `new P(5)`.
+- **The `val` hint in a `do` block no longer copies a trailing comment into its fix.**
+  - Before: `val y = x + 1 // add one` hinted `Option::some(x + 1 // add one)`, which does not compile.
+  - Now: the hint is `y <- Option::some(x + 1)`.
+- **`class C extends A` with no constructor is a compile error when `A` has no no-arg constructor (#2664).**
+  - Before: it compiled, then `new C()` threw `NoSuchMethodError`. This happened when every parameter of `A`'s only constructor had a default.
+  - Now: E0021 at the class (E0013 if `A()` is private), as an explicit `def this { }` already reports. To pass arguments, write `extends A(...)`.
+- **`class C extends A(1)` with a private `A` constructor is a compile error (#2662).**
+  - Before: it compiled, then crashed with `IllegalAccessError`.
+  - Now: `E0013`, as for `new A(1)`, with the hint to put the constructor under `protected:` or `public:`.
+- **An override with no contract of its own is checked against the `ensures` it inherits.**
+  - Before: `override def f(k: Int): Int { return 0 - 1 }` under a base `ensures result >= 0` built with no word.
+  - Now: W0025 names the counterexample. The `--contracts runtime` guard for such an override is still open (#2639).
+- **A default on an abstract or interface method can be omitted at the call (#2638).**
+  - Before: `abstract def f(n: Int = 5): Int` compiled, then `a.f()` was E0005.
+  - Now: when `a` is typed as the declaring class or interface, `a.f()` calls the implementation with `5`.
+- **`--contracts runtime` catches a `history` broken by a setter whose parameter has the field's name (#2633).**
+  - Before: `history n >= old(n)` with `def set(n: Int) { this.n = n }` read the parameter, so `set(3)` passed.
+  - Now: the guard reads the field, and `set(3)` throws `ContractViolation`.
+- **`new IllegalArgumentException("x")` is pure in a `tool` and in contract predicates (#2611).**
+  - Before: effect `unknown`, so a `tool` that throws it needed `unknown`, and a predicate that reached it was not run (W0023).
+  - Now: the common `java.lang` exceptions are pure, like `RuntimeException`.
+- **`requires x > 0` inside a method body now says where the clause goes (#2605).**
+  - Before: the hint said to write `requires(...)` as a call, which sends you the wrong way.
+  - Now: the hint says `requires`/`ensures` follow the signature, before the body: `def half(x: Int): Int requires x > 0 { ... }`.
+- **Compiling no longer runs a contract predicate that prints, does I/O or never ends (#2601).**
+  - Before: `ensures result` predicates and `E0112` replays ran whatever they called, including overrides the library calls back (`toString`, `fillInStackTrace`). `onionc` printed, exited, or hung.
+  - Now: only a predicate whose effects are at most `mutate` runs. Others, and any run past 10 seconds, get the new warning `W0023`, which names the call, static initializer or parameter class that has the effect. Making a sample argument of a program class (`Foo` or `Foo?`) counts too, and so does a record's generated `toString`/`hashCode`/`equals`, which calls its components' overrides.
+  - An `E0112` replay that is not run, or not waited for, gives `W0023` beside its `W0021`.
+  - A `--warn error` build fails on a new `W0023`. Fix: move the effect out of the predicate, or pass `--Wno W0023`.
+- **`val y: Comparable[String] = 5` is a compile error, not a runtime `ClassCastException`.**
+  - Before: it compiled, then threw when `y` was used. `Comparable[Object]` slots and a `T` inferred as `Object` (`g(o, 5)` with `def g[T](b: T, a: Comparable[T])`) were accepted the same way; Java rejects them too.
+  - Now: the type argument is checked against the box's own (`Comparable[JInteger]`), as `5 as Comparable[String]` already was. With overloads `f(Comparable[String])` and `f(Object)`, `f(5)` now picks `f(Object)`.
+- **`val n: Number = id(5)` compiles, as in Java.**
+  - Before: E0000 when a generic call's expected type (`Number`) was wider than the `T` its arguments give (`Integer`).
+  - Now: the arguments decide `T`, and the result is checked against the expected type.
+- **`ns[0]++` and `counts[k]--` work on a `List` or `Map` element (#2587).**
+  - Before: E0001 "operator ++ is not applicable for type Int", though `ns[0] += 1` worked.
+  - Now: `ns[0]++` means `ns[0] += 1`, and its value is the old element, as for an array.
+- **`(i as Long?)` on an `Int?` is a compile error, not a crash at run time.**
+  - Before: it compiled, then always threw `ClassCastException`.
+  - Now: E0000 at the cast, as Java rejects `(Long) anInteger`. `Int? as Int` and `Int? as Object` still work.
+- **A `shape` named like a record component is rejected at the `shape` clause (#2531).**
+  - Before: `record Pt(x: Int) { shape x = re"..." }` compiled, then `Pt::x()` was E0005 listing `x(), x()`.
+  - Now: one E0026 at the clause names the clash and says to rename one; the call site reports nothing more.
+- **`Collections::copy(x, o)` with `x: List[T]` and `o: List[Object]` no longer compiles inside `G[T]` (#2431).**
+  - Before: it compiled, then `x[0]` threw `ClassCastException`.
+  - Now: E0005 at the call, with its `available:` line; a fitting overload beside it is chosen instead, as in Java.
+
+### Documentation
+
+- **The guide's longer do-block example compiles (#2668).**
+  - Before: it used a `val` and a bare `println`, both rejected inside a do block.
+  - Now: it binds the intermediate value and prints in the `yield` block; the Japanese guide has the same section.
+
+## [0.152.0] - 2026-11-08
+
+### Fixed
+
+- **`new R(5)` for `record R(x: Long?)` compiles and runs.**
+  - Before: `VerifyError` at run time.
+  - Now: the `Int` is widened to `Long`, then boxed, as `new R(5L)` and `f(5)` already did.
+- **E0113 no longer tells a predicate with parameters that it has none (#2687).**
+  - Before: `def pos(x: Int): Boolean ensures result = x > 0` said "A predicate with no parameters ...". In `ja`, the reason (`returned false`, `threw ...`) stayed English.
+  - Now: a sampled predicate gets its own sentence ("must return true for every sampled argument"), and the reason is written in the message language.
+- **`val a: Long? = 5` and `val d: Double? = 5` work (#2684).**
+  - Before: compiled, then threw `ClassCastException` (an `Integer` was put in the `Long?` slot).
+  - Now: the `Int` is widened first, as `val a: Long = 5` does.
+- **`val a: Int? = ident(5)` compiles when `ident` is generic (#2666).**
+  - Before: E0000 "type Int is expected, but type Int? is used". `String?` worked.
+  - Now: a generic call's result goes into `Int?`/`Long?`/`Double?`, as it does into `String?`.
+- **`extends A(b = 7, a = 3)` and `: this(b = 8, a = 4)` bind arguments by name (#2659).**
+  - Before: the names were ignored, so `a` got 7 with no error; `extends A(b = 7)` was E0021.
+  - Now: they bind as `new A(b = 7, a = 3)` does, an omitted argument takes its default, and an unknown or repeated name is E0043/E0044.
+  - A Java superclass constructor has no parameter names, so `extends Thread(name = "x")` is now E0021, as `new Thread(name = "x")` already was. It used to compile by binding the argument by position.
+- **`super.f()` on an abstract method is a compile error, E0115 (#2656).**
+  - Before: it compiled, then threw `AbstractMethodError` when the line ran.
+  - Now: E0115 at the call, as in Java. A superclass method with a body is unaffected.
+- **`super.f()` in a `static def` is a compile error (#2655).**
+  - Before: an internal compiler error (`no 'this' pointer within static method`).
+  - Now: E0050, as for `this` in a static method.
+- **`--Wno W0016` and `--warn off` silence the W0016 `@TailRecursive` warning (#2654).**
+  - Before: both warnings were printed anyway.
+  - Now: W0016 follows the same switches as every other warning.
+- **A primitive in a `T` slot is a compile error, not a ClassCastException later (#2534, #2652).**
+  - Before: `def zero(): T = 0`, `t = 5` and a default `def id(n: T = 3)` compiled; a caller with `T = String` then failed at run time on its own line.
+  - Now: each is E0000 `type T is expected, but type Int is used`, as a `String` there already was. `new Box[JInteger](3)` and `val o: Object = 5` still compile.
+- **`super.d(b = 5)` sets `b`, as `this.d(b = 5)` does (#2650).**
+  - Before: the name was ignored and `5` went into the first parameter; no error.
+  - Now: named arguments on a `super` call bind by name, in any order, and an unknown name is an error.
+- **`obj.n++` on an instance field yields the old value, as in Java.**
+  - Before: `val id = k.n++` gave the new value (5 -> 6), unlike a local, static field or array element.
+  - Now: it gives 5; `n--` likewise.
+- **A default argument works when its method is declared later in the same class (#2637).**
+  - Before: in `class A { def run(): Int = g()  def g(n: Int = 5): Int = n }`, `g()` was E0005, with `available: g(Int)` right below.
+  - Now: it compiles and `g()` uses `5`, as if `g` were declared first. Top-level functions, records and other classes still need the declaration first (#2653).
+- **`super.f()` inside a lambda runs (#2636).**
+  - Before: it compiled, then failed with `VerifyError: Bad invokespecial instruction`.
+  - Now: it calls the superclass's `f`, as in Java. Omitted default arguments work too.
+- **Two contract messages read correctly (#2605).**
+  - Before: a predicate that threw gave E0113 "is threw ..."; W0021 was English-only, with single quotes and no final period.
+  - Now: E0113 says `(threw X: ...)`; W0021 is translated and styled like the other warnings.
+- **A top-level build-time predicate runs in its own script, not in another class (#2604).**
+  - Before: `def check(): Boolean ensures result` at top level could run a same-named static `check()` of another class, so the result depended on that class (and, across files, on file order).
+  - Now: the build runs the predicate the script declares.
+- **A `history` now sees `*=`, `/=`, `%=` and the bitwise compound assignments (#2603).**
+  - Before: under `history n >= old(n)`, `def neg(): void { n *= -1 }` compiled with no diagnostic, and the run took `n` from 10 to -10.
+  - Now: `n *= -1` is E0112 (the run reproduces the break), and `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`, `>>>=` get the warning W0024, since the solver does not model them.
+- **A `history` proved only by assuming the class `invariant` is now W0024, not "proved".**
+  - Before: `--verbose` printed `[history] proved` and `--contracts runtime` dropped the guard, even when a constructor broke the invariant (`n = 2147483647` with `invariant n < 10`).
+  - Now: W0024 says the proof needs the invariant, which nothing proves yet, and the runtime guard stays.
+- **`--warn error` fails the build on W0021, W0024 and W0025 (#2595).**
+  - Before: these warnings are found after type checking, so the build printed them and exited 0.
+  - Now: they are errors under `--warn error`, as every other warning is.
+- **A call through `G[JInteger]` runs `n(x: JInteger)`, not `n(x: Int)`, when a class declares both (#2559).**
+  - Before: `val g: G[JInteger] = new C; g.n(4)` ran the `Int` overload, with no warning.
+  - Now: it runs the `JInteger` override, as Java does. `n(Int)` is still used when it is the only candidate.
+- **Inside a generic class, `f(xs)` picks `f(o: Object)` when `xs` does not fit `f(xs: List[T])` (#2555).**
+  - Before: in `class N[T extends Number]`, a `List[Number]` passed through `this` or `me: N[T]` chose `f(List[T])` and failed with E0000.
+  - Now: `f(Object)` is chosen, as in Java. A `List[T]` still takes `f(List[T])`.
+- **`"\101"` is `"A"`, as in Java (#2529).**
+  - Before: the escape compiled, but the digits stayed in the string (`"a\001b".length()` was 5).
+  - Now: `\0`..`\377` decode in strings and character literals.
+
+## [0.151.0] - 2026-11-07
+
+### Breaking
+
+- **A field an `invariant` or `history` names is written only through `this` (E0110, #2599).**
+  - Before: `o.t = o.t - 1` (with `o: Clock`), `cs[0].t = 7` or a factory's `val c = new Clock(); c.t = 5` compiled silently.
+  - Now: E0110 at `o`. Call a method of that object, or pass the value to a constructor. Contracts are a preview feature (RFC #2557); `docs/migration/pre-1.0.md` shows both rewrites.
+- **`--contracts` now defaults to `check`.**
+  - Before: a contract clause (`requires`, `ensures`, `invariant`, `history`) was E0105 unless you passed `--contracts check`.
+  - Now: clauses are accepted. `--contracts off` restores the old behaviour.
+- **The docs and guides show `example` and `law` as contract predicates.**
+  - A new migration-guide section gives the Before / Now form.
+  - `example`/`law` still compile; the next change removes them.
+- **`law` and `example` are removed; use a contract predicate.**
+  - Before: `law name(p: T) { e }` and `example { e }` in a record body or at the top level.
+  - Now: `static def name(p: T): Boolean ensures result = e` (top level: `def name(...)`). A failing one is E0113. See the migration guide.
+  - Removed: the flag `--no-check-laws` (use `--contracts off`), and the codes E0064, E0065, E0074, E0075 and E0080 (numbers are not reused).
+  - Renamed: `--law-seed` and `--law-samples` are `--contract-seed` and `--contract-samples`.
+- **The `run/` samples no longer use `example` or `law`.**
+  - Before: `example { e }` in a record body or at the top level.
+  - Now: `static def name(): Boolean ensures result = e` (a block body ends with `return`).
+  - The build runs these predicates; a parameterized one is sampled. `law` and `example` still compile for now and are removed in a later change.
+- **A literal `[u]` or `["k": u]` is no longer a `List[T]` or `Map[K, T]` when `u` is not a `T` (#2332).**
+  - Before: `xs = [u]`, `take([t, u])` or `m = ["k": u]` compiled, then threw `ClassCastException` where a `T` was read back.
+  - Now: `E0000 type List[T] is expected, but type List[U] is used.` (`List[Object?]` for a mix). Write `[(u as T)]` if the value really is a `T`.
+  - No `onion migrate` rule: the value is not a `T`, so an inserted cast would only bring back the same exception. See `docs/migration/pre-1.0.md`.
+
+### Added
+
+- **Warning `W0024` (`history-not-checked`): a write that no history check settled is named, not left silent (#2574).**
+  - Before: `t = t + 1L` (overflow not checked) or `history old(open) == false || open` compiled exactly like a proved history.
+  - Now: `` `Clock.tick` writes `t`, but nothing checks the history `t >= old(t)` for it, so it may not hold: the checker models only `Int` fields, and `t` is a `Long`. `` Under `--contracts check` only; `--Wno W0024` turns it off.
+- **A closed predicate runs when the build runs; a false one is E0113.**
+  - A no-parameter `static def` returning `Boolean` with an `ensures` clause, in a class, record or at the top level.
+  - The replacement for `example`. Needs `--contracts check`.
+- **`--contracts runtime` checks a class's `invariant` when its constructor finishes.**
+  - `new Account(-3)` throws `ContractViolation` when `invariant balance >= 0` does not hold.
+  - A constructor with a `return` of its own, and a record's compiler-written constructor, are named by the warning W0026.
+- **A contract crosses a module boundary.**
+  - A method with `requires` / `ensures` gets `@onion.Contract` in its class file: the parameter names and the clauses as text. A clause that would not read back as the same clause is left out.
+  - A module built later against that class file reads the contracts and uses them: `n = n + s.step(k)` is proved from the `step` contract written in the other module. A built type with no contract, or a weaker one, proves nothing.
+- **`--contracts runtime` guards `ensures`.**
+  - A false `ensures` throws `onion.ContractViolation` from any `return` of the method; the message names the clause and the method.
+  - A clause it cannot enforce yet (`old(...)`, a static, generic or variadic method) is the warning W0026, never silent.
+- **`--contracts runtime` guards a generic and a variadic method.**
+  - Their `requires` and `ensures` are checked like any other method's.
+  - The class's `invariant` is not yet checked when a constructor finishes; the warning W0026 names it.
+- **`--contracts runtime` guards `invariant` and `history`.**
+  - A class's `invariant` is checked on entry to and on exit from each public instance method; its `history` on exit, against `old(field)` saved at entry.
+  - A step the compiler cannot see through (one that calls something) is caught here when it breaks a `history`.
+- **`--contracts runtime` saves `old(e)` at entry.**
+  - `ensures n == old(n) + 1` is checked against the value of `n` when the method was entered, not the value after the body ran.
+- **W0025: an override can break the contract it inherits.**
+  - The effective contract is `pre_super or pre_sub` and `(old(pre_super) => post_super) and (old(pre_sub) => post_sub)`; the override body is checked against it.
+  - A counterexample is a warning, not an error: it may rest on an integer wrap-around the program never reaches.
+- **A closed predicate may take parameters; the build samples it.**
+  - `def commutes(a: Int, b: Int): Boolean ensures result = a + b == b + a` is run on sampled values; a failing sample is E0113 with the arguments and `--law-seed`/`--law-samples` to reproduce it.
+  - A parameter type that cannot be sampled is E0113, not a silent pass. This is the replacement for `law`.
+- **A history is proved through a call to a pure method that states its contract.**
+  - `n = n + step(k)` is proved (or gets a counterexample) from `step`'s `requires` and `ensures`; `--verbose` lists the proof.
+  - A callee with no contract, or whose `requires` can fail at the call, is not used: the history is left unproved, never guessed.
+- **`--contracts runtime` guards each `requires` clause.**
+  - A false `requires` throws `onion.ContractViolation` (an `AssertionError`) before the method body runs; the message names the clause and the method.
+  - `--contracts check` (the default) is unchanged and adds no guard. Guards for `ensures`, `invariant` and `history` are not built yet. `verify` is still refused.
+- **A `Shape` that does not round-trip a value it says it can print is E0114.**
+  - The contract is `parse(print(v)) == Ok(v)` for each value `canPrint()` and `printable(v)` admit; the build samples the value type.
+  - `Shape` gains `printable(v)` (default: every value). `run/FixedWidthDemo.on` states its domain with it.
+  - A value type that cannot be sampled is the warning W0022, never a silent pass.
+- **`--contracts runtime` guards a static method.**
+  - `requires` and `ensures` of a static method are checked like an instance method's; the class's `invariant` and `history` are not, since they speak about an object.
+  - A generic or variadic method is still unguarded, with the warning W0026.
+- **`@Trusted` on a method marks its contract as relied on, not verified.**
+  - Each use is listed with the warning W0027, so what nothing checked is visible.
+  - The body is not skipped by any check yet; that comes with the change that makes an unproved contract an error.
+- **A method's `ensures` is now proved against its body.**
+  - Proved: `--verbose` prints `[ensures] proved: C.m`.
+  - Counterexample: new warning `W0028`, with the values that break it.
+  - `@Trusted` methods are skipped.
+
+### Changed
+
+- **`--contracts runtime` keeps a guard only for what was not proved.**
+  - A `history` the solver proves has no run-time guard. The guards for `invariant`, `ensures` and `requires` stay, since nothing proves them yet.
+- **`--contracts runtime` no longer checks an `ensures` the compiler proved.**
+  - Before: every `ensures` became a run-time check.
+  - Now: only an `ensures` that was not proved keeps its check.
+
+### Fixed
+
+- **The contracts docs match the shipped behaviour.**
+  - Before: error-codes said `--contracts off` is the default, and the E0109/E0111 samples did not compile.
+  - Now: the default is named `check` and the samples compile as written.
+- **The history solver no longer "proves" two methods whose run breaks the history.**
+  - `def set(n: Int) { this.n = n }`: the parameter `n` was read as the field, so the write looked like a no-op.
+  - `if k > 0 { n = n - k; return }` followed by `n = n + k`: the path through the `return` was not seen.
+  - Before: `--verbose` printed `[history] proved`, and `--contracts runtime` dropped the guard.
+  - Now: neither is proved. The `return` method gets W0024, and `--contracts runtime` throws `ContractViolation`.
+  - Not yet: the setter gets no warning (W0024 comes with #2599), and the runtime guard still misses it (#2633).
+- **A write that breaks a `history` is caught inside a lambda (#2597).**
+  - Before: `() -> { t = t - 1 }` against `history t >= old(t)` compiled with no error and no warning.
+  - Now: E0109, as for `t = t - 1` in the method body. A lambda's write the checker cannot settle (`t = t + 1`, `t++`) gets W0024 at its line.
+- **A contract clause on an extension method, an enum, an interface method or an `abstract def` is checked (#2577).**
+  - Before: the clause was dropped. An extension method's or an enum's clause compiled even with contracts off, and with `--contracts check` an undefined name compiled in all four places.
+  - Now: with contracts off each clause is E0105, as everywhere else. With `--contracts check` it is typed like a class method's clause (E0002, E0106, E0107).
+- **A `history` on a `Long` or `Double` field is checked against writes, like one on an `Int` (#2574).**
+  - Before: `t = t - 1L` against `history t >= old(t)` compiled with no error.
+  - Now: E0109, as for `t = t - 1` on an `Int` field.
+- **`(5 as Comparable[String])` is a compile error (E0000).**
+  - Before: it compiled, then threw ClassCastException when used.
+  - Now: a primitive casts to an applied type only if its box has that type, e.g. `5 as Comparable[JInteger]`.
+- **A subclass method with the same name no longer takes over an inherited default (#2548).**
+  - Before (v0.150.0): `sh.scale(5)` printed `500`, the subclass's default, and an overload whose default had another type was `E0104` naming `f$default$2`.
+  - Now: `5`, and the overload compiles. Through a parent type, `a.f()` uses the parent's default again, as in v0.149.0.
+- **A default argument is named by its method in runtime errors, `--effects` and `E0077`.**
+  - Before: `called from a.on:5 (f$default$1)`, `--effects` listed `A#f$default$1()`, and E0077 said `(calling stamp$default$1)`.
+  - Now: `called from a.on:5 (f)`, E0077 says `(calling stamp)`, and `--effects` lists no default; its effects go to each caller that omits it.
+- **`xs[i] = u` into a `List[T]` is checked like `xs.set(i, u)` (#2332).**
+  - Before: an unrelated `U`, an `Object` or a `String` compiled into a `List[T]` or a `Map[K, T]` through `[]`, then threw ClassCastException where the `T` was read.
+  - Now: E0000, the same error `xs.set(i, u)` and `m.put(k, u)` already gave. A map key is checked too.
+- **A self-recursive method with `ensures` keeps tail-call optimization under `--contracts runtime`.**
+  - Before: the guard made each self-call a non-tail call; deep recursion overflowed the stack.
+  - Now: only the entry is guarded. The `requires` of an inner self-call is not checked at run time.
+
+### Documentation
+
+- **The Japanese Java-interop guide says `extends` inherits a Java class (#2532).**
+  - Before: the text said `:`, retired syntax, above an example that uses `extends`.
+  - Now: text and example agree, as in the English guide.
+
 ## [0.150.0] - 2026-11-01
 
 ### Breaking

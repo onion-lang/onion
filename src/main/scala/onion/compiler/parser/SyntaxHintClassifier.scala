@@ -295,6 +295,10 @@ private[compiler] object SyntaxHintClassifier {
   private val RecordClauseBeforeSemicolon =
     """(?:^|[{;\s])(?:shape\s+[A-Za-z_]\w*\s*=\s*(?:re"[^"]*"|[A-Za-z_]\w*))\s*$""".r
 
+  // A statement that starts with the contract keyword `requires` or `ensures` and an operand.
+  private val ContractClauseStatement =
+    """^\s*(requires|ensures)\s+\S""".r
+
   def classify(
     found: String,
     expected: String,
@@ -336,6 +340,20 @@ private[compiler] object SyntaxHintClassifier {
       // `example { ... }` got no hint at all.
       case "law" | "example" =>
         hint("error.parsing.hint.law_example_outside_record", found)
+      // `requires e` / `ensures e` written as a class member (#2605 item 7): both are clauses
+      // of a method signature, so the class body's member list fails at the keyword itself.
+      // A condition on the object's state is an `invariant`, which a class body does take.
+      case "requires" | "ensures" if expected.contains("\"def\"") =>
+        hint("error.parsing.hint.contract_clause_in_class_body", found)
+      // The same clause as a record or enum member: those bodies hold access sections (and, in
+      // a record, `invariant`/`shape`), whose starts are all soft keywords, so the only expected
+      // token left is `}`. Methods there live under a section, which the example shows.
+      // An interface body expects only `}` there too, but takes no `public:` section and no
+      // method body, so the hint is given only once the enclosing body is a record or enum.
+      case "requires" | "ensures"
+          if expected.trim == "\"}\"" &&
+            enclosingTypeKeyword(precedingText + textBefore(context, sourceLine)).exists(k => k == "record" || k == "enum") =>
+        hint("error.parsing.hint.contract_clause_in_type_body", found)
       case "instanceof" if InstanceofExpression.findFirstMatchIn(sourceLine).isDefined =>
         val matched = InstanceofExpression.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.instanceof_not_supported", matched.group(1), matched.group(2))
@@ -629,6 +647,12 @@ private[compiler] object SyntaxHintClassifier {
             RustStyleMacroCall.findFirstMatchIn(sourceLine).isDefined =>
         val matched = RustStyleMacroCall.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.rust_style_macro_call", matched.group(1))
+      // `requires e` / `ensures e` as a statement in a body: the clauses belong after the
+      // signature, so the generic call-parentheses hint below would send the user the wrong way.
+      case _
+          if expected.contains("<EOL>") && expected.contains(";") && expected.contains("<EOF>") &&
+            ContractClauseStatement.findFirstMatchIn(sourceLine).isDefined =>
+        hint("error.parsing.hint.contract_clause_in_body", ContractClauseStatement.findFirstMatchIn(sourceLine).get.group(1))
       // A complete statement was expected right where a second bare token follows its
       // leading identifier with nothing in between -- most often a call whose arguments
       // were written without parentheses (a Python 2 `print "x"` or Ruby `puts x` habit).
@@ -679,12 +703,37 @@ private[compiler] object SyntaxHintClassifier {
       depth == 1
     }.map(_.group(1).trim)
 
+  // `text` without `//` and `/* */` comments (an unterminated `/*` runs to the end);
+  // a comment marker inside a string literal is text, not a comment (#2669).
+  private def stripComments(text: String): String = {
+    val out = new StringBuilder
+    var i = 0
+    var quote = ' '
+    while (i < text.length) {
+      val c = text.charAt(i)
+      val next = if (i + 1 < text.length) text.charAt(i + 1) else ' '
+      if (quote != ' ') {
+        out += c
+        if (c == '\\' && i + 1 < text.length) { out += next; i += 1 }
+        else if (c == quote) quote = ' '
+        i += 1
+      } else if (c == '"' || c == '\'') { quote = c; out += c; i += 1 }
+      else if (c == '/' && next == '/') i = text.length
+      else if (c == '/' && next == '*') {
+        val end = text.indexOf("*/", i + 2)
+        i = if (end < 0) text.length else end + 2
+        out += ' '
+      } else { out += c; i += 1 }
+    }
+    out.toString
+  }
+
   // A `val y = e` in a do block (#2465). Computing `e` inside the `yield` works for every
   // monad; a bind form is named only for the monads whose unit infers there (`Option::some`,
   // `Future::successful`, a one-element list). `Result::successful(e)` cannot pin the error
   // type, so `do[Result]` and a user monad get the `yield` advice alone.
   private def doBlockLetHint(monad: String, context: String): Option[SyntaxHint] = {
-    val statement = context.takeWhile(c => c != ';' && c != '\n' && c != '\r' && c != '}').trim
+    val statement = stripComments(context.takeWhile(c => c != ';' && c != '\n' && c != '\r' && c != '}')).trim
     val (name, expr) = statement match {
       case LetStatement(n, e) => (n, e.trim)
       case _ => ("y", "expr")
@@ -732,6 +781,30 @@ private[compiler] object SyntaxHintClassifier {
         }
       (m.group(1), params)
     }
+
+  private val TypeKeyword = """\b(class|interface|record|enum)\b""".r
+
+  /** The keyword (`class`, `interface`, `record`, `enum`) declaring the innermost unclosed brace
+   * in `text`, if that brace opens a type body; braces in strings or comments are not skipped. */
+  private def enclosingTypeKeyword(text: String): Option[String] = {
+    var depth = 0
+    var i = text.length - 1
+    var open = -1
+    while (i >= 0 && open < 0) {
+      text.charAt(i) match {
+        case '}' => depth += 1
+        case '{' => if (depth == 0) open = i else depth -= 1
+        case _   =>
+      }
+      i -= 1
+    }
+    if (open < 0) None
+    else {
+      // The header runs back from the brace to the previous `{`, `}` or `;`.
+      val header = text.substring(0, open).reverse.takeWhile(c => c != '{' && c != '}' && c != ';').reverse
+      TypeKeyword.findAllMatchIn(header).toList.lastOption.map(_.group(1))
+    }
+  }
 
   private def textBefore(context: String, sourceLine: String): String = {
     val rest = context.takeWhile(c => c != '\n' && c != '\r')

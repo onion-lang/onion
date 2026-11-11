@@ -263,4 +263,230 @@ public:
 - **What you see:** a false predicate is **E0113**. A parameter that cannot be sampled is also E0113,
   not a silent skip. `--contracts` is on by default (`check`).
 - **Seed and samples:** `--law-seed` and `--law-samples` are now `--contract-seed` and `--contract-samples`; `--no-check-laws` is gone (use `--contracts off`).
-- **`onion.Shape`:** a class that implements it needs at least one such predicate that uses it (E0080).
+- **`onion.Shape`:** a class that implements it no longer needs a predicate in its file (E0080 is retired).
+- **Update a whole project:** `onion migrate src/` rewrites each `law` and `example` into this form.
+  - A body of one expression becomes `= expr`; a longer body keeps its block, with `return` before the last statement.
+  - An `example` with no name is named `example1`, `example2`, ... Rename it if you like.
+  - A file that would not compile after the rewrite is left as written, and the command names the line.
+
+## A field an `invariant` or `history` names is written only through `this`
+
+Contracts are a preview feature (RFC #2557). A field that a class's `invariant` or `history`
+names may be written only by that class's own code, through `this`. A write through any other
+object is E0110.
+
+```onion
+class Clock {
+public:
+  var t: Int
+  history t >= old(t)
+  def this { t = 0 }
+  def this(start: Int) { t = start }
+  def advanceTo(k: Int): void { if k > t { t = k } }
+}
+
+// Before: compiled. Now: E0110 at `c`
+//   val c = new Clock(); c.t = 5
+// Now: pass the value to a constructor
+val c = new Clock(5)
+
+// Before: compiled. Now: E0110 at `o`
+//   def sync(o: Clock): void { o.t = 9 }
+// Now: call a method of that object; its own writes are checked
+def sync(o: Clock): void { o.advanceTo(9) }
+sync(c)
+println(c.t)   // 9
+```
+
+- **What changed:** each object keeps its own `invariant` and `history`, checked one call at a
+  time. A write from outside that object's methods is one no such check can follow.
+- **What you see:** `E0110`, with the caret on the receiver (`o`, `c`, `cs[0]`). The message
+  says to call a method of that object or set the value in a constructor.
+- **Still fine:** `t = v`, `this.t = v`, `self.t = v`, `t++` and `t += 1` in the class's own
+  methods, also inside a lambda. Reading `o.t` from anywhere is fine too.
+- **No `onion migrate` rule, on purpose:** the fix adds a method or a constructor to the
+  receiver's class, and which one fits is a design choice.
+
+## A `tool`'s `requires` sees more of what it runs
+
+`onionc` checks a `tool`'s `requires { ... }` clause against the effects its body has. It now
+counts four things it missed before. A tool that relied on a miss gets `E0077` (an effect
+missing from `requires`) or `E0078` (a capability nothing uses).
+
+```onion
+class Base {
+public:
+  def this {}
+  def run(): Int = 1
+}
+class Loud extends Base {
+public:
+  def this {}
+  override def run(): Int { IO::println("loud"); return 2 }
+}
+
+// Before: compiled. Now: E0077 at `b.run()`, "calling Loud::run"
+//   tool go(): Int { val b: Base = new Base(); return b.run() }
+// Now: declare what an override can do
+tool go(): Int requires { console } {
+  val b: Base = new Base()
+  return b.run()
+}
+```
+
+| What the tool does | Before | Now |
+|---|---|---|
+| Calls a method a program class overrides (`b.run()` above) | only the called method counted | every program override counts too (`E0077`) |
+| Uses a class whose static initializer has an effect | not counted | counted (`E0077`) |
+| `try (val r = new R()) { }` where `R` is a program class | `close()` not counted | `R::close` counts (`E0077`) |
+| `new Box[String]()` of a program class | `unknown` | the constructor's own effects; an `unknown` kept only for it is `E0078` |
+
+- **What you see:** `E0077` names the call and the capability to add. `E0078` names the
+  capability to remove.
+- **Not affected:** what a library method might call back on an object you pass it
+  (`list.add(item)` and `Item::toString`). Only the build's own check of contract predicates
+  counts that.
+- **No `onion migrate` rule, on purpose:** the fix depends on what the called code does.
+  Each error names the edit: add that capability, or remove the unused one.
+
+## A record component named `hashCode`, `toString` or `getClass` must not change that method's type
+
+`record R(hashCode: Long)` gave one object two `hashCode()` answers: the accessor, and the
+`Int` one a `HashMap` uses. `getClass: Int` did the same to `getClass()`. Both are now errors,
+as `hashCode: Int`, `toString: String` and `getClass: Class` were.
+
+```onion
+// Before: compiled, r.hashCode() = 5, (r as Object).hashCode() = 36
+record R(hashCode: Long)
+
+// Now: E0010. Rename the component.
+record R(code: Long)
+```
+
+- **What you see:** **E0010** at the component, for `hashCode`, `toString` or `getClass` of any
+  type, in a record or an `enum` case.
+- **No `onion migrate` rule:** the new name and the code that reads it are your choice.
+
+## A default on an abstract or interface method is type-checked
+
+A default on an `abstract def` or an interface method now works: a call may omit that
+argument. So the default is now type-checked like any other default. Before, it was never used,
+and a wrong one compiled.
+
+```onion
+// Before: compiled, because the default was never used
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = "x"): Int
+}
+
+// Now: E0000 at "x". Give a default of the parameter's type.
+abstract class A {
+public:
+  def this {}
+  abstract def f(n: Int = 0): Int
+}
+```
+
+- **What you see:** **E0000** (wrong type) or **E0002** (unknown name) at the default.
+- **No `onion migrate` rule:** only you know which default was meant. Fix it, or remove it.
+
+## A record method that overrides `toString`, `hashCode` or `equals` must keep its type
+
+A record body could redefine an `Object` method with another return type. A class could not.
+`toString(): Int` silently dropped the generated `toString()`, and `toString(): String?` let a
+`null` reach `println`. A record now follows the class rule.
+
+```onion
+// Before: compiled; println(new R("")) printed null
+record R(name: String) {
+public:
+  def toString(): String? = if name == "" { null } else { name }
+}
+
+// Now: E0000 at toString. Return a String.
+record R(name: String) {
+public:
+  def toString(): String = if name == "" { "(none)" } else { name }
+}
+```
+
+- **What you see:**
+  - **E0000** at the method when the return type is another reference type (`String?`,
+    `Object`, `CharSequence`). Its hint suggests `?:` for a nullable value.
+  - **E0104** when either return type is primitive (`toString(): Int`, `hashCode(): Long`).
+- **No `onion migrate` rule:** what to return instead of `null` is your choice.
+
+## `Http.Response` reads through `status()`, `body()` and `headers()` only
+
+`Http.Response` had public fields and accessor methods with the same names. The fields are
+now private, as in `Server.Response` and `Proc.Result`.
+
+```onion
+val r = Http::getResponse("https://example.com")
+println(r.status)     // still compiles: calls status()
+println(r.status())   // the same call
+```
+
+- **Onion source:** nothing to change. With no field to read, `r.status` calls `status()`.
+- **What you see:** an `IllegalAccessError` when you run a `.class` file built by an older
+  `onionc` that read the field. Recompile it.
+- **Java code:** write `r.status()`, `r.body()` and `r.headers()`.
+- **No `onion migrate` rule:** every Onion spelling still compiles, so there is nothing to rewrite.
+
+## One instance per trait and type, across modules
+
+An `instance` of one trait for one type may be declared only once in the whole program.
+Before, a second one in another `module` compiled, and only the one in a file without a
+`module` line was ever used. Now the second one is an error.
+
+```onion
+// shapes.on
+module shapes;
+trait Show[T] {
+  def show(x: T): String
+}
+instance Show[Int] {
+  def show(x: Int): String = "lib " + x
+}
+
+// app.on: Before, compiled. Now E0097. Delete this instance, or the one in shapes.on.
+module app;
+import { shapes.Show }
+instance Show[Int] {
+  def show(x: Int): String = "app " + x
+}
+```
+
+- **What you see:** **E0097** `instance shapes.Show[java.lang.Integer] is already defined`, at
+  the second instance.
+- **Fix:** keep one instance and delete the other.
+- **Two files in the same package** (both without a `module` line) still give **E0008**
+  `duplicated class definition Show$$Integer`. The fix is the same.
+- **Type arguments of the type:** E0097 compares only the outer type, so `Show[List[String]]`
+  and `Show[List[Integer]]` are one instance and clash.
+- **No `onion migrate` rule:** which instance to keep is your choice.
+
+## A call above overloads with defaults picks what a call below them picks
+
+A call can now omit a default declared later in the file (#2653). So a call written above a
+set of overloads now sees their defaults, and picks the overload a call below them picks.
+
+```onion
+def run(): String = pick()
+def pick(): String = "zero"
+def pick(n: Int = 1): String = "one"
+println(run())   // Before: zero. Now: one, as when run() is declared below pick
+```
+
+| Overloads (declared below the call) | Call | Before | Now | To keep the old result |
+|---|---|---|---|---|
+| `pick()`, `pick(n: Int = 1)` | `pick()` | `zero` | `one` | rename one of the two methods |
+| `f(n: Long)`, `f(n: Int, a: Int = 1)`, `f(n: Int, b: String = "")` | `f(1)` | `long` | E0006 | `f(1L)` |
+
+- **What you see:** a different overload runs with no message, or **E0006**
+  `method call is applicable for both …` at the call.
+- **Still fine:** a call below the overloads, and a call that passes every argument.
+- **No `onion migrate` rule:** only you know which overload the call meant. Pass the argument
+  (`f(1L)`, `f(1, 1)`) or rename one method.

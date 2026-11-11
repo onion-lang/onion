@@ -106,4 +106,34 @@ class SuperInterfaceDefaultSpec extends AbstractShellSpec {
         "class Main { public: static def main(args: String[]): Long { return new L().count() } }"))
     }
   }
+
+  describe("super.m() to an interface default inside a lambda") {
+    it("reaches the default through the enclosing class (no VerifyError)") {
+      assert(Shell.Success(8) == run(
+        "interface A { def g(): Int = 7 }\n" +
+        "class C conforms A {\npublic:\n  def this {}\n" +
+        "  override def g(): Int { val f: () -> Int = () -> super.g() + 1; return f() }\n}\n" +
+        "class Main { public: static def main(args: String[]): Int { return new C().g() } }"))
+    }
+
+    it("reaches a default through an abstract superclass (#2702)") {
+      assert(Shell.Success(6) == run(
+        "interface I {\n  def g(): Int = 5\n}\n" +
+        "abstract class Base conforms I { }\n" +
+        "class Child extends Base {\npublic:\n  def this {}\n" +
+        "  override def g(): Int { val f: () -> Int = () -> super.g() + 1; return f() }\n}\n" +
+        "class Main { public: static def main(args: String[]): Int { return new Child().g() } }"))
+    }
+  }
+
+  describe("the most specific default wins, as in Java") {
+    it("calls B's override when B conforms A") {
+      assert(Shell.Success(20) == run(
+        "interface A { def g(): Int = 1 }\n" +
+        "interface B conforms A { def g(): Int = 2 }\n" +
+        "class C conforms A, B {\npublic:\n  def this {}\n" +
+        "  override def g(): Int = super.g() * 10\n}\n" +
+        "class Main { public: static def main(args: String[]): Int { return new C().g() } }"))
+    }
+  }
 }

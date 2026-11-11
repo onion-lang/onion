@@ -24,9 +24,16 @@ private[compiler] final class DeclarationBodySupport(
       methodBodySupport.processTypeContracts(definition, node.invariants, node.histories)
       val instanceInitializers = Buffer[ActionStatement]()
       val staticInitializers = Buffer[ActionStatement]()
-      definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {
-        case ctor: AST.ConstructorDeclaration if ctor.primary => ctor.args.map(_.name)
-      }.flatten.toSet
+      recordPrimaryParameterNames(node, definition)
+      // Most defaults were typed ahead by DefaultScheduling. A held-back one (it reads a top-level
+      // `val`/`var`, or calls a method whose default does) waits until here, so a call above it
+      // in this class still sees it (#2637).
+      for (section <- node.defaultSection ++ node.sections; member <- section.members) member match {
+        case m: AST.MethodDeclaration => predefineMethodDefaults(m)
+        case c: AST.ConstructorDeclaration =>
+          typing.kernelNodeOf[ConstructorDefinition](c).foreach(methodBodySupport.predefineConstructorDefaults(_, c.args))
+        case _ =>
+      }
       for (section <- node.defaultSection ++ node.sections; member <- section.members) {
         member match {
           case field: AST.FieldDeclaration =>
@@ -52,10 +59,181 @@ private[compiler] final class DeclarationBodySupport(
         }
       }
       reportDelegationCycles(node, definition)
+      checkImplicitSuperConstructor(node, definition)
       classInitializerSupport.injectInstanceInitializers(definition, instanceInitializers.toSeq)
       if (staticInitializers.nonEmpty) {
         definition.setStaticInitializers(staticInitializers.toArray)
       }
+    }
+  }
+
+  /**
+   * The defaults of every method and constructor in this unit, one job per declaration, for
+   * [[DefaultScheduling]] to type before any body of any unit (#2653). A call can then omit a
+   * default declared later in the file, in another type, or in another file, as #2637 already
+   * allowed within one class body. A job that is never run is typed in source order instead.
+   */
+  def unitDefaultJobs(unit: AST.CompilationUnit): Seq[DefaultScheduling.Job] = {
+    val topLevelVariables = unit.toplevels.collect {
+      case v: AST.LocalVariableDeclaration => v.name
+      case v: AST.GlobalVariableDeclaration => v.name
+    }.toSet
+    def job(name: String, args: List[AST.Argument], declaration: => Option[AnyRef] = None)(body: => Unit): Option[DefaultScheduling.Job] =
+      if (!args.exists(_.defaultValue != null)) None
+      else {
+        val mentions = mentionedNames(unit, args)
+        // A top-level `val`/`var` becomes a field only when the body pass reaches it, so a default
+        // that reads one, in any kind of declaration, stays in source order, after it.
+        // A held-back declaration records why, so a call above it that omits the default gets a hint.
+        val hold = (roots: Seq[String], via: Seq[String]) => {
+          // Read from the syntax: a held-back default is not typed yet when the call reports.
+          val omittableFrom = args.lastIndexWhere(_.defaultValue == null) + 1
+          declaration match {
+            case Some(m: MethodDefinition) =>
+              m.defaultsHeldBackBy = roots; m.defaultsHeldBackVia = via; m.defaultsOmittableFrom = omittableFrom
+            case Some(c: ConstructorDefinition) =>
+              c.defaultsHeldBackBy = roots; c.defaultsHeldBackVia = via; c.defaultsOmittableFrom = omittableFrom
+            case _ =>
+          }
+        }
+        // The declaration's own name stays among its mentions: a call to a same-named overload,
+        // another constructor or another class's `g` must see that one held back (panel round 7
+        // on #2798). Only the job itself is excluded, in DefaultScheduling.
+        Some(DefaultScheduling.Job(name, mentions, mentions & topLevelVariables, hold, () => {
+          body
+          unitContext.currentDefinition = null
+          unitContext.currentMapper = null
+        }))
+      }
+    def typeParams(node: AST.Node): Seq[TypeParam] = typing.declaredTypeParams_.getOrElse(node, Seq())
+    def methodJobs(node: AST.TypeDeclaration, params: Seq[TypeParam], methods: Seq[AST.MethodDeclaration]) =
+      methods.flatMap(m => job(m.name, m.args, typing.kernelNodeOf[MethodDefinition](m))(inDefinition(node, params)(_ => predefineMethodDefaults(m))))
+    unit.toplevels.flatMap {
+      case node: AST.ClassDeclaration =>
+        val members = (node.defaultSection ++ node.sections).toSeq.flatMap(_.members)
+        methodJobs(node, typeParams(node), members.collect { case m: AST.MethodDeclaration => m }) ++
+          members.collect { case c: AST.ConstructorDeclaration => c }.flatMap { c =>
+            job(node.name, c.args, typing.kernelNodeOf[ConstructorDefinition](c))(inDefinition(node, typeParams(node)) { _ =>
+              typing.kernelNodeOf[ConstructorDefinition](c).foreach(methodBodySupport.predefineConstructorDefaults(_, c.args))
+            })
+          }
+      case node: AST.RecordDeclaration =>
+        methodJobs(node, typeParams(node),
+          node.synthesizedMethods ++ node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m })
+      case node: AST.EnumDeclaration =>
+        methodJobs(node, Seq(), node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m })
+      case node: AST.InterfaceDeclaration =>
+        methodJobs(node, typeParams(node), node.methods)
+      case node: AST.ExtensionDeclaration =>
+        node.methods.flatMap { m =>
+          job(m.name, m.args) {
+            typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+              unitContext.currentDefinition = definition
+              typing.find(definition.name).foreach(unitContext.currentMapper = _)
+              typing.mapFromExtensionReceiver(node.receiverType).foreach { receiverType =>
+                methodBodySupport.predefineExtensionDefaults(m, receiverType, definition)
+              }
+            }
+          }
+        }
+      case node: AST.FunctionDeclaration if node.block != null =>
+        job(node.name, node.args, typing.kernelNodeOf[MethodDefinition](node)) {
+          typing.kernelNodeOf[MethodDefinition](node).foreach { function =>
+            typing.loadTopClass.collect { case cd: ClassDefinition => cd }.foreach(unitContext.currentDefinition = _)
+            typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
+            typing.openTypeParams(typing.emptyTypeParams ++ typeParams(node)) {
+              methodBodySupport.predefineDefaults(function, node.args)
+            }
+          }
+        }.toSeq
+      case _ => Seq()
+    }
+  }
+
+  /**
+   * Every name the defaults mention: any node's `name` (a variable, a call of any form, a
+   * member) and every type they name. The scan walks every field of every node, closures and trailing lambdas
+   * included, so no node kind can hide a read (panel round 2 on #2798). A false match only
+   * keeps a default in source order, as on `main`.
+   */
+  private def mentionedNames(unit: AST.CompilationUnit, args: List[AST.Argument]): Set[String] = {
+    val names = scala.collection.mutable.Set.empty[String]
+    def visit(x: Any): Unit = x match {
+      case ref: AST.ReferenceType => names += ref.name.split('.').last
+      case _: Location => ()
+      case xs: IterableOnce[?] => xs.iterator.foreach(visit)
+      // Any node's `name` field counts, so no call form (`super.g()`, a trait call, a member
+      // selection, ...) can hide a dependency (panel round 4 on #2798).
+      case p: Product =>
+        p.productElementNames.zip(p.productIterator).foreach {
+          case ("name", name: String) => names += name
+          case (_, child) => visit(child)
+        }
+      case _ => ()
+    }
+    args.foreach(a => if (a.defaultValue != null) visit(a.defaultValue))
+    // A name that renames a class also names that class: a `type` alias (`type BB = B`, panel
+    // round 5 on #2798) and an import alias (`import { p.K as KK; }`, round 6). Every such name
+    // is resolved to its target's simple name, until nothing new appears, so alias chains and
+    // an alias of an alias across both kinds are covered too.
+    val typeAliasTargets = typing.typeAliases_.values.toSeq.groupMap(_.node.name)(_.node.targetType)
+    val importAliasTargets =
+      if (unit.imports == null) Map.empty[String, Seq[String]]
+      else unit.imports.mapping.groupMap(_._1)(_._2.split('.').last)
+    val renamings = typeAliasTargets.keySet ++ importAliasTargets.keySet
+    val expanded = scala.collection.mutable.Set.empty[String]
+    var pending = names.toSet.intersect(renamings)
+    while (pending.nonEmpty) {
+      expanded ++= pending
+      pending.foreach { alias =>
+        typeAliasTargets.getOrElse(alias, Seq()).foreach(visit)
+        names ++= importAliasTargets.getOrElse(alias, Seq())
+      }
+      pending = names.toSet.intersect(renamings) -- expanded
+    }
+    names.toSet
+  }
+
+  /** A plain primary-constructor parameter is not a field; E0002 on one hints so (#2515). */
+  private def recordPrimaryParameterNames(node: AST.ClassDeclaration, definition: ClassDefinition): Unit =
+    definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {
+      case ctor: AST.ConstructorDeclaration if ctor.primary => ctor.args.map(_.name)
+    }.flatten.toSet
+
+  private def inDefinition(node: AST.TypeDeclaration, typeParams: Seq[TypeParam])(body: ClassDefinition => Unit): Unit =
+    typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
+      // A default typed ahead of the body pass still gets the constructor-parameter hint (panel round 5 on #2798).
+      node match {
+        case c: AST.ClassDeclaration => recordPrimaryParameterNames(c, definition)
+        case _ =>
+      }
+      unitContext.currentDefinition = definition
+      typing.find(definition.name).foreach(unitContext.currentMapper = _)
+      typing.openTypeParams(typing.emptyTypeParams ++ typeParams)(body(definition))
+    }
+
+  /** An explicitly `abstract` method with a body is an error the body pass reports; its defaults wait for that. */
+  private def predefineMethodDefaults(m: AST.MethodDeclaration): Unit =
+    if (m.block == null || !AST.hasModifier(m.modifiers, AST.M_ABSTRACT))
+      typing.kernelNodeOf[MethodDefinition](m).foreach { method =>
+        typing.openTypeParams(unitContext.currentTypeParams ++ typing.declaredTypeParams_.getOrElse(m, Seq())) {
+          methodBodySupport.predefineDefaults(method, m.args)
+        }
+      }
+
+  /** A class that declares no constructor gets one that calls `super()`. When the superclass has
+   *  no accessible no-arg constructor, that call used to compile and then throw NoSuchMethodError
+   *  on `new C()` (#2664), e.g. when every parameter of the parent's only constructor has a default.
+   *  An explicit `def this { }` already reports E0021 for it; the implicit one reports it too. */
+  private def checkImplicitSuperConstructor(node: AST.ClassDeclaration, definition: ClassDefinition): Unit = {
+    val declaresConstructor = (node.defaultSection ++ node.sections).exists(_.members.exists(_.isInstanceOf[AST.ConstructorDeclaration]))
+    val parent = definition.superClass
+    if (!declaresConstructor && parent != null) {
+      val matched = parent.findConstructor(Array.empty[Term])
+      if (matched.length == 0)
+        bodyContext.report(SemanticError.CONSTRUCTOR_NOT_FOUND, node, parent, Array.empty[Type], parent.constructors)
+      else if (matched.length == 1 && !MemberAccess.isMemberAccessible(matched(0), definition))
+        bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, matched(0).affiliation, "new", matched(0).getArgs, definition)
     }
   }
 

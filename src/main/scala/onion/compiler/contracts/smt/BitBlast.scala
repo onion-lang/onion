@@ -26,19 +26,36 @@ final class BitBlast {
   // ---- gates -------------------------------------------------------------------------------
   def not(a: Int): Int = -a
 
+  /**
+   * One output per distinct gate: building `a AND b` twice returns the first output. A comparison
+   * and a subtraction over the same words then share their carry chain, which the solver would
+   * otherwise have to prove equal bit by bit (#2748: `n <= bal` next to `bal - n`).
+   */
+  private val andGates = mutable.HashMap.empty[(Int, Int), Int]
+  private val xorGates = mutable.HashMap.empty[(Int, Int), Int]
+  private def key(a: Int, b: Int): (Int, Int) = if (a < b) (a, b) else (b, a)
+
   def and(a: Int, b: Int): Int =
     if (a == fls || b == fls) fls else if (a == tru) b else if (b == tru) a else if (a == b) a else if (a == -b) fls
-    else { val o = newVar(); clauses += Array(-o, a); clauses += Array(-o, b); clauses += Array(o, -a, -b); o }
+    else andGates.getOrElseUpdate(key(a, b), {
+      val o = newVar(); clauses += Array(-o, a); clauses += Array(-o, b); clauses += Array(o, -a, -b); o
+    })
 
   def or(a: Int, b: Int): Int = -and(-a, -b)
 
   def xor(a: Int, b: Int): Int =
     if (a == fls) b else if (b == fls) a else if (a == tru) -b else if (b == tru) -a else if (a == b) fls else if (a == -b) tru
     else {
-      val o = newVar()
-      clauses += Array(-o, a, b); clauses += Array(-o, -a, -b)
-      clauses += Array(o, -a, b); clauses += Array(o, a, -b)
-      o
+      // a XOR b = (-a) XOR (-b) = -((-a) XOR b): one gate for each pair of variables.
+      val flip = (a < 0) != (b < 0)
+      val o = xorGates.getOrElseUpdate(key(math.abs(a), math.abs(b)), {
+        val (x, y) = (math.abs(a), math.abs(b))
+        val o = newVar()
+        clauses += Array(-o, x, y); clauses += Array(-o, -x, -y)
+        clauses += Array(o, -x, y); clauses += Array(o, x, -y)
+        o
+      })
+      if (flip) -o else o
     }
 
   def ite(c: Int, t: Int, e: Int): Int = or(and(c, t), and(-c, e))

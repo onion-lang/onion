@@ -30,7 +30,7 @@ class HistoryCallProofSpec extends AnyFunSpec {
        |  { return x }
        |  def add(k: Int): void
        |    requires k >= 0 && k < 100
-       |  { n = n + step(k) }
+       |  { if n < 1000 { n = n + step(k) } }
        |}""".stripMargin
 
   it("proves the history through the call and says so under --verbose") {

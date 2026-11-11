@@ -123,7 +123,7 @@ private[compiler] final class StaticMethodCallSupport(
       def finalizeSelection(selected: ApplicableMethod): Option[Term] = {
         if (!ensureStaticMethodAccessible(node, selected.method)) return None
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
-        calls.buildResolvedCall(node, selected.method, parameters, node.typeArgs, classSubst, expected)(
+        calls.buildResolvedCall(node, selected.method, parameters, node.typeArgs, classSubst, expected, context)(
           expectedArgs => calls.prepareCallParams(node, node.args, selected.method, parameters, expectedArgs),
           finalParams => new CallStatic(typeRef, selected.method, finalParams)
         )
@@ -179,14 +179,19 @@ private[compiler] final class StaticMethodCallSupport(
     typeRef: ClassType,
     context: LocalContext,
     expected: Type,
-    untypedClosureIndices: Set[Int]
+    untypedClosureIndices: Set[Int],
+    typedArgs: Array[Term] = null
   ): Option[Term] = {
     val args = argList
 
-    val preliminaryParams = calls.typePreliminaryParams(args, context, untypedClosureIndices) match {
-      case Some(params) => params
-      case None => return None
-    }
+    // A caller that already typed the other arguments (a static-imported call choosing its class,
+    // #2667) passes them in, so they are not typed, and their errors not reported, twice.
+    val preliminaryParams =
+      if (typedArgs != null) typedArgs
+      else calls.typePreliminaryParams(args, context, untypedClosureIndices) match {
+        case Some(params) => params
+        case None => return None
+      }
 
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(typeRef, name, candidates, calls.isStaticMethod)
@@ -318,7 +323,12 @@ private[compiler] final class StaticMethodCallSupport(
       return None
     }
 
-    overloadSupport.selectNamedArgumentMethod(candidates, node.args) match {
+    val pretyped = new java.util.IdentityHashMap[AST.Expression, Term]()
+    val selection = overloadSupport.selectNamedArgumentMethod(candidates, node.args, context, _ => TypeSubstitution.classSubstitution(typeRef), pretyped) match {
+      case Some(found) => found
+      case None => return None
+    }
+    selection match {
       case CandidateSelection.NoMatch =>
         ArgumentHelpers.findUnknownNamedArg(candidates.asScala, node.args) match {
           case Some(named) =>
@@ -333,9 +343,10 @@ private[compiler] final class StaticMethodCallSupport(
       case CandidateSelection.Selected(method) =>
         if (!ensureStaticMethodAccessible(node, method)) return None
         val classSubst = TypeSubstitution.classSubstitution(typeRef)
-        calls.processNamedArguments(node, node.args, method, context).flatMap { params =>
-          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
+        calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
+          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
+              .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams => new CallStatic(typeRef, method, finalParams)
           )
         }

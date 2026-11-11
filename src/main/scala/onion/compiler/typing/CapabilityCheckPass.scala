@@ -141,7 +141,8 @@ final class CapabilityCheckPass(typing: Typing) {
                               unitEffects: Map[EffectInference.Unit0, Set[Effect]],
                               table: EffectTable.Table): Unit = {
     val reported = scala.collection.mutable.Set[Effect]()
-    for (site <- EffectInference.callSites(tool.getBlock, classes, unitEffects, table)) {
+    for (site <- EffectInference.callSites(tool.getBlock, classes, unitEffects, table,
+        tool.affiliation match { case c: ClassDefinition => c; case _ => null })) {
       // `mutate` describes memory, not the world: it is never declared, so never missing.
       val missing = ((site.effects -- Effect.internal) -- declared) -- reported
       for (effect <- missing.toSeq.sorted) {

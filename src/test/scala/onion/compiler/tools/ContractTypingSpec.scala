@@ -200,6 +200,74 @@ class ContractTypingSpec extends AnyFunSpec {
       assert(codes(src).contains("E0106"), codes(src).toString)
     }
 
+    // #2605: interpolation was E0106 naming StringBuilder::append, a call the user never wrote.
+    it("accepts string interpolation, as it accepts concatenation") {
+      val src =
+        """class K {
+          |public:
+          |  static def f(n: Int): Int requires "n#{n}" != "" { return n }
+          |  static def g(n: Int): Int requires ("n" + n) != "" { return n }
+          |}""".stripMargin
+      assert(codes(src).isEmpty, codes(src).toString)
+    }
+
+    // Panel on #2815: `"#{e}"` with `e: CharSequence` picks `append(CharSequence)`, which
+    // calls `e.length()` and `e.charAt()`, not only `toString`.
+    it("rejects an interpolated CharSequence whose length or charAt writes") {
+      val src =
+        """import { java.util.* }
+          |class Evil conforms CharSequence {
+          |  val xs: List[Int]
+          |public:
+          |  def this(xs: List[Int]) { this.xs = xs }
+          |  def length(): Int { xs.add(1); return 1 }
+          |  def charAt(i: Int): Char { xs.add(2); return 'a' }
+          |  def subSequence(a: Int, b: Int): CharSequence = this
+          |  override def toString(): String = "e"
+          |}
+          |class K {
+          |public:
+          |  static def g(e: CharSequence): Int requires "#{e}" != "" { return 1 }
+          |}""".stripMargin
+      assert(codes(src).contains("E0106"), codes(src).toString)
+    }
+
+    it("still accepts an interpolated Object part whose class has no writing toString") {
+      val src =
+        """import { java.util.* }
+          |class Job conforms Runnable {
+          |  val xs: List[Int] = new ArrayList[Int]()
+          |public:
+          |  def run(): void { xs.add(1) }
+          |}
+          |class K {
+          |public:
+          |  static def g(o: Object): Int requires "#{o}" != "" { return 1 }
+          |}""".stripMargin
+      assert(codes(src).isEmpty, codes(src).toString)
+    }
+
+    // #2816: a StringBuilder part is appended as an Object (JDK StringBuilder is final, its
+    // toString only reads), not through the package-private append(AbstractStringBuilder)
+    it("accepts an interpolated StringBuilder part, as an Object part") {
+      val src =
+        """class K {
+          |public:
+          |  static def g(sb: StringBuilder): Int requires "#{sb}" != "" { return 1 }
+          |}""".stripMargin
+      assert(codes(src).isEmpty, codes(src).toString)
+    }
+
+    it("still rejects a write inside an interpolation") {
+      val src =
+        """import { java.util.* }
+          |class A {
+          |public:
+          |  def f(xs: List[Int]): Int requires "#{xs.add(1)}" != "" { return 0 }
+          |}""".stripMargin
+      assert(codes(src).contains("E0106"), codes(src).toString)
+    }
+
     it("accepts reading a collection") {
       val src =
         """import { java.util.* }

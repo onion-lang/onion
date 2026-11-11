@@ -843,8 +843,14 @@ class AsmCodeGenerationVisitor(
     controlFlow.emitSynchronizedTerm(node)
 
   // Statement visitors
-  override def visitStatementBlock(node: StatementBlock): Unit =
-    controlFlow.emitStatementBlock(node)
+  override def visitStatementBlock(node: StatementBlock): Unit = node match
+    case init: FieldInitializerBlock =>
+      // Its locals are numbered in its own frame: give them fresh slots, after the
+      // constructor's parameters and locals, instead of the constructor's mapping.
+      val own = new LocalVarContext(gen).withBoxedVariables(init.frame)
+      init.statements.foreach(asmCodeGen.emitStatementWithContext(gen, _, className, own))
+    case _ =>
+      controlFlow.emitStatementBlock(node)
   
   override def visitBreak(node: Break): Unit =
     controlFlow.emitBreak(node)

@@ -129,6 +129,67 @@ object Boxing {
     new TypedAST.CallStatic(aBoxedType, valueOfMethod, args)
   }
 
+  /** The operand of a reference-type test (`x is T`, `case s is T:`, a nested
+   *  `Wrap(n is T)`) or of a cast to a reference type: a primitive value is
+   *  boxed first, since `instanceof`/`checkcast` need a reference (#2726).
+   *  Every such site goes through here, so the rule has one home. */
+  def asReference(table: ClassTable, node: TypedAST.Term): TypedAST.Term =
+    if (node.isBasicType && !(node.`type` eq TypedAST.BasicType.VOID)) boxing(table, node) else node
+
+  /** Box a primitive argument for a reference-typed parameter slot. An `Int`
+   *  for a `Long?`/`Long`/`Double?` slot is widened to the slot's primitive
+   *  first, so the box is a `Long`, not an `Integer` (#2697, #2701). Every
+   *  argument site (`new`, `super(...)`, `this(...)`, `copy`, lambda-argument
+   *  retyping) and `val l: Long? = 5` go through here, so the rule has one
+   *  home. */
+  def boxForSlot(table: ClassTable, term: TypedAST.Term, formal: TypedAST.Type): TypedAST.Term = {
+    val slotType = formal match {
+      case n: TypedAST.NullableType => n.innerType
+      case other => other
+    }
+    val slotPrimitive = slotType match {
+      case bt: TypedAST.BasicType => Some(bt)
+      case other => unboxedType(table, other)
+    }
+    val from = term.`type`
+    val widened = slotPrimitive match {
+      case Some(slot) if slot != TypedAST.BasicType.VOID && slot != TypedAST.BasicType.BOOLEAN && slot != from &&
+          TypedAST.TypeRules.isAssignable(slot, from) =>
+        new TypedAST.AsInstanceOf(term.location, term, slot)
+      case _ => term
+    }
+    boxing(table, widened)
+  }
+
+  /** Adapt one already-matched argument to its formal type: box a primitive
+   *  for a reference formal (`boxForSlot`), and insert the numeric conversion
+   *  when both sides are primitive but differ. Without the conversion an `Int`
+   *  for a `Long`/`Double` formal left a 1-slot value where the descriptor
+   *  declares a 2-slot one (VerifyError, or a corrupt stack map in ASM).
+   *  `adaptArguments` and the lambda-argument constructor paths both use it,
+   *  so `new R(5, (y) -> y + 1)` adapts `5` exactly as `new P(5)` does (#2701). */
+  def adaptArgument(table: ClassTable, p: TypedAST.Term, f: TypedAST.Type): TypedAST.Term =
+    if (!f.isBasicType && p.isBasicType) boxForSlot(table, p, f)
+    else f match {
+      case bt: TypedAST.BasicType if p.isBasicType && bt != p.`type` => new TypedAST.AsInstanceOf(p.location, p, bt)
+      case _ => p
+    }
+
+  /** `adaptArgument` over a whole argument list. `new P(5)`, `extends P(5)`
+   *  and `this(5)` all go through here (#2701). */
+  def adaptArguments(table: ClassTable, parameters: Array[TypedAST.Term], formals: Array[TypedAST.Type]): Array[TypedAST.Term] =
+    if (parameters == null || parameters.length != formals.length) parameters
+    else {
+      // An index loop: zip + map built two arrays (and a ClassTag each) per call.
+      val out = new Array[TypedAST.Term](parameters.length)
+      var i = 0
+      while (i < parameters.length) {
+        out(i) = adaptArgument(table, parameters(i), formals(i))
+        i += 1
+      }
+      out
+    }
+
   /**
    * Returns the primitive type that the given reference type can be unboxed to.
    * Returns None if the type cannot be unboxed.

@@ -14,7 +14,9 @@ private[compiler] final class MethodBodySupport(
   typedTerms: (Array[AST.Expression], LocalContext) => Array[Term],
   translate: (AST.BlockElement, LocalContext) => ActionStatement,
   addReturnNode: (ActionStatement, Type) => StatementBlock,
-  processAssignable: (AST.Node, Type, Term) => Term
+  processAssignable: (AST.Node, Type, Term) => Term,
+  resolveConstructorWithNamedArgs: (AST.Node, List[AST.Expression], ClassType, LocalContext, Array[Term]) =>
+    Option[(ConstructorDefinition, Array[Term], Array[AST.Node])]
 ) {
   def processMethodLikeBody(
     method: MethodDefinition,
@@ -130,7 +132,9 @@ private[compiler] final class MethodBodySupport(
     // done before `saved` is built, since typing it adds to the saves.
     // A class's `invariant` and `history` speak about an object, so a static method has neither.
     val invariantTerms = if (isStatic) Seq.empty else definition.invariants.zip(definition.invariantSources)
-    val historyTerms = if (isStatic) Nil else typeContractClauses(definition.historySources, gctx, ContractScope.History)
+    // Its names are the object's fields, so a parameter with a field's name is hidden from it (#2633).
+    val historyTerms = if (isStatic) Nil else
+      gctx.withHidden(args.map(_.name).toSet)(typeContractClauses(definition.historySources, gctx, ContractScope.History))
     val pre: Seq[ActionStatement] = requiresTerms.zip(requires).map { case (t, s) => guard(t, s, "precondition") } ++
       invariantTerms.map { case (t, s) => guard(t, s, "invariant (on entry)") }
     val ensuresGuards: Seq[ActionStatement] = ensuresTerms.zip(ensures).map { case (t, s) => guard(t, s, "postcondition") }
@@ -174,6 +178,21 @@ private[compiler] final class MethodBodySupport(
       }
       new StatementBlock(body.location, (guards :+ body)*)
     }
+
+  /**
+   * An abstract or interface method has no body, but a parameter may still declare a default
+   * (#2638): the default is a method of the declaring class, so a call that omits the argument
+   * works through a receiver typed as the declaring class or interface. A call through a
+   * subclass that overrides without a default still needs the argument, as for a concrete method.
+   */
+  def processBodilessDefaults(method: MethodDefinition, args: List[AST.Argument]): Unit =
+    if args.exists(_.defaultValue != null) && !predefinedDefaults.contains(method) then
+      val context = new LocalContext
+      if (method.modifier & AST.M_STATIC) != 0 then context.setStatic(true)
+      context.setMethod(method)
+      bindParameters(context, args, method.arguments, null)
+      method.setArgumentsWithDefaults(
+        buildArgumentsWithDefaults(args, method.arguments, context.recordUsage, DefaultOwner(method.name, method.modifier, method.typeParameters)))
 
   /**
    * The clauses of a method with no body: an interface method or an `abstract def` (RFC #2557,
@@ -222,12 +241,41 @@ private[compiler] final class MethodBodySupport(
     } else {
       val saved = context.contractScope
       context.contractScope = Some(scope)
-      try clauses.flatMap { c =>
+      try clauses.flatMap {
+        case c: AST.NullLiteral =>
+          // `requires null` is rejected while typing against Boolean, with cast advice; no cast
+          // makes `null` a condition, so it gets the clause hint too (#2605).
+          bodyContext.report(INCOMPATIBLE_TYPE, c, BasicType.BOOLEAN, NullType.NULL, SemanticErrorReporter.ContractClauseHint(word))
+          None
+        case c =>
         typed(c, context, BasicType.BOOLEAN).flatMap { t =>
-          Option(processAssignable(c, BasicType.BOOLEAN, t))
+          if (isCondition(t.`type`)) Option(processAssignable(c, BasicType.BOOLEAN, t)).map { term =>
+            typing.contractClauseSources.put(term, c)
+            term
+          }
+          else {
+            // Not a condition at all (`requires x` with `x: Int`): say what a clause is,
+            // rather than "consider a cast" (#2605).
+            bodyContext.report(INCOMPATIBLE_TYPE, c, BasicType.BOOLEAN, t.`type`, SemanticErrorReporter.ContractClauseHint(word))
+            None
+          }
         }
       } finally context.contractScope = saved
     }
+  }
+
+  /**
+   * Whether a clause's type can be a condition: `Boolean`, a boxed `java.lang.Boolean`, either
+   * one nullable (which then gets the null-safety error), or a type that never completes.
+   * Anything else goes to the contract-clause hint.
+   */
+  private def isCondition(tpe: Type): Boolean = {
+    val inner = tpe match {
+      case n: NullableType => n.innerType
+      case other => other
+    }
+    inner.isBottomType || inner.isNullType ||
+      TypeRelations.isAssignableWithBoxing(BasicType.BOOLEAN, inner, bodyContext.table)
   }
 
   /**
@@ -309,45 +357,97 @@ private[compiler] final class MethodBodySupport(
       case b: AST.BlockExpression => markCapturedVariables(context, args, b)
       case _ =>
     bindParameters(context, args, paramTypes, block)
-    constructor.setArgumentsWithDefaults(
-      buildArgumentsWithDefaults(args, paramTypes, context, DefaultOwner("init", constructor.modifier | AST.M_STATIC, Array())))
+    predefinedConstructorDefaults.get(constructor) match
+      case Some((withDefaults, used)) =>
+        used.foreach(context.recordUsage)
+        constructor.setArgumentsWithDefaults(withDefaults)
+      case None =>
+        constructor.setArgumentsWithDefaults(
+          buildArgumentsWithDefaults(args, paramTypes, context.recordUsage, constructorDefaultOwner(constructor)))
     context
   }
 
   def processConstructorDeclaration(node: AST.ConstructorDeclaration): Unit =
     typing.kernelNodeOf[ConstructorDefinition](node).foreach { constructor =>
       val context = prepareConstructorContext(constructor, node.args, node.block)
-      val params0 = context.withArgumentSlots(typedTerms(node.superInits.toArray, context))
+      val targetClass = if node.selfDelegation then bodyContext.definition else bodyContext.definition.superClass
       // The object does not exist while its super/self initializer arguments are being
       // evaluated. A field read there -- `def this : this(seed)` where `seed` is a field,
       // or an explicit `this` -- is a GETFIELD on `uninitializedThis`, which the JVM
       // verifier rejects; it used to surface as an internal error at class load. Closure
       // bodies are exempt: they capture `this` and run later, when it does exist.
-      if params0 != null then
-        params0.zip(node.superInits).collectFirst {
-          case (term, source) if TermWalk.exists(term) { case _: This => true; case _ => false } => source
+      def reportThisBeforeDelegation(terms: Array[Term], sources: Seq[AST.Node]): Unit =
+        terms.zip(sources).collectFirst {
+          case (term, source) if term != null && source != null &&
+            TermWalk.exists(term) { case _: This => true; case _ => false } => source
         }.foreach(source => bodyContext.report(THIS_BEFORE_CONSTRUCTOR_DELEGATION, source, bodyContext.definition))
-      val targetClass = if node.selfDelegation then bodyContext.definition else bodyContext.definition.superClass
-      val matched0 = targetClass.findConstructor(params0)
-      // Exact matching is substitution-blind: an applied Box[Int] still exposes
-      // the constructor as Box(T) over the erased bound (Object), so a primitive
-      // argument (Int) does not match. Retry against the type-argument-
-      // substituted signatures with primitive boxing so that
-      // `class IntBox(v: Int) : Box[Int](v)` boxes v into T, mirroring what the
-      // `new Box[Int](42)` path already does (ConstructionTyping.findConstructorWithBoxing).
-      val (matched, params) =
-        if matched0.nonEmpty || params0 == null then (matched0, params0)
-        else findSuperConstructorWithBoxing(targetClass, params0)
-      if matched.length == 0 then
-        bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
-      else if matched.length > 1 then
-        bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
+      // `extends A(b = 7, a = 3)` / `: this(b = 8)`, and `extends A(7)` with `b`
+      // omitted: bind by name and fill defaults, exactly as `new A(...)` does.
+      def delegateFillingDefaults(positional: Array[Term]): Unit =
+        context.withArgumentSlots(resolveConstructorWithNamedArgs(node, node.superInits, targetClass, context, positional)).foreach {
+          case (ctor, _, _) if !superConstructorAccessible(node, ctor) =>
+            reportInaccessibleSuperConstructor(node, ctor)
+          case (ctor, params, sources) =>
+            reportThisBeforeDelegation(params, sources.toSeq)
+            val init = new Super(targetClass, ctor.getArgs, params, node.selfDelegation)
+            finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
+        }
+      if ArgumentHelpers.hasNamedArguments(node.superInits) then
+        // The positional path below would put 7 into `a` (#2659).
+        delegateFillingDefaults(null)
       else
-        warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
-        val init = new Super(targetClass, matched(0).getArgs, params, node.selfDelegation)
-        finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
+        val params0 = context.withArgumentSlots(typedTerms(node.superInits.toArray, context))
+        if params0 != null then reportThisBeforeDelegation(params0, node.superInits)
+        // Same own-view guard as `new` (#2649): `: Base(b)` with `b: JInteger` into
+        // `def this(c: Comparable[String])` must not match by erasure.
+        val matched0 = if params0 == null then targetClass.findConstructor(params0) else
+          targetClass.findConstructor(params0).filter { c =>
+            val formals = c.getArgs
+            formals.length != params0.length || formals.indices.forall { i =>
+              params0(i) == null || !TypeRelations.ownViewRejects(bodyContext.table, formals(i), params0(i).`type`)
+            }
+          }
+        // Exact matching is substitution-blind: an applied Box[Int] still exposes
+        // the constructor as Box(T) over the erased bound (Object), so a primitive
+        // argument (Int) does not match. Retry against the type-argument-
+        // substituted signatures with primitive boxing so that
+        // `class IntBox(v: Int) : Box[Int](v)` boxes v into T, mirroring what the
+        // `new Box[Int](42)` path already does (ConstructionTyping.findConstructorWithBoxing).
+        val (matched, params) =
+          if matched0.nonEmpty || params0 == null then (matched0, params0)
+          else findSuperConstructorWithBoxing(targetClass, params0)
+        // A constructor with defaults takes fewer positional arguments than it
+        // declares: `extends A(7)` / `: this(4)` into `def this(a: Int = 1, b: Int = 2)`
+        // fills `b`, as `new A(7)` does (#2660).
+        def defaultsCandidate: Boolean = targetClass.constructors.exists {
+          case cd: ConstructorDefinition =>
+            cd.argumentsWithDefaults != null &&
+              params0.length < cd.argumentsWithDefaults.length &&
+              params0.length >= cd.minArguments
+          case _ => false
+        }
+        if matched.length == 0 && params0 != null && !params0.contains(null) && defaultsCandidate then
+          delegateFillingDefaults(params0)
+        else if matched.length == 0 then
+          bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, targetClass, termTypes(params), targetClass.constructors)
+        else if matched.length > 1 then
+          bodyContext.report(AMBIGUOUS_CONSTRUCTOR, node, Array[AnyRef](targetClass, termTypes(params)), Array[AnyRef](targetClass, termTypes(params)))
+        else if !superConstructorAccessible(node, matched(0)) then
+          reportInaccessibleSuperConstructor(node, matched(0))
+        else
+          warnNullSuperArguments(targetClass, matched(0), node.superInits, params)
+          val init = new Super(targetClass, matched(0).getArgs, Boxing.adaptArguments(bodyContext.table, params, matched(0).getArgs), node.selfDelegation)
+          finishConstructorBody(constructor, init, node.block, context, if node.primary then node.primaryAssignments else 0)
       reportConstructorOnly(context)
     }
+
+  /** A private parent constructor resolved for `extends A(..)` used to compile, then fail
+   *  with IllegalAccessError (#2662). `: this(..)` reaches the class's own constructors. */
+  private def superConstructorAccessible(node: AST.ConstructorDeclaration, ctor: ConstructorRef): Boolean =
+    node.selfDelegation || MemberAccess.isMemberAccessible(ctor, bodyContext.definition)
+
+  private def reportInaccessibleSuperConstructor(node: AST.ConstructorDeclaration, ctor: ConstructorRef): Unit =
+    bodyContext.report(METHOD_NOT_ACCESSIBLE, node, ctor.affiliation, "new", ctor.getArgs, bodyContext.definition)
 
   /** W0012 for a `null` argument to an Onion-declared super/self constructor's
    *  non-null parameter, as `new P(null)` already warns (#2477). A Java
@@ -391,11 +491,9 @@ private[compiler] final class MethodBodySupport(
     if (candidates.length != 1) (candidates, params)
     else {
       val formals = substitutedArgs(candidates(0))
-      val adapted = params.zip(formals).map { (p, f) =>
-        if (!f.isBasicType && p.isBasicType) Boxing.boxing(bodyContext.table, p)
-        else p
-      }
-      (candidates, adapted)
+      // Adapt against the substituted formals: the erased ones (`Object` for
+      // `Box[Long?]`) would box `5` as an Integer, not a Long.
+      (candidates, Boxing.adaptArguments(bodyContext.table, params, formals))
     }
   }
 
@@ -508,10 +606,46 @@ private[compiler] final class MethodBodySupport(
     val arguments = method.arguments
     markCapturedVariables(context, args, block)
     bindParameters(context, args, arguments, block)
-    method.setArgumentsWithDefaults(
-      buildArgumentsWithDefaults(args, arguments, context, DefaultOwner(method.name, method.modifier, method.typeParameters)))
+    predefinedDefaults.get(method) match
+      case Some((withDefaults, used)) =>
+        used.foreach(context.recordUsage)
+        method.setArgumentsWithDefaults(withDefaults)
+      case None =>
+        method.setArgumentsWithDefaults(
+          buildArgumentsWithDefaults(args, arguments, context.recordUsage, DefaultOwner(method.name, method.modifier, method.typeParameters)))
     context
   }
+
+  /** Methods whose defaults were typed ahead of the bodies, with the parameter names those defaults read. */
+  private val predefinedDefaults = scala.collection.mutable.HashMap.empty[MethodDefinition, (Array[TypedAST.MethodArgument], Set[String])]
+
+  /**
+   * Types a method's defaults before any body of its class is typed, so a call written above the
+   * method (`def run() = g()` ... `def g(n: Int = 5)`) already sees them (#2637).
+   */
+  def predefineDefaults(method: MethodDefinition, args: List[AST.Argument]): Unit =
+    if args.exists(_.defaultValue != null) && !predefinedDefaults.contains(method) then
+      val used = scala.collection.mutable.Set.empty[String]
+      val withDefaults = buildArgumentsWithDefaults(args, method.arguments, used += _, DefaultOwner(method.name, method.modifier, method.typeParameters))
+      method.setArgumentsWithDefaults(withDefaults)
+      predefinedDefaults(method) = (withDefaults, used.toSet)
+
+  private val predefinedConstructorDefaults = scala.collection.mutable.HashMap.empty[ConstructorDefinition, (Array[TypedAST.MethodArgument], Set[String])]
+
+  private def constructorDefaultOwner(constructor: ConstructorDefinition): DefaultOwner =
+    DefaultOwner("init", constructor.modifier | AST.M_STATIC, Array())
+
+  /**
+   * Types a constructor's defaults before any body of its class is typed, so a delegation
+   * written above it (`def this() : this(z = 1)` with the primary `(z: Int, w: Int = 2)`)
+   * already sees them, as [[predefineDefaults]] does for methods.
+   */
+  def predefineConstructorDefaults(constructor: ConstructorDefinition, args: List[AST.Argument]): Unit =
+    if args.exists(_.defaultValue != null) && !predefinedConstructorDefaults.contains(constructor) then
+      val used = scala.collection.mutable.Set.empty[String]
+      val withDefaults = buildArgumentsWithDefaults(args, constructor.getArgs, used += _, constructorDefaultOwner(constructor))
+      constructor.setArgumentsWithDefaults(withDefaults)
+      predefinedConstructorDefaults(constructor) = (withDefaults, used.toSet)
 
   private def prepareExtensionContext(
     staticMethod: MethodDefinition,
@@ -542,10 +676,34 @@ private[compiler] final class MethodBodySupport(
     }
     addSharedParameterCopies(context, node.args, arguments.tail, shared)
 
-    staticMethod.setArgumentsWithDefaults(
-      buildArgumentsWithDefaults(extArgs, arguments, context, DefaultOwner(staticMethod.name, staticMethod.modifier, staticMethod.typeParameters, staticMethod.classType.asInstanceOf[ClassDefinition])))
+    predefinedDefaults.get(staticMethod) match
+      case Some((withDefaults, used)) =>
+        used.foreach(context.recordUsage)
+        staticMethod.setArgumentsWithDefaults(withDefaults)
+      case None =>
+        staticMethod.setArgumentsWithDefaults(
+          buildArgumentsWithDefaults(extArgs, arguments, context.recordUsage, extensionDefaultOwner(staticMethod)))
     context
   }
+
+  private def extensionDefaultOwner(staticMethod: MethodDefinition): DefaultOwner =
+    DefaultOwner(staticMethod.name, staticMethod.modifier, staticMethod.typeParameters, staticMethod.classType.asInstanceOf[ClassDefinition])
+
+  /** Types an extension method's defaults before any body is typed, as [[predefineDefaults]] does for a method (#2653). */
+  def predefineExtensionDefaults(node: AST.MethodDeclaration, receiverType: Type, definition: ClassDefinition): Unit =
+    if node.block != null && node.args.exists(_.defaultValue != null) then
+      typing.kernelNodeOf[ExtensionMethodDefinition](node).foreach { extMethod =>
+        val methodTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
+        typing.openTypeParams(unitContext.currentTypeParams ++ methodTypeParams) {
+          val staticMethod = findStaticExtensionMethod(definition, node, extMethod, receiverType)
+          if staticMethod != null && !predefinedDefaults.contains(staticMethod) then
+            val used = scala.collection.mutable.Set.empty[String]
+            val withDefaults = buildArgumentsWithDefaults(
+              receiverArgument(node, receiverType) :: node.args, staticMethod.arguments, used += _, extensionDefaultOwner(staticMethod))
+            staticMethod.setArgumentsWithDefaults(withDefaults)
+            predefinedDefaults(staticMethod) = (withDefaults, used.toSet)
+        }
+      }
 
   private def findStaticExtensionMethod(
     definition: ClassDefinition,
@@ -649,14 +807,14 @@ private[compiler] final class MethodBodySupport(
   private def buildArgumentsWithDefaults(
     args: List[AST.Argument],
     types: Array[Type],
-    calleeContext: LocalContext,
+    recordUsage: String => Unit,
     owner: DefaultOwner
   ): Array[TypedAST.MethodArgument] =
     args.zipWithIndex.map { case (arg, i) =>
       // A default is checked like `val x: T = e` (issue #2541): an out-of-range `200` for a
       // `Byte` or a `3.7` for a `Short` is E0000 here, not a truncated value or a VerifyError.
       val defaultTerm = Option(arg.defaultValue).flatMap { expr =>
-        synthesizeDefault(args, types, calleeContext, owner, i, expr)
+        synthesizeDefault(args, types, recordUsage, owner, i, expr)
       }
       TypedAST.MethodArgument(arg.name, types(i), defaultTerm)
     }.toArray
@@ -664,7 +822,7 @@ private[compiler] final class MethodBodySupport(
   private def synthesizeDefault(
     args: List[AST.Argument],
     types: Array[Type],
-    calleeContext: LocalContext,
+    recordUsage: String => Unit,
     owner: DefaultOwner,
     i: Int,
     expr: AST.Expression
@@ -673,7 +831,10 @@ private[compiler] final class MethodBodySupport(
     val isStatic = (owner.modifier & AST.M_STATIC) != 0
     val access = owner.modifier & (AST.M_PUBLIC | AST.M_PROTECTED | AST.M_PRIVATE)
     val prefixTypes = types.take(i)
-    val name = defaultMethodName(definition, s"${owner.name}$$default$$${i + 1}", prefixTypes)
+    // The declaring class is part of the name, so no subclass method ever overrides a default
+    // (#2548): a call uses the default of the method it resolves to at compile time.
+    val classTag = definition.name.replace('.', '$')
+    val name = defaultMethodName(definition, s"${owner.name}$$default$$${i + 1}$$$classTag", prefixTypes)
     val method = new MethodDefinition(
       expr.location, access | (if isStatic then AST.M_STATIC else 0), definition, name,
       prefixTypes, types(i), null, owner.typeParameters)
@@ -687,7 +848,7 @@ private[compiler] final class MethodBodySupport(
     val problemsBefore = bodyContext.problemCount
     val value = typed(expr, context, types(i)).map(term => processAssignable(expr, types(i), term)).filter(_ != null)
     // A parameter read only by a later default is used (no W0006).
-    context.usedNames.foreach(calleeContext.recordUsage)
+    context.usedNames.foreach(recordUsage)
     value match
       case Some(term) =>
         method.mayContainTry = bodyContext.tryCount != triesBefore

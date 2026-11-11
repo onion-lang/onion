@@ -1197,7 +1197,18 @@ public:
 
 Only what the syntax settles is reported. Fix: remove the write, or weaken the history.
 
-### `E0110` — an `invariant` or `history` on a mutable object
+A write counts wherever the method makes it, also inside a lambda it creates. A write in a
+lambda that the syntax does not settle gets the warning W0024 at its line. A write through
+another object (`o.n = 0`) is E0110, below.
+
+A history declared in a subclass also binds the methods the subclass inherits without
+overriding them. If `class Up extends Base` declares `history n >= old(n)`, an inherited
+`Base.dec` that lowers `n` is E0109 at its write. Fix: override `dec` in `Up`, or declare the
+history in `Base` and make `dec` keep it. A private method counts too: it is checked when an
+inherited method calls it, and the error names that method. An inherited write the syntax does
+not settle gets W0024.
+
+### `E0110` — an `invariant` or `history` on a mutable object, or its field written through another object
 
 A clause may name only fields of a primitive, `String`, enum or record type. A `List` or another
 class can change without this class running, so the clause could not be checked one call at a time.
@@ -1210,6 +1221,25 @@ class A {
 ```
 
 Fix: name a value-typed field, or a pure method that reads the object.
+
+A field a clause names is written only through `this` (bare `n`, `this.n` or `self.n`). A write
+through any other reference is E0110, whatever its declared type, because no check of one call
+at a time can follow it:
+
+```onion
+class Counter {
+protected:
+  var n: Int
+  history n >= old(n)
+public:
+  def this { n = 0 }
+  def copyFrom(o: Counter): void { o.n = n }                      // E0110
+  static def at(k: Int): Counter { val c = new Counter(); c.n = k; return c }   // E0110
+}
+```
+
+Fix: call a method of that object, whose own writes are checked, or set the value in a
+constructor (`def this(k: Int) { n = k }`).
 
 ### `E0111` — an `invariant` or `history` on a class with a Java superclass
 
@@ -1244,6 +1274,26 @@ def sums(): Boolean
 
 Fix: correct the expression, or the code it checks.
 
+The build runs a predicate only when its effects are at most `mutate`. One that prints, reads or
+writes files, or calls something the effect table cannot vouch for (`unknown`) is not run: it
+gets the warning `W0023` instead. So does one that does not finish within 10 seconds.
+The effects count everything a run can reach:
+
+- every overload with the predicate's name and parameter count
+- an override or interface implementation the program defines
+- a method the library calls back on a program value: `toString` from `+` and `#{}`,
+  `hashCode` from a map literal, `equals` from `==`, `getMessage` of a thrown exception
+- the static initializer of each class the predicate uses, and of its superclasses
+- for a parameter of a program class (`Foo` or `Foo?`): that class's constructors, static
+  initializers and `toString`, which the build runs to make sample arguments, and the same for
+  the classes of their parameters
+
+An `E0112` replay follows the same rule. When it is not run, or does not finish in time, the
+`W0021` for that method stays, and `W0023` says why the build did not confirm it.
+
+When the effect is not in the predicate's own body, `W0023` names where it is: the call, the
+class whose static initializer has it, or the parameter's class.
+
 ### `E0114` — a `Shape` that does not round-trip
 
 Every `onion.Shape` has a contract: `parse(print(v))` must equal `v` for each value the shape can
@@ -1262,6 +1312,27 @@ public:
 Fix: override `printable` to say which values the shape can print, or fix `print` / `parse`.
 A shape with `canPrint() == false` owes nothing. A value type that cannot be sampled is the
 warning `W0022`, never a silent pass.
+
+
+### `E0115` — `super` call to an abstract method
+
+`super.f()` runs the superclass's own body. If `f` is abstract there, or is left open by an
+abstract class that implements an interface, there is no body to run. Without this error the
+call compiled and threw `AbstractMethodError`.
+
+```onion
+abstract class Base {
+public:
+  abstract def f(): Int
+}
+class Child extends Base {
+public:
+  override def f(): Int = 2
+  def g(): Int = super.f()   // E0115
+}
+```
+
+Fix: call the override on `self` (`f()`), or give the superclass method a body.
 
 ## Declaration errors
 
@@ -1337,6 +1408,21 @@ public:
 
 Fix: rename the method or the component. A method `a(x: Int)` with parameters is a
 genuine overload and compiles.
+
+Every record also generates public instance methods `equals(Object)`, `hashCode()` and
+`toString()`. A body method with one of those signatures replaces the generated one only
+when it is a public or protected instance method. A `static` one, or a private one, is
+E0010, because `==` and string conversion could not call it:
+
+```onion
+record R(name: String) {
+public:
+  static def toString(): String = "s"   // E0010: clashes with the generated toString()
+}
+```
+
+Fix: remove `static` (or move the method under `public:`) to replace the generated
+method, or rename it.
 
 ### `E0025` — Duplicate constructor
 
@@ -1915,7 +2001,8 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0020` | an `extension` method's name and arity exactly match an existing member (own or inherited); the existing member always wins, so the extension method is never called |
 | `W0021` | a method can break a `history`: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 | `W0022` | the contract of a Shape was not checked: its value type cannot be sampled |
-| `W0024` | a method writes a field that a `history` names, and no check settled whether the history still holds: the field is not an `Int`, the solver does not model the method body, or the history is not of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`. Nothing guarantees the history there |
+| `W0023` | the build did not run a contract predicate: its effects go beyond `mutate` (it prints, does I/O, or calls something `unknown`), or it did not finish within 10 seconds; also a `Shape` whose round-trip check (`E0114`) would run code with such an effect, or did not finish in time |
+| `W0024` | a method writes a field that a `history` names, and no check settled whether the history still holds: the field is not an `Int`, the solver does not model the method body, the write is in a lambda, the proof needs a class `invariant` (nothing proves an invariant at compile time yet, so a constructor may break it), or the history is not of the form `x >= old(x)`, `x <= old(x)`, `x == old(x)`. Nothing guarantees the history there |
 | `W0025` | an override can break the contract it inherits: the solver found a counterexample (a warning, since it may rest on an integer wrap-around the program never reaches) |
 | `W0026` | a contract clause is not enforced at run time by `--contracts runtime`, with the reason (a warning, so a clause that is not guarded is never silent) |
 | `W0027` | the contract of a method is trusted, not verified (`@Trusted`): its body is not checked and callers rely on it; each use is listed |
@@ -2032,11 +2119,12 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0107` | `old(...)` is allowed only in an `ensures` or a `history` |
 | `E0108` | this `history` is not a preorder: … is not both reflexive and transitive |
 | `E0109` | this write can break the history … on … |
-| `E0110` | an `invariant` or `history` names a field that holds a mutable object |
+| `E0110` | an `invariant` or `history` names a field that holds a mutable object, or such a field is written through another object |
 | `E0111` | a class with an `invariant` or `history` extends a Java class |
 | `E0112` | this method breaks the history … when run from … |
 | `E0113` | the closed predicate … is … when the build runs it |
 | `E0114` | the Shape … breaks its round-trip contract |
+| `E0115` | `super.…(...)` calls an abstract method of … |
 
 ## See also
 

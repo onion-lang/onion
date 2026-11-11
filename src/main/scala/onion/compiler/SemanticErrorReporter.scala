@@ -271,8 +271,38 @@ class SemanticErrorReporter(threshold: Int) {
     val withHexDigitB =
       if (!hexDigitB) suggestion
       else Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + message("suggestion.hexDigitB"))
-    problem(position, appendSuggestion(baseMessage, withHexDigitB))
+    val heldBack = sameName.collectFirst {
+      case m: TypedAST.MethodDefinition if m.defaultsPending && fitsLeadingParameters(m.arguments, m.defaultsOmittableFrom, argTypes) => (m.defaultsHeldBackBy, m.defaultsHeldBackVia)
+    }
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withHexDigitB, name, heldBack)))
   }
+
+  /**
+   * The given arguments fit the leading parameters, and every parameter they leave out has a
+   * default in the source, so only the held-back defaults stop the call. A type error or a
+   * missing required argument gets no held-back hint: following it would not fix the call
+   * (panel rounds 7 and 8 on #2798).
+   */
+  private def fitsLeadingParameters(params: Array[TypedAST.Type], omittableFrom: Int, argTypes: Array[TypedAST.Type]): Boolean =
+    argTypes.length < params.length && argTypes.length >= omittableFrom && argTypes.indices.forall(i => argPassable(params(i), argTypes(i)))
+
+  /**
+   * A call above a declaration whose defaults are typed in source order (#2653) cannot omit
+   * them yet. Say so after any other suggestion, naming what holds them back and everything
+   * the call needs above it, in order: moving only the function gave E0002 for the top-level
+   * `val` its default reads (panel round 9 on #2798).
+   */
+  private def withHeldBackDefault(suggestion: Option[String], name: String, heldBy: Option[(Seq[String], Seq[String])]): Option[String] =
+    heldBy match {
+      case None => suggestion
+      case Some((roots, via)) =>
+        def quoted(names: Seq[String]) = names.map(n => s"`$n`").mkString(", ")
+        val order = quoted(roots ++ via :+ name)
+        val hint =
+          if (via.isEmpty) format(message("suggestion.heldBackDefault"), Seq(name, quoted(roots), order))
+          else format(message("suggestion.heldBackDefaultVia"), Seq(name, quoted(roots), order, quoted(via)))
+        Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + hint)
+    }
 
   /**
    * The names a failed call `name(argTypes)` on `obj` may be steered to.
@@ -688,8 +718,11 @@ class SemanticErrorReporter(threshold: Int) {
         Some(s"${message("error.suggestion.availableConstructors")}${Systems.lineSeparator}${ctorSignatures.mkString(Systems.lineSeparator)}")
       } else None
     } else None
+    val heldBack = if (items.length > 2) items(2).asInstanceOf[Array[TypedAST.ConstructorRef]].collectFirst {
+      case c: TypedAST.ConstructorDefinition if c.defaultsPending && fitsLeadingParameters(c.arguments, c.defaultsOmittableFrom, argTypes) => (c.defaultsHeldBackBy, c.defaultsHeldBackVia)
+    } else None
 
-    problem(position, appendSuggestion(baseMessage, suggestion))
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(suggestion, s"class ${typeName(typeRef)}", heldBack)))
   }
 
   /**
@@ -767,16 +800,23 @@ class SemanticErrorReporter(threshold: Int) {
     def written(t: TypedAST.Type): String = t match
       case a: TypedAST.ArrayType if listArrayCast.isDefined => onion.compiler.toolbox.TypeFormatting.arrayWrittenForm(a)
       case other => typeName(other)
+    val contractClause: Option[SemanticErrorReporter.ContractClauseHint] =
+      if (items.length > 2) items(2) match
+        case c: SemanticErrorReporter.ContractClauseHint => Some(c)
+        case _ => None
+      else None
     // A set or range is never a List at runtime either, so a cast is no fix for the widening case.
     val widenToIterable = items.length > 2 && items(2).isInstanceOf[SemanticErrorReporter.WidenToIterableHint]
     val baseMessage = format(
       // "Consider a cast" is no advice on an `as` cast that was itself rejected, nor on the
       // widening case (a set or range is never a List at runtime either).
-      message(if (listArrayCast.isDefined || widenToIterable || castSource.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      message(if (listArrayCast.isDefined || widenToIterable || castSource.isDefined || contractClause.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
       Seq(written(expected), written(actual) + (if (sourceNullable) "?" else ""))
     )
     val hint =
-      if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
+      if (contractClause.isDefined) {
+        Some(format(message("suggestion.contractClauseBoolean"), Seq(contractClause.get.keyword)))
+      } else if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
         Some(message("suggestion.hexDigitB"))
       } else if (widenToIterable) {
         val widen = items(2).asInstanceOf[SemanticErrorReporter.WidenToIterableHint]
@@ -1004,9 +1044,25 @@ class SemanticErrorReporter(threshold: Int) {
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordComponentClash] =>
         reportRecordComponentClash(position, items)
+      case SemanticError.DUPLICATE_GENERATED_METHOD
+          if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.GeneratedMethodClashesComponent] =>
+        val clash = items(3).asInstanceOf[SemanticErrorReporter.GeneratedMethodClashesComponent]
+        problem(position, format(
+          message("error.semantic.generatedMethodClashesComponent"),
+          Seq(typeName(items(0)), asString(items(1)), typeName(clash.componentType))))
       case SemanticError.DUPLICATE_METHOD
           if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordAccessorRedefined] =>
         reportRecordAccessorRedefined(position, items)
+      case SemanticError.DUPLICATE_METHOD
+          if items.length > 3 && items(3).isInstanceOf[SemanticErrorReporter.RecordObjectMethodClash] =>
+        val clash = items(3).asInstanceOf[SemanticErrorReporter.RecordObjectMethodClash]
+        val args = typeNames(asTypeArray(items(2)))
+        problem(position, format(
+          message(if (clash.isStatic) "error.semantic.recordObjectMethodStatic" else "error.semantic.recordObjectMethodPrivate"),
+          Seq(typeName(items(0)), asString(items(1)), args)))
+      // E0110's second form (design 3.2, rule 2; #2599): a contract field written through another object.
+      case SemanticError.CONTRACT_FIELD_NOT_VALUE if items.length > 2 && items(2) == "write" =>
+        problem(position, format(message("error.semantic.contractFieldWrittenOutside"), Seq(asString(items(0)), asString(items(1)))))
 
       // Data-driven cases
       case _ =>
@@ -1035,7 +1091,8 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportRecordComponentClash(position: Location, items: Array[AnyRef]): Unit = {
     val clash = items(3).asInstanceOf[SemanticErrorReporter.RecordComponentClash]
     val key =
-      if (clash.overridesFinal) "error.semantic.recordComponentOverridesFinalMethod"
+      if (clash.otherReturnType) "error.semantic.recordComponentOtherReturnType"
+      else if (clash.overridesFinal) "error.semantic.recordComponentOverridesFinalMethod"
       else "error.semantic.recordComponentClashesGeneratedMethod"
     problem(position, format(
       message(key),
@@ -1150,6 +1207,13 @@ object SemanticErrorReporter {
    */
   private[compiler] final case class CastSource(name: String, nullable: Boolean)
 
+  /**
+   * An extra (third) item on INCOMPATIBLE_TYPE: the value is a contract clause (`requires`,
+   * `ensures`, `invariant`, `history`; the word is `keyword`) that is not a Boolean condition
+   * (#2605). No cast makes an `Int` a condition, so the message shows one instead.
+   */
+  private[compiler] final case class ContractClauseHint(keyword: String)
+
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */
   private[compiler] case object LambdaOverloadHint
@@ -1158,11 +1222,21 @@ object SemanticErrorReporter {
    *  accessor colliding with a method the record generates, so the error says so (#2391).
    *  `overridesFinal`: the accessor would instead override a final `Object` method, which no
    *  record generates (`getClass: Class`, #2512), so the error names that method. */
-  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type, overridesFinal: Boolean = false)
+  private[compiler] final case class RecordComponentClash(componentType: TypedAST.Type, overridesFinal: Boolean = false, otherReturnType: Boolean = false)
 
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record body method
    *  `a()` that redefines component `a`'s generated accessor, so the error says so (#2396). */
   private[compiler] final case class RecordAccessorRedefined(componentType: TypedAST.Type)
+
+  /** An extra (fourth) item on DUPLICATE_METHOD: a `static` or private record body method with
+   *  the signature of the generated `equals(Object)`, `hashCode()` or `toString()`. It cannot
+   *  replace the public instance method `==` and string conversion call (#2746, #2754). */
+  private[compiler] final case class RecordObjectMethodClash(isStatic: Boolean)
+
+  /** An extra (fourth) item on DUPLICATE_GENERATED_METHOD: a clause (`shape x = ...`,
+   *  `derive!`) generates a no-argument method named like component `x`, whose accessor
+   *  `x()` already exists (#2531). */
+  private[compiler] final case class GeneratedMethodClashesComponent(componentType: TypedAST.Type)
   // Compiled once: a reporter is created per compilation, and a regex in its body was too.
   private val TemplateLiteralInName = """\$\{.*\}""".r
   // The reference types a primitive argument boxes into, for ranking call suggestions.
@@ -1411,11 +1485,17 @@ object SemanticErrorReporter {
     ),
     SemanticError.HISTORY_BROKEN_BY_WRITE -> ErrorDef(
       "error.semantic.historyBrokenByWrite",
-      // items: field, history as source text, reason kind (lower | set | any), the method that raises the field (or "").
+      // items: field, history as source text, reason kind (lower | set | any), the method that raises the field (or "");
+      // for an inherited method (#2603) also the class that declares the history, the method, and the class it comes from.
       Seq(
         items => asString(items(0)),
         items => asString(items(1)),
-        items => format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
+        items => {
+          val reason = format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
+          if (items.length < 7) reason
+          // A Japanese sentence ends in `。` and takes no space after it.
+          else reason + (if (reason.endsWith("\u3002")) "" else " ") + format(message("error.semantic.historyBrokenByWrite.inherited"), Seq(asString(items(4)), asString(items(5)), asString(items(6))))
+        }
       )
     ),
     SemanticError.CONTRACT_FIELD_NOT_VALUE -> ErrorDef(
@@ -1632,6 +1712,10 @@ object SemanticErrorReporter {
       "error.semantic.staticMethodWithoutBody",
       Seq(items => asString(items(0)))
     ),
+    SemanticError.SUPER_CALL_ABSTRACT_METHOD -> ErrorDef(
+      "error.semantic.superCallAbstractMethod",
+      Seq(items => asString(items(0)), items => typeName(items(1)))
+    ),
     SemanticError.PRIVATE_ABSTRACT_METHOD -> ErrorDef(
       "error.semantic.privateAbstractMethod",
       Seq(items => asString(items(0)))
@@ -1671,6 +1755,10 @@ object SemanticErrorReporter {
     ),
     SemanticError.DUPLICATE_TYPE_ALIAS -> ErrorDef(
       "error.semantic.duplicateTypeAlias",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_TRAIT_INSTANCE -> ErrorDef(
+      "error.semantic.duplicateTraitInstance",
       Seq(items => asString(items(0)))
     ),
     SemanticError.MULTIPLE_BINDING_PATTERNS_IN_CASE -> ErrorDef(

@@ -707,3 +707,240 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     invoke(root, "--frobnicate", "x.on").exitCode shouldBe 2
     invoke(root, "x.on", "-classpath").exitCode shouldBe 2
     invoke(root, root.resolve("missing.on").toString).exitCode shouldBe 2
+
+  // `law` and `example` (#2609 removed them; #2740 adds the rule).
+
+  private val OldLaws =
+    """// laws, the old way
+      |record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
+      |  law roundtrip(p: Pt) { Pt::parse(Pt::format(p)) == p }
+      |  example { Pt::parse("3,4") == new Pt(3, 4) }
+      |public:
+      |  static def main(args: String[]): Int = new Pt(40, 2).x() + 2
+      |}
+      |""".stripMargin
+
+  test("a record's law and example become contract predicates under one public: section"):
+    val (root, file) = script(OldLaws)
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 0
+    read(file) shouldBe
+      """// laws, the old way
+        |record Pt(x: Int, y: Int) from re"(-?\d+),(-?\d+)" {
+        |  public:
+        |    static def roundtrip(p: Pt): Boolean
+        |      ensures result
+        |      = Pt::parse(Pt::format(p)) == p
+        |    static def example1(): Boolean
+        |      ensures result
+        |      = Pt::parse("3,4") == new Pt(3, 4)
+        |public:
+        |  static def main(args: String[]): Int = new Pt(40, 2).x() + 2
+        |}
+        |""".stripMargin
+    result.stdout should include("old.on:3:3: law -> contract predicate `roundtrip`")
+    result.stdout should include("old.on:4:3: example -> contract predicate `example1`")
+    Shell(Seq()).run(read(file), "old.on", Array()) shouldBe Shell.Success(42)
+
+  test("a top-level example becomes a def, and a block body returns its last statement"):
+    val source =
+      """example two { 1 + 1 == 2 }
+        |example {
+        |  val s = "a #{1}"
+        |  s == "a 1"   // the last one
+        |}
+        |IO::println("ran")
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    invoke(root, file.toString).exitCode shouldBe 0
+
+    read(file) shouldBe
+      """def two(): Boolean
+        |  ensures result
+        |  = 1 + 1 == 2
+        |def example1(): Boolean
+        |  ensures result
+        |  {
+        |  val s = "a #{1}"
+        |  return s == "a 1"   // the last one
+        |}
+        |IO::println("ran")
+        |""".stripMargin
+    Shell(Seq()).run(read(file), "old.on", Array()) shouldBe a[Shell.Success]
+
+  test("a migrated example that is false still fails the build"):
+    val (root, file) = script("example wrong { 1 + 1 == 3 }\nIO::println(1)\n")
+
+    invoke(root, file.toString)
+
+    read(file) should not include "def wrong"
+    Shell(Seq()).run(
+      "def wrong(): Boolean\n  ensures result\n  = 1 + 1 == 3\nIO::println(1)\n", "w.on", Array()
+    ) shouldBe Shell.Failure(-1)
+
+  test("a function named example, called with a trailing lambda, is left alone"):
+    val source =
+      """def example(f: () -> Boolean): Boolean = f()
+        |example { 1 == 1 }
+        |IO::println("ok")
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 0
+    read(file) shouldBe source
+    result.stdout should include("is a name, not the old `example` clause")
+
+  test("law and example outside a record body or the top level are not touched"):
+    val source =
+      """class C {
+        |public:
+        |  def law(x: Int): Int = x
+        |  def example(): Int = law(1)
+        |}
+        |IO::println(new C().example())
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    invoke(root, file.toString).exitCode shouldBe 0
+    read(file) shouldBe source
+
+  test("a top-level call of a declared example function is not rewritten when a record has an old clause"):
+    val source =
+      """record P(x: Int) {
+        |  example { new P(1).x() == 1 }
+        |}
+        |def example(f: () -> Boolean): void {
+        |  IO::println("ran: " + f())
+        |}
+        |example { true }
+        |IO::println("ok")
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 0
+    val migrated = read(file)
+    migrated should include("static def example1(): Boolean")
+    migrated should include("\nexample { true }\n")
+    migrated should not include "def example2"
+    Shell(Seq()).run(migrated, "old.on", Array()) shouldBe a[Shell.Success]
+
+  test("a clause in a private: section leaves the members after it private"):
+    val source =
+      """record P(x: Int) {
+        |private:
+        |  example { new P(1).x() == 1 }
+        |  def secret(): Int = 42
+        |}
+        |println(new P(2).secret())
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    // Rewritten, `secret` stays private, so the outside call still does not compile:
+    // migrate cannot tell, and leaves the file as written rather than opening `secret`.
+    invoke(root, file.toString).exitCode should not be 0
+
+    read(file) shouldBe source
+
+  test("a clause before any section label leaves the default-private members after it private"):
+    val source =
+      """record P(x: Int) {
+        |  example { new P(1).x() == 1 }
+        |  def secret(): Int = 42
+        |public:
+        |  def open(): Int = secret()
+        |}
+        |println(new P(2).open())
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    invoke(root, file.toString).exitCode shouldBe 0
+
+    val migrated = read(file)
+    val afterPredicate = migrated.substring(migrated.indexOf("example1"))
+    afterPredicate.indexOf("private:") should (be >= 0 and be < afterPredicate.indexOf("def secret"))
+    Shell(Seq()).run(migrated, "old.on", Array()) shouldBe a[Shell.Success]
+
+  test("the panel's repro: a top-level example in a file with a ::* import is left alone"):
+    // `lib.Lib` comes from -classpath, as the panel's Java class did.
+    val classes = Files.createTempDirectory("onion-migrate-lib").toRealPath()
+    val lib =
+      """module lib;
+        |class Lib {
+        |public:
+        |  static def example(f: () -> Boolean): void { IO::println("ran example: " + f()) }
+        |}
+        |""".stripMargin
+    val config = onion.compiler.CompilerConfig(Seq(), null, "UTF-8", "", 10, runContracts = false)
+    new onion.compiler.OnionCompiler(config)
+      .compileOrThrow(Seq(onion.compiler.StringInputSource(lib, "lib.on")))
+      .foreach { c =>
+        val target = classes.resolve(c.className.replace('.', '/') + ".class")
+        Files.createDirectories(target.getParent)
+        Files.write(target, c.content)
+      }
+    val root = Files.createTempDirectory("onion-migrate").toRealPath()
+    val main = root.resolve("Main.on")
+    Files.writeString(main,
+      """import { lib.Lib::* }
+        |record P(x: Int) {
+        |  law same(a: Int) { a == a }
+        |}
+        |example { 1 + 1 == 2 }
+        |IO::println("done")
+        |""".stripMargin, UTF_8)
+
+    val result = invoke(root, "-classpath", classes.toString, main.toString)
+
+    withClue(result.stdout + result.stderr) { result.exitCode shouldBe 0 }
+    val migrated = read(main)
+    migrated should include("static def same(a: Int): Boolean")
+    migrated should include("\nexample { 1 + 1 == 2 }\n")
+    migrated should not include "def example1"
+    result.stdout should include("Main.on:5:1: note: this `example` may be a call")
+
+  test("the panel's repro: a false example is named at its own line, as E0113"):
+    val source =
+      """record Pt(x: Int, y: Int) {
+        |  law same(p: Pt) { p == p }
+        |  example { new Pt(1, 2).x() == 1 }
+        |  example { new Pt(1, 2).y() == 3 }
+        |}
+        |IO::println(new Pt(1, 2).x())
+        |""".stripMargin
+    val (root, file) = script(source, "g.on")
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 1
+    read(file) shouldBe source
+    result.stderr should include("g.on:4:3: this `example` is false (E0113)")
+    result.stderr should not include "g.on:2:3"
+    result.stderr should not include "g.on:3:3"
+    result.stderr should not include "example2"
+
+  test("a refusal names lines of the file as written, not of the rewritten text"):
+    val source =
+      """record P(x: Int) {
+        |private:
+        |  example { new P(1).x() == 1 }
+        |  def secret(): Int = 42
+        |}
+        |println(new P(2).secret())
+        |""".stripMargin
+    val (root, file) = script(source, "p.on")
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 1
+    read(file) shouldBe source
+    result.stderr should include("p.on:6:")
+    val lines = "p\\.on:(\\d+):".r.findAllMatchIn(result.stderr).map(_.group(1).toInt).toSeq
+    lines should not be empty
+    all(lines) should be <= 6

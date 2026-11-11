@@ -16,13 +16,62 @@ import java.io.StringReader
  */
 class IneffectiveTailRecursiveWarningSpec extends AnyFunSpec {
 
-  private def compileWarnings(source: String, level: WarningLevel = WarningLevel.On) = {
-    val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = level)
+  private def compileWarnings(
+    source: String,
+    level: WarningLevel = WarningLevel.On,
+    suppressed: Set[onion.compiler.WarningCategory] = Set.empty
+  ) = {
+    val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = level, suppressedWarnings = suppressed)
     new OnionCompiler(config)
       .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "W.on")))
   }
 
   describe("W0016 ineffective @TailRecursive") {
+    val publicGroup =
+      """
+        |class Parity {
+        |public:
+        |  @TailRecursive
+        |  def isEven(n: Int): Boolean {
+        |    if n == 0 { return true }
+        |    return isOdd(n - 1)
+        |  }
+        |  @TailRecursive
+        |  def isOdd(n: Int): Boolean {
+        |    if n == 0 { return false }
+        |    return isEven(n - 1)
+        |  }
+        |}
+        |""".stripMargin
+
+    it("is silenced by --Wno W0016 (#2654)") {
+      val result = compileWarnings(publicGroup, suppressed = Set(onion.compiler.WarningCategory.IneffectiveTailRecursive))
+      assert(!result.hasErrors)
+      assert(!result.diagnostics.warnings.exists(_.category.code == "W0016"))
+    }
+
+    it("is silenced by --warn off (#2654)") {
+      val result = compileWarnings(publicGroup, level = WarningLevel.Off)
+      assert(!result.hasErrors)
+      assert(!result.diagnostics.warnings.exists(_.category.code == "W0016"))
+    }
+
+    it("does not fire for an out-of-order nested call in a member (#2800)") {
+      val result = compileWarnings(
+        """
+          |class M {
+          |private:
+          |  static def f(a: Int, b: Int): Int = a - b
+          |  static def id(i: Int): Int = i
+          |  static @TailRecursive def ev(n: Int, s: Int): Boolean = if n == 0 { true } else { od(n - 1, s) }
+          |  static @TailRecursive def od(n: Int, s: Int): Boolean = if n == 0 { false } else { ev(s = f(b = id(1), a = id(s)), n = n - 1) }
+          |}
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w16 = result.diagnostics.warnings.filter(_.category.code == "W0016")
+      assert(w16.isEmpty, w16.map(_.message))
+    }
+
     it("warns when the annotated group is not private") {
       val result = compileWarnings(
         """

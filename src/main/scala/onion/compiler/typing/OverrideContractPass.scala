@@ -46,7 +46,7 @@ final class OverrideContractPass(report: (String, onion.compiler.Location, Strin
     val invariants = chain.flatMap(_.invariants)
     val callees = chain.reverse.flatMap(methodsOf).map(m => m.name -> m).toMap
     for {
-      sub <- methodsOf(cls) if sub.block != null && (sub.requires.nonEmpty || sub.ensures.nonEmpty)
+      sub <- methodsOf(cls) if sub.block != null
       sup <- supers.flatMap(methodsOf).find(p => p.name == sub.name && p.args.size == sub.args.size)
       if sup.requires.nonEmpty || sup.ensures.nonEmpty
     } {

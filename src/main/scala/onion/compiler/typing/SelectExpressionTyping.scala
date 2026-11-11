@@ -3,6 +3,7 @@ package onion.compiler.typing
 import onion.compiler.*
 import onion.compiler.SemanticError.*
 import onion.compiler.TypedAST.*
+import onion.compiler.toolbox.Boxing
 import onion.compiler.TypedAST.BinaryTerm.Kind.*
 import onion.compiler.typing.session.TypingBodyContext
 
@@ -373,7 +374,9 @@ final class SelectExpressionTyping(
             def buildAccessor(base: Term, path: List[AccessStep]): Term = path match {
               case Nil => base
               case AccessStep(castType, getter) :: rest =>
-                val cast = new AsInstanceOf(base, castType)
+                // A nested type pattern on a primitive component (`Wrap(n is Object)`)
+                // ends with a cast to the tested reference type: box first (#2726).
+                val cast = new AsInstanceOf(Boxing.asReference(bodyContext.table, base), castType)
                 if (getter == null) buildAccessor(cast, rest)
                 else {
                   val call = new Call(cast, getter, Array.empty)
@@ -565,15 +568,27 @@ final class SelectExpressionTyping(
       case typePattern @ AST.TypePattern(_, name, typeRef) =>
         val mappedType = typing.mapFrom(typeRef).getOrElse(break((null, NoBindings, false, None)))
 
-        if (!mappedType.isObjectType) {
+        val primitiveName = mappedType match {
+          case bt: BasicType if bt != BasicType.VOID && conditionType.isObjectType => Some(bt)
+          case _ => None
+        }
+
+        if (primitiveName.isEmpty && !mappedType.isObjectType) {
           bodyContext.report(INCOMPATIBLE_TYPE, typePattern, bodyContext.table.rootClass, mappedType)
           break((null, NoBindings, false, None))
         }
 
+        if (primitiveName.isDefined) {
+          // A primitive name (`case n is Long:`) tests the boxed wrapper, as `o is Long`
+          // does, and binds the unboxed value (#2721).
+          bindingInfo = SingleBinding(name, primitiveName.get)
+          new InstanceOf(new RefLocal(bind), primitiveName.get)
+        } else {
+
         // Create instanceof check. The check itself is on the erased class:
         // the JVM has no type arguments at runtime, so `x is Some` can only
         // test membership of `Some`.
-        val instanceOfCheck = new InstanceOf(new RefLocal(bind), mappedType.asInstanceOf[ObjectType])
+        val instanceOfCheck = new InstanceOf(Boxing.asReference(bodyContext.table, new RefLocal(bind)), mappedType.asInstanceOf[ObjectType])
 
         // Store type pattern info (name and type) - variable will be registered later.
         // The *binding* can be more precise than the check: matching a
@@ -582,6 +597,7 @@ final class SelectExpressionTyping(
         bindingInfo = SingleBinding(name, TypeSubst.specializeFromScrutinee(mappedType, conditionType, typing))
 
         instanceOfCheck
+        }
 
       case AST.BindingPattern(loc, name) =>
         // Simple binding pattern - matches everything and binds the value

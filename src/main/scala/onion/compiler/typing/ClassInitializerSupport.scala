@@ -76,11 +76,12 @@ private[compiler] final class ClassInitializerSupport(
       case Some(term) =>
         val value = processAssignable(init, fieldType, term)
         if value != null then
-          val statement =
+          val store =
             if isStatic then
               new ExpressionActionStatement(new SetStaticField(definition, field, value))
             else
               new ExpressionActionStatement(new SetField(new This(definition), field, value))
+          val statement = new FieldInitializerBlock(context.getContextFrame, store)
           if isStatic then staticInitializers += statement else instanceInitializers += statement
       case None => ()
     }

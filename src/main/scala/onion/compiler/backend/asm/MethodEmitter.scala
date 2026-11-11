@@ -31,6 +31,22 @@ final class DebugGeneratorAdapter(access: Int, method: AsmMethod, methodVisitor:
     slot: Int
   ): Unit =
     if (mv != null) mv.visitLocalVariable(name, descriptor, null, start, end, slot)
+
+  // Where each line-number entry so far starts, so a caller can avoid a second entry at the
+  // same instruction: the JVM then reports the first entry for an exception thrown exactly
+  // there, and the last for one thrown later, so neither order gives the right line.
+  private val lineStarts = scala.collection.mutable.ArrayBuffer[Label]()
+
+  override def visitLineNumber(line: Int, start: Label): Unit =
+    lineStarts += start
+    super.visitLineNumber(line, start)
+
+  /** Whether a line-number entry already starts at `label`'s instruction. */
+  def hasLineNumberAt(label: Label): Boolean = {
+    def offset(l: Label): Int = try l.getOffset catch { case _: IllegalStateException => -1 }
+    val at = offset(label)
+    at >= 0 && lineStarts.exists(offset(_) == at)
+  }
 }
 
 object MethodEmitter {

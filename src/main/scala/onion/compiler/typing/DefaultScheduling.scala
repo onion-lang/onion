@@ -8,7 +8,8 @@ package onion.compiler.typing
  *     whose default is held back, repeating until nothing new is held back. It is not run here;
  *     the body pass types it in source order, as before #2653.
  *  2. Every other default is typed before any body, in dependency order: a default that calls
- *     `g` is typed after `g`'s own defaults. A cycle falls back to declaration order.
+ *     `g` is typed after `g`'s own defaults. The members of a cycle are typed in declaration
+ *     order, after everything the cycle depends on.
  *
  * Matching is by name, so a false match only keeps a default in source order.
  */
@@ -36,20 +37,49 @@ private[compiler] object DefaultScheduling {
       held ++= more
     }
     val ready = jobs.filterNot { case (_, j) => held.contains(j) }
+    stronglyConnected(ready).foreach { component =>
+      // Within a cycle, declaration order, as every default was typed before #2653 (panel round
+      // 8 on #2798): `def a(x = b(1))` / `def b(y = a())` types `a` first, so `b`'s `a()` can omit x.
+      component.foreach { case (unit, job) => enter(unit); job.run() }
+    }
+  }
+
+  /**
+   * The jobs' strongly connected components under "mentions the name of", each in declaration
+   * order, a component after every component it depends on (Tarjan's algorithm).
+   */
+  private def stronglyConnected[U](ready: Seq[(U, Job)]): Seq[Seq[(U, Job)]] = {
+    val position = ready.map(_._2).zipWithIndex.toMap
     val byName = ready.groupBy(_._2.name)
-    val visiting = scala.collection.mutable.Set.empty[Job]
-    val done = scala.collection.mutable.Set.empty[Job]
-    def visit(entry: (U, Job)): Unit = {
-      val (unit, job) = entry
-      if (!done.contains(job) && !visiting.contains(job)) {
-        visiting += job
-        for (name <- job.mentions.toSeq.sorted; dependency <- byName.getOrElse(name, Seq()) if dependency._2 ne job) visit(dependency)
-        enter(unit)
-        job.run()
-        done += job
+    def dependencies(job: Job): Seq[(U, Job)] =
+      job.mentions.toSeq.sorted.flatMap(name => byName.getOrElse(name, Seq())).filter(_._2 ne job)
+    val index = scala.collection.mutable.Map.empty[Job, Int]
+    val low = scala.collection.mutable.Map.empty[Job, Int]
+    val stack = scala.collection.mutable.Stack.empty[(U, Job)]
+    val onStack = scala.collection.mutable.Set.empty[Job]
+    val components = Seq.newBuilder[Seq[(U, Job)]]
+    def connect(entry: (U, Job)): Unit = {
+      val job = entry._2
+      index(job) = index.size
+      low(job) = index(job)
+      stack.push(entry)
+      onStack += job
+      for (dependency <- dependencies(job)) {
+        val other = dependency._2
+        if (!index.contains(other)) { connect(dependency); low(job) = low(job) min low(other) }
+        else if (onStack.contains(other)) low(job) = low(job) min index(other)
+      }
+      if (low(job) == index(job)) {
+        val members = Seq.newBuilder[(U, Job)]
+        var top = stack.pop()
+        onStack -= top._2
+        members += top
+        while (top._2 ne job) { top = stack.pop(); onStack -= top._2; members += top }
+        components += members.result().sortBy(e => position(e._2))
       }
     }
-    ready.foreach(visit)
+    ready.foreach(entry => if (!index.contains(entry._2)) connect(entry))
+    components.result()
   }
 
   /** The names `job` mentions that belong to a held-back job other than itself. */

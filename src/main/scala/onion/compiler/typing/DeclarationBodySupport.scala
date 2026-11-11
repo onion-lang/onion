@@ -87,9 +87,11 @@ private[compiler] final class DeclarationBodySupport(
         // A held-back declaration records why, so a call above it that omits the default gets a hint.
         val hold = (by: Set[String]) => {
           val reason = by.toSeq.sorted.map(n => s"`$n`").mkString(", ")
+          // Read from the syntax: a held-back default is not typed yet when the call reports.
+          val omittableFrom = args.lastIndexWhere(_.defaultValue == null) + 1
           declaration match {
-            case Some(m: MethodDefinition) => m.defaultsHeldBackBy = reason
-            case Some(c: ConstructorDefinition) => c.defaultsHeldBackBy = reason
+            case Some(m: MethodDefinition) => m.defaultsHeldBackBy = reason; m.defaultsOmittableFrom = omittableFrom
+            case Some(c: ConstructorDefinition) => c.defaultsHeldBackBy = reason; c.defaultsOmittableFrom = omittableFrom
             case _ =>
           }
         }

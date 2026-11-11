@@ -466,6 +466,33 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
       assert(!text.contains("`k`"), text)
     }
 
+    it("gives no such hint when a required argument is missing") {
+      val text = errorsOf(
+        """
+          |def run(): Int = g(1)
+          |val base = 7
+          |def g(a: Int, b: Int, n: Int = base): Int = a + b + n
+          |println(run())
+        """)
+      assert(text.contains("E0005"), text)
+      assert(!text.contains("`base`"), text)
+    }
+
+    it("gives no such hint for a constructor when a required argument is missing") {
+      val text = errorsOf(
+        """
+          |def make(): Int = new K().a
+          |class K {
+          |public:
+          |  val a: Int
+          |  def this(x: Int, y: Int = k) { this.a = x + y }
+          |}
+          |val k = 5
+        """)
+      assert(text.contains("E0021"), text)
+      assert(!text.contains("`k`"), text)
+    }
+
     it("gives no such hint when the argument is passed") {
       val text = errorsOf(
         """
@@ -516,6 +543,57 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
           |println(f())
           |println(new C().p())
         """) == "2,5")
+    }
+  }
+
+  describe("defaults that mention each other") {
+    it("are typed in declaration order at the top level") {
+      assert(output(
+        """
+          |def a(x: Int = b(1)): Int = x
+          |def b(y: Int = a()): Int = y
+          |println(a())
+          |println(b())
+        """) == "1,1")
+    }
+
+    it("are typed in declaration order in a class") {
+      assert(output(
+        """
+          |class K {
+          |public:
+          |  def a(x: Int = b(1)): Int = x
+          |  def b(y: Int = a()): Int = y
+          |}
+          |println(new K().a())
+          |println(new K().b())
+        """) == "1,1")
+    }
+
+    it("are typed in declaration order when a method name matches by accident") {
+      assert(output(
+        """
+          |def label(s: String = "n=" + "abc".length()): String = s
+          |def length(n: Int = label().length()): Int = n
+          |println(length())
+        """) == "3")
+      assert(output(
+        """
+          |def width(w: Int = [1, 2].size()): Int = w
+          |def size(n: Int = width()): Int = n
+          |println(size())
+        """) == "2")
+    }
+
+    it("are typed after what the cycle itself calls") {
+      assert(output(
+        """
+          |def a(x: Int = b(c())): Int = x
+          |def b(y: Int = a()): Int = y
+          |def c(z: Int = 4): Int = z
+          |println(a())
+          |println(b())
+        """) == "4,4")
     }
   }
 }

@@ -625,6 +625,9 @@ object TypedAST {
     /** Why this constructor's defaults are typed in source order (#2653), or null. */
     var defaultsHeldBackBy: String = null
 
+    /** The first parameter from which every later one has a default in the source; set with [[defaultsHeldBackBy]]. */
+    var defaultsOmittableFrom: Int = Int.MaxValue
+
     /** Its defaults are held back and not typed yet, so a call above it cannot omit them. */
     def defaultsPending: Boolean = defaultsHeldBackBy != null && argumentsWithDefaults.forall(_.defaultValue.isEmpty)
 
@@ -954,6 +957,9 @@ object TypedAST {
 
     /** Why this method's defaults are typed in source order (#2653), or null. */
     var defaultsHeldBackBy: String = null
+
+    /** The first parameter from which every later one has a default in the source; set with [[defaultsHeldBackBy]]. */
+    var defaultsOmittableFrom: Int = Int.MaxValue
 
     /** Its defaults are held back and not typed yet, so a call above it cannot omit them. */
     def defaultsPending: Boolean = defaultsHeldBackBy != null && argumentsWithDefaults.forall(_.defaultValue.isEmpty)

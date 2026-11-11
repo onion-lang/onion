@@ -219,6 +219,15 @@ object TypedAST {
   }
 
   /**
+   * One field's initializer. It is typed in a `LocalContext` of its own, so its locals
+   * number from 0 in `frame`, apart from the constructor (or static initializer) it is
+   * emitted into. Codegen gives it a slot map of its own; sharing the constructor's
+   * mapped its first local onto the constructor's first parameter (#2800).
+   */
+  final class FieldInitializerBlock(val frame: LocalFrame, newStatements: TypedAST.ActionStatement*)
+    extends StatementBlock(null: Location, newStatements*)
+
+  /**
    * A `select` case with a `when` guard: `taken = false; <pattern, guard, body>; if (!taken) <rest>`.
    * `statements(1)` is the case itself and ends in the case's value; the rest runs only when
    * that did not happen, so a return may be sunk into both (tail-call optimization).
@@ -769,7 +778,12 @@ object TypedAST {
     }
   }
 
-  class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: TypedAST.Type)  extends Term(location) {
+  class RefLocal(location: Location, val frame: Int, index0: Int, val `type`: TypedAST.Type)  extends Term(location) {
+    private var slot: Int = index0
+    def index: Int = slot
+    /** Moves this read to another local slot; see `MutualRecursionOptimization` (#2800). */
+    private[compiler] def relocate(newIndex: Int): Unit = slot = newIndex
+
     def this(bind: ClosureLocalBinding) = {
       this(null, bind.frameIndex, bind.index, bind.tp)
     }
@@ -782,7 +796,12 @@ object TypedAST {
   /** The compiler temporary an if/select/try expression yields; never a user variable. */
   class ResultRefLocal(bind: ClosureLocalBinding) extends RefLocal(bind)
 
-  class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: TypedAST.Type, val value: TypedAST.Term) extends Term(location) {
+  class SetLocal(location: Location, val frame: Int, index0: Int, val `type`: TypedAST.Type, val value: TypedAST.Term) extends Term(location) {
+    private var slot: Int = index0
+    def index: Int = slot
+    /** Moves this store to another local slot; see `MutualRecursionOptimization` (#2800). */
+    private[compiler] def relocate(newIndex: Int): Unit = slot = newIndex
+
     def this(bind: ClosureLocalBinding, value: TypedAST.Term) = {
       this(null, bind.frameIndex, bind.index, bind.tp, value)
     }

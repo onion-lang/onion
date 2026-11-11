@@ -340,6 +340,11 @@ private[compiler] object SyntaxHintClassifier {
       // `example { ... }` got no hint at all.
       case "law" | "example" =>
         hint("error.parsing.hint.law_example_outside_record", found)
+      // `requires e` / `ensures e` written as a class member (#2605 item 7): both are clauses
+      // of a method signature, so the class body's member list fails at the keyword itself.
+      // A condition on the object's state is an `invariant`, which a class body does take.
+      case "requires" | "ensures" if expected.contains("\"def\"") =>
+        hint("error.parsing.hint.contract_clause_in_class_body", found)
       case "instanceof" if InstanceofExpression.findFirstMatchIn(sourceLine).isDefined =>
         val matched = InstanceofExpression.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.instanceof_not_supported", matched.group(1), matched.group(2))

@@ -345,6 +345,11 @@ private[compiler] object SyntaxHintClassifier {
       // A condition on the object's state is an `invariant`, which a class body does take.
       case "requires" | "ensures" if expected.contains("\"def\"") =>
         hint("error.parsing.hint.contract_clause_in_class_body", found)
+      // The same clause as a record or enum member: those bodies hold access sections (and, in
+      // a record, `invariant`/`shape`), whose starts are all soft keywords, so the only expected
+      // token left is `}`. Methods there live under a section, which the example shows.
+      case "requires" | "ensures" if expected.trim == "\"}\"" =>
+        hint("error.parsing.hint.contract_clause_in_type_body", found)
       case "instanceof" if InstanceofExpression.findFirstMatchIn(sourceLine).isDefined =>
         val matched = InstanceofExpression.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.instanceof_not_supported", matched.group(1), matched.group(2))

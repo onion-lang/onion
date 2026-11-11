@@ -241,8 +241,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
       warningReporter_.setSourceFile(file)
       warningReporter_.report(WarningCategory.OverrideBreaksContract, location, message)
     }).run(source)
-    // RFC #2557 design 6: the `ensures` of every method, proved against its body.
-    new onion.compiler.typing.EnsuresVerifyPass(
+    // RFC #2557 design 6: the `ensures` of every method, proved against its body. Under
+    // `--contracts off` a clause is already an error, so nothing is proved (#2748).
+    if (config.contracts != ContractMode.Off) new onion.compiler.typing.EnsuresVerifyPass(
       (file, location, message) => {
         warningReporter_.setSourceFile(file)
         warningReporter_.report(WarningCategory.EnsuresNotProved, location, message)

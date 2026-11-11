@@ -467,3 +467,26 @@ instance Show[Int] {
 - **Type arguments of the type:** E0097 compares only the outer type, so `Show[List[String]]`
   and `Show[List[Integer]]` are one instance and clash.
 - **No `onion migrate` rule:** which instance to keep is your choice.
+
+## A call above overloads with defaults picks what a call below them picks
+
+A call can now omit a default declared later in the file (#2653). So a call written above a
+set of overloads now sees their defaults, and picks the overload a call below them picks.
+
+```onion
+def run(): String = pick()
+def pick(): String = "zero"
+def pick(n: Int = 1): String = "one"
+println(run())   // Before: zero. Now: one, as when run() is declared below pick
+```
+
+| Overloads (declared below the call) | Call | Before | Now | To keep the old result |
+|---|---|---|---|---|
+| `pick()`, `pick(n: Int = 1)` | `pick()` | `zero` | `one` | rename one of the two methods |
+| `f(n: Long)`, `f(n: Int, a: Int = 1)`, `f(n: Int, b: String = "")` | `f(1)` | `long` | E0006 | `f(1L)` |
+
+- **What you see:** a different overload runs with no message, or **E0006**
+  `method call is applicable for both …` at the call.
+- **Still fine:** a call below the overloads, and a call that passes every argument.
+- **No `onion migrate` rule:** only you know which overload the call meant. Pass the argument
+  (`f(1L)`, `f(1, 1)`) or rename one method.

@@ -503,6 +503,69 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
         """)
       assert(!text.contains("`k`"), text)
     }
+
+    // Panel round 9 on #2798: "declare g above this call" alone gave E0002 for `base`.
+    it("names the top-level val and the function, in the order to declare them") {
+      val text = errorsOf(
+        """
+          |def run(): Int = g(1)
+          |val base = 7
+          |def g(a: Int, n: Int = base): Int = a + n
+          |println(run())
+        """)
+      assert(text.contains("E0005"), text)
+      assert(text.contains("`base`, `g`"), text)
+    }
+
+    it("compiles the program built by following that hint") {
+      assert(output(
+        """
+          |val base = 7
+          |def g(a: Int, n: Int = base): Int = a + n
+          |def run(): Int = g(1)
+          |println(run())
+        """) == "8")
+    }
+
+    it("names every function on a chain to the top-level val, in order") {
+      val text = errorsOf(
+        """
+          |def run(): Int = f()
+          |def f(a: Int = h()): Int = a
+          |def h(b: Int = base): Int = b
+          |val base = 7
+          |println(run())
+        """)
+      assert(text.contains("E0005"), text)
+      assert(text.contains("`base`, `h`, `f`"), text)
+    }
+
+    it("compiles the chain built by following that hint") {
+      assert(output(
+        """
+          |val base = 7
+          |def h(b: Int = base): Int = b
+          |def f(a: Int = h()): Int = a
+          |def run(): Int = f()
+          |println(run())
+        """) == "7")
+    }
+
+    it("names a constructor's class as `class K`") {
+      val text = errorsOf(
+        """
+          |def make(): Int = new K().a
+          |class K {
+          |public:
+          |  val a: Int
+          |  def this(a: Int = k) { this.a = a }
+          |}
+          |val k = 5
+          |println(make())
+        """)
+      assert(text.contains("E0021"), text)
+      assert(text.contains("`k`, `class K`"), text)
+    }
   }
 
   describe("a default that reads a plain constructor parameter") {

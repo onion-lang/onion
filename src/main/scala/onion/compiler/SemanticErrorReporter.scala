@@ -272,7 +272,7 @@ class SemanticErrorReporter(threshold: Int) {
       if (!hexDigitB) suggestion
       else Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + message("suggestion.hexDigitB"))
     val heldBack = sameName.collectFirst {
-      case m: TypedAST.MethodDefinition if m.defaultsPending && fitsLeadingParameters(m.arguments, m.defaultsOmittableFrom, argTypes) => m.defaultsHeldBackBy
+      case m: TypedAST.MethodDefinition if m.defaultsPending && fitsLeadingParameters(m.arguments, m.defaultsOmittableFrom, argTypes) => (m.defaultsHeldBackBy, m.defaultsHeldBackVia)
     }
     problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withHexDigitB, name, heldBack)))
   }
@@ -288,14 +288,20 @@ class SemanticErrorReporter(threshold: Int) {
 
   /**
    * A call above a declaration whose defaults are typed in source order (#2653) cannot omit
-   * them yet. Say so after any other suggestion, naming what holds them back, since nothing
-   * else at the call site explains why the default is not there.
+   * them yet. Say so after any other suggestion, naming what holds them back and everything
+   * the call needs above it, in order: moving only the function gave E0002 for the top-level
+   * `val` its default reads (panel round 9 on #2798).
    */
-  private def withHeldBackDefault(suggestion: Option[String], name: String, heldBy: Option[String]): Option[String] =
+  private def withHeldBackDefault(suggestion: Option[String], name: String, heldBy: Option[(Seq[String], Seq[String])]): Option[String] =
     heldBy match {
       case None => suggestion
-      case Some(by) =>
-        Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + format(message("suggestion.heldBackDefault"), Seq(name, by)))
+      case Some((roots, via)) =>
+        def quoted(names: Seq[String]) = names.map(n => s"`$n`").mkString(", ")
+        val order = quoted(roots ++ via :+ name)
+        val hint =
+          if (via.isEmpty) format(message("suggestion.heldBackDefault"), Seq(name, quoted(roots), order))
+          else format(message("suggestion.heldBackDefaultVia"), Seq(name, quoted(roots), order, quoted(via)))
+        Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + hint)
     }
 
   /**
@@ -713,10 +719,10 @@ class SemanticErrorReporter(threshold: Int) {
       } else None
     } else None
     val heldBack = if (items.length > 2) items(2).asInstanceOf[Array[TypedAST.ConstructorRef]].collectFirst {
-      case c: TypedAST.ConstructorDefinition if c.defaultsPending && fitsLeadingParameters(c.arguments, c.defaultsOmittableFrom, argTypes) => c.defaultsHeldBackBy
+      case c: TypedAST.ConstructorDefinition if c.defaultsPending && fitsLeadingParameters(c.arguments, c.defaultsOmittableFrom, argTypes) => (c.defaultsHeldBackBy, c.defaultsHeldBackVia)
     } else None
 
-    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(suggestion, s"new ${typeName(typeRef)}", heldBack)))
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(suggestion, s"class ${typeName(typeRef)}", heldBack)))
   }
 
   /**

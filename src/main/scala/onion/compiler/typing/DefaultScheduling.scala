@@ -16,26 +16,26 @@ package onion.compiler.typing
 private[compiler] object DefaultScheduling {
   /**
    * One declaration's defaults: its name, the names they mention, the top-level `val`/`var`s
-   * among them, how to mark the declaration held back (with the names that hold it, for the
-   * E0005/E0021 hint), and how to type them.
+   * among them, how to mark the declaration held back, and how to type them. `hold` gets the
+   * top-level `val`/`var`s at the root of the hold and the held-back functions in between, in
+   * the order they must be declared, for the E0005/E0021 hint (panel round 9 on #2798).
    */
-  final case class Job(name: String, mentions: Set[String], topLevelReads: Set[String], hold: Set[String] => Unit, run: () => Unit) {
+  final case class Job(name: String, mentions: Set[String], topLevelReads: Set[String], hold: (Seq[String], Seq[String]) => Unit, run: () => Unit) {
     def readsTopLevel: Boolean = topLevelReads.nonEmpty
   }
 
   /** Runs the jobs that are not held back, each after the jobs it depends on; `enter` runs before each job. */
   def run[U](jobs: Seq[(U, Job)])(enter: U => Unit): Unit = {
     var held = jobs.filter { case (_, j) => j.readsTopLevel }.map(_._2).toSet
-    held.foreach(j => j.hold(j.topLevelReads))
     // A job is held back by a mention of any *other* held-back job's name; that includes a
     // same-named overload or constructor, but not the job itself (panel round 7 on #2798).
     var grew = true
     while (grew) {
       val more = jobs.collect { case (_, j) if !held.contains(j) && heldBy(j, held).nonEmpty => j }
-      more.foreach(j => j.hold(heldBy(j, held)))
       grew = more.nonEmpty
       held ++= more
     }
+    markHeld(jobs.map(_._2).filter(held.contains), held)
     val ready = jobs.filterNot { case (_, j) => held.contains(j) }
     stronglyConnected(ready).foreach { component =>
       // Within a cycle, declaration order, as every default was typed before #2653 (panel round
@@ -80,6 +80,40 @@ private[compiler] object DefaultScheduling {
     }
     ready.foreach(entry => if (!index.contains(entry._2)) connect(entry))
     components.result()
+  }
+
+  /**
+   * Marks each held-back job with what a call above it must move: the top-level `val`/`var`s
+   * it reaches through held-back defaults, and the held-back functions on the way, each after
+   * the ones its default calls. Following "declare g above this call" alone gave E0002 when
+   * g's default read `base` (panel round 9 on #2798).
+   */
+  private def markHeld(order: Seq[Job], held: Set[Job]): Unit = {
+    val byName = order.groupBy(_.name)
+    def deps(job: Job): Seq[Job] = heldBy(job, held).toSeq.flatMap(byName.getOrElse(_, Seq()))
+    val roots = scala.collection.mutable.Map.from(order.map(j => j -> j.topLevelReads))
+    val via = scala.collection.mutable.Map.from(order.map(j => j -> Set.empty[String]))
+    // Depth: how many held-back functions lie between a job and a top-level read. A cycle
+    // stops growing after `order.size` rounds.
+    val depth = scala.collection.mutable.Map.from(order.map(j => j -> 0))
+    var changed = true
+    var rounds = 0
+    while (changed && rounds <= order.size) {
+      changed = false
+      rounds += 1
+      for (job <- order; dep <- deps(job)) {
+        val r = roots(job) ++ roots(dep)
+        val v = via(job) ++ via(dep) + dep.name - job.name
+        val d = depth(job) max (depth(dep) + 1)
+        if (r != roots(job) || v != via(job) || d != depth(job)) {
+          roots(job) = r; via(job) = v; depth(job) = d; changed = true
+        }
+      }
+    }
+    val depthOf = order.groupMapReduce(_.name)(depth)(_ max _)
+    order.foreach { job =>
+      job.hold(roots(job).toSeq.sorted, via(job).toSeq.sortBy(n => (depthOf.getOrElse(n, 0), n)))
+    }
   }
 
   /** The names `job` mentions that belong to a held-back job other than itself. */

@@ -622,8 +622,11 @@ object TypedAST {
     def setArgumentsWithDefaults(args: Array[MethodArgument]): Unit =
       argsWithDefaults_ = args
 
-    /** Why this constructor's defaults are typed in source order (#2653), or null. */
-    var defaultsHeldBackBy: String = null
+    /** The top-level `val`/`var`s that keep this constructor's defaults in source order (#2653), or null. */
+    var defaultsHeldBackBy: Seq[String] = null
+
+    /** The held-back functions between this constructor and [[defaultsHeldBackBy]], in declaration order to follow. */
+    var defaultsHeldBackVia: Seq[String] = Seq()
 
     /** The first parameter from which every later one has a default in the source; set with [[defaultsHeldBackBy]]. */
     var defaultsOmittableFrom: Int = Int.MaxValue
@@ -955,8 +958,11 @@ object TypedAST {
     /** Set the arguments with default values */
     def setArgumentsWithDefaults(args: Array[MethodArgument]): Unit = argsWithDefaults_ = args
 
-    /** Why this method's defaults are typed in source order (#2653), or null. */
-    var defaultsHeldBackBy: String = null
+    /** The top-level `val`/`var`s that keep this method's defaults in source order (#2653), or null. */
+    var defaultsHeldBackBy: Seq[String] = null
+
+    /** The held-back functions between this method and [[defaultsHeldBackBy]], in declaration order to follow. */
+    var defaultsHeldBackVia: Seq[String] = Seq()
 
     /** The first parameter from which every later one has a default in the source; set with [[defaultsHeldBackBy]]. */
     var defaultsOmittableFrom: Int = Int.MaxValue

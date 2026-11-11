@@ -85,13 +85,14 @@ private[compiler] final class DeclarationBodySupport(
         // A top-level `val`/`var` becomes a field only when the body pass reaches it, so a default
         // that reads one, in any kind of declaration, stays in source order, after it.
         // A held-back declaration records why, so a call above it that omits the default gets a hint.
-        val hold = (by: Set[String]) => {
-          val reason = by.toSeq.sorted.map(n => s"`$n`").mkString(", ")
+        val hold = (roots: Seq[String], via: Seq[String]) => {
           // Read from the syntax: a held-back default is not typed yet when the call reports.
           val omittableFrom = args.lastIndexWhere(_.defaultValue == null) + 1
           declaration match {
-            case Some(m: MethodDefinition) => m.defaultsHeldBackBy = reason; m.defaultsOmittableFrom = omittableFrom
-            case Some(c: ConstructorDefinition) => c.defaultsHeldBackBy = reason; c.defaultsOmittableFrom = omittableFrom
+            case Some(m: MethodDefinition) =>
+              m.defaultsHeldBackBy = roots; m.defaultsHeldBackVia = via; m.defaultsOmittableFrom = omittableFrom
+            case Some(c: ConstructorDefinition) =>
+              c.defaultsHeldBackBy = roots; c.defaultsHeldBackVia = via; c.defaultsOmittableFrom = omittableFrom
             case _ =>
           }
         }

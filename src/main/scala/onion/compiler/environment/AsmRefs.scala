@@ -444,7 +444,8 @@ object AsmRefs {
     private lazy val methods_ : MultiTable[TypedAST.Method] = {
       val m = new MultiTable[TypedAST.Method]
       import scala.jdk.CollectionConverters._
-      for (method <- node.methods.asInstanceOf[java.util.List[MethodNode]].asScala if method.name != CONSTRUCTOR_NAME) {
+      val all = node.methods.asInstanceOf[java.util.List[MethodNode]].asScala.filter(_.name != CONSTRUCTOR_NAME)
+      for (method <- all if !BridgeMethods.isShadowedBridge(method, all)) {
         m.add(new AsmMethodRef(method, this, table, classEnv, onionCompiled))
       }
       m
@@ -512,4 +513,41 @@ object AsmRefs {
       }.toList
     }
   }
+}
+
+/**
+ * A bridge the compiler emitted for a generic or covariant override (`Integer.compareTo(Object)`
+ * next to `compareTo(Integer)`) is not a method the source can name: javac never resolves a call
+ * to it, and resolving to it lets a wrong argument through (`i.compareTo("x")` compiled, then threw
+ * ClassCastException, #2708). Such a bridge always sits next to the real method it forwards to, with
+ * the same name and arity and the same primitive parameters. A visibility bridge
+ * (`StringBuilder.length()`, re-declaring a method of a non-public superclass) has no such sibling
+ * and stays: it is the only public way in.
+ */
+private[environment] object BridgeMethods {
+  def isShadowedBridge(method: MethodNode, siblings: Iterable[MethodNode]): Boolean =
+    (method.access & Opcodes.ACC_BRIDGE) != 0 && {
+      val args = Type.getArgumentTypes(method.desc)
+      siblings.exists { other =>
+        (other.access & Opcodes.ACC_BRIDGE) == 0 && other.name == method.name && other.desc != method.desc && {
+          val otherArgs = Type.getArgumentTypes(other.desc)
+          otherArgs.length == args.length && sameShape(args.map(_.getSort), otherArgs.map(_.getSort))
+        }
+      }
+    }
+
+  def isShadowedBridge(method: java.lang.reflect.Method, siblings: Array[java.lang.reflect.Method]): Boolean =
+    method.isBridge && {
+      val args = method.getParameterTypes
+      siblings.exists { other =>
+        !other.isBridge && other.getName == method.getName && other.getParameterCount == args.length &&
+          !java.util.Arrays.equals(other.getParameterTypes.asInstanceOf[Array[AnyRef]], args.asInstanceOf[Array[AnyRef]]) &&
+          sameShape(args.map(c => Type.getType(c).getSort), other.getParameterTypes.map(c => Type.getType(c).getSort))
+      }
+    }
+
+  // Reference parameters may differ (that is what a bridge erases); primitive ones may not.
+  private def isReference(sort: Int): Boolean = sort == Type.OBJECT || sort == Type.ARRAY
+  private def sameShape(a: Array[Int], b: Array[Int]): Boolean =
+    a.indices.forall(i => (isReference(a(i)) && isReference(b(i))) || a(i) == b(i))
 }

@@ -241,7 +241,13 @@ private[compiler] final class MethodBodySupport(
     } else {
       val saved = context.contractScope
       context.contractScope = Some(scope)
-      try clauses.flatMap { c =>
+      try clauses.flatMap {
+        case c: AST.NullLiteral =>
+          // `requires null` is rejected while typing against Boolean, with cast advice; no cast
+          // makes `null` a condition, so it gets the clause hint too (#2605).
+          bodyContext.report(INCOMPATIBLE_TYPE, c, BasicType.BOOLEAN, NullType.NULL, SemanticErrorReporter.ContractClauseHint(word))
+          None
+        case c =>
         typed(c, context, BasicType.BOOLEAN).flatMap { t =>
           if (isCondition(t.`type`)) Option(processAssignable(c, BasicType.BOOLEAN, t))
           else {

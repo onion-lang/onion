@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.155.0] - 2026-11-11
+
+### Breaking
+
+- **A call above overloads with defaults now picks what a call below them picks (#2653).**
+  - Before: with `pick()` and `pick(n: Int = 1)` declared below it, `pick()` called `pick()`; below them it called `pick(n: Int = 1)`.
+  - Now: `pick()` calls `pick(n: Int = 1)` wherever it is written. Likewise `f(1)` against `f(n: Long)`, `f(n: Int, a: Int = 1)` and `f(n: Int, b: String = "")` is E0006 above them too, as it already was below.
+  - To keep the old result, pass the argument or rename a method; there is no `onion migrate` rule. See `docs/migration/pre-1.0.md`.
+
+### Fixed
+
+- **`v.total`, `a + b` and `v[i]` fill an omitted default argument (#2803).**
+  - Before: each compiled, then failed to load with `VerifyError: Bad type on operand stack`.
+  - Now: the default is passed, as with `v.total()`. Also `v[i] = x`, `a += b` and `a < b`.
+- **Named arguments run in the order they are written (#2767).**
+  - Before: `f(b = t("B"), a = t("A"))` ran `t("A")` first, in parameter order.
+  - Now: `t("B")` runs first, as in Kotlin, Scala and C#. This covers method, `super`, safe (`?.`) and `new` calls.
+  - Still in parameter order: `extends A(..)`, `: this(..)` and `copy(..)` (#2801).
+- **A local inside a field initializer no longer overwrites a constructor parameter (#2800).**
+  - Before: `val s: String = if true { val t = "x"; t } else { "" }` in a class with `def this(n: String)` set `n` to `"x"`; with a `Long` parameter, `new` threw `VerifyError`.
+  - Now: the initializer's locals get their own slots.
+- **A runtime error in a method's first statement reports that statement's line (#2800).**
+  - Before: `static def main(..) { IO::println(boom()) }` said `called from x.on:6`, the `def` line.
+  - Now: it says `called from x.on:7`, the line of the call.
+- **`onionc` no longer hangs on a method with `requires`/`ensures` (#2748).**
+  - Before: `ensures result >= 0` on `bal - n`, with `requires n > 0 && n <= bal`, hung the build, even under `--contracts off`.
+  - Now: it is proved in under a second. A formula the prover cannot settle is given up after about two seconds and left unproved (under `--contracts runtime` it keeps its run-time check).
+  - Under `--contracts off` the prover does not run; the clause is only reported as E0105.
+- **A call can omit a default declared later in the file, or in another file (#2653).**
+  - Before: `def run() = g()` above `def g(n: Int = 7)` was E0005 outside one class body. The same held for calls into a later class, record, enum, interface, `extension` or file, for `new B()` with a later `def this(a: Int = 7)` (E0021), and for a default that omits a later method's default (`def f(a: Int = g())` above `def g(b: Int = 2)`).
+  - Now: declaration order no longer matters for most defaults.
+  - Exception: a default that reads a top-level `val`/`var`, directly or through another default, still needs its function declared above the call. The E0005/E0021 at such a call now lists what to move above it, in order (for example `base`, `g`).
+  - Two defaults that call each other are typed in declaration order, as before.
+- **`val y: Comparable[String] = b` with `b: JInteger` is a compile error (#2649).**
+  - Before: it compiled, then threw `ClassCastException` at the first `compareTo`. So did `b as Comparable[String]`, `"s" as Comparable[JInteger]`, `[b]` or `[5]` as a `List[Comparable[String]]`, a `Comparable[String]?` target, `o ?: 5`, and `new D(b)` / `new R(b)` / `extends Base(b)` into a `Comparable[String]` parameter.
+  - Now: E0000 (E0001 for `?:`, E0005 for a method argument, E0021 for a constructor argument). It applies only when the type arguments can share no value (`String` vs `Integer`; an interface such as `CharSequence` vs the final `Integer`). `Comparable[JInteger]`, `Object`, `Number`, and related arguments (`new Properties()` as `Map[String, String]`) still compile.
+- **E0106 (a contract that is not pure) points at the call that has the effect.**
+  - Before: `def f(xs: List[Int]): Int ensures xs.add(1)` reported `1:1`, under `def`; an `invariant` or `history` pointed at its `class` line or at an `&&`.
+  - Now: `1:38`, under `add(1)`. The same for `requires`, `invariant` and `history`.
+- **String interpolation is allowed in a contract, as `+` is.**
+  - Before: `requires "n#{n}" != ""` was E0106, naming `StringBuilder::append`, a call you never wrote. `--effects` reported such a method as `mutate`.
+  - Now: it compiles, and `--effects` reports it `pure`. A write inside `#{...}` is still E0106, and so is a `CharSequence` part, whose `length()`/`charAt()` the append calls.
+- **`requires null` gets the contract-clause hint, not cast advice.**
+  - Before: E0000 ending in "Consider a cast or check return type".
+  - Now: E0000 with the hint that `requires` takes a Boolean condition (`requires n > 0`). The same for `ensures`, `invariant` and `history`, in en and ja.
+
 ## [0.154.0] - 2026-11-10
 
 ### Breaking

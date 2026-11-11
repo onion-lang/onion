@@ -170,6 +170,17 @@ class MutateEffectSpec extends AnyFunSpec {
       assert(eff("A#f").contains(Mutate), eff("A#f"))
     }
 
+    // `append(CharSequence)` calls `length()`/`charAt()` on the part, not only `toString`
+    // (panel on #2815), so it is not exempt.
+    it("still counts interpolating a CharSequence, whose length and charAt may be overridden") {
+      val eff = infer(
+        """class A {
+          |public:
+          |  static def f(e: CharSequence): String = "#{e}!"
+          |}""".stripMargin)
+      assert(eff("A#f").contains(Mutate), eff("A#f"))
+    }
+
     it("defaults an unlisted method of a mutable class to a mutation, not to pure") {
       assert(EffectTable.effectsOrUnknown("java.util.List", "aMethodAddedInSomeFutureJdk") == Set(Mutate))
       assert(EffectTable.effectsOrUnknown("java.util.List", "add") == Set(Mutate))

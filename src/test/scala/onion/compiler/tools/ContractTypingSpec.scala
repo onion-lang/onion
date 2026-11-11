@@ -211,6 +211,42 @@ class ContractTypingSpec extends AnyFunSpec {
       assert(codes(src).isEmpty, codes(src).toString)
     }
 
+    // Panel on #2815: `"#{e}"` with `e: CharSequence` picks `append(CharSequence)`, which
+    // calls `e.length()` and `e.charAt()`, not only `toString`.
+    it("rejects an interpolated CharSequence whose length or charAt writes") {
+      val src =
+        """import { java.util.* }
+          |class Evil conforms CharSequence {
+          |  val xs: List[Int]
+          |public:
+          |  def this(xs: List[Int]) { this.xs = xs }
+          |  def length(): Int { xs.add(1); return 1 }
+          |  def charAt(i: Int): Char { xs.add(2); return 'a' }
+          |  def subSequence(a: Int, b: Int): CharSequence = this
+          |  override def toString(): String = "e"
+          |}
+          |class K {
+          |public:
+          |  static def g(e: CharSequence): Int requires "#{e}" != "" { return 1 }
+          |}""".stripMargin
+      assert(codes(src).contains("E0106"), codes(src).toString)
+    }
+
+    it("still accepts an interpolated Object part whose class has no writing toString") {
+      val src =
+        """import { java.util.* }
+          |class Job conforms Runnable {
+          |  val xs: List[Int] = new ArrayList[Int]()
+          |public:
+          |  def run(): void { xs.add(1) }
+          |}
+          |class K {
+          |public:
+          |  static def g(o: Object): Int requires "#{o}" != "" { return 1 }
+          |}""".stripMargin
+      assert(codes(src).isEmpty, codes(src).toString)
+    }
+
     it("still rejects a write inside an interpolation") {
       val src =
         """import { java.util.* }

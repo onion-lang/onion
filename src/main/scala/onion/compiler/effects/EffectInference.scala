@@ -398,7 +398,19 @@ object EffectInference {
     private def freshBuilderAppend(c: Call): Boolean =
       c.method != null && c.method.name == "append" && c.parameters.length == 1 &&
         c.method.affiliation != null && c.method.affiliation.name == "java.lang.StringBuilder" &&
-        freshBuilder(c.target)
+        toStringOnlyAppend(c.method) && freshBuilder(c.target)
+
+    /**
+     * The `append` overloads that call nothing on their argument but `toString`: a primitive,
+     * `String` or `Object` parameter. `append(CharSequence)` also calls `length()` and
+     * `charAt()`, which a program class can override, so it stays an ordinary library call
+     * (panel on #2815).
+     */
+    private def toStringOnlyAppend(m: TypedAST.Method): Boolean =
+      m.arguments.length == 1 && m.arguments(0) != null && {
+        val p = m.arguments(0)
+        p.isBasicType || p.name == "java.lang.Object" || p.name == "java.lang.String"
+      }
 
     private def freshBuilder(t: Term): Boolean = t match {
       case n: NewObject => n.parameters.isEmpty && n.constructor.affiliation != null &&

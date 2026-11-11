@@ -461,10 +461,11 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     // reuses one), so whole-method scope cannot describe two variables at once.
     val methodStart = gen.mark()
 
-    // Emit line number for method declaration
-    if node.location != null then
-      val label = gen.mark()
-      gen.visitLineNumber(node.location.line, label)
+    // The method's own line covers any code before its first statement. It is recorded
+    // after the body, and only when the first statement does not start at the same
+    // instruction: two entries there made a failure in that statement say it came from
+    // the `def` line (#2800).
+    val declarationLine = gen.mark()
 
     val isStatic = (node.modifier & Modifier.STATIC) != 0
     val localVars = new LocalVarContext(gen)
@@ -546,6 +547,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
       MethodEmitter.ensureReturn(gen, returnType, !needsDefault)
     else
       gen.returnValue()
+    if node.location != null && !gen.hasLineNumberAt(declarationLine) then
+      gen.visitLineNumber(node.location.line, declarationLine)
     emitLocalVariableTable(gen, localVars, methodStart)
     try gen.endMethod()
     catch

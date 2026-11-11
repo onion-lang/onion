@@ -28,6 +28,62 @@ class ConstructorPositionalDefaultSpec extends AbstractShellSpec {
     Array()
   )
 
+  // Runs `src` and returns (result, stderr).
+  private def runCapturing(src: String): (Shell.Result, String) = {
+    val out = new java.io.ByteArrayOutputStream()
+    val ps = new java.io.PrintStream(out, true, "UTF-8")
+    val savedErr = System.err
+    val result =
+      try {
+        System.setErr(ps)
+        Console.withErr(ps) { shell.run(src, "None", Array()) }
+      } finally System.setErr(savedErr)
+    (result, out.toString("UTF-8"))
+  }
+
+  // Panel block on #2826: a wrong-typed argument to the only constructor,
+  // which has a default, reported the constructor's own parameter types as the
+  // call's ("applicable for A(Int, Int) ... available: A(Int, Int)").
+  describe("E0021 for a wrong-typed argument to a constructor with a default") {
+    val one =
+      """class A {
+        |public:
+        |  def this(a: Int, b: Int = 2) { }
+        |}
+        |""".stripMargin
+
+    def assertNamesArgumentTypes(src: String, call: String): Unit = {
+      val (result, err) = runCapturing(src)
+      assert(Shell.Failure(-1) == result)
+      assert(err.contains("E0021"), err)
+      assert(err.contains(call), err)
+      assert(!err.contains("A(Int, Int) ") && err.split("A\\(Int, Int\\)", -1).length == 2, err)
+    }
+
+    it("names the argument types in `extends A(\"x\")`") {
+      assertNamesArgumentTypes(one + "class D extends A(\"x\") { }\n", "A(String)")
+    }
+
+    it("names the argument types in `: this(\"x\")`") {
+      val src =
+        """class A {
+          |public:
+          |  def this(a: Int, b: Int = 2) { }
+          |  def this(c: Boolean, d: Boolean) : this("x") { }
+          |}
+          |""".stripMargin
+      assertNamesArgumentTypes(src, "A(String)")
+    }
+
+    it("names the argument types in `new A(\"x\")`") {
+      assertNamesArgumentTypes(one + "class M {\npublic:\n  static def main(args: String[]): void { new A(\"x\") }\n}\n", "A(String)")
+    }
+
+    it("names the argument types in `new A(b = \"x\", a = 1)`") {
+      assertNamesArgumentTypes(one + "class M {\npublic:\n  static def main(args: String[]): void { new A(b = \"x\", a = 1) }\n}\n", "A(String, Int)")
+    }
+  }
+
   describe("A positional constructor call with an omitted default") {
     it("fills the default in `extends A(7)`") {
       assert(Shell.Success("72") == run("class D extends A(7) { }", "new D().show()"))

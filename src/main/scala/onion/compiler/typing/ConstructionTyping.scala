@@ -998,6 +998,11 @@ final class ConstructionTyping(
       TypeSubstitution.substituteType(a.argType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
     val result = new Array[Term](argsWithDefaults.length)
     val filled = new Array[Boolean](argsWithDefaults.length)
+    // The supplied arguments in written order, so E0021 names the call's own
+    // types (`A(String)`), not the constructor's formals, which the
+    // "available constructors" list beneath it already shows.
+    val written = scala.collection.mutable.ArrayBuffer[Term]()
+    def suppliedTypes: Array[Type] = written.map(_.`type`).toArray
 
     var positionalIndex = 0
     var sawNamed = false
@@ -1020,6 +1025,7 @@ final class ConstructionTyping(
             // Type the value against its formal type
             typed(named.value, context, formals(paramIndex)) match {
               case Some(term) =>
+                written += term
                 result(paramIndex) = term
                 filled(paramIndex) = true
                 sources(paramIndex) = named.value
@@ -1040,6 +1046,7 @@ final class ConstructionTyping(
           } else {
             typed(expr, context, formals(positionalIndex)) match {
               case Some(term) =>
+                written += term
                 result(positionalIndex) = term
                 filled(positionalIndex) = true
                 sources(positionalIndex) = expr
@@ -1058,7 +1065,7 @@ final class ConstructionTyping(
     val missingRequired = argsWithDefaults.indices.find(i => !filled(i) && argsWithDefaults(i).defaultValue.isEmpty)
     if (missingRequired.isDefined) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, ctor.affiliation,
-        argsWithDefaults.map(_.argType), ctor.affiliation.constructors)
+        suppliedTypes, ctor.affiliation.constructors)
       return None
     }
 
@@ -1068,7 +1075,7 @@ final class ConstructionTyping(
     val suppliedIndices = argsWithDefaults.indices.filter(filled)
     if (!suppliedIndices.forall(i => formalAccepts(formals(i), result(i)))) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, ctor.affiliation,
-        argsWithDefaults.map(_.argType), ctor.affiliation.constructors)
+        suppliedTypes, ctor.affiliation.constructors)
       return None
     }
     warnNullArguments(ctor, sources, result, formals)

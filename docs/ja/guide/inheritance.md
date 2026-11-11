@@ -85,6 +85,21 @@ public:
 println(new K().greet())   // Hello, kota（overrideなしで使える）
 ```
 
+overrideしたメソッドから、元のデフォルトメソッドを `super.m()` で呼べます（Javaの `Greeter.super.greet()` にあたります）。
+同じ名前のメソッドがスーパークラスにあれば、そちらが優先されます。
+二つのインターフェースが別々のデフォルトを持つ場合、`super.m()` は曖昧です（E0006）。
+
+```onion
+class Loud conforms Greeter {
+public:
+  def this {}
+  def name(): String { return "kota" }
+  override def greet(): String = super.greet().toUpperCase()
+}
+
+println(new Loud().greet())   // HELLO, KOTA
+```
+
 ## 継承とインターフェースの組み合わせ
 
 `extends` と `conforms` を組み合わせて使えます：

@@ -591,6 +591,12 @@ object TypedAST {
     def setArgumentsWithDefaults(args: Array[MethodArgument]): Unit =
       argsWithDefaults_ = args
 
+    /** Why this constructor's defaults are typed in source order (#2653), or null. */
+    var defaultsHeldBackBy: String = null
+
+    /** Its defaults are held back and not typed yet, so a call above it cannot omit them. */
+    def defaultsPending: Boolean = defaultsHeldBackBy != null && argumentsWithDefaults.forall(_.defaultValue.isEmpty)
+
     def argumentsWithDefaults: Array[MethodArgument] =
       if (argsWithDefaults_ != null) argsWithDefaults_
       else arguments.zipWithIndex.map { case (tp, i) => MethodArgument(s"arg$i", tp, None) }
@@ -904,6 +910,12 @@ object TypedAST {
 
     /** Set the arguments with default values */
     def setArgumentsWithDefaults(args: Array[MethodArgument]): Unit = argsWithDefaults_ = args
+
+    /** Why this method's defaults are typed in source order (#2653), or null. */
+    var defaultsHeldBackBy: String = null
+
+    /** Its defaults are held back and not typed yet, so a call above it cannot omit them. */
+    def defaultsPending: Boolean = defaultsHeldBackBy != null && argumentsWithDefaults.forall(_.defaultValue.isEmpty)
 
     /** Get arguments with names and optional default values */
     override def argumentsWithDefaults: Array[MethodArgument] =

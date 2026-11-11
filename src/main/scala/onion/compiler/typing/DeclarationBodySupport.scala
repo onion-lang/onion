@@ -78,13 +78,22 @@ private[compiler] final class DeclarationBodySupport(
       case v: AST.LocalVariableDeclaration => v.name
       case v: AST.GlobalVariableDeclaration => v.name
     }.toSet
-    def job(name: String, args: List[AST.Argument])(body: => Unit): Option[DefaultScheduling.Job] =
+    def job(name: String, args: List[AST.Argument], declaration: => Option[AnyRef] = None)(body: => Unit): Option[DefaultScheduling.Job] =
       if (!args.exists(_.defaultValue != null)) None
       else {
-        val mentions = mentionedNames(args)
+        val mentions = mentionedNames(unit, args)
         // A top-level `val`/`var` becomes a field only when the body pass reaches it, so a default
         // that reads one, in any kind of declaration, stays in source order, after it.
-        Some(DefaultScheduling.Job(name, mentions - name, (mentions & topLevelVariables).nonEmpty, () => {
+        // A held-back declaration records why, so a call above it that omits the default gets a hint.
+        val hold = (by: Set[String]) => {
+          val reason = by.toSeq.sorted.map(n => s"`$n`").mkString(", ")
+          declaration match {
+            case Some(m: MethodDefinition) => m.defaultsHeldBackBy = reason
+            case Some(c: ConstructorDefinition) => c.defaultsHeldBackBy = reason
+            case _ =>
+          }
+        }
+        Some(DefaultScheduling.Job(name, mentions - name, mentions & topLevelVariables, hold, () => {
           body
           unitContext.currentDefinition = null
           unitContext.currentMapper = null
@@ -92,13 +101,13 @@ private[compiler] final class DeclarationBodySupport(
       }
     def typeParams(node: AST.Node): Seq[TypeParam] = typing.declaredTypeParams_.getOrElse(node, Seq())
     def methodJobs(node: AST.TypeDeclaration, params: Seq[TypeParam], methods: Seq[AST.MethodDeclaration]) =
-      methods.flatMap(m => job(m.name, m.args)(inDefinition(node, params)(_ => predefineMethodDefaults(m))))
+      methods.flatMap(m => job(m.name, m.args, typing.kernelNodeOf[MethodDefinition](m))(inDefinition(node, params)(_ => predefineMethodDefaults(m))))
     unit.toplevels.flatMap {
       case node: AST.ClassDeclaration =>
         val members = (node.defaultSection ++ node.sections).toSeq.flatMap(_.members)
         methodJobs(node, typeParams(node), members.collect { case m: AST.MethodDeclaration => m }) ++
           members.collect { case c: AST.ConstructorDeclaration => c }.flatMap { c =>
-            job(node.name, c.args)(inDefinition(node, typeParams(node)) { _ =>
+            job(node.name, c.args, typing.kernelNodeOf[ConstructorDefinition](c))(inDefinition(node, typeParams(node)) { _ =>
               typing.kernelNodeOf[ConstructorDefinition](c).foreach(methodBodySupport.predefineConstructorDefaults(_, c.args))
             })
           }
@@ -122,7 +131,7 @@ private[compiler] final class DeclarationBodySupport(
           }
         }
       case node: AST.FunctionDeclaration if node.block != null =>
-        job(node.name, node.args) {
+        job(node.name, node.args, typing.kernelNodeOf[MethodDefinition](node)) {
           typing.kernelNodeOf[MethodDefinition](node).foreach { function =>
             typing.loadTopClass.collect { case cd: ClassDefinition => cd }.foreach(unitContext.currentDefinition = _)
             typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
@@ -141,7 +150,7 @@ private[compiler] final class DeclarationBodySupport(
    * included, so no node kind can hide a read (panel round 2 on #2798). A false match only
    * keeps a default in source order, as on `main`.
    */
-  private def mentionedNames(args: List[AST.Argument]): Set[String] = {
+  private def mentionedNames(unit: AST.CompilationUnit, args: List[AST.Argument]): Set[String] = {
     val names = scala.collection.mutable.Set.empty[String]
     def visit(x: Any): Unit = x match {
       case ref: AST.ReferenceType => names += ref.name.split('.').last
@@ -157,15 +166,24 @@ private[compiler] final class DeclarationBodySupport(
       case _ => ()
     }
     args.foreach(a => if (a.defaultValue != null) visit(a.defaultValue))
-    // A `type` alias names its target too, so `new BB()` through `type BB = B` mentions `B`
-    // (panel round 5 on #2798). Expanding until nothing new appears covers alias chains.
-    val aliasTargets = typing.typeAliases_.values.toSeq.groupMap(_.node.name)(_.node.targetType)
+    // A name that renames a class also names that class: a `type` alias (`type BB = B`, panel
+    // round 5 on #2798) and an import alias (`import { p.K as KK; }`, round 6). Every such name
+    // is resolved to its target's simple name, until nothing new appears, so alias chains and
+    // an alias of an alias across both kinds are covered too.
+    val typeAliasTargets = typing.typeAliases_.values.toSeq.groupMap(_.node.name)(_.node.targetType)
+    val importAliasTargets =
+      if (unit.imports == null) Map.empty[String, Seq[String]]
+      else unit.imports.mapping.groupMap(_._1)(_._2.split('.').last)
+    val renamings = typeAliasTargets.keySet ++ importAliasTargets.keySet
     val expanded = scala.collection.mutable.Set.empty[String]
-    var pending = names.toSet.intersect(aliasTargets.keySet)
+    var pending = names.toSet.intersect(renamings)
     while (pending.nonEmpty) {
       expanded ++= pending
-      pending.foreach(alias => aliasTargets(alias).foreach(visit))
-      pending = names.toSet.intersect(aliasTargets.keySet) -- expanded
+      pending.foreach { alias =>
+        typeAliasTargets.getOrElse(alias, Seq()).foreach(visit)
+        names ++= importAliasTargets.getOrElse(alias, Seq())
+      }
+      pending = names.toSet.intersect(renamings) -- expanded
     }
     names.toSet
   }

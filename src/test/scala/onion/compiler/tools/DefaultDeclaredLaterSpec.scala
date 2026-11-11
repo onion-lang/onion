@@ -336,6 +336,78 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
           |println(new C().g())
         """) == "5,6")
     }
+
+    it("is held back when it constructs a held-back class through an import alias") {
+      assert(compiles(
+        "A.on" ->
+          """module p
+            |val k = 5
+            |class K {
+            |public:
+            |  val a: Int
+            |  def this(a: Int = k) { this.a = a }
+            |}
+            |""",
+        "B.on" ->
+          """import { p.K as KK; }
+            |class Main {
+            |public:
+            |  static def f(x: Int = new KK().a): Int = x
+            |  static def main(args: String[]): void { println(f()) }
+            |}
+            |"""))
+    }
+  }
+
+  describe("a call above a held-back default") {
+    def errorsOf(src: String): String = {
+      import onion.compiler.*
+      val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+      val source = new StreamInputSource(() => new java.io.StringReader(src.stripMargin), "Held.on")
+      new OnionCompiler(config).compile(Seq(source)) match {
+        case CompilationOutcome.Success(_) => fail("expected a compile error")
+        case CompilationOutcome.Failure(errors) => errors.map(e => s"${e.errorCode.getOrElse("")} ${e.message}").mkString("\n")
+      }
+    }
+
+    it("hints at what holds back a function's default") {
+      val text = errorsOf(
+        """
+          |def run(): Int = f()
+          |def f(a: Int = k): Int = a
+          |val k = 5
+          |println(run())
+        """)
+      assert(text.contains("E0005"), text)
+      assert(text.contains("`k`"), text)
+    }
+
+    it("hints at what holds back a constructor's default") {
+      val text = errorsOf(
+        """
+          |def make(): Int = new K().a
+          |class K {
+          |public:
+          |  val a: Int
+          |  def this(a: Int = k) { this.a = a }
+          |}
+          |val k = 5
+          |println(make())
+        """)
+      assert(text.contains("E0021"), text)
+      assert(text.contains("`k`"), text)
+    }
+
+    it("gives no such hint when the argument is passed") {
+      val text = errorsOf(
+        """
+          |def run(): Int = f("x")
+          |def f(a: Int = k): Int = a
+          |val k = 5
+          |println(run())
+        """)
+      assert(!text.contains("`k`"), text)
+    }
   }
 
   describe("a default that reads a plain constructor parameter") {

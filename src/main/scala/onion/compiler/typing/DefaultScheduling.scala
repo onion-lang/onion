@@ -13,16 +13,24 @@ package onion.compiler.typing
  * Matching is by name, so a false match only keeps a default in source order.
  */
 private[compiler] object DefaultScheduling {
-  /** One declaration's defaults: its name, the names they mention, and how to type them. */
-  final case class Job(name: String, mentions: Set[String], readsTopLevel: Boolean, run: () => Unit)
+  /**
+   * One declaration's defaults: its name, the names they mention, the top-level `val`/`var`s
+   * among them, how to mark the declaration held back (with the names that hold it, for the
+   * E0005/E0021 hint), and how to type them.
+   */
+  final case class Job(name: String, mentions: Set[String], topLevelReads: Set[String], hold: Set[String] => Unit, run: () => Unit) {
+    def readsTopLevel: Boolean = topLevelReads.nonEmpty
+  }
 
   /** Runs the jobs that are not held back, each after the jobs it depends on; `enter` runs before each job. */
   def run[U](jobs: Seq[(U, Job)])(enter: U => Unit): Unit = {
     var heldNames = jobs.collect { case (_, j) if j.readsTopLevel => j.name }.toSet
     var held = jobs.filter { case (_, j) => j.readsTopLevel }.map(_._2).toSet
+    held.foreach(j => j.hold(j.topLevelReads))
     var grew = true
     while (grew) {
       val more = jobs.collect { case (_, j) if !held.contains(j) && (j.mentions & heldNames).nonEmpty => j }
+      more.foreach(j => j.hold(j.mentions & heldNames))
       grew = more.nonEmpty
       held ++= more
       heldNames ++= more.map(_.name)

@@ -271,8 +271,23 @@ class SemanticErrorReporter(threshold: Int) {
     val withHexDigitB =
       if (!hexDigitB) suggestion
       else Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + message("suggestion.hexDigitB"))
-    problem(position, appendSuggestion(baseMessage, withHexDigitB))
+    val heldBack = sameName.collectFirst {
+      case m: TypedAST.MethodDefinition if m.defaultsPending && argTypes.length < m.arguments.length => m.defaultsHeldBackBy
+    }
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withHexDigitB, name, heldBack)))
   }
+
+  /**
+   * A call above a declaration whose defaults are typed in source order (#2653) cannot omit
+   * them yet. Say so after any other suggestion, naming what holds them back, since nothing
+   * else at the call site explains why the default is not there.
+   */
+  private def withHeldBackDefault(suggestion: Option[String], name: String, heldBy: Option[String]): Option[String] =
+    heldBy match {
+      case None => suggestion
+      case Some(by) =>
+        Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + format(message("suggestion.heldBackDefault"), Seq(name, by)))
+    }
 
   /**
    * The names a failed call `name(argTypes)` on `obj` may be steered to.
@@ -688,8 +703,11 @@ class SemanticErrorReporter(threshold: Int) {
         Some(s"${message("error.suggestion.availableConstructors")}${Systems.lineSeparator}${ctorSignatures.mkString(Systems.lineSeparator)}")
       } else None
     } else None
+    val heldBack = if (items.length > 2) items(2).asInstanceOf[Array[TypedAST.ConstructorRef]].collectFirst {
+      case c: TypedAST.ConstructorDefinition if c.defaultsPending && argTypes.length < c.arguments.length => c.defaultsHeldBackBy
+    } else None
 
-    problem(position, appendSuggestion(baseMessage, suggestion))
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(suggestion, s"new ${typeName(typeRef)}", heldBack)))
   }
 
   /**

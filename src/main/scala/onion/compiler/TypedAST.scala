@@ -271,10 +271,28 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class Call(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, val parameters: Array[TypedAST.Term]) extends Term(location) {
+  /**
+   * Completes a call's arguments with the defaults it omits (#2803). Every call
+   * form that is not spelled `m(...)` -- `v.total`, `a + b`, `v[i]`, `v[i] = x`,
+   * `a < b`, `a += b` -- resolves a method that may take more arguments than were
+   * written; filling them here, where each call node is built, means no call can
+   * reach code generation short of its method's arity. A call that already has
+   * every argument, or omits one with no default, is left as it is.
+   */
+  private def withOmittedDefaults(method: TypedAST.Method, parameters: Array[TypedAST.Term]): Array[TypedAST.Term] =
+    if (parameters == null || method == null || method.isVararg || parameters.length >= method.argumentCount) parameters
+    else {
+      val declared = method.argumentsWithDefaults
+      if (declared.length != method.argumentCount || declared.drop(parameters.length).exists(_.defaultValue.isEmpty)) parameters
+      else parameters ++ declared.drop(parameters.length).map(_.defaultValue.get)
+    }
+
+  class Call(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, written: Array[TypedAST.Term]) extends Term(location) {
     def this(target: TypedAST.Term, method: TypedAST.Method, parameters: Array[TypedAST.Term]) = {
       this(null, target, method, parameters)
     }
+
+    val parameters: Array[TypedAST.Term] = withOmittedDefaults(method, written)
 
     def `type`: TypedAST.Type = method.returnType
   }
@@ -283,10 +301,12 @@ object TypedAST {
    * Safe method call: target?.method(params)
    * Returns null if target is null, otherwise calls the method
    */
-  class SafeCall(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, val parameters: Array[TypedAST.Term]) extends Term(location) {
+  class SafeCall(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, written: Array[TypedAST.Term]) extends Term(location) {
     def this(target: TypedAST.Term, method: TypedAST.Method, parameters: Array[TypedAST.Term]) = {
       this(null, target, method, parameters)
     }
+
+    val parameters: Array[TypedAST.Term] = withOmittedDefaults(method, written)
 
     /** Result type is nullable because it can be null when target is null */
     def `type`: TypedAST.Type = NullableType.of(method.returnType)
@@ -320,10 +340,12 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class CallStatic(location: Location, val target: TypedAST.ObjectType, val method: TypedAST.Method, val parameters: Array[TypedAST.Term]) extends Term(location) {
+  class CallStatic(location: Location, val target: TypedAST.ObjectType, val method: TypedAST.Method, written: Array[TypedAST.Term]) extends Term(location) {
     def this(target: TypedAST.ObjectType, method: TypedAST.Method, parameters: Array[TypedAST.Term]) = {
       this(null, target, method, parameters)
     }
+
+    val parameters: Array[TypedAST.Term] = withOmittedDefaults(method, written)
     def `type`: TypedAST.Type = method.returnType
   }
 

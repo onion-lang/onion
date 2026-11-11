@@ -240,8 +240,18 @@ private[compiler] final class UnqualifiedMethodCallSupport(
           node, name, node.args, node.typeArgs, top, context, expected, untypedClosureIndices
         )
       case _ =>
-        // No target class holds a method of this name. The remaining fallbacks
-        // (static-import, callable-value) and the not-found diagnostic cannot
+        // A static-imported function types its lambda as `Type::name(...)` does, when exactly
+        // one imported type has an overload that fits the other arguments (#2667).
+        staticImportMethodCallSupport.soleImportedTypeFor(node, context, expected, untypedClosureIndices) match {
+          case Some(None) => return None
+          case Some(Some((typeRef, typedArgs))) =>
+            return staticCalls.typeStaticCallWithBidirectionalInferenceCore(
+              node, name, node.args, node.typeArgs, typeRef, context, expected, untypedClosureIndices, typedArgs
+            )
+          case None =>
+        }
+        // Otherwise no target class holds a method of this name. The remaining fallbacks
+        // (an ambiguous static import, callable-value) and the not-found diagnostic cannot
         // benefit from bidirectional inference on the closure, so report the
         // closure's parameter type as usual by delegating to the eager path,
         // which yields the standard not-found error for the arguments it can

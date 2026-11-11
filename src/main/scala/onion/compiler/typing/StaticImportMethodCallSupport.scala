@@ -79,6 +79,31 @@ private[compiler] final class StaticImportMethodCallSupport(
   }
 
   /**
+   * For a bare call with an untyped lambda argument: the one static-imported type with an
+   * overload that fits the other arguments, and those arguments typed. The caller then types
+   * the call as `Type::name(...)`, so the lambda gets its parameter types from the chosen
+   * overload (#2667). None when no imported type, or more than one, fits; Some(None) when
+   * typing the other arguments failed (already reported).
+   */
+  def soleImportedTypeFor(
+    node: AST.UnqualifiedMethodCall,
+    context: LocalContext,
+    expected: Type,
+    untypedClosureIndices: Set[Int]
+  ): Option[Option[(ClassType, Array[Term])]] = {
+    val imported = staticCandidates(node.name)
+    if (imported.isEmpty) return None
+    calls.typePreliminaryParams(node.args, context, untypedClosureIndices) match {
+      case None => Some(None)
+      case Some(typedArgs) =>
+        val fitting = imported.filter { case (typeRef, candidates) =>
+          overloadSupport.collectPartialInstanceApplicables(typeRef, candidates, node, typedArgs, expected).nonEmpty
+        }
+        if (fitting.length == 1) Some(Some((fitting.head._1, typedArgs))) else None
+    }
+  }
+
+  /**
    * The imported types that declare a static method of this name, with those methods.
    *
    * A bare call such as `println(x)` used to walk every static import -- a couple of

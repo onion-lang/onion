@@ -179,14 +179,19 @@ private[compiler] final class StaticMethodCallSupport(
     typeRef: ClassType,
     context: LocalContext,
     expected: Type,
-    untypedClosureIndices: Set[Int]
+    untypedClosureIndices: Set[Int],
+    typedArgs: Array[Term] = null
   ): Option[Term] = {
     val args = argList
 
-    val preliminaryParams = calls.typePreliminaryParams(args, context, untypedClosureIndices) match {
-      case Some(params) => params
-      case None => return None
-    }
+    // A caller that already typed the other arguments (a static-imported call choosing its class,
+    // #2667) passes them in, so they are not typed, and their errors not reported, twice.
+    val preliminaryParams =
+      if (typedArgs != null) typedArgs
+      else calls.typePreliminaryParams(args, context, untypedClosureIndices) match {
+        case Some(params) => params
+        case None => return None
+      }
 
     val candidates = new JTreeSet[Method](new MethodComparator)
     calls.collectMethodsMatching(typeRef, name, candidates, calls.isStaticMethod)

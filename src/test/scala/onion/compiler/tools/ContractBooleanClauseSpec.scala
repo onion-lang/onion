@@ -69,6 +69,20 @@ class ContractBooleanClauseSpec extends AnyFunSpec {
       assert(!e.message.contains("Generic.Case"), e.message)
     }
 
+    it("a literal `requires null` gets the clause hint, not cast advice") {
+      val e = single(method("requires null"))
+      assert(e.errorCode.contains("E0000"))
+      assert(e.message.contains("`requires n > 0`"), e.message)
+      assert(!e.message.contains("cast"), e.message)
+      assert(!e.message.contains("キャスト"), e.message)
+    }
+
+    it("an `ensures null` names `ensures`") {
+      val e = single(method("ensures null"))
+      assert(e.errorCode.contains("E0000"))
+      assert(e.message.contains("`ensures n > 0`"), e.message)
+    }
+
     it("an `invariant` names `invariant`") {
       val src =
         """class C {

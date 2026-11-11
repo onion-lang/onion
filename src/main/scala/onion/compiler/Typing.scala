@@ -288,6 +288,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     finally unitContext.reportingSuppressed -= 1
   }
 
+  /**
+   * The source expression of each typed contract clause, by identity. A typed clause and the
+   * calls in it mostly carry no location, so a check over the typed clause (E0106) looks its
+   * diagnostic's position up here instead of falling back to the owning `def` (#2605).
+   */
+  private[compiler] val contractClauseSources = new java.util.IdentityHashMap[TypedAST.Term, AST.Expression]()
   private[compiler] def reportingEnabled: Boolean = currentUnitContext.reportingSuppressed == 0
 
   /**

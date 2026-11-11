@@ -249,7 +249,10 @@ private[compiler] final class MethodBodySupport(
           None
         case c =>
         typed(c, context, BasicType.BOOLEAN).flatMap { t =>
-          if (isCondition(t.`type`)) Option(processAssignable(c, BasicType.BOOLEAN, t))
+          if (isCondition(t.`type`)) Option(processAssignable(c, BasicType.BOOLEAN, t)).map { term =>
+            typing.contractClauseSources.put(term, c)
+            term
+          }
           else {
             // Not a condition at all (`requires x` with `x: Int`): say what a clause is,
             // rather than "consider a cast" (#2605).

@@ -1,6 +1,6 @@
 package onion.compiler.typing
 
-import onion.compiler.{Location, SemanticError, Typing}
+import onion.compiler.{AST, Location, SemanticError, Typing}
 import onion.compiler.TypedAST.*
 import onion.compiler.effects.{Effect, EffectInference, EffectTable}
 
@@ -45,11 +45,37 @@ final class ContractPurityPass(typing: Typing) {
       val culprit = sites.find(_.effects.nonEmpty)
       val callee = culprit.map(_.callee).getOrElse("=")
       val blamed = culprit.map(_.effects).getOrElse(effects)
-      val where = culprit.flatMap(c => Option(c.location)).orElse(Option(clause.location)).getOrElse(ownerLocation)
+      // Typed calls mostly carry no location, so point at the call in the clause's source that
+      // has the culprit's name; else at the clause itself; never at the owning `def` or `class`
+      // while the clause is known (#2605).
+      val source = Option(typing.contractClauseSources.get(clause))
+      val where = culprit.flatMap(c => source.flatMap(callNamed(_, methodName(c.callee))))
+        .orElse(culprit.flatMap(c => Option(c.location)))
+        .orElse(Option(clause.location))
+        .orElse(source.flatMap(s => Option(s.location)))
+        .getOrElse(ownerLocation)
       // The reason is a kind and the effect names (identifiers, the same in every language); the
       // sentence is built from a message key, so it is translated with the rest of the message.
       typing.report(SemanticError.CONTRACT_NOT_PURE, where, callee, reasonKind(blamed), worldEffects(blamed))
     }
+  }
+
+  /** The method a call site names: `add` for `java.util.List::add`, `f` for a top-level `f`. */
+  private def methodName(callee: String): String = {
+    val i = callee.lastIndexOf("::")
+    if (i >= 0) callee.substring(i + 2) else callee
+  }
+
+  /** The location of the first call to `name` in a clause's source, left to right. */
+  private def callNamed(node: Any, name: String): Option[Location] = node match {
+    case c: AST.MethodCall if c.name == name && c.location != null            => Some(c.location)
+    case c: AST.SafeMethodCall if c.name == name && c.location != null        => Some(c.location)
+    case c: AST.UnqualifiedMethodCall if c.name == name && c.location != null => Some(c.location)
+    case c: AST.StaticMethodCall if c.name == name && c.location != null      => Some(c.location)
+    case c: AST.SuperMethodCall if c.name == name && c.location != null       => Some(c.location)
+    case p: Product => p.productIterator.map(callNamed(_, name)).collectFirst { case Some(l) => l }
+    case it: Iterable[?] => it.iterator.map(callNamed(_, name)).collectFirst { case Some(l) => l }
+    case _ => None
   }
 
   /** `memory` (writes only), `world` (an outside effect only), `both`, or `unknown` (not in the table). */

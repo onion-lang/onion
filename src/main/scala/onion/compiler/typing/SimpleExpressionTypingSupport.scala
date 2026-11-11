@@ -329,8 +329,11 @@ private[compiler] final class SimpleExpressionTypingSupport(
         // sound because a literal creates a fresh list of that element type.
         else if (expectedElem != null && typedElements.forall(fitsExpectedElement)) expectedElem
         else elementType
+      val elements =
+        if (finalElementType eq expectedElem) typedElements.map(widenToSlot(_, expectedElem))
+        else typedElements
       val listType = AppliedClassType(bodyContext.load("java.util.List"), scala.collection.immutable.List(finalElementType))
-      Some(new ListLiteral(typedElements, listType))
+      Some(new ListLiteral(elements, listType))
     }
   }
 
@@ -580,8 +583,36 @@ private[compiler] final class SimpleExpressionTypingSupport(
         if (values.isEmpty) (if (expectedValue != null) expectedValue else bodyContext.rootClass)
         else if (expectedValue != null && values.forall(v => fitsExpected(expectedValue, v))) expectedValue
         else valueType
+      val finalKeys = if (finalKeyType eq expectedKey) keys.map(widenToSlot(_, expectedKey)) else keys
+      val finalValues = if (finalValueType eq expectedValue) values.map(widenToSlot(_, expectedValue)) else values
       val mapType = AppliedClassType(bodyContext.load("java.util.Map"), scala.collection.immutable.List(finalKeyType, finalValueType))
-      Some(new MapLiteral(keys, values, mapType))
+      Some(new MapLiteral(finalKeys, finalValues, mapType))
+    }
+  }
+
+  /**
+   * A primitive element of a literal that adopted the expected element type `slot`:
+   * widen it to the slot's own primitive first, so `[1, 2]` typed `List[Long?]`
+   * holds Longs, as `val a: Long? = 1` does. Boxing the Int as it stands put an
+   * Integer where a Long is read back (ClassCastException, #2698).
+   */
+  private def widenToSlot(element: Term, slot: Type): Term = {
+    val from = element.`type`
+    if (!from.isInstanceOf[BasicType] || from == BasicType.VOID || from == BasicType.BOOLEAN) element
+    else {
+      val slotType = slot match {
+        case n: NullableType => n.innerType
+        case other => other
+      }
+      val slotPrimitive = slotType match {
+        case bt: BasicType => Some(bt)
+        case other => Boxing.unboxedType(bodyContext.table, other)
+      }
+      slotPrimitive match {
+        case Some(target) if target != BasicType.VOID && target != BasicType.BOOLEAN && target != from && TypeRules.isAssignable(target, from) =>
+          new AsInstanceOf(element.location, element, target)
+        case _ => element
+      }
     }
   }
 

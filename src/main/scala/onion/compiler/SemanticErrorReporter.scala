@@ -243,6 +243,9 @@ class SemanticErrorReporter(threshold: Int) {
         // already failed, so a name+arity match here can only be this stdlib method.
         val className = FormerDefaultImportLookup.find(name, argTypes.length).get
         Some(format(message("suggestion.stdlibNoLongerDefaultImported"), Seq(className, name)))
+      } else if (isUnqualifiedCall && NotDefaultImportedLookup.find(name, argTypes.length).isDefined) {
+        // `sum(xs)`, `sha256(s)`: pure helpers that were never default-imported (#2723).
+        Some(format(message("suggestion.stdlibNotDefaultImported"), Seq(NotDefaultImportedLookup.find(name, argTypes.length).get, name)))
       } else if (ForeignCollectionNames.contains(name) && isListType(targetType)) {
         // The name another language gives a List operation Onion also has, under its own
         // name (Scala `sortBy`/`foldLeft`/`forall`, Kotlin `joinToString`/`sumOf`, Ruby
@@ -593,6 +596,27 @@ class SemanticErrorReporter(threshold: Int) {
 
     // (name, arity) -> simple class name. A name/arity pair shared by two of these
     // classes is dropped rather than guessed at.
+    private lazy val index: Map[(String, Int), String] = {
+      val entries = for {
+        cls <- classes
+        m <- cls.getMethods
+        mods = m.getModifiers
+        if java.lang.reflect.Modifier.isStatic(mods) && java.lang.reflect.Modifier.isPublic(mods)
+        if m.getDeclaringClass == cls
+      } yield (m.getName, m.getParameterCount) -> cls.getSimpleName
+      entries.groupBy(_._1).collect {
+        case (key, matches) if matches.map(_._2).distinct.size == 1 => key -> matches.head._2
+      }
+    }
+
+    def find(name: String, arity: Int): Option[String] = index.get((name, arity))
+  }
+
+  /** Pure stdlib classes outside the default static imports; same reflection scheme as above. */
+  private object NotDefaultImportedLookup {
+    private val classes: Seq[Class[?]] =
+      Seq(classOf[onion.Stats], classOf[onion.Hash], classOf[onion.Codec], classOf[onion.Format])
+
     private lazy val index: Map[(String, Int), String] = {
       val entries = for {
         cls <- classes

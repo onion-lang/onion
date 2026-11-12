@@ -170,8 +170,11 @@ final class ExpressionFormTyping(
               case m: AST.MapLiteral => m.entries.isEmpty
               case _ => false
             }
-            if (!node.synthetic && !emptyLiteral && isUncheckedCast(term.`type`, destination))
+            if (!node.synthetic && !emptyLiteral && isUncheckedCast(term.`type`, destination)) {
+              // The reporter's file is whichever unit last set it; name this cast's own (#2848).
+              bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
               bodyContext.warningReporter.uncheckedCast(node.location, term.`type`.displayName, destination.displayName)
+            }
             Some(new AsInstanceOf(term, destination))
           }
         }

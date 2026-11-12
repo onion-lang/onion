@@ -100,6 +100,32 @@ class UncheckedCastWarningSpec extends AnyFunSpec {
       assert(w0011(shape).isEmpty)
     }
 
+    it("names the file of the cast, in a one-file and a two-file build") {
+      // #2848 panel: inside a method body the warning had no file name (`:4:70:`), and with
+      // two files it named whichever file was typed first.
+      val one = w0011(
+        """class Box[T] {
+          |public:
+          |  def get(o: Object): T = o as T
+          |}
+          |def f(o: Object): List[String] = o as List[String]
+          |println(new Box[String]().get("x"))
+          |""".stripMargin)
+      assert(one.size == 2, one.map(_.formatted))
+      assert(one.forall(_.sourceFile == "W.on"), one.map(_.formatted))
+      val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.On)
+      val a = "class A {\npublic:\n  static def run(): void { println(\"a\") }\n}\n"
+      val b = "class B[T] {\npublic:\n  def get(o: Object): T = o as T\n}\n"
+      for (order <- Seq(Seq("B.on" -> b, "A.on" -> a), Seq("A.on" -> a, "B.on" -> b))) {
+        val result = new OnionCompiler(config).compileDetailed(order.map { case (name, src) =>
+          new StreamInputSource(() => new StringReader(src), name)
+        })
+        assert(!result.hasErrors, result.allErrors.map(_.message))
+        val ws = result.diagnostics.warnings.filter(_.category.code == "W0011")
+        assert(ws.size == 1 && ws.head.sourceFile == "B.on", (order.map(_._1), ws.map(_.formatted)))
+      }
+    }
+
     it("is silenced by --Wno unchecked-cast") {
       val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.On,
         suppressedWarnings = Set(onion.compiler.WarningCategory.UncheckedCast))

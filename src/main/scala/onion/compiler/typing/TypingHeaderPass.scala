@@ -71,7 +71,8 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
           // only failed (confusingly) at the use site, if at all
           val resolved = typing.table_.loadDottedOrNull(value)
           if (resolved == null) {
-            typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, value, importCandidates(value))
+            // Not found yet: a class of a later file is not registered until every header
+            // has run, so `checkImports` reports a name that is still missing then (#2776).
             imports.append(item)
           } else if (resolved.name == value) imports.append(item)
           else imports.append(ImportItem(key, resolved.name.split("\\.").toIndexedSeq))
@@ -81,15 +82,28 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
     imports.toSeq
   }
 
+  /** Reports each single-class and static import that names no class. Runs after every
+    * unit's header pass, so an import of a class declared in a file later on the command
+    * line is found (#2776). */
+  def checkImports(): Unit = {
+    if (unit.imports == null) return
+    def missing(name: String): Boolean = typing.table_.loadDottedOrNull(name) == null
+    for ((key, value) <- unit.imports.mapping) {
+      val item = ImportItem(key, value.split("\\.").toIndexedSeq)
+      if (!item.isOnDemand && missing(value))
+        typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, value, importCandidates(value))
+    }
+    for ((_, writtenName) <- unit.imports.staticImports)
+      if (missing(writtenName))
+        typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, writtenName, importCandidates(writtenName))
+  }
+
   def collectStaticImports(): StaticImportList = {
     val staticList = defaultStaticImports()
     if (unit.imports != null) {
       for ((methodName, writtenName) <- unit.imports.staticImports) {
         // `onion.Result.Ok::*` names a nested class with dots, like a type import does.
         val resolved = typing.table_.loadDottedOrNull(writtenName)
-        if (resolved == null) {
-          typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, writtenName, importCandidates(writtenName))
-        }
         val className = if (resolved == null) writtenName else resolved.name
         if (methodName == "*") staticList.add(new StaticImportItem(className, true))
         else staticList.add(new StaticImportItem(className, true, methodName))

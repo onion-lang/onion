@@ -46,6 +46,30 @@ class ExtensionWideningReceiverSpec extends AbstractShellSpec {
 
   private def runAlone(src: String) = shell.run(src.stripMargin, "None", Array())
 
+  describe("A boxed receiver widens exactly as a boxed argument does") {
+    // `Format::bytes(xs[0])` with `xs: List[Int]` is E0005 (the box does not widen as an
+    // argument), so `xs[0].bytes()` must not compile either: the two forms take the same values.
+    it("rejects a List[Int] element for an extension Long, like the function form") {
+      val method = runAlone(
+        """
+          |extension Long { def twice(): Long = this * 2L }
+          |class Main {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val xs: List[Int] = [1536, 2048]
+          |    return "" + xs[0].twice()
+          |  }
+          |}
+          |""")
+      assert(method == Shell.Failure(-1))
+    }
+    it("still takes the element once it is unboxed into an Int") {
+      assert(Shell.Success("3072") == run("""val xs: List[Int] = [1536, 2048]
+                                            |val n: Int = xs[0]
+                                            |return "" + n.twice()""".stripMargin))
+    }
+  }
+
   describe("A widened extension never competes with a nearer one") {
     def supertypeVsLong(superName: String) = runAlone(
       s"""

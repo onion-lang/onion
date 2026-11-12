@@ -409,7 +409,7 @@ final class MethodCallTyping(
     params: Array[Term],
     expected: Type
   ): Option[Term] =
-    if (methodCallFallbackSupport.hasErasureTwinExtension(targetType, node.name))
+    if (methodCallFallbackSupport.hasErasureTwinExtension(targetType, node.name, target))
       typing.withSuppressedReporting(methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected))
     else methodCallFallbackSupport.tryExtensionMethodCallForSafeNav(node, target, targetType, params, expected)
 

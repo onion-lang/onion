@@ -23,8 +23,8 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
-  def hasErasureTwinExtension(targetType: ObjectType, name: String): Boolean =
-    extensionMethodFallbackSupport.hasErasureTwinExtension(targetType, name)
+  def hasErasureTwinExtension(targetType: ObjectType, name: String, target: Term = null): Boolean =
+    extensionMethodFallbackSupport.hasErasureTwinExtension(targetType, name, target)
 
   def tryUserExtensionWithTypedArguments(
     node: AST.MethodCall,
@@ -35,8 +35,8 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Option[Term]] =
     extensionMethodFallbackSupport.tryUserExtensionWithTypedArguments(node, target, targetType, params, expected)
 
-  def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
-    extensionMethodFallbackSupport.isAmbiguousExtensionCall(targetType, name, params)
+  def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term], target: Term = null): Boolean =
+    extensionMethodFallbackSupport.isAmbiguousExtensionCall(targetType, name, params, target)
 
   /** Zero-arg extension property access: `expr.name` resolves `def name: T` in an extension block. */
   def tryZeroArgExtensionAccess(

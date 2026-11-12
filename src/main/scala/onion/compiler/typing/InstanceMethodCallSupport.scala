@@ -45,7 +45,7 @@ private[compiler] final class InstanceMethodCallSupport(
   ): Option[Term] =
     // An extension block declaring two `name`s with one erasure is already E0084; a call to
     // that name, whichever twin it means, reports nothing of its own (#2475).
-    if (fallback.hasErasureTwinExtension(targetType, node.name))
+    if (fallback.hasErasureTwinExtension(targetType, node.name, target))
       calls.typing.withSuppressedReporting(typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected))
     else typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected)
 
@@ -124,7 +124,7 @@ private[compiler] final class InstanceMethodCallSupport(
       // `e.message` does, so parens are optional on property accessors too.
       val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound = false)
       if (ext.isDefined) return ext
-      if (fallback.isAmbiguousExtensionCall(targetType, name, params)) return None
+      if (fallback.isAmbiguousExtensionCall(targetType, name, params, target)) return None
       if (params != null && params.length == 0) {
         val getters = {
           val g = MethodResolution.findMethods(targetType, calls.getter(name), params, bodyContext.table)

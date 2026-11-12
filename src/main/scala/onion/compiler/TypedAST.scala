@@ -609,6 +609,11 @@ object TypedAST {
 
     def affiliation: TypedAST.ClassType = classType
 
+    /** The last parameter is `xs: T...`; set by the outline pass (#2839). */
+    var vararg: Boolean = false
+
+    override def isVararg: Boolean = vararg
+
     var frame: LocalFrame = _
 
     /**
@@ -1588,6 +1593,9 @@ object TypedAST {
     def getArgs: Array[TypedAST.Type]
 
     def typeParameters: Array[TypedAST.TypeParameter] = Array()
+
+    /** Declared `xs: T...` (Onion) or `T...` (Java): trailing arguments may be spread (#2839). */
+    def isVararg: Boolean = false
   }
 
   /**

@@ -185,10 +185,16 @@ public final class DateTime {
     // ========== Arithmetic ==========
 
     /**
-     * Adds days to the given time.
+     * Adds calendar days to the given time, keeping its local wall-clock time,
+     * so a 23- or 25-hour DST day still moves the date by one.
      */
     public static long addDays(long epochMillis, int days) {
-        return epochMillis + (long) days * 24 * 60 * 60 * 1000;
+        return addDays(epochMillis, days, LOCAL);
+    }
+
+    static long addDays(long epochMillis, int days, ZoneId zone) {
+        LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), zone).plusDays(days);
+        return ldt.atZone(zone).toInstant().toEpochMilli();
     }
 
     /**

@@ -375,6 +375,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     withKernel[ClassDefinition](node) { clazz =>
       resetForTypeDeclaration(clazz)
       for (methodDecl <- node.methods) processMethodDeclaration(methodDecl)
+      DuplicationChecks.checkInterfaceFinalObjectOverrides(typing, clazz, node.location)
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
     }
 

@@ -376,9 +376,19 @@ final class TypingTypeSupport(private val typing: Typing) {
                     // variables (#2259 review repro), so an abstract `upper`
                     // uses only identity through the argument's own bound
                     // chain -- never the lenient fallback -- to decide.
+                    // A concrete argument meets an F-bound read with itself in place of the
+                    // parameter (`Cat` must be an `Animal[Cat]`), and a bound is read with its
+                    // type arguments, not by erasure (`Integer` is no `Comparable[String]`, #2780).
+                    val appliedUpper: TypedAST.Type = checkedArg match {
+                      case c: TypedAST.ClassType if !TypeCheckingHelpers.containsTypeVariable(c) =>
+                        TypeSubstitution.substituteType(declaredUpper, fullSubst, Map.empty, defaultToBound = false)
+                      case _ => upper
+                    }
                     val satisfied = upper match {
                       case tv: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(tv, checkedArg)
-                      case _ => satisfiesObjectBound || TypeRules.isAssignable(upper, checkedArg)
+                      case _ =>
+                        satisfiesObjectBound || (TypeRules.isAssignable(upper, checkedArg) &&
+                          !TypeRelations.ownViewRejects(typing.table_, appliedUpper, checkedArg))
                     }
                     if (!satisfied) {
                       typing.report(INCOMPATIBLE_TYPE, typeNode, upper, arg)

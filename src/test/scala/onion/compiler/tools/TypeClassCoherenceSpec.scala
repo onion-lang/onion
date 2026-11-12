@@ -50,5 +50,22 @@ class TypeClassCoherenceSpec extends AbstractShellSpec {
       assert(Shell.Success("d") == shell.run(
         "trait Show[T] { def show(x: T): String }\ninstance Show[Integer] { def show(x: Integer): String { return \"\" + x } }\ninstance Show[String] { def show(x: String): String = x }\ndef main(args: String[]): String { return \"d\" }", "None", Array()))
     }
+    it("keeps instances for two instantiations of one generic type apart (#2778)") {
+      val src = "trait Show[T] { def show(x: T): String }\n" +
+        "instance Show[List[String]] { def show(x: List[String]): String = \"strings \" + x.size }\n" +
+        "instance Show[List[Integer]] { def show(x: List[Integer]): String = \"ints \" + x.size }\n" +
+        "def main(args: String[]): String {\n" +
+        "  val a: List[String] = [\"a\"]\n  val b: List[Integer] = [1, 2]\n" +
+        "  return Show[List[String]]::show(a) + \"/\" + Show[List[Integer]]::show(b)\n}"
+      assert(Shell.Success("strings 1/ints 2") == shell.run(src, "None", Array()))
+    }
+    it("still rejects the same generic instantiation twice (#2778)") {
+      val messages = errorMessages(
+        "trait Show[T] { def show(x: T): String }\n" +
+        "instance Show[List[String]] { def show(x: List[String]): String = \"a\" }\n" +
+        "instance Show[List[String]] { def show(x: List[String]): String = \"b\" }\n" +
+        "def main(args: String[]): void { IO::println(\"x\") }")
+      assert(messages.nonEmpty, "expected a duplicate-instance error")
+    }
   }
 }

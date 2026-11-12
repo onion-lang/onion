@@ -1,6 +1,7 @@
 package onion.compiler.tools
 
-import java.io.StringReader
+import java.io.{File, StringReader}
+import java.nio.file.Files
 import onion.compiler.{CompilationOutcome, CompilerConfig, OnionCompiler, StreamInputSource}
 import org.scalatest.funspec.AnyFunSpec
 
@@ -21,8 +22,11 @@ class ImportSourceOrderSpec extends AnyFunSpec {
       |class Timer {
       |}""".stripMargin
 
-  private def errorCodes(sources: (String, String)*): Either[Seq[String], Unit] = {
-    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10)
+  private def errorCodes(sources: (String, String)*): Either[Seq[String], Unit] =
+    errorCodesWith(Seq("."), sources*)
+
+  private def errorCodesWith(classPath: Seq[String], sources: (String, String)*): Either[Seq[String], Unit] = {
+    val config = new CompilerConfig(classPath, null, "UTF-8", "", 10)
     val inputs = sources.map { case (name, src) => new StreamInputSource(() => new StringReader(src), name) }
     new OnionCompiler(config).compile(inputs) match {
       case CompilationOutcome.Success(_)      => Right(())
@@ -59,6 +63,60 @@ class ImportSourceOrderSpec extends AnyFunSpec {
     it("prefers the module's class when its file comes later") {
       // `Timer` is also java.util.Timer and javax.swing.Timer
       assert(errorCodes("app.on" -> app("shapes.*", "Timer"), "lib.on" -> lib) == Right(()))
+    }
+  }
+
+  /** Compiles `sources` and writes their classes to a fresh directory, for use as a classpath. */
+  private def classDir(sources: (String, String)*): String = {
+    val dir = Files.createTempDirectory("onion-import-order").toFile
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", dir.getAbsolutePath, 10)
+    val inputs = sources.map { case (name, src) => new StreamInputSource(() => new StringReader(src), name) }
+    new OnionCompiler(config).compile(inputs) match {
+      case CompilationOutcome.Success(classes) =>
+        for (c <- classes) {
+          val file = new File(dir, c.className.replace('.', '/') + ".class")
+          file.getParentFile.mkdirs()
+          Files.write(file.toPath, c.content)
+        }
+      case CompilationOutcome.Failure(errors) => fail("library failed: " + errors.mkString("; "))
+    }
+    dir.getAbsolutePath
+  }
+
+  describe("a wildcard import of classes that come only from the classpath") {
+    // Two modules on the classpath both declare `Foo`; `p.*` is written first, so a bare
+    // `Foo` is `p.Foo`. Whether an earlier line already loaded `q.Foo` must not matter.
+    lazy val lib = classDir(
+      "p.on" -> "module p;\nclass Foo {\npublic:\n  def this {}\n  def onlyP(): Int = 1\n}",
+      "q.on" -> "module q;\nclass Foo {\npublic:\n  def this {}\n  def onlyQ(): Int = 2\n}",
+      "t.on" -> "module mypkg;\nclass Timer {\npublic:\n  def this {}\n}"
+    )
+    def use(pre: String, body: String, imports: String = "p.*\n  q.*"): String =
+      s"""module app;
+         |import {
+         |  $imports
+         |}
+         |class Use {
+         |public:
+         |  static def f(): Int {
+         |    $pre
+         |    $body
+         |  }
+         |}""".stripMargin
+
+    it("binds the first import's class when nothing loaded the other one") {
+      assert(errorCodesWith(Seq(".", lib), "use.on" -> use("", "val f: Foo = new Foo()\n    return f.onlyP()")) == Right(()))
+    }
+    it("binds the first import's class when an earlier line loaded the other one") {
+      val src = use("val pre: q.Foo = new q.Foo()", "val f: Foo = new Foo()\n    return f.onlyP() + pre.onlyQ()")
+      assert(errorCodesWith(Seq(".", lib), "use.on" -> src) == Right(()))
+    }
+    it("keeps a default-imported JDK class over a classpath class, loaded or not") {
+      // `Timer` is java.util.Timer (a default import) on main; `mypkg.Timer` has no `cancel`
+      val before = use("", "val t: Timer = new Timer()\n    t.cancel()\n    return 0", "mypkg.*")
+      val after = use("val m: mypkg.Timer = new mypkg.Timer()", "val t: Timer = new Timer()\n    t.cancel()\n    return 0", "mypkg.*")
+      assert(errorCodesWith(Seq(".", lib), "use.on" -> before) == Right(()))
+      assert(errorCodesWith(Seq(".", lib), "use.on" -> after) == Right(()))
     }
   }
 }

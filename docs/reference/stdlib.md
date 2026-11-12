@@ -2483,6 +2483,8 @@ DateTime::parse(isoString): Long
 DateTime::parse(dateTime, pattern): Long
 ```
 
+`parse(isoString)` accepts `2026-11-11`, `2026-11-11T10:00[:00]` (local zone), and a value with `Z` or an offset (`2026-11-11T10:00:00+09:00`), which is an exact instant.
+
 ### Formatting
 
 ```

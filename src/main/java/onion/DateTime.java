@@ -45,6 +45,9 @@ public final class DateTime {
 
     /**
      * Parses an ISO-formatted date-time string to epoch milliseconds.
+     * Accepts {@code 2026-11-11}, {@code 2026-11-11T10:00[:00]} (local zone) and a
+     * value with an offset, {@code 2026-11-11T10:00:00Z} or {@code ...+09:00}, which
+     * names an exact instant whatever the local zone is.
      */
     public static long parse(String dateTime) {
         if (dateTime == null || dateTime.isEmpty())
@@ -52,12 +55,19 @@ public final class DateTime {
         try {
             return LocalDateTime.parse(dateTime, ISO_FORMAT).atZone(LOCAL).toInstant().toEpochMilli();
         } catch (java.time.format.DateTimeParseException dt) {
-            // Fall back to a date-only value (midnight, local zone).
+            // A value with a zone or offset names an exact instant.
             try {
-                return LocalDate.parse(dateTime, DateTimeFormatter.ISO_LOCAL_DATE)
-                    .atStartOfDay(LOCAL).toInstant().toEpochMilli();
-            } catch (java.time.format.DateTimeParseException d) {
-                throw new IllegalArgumentException("cannot parse date-time \"" + dateTime + "\"", d);
+                return java.time.OffsetDateTime.parse(dateTime, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                    .toInstant().toEpochMilli();
+            } catch (java.time.format.DateTimeParseException o) {
+                // Fall back to a date-only value (midnight, local zone).
+                try {
+                    return LocalDate.parse(dateTime, DateTimeFormatter.ISO_LOCAL_DATE)
+                        .atStartOfDay(LOCAL).toInstant().toEpochMilli();
+                } catch (java.time.format.DateTimeParseException d) {
+                    throw new IllegalArgumentException("cannot parse date-time \"" + dateTime
+                        + "\"; expected 2026-11-11, 2026-11-11T10:00[:00] or 2026-11-11T10:00:00Z / +09:00", d);
+                }
             }
         }
     }

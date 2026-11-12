@@ -36,4 +36,22 @@ class EnsuresVerifySpec extends AnyFunSpec {
     val (ws, err) = run(cls("result < x", "@Trusted"))
     assert(ws.isEmpty && !err.contains("[ensures] proved"), err)
   }
+
+  describe("an ensures that needs a class invariant (#2672)") {
+    // Nothing checks the invariant, so a constructor can break it: the proof is not "proved".
+    val counter =
+      "class Counter {\n  invariant n >= 0 && n < 10\nprotected:\n  var n: Int\npublic:\n" +
+        "  def this { n = 2147483647 }\n  def next(): Int ensures result > 0 { return n + 1 }\n}"
+
+    it("is not reported as proved") {
+      val (ws, err) = run(counter)
+      assert(!err.contains("[ensures] proved"), err)
+      assert(ws.isEmpty, ws.toString)
+    }
+
+    it("is still proved when the invariant is not needed") {
+      val (_, err) = run(counter.replace("ensures result > 0 { return n + 1 }", "ensures result == 1 { return 1 }"))
+      assert(err.contains("[ensures] proved: Counter.next"), err)
+    }
+  }
 }

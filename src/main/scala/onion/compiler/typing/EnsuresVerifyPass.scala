@@ -52,6 +52,10 @@ final class EnsuresVerifyPass(
     val callees = chain.reverse.flatMap(methodsOf).map(m => m.name -> m).toMap
     for (m <- methodsOf(cls) if m.block != null && m.ensures.nonEmpty && !m.annotations.exists(_.name == "Trusted")) {
       HistoryProver.proveEnsures(m, m.ensures, invariants, intFields, callees) match {
+        // A proof may lean on a class invariant only once something checks that invariant (#2602,
+        // #2672): a constructor can break it unseen. A proof that needs one is not "proved".
+        case HistoryProver.Proved if invariants.nonEmpty &&
+            HistoryProver.proveEnsures(m, m.ensures, Nil, intFields, callees) != HistoryProver.Proved =>
         case HistoryProver.Proved =>
           onProved(cls.name, m.name, m.location)
           proved(s"${cls.name}.${m.name}: ${m.ensures.map(onion.compiler.contracts.ExpressionText.of).mkString(" && ")}")

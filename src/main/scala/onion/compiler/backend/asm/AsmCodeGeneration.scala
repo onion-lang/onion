@@ -78,7 +78,7 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     var closureCounter = 0
     val closures = mutable.ArrayBuffer[CompiledClass]()
     val closureCodegen: ClosureCodegen =
-      new ClosureCodegen(AsmCodeGeneration.this, config.outputDirectory, () => { closureCounter += 1; closureCounter }, compiled => closures += compiled)
+      new ClosureCodegen(AsmCodeGeneration.this, config.outputDirectory, () => { closureCounter += 1; closureCounter }, compiled => closures += compiled, sourceFileName(host))
     var lastVisitor: AsmCodeGenerationVisitor = null
     var lastVisitorGen: GeneratorAdapter = null
     var lastVisitorLocals: LocalVarContext = null

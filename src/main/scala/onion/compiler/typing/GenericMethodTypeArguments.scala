@@ -27,6 +27,16 @@ private[typing] object GenericMethodTypeArguments {
     case _ => false
   }
 
+  /** Whether `t` mentions any type variable, a method's or an enclosing class's. */
+  private def mentionsTypeVariable(t: Type): Boolean = t match {
+    case _: TypeVariableType => true
+    case applied: AppliedClassType => applied.typeArguments.exists(mentionsTypeVariable)
+    case at: ArrayType => mentionsTypeVariable(at.base)
+    case n: NullableType => mentionsTypeVariable(n.innerType)
+    case w: WildcardType => mentionsTypeVariable(w.upperBound) || w.lowerBound.exists(mentionsTypeVariable)
+    case _ => false
+  }
+
   private def typeParamsIn(t: Type, names: Set[String]): Set[String] = t match {
     case tv: TypeVariableType => if (names.contains(tv.name)) Set(tv.name) else Set.empty
     case applied: AppliedClassType => applied.typeArguments.toSet.flatMap(typeParamsIn(_, names))
@@ -536,6 +546,16 @@ private[typing] object GenericMethodTypeArguments {
         for (upper <- upperConstraints.get(name); lower <- lowerConstraints.get(name)
              if !failedBound(name) && !fitsBothLimits(upper, lower)) {
           reportError(callNode, INCOMPATIBLE_TYPE, upper, lower)
+          limitsConflict = true
+          failedBound += name
+        }
+
+        // The same holds for a value a plain `T` argument fixed, when the `? super T` limit
+        // mentions a type variable: erased, `T` would take an `Object`, which a concrete limit
+        // already refuses (`Collections::fill(x: List[T], v: Object)`, #2695).
+        for (upper <- upperConstraints.get(name) if !failedBound(name) && mentionsTypeVariable(upper);
+             fixed <- inferred.get(name) if !fitsBothLimits(upper, fixed)) {
+          reportError(callNode, INCOMPATIBLE_TYPE, upper, fixed)
           limitsConflict = true
           failedBound += name
         }

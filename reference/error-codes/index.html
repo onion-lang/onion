@@ -8971,7 +8971,7 @@ pass reports it yet -- it can never actually appear in a build log.</p>
 </tr>
 <tr>
 <td><code>W0011</code></td>
-<td>unchecked cast (reserved)</td>
+<td>unchecked cast: <code>e as D</code> where the run-time check cannot test D's type arguments (<code>o as List[String]</code>) or a type-variable D (<code>o as T</code>); an upcast, all-<code>Object</code> arguments and a downcast whose arguments follow from the source (<code>ls as ArrayList[String]</code>) do not warn</td>
 </tr>
 <tr>
 <td><code>W0012</code></td>

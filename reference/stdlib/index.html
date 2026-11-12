@@ -11067,6 +11067,7 @@ on any method, or the response status:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-160-1"><a id="__codelineno-160-1" name="__codelineno-160-1" href="#__codelineno-160-1"></a>DateTime::parse(isoString): Long
 </span><span id="__span-160-2"><a id="__codelineno-160-2" name="__codelineno-160-2" href="#__codelineno-160-2"></a>DateTime::parse(dateTime, pattern): Long
 </span></code></pre></div>
+<p><code>parse(isoString)</code> accepts <code>2026-11-11</code>, <code>2026-11-11T10:00[:00]</code> (local zone), and a value with <code>Z</code> or an offset (<code>2026-11-11T10:00:00+09:00</code>), which is an exact instant.</p>
 <h3 id="formatting">Formatting<a class="headerlink" href="#formatting" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-161-1"><a id="__codelineno-161-1" name="__codelineno-161-1" href="#__codelineno-161-1"></a>DateTime::format(epochMillis): String
 </span><span id="__span-161-2"><a id="__codelineno-161-2" name="__codelineno-161-2" href="#__codelineno-161-2"></a>DateTime::format(epochMillis, pattern): String

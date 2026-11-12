@@ -11034,6 +11034,7 @@ null なプラットフォーム型の <code>List</code> に対して直接呼�
 <div class="language-text highlight"><pre><span></span><code><span id="__span-162-1"><a id="__codelineno-162-1" name="__codelineno-162-1" href="#__codelineno-162-1"></a>DateTime::parse(isoString): Long
 </span><span id="__span-162-2"><a id="__codelineno-162-2" name="__codelineno-162-2" href="#__codelineno-162-2"></a>DateTime::parse(dateTime, pattern): Long
 </span></code></pre></div>
+<p><code>parse(isoString)</code> は <code>2026-11-11</code>、<code>2026-11-11T10:00[:00]</code>(ローカルゾーン)、<code>Z</code> やオフセット付き(<code>2026-11-11T10:00:00+09:00</code>)を受け付けます。オフセット付きは正確な時刻になります。</p>
 <h3 id="_33">フォーマット<a class="headerlink" href="#_33" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-163-1"><a id="__codelineno-163-1" name="__codelineno-163-1" href="#__codelineno-163-1"></a>DateTime::format(epochMillis): String
 </span><span id="__span-163-2"><a id="__codelineno-163-2" name="__codelineno-163-2" href="#__codelineno-163-2"></a>DateTime::format(epochMillis, pattern): String

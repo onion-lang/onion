@@ -8968,7 +8968,7 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 </tr>
 <tr>
 <td><code>W0011</code></td>
-<td>未検査キャスト（予約）</td>
+<td>未検査キャスト: 実行時の検査では D の型引数を確かめられない <code>e as D</code>（<code>o as List[String]</code>）、または型変数への <code>o as T</code>。アップキャスト、型引数がすべて <code>Object</code> のもの、型引数が元の型から決まるダウンキャスト（<code>ls as ArrayList[String]</code>）は警告しません</td>
 </tr>
 <tr>
 <td><code>W0012</code></td>

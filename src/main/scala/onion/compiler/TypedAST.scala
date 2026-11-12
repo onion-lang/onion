@@ -2020,6 +2020,12 @@ object TypedAST {
       // Handle NullableType
       (left, right) match {
         // T? ← T? : check inner types
+        // Two nullable primitives hold boxes, and a box never converts to another box
+        // (`Integer` is not a `Long`), so `Int?` fits `Long?` only as the same primitive:
+        // numeric widening would compile and then throw ClassCastException (#2730).
+        case (l: TypedAST.NullableType, r: TypedAST.NullableType)
+            if l.innerType.isBasicType && r.innerType.isBasicType =>
+          return l.innerType eq r.innerType
         case (l: TypedAST.NullableType, r: TypedAST.NullableType) =>
           return isSuperType(l.innerType, r.innerType)
         // T? ← T : allowed (widening)

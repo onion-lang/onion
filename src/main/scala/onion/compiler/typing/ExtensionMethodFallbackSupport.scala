@@ -799,6 +799,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     name: String
   ): Seq[ExtensionMethodDefinition] = {
     val result = scala.collection.mutable.LinkedHashSet.empty[ExtensionMethodDefinition]
+    var isWidenedLookup = false
 
     def collect(currentType: ObjectType): Unit = {
       if (currentType == null) return
@@ -806,6 +807,15 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         case classType: ClassType =>
           typing.lookupExtensionMethods(classType.name).foreach { extMethod =>
             if (extMethod.name == name && (isBuiltinExtension(extMethod) || receiverArgumentsMatch(extMethod.receiverType, classType))) result += extMethod
+          }
+          // A number receiver widens like an argument: `5.bytes()` reaches `extension Long` (#2724).
+          // Only when its own type has no such extension, and then the nearest wider type wins.
+          if (!result.exists(_.name == name) && !isWidenedLookup) {
+            val widened = ExtensionMethodFallbackSupport.WideningReceivers.getOrElse(classType.name, Nil).iterator
+              .map(wider => typing.lookupExtensionMethods(wider).filter(m => m.name == name && m.receiverType.isBasicType))
+              .find(_.nonEmpty)
+            widened.foreach(ms => result ++= ms)
+            isWidenedLookup = widened.isDefined
           }
         case at: ArrayType =>
           typing.lookupExtensionMethods(Typing.ArrayExtensionReceiver).foreach { extMethod =>
@@ -886,6 +896,15 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 }
 
 private[compiler] object ExtensionMethodFallbackSupport {
+  /** Boxed number classes an extension receiver of a wider primitive also serves. */
+  val WideningReceivers: Map[String, List[String]] = Map(
+    "java.lang.Byte" -> List("java.lang.Short", "java.lang.Integer", "java.lang.Long", "java.lang.Float", "java.lang.Double"),
+    "java.lang.Short" -> List("java.lang.Integer", "java.lang.Long", "java.lang.Float", "java.lang.Double"),
+    "java.lang.Integer" -> List("java.lang.Long", "java.lang.Float", "java.lang.Double"),
+    "java.lang.Long" -> List("java.lang.Float", "java.lang.Double"),
+    "java.lang.Float" -> List("java.lang.Double")
+  )
+
   /** The single source of truth for which stdlib containers' static helpers are
    *  registered as builtin extension methods -- consumed both by
    *  `Typing.registerBuiltinExtensions` (which registers them, in this order: for

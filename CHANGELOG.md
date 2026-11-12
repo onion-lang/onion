@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.156.0] - 2026-11-12
+
+### Added
+
+- **A cast the JVM cannot fully check now warns: W0011 (#2665).**
+  - Before: `o as List[String]` or `o as T` compiled silently. A wrong element failed later, where it was read.
+  - Now: W0011 at the cast. Upcasts, all-`Object` arguments and empty `[]`/`[:]` literals do not warn. Silence it with `--Wno unchecked-cast`.
+
+### Fixed
+
+- **`DateTime::parse("2026-11-11T10:00:00Z")` parses (#2833).**
+  - Before: a timestamp with `Z` or an offset (`+09:00`) was rejected.
+  - Now: it parses to that exact instant; the error for other text lists the accepted forms.
+- **`"#{sb}"` with a `StringBuilder` part prints its text.**
+  - Before: it compiled, then the class failed to load with `VerifyError: Bad type on operand stack`.
+  - Now: `"[#{sb}]"` gives `[hi]` for `new StringBuilder("hi")`, as `"[" + sb + "]"` already did.
+  - In a contract, `requires "#{sb}" != ""` now compiles, as an `Object` part does. Before, it was E0106 naming `AbstractStringBuilder::append`.
+- **`instance Show[List[String]]` and `instance Show[List[Integer]]` compile together again (#2778).**
+  - Before: the second one was E0097, "already defined", since only `List` was compared.
+  - Now: the type arguments count too; the same instantiation twice is still E0097.
+- **An interface `history` over method calls now gets W0024 at a method that writes a field.**
+  - Before: `history x() >= old(x())` in an interface was accepted with no error or warning.
+  - Now: each implementing method that writes a field gets W0024, "nothing checks the history".
+- **A `String?` passed to a `String` parameter now says it is nullable (#2722).**
+  - Before: E0005 "not found. Check spelling", with a signature that looked like the call.
+  - Now: the same E0005 adds "argument 1 is `String?`, but the parameter takes a non-null `String`", with `!!`, `?:` and a null check as fixes.
+- **`i.compareTo("x")` on a `JInteger` is a compile error (#2708).**
+  - Before: it compiled, then threw `ClassCastException` at run time.
+  - Now: `E0005`, as in Java.
+- **`val xs: List[Long?] = [1, 2]` holds Longs, so `xs[0]` reads back as a `Long?`.**
+  - Before: it compiled, then threw `ClassCastException` (Integer → Long) on the first read.
+  - Now: each `Int` element is widened, as in `val a: Long? = 1`. Map literal keys and values (`Map[String, Long?]`) and `Double?` slots work the same way.
+- **`Collections::fill(x, v)` with `x: List[T]` and `v: Object` is now a compile error (#2695).**
+  - Before: it compiled inside a generic class, then threw ClassCastException when `x[0]` was read as a `T`.
+  - Now: E0005, as Java does and as Onion already did for a `List[String]`. A `v: T` still compiles.
+- **`new C[T](xs)` checks `xs` against `T` itself, not `T`'s bound (#2677).**
+  - Before: inside `class D[T extends Number]`, `new C[T](xs)` with `xs: List[Number]` compiled, then threw `ClassCastException` when an element was read.
+  - Now: E0021, the same check a method call `f(xs)` gets, also for `new C[T](xs = xs)` and a constructor with a default parameter. With a `this(o: Object)` overload beside `this(xs: List[T])`, that one is chosen, as in Java.
+- **`super.greet()` reaches a trait's or interface's default method (#2675).**
+  - Before: in `class Loud conforms Greeter`, it was E0005 "not found", while listing `greet()` as available.
+  - Now: it calls `Greeter`'s default, like Java's `Greeter.super.greet()`, also inside a lambda. A superclass method still wins.
+- **`super.g()` through an abstract superclass runs (#2702).**
+  - Before: when `Base conforms I` inherited `I`'s default `g()`, the call compiled, then threw `IncompatibleClassChangeError`. `super.stream()` from an `AbstractList` subclass failed the same way.
+  - Now: it calls the default, as in Java.
+- **`--verbose` no longer says an `ensures` is proved when the proof needs a class `invariant` (#2672).**
+  - Before: `[ensures] proved: Counter.next` for `ensures result > 0` over `n + 1`, then the run printed `-2147483648`.
+  - Now: no "proved" line, since a constructor can break an unchecked `invariant`. A proof that needs no invariant is still proved.
+- **A static-imported function types its lambda: `filterValues(m) { v -> v > 1 }` compiles after `import { onion.Maps::* }` (#2667).**
+  - Before: E0052 "lambda parameter v must specify a type", while `Maps::filterValues(m) { v -> v > 1 }` worked.
+  - Now: the bare call takes the lambda's parameter types from the imported function, trailing or positional, for class-level and single-method imports alike.
+- **`extends A(7)`, `: this(4)` and `new A(7)` fill an omitted constructor default.** With `def this(a: Int = 1, b: Int = 2)`:
+  - Before: E0021 for the two delegations; E0022 for `new A(7)` next to an `A(s: String)` constructor.
+  - Now: `b` takes its default `2`, and the constructor whose parameter types fit the arguments is chosen.
+  - E0021 for a wrong-typed argument, such as `new A("x")`, names the call's types (`A(String)`), not the constructor's.
+- **`requires`/`ensures` written in a class body now get a hint (#2605).**
+  - Before: a bare syntax error, `Encountered "requires", but expecting "val", "var", ...`.
+  - Now: the hint says the clause belongs after a method's signature (`def inc(): void requires n >= 0 { ... }`), or, for a condition on the fields, to write `invariant n >= 0`.
+- **`requires`/`ensures` written in a record or enum body now get a hint (#2605).**
+  - Before: a bare syntax error, `Encountered "requires", but expecting "}"`.
+  - Now: the hint shows the clause after a method's signature (`public: def half(): Int requires n > 0 = n / 2`), or `invariant n >= 0` under `public:` for a condition that always holds.
+- **E0106, E0077 and W0023 name an instance call the way it is written (#2605).**
+  - Before: `ensures xs.add(1)` was E0106 "this contract calls `java.util.List::add`", in static-call syntax.
+  - Now: "calls `java.util.List.add`". A static call keeps `Owner::method` (`Loader::load`).
+- **An interface method named like a final `Object` method is E0039 (#2572).**
+  - Before: `interface N { def notify(): void }` compiled, then failed at load with `IncompatibleClassChangeError`.
+  - Now: E0039 at the method, as a class and a record get.
+
 ## [0.155.0] - 2026-11-11
 
 ### Breaking

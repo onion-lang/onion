@@ -1,7 +1,7 @@
 package onion.compiler.environment
 
 import onion.compiler.{TypedAST, Modifier, OnionTypeConversion, MultiTable, OrderedTable, ClassTable}
-import org.objectweb.asm.{ClassReader, ClassVisitor, Opcodes, Type}
+import org.objectweb.asm.{ClassReader, ClassVisitor, MethodVisitor, Opcodes, Type}
 import org.objectweb.asm.signature.{SignatureReader, SignatureVisitor}
 import org.objectweb.asm.tree.{ClassNode, MethodNode, FieldNode}
 import scala.collection.mutable
@@ -445,7 +445,11 @@ object AsmRefs {
       val m = new MultiTable[TypedAST.Method]
       import scala.jdk.CollectionConverters._
       val all = node.methods.asInstanceOf[java.util.List[MethodNode]].asScala.filter(_.name != CONSTRUCTOR_NAME)
-      for (method <- all if !BridgeMethods.isShadowedBridge(method, all)) {
+      val shadowed = all.filter(BridgeMethods.isShadowedBridge(_, all))
+      // A visibility bridge with a same-name overload passes the sibling test too; only its body tells
+      // it apart (#2837), and the node was read without code, so read the candidates' bodies alone.
+      val visibility = if (shadowed.isEmpty) Set.empty[(String, String)] else BridgeMethods.visibilityBridges(classBytes, node.name)
+      for (method <- all if !(shadowed.contains(method) && !visibility.contains((method.name, method.desc)))) {
         m.add(new AsmMethodRef(method, this, table, classEnv, onionCompiled))
       }
       m
@@ -519,10 +523,13 @@ object AsmRefs {
  * A bridge the compiler emitted for a generic or covariant override (`Integer.compareTo(Object)`
  * next to `compareTo(Integer)`) is not a method the source can name: javac never resolves a call
  * to it, and resolving to it lets a wrong argument through (`i.compareTo("x")` compiled, then threw
- * ClassCastException, #2708). Such a bridge always sits next to the real method it forwards to, with
- * the same name and arity and the same primitive parameters. A visibility bridge
- * (`StringBuilder.length()`, re-declaring a method of a non-public superclass) has no such sibling
- * and stays: it is the only public way in.
+ * ClassCastException, #2708). Such a bridge forwards to a method of its own class, which sits next
+ * to it with the same name and arity and the same primitive parameters; it is dropped.
+ *
+ * A visibility bridge (`StringBuilder.length()`, or `Pub.foo(String)` over a package-private
+ * `Base.foo(String)`) re-declares an inherited method so that it is reachable through the public
+ * class. It is the only public way in, so it stays, even when an overload such as `Pub.foo(Integer)`
+ * makes it look like a generic bridge: its body calls the superclass method with `invokespecial`.
  */
 private[environment] object BridgeMethods {
   def isShadowedBridge(method: MethodNode, siblings: Iterable[MethodNode]): Boolean =
@@ -536,15 +543,43 @@ private[environment] object BridgeMethods {
       }
     }
 
+  /** The (name, descriptor) of every bridge in `classBytes` whose body calls the same method of another class with `invokespecial`. */
+  def visibilityBridges(classBytes: Array[Byte], owner: String): Set[(String, String)] = {
+    val found = scala.collection.mutable.Set.empty[(String, String)]
+    new ClassReader(classBytes).accept(new ClassVisitor(Opcodes.ASM9) {
+      override def visitMethod(access: Int, name: String, desc: String, signature: String, exceptions: Array[String]): MethodVisitor =
+        if ((access & Opcodes.ACC_BRIDGE) == 0) null
+        else new MethodVisitor(Opcodes.ASM9) {
+          override def visitMethodInsn(opcode: Int, insnOwner: String, insnName: String, insnDesc: String, isInterface: Boolean): Unit =
+            if (opcode == Opcodes.INVOKESPECIAL && insnOwner != owner && insnName == name && insnDesc == desc) found += ((name, desc))
+        }
+    }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES)
+    found.toSet
+  }
+
   def isShadowedBridge(method: java.lang.reflect.Method, siblings: Array[java.lang.reflect.Method]): Boolean =
-    method.isBridge && {
+    method.isBridge && !isVisibilityBridge(method) && {
       val args = method.getParameterTypes
+      val desc = Type.getMethodDescriptor(method)
       siblings.exists { other =>
         !other.isBridge && other.getName == method.getName && other.getParameterCount == args.length &&
-          !java.util.Arrays.equals(other.getParameterTypes.asInstanceOf[Array[AnyRef]], args.asInstanceOf[Array[AnyRef]]) &&
+          Type.getMethodDescriptor(other) != desc &&
           sameShape(args.map(c => Type.getType(c).getSort), other.getParameterTypes.map(c => Type.getType(c).getSort))
       }
     }
+
+  // Reflection has no method bodies: a visibility bridge is one that re-declares, with the exact
+  // signature, a method of a non-public superclass.
+  private def isVisibilityBridge(method: java.lang.reflect.Method): Boolean = {
+    var c = method.getDeclaringClass.getSuperclass
+    var found = false
+    while (c != null && !found) {
+      found = !java.lang.reflect.Modifier.isPublic(c.getModifiers) &&
+        c.getDeclaredMethods.exists(m => m.getName == method.getName && Type.getMethodDescriptor(m) == Type.getMethodDescriptor(method))
+      c = c.getSuperclass
+    }
+    found
+  }
 
   // Reference parameters may differ (that is what a bridge erases); primitive ones may not.
   private def isReference(sort: Int): Boolean = sort == Type.OBJECT || sort == Type.ARRAY

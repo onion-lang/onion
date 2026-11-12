@@ -579,12 +579,11 @@ final class ConstructionTyping(
     * ordinary boxing-aware assignability or -- for a literal like `-3` against
     * a `Byte`/`Short`/`Char` formal -- constant narrowing (issue #374). */
   private def formalAccepts(formal: Type, actual: Term): Boolean =
-    // `null` never fills a primitive slot: boxing the formal would let it through (#2828)
-    !(formal.isBasicType && actual.`type`.isNullType) && (TypeRelations.isAssignableWithBoxing(formal, actual.`type`, bodyContext.table) ||
+    TypeRelations.isAssignableWithBoxing(formal, actual.`type`, bodyContext.table) ||
       (formal match {
         case bt: BasicType => ConstantNarrowing.constantIntOf(actual).exists(v => ConstantNarrowing.fits(bt, v))
         case _ => false
-      }))
+      })
 
   /**
    * Boxing-aware constructor fallback: substitutes class type arguments into

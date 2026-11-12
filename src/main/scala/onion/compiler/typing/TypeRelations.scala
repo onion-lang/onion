@@ -122,6 +122,9 @@ private[typing] object TypeRelations {
 
   def isAssignableWithBoxing(expected: Type, actual: Type, table: ClassTable, topLevel: Boolean = true): Boolean =
     if ownViewRejects(table, expected, actual) then false
+    // `null` never fills a primitive slot: boxing the slot's type would let it through,
+    // for a `new`, an `extends A(..)` and a `: this(..)` alike (#2828).
+    else if expected.isBasicType && actual.isNullType then false
     else if TypeRules.isAssignable(expected, actual) then true
     else if !expected.isBasicType && actual.isBasicType then
       val basicType = actual.asInstanceOf[BasicType]

@@ -69,9 +69,10 @@ final class ExpressionFormTyping(
         // a reference and both branches must leave the same stack type. A
         // primitive fallback against a boxed result (e.g. `Int? ?: -1`, where the
         // left is a boxed Integer) is boxed so both branches agree; the boxed
-        // result unboxes at the use site as usual.
+        // result unboxes at the use site as usual. The fallback takes the left's
+        // slot like any other argument, so `Long? ?: 5` boxes a Long (#2727).
         val right: Term =
-          if (right0.isBasicType && !leftNonNull.isBasicType) Boxing.boxing(bodyContext.table, right0)
+          if (right0.isBasicType && !leftNonNull.isBasicType) Boxing.boxForSlot(bodyContext.table, right0, leftT)
           else right0
         // Compare against the right operand's non-null core: a nullable fallback
         // (`a ?: b` where both are T?) is valid and yields a nullable result

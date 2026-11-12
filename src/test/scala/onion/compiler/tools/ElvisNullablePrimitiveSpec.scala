@@ -38,5 +38,10 @@ class ElvisNullablePrimitiveSpec extends AbstractShellSpec {
     it("still works for nullable references") {
       assert(Shell.Success("default") == run("    val s: String? = null\n    return s ?: \"default\"", "String"))
     }
+    it("an Int fallback widens to the Long?/Double? left, as in `val l: Long = 5` (#2727)") {
+      assert(Shell.Success(5L) == run("    val x: Long? = null\n    val b: Long = x ?: 5\n    return b", "Long"))
+      assert(Shell.Success(9L) == run("    val x: Long? = 9L\n    return x ?: 5", "Long"))
+      assert(Shell.Success(5.0) == run("    val d: Double? = null\n    return d ?: 5", "Double"))
+    }
   }
 }

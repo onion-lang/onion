@@ -271,7 +271,21 @@ class SemanticErrorReporter(threshold: Int) {
     val withHexDigitB =
       if (!hexDigitB) suggestion
       else Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + message("suggestion.hexDigitB"))
-    problem(position, appendSuggestion(baseMessage, withHexDigitB))
+    // `shout(s)` with `s: String?` and `shout(x: String)`: the call fits once nullability is
+    // set aside, so "not found" misleads. Name the argument and the ways out (#2722).
+    val nullableArg: Option[(Int, TypedAST.Type, TypedAST.Type)] =
+      sameName.iterator.filter(m => !m.isVararg && m.argumentCount == argTypes.length && acceptsTypes(m, argTypes)).flatMap { m =>
+        argTypes.indices.find { i =>
+          val p = m.arguments(i)
+          argTypes(i) != null && argTypes(i).isNullable && !p.isNullable && !p.isInstanceOf[TypedAST.TypeVariableType]
+        }.map(i => (i, m.arguments(i), argTypes(i)))
+      }.nextOption()
+    val withNullable = nullableArg match
+      case Some((i, param, arg)) =>
+        val hint = format(message("suggestion.nullableArgument"), Seq((i + 1).toString, typeName(arg), typeName(param)))
+        Some(withHexDigitB.fold("")(_ + Systems.lineSeparator + "  ") + hint)
+      case None => withHexDigitB
+    problem(position, appendSuggestion(baseMessage, withNullable))
   }
 
   /**

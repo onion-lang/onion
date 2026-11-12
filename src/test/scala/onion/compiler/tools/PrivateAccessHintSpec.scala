@@ -54,6 +54,30 @@ class PrivateAccessHintSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a private member of a class that is not Onion source (#2764)") {
+    it("E0014 on a stdlib field gives no `public:` advice, since the user cannot edit that class") {
+      val msgs = messages(
+        """
+          |import { onion.Server; }
+          |val r = Server::text("x")
+          |r.status = 1
+          |""".stripMargin
+      ).mkString("\n")
+      assert(msgs.contains("E0014"), s"expected E0014, got: $msgs")
+      assert(!msgs.contains("public:"), s"a Java class has no section to move the field to, got: $msgs")
+    }
+
+    it("E0013 on a stdlib constructor gives no `public:` advice either") {
+      val msgs = messages(
+        """
+          |import { onion.Server; }
+          |val r = new Server.Response(200, "x")
+          |""".stripMargin
+      ).mkString("\n")
+      if (msgs.contains("E0013")) assert(!msgs.contains("public:"), s"got: $msgs")
+    }
+  }
+
   describe("a constructor correctly placed under `public:`") {
     it("does not fire the private-access hint") {
       val msgs = messages(

@@ -257,5 +257,30 @@ class ConstructorVarargsSpec extends AbstractShellSpec {
           |""", "CtorVarargsTypeVarOk.on")
       assert(Shell.Success("rb") == result)
     }
+    it("unboxes a boxed Integer spread into an Int... constructor") {
+      // A boxed element went into the int[] unconverted: VerifyError at class load.
+      val result = run(
+        """
+          |class I {
+          |public:
+          |  val n: Int
+          |  def this(xs: Int...) { this.n = xs[0] + xs[1] }
+          |}
+          |class L {
+          |public:
+          |  val n: Int
+          |  def this(tag: String, xs: Int...) { this.n = xs[0] + xs[1] }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val v: Integer = 7
+          |    val w: Int = 2
+          |    return new I(v, v).n + "," + new I(w, v).n + "," + new L("t", v, 3).n
+          |  }
+          |}
+          |""", "CtorVarargsUnbox.on")
+      assert(Shell.Success("14,9,10") == result)
+    }
   }
 }

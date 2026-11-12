@@ -590,7 +590,16 @@ final class ConstructionTyping(
         val fixed = formals.length - 1
         val fixedArgs = adaptToFormals(parameters.take(fixed), formals.take(fixed))
         val rest = parameters.drop(fixed)
-        val elements = Boxing.adaptArguments(table, rest, Array.fill[Type](rest.length)(arrayType.base))
+        // A boxed element for a primitive array (`Integer` into `Int...`) is unboxed
+        // first, as the varargs method path does; stored as-is it failed verification.
+        val elements = rest.map { p =>
+          val unboxed = arrayType.base match {
+            case _: BasicType if !p.isBasicType =>
+              Boxing.unboxedType(table, p.`type`).map(Boxing.unboxing(table, p, _)).getOrElse(p)
+            case _ => p
+          }
+          Boxing.adaptArgument(table, unboxed, arrayType.base)
+        }
         val args = fixedArgs :+ (new NewArrayWithValues(arrayType, elements): Term)
         val ref = typeRef match {
           case applied: TypedAST.AppliedClassType =>

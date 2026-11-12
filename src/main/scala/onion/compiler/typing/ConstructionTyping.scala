@@ -458,7 +458,7 @@ final class ConstructionTyping(
                   if n.innerType.isInstanceOf[TypedAST.TypeVariableType] &&
                     nonNullCore(params(i).`type`).isInstanceOf[TypedAST.TypeVariableType] =>
                 TypeRules.isSuperTypeByIdentity(n.innerType, nonNullCore(params(i).`type`))
-              case f =>TypeRelations.isAssignableWithBoxing(f, params(i).`type`, bodyContext.table)
+              case f =>TypeRelations.isConstructorArgAssignable(f, params(i).`type`, bodyContext.table)
             }
           } && typeVariableSlotsFit(ctors(0), params)
       case _ => true
@@ -663,7 +663,7 @@ final class ConstructionTyping(
     * ordinary boxing-aware assignability or -- for a literal like `-3` against
     * a `Byte`/`Short`/`Char` formal -- constant narrowing (issue #374). */
   private def formalAccepts(formal: Type, actual: Term): Boolean =
-    TypeRelations.isAssignableWithBoxing(formal, actual.`type`, bodyContext.table) ||
+    TypeRelations.isConstructorArgAssignable(formal, actual.`type`, bodyContext.table) ||
       (formal match {
         case bt: BasicType => ConstantNarrowing.constantIntOf(actual).exists(v => ConstantNarrowing.fits(bt, v))
         case _ => false
@@ -780,7 +780,7 @@ final class ConstructionTyping(
       val formals = substitutedArgs(c)
       formals.length == args.length &&
         args.indices.forall { i =>
-          malleableIndices.contains(i) || TypeRelations.isAssignableWithBoxing(formals(i), prelim(i).`type`, bodyContext.table)
+          malleableIndices.contains(i) || TypeRelations.isConstructorArgAssignable(formals(i), prelim(i).`type`, bodyContext.table)
         }
     }
     if (candidates.length != 1) break(None)
@@ -880,7 +880,7 @@ final class ConstructionTyping(
             }
             closureCanTarget(formals(i), arity)
           } else
-            TypeRelations.isAssignableWithBoxing(formals(i), prelim(i).`type`, bodyContext.table)
+            TypeRelations.isConstructorArgAssignable(formals(i), prelim(i).`type`, bodyContext.table)
         }
     }
     if (candidates.length != 1) break(None)

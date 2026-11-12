@@ -120,6 +120,14 @@ private[typing] object TypeRelations {
       sameClass(ea.raw, aa.raw) && sameTypeArguments(ea.typeArguments, aa.typeArguments, table)
     case _ => isAssignableWithBoxing(expected, actual, table, topLevel = false) && isAssignableWithBoxing(actual, expected, table, topLevel = false)
 
+  /** Constructor resolution's boxing-aware match: as `isAssignableWithBoxing`, except
+    * that `null` never fills a primitive slot. Boxing the slot's type would let it
+    * through for a `new`, an `extends A(..)` and a `: this(..)` alike, and nothing
+    * after constructor resolution rejects it (#2828). Method calls keep the plain
+    * check: their argument check reports E0000 at the `null` itself. */
+  def isConstructorArgAssignable(expected: Type, actual: Type, table: ClassTable): Boolean =
+    !(expected.isBasicType && actual.isNullType) && isAssignableWithBoxing(expected, actual, table)
+
   def isAssignableWithBoxing(expected: Type, actual: Type, table: ClassTable, topLevel: Boolean = true): Boolean =
     if ownViewRejects(table, expected, actual) then false
     else if TypeRules.isAssignable(expected, actual) then true

@@ -254,7 +254,8 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
       c <- conjuncts(h) if HistoryPreorder.simpleRelations(c).isEmpty
       named = namesIn(c).filter(fields.contains)
       m <- methodsOf(cls) if m.block != null
-      w <- writesIn(m, cls).find(w => named.exists(w.ofField(m, _)))
+      // A history over method calls (`x() >= old(x())`) names no field, so any write may break it (#2735).
+      w <- writesIn(m, cls).find(w => if (named.isEmpty) fields.contains(w.field) else named.exists(w.ofField(m, _)))
     } unchecked += Unchecked(unitFile, cls, m, w.field, None, line = Option(h.location).map(_.line).getOrElse(0), fieldType = None)
   }
 

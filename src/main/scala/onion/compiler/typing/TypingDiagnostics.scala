@@ -18,6 +18,13 @@ final class TypingDiagnostics(private val typing: Typing, private val session: T
     reporter.report(error, location, items.toArray)
   }
 
+  /** Reports against `sourceFile`, for a pass that runs after every unit is typed (#2781). */
+  def reportIn(sourceFile: String, error: SemanticError, location: Location, items: Seq[AnyRef]): Unit = {
+    if (!typing.reportingEnabled) return
+    reporter.setSourceFile(if (sourceFile != null) sourceFile else typing.unit_.sourceFile)
+    reporter.report(error, location, items.toArray)
+  }
+
   def reportUnusedVariables(context: LocalContext): Unit = {
     if (!typing.reportingEnabled) return
     warningReporter.setSourceFile(typing.unit_.sourceFile)

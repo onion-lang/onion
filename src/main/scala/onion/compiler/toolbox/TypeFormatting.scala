@@ -35,13 +35,21 @@ object TypeFormatting {
   }
 
   /**
-   * A method as a diagnostic names it: `Owner::name`, or just `name` for a top-level
-   * function, whose owner is a synthetic class the user never wrote.
+   * A method as a diagnostic names it: `Owner::name` for a static method (how Onion writes
+   * a static call), `Owner.name` for an instance method (how a call on a value reads; #2605),
+   * or just `name` for a top-level function, whose owner is a synthetic class the user
+   * never wrote.
    */
-  def methodReference(owner: TypedAST.ClassType, name: String): String = {
+  def methodReference(owner: TypedAST.ClassType, name: String, isStatic: Boolean = true): String = {
     val written = sourceMethodName(name)
-    if (owner == null || isTopLevelContainer(owner)) written else s"${owner.name}::$written"
+    if (owner == null || isTopLevelContainer(owner)) written
+    else if (isStatic) s"${owner.name}::$written"
+    else s"${owner.name}.$written"
   }
+
+  /** [[methodReference]] for `m`, with `::` or `.` chosen by whether `m` is static. */
+  def methodReference(m: TypedAST.Method): String =
+    methodReference(m.affiliation, m.name, onion.compiler.Modifier.isStatic(m.modifier))
 
   private val DefaultArgumentMethod = """(.+)\$default\$\d+(?:\$.*)?""".r
 

@@ -220,6 +220,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
   private def processClassDeclaration(node: AST.ClassDeclaration): Unit =
     withKernel[ClassDefinition](node) { clazz =>
       resetForTypeDeclaration(clazz)
+      checkTraitInstanceCoherence(node, clazz)
       for (defaultSection <- node.defaultSection) processAccessSection(defaultSection)
       for (section <- node.sections) processAccessSection(section)
       generateForwardedMethods()
@@ -227,6 +228,28 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       DuplicationChecks.checkOverrideTargets(typing, clazz, node.location)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
+    }
+
+  /** At most one `instance` per (trait, type argument) in the whole program, whatever package each one
+    * is declared in. An `instance` lowers to a class named `<Trait>$$<Type>` (Rewriting; `$` is
+    * not an identifier character, so only an instance has such a name) in its own unit's
+    * package, so two of them in different packages are two classes, and the call site's package
+    * would decide which one a `[T: Trait]` dictionary gets (#2770). Rewriting already rejects a
+    * duplicate within one unit. */
+  private def checkTraitInstanceCoherence(node: AST.ClassDeclaration, clazz: ClassDefinition): Unit =
+    if (node.name.contains("$$") && node.superClass == null && node.superInterfaces.size == 1) {
+      clazz.interfaces.headOption.foreach { traitType =>
+        val (traitRaw, typeArg) = traitType match {
+          case a: AppliedClassType => (a.raw, a.typeArguments.headOption.map(TraitInstanceKeys.typeArgumentName))
+          case c => (c, None)
+        }
+        // Keyed on the type argument's full name: `Show[a.Foo]` and `Show[b.Foo]` are two
+        // instances even though both lower to `Show$$Foo`.
+        val key = (traitRaw.name, typeArg.getOrElse(node.name))
+        if (typing.traitInstances.contains(key))
+          typing.report(SemanticError.DUPLICATE_TRAIT_INSTANCE, node, traitType.displayName)
+        else typing.traitInstances(key) = clazz.name
+      }
     }
 
   // A record can declare `conforms Interface`, but its only methods are the synthesized

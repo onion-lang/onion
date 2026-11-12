@@ -28,9 +28,10 @@ final class ExpressionFormTyping(
     constructionTyping.typeNewArrayWithValues(node, context)
 
   def resolveConstructorWithNamedArgs(
-    node: AST.Node, args: List[AST.Expression], typeRef: ClassType, context: LocalContext
+    node: AST.Node, args: List[AST.Expression], typeRef: ClassType, context: LocalContext,
+    positional: Array[Term] = null
   ): Option[(ConstructorDefinition, Array[Term], Array[AST.Node])] =
-    constructionTyping.resolveConstructorWithNamedArgs(node, args, typeRef, context)
+    constructionTyping.resolveConstructorWithNamedArgs(node, args, typeRef, context, positional)
 
   def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] =
     constructionTyping.typeNewObject(node, context, expected)
@@ -81,7 +82,10 @@ final class ExpressionFormTyping(
           case tv: TypeVariableType if tv.nullability == Nullability.Nullable => tv.nonNullView
           case other => other
         }
-        if (leftT.isBasicType || (!leftNonNull.isBottomType && !TypeRules.isAssignable(leftNonNull, rightNonNull))) {
+        // `o ?: 5` with `o: Comparable[String]?` boxes 5 to an `Integer`, whose own view
+        // is `Comparable[Integer]`: the erasure fits, the arguments do not (#2649).
+        if (leftT.isBasicType || (!leftNonNull.isBottomType && (!TypeRules.isAssignable(leftNonNull, rightNonNull) ||
+            TypeRelations.ownViewRejects(bodyContext.table, leftNonNull, rightNonNull)))) {
           bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftT, right0.`type`))
           None
         } else {
@@ -237,11 +241,16 @@ final class ExpressionFormTyping(
           else if (srcIface && !dt.isInterface && Modifier.isFinal(dt.modifier)) false
           else srcIface || dstIface
         }
+        // A class's own view of an interface fixes its arguments, so `b as
+        // Comparable[String]` with `b: JInteger` can never succeed (#2649); JLS 5.5.1
+        // rejects it too. Either direction, as a cast from the interface back is the same.
+        !TypeRelations.ownViewRejects(bodyContext.table, dt, ct) &&
+          !TypeRelations.ownViewRejects(bodyContext.table, ct, dt) && (
         TypeRules.isSuperType(dt, ct) || TypeRules.isSuperType(ct, dt) ||
           TypeRules.isSuperType(erasure(dt), erasure(ct)) ||
           TypeRules.isSuperType(erasure(ct), erasure(dt)) ||
           ct.isInstanceOf[TypeVariableType] || dt.isInstanceOf[TypeVariableType] ||
-          interfaceCastAllowed
+          interfaceCastAllowed)
       case (bt1: BasicType, bt2: BasicType) =>
         (bt1 eq bt2) || (isNumericBasic(bt1) && isNumericBasic(bt2))
       case (ct: ClassType, _: ArrayType) =>

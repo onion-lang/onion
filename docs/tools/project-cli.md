@@ -178,6 +178,8 @@ Rules so far:
 | Rule | Before | After |
 |---|---|---|
 | A `do` block's final value | `ret a + b` | `yield a + b` |
+| A record's `law` (removed in 0.151.0) | `law rt(p: Pt) { e }` | `public: static def rt(p: Pt): Boolean ensures result = e` |
+| An `example`, in a record or at the top level | `example { e }` | `static def example1(): Boolean ensures result = e` (top level: `def`) |
 
 A `ret` that starts the last clause of a `do` block may be the old keyword, or a name `ret`
 declared elsewhere (an inherited method or field) followed by another clause. Only the
@@ -191,6 +193,13 @@ compiler can tell:
 
 A `ret` with another clause after it (`ret(a); yield a`) is always left alone, with a `note:`:
 the old keyword was only legal last, so it is a call.
+
+A `law` or `example` is rewritten the same way: only when the file does not compile as written
+and does compile rewritten. A top-level `example { e }` also reads today as a call of a function
+`example`, so a file where that call compiles is left alone. So is a top-level `example` in a
+file with a `::*` import, which may bring in such a function; a `note:` says so. A false
+predicate stays false: it is E0113 after the rewrite, so such a file is reported at that
+clause's line, not rewritten.
 
 See [Migrating to 1.0](../migration/pre-1.0.md) for each change.
 

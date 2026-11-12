@@ -46,7 +46,11 @@ instance Numeric[Long] {
 
 There is at most **one instance per `(trait, type)`** (coherence). Primitive and
 boxed forms are the same type, so `Numeric[Int]` and `Numeric[Integer]` are one
-instance — declaring both is an error.
+instance — declaring both is an error. The rule holds across the whole program: a
+second `instance Numeric[Int]` in another `module` is the same error (E0097).
+
+An instance is found when it is declared in the module of the code that needs it, in the
+trait's module, in the type's module, or in a file with no `module` line.
 
 ## Constrained generics
 

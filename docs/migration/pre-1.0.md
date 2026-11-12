@@ -263,7 +263,11 @@ public:
 - **What you see:** a false predicate is **E0113**. A parameter that cannot be sampled is also E0113,
   not a silent skip. `--contracts` is on by default (`check`).
 - **Seed and samples:** `--law-seed` and `--law-samples` are now `--contract-seed` and `--contract-samples`; `--no-check-laws` is gone (use `--contracts off`).
-- **`onion.Shape`:** a class that implements it needs at least one such predicate that uses it (E0080).
+- **`onion.Shape`:** a class that implements it no longer needs a predicate in its file (E0080 is retired).
+- **Update a whole project:** `onion migrate src/` rewrites each `law` and `example` into this form.
+  - A body of one expression becomes `= expr`; a longer body keeps its block, with `return` before the last statement.
+  - An `example` with no name is named `example1`, `example2`, ... Rename it if you like.
+  - A file that would not compile after the rewrite is left as written, and the command names the line.
 
 ## A field an `invariant` or `history` names is written only through `this`
 
@@ -321,7 +325,7 @@ public:
   override def run(): Int { IO::println("loud"); return 2 }
 }
 
-// Before: compiled. Now: E0077 at `b.run()`, "calling Loud::run"
+// Before: compiled. Now: E0077 at `b.run()`, "calling Loud.run"
 //   tool go(): Int { val b: Base = new Base(); return b.run() }
 // Now: declare what an override can do
 tool go(): Int requires { console } {
@@ -430,3 +434,59 @@ println(r.status())   // the same call
   `onionc` that read the field. Recompile it.
 - **Java code:** write `r.status()`, `r.body()` and `r.headers()`.
 - **No `onion migrate` rule:** every Onion spelling still compiles, so there is nothing to rewrite.
+
+## One instance per trait and type, across modules
+
+An `instance` of one trait for one type may be declared only once in the whole program.
+Before, a second one in another `module` compiled, and only the one in a file without a
+`module` line was ever used. Now the second one is an error.
+
+```onion
+// shapes.on
+module shapes;
+trait Show[T] {
+  def show(x: T): String
+}
+instance Show[Int] {
+  def show(x: Int): String = "lib " + x
+}
+
+// app.on: Before, compiled. Now E0097. Delete this instance, or the one in shapes.on.
+module app;
+import { shapes.Show }
+instance Show[Int] {
+  def show(x: Int): String = "app " + x
+}
+```
+
+- **What you see:** **E0097** `instance shapes.Show[java.lang.Integer] is already defined`, at
+  the second instance.
+- **Fix:** keep one instance and delete the other.
+- **Two files in the same package** (both without a `module` line) still give **E0008**
+  `duplicated class definition Show$$Integer`. The fix is the same.
+- **Type arguments of the type:** E0097 compares only the outer type, so `Show[List[String]]`
+  and `Show[List[Integer]]` are one instance and clash.
+- **No `onion migrate` rule:** which instance to keep is your choice.
+
+## A call above overloads with defaults picks what a call below them picks
+
+A call can now omit a default declared later in the file (#2653). So a call written above a
+set of overloads now sees their defaults, and picks the overload a call below them picks.
+
+```onion
+def run(): String = pick()
+def pick(): String = "zero"
+def pick(n: Int = 1): String = "one"
+println(run())   // Before: zero. Now: one, as when run() is declared below pick
+```
+
+| Overloads (declared below the call) | Call | Before | Now | To keep the old result |
+|---|---|---|---|---|
+| `pick()`, `pick(n: Int = 1)` | `pick()` | `zero` | `one` | rename one of the two methods |
+| `f(n: Long)`, `f(n: Int, a: Int = 1)`, `f(n: Int, b: String = "")` | `f(1)` | `long` | E0006 | `f(1L)` |
+
+- **What you see:** a different overload runs with no message, or **E0006**
+  `method call is applicable for both …` at the call.
+- **Still fine:** a call below the overloads, and a call that passes every argument.
+- **No `onion migrate` rule:** only you know which overload the call meant. Pass the argument
+  (`f(1L)`, `f(1, 1)`) or rename one method.

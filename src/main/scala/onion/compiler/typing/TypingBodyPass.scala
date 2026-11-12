@@ -25,7 +25,7 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   private val methodLookupSupport = new MethodLookupSupport(typing, bodyContext)
   private val classInitializerSupport = new ClassInitializerSupport(typing, typed(_, _, _), processAssignable(_, _, _))
   private val methodBodySupport = new MethodBodySupport(typing, unitContext, bodyContext, typed(_, _, _), typedTerms, translate, addReturnNode, processAssignable(_, _, _),
-    expressionFormTyping.resolveConstructorWithNamedArgs(_, _, _, _))
+    expressionFormTyping.resolveConstructorWithNamedArgs(_, _, _, _, _))
   private val entryPointSupport = new EntryPointSupport(typing, addReturnNode)
   private val assignabilitySupport = new AssignabilitySupport(bodyContext)
   private val expressionDispatchSupport = new ExpressionDispatchSupport(this)
@@ -62,6 +62,9 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     processTopLevelVarDeclaration
   )
   def run(): Unit = runUnit()
+
+  /** This unit's defaults; [[Typing.processBody]] schedules every unit's before any [[run]] (#2653). */
+  def defaultJobs(): Seq[DefaultScheduling.Job] = declarationBodySupport.unitDefaultJobs(unit)
 
   def createEqualsForRef(lhs: Term, rhs: Term): Term =
     operatorTyping.createEquals(EQUAL, lhs, rhs)

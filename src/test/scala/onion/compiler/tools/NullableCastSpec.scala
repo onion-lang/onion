@@ -276,4 +276,96 @@ class NullableCastSpec extends AbstractShellSpec {
       assert(Shell.Success(1) == r)
     }
   }
+
+  describe("a reference whose own view contradicts an applied target (#2649)") {
+    val imports = "import { java.util.*; java.lang.Integer as JInteger }\n"
+    it("rejects a cast, an assignment and every other spelling at compile time") {
+      for (body <- Seq(
+        "val b: JInteger = 5\n  val y = (b as Comparable[String])",
+        "val b: JInteger = 5\n  val y: Comparable[String] = b",
+        "val b: JInteger? = 5\n  val y: Comparable[String]? = b",
+        "val x: Comparable[JInteger] = \"s\"",
+        "val x = (\"s\" as Comparable[JInteger])",
+        "val b: JInteger = 5\n  val xs: List[Comparable[String]] = [b]",
+        "val e: Comparable[String]? = 5",
+        "val xs: List[Comparable[String]] = [5]",
+        "val m: Map[String, Comparable[String]] = [\"a\": 5]",
+        "val o: Comparable[String]? = null\n  val y: Comparable[String] = o ?: 5"
+      )) {
+        val msgs = compileErrors(s"${imports}def main(args: String[]): void {\n  $body\n}\n")
+        assert(msgs.nonEmpty, s"expected a compile error for <$body>")
+      }
+    }
+    it("rejects passing it to a parameter of the contradicted type") {
+      val msgs = compileErrors(
+        s"${imports}def f(c: Comparable[String]): Int = c.compareTo(\"x\")\ndef main(args: String[]): void {\n  val b: JInteger = 5\n  f(b)\n}\n")
+      assert(msgs.nonEmpty)
+    }
+    it("rejects it as a constructor argument: class, record and primary super call") {
+      for (decl <- Seq(
+        "class D { public: def this(c: Comparable[String]) { } }\ndef main(args: String[]): void {\n  val b: JInteger = 5\n  new D(b)\n}\n",
+        "record R(c: Comparable[String])\ndef main(args: String[]): void {\n  val b: JInteger = 5\n  new R(b)\n}\n",
+        "class Base(c: Comparable[String])\nclass Sub(b: JInteger) extends Base(b)\ndef main(args: String[]): void {\n  new Sub(5)\n}\n"
+      )) {
+        val msgs = compileErrors(imports + decl)
+        assert(msgs.contains("E0021"), s"expected E0021 for <$decl>, got $msgs")
+      }
+    }
+    it("rejects an interface type argument that a final class's own argument can never meet") {
+      for (body <- Seq(
+        "val b: JInteger = 5\n  val s: Comparable[CharSequence] = b",
+        "val b: JInteger = 5\n  val s = (b as Comparable[CharSequence])",
+        "val s: Comparable[Runnable] = \"s\"",
+        "val q: Comparable[Runnable] = new Q()"
+      )) {
+        val msgs = compileErrors(
+          s"${imports}final class Q conforms Comparable[Q] { public: def compareTo(o: Q): Int = 0 }\ndef main(args: String[]): void {\n  $body\n}\n")
+        assert(msgs.nonEmpty, s"expected a compile error for <$body>")
+      }
+    }
+    it("still accepts an interface type argument against a non-final class's own argument") {
+      val msgs = compileErrors(
+        s"${imports}def main(args: String[]): void {\n  val c: Comparable[CharSequence] = new Date()\n}\n")
+      assert(msgs.isEmpty, s"expected no compile error, got $msgs")
+    }
+    it("leaves related type arguments to the old rule (no break)") {
+      val r = shell.run(
+        imports +
+        """class Names conforms Iterable[String] {
+          |public:
+          |  def iterator(): Iterator[String] = (["a", "b"] as List[String]).iterator()
+          |}
+          |def main(args: String[]): Int {
+          |  val p = new Properties()
+          |  p.setProperty("k", "v")
+          |  val m: Map[String, String] = p
+          |  val m2 = (p as Map[String, String])
+          |  val it: Iterable[Object] = new Names()
+          |  var n = 0
+          |  foreach x in it { n = n + 1 }
+          |  return m.size + m2.size * 10 + n * 100
+          |}
+          |""".stripMargin, "OwnViewRelated.on", Array())
+      assert(Shell.Success(211) == r)
+    }
+    it("still accepts the class's own view, plain supertypes and casts that may succeed") {
+      val r = shell.run(
+        imports +
+        """def main(args: String[]): Int {
+          |  val b: JInteger = 5
+          |  val c: Comparable[JInteger] = b
+          |  val d = (b as Comparable[JInteger])
+          |  val s: Comparable[String] = "a"
+          |  val n: Number = b
+          |  val o: Object = b
+          |  val back = (o as Comparable[String])
+          |  val e: Comparable[JInteger]? = b
+          |  val xs: List[Comparable[JInteger]] = [b, 7]
+          |  return c.compareTo(4) + d.compareTo(5) * 10 + s.compareTo("a") + n.intValue() * 100 +
+          |    (if back === o && e != null { 1000 } else { 0 }) + xs.size * 10000
+          |}
+          |""".stripMargin, "OwnViewStillFits.on", Array())
+      assert(Shell.Success(21501) == r)
+    }
+  }
 }

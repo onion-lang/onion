@@ -219,7 +219,8 @@ public final class Future<T> {
 
     /**
      * Blocks and waits for the result.
-     * Throws RuntimeException if the Future failed.
+     * Throws RuntimeException if the Future failed; its message ends with the
+     * reason in parentheses, and its cause is the task's exception.
      */
     public T await() {
         try {
@@ -228,7 +229,7 @@ public final class Future<T> {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Future.await() was interrupted", e);
         } catch (ExecutionException e) {
-            throw new RuntimeException("Future.await() failed", e.getCause());
+            throw new RuntimeException(failureMessage("Future.await() failed", e.getCause()), e.getCause());
         }
     }
 
@@ -245,10 +246,19 @@ public final class Future<T> {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Future.awaitTimeout() was interrupted", e);
         } catch (ExecutionException e) {
-            throw new RuntimeException("Future.awaitTimeout() failed", e.getCause());
+            throw new RuntimeException(failureMessage("Future.awaitTimeout() failed", e.getCause()), e.getCause());
         } catch (TimeoutException e) {
             throw new RuntimeException("Future.awaitTimeout() timed out after " + timeoutMs + "ms", e);
         }
+    }
+
+    /** {@code prefix (reason)}, the reason being the root cause's message, or its type when it has none. */
+    private static String failureMessage(String prefix, Throwable error) {
+        if (error == null) return prefix;
+        Throwable cause = error;
+        while (cause.getCause() != null && cause.getCause() != cause) cause = cause.getCause();
+        String message = cause.getMessage();
+        return prefix + " (" + (message == null ? cause.getClass().getSimpleName() : message) + ")";
     }
 
     /**

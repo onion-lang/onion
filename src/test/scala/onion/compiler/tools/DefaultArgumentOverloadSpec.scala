@@ -136,7 +136,7 @@ class DefaultArgumentOverloadSpec extends AbstractShellSpec {
       assert(e0077.exists(_.message.contains("stamp")), errs.map(_.message).mkString("\n"))
     }
 
-    it("names a class method's default as `Owner::method`") {
+    it("names a class method's default as `Owner.method` (an instance method; #2605)") {
       val errs = errors(
         """
           |class Clock {
@@ -149,7 +149,7 @@ class DefaultArgumentOverloadSpec extends AbstractShellSpec {
       val e0077 = errs.filter(_.errorCode.contains("E0077"))
       assert(e0077.nonEmpty, errs.map(_.message).mkString("\n"))
       assert(!errs.exists(_.message.contains("$default$")), errs.map(_.message).mkString("\n"))
-      assert(e0077.exists(_.message.contains("Clock::stamp")), errs.map(_.message).mkString("\n"))
+      assert(e0077.exists(_.message.contains("Clock.stamp")), errs.map(_.message).mkString("\n"))
     }
   }
 }

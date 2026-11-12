@@ -121,6 +121,21 @@ public:
 println(new K().greet())   // Hello, kota — no override needed
 ```
 
+An override can call the default it replaces with `super.m()` (Java writes
+`Greeter.super.greet()`). A superclass method with the same name wins. If two
+interfaces give different defaults, `super.m()` is ambiguous (E0006).
+
+```onion
+class Loud conforms Greeter {
+public:
+  def this {}
+  def name(): String { return "kota" }
+  override def greet(): String = super.greet().toUpperCase()
+}
+
+println(new Loud().greet())   // HELLO, KOTA
+```
+
 ### Multiple Interfaces
 
 Implement multiple interfaces with a comma-separated list:

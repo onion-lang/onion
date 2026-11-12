@@ -258,9 +258,13 @@ private[typing] object GenericMethodTypeArguments {
     /** Set by `withDefaults()`: some type parameter has an upper and a lower limit no type meets. */
     var limitsConflict: Boolean = false
 
-    def isAssignableForBounds(left: Type, right: Type): Boolean =
-      if (!left.isBasicType && right.isBasicType) TypeRules.isAssignable(left, boxedTypeArg(right))
-      else TypeRules.isAssignable(left, right)
+    // A bound is read with its type arguments, not by erasure: a `Cat` that is an
+    // `Animal[Dog]` does not meet `Animal[Cat]`, and an `Integer` does not meet
+    // `Comparable[String]` (#2780).
+    def isAssignableForBounds(left: Type, right: Type): Boolean = {
+      val r = if (!left.isBasicType && right.isBasicType) boxedTypeArg(right) else right
+      TypeRules.isAssignable(left, r) && !TypeRelations.ownViewRejects(typing.table_, left, r)
+    }
 
     val bounds = HashMap[String, Type]()
     for (tp <- typeParams) {

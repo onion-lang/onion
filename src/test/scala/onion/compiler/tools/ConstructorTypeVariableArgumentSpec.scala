@@ -102,6 +102,83 @@ class ConstructorTypeVariableArgumentSpec extends AbstractShellSpec {
       assert(result == Shell.Success("obj,list"), out)
     }
 
+    it("rejects a List[Number] passed by name (`xs = xs`)") {
+      val src = boundedC +
+        """class D[T extends Number] {
+          |public:
+          |  def this {}
+          |  def go(xs: List[Number]): C[T] = new C[T](xs = xs)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val c: C[Integer] = new D[Integer]().go([1.5])
+          |    val i: Integer = c.xs[0]
+          |    return "ran " + i
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(out.contains("E0021"), out)
+    }
+
+    it("rejects a List[Number] for a constructor that fills a default parameter") {
+      val src =
+        """class C[T extends Number] {
+          |public:
+          |  val xs: List[T]
+          |  def this(xs: List[T], d: Int = 1) { this.xs = xs }
+          |}
+          |class D[T extends Number] {
+          |public:
+          |  def this {}
+          |  def go(xs: List[Number]): C[T] = new C[T](xs)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val c: C[Integer] = new D[Integer]().go([1.5])
+          |    val i: Integer = c.xs[0]
+          |    return "ran " + i
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(out.contains("E0021"), out)
+    }
+
+    it("still accepts a List[T] by name and through a default parameter") {
+      val src =
+        """class C[T extends Number] {
+          |public:
+          |  val xs: List[T]
+          |  val d: Int
+          |  def this(xs: List[T], d: Int = 1) { this.xs = xs; this.d = d }
+          |}
+          |class D[T extends Number] {
+          |public:
+          |  def this {}
+          |  def named(xs: List[T]): C[T] = new C[T](xs = xs)
+          |  def dflt(xs: List[T]): C[T] = new C[T](xs)
+          |  def empty(): C[T] = new C[T](xs = [], d = 5)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val d = new D[Integer]()
+          |    val a = d.named([7])
+          |    val b = d.dflt([8, 9])
+          |    val e = d.empty()
+          |    return "" + a.xs[0] + a.d + b.xs.size + b.d + e.xs.size + e.d
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("712105"), out)
+    }
+
     it("still accepts a List[T], an ArrayList[T] and concrete type arguments") {
       val src = "import { java.util.ArrayList }\n" + boundedC +
         """class D[T extends Number] {

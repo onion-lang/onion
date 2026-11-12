@@ -415,11 +415,7 @@ final class ConstructionTyping(
         val formals = c.getArgs.map(t =>
           TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
         formals.length != params.length || formals.indices.forall { i =>
-          val actual = if (params(i) == null) null else params(i).`type`
-          !TypeCheckingHelpers.containsTypeVariable(formals(i)) ||
-            actual == null || actual.isBasicType || actual.isNullType || actual.isBottomType ||
-            TypeRules.emptyCollectionLiteralAccepts(formals(i), params(i)) ||
-            AssignabilitySupport.fitsWithoutConversion(formals(i), actual, bodyContext.table)
+          AssignabilitySupport.typeVariableSlotFits(formals(i), params(i), bodyContext.table)
         }
       case _ => true
     }
@@ -1098,7 +1094,11 @@ final class ConstructionTyping(
     // type -- targeting the expected type above only steers inference, it
     // does not itself enforce assignability.
     val suppliedIndices = argsWithDefaults.indices.filter(filled)
-    if (!suppliedIndices.forall(i => formalAccepts(formals(i), result(i)))) {
+    // A slot typed by a class type variable takes the assignment rule, as on the
+    // positional path: `new C[T](xs = xs)` with `xs: List[Number]` is not a `List[T]`.
+    if (!suppliedIndices.forall(i =>
+        formalAccepts(formals(i), result(i)) &&
+          AssignabilitySupport.typeVariableSlotFits(formals(i), result(i), bodyContext.table))) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, ctor.affiliation,
         suppliedTypes, ctor.affiliation.constructors)
       return None

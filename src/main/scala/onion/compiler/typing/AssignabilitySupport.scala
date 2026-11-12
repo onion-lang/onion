@@ -248,6 +248,23 @@ private[compiler] object AssignabilitySupport {
     if (containsTypeVariable(expected)) structurallyAssignable(expected, actual, table)
     else TypeRelations.isAssignableWithBoxing(expected, actual, table)
 
+  /**
+   * Whether `arg` may fill a parameter slot whose (substituted) type is `slot`, for a
+   * slot that mentions a class type variable. Overload matching reads such a variable
+   * through its bound, which accepts a `List[Number]` for `List[T]` with
+   * `T extends Number`; this applies the assignment rule instead, so the argument must
+   * carry that very variable. A slot with no type variable, a primitive, `null` and an
+   * empty collection literal are converted or adopted later, so they always pass here.
+   * Method calls (#2676) and every constructor path (#2677) share this one check.
+   */
+  def typeVariableSlotFits(slot: Type, arg: Term, table: ClassTable): Boolean = {
+    val actual = if (arg == null) null else arg.`type`
+    !containsTypeVariable(slot) ||
+      actual == null || actual.isBasicType || actual.isNullType || actual.isBottomType ||
+      TypeRules.emptyCollectionLiteralAccepts(slot, arg) ||
+      fitsWithoutConversion(slot, actual, table)
+  }
+
   // `nested` is true inside a type-argument comparison, where type arguments are
   // invariant and a variable must not widen to its bound.
   def structurallyAssignable(expected: Type, actual: Type, table: ClassTable, nested: Boolean = false): Boolean = (expected, actual) match {

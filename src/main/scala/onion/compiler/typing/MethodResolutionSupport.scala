@@ -141,14 +141,10 @@ private[compiler] final class MethodResolutionSupport(
     val fixed = if method.isVararg then expected.length - 1 else expected.length
     var i = 0
     while i < params.length && i < fixed do
-      val slot = expected(i)
-      val actual = params(i).`type`
-      val checked =
-        TypeCheckingHelpers.containsTypeVariable(slot) &&
-          !(methodTypeParams.nonEmpty && containsMethodTypeParam(argsWithTypeParams(i), methodTypeParams)) &&
-          actual != null && !actual.isBasicType && !actual.isNullType && !actual.isBottomType &&
-          !TypeRules.emptyCollectionLiteralAccepts(slot, params(i))
-      if checked && !AssignabilitySupport.fitsWithoutConversion(slot, actual, table) then return false
+      val inferredPerCall =
+        methodTypeParams.nonEmpty && containsMethodTypeParam(argsWithTypeParams(i), methodTypeParams)
+      if !inferredPerCall && !AssignabilitySupport.typeVariableSlotFits(expected(i), params(i), table) then
+        return false
       i += 1
     true
   }

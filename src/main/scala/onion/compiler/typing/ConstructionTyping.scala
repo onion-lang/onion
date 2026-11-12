@@ -494,6 +494,12 @@ final class ConstructionTyping(
       break(None)
     }
     if (constructors.length == 0) {
+      // Varargs fallback, as for methods: `new ProcessBuilder("echo", "x")` spreads its
+      // trailing arguments into the `String...` array (#2839).
+      varargConstruction(node, typeRef, parameters) match {
+        case Some(result) => break(result)
+        case None =>
+      }
       // Default-parameter fallback: a constructor with defaults accepts
       // fewer positional arguments than its signature lists
       val defaultsCandidate = typeRef.constructors.exists {
@@ -537,6 +543,68 @@ final class ConstructionTyping(
           warnNullArguments(constructors(0), node.args.toArray, parameters, constructors(0).getArgs)
           Some(new NewObject(constructors(0), adaptToFormals(parameters, constructors(0).getArgs)))
       }
+    }
+  }
+
+  /**
+   * Resolves `new C(a, b, c)` against a varargs constructor `C(x: X, ys: Y...)` when no
+   * constructor takes the arguments as written: the fixed arguments must fit their slots
+   * and every trailing one the array's element type, as for a varargs method (#2839).
+   * Returns None when no varargs constructor fits, so the caller reports E0021;
+   * Some(None) when it reported an error itself; Some(Some(term)) on success.
+   */
+  private def varargConstruction(node: AST.NewObject, typeRef: ClassType, parameters: Array[Term]): Option[Option[Term]] = {
+    val table = bodyContext.table
+    def formalsOf(c: ConstructorRef): Array[Type] = typeRef match {
+      case applied: TypedAST.AppliedClassType =>
+        val classSubst = TypeSubstitution.classSubstitution(applied)
+        c.getArgs.map(t =>
+          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      case _ => c.getArgs
+    }
+    val candidates = typeRef.constructors.toSeq.filter(_.isVararg).flatMap { c =>
+      val formals = formalsOf(c)
+      val fixed = formals.length - 1
+      formals.lastOption match {
+        case Some(arrayType: ArrayType) if parameters.length >= fixed =>
+          val fixedFit = (0 until fixed).forall(i => TypeRelations.isAssignableWithBoxing(formals(i), parameters(i).`type`, table))
+          val restFit = parameters.drop(fixed).forall(p => TypeRelations.isAssignableWithBoxing(arrayType.base, p.`type`, table))
+          if (fixedFit && restFit) Some((c, formals, arrayType)) else None
+        case _ => None
+      }
+    }
+    candidates match {
+      case Seq() => None
+      case Seq((ctor, formals, arrayType)) =>
+        if (!MemberAccess.isMemberAccessible(ctor, bodyContext.definition)) {
+          bodyContext.report(METHOD_NOT_ACCESSIBLE, node, ctor.affiliation, "new", ctor.getArgs, bodyContext.definition)
+          return Some(None)
+        }
+        val fixed = formals.length - 1
+        val fixedArgs = adaptToFormals(parameters.take(fixed), formals.take(fixed))
+        val rest = parameters.drop(fixed)
+        val elements = Boxing.adaptArguments(table, rest, Array.fill[Type](rest.length)(arrayType.base))
+        val args = fixedArgs :+ (new NewArrayWithValues(arrayType, elements): Term)
+        val ref = typeRef match {
+          case applied: TypedAST.AppliedClassType =>
+            new TypedAST.ConstructorRef {
+              def modifier: Int = ctor.modifier
+              def affiliation: TypedAST.ClassType = applied
+              def name: String = ctor.name
+              def getArgs: Array[TypedAST.Type] = ctor.getArgs
+              override def isVararg: Boolean = true
+            }
+          case _ => ctor
+        }
+        Some(Some(new NewObject(ref, args)))
+      case Seq((c1, _, _), (c2, _, _), _*) =>
+        bodyContext.report(
+          AMBIGUOUS_CONSTRUCTOR,
+          node,
+          Array[AnyRef](c1.affiliation, c1.getArgs),
+          Array[AnyRef](c2.affiliation, c2.getArgs)
+        )
+        Some(None)
     }
   }
 

@@ -239,7 +239,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val argTypes = ctor.arguments.map(asmType)
     val ctorSignature =
       GenericSignatureEncoder.methodSignature(ctor.typeParameters, ctor.arguments, BasicType.VOID)
-    val gen = MethodEmitter.newGenerator(cw, toAsmModifier(ctor.modifier), "<init>", AsmType.VOID_TYPE, argTypes, signature = ctorSignature)
+    val access = toAsmModifier(ctor.modifier) | (if ctor.isVararg then Opcodes.ACC_VARARGS else 0)
+    val gen = MethodEmitter.newGenerator(cw, access, "<init>", AsmType.VOID_TYPE, argTypes, signature = ctorSignature)
     NullabilityMetadata.emitParameters(gen, ctor.arguments)
 
     // Emit line number for constructor declaration

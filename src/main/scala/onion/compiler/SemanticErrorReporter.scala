@@ -921,8 +921,18 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportMethodNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
     val baseMessage = format(message("error.semantic.methodNotAccessible"),
       Seq(objectTypeName(items(0)), asString(items(1)), typeNames(asTypeArray(items(2))), classTypeName(items(3))))
-    problem(position, appendSuggestion(baseMessage, Some(message("suggestion.privateAccessHint"))))
+    problem(position, appendSuggestion(baseMessage, Some(message(privateAccessHintKey(items(0))))))
   }
+
+  /**
+   * The `public:` advice only helps when the owner is Onion source the user can edit; a
+   * Java or classpath class has no section to move the member to (#2764).
+   */
+  private def privateAccessHintKey(owner: AnyRef): String =
+    owner match {
+      case _: TypedAST.ClassDefinition => "suggestion.privateAccessHint"
+      case _ => "suggestion.privateAccessHintExternal"
+    }
 
   /**
    * Handles FIELD_NOT_ACCESSIBLE with the same hint as [[reportMethodNotAccessible]].
@@ -930,7 +940,7 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportFieldNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
     val baseMessage = format(message("error.semantic.fieldNotAccessible"),
       Seq(classTypeName(items(0)), asString(items(1)), classTypeName(items(2))))
-    problem(position, appendSuggestion(baseMessage, Some(message("suggestion.privateAccessHint"))))
+    problem(position, appendSuggestion(baseMessage, Some(message(privateAccessHintKey(items(0))))))
   }
 
   /**

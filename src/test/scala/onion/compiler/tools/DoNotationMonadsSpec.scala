@@ -132,6 +132,24 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(42) == result)
     }
+
+    it("binds Result::successful without pinning an error type (#2537)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val r: Result[Int, String] = Result::ok(1)
+          |    val out: Result[Int, String] = do[Result] { x <- r; y <- Result::successful(x + 1); yield y * 10 }
+          |    return (out.getOrThrow() as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "DoResultSuccessful.on",
+        Array()
+      )
+      assert(Shell.Success(20) == result)
+    }
   }
 
   describe("do-notation over List (comprehension)") {

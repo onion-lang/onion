@@ -2042,6 +2042,20 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
+  /** True for `Result::successful(e)` (no type arguments) bound inside `do[Result]`. */
+  private def isResultUnitBind(expr: AST.Expression, monadType: AST.TypeNode): Boolean = {
+    def simple(desc: AST.TypeDescriptor): Option[String] = desc match {
+      case AST.ReferenceType(name, _) => Some(name.substring(name.lastIndexOf('.') + 1))
+      case _ => None
+    }
+    expr match {
+      case c: AST.StaticMethodCall =>
+        c.name == "successful" && c.args.size == 1 && c.typeArgs.isEmpty &&
+          simple(c.typeRef.desc).contains("Result") && simple(monadType.desc).contains("Result")
+      case _ => false
+    }
+  }
+
   private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any]): AST.Expression = {
     statements match {
       // Final expression: yield e => M::successful(e)
@@ -2056,6 +2070,14 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case List(expr: AST.Expression) =>
         val rewritten = rewriteExpression(expr)
         AST.StaticMethodCall(loc, monadType, "successful", List(rewritten))
+
+      // `x <- Result::successful(e); rest` => `val x = e; rest` (left identity:
+      // unit(e).bind(f) == f(e)). `Result::successful(e)` alone cannot pin its error
+      // type, so left as a bind it types as `Result[T, Object]` (#2537).
+      case (binding: AST.DoBinding) :: rest if rest.nonEmpty && isResultUnitBind(binding.expr, monadType) =>
+        val call = binding.expr.asInstanceOf[AST.StaticMethodCall]
+        val decl = AST.LocalVariableDeclaration(binding.location, AST.M_FINAL, binding.name, null, rewriteExpression(call.args.head))
+        AST.BlockExpression(binding.location, List(decl, desugarDoStatements(binding.location, monadType, rest)))
 
       // Binding followed directly by the final yield: x <- e1; yield e2
       // => e1.map((x) -> e2). Using map instead of bind+M::successful means

@@ -186,5 +186,76 @@ class ConstructorVarargsSpec extends AbstractShellSpec {
           |""", "CtorVarargsVsAllDefaults.on")
       assert(Shell.Success("defaults:7 varargs:2") == result)
     }
+  
+    it("rejects an Object in a T... slot of a generic class (E0021)") {
+      val result = run(
+        """
+          |class Bag[T] {
+          |public:
+          |  val xs: T[]
+          |  def this(xs: T...) { this.xs = xs }
+          |  def get(i: Int): T = xs[i]
+          |}
+          |class W[U] {
+          |public:
+          |  def make(u: U, o: Object): Bag[U] = new Bag[U](u, o)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): void {
+          |    val s: String = new W[String]().make("a", 42).get(1)
+          |    IO::println(s.length())
+          |  }
+          |}
+          |""", "CtorVarargsTypeVarObject.on")
+      assert(result.isInstanceOf[Shell.Failure])
+      assert(result == Shell.Failure(-1))
+    }
+
+    it("rejects another type variable in a T... slot, one argument or two") {
+      val result = run(
+        """
+          |class Bag[T] {
+          |public:
+          |  val xs: T[]
+          |  def this(xs: T...) { this.xs = xs }
+          |  def get(i: Int): T = xs[i]
+          |}
+          |class W[U, V] {
+          |public:
+          |  def one(v: V): Bag[U] = new Bag[U](v)
+          |  def two(u: U, v: V): Bag[U] = new Bag[U](u, v)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): void { IO::println("x") }
+          |}
+          |""", "CtorVarargsTypeVarOther.on")
+      assert(result == Shell.Failure(-1))
+    }
+
+    it("still takes the same type variable and a concrete type argument") {
+      val result = run(
+        """
+          |class Bag[T] {
+          |public:
+          |  val xs: T[]
+          |  def this(xs: T...) { this.xs = xs }
+          |  def get(i: Int): T = xs[i]
+          |}
+          |class W[U] {
+          |public:
+          |  def make(a: U, b: U): Bag[U] = new Bag[U](a, b)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val b = new Bag[String]("p", "q", "r")
+          |    return b.get(2) + new W[String]().make("a", "b").get(1)
+          |  }
+          |}
+          |""", "CtorVarargsTypeVarOk.on")
+      assert(Shell.Success("rb") == result)
+    }
   }
 }

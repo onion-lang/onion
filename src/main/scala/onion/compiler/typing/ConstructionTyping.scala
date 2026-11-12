@@ -568,8 +568,14 @@ final class ConstructionTyping(
       val fixed = formals.length - 1
       formals.lastOption match {
         case Some(arrayType: ArrayType) if parameters.length >= fixed =>
-          val fixedFit = (0 until fixed).forall(i => TypeRelations.isAssignableWithBoxing(formals(i), parameters(i).`type`, table))
-          val restFit = parameters.drop(fixed).forall(p => TypeRelations.isAssignableWithBoxing(arrayType.base, p.`type`, table))
+          // A slot typed by a type variable is abstract: only that variable fits it (#2332),
+          // as on the exact-arity path, so `T...` never takes an `Object` (#2839).
+          val fixedFit = (0 until fixed).forall(i =>
+            TypeRelations.isAssignableWithBoxing(formals(i), parameters(i).`type`, table) &&
+              AssignabilitySupport.typeVariableSlotFits(formals(i), parameters(i), table))
+          val restFit = parameters.drop(fixed).forall(p =>
+            TypeRelations.isAssignableWithBoxing(arrayType.base, p.`type`, table) &&
+              AssignabilitySupport.typeVariableSlotFits(arrayType.base, p, table))
           if (fixedFit && restFit) Some((c, formals, arrayType)) else None
         case _ => None
       }

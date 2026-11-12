@@ -1812,6 +1812,9 @@ public:
 
 Fix: drop `static`, or pass the instance in explicitly as a parameter.
 
+`super` inside an `extension` method is also E0050, with its own message:
+the receiver is `this`, so call the method on it.
+
 ### `E0058` — Label not found
 
 A labeled `break`/`continue` names a label that is not bound to any

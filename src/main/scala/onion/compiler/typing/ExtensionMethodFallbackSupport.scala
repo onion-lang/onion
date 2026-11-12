@@ -799,7 +799,6 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     name: String
   ): Seq[ExtensionMethodDefinition] = {
     val result = scala.collection.mutable.LinkedHashSet.empty[ExtensionMethodDefinition]
-    var isWidenedLookup = false
 
     def collect(currentType: ObjectType): Unit = {
       if (currentType == null) return
@@ -807,15 +806,6 @@ private[compiler] final class ExtensionMethodFallbackSupport(
         case classType: ClassType =>
           typing.lookupExtensionMethods(classType.name).foreach { extMethod =>
             if (extMethod.name == name && (isBuiltinExtension(extMethod) || receiverArgumentsMatch(extMethod.receiverType, classType))) result += extMethod
-          }
-          // A number receiver widens like an argument: `5.bytes()` reaches `extension Long` (#2724).
-          // Only when its own type has no such extension, and then the nearest wider type wins.
-          if (!result.exists(_.name == name) && !isWidenedLookup) {
-            val widened = ExtensionMethodFallbackSupport.WideningReceivers.getOrElse(classType.name, Nil).iterator
-              .map(wider => typing.lookupExtensionMethods(wider).filter(m => m.name == name && m.receiverType.isBasicType))
-              .find(_.nonEmpty)
-            widened.foreach(ms => result ++= ms)
-            isWidenedLookup = widened.isDefined
           }
         case at: ArrayType =>
           typing.lookupExtensionMethods(Typing.ArrayExtensionReceiver).foreach { extMethod =>
@@ -828,6 +818,18 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     }
 
     collect(targetType)
+    // A number receiver widens like an argument: `5.bytes()` reaches `extension Long` (#2724).
+    // Only when the whole supertype walk (`Integer`, `Number`, `Comparable`, `Object`) found no
+    // extension of that name, so widening never competes with a supertype extension; then the
+    // nearest wider type wins.
+    if (result.isEmpty) targetType match {
+      case classType: ClassType =>
+        ExtensionMethodFallbackSupport.WideningReceivers.getOrElse(classType.name, Nil).iterator
+          .map(wider => typing.lookupExtensionMethods(wider).filter(m => m.name == name && m.receiverType.isBasicType))
+          .find(_.nonEmpty)
+          .foreach(ms => result ++= ms)
+      case _ =>
+    }
     result.toSeq
   }
 

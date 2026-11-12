@@ -404,7 +404,30 @@ final class ConstructionTyping(
           params(i) == null || !TypeRelations.ownViewRejects(bodyContext.table, formals(i), params(i).`type`)
         }
       }
-    val constructors0 = ownViewAccepts(typeRef.findConstructor(parameters0), parameters0)
+    // A slot typed by a class type variable (`List[T]` with `T` the enclosing class's own
+    // variable) is matched through T's bound, so a `List[Number]` passes it. Check it by
+    // the rule an assignment uses instead, as method calls do (#2676): the argument must
+    // be that very variable's type. Primitives, null and empty collection literals are
+    // converted or adopted later and are left alone (#2677).
+    def typeVariableSlotsFit(c: TypedAST.ConstructorRef, params: Array[Term]): Boolean = typeRef match {
+      case applied: TypedAST.AppliedClassType =>
+        val classSubst = TypeSubstitution.classSubstitution(applied)
+        val formals = c.getArgs.map(t =>
+          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+        formals.length != params.length || formals.indices.forall { i =>
+          val actual = if (params(i) == null) null else params(i).`type`
+          !TypeCheckingHelpers.containsTypeVariable(formals(i)) ||
+            actual == null || actual.isBasicType || actual.isNullType || actual.isBottomType ||
+            TypeRules.emptyCollectionLiteralAccepts(formals(i), params(i)) ||
+            AssignabilitySupport.fitsWithoutConversion(formals(i), actual, bodyContext.table)
+        }
+      case _ => true
+    }
+    // With overloads, prefer the ones that check accepts: Java picks `this(Object)` for a
+    // `List[Number]` when the other overload takes `List[T]`.
+    val constructors0 = ownViewAccepts(
+      typeRef.findConstructor(parameters0, (c: TypedAST.ConstructorRef) => typeVariableSlotsFit(c, parameters0)),
+      parameters0)
     // Exact matching is substitution-blind (an applied Pair[String, Integer]
     // still exposes (A, B)): retry against the substituted signatures with
     // boxing so 'new Pair[String, Integer]("x", 42)' boxes 42
@@ -441,7 +464,7 @@ final class ConstructionTyping(
                 TypeRules.isSuperTypeByIdentity(n.innerType, nonNullCore(params(i).`type`))
               case f =>TypeRelations.isAssignableWithBoxing(f, params(i).`type`, bodyContext.table)
             }
-          }
+          } && typeVariableSlotsFit(ctors(0), params)
       case _ => true
     }
     // Nothing matched eagerly, or it only matched via the empty-collection-literal
@@ -464,7 +487,9 @@ final class ConstructionTyping(
     val parameters = retyped.getOrElse(parameters0)
     val constructors = retyped match {
       case Some(newParams) =>
-        val exact = ownViewAccepts(typeRef.findConstructor(newParams), newParams)
+        val exact = ownViewAccepts(
+          typeRef.findConstructor(newParams, (c: TypedAST.ConstructorRef) => typeVariableSlotsFit(c, newParams)),
+          newParams)
         if (exact.nonEmpty) exact else findConstructorWithBoxing(typeRef, newParams)
       case None => constructors1
     }

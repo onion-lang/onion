@@ -1403,6 +1403,11 @@ object TypedAST {
 
     def findConstructor(params: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef] = constructorRefFinder.find(this, params)
 
+    def findConstructor(
+      params: Array[TypedAST.Term],
+      prefer: TypedAST.ConstructorRef => Boolean
+    ): Array[TypedAST.ConstructorRef] = constructorRefFinder.find(this, params, prefer)
+
     def isClassType: Boolean = true
 
     def isArrayType: Boolean = false
@@ -1521,6 +1526,14 @@ object TypedAST {
 
     def findConstructor(params: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef]
 
+    /** As [[findConstructor]], but when two or more constructors match, keeps only those
+      * `prefer` accepts before picking the most specific one; when it accepts none, all
+      * matches are kept. */
+    def findConstructor(
+      params: Array[TypedAST.Term],
+      prefer: TypedAST.ConstructorRef => Boolean
+    ): Array[TypedAST.ConstructorRef]
+
     def typeParameters: Array[TypedAST.TypeParameter] = Array()
 
     /** Binary names (`onion.Result$Ok`) of the classes a Java `sealed` class or interface
@@ -1534,10 +1547,20 @@ object TypedAST {
   }
 
   class ConstructorFinder {
-    def find(target: TypedAST.ClassType, args: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef] = {
+    def find(
+      target: TypedAST.ClassType,
+      args: Array[TypedAST.Term],
+      prefer: TypedAST.ConstructorRef => Boolean = _ => true
+    ): Array[TypedAST.ConstructorRef] = {
       if (target == null) return Array.empty
-      val matching = target.constructors.filter(c => matcher.matches(c.getArgs, args))
-      if (matching.isEmpty) return Array.empty
+      val matched = target.constructors.filter(c => matcher.matches(c.getArgs, args))
+      if (matched.isEmpty) return Array.empty
+      val matching =
+        if (matched.length < 2) matched
+        else {
+          val preferred = matched.filter(prefer)
+          if (preferred.nonEmpty) preferred else matched
+        }
       val sorted = matching.sortWith((c1, c2) => sorter.compare(c1, c2) < 0)
       if (sorted.length < 2 || isAmbiguous(sorted(0), sorted(1))) sorted
       else Array(sorted(0))

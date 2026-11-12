@@ -248,12 +248,15 @@ private[compiler] final class SimpleExpressionTypingSupport(
    * Whether a literal's element of type `actual` lets the literal adopt the expected
    * element type. A slot that mentions a type variable takes only what an assignment
    * to it takes: `[u]` with `u: U` is not a `List[T]` just because `U` and `T` both
-   * erase to `Object` (#2332). Other slots keep the plain subtype test.
+   * erase to `Object` (#2332). Other slots keep the plain subtype test, less what
+   * the element's own view of the slot's interface contradicts (#2649).
    */
   private def fitsLiteralSlot(expected: Type, actual: Type): Boolean =
     if (TypeCheckingHelpers.containsTypeVariable(expected) && !expected.isInstanceOf[WildcardType])
       assignability.fitsWithoutConversion(expected, actual)
-    else TypeRules.isAssignable(expected, actual)
+    // `[b]` with `b: JInteger` is no `List[Comparable[String]]`: the element's own view
+    // of `Comparable` says `Integer` (#2649), whatever the erasure allows.
+    else TypeRules.isAssignable(expected, actual) && !TypeRelations.ownViewRejects(bodyContext.table, expected, actual)
 
   private def typeListLiteral(node: AST.ListLiteral, context: LocalContext, expected: Type): Option[Term] = {
     val typedElements = new Array[Term](node.elements.size)
@@ -326,8 +329,11 @@ private[compiler] final class SimpleExpressionTypingSupport(
         // sound because a literal creates a fresh list of that element type.
         else if (expectedElem != null && typedElements.forall(fitsExpectedElement)) expectedElem
         else elementType
+      val elements =
+        if (finalElementType eq expectedElem) typedElements.map(widenToSlot(_, expectedElem))
+        else typedElements
       val listType = AppliedClassType(bodyContext.load("java.util.List"), scala.collection.immutable.List(finalElementType))
-      Some(new ListLiteral(typedElements, listType))
+      Some(new ListLiteral(elements, listType))
     }
   }
 
@@ -577,8 +583,36 @@ private[compiler] final class SimpleExpressionTypingSupport(
         if (values.isEmpty) (if (expectedValue != null) expectedValue else bodyContext.rootClass)
         else if (expectedValue != null && values.forall(v => fitsExpected(expectedValue, v))) expectedValue
         else valueType
+      val finalKeys = if (finalKeyType eq expectedKey) keys.map(widenToSlot(_, expectedKey)) else keys
+      val finalValues = if (finalValueType eq expectedValue) values.map(widenToSlot(_, expectedValue)) else values
       val mapType = AppliedClassType(bodyContext.load("java.util.Map"), scala.collection.immutable.List(finalKeyType, finalValueType))
-      Some(new MapLiteral(keys, values, mapType))
+      Some(new MapLiteral(finalKeys, finalValues, mapType))
+    }
+  }
+
+  /**
+   * A primitive element of a literal that adopted the expected element type `slot`:
+   * widen it to the slot's own primitive first, so `[1, 2]` typed `List[Long?]`
+   * holds Longs, as `val a: Long? = 1` does. Boxing the Int as it stands put an
+   * Integer where a Long is read back (ClassCastException, #2698).
+   */
+  private def widenToSlot(element: Term, slot: Type): Term = {
+    val from = element.`type`
+    if (!from.isInstanceOf[BasicType] || from == BasicType.VOID || from == BasicType.BOOLEAN) element
+    else {
+      val slotType = slot match {
+        case n: NullableType => n.innerType
+        case other => other
+      }
+      val slotPrimitive = slotType match {
+        case bt: BasicType => Some(bt)
+        case other => Boxing.unboxedType(bodyContext.table, other)
+      }
+      slotPrimitive match {
+        case Some(target) if target != BasicType.VOID && target != BasicType.BOOLEAN && target != from && TypeRules.isAssignable(target, from) =>
+          new AsInstanceOf(element.location, element, target)
+        case _ => element
+      }
     }
   }
 

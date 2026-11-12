@@ -56,8 +56,40 @@ private[compiler] final class MethodInvocationBuilderSupport(
   private def instanceClassName(traitClass: ClassType, concrete: Type): String =
     simpleName(traitClass.name) + "$$" + boxedSimpleName(concrete.name)
 
+  private def packageOf(n: String): String = { val i = n.lastIndexOf('.'); if (i >= 0) n.substring(0, i) else null }
+
+  /** The instance class for `Trait[Concrete]`. An `instance` lowers to a class in its own
+    * unit's package, so look in the caller's package first, then beside the trait, then
+    * beside the type argument, then in the default package. A candidate counts only if it
+    * really implements this trait: another trait that merely shares the simple name must not
+    * capture the slot (#2769). At most one candidate can match, because a second instance for
+    * the same (trait, type) is rejected as E0097 (TypingDuplicationPass). */
+  private def findInstanceClass(traitClass: ClassType, concrete: Type): Option[ClassType] = {
+    val mangled = instanceClassName(traitClass, concrete)
+    val module = typing.unit_.module
+    val packages = List(if (module != null) module.name else null, packageOf(traitClass.name), packageOf(concrete.name), null).distinct
+    val traitRaw = traitClass match { case a: AppliedClassType => a.raw; case c => c }
+    val wanted = TraitInstanceKeys.typeArgumentName(concrete)
+    packages.iterator
+      .flatMap(p => typing.load(typing.createFQCN(p, mangled)))
+      .find(c => TypeRules.isSuperType(traitRaw, c) && declaredFor(c, traitRaw, wanted))
+  }
+
+  /** Whether `candidate` is the instance for `wanted`, not one declared for another type that
+    * shares its simple name (`pa.Point` vs `pb.Point`): its `Trait[X]` interface must name
+    * exactly `wanted` as X. A class read without generic information (a raw interface) is
+    * taken on its name, as before. */
+  private def declaredFor(candidate: ClassType, traitRaw: ClassType, wanted: String): Boolean =
+    candidate.interfaces.collectFirst {
+      case a: AppliedClassType if a.raw.name == traitRaw.name => a.typeArguments.headOption
+      case c if c.name == traitRaw.name => None
+    } match {
+      case Some(Some(arg)) => TraitInstanceKeys.typeArgumentName(arg) == wanted
+      case _ => true
+    }
+
   private def dictionaryInstanceTerm(node: AST.Node, traitClass: ClassType, concrete: Type): Option[Term] =
-    typing.load(instanceClassName(traitClass, concrete)).flatMap { instanceClass =>
+    findInstanceClass(traitClass, concrete).flatMap { instanceClass =>
       val ctors = instanceClass.findConstructor(Array[Term]())
       if (ctors.isEmpty) None else Some(new NewObject(node.location, ctors(0), Array[Term]()))
     }
@@ -97,7 +129,7 @@ private[compiler] final class MethodInvocationBuilderSupport(
    * instance is a clean error (not a runtime null). Non-constrained methods are
    * untouched.
    */
-  private def injectDictionaries(
+  private[typing] def injectDictionaries(
     node: AST.Node,
     method: Method,
     finalParams: Array[Term],

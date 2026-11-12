@@ -41,9 +41,65 @@ private[compiler] final class SuperMethodCallSupport(
             if (context.isClosure) superCallThroughAccessor(contextClass, method, finalParams)
             else new CallSuper(new This(contextClass), method, finalParams)
         )
+      case Left(true) =>
+        // Not in the superclass chain: a default method of one of the class's
+        // own interfaces, as Java's `I.super.m()` reaches it (#2675).
+        interfaceDefault(node, contextClass, parameters) match {
+          case Right((iface, method)) =>
+            val classSubst = TypeSubstitution.hierarchySubstitution(iface, method.affiliation, selfReceiver = true)
+            calls.buildResolvedCall(node, method, parameters, node.typeArgs, classSubst, expected)(
+              expectedArgs => calls.prepareCallParams(node, node.args, method, parameters, expectedArgs),
+              finalParams =>
+                if (context.isClosure) superCallThroughAccessor(contextClass, method, finalParams, iface)
+                else new CallSuper(null, new This(contextClass), method, finalParams, iface)
+            )
+          case Left(true) =>
+            calls.reportMethodNotFound(node, contextClass, node.name, calls.types(parameters))
+            None
+          case Left(_) => None // already reported (ambiguous or inaccessible)
+        }
       case Left(_) =>
         calls.reportMethodNotFound(node, contextClass, node.name, calls.types(parameters))
         None
+    }
+  }
+
+  /** The one default (non-abstract) method `name` among the direct interfaces,
+   *  paired with the interface it is reached through. Two different defaults
+   *  are ambiguous (E0006), as in Java. `Left(true)`: none found, nothing
+   *  reported; `Left(false)`: an error was reported. */
+  private def interfaceDefault(node: AST.SuperMethodCall, contextClass: ClassType, parameters: Array[Term]): Either[Boolean, (ClassType, Method)] = {
+    val found = contextClass.interfaces.toList.flatMap { iface =>
+      MethodResolution.findMethods(iface, node.name, parameters, bodyContext.table).toList
+        .filter(m => !Modifier.isAbstract(m.modifier) && !Modifier.isStatic(m.modifier))
+        .map(m => (iface, m))
+    }
+    val unique = found.foldLeft(List.empty[(ClassType, Method)]) { (acc, f) =>
+      if (acc.exists(_._2 eq f._2)) acc else acc :+ f
+    }
+    // The most specific default wins, as in Java: `class C conforms A, B`
+    // with `B conforms A` overriding `g` calls B's `g`, not E0006.
+    val distinct = unique.filterNot { case (_, m) =>
+      unique.exists { case (_, other) =>
+        (other ne m) && (other.affiliation ne m.affiliation) &&
+          TypeRules.isSuperType(m.affiliation, other.affiliation)
+      }
+    }
+    distinct match {
+      case Nil => Left(true)
+      case one :: Nil =>
+        if (!MemberAccess.isMemberAccessible(one._2, contextClass)) {
+          bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, one._2.affiliation, node.name, one._2.arguments, contextClass)
+          Left(false)
+        } else Right(one)
+      case a :: b :: _ =>
+        bodyContext.report(
+          SemanticError.AMBIGUOUS_METHOD,
+          node,
+          Array[AnyRef](a._2.affiliation, node.name, a._2.arguments),
+          Array[AnyRef](b._2.affiliation, node.name, b._2.arguments)
+        )
+        Left(false)
     }
   }
 
@@ -57,7 +113,7 @@ private[compiler] final class SuperMethodCallSupport(
    * the closure reaches it as a nestmate (JEP 181), on a trait's interface too. Its name carries
    * the holding class, so two traits mixed into one class never collide on it.
    */
-  private def superCallThroughAccessor(contextClass: ClassDefinition, method: Method, params: Array[Term]): Term = {
+  private def superCallThroughAccessor(contextClass: ClassDefinition, method: Method, params: Array[Term], interfaceOwner: ClassType = null): Term = {
     val explicit = params.indices.filterNot(i => params(i).isInstanceOf[DefaultArgument])
     val mask = params.indices.map(i => if (explicit.contains(i)) '1' else '0').mkString
     val owner = method.affiliation.name.replace('.', '_')
@@ -77,7 +133,7 @@ private[compiler] final class SuperMethodCallSupport(
           val k = explicit.indexOf(i)
           if (k < 0) params(i) else new RefLocal(0, slots(k), method.arguments(i)): Term
         }.toArray
-        val call = new CallSuper(new This(contextClass), method, superParams)
+        val call = new CallSuper(null, new This(contextClass), method, superParams, interfaceOwner)
         val body: Seq[ActionStatement] =
           if (method.returnType == BasicType.VOID) Seq(new ExpressionActionStatement(null, call), new Return(null, null))
           else Seq(new Return(null, call))
@@ -120,7 +176,8 @@ private[compiler] final class SuperMethodCallSupport(
         val classSubst = TypeSubstitution.hierarchySubstitution(contextClass.superClass, method.affiliation, selfReceiver = true)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
+              .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams =>
               if (context.isClosure) superCallThroughAccessor(contextClass, method, finalParams)
               else new CallSuper(new This(contextClass), method, finalParams)

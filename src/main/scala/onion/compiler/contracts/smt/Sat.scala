@@ -11,19 +11,28 @@ import scala.collection.mutable
  * An answer is never trusted on its own: a `Sat` model is checked against the clauses by the
  * caller ([[Sat.satisfies]]), and an `Unsat` carries the learned clauses as a RUP proof that
  * [[Rup.check]] replays independently.
+ *
+ * The search is bounded: past `maxConflicts` conflicts the answer is [[Unknown]], so a hard
+ * formula costs the build a bounded time, never a hang (#2748).
  */
 object Sat {
   sealed trait Result
   final case class Satisfiable(model: Array[Boolean]) extends Result // index 1..numVars
   final case class Unsatisfiable(proof: Seq[Array[Int]]) extends Result // learned clauses, last is empty
+  /** The conflict budget ran out before an answer. */
+  case object Unknown extends Result
 
-  def solve(numVars: Int, clauses: Seq[Array[Int]]): Result = new Solver(numVars, clauses).run()
+  /** Conflicts allowed per call: well past what an `ensures` over a few `Int`s needs. */
+  val DefaultMaxConflicts: Int = 5000
+
+  def solve(numVars: Int, clauses: Seq[Array[Int]], maxConflicts: Int = DefaultMaxConflicts): Result =
+    new Solver(numVars, clauses, maxConflicts).run()
 
   /** Whether `model` (index 1..n) makes every clause true. */
   def satisfies(model: Array[Boolean], clauses: Seq[Array[Int]]): Boolean =
     clauses.forall(_.exists(l => if (l > 0) model(l) else !model(-l)))
 
-  private final class Solver(n: Int, input: Seq[Array[Int]]) {
+  private final class Solver(n: Int, input: Seq[Array[Int]], maxConflicts: Int) {
     private val clauses = mutable.ArrayBuffer.empty[Array[Int]]
     private val watches = Array.fill(2 * n + 2)(mutable.ArrayBuffer.empty[Int])
     private val value = new Array[Byte](n + 1) // 0 unassigned, 1 true, -1 false
@@ -171,6 +180,7 @@ object Sat {
         val confl = propagate()
         if (confl >= 0) {
           conflicts += 1
+          if (conflicts > maxConflicts) return Unknown
           if (trailLim.isEmpty) { proof += Array.empty[Int]; return Unsatisfiable(proof.toSeq) }
           val (learnt, back) = analyze(confl)
           cancelUntil(back)

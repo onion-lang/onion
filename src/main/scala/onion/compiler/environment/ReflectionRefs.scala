@@ -200,7 +200,8 @@ object ReflectionRefs {
     private def requireMethodTable(): Unit = {
       if (methods_ == null) {
         methods_ = new MultiTable[TypedAST.Method]
-        for (method <- klass.getMethods if method.getName != CONSTRUCTOR_NAME) {
+        val all = klass.getMethods
+        for (method <- all if method.getName != CONSTRUCTOR_NAME && !BridgeMethods.isShadowedBridge(method, all)) {
           val owner = table.loadOrNull(method.getDeclaringClass.getName)
           val ownerEnv = mapper.typeParamEnv(owner.typeParameters)
           methods_.add(new ReflectMethodRef(method, owner, mapper, ownerEnv))

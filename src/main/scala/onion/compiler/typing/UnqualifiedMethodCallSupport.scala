@@ -143,7 +143,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       }.toSet
       typeUnqualifiedCallWithClosures(node, context, expected, closureIndices)
     } else if (methods.length == 0) {
-      staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected) match {
+      staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected, context) match {
         case MethodFallbackLookup.Found(term) =>
           checkRegexLiteral(node, term)
           Some(term)
@@ -240,8 +240,18 @@ private[compiler] final class UnqualifiedMethodCallSupport(
           node, name, node.args, node.typeArgs, top, context, expected, untypedClosureIndices
         )
       case _ =>
-        // No target class holds a method of this name. The remaining fallbacks
-        // (static-import, callable-value) and the not-found diagnostic cannot
+        // A static-imported function types its lambda as `Type::name(...)` does, when exactly
+        // one imported type has an overload that fits the other arguments (#2667).
+        staticImportMethodCallSupport.soleImportedTypeFor(node, context, expected, untypedClosureIndices) match {
+          case Some(None) => return None
+          case Some(Some((typeRef, typedArgs))) =>
+            return staticCalls.typeStaticCallWithBidirectionalInferenceCore(
+              node, name, node.args, node.typeArgs, typeRef, context, expected, untypedClosureIndices, typedArgs
+            )
+          case None =>
+        }
+        // Otherwise no target class holds a method of this name. The remaining fallbacks
+        // (an ambiguous static import, callable-value) and the not-found diagnostic cannot
         // benefit from bidirectional inference on the closure, so report the
         // closure's parameter type as usual by delegating to the eager path,
         // which yields the standard not-found error for the arguments it can
@@ -249,7 +259,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         // callable value or static import is genuinely absent).
         val params0 = calls.typedTerms(node.args.toArray, context)
         if (params0 == null) return None
-        staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params0, expected) match {
+        staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params0, expected, context) match {
           case MethodFallbackLookup.Found(term) =>
             checkRegexLiteral(node, term)
             Some(term)
@@ -416,7 +426,8 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         val classSubst = selfClassSubstitution(method)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method),
+            expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
+              .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams => rawUnqualifiedCall(targetType, method, finalParams, context)
           )
         }

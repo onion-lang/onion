@@ -640,6 +640,39 @@ class TailCallOptimizationSpec extends AbstractShellSpec {
       assert(Shell.Success(-1) == result)
     }
 
+    it("loops when a select case is an Integer unboxed to the Int result") {
+      // #2416: the select form of the if case above.
+      val result = run("TcoBoxedSelect.on",
+        """
+          |class C {
+          |public:
+          |  static def q(o: Integer, n: Int): Int = select n {
+          |    case 0: o
+          |    else: q(o, n - 1)
+          |  }
+          |  static def main(args: String[]): Int = q(7, 1000000)
+          |}
+          |""")
+      assert(Shell.Success(7) == result)
+    }
+
+    it("still throws NullPointerException for a null Integer in a taken select case") {
+      val result = run("TcoBoxedSelectNull.on",
+        """
+          |class C {
+          |public:
+          |  static def q(o: Integer, n: Int): Int = select n {
+          |    case 0: o
+          |    else: q(o, n - 1)
+          |  }
+          |  static def main(args: String[]): Int {
+          |    try { return q(null, 3) } catch e: NullPointerException { return -1 }
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(-1) == result)
+    }
+
     it("leaves the unboxing of an if under a try outside the branches, like a bare call") {
       // The panel's repro on #2413: a `try` around `if c { nn() }` must let the unboxing
       // NullPointerException escape, as a `try` around a bare `nn()` does.

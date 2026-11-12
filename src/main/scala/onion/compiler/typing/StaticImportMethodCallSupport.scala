@@ -24,11 +24,14 @@ private[compiler] final class StaticImportMethodCallSupport(
   private case class StaticImportResolved(method: Method, term: Term) extends StaticImportResolution
   private case class StaticImportAmbiguous(first: Method, second: Method) extends StaticImportResolution
   private case object StaticImportNoMatch extends StaticImportResolution
+  /** The method was chosen but the call could not be built; the error is already reported. */
+  private case object StaticImportFailed extends StaticImportResolution
 
   def resolveStaticImportMethodCall(
     node: AST.UnqualifiedMethodCall,
     params: Array[Term],
-    expected: Type
+    expected: Type,
+    context: LocalContext = null
   ): MethodFallbackLookup[Term] = {
     val mappedTypeArgs =
       if (node.typeArgs.nonEmpty) {
@@ -42,19 +45,24 @@ private[compiler] final class StaticImportMethodCallSupport(
 
     val resolved = scala.collection.mutable.Buffer[StaticImportResolved]()
     var ambiguous: Option[StaticImportAmbiguous] = None
+    var failed = false
     staticCandidates(node.name).foreach { case (typeRef, candidates) =>
-      resolveStaticImportOnType(node, typeRef, candidates, params, expected, mappedTypeArgs) match {
+      resolveStaticImportOnType(node, typeRef, candidates, params, expected, mappedTypeArgs, context) match {
         case found: StaticImportResolved =>
           // Deduplicate: the same method may be reachable through both a
           // class-level static import and a single-method static import.
           if (!resolved.exists(_.method eq found.method)) resolved += found
         case amb: StaticImportAmbiguous =>
           if (ambiguous.isEmpty) ambiguous = Some(amb)
+        case StaticImportFailed =>
+          failed = true
         case StaticImportNoMatch =>
       }
     }
 
-    if (resolved.length == 1) {
+    if (failed && resolved.isEmpty) {
+      MethodFallbackLookup.Error
+    } else if (resolved.length == 1) {
       MethodFallbackLookup.Found(resolved.head.term)
     } else if (resolved.length > 1) {
       calls.reportAmbiguousMethod(node, resolved(0).method, resolved(1).method)
@@ -67,6 +75,31 @@ private[compiler] final class StaticImportMethodCallSupport(
         case None =>
           MethodFallbackLookup.NotFound
       }
+    }
+  }
+
+  /**
+   * For a bare call with an untyped lambda argument: the one static-imported type with an
+   * overload that fits the other arguments, and those arguments typed. The caller then types
+   * the call as `Type::name(...)`, so the lambda gets its parameter types from the chosen
+   * overload (#2667). None when no imported type, or more than one, fits; Some(None) when
+   * typing the other arguments failed (already reported).
+   */
+  def soleImportedTypeFor(
+    node: AST.UnqualifiedMethodCall,
+    context: LocalContext,
+    expected: Type,
+    untypedClosureIndices: Set[Int]
+  ): Option[Option[(ClassType, Array[Term])]] = {
+    val imported = staticCandidates(node.name)
+    if (imported.isEmpty) return None
+    calls.typePreliminaryParams(node.args, context, untypedClosureIndices) match {
+      case None => Some(None)
+      case Some(typedArgs) =>
+        val fitting = imported.filter { case (typeRef, candidates) =>
+          overloadSupport.collectPartialInstanceApplicables(typeRef, candidates, node, typedArgs, expected).nonEmpty
+        }
+        if (fitting.length == 1) Some(Some((fitting.head._1, typedArgs))) else None
     }
   }
 
@@ -97,7 +130,8 @@ private[compiler] final class StaticImportMethodCallSupport(
     candidates: Seq[Method],
     params: Array[Term],
     expected: Type,
-    mappedTypeArgs: Option[Array[Type]]
+    mappedTypeArgs: Option[Array[Type]],
+    context: LocalContext
   ): StaticImportResolution = {
     val applicable = overloadSupport.collectStaticApplicables(
       typeRef,
@@ -120,9 +154,9 @@ private[compiler] final class StaticImportMethodCallSupport(
         // methods like `format`/`printf` resolve the same as `IO::format`.
         calls.prepareCallParams(node, node.args, chosen.method, params, chosen.expectedArgs) match {
           case Some(adjusted) =>
-            overloadSupport.buildStaticCall(typeRef, chosen.method, adjusted, classSubst, chosen.methodSubst) match {
+            overloadSupport.buildStaticCall(node, typeRef, chosen.method, adjusted, classSubst, chosen.methodSubst, context) match {
               case Some(term) => StaticImportResolved(chosen.method, term)
-              case None => StaticImportNoMatch
+              case None => StaticImportFailed
             }
           case None => StaticImportNoMatch
         }

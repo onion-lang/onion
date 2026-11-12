@@ -25,6 +25,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
   /** Writes that neither the syntax nor the solver settled (W0024): never left silent (#2574). */
   val unchecked: scala.collection.mutable.ArrayBuffer[Unchecked] = scala.collection.mutable.ArrayBuffer.empty
   private var unitFile: String = null
+  private var unitOf: Map[String, AST.CompilationUnit] = Map.empty
   private sealed trait Kind
   private case object Raise extends Kind
   private case object Lower extends Kind
@@ -80,8 +81,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
       units.flatMap(_.toplevels).collect { case c: AST.ClassDeclaration => c.name -> c }.toMap
     val interfaces: Map[String, AST.InterfaceDeclaration] =
       units.flatMap(_.toplevels).collect { case i: AST.InterfaceDeclaration => i.name -> i }.toMap
-    val unitOf: Map[String, AST.CompilationUnit] =
-      units.flatMap(u => u.toplevels.collect { case c: AST.ClassDeclaration => c.name -> u }).toMap
+    unitOf = units.flatMap(u => u.toplevels.collect { case c: AST.ClassDeclaration => c.name -> u }).toMap
     if (classes.values.exists(_.histories.nonEmpty) || interfaces.values.exists(_.histories.nonEmpty)) {
       for (cls <- classes.values) {
         unitFile = unitOf(cls.name).sourceFile
@@ -94,7 +94,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
                      interfaces: Map[String, AST.InterfaceDeclaration]): Unit = {
     val chain = hierarchy(cls, classes)
     // An interface's history binds every implementor (design 4.2), like a superclass's.
-    val histories = chain.flatMap(_.histories) ++ interfaceHistories(chain.flatMap(_.superInterfaces), interfaces, Set.empty)
+    val histories = historiesOf(chain, interfaces)
     val relations = for {
       h <- histories
       (field, op) <- HistoryPreorder.simpleRelations(h)
@@ -107,12 +107,140 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
         (field, op) <- relations.distinct
         w <- writes if w.ofField(m, field)
         problem <- problemOf(op, w.kind, field, perMethod)
-      } if (reporting) typing.report(SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)", problem._1, problem._2)
+      } if (reporting) typing.reportIn(unitFile, SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)", problem._1, problem._2)
       // After the codegen the solver is asked again to reproduce counterexamples; under `--contracts
       // runtime` it is asked once here, so a history it proves does not need its run-time guard.
       if (!reporting || dropsProvedGuards) proveRest(cls, chain, relations.distinct)
     }
     if (!reporting) uncheckedForms(cls, chain, histories)
+    checkInherited(cls, chain, histories, classes, interfaces)
+  }
+
+  /**
+   * A history binds every method callable on the class, so also the methods it inherits without
+   * overriding them (#2603). Each is checked against the relations the class adds: one its
+   * superclass is already bound by, on the same field, is checked there, since the superclass runs
+   * the same inherited methods (#2781). A write binds a relation only
+   * when it writes the field the relation names, not a shadowed one of the same name (#2781). A
+   * write the syntax settles is E0109 at the write, in the file that holds it; any other is W0024,
+   * since the solver does not prove an inherited body against a subclass's history.
+   */
+  private def checkInherited(cls: AST.ClassDeclaration, chain: Seq[AST.ClassDeclaration], histories: Seq[AST.Expression],
+                             classes: Map[String, AST.ClassDeclaration], interfaces: Map[String, AST.InterfaceDeclaration]): Unit = {
+    lazy val perMethod: Seq[(AST.MethodDeclaration, Seq[Write])] =
+      for (c <- chain; m <- methodsOf(c) if m.block != null) yield (m, writesIn(m, c))
+    // The class that declares the field `f` as `from` sees it, by name.
+    def fieldOwner(from: AST.ClassDeclaration, f: String): Option[String] =
+      hierarchy(from, classes).find(c => fieldsOf(c).contains(f)).map(_.name)
+    // The class that declares `h`; an interface's history reads the fields of `default`.
+    def holder(h: AST.Expression, among: Seq[AST.ClassDeclaration], default: AST.ClassDeclaration) =
+      among.find(_.histories.exists(_ eq h)).getOrElse(default)
+    def relationsOf(hs: Seq[AST.Expression], among: Seq[AST.ClassDeclaration], default: AST.ClassDeclaration) =
+      for (h <- hs; (f, op) <- HistoryPreorder.simpleRelations(h)) yield (f, op, fieldOwner(holder(h, among, default), f))
+    lazy val added = relationsOf(histories, chain, cls).distinct
+    val parentChain = chain.drop(1)
+    lazy val parentHistories = historiesOf(parentChain, interfaces)
+    lazy val theirs = parentChain.headOption.map(p => relationsOf(parentHistories, parentChain, p).toSet).getOrElse(Set.empty)
+    for ((owner, m, via) <- inheritedMethods(cls, chain)) {
+      val writes = writesIn(m, owner)
+      val file = unitOf.get(owner.name).map(_.sourceFile).orNull
+      for ((field, op, declarer) <- added if !theirs((field, op, declarer)) && fieldOwner(owner, field) == declarer) {
+        val mine = writes.filter(_.ofField(m, field))
+        val broken = mine.flatMap(w => problemOf(op, w.kind, field, perMethod).map(w -> _))
+        if (reporting) broken.foreach { case (w, problem) =>
+          typing.reportIn(file, SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)",
+            problem._1, problem._2, cls.name, via.name, owner.name)
+        }
+        // A raise under `>=` (a lowering under `<=`, a constant nothing undoes) is settled by the syntax.
+        else if (broken.isEmpty) mine.find(_.kind == Other).foreach { w =>
+          unchecked += Unchecked(file, owner, m, field, Some(s"$field $op old($field)"), line = lineOf(w.node),
+            fieldType = None, reason = Some(("inherited", cls.name)), at = w.node.location, via = via.name)
+        }
+      }
+      if (!reporting) {
+        val fields = fieldTypes(chain).keySet
+        for {
+          h <- histories if !parentHistories.exists(sameClause(_, h))
+          from = holder(h, chain, cls)
+          c <- conjuncts(h) if HistoryPreorder.simpleRelations(c).isEmpty
+          named = namesIn(c).filter(f => fields.contains(f) && fieldOwner(from, f) == fieldOwner(owner, f))
+          w <- writes.find(w => named.exists(w.ofField(m, _)))
+        } unchecked += Unchecked(file, owner, m, w.field, None, line = lineOf(h), fieldType = None, at = w.node.location)
+      }
+    }
+  }
+
+  /** Two clauses spelled the same, wherever they are written. */
+  private def sameClause(a: Any, b: Any): Boolean = (a, b) match {
+    case (_: onion.compiler.Location, _: onion.compiler.Location) => true
+    case (x: Product, y: Product) =>
+      x.getClass == y.getClass && x.productArity == y.productArity &&
+        x.productIterator.zip(y.productIterator).forall { case (l, r) => sameClause(l, r) }
+    case _ => a == b
+  }
+
+  /** The names of the fields `c` itself declares. */
+  private def fieldsOf(c: AST.ClassDeclaration): Set[String] =
+    (c.defaultSection.toSeq ++ c.sections).flatMap(_.members).collect { case f: AST.FieldDeclaration => f.name }.toSet
+
+  /** The histories that bind a class: its own, its superclasses', and its interfaces'. */
+  private def historiesOf(chain: Seq[AST.ClassDeclaration], interfaces: Map[String, AST.InterfaceDeclaration]): Seq[AST.Expression] =
+    chain.flatMap(_.histories) ++ interfaceHistories(chain.flatMap(_.superInterfaces), interfaces, Set.empty)
+
+  /**
+   * The superclasses' methods a `cls` runs without overriding them, nearest first, each with the
+   * method a caller reaches it through. A non-private method is reached by itself, unless a
+   * non-private method of the same name and arity overrides it; a private method never overrides
+   * and is never overridden (#2781). A private method runs when an inherited method of its own
+   * class calls it, directly or through other private methods, and is reached through that caller.
+   */
+  private def inheritedMethods(cls: AST.ClassDeclaration, chain: Seq[AST.ClassDeclaration]): Seq[(AST.ClassDeclaration, AST.MethodDeclaration, AST.MethodDeclaration)] = {
+    def sig(m: AST.MethodDeclaration) = (m.name, m.args.size)
+    def visible(c: AST.ClassDeclaration) = methodsOf(c).filterNot(isPrivate(c, _))
+    var overridden = visible(cls).map(sig).toSet
+    chain.drop(1).flatMap { c =>
+      val entries = visible(c).filter(m => m.block != null && !overridden(sig(m)))
+      val privates = methodsOf(c).filter(m => m.block != null && isPrivate(c, m))
+      val reached = for {
+        p <- privates
+        via <- entries.find(e => reachable(e, privates).exists(_ eq p))
+      } yield (c, p, via)
+      overridden ++= visible(c).map(sig)
+      entries.map(m => (c, m, m)) ++ reached
+    }
+  }
+
+  private def isPrivate(c: AST.ClassDeclaration, m: AST.MethodDeclaration): Boolean =
+    (m.modifiers & AST.M_PRIVATE) != 0 ||
+      (c.defaultSection.toSeq ++ c.sections).exists(s => (s.modifiers & AST.M_PRIVATE) != 0 && s.members.exists(_ eq m))
+
+  /** The private methods `from` calls on `this`, directly or through one another. */
+  private def reachable(from: AST.MethodDeclaration, privates: Seq[AST.MethodDeclaration]): Seq[AST.MethodDeclaration] = {
+    val seen = scala.collection.mutable.ArrayBuffer.empty[AST.MethodDeclaration]
+    def visit(m: AST.MethodDeclaration): Unit = {
+      val called = callsOnThis(m)
+      for (p <- privates if called.contains((p.name, p.args.size)) && !seen.exists(_ eq p)) {
+        seen += p
+        visit(p)
+      }
+    }
+    visit(from)
+    seen.toSeq
+  }
+
+  /** The methods `m` calls on this object, by name and arity: `f()`, `this.f()`, `self.f()`. */
+  private def callsOnThis(m: AST.MethodDeclaration): Set[(String, Int)] = {
+    val out = Set.newBuilder[(String, Int)]
+    def visit(n: AST.Node): Unit = {
+      n match {
+        case AST.UnqualifiedMethodCall(_, name, args, _) => out += ((name, args.size))
+        case AST.MethodCall(_, null | (_: AST.CurrentInstance), name, args, _) => out += ((name, args.size))
+        case _ =>
+      }
+      ASTWalk.visitChildren(n)(visit)
+    }
+    if (m.block != null) visit(m.block)
+    out.result()
   }
 
   /**
@@ -378,8 +506,10 @@ object HistoryWritePass {
    * `fieldType` is set when the field is not an `Int`, which the solver does not model. `reason` is
    * a write the body-only checks cannot follow (`lambda`), reported `at` the write rather than at
    * the method (#2599), or a proof that holds only by assuming a class invariant (`invariant`, #2602).
+   * `via` is, for an inherited method (`inherited`), the method a caller reaches it through (#2781).
    */
   final case class Unchecked(sourceFile: String, cls: AST.ClassDeclaration, method: AST.MethodDeclaration,
                              field: String, history: Option[String], line: Int, fieldType: Option[String],
-                             reason: Option[(String, String)] = None, at: onion.compiler.Location = null)
+                             reason: Option[(String, String)] = None, at: onion.compiler.Location = null,
+                             via: String = null)
 }

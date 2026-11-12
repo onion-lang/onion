@@ -20,8 +20,18 @@ object NullabilityMetadata:
     case nt: NullableType => !nt.innerType.isInstanceOf[BasicType]
     case _                => false
 
-  def emitParameters(mv: MethodVisitor, arguments: Array[Type]): Unit =
-    if arguments != null && arguments.exists(isMarked) then
+  /**
+   * Marks a type-class dictionary parameter: one of the trailing parameters a `[T: Trait]`
+   * method carries, one per (type parameter, trait) in declaration order (#2768). A separate
+   * compilation reads the constraint back from it and fills the slot at each call, as it does
+   * within one compilation.
+   */
+  val DictionaryDescriptor: String = "Lonion/internal/Dictionary;"
+
+  def emitParameters(mv: MethodVisitor, arguments: Array[Type], dictionaryCount: Int = 0): Unit =
+    if arguments != null && (dictionaryCount > 0 || arguments.exists(isMarked)) then
       mv.visitAnnotableParameterCount(arguments.length, false)
-      for (arg, i) <- arguments.zipWithIndex if isMarked(arg) do
-        mv.visitParameterAnnotation(i, NullableDescriptor, false).visitEnd()
+      val firstDictionary = arguments.length - dictionaryCount
+      for (arg, i) <- arguments.zipWithIndex do
+        if isMarked(arg) then mv.visitParameterAnnotation(i, NullableDescriptor, false).visitEnd()
+        if i >= firstDictionary then mv.visitParameterAnnotation(i, DictionaryDescriptor, false).visitEnd()

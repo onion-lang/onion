@@ -540,23 +540,40 @@ private[typing] object GenericMethodTypeArguments {
           failedBound += name
         }
 
-        val inferredType0 =
-          inferred.get(name)
-            .orElse(lowerConstraints.get(name))
-            .getOrElse(bound)
+        val fixedType = inferred.get(name).orElse(lowerConstraints.get(name))
+        val inferredType0 = fixedType.getOrElse(bound)
+
+        // An F-bound (`T extends Comparable[T]`) names the parameter itself. Read with `T`
+        // erased it is `Comparable[Object]`, which no `String` or `U extends Comparable[U]`
+        // meets. Check a fixed `T` against its bound with `T` read as that type, the way
+        // `Comparable[String]` is the bound a `String` must meet (#2338).
+        val selfBound = (fixedType, tp.upperBound) match
+          case (Some(fixed), Some(upper0)) if !upperConstraints.contains(name) && mentionsTypeParam(upper0, Set(name)) =>
+            val self = fixed match
+              case n: NullableType => boxedTypeArg(n.innerType)
+              case other => boxedTypeArg(other)
+            TypeSubstitution.substituteType(upper0, classSubst, scala.collection.immutable.Map(name -> self), defaultToBound = true)
+          case _ => bound
+        // A variable fixes an F-bound only through its own bound, by the rule on #2338:
+        // `U extends Comparable[U]` meets `Comparable[U]`, `U extends Comparable[String]`
+        // does not. Read by erasure, both would.
+        def meetsBound(t: Type): Boolean = (selfBound, t) match
+          case (applied: AppliedClassType, tv: TypeVariableType) if !(selfBound eq bound) =>
+            TypeRelations.typeVariableFitsAppliedBound(applied, tv, typing.table_)
+          case _ => isAssignableForBounds(selfBound, t)
 
         // Nullable inferences satisfy the bound through their inner type and
         // are rejected outright for non-null parameters (the Object top-type
         // rule would otherwise let String? through an Object bound)
         val boundsOk = inferredType0 match {
           case n: NullableType =>
-            tp.nullability != Nullability.NonNull && isAssignableForBounds(bound, n.innerType)
+            tp.nullability != Nullability.NonNull && meetsBound(n.innerType)
           case other =>
-            isAssignableForBounds(bound, other)
+            meetsBound(other)
         }
         val inferredType =
           if (!boundsOk) {
-            reportError(callNode, INCOMPATIBLE_TYPE, bound, inferredType0)
+            reportError(callNode, INCOMPATIBLE_TYPE, selfBound, inferredType0)
             failedBound += name
             bound
           } else {

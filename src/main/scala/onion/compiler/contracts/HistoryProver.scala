@@ -120,6 +120,7 @@ object HistoryProver {
         case Sat.Unsatisfiable(proof) => if (Rup.check(bb.numVars, bb.allClauses, proof)) Proved else Unsupported
         case Sat.Satisfiable(model) =>
           Counterexample(pre.view.mapValues(w => bb.valueOf(model, w).toInt).toMap)
+        case Sat.Unknown => Unsupported
       }
     }
 
@@ -143,6 +144,7 @@ object HistoryProver {
         case Sat.Unsatisfiable(proof) => if (Rup.check(bb.numVars, bb.allClauses, proof)) Proved else Unsupported
         case Sat.Satisfiable(model) =>
           Counterexample(pre.view.mapValues(w => bb.valueOf(model, w).toInt).toMap)
+        case Sat.Unknown => Unsupported
       }
     }
 

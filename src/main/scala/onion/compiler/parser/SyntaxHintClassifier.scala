@@ -340,6 +340,20 @@ private[compiler] object SyntaxHintClassifier {
       // `example { ... }` got no hint at all.
       case "law" | "example" =>
         hint("error.parsing.hint.law_example_outside_record", found)
+      // `requires e` / `ensures e` written as a class member (#2605 item 7): both are clauses
+      // of a method signature, so the class body's member list fails at the keyword itself.
+      // A condition on the object's state is an `invariant`, which a class body does take.
+      case "requires" | "ensures" if expected.contains("\"def\"") =>
+        hint("error.parsing.hint.contract_clause_in_class_body", found)
+      // The same clause as a record or enum member: those bodies hold access sections (and, in
+      // a record, `invariant`/`shape`), whose starts are all soft keywords, so the only expected
+      // token left is `}`. Methods there live under a section, which the example shows.
+      // An interface body expects only `}` there too, but takes no `public:` section and no
+      // method body, so the hint is given only once the enclosing body is a record or enum.
+      case "requires" | "ensures"
+          if expected.trim == "\"}\"" &&
+            enclosingTypeKeyword(precedingText + textBefore(context, sourceLine)).exists(k => k == "record" || k == "enum") =>
+        hint("error.parsing.hint.contract_clause_in_type_body", found)
       case "instanceof" if InstanceofExpression.findFirstMatchIn(sourceLine).isDefined =>
         val matched = InstanceofExpression.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.instanceof_not_supported", matched.group(1), matched.group(2))
@@ -767,6 +781,30 @@ private[compiler] object SyntaxHintClassifier {
         }
       (m.group(1), params)
     }
+
+  private val TypeKeyword = """\b(class|interface|record|enum)\b""".r
+
+  /** The keyword (`class`, `interface`, `record`, `enum`) declaring the innermost unclosed brace
+   * in `text`, if that brace opens a type body; braces in strings or comments are not skipped. */
+  private def enclosingTypeKeyword(text: String): Option[String] = {
+    var depth = 0
+    var i = text.length - 1
+    var open = -1
+    while (i >= 0 && open < 0) {
+      text.charAt(i) match {
+        case '}' => depth += 1
+        case '{' => if (depth == 0) open = i else depth -= 1
+        case _   =>
+      }
+      i -= 1
+    }
+    if (open < 0) None
+    else {
+      // The header runs back from the brace to the previous `{`, `}` or `;`.
+      val header = text.substring(0, open).reverse.takeWhile(c => c != '{' && c != '}' && c != ';').reverse
+      TypeKeyword.findAllMatchIn(header).toList.lastOption.map(_.group(1))
+    }
+  }
 
   private def textBefore(context: String, sourceLine: String): String = {
     val rest = context.takeWhile(c => c != '\n' && c != '\r')

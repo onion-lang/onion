@@ -349,7 +349,19 @@ class AsmCodeGenerationVisitor(
       emitArgumentsWithDefaults(node.params, argTypes, Array(asmType(node.target.`type`)), 0, special = true)
     else
       emitArgumentsWithAdaptation(node.params, argTypes, Array(asmType(node.target.`type`)))
-    val ownerType = AsmUtil.objectType(node.method.affiliation.name)
+    // The owner of an invokespecial must be the direct superclass or a direct
+    // superinterface. A default method reached through the superclass chain
+    // (`abstract class Base conforms I`) is named through the superclass, as
+    // javac does; naming the interface threw IncompatibleClassChangeError (#2702).
+    val (ownerName, ownerIsInterface) =
+      if node.interfaceOwner != null then (node.interfaceOwner.name, true)
+      else if node.method.affiliation.isInterface then
+        val superClass = node.target.`type` match
+          case ct: ClassType if ct.superClass != null => ct.superClass.name
+          case _ => node.method.affiliation.name
+        (superClass, false)
+      else (node.method.affiliation.name, false)
+    val ownerType = AsmUtil.objectType(ownerName)
     val methodDesc = AsmType.getMethodDescriptor(
       asmType(node.method.returnType),
       argTypes*
@@ -359,7 +371,7 @@ class AsmCodeGenerationVisitor(
       ownerType.getInternalName,
       node.method.name,
       methodDesc,
-      false
+      ownerIsInterface
     )
 
   /**
@@ -831,8 +843,14 @@ class AsmCodeGenerationVisitor(
     controlFlow.emitSynchronizedTerm(node)
 
   // Statement visitors
-  override def visitStatementBlock(node: StatementBlock): Unit =
-    controlFlow.emitStatementBlock(node)
+  override def visitStatementBlock(node: StatementBlock): Unit = node match
+    case init: FieldInitializerBlock =>
+      // Its locals are numbered in its own frame: give them fresh slots, after the
+      // constructor's parameters and locals, instead of the constructor's mapping.
+      val own = new LocalVarContext(gen).withBoxedVariables(init.frame)
+      init.statements.foreach(asmCodeGen.emitStatementWithContext(gen, _, className, own))
+    case _ =>
+      controlFlow.emitStatementBlock(node)
   
   override def visitBreak(node: Break): Unit =
     controlFlow.emitBreak(node)

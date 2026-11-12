@@ -195,7 +195,7 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
           |}""".stripMargin)
       assert(!o.stdout.contains("TOSTRING RAN"), o.toString)
       assert(o.errors.isEmpty, o.toString)
-      assert(o.w23.exists(w => w.contains("`p`") && w.contains("T::toString")), o.toString)
+      assert(o.w23.exists(w => w.contains("`p`") && w.contains("T.toString")), o.toString)
     }
 
     it("is not run when interpolation, a map literal key, `==` or a thrown exception reach an effect") {
@@ -229,7 +229,7 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
           |  static def p(): Boolean ensures result { throw new Ex() }
           |}""".stripMargin)
       assert(!thrown.stdout.contains("MSG RAN"), thrown.toString)
-      assert(thrown.w23.exists(_.contains("Ex::getMessage")), thrown.toString)
+      assert(thrown.w23.exists(_.contains("Ex.getMessage")), thrown.toString)
     }
 
     it("still runs when the toString it reaches only touches memory: a false one is E0113") {
@@ -446,7 +446,7 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
           |}""".stripMargin)
       assert(!o.stdout.contains("dbg"), o.toString)
       assert(o.errors.isEmpty, o.toString)
-      assert(o.w23.exists(_.contains("Item::toString")), o.toString)
+      assert(o.w23.exists(_.contains("Item.toString")), o.toString)
     }
   }
 

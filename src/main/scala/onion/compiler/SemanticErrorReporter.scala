@@ -271,8 +271,52 @@ class SemanticErrorReporter(threshold: Int) {
     val withHexDigitB =
       if (!hexDigitB) suggestion
       else Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + message("suggestion.hexDigitB"))
-    problem(position, appendSuggestion(baseMessage, withHexDigitB))
+    // `shout(s)` with `s: String?` and `shout(x: String)`: the call fits once nullability is
+    // set aside, so "not found" misleads. Name the argument and the ways out (#2722).
+    val nullableArg: Option[(Int, TypedAST.Type, TypedAST.Type)] =
+      sameName.iterator.filter(m => !m.isVararg && m.argumentCount == argTypes.length && acceptsTypes(m, argTypes)).flatMap { m =>
+        argTypes.indices.find { i =>
+          val p = m.arguments(i)
+          argTypes(i) != null && argTypes(i).isNullable && !p.isNullable && !p.isInstanceOf[TypedAST.TypeVariableType]
+        }.map(i => (i, m.arguments(i), argTypes(i)))
+      }.nextOption()
+    val withNullable = nullableArg match
+      case Some((i, param, arg)) =>
+        val hint = format(message("suggestion.nullableArgument"), Seq((i + 1).toString, typeName(arg), typeName(param)))
+        Some(withHexDigitB.fold("")(_ + Systems.lineSeparator + "  ") + hint)
+      case None => withHexDigitB
+    val heldBack = sameName.collectFirst {
+      case m: TypedAST.MethodDefinition if m.defaultsPending && fitsLeadingParameters(m.arguments, m.defaultsOmittableFrom, argTypes) => (m.defaultsHeldBackBy, m.defaultsHeldBackVia)
+    }
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withNullable, name, heldBack)))
   }
+
+  /**
+   * The given arguments fit the leading parameters, and every parameter they leave out has a
+   * default in the source, so only the held-back defaults stop the call. A type error or a
+   * missing required argument gets no held-back hint: following it would not fix the call
+   * (panel rounds 7 and 8 on #2798).
+   */
+  private def fitsLeadingParameters(params: Array[TypedAST.Type], omittableFrom: Int, argTypes: Array[TypedAST.Type]): Boolean =
+    argTypes.length < params.length && argTypes.length >= omittableFrom && argTypes.indices.forall(i => argPassable(params(i), argTypes(i)))
+
+  /**
+   * A call above a declaration whose defaults are typed in source order (#2653) cannot omit
+   * them yet. Say so after any other suggestion, naming what holds them back and everything
+   * the call needs above it, in order: moving only the function gave E0002 for the top-level
+   * `val` its default reads (panel round 9 on #2798).
+   */
+  private def withHeldBackDefault(suggestion: Option[String], name: String, heldBy: Option[(Seq[String], Seq[String])]): Option[String] =
+    heldBy match {
+      case None => suggestion
+      case Some((roots, via)) =>
+        def quoted(names: Seq[String]) = names.map(n => s"`$n`").mkString(", ")
+        val order = quoted(roots ++ via :+ name)
+        val hint =
+          if (via.isEmpty) format(message("suggestion.heldBackDefault"), Seq(name, quoted(roots), order))
+          else format(message("suggestion.heldBackDefaultVia"), Seq(name, quoted(roots), order, quoted(via)))
+        Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + hint)
+    }
 
   /**
    * The names a failed call `name(argTypes)` on `obj` may be steered to.
@@ -688,8 +732,11 @@ class SemanticErrorReporter(threshold: Int) {
         Some(s"${message("error.suggestion.availableConstructors")}${Systems.lineSeparator}${ctorSignatures.mkString(Systems.lineSeparator)}")
       } else None
     } else None
+    val heldBack = if (items.length > 2) items(2).asInstanceOf[Array[TypedAST.ConstructorRef]].collectFirst {
+      case c: TypedAST.ConstructorDefinition if c.defaultsPending && fitsLeadingParameters(c.arguments, c.defaultsOmittableFrom, argTypes) => (c.defaultsHeldBackBy, c.defaultsHeldBackVia)
+    } else None
 
-    problem(position, appendSuggestion(baseMessage, suggestion))
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(suggestion, s"class ${typeName(typeRef)}", heldBack)))
   }
 
   /**
@@ -1452,11 +1499,17 @@ object SemanticErrorReporter {
     ),
     SemanticError.HISTORY_BROKEN_BY_WRITE -> ErrorDef(
       "error.semantic.historyBrokenByWrite",
-      // items: field, history as source text, reason kind (lower | set | any), the method that raises the field (or "").
+      // items: field, history as source text, reason kind (lower | set | any), the method that raises the field (or "");
+      // for an inherited method (#2603) also the class that declares the history, the method, and the class it comes from.
       Seq(
         items => asString(items(0)),
         items => asString(items(1)),
-        items => format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
+        items => {
+          val reason = format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
+          if (items.length < 7) reason
+          // A Japanese sentence ends in `。` and takes no space after it.
+          else reason + (if (reason.endsWith("\u3002")) "" else " ") + format(message("error.semantic.historyBrokenByWrite.inherited"), Seq(asString(items(4)), asString(items(5)), asString(items(6))))
+        }
       )
     ),
     SemanticError.CONTRACT_FIELD_NOT_VALUE -> ErrorDef(
@@ -1716,6 +1769,10 @@ object SemanticErrorReporter {
     ),
     SemanticError.DUPLICATE_TYPE_ALIAS -> ErrorDef(
       "error.semantic.duplicateTypeAlias",
+      Seq(items => asString(items(0)))
+    ),
+    SemanticError.DUPLICATE_TRAIT_INSTANCE -> ErrorDef(
+      "error.semantic.duplicateTraitInstance",
       Seq(items => asString(items(0)))
     ),
     SemanticError.MULTIPLE_BINDING_PATTERNS_IN_CASE -> ErrorDef(

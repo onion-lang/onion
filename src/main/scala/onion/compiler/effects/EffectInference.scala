@@ -394,6 +394,31 @@ object EffectInference {
       case _ => compatible(v.`type`)
     }
 
+    /** `append(x)` on a chain that starts at `new StringBuilder()`, as interpolation lowers to. */
+    private def freshBuilderAppend(c: Call): Boolean =
+      c.method != null && c.method.name == "append" && c.parameters.length == 1 &&
+        c.method.affiliation != null && c.method.affiliation.name == "java.lang.StringBuilder" &&
+        toStringOnlyAppend(c.method) && freshBuilder(c.target)
+
+    /**
+     * The `append` overloads that call nothing on their argument but `toString`: a primitive,
+     * `String` or `Object` parameter. `append(CharSequence)` also calls `length()` and
+     * `charAt()`, which a program class can override, so it stays an ordinary library call
+     * (panel on #2815).
+     */
+    private def toStringOnlyAppend(m: TypedAST.Method): Boolean =
+      m.arguments.length == 1 && m.arguments(0) != null && {
+        val p = m.arguments(0)
+        p.isBasicType || p.name == "java.lang.Object" || p.name == "java.lang.String"
+      }
+
+    private def freshBuilder(t: Term): Boolean = t match {
+      case n: NewObject => n.parameters.isEmpty && n.constructor.affiliation != null &&
+        n.constructor.affiliation.name == "java.lang.StringBuilder"
+      case c: Call      => freshBuilderAppend(c)
+      case _            => false
+    }
+
     /** What an operator or a map literal can call on an object operand: `+` `toString`, `==` `equals`, `<` `compareTo`, a key `hashCode`. */
     private val operatorCallbacks = Set("toString", "equals", "compareTo", "hashCode")
 
@@ -437,7 +462,7 @@ object EffectInference {
         md <- libraryCallbacks.getOrElse(cd.name, Nil) if only == null || only.contains(md.name)
       } if (internalCallees.add(Callback(md)))
           rawSites += RawSite(location,
-            onion.compiler.toolbox.TypeFormatting.methodReference(md.affiliation, md.name), None, Callback(md))
+            onion.compiler.toolbox.TypeFormatting.methodReference(md), None, Callback(md))
 
     /**
      * The program `close()` methods a try-with-resources can call on `resource`: those of
@@ -453,7 +478,7 @@ object EffectInference {
         }
       } if (internalCallees.add(md))
           rawSites += RawSite(location,
-            onion.compiler.toolbox.TypeFormatting.methodReference(md.affiliation, md.name), None, md)
+            onion.compiler.toolbox.TypeFormatting.methodReference(md), None, md)
 
     /**
      * The edges of a record's generated `toString`/`hashCode`/`equals`: the same method of
@@ -472,7 +497,7 @@ object EffectInference {
           } ++ c.interfaces.toSeq.flatMap(defaults)
         for (om <- rec.interfaces.toSeq.flatMap(defaults)) if (internalCallees.add(om))
           rawSites += RawSite(md.location,
-            onion.compiler.toolbox.TypeFormatting.methodReference(om.affiliation, om.name), None, om)
+            onion.compiler.toolbox.TypeFormatting.methodReference(om), None, om)
       case rec: ClassDefinition =>
         val arity = md.arguments.length
         for {
@@ -485,7 +510,7 @@ object EffectInference {
           }
         } if (internalCallees.add(om))
             rawSites += RawSite(md.location,
-              onion.compiler.toolbox.TypeFormatting.methodReference(om.affiliation, om.name), None, om)
+              onion.compiler.toolbox.TypeFormatting.methodReference(om), None, om)
       case _ =>
     }
 
@@ -520,7 +545,7 @@ object EffectInference {
     private def method(m: TypedAST.Method, location: onion.compiler.Location,
                        target: Term, args: Array[Term]): scala.Unit = {
       // A top-level function is named as written, not through its synthetic owner.
-      val callee = onion.compiler.toolbox.TypeFormatting.methodReference(m.affiliation, m.name)
+      val callee = onion.compiler.toolbox.TypeFormatting.methodReference(m)
       if (Modifier.isStatic(m.modifier)) initializes(m.affiliation, location)
       m match {
         case md: MethodDefinition if units.contains(md) =>
@@ -538,7 +563,7 @@ object EffectInference {
       if (target != null) for (om <- overridesOf(m)) {
         internalCallees += om
         rawSites += RawSite(location,
-          onion.compiler.toolbox.TypeFormatting.methodReference(om.affiliation, om.name), None, om)
+          onion.compiler.toolbox.TypeFormatting.methodReference(om), None, om)
       }
     }
 
@@ -632,6 +657,12 @@ object EffectInference {
       val entry = currentLoc
       t match {
       case null => ()
+      case c: Call if freshBuilderAppend(c) =>
+        // String interpolation: appends to a builder the expression made itself, so no
+        // memory anyone else can see changes. Like `+`, an object part may have its
+        // `toString` called back (#2605).
+        term(c.target); c.parameters.foreach(term)
+        toLibrary(c.parameters.toSeq.filter(o => o.`type` != null && !o.`type`.isBasicType), entry, operatorCallbacks)
       case c: Call          => term(c.target); c.parameters.foreach(term); method(c.method, entry, c.target, c.parameters)
       case c: SafeCall      => term(c.target); c.parameters.foreach(term); method(c.method, entry, c.target, c.parameters)
       case c: SafeStaticExtensionCall => term(c.target); c.parameters.foreach(term); method(c.method, entry, null, Array.empty)

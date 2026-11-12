@@ -2516,6 +2516,8 @@ DateTime::addMonths(epochMillis, months): Long
 DateTime::addYears(epochMillis, years): Long
 ```
 
+`addDays`, `addMonths` and `addYears` move the calendar date and keep the local time, even across a daylight-saving change. `addHours`, `addMinutes` and `addSeconds` add elapsed time.
+
 ### Comparison
 
 ```

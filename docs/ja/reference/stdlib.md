@@ -2667,6 +2667,8 @@ DateTime::addMonths(epochMillis, months): Long
 DateTime::addYears(epochMillis, years): Long
 ```
 
+`addDays`・`addMonths`・`addYears` は暦の日付を進め、ローカル時刻を保ちます。夏時間の切り替えをまたいでも同じです。`addHours`・`addMinutes`・`addSeconds` は経過時間を足します。
+
 ### 比較
 
 ```

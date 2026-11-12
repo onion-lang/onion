@@ -2634,6 +2634,8 @@ DateTime::parse(isoString): Long
 DateTime::parse(dateTime, pattern): Long
 ```
 
+`parse(isoString)` は `2026-11-11`、`2026-11-11T10:00[:00]`(ローカルゾーン)、`Z` やオフセット付き(`2026-11-11T10:00:00+09:00`)を受け付けます。オフセット付きは正確な時刻になります。
+
 ### フォーマット
 
 ```

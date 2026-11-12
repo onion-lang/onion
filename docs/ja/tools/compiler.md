@@ -139,7 +139,7 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0008` | `redundant-cast` | 冗長なキャスト（予約） |
 | `W0009` | `possible-null-deref`, `null-deref` | null 参照の可能性（予約） |
 | `W0010` | `unnecessary-conversion` | 不要な型変換（予約） |
-| `W0011` | `unchecked-cast` | 未検査キャスト（予約） |
+| `W0011` | `unchecked-cast` | 未検査キャスト: 実行時の検査で型引数を確かめられないキャスト |
 | `W0012` | `null-to-non-nullable` | 非 null 型への null 代入 |
 | `W0013` | `suspicious-interpolation` | 疑わしい文字列補間構文 |
 | `W0014` | `discarded-toplevel` | main が定義されているためトップレベル文が無視された |

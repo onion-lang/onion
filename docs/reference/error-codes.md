@@ -1989,7 +1989,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0008` | redundant cast (reserved) |
 | `W0009` | possible null dereference (reserved) |
 | `W0010` | unnecessary type conversion (reserved) |
-| `W0011` | unchecked cast (reserved) |
+| `W0011` | unchecked cast: `e as D` where the run-time check cannot test D's type arguments (`o as List[String]`) or a type-variable D (`o as T`); an upcast, all-`Object` arguments and a downcast whose arguments follow from the source (`ls as ArrayList[String]`) do not warn |
 | `W0012` | null assigned to non-nullable type |
 | `W0013` | suspicious string interpolation syntax |
 | `W0014` | top-level statements ignored because a main is defined |

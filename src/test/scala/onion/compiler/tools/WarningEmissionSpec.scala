@@ -15,7 +15,7 @@ import java.io.StringReader
  * (W0001/W0006, W0012, W0013, W0015, W0016); this fills the W0003/W0005/W0014 gap.
  *
  * See `ReservedWarningCodeSpec` for the codes that are declared and documented but never
- * fired by any code path at all (W0002, W0004, W0007-W0011).
+ * fired by any code path at all (W0002, W0004, W0007-W0010).
  */
 class WarningEmissionSpec extends AnyFunSpec {
 

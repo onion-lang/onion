@@ -151,7 +151,11 @@ object AST {
   case class BitOrAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("|=")
   case class BooleanLiteral(location: Location, value: Boolean) extends Expression
   case class ByteLiteral(location: Location, value: Byte) extends Expression
-  case class Cast(location: Location, src: Expression, to: TypeNode) extends Expression
+  /** `src as to`. `synthetic`: the compiler wrote this cast while desugaring (a tool's argument,
+   *  a shape's build lambda), so no cast warning (W0011) is reported for it at the user's code. */
+  case class Cast(location: Location, src: Expression, to: TypeNode, synthetic: Boolean = false) extends Expression {
+    def this(location: Location, src: Expression, to: TypeNode) = this(location, src, to, false)
+  }
   case class CharacterLiteral(location: Location, value: Char) extends Expression
   case class ClosureExpression(location: Location, typeRef: TypeNode, mname: String, args: List[Argument], returns: TypeNode/*nullable*/, body: BlockExpression) extends Expression
   case class CurrentInstance(location: Location) extends Expression

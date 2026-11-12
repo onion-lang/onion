@@ -163,6 +163,15 @@ final class ExpressionFormTyping(
             bodyContext.report(INCOMPATIBLE_TYPE, node, destination, reported, SemanticErrorReporter.CastSource(name, nullable))
             None
           } else {
+            // `[] as List[Contact]` and `[:] as Map[K, V]` type an empty literal: there is no
+            // element whose type the cast takes on trust, so they do not warn.
+            val emptyLiteral = node.src match {
+              case l: AST.ListLiteral => l.elements.isEmpty
+              case m: AST.MapLiteral => m.entries.isEmpty
+              case _ => false
+            }
+            if (!node.synthetic && !emptyLiteral && isUncheckedCast(term.`type`, destination))
+              bodyContext.warningReporter.uncheckedCast(node.location, term.`type`.displayName, destination.displayName)
             Some(new AsInstanceOf(term, destination))
           }
         }
@@ -277,6 +286,54 @@ final class ExpressionFormTyping(
           }
         }
       case _ => true
+    }
+  }
+
+  /**
+   * W0011 (#2665): the run-time check of `src as D` tests only D's erased class, so a type
+   * argument of D, or a type-variable D, is taken on trust. Such a cast warns, as Java's
+   * unchecked cast does, unless nothing is taken on trust:
+   *   - every type argument of D is `Object` (with or without `?`), so the class test is all;
+   *   - the value already has type D (an upcast, or the same type);
+   *   - D only narrows the class and its arguments follow from the source's
+   *     (`List[String] as ArrayList[String]`).
+   */
+  private def isUncheckedCast(source: Type, destination: Type): Boolean = {
+    def strip(t: Type): Type = t match {
+      case n: NullableType => n.innerType
+      case other => other
+    }
+    def isObject(t: Type): Boolean = strip(t) match {
+      case ct: ClassType => ct.name == "java.lang.Object" && !ct.isInstanceOf[TypeVariableType]
+      case _ => false
+    }
+    val src = strip(source)
+    val dst = strip(destination)
+    if (src.isInstanceOf[NullType] || src.isBasicType) return false
+    val takesOnTrust = dst match {
+      case _: TypeVariableType => true
+      case a: AppliedClassType => a.typeArguments.exists(arg => !isObject(arg))
+      case _ => false
+    }
+    if (!takesOnTrust) false
+    else if (dst.isInstanceOf[TypeVariableType]) !(src eq dst)
+    else if (TypeRules.isSuperType(dst, src)) false
+    else (src, dst) match {
+      case (s: AppliedClassType, d: AppliedClassType) => !argumentsFollowFrom(s, d)
+      case _ => true
+    }
+  }
+
+  // `d`'s own view of `s`'s class is `s` itself, and each of `d`'s type arguments shows up
+  // in that view, so a value of class `d.raw` that is an `s` can only be a `d`.
+  private def argumentsFollowFrom(s: AppliedClassType, d: AppliedClassType): Boolean = {
+    val views = bodyContext.table.appliedViewsOf(d)(AppliedTypeViews.collectAppliedViewsFrom(d))
+    views.collectFirst { case (raw, view) if TypeRelations.sameClass(raw, s.raw) => view } match {
+      case Some(view) =>
+        val viewArgs = view.typeArguments.map(_.displayName).toSeq
+        viewArgs == s.typeArguments.map(_.displayName).toSeq &&
+          d.typeArguments.forall(arg => viewArgs.contains(arg.displayName))
+      case None => false
     }
   }
 

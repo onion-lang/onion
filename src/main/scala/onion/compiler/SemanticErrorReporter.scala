@@ -1055,6 +1055,9 @@ class SemanticErrorReporter(threshold: Int) {
       // Special cases that need custom handling
       case SemanticError.VARIABLE_NOT_FOUND =>
         reportVariableNotFound(position, items)
+      case SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE if items.nonEmpty && items(0) == java.lang.Boolean.TRUE =>
+        // `super` inside an `extension` method: name the real reason (#2688).
+        problem(position, message("error.semantic.superInExtension"))
       case SemanticError.METHOD_NOT_FOUND =>
         reportMethodNotFound(position, items)
       case SemanticError.FIELD_NOT_FOUND =>

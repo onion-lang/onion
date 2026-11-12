@@ -139,7 +139,7 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 | `W0008` | `redundant-cast` | Redundant cast (reserved) |
 | `W0009` | `possible-null-deref`, `null-deref` | Possible null dereference (reserved) |
 | `W0010` | `unnecessary-conversion` | Unnecessary type conversion (reserved) |
-| `W0011` | `unchecked-cast` | Unchecked cast (reserved) |
+| `W0011` | `unchecked-cast` | Unchecked cast: a cast whose type arguments the run-time check cannot test |
 | `W0012` | `null-to-non-nullable` | Null assigned to non-nullable type |
 | `W0013` | `suspicious-interpolation` | Suspicious string interpolation syntax |
 | `W0014` | `discarded-toplevel` | Top-level statements ignored because a main is defined |

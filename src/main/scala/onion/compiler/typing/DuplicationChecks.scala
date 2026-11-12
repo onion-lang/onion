@@ -61,6 +61,27 @@ private[compiler] object DuplicationChecks {
   }
 
   /**
+   * An interface method with the name and full descriptor of a final `java.lang.Object` method
+   * (`notify()V`, `getClass()Ljava/lang/Class;`) makes the interface fail to load with
+   * `IncompatibleClassChangeError` (#2572). Report E0039 at the method, as a class gets.
+   * A same-named method with another descriptor is a different method and stays legal.
+   */
+  def checkInterfaceFinalObjectOverrides(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
+    val objectClass = typing.table_.rootClass
+    val finals = objectClass.methods.filter(m => Modifier.isFinal(m.modifier) && !Modifier.isStatic(m.modifier))
+    if finals.nonEmpty then
+      val finalDescriptors =
+        finals.iterator.map(m => (m.name, Erasure.methodDescriptor(m.returnType, m.arguments))).toSet
+      for (impl <- clazz.methods
+           if !Modifier.isStatic(impl.modifier) && !Modifier.isPrivate(impl.modifier) &&
+             finalDescriptors.contains((impl.name, Erasure.methodDescriptor(impl.returnType, impl.arguments)))) {
+        val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
+        val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
+        typing.report(SemanticError.FINAL_METHOD_OVERRIDE, location, impl.name, paramDescriptor, objectClass.name)
+      }
+  }
+
+  /**
    * A record skips the `java.lang.Object` contracts in [[checkOverrideContracts]], because a
    * component may be named like an Object method (`wait: Int`) and the JVM tells the two apart
    * by descriptor. A body method with the full descriptor of a final Object method (`notify()V`,

@@ -27,6 +27,51 @@ private[typing] object TypeRelations {
     case _ => TypeRules.isSuperType(expected, boxed)
   }
 
+  /** A plain class's own view of an interface fixes its type arguments: `Integer` is a
+   *  `Comparable[Integer]` and nothing else, and no subclass can implement `Comparable`
+   *  a second time. So an applied `expected` whose erasure the class reaches, but whose
+   *  arguments its view contradicts (`Comparable[String]` for an `Integer` or a `JInteger`
+   *  value), can hold no value of it (#2649). Only a concrete view decides: a raw generic
+   *  class, a type variable on either side, or the class itself leave the old rule alone. */
+  def ownViewRejects(table: ClassTable, expected: Type, actual: Type): Boolean = (expected, actual) match
+    case (e: NullableType, a: NullableType) => ownViewRejects(table, e.innerType, a.innerType)
+    case (e: NullableType, _) => ownViewRejects(table, e.innerType, actual)
+    case (_, a: NullableType) => ownViewRejects(table, expected, a.innerType)
+    case (_, _: AppliedClassType) | (_, _: TypeVariableType) => false
+    case (e: AppliedClassType, a: ClassType)
+        if !sameClass(e.raw, a) && !TypeCheckingHelpers.containsTypeVariable(e) =>
+      val views = table.appliedViewsOf(a)(AppliedTypeViews.collectAppliedViewsFrom(a))
+        .collect { case (raw, view) if sameClass(raw, e.raw) => view }
+      views.nonEmpty && views.forall(v => !TypeCheckingHelpers.containsTypeVariable(v)) &&
+        !boxSupertypeAccepts(table, e, a) && views.forall(v => argumentsDisjoint(e, v))
+    case _ => false
+
+  /** Some type argument of `expected` and of the class's own `view` can share no value:
+   *  `Comparable[String]` against `Comparable[Integer]`. Related arguments
+   *  (`Iterable[Object]` against `Iterable[String]`, `Map[String, String]` against
+   *  `Properties`' `Map[Object, Object]`) are left to the old rule: such a value can
+   *  still work at run time, so rejecting it would be a break, not a fix (#2649). */
+  private def argumentsDisjoint(expected: AppliedClassType, view: AppliedClassType): Boolean =
+    expected.typeArguments.length == view.typeArguments.length &&
+      expected.typeArguments.indices.exists(i => provablyDisjoint(expected.typeArguments(i), view.typeArguments(i)))
+
+  private def provablyDisjoint(left: Type, right: Type): Boolean =
+    def core(t: Type): Type = t match
+      case n: NullableType => n.innerType
+      case other => other
+    def erased(c: ClassType): ClassType = c match
+      case ap: AppliedClassType => ap.raw
+      case other => other
+    (core(left), core(right)) match
+      case (_: TypeVariableType, _) | (_, _: TypeVariableType) => false
+      case (l: ClassType, r: ClassType) =>
+        val (le, re) = (erased(l), erased(r))
+        // A non-final class and an interface can meet in a subclass (JLS 5.5.1).
+        def mayMeet(x: ClassType, y: ClassType): Boolean =
+          x.isInterface && !onion.compiler.Modifier.isFinal(y.modifier)
+        !TypeRules.isSuperType(le, re) && !TypeRules.isSuperType(re, le) && !mayMeet(le, re) && !mayMeet(re, le)
+      case _ => false
+
   /** A bare, Onion-declared type variable (`[T]`, or `[T extends B?]`): its type
    *  arguments may be nullable, so `null` is a valid `T` and W0012 does not apply
    *  (#2500). `[T extends B]`, and the non-null view after a smart cast, do not. */
@@ -75,16 +120,28 @@ private[typing] object TypeRelations {
       sameClass(ea.raw, aa.raw) && sameTypeArguments(ea.typeArguments, aa.typeArguments, table)
     case _ => isAssignableWithBoxing(expected, actual, table, topLevel = false) && isAssignableWithBoxing(actual, expected, table, topLevel = false)
 
+  /** Constructor resolution's boxing-aware match: as `isAssignableWithBoxing`, except
+    * that `null` never fills a primitive slot. Boxing the slot's type would let it
+    * through for a `new`, an `extends A(..)` and a `: this(..)` alike, and nothing
+    * after constructor resolution rejects it (#2828). Method calls keep the plain
+    * check: their argument check reports E0000 at the `null` itself. */
+  def isConstructorArgAssignable(expected: Type, actual: Type, table: ClassTable): Boolean =
+    !(expected.isBasicType && actual.isNullType) && isAssignableWithBoxing(expected, actual, table)
+
   def isAssignableWithBoxing(expected: Type, actual: Type, table: ClassTable, topLevel: Boolean = true): Boolean =
-    if TypeRules.isAssignable(expected, actual) then true
+    if ownViewRejects(table, expected, actual) then false
+    else if TypeRules.isAssignable(expected, actual) then true
     else if !expected.isBasicType && actual.isBasicType then
       val basicType = actual.asInstanceOf[BasicType]
       basicType != BasicType.VOID && {
         val boxed = Boxing.boxedType(table, basicType)
         // An applied target is matched against the box's own view, not by erasure:
         // `val y: Comparable[String] = 5` is rejected (#2594).
+        // A nullable target (`Comparable[String]?`) checks its inner type the same way (#2649).
         expected match
           case applied: AppliedClassType => boxSupertypeAccepts(table, applied, boxed)
+          case n: NullableType if n.innerType.isInstanceOf[AppliedClassType] =>
+            boxSupertypeAccepts(table, n.innerType.asInstanceOf[AppliedClassType], boxed)
           case _ => TypeRules.isAssignable(expected, boxed)
       }
     else if expected.isBasicType && !actual.isBasicType then

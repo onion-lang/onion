@@ -27,6 +27,16 @@ private[typing] object GenericMethodTypeArguments {
     case _ => false
   }
 
+  /** Whether `t` mentions any type variable, a method's or an enclosing class's. */
+  private def mentionsTypeVariable(t: Type): Boolean = t match {
+    case _: TypeVariableType => true
+    case applied: AppliedClassType => applied.typeArguments.exists(mentionsTypeVariable)
+    case at: ArrayType => mentionsTypeVariable(at.base)
+    case n: NullableType => mentionsTypeVariable(n.innerType)
+    case w: WildcardType => mentionsTypeVariable(w.upperBound) || w.lowerBound.exists(mentionsTypeVariable)
+    case _ => false
+  }
+
   private def typeParamsIn(t: Type, names: Set[String]): Set[String] = t match {
     case tv: TypeVariableType => if (names.contains(tv.name)) Set(tv.name) else Set.empty
     case applied: AppliedClassType => applied.typeArguments.toSet.flatMap(typeParamsIn(_, names))
@@ -248,9 +258,13 @@ private[typing] object GenericMethodTypeArguments {
     /** Set by `withDefaults()`: some type parameter has an upper and a lower limit no type meets. */
     var limitsConflict: Boolean = false
 
-    def isAssignableForBounds(left: Type, right: Type): Boolean =
-      if (!left.isBasicType && right.isBasicType) TypeRules.isAssignable(left, boxedTypeArg(right))
-      else TypeRules.isAssignable(left, right)
+    // A bound is read with its type arguments, not by erasure: a `Cat` that is an
+    // `Animal[Dog]` does not meet `Animal[Cat]`, and an `Integer` does not meet
+    // `Comparable[String]` (#2780).
+    def isAssignableForBounds(left: Type, right: Type): Boolean = {
+      val r = if (!left.isBasicType && right.isBasicType) boxedTypeArg(right) else right
+      TypeRules.isAssignable(left, r) && !TypeRelations.ownViewRejects(typing.table_, left, r)
+    }
 
     val bounds = HashMap[String, Type]()
     for (tp <- typeParams) {
@@ -259,6 +273,8 @@ private[typing] object GenericMethodTypeArguments {
     }
 
     val inferred = HashMap[String, Type]()
+    // The bindings the arguments fixed, before the expected return type is unified in.
+    private var inferredFromArgs: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
     val upperConstraints = HashMap[String, Type]()
     val lowerConstraints = HashMap[String, Type]()
     val paramNames = typeParams.iterator.map(_.name).toSet
@@ -430,6 +446,8 @@ private[typing] object GenericMethodTypeArguments {
         formalArgs.zip(args).foreach { (formal, actual) => if (actual != null) unify(formal, actual.`type`, callNode) }
       }
 
+      inferredFromArgs = inferred.toMap
+
       if (expectedReturn != null) {
         val formalReturn =
           TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
@@ -540,23 +558,52 @@ private[typing] object GenericMethodTypeArguments {
           failedBound += name
         }
 
-        val inferredType0 =
-          inferred.get(name)
-            .orElse(lowerConstraints.get(name))
-            .getOrElse(bound)
+        // The same holds for a value a plain `T` argument fixed, when the `? super T` limit
+        // mentions a type variable: erased, `T` would take an `Object`, which a concrete limit
+        // already refuses (`Collections::fill(x: List[T], v: Object)`, #2695). Only an argument
+        // passes a value in: `val o: Object = Collections::max(x: List[T], c: Comparator[T])`
+        // fixes `T = Object` from the target alone, and stays accepted.
+        for (upper <- upperConstraints.get(name) if !failedBound(name) && mentionsTypeVariable(upper);
+             fixed <- inferredFromArgs.get(name) if !fitsBothLimits(upper, fixed)) {
+          reportError(callNode, INCOMPATIBLE_TYPE, upper, fixed)
+          limitsConflict = true
+          failedBound += name
+        }
+
+        val fixedType = inferred.get(name).orElse(lowerConstraints.get(name))
+        val inferredType0 = fixedType.getOrElse(bound)
+
+        // An F-bound (`T extends Comparable[T]`) names the parameter itself. Read with `T`
+        // erased it is `Comparable[Object]`, which no `String` or `U extends Comparable[U]`
+        // meets. Check a fixed `T` against its bound with `T` read as that type, the way
+        // `Comparable[String]` is the bound a `String` must meet (#2338).
+        val selfBound = (fixedType, tp.upperBound) match
+          case (Some(fixed), Some(upper0)) if !upperConstraints.contains(name) && mentionsTypeParam(upper0, Set(name)) =>
+            val self = fixed match
+              case n: NullableType => boxedTypeArg(n.innerType)
+              case other => boxedTypeArg(other)
+            TypeSubstitution.substituteType(upper0, classSubst, scala.collection.immutable.Map(name -> self), defaultToBound = true)
+          case _ => bound
+        // A variable fixes an F-bound only through its own bound, by the rule on #2338:
+        // `U extends Comparable[U]` meets `Comparable[U]`, `U extends Comparable[String]`
+        // does not. Read by erasure, both would.
+        def meetsBound(t: Type): Boolean = (selfBound, t) match
+          case (applied: AppliedClassType, tv: TypeVariableType) if !(selfBound eq bound) =>
+            TypeRelations.typeVariableFitsAppliedBound(applied, tv, typing.table_)
+          case _ => isAssignableForBounds(selfBound, t)
 
         // Nullable inferences satisfy the bound through their inner type and
         // are rejected outright for non-null parameters (the Object top-type
         // rule would otherwise let String? through an Object bound)
         val boundsOk = inferredType0 match {
           case n: NullableType =>
-            tp.nullability != Nullability.NonNull && isAssignableForBounds(bound, n.innerType)
+            tp.nullability != Nullability.NonNull && meetsBound(n.innerType)
           case other =>
-            isAssignableForBounds(bound, other)
+            meetsBound(other)
         }
         val inferredType =
           if (!boundsOk) {
-            reportError(callNode, INCOMPATIBLE_TYPE, bound, inferredType0)
+            reportError(callNode, INCOMPATIBLE_TYPE, selfBound, inferredType0)
             failedBound += name
             bound
           } else {

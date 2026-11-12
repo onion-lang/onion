@@ -246,7 +246,11 @@ public:
 - **見えるもの:** 偽の述語は **E0113** になります。サンプルを作れない引数の型も、黙って通さず E0113 です。
   `--contracts` は既定で有効（`check`）です。
 - **シードとサンプル数:** `--law-seed` と `--law-samples` は `--contract-seed` と `--contract-samples` になり、`--no-check-laws` は無くなりました（`--contracts off` を使います）。
-- **`onion.Shape`:** 実装するクラスは、それを使う述語を少なくとも1つ必要とします（なければ E0080）。
+- **`onion.Shape`:** 実装するクラスのファイルに述語は不要になりました（E0080 は廃止です）。
+- **プロジェクト全体の更新:** `onion migrate src/` は、`law` と `example` をこの形に書き換えます。
+  - 式1つの本体は `= expr` になります。それより長い本体はブロックのまま残し、最後の文の前に `return` を置きます。
+  - 名前のない `example` は `example1`、`example2`、... と名付けます。名前は自由に変えてかまいません。
+  - 書き換えてもコンパイルできないファイルは元のまま残し、その行を表示します。
 
 ## `invariant` や `history` が名指すフィールドは `this` を通してしか書けなくなりました
 
@@ -303,7 +307,7 @@ public:
   override def run(): Int { IO::println("loud"); return 2 }
 }
 
-// Before: compiled. Now: E0077 at `b.run()`, "calling Loud::run"
+// Before: compiled. Now: E0077 at `b.run()`, "calling Loud.run"
 //   tool go(): Int { val b: Base = new Base(); return b.run() }
 // Now: declare what an override can do
 tool go(): Int requires { console } {
@@ -400,3 +404,55 @@ println(r.status())   // 同じ呼び出し
 - **表示されるもの:** 古い `onionc` がフィールドを読むように生成した `.class` ファイルを実行すると、`IllegalAccessError` になります。再コンパイルしてください。
 - **Java のコード:** `r.status()`、`r.body()`、`r.headers()` と書いてください。
 - **`onion migrate` の規則はありません:** Onion の書き方はどれもそのままコンパイルできるため、書き換えるものがありません。
+
+## 1つの trait と型に対するインスタンスは、モジュールをまたいでも1つだけになりました
+
+ある trait のある型に対する `instance` は、プログラム全体で1回だけ宣言できます。
+これまでは、別の `module` に2つ目を書いてもコンパイルでき、`module` 行のないファイルのものだけが使われていました。
+今は2つ目がエラーになります。
+
+```onion
+// shapes.on
+module shapes;
+trait Show[T] {
+  def show(x: T): String
+}
+instance Show[Int] {
+  def show(x: Int): String = "lib " + x
+}
+
+// app.on: 以前はコンパイルできた。今は E0097。このインスタンスか shapes.on のものを削除する。
+module app;
+import { shapes.Show }
+instance Show[Int] {
+  def show(x: Int): String = "app " + x
+}
+```
+
+- **表示されるもの:** 2つ目のインスタンスで **E0097** `instance shapes.Show[java.lang.Integer] is already defined`。
+- **直し方:** インスタンスを1つだけ残し、もう1つを削除してください。
+- **同じパッケージの2つのファイル**（どちらも `module` 行なし）では、これまでどおり **E0008** `duplicated class definition Show$$Integer` になります。直し方は同じです。
+- **型の型引数:** E0097 は外側の型だけを比べます。そのため `Show[List[String]]` と `Show[List[Integer]]` は同じインスタンスとみなされ、衝突します。
+- **`onion migrate` の規則はありません:** どちらのインスタンスを残すかは、あなたが決めることです。
+
+## デフォルト値を持つオーバーロードより上にある呼び出しは、下にある呼び出しと同じものを選ぶようになりました
+
+ファイルの後ろで宣言されたデフォルト値も、呼び出しで省略できるようになりました (#2653)。
+そのため、オーバーロードより上に書いた呼び出しにもデフォルト値が見えます。
+その結果、下に書いた呼び出しと同じオーバーロードを選びます。
+
+```onion
+def run(): String = pick()
+def pick(): String = "zero"
+def pick(n: Int = 1): String = "one"
+println(run())   // 以前: zero。今: one。run() を pick より下に書いたときと同じ
+```
+
+| オーバーロード（呼び出しより下で宣言） | 呼び出し | 以前 | 今 | 以前の結果を保つには |
+|---|---|---|---|---|
+| `pick()`、`pick(n: Int = 1)` | `pick()` | `zero` | `one` | どちらかのメソッドの名前を変える |
+| `f(n: Long)`、`f(n: Int, a: Int = 1)`、`f(n: Int, b: String = "")` | `f(1)` | `long` | E0006 | `f(1L)` |
+
+- **表示されるもの:** メッセージなしで別のオーバーロードが実行されます。または呼び出しで **E0006** `method call is applicable for both …` になります。
+- **これまでどおり動くもの:** オーバーロードより下にある呼び出しと、すべての引数を渡す呼び出しです。
+- **`onion migrate` の規則はありません:** どのオーバーロードを呼ぶつもりだったかは、書いた人にしか分かりません。引数を渡す（`f(1L)`、`f(1, 1)`）か、どちらかのメソッドの名前を変えてください。

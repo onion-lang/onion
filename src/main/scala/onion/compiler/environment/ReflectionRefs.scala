@@ -145,6 +145,7 @@ object ReflectionRefs {
   private class ReflectConstructorRef(constructor: Constructor[?], override val affiliation: TypedAST.ClassType, mapper: GenericTypeMapper, baseEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.ConstructorRef {
     override val modifier: Int = toOnionModifier(constructor.getModifiers)
     override val name: String = "<init>"
+    override val isVararg: Boolean = constructor.isVarArgs
     private val (typeParams0, env0) = mapper.typeParamsFrom(constructor.getTypeParameters, baseEnv)
     override val typeParameters: Array[TypedAST.TypeParameter] = typeParams0.clone()
     private val args0: Array[TypedAST.Type] = constructor.getGenericParameterTypes.map(t => mapper.toOnionType(t, env0))
@@ -200,7 +201,8 @@ object ReflectionRefs {
     private def requireMethodTable(): Unit = {
       if (methods_ == null) {
         methods_ = new MultiTable[TypedAST.Method]
-        for (method <- klass.getMethods if method.getName != CONSTRUCTOR_NAME) {
+        val all = klass.getMethods
+        for (method <- all if method.getName != CONSTRUCTOR_NAME && !BridgeMethods.isShadowedBridge(method, all)) {
           val owner = table.loadOrNull(method.getDeclaringClass.getName)
           val ownerEnv = mapper.typeParamEnv(owner.typeParameters)
           methods_.add(new ReflectMethodRef(method, owner, mapper, ownerEnv))

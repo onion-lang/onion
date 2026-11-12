@@ -1,0 +1,223 @@
+package onion.compiler.tools
+
+import java.io.{ByteArrayOutputStream, PrintStream, StringReader}
+import java.net.URLClassLoader
+import java.nio.file.{Files, Path}
+import onion.compiler.{CompilationOutcome, CompilerConfig, OnionCompiler, StreamInputSource}
+import org.scalatest.funspec.AnyFunSpec
+
+/**
+ * Issue #2769: a type-class instance is found by its trait, not by the trait's simple name.
+ * A trait declared in a `module` gets the instance declared beside it, and another trait that
+ * only shares its simple name can no longer capture the dictionary slot (which compiled, then
+ * threw IncompatibleClassChangeError).
+ */
+class TypeClassInstanceAcrossModulesSpec extends AnyFunSpec {
+  private val lib =
+    """module numlib;
+      |trait Numeric[T] {
+      |  def zero(): T
+      |  def plus(a: T, b: T): T
+      |}
+      |instance Numeric[Int] {
+      |  def zero(): Int = 0
+      |  def plus(a: Int, b: Int): Int = a + b
+      |}
+      |class Agg {
+      |public:
+      |  static def total[T: Numeric](xs: List[T]): T {
+      |    var acc: T = Numeric[T]::zero()
+      |    foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
+      |    return acc
+      |  }
+      |  static def inside(): Int = total([10, 20])
+      |}""".stripMargin
+
+  /** Compile the sources together, run `Main.main`, and return what it printed, or the errors. */
+  private def compileAndRun(sources: (String, String)*): Either[String, String] = compileAndRunMain("Main", sources*)
+
+  private def compileAndRunMain(mainClass: String, sources: (String, String)*): Either[String, String] = {
+    val config = new CompilerConfig(Seq("."), null, "UTF-8", "", 10)
+    val inputs = sources.map { case (name, src) => new StreamInputSource(() => new StringReader(src), name) }
+    new OnionCompiler(config).compile(inputs) match {
+      case CompilationOutcome.Success(classes) =>
+        val dir: Path = Files.createTempDirectory("onion-tc-2769")
+        classes.foreach { c =>
+          val f = dir.resolve(c.className.replace('.', '/') + ".class")
+          Files.createDirectories(f.getParent)
+          Files.write(f, c.content)
+        }
+        val loader = new URLClassLoader(Array(dir.toUri.toURL), getClass.getClassLoader)
+        val buffer = new ByteArrayOutputStream()
+        val old = System.out
+        System.setOut(new PrintStream(buffer, true, "UTF-8"))
+        try loader.loadClass(mainClass).getMethod("main", classOf[Array[String]]).invoke(null, Array[String]())
+        finally System.setOut(old)
+        Right(buffer.toString("UTF-8").trim)
+      case CompilationOutcome.Failure(errors) => Left(errors.map(_.toString).mkString("\n"))
+    }
+  }
+
+  private def main(body: String, extra: String = ""): String =
+    s"""import { numlib.Agg }
+       |$extra
+       |class Main {
+       |public:
+       |  static def main(args: String[]): void {
+       |    $body
+       |  }
+       |}""".stripMargin
+
+  it("finds the instance declared beside a module's trait") {
+    assert(compileAndRun("lib.on" -> lib, "main.on" -> main("val xs: List[Int] = [1, 2, 4]\n    println(Agg::total(xs))")) == Right("7"))
+  }
+
+  it("finds it from a call inside the module") {
+    assert(compileAndRun("lib.on" -> lib, "main.on" -> main("println(Agg::inside())")) == Right("30"))
+  }
+
+  it("does not pass another trait's instance that only shares the simple name") {
+    val own =
+      """trait Numeric[T] {
+        |  def zero(): T
+        |  def plus(a: T, b: T): T
+        |}
+        |instance Numeric[Integer] {
+        |  def zero(): Integer = 0
+        |  def plus(a: Integer, b: Integer): Integer = a + b
+        |}""".stripMargin
+    assert(compileAndRun("lib.on" -> lib, "main.on" -> main("val xs: List[Int] = [1, 2, 4]\n    println(Agg::total(xs))", own)) == Right("7"))
+  }
+
+  it("still reports a missing instance as an error, not a crash") {
+    val r = compileAndRun("lib.on" -> lib, "main.on" -> main("val xs: List[Long] = [1L, 2L]\n    println(Agg::total(xs))"))
+    assert(r.isLeft && r.left.toOption.get.contains("E0003"), r)
+  }
+
+  // Panel block on #2770, repro 1: the trait is in a module, its instance in a default-package
+  // file, and the caller in a third module. This printed 7 before #2769 and must still.
+  it("finds an instance declared in the default package for a module's trait") {
+    val tr =
+      """module tb;
+        |trait Numeric[T] {
+        |  def zero(): T
+        |  def plus(a: T, b: T): T
+        |}
+        |class Agg {
+        |public:
+        |  static def total[T: Numeric](xs: List[T]): T {
+        |    var acc: T = Numeric[T]::zero()
+        |    foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }
+        |    return acc
+        |  }
+        |}""".stripMargin
+    val inst =
+      """import { tb.Numeric }
+        |instance Numeric[Int] {
+        |  def zero(): Int = 0
+        |  def plus(a: Int, b: Int): Int = a + b
+        |}""".stripMargin
+    val app =
+      """module app;
+        |import { tb.Agg }
+        |class Main {
+        |public:
+        |  static def main(args: String[]): void {
+        |    val xs: List[Int] = [1, 2, 4]
+        |    println(Agg::total(xs))
+        |  }
+        |}""".stripMargin
+    assert(compileAndRunMain("app.Main", "tr.on" -> tr, "inst.on" -> inst, "main.on" -> app) == Right("7"))
+  }
+
+  // Panel block on #2770, repro 2: a second instance of numlib.Numeric[Int], declared in another
+  // package, is a duplicate (E0097), not a silent second dictionary that the call site picks.
+  it("rejects a second instance of the same trait and type in another package") {
+    val dup =
+      """import { numlib.Numeric }
+        |instance Numeric[Integer] {
+        |  def zero(): Integer = 1000
+        |  def plus(a: Integer, b: Integer): Integer = a + b
+        |}""".stripMargin
+    val r = compileAndRun("lib.on" -> lib, "dup.on" -> dup, "main.on" -> main("println(Agg::inside())"))
+    assert(r.isLeft && r.left.toOption.get.contains("E0097"), r)
+  }
+
+  // Panel block on #2770 round 2, repro 1: `Show[a.Foo]` and `Show[b.Foo]` are two instances,
+  // even though both lower to a class named `Show$$Foo`.
+  it("keeps instances for two types that share a simple name apart") {
+    val tc =
+      """module tc;
+        |trait Show[T] { def show(a: T): String }""".stripMargin
+    def side(p: String, user: String) =
+      s"""module $p;
+         |import { tc.Show }
+         |class Foo
+         |instance Show[Foo] { def show(f: Foo): String = "$p.Foo" }
+         |class $user {
+         |public:
+         |  static def run(): String = Show[Foo]::show(new Foo())
+         |}""".stripMargin
+    val app =
+      """import { a.UseA; b.UseB }
+        |class Main {
+        |public:
+        |  static def main(args: String[]): void {
+        |    println(UseA::run())
+        |    println(UseB::run())
+        |  }
+        |}""".stripMargin
+    val r = compileAndRun("tc.on" -> tc, "a.on" -> side("a", "UseA"), "b.on" -> side("b", "UseB"), "main.on" -> app)
+    assert(r.map(_.replace("\r\n", "\n")) == Right("a.Foo\nb.Foo"), r)
+  }
+
+  // Panel block on #2770 round 2, repro 2: the instance for `pa.Point` is not passed for a
+  // `pb.Point` (that compiled, then threw ClassCastException); no instance is found instead.
+  it("does not pass the instance of another type that shares the simple name") {
+    val tr =
+      """module tr;
+        |trait Show[T] { def show(x: T): String }
+        |class Util {
+        |public:
+        |  static def render[T: Show](x: T): String = Show[T]::show(x)
+        |}""".stripMargin
+    val pb =
+      """module pb;
+        |record Point(x: Int, y: Int)""".stripMargin
+    val pa =
+      """module pa;
+        |import { tr.Show; tr.Util }
+        |record Point(name: String)
+        |instance Show[Point] { def show(p: Point): String = "pa.Point " + p.name() }
+        |class Main {
+        |public:
+        |  static def main(args: String[]): void { println(Util::render(new pb.Point(1, 2))) }
+        |}""".stripMargin
+    val r = compileAndRunMain("pa.Main", "tr.on" -> tr, "pb.on" -> pb, "pa.on" -> pa)
+    assert(r.isLeft && r.left.toOption.get.contains("E0003"), r)
+  }
+
+  // Twin from the same verdict: a default-package `instance Show[Foo]` is not passed for a `b.Foo`.
+  it("does not pass a default-package instance for another package's same-named type") {
+    val tr =
+      """module tr;
+        |trait Show[T] { def show(x: T): String }
+        |class Util {
+        |public:
+        |  static def render[T: Show](x: T): String = Show[T]::show(x)
+        |}""".stripMargin
+    val b =
+      """module b;
+        |class Foo""".stripMargin
+    val app =
+      """import { tr.Show; tr.Util }
+        |class Foo
+        |instance Show[Foo] { def show(f: Foo): String = "Foo" }
+        |class Main {
+        |public:
+        |  static def main(args: String[]): void { println(Util::render(new b.Foo())) }
+        |}""".stripMargin
+    val r = compileAndRun("tr.on" -> tr, "b.on" -> b, "main.on" -> app)
+    assert(r.isLeft && r.left.toOption.get.contains("E0003"), r)
+  }
+}

@@ -190,7 +190,12 @@ final class TypingTypeSupport(private val typing: Typing) {
     val outerScope = typing.typeParams_
     var scope = outerScope ++ placeholders
     typing.setTypeParams(scope)
-    try {
+    // A bound that applies a generic type to one of these parameters
+    // (`C extends Animal[C]`) is checked once every placeholder is linked to
+    // the parameter it became; checked on the spot, `C` was still the
+    // placeholder bounded by the root class, and `Holder[A extends Animal[A],
+    // C extends Animal[C]]` was E0000 (#2338).
+    typing.withDeferredBoundChecks(try {
       val resolvedByName = resolutionOrder.map { tp =>
         // Nullability: bare [T] means T ranges over nullable types too;
         // an explicit non-null bound [T extends B] restricts T to non-null
@@ -239,7 +244,7 @@ final class TypingTypeSupport(private val typing: Typing) {
       distinct.map(tp => resolvedByName(tp.name)).toSeq
     } finally {
       typing.setTypeParams(outerScope)
-    }
+    })
   }
 
   private def validateTypeApplication(typeNode: AST.TypeNode, mappedType: Type): Unit = {
@@ -305,8 +310,15 @@ final class TypingTypeSupport(private val typing: Typing) {
             // Without this, `C3[Object, String, String]` checked `String`
             // against literal `B` and failed, even though `B` substitutes to
             // exactly `String` at this instantiation (#2259 review repro).
+            // A placeholder argument (`C` in `C extends Animal[C]`, checked
+            // after the declaration's parameters are linked) reads as the
+            // parameter it became, whose bound is real (#2338).
+            val typeArguments: Array[TypedAST.Type] = applied.typeArguments.map {
+              case tv: TypedAST.TypeVariableType => tv.resolvedView
+              case other => other
+            }.toArray
             val fullSubst: scala.collection.immutable.Map[String, TypedAST.Type] =
-              rawParams.indices.map(j => rawParams(j).name -> applied.typeArguments(j)).toMap
+              rawParams.indices.map(j => rawParams(j).name -> typeArguments(j)).toMap
             rawParams.indices.foreach { i =>
               val param = rawParams(i)
               val declaredUpper = param.upperBound.getOrElse(typing.rootClass)
@@ -328,7 +340,7 @@ final class TypingTypeSupport(private val typing: Typing) {
                 case ct: TypedAST.ClassType => ct
                 case _ => declaredUpper
               }
-              val arg = applied.typeArguments(i)
+              val arg = typeArguments(i)
               if (arg eq BasicType.VOID) {
                 typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
               } else {
@@ -364,9 +376,19 @@ final class TypingTypeSupport(private val typing: Typing) {
                     // variables (#2259 review repro), so an abstract `upper`
                     // uses only identity through the argument's own bound
                     // chain -- never the lenient fallback -- to decide.
+                    // A concrete argument meets an F-bound read with itself in place of the
+                    // parameter (`Cat` must be an `Animal[Cat]`), and a bound is read with its
+                    // type arguments, not by erasure (`Integer` is no `Comparable[String]`, #2780).
+                    val appliedUpper: TypedAST.Type = checkedArg match {
+                      case c: TypedAST.ClassType if !TypeCheckingHelpers.containsTypeVariable(c) =>
+                        TypeSubstitution.substituteType(declaredUpper, fullSubst, Map.empty, defaultToBound = false)
+                      case _ => upper
+                    }
                     val satisfied = upper match {
                       case tv: TypedAST.TypeVariableType => TypeRules.isSuperTypeByIdentity(tv, checkedArg)
-                      case _ => satisfiesObjectBound || TypeRules.isAssignable(upper, checkedArg)
+                      case _ =>
+                        satisfiesObjectBound || (TypeRules.isAssignable(upper, checkedArg) &&
+                          !TypeRelations.ownViewRejects(typing.table_, appliedUpper, checkedArg))
                     }
                     if (!satisfied) {
                       typing.report(INCOMPATIBLE_TYPE, typeNode, upper, arg)

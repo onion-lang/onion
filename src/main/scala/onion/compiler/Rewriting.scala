@@ -416,7 +416,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       val bound = boundCliArguments(loc, tool.args, "__toolArg")
       val callArgs = tool.args.zipWithIndex.map { case (a, j) =>
         val raw = AST.MethodCall(loc, res, "value", List(AST.IntegerLiteral(loc, j)))
-        val cast = AST.Cast(loc, raw, a.typeRef)
+        val cast = syntheticCast(loc, raw, a.typeRef)
         if (a.defaultValue == null) cast
         else AST.IfExpression(loc,
           AST.Equal(loc, raw, AST.NullLiteral(loc)),
@@ -669,9 +669,13 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
    * A `Short`/`Byte` parameter's default is written as an Int literal (`s: Short = 3`),
    * which a direct call narrows; the synthesized call passes it as an Int, so cast it.
    */
+  /** A cast the compiler writes itself; W0011 is for casts the user wrote (#2665). */
+  private def syntheticCast(loc: Location, src: AST.Expression, to: AST.TypeNode): AST.Cast =
+    AST.Cast(loc, src, to, synthetic = true)
+
   private def narrowedDefault(loc: Location, a: AST.Argument, kind: Option[String]): AST.Expression = {
     val d = rewriteExpression(a.defaultValue)
-    if (kind.exists(k => k == "Short" || k == "Byte")) AST.Cast(loc, d, a.typeRef) else d
+    if (kind.exists(k => k == "Short" || k == "Byte")) syntheticCast(loc, d, a.typeRef) else d
   }
 
   /**
@@ -992,8 +996,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val nested =
       if (structured) List(AST.ListLiteral(loc, declaration.args.map { a =>
         JsonShapeComponents.nestedRecordOfAst(a.typeRef) match {
-          case Some(desc) => AST.Cast(loc, nestedShapeThunk(loc, desc), objectType)
-          case None       => AST.Cast(loc, AST.NullLiteral(loc), objectType)
+          case Some(desc) => syntheticCast(loc, nestedShapeThunk(loc, desc), objectType)
+          case None       => syntheticCast(loc, AST.NullLiteral(loc), objectType)
         }
       }))
       else Nil
@@ -1040,7 +1044,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   private def shapeBuildLambda(loc: Location, declaration: AST.RecordDeclaration, recordType: AST.TypeNode, tags: List[String]): AST.Expression = {
     val partsName = "__p"
     val ctorArgs = declaration.args.zipWithIndex.map { case (a, i) =>
-      AST.Cast(loc, AST.Indexing(loc, AST.Id(loc, partsName), AST.IntegerLiteral(loc, i)), partTypeNodeFor(loc, a, tags(i)))
+      syntheticCast(loc, AST.Indexing(loc, AST.Id(loc, partsName), AST.IntegerLiteral(loc, i)), partTypeNodeFor(loc, a, tags(i)))
     }
     AST.ClosureExpression(loc,
       AST.TypeNode(loc, AST.ReferenceType("onion.Function1", true), true), "call",
@@ -1218,7 +1222,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
     // Build to Name? so the select unifies cleanly with the `else: null` branch
     // (avoids a spurious "null assigned where non-nullable" warning at synthesis).
-    val buildExpr = AST.Cast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)
+    val buildExpr = syntheticCast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)
     val matchedCaseBody = AST.BlockExpression(loc, nullableDecls.toList :+ buildExpr)
     val selectExpr = AST.SelectExpression(
       loc,
@@ -1244,7 +1248,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val arrayListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("ArrayList", false), List(recordDescriptor(declaration))), false)
     // Declare the accumulator with the List[Name] return type and widen the freshly
     // built ArrayList to it via a cast, so `return __acc` matches without E0000.
-    val accInit = AST.Cast(loc, AST.NewObject(loc, arrayListType, Nil), listType)
+    val accInit = syntheticCast(loc, AST.NewObject(loc, arrayListType, Nil), listType)
     val accDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__acc", listType, accInit)
     val linesCall = AST.StaticMethodCall(loc, AST.TypeNode(loc, AST.ReferenceType("Strings", false), false), "lines", List(AST.Id(loc, "__text")))
     val parseCall = AST.StaticMethodCall(loc, recordRef, "parse", List(AST.Id(loc, "__line")))
@@ -1414,7 +1418,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
           }
       }
     }
-    val buildExpr = AST.Cast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)
+    val buildExpr = syntheticCast(loc, AST.NewObject(loc, recordType, ctorArgs), nullableRecordType)
     val tryBody = AST.BlockExpression(loc, getterStmts.toList :+ AST.ReturnExpression(loc, buildExpr))
     val catchArg = AST.Argument(loc, "__e", AST.TypeNode(loc, AST.ReferenceType("Exception", false), false))
     val catchBody = AST.BlockExpression(loc, List(AST.ReturnExpression(loc, AST.NullLiteral(loc))))
@@ -1504,7 +1508,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val arrayListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("ArrayList", false), List(recordDescriptor(declaration))), false)
     val objectListType = AST.TypeNode(loc, AST.ParameterizedType(AST.ReferenceType("List", false), List(AST.ReferenceType("Object", false))), false)
 
-    val accInit = AST.Cast(loc, AST.NewObject(loc, arrayListType, Nil), listType)
+    val accInit = syntheticCast(loc, AST.NewObject(loc, arrayListType, Nil), listType)
     val accDecl = AST.LocalVariableDeclaration(loc, AST.M_FINAL, "__acc", listType, accInit)
     val parseOrNullCall = AST.StaticMethodCall(loc, parseType, "parseOrNull", List(AST.Id(loc, "__s")))
     val asArrayCall = AST.StaticMethodCall(loc, jsonType, "asArray", List(parseOrNullCall))
@@ -1775,7 +1779,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
          _: AST.NullLiteral => expr
 
     // Other expressions
-    case AST.Cast(loc, src, to) => AST.Cast(loc, rewriteExpression(src), to)
+    case c: AST.Cast => c.copy(src = rewriteExpression(c.src))
     case AST.ClosureExpression(loc, typeRef, mname, args, returns, body) =>
       AST.ClosureExpression(loc, typeRef, mname, args, returns, rewriteBlockExpression(body))
     case AST.CurrentInstance(_) => expr

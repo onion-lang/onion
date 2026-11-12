@@ -219,6 +219,15 @@ object TypedAST {
   }
 
   /**
+   * One field's initializer. It is typed in a `LocalContext` of its own, so its locals
+   * number from 0 in `frame`, apart from the constructor (or static initializer) it is
+   * emitted into. Codegen gives it a slot map of its own; sharing the constructor's
+   * mapped its first local onto the constructor's first parameter (#2800).
+   */
+  final class FieldInitializerBlock(val frame: LocalFrame, newStatements: TypedAST.ActionStatement*)
+    extends StatementBlock(null: Location, newStatements*)
+
+  /**
    * A `select` case with a `when` guard: `taken = false; <pattern, guard, body>; if (!taken) <rest>`.
    * `statements(1)` is the case itself and ends in the case's value; the rest runs only when
    * that did not happen, so a return may be sunk into both (tail-call optimization).
@@ -262,10 +271,28 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class Call(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, val parameters: Array[TypedAST.Term]) extends Term(location) {
+  /**
+   * Completes a call's arguments with the defaults it omits (#2803). Every call
+   * form that is not spelled `m(...)` -- `v.total`, `a + b`, `v[i]`, `v[i] = x`,
+   * `a < b`, `a += b` -- resolves a method that may take more arguments than were
+   * written; filling them here, where each call node is built, means no call can
+   * reach code generation short of its method's arity. A call that already has
+   * every argument, or omits one with no default, is left as it is.
+   */
+  private def withOmittedDefaults(method: TypedAST.Method, parameters: Array[TypedAST.Term]): Array[TypedAST.Term] =
+    if (parameters == null || method == null || method.isVararg || parameters.length >= method.argumentCount) parameters
+    else {
+      val declared = method.argumentsWithDefaults
+      if (declared.length != method.argumentCount || declared.drop(parameters.length).exists(_.defaultValue.isEmpty)) parameters
+      else parameters ++ declared.drop(parameters.length).map(_.defaultValue.get)
+    }
+
+  class Call(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, written: Array[TypedAST.Term]) extends Term(location) {
     def this(target: TypedAST.Term, method: TypedAST.Method, parameters: Array[TypedAST.Term]) = {
       this(null, target, method, parameters)
     }
+
+    val parameters: Array[TypedAST.Term] = withOmittedDefaults(method, written)
 
     def `type`: TypedAST.Type = method.returnType
   }
@@ -274,10 +301,12 @@ object TypedAST {
    * Safe method call: target?.method(params)
    * Returns null if target is null, otherwise calls the method
    */
-  class SafeCall(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, val parameters: Array[TypedAST.Term]) extends Term(location) {
+  class SafeCall(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, written: Array[TypedAST.Term]) extends Term(location) {
     def this(target: TypedAST.Term, method: TypedAST.Method, parameters: Array[TypedAST.Term]) = {
       this(null, target, method, parameters)
     }
+
+    val parameters: Array[TypedAST.Term] = withOmittedDefaults(method, written)
 
     /** Result type is nullable because it can be null when target is null */
     def `type`: TypedAST.Type = NullableType.of(method.returnType)
@@ -311,17 +340,24 @@ object TypedAST {
   /**
    * @author Kota Mizushima
    */
-  class CallStatic(location: Location, val target: TypedAST.ObjectType, val method: TypedAST.Method, val parameters: Array[TypedAST.Term]) extends Term(location) {
+  class CallStatic(location: Location, val target: TypedAST.ObjectType, val method: TypedAST.Method, written: Array[TypedAST.Term]) extends Term(location) {
     def this(target: TypedAST.ObjectType, method: TypedAST.Method, parameters: Array[TypedAST.Term]) = {
       this(null, target, method, parameters)
     }
+
+    val parameters: Array[TypedAST.Term] = withOmittedDefaults(method, written)
     def `type`: TypedAST.Type = method.returnType
   }
 
   /**
    * @author Kota Mizushima
    */
-  class CallSuper(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, val params: Array[TypedAST.Term]) extends Term(location) {
+  /**
+   * `super.m(..)`. `interfaceOwner` is set when the call reaches a default
+   * method of one of the class's own interfaces (Java's `I.super.m()`): the
+   * JVM then needs that direct superinterface as the owner (#2675).
+   */
+  class CallSuper(location: Location, val target: TypedAST.Term, val method: TypedAST.Method, val params: Array[TypedAST.Term], val interfaceOwner: TypedAST.ClassType = null) extends Term(location) {
     def this(target: TypedAST.Term, method: TypedAST.Method, params: Array[TypedAST.Term]) = {
       this(null, target, method, params)
     }
@@ -573,6 +609,11 @@ object TypedAST {
 
     def affiliation: TypedAST.ClassType = classType
 
+    /** The last parameter is `xs: T...`; set by the outline pass (#2839). */
+    var vararg: Boolean = false
+
+    override def isVararg: Boolean = vararg
+
     var frame: LocalFrame = _
 
     /**
@@ -590,6 +631,18 @@ object TypedAST {
 
     def setArgumentsWithDefaults(args: Array[MethodArgument]): Unit =
       argsWithDefaults_ = args
+
+    /** The top-level `val`/`var`s that keep this constructor's defaults in source order (#2653), or null. */
+    var defaultsHeldBackBy: Seq[String] = null
+
+    /** The held-back functions between this constructor and [[defaultsHeldBackBy]], in declaration order to follow. */
+    var defaultsHeldBackVia: Seq[String] = Seq()
+
+    /** The first parameter from which every later one has a default in the source; set with [[defaultsHeldBackBy]]. */
+    var defaultsOmittableFrom: Int = Int.MaxValue
+
+    /** Its defaults are held back and not typed yet, so a call above it cannot omit them. */
+    def defaultsPending: Boolean = defaultsHeldBackBy != null && argumentsWithDefaults.forall(_.defaultValue.isEmpty)
 
     def argumentsWithDefaults: Array[MethodArgument] =
       if (argsWithDefaults_ != null) argsWithDefaults_
@@ -769,7 +822,12 @@ object TypedAST {
     }
   }
 
-  class RefLocal(location: Location, val frame: Int, val index: Int, val `type`: TypedAST.Type)  extends Term(location) {
+  class RefLocal(location: Location, val frame: Int, index0: Int, val `type`: TypedAST.Type)  extends Term(location) {
+    private var slot: Int = index0
+    def index: Int = slot
+    /** Moves this read to another local slot; see `MutualRecursionOptimization` (#2800). */
+    private[compiler] def relocate(newIndex: Int): Unit = slot = newIndex
+
     def this(bind: ClosureLocalBinding) = {
       this(null, bind.frameIndex, bind.index, bind.tp)
     }
@@ -782,7 +840,12 @@ object TypedAST {
   /** The compiler temporary an if/select/try expression yields; never a user variable. */
   class ResultRefLocal(bind: ClosureLocalBinding) extends RefLocal(bind)
 
-  class SetLocal(location: Location, val frame: Int, val index: Int, val `type`: TypedAST.Type, val value: TypedAST.Term) extends Term(location) {
+  class SetLocal(location: Location, val frame: Int, index0: Int, val `type`: TypedAST.Type, val value: TypedAST.Term) extends Term(location) {
+    private var slot: Int = index0
+    def index: Int = slot
+    /** Moves this store to another local slot; see `MutualRecursionOptimization` (#2800). */
+    private[compiler] def relocate(newIndex: Int): Unit = slot = newIndex
+
     def this(bind: ClosureLocalBinding, value: TypedAST.Term) = {
       this(null, bind.frameIndex, bind.index, bind.tp, value)
     }
@@ -904,6 +967,18 @@ object TypedAST {
 
     /** Set the arguments with default values */
     def setArgumentsWithDefaults(args: Array[MethodArgument]): Unit = argsWithDefaults_ = args
+
+    /** The top-level `val`/`var`s that keep this method's defaults in source order (#2653), or null. */
+    var defaultsHeldBackBy: Seq[String] = null
+
+    /** The held-back functions between this method and [[defaultsHeldBackBy]], in declaration order to follow. */
+    var defaultsHeldBackVia: Seq[String] = Seq()
+
+    /** The first parameter from which every later one has a default in the source; set with [[defaultsHeldBackBy]]. */
+    var defaultsOmittableFrom: Int = Int.MaxValue
+
+    /** Its defaults are held back and not typed yet, so a call above it cannot omit them. */
+    def defaultsPending: Boolean = defaultsHeldBackBy != null && argumentsWithDefaults.forall(_.defaultValue.isEmpty)
 
     /** Get arguments with names and optional default values */
     override def argumentsWithDefaults: Array[MethodArgument] =
@@ -1333,6 +1408,11 @@ object TypedAST {
 
     def findConstructor(params: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef] = constructorRefFinder.find(this, params)
 
+    def findConstructor(
+      params: Array[TypedAST.Term],
+      prefer: TypedAST.ConstructorRef => Boolean
+    ): Array[TypedAST.ConstructorRef] = constructorRefFinder.find(this, params, prefer)
+
     def isClassType: Boolean = true
 
     def isArrayType: Boolean = false
@@ -1451,6 +1531,14 @@ object TypedAST {
 
     def findConstructor(params: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef]
 
+    /** As [[findConstructor]], but when two or more constructors match, keeps only those
+      * `prefer` accepts before picking the most specific one; when it accepts none, all
+      * matches are kept. */
+    def findConstructor(
+      params: Array[TypedAST.Term],
+      prefer: TypedAST.ConstructorRef => Boolean
+    ): Array[TypedAST.ConstructorRef]
+
     def typeParameters: Array[TypedAST.TypeParameter] = Array()
 
     /** Binary names (`onion.Result$Ok`) of the classes a Java `sealed` class or interface
@@ -1464,10 +1552,20 @@ object TypedAST {
   }
 
   class ConstructorFinder {
-    def find(target: TypedAST.ClassType, args: Array[TypedAST.Term]): Array[TypedAST.ConstructorRef] = {
+    def find(
+      target: TypedAST.ClassType,
+      args: Array[TypedAST.Term],
+      prefer: TypedAST.ConstructorRef => Boolean = _ => true
+    ): Array[TypedAST.ConstructorRef] = {
       if (target == null) return Array.empty
-      val matching = target.constructors.filter(c => matcher.matches(c.getArgs, args))
-      if (matching.isEmpty) return Array.empty
+      val matched = target.constructors.filter(c => matcher.matches(c.getArgs, args))
+      if (matched.isEmpty) return Array.empty
+      val matching =
+        if (matched.length < 2) matched
+        else {
+          val preferred = matched.filter(prefer)
+          if (preferred.nonEmpty) preferred else matched
+        }
       val sorted = matching.sortWith((c1, c2) => sorter.compare(c1, c2) < 0)
       if (sorted.length < 2 || isAmbiguous(sorted(0), sorted(1))) sorted
       else Array(sorted(0))
@@ -1495,6 +1593,9 @@ object TypedAST {
     def getArgs: Array[TypedAST.Type]
 
     def typeParameters: Array[TypedAST.TypeParameter] = Array()
+
+    /** Declared `xs: T...` (Onion) or `T...` (Java): trailing arguments may be spread (#2839). */
+    def isVararg: Boolean = false
   }
 
   /**

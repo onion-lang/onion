@@ -8,9 +8,9 @@ import scala.jdk.CollectionConverters.*
 /**
  * `WarningCodeDocCoverageSpec` guards that every declared `WarningCategory` is mentioned
  * in the docs. It does not check whether the compiler ever actually reports that
- * category -- and seven of them never do: their `WarningReporter` convenience method
+ * category -- and six of them never do (W0011 has fired since #2665): their `WarningReporter` convenience method
  * (`unusedImport`, `deprecatedFeature`, `emptyBlock`, `redundantCast`,
- * `possibleNullDereference`, `unnecessaryConversion`, `uncheckedCast`) is defined but
+ * `possibleNullDereference`, `unnecessaryConversion`) is defined but
  * called from nowhere else in `src/main/scala`, so `--Wno unused-import` and friends name
  * a warning that can be suppressed but can never fire. Nothing told a reader of
  * docs/reference/error-codes.md's "W codes don't fail compilation by default... and can
@@ -33,7 +33,7 @@ class ReservedWarningCodeSpec extends AnyFunSpec {
   // convenience method anywhere in src/main/scala outside WarningReporter.scala itself.
   // Implementing one moves it out of this set *and* out of the doc's reserved markers.
   private val reservedByConvention: Set[String] =
-    Set("W0002", "W0004", "W0007", "W0008", "W0009", "W0010", "W0011")
+    Set("W0002", "W0004", "W0007", "W0008", "W0009", "W0010")
 
   private def readPath(p: Path): String = Files.readString(p)
   private def read(p: String): String = readPath(Path.of(p))

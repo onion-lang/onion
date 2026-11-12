@@ -2483,6 +2483,8 @@ DateTime::parse(isoString): Long
 DateTime::parse(dateTime, pattern): Long
 ```
 
+`parse(isoString)` accepts `2026-11-11`, `2026-11-11T10:00[:00]` (local zone), and a value with `Z` or an offset (`2026-11-11T10:00:00+09:00`), which is an exact instant.
+
 ### Formatting
 
 ```
@@ -2513,6 +2515,8 @@ DateTime::addSeconds(epochMillis, seconds): Long
 DateTime::addMonths(epochMillis, months): Long
 DateTime::addYears(epochMillis, years): Long
 ```
+
+`addDays`, `addMonths` and `addYears` move the calendar date and keep the local time, even across a daylight-saving change. `addHours`, `addMinutes` and `addSeconds` add elapsed time.
 
 ### Comparison
 

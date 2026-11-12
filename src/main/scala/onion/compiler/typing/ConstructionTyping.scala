@@ -394,7 +394,36 @@ final class ConstructionTyping(
       }
     }
 
-    val constructors0 = typeRef.findConstructor(parameters0)
+    // The exact match goes by erasure; drop a constructor whose parameter the argument's
+    // own view contradicts, as a method call already does: `new D(b)` with `b: JInteger`
+    // and `def this(c: Comparable[String])` compiled and threw (#2649).
+    def ownViewAccepts(ctors: Array[TypedAST.ConstructorRef], params: Array[Term]): Array[TypedAST.ConstructorRef] =
+      ctors.filter { c =>
+        val formals = c.getArgs
+        formals.length != params.length || formals.indices.forall { i =>
+          params(i) == null || !TypeRelations.ownViewRejects(bodyContext.table, formals(i), params(i).`type`)
+        }
+      }
+    // A slot typed by a class type variable (`List[T]` with `T` the enclosing class's own
+    // variable) is matched through T's bound, so a `List[Number]` passes it. Check it by
+    // the rule an assignment uses instead, as method calls do (#2676): the argument must
+    // be that very variable's type. Primitives, null and empty collection literals are
+    // converted or adopted later and are left alone (#2677).
+    def typeVariableSlotsFit(c: TypedAST.ConstructorRef, params: Array[Term]): Boolean = typeRef match {
+      case applied: TypedAST.AppliedClassType =>
+        val classSubst = TypeSubstitution.classSubstitution(applied)
+        val formals = c.getArgs.map(t =>
+          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+        formals.length != params.length || formals.indices.forall { i =>
+          AssignabilitySupport.typeVariableSlotFits(formals(i), params(i), bodyContext.table)
+        }
+      case _ => true
+    }
+    // With overloads, prefer the ones that check accepts: Java picks `this(Object)` for a
+    // `List[Number]` when the other overload takes `List[T]`.
+    val constructors0 = ownViewAccepts(
+      typeRef.findConstructor(parameters0, (c: TypedAST.ConstructorRef) => typeVariableSlotsFit(c, parameters0)),
+      parameters0)
     // Exact matching is substitution-blind (an applied Pair[String, Integer]
     // still exposes (A, B)): retry against the substituted signatures with
     // boxing so 'new Pair[String, Integer]("x", 42)' boxes 42
@@ -429,9 +458,9 @@ final class ConstructionTyping(
                   if n.innerType.isInstanceOf[TypedAST.TypeVariableType] &&
                     nonNullCore(params(i).`type`).isInstanceOf[TypedAST.TypeVariableType] =>
                 TypeRules.isSuperTypeByIdentity(n.innerType, nonNullCore(params(i).`type`))
-              case f =>TypeRelations.isAssignableWithBoxing(f, params(i).`type`, bodyContext.table)
+              case f =>TypeRelations.isConstructorArgAssignable(f, params(i).`type`, bodyContext.table)
             }
-          }
+          } && typeVariableSlotsFit(ctors(0), params)
       case _ => true
     }
     // Nothing matched eagerly, or it only matched via the empty-collection-literal
@@ -454,7 +483,9 @@ final class ConstructionTyping(
     val parameters = retyped.getOrElse(parameters0)
     val constructors = retyped match {
       case Some(newParams) =>
-        val exact = typeRef.findConstructor(newParams)
+        val exact = ownViewAccepts(
+          typeRef.findConstructor(newParams, (c: TypedAST.ConstructorRef) => typeVariableSlotsFit(c, newParams)),
+          newParams)
         if (exact.nonEmpty) exact else findConstructorWithBoxing(typeRef, newParams)
       case None => constructors1
     }
@@ -472,7 +503,14 @@ final class ConstructionTyping(
             parameters0.length >= cd.minArguments
         case _ => false
       }
-      if (defaultsCandidate) break(typeNewObjectWithNamedArgs(node, typeRef, context))
+      if (defaultsCandidate) break(typeNewObjectWithNamedArgs(node, typeRef, context, parameters0))
+      // Varargs fallback, as for methods: `new ProcessBuilder("echo", "x")` spreads its
+      // trailing arguments into the `String...` array (#2839). It comes after the
+      // default-parameter fallback, as method resolution orders them.
+      varargConstruction(node, typeRef, parameters) match {
+        case Some(result) => break(result)
+        case None =>
+      }
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
       None
     } else if (constructors.length > 1) {
@@ -506,6 +544,83 @@ final class ConstructionTyping(
           warnNullArguments(constructors(0), node.args.toArray, parameters, constructors(0).getArgs)
           Some(new NewObject(constructors(0), adaptToFormals(parameters, constructors(0).getArgs)))
       }
+    }
+  }
+
+  /**
+   * Resolves `new C(a, b, c)` against a varargs constructor `C(x: X, ys: Y...)` when no
+   * constructor takes the arguments as written: the fixed arguments must fit their slots
+   * and every trailing one the array's element type, as for a varargs method (#2839).
+   * Returns None when no varargs constructor fits, so the caller reports E0021;
+   * Some(None) when it reported an error itself; Some(Some(term)) on success.
+   */
+  private def varargConstruction(node: AST.NewObject, typeRef: ClassType, parameters: Array[Term]): Option[Option[Term]] = {
+    val table = bodyContext.table
+    def formalsOf(c: ConstructorRef): Array[Type] = typeRef match {
+      case applied: TypedAST.AppliedClassType =>
+        val classSubst = TypeSubstitution.classSubstitution(applied)
+        c.getArgs.map(t =>
+          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      case _ => c.getArgs
+    }
+    val candidates = typeRef.constructors.toSeq.filter(_.isVararg).flatMap { c =>
+      val formals = formalsOf(c)
+      val fixed = formals.length - 1
+      formals.lastOption match {
+        case Some(arrayType: ArrayType) if parameters.length >= fixed =>
+          // A slot typed by a type variable is abstract: only that variable fits it (#2332),
+          // as on the exact-arity path, so `T...` never takes an `Object` (#2839).
+          val fixedFit = (0 until fixed).forall(i =>
+            TypeRelations.isAssignableWithBoxing(formals(i), parameters(i).`type`, table) &&
+              AssignabilitySupport.typeVariableSlotFits(formals(i), parameters(i), table))
+          val restFit = parameters.drop(fixed).forall(p =>
+            TypeRelations.isAssignableWithBoxing(arrayType.base, p.`type`, table) &&
+              AssignabilitySupport.typeVariableSlotFits(arrayType.base, p, table))
+          if (fixedFit && restFit) Some((c, formals, arrayType)) else None
+        case _ => None
+      }
+    }
+    candidates match {
+      case Seq() => None
+      case Seq((ctor, formals, arrayType)) =>
+        if (!MemberAccess.isMemberAccessible(ctor, bodyContext.definition)) {
+          bodyContext.report(METHOD_NOT_ACCESSIBLE, node, ctor.affiliation, "new", ctor.getArgs, bodyContext.definition)
+          return Some(None)
+        }
+        val fixed = formals.length - 1
+        val fixedArgs = adaptToFormals(parameters.take(fixed), formals.take(fixed))
+        val rest = parameters.drop(fixed)
+        // A boxed element for a primitive array (`Integer` into `Int...`) is unboxed
+        // first, as the varargs method path does; stored as-is it failed verification.
+        val elements = rest.map { p =>
+          val unboxed = arrayType.base match {
+            case _: BasicType if !p.isBasicType =>
+              Boxing.unboxedType(table, p.`type`).map(Boxing.unboxing(table, p, _)).getOrElse(p)
+            case _ => p
+          }
+          Boxing.adaptArgument(table, unboxed, arrayType.base)
+        }
+        val args = fixedArgs :+ (new NewArrayWithValues(arrayType, elements): Term)
+        val ref = typeRef match {
+          case applied: TypedAST.AppliedClassType =>
+            new TypedAST.ConstructorRef {
+              def modifier: Int = ctor.modifier
+              def affiliation: TypedAST.ClassType = applied
+              def name: String = ctor.name
+              def getArgs: Array[TypedAST.Type] = ctor.getArgs
+              override def isVararg: Boolean = true
+            }
+          case _ => ctor
+        }
+        Some(Some(new NewObject(ref, args)))
+      case Seq((c1, _, _), (c2, _, _), _*) =>
+        bodyContext.report(
+          AMBIGUOUS_CONSTRUCTOR,
+          node,
+          Array[AnyRef](c1.affiliation, c1.getArgs),
+          Array[AnyRef](c2.affiliation, c2.getArgs)
+        )
+        Some(None)
     }
   }
 
@@ -548,7 +663,7 @@ final class ConstructionTyping(
     * ordinary boxing-aware assignability or -- for a literal like `-3` against
     * a `Byte`/`Short`/`Char` formal -- constant narrowing (issue #374). */
   private def formalAccepts(formal: Type, actual: Term): Boolean =
-    TypeRelations.isAssignableWithBoxing(formal, actual.`type`, bodyContext.table) ||
+    TypeRelations.isConstructorArgAssignable(formal, actual.`type`, bodyContext.table) ||
       (formal match {
         case bt: BasicType => ConstantNarrowing.constantIntOf(actual).exists(v => ConstantNarrowing.fits(bt, v))
         case _ => false
@@ -665,7 +780,7 @@ final class ConstructionTyping(
       val formals = substitutedArgs(c)
       formals.length == args.length &&
         args.indices.forall { i =>
-          malleableIndices.contains(i) || TypeRelations.isAssignableWithBoxing(formals(i), prelim(i).`type`, bodyContext.table)
+          malleableIndices.contains(i) || TypeRelations.isConstructorArgAssignable(formals(i), prelim(i).`type`, bodyContext.table)
         }
     }
     if (candidates.length != 1) break(None)
@@ -765,7 +880,7 @@ final class ConstructionTyping(
             }
             closureCanTarget(formals(i), arity)
           } else
-            TypeRelations.isAssignableWithBoxing(formals(i), prelim(i).`type`, bodyContext.table)
+            TypeRelations.isConstructorArgAssignable(formals(i), prelim(i).`type`, bodyContext.table)
         }
     }
     if (candidates.length != 1) break(None)
@@ -805,9 +920,11 @@ final class ConstructionTyping(
   private def typeNewObjectWithNamedArgs(
     node: AST.NewObject,
     typeRef: ClassType,
-    context: LocalContext
+    context: LocalContext,
+    positional: Array[Term] = null
   ): Option[Term] =
-    resolveConstructorWithNamedArgs(node, node.args, typeRef, context).map { case (ctor, params, _) =>
+    resolveConstructorWithNamedArgs(node, node.args, typeRef, context, positional).map { case (ctor, resolved, _) =>
+      val params = ArgumentHelpers.evaluateInWrittenOrder(node.args, ctor.argumentsWithDefaults.toSeq.map(_.name), resolved, context)
       typeRef match {
         case applied: TypedAST.AppliedClassType =>
           val appliedCtor = new TypedAST.ConstructorRef {
@@ -829,18 +946,47 @@ final class ConstructionTyping(
    * and `: this(b = 1)`, which used to bind them by position (#2659).
    * Returns the constructor, its full argument list, and the source node of
    * each argument (null where a default was filled in).
+   *
+   * `positional`, when given, holds the already-typed arguments of an
+   * all-positional call. Two constructors that both take that many arguments
+   * once their defaults are filled are then told apart by type, as a method
+   * call is: `new A(7)` picks `A(a: Int, b: Int = 2)` over `A(s: String)`
+   * (#2660).
    */
   def resolveConstructorWithNamedArgs(
     node: AST.Node,
     args: List[AST.Expression],
     typeRef: ClassType,
-    context: LocalContext
+    context: LocalContext,
+    positional: Array[Term] = null
   ): Option[(ConstructorDefinition, Array[Term], Array[AST.Node])] = {
     // Extract named argument info
     val namedInfo = extractNamedArgInfo(args)
 
     // Filter constructors by named argument compatibility
-    val candidates = filterConstructorsByNamedArgs(typeRef.constructors.toIndexedSeq, namedInfo)
+    val byCount = filterConstructorsByNamedArgs(typeRef.constructors.toIndexedSeq, namedInfo)
+    val candidates =
+      if (byCount.length <= 1 || positional == null || positional.contains(null) ||
+          namedInfo._2.nonEmpty || positional.length != namedInfo._1) byCount
+      else {
+        val classSubst = TypeSubstitution.classSubstitution(typeRef)
+        val byType = byCount.filter {
+          case cd: ConstructorDefinition =>
+            positional.indices.forall { i =>
+              val formal = TypeSubstitution.substituteType(cd.argumentsWithDefaults(i).argType, classSubst,
+                scala.collection.immutable.Map.empty, defaultToBound = false)
+              formalAccepts(formal, positional(i))
+            }
+          case _ => false
+        }
+        // No candidate takes the arguments: `extends A(true)` is "not found",
+        // not "ambiguous between A(Int, Int) and A(String)".
+        if (byType.isEmpty) {
+          bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(positional), typeRef.constructors)
+          return None
+        }
+        byType
+      }
 
     if (candidates.isEmpty) {
       val unknownNamed = typeRef.constructors.collectFirst { case cd: ConstructorDefinition => cd } match {
@@ -957,6 +1103,11 @@ final class ConstructionTyping(
       TypeSubstitution.substituteType(a.argType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
     val result = new Array[Term](argsWithDefaults.length)
     val filled = new Array[Boolean](argsWithDefaults.length)
+    // The supplied arguments in written order, so E0021 names the call's own
+    // types (`A(String)`), not the constructor's formals, which the
+    // "available constructors" list beneath it already shows.
+    val written = scala.collection.mutable.ArrayBuffer[Term]()
+    def suppliedTypes: Array[Type] = written.map(_.`type`).toArray
 
     var positionalIndex = 0
     var sawNamed = false
@@ -979,6 +1130,7 @@ final class ConstructionTyping(
             // Type the value against its formal type
             typed(named.value, context, formals(paramIndex)) match {
               case Some(term) =>
+                written += term
                 result(paramIndex) = term
                 filled(paramIndex) = true
                 sources(paramIndex) = named.value
@@ -999,6 +1151,7 @@ final class ConstructionTyping(
           } else {
             typed(expr, context, formals(positionalIndex)) match {
               case Some(term) =>
+                written += term
                 result(positionalIndex) = term
                 filled(positionalIndex) = true
                 sources(positionalIndex) = expr
@@ -1017,7 +1170,7 @@ final class ConstructionTyping(
     val missingRequired = argsWithDefaults.indices.find(i => !filled(i) && argsWithDefaults(i).defaultValue.isEmpty)
     if (missingRequired.isDefined) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, ctor.affiliation,
-        argsWithDefaults.map(_.argType), ctor.affiliation.constructors)
+        suppliedTypes, ctor.affiliation.constructors)
       return None
     }
 
@@ -1025,9 +1178,13 @@ final class ConstructionTyping(
     // type -- targeting the expected type above only steers inference, it
     // does not itself enforce assignability.
     val suppliedIndices = argsWithDefaults.indices.filter(filled)
-    if (!suppliedIndices.forall(i => formalAccepts(formals(i), result(i)))) {
+    // A slot typed by a class type variable takes the assignment rule, as on the
+    // positional path: `new C[T](xs = xs)` with `xs: List[Number]` is not a `List[T]`.
+    if (!suppliedIndices.forall(i =>
+        formalAccepts(formals(i), result(i)) &&
+          AssignabilitySupport.typeVariableSlotFits(formals(i), result(i), bodyContext.table))) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, ctor.affiliation,
-        argsWithDefaults.map(_.argType), ctor.affiliation.constructors)
+        suppliedTypes, ctor.affiliation.constructors)
       return None
     }
     warnNullArguments(ctor, sources, result, formals)

@@ -9,7 +9,8 @@ final class ClosureCodegen(
   asmCodeGen: onion.compiler.backend.asm.AsmCodeGeneration,
   outputDirectory: String,
   nextClosureId: () => Int,
-  registerCompiledClass: CompiledClass => Unit
+  registerCompiledClass: CompiledClass => Unit,
+  sourceFile: String
 ) {
   private def asmType(tp: TypedAST.Type): AsmType = asmCodeGen.asmType(tp)
   private def boxAsmType(tp: TypedAST.Type): AsmType = asmCodeGen.boxAsmType(tp)
@@ -137,6 +138,11 @@ final class ClosureCodegen(
       AsmUtil.internalName(AsmUtil.JavaLangObject),
       Array(AsmUtil.internalName(interfaceType.name))
     )
+
+    // The closure's line numbers are lines of its host's source file. Without this
+    // attribute the JVM prints `Unknown Source` for its frames, and the runtime error
+    // report skips them, naming the line that called the lambda instead (#2804).
+    cw.visitSource(sourceFile, null)
 
     // Join the enclosing class's nest so private members stay accessible
     val nestHostEnd = className.indexOf("$Closure")

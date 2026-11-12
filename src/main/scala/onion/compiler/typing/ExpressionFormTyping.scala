@@ -28,9 +28,10 @@ final class ExpressionFormTyping(
     constructionTyping.typeNewArrayWithValues(node, context)
 
   def resolveConstructorWithNamedArgs(
-    node: AST.Node, args: List[AST.Expression], typeRef: ClassType, context: LocalContext
+    node: AST.Node, args: List[AST.Expression], typeRef: ClassType, context: LocalContext,
+    positional: Array[Term] = null
   ): Option[(ConstructorDefinition, Array[Term], Array[AST.Node])] =
-    constructionTyping.resolveConstructorWithNamedArgs(node, args, typeRef, context)
+    constructionTyping.resolveConstructorWithNamedArgs(node, args, typeRef, context, positional)
 
   def typeNewObject(node: AST.NewObject, context: LocalContext, expected: Type = null): Option[Term] =
     constructionTyping.typeNewObject(node, context, expected)
@@ -69,9 +70,10 @@ final class ExpressionFormTyping(
         // a reference and both branches must leave the same stack type. A
         // primitive fallback against a boxed result (e.g. `Int? ?: -1`, where the
         // left is a boxed Integer) is boxed so both branches agree; the boxed
-        // result unboxes at the use site as usual.
+        // result unboxes at the use site as usual. The fallback takes the left's
+        // slot like any other argument, so `Long? ?: 5` boxes a Long (#2727).
         val right: Term =
-          if (right0.isBasicType && !leftNonNull.isBasicType) Boxing.boxing(bodyContext.table, right0)
+          if (right0.isBasicType && !leftNonNull.isBasicType) Boxing.boxForSlot(bodyContext.table, right0, leftT)
           else right0
         // Compare against the right operand's non-null core: a nullable fallback
         // (`a ?: b` where both are T?) is valid and yields a nullable result
@@ -81,7 +83,10 @@ final class ExpressionFormTyping(
           case tv: TypeVariableType if tv.nullability == Nullability.Nullable => tv.nonNullView
           case other => other
         }
-        if (leftT.isBasicType || (!leftNonNull.isBottomType && !TypeRules.isAssignable(leftNonNull, rightNonNull))) {
+        // `o ?: 5` with `o: Comparable[String]?` boxes 5 to an `Integer`, whose own view
+        // is `Comparable[Integer]`: the erasure fits, the arguments do not (#2649).
+        if (leftT.isBasicType || (!leftNonNull.isBottomType && (!TypeRules.isAssignable(leftNonNull, rightNonNull) ||
+            TypeRelations.ownViewRejects(bodyContext.table, leftNonNull, rightNonNull)))) {
           bodyContext.report(INCOMPATIBLE_OPERAND_TYPE, node, node.symbol, Array[Type](leftT, right0.`type`))
           None
         } else {
@@ -159,6 +164,18 @@ final class ExpressionFormTyping(
             bodyContext.report(INCOMPATIBLE_TYPE, node, destination, reported, SemanticErrorReporter.CastSource(name, nullable))
             None
           } else {
+            // `[] as List[Contact]` and `[:] as Map[K, V]` type an empty literal: there is no
+            // element whose type the cast takes on trust, so they do not warn.
+            val emptyLiteral = node.src match {
+              case l: AST.ListLiteral => l.elements.isEmpty
+              case m: AST.MapLiteral => m.entries.isEmpty
+              case _ => false
+            }
+            if (!node.synthetic && !emptyLiteral && isUncheckedCast(term.`type`, destination)) {
+              // The reporter's file is whichever unit last set it; name this cast's own (#2848).
+              bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
+              bodyContext.warningReporter.uncheckedCast(node.location, term.`type`.displayName, destination.displayName)
+            }
             Some(new AsInstanceOf(term, destination))
           }
         }
@@ -237,11 +254,16 @@ final class ExpressionFormTyping(
           else if (srcIface && !dt.isInterface && Modifier.isFinal(dt.modifier)) false
           else srcIface || dstIface
         }
+        // A class's own view of an interface fixes its arguments, so `b as
+        // Comparable[String]` with `b: JInteger` can never succeed (#2649); JLS 5.5.1
+        // rejects it too. Either direction, as a cast from the interface back is the same.
+        !TypeRelations.ownViewRejects(bodyContext.table, dt, ct) &&
+          !TypeRelations.ownViewRejects(bodyContext.table, ct, dt) && (
         TypeRules.isSuperType(dt, ct) || TypeRules.isSuperType(ct, dt) ||
           TypeRules.isSuperType(erasure(dt), erasure(ct)) ||
           TypeRules.isSuperType(erasure(ct), erasure(dt)) ||
           ct.isInstanceOf[TypeVariableType] || dt.isInstanceOf[TypeVariableType] ||
-          interfaceCastAllowed
+          interfaceCastAllowed)
       case (bt1: BasicType, bt2: BasicType) =>
         (bt1 eq bt2) || (isNumericBasic(bt1) && isNumericBasic(bt2))
       case (ct: ClassType, _: ArrayType) =>
@@ -268,6 +290,54 @@ final class ExpressionFormTyping(
           }
         }
       case _ => true
+    }
+  }
+
+  /**
+   * W0011 (#2665): the run-time check of `src as D` tests only D's erased class, so a type
+   * argument of D, or a type-variable D, is taken on trust. Such a cast warns, as Java's
+   * unchecked cast does, unless nothing is taken on trust:
+   *   - every type argument of D is `Object` (with or without `?`), so the class test is all;
+   *   - the value already has type D (an upcast, or the same type);
+   *   - D only narrows the class and its arguments follow from the source's
+   *     (`List[String] as ArrayList[String]`).
+   */
+  private def isUncheckedCast(source: Type, destination: Type): Boolean = {
+    def strip(t: Type): Type = t match {
+      case n: NullableType => n.innerType
+      case other => other
+    }
+    def isObject(t: Type): Boolean = strip(t) match {
+      case ct: ClassType => ct.name == "java.lang.Object" && !ct.isInstanceOf[TypeVariableType]
+      case _ => false
+    }
+    val src = strip(source)
+    val dst = strip(destination)
+    if (src.isInstanceOf[NullType] || src.isBasicType) return false
+    val takesOnTrust = dst match {
+      case _: TypeVariableType => true
+      case a: AppliedClassType => a.typeArguments.exists(arg => !isObject(arg))
+      case _ => false
+    }
+    if (!takesOnTrust) false
+    else if (dst.isInstanceOf[TypeVariableType]) !(src eq dst)
+    else if (TypeRules.isSuperType(dst, src)) false
+    else (src, dst) match {
+      case (s: AppliedClassType, d: AppliedClassType) => !argumentsFollowFrom(s, d)
+      case _ => true
+    }
+  }
+
+  // `d`'s own view of `s`'s class is `s` itself, and each of `d`'s type arguments shows up
+  // in that view, so a value of class `d.raw` that is an `s` can only be a `d`.
+  private def argumentsFollowFrom(s: AppliedClassType, d: AppliedClassType): Boolean = {
+    val views = bodyContext.table.appliedViewsOf(d)(AppliedTypeViews.collectAppliedViewsFrom(d))
+    views.collectFirst { case (raw, view) if TypeRelations.sameClass(raw, s.raw) => view } match {
+      case Some(view) =>
+        val viewArgs = view.typeArguments.map(_.displayName).toSeq
+        viewArgs == s.typeArguments.map(_.displayName).toSeq &&
+          d.typeArguments.forall(arg => viewArgs.contains(arg.displayName))
+      case None => false
     }
   }
 

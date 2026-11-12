@@ -19,8 +19,22 @@ import scala.collection.mutable
  */
 object Migrator:
 
-  /** One rewrite: `length` characters at `offset` become `replacement`. */
-  final case class Edit(offset: Int, length: Int, replacement: String, line: Int, column: Int, note: String)
+  /**
+   * One rewrite: `length` characters at `offset` become `replacement`. `subject` names the old
+   * spelling for messages (`` `ret` ``, `` `law` ``, `` `example` ``). A `clause` edit replaces
+   * whole tokens with a different number of tokens, so it is checked by re-lexing the pieces
+   * (see [[MigrateCommand]]), not token by token.
+   */
+  final case class Edit(
+    offset: Int,
+    length: Int,
+    replacement: String,
+    line: Int,
+    column: Int,
+    note: String,
+    subject: String = "`ret`",
+    clause: Boolean = false
+  )
 
   /** A place a rule left alone, or could not change, with why. */
   final case class Note(line: Int, column: Int, message: String)
@@ -33,7 +47,9 @@ object Migrator:
     def changed: Boolean = edits.nonEmpty
 
   def migrate(source: String): Result =
-    val (last, notLast) = RetToYield.find(source).partition(_._2)
+    val (clauses, clauseNotes) = LawExampleToPredicate.find(source)
+    val insideClause = (offset: Int) => clauses.exists(c => offset >= c.offset && offset < c.offset + c.length)
+    val (last, notLast) = RetToYield.find(source).filterNot((offset, _) => insideClause(offset)).partition(_._2)
     val notes = notLast.map { (offset, _) =>
       val (line, column) = lineColumnOf(source, offset)
       Note(line, column,
@@ -44,7 +60,36 @@ object Migrator:
       val (line, column) = lineColumnOf(source, offset)
       Edit(offset, 3, "yield", line, column, "ret -> yield")
     }
-    Result(apply(source, edits), edits, notes)
+    val all = (edits ++ clauses).sortBy(_.offset)
+    Result(apply(source, all), all, (notes ++ clauseNotes).sortBy(n => (n.line, n.column)))
+
+  /**
+   * Where the character at `line`:`column` of `result.text` was in `source`, and the edit whose
+   * replacement holds it, if one does: a compile of the rewritten text reports positions in
+   * that text, which was never written to disk (#2765). A position inside an edit maps to the
+   * edit's own start. `None` when no character sits at that position.
+   */
+  def origin(source: String, result: Result, line: Int, column: Int): Option[(Int, Int, Option[Edit])] =
+    offsetOf(result.text, line, column).map { at =>
+      var delta = 0
+      var found: Option[Either[Int, Edit]] = None
+      result.edits.sortBy(_.offset).foreach { e =>
+        if found.isEmpty then
+          val from = e.offset + delta
+          if at < from then found = Some(Left(at - delta))
+          else if at < from + e.replacement.length then found = Some(Right(e))
+          else delta += e.replacement.length - e.length
+      }
+      found.getOrElse(Left(at - delta)) match
+        case Left(offset) =>
+          val (l, c) = lineColumnOf(source, offset)
+          (l, c, None)
+        case Right(e) => (e.line, e.column, Some(e))
+    }
+
+  /** `source` with only the clause edits of `result` applied: what the `ret` edits are checked against. */
+  def withClausesOnly(source: String, result: Result): String =
+    apply(source, result.edits.filter(_.clause))
 
   /**
    * The token images of `source`, comments included, for the before/after comparison: a
@@ -172,6 +217,287 @@ object Migrator:
     bodies.toSeq
 
   /**
+   * `law name(p: T) { e }` and `example [name] { e }` → a contract predicate (#2740).
+   *
+   * #2609 removed both clauses. A record's clause becomes
+   * `public: static def name(p: T): Boolean ensures result = e`, and a top-level `example`
+   * becomes `def name(): Boolean ensures result = e`, the forms the migration guide shows.
+   * A body of one expression becomes `= e`; a body of several statements stays a block, with
+   * `return` put in front of its last statement, as the old clause returned it. An `example`
+   * with no name is named `example1`, `example2`, ... in order, per record and per file.
+   *
+   * Only the two places the old grammar accepted are looked at: a record's body, and the top
+   * level of a file. A top-level `example { e }` also reads today as a call of a function
+   * `example` with a trailing lambda, so, as for `ret`, [[MigrateCommand]] keeps a rewrite only
+   * when the file does not compile as written and does compile rewritten.
+   */
+  private object LawExampleToPredicate:
+    private enum Bracket:
+      case Paren, Square, Brace, RecordBody
+
+    private val SectionLabels = Set("public", "protected", "private")
+
+    /** Before an `example` that names a value, so a top-level `example { e }` may be its call. */
+    private val Declarers = Set("def", "val", "var", "::", "as")
+
+    /** After these, a header's next line still continues it. */
+    private val HeaderWords = Set("from", "derive", "conforms", "{")
+
+    def find(source: String): (Seq[Edit], Seq[Note]) =
+      val tokens =
+        try codeTokens(source)
+        catch case _: Exception => IndexedSeq.empty
+      val edits = mutable.Buffer[Edit]()
+      val stack = mutable.Stack[Bracket]()
+      // The stack depth a `record` header was seen at, until its body's `{` or its end.
+      var recordHeader: Option[Int] = None
+      // How many unnamed examples each record body (by its `{` index) and the file have had.
+      val unnamed = mutable.Map[Int, Int]().withDefaultValue(0)
+      val bodies = mutable.Stack[Int]()
+      val notes = mutable.Buffer[Note]()
+      // The access section in force in each record body (by its `{` index); members default to private.
+      val sections = mutable.Map[Int, String]().withDefaultValue("private")
+      // Each record clause's edit index, the section it sat in, and its closing `}`'s index.
+      val inRecordClauses = mutable.Buffer[(Int, String, Int)]()
+      // A file that declares or imports a name `example` may call it as `example { e }` at the
+      // top level, so no top-level `example` there is taken for the old clause (#2765).
+      val exampleIsName = tokens.indices.exists { j =>
+        j > 0 && tokens(j).kind == K.ID && tokens(j).image == "example" && Declarers.contains(tokens(j - 1).image)
+      }
+      // A wildcard static import (`import { lib.Lib::* }`) may bring in an `example` no token
+      // here names, so a top-level `example` there is left alone too (#2765).
+      val wildcardImport = !exampleIsName && tokens.indices.exists { j =>
+        j > 0 && tokens(j).image == "*" && tokens(j - 1).image == "::"
+      }
+      var i = 0
+      while i < tokens.length do
+        val token = tokens(i)
+        val image = token.image
+        val previous = if i > 0 then Some(tokens(i - 1)) else None
+        val atTop = stack.isEmpty
+        val inRecord = stack.headOption.contains(Bracket.RecordBody)
+        val clause =
+          if token.kind != K.ID || !(atTop || inRecord) then None
+          else if image == "law" && inRecord then lawAt(tokens, i)
+          else if image == "example" && (inRecord || startsStatement(previous, token)) then
+            exampleAt(tokens, i).filter { _ =>
+              val call = !inRecord && (exampleIsName || wildcardImport)
+              if call then
+                val (line, column) = start(source, token).map(lineColumnOf(source, _)).getOrElse((token.beginLine, token.beginColumn))
+                notes += Note(line, column,
+                  if exampleIsName then
+                    "this `example` is a name, not the old `example` clause: the file declares or imports " +
+                      "`example`, so `example { ... }` at the top level is its call; left as written"
+                  else
+                    "this `example` may be a call: the file has a `::*` import, which may bring in a function " +
+                      "`example`; left as written. If it is the old `example` clause, " +
+                      "write `def name(): Boolean ensures result = ...` instead")
+              !call
+            }
+          else None
+        clause match
+          case Some((nameIndex, params, open, close)) =>
+            val scope = if inRecord then bodies.head else -1
+            val name = nameIndex.map(tokens(_).image).getOrElse {
+              unnamed(scope) += 1
+              s"example${unnamed(scope)}"
+            }
+            // A clause right after another rewritten one is already under its `public:`.
+            val labelled = inRecord && edits.lastOption.exists { e =>
+              e.clause &&
+                start(source, token).exists(at => at >= e.offset + e.length && source.substring(e.offset + e.length, at).isBlank)
+            }
+            render(source, tokens, i, name, params, open, close, inRecord, labelled).foreach { e =>
+              if inRecord then inRecordClauses += ((edits.length, sections(scope), close))
+              edits += e
+            }
+            i = close + 1
+          case None =>
+            recordHeader.foreach { depth =>
+              if stack.size == depth && image != "{" && endsHeader(token, previous) then recordHeader = None
+            }
+            image match
+              case "(" => stack.push(Bracket.Paren)
+              case "[" => stack.push(Bracket.Square)
+              case "{" =>
+                if recordHeader.contains(stack.size) then
+                  recordHeader = None
+                  bodies.push(i)
+                  stack.push(Bracket.RecordBody)
+                else stack.push(Bracket.Brace)
+              case ")" | "]" | "}" =>
+                if stack.nonEmpty then
+                  if stack.pop() == Bracket.RecordBody && bodies.nonEmpty then bodies.pop()
+                recordHeader.foreach(depth => if stack.size < depth then recordHeader = None)
+              case _ => ()
+            if inRecord && SectionLabels.contains(image) && tokens.lift(i + 1).exists(_.image == ":") then
+              sections(bodies.head) = image
+            if token.kind == K.K_RECORD then recordHeader = Some(stack.size)
+            i += 1
+      restoreSections(source, tokens, edits, inRecordClauses.toSeq)
+      (edits.toSeq, notes.toSeq)
+
+    /**
+     * A record clause's predicate goes under an inserted `public:`. Unless what follows it is
+     * another clause, a section label or the body's end, the section that was in force is
+     * labelled again after it, so the members after the clause keep their access (#2765).
+     */
+    private def restoreSections(
+      source: String,
+      tokens: IndexedSeq[Token],
+      edits: mutable.Buffer[Edit],
+      clauses: Seq[(Int, String, Int)]
+    ): Unit =
+      clauses.foreach { (index, section, close) =>
+        val next = tokens.lift(close + 1)
+        val nextIsClause = next.flatMap(start(source, _)).exists(at => edits.exists(e => e.clause && e.offset == at))
+        val nextIsLabel = next.exists(t => SectionLabels.contains(t.image)) && tokens.lift(close + 2).exists(_.image == ":")
+        if section != "public" && !nextIsClause && !nextIsLabel && !next.exists(_.image == "}") then
+          val e = edits(index)
+          val lineStart = source.lastIndexOf('\n', e.offset - 1) + 1
+          val before = source.substring(lineStart, e.offset)
+          val ownLine = before.forall(c => c == ' ' || c == '\t')
+          val restored = if ownLine then s"\n$before$section:" else s" $section:"
+          edits(index) = e.copy(replacement = e.replacement + restored)
+      }
+
+    /** A token at the header's own depth that cannot be part of `record N[T](...) from .. derive!(..) conforms T, U`. */
+    private def endsHeader(token: Token, previous: Option[Token]): Boolean =
+      val image = token.image
+      val fits = token.kind == K.ID || token.kind == K.K_RECORD || token.kind == K.RE_STRING ||
+        Set("(", "[", ")", "]", ".", ",", "?", "!").contains(image)
+      val newLine = previous.exists(p => token.beginLine > p.endLine)
+      !fits || (newLine && !HeaderWords.contains(image) && !previous.exists(p => p.image == "," || p.image == "conforms"))
+
+    private def startsStatement(previous: Option[Token], token: Token): Boolean =
+      previous.forall(p => p.image == ";" || p.image == "}" || token.beginLine > p.endLine)
+
+    /** `law name ( params ) { body }`: (name, params' bounds, body's `{`, body's `}`). */
+    private def lawAt(tokens: IndexedSeq[Token], i: Int): Option[(Option[Int], Option[(Int, Int)], Int, Int)] =
+      if !tokens.lift(i + 1).exists(_.kind == K.ID) || !tokens.lift(i + 2).exists(_.image == "(") then None
+      else matching(tokens, i + 2).flatMap { closeParen =>
+        if !tokens.lift(closeParen + 1).exists(_.image == "{") then None
+        else matching(tokens, closeParen + 1).map(close => (Some(i + 1), Some((i + 2, closeParen)), closeParen + 1, close))
+      }
+
+    /** `example [name] { body }`. */
+    private def exampleAt(tokens: IndexedSeq[Token], i: Int): Option[(Option[Int], Option[(Int, Int)], Int, Int)] =
+      val named = tokens.lift(i + 1).exists(_.kind == K.ID) && tokens.lift(i + 2).exists(_.image == "{")
+      val open = if named then i + 2 else i + 1
+      if !tokens.lift(open).exists(_.image == "{") then None
+      else matching(tokens, open).map(close => (if named then Some(i + 1) else None, None, open, close))
+
+    /** The index of the bracket that closes the one at `open`. */
+    private def matching(tokens: IndexedSeq[Token], open: Int): Option[Int] =
+      var depth = 0
+      var i = open
+      var found: Option[Int] = None
+      while found.isEmpty && i < tokens.length do
+        tokens(i).image match
+          case "(" | "[" | "{" => depth += 1
+          case ")" | "]" | "}" =>
+            depth -= 1
+            if depth == 0 then found = Some(i)
+          case _ => ()
+        i += 1
+      found
+
+    private def start(source: String, token: Token): Option[Int] =
+      offsetOf(source, token.beginLine, token.beginColumn).filter(source.startsWith(token.image, _))
+
+    private def render(
+      source: String,
+      tokens: IndexedSeq[Token],
+      at: Int,
+      name: String,
+      params: Option[(Int, Int)],
+      open: Int,
+      close: Int,
+      inRecord: Boolean,
+      labelled: Boolean
+    ): Option[Edit] =
+      for
+        from <- start(source, tokens(at))
+        openAt <- start(source, tokens(open))
+        closeAt <- start(source, tokens(close))
+        paramText <- params match
+          case Some((p, q)) =>
+            for a <- start(source, tokens(p)); b <- start(source, tokens(q)) yield source.substring(a + 1, b)
+          case None => Some("")
+        body <- bodyText(source, tokens, open, close, openAt, closeAt)
+      yield
+        val lineStart = source.lastIndexOf('\n', from - 1) + 1
+        val before = source.substring(lineStart, from)
+        val ownLine = before.forall(c => c == ' ' || c == '\t')
+        val signature = (if inRecord then "static def " else "def ") + s"$name($paramText): Boolean"
+        val label = inRecord && !labelled
+        val text =
+          if ownLine then
+            // A record's predicate sits one step in from its `public:`.
+            val extra = if inRecord then "  " else ""
+            val member = before + extra
+            (if label then s"public:\n$member" else extra) +
+              s"$signature\n$member  ensures result\n$member  " + body
+          else (if label then "public: " else "") + s"$signature ensures result " + body
+        val (line, column) = lineColumnOf(source, from)
+        val subject = tokens(at).image
+        Edit(from, closeAt + 1 - from, text, line, column, s"$subject -> contract predicate `$name`",
+          s"`$subject`", clause = true)
+
+    /**
+     * `= e` for a body of one expression, else the block as written with `return` in front of
+     * its last statement. `None` for an empty body, which never held.
+     */
+    private def bodyText(
+      source: String,
+      tokens: IndexedSeq[Token],
+      open: Int,
+      close: Int,
+      openAt: Int,
+      closeAt: Int
+    ): Option[String] =
+      if close == open + 1 then None
+      else
+        val starts = statementStarts(tokens, open, close)
+        val first = tokens(open + 1)
+        val last = tokens(close - 1)
+        for
+          firstAt <- start(source, first)
+          lastAt <- start(source, last)
+          lastStart <- start(source, tokens(starts.last))
+        yield
+          val lastEnd = lastAt + last.image.length
+          val bare = source.substring(openAt + 1, firstAt).isBlank && source.substring(lastEnd, closeAt).isBlank
+          val head = tokens(starts.last)
+          if starts.size == 1 && bare && head.kind != K.K_VAL && head.kind != K.K_VAR then
+            if head.kind == K.K_RETURN then
+              val next = tokens.lift(starts.last + 1).filter(_ => starts.last + 1 < close)
+              next.flatMap(start(source, _)).fold("= " + source.substring(firstAt, lastEnd))(n => "= " + source.substring(n, lastEnd))
+            else "= " + source.substring(firstAt, lastEnd)
+          else if head.kind == K.K_RETURN then source.substring(openAt, closeAt + 1)
+          else source.substring(openAt, lastStart) + "return " + source.substring(lastStart, closeAt + 1)
+
+    /** The first token of each statement directly inside the block from `open` to `close`. */
+    private def statementStarts(tokens: IndexedSeq[Token], open: Int, close: Int): Seq[Int] =
+      val starts = mutable.Buffer(open + 1)
+      var depth = 0
+      var previous = tokens(open + 1)
+      var i = open + 1
+      while i < close do
+        val token = tokens(i)
+        if depth == 0 && i > open + 1 then
+          val separated = previous.image == ";" ||
+            (token.beginLine > previous.endLine && !RetToYield.continues(previous, token))
+          if separated && token.image != ";" then starts += i
+        token.image match
+          case "(" | "[" | "{" => depth += 1
+          case ")" | "]" | "}" => depth -= 1
+          case _ => ()
+        if depth == 0 then previous = token
+        i += 1
+      starts.toSeq
+
+  /**
    * `ret e` → `yield e` in a `do[M] { ... }` block (#2291).
    *
    * Before the change `ret` was a keyword, legal only at the start of a do block's final
@@ -197,6 +523,10 @@ object Migrator:
     private val OpenEnds = Set(
       "=", "+", "-", "*", "/", "%", "==", "!=", "===", "!==", "<", ">", "<=", ">=", "&&", "||",
       "?:", "|>", ".", "?.", "::", "->", ",", "as", "is", "instanceof", "!")
+
+    /** Whether `token`, on a new line after `previous`, continues the same expression. */
+    def continues(previous: Token, token: Token): Boolean =
+      Continuations.contains(token.image) || OpenEnds.contains(previous.image)
 
     /** Keywords that start an expression, so after a finished operand they start a new clause. */
     private val ExpressionKeywords = Set("new", "if", "select", "do", "try")

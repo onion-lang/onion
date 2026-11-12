@@ -2634,6 +2634,8 @@ DateTime::parse(isoString): Long
 DateTime::parse(dateTime, pattern): Long
 ```
 
+`parse(isoString)` は `2026-11-11`、`2026-11-11T10:00[:00]`(ローカルゾーン)、`Z` やオフセット付き(`2026-11-11T10:00:00+09:00`)を受け付けます。オフセット付きは正確な時刻になります。
+
 ### フォーマット
 
 ```
@@ -2664,6 +2666,8 @@ DateTime::addSeconds(epochMillis, seconds): Long
 DateTime::addMonths(epochMillis, months): Long
 DateTime::addYears(epochMillis, years): Long
 ```
+
+`addDays`・`addMonths`・`addYears` は暦の日付を進め、ローカル時刻を保ちます。夏時間の切り替えをまたいでも同じです。`addHours`・`addMinutes`・`addSeconds` は経過時間を足します。
 
 ### 比較
 

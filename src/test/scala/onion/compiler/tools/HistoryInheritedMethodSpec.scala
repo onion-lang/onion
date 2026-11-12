@@ -243,4 +243,60 @@ class HistoryInheritedMethodSpec extends AnyFunSpec {
     assert(o.errors == Seq("E0109"), o.toString)
     assert(o.messages.exists(m => m.contains("`B`") && !m.contains("`C`")), o.toString)
   }
+
+  // #2782: an override that delegates to `super` runs the superclass's body on the subclass.
+  it("is E0109 for an override that calls a lowering `super` method (the #2782 repro)") {
+    val o = compile(program("def dec(): void { n = n - 1 }", "override def dec(): void { super.dec() }"))
+    assert(o.errors == Seq("E0109"), o.toString)
+    assert(o.messages.exists(m => m.contains("super.dec") && m.contains("`Base`") && !m.contains("without overriding")), o.toString)
+  }
+
+  it("is E0109 when any method of the subclass calls the lowering `super` method") {
+    val o = compile(program("def dec(): void { n = n - 1 }", "override def dec(): void { }\n  def twice(): void { super.dec(); super.dec() }"))
+    assert(o.errors == Seq("E0109"), o.toString)
+  }
+
+  it("accepts an override that calls a `super` method that only raises the field") {
+    val o = compile(program("def bump(): void { n = n + 2 }", "override def bump(): void { super.bump() }"))
+    assert(o.errors.isEmpty, o.toString)
+    assert(o.w24.isEmpty, o.toString)
+  }
+
+  it("warns W0024 for a `super` method whose write the syntax does not settle, without saying it is not overridden") {
+    val o = compile(program("def scale(k: Int): void { n = n * k }", "override def scale(k: Int): void { super.scale(k) }"))
+    assert(o.errors.isEmpty, o.toString)
+    assert(o.w24.exists(m => m.contains("Base.scale") && m.contains("super.scale") && !m.contains("without overriding")), o.toString)
+  }
+
+  it("follows a `super` call to a private write the superclass method reaches") {
+    val o = compile(program("def dec(): void { lower() }\nprivate:\n  def lower(): void { n = n - 1 }\npublic:",
+      "override def dec(): void { super.dec() }"))
+    assert(o.errors == Seq("E0109"), o.toString)
+  }
+
+  it("follows `super` through a middle class, both from the subclass and from an inherited override") {
+    def src(mid: String, up: String) =
+      s"""class A {
+         |protected:
+         |  var n: Int
+         |public:
+         |  def this { n = 10 }
+         |  def dec(): void { n = n - 1 }
+         |}
+         |class B extends A {
+         |public:
+         |  $mid
+         |}
+         |class C extends B {
+         |  history n >= old(n)
+         |public:
+         |  $up
+         |}""".stripMargin
+    // B does not declare `dec`, so C's `super.dec()` runs A's.
+    assert(compile(src("", "override def dec(): void { super.dec() }")).errors == Seq("E0109"))
+    // C inherits B's override, which delegates to A's.
+    assert(compile(src("override def dec(): void { super.dec() }", "")).errors == Seq("E0109"))
+    // B's override does not delegate, so nothing lowers `n`.
+    assert(compile(src("override def dec(): void { }", "override def dec(): void { super.dec() }")).errors.isEmpty)
+  }
 }

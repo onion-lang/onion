@@ -141,20 +141,26 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     val parentChain = chain.drop(1)
     lazy val parentHistories = historiesOf(parentChain, interfaces)
     lazy val theirs = parentChain.headOption.map(p => relationsOf(parentHistories, parentChain, p).toSet).getOrElse(Set.empty)
-    for ((owner, m, via) <- inheritedMethods(cls, chain)) {
+    for (Reach(owner, m, via, caller) <- inheritedMethods(cls, chain)) {
       val writes = writesIn(m, owner)
       val file = unitOf.get(owner.name).map(_.sourceFile).orNull
       for ((field, op, declarer) <- added if !theirs((field, op, declarer)) && fieldOwner(owner, field) == declarer) {
         val mine = writes.filter(_.ofField(m, field))
         val broken = mine.flatMap(w => problemOf(op, w.kind, field, perMethod).map(w -> _))
         if (reporting) broken.foreach { case (w, problem) =>
-          typing.reportIn(file, SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, field, s"$field $op old($field)",
-            problem._1, problem._2, cls.name, via.name, owner.name)
+          // Reached through `super` (#2782), the method is overridden, so the hint names the `super` call instead.
+          val through = caller.toSeq.flatMap { case (c, cm) => Seq(c, cm) }
+          typing.reportIn(file, SemanticError.HISTORY_BROKEN_BY_WRITE, w.node, (Seq[AnyRef](field, s"$field $op old($field)",
+            problem._1, problem._2, cls.name, via.name, owner.name) ++ through)*)
         }
         // A raise under `>=` (a lowering under `<=`, a constant nothing undoes) is settled by the syntax.
         else if (broken.isEmpty) mine.find(_.kind == Other).foreach { w =>
+          val reason = caller match {
+            case Some((c, cm)) => ("super", s"$c.$cm")
+            case None          => ("inherited", cls.name)
+          }
           unchecked += Unchecked(file, owner, m, field, Some(s"$field $op old($field)"), line = lineOf(w.node),
-            fieldType = None, reason = Some(("inherited", cls.name)), at = w.node.location, via = via.name)
+            fieldType = None, reason = Some(reason), at = w.node.location, via = via.name)
         }
       }
       if (!reporting) {
@@ -188,26 +194,80 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     chain.flatMap(_.histories) ++ interfaceHistories(chain.flatMap(_.superInterfaces), interfaces, Set.empty)
 
   /**
-   * The superclasses' methods a `cls` runs without overriding them, nearest first, each with the
-   * method a caller reaches it through. A non-private method is reached by itself, unless a
-   * non-private method of the same name and arity overrides it; a private method never overrides
-   * and is never overridden (#2781). A private method runs when an inherited method of its own
-   * class calls it, directly or through other private methods, and is reached through that caller.
+   * A superclass method that runs on a `cls`: the class that declares it, the method, the method a
+   * caller reaches it through, and, when it is reached through `super`, the class and method that
+   * hold the `super` call (#2782).
    */
-  private def inheritedMethods(cls: AST.ClassDeclaration, chain: Seq[AST.ClassDeclaration]): Seq[(AST.ClassDeclaration, AST.MethodDeclaration, AST.MethodDeclaration)] = {
+  private final case class Reach(owner: AST.ClassDeclaration, m: AST.MethodDeclaration, via: AST.MethodDeclaration,
+                                 caller: Option[(String, String)] = None)
+
+  /**
+   * The superclasses' methods a `cls` runs, nearest first. A non-private method runs when `cls`
+   * does not override it: it is reached by itself, unless a non-private method of the same name
+   * and arity overrides it; a private method never overrides and is never overridden (#2781). A
+   * private method runs when an inherited method of its own class calls it, directly or through
+   * other private methods, and is reached through that caller. A method that runs on `cls` and calls
+   * `super.f(..)` also runs the `f` its class inherits, overridden or not, and what that `f` reaches
+   * in turn (#2782).
+   */
+  private def inheritedMethods(cls: AST.ClassDeclaration, chain: Seq[AST.ClassDeclaration]): Seq[Reach] = {
     def sig(m: AST.MethodDeclaration) = (m.name, m.args.size)
     def visible(c: AST.ClassDeclaration) = methodsOf(c).filterNot(isPrivate(c, _))
+    def privatesOf(c: AST.ClassDeclaration) = methodsOf(c).filter(m => m.block != null && isPrivate(c, m))
     var overridden = visible(cls).map(sig).toSet
-    chain.drop(1).flatMap { c =>
+    val plain = chain.drop(1).flatMap { c =>
       val entries = visible(c).filter(m => m.block != null && !overridden(sig(m)))
-      val privates = methodsOf(c).filter(m => m.block != null && isPrivate(c, m))
+      val privates = privatesOf(c)
       val reached = for {
         p <- privates
         via <- entries.find(e => reachable(e, privates).exists(_ eq p))
-      } yield (c, p, via)
+      } yield Reach(c, p, via)
       overridden ++= visible(c).map(sig)
-      entries.map(m => (c, m, m)) ++ reached
+      entries.map(m => Reach(c, m, m)) ++ reached
     }
+    // The methods that run on `cls`, by the index of their class in `chain`, are searched for `super` calls.
+    def indexOf(c: AST.ClassDeclaration) = chain.indexWhere(_ eq c)
+    val seen = scala.collection.mutable.ArrayBuffer.empty[AST.MethodDeclaration]
+    seen ++= plain.map(_.m)
+    val viaSuper = scala.collection.mutable.ArrayBuffer.empty[Reach]
+    var pending: Seq[(Int, AST.MethodDeclaration)] =
+      methodsOf(cls).filter(_.block != null).map(0 -> _) ++ plain.map(r => indexOf(r.owner) -> r.m)
+    while (pending.nonEmpty) {
+      val next = for {
+        (i, caller) <- pending
+        call <- superCalls(caller).toSeq
+        // `super.f(..)` runs the nearest `f` above the caller's class.
+        k <- chain.indices.drop(i + 1).find(j => visible(chain(j)).exists(sig(_) == call)).toSeq
+        target <- visible(chain(k)).find(m => sig(m) == call && m.block != null).toSeq
+        if !seen.exists(_ eq target)
+      } yield {
+        seen += target
+        val c = chain(k)
+        val privates = privatesOf(c)
+        val reached = reachable(target, privates).filterNot(p => seen.exists(_ eq p))
+        seen ++= reached
+        val from = Some((chain(i).name, caller.name))
+        viaSuper += Reach(c, target, target, from)
+        viaSuper ++= reached.map(p => Reach(c, p, target, from))
+        (k -> target) +: reached.map(k -> _)
+      }
+      pending = next.flatten
+    }
+    plain ++ viaSuper
+  }
+
+  /** The methods `m` calls through `super`, by name and arity. */
+  private def superCalls(m: AST.MethodDeclaration): Set[(String, Int)] = {
+    val out = Set.newBuilder[(String, Int)]
+    def visit(n: AST.Node): Unit = {
+      n match {
+        case AST.SuperMethodCall(_, name, args, _) => out += ((name, args.size))
+        case _ =>
+      }
+      ASTWalk.visitChildren(n)(visit)
+    }
+    if (m.block != null) visit(m.block)
+    out.result()
   }
 
   private def isPrivate(c: AST.ClassDeclaration, m: AST.MethodDeclaration): Boolean =

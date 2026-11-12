@@ -494,12 +494,6 @@ final class ConstructionTyping(
       break(None)
     }
     if (constructors.length == 0) {
-      // Varargs fallback, as for methods: `new ProcessBuilder("echo", "x")` spreads its
-      // trailing arguments into the `String...` array (#2839).
-      varargConstruction(node, typeRef, parameters) match {
-        case Some(result) => break(result)
-        case None =>
-      }
       // Default-parameter fallback: a constructor with defaults accepts
       // fewer positional arguments than its signature lists
       val defaultsCandidate = typeRef.constructors.exists {
@@ -510,6 +504,13 @@ final class ConstructionTyping(
         case _ => false
       }
       if (defaultsCandidate) break(typeNewObjectWithNamedArgs(node, typeRef, context, parameters0))
+      // Varargs fallback, as for methods: `new ProcessBuilder("echo", "x")` spreads its
+      // trailing arguments into the `String...` array (#2839). It comes after the
+      // default-parameter fallback, as method resolution orders them.
+      varargConstruction(node, typeRef, parameters) match {
+        case Some(result) => break(result)
+        case None =>
+      }
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, typeRef, types(parameters), typeRef.constructors)
       None
     } else if (constructors.length > 1) {

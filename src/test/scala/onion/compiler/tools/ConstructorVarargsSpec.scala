@@ -144,5 +144,47 @@ class ConstructorVarargsSpec extends AbstractShellSpec {
           |""", "CtorVarargsFlag.on")
       assert(Shell.Success(true) == result)
     }
+    it("loses to a default-parameter constructor, as for methods (panel repro on #2860)") {
+      val result = run(
+        """
+          |class C {
+          |public:
+          |  val tag: String
+          |  def this(a: String, b: String = "d") { this.tag = "defaults:" + a + b }
+          |  def this(xs: String...) { this.tag = "varargs:" + xs.length }
+          |}
+          |class M {
+          |public:
+          |  static def m(a: String, b: String = "d"): String = "defaults:" + a + b
+          |  static def m(xs: String...): String = "varargs:" + xs.length
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new C("a").tag + " " + M::m("a") + " " + new C("a", "b", "c").tag
+          |  }
+          |}
+          |""", "CtorVarargsVsDefaults.on")
+      assert(Shell.Success("defaults:ad defaults:ad varargs:3") == result)
+    }
+
+    it("loses to an all-defaults constructor for `new D()`") {
+      val result = run(
+        """
+          |class D {
+          |public:
+          |  val tag: String
+          |  def this(a: Int = 7) { this.tag = "defaults:" + a }
+          |  def this(xs: Object...) { this.tag = "varargs:" + xs.length }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new D().tag + " " + new D("x", "y").tag
+          |  }
+          |}
+          |""", "CtorVarargsVsAllDefaults.on")
+      assert(Shell.Success("defaults:7 varargs:2") == result)
+    }
   }
 }

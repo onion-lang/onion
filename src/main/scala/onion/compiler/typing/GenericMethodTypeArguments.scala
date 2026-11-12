@@ -269,6 +269,8 @@ private[typing] object GenericMethodTypeArguments {
     }
 
     val inferred = HashMap[String, Type]()
+    // The bindings the arguments fixed, before the expected return type is unified in.
+    private var inferredFromArgs: scala.collection.immutable.Map[String, Type] = scala.collection.immutable.Map.empty
     val upperConstraints = HashMap[String, Type]()
     val lowerConstraints = HashMap[String, Type]()
     val paramNames = typeParams.iterator.map(_.name).toSet
@@ -440,6 +442,8 @@ private[typing] object GenericMethodTypeArguments {
         formalArgs.zip(args).foreach { (formal, actual) => if (actual != null) unify(formal, actual.`type`, callNode) }
       }
 
+      inferredFromArgs = inferred.toMap
+
       if (expectedReturn != null) {
         val formalReturn =
           TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
@@ -552,9 +556,11 @@ private[typing] object GenericMethodTypeArguments {
 
         // The same holds for a value a plain `T` argument fixed, when the `? super T` limit
         // mentions a type variable: erased, `T` would take an `Object`, which a concrete limit
-        // already refuses (`Collections::fill(x: List[T], v: Object)`, #2695).
+        // already refuses (`Collections::fill(x: List[T], v: Object)`, #2695). Only an argument
+        // passes a value in: `val o: Object = Collections::max(x: List[T], c: Comparator[T])`
+        // fixes `T = Object` from the target alone, and stays accepted.
         for (upper <- upperConstraints.get(name) if !failedBound(name) && mentionsTypeVariable(upper);
-             fixed <- inferred.get(name) if !fitsBothLimits(upper, fixed)) {
+             fixed <- inferredFromArgs.get(name) if !fitsBothLimits(upper, fixed)) {
           reportError(callNode, INCOMPATIBLE_TYPE, upper, fixed)
           limitsConflict = true
           failedBound += name

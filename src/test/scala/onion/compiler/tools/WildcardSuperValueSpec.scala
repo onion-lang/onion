@@ -1,5 +1,6 @@
 package onion.compiler.tools
 
+import onion.tools.Shell
 import onion.compiler.{OnionCompiler, CompilerConfig, StreamInputSource, CompilationOutcome}
 import java.io.StringReader
 
@@ -82,6 +83,48 @@ class WildcardSuperValueSpec extends AbstractShellSpec {
           |}
           |""".stripMargin
       assert(errorCodes(src).contains("E0005"))
+    }
+  }
+
+  describe("a type that only the expected result fixes") {
+    // `val o: Object = Collections::max(x, c)` fixes T = Object from the target alone; no
+    // argument passes an Object into the list, so the `? super T` limit has nothing to refuse.
+    val maxMin =
+      """import { java.util.* }
+        |class G[T] {
+        |public:
+        |  def f(x: List[T], c: Comparator[T]): Object {
+        |    val o: Object = Collections::max(x, c)
+        |    return o
+        |  }
+        |  def g(x: List[T], c: Comparator[T]): Object = Collections::min(x, c)
+        |}
+        |""".stripMargin
+
+    it("accepts Collections::max/min with a Comparator[T] assigned to Object") {
+      assert(errorCodes(maxMin).isEmpty)
+    }
+
+    it("accepts the same call in a generic top-level function") {
+      val src =
+        """import { java.util.* }
+          |def mx[T](x: List[T], c: Comparator[T]): Object = Collections::max(x, c)
+          |""".stripMargin
+      assert(errorCodes(src).isEmpty)
+    }
+
+    it("runs and returns the maximum and the minimum") {
+      val src = maxMin +
+        """class MaxMinMain {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val x = new ArrayList[String](); x.add("a"); x.add("b")
+          |    val c: Comparator[String] = (a, b) -> a.compareTo(b)
+          |    return "" + new G[String]().f(x, c) + new G[String]().g(x, c)
+          |  }
+          |}
+          |""".stripMargin
+      assert(Shell.Success("ba") == shell.run(src, "MaxMinMain.on", Array()))
     }
   }
 }

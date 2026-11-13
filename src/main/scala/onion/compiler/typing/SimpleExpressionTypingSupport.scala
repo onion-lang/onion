@@ -315,9 +315,17 @@ private[compiler] final class SimpleExpressionTypingSupport(
         case n: NullableType => n.innerType
         case _ => expectedElem
       }
+      // A generic call into `Int?` can come back typed `Integer?` (T boxed inside the
+      // `?`, #2666); it fits `List[Int?]` like the plain `Integer` does (#2693).
+      val expectedBoxedNullable: Type = expectedElem match {
+        case n: NullableType if n.innerType.isBasicType && n.innerType != BasicType.VOID =>
+          NullableType.of(Boxing.boxedType(bodyContext.table, n.innerType.asInstanceOf[BasicType]))
+        case _ => null
+      }
       def fitsExpectedElement(t: Term): Boolean =
         fitsLiteralSlot(expectedElem, t.`type`) ||
-          (expectedNonNull != null && fitsLiteralSlot(expectedNonNull, normalizeListElementType(t.`type`)))
+          (expectedNonNull != null && fitsLiteralSlot(expectedNonNull, normalizeListElementType(t.`type`))) ||
+          (expectedBoxedNullable != null && fitsLiteralSlot(expectedBoxedNullable, t.`type`))
       val finalElementType =
         if (typedElements.isEmpty) (if (expectedElem != null) expectedElem else bodyContext.rootClass)
         // Target-type the literal: if every element fits the expected element type,

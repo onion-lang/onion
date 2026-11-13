@@ -5070,6 +5070,7 @@ Java クラスの <code>permits</code> も読みます。上の例から <code>R
 <p>do ブロックに書けるのは <code>x &lt;- expr</code> のバインドと、最後の <code>yield</code> だけです。<code>val</code>/<code>var</code> や、単独の文は書けません。</p>
 <ul>
 <li>途中の値に名前を付けるときは、バインドします：<code>doubled &lt;- Option::some(x * 2)</code>。</li>
+<li><code>do[Result]</code> の中の <code>y &lt;- Result::ok(e)</code>（または <code>Result::successful(e)</code>）は <code>val y = e</code> と同じです。ブロックのエラー型は、ほかのバインドから決まります。これは <code>onion.Result</code> だけに当てはまり、自分で定義した <code>Result</code> という名前のクラスには当てはまりません。</li>
 <li>副作用を実行するときは、<code>yield</code> のブロックの中で、結果の前に書きます。</li>
 </ul>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">parseNumber</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">):</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Option</span><span class="o">::</span><span class="nf">some</span><span class="p">(</span><span class="nc">JInteger</span><span class="o">::</span><span class="nf">parseInt</span><span class="p">(</span><span class="n">s</span><span class="p">))</span>

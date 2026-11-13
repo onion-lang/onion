@@ -8808,6 +8808,8 @@ instance.</p>
 </span><span id="__span-107-5"><a id="__codelineno-107-5" name="__codelineno-107-5" href="#__codelineno-107-5"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>Fix: drop <code>static</code>, or pass the instance in explicitly as a parameter.</p>
+<p><code>super</code> inside an <code>extension</code> method is also E0050, with its own message:
+the receiver is <code>this</code>, so call the method on it.</p>
 <h3 id="e0058-label-not-found"><code>E0058</code> — Label not found<a class="headerlink" href="#e0058-label-not-found" title="Permanent link">&para;</a></h3>
 <p>A labeled <code>break</code>/<code>continue</code> names a label that is not bound to any
 enclosing loop.</p>

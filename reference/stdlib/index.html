@@ -11090,6 +11090,7 @@ on any method, or the response status:</p>
 </span><span id="__span-163-5"><a id="__codelineno-163-5" name="__codelineno-163-5" href="#__codelineno-163-5"></a>DateTime::addMonths(epochMillis, months): Long
 </span><span id="__span-163-6"><a id="__codelineno-163-6" name="__codelineno-163-6" href="#__codelineno-163-6"></a>DateTime::addYears(epochMillis, years): Long
 </span></code></pre></div>
+<p><code>addDays</code>, <code>addMonths</code> and <code>addYears</code> move the calendar date and keep the local time, even across a daylight-saving change. <code>addHours</code>, <code>addMinutes</code> and <code>addSeconds</code> add elapsed time.</p>
 <h3 id="comparison">Comparison<a class="headerlink" href="#comparison" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-164-1"><a id="__codelineno-164-1" name="__codelineno-164-1" href="#__codelineno-164-1"></a>DateTime::diff(time1, time2): Long        // Difference in milliseconds
 </span><span id="__span-164-2"><a id="__codelineno-164-2" name="__codelineno-164-2" href="#__codelineno-164-2"></a>DateTime::diffDays(time1, time2): Int

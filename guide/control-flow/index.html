@@ -5962,6 +5962,7 @@ comprehension:</p>
 <p>A do block holds only <code>x &lt;- expr</code> binds and a final <code>yield</code>. It has no <code>val</code>/<code>var</code> and no bare statements.</p>
 <ul>
 <li>To name an intermediate value, bind it: <code>doubled &lt;- Option::some(x * 2)</code>.</li>
+<li>In <code>do[Result]</code>, <code>y &lt;- Result::ok(e)</code> (or <code>Result::successful(e)</code>) is the same as <code>val y = e</code>; the block's error type then comes from its other binds. This applies only to <code>onion.Result</code>, not to a class of your own named <code>Result</code>.</li>
 <li>To run a side effect, put it in the <code>yield</code> block, before the result.</li>
 </ul>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kd">def</span><span class="w"> </span><span class="nf">parseNumber</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">):</span><span class="w"> </span><span class="nb">Option</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Option</span><span class="o">::</span><span class="nf">some</span><span class="p">(</span><span class="nc">JInteger</span><span class="o">::</span><span class="nf">parseInt</span><span class="p">(</span><span class="n">s</span><span class="p">))</span>

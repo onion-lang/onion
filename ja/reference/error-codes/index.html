@@ -8809,6 +8809,8 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 </span><span id="__span-107-5"><a id="__codelineno-107-5" name="__codelineno-107-5" href="#__codelineno-107-5"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>対処: <code>static</code> を外すか、インスタンスを明示的にパラメータとして渡してください。</p>
+<p><code>extension</code> メソッド内の <code>super</code> も E0050 です。専用のメッセージが出ます。
+レシーバは <code>this</code> なので、<code>this</code> に対してメソッドを呼んでください。</p>
 <h3 id="e0058"><code>E0058</code> — ラベルが見つからない<a class="headerlink" href="#e0058" title="Permanent link">&para;</a></h3>
 <p>ラベル付きの <code>break</code>/<code>continue</code> が、囲んでいるどのループにも束縛されていない
 ラベルを指定しています。</p>

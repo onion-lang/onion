@@ -11057,6 +11057,7 @@ null なプラットフォーム型の <code>List</code> に対して直接呼�
 </span><span id="__span-165-5"><a id="__codelineno-165-5" name="__codelineno-165-5" href="#__codelineno-165-5"></a>DateTime::addMonths(epochMillis, months): Long
 </span><span id="__span-165-6"><a id="__codelineno-165-6" name="__codelineno-165-6" href="#__codelineno-165-6"></a>DateTime::addYears(epochMillis, years): Long
 </span></code></pre></div>
+<p><code>addDays</code>・<code>addMonths</code>・<code>addYears</code> は暦の日付を進め、ローカル時刻を保ちます。夏時間の切り替えをまたいでも同じです。<code>addHours</code>・<code>addMinutes</code>・<code>addSeconds</code> は経過時間を足します。</p>
 <h3 id="_36">比較<a class="headerlink" href="#_36" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-166-1"><a id="__codelineno-166-1" name="__codelineno-166-1" href="#__codelineno-166-1"></a>DateTime::diff(time1, time2): Long        // ミリ秒単位の差分
 </span><span id="__span-166-2"><a id="__codelineno-166-2" name="__codelineno-166-2" href="#__codelineno-166-2"></a>DateTime::diffDays(time1, time2): Int

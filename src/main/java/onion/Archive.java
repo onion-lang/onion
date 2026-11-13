@@ -49,13 +49,24 @@ public final class Archive {
      */
     public static void zip(String zipPath, List files) {
         if (files == null) throw new IllegalArgumentException("Archive: files must not be null");
-        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(Paths.get(zipPath)))) {
-            for (Object entry : files) {
-                Path source = Paths.get(String.valueOf(entry));
-                if (!Files.isRegularFile(source)) {
-                    throw new IllegalArgumentException(
-                        "Archive: not a file: " + source);
-                }
+        // Check everything before the zip is opened: opening it truncates the file, so a
+        // check after that point has already destroyed a source that is the zip itself.
+        Path zipFile = Paths.get(zipPath);
+        List<Path> sources = new ArrayList<>();
+        for (Object entry : files) {
+            Path source = Paths.get(String.valueOf(entry));
+            if (!Files.isRegularFile(source)) {
+                throw new IllegalArgumentException(
+                    "Archive: not a file: " + source);
+            }
+            if (isSameFileQuietly(source, zipFile)) {
+                throw new IllegalArgumentException("Archive: could not zip " + source + " to " + zipPath
+                    + " (source and target are the same file)");
+            }
+            sources.add(source);
+        }
+        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zipFile))) {
+            for (Path source : sources) {
                 writeEntry(out, source.getFileName().toString(), source);
             }
         } catch (IOException e) {

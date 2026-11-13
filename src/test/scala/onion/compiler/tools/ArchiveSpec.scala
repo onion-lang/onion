@@ -257,5 +257,35 @@ class ArchiveSpec extends AbstractShellSpec {
       assert(e2.getMessage.contains("same file"), e2.getMessage)
       assert(Files.readAllBytes(gz).toSeq == before)
     }
+
+    it("zip refuses a zip path that is also one of its files, leaving every file intact") {
+      val work = Files.createTempDirectory("onion-zip-same")
+      val f = work.resolve("f.txt")
+      Files.writeString(f, "hello\n")
+      val g = work.resolve("g.txt")
+      Files.writeString(g, "other\n")
+      val e1 = intercept[RuntimeException] { onion.Archive.zip(f.toString, java.util.List.of(f.toString)) }
+      assert(e1.getMessage.contains("same file"), e1.getMessage)
+      assert(Files.readString(f) == "hello\n")
+
+      // not only when it is the sole file, and not only when spelled the same way
+      val e2 = intercept[RuntimeException] {
+        onion.Archive.zip(f.toString, java.util.List.of(g.toString, work.resolve(".").resolve("f.txt").toString))
+      }
+      assert(e2.getMessage.contains("same file"), e2.getMessage)
+      assert(Files.readString(f) == "hello\n")
+      assert(Files.readString(g) == "other\n")
+    }
+
+    it("zip checks every file before it creates the zip") {
+      val work = Files.createTempDirectory("onion-zip-precheck")
+      val ok = work.resolve("ok.txt")
+      Files.writeString(ok, "x")
+      val out = work.resolve("out.zip")
+      intercept[IllegalArgumentException] {
+        onion.Archive.zip(out.toString, java.util.List.of(ok.toString, work.resolve("missing.txt").toString))
+      }
+      assert(!Files.exists(out), "a rejected call must not leave a half-written zip")
+    }
   }
 }

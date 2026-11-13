@@ -152,14 +152,18 @@ final class BlockElementLowering(
                       new ExpressionActionStatement(new SetLocal(counterVariable, new IntValue(0)))
                     )
 
+                  // The index increment is the loop's update, not the body's last
+                  // statement: `continue` jumps to the update, so a continue in the
+                  // body still advances to the next element (#2940).
                   block =
                     new ConditionalLoop(
+                      null,
                       new BinaryTerm(LESS_THAN, BasicType.BOOLEAN, ref(counterVariable), new ArrayLength(ref(collectionVar))),
                       new StatementBlock(
                         assign(elementVar, indexref(collectionVar, ref(counterVariable))),
-                        block,
-                        assign(counterVariable, new BinaryTerm(ADD, BasicType.INT, ref(counterVariable), new IntValue(1)))
-                      )
+                        block
+                      ),
+                      update = assign(counterVariable, new BinaryTerm(ADD, BasicType.INT, ref(counterVariable), new IntValue(1)))
                     )
                   new StatementBlock(init, block)
                 } else if (isMapType(collection.`type`)) {

@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.157.0] - 2026-11-13
+
+### Fixed
+
+- **`Archive::gzipFile(p, p)` and `gunzipFile(p, p)` refuse to run instead of destroying the file.**
+  - Before: returned normally, and the file was left holding a bare gzip header.
+  - Now: `Archive: could not gzip p to p (source and target are the same file)`, and the file is untouched.
+- **`new Object().clone()` is E0013 at compile time, not a VerifyError at load (#2900).**
+  - Before: a protected method or field reached from a subclass compiled on any receiver, then the script failed to load ("Bad access to protected data").
+  - Now: as in Java, the receiver must be the calling class or a subclass of it (E0013 for a method, E0014 for a field). `this`, an unqualified call and a static member are unchanged.
+- **`Files::glob(dir, "**/*.on")` now finds files directly in `dir`.**
+  - Before: only files in a subdirectory matched, so top-level files were silently left out.
+  - Now: `**/` also matches zero directories, as in bash `globstar` and Python `glob`.
+- **`new ProcessBuilder("echo", "x")` compiles (#2839).**
+  - Before: E0021 for `new` with a varargs constructor, Java or Onion (`def this(xs: String...)`), though the error listed it as available.
+  - Now: `new` spreads trailing arguments into the array, as a varargs method call does. A constructor with default parameters still wins when it fits, as for methods. An Onion varargs constructor is also marked varargs for Java callers.
+- **`DateTime::addDays(d, 1)` is the next date, even across a daylight-saving change (#2832).**
+  - Before: it added 24 hours. In New York, "tomorrow" from 2026-11-01 was still 11-01, and 09:00 became 10:00 after spring-forward.
+  - Now: it moves the calendar date and keeps the local time, as `addMonths` does. `addHours` still adds elapsed time.
+- **`null` for an `Int` constructor parameter is a compile error (#2828).**
+  - Before: `new A(null)`, `extends A(null)` and `: this(null)` compiled, then crashed with a null-value error at run time.
+  - Now: E0021, as for any constructor that does not fit. With a nullable overload, `A(null)` picks it. A method call `f(null)` keeps its E0000 at the `null`.
+- **`f(3) { x -> ... }` and `f(3) { x, y -> ... }` each call their own overload (#2823).**
+  - Before: with `f(Int, (Int) -> Int)` and `f(Int, (Int, Int) -> Int)`, the second call often reused the first call's overload. A statement vanished with no error, or a valid lambda got E0101.
+  - Now: the overload whose function type takes as many parameters as the lambda is chosen, in any order.
+- **`Yaml::parse` reads a file that starts with `---` (#2805).**
+  - Before: `---\nname: Alice` failed with "found no colon".
+  - Now: a leading `---` and a trailing `...` are skipped. A second document is rejected with "Multiple documents are out of scope".
+- **An error thrown inside a lambda is reported at the lambda's own line (#2804).**
+  - Before: `repro.on:4: error: ...` pointed at the line that called the lambda, and `--stacktrace` showed its frames as `Unknown Source`.
+  - Now: the report shows the line that threw (`repro.on:2`), and every lambda frame names the script file. This also covers `map`/`filter` blocks and `Server` handlers.
+- **A `[T: Trait]` function that forwards its constraint no longer warns W0006 (#2792).**
+  - Before: `def total[T: Numeric](xs: List[T]): T = sum(xs)` warned about `dict$Numeric$T`, a parameter you never wrote; `--warn error` failed the build.
+  - Now: no warning for the compiler's own constraint parameter. Your own unused parameters still warn.
+- **A same-name overload no longer hides an inherited method from a subclass `history` (#2786).**
+  - Before: with `def dec(k: Long)` in `Up`, the inherited `Base.dec(k: Int)` lowered `n` under `history n >= old(n)` and nothing was reported.
+  - Now: E0109 at `Base.dec`'s write. Only a method with the same parameter types counts as an override, as E0068 already decides.
+- **`Future.await()` no longer hangs when the failure's cause chain loops (#2784).**
+  - Before: an exception whose causes pointed back at each other froze `await()` forever.
+  - Now: it throws as usual, naming the last cause before the loop. A `getMessage()` that throws falls back to the exception's type name.
+- **An override that calls `super.dec()` no longer slips past a subclass `history` (#2782).**
+  - Before: `override def dec(): void { super.dec() }` compiled, and `Base.dec` lowered `n` under `history n >= old(n)`.
+  - Now: E0109 at the superclass write, naming the `super` call to change (W0024 when the write is not settled by syntax).
+- **A type argument that fails its bound's type arguments is a compile error (#2780).**
+  - Before: `f[C extends Animal[C]]` took a `Cat` that is an `Animal[Dog]`, and `m[T extends Comparable[String]]` took an `Integer`. Both compiled, then threw `ClassCastException`.
+  - Now: the call is rejected (E0000 or E0005), as javac does; so is `new H[JInteger]()` for `class H[T extends Comparable[String]]`.
+- **`onionc app.on lib.on` finds `import { shapes.Plain }` even when `lib.on` comes second (#2776).**
+  - Before: E0003 "type shapes.Plain is not found" unless the declaring file was listed first.
+  - Now: file order does not matter. Which class a bare name binds is unchanged.
+- **`Archive::gzipFile`/`gunzipFile` say which path is missing (#2774).**
+  - Before: `could not gzip /etc/hostname (/no/dir/out.gz)`, with no reason.
+  - Now: `... (no such directory: /no/dir)` or `... (no such file: <source>)`.
+- **`Proc::run(cmd)` with `cmd: List[String]` now says how to fix it (#2773).**
+  - Before: E0005 listed `run(String[])` and gave no way to get an array.
+  - Now: the error adds a hint to pass `cmd.toArray(new String[0])`.
+- **`try (val pool = Concurrent::pool(2)) { ... }` compiles, and the pool is closed at the end (#2772).**
+  - Before: E0000 "type AutoCloseable is expected". Same for `Db::connect`, `Net::connect`, `Net::listen` and `Server::start`.
+  - Now: these five types are `AutoCloseable`, like any resource.
+- **E0013/E0014 on a private member of a Java or stdlib class no longer says "move it under a `public:` section".**
+  - Before: `r.status = 1` on `Server.Response` told you to edit a class you cannot edit.
+  - Now: the hint says the class is not Onion source and to use its public methods or fields.
+- **`u() is Object` on a `void` call is a compile error (#2745).**
+  - Before: it compiled, then the JVM rejected the class with `VerifyError: Operand stack underflow`.
+  - Now: E0027 at the `is`, as for other `void` values with no value to use.
+- **`val l: Long? = j` with `j: Int?` is a compile error, not a crash.**
+  - Before: it compiled, then threw `ClassCastException` (or `VerifyError` as a constructor argument). With `j` null it printed `null`.
+  - Now: E0000. A nullable primitive is a box, and `Int?` never converts to `Long?`. Null-check first (`if j != null { l = j }`), or keep one primitive type.
+- **`(i as Long?)` with `i: Int` gives `5L`, not a `ClassCastException`.** `(k as Long?)` with `k: JInteger` is E0000; `(k as Long)` still converts.
+- `f(Int?)` stays more specific than `f(Long?)`: `f(3)` still calls `f(Int?)`.
+- **`x ?: 5` compiles when `x` is a `Long?` or `Double?` (#2727).**
+  - Before: E0001, "operator ?: is not applicable for type Long?, Int".
+  - Now: the `Int` fallback widens to the left's type, as in `val l: Long = 5`.
+- **`n.bytes()` compiles when `n` is an `Int` (#2724).**
+  - Before: E0005 for an `Int` receiver of an `extension Long` method, though `Format::bytes(n)` worked.
+  - Now: a primitive receiver widens as a primitive argument does (`Byte`/`Short`/`Int` to `Long`, `Float` or `Double`; `Long` to `Float`/`Double`), when no extension of that name exists on its own type or a supertype (`Number`, `Object`). A boxed value, such as an element of a `List[Int]`, does not widen, just as it does not as an argument. A `Long` is still not an `Int` receiver.
+- **A bare `sum(xs)` or `sha256(s)` now says to write `Stats::sum(...)` or `Hash::sha256(...)`.**
+  - Before: E0005 "function not found", with no pointer.
+  - Now: E0005 plus a hint naming the class (`Stats`, `Hash`, `Codec`, `Format`).
+- **`val xs: List[Int?] = [ident(5), null]` compiles (#2693).**
+  - Before: E0000, `List[Int?]` expected but `List[Int]` used.
+  - Now: it prints `[5, null]`, as the `List[String?]` form already did.
+- **`super` in an `extension` method gets an error that names the real reason (#2688).**
+  - Before: E0050 said "current instance is not available in a static context", though `this` works there.
+  - Now: still E0050, but it says `super` is not available in an `extension` method and the receiver is `this`.
+- **`y <- Result::ok(x + 1)` and `y <- Result::successful(x + 1)` compile inside `do[Result]`.**
+  - Before: E0000, the error type was inferred as `Object`.
+  - Now: the bind means `val y = x + 1`, so the block takes its error type from the other binds. Only `onion.Result` is affected; a class of your own named `Result` keeps its `bind` calls.
+
 ## [0.156.0] - 2026-11-12
 
 ### Added

@@ -394,7 +394,7 @@ private[compiler] final class CallOverloadSupport(
       relevantIndices.forall { index =>
         index < candidate.length &&
         index < baseline.length &&
-        TypeRules.isSuperType(baseline(index), candidate(index))
+        TypeRules.isSuperTypeForSpecificity(baseline(index), candidate(index))
       }
     } else {
       TypeRules.isAllSuperType(baseline, candidate)

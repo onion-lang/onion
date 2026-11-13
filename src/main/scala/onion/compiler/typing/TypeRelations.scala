@@ -154,6 +154,10 @@ private[typing] object TypeRelations {
         // below; without this a `Node[T]?` argument did not match a `Node[T]?`
         // parameter, since TypeRules.isAssignable alone cannot relate a
         // type-variable-parameterized applied type to itself (#295).
+        // `Int?` fits `Long?` only as the same primitive: see `TypeRules.isSuperType` (#2730).
+        case (expNullable: NullableType, actNullable: NullableType)
+            if expNullable.innerType.isBasicType && actNullable.innerType.isBasicType =>
+          expNullable.innerType eq actNullable.innerType
         case (expNullable: NullableType, actNullable: NullableType) =>
           isAssignableWithBoxing(expNullable.innerType, actNullable.innerType, table, topLevel)
         // `T? ← T`: a non-null value widens to the nullable parameter.

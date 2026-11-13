@@ -253,10 +253,10 @@ private[compiler] object DuplicationChecks {
     // Index actual base methods by name and arity, keeping per-position choices.
     // Include both the specialized (type-argument substituted) and the raw erased
     // form, plus boxing variants, so that primitive/boxed parameter forms match.
-    val basePatterns = mutable.HashMap[(String, Int), mutable.ArrayBuffer[ErasedParameterPattern]]()
+    // One entry per base method: its boxing-aware patterns and its exact descriptors.
+    final case class BaseContract(patterns: Seq[ErasedParameterPattern], exact: Set[String])
+    val baseContracts = mutable.HashMap[(String, Int), mutable.ArrayBuffer[BaseContract]]()
     val baseNames = mutable.HashSet[String]()
-    // Exact (unboxed-form) parameter descriptors of base methods, by name and arity.
-    val baseExact = mutable.HashMap[(String, Int), mutable.HashSet[String]]()
     val requestedKeys = overrideMethods.iterator.map(m => (m.name, m.arguments.length)).toSet
     for (view <- views.values) {
       val viewSubst: scala.collection.immutable.Map[String, Type] =
@@ -268,27 +268,25 @@ private[compiler] object DuplicationChecks {
           if requestedKeys.contains(key) then
             val specializedArgs =
               contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
-            val patterns = basePatterns.getOrElseUpdate(key, mutable.ArrayBuffer.empty)
-            patterns += parameterPattern(specializedArgs, typing)
-            patterns += parameterPattern(contract.arguments, typing)
-            val exact = baseExact.getOrElseUpdate(key, mutable.HashSet.empty)
-            exact += erasedParamDescriptor(specializedArgs)
-            exact += erasedParamDescriptor(contract.arguments)
+            baseContracts.getOrElseUpdate(key, mutable.ArrayBuffer.empty) += BaseContract(
+              Seq(parameterPattern(specializedArgs, typing), parameterPattern(contract.arguments, typing)),
+              Set(erasedParamDescriptor(specializedArgs), erasedParamDescriptor(contract.arguments)))
       }
     }
 
     for (impl <- overrideMethods) {
       val implPattern = parameterPattern(impl.arguments, typing)
-      val candidates = basePatterns.get((impl.name, impl.arguments.length))
-      // A sibling that matches a base method exactly is the real override; an
-      // `override` that matches only through boxing next to it overrides nothing (#2681).
-      val key = (impl.name, impl.arguments.length)
-      val exactSet = baseExact.getOrElse(key, mutable.HashSet.empty[String])
       val implExact = erasedParamDescriptor(impl.arguments)
-      val shadowedBySibling = !exactSet.contains(implExact) &&
+      val candidates = baseContracts.getOrElse((impl.name, impl.arguments.length), mutable.ArrayBuffer.empty[BaseContract])
+      // A sibling that matches a base method exactly is that method's real override, so an
+      // `override` reaching the same base method only through boxing overrides nothing (#2681).
+      // Judged per base method: a sibling matching a different overload does not count (#2921).
+      def exactSibling(c: BaseContract): Boolean =
         clazz.methods.exists(o => (o ne impl) && o.name == impl.name && !Modifier.isStatic(o.modifier) &&
-          o.arguments.length == impl.arguments.length && exactSet.contains(erasedParamDescriptor(o.arguments)))
-      if shadowedBySibling || !candidates.exists(_.exists(implPattern.overlaps)) then
+          o.arguments.length == impl.arguments.length && c.exact.contains(erasedParamDescriptor(o.arguments)))
+      val overridesSomething = candidates.exists(c =>
+        c.patterns.exists(implPattern.overlaps) && (c.exact.contains(implExact) || !exactSibling(c)))
+      if !overridesSomething then
         val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
         val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
         typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name, baseNames.toArray)

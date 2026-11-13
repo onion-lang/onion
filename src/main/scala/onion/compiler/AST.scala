@@ -15,6 +15,7 @@ object AST {
   val M_FORWARDED = 1024
   val M_SEALED = 2048
   val M_SYNTHETIC_RECORD = 8192  // Auto-generated record methods (equals, hashCode, toString, copy)
+  val M_DO_BINDING = 65536  // A local `val` the rewriter makes from a do-block bind; it warns as the bind's parameter would
   def hasModifier(bitFlags: Int, modifier: Int): Boolean = (bitFlags & modifier) != 0
   def append[A](buffer: scala.collection.mutable.Buffer[A], element: A): Unit = {
     buffer += element

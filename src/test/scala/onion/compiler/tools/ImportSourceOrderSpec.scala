@@ -8,7 +8,7 @@ import org.scalatest.funspec.AnyFunSpec
 /**
  * Issue #2776: the order of source files on the command line does not change what an import
  * finds. `onionc app.on lib.on` used to fail with E0003 on `import { shapes.Plain }`, and
- * `shapes.*` lost to a default-imported JDK class of the same name.
+ * Which class a bare name binds is not part of that fix and stays as on main.
  */
 class ImportSourceOrderSpec extends AnyFunSpec {
   private val lib =
@@ -57,12 +57,14 @@ class ImportSourceOrderSpec extends AnyFunSpec {
   }
 
   describe("a wildcard import of a module that declares a name the JDK also has") {
-    it("prefers the module's generic class when its file comes first") {
-      assert(errorCodes("lib.on" -> lib, "app.on" -> app("shapes.*", "Box[Int]")) == Right(()))
+    // Binding is unchanged from main (#2855's rule): the default imports still supply
+    // `java.util.Timer`, in either file order. A shadowing change needs its own RFC.
+    def timerApp = app("shapes.*", "Timer").replace("static def f(s: Timer): void { }", "static def f(s: Timer): void { s.cancel() }")
+    it("still binds the JDK class when the module's file comes first") {
+      assert(errorCodes("lib.on" -> lib, "app.on" -> timerApp) == Right(()))
     }
-    it("prefers the module's class when its file comes later") {
-      // `Timer` is also java.util.Timer and javax.swing.Timer
-      assert(errorCodes("app.on" -> app("shapes.*", "Timer"), "lib.on" -> lib) == Right(()))
+    it("still binds the JDK class when the module's file comes later") {
+      assert(errorCodes("app.on" -> timerApp, "lib.on" -> lib) == Right(()))
     }
   }
 
@@ -84,9 +86,8 @@ class ImportSourceOrderSpec extends AnyFunSpec {
   }
 
   describe("two wildcard imports, one module from the classpath and one from source") {
-    // The panel's repro on #2855: a class declared in this compilation outranks only the
-    // default imports. Between the user's own wildcards the written order decides, whether
-    // the class comes from source or a jar.
+    // The panel's repro on #2855: between the user's own wildcards the written order
+    // decides, whether the class comes from source or a jar.
     val qSource = "module q;\nclass Foo {\npublic:\n  def this {}\n  def onlyQ(): Int = 2\n}"
     lazy val pOnly = classDir("p.on" -> "module p;\nclass Foo {\npublic:\n  def this {}\n  def onlyP(): Int = 1\n}")
     def useFoo(imports: String, call: String): String =

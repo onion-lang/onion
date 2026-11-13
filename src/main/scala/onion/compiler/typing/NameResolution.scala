@@ -211,17 +211,7 @@ class NameResolver(private val context: NameResolutionContext) {
               // JList; }` silently resolved `JList` to the unrelated
               // `javax.swing.JList` instead of the user's own alias (#2025).
               val (explicitImports, onDemandImports) = imports.partition(!_.isOnDemand)
-              // A class this compilation declares, reached by the user's own on-demand
-              // import, beats a default import's same-named JDK class: `shapes.*` finds
-              // `shapes.Box` before `javax.swing.Box`, wherever its file is on the command
-              // line (#2776). It outranks only the default imports: among the imports the
-              // user wrote, the written order decides, whether a class comes from source
-              // or a jar. Only declared classes count: `lookup` also sees classpath classes
-              // already loaded, which would make a name bind by load order.
-              val (defaultOnDemand, writtenOnDemand) = onDemandImports.partition(ImportItem.isDefaultOnDemand)
-              val localWins = writtenOnDemand.exists(_.matches(name).exists(context.table.classes.getOrNull(_) != null))
-              val orderedOnDemand = if (localWins) writtenOnDemand ++ defaultOnDemand else onDemandImports
-              val found = (explicitImports.iterator ++ orderedOnDemand.iterator)
+              val found = (explicitImports.iterator ++ onDemandImports.iterator)
                 .flatMap(_.matches(name))
                 .map(fqcn => {
                   // A candidate the imports produced is already qualified: it is a class,

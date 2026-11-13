@@ -42,20 +42,3 @@ case class ImportItem(simpleName : String, fqcn: Seq[String]) {
   }
 
 }
-
-object ImportItem {
-  /** The on-demand imports every unit gets without writing them. `onion.*` must precede
-    * `java.lang.*`: since Java 25 `java.lang.IO` exists and would otherwise shadow `onion.IO`. */
-  val DefaultOnDemand: Seq[ImportItem] = Seq(
-    ImportItem("*", Seq("onion", "*")),
-    ImportItem("*", Seq("java", "lang", "*")),
-    ImportItem("*", Seq("java", "io", "*")),
-    ImportItem("*", Seq("java", "util", "*")),
-    ImportItem("*", Seq("javax", "swing", "*")),
-    ImportItem("*", Seq("java", "awt", "event", "*"))
-  )
-  private val defaultOnDemandSet: Set[ImportItem] = DefaultOnDemand.toSet
-
-  /** Whether `item` is one of the default on-demand imports (also when the user writes it). */
-  def isDefaultOnDemand(item: ImportItem): Boolean = defaultOnDemandSet.contains(item)
-}

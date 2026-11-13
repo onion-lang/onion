@@ -169,10 +169,7 @@ public final class Concurrent {
         }
 
         private static String rootMessage(Throwable error) {
-            Throwable cause = error;
-            while (cause.getCause() != null) cause = cause.getCause();
-            String message = cause.getMessage();
-            return message == null ? cause.getClass().getSimpleName() : message;
+            return Future.rootMessage(error);
         }
     }
 

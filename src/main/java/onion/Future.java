@@ -255,10 +255,29 @@ public final class Future<T> {
     /** {@code prefix (reason)}, the reason being the root cause's message, or its type when it has none. */
     private static String failureMessage(String prefix, Throwable error) {
         if (error == null) return prefix;
+        return prefix + " (" + rootMessage(error) + ")";
+    }
+
+    /**
+     * The root cause's message, or its type name when it has none. Safe on a cyclic cause chain
+     * (stops at the first repeat) and on a {@code getMessage()} that throws.
+     */
+    static String rootMessage(Throwable error) {
+        java.util.Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         Throwable cause = error;
-        while (cause.getCause() != null && cause.getCause() != cause) cause = cause.getCause();
-        String message = cause.getMessage();
-        return prefix + " (" + (message == null ? cause.getClass().getSimpleName() : message) + ")";
+        seen.add(cause);
+        while (true) {
+            Throwable next = cause.getCause();
+            if (next == null || !seen.add(next)) break;
+            cause = next;
+        }
+        String message;
+        try {
+            message = cause.getMessage();
+        } catch (Throwable broken) {
+            message = null;
+        }
+        return message == null ? cause.getClass().getSimpleName() : message;
     }
 
     /**

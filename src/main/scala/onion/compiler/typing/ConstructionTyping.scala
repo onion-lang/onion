@@ -873,7 +873,7 @@ final class ConstructionTyping(
       }
     }
 
-    val candidates = typeRef.constructors.filter { c =>
+    val candidates0 = typeRef.constructors.filter { c =>
       val formals = substitutedArgs(c)
       formals.length == args.length &&
         args.indices.forall { i =>
@@ -894,6 +894,24 @@ final class ConstructionTyping(
             TypeRelations.isConstructorArgAssignable(formals(i), prelim(i).`type`, bodyContext.table)
         }
     }
+    // Several survivors: take the most specific one, as a method call does and as Java does,
+    // so `new C((s) -> ..)` with `C(Function)` and `C(UnaryOperator)` picks `UnaryOperator`.
+    // The one whose every formal is assignable to each rival's formal wins; none = ambiguous.
+    val candidates =
+      if (candidates0.length <= 1) candidates0
+      else {
+        val table = bodyContext.table
+        val mostSpecific = candidates0.filter { c =>
+          val cf = substitutedArgs(c)
+          candidates0.forall { d =>
+            (d eq c) || {
+              val df = substitutedArgs(d)
+              cf.indices.forall(i => TypeRules.isAssignable(df(i), cf(i)))
+            }
+          }
+        }
+        if (mostSpecific.length == 1) mostSpecific else candidates0
+      }
     if (candidates.length != 1) break(None)
 
     val ctor = candidates(0)

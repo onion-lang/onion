@@ -400,9 +400,15 @@ final class ExpressionFormTyping(
     for {
       target <- typed(node.target, context)
       destinationType <- typing.mapFrom(node.typeRef, bodyContext.mapper)
+      operand <-
+        if (target.`type` == BasicType.VOID) {
+          // A void call leaves nothing on the stack to test.
+          bodyContext.report(SemanticError.IS_NOT_BOXABLE_TYPE, node.target, target.`type`)
+          None
+        } else Some(target)
     } yield {
       // `instanceof` tests a reference; a primitive operand is tested boxed.
-      new InstanceOf(Boxing.asReference(bodyContext.table, target), destinationType)
+      new InstanceOf(Boxing.asReference(bodyContext.table, operand), destinationType)
     }
 
   private def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] =

@@ -232,4 +232,35 @@ class DiagnosticHintsSpec extends AnyFunSpec {
       assert(errors.forall(e => !e.contains("toArray") && !e.contains("Colls::toList")), s"did not expect a List/array hint, got: $errors")
     }
   }
+
+  describe("List passed to a varargs parameter (#2773)") {
+    def callErrors(listType: String, init: String, call: String): Seq[String] = compile(
+      s"""
+        |class Test {
+        |public:
+        |  static def main(args: String[]): Int {
+        |    val xs: $listType = $init
+        |    $call
+        |    return 0
+        |  }
+        |}
+      """.stripMargin
+    )
+
+    it("hints at toArray when the List is the whole varargs tail") {
+      val errors = callErrors("List[String]", "[\"echo\", \"a\"]", "Proc::run(xs)")
+      assert(errors.exists(e => e.contains("E0005") || e.contains("run")), s"expected E0005, got: $errors")
+      assert(errors.exists(_.contains("toArray(new String[0])")), s"expected a toArray hint, got: $errors")
+    }
+
+    it("hints for a List after fixed arguments (Proc::captureIn)") {
+      val errors = callErrors("List[String]", "[\"a\"]", "Proc::captureIn(\".\", xs)")
+      assert(errors.exists(_.contains("toArray(new String[0])")), s"expected a toArray hint, got: $errors")
+    }
+
+    it("gives no toArray hint for a List[Int], whose elements would not fit") {
+      val errors = callErrors("List[Int]", "[1]", "Proc::run(xs)")
+      assert(errors.nonEmpty && errors.forall(!_.contains("toArray")), s"did not expect a toArray hint, got: $errors")
+    }
+  }
 }

@@ -288,10 +288,26 @@ class SemanticErrorReporter(threshold: Int) {
         val hint = format(message("suggestion.nullableArgument"), Seq((i + 1).toString, typeName(arg), typeName(param)))
         Some(withHexDigitB.fold("")(_ + Systems.lineSeparator + "  ") + hint)
       case None => withHexDigitB
+    // `Proc::run(cmd)` with `cmd: List[String]` and `run(String...)`: the list is the only
+    // thing missing an array, so show the call that works (#2773).
+    val listForVarargs: Option[TypedAST.ArrayType] =
+      sameName.iterator.filter(m => m.isVararg && m.argumentCount == argTypes.length).flatMap { m =>
+        (m.arguments.last, argTypes.last) match
+          case (arr: TypedAST.ArrayType, actual) if arr.dimension == 1 && !arr.component.isBasicType && actual != null &&
+              isListType(actual match { case n: TypedAST.NullableType => n.innerType; case o => o }) &&
+              listElementsFit(actual, arr) && snippetCompiles(actual, arr) &&
+              m.arguments.init.zip(argTypes.init).forall { case (p, a) => argPassable(p, a) } => Some(arr)
+          case _ => None
+      }.nextOption()
+    val withListHint = listForVarargs match
+      case Some(arr) =>
+        val written = onion.compiler.toolbox.TypeFormatting.componentWrittenForm(arr.component) + "[0]"
+        Some(withNullable.fold("")(_ + Systems.lineSeparator + "  ") + format(message("suggestion.listToVarargs"), Seq(written)))
+      case None => withNullable
     val heldBack = sameName.collectFirst {
       case m: TypedAST.MethodDefinition if m.defaultsPending && fitsLeadingParameters(m.arguments, m.defaultsOmittableFrom, argTypes) => (m.defaultsHeldBackBy, m.defaultsHeldBackVia)
     }
-    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withNullable, name, heldBack)))
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withListHint, name, heldBack)))
   }
 
   /**

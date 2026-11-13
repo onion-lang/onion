@@ -139,4 +139,36 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(out.contains("greet"), s"expected suggestion 'greet' in diagnostics, got:\n$out")
     }
   }
+
+  describe("an override that matches a generic contract only through boxing (#2681)") {
+    it("reports E0068 when a sibling overload is the exact implementation") {
+      val results = errors(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class C conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  override def n(x: Int): JInteger = 1
+          |  def n(x: JInteger): JInteger = 2
+          |}
+          |""".stripMargin
+      )
+      assert(results.map(_._1).contains(Some("E0068")))
+    }
+
+    it("still accepts the boxed override next to an unmarked primitive overload") {
+      val results = errors(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class C conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |  override def n(x: JInteger): JInteger = 2
+          |}
+          |""".stripMargin
+      )
+      assert(!results.map(_._1).contains(Some("E0068")))
+    }
+  }
 }

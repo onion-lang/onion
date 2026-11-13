@@ -255,6 +255,8 @@ private[compiler] object DuplicationChecks {
     // form, plus boxing variants, so that primitive/boxed parameter forms match.
     val basePatterns = mutable.HashMap[(String, Int), mutable.ArrayBuffer[ErasedParameterPattern]]()
     val baseNames = mutable.HashSet[String]()
+    // Exact (unboxed-form) parameter descriptors of base methods, by name and arity.
+    val baseExact = mutable.HashMap[(String, Int), mutable.HashSet[String]]()
     val requestedKeys = overrideMethods.iterator.map(m => (m.name, m.arguments.length)).toSet
     for (view <- views.values) {
       val viewSubst: scala.collection.immutable.Map[String, Type] =
@@ -269,13 +271,24 @@ private[compiler] object DuplicationChecks {
             val patterns = basePatterns.getOrElseUpdate(key, mutable.ArrayBuffer.empty)
             patterns += parameterPattern(specializedArgs, typing)
             patterns += parameterPattern(contract.arguments, typing)
+            val exact = baseExact.getOrElseUpdate(key, mutable.HashSet.empty)
+            exact += erasedParamDescriptor(specializedArgs)
+            exact += erasedParamDescriptor(contract.arguments)
       }
     }
 
     for (impl <- overrideMethods) {
       val implPattern = parameterPattern(impl.arguments, typing)
       val candidates = basePatterns.get((impl.name, impl.arguments.length))
-      if !candidates.exists(_.exists(implPattern.overlaps)) then
+      // A sibling that matches a base method exactly is the real override; an
+      // `override` that matches only through boxing next to it overrides nothing (#2681).
+      val key = (impl.name, impl.arguments.length)
+      val exactSet = baseExact.getOrElse(key, mutable.HashSet.empty[String])
+      val implExact = erasedParamDescriptor(impl.arguments)
+      val shadowedBySibling = !exactSet.contains(implExact) &&
+        clazz.methods.exists(o => (o ne impl) && o.name == impl.name && !Modifier.isStatic(o.modifier) &&
+          o.arguments.length == impl.arguments.length && exactSet.contains(erasedParamDescriptor(o.arguments)))
+      if shadowedBySibling || !candidates.exists(_.exists(implPattern.overlaps)) then
         val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
         val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
         typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name, baseNames.toArray)

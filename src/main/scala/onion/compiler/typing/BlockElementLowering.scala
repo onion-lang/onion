@@ -363,7 +363,10 @@ final class BlockElementLowering(
           context.recordFailedDeclaration(node.name)
           return new NOP(node.location)
         }
-        typing.checkAndReportShadowing(node.name, node.location, context)
+        // A do-block bind's lambda parameter may reuse an outer name without W0005, so the
+        // `val` the rewriter makes from `x <- Result::ok(e)` may too (#2537).
+        if (!AST.hasModifier(node.modifiers, AST.M_DO_BINDING))
+          typing.checkAndReportShadowing(node.name, node.location, context)
         // A `var` never reassigned in its enclosing body is effectively final,
         // so it can be smart-cast like a `val` (issue #273). `val` (final) is
         // always immutable regardless.

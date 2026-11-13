@@ -1,6 +1,9 @@
 package onion.compiler.tools
 
+import onion.compiler.{CompilerConfig, OnionCompiler, StreamInputSource, WarningLevel}
 import onion.tools.Shell
+
+import java.io.StringReader
 
 /**
  * Tests for issue #131: do-notation over Option and Result (bind/successful
@@ -194,6 +197,27 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
         Array()
       )
       assert(Shell.Success(10200) == result)
+    }
+
+    it("adds no warning where the bind it replaces had none, so --warn error accepts it (#2537)") {
+      // `x <- Result::ok(q + 1)` becomes a local `val x`; the bind's lambda parameter never
+      // warned W0005 for shadowing an outer `x`, so the generated `val` must not either.
+      def warningsUnderError(body: String) = {
+        val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.Error)
+        val source = "val x = 100\nval r: Result[Int, Object] = Result::ok(1)\nprintln(do[Result] { " + body + " })\n"
+        new OnionCompiler(config)
+          .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "W.on")))
+      }
+      val control = warningsUnderError("q <- r; x <- r; yield x")
+      val rewritten = warningsUnderError("q <- r; x <- Result::ok(q + 1); yield x")
+      val unused = warningsUnderError("q <- r; y <- Result::successful(q + 1); yield q")
+      val unusedControl = warningsUnderError("q <- r; y <- r; yield q")
+      assert(!control.hasErrors, s"control: ${control.allErrors.map(_.message)}")
+      assert(!rewritten.hasErrors, s"rewritten: ${rewritten.allErrors.map(_.message)} ${rewritten.diagnostics.warnings.map(_.message)}")
+      assert(!unused.hasErrors, s"unused: ${unused.allErrors.map(_.message)} ${unused.diagnostics.warnings.map(_.message)}")
+      def codes(r: onion.compiler.pipeline.CompilationResult) = r.diagnostics.warnings.map(_.category.code)
+      assert(codes(rewritten) == codes(control), s"rewritten warnings: ${rewritten.diagnostics.warnings.map(_.message)}")
+      assert(codes(unused) == codes(unusedControl), s"unused warnings: ${unused.diagnostics.warnings.map(_.message)}")
     }
   }
 

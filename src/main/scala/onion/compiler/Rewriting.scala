@@ -2111,7 +2111,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       // type, so left as a bind it types as `Result[T, Object]` (#2537).
       case (binding: AST.DoBinding) :: rest if rest.nonEmpty && isResultUnitBind(binding.expr, monadType) =>
         val call = binding.expr.asInstanceOf[AST.StaticMethodCall]
-        val decl = AST.LocalVariableDeclaration(binding.location, AST.M_FINAL, binding.name, null, rewriteExpression(call.args.head))
+        val decl = AST.LocalVariableDeclaration(binding.location, AST.M_FINAL | AST.M_DO_BINDING, binding.name, null, rewriteExpression(call.args.head))
         AST.BlockExpression(binding.location, List(decl, desugarDoStatements(binding.location, monadType, rest)))
 
       // Binding followed directly by the final yield: x <- e1; yield e2

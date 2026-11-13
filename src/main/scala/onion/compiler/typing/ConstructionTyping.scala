@@ -837,9 +837,10 @@ final class ConstructionTyping(
     * Used to disambiguate constructor overloads at a closure argument position
     * (e.g. Thread(Runnable) vs Thread(String) for `new Thread(() -> ...)`). */
   private def closureCanTarget(formal: Type, arity: Int): Boolean = formal match {
-    case ct: ClassType =>
+    case target: ClassType =>
+      val name = (target match { case a: AppliedClassType => a.raw; case _ => target }).name
+      val ct = FunctionalInterfaces.functionalView(target)
       val raw = ct match { case a: AppliedClassType => a.raw; case _ => ct }
-      val name = raw.name
       if (name != null && name.matches("""onion\.Function\d+""")) true
       else {
         def isPublicObjectMethod(m: Method): Boolean = m.name match {
@@ -872,7 +873,7 @@ final class ConstructionTyping(
       }
     }
 
-    val candidates = typeRef.constructors.filter { c =>
+    val candidates0 = typeRef.constructors.filter { c =>
       val formals = substitutedArgs(c)
       formals.length == args.length &&
         args.indices.forall { i =>
@@ -893,6 +894,38 @@ final class ConstructionTyping(
             TypeRelations.isConstructorArgAssignable(formals(i), prelim(i).`type`, bodyContext.table)
         }
     }
+    // Several survivors: take the most specific one, as a method call does and as Java does,
+    // so `new C((s) -> ..)` with `C(Function)` and `C(UnaryOperator)` picks `UnaryOperator`.
+    // The one whose every formal is assignable to each rival's formal wins; none = ambiguous.
+    //
+    // First keep only the survivors every lambda argument really types against (its parameters
+    // and result against the formal's type arguments): `C(Function[String, Integer])` and
+    // `C(UnaryOperator[String])` both accept a lambda by arity, but `s -> s.length()` fits only
+    // the first, and a most-specific pick must not commit to one the lambda does not fit.
+    val candidates =
+      if (candidates0.length <= 1) candidates0
+      else {
+        val table = bodyContext.table
+        val fitting = candidates0.filter { c =>
+          val cf = substitutedArgs(c)
+          closureIndices.forall { i =>
+            typing.withSuppressedReporting {
+              typed(args(i), context, cf(i)).exists(t => TypeRelations.isConstructorArgAssignable(cf(i), t.`type`, table))
+            }
+          }
+        }
+        val pool = if (fitting.nonEmpty) fitting else candidates0
+        val mostSpecific = pool.filter { c =>
+          val cf = substitutedArgs(c)
+          pool.forall { d =>
+            (d eq c) || {
+              val df = substitutedArgs(d)
+              cf.indices.forall(i => TypeRules.isAssignable(df(i), cf(i)))
+            }
+          }
+        }
+        if (mostSpecific.length == 1) mostSpecific else pool
+      }
     if (candidates.length != 1) break(None)
 
     val ctor = candidates(0)

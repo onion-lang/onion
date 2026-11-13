@@ -897,20 +897,34 @@ final class ConstructionTyping(
     // Several survivors: take the most specific one, as a method call does and as Java does,
     // so `new C((s) -> ..)` with `C(Function)` and `C(UnaryOperator)` picks `UnaryOperator`.
     // The one whose every formal is assignable to each rival's formal wins; none = ambiguous.
+    //
+    // First keep only the survivors every lambda argument really types against (its parameters
+    // and result against the formal's type arguments): `C(Function[String, Integer])` and
+    // `C(UnaryOperator[String])` both accept a lambda by arity, but `s -> s.length()` fits only
+    // the first, and a most-specific pick must not commit to one the lambda does not fit.
     val candidates =
       if (candidates0.length <= 1) candidates0
       else {
         val table = bodyContext.table
-        val mostSpecific = candidates0.filter { c =>
+        val fitting = candidates0.filter { c =>
           val cf = substitutedArgs(c)
-          candidates0.forall { d =>
+          closureIndices.forall { i =>
+            typing.withSuppressedReporting {
+              typed(args(i), context, cf(i)).exists(t => TypeRelations.isConstructorArgAssignable(cf(i), t.`type`, table))
+            }
+          }
+        }
+        val pool = if (fitting.nonEmpty) fitting else candidates0
+        val mostSpecific = pool.filter { c =>
+          val cf = substitutedArgs(c)
+          pool.forall { d =>
             (d eq c) || {
               val df = substitutedArgs(d)
               cf.indices.forall(i => TypeRules.isAssignable(df(i), cf(i)))
             }
           }
         }
-        if (mostSpecific.length == 1) mostSpecific else candidates0
+        if (mostSpecific.length == 1) mostSpecific else pool
       }
     if (candidates.length != 1) break(None)
 

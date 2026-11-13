@@ -70,6 +70,21 @@ class InheritedSamSpec extends AbstractShellSpec {
           |}
           |""".stripMargin))
     }
+    it("keeps the Function constructor when the lambda does not fit the UnaryOperator one") {
+      assert(Shell.Success("function:3/function:3/function:3") == run(
+        """
+          |import { java.util.function.Function; java.util.function.UnaryOperator }
+          |class Ov {
+          |public:
+          |  val tag: String
+          |  def this(g: Function[String, Integer]) { this.tag = "function:" + g.apply("xyz") }
+          |  def this(g: UnaryOperator[String]) { this.tag = "unary:" + g.apply("x") }
+          |}
+          |def main(args: String[]): String {
+          |  return new Ov((s: String) -> s.length()).tag + "/" + new Ov({ s -> s.length() }).tag + "/" + new Ov((s) -> s.length()).tag
+          |}
+          |""".stripMargin))
+    }
     it("still rejects a lambda of the wrong arity") {
       assert(Shell.Failure(-1) == run(
         """

@@ -220,6 +220,20 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
       assert(codes(unused) == codes(unusedControl), s"unused warnings: ${unused.diagnostics.warnings.map(_.message)}")
     }
 
+    it("adds no unused-variable warning inside a method body, so --warn error accepts it (#2537)") {
+      // Top level hid this: only a method body reports W0001 for an unused local.
+      def inMethod(bind: String) = {
+        val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.Error)
+        val source =
+          "def f(r: Result[Int, Object]): Result[Int, Object] {\n" +
+          "  return do[Result] { x <- r; " + bind + "; yield x }\n}\nprintln(f(Result::ok(1)))\n"
+        new OnionCompiler(config)
+          .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "M.on")))
+      }
+      val rewritten = inMethod("y <- Result::ok(x + 1)")
+      assert(!rewritten.hasErrors, s"${rewritten.allErrors.map(_.message)} ${rewritten.diagnostics.warnings.map(_.message)}")
+    }
+
     it("reports a wrong yield type after a rewritten bind as the plain bind form does (#2537)") {
       // Removing `y <- Result::ok(e)` must leave the block main would build without it, so a
       // String yielded where an Int belongs gets main's one error, not a reversed pair.

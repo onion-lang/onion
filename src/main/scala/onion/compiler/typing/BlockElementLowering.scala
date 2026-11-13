@@ -372,7 +372,9 @@ final class BlockElementLowering(
         // always immutable regardless.
         val mutable = !Modifier.isFinal(node.modifiers) && context.isReassigned(node.name)
         val index = context.add(node.name, inferredType, isMutable = mutable)
-        context.recordDeclaration(node.name, node.location)
+        // Likewise no W0001: the bind's lambda parameter was never checked for being unused.
+        if (!AST.hasModifier(node.modifiers, AST.M_DO_BINDING))
+          context.recordDeclaration(node.name, node.location)
         new ExpressionActionStatement(new SetLocal(node.location, 0, index, inferredType, inferred))
       } else {
         val lhsTypeOpt = mapFrom(node.typeRef)

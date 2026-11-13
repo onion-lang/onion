@@ -139,4 +139,103 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(out.contains("greet"), s"expected suggestion 'greet' in diagnostics, got:\n$out")
     }
   }
+
+  describe("an override that matches a generic contract only through boxing (#2681)") {
+    it("reports E0068 when a sibling overload is the exact implementation") {
+      val results = errors(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class C conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  override def n(x: Int): JInteger = 1
+          |  def n(x: JInteger): JInteger = 2
+          |}
+          |""".stripMargin
+      )
+      assert(results.map(_._1).contains(Some("E0068")))
+    }
+
+    it("still accepts the boxed override next to an unmarked primitive overload") {
+      val results = errors(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class C conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |  override def n(x: JInteger): JInteger = 2
+          |}
+          |""".stripMargin
+      )
+      assert(!results.map(_._1).contains(Some("E0068")))
+    }
+
+    it("accepts a boxed override when the sibling matches a different base overload (#2921)") {
+      val results = errors(
+        """
+          |interface G[T] { def n(x: T): String; def n(x: String): String }
+          |class C conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  override def n(x: Int): String = "int"
+          |  override def n(x: String): String = "str"
+          |}
+          |""".stripMargin
+      )
+      assert(results.isEmpty, s"expected no errors, got: $results")
+    }
+
+    it("accepts a boxed override when the other overload comes from a second interface (#2921)") {
+      val results = errors(
+        """
+          |interface A[T] { def n(x: T): String }
+          |interface B { def n(x: String): String }
+          |class C conforms A[JInteger], B {
+          |public:
+          |  def this {}
+          |  override def n(x: Int): String = "int"
+          |  override def n(x: String): String = "str"
+          |}
+          |""".stripMargin
+      )
+      assert(results.isEmpty, s"expected no errors, got: $results")
+    }
+
+    it("accepts a boxed override of a generic abstract class next to another overload (#2921)") {
+      val results = errors(
+        """
+          |abstract class Base[T] {
+          |public:
+          |  def this {}
+          |  abstract def n(x: T): String
+          |  abstract def n(x: String): String
+          |}
+          |class C extends Base[JLong] {
+          |public:
+          |  def this {}
+          |  override def n(x: Long): String = "long"
+          |  override def n(x: String): String = "str"
+          |}
+          |""".stripMargin
+      )
+      assert(results.isEmpty, s"expected no errors, got: $results")
+    }
+
+    it("still reports E0068 when the sibling exactly matches the same base overload (#2921)") {
+      val results = errors(
+        """
+          |interface G[T] { def n(x: T): String; def n(x: String): String }
+          |class C conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  override def n(x: Int): String = "int"
+          |  def n(x: JInteger): String = "boxed"
+          |  override def n(x: String): String = "str"
+          |}
+          |""".stripMargin
+      )
+      assert(results.map(_._1).contains(Some("E0068")), s"got: $results")
+    }
+  }
 }

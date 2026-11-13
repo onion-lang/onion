@@ -841,13 +841,19 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   // emitted line) and re-allocated its emitters.
   private def withVisitor(gen: GeneratorAdapter, className: String, localVars: LocalVarContext)(action: AsmCodeGenerationVisitor => Unit): Unit =
     val st = state
-    val visitor =
-      if (st.lastVisitor != null) && (st.lastVisitorGen eq gen) && (st.lastVisitorLocals eq localVars) && (st.lastVisitorClass == className) then st.lastVisitor
-      else
-        val v = new AsmCodeGenerationVisitor(gen, className, localVars, this)
-        st.lastVisitor = v; st.lastVisitorGen = gen; st.lastVisitorLocals = localVars; st.lastVisitorClass = className
-        v
-    action(visitor)
+    if (st.lastVisitor != null) && (st.lastVisitorGen eq gen) && (st.lastVisitorLocals eq localVars) && (st.lastVisitorClass == className) then
+      action(st.lastVisitor)
+    else
+      // A nested emission (a lambda body, with its own gen) must not evict the enclosing
+      // method's visitor: that visitor holds the open loops, and a later `continue` or
+      // `break` emitted through a fresh one would find none (#2913). Put it back afterwards.
+      val (outer, outerGen, outerLocals, outerClass) = (st.lastVisitor, st.lastVisitorGen, st.lastVisitorLocals, st.lastVisitorClass)
+      val v = new AsmCodeGenerationVisitor(gen, className, localVars, this)
+      st.lastVisitor = v; st.lastVisitorGen = gen; st.lastVisitorLocals = localVars; st.lastVisitorClass = className
+      try action(v)
+      finally
+        if outer != null then
+          st.lastVisitor = outer; st.lastVisitorGen = outerGen; st.lastVisitorLocals = outerLocals; st.lastVisitorClass = outerClass
 
   private def emitStatementsWithContext(gen: GeneratorAdapter, stmts: Array[ActionStatement], className: String, localVars: LocalVarContext): Unit =
     withVisitor(gen, className, localVars)(visitor => stmts.foreach(visitor.visitStatement))

@@ -1315,6 +1315,26 @@ public:
 
 直し方: `self` 側のオーバーライドを呼ぶ（`f()`）か、スーパークラスのメソッドに本体を与えます。
 
+### `E0116` — 一つのメソッドに無関係なインターフェースの既定実装が複数ある
+
+クラスが二つのインターフェースに準拠し、どちらも同じメソッドに本体を与えています。
+どちらのインターフェースも他方を継承していません。JVM はどちらも選べません。
+このエラーがないころは、コンパイルは通り、呼び出しで `AbstractMethodError` になりました。
+Java もこのクラスを拒否します。
+
+```onion
+interface A { def g(): Int = 1 }
+interface B { def g(): Int = 2 }
+class C conforms A, B {   // E0116
+public:
+  def this {}
+}
+```
+
+直し方: クラスでメソッドをオーバーライドします（`override def g(): Int = 1`）。
+スーパークラスから継承したメソッドがあれば、それでも解決します。
+他方を継承するインターフェースの既定実装も同じです。
+
 ## 宣言エラー
 
 ### `E0007` — ローカル変数の重複
@@ -2104,6 +2124,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0113` | the closed predicate … is … when the build runs it |
 | `E0114` | the Shape … breaks its round-trip contract |
 | `E0115` | `super.…(...)` calls an abstract method of … |
+| `E0116` | class … inherits a default …(…) from each of …, and none of them overrides the others |
 
 ## 関連項目
 

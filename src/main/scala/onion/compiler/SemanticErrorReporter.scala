@@ -1520,6 +1520,10 @@ object SemanticErrorReporter {
       "error.semantic.unimplementedAbstractMethod",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
     ),
+    SemanticError.CONFLICTING_INTERFACE_DEFAULTS -> ErrorDef(
+      "error.semantic.conflictingInterfaceDefaults",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)), items => asString(items(3)))
+    ),
     SemanticError.ABSTRACT_CLASS_INSTANTIATION -> ErrorDef(
       "error.semantic.abstractClassInstantiation",
       Seq(items => typeName(items(0)))

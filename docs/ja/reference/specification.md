@@ -338,6 +338,12 @@ record Point(x: Int, y: Int) from re"(-?\d+),(-?\d+)" derive!(Json, Yaml)
 | `Json` | `R::fromJson(s: String): R?` | `R::toJson(v: R): String` |
 | `Yaml` | `R::fromYaml(s: String): R?` | `R::toYaml(v: R): String` |
 
+合成されるメソッドは static です。`v.toJson()` ではなく、`R::toJson(v)` のように record 型に対して呼びます。
+コンポーネントがこれらと同じ名前を持っても構いません。
+`record P(toJson: Int, n: Int) derive!(Json)` では、`p.toJson()` はコンポーネントのアクセサ、
+`P::toJson(p)` はシリアライザです。
+static メソッドと同名のアクセサは常に共存できるので、どちらもコンパイルされます。
+
 `Json` はさらに `R::fromJsonList(s: String): List[R]` を、`Yaml` は
 `R::fromYamlList(s: String): List[R]` を合成します。それぞれトップレベルのシーケンス
 （JSON 配列、または flat mapping の YAML block シーケンス）を読み、各要素を

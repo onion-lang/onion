@@ -112,7 +112,7 @@ val one  = Access::parse(line)                          // Access?（不一致�
 
 ## シリアライズの導出（derive!）
 
-`derive!(Json)` / `derive!(Yaml)` でレコードの形から双方向のシリアライズを導出します。`derive!` は型クラスではなくマクロです（`!` が展開の印）。
+`derive!(Json)` / `derive!(Yaml)` でレコードの形から双方向のシリアライズを導出します。`derive!` は型クラスではなくマクロです（`!` が展開の印）。導出されるメソッドは static です。`u.toJson()` ではなく `User::toJson(u)` と呼びます。
 
 ```onion
 record User(name: String, age: Int) derive!(Json, Yaml)

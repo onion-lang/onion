@@ -400,7 +400,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         // clause's error comes first and the clashing method is never registered: a call
         // `R::x()` then sees only the accessor instead of an E0005 listing `x(), x()`.
         val componentTypeByName = node.args.map(_.name).zip(argTypes).toMap
-        val clashing = derivedMethods.filter(m => m.args.isEmpty && componentTypeByName.contains(m.name))
+        // `derive!` statics take the record (`toJson(v)`), so they differ from the accessor by
+        // arity yet sit behind it: `r.toJson()` would call the accessor (#2758).
+        val derivedDataNames = Set("toMap", "fromMap", "toJson", "fromJson", "toYaml", "fromYaml", "fromJsonList", "fromYamlList")
+        val clashing = derivedMethods.filter(m => (m.args.isEmpty || derivedDataNames.contains(m.name)) && componentTypeByName.contains(m.name))
         clashing.distinctBy(_.name).foreach { m =>
           report(SemanticError.DUPLICATE_GENERATED_METHOD, m, definition_, m.name, Array.empty[Type],
             SemanticErrorReporter.GeneratedMethodClashesComponent(componentTypeByName(m.name)))

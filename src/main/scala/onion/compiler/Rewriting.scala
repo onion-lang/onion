@@ -2152,7 +2152,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         val arg = AST.Argument(binding.location, binding.name, null, null, false)
         // The closure body is anchored at ret's own location, not the preceding binding's,
         // so a type mismatch in `retExpr` is reported at `ret`, not at `x <- e1`.
-        val closureBody = AST.BlockExpression(yieldLoc, decls :+ rewrittenRet)
+        // Each `val` gets its own nested block, as a bind's lambda parameter gets its own
+        // scope, so a later bind may reuse an earlier one's name (`y <- ok(1); y <- ok(y + 1)`).
+        val closureBody = decls.foldRight(AST.BlockExpression(yieldLoc, List(rewrittenRet))) { (decl, inner) =>
+          AST.BlockExpression(yieldLoc, List(decl, inner))
+        }
         val closureType = AST.TypeNode(binding.location, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(binding.location, closureType, "call", List(arg), null, closureBody)
         AST.MethodCall(binding.location, bindExpr, "map", List(closure))

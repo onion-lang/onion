@@ -278,6 +278,54 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
         assert(errors.head._3 == ("val t: " + target + " = do[Result] { " + body).indexOf("yield") + 1, s"$body: $errors")
       }
     }
+    it("lets a later unit bind reuse an earlier bind's name, as a lambda parameter may (#2537)") {
+      // Each bind is a nested lambda parameter on main, so rebinding a name is legal; each
+      // generated `val` must be scoped the same way, not share one block (E0007).
+      def run(body: String) = {
+        val source = "import { onion.Result }\nval r: Result[Int, Object] = Result::ok(1)\n" +
+          "val out: Result[Int, Object] = do[Result] { " + body + " }\nprintln(out)\n"
+        new OnionCompiler(CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.Error))
+          .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "R.on")))
+      }
+      val bodies = Seq(
+        "x <- r; y <- Result::ok(x + 1); y <- Result::ok(y * 3); yield y",
+        "y <- r; y <- Result::ok(y + 1); y <- Result::ok(y * 3); yield y",
+        "a <- Result::ok(1); a <- Result::ok(a + 1); a <- Result::ok(a + 1); yield a",
+        "x <- r; y <- Result::ok(x + 1); y <- Result::ok(y * 3); z <- r; yield y + z")
+      for (body <- bodies) {
+        val result = run(body)
+        assert(!result.hasErrors, s"$body: ${result.allErrors.map(e => (e.errorCode, e.message))} ${result.diagnostics.warnings.map(_.message)}")
+      }
+      val value = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val r: Result[Int, Object] = Result::ok(1)
+          |    val out: Result[Int, Object] = do[Result] { x <- r; y <- Result::ok(x + 1); y <- Result::ok(y * 3); yield y }
+          |    return (out.getOrThrow() as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "DoResultRebind.on",
+        Array()
+      )
+      assert(Shell.Success(6) == value)
+    }
+
+    it("adds no W0012 for a Result::ok(null) bind, so --warn error accepts it as main does (#2537)") {
+      // The bind's lambda parameter is an `Object`, so the generated `val` must be one too.
+      def warningsUnderError(body: String) = {
+        val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.Error)
+        val source = "import { onion.Result }\nval r: Result[Int, Object] = Result::ok(1)\nprintln(do[Result] { " + body + " })\n"
+        new OnionCompiler(config)
+          .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "N.on")))
+      }
+      for (body <- Seq("x <- r; y <- Result::ok(null); yield y", "x <- r; y <- Result::ok(null); z <- r; yield y")) {
+        val result = warningsUnderError(body)
+        assert(!result.hasErrors, s"$body: ${result.allErrors.map(e => (e.errorCode, e.message))} ${result.diagnostics.warnings.map(_.message)}")
+      }
+    }
   }
 
   describe("do-notation over List (comprehension)") {

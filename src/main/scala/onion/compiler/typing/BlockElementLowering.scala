@@ -357,7 +357,12 @@ final class BlockElementLowering(
           context.recordFailedDeclaration(node.name)
           return new NOP(node.location)
         }
-        val inferredType = inferred.`type`
+        // `x <- Result::ok(null)` gives the bind's lambda parameter the type `Object` (a Java
+        // type variable with an uninformative argument), so the `val` the rewriter makes from it
+        // is an `Object` too, not the null type, which would warn W0012 where it flows (#2537).
+        val inferredType =
+          if (inferred.`type`.isNullType && AST.hasModifier(node.modifiers, AST.M_DO_BINDING)) bodyContext.rootClass
+          else inferred.`type`
         if (inferredType == BasicType.VOID) {
           bodyContext.report(INCOMPATIBLE_TYPE, node.init, bodyContext.rootClass, inferredType)
           context.recordFailedDeclaration(node.name)

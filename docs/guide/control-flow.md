@@ -433,7 +433,7 @@ val pairs = do[List] {
 A do block holds only `x <- expr` binds and a final `yield`. It has no `val`/`var` and no bare statements.
 
 - To name an intermediate value, bind it: `doubled <- Option::some(x * 2)`.
-- In `do[Result]`, `y <- Result::ok(e)` (or `Result::successful(e)`) is the same as `val y = e`, so it needs no error type of its own. This applies only to `onion.Result`, not to a class of your own named `Result`.
+- In `do[Result]`, `y <- Result::ok(e)` (or `Result::successful(e)`) is the same as `val y = e`; the block's error type then comes from its other binds. This applies only to `onion.Result`, not to a class of your own named `Result`.
 - To run a side effect, put it in the `yield` block, before the result.
 
 ```onion

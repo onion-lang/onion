@@ -169,8 +169,13 @@ final class ClosureCodegen(
     cw.toByteArray
   }
 
+  // The erased signature the bridge must implement. An inherited SAM (`UnaryOperator`'s
+  // `apply`, declared on `Function`) is found on the superinterface (#2844).
   private def findInterfaceMethod(interfaceType: ClassType, name: String, argCount: Int): Option[TypedAST.Method] =
-    interfaceType.methods(name).find(_.arguments.length == argCount)
+    if interfaceType == null then None
+    else
+      interfaceType.methods(name).find(_.arguments.length == argCount)
+        .orElse(interfaceType.interfaces.iterator.map(findInterfaceMethod(_, name, argCount)).collectFirst { case Some(m) => m })
 
   private def generateBridgeMethod(
     cw: ClassWriter,

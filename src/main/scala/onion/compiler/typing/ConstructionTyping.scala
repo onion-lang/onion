@@ -837,9 +837,10 @@ final class ConstructionTyping(
     * Used to disambiguate constructor overloads at a closure argument position
     * (e.g. Thread(Runnable) vs Thread(String) for `new Thread(() -> ...)`). */
   private def closureCanTarget(formal: Type, arity: Int): Boolean = formal match {
-    case ct: ClassType =>
+    case target: ClassType =>
+      val name = (target match { case a: AppliedClassType => a.raw; case _ => target }).name
+      val ct = FunctionalInterfaces.functionalView(target)
       val raw = ct match { case a: AppliedClassType => a.raw; case _ => ct }
-      val name = raw.name
       if (name != null && name.matches("""onion\.Function\d+""")) true
       else {
         def isPublicObjectMethod(m: Method): Boolean = m.name match {

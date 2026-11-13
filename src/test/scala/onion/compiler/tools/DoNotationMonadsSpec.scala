@@ -256,6 +256,28 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
       // Same code and the same (not reversed) expected/actual text as the plain bind form.
       assert(rewritten.head._1 == control.head._1 && rewritten.head._4 == control.head._4, s"rewritten: $rewritten, control: $control")
     }
+
+    it("reports a wrong yield type after a unit bind that opens the block as main does (#2537)") {
+      // Nothing is bound before `y <- Result::ok(..)`, so main's `ok(e).map(y -> v)` shape stays:
+      // one error at `yield`, the right way round, and no second error on the bind line.
+      def errorsOf(target: String, body: String) = {
+        val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10)
+        val source = "import { onion.Result }\nval t: " + target + " = do[Result] { " + body + " }\n"
+        new OnionCompiler(config)
+          .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "Y.on")))
+          .allErrors.map(e => (e.errorCode, e.location.line, e.location.column, e.message))
+      }
+      val cases = Seq(
+        ("Result[String, String]", "y <- Result::ok(2); yield y"),
+        ("Result[Int, String]", "y <- Result::ok(1); yield y + \"s\""),
+        ("Result[String, String]", "y <- Result::successful(1); z <- Result::ok(2); yield y + z"))
+      for ((target, body) <- cases) {
+        val errors = errorsOf(target, body)
+        assert(errors.size == 1, s"$body: $errors")
+        assert(errors.head._1 == Some("E0000") && errors.head._2 == 2, s"$body: $errors")
+        assert(errors.head._3 == ("val t: " + target + " = do[Result] { " + body).indexOf("yield") + 1, s"$body: $errors")
+      }
+    }
   }
 
   describe("do-notation over List (comprehension)") {

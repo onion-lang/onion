@@ -1883,7 +1883,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
 
     val pinned = pinThrowOnlyGenerativeBinds(pinEmptyBindElementTypes(statements, elementHint), elementHint)
-    desugarDoStatements(doExpr.location, monadType, pinned)
+    desugarDoStatements(doExpr.location, monadType, pinned, leading = true)
   }
 
   /**
@@ -2110,7 +2110,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
-  private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any]): AST.Expression = {
+  private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any], leading: Boolean = false): AST.Expression = {
     statements match {
       // Final expression: yield e => M::successful(e)
       // The synthesized call is anchored at yield's own location, not the caller-supplied
@@ -2128,7 +2128,12 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       // `x <- Result::successful(e); rest` (or `Result::ok(e)`) => `val x = e; rest` (left identity:
       // unit(e).bind(f) == f(e)). `Result::successful(e)` alone cannot pin its error
       // type, so left as a bind it types as `Result[T, Object]` (#2537).
-      case (binding: AST.DoBinding) :: rest if rest.nonEmpty && isResultUnitBind(binding.expr, monadType) =>
+      // Not when nothing is bound before them and only unit binds lie between the block's start
+      // and `yield`: there main builds `Result::ok(e).map((y) -> v)` and types a wrong `yield`
+      // with one correct error, so that block stays as main desugars it (#2537).
+      case (binding: AST.DoBinding) :: rest
+          if rest.nonEmpty && isResultUnitBind(binding.expr, monadType) &&
+            !(leading && unitBindsThenYield(statements, monadType).isDefined) =>
         AST.BlockExpression(binding.location, List(unitBindDeclaration(binding), desugarDoStatements(binding.location, monadType, rest)))
 
       // Binding followed directly by the final yield: x <- e1; yield e2

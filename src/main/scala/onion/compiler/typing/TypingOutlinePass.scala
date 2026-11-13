@@ -388,7 +388,15 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         if (hasShapes && unsupportedFrom.isEmpty) unsupportedShape.foreach { case (arg, argType, sc) =>
           val supported =
             if (isJsonClause(sc)) JsonShapeComponents.supportedDescription else ScalarConversions.supportedNames
-          report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
+          // A component written as an alias (`n: Name`, `type Name = JS` in another file) is named
+          // by what it resolved to, so the message would never mention `Name` (#2530).
+          val resolvedName = argType.displayName
+          val shown = arg.typeRef.desc match {
+            case AST.ReferenceType(written, _) if written != resolvedName && !resolvedName.endsWith("." + written) =>
+              s"$written (= $resolvedName)"
+            case _ => resolvedName
+          }
+          report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, shown,
             supported, shapeClauseSyntax(sc))
         }
         // The `from` synthesis inherits E0059/E0060 by lowering to a regex select pattern;

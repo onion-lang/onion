@@ -193,8 +193,9 @@ public final class DateTime {
     }
 
     static long addDays(long epochMillis, int days, ZoneId zone) {
-        LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), zone).plusDays(days);
-        return ldt.atZone(zone).toInstant().toEpochMilli();
+        // ZonedDateTime keeps the offset when it is still valid, so the second 01:30 of a
+        // fall-back night stays the second 01:30 (a LocalDateTime round trip picked the first).
+        return Instant.ofEpochMilli(epochMillis).atZone(zone).plusDays(days).toInstant().toEpochMilli();
     }
 
     /**
@@ -222,16 +223,22 @@ public final class DateTime {
      * Adds months to the given time.
      */
     public static long addMonths(long epochMillis, int months) {
-        LocalDateTime ldt = toLocalDateTime(epochMillis).plusMonths(months);
-        return ldt.atZone(LOCAL).toInstant().toEpochMilli();
+        return addMonths(epochMillis, months, LOCAL);
+    }
+
+    static long addMonths(long epochMillis, int months, ZoneId zone) {
+        return Instant.ofEpochMilli(epochMillis).atZone(zone).plusMonths(months).toInstant().toEpochMilli();
     }
 
     /**
      * Adds years to the given time.
      */
     public static long addYears(long epochMillis, int years) {
-        LocalDateTime ldt = toLocalDateTime(epochMillis).plusYears(years);
-        return ldt.atZone(LOCAL).toInstant().toEpochMilli();
+        return addYears(epochMillis, years, LOCAL);
+    }
+
+    static long addYears(long epochMillis, int years, ZoneId zone) {
+        return Instant.ofEpochMilli(epochMillis).atZone(zone).plusYears(years).toInstant().toEpochMilli();
     }
 
     // ========== Comparison ==========

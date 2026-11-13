@@ -490,3 +490,27 @@ println(run())   // Before: zero. Now: one, as when run() is declared below pick
 - **Still fine:** a call below the overloads, and a call that passes every argument.
 - **No `onion migrate` rule:** only you know which overload the call meant. Pass the argument
   (`f(1L)`, `f(1, 1)`) or rename one method.
+
+## A `protected` constructor is checked the same way however the call reaches it
+
+A call that omits a default, or passes named arguments, now gets the same access check as a
+call that passes every argument (#2827). So an unrelated class can no longer reach a
+`protected` constructor that way.
+
+```onion
+class A {
+protected:
+  def this(a: Int, b: Int = 2) { }
+}
+class Other {
+public:
+  def mk(): A = new A(9)          // Before: compiled and ran. Now: E0013
+  def all(): A = new A(9, 2)      // E0013 before and now
+}
+```
+
+- **What you see:** **E0013** `method A.new(Int, Int) is not accessible from class Other.` at the `new`.
+- **Still fine:** the same call from inside `A` or from a subclass of `A`.
+- **To update:** move the constructor under `public:`, or add a `public` factory method to `A`.
+- **No `onion migrate` rule:** widening a constructor's access is a design choice only you can
+  make, so the hint shows the edit instead.

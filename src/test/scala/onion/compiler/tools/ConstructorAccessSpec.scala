@@ -54,4 +54,23 @@ class ConstructorAccessSpec extends AbstractShellSpec {
       privateDefaulted + "def main(args: String[]): Int {\n  A::inside(); A::insideNamed(); L::inside()\n  return 3\n}\n",
       "None", Array()))
   }
+
+  // #2827 (panel on #2915): the same check covers a protected constructor.
+  // A class that is not a subclass gets E0013, as `new A(9, 9)` already did;
+  // a subclass may still reach it through a default or named arguments.
+  private val protectedDefaulted =
+    "class A {\nprotected:\n  def this(a: Int, b: Int = 2) { }\npublic:\n  def this() { }\n}\n"
+
+  it("rejects a protected constructor picked by a default from a non-subclass (#2827)") {
+    assert(codes(protectedDefaulted +
+      "class Other {\npublic:\n  def this() { }\n  def mk(): A = new A(9)\n  def mk2(): A = new A(b = 5, a = 1)\n}\n") ==
+      Seq("E0013", "E0013"))
+  }
+  it("still allows a protected constructor picked by a default from a subclass (#2827)") {
+    assert(Shell.Success(2) == shell.run(
+      protectedDefaulted +
+      "class Sub extends A {\npublic:\n  def this() { }\n  def mk(): A = new A(7)\n  def mk2(): A = new A(b = 5, a = 1)\n}\n" +
+      "def main(args: String[]): Int {\n  new Sub().mk(); new Sub().mk2()\n  return 2\n}\n",
+      "None", Array()))
+  }
 }

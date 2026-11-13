@@ -339,7 +339,7 @@ final class ConstructionTyping(
     }.toSet
     if (untypedClosureIndices.nonEmpty) {
       resolveConstructorForClosures(node, typeRef, context, untypedClosureIndices) match {
-        case Some(term) => break(Some(term))
+        case Some(result) => break(result)
         case None => // ambiguous/unresolved: fall through to the eager path, which reports E0052 / constructor-not-found
       }
     }
@@ -367,7 +367,7 @@ final class ConstructionTyping(
     if (parameters0 == null) {
       if (malleableIndices.nonEmpty) {
         resolveConstructorForMalleableArgs(node, typeRef, context, malleableIndices) match {
-          case Some(term) => break(Some(term))
+          case Some(result) => break(result)
           case None => // unresolved: fall through and re-type without suppression to report the real diagnostic
         }
       }
@@ -521,10 +521,7 @@ final class ConstructionTyping(
         Array[AnyRef](constructors(1).affiliation, constructors(1).getArgs)
       )
       None
-    } else if (!MemberAccess.isMemberAccessible(constructors(0), bodyContext.definition)) {
-      // A private/protected constructor was resolvable but is not accessible here;
-      // previously this compiled and threw IllegalAccessError at runtime.
-      bodyContext.report(METHOD_NOT_ACCESSIBLE, node, constructors(0).affiliation, "new", constructors(0).getArgs, bodyContext.definition)
+    } else if (!constructorAccessible(node, constructors(0))) {
       None
     } else {
       typeRef match {
@@ -583,10 +580,7 @@ final class ConstructionTyping(
     candidates match {
       case Seq() => None
       case Seq((ctor, formals, arrayType)) =>
-        if (!MemberAccess.isMemberAccessible(ctor, bodyContext.definition)) {
-          bodyContext.report(METHOD_NOT_ACCESSIBLE, node, ctor.affiliation, "new", ctor.getArgs, bodyContext.definition)
-          return Some(None)
-        }
+        if (!constructorAccessible(node, ctor)) return Some(None)
         val fixed = formals.length - 1
         val fixedArgs = adaptToFormals(parameters.take(fixed), formals.take(fixed))
         val rest = parameters.drop(fixed)
@@ -623,6 +617,19 @@ final class ConstructionTyping(
         Some(None)
     }
   }
+
+  /**
+   * Reports E0013 when the resolved constructor is not accessible from the
+   * current class. Every `new` resolution path (exact, varargs, defaults,
+   * named arguments, lambda and malleable arguments) checks this before it
+   * builds a NewObject; the paths that skipped it compiled a private
+   * constructor call that threw IllegalAccessError at run time (#2827).
+   */
+  private def constructorAccessible(node: AST.NewObject, ctor: ConstructorRef): Boolean =
+    MemberAccess.isMemberAccessible(ctor, bodyContext.definition) || {
+      bodyContext.report(METHOD_NOT_ACCESSIBLE, node, ctor.affiliation, "new", ctor.getArgs, bodyContext.definition)
+      false
+    }
 
   /**
    * Adapts already-matched arguments to their constructor's formal types:
@@ -756,13 +763,14 @@ final class ConstructionTyping(
    * type, no candidate uniquely matches, or a malleable argument still
    * fails to type against the resolved expected type. Mirrors
    * resolveConstructorForClosures for a malleable, non-closure argument.
+   * Some(None) means the one match is not accessible (E0013 is reported).
    */
   private def resolveConstructorForMalleableArgs(
     node: AST.NewObject,
     typeRef: ClassType,
     context: LocalContext,
     malleableIndices: Set[Int]
-  ): Option[Term] = boundary {
+  ): Option[Option[Term]] = boundary {
     val args = node.args.toArray
     val classSubst = TypeSubstitution.classSubstitution(typeRef)
     def substitutedArgs(c: ConstructorRef): Array[Type] =
@@ -786,6 +794,7 @@ final class ConstructionTyping(
     if (candidates.length != 1) break(None)
 
     val ctor = candidates(0)
+    if (!constructorAccessible(node, ctor)) break(Some(None))
     val formals = substitutedArgs(ctor)
     val finalParams = new Array[Term](args.length)
     for (i <- args.indices) {
@@ -808,9 +817,9 @@ final class ConstructionTyping(
           def name: String = ctor.name
           def getArgs: Array[TypedAST.Type] = ctor.getArgs
         }
-        Some(new NewObject(appliedCtor, finalParams))
+        Some(Some(new NewObject(appliedCtor, finalParams)))
       case _ =>
-        Some(new NewObject(ctor, finalParams))
+        Some(Some(new NewObject(ctor, finalParams)))
     }
   }
 
@@ -819,7 +828,8 @@ final class ConstructionTyping(
    * parameters: type the non-closure arguments, pick the unique constructor
    * that matches on arity and those arguments, then type each closure against
    * the constructor's corresponding parameter type. Returns None (to fall back
-   * to eager handling) when resolution is ambiguous or finds no single match.
+   * to eager handling) when resolution is ambiguous or finds no single match,
+   * and Some(None) when the one match is not accessible (E0013 is reported).
    */
   /** Whether a lambda with `arity` parameters can be converted to `formal` --
     * i.e. `formal` is an onion.FunctionN type or a Java functional interface
@@ -848,7 +858,7 @@ final class ConstructionTyping(
     typeRef: ClassType,
     context: LocalContext,
     closureIndices: Set[Int]
-  ): Option[Term] = boundary {
+  ): Option[Option[Term]] = boundary {
     val args = node.args.toArray
     val classSubst = TypeSubstitution.classSubstitution(typeRef)
     def substitutedArgs(c: ConstructorRef): Array[Type] =
@@ -886,6 +896,7 @@ final class ConstructionTyping(
     if (candidates.length != 1) break(None)
 
     val ctor = candidates(0)
+    if (!constructorAccessible(node, ctor)) break(Some(None))
     val formals = substitutedArgs(ctor)
     val finalParams = new Array[Term](args.length)
     for (i <- args.indices) {
@@ -908,9 +919,9 @@ final class ConstructionTyping(
           def name: String = ctor.name
           def getArgs: Array[TypedAST.Type] = ctor.getArgs
         }
-        Some(new NewObject(appliedCtor, finalParams))
+        Some(Some(new NewObject(appliedCtor, finalParams)))
       case _ =>
-        Some(new NewObject(ctor, finalParams))
+        Some(Some(new NewObject(ctor, finalParams)))
     }
   }
 
@@ -923,21 +934,23 @@ final class ConstructionTyping(
     context: LocalContext,
     positional: Array[Term] = null
   ): Option[Term] =
-    resolveConstructorWithNamedArgs(node, node.args, typeRef, context, positional).map { case (ctor, resolved, _) =>
-      val params = ArgumentHelpers.evaluateInWrittenOrder(node.args, ctor.argumentsWithDefaults.toSeq.map(_.name), resolved, context)
-      typeRef match {
-        case applied: TypedAST.AppliedClassType =>
-          val appliedCtor = new TypedAST.ConstructorRef {
-            def modifier: Int = ctor.modifier
-            def affiliation: TypedAST.ClassType = applied
-            def name: String = ctor.name
-            def getArgs: Array[TypedAST.Type] = ctor.getArgs
-          }
-          new NewObject(appliedCtor, params)
-        case _ =>
-          new NewObject(ctor, params)
+    resolveConstructorWithNamedArgs(node, node.args, typeRef, context, positional)
+      .filter { case (ctor, _, _) => constructorAccessible(node, ctor) }
+      .map { case (ctor, resolved, _) =>
+        val params = ArgumentHelpers.evaluateInWrittenOrder(node.args, ctor.argumentsWithDefaults.toSeq.map(_.name), resolved, context)
+        typeRef match {
+          case applied: TypedAST.AppliedClassType =>
+            val appliedCtor = new TypedAST.ConstructorRef {
+              def modifier: Int = ctor.modifier
+              def affiliation: TypedAST.ClassType = applied
+              def name: String = ctor.name
+              def getArgs: Array[TypedAST.Type] = ctor.getArgs
+            }
+            new NewObject(appliedCtor, params)
+          case _ =>
+            new NewObject(ctor, params)
+        }
       }
-    }
 
   /**
    * Resolves a constructor of `typeRef` for an argument list with named

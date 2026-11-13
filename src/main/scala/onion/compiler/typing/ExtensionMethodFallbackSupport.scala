@@ -25,8 +25,8 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 
   /** One `extension` block that applies to this receiver declares two `name`s with the same
    *  erased signature: the declaration is E0084, so its calls must not add errors (#2475). */
-  def hasErasureTwinExtension(targetType: ObjectType, name: String): Boolean =
-    collectExtensionMethods(targetType, name).groupBy(_.containerClass).exists { (_, ms) =>
+  def hasErasureTwinExtension(targetType: ObjectType, name: String, target: Term = null): Boolean =
+    collectExtensionMethods(targetType, name, isBoxedPrimitive(target)).groupBy(_.containerClass).exists { (_, ms) =>
       ms.lengthCompare(1) > 0 && ms.map(DuplicationChecks.erasedSignatureKey).distinct.lengthCompare(ms.length) < 0
     }
 
@@ -46,11 +46,11 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     params: Array[Term],
     expected: Type
   ): Option[Option[Term]] =
-    val user = collectExtensionMethods(targetType, node.name).filterNot(isBuiltinExtension)
+    val user = collectExtensionMethods(targetType, node.name, isBoxedPrimitive(target)).filterNot(isBuiltinExtension)
     // One receiver type for all of them: overloads whose parameters and receivers could rank
     // in opposite directions (E0006) are left to the ranking in the bidirectional path.
     if (user.isEmpty || user.exists(m => !(m.receiverType eq user.head.receiverType))) None
-    else selectApplicableExtensionMethod(targetType, node.name, params) match {
+    else selectApplicableExtensionMethod(targetType, node.name, params, isBoxedPrimitive(target)) match {
       case CandidateSelection.Selected(m) if !isBuiltinExtension(m) && !lambdaCouldRetypeToAnother(m, user, node, params) =>
         Some(buildExtensionCall(node, target, targetType, params, expected, m))
       case _ => None
@@ -78,8 +78,8 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   /** Two extensions of this name apply equally well. `tryExtensionMethodCall` has then
    *  reported E0006, so the caller must not add an E0005 saying none exists (#2446). */
 
-  def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
-    selectApplicableExtensionMethod(targetType, name, params).isInstanceOf[CandidateSelection.Ambiguous[?]]
+  def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term], target: Term = null): Boolean =
+    selectApplicableExtensionMethod(targetType, name, params, isBoxedPrimitive(target)).isInstanceOf[CandidateSelection.Ambiguous[?]]
 
   def tryExtensionMethodCall(
     node: AST.MethodCall,
@@ -89,7 +89,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     expected: Type,
     reportIfNotFound: Boolean = true
   ): Option[Term] = {
-    selectApplicableExtensionMethod(targetType, node.name, params) match {
+    selectApplicableExtensionMethod(targetType, node.name, params, isBoxedPrimitive(target)) match {
       case CandidateSelection.NoMatch if arrayAsList(node, target, targetType).isDefined =>
         val (listTarget, listType) = arrayAsList(node, target, targetType).get
         tryExtensionMethodCall(node, listTarget, listType, params, expected, reportIfNotFound)
@@ -131,7 +131,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     expected: Type
   ): Option[Term] = {
     val params = Array(param)
-    selectApplicableExtensionMethod(targetType, name, params) match {
+    selectApplicableExtensionMethod(targetType, name, params, isBoxedPrimitive(target)) match {
       case CandidateSelection.Selected(extMethod) =>
         val containerClass = extMethod.containerClass
         val staticArgs = Array(staticReceiver(target, extMethod)) ++ params
@@ -159,7 +159,8 @@ private[compiler] final class ExtensionMethodFallbackSupport(
   private def selectApplicableExtensionMethod(
     targetType: ObjectType,
     name: String,
-    params: Array[Term]
+    params: Array[Term],
+    widen: Boolean
   ): CandidateSelection[ExtensionMethodDefinition] =
     targetType match {
       // Class receivers and array receivers both resolve through the extension
@@ -167,7 +168,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       // without the ArrayType case a no-closure call like `arr.toList()` would
       // never find its builtin array extension (the closure path already does).
       case _: ClassType | _: ArrayType =>
-        val applicableAll = collectExtensionMethods(targetType, name).filter { extMethod =>
+        val applicableAll = collectExtensionMethods(targetType, name, widen).filter { extMethod =>
           extMethod.name == name && isExtensionMethodApplicable(extMethod, params)
         }
         // An overload that takes exactly the arguments written outranks one that needs a
@@ -226,7 +227,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     targetType match {
       case at: ArrayType if (at.dimension > 1 || !at.component.isBasicType) &&
           collectExtensionMethods(targetType, node.name).isEmpty =>
-        selectApplicableExtensionMethod(targetType, "toList", Array.empty) match {
+        selectApplicableExtensionMethod(targetType, "toList", Array.empty, widen = false) match {
           case CandidateSelection.Selected(toList) =>
             val toListNode = node.copy(name = "toList", args = Nil, typeArgs = Nil)
             buildExtensionCall(toListNode, target, targetType, Array.empty, null, toList).collect {
@@ -333,7 +334,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     params: Array[Term],
     expected: Type
   ): Option[Term] =
-    selectApplicableExtensionMethod(targetType, node.name, params) match {
+    selectApplicableExtensionMethod(targetType, node.name, params, isBoxedPrimitive(target)) match {
       case CandidateSelection.NoMatch =>
         calls.reportMethodNotFound(node, targetType, node.name, calls.types(params))
         None
@@ -365,7 +366,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     expected: Type
   ): Option[Term] = {
     val params = Array.empty[Term]
-    selectApplicableExtensionMethod(targetType, name, params) match {
+    selectApplicableExtensionMethod(targetType, name, params, isBoxedPrimitive(target)) match {
       case CandidateSelection.NoMatch => None
       case CandidateSelection.Ambiguous(first, second) =>
         calls.reportAmbiguousSignature(
@@ -459,7 +460,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
     expected: Type
   ): Option[Term] = {
     val params = Array.empty[Term]
-    selectApplicableExtensionMethod(targetType, name, params) match {
+    selectApplicableExtensionMethod(targetType, name, params, isBoxedPrimitive(target)) match {
       case CandidateSelection.NoMatch => None
       case CandidateSelection.Ambiguous(first, second) =>
         calls.reportAmbiguousSignature(
@@ -508,7 +509,7 @@ private[compiler] final class ExtensionMethodFallbackSupport(
       }
     }
 
-    val candidates = collectExtensionMethods(targetType, name).filter(_.arguments.length == args.length)
+    val candidates = collectExtensionMethods(targetType, name, isBoxedPrimitive(target)).filter(_.arguments.length == args.length)
     if (candidates.isEmpty) arrayAsList(node, target, targetType) match {
       case Some((listTarget, listType)) =>
         break(tryExtensionMethodCallBidirectional(node, listTarget, listType, context, expected, untypedClosureIndices))
@@ -788,11 +789,36 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 
   private def collectExtensionMethods(
     targetType: ObjectType,
-    name: String
-  ): Seq[ExtensionMethodDefinition] =
+    name: String,
+    widen: Boolean = false
+  ): Seq[ExtensionMethodDefinition] = {
     // The receiver hierarchy walk and the per-type name filter depend only on the
     // (receiver type, name) pair; user extensions are all registered before body typing.
-    typing.table_.extensionCandidatesOf(targetType, name)(collectExtensionMethodsUncached(targetType, name))
+    val found = typing.table_.extensionCandidatesOf(targetType, name)(collectExtensionMethodsUncached(targetType, name))
+    // A primitive receiver widens like a primitive argument: `5.bytes()` reaches
+    // `extension Long` (#2724). Only when the whole supertype walk (`Integer`, `Number`,
+    // `Comparable`, `Object`) found no extension of that name, so widening never competes
+    // with a supertype extension; then the nearest wider type wins. A boxed receiver
+    // (`xs[0]` of a `List[Int]`) does not widen, as a boxed argument does not.
+    if (found.nonEmpty || !widen) found
+    else targetType match {
+      case classType: ClassType =>
+        ExtensionMethodFallbackSupport.WideningReceivers.getOrElse(classType.name, Nil).iterator
+          .map(wider => typing.lookupExtensionMethods(wider).filter(m => m.name == name && m.receiverType.isBasicType).toSeq)
+          .find(_.nonEmpty)
+          .getOrElse(Seq.empty)
+      case _ => found
+    }
+  }
+
+  /** The receiver is a primitive value the call boxed to look its methods up
+   *  (`5.bytes()`), not a value that was already a box (`xs[0]` of a `List[Int]`). */
+  private def isBoxedPrimitive(target: Term): Boolean = target match {
+    case null => false
+    case cs: CallStatic =>
+      cs.method.name == "valueOf" && cs.parameters.length == 1 && cs.parameters(0).`type`.isBasicType
+    case _ => false
+  }
 
   private def collectExtensionMethodsUncached(
     targetType: ObjectType,
@@ -886,6 +912,15 @@ private[compiler] final class ExtensionMethodFallbackSupport(
 }
 
 private[compiler] object ExtensionMethodFallbackSupport {
+  /** Boxed number classes an extension receiver of a wider primitive also serves. */
+  val WideningReceivers: Map[String, List[String]] = Map(
+    "java.lang.Byte" -> List("java.lang.Short", "java.lang.Integer", "java.lang.Long", "java.lang.Float", "java.lang.Double"),
+    "java.lang.Short" -> List("java.lang.Integer", "java.lang.Long", "java.lang.Float", "java.lang.Double"),
+    "java.lang.Integer" -> List("java.lang.Long", "java.lang.Float", "java.lang.Double"),
+    "java.lang.Long" -> List("java.lang.Float", "java.lang.Double"),
+    "java.lang.Float" -> List("java.lang.Double")
+  )
+
   /** The single source of truth for which stdlib containers' static helpers are
    *  registered as builtin extension methods -- consumed both by
    *  `Typing.registerBuiltinExtensions` (which registers them, in this order: for

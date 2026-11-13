@@ -176,10 +176,18 @@ final class ExpressionFormTyping(
               bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)
               bodyContext.warningReporter.uncheckedCast(node.location, term.`type`.displayName, destination.displayName)
             }
-            Some(new AsInstanceOf(term, destination))
+            Some(castTerm(term, destination))
           }
         }
       }
+  }
+
+  /** `i as Long?` with `i: Int` converts the primitive first and then boxes it, as
+    * `val l: Long? = i` does; a single cast would check an `Integer` against `Long` (#2730). */
+  private def castTerm(term: Term, destination: Type): Term = (term.`type`, destination) match {
+    case (bt: BasicType, d: NullableType) if d.innerType.isBasicType && (bt ne d.innerType) =>
+      new AsInstanceOf(new AsInstanceOf(term, d.innerType), destination)
+    case _ => new AsInstanceOf(term, destination)
   }
 
   /**
@@ -200,6 +208,11 @@ final class ExpressionFormTyping(
       case (n: NullableType, d: NullableType) if n.innerType.isBasicType && d.innerType.isBasicType =>
         n.innerType eq d.innerType
       case (n: NullableType, _) => isValidCast(n.innerType, destination)
+      // The same holds for a non-null box: `k as Long?` with `k: JInteger` is
+      // `Integer` into a `Long` box (#2730). `k as Long` still unboxes and converts.
+      case (ct: ClassType, d: NullableType) if d.innerType.isBasicType &&
+          Boxing.unboxedType(bodyContext.table, ct).exists(p => p ne d.innerType) =>
+        false
       case (_, n: NullableType) => isValidCast(source, n.innerType)
       case (_: NullType, _: BasicType) =>
         false

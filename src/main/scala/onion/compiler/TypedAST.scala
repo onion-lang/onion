@@ -2359,11 +2359,24 @@ object TypedAST {
           right eq BasicType.VOID
 
     /** Check if all types in arg1 are supertypes of corresponding types in arg2 */
+    /** Overload specificity for one parameter: is `left` at least as general as `right`?
+      * Assignability, except that two nullable primitives rank by their primitives:
+      * `Int?` does not convert to `Long?` (#2730), yet `f(Int?)` is still more specific
+      * than `f(Long?)`, as `f(Int)` is than `f(Long)`. */
+    def isSuperTypeForSpecificity(left: TypedAST.Type, right: TypedAST.Type): Boolean =
+      (left, right) match {
+        case (l: TypedAST.NullableType, r: TypedAST.NullableType)
+            if l.innerType.isBasicType && r.innerType.isBasicType =>
+          isSuperType(l.innerType, r.innerType)
+        case _ => isSuperType(left, right)
+      }
+
+    /** Overload specificity over a parameter list: see `isSuperTypeForSpecificity`. */
     def isAllSuperType(arg1: Array[TypedAST.Type], arg2: Array[TypedAST.Type]): Boolean = {
       val limit = if (arg1.length < arg2.length) arg1.length else arg2.length
       var i = 0
       while (i < limit) {
-        if (!isSuperType(arg1(i), arg2(i))) return false
+        if (!isSuperTypeForSpecificity(arg1(i), arg2(i))) return false
         i += 1
       }
       true

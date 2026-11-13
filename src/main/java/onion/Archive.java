@@ -190,6 +190,7 @@ public final class Archive {
 
     /** Compresses a file, streaming rather than reading it all into memory. */
     public static void gzipFile(String source, String target) {
+        checkFileTransfer("gzip", source, target);
         try (InputStream in = Files.newInputStream(Paths.get(source));
              GZIPOutputStream out = new GZIPOutputStream(Files.newOutputStream(Paths.get(target)))) {
             transfer(in, out);
@@ -201,6 +202,7 @@ public final class Archive {
 
     /** Decompresses a file, streaming. */
     public static void gunzipFile(String source, String target) {
+        checkFileTransfer("gunzip", source, target);
         try (GZIPInputStream in = new GZIPInputStream(Files.newInputStream(Paths.get(source)));
              OutputStream out = Files.newOutputStream(Paths.get(target))) {
             transfer(in, out);
@@ -211,6 +213,21 @@ public final class Archive {
     }
 
     // ========== Internals ==========
+
+    /** Says which path is missing; the JDK's message is just the path, with no reason. */
+    private static void checkFileTransfer(String verb, String source, String target) {
+        Path src = Paths.get(source);
+        if (!Files.isRegularFile(src)) {
+            String why = Files.isDirectory(src) ? "not a file: " : "no such file: ";
+            throw new RuntimeException("Archive: could not " + verb + " " + source + " to " + target
+                + " (" + why + source + ")");
+        }
+        Path parent = Paths.get(target).toAbsolutePath().getParent();
+        if (parent != null && !Files.isDirectory(parent)) {
+            throw new RuntimeException("Archive: could not " + verb + " " + source + " to " + target
+                + " (no such directory: " + parent + ")");
+        }
+    }
 
     /** An empty or header-short input makes the JDK throw an EOFException with no message. */
     private static String gunzipReason(IOException e) {

@@ -219,6 +219,29 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
       assert(codes(rewritten) == codes(control), s"rewritten warnings: ${rewritten.diagnostics.warnings.map(_.message)}")
       assert(codes(unused) == codes(unusedControl), s"unused warnings: ${unused.diagnostics.warnings.map(_.message)}")
     }
+
+    it("reports a wrong yield type after a rewritten bind as the plain bind form does (#2537)") {
+      // Removing `y <- Result::ok(e)` must leave the block main would build without it, so a
+      // String yielded where an Int belongs gets main's one error, not a reversed pair.
+      def errorsOf(body: String) = {
+        val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10)
+        val source = "val r: Result[Int, String] = Result::ok(1)\nval out: Result[Int, String] = do[Result] { " + body + " }\n"
+        new OnionCompiler(config)
+          .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "Y.on")))
+          .allErrors.map(e => (e.errorCode, e.location.line, e.location.column, e.message))
+      }
+      val prefix = "val out: Result[Int, String] = do[Result] { "
+      val rewrittenBody = "x <- r; y <- Result::ok(x + 1); yield \"s\" + y"
+      val controlBody = "y <- r; yield \"s\" + y"
+      val rewritten = errorsOf(rewrittenBody)
+      val control = errorsOf(controlBody)
+      assert(rewritten.size == 1, s"rewritten: $rewritten")
+      assert(control.size == 1, s"control: $control")
+      val yieldColumn = prefix.length + rewrittenBody.indexOf("yield") + 1
+      assert(rewritten.head._2 == 2 && rewritten.head._3 == yieldColumn, s"rewritten: $rewritten")
+      // Same code and the same (not reversed) expected/actual text as the plain bind form.
+      assert(rewritten.head._1 == control.head._1 && rewritten.head._4 == control.head._4, s"rewritten: $rewritten, control: $control")
+    }
   }
 
   describe("do-notation over List (comprehension)") {

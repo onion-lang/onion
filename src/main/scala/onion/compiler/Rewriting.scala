@@ -2091,6 +2091,25 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     case _ => false
   }
 
+  /** `val x = e` for the unit bind `x <- Result::ok(e)`. */
+  private def unitBindDeclaration(binding: AST.DoBinding): AST.LocalVariableDeclaration = {
+    val call = binding.expr.asInstanceOf[AST.StaticMethodCall]
+    AST.LocalVariableDeclaration(binding.location, AST.M_FINAL | AST.M_DO_BINDING, binding.name, null, rewriteExpression(call.args.head))
+  }
+
+  /** When `statements` is zero or more Result unit binds followed by the final `yield`,
+    * those binds and the `yield`. */
+  private def unitBindsThenYield(statements: List[Any], monadType: AST.TypeNode): Option[(List[AST.DoBinding], AST.YieldStatement)] = {
+    val (binds, tail) = statements.span {
+      case b: AST.DoBinding => isResultUnitBind(b.expr, monadType)
+      case _ => false
+    }
+    tail match {
+      case List(y: AST.YieldStatement) => Some((binds.map(_.asInstanceOf[AST.DoBinding]), y))
+      case _ => None
+    }
+  }
+
   private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any]): AST.Expression = {
     statements match {
       // Final expression: yield e => M::successful(e)
@@ -2110,22 +2129,25 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       // unit(e).bind(f) == f(e)). `Result::successful(e)` alone cannot pin its error
       // type, so left as a bind it types as `Result[T, Object]` (#2537).
       case (binding: AST.DoBinding) :: rest if rest.nonEmpty && isResultUnitBind(binding.expr, monadType) =>
-        val call = binding.expr.asInstanceOf[AST.StaticMethodCall]
-        val decl = AST.LocalVariableDeclaration(binding.location, AST.M_FINAL | AST.M_DO_BINDING, binding.name, null, rewriteExpression(call.args.head))
-        AST.BlockExpression(binding.location, List(decl, desugarDoStatements(binding.location, monadType, rest)))
+        AST.BlockExpression(binding.location, List(unitBindDeclaration(binding), desugarDoStatements(binding.location, monadType, rest)))
 
       // Binding followed directly by the final yield: x <- e1; yield e2
       // => e1.map((x) -> e2). Using map instead of bind+M::successful means
       // a monad only needs map/bind instance (or extension) methods — no
       // static successful — which is what lets do[List] work over plain
       // java.util.List via the Colls extension methods.
-      case (binding: AST.DoBinding) :: List(AST.YieldStatement(yieldLoc, retExpr)) =>
+      // Result unit binds between them (`x <- e1; y <- Result::ok(e); yield e2`) are left out,
+      // as the case above leaves them out: the block desugars as if they were not written,
+      // so `e1.map((x) -> { val y = e; e2 })`, the shape main gives `x <- e1; yield e2` (#2537).
+      case (binding: AST.DoBinding) :: rest if unitBindsThenYield(rest, monadType).isDefined =>
+        val (unitBinds, AST.YieldStatement(yieldLoc, retExpr)) = unitBindsThenYield(rest, monadType).get: @unchecked
         val bindExpr = rewriteExpression(binding.expr)
+        val decls = unitBinds.map(unitBindDeclaration)
         val rewrittenRet = rewriteExpression(retExpr)
         val arg = AST.Argument(binding.location, binding.name, null, null, false)
         // The closure body is anchored at ret's own location, not the preceding binding's,
         // so a type mismatch in `retExpr` is reported at `ret`, not at `x <- e1`.
-        val closureBody = AST.BlockExpression(yieldLoc, List(rewrittenRet))
+        val closureBody = AST.BlockExpression(yieldLoc, decls :+ rewrittenRet)
         val closureType = AST.TypeNode(binding.location, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(binding.location, closureType, "call", List(arg), null, closureBody)
         AST.MethodCall(binding.location, bindExpr, "map", List(closure))

@@ -222,6 +222,14 @@ public final class Archive {
             throw new RuntimeException("Archive: could not " + verb + " " + source + " to " + target
                 + " (" + why + source + ")");
         }
+        try {
+            if (Files.exists(Paths.get(target)) && Files.isSameFile(src, Paths.get(target))) {
+                throw new RuntimeException("Archive: could not " + verb + " " + source + " to " + target
+                    + " (source and target are the same file)");
+            }
+        } catch (IOException e) {
+            // cannot compare; the transfer itself reports any real problem
+        }
         Path parent = Paths.get(target).toAbsolutePath().getParent();
         if (parent != null && !Files.isDirectory(parent)) {
             throw new RuntimeException("Archive: could not " + verb + " " + source + " to " + target

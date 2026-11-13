@@ -241,5 +241,21 @@ class ArchiveSpec extends AbstractShellSpec {
       val e3 = intercept[RuntimeException] { onion.Archive.gunzipFile(noSrc, work.resolve("o").toString) }
       assert(e3.getMessage.contains("no such file: " + noSrc), e3.getMessage)
     }
+
+    it("gzipFile and gunzipFile refuse the same path as source and target, leaving the file intact") {
+      val work = Files.createTempDirectory("onion-gzip-same")
+      val f = work.resolve("same.txt")
+      Files.writeString(f, "hi\n")
+      val e1 = intercept[RuntimeException] { onion.Archive.gzipFile(f.toString, f.toString) }
+      assert(e1.getMessage.contains("same file"), e1.getMessage)
+      assert(Files.readString(f) == "hi\n")
+
+      val gz = work.resolve("a.gz")
+      onion.Archive.gzipFile(f.toString, gz.toString)
+      val before = Files.readAllBytes(gz).toSeq
+      val e2 = intercept[RuntimeException] { onion.Archive.gunzipFile(gz.toString, gz.toString) }
+      assert(e2.getMessage.contains("same file"), e2.getMessage)
+      assert(Files.readAllBytes(gz).toSeq == before)
+    }
   }
 }

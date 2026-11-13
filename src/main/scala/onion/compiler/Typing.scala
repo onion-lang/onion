@@ -224,6 +224,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
+    for(unit <- source) {
+      new onion.compiler.typing.TypingHeaderPass(this, session.activate(unit)).checkImports()
+    }
     for(unit <- source) processOutline(unit)
     // Every unit's defaults are typed before any body, so a call may omit a default
     // declared later in its file or in another file (#2653).

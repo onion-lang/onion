@@ -244,7 +244,7 @@ public final class Server {
     }
 
     /** A running server. */
-    public static final class Instance {
+    public static final class Instance implements AutoCloseable {
         private final HttpServer server;
         private final ExecutorService pool;
         private final List<Route> routes = new ArrayList<>();
@@ -302,6 +302,12 @@ public final class Server {
         public void stop() {
             server.stop(1);
             pool.shutdownNow();
+        }
+
+        /** Same as {@link #stop}, so a server works in try-with-resources. */
+        @Override
+        public void close() {
+            stop();
         }
 
         private void require(Handler handler) {

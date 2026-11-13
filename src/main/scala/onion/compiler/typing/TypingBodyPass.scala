@@ -490,8 +490,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     methodLookupSupport.types(terms)
   private[typing] def typeNames(types: Array[Type]): Array[String] =
     methodLookupSupport.typeNames(types)
-  private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[typing.Continuable, Method] =
-    methodLookupSupport.tryFindMethod(node, target, name, params)
+  private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term], receiver: Type = null): Either[typing.Continuable, Method] =
+    methodLookupSupport.tryFindMethod(node, target, name, params, receiver)
   private[typing] def tryExtensionOperatorMethod(node: AST.Node, name: String, target: Term, targetType: ObjectType, param: Term, expected: Type): Option[Term] =
     methodCallTyping.tryExtensionOperatorMethod(node, name, target, targetType, param, expected)
 

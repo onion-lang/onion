@@ -75,7 +75,7 @@ final class MethodCallTyping(
       reportMethodNotFound(node, targetType, name, argTypes)
       None
     case Array(m) =>
-      if (!MemberAccess.isMemberAccessible(m, bodyContext.definition)) {
+      if (!MemberAccess.isMemberAccessible(m, bodyContext.definition, targetType)) {
         bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, targetType, name, argTypes, bodyContext.definition)
         None
       } else Some(m)
@@ -378,8 +378,8 @@ final class MethodCallTyping(
   private[typing] def processAssignableForJavaCallee(node: AST.Node, expected: Type, term: Term): Term =
     body.processAssignable(node, expected, term, suppressNullWarning = true)
 
-  private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Boolean, Method] =
-    body.tryFindMethod(node, target, name, params)
+  private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term], receiver: Type = null): Either[Boolean, Method] =
+    body.tryFindMethod(node, target, name, params, receiver)
 
   /** Zero-arg extension property access: `expr.name` resolves `def name: T` in an extension block. */
   private[typing] def tryZeroArgExtensionAccess(

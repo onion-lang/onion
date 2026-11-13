@@ -299,4 +299,51 @@ class HistoryInheritedMethodSpec extends AnyFunSpec {
     // B's override does not delegate, so nothing lowers `n`.
     assert(compile(src("override def dec(): void { }", "override def dec(): void { super.dec() }")).errors.isEmpty)
   }
+
+  // Panel block on #2870: `super.set(x)` is matched to the overload it resolves to, not to the
+  // first method of the same name and arity.
+  describe("a `super` call to one of two same-arity overloads") {
+    def src(first: String, second: String) =
+      s"""class Base {
+         |protected:
+         |  var n: Int
+         |  var s: String
+         |public:
+         |  def this { n = 10; s = "" }
+         |  $first
+         |  $second
+         |  def get(): Int = n
+         |}
+         |class Up extends Base {
+         |  history n >= old(n)
+         |public:
+         |  override def set(x: Int): void { if n < 1000 { n = n + 1 } }
+         |  override def set(x: String): void { super.set(x) }
+         |}
+         |val u = new Up(); u.set("a"); println(u.get())""".stripMargin
+    val lowersInt = "def set(x: Int): void { n = n - 1 }"
+    val keepsString = "def set(x: String): void { s = x }"
+    val lowersString = "def set(x: String): void { n = n - 1 }"
+    val keepsInt = "def set(x: Int): void { s = \"\" + x }"
+
+    it("accepts the call when the overload it runs does not lower the field, in either declaration order") {
+      for (o <- Seq(compile(src(lowersInt, keepsString)), compile(src(keepsString, lowersInt)))) {
+        assert(o.errors.isEmpty, o.toString)
+        assert(o.w24.isEmpty, o.toString)
+      }
+    }
+
+    it("follows the overload a `super` call inside a lambda runs") {
+      def viaLambda(first: String, second: String) =
+        src(first, second).replace("{ super.set(x) }", "{ val f: () -> void = () -> super.set(x); f() }")
+      val ok = compile(viaLambda(lowersInt, keepsString))
+      assert(ok.errors.isEmpty && ok.w24.isEmpty, ok.toString)
+      assert(compile(viaLambda(keepsInt, lowersString)).errors == Seq("E0109"))
+    }
+
+    it("is E0109 when the overload it runs lowers the field, in either declaration order") {
+      assert(compile(src(keepsInt, lowersString)).errors == Seq("E0109"))
+      assert(compile(src(lowersString, keepsInt)).errors == Seq("E0109"))
+    }
+  }
 }

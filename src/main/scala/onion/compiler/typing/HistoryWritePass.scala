@@ -16,7 +16,8 @@ import onion.compiler.contracts.HistoryProver
  * Constructors are not checked: a history relates the states around a call, and a constructor
  * has no earlier state.
  */
-final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.compiler.TypedAST.ClassType] = _ => None) {
+final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.compiler.TypedAST.ClassType] = _ => None,
+                             typedOf: AST.Node => Option[onion.compiler.TypedAST.Node] = _ => None) {
   import HistoryWritePass.{Repro, Unchecked}
   // `counterexamples` runs the same analysis without reporting and collects what the solver found.
   private var collected: scala.collection.mutable.ArrayBuffer[Repro] = null
@@ -235,10 +236,8 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     while (pending.nonEmpty) {
       val next = for {
         (i, caller) <- pending
-        call <- superCalls(caller).toSeq
-        // `super.f(..)` runs the nearest `f` above the caller's class.
-        k <- chain.indices.drop(i + 1).find(j => visible(chain(j)).exists(sig(_) == call)).toSeq
-        target <- visible(chain(k)).find(m => sig(m) == call && m.block != null).toSeq
+        call <- superCalls(caller)
+        (k, target) <- superTarget(call, chain, i, visible).toSeq
         if !seen.exists(_ eq target)
       } yield {
         seen += target
@@ -256,12 +255,13 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     plain ++ viaSuper
   }
 
-  /** The methods `m` calls through `super`, by name and arity. */
-  private def superCalls(m: AST.MethodDeclaration): Set[(String, Int)] = {
-    val out = Set.newBuilder[(String, Int)]
+  /** The `super` calls in `m`'s body, also inside its lambdas, which may run while `m` does. */
+  private def superCalls(m: AST.MethodDeclaration): Seq[AST.SuperMethodCall] = {
+    val out = Seq.newBuilder[AST.SuperMethodCall]
     def visit(n: AST.Node): Unit = {
       n match {
-        case AST.SuperMethodCall(_, name, args, _) => out += ((name, args.size))
+        case c: AST.SuperMethodCall => out += c
+        case c: AST.ClosureExpression => visit(c.body)
         case _ =>
       }
       ASTWalk.visitChildren(n)(visit)
@@ -269,6 +269,64 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
     if (m.block != null) visit(m.block)
     out.result()
   }
+
+  /**
+   * The method a `super` call in a method of `chain(from)` runs, with the index of its class, when
+   * its body is in this compilation. The type checker's choice decides between overloads of the
+   * same name and arity (panel block on #2870). Without it (the call did not type, or its target is
+   * not found in `chain`), the nearest method of that name and arity is taken.
+   */
+  private def superTarget(call: AST.SuperMethodCall, chain: Seq[AST.ClassDeclaration], from: Int,
+                          visible: AST.ClassDeclaration => Seq[AST.MethodDeclaration]): Option[(Int, AST.MethodDeclaration)] = {
+    val sig = (call.name, call.args.size)
+    val above = chain.indices.drop(from + 1)
+    def sameSig(m: AST.MethodDeclaration) = m.name == sig._1 && m.args.size == sig._2
+    val chosen = resolvedSuper(call).flatMap { r =>
+      above.iterator.flatMap(j => visible(chain(j)).find(m => sameSig(m) && isResolved(m, r)).map(j -> _)).nextOption()
+    }
+    chosen match {
+      case Some(found) => Some(found).filter(_._2.block != null)
+      case None =>
+        // `super.f(..)` runs the nearest `f` above the caller's class.
+        above.find(j => visible(chain(j)).exists(sameSig)).flatMap { k =>
+          visible(chain(k)).find(m => sameSig(m) && m.block != null).map(k -> _)
+        }
+    }
+  }
+
+  /** The method the type checker chose for a `super` call, also when it is reached from a closure. */
+  private def resolvedSuper(call: AST.SuperMethodCall): Option[onion.compiler.TypedAST.Method] = {
+    import onion.compiler.TypedAST
+    def find(t: TypedAST.Term): Option[TypedAST.Method] = {
+      var found: Option[TypedAST.Method] = None
+      onion.compiler.TermWalk.exists(t) {
+        case c: TypedAST.CallSuper => found = Some(c.method); true
+        case _ => false
+      }
+      found.orElse(t match {
+        // Inside a closure the call goes through a private accessor whose body holds the `super` call.
+        case c: TypedAST.Call => c.method match {
+          case d: TypedAST.MethodDefinition if d.block != null =>
+            d.block.statements.iterator.flatMap {
+              case e: TypedAST.ExpressionActionStatement => find(e.term)
+              case r: TypedAST.Return if r.term != null => find(r.term)
+              case _ => None
+            }.nextOption()
+          case _ => None
+        }
+        case _ => None
+      })
+    }
+    typedOf(call).collect { case t: TypedAST.Term => t }.flatMap(find)
+  }
+
+  private def isResolved(m: AST.MethodDeclaration, r: onion.compiler.TypedAST.Method): Boolean =
+    typedOf(m) match {
+      case Some(d: onion.compiler.TypedAST.Method) =>
+        (d eq r) || (d.name == r.name && d.affiliation.name == r.affiliation.name &&
+          d.arguments.map(_.name).sameElements(r.arguments.map(_.name)))
+      case _ => false
+    }
 
   private def isPrivate(c: AST.ClassDeclaration, m: AST.MethodDeclaration): Boolean =
     (m.modifiers & AST.M_PRIVATE) != 0 ||

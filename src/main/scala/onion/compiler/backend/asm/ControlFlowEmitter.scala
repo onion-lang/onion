@@ -114,11 +114,29 @@ final class ControlFlowEmitter(
     for stmt <- node.statements do
       visitStatement(stmt)
 
+  private def tracker: Option[OperandStackTracker] = gen match
+    case d: DebugGeneratorAdapter => Option(d.stackTracker)
+    case _ => None
+
+  /** The operand stack's size now, or -1 when it is not known. */
+  private def stackDepth: Int = tracker.map(_.depth).getOrElse(-1)
+
+  /** A `break`/`continue` inside an operand (`10 + (if c { continue } else { i })`) runs
+    * with the enclosing expression's operands still on the stack; the loop's labels
+    * expect the stack the loop started with, so drop the rest first (#2932). */
+  private def dropOperands(loopDepth: Option[Int]): Unit =
+    for
+      d <- loopDepth
+      t <- tracker
+      pops <- t.popsDownTo(d)
+    do pops.foreach(op => gen.visitInsn(op))
+
   def emitBreak(node: Break): Unit =
     val target = if (node.label != null) loops.endOf(node.label) else loops.currentEnd
     val depth = if (node.label != null) loops.finallyDepthOf(node.label) else loops.currentFinallyDepth
     target match
       case Some(label) =>
+        dropOperands(if (node.label != null) loops.stackDepthOf(node.label) else loops.currentStackDepth)
         // Run any finally blocks entered inside the loop before jumping out.
         depth.foreach(runFinalliesDownTo)
         gen.goTo(label)
@@ -129,6 +147,7 @@ final class ControlFlowEmitter(
     val depth = if (node.label != null) loops.finallyDepthOf(node.label) else loops.currentFinallyDepth
     target match
       case Some(label) =>
+        dropOperands(if (node.label != null) loops.stackDepthOf(node.label) else loops.currentStackDepth)
         depth.foreach(runFinalliesDownTo)
         gen.goTo(label)
       case None => throw new RuntimeException("Continue statement outside of loop")
@@ -182,7 +201,7 @@ final class ControlFlowEmitter(
       val bodyLabel = gen.newLabel()
       val condLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(node.label, condLabel, endLabel, finallyStack.length)
+      loops.push(node.label, condLabel, endLabel, finallyStack.length, stackDepth)
       try
         gen.visitLabel(bodyLabel)
         visitStatement(node.stmt)
@@ -197,7 +216,7 @@ final class ControlFlowEmitter(
       val condLabel = gen.newLabel()
       val continueLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(node.label, continueLabel, endLabel, finallyStack.length)
+      loops.push(node.label, continueLabel, endLabel, finallyStack.length, stackDepth)
       try
         gen.visitLabel(condLabel)
         visitTerm(node.condition)
@@ -212,7 +231,7 @@ final class ControlFlowEmitter(
     else
       val startLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(node.label, startLabel, endLabel, finallyStack.length)
+      loops.push(node.label, startLabel, endLabel, finallyStack.length, stackDepth)
       try
         gen.visitLabel(startLabel)
         visitTerm(node.condition)

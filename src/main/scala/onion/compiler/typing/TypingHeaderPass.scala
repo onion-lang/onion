@@ -261,6 +261,14 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
   }
 
   private def registerTopLevelContainer(imports: Seq[ImportItem]): Unit = {
+    // Two scripts with the same file name (d1/x.on, d2/x.on) would both become `xMain`.
+    val existing = typing.table_.lookup(typing.topClass)
+    if (existing != null) {
+      typing.report(SemanticError.DUPLICATE_CLASS, unit.location,
+        typing.topClass + " (the top-level code of " + unit.sourceFile + " and of " +
+          (existing match { case cd: ClassDefinition => cd.getSourceFile; case _ => "another file" }) + " would both become this class; rename one file)")
+      return
+    }
     val node = ClassDefinition.newClass(unit.location, 0, typing.topClass, typing.table_.rootClass, new Array[ClassType](0))
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
     node.isTopLevelContainer = true

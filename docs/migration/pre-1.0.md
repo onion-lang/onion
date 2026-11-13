@@ -493,9 +493,9 @@ println(run())   // Before: zero. Now: one, as when run() is declared below pick
 
 ## A `protected` constructor is checked the same way however the call reaches it
 
-A call that omits a default, or passes named arguments, now gets the same access check as a
-call that passes every argument (#2827). So an unrelated class can no longer reach a
-`protected` constructor that way.
+A call that omits a default, passes named arguments, or passes an untyped lambda argument
+(`new A((x) -> x + 1)`) now gets the same access check as a call that passes every argument
+(#2827). So an unrelated class can no longer reach a `protected` constructor that way.
 
 ```onion
 class A {

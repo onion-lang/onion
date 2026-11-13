@@ -1,6 +1,6 @@
 ### Breaking
 
-- **A `protected` constructor picked by a default or named arguments is E0013 outside its subclasses.**
+- **A `protected` constructor picked by a default, named arguments, or an untyped lambda argument is E0013 outside its subclasses.**
   - Before: `new A(9)` from an unrelated class compiled and ran, while `new A(9, 2)` was already E0013.
   - Now: both are E0013. Move the constructor under `public:`; see `docs/migration/pre-1.0.md`.
 

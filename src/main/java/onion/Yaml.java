@@ -384,7 +384,7 @@ public final class Yaml {
      *   - leading or trailing whitespace
      *   - starts with a YAML indicator ([ ] { } & * ! | > % @ `)
      *   - equals "-" or "?", or starts with "- " or "? "
-     *   - contains ':', '#', newline, or tab
+     *   - contains ':', '#', '"', newline, or tab
      *   - looks like a number (would be parsed back as Long or Double)
      *   - equals "true", "false", or "null" (would be parsed back as Boolean/null)
      */
@@ -411,6 +411,8 @@ public final class Yaml {
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == ':' || c == '#' || c == '\n' || c == '\r' || c == '\t') return true;
+            // An inner " opens a quoted region in findKeySeparator/stripComment, hiding the ':' after it
+            if (c == '"') return true;
         }
         // Would be mis-parsed as a Boolean or null
         if (s.equals("true") || s.equals("false") || s.equals("null") || s.equals("~")) return true;

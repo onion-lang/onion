@@ -99,7 +99,7 @@ public final class Net {
     // ========== Types ==========
 
     /** One end of an open TCP connection. */
-    public static final class Conn {
+    public static final class Conn implements AutoCloseable {
         private final Socket socket;
         private final java.io.BufferedInputStream input;
         private final OutputStream output;
@@ -224,7 +224,7 @@ public final class Net {
     }
 
     /** A bound listening socket. */
-    public static final class Listener {
+    public static final class Listener implements AutoCloseable {
         private final ServerSocket socket;
 
         Listener(ServerSocket socket) {

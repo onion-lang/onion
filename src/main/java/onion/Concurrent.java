@@ -77,7 +77,7 @@ public final class Concurrent {
     // ========== Pool ==========
 
     /** A fixed set of worker threads. */
-    public static final class Pool {
+    public static final class Pool implements AutoCloseable {
         private final ExecutorService executor;
         private final int size;
         private volatile boolean closed;

@@ -354,6 +354,42 @@ private[compiler] object DuplicationChecks {
   def erasedConstructorDescriptor(c: ConstructorRef): String =
     Erasure.methodDescriptor(BasicType.VOID, c.getArgs)
 
+  /** A concrete class whose interfaces give the same method two or more unrelated defaults, and
+    * which declares or inherits no class method of that signature to settle it, is E0116. The
+    * JVM finds no single maximally specific default, so the call throws AbstractMethodError
+    * (#2835); javac rejects the class as "inherits unrelated defaults". A default that a more
+    * specific interface overrides (`interface B conforms A`) does not count. */
+  def checkConflictingInterfaceDefaults(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
+    if Modifier.isAbstract(clazz.modifier) || clazz.isInterface then return
+    val views = typing.table_.appliedViewsOf(clazz)(AppliedTypeViews.collectAppliedViewsFrom(clazz)) - clazz
+    val interfaces = views.keys.filter(_.isInterface).toSeq
+    if interfaces.size < 2 then return
+
+    def isInstance(m: Method): Boolean = !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier)
+    // Interface members by JVM identity: who declares each, and whether that declaration has a body.
+    val declarers = mutable.LinkedHashMap[(String, String), mutable.ArrayBuffer[(ClassType, Method)]]()
+    for iface <- interfaces; m <- iface.methods if isInstance(m) do
+      declarers.getOrElseUpdate(erasedSignatureKey(m), mutable.ArrayBuffer.empty) += ((iface, m))
+    if !declarers.values.exists(_.count(d => !Modifier.isAbstract(d._2.modifier)) >= 2) then return
+
+    // A method in the class or a superclass wins over every interface default.
+    val classChain = mutable.HashSet[(String, String)]()
+    for m <- clazz.methods if isInstance(m) do classChain += erasedSignatureKey(m)
+    for (tp, _) <- views if !tp.isInterface; m <- tp.methods if isInstance(m) do classChain += erasedSignatureKey(m)
+
+    for (key, ds) <- declarers if !classChain.contains(key) do
+      // Maximally specific: no other declaring interface is a subinterface of this one.
+      val specific = ds.filter { case (iface, _) =>
+        !ds.exists { case (other, _) => (other ne iface) && TypeRules.isSuperType(iface, other) && !TypeRules.isSuperType(other, iface) }
+      }
+      val withBody = specific.filter(d => !Modifier.isAbstract(d._2.modifier)).map(_._1).distinct
+      if withBody.size >= 2 then
+        val m = specific.head._2
+        val params = m.arguments.map(_.name).mkString(", ")
+        val owners = withBody.map(_.name).sorted.mkString(", ")
+        typing.report(SemanticError.CONFLICTING_INTERFACE_DEFAULTS, fallback, clazz.name, m.name, params, owners)
+  }
+
   def checkAbstractMethodImplementation(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     // Skip if the class is abstract or an interface
     if Modifier.isAbstract(clazz.modifier) || clazz.isInterface then return

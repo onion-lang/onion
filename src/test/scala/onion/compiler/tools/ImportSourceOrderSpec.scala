@@ -83,6 +83,36 @@ class ImportSourceOrderSpec extends AnyFunSpec {
     dir.getAbsolutePath
   }
 
+  describe("two wildcard imports, one module from the classpath and one from source") {
+    // The panel's repro on #2855: a class declared in this compilation outranks only the
+    // default imports. Between the user's own wildcards the written order decides, whether
+    // the class comes from source or a jar.
+    val qSource = "module q;\nclass Foo {\npublic:\n  def this {}\n  def onlyQ(): Int = 2\n}"
+    lazy val pOnly = classDir("p.on" -> "module p;\nclass Foo {\npublic:\n  def this {}\n  def onlyP(): Int = 1\n}")
+    def useFoo(imports: String, call: String): String =
+      s"""module app;
+         |import {
+         |  $imports
+         |}
+         |class Use {
+         |public:
+         |  static def f(): Int {
+         |    val f: Foo = new Foo()
+         |    return f.$call()
+         |  }
+         |}""".stripMargin
+
+    it("binds the first written import's class when the second one's comes from source") {
+      val src = useFoo("p.*\n  q.*", "onlyP")
+      assert(errorCodesWith(Seq(".", pOnly), "use.on" -> src, "q.on" -> qSource) == Right(()))
+      assert(errorCodesWith(Seq(".", pOnly), "q.on" -> qSource, "use.on" -> src) == Right(()))
+    }
+    it("binds the source class when its import is written first") {
+      val src = useFoo("q.*\n  p.*", "onlyQ")
+      assert(errorCodesWith(Seq(".", pOnly), "use.on" -> src, "q.on" -> qSource) == Right(()))
+    }
+  }
+
   describe("a wildcard import of classes that come only from the classpath") {
     // Two modules on the classpath both declare `Foo`; `p.*` is written first, so a bare
     // `Foo` is `p.Foo`. Whether an earlier line already loaded `q.Foo` must not matter.

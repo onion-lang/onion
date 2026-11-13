@@ -150,6 +150,51 @@ class DoNotationMonadsSpec extends AbstractShellSpec {
       )
       assert(Shell.Success(20) == result)
     }
+
+    it("binds Result::ok, alone or mixed with Result::successful, the same way (#2537)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val r: Result[Int, String] = Result::ok(1)
+          |    val a: Result[Int, String] = do[Result] { x <- r; y <- Result::ok(x + 1); yield y * 10 }
+          |    val b: Result[Int, String] = do[onion.Result] { x <- r; y <- Result::ok(x + 1); z <- onion.Result::successful(y + 1); yield z }
+          |    return (a.getOrThrow() as Int) + (b.getOrThrow() as Int)
+          |  }
+          |}
+          |""".stripMargin,
+        "DoResultOk.on",
+        Array()
+      )
+      assert(Shell.Success(23) == result)
+    }
+
+    it("leaves a bind on a user class named Result as a bind (#2537)") {
+      val result = shell.run(
+        """
+          |class Result {
+          |  val v: Int
+          |public:
+          |  def this(v: Int) { this.v = v }
+          |  static def successful(v: Int): Result = new Result(v * 100)
+          |  def bind(f: Function1[Int, Result]): Result = f.call(v)
+          |  def map(f: Function1[Int, Int]): Result = new Result(f.call(v))
+          |  def get(): Int = v
+          |}
+          |class Main {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val r: Result = do[Result] { a <- Result::successful(1); b <- Result::successful(a + 1); yield a + b }
+          |    return r.get()
+          |  }
+          |}
+          |""".stripMargin,
+        "DoUserResult.on",
+        Array()
+      )
+      assert(Shell.Success(10200) == result)
+    }
   }
 
   describe("do-notation over List (comprehension)") {

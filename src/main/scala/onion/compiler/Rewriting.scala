@@ -102,8 +102,20 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
             a.name -> a.targetType.desc
         }.toMap
       }.toMap
+    val typeNamesByModule: scala.collection.immutable.Map[String, Set[String]] =
+      source.groupBy(moduleOf).view.mapValues { units =>
+        units.flatMap(_.toplevels).flatMap {
+          case e: AST.EnumDeclaration => e.name :: e.constants.collect { case c if c.caseFields.isDefined => c.name }
+          case d: AST.TypeDeclaration => List(d.name)
+          case a: AST.TypeAliasDeclaration => List(a.name)
+          case _ => Nil
+        }.toSet
+      }.toMap
     for (unit <- source) {
       try {
+        currentModuleName = moduleOf(unit)
+        currentModuleTypeNames = typeNamesByModule.getOrElse(currentModuleName, Set.empty)
+        currentImports = if (unit.imports == null) Nil else unit.imports.mapping
         cliAliases = aliasesByModule.getOrElse(moduleOf(unit), scala.collection.immutable.Map.empty)
         recordAliases = recordAliasesOf(unit, cliAliases)
         rewritten += rewrite(unit)
@@ -128,6 +140,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   // parameter; a ground `Trait[Int]::m(...)` still resolves to the instance
   // class. `typeParamsInScope` distinguishes the two.
   private var typeParamsInScope: Set[String] = Set.empty
+  // The unit being rewritten: its module, the type names its module declares in any source
+  // file, and its written imports (simple name -> qualified name). `namesOnionResult` reads them.
+  private var currentModuleName: String = ""
+  private var currentModuleTypeNames: Set[String] = Set.empty
+  private var currentImports: List[(String, String)] = Nil
   private var dictScope: scala.collection.immutable.Map[(String, String), String] = scala.collection.immutable.Map.empty
 
   /** The dictionary parameters a constrained generic declaration needs: one per
@@ -2042,18 +2059,36 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
-  /** True for `Result::successful(e)` (no type arguments) bound inside `do[Result]`. */
-  private def isResultUnitBind(expr: AST.Expression, monadType: AST.TypeNode): Boolean = {
-    def simple(desc: AST.TypeDescriptor): Option[String] = desc match {
-      case AST.ReferenceType(name, _) => Some(name.substring(name.lastIndexOf('.') + 1))
-      case _ => None
-    }
-    expr match {
-      case c: AST.StaticMethodCall =>
-        c.name == "successful" && c.args.size == 1 && c.typeArgs.isEmpty &&
-          simple(c.typeRef.desc).contains("Result") && simple(monadType.desc).contains("Result")
-      case _ => false
-    }
+  /** True when the written type `desc` names `onion.Result`, decided as the typer's
+    * NameResolver would: a type parameter, a class of the unit's own module (from source or
+    * from the classpath) and an explicit import all outrank the default `onion.*` import. */
+  private def namesOnionResult(desc: AST.TypeDescriptor): Boolean = desc match {
+    case AST.ReferenceType("onion.Result", _) => true
+    case AST.ReferenceType("Result", false) =>
+      !typeParamsInScope.contains("Result") &&
+        !currentModuleTypeNames.contains("Result") &&
+        !currentImports.exists { case (key, value) => key == "Result" && value != "onion.Result" } &&
+        !onClasspath(if (currentModuleName.isEmpty) "Result" else currentModuleName + ".Result")
+    case _ => false
+  }
+
+  private def onClasspath(fqcn: String): Boolean =
+    classpathLoader.getResource(fqcn.replace('.', '/') + ".class") != null
+
+  private lazy val classpathLoader: java.net.URLClassLoader = {
+    val urls = config.classPath.iterator.filter(p => p != null && p.nonEmpty).flatMap { p =>
+      scala.util.Try(new java.io.File(p).toURI.toURL).toOption
+    }.toArray
+    new java.net.URLClassLoader(urls, null: ClassLoader)
+  }
+
+  /** True for `Result::successful(e)` or `Result::ok(e)` (no type arguments) bound inside
+    * `do[Result]`, where both `Result`s name `onion.Result`. */
+  private def isResultUnitBind(expr: AST.Expression, monadType: AST.TypeNode): Boolean = expr match {
+    case c: AST.StaticMethodCall =>
+      (c.name == "successful" || c.name == "ok") && c.args.size == 1 && c.typeArgs.isEmpty &&
+        namesOnionResult(c.typeRef.desc) && namesOnionResult(monadType.desc)
+    case _ => false
   }
 
   private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any]): AST.Expression = {
@@ -2071,7 +2106,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         val rewritten = rewriteExpression(expr)
         AST.StaticMethodCall(loc, monadType, "successful", List(rewritten))
 
-      // `x <- Result::successful(e); rest` => `val x = e; rest` (left identity:
+      // `x <- Result::successful(e); rest` (or `Result::ok(e)`) => `val x = e; rest` (left identity:
       // unit(e).bind(f) == f(e)). `Result::successful(e)` alone cannot pin its error
       // type, so left as a bind it types as `Result[T, Object]` (#2537).
       case (binding: AST.DoBinding) :: rest if rest.nonEmpty && isResultUnitBind(binding.expr, monadType) =>

@@ -222,5 +222,24 @@ class ArchiveSpec extends AbstractShellSpec {
       assert(unzipError.getMessage.contains("no such file"), unzipError.getMessage)
       assert(unzipError.getMessage.contains(missing), unzipError.getMessage)
     }
+
+    it("gzipFile and gunzipFile say which path is missing") {
+      val work = Files.createTempDirectory("onion-gzip-missing")
+      val src = work.resolve("a.txt")
+      Files.writeString(src, "x")
+      val gz = work.resolve("a.gz").toString
+      onion.Archive.gzipFile(src.toString, gz)
+
+      val noTargetDir = work.resolve("nodir").resolve("out.gz").toString
+      val e1 = intercept[RuntimeException] { onion.Archive.gzipFile(src.toString, noTargetDir) }
+      assert(e1.getMessage.contains("no such directory: " + work.resolve("nodir")), e1.getMessage)
+
+      val noSrc = work.resolve("nope.txt").toString
+      val e2 = intercept[RuntimeException] { onion.Archive.gzipFile(noSrc, gz + "2") }
+      assert(e2.getMessage.contains("no such file: " + noSrc), e2.getMessage)
+
+      val e3 = intercept[RuntimeException] { onion.Archive.gunzipFile(noSrc, work.resolve("o").toString) }
+      assert(e3.getMessage.contains("no such file: " + noSrc), e3.getMessage)
+    }
   }
 }

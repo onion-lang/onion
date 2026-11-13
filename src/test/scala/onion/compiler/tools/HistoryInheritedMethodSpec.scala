@@ -346,4 +346,44 @@ class HistoryInheritedMethodSpec extends AnyFunSpec {
       assert(compile(src(lowersString, keepsInt)).errors == Seq("E0109"))
     }
   }
+
+  // #2786: a method of the same name and arity but other parameter types is an overload, not an
+  // override (E0068 already says so), so the inherited method still runs on the subclass.
+  describe("a same-arity overload in the subclass") {
+    it("does not hide an inherited method that lowers the field (the issue's repro)") {
+      val o = compile(program("def dec(k: Int): void { n = n - 1 }", "def dec(k: Long): void { }"))
+      assert(o.errors == Seq("E0109"), o.toString)
+      assert(o.messages.exists(m => m.contains("Base") && m.contains("dec")), o.toString)
+    }
+
+    it("still lets an override with the same parameter types replace it") {
+      val o = compile(program("def dec(k: Int): void { n = n - 1 }", "override def dec(k: Int): void { }"))
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w24.isEmpty, o.toString)
+    }
+
+    it("does not hide an inherited override whose `super` call lowers the field (the #2870 repro)") {
+      val src =
+        """class A {
+          |protected:
+          |  var n: Int
+          |public:
+          |  def this { n = 10 }
+          |  def set(x: Int): void { }
+          |  def set(x: String): void { n = n - 1 }
+          |  def get(): Int = n
+          |}
+          |class B extends A {
+          |public:
+          |  override def set(x: Int): void { super.set("q") }
+          |}
+          |class C extends B {
+          |  history n >= old(n)
+          |public:
+          |  override def set(x: String): void { }
+          |}
+          |val c = new C(); c.set(1); println(c.get())""".stripMargin
+      assert(compile(src).errors == Seq("E0109"), compile(src).toString)
+    }
+  }
 }

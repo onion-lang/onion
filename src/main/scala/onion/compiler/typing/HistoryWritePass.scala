@@ -204,26 +204,26 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
 
   /**
    * The superclasses' methods a `cls` runs, nearest first. A non-private method runs when `cls`
-   * does not override it: it is reached by itself, unless a non-private method of the same name
-   * and arity overrides it; a private method never overrides and is never overridden (#2781). A
+   * does not override it: it is reached by itself, unless a non-private method of the same
+   * signature overrides it ([[mayOverride]], #2786); a private method never overrides and is never
+   * overridden (#2781). A
    * private method runs when an inherited method of its own class calls it, directly or through
    * other private methods, and is reached through that caller. A method that runs on `cls` and calls
    * `super.f(..)` also runs the `f` its class inherits, overridden or not, and what that `f` reaches
    * in turn (#2782).
    */
   private def inheritedMethods(cls: AST.ClassDeclaration, chain: Seq[AST.ClassDeclaration]): Seq[Reach] = {
-    def sig(m: AST.MethodDeclaration) = (m.name, m.args.size)
     def visible(c: AST.ClassDeclaration) = methodsOf(c).filterNot(isPrivate(c, _))
     def privatesOf(c: AST.ClassDeclaration) = methodsOf(c).filter(m => m.block != null && isPrivate(c, m))
-    var overridden = visible(cls).map(sig).toSet
+    var overriding = visible(cls)
     val plain = chain.drop(1).flatMap { c =>
-      val entries = visible(c).filter(m => m.block != null && !overridden(sig(m)))
+      val entries = visible(c).filter(m => m.block != null && !overriding.exists(mayOverride(_, m)))
       val privates = privatesOf(c)
       val reached = for {
         p <- privates
         via <- entries.find(e => reachable(e, privates).exists(_ eq p))
       } yield Reach(c, p, via)
-      overridden ++= visible(c).map(sig)
+      overriding ++= visible(c)
       entries.map(m => Reach(c, m, m)) ++ reached
     }
     // The methods that run on `cls`, by the index of their class in `chain`, are searched for `super` calls.
@@ -253,6 +253,35 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
       pending = next.flatten
     }
     plain ++ viaSuper
+  }
+
+  /**
+   * Whether `sub` may override `base`: the same name and arity, and no parameter whose erased JVM
+   * type differs from `base`'s (#2786). `dec(k: Long)` is an overload of `dec(k: Int)`, as E0068
+   * already says. A parameter that is a type variable, or a primitive against its box, could still
+   * match, so it counts as overriding, as it did before; without typed declarations, so does any
+   * same-arity method.
+   */
+  private def mayOverride(sub: AST.MethodDeclaration, base: AST.MethodDeclaration): Boolean = {
+    import onion.compiler.TypedAST
+    def hasVariable(t: TypedAST.Type): Boolean = t match {
+      case _: TypedAST.TypeVariableType => true
+      case n: TypedAST.NullableType => hasVariable(n.innerType)
+      case a: TypedAST.ArrayType => hasVariable(a.component)
+      case _ => false
+    }
+    def boxes(p: TypedAST.Type, c: TypedAST.Type): Boolean = (p, c) match {
+      case (b: TypedAST.BasicType, k: TypedAST.ClassType) => onion.compiler.toolbox.Boxing.boxedClassName(b).contains(k.name)
+      case _ => false
+    }
+    def sameSlot(a: TypedAST.Type, b: TypedAST.Type): Boolean =
+      hasVariable(a) || hasVariable(b) || boxes(a, b) || boxes(b, a) ||
+        onion.compiler.generics.Erasure.asmType(a).getDescriptor == onion.compiler.generics.Erasure.asmType(b).getDescriptor
+    sub.name == base.name && sub.args.size == base.args.size && ((typedOf(sub), typedOf(base)) match {
+      case (Some(s: TypedAST.Method), Some(b: TypedAST.Method)) if s.arguments.length == b.arguments.length =>
+        s.arguments.indices.forall(i => sameSlot(s.arguments(i), b.arguments(i)))
+      case _ => true
+    })
   }
 
   /** The `super` calls in `m`'s body, also inside its lambdas, which may run while `m` does. */

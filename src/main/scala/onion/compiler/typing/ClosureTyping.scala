@@ -425,7 +425,11 @@ final class ClosureTyping(
                     Some((bodyReturn == BasicType.VOID) == (samReturn == BasicType.VOID))
                   case None => None
                 }
-              case None => None
+              // No abstract method of the lambda's arity: it cannot fit this SAM, whatever
+              // its body. Answering "unknown" here kept a `(Int) -> Int` overload alive
+              // for `{ x, y -> ... }`, and the tie on the other arguments then went to
+              // whichever overload came first, which varied between passes (#2823).
+              case None => Some(false)
             }
           case _ => None
         }

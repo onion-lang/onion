@@ -534,9 +534,12 @@ println(row[2])     // Now: "" (an empty string)
 - **What you see:** no error. A text that ends with the delimiter gives one more `""` for each
   delimiter at the end. Splitting lines is the common case: `Strings::split(text, "\n")` on a
   text that ends with `"\n"` now ends with an empty line.
-- **To keep the old result:** split without the final delimiter, e.g.
-  `if text.endsWith("\n") { Strings::split(text.substring(0, text.length() - 1), "\n") }`,
-  or call `Regex::split(s, pattern, 0)`, which drops trailing empties as before.
+- **To keep the old result:**
+  - For lines, call `Strings::lines(text)`. `Strings::lines("l1\nl2\n")` gives `[l1, l2]`, as
+    `split` did before.
+  - For any other delimiter, call `Regex::split(s, pattern, 0)`. It drops every trailing empty
+    field, as before. Its delimiter is a regex, so escape `.` and `|`:
+    `Regex::split("a.b..", "\\.", 0)` gives `[a, b]`.
 - **No `onion migrate` rule:** most calls split text that does not end with the delimiter and
   give the same result. Only you know whether an empty last field is data (a CSV column) or
   noise (a final newline), so a rewrite would be wrong for one of them.

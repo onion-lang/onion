@@ -420,7 +420,8 @@ final class ConstructionTyping(
         val formals = c.getArgs.map(t =>
           TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
         formals.length != params.length || formals.indices.forall { i =>
-          AssignabilitySupport.typeVariableSlotFits(formals(i), params(i), bodyContext.table)
+          AssignabilitySupport.typeVariableSlotFits(formals(i), params(i), bodyContext.table) &&
+            !primitiveIntoTypeVariable(typeRef, formals(i), params(i))
         }
       case _ => true
     }
@@ -574,10 +575,12 @@ final class ConstructionTyping(
           // as on the exact-arity path, so `T...` never takes an `Object` (#2839).
           val fixedFit = (0 until fixed).forall(i =>
             TypeRelations.isAssignableWithBoxing(formals(i), parameters(i).`type`, table) &&
-              AssignabilitySupport.typeVariableSlotFits(formals(i), parameters(i), table))
+              AssignabilitySupport.typeVariableSlotFits(formals(i), parameters(i), table) &&
+              !primitiveIntoTypeVariable(typeRef, formals(i), parameters(i)))
           val restFit = parameters.drop(fixed).forall(p =>
             TypeRelations.isAssignableWithBoxing(arrayType.base, p.`type`, table) &&
-              AssignabilitySupport.typeVariableSlotFits(arrayType.base, p, table))
+              AssignabilitySupport.typeVariableSlotFits(arrayType.base, p, table) &&
+              !primitiveIntoTypeVariable(typeRef, arrayType.base, p))
           if (fixedFit && restFit) Some((c, formals, arrayType)) else None
         case _ => None
       }
@@ -697,9 +700,28 @@ final class ConstructionTyping(
     typeRef.constructors.filter { c =>
       val formals = substitutedArgs(c)
       formals.length == parameters.length &&
-        formals.indices.forall(i => formalAccepts(formals(i), parameters(i)))
+        formals.indices.forall(i =>
+          formalAccepts(formals(i), parameters(i)) && !primitiveIntoTypeVariable(typeRef, formals(i), parameters(i)))
     }
   }
+
+  /**
+   * A primitive argument for a slot that is still a type variable after the class's type
+   * arguments are substituted (`new Box[T](i)` inside `G[T]`, with `i: Int`). Boxing gives an
+   * `Integer`, which fits no abstract `T`: `new G[String]().wrapInt(3)` compiled and its `v`
+   * read threw a ClassCastException (#2840). A method call `take(3)` against `take(t: T)` is
+   * already rejected. Only for an applied type (`Box[T]`, `Box[String]`): there every slot
+   * left as a type variable is the caller's own; a raw `new Box(3)` still infers `T`.
+   */
+  private def primitiveIntoTypeVariable(typeRef: ClassType, formal: Type, arg: Term): Boolean =
+    typeRef.isInstanceOf[TypedAST.AppliedClassType] && primitiveIntoTypeVariable(formal, arg)
+
+  private def primitiveIntoTypeVariable(formal: Type, arg: Term): Boolean =
+    arg != null && arg.`type` != null && arg.`type`.isBasicType && (formal match {
+      case _: TypedAST.TypeVariableType => true
+      case n: TypedAST.NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
+      case _ => false
+    })
 
   /**
    * When no constructor matched the eagerly-typed arguments, retype malleable
@@ -1233,7 +1255,8 @@ final class ConstructionTyping(
     // positional path: `new C[T](xs = xs)` with `xs: List[Number]` is not a `List[T]`.
     if (!suppliedIndices.forall(i =>
         formalAccepts(formals(i), result(i)) &&
-          AssignabilitySupport.typeVariableSlotFits(formals(i), result(i), bodyContext.table))) {
+          AssignabilitySupport.typeVariableSlotFits(formals(i), result(i), bodyContext.table) &&
+          !primitiveIntoTypeVariable(typeRef, formals(i), result(i)))) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, ctor.affiliation,
         suppliedTypes, ctor.affiliation.constructors)
       return None

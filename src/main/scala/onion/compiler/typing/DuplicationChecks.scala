@@ -253,7 +253,9 @@ private[compiler] object DuplicationChecks {
     // Index actual base methods by name and arity, keeping per-position choices.
     // Include both the specialized (type-argument substituted) and the raw erased
     // form, plus boxing variants, so that primitive/boxed parameter forms match.
-    val basePatterns = mutable.HashMap[(String, Int), mutable.ArrayBuffer[ErasedParameterPattern]]()
+    // One entry per base method: its boxing-aware patterns and its exact descriptors.
+    final case class BaseContract(patterns: Seq[ErasedParameterPattern], exact: Set[String])
+    val baseContracts = mutable.HashMap[(String, Int), mutable.ArrayBuffer[BaseContract]]()
     val baseNames = mutable.HashSet[String]()
     val requestedKeys = overrideMethods.iterator.map(m => (m.name, m.arguments.length)).toSet
     for (view <- views.values) {
@@ -266,16 +268,25 @@ private[compiler] object DuplicationChecks {
           if requestedKeys.contains(key) then
             val specializedArgs =
               contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
-            val patterns = basePatterns.getOrElseUpdate(key, mutable.ArrayBuffer.empty)
-            patterns += parameterPattern(specializedArgs, typing)
-            patterns += parameterPattern(contract.arguments, typing)
+            baseContracts.getOrElseUpdate(key, mutable.ArrayBuffer.empty) += BaseContract(
+              Seq(parameterPattern(specializedArgs, typing), parameterPattern(contract.arguments, typing)),
+              Set(erasedParamDescriptor(specializedArgs), erasedParamDescriptor(contract.arguments)))
       }
     }
 
     for (impl <- overrideMethods) {
       val implPattern = parameterPattern(impl.arguments, typing)
-      val candidates = basePatterns.get((impl.name, impl.arguments.length))
-      if !candidates.exists(_.exists(implPattern.overlaps)) then
+      val implExact = erasedParamDescriptor(impl.arguments)
+      val candidates = baseContracts.getOrElse((impl.name, impl.arguments.length), mutable.ArrayBuffer.empty[BaseContract])
+      // A sibling that matches a base method exactly is that method's real override, so an
+      // `override` reaching the same base method only through boxing overrides nothing (#2681).
+      // Judged per base method: a sibling matching a different overload does not count (#2921).
+      def exactSibling(c: BaseContract): Boolean =
+        clazz.methods.exists(o => (o ne impl) && o.name == impl.name && !Modifier.isStatic(o.modifier) &&
+          o.arguments.length == impl.arguments.length && c.exact.contains(erasedParamDescriptor(o.arguments)))
+      val overridesSomething = candidates.exists(c =>
+        c.patterns.exists(implPattern.overlaps) && (c.exact.contains(implExact) || !exactSibling(c)))
+      if !overridesSomething then
         val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
         val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
         typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name, baseNames.toArray)
@@ -342,6 +353,42 @@ private[compiler] object DuplicationChecks {
     * the same one cannot both be emitted into one class file. */
   def erasedConstructorDescriptor(c: ConstructorRef): String =
     Erasure.methodDescriptor(BasicType.VOID, c.getArgs)
+
+  /** A concrete class whose interfaces give the same method two or more unrelated defaults, and
+    * which declares or inherits no class method of that signature to settle it, is E0116. The
+    * JVM finds no single maximally specific default, so the call throws AbstractMethodError
+    * (#2835); javac rejects the class as "inherits unrelated defaults". A default that a more
+    * specific interface overrides (`interface B conforms A`) does not count. */
+  def checkConflictingInterfaceDefaults(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
+    if Modifier.isAbstract(clazz.modifier) || clazz.isInterface then return
+    val views = typing.table_.appliedViewsOf(clazz)(AppliedTypeViews.collectAppliedViewsFrom(clazz)) - clazz
+    val interfaces = views.keys.filter(_.isInterface).toSeq
+    if interfaces.size < 2 then return
+
+    def isInstance(m: Method): Boolean = !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier)
+    // Interface members by JVM identity: who declares each, and whether that declaration has a body.
+    val declarers = mutable.LinkedHashMap[(String, String), mutable.ArrayBuffer[(ClassType, Method)]]()
+    for iface <- interfaces; m <- iface.methods if isInstance(m) do
+      declarers.getOrElseUpdate(erasedSignatureKey(m), mutable.ArrayBuffer.empty) += ((iface, m))
+    if !declarers.values.exists(_.count(d => !Modifier.isAbstract(d._2.modifier)) >= 2) then return
+
+    // A method in the class or a superclass wins over every interface default.
+    val classChain = mutable.HashSet[(String, String)]()
+    for m <- clazz.methods if isInstance(m) do classChain += erasedSignatureKey(m)
+    for (tp, _) <- views if !tp.isInterface; m <- tp.methods if isInstance(m) do classChain += erasedSignatureKey(m)
+
+    for (key, ds) <- declarers if !classChain.contains(key) do
+      // Maximally specific: no other declaring interface is a subinterface of this one.
+      val specific = ds.filter { case (iface, _) =>
+        !ds.exists { case (other, _) => (other ne iface) && TypeRules.isSuperType(iface, other) && !TypeRules.isSuperType(other, iface) }
+      }
+      val withBody = specific.filter(d => !Modifier.isAbstract(d._2.modifier)).map(_._1).distinct
+      if withBody.size >= 2 then
+        val m = specific.head._2
+        val params = m.arguments.map(_.name).mkString(", ")
+        val owners = withBody.map(_.name).sorted.mkString(", ")
+        typing.report(SemanticError.CONFLICTING_INTERFACE_DEFAULTS, fallback, clazz.name, m.name, params, owners)
+  }
 
   def checkAbstractMethodImplementation(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     // Skip if the class is abstract or an interface

@@ -47,9 +47,10 @@ final class ContractPurityPass(typing: Typing) {
       val blamed = culprit.map(_.effects).getOrElse(effects)
       // Typed calls mostly carry no location, so point at the call in the clause's source that
       // has the culprit's name; else at the clause itself; never at the owning `def` or `class`
-      // while the clause is known (#2605).
+      // while the clause is known (#2605). Among calls of that name, take the one in the
+      // culprit's position, so an earlier pure `p.add(1)` is not blamed for `xs.add(1)` (#2847).
       val source = Option(typing.contractClauseSources.get(clause))
-      val where = culprit.flatMap(c => source.flatMap(callNamed(_, methodName(c.callee))))
+      val where = culprit.flatMap(c => source.flatMap(s => callAt(s, methodName(c.callee), ordinal(sites, c))))
         .orElse(culprit.flatMap(c => Option(c.location)))
         .orElse(Option(clause.location))
         .orElse(source.flatMap(s => Option(s.location)))
@@ -68,16 +69,42 @@ final class ContractPurityPass(typing: Typing) {
     else callee.substring(callee.lastIndexOf('.') + 1)
   }
 
-  /** The location of the first call to `name` in a clause's source, left to right. */
-  private def callNamed(node: Any, name: String): Option[Location] = node match {
-    case c: AST.MethodCall if c.name == name && c.location != null            => Some(c.location)
-    case c: AST.SafeMethodCall if c.name == name && c.location != null        => Some(c.location)
-    case c: AST.UnqualifiedMethodCall if c.name == name && c.location != null => Some(c.location)
-    case c: AST.StaticMethodCall if c.name == name && c.location != null      => Some(c.location)
-    case c: AST.SuperMethodCall if c.name == name && c.location != null       => Some(c.location)
-    case p: Product => p.productIterator.map(callNamed(_, name)).collectFirst { case Some(l) => l }
-    case it: Iterable[?] => it.iterator.map(callNamed(_, name)).collectFirst { case Some(l) => l }
-    case _ => None
+  /**
+   * How many calls of the culprit's name the clause makes before the culprit itself, counting
+   * only the calls the clause writes, in the order they finish. 0 when the culprit is not one
+   * of them (a call it reaches through an override, say), which keeps the first call of the name.
+   */
+  private def ordinal(sites: Seq[EffectInference.CallSite], culprit: EffectInference.CallSite): Int =
+    if (!culprit.written) 0
+    else {
+      val name = methodName(culprit.callee)
+      sites.takeWhile(_ ne culprit).count(s => s.written && methodName(s.callee) == name)
+    }
+
+  /**
+   * The location of the `n`th call to `name` in a clause's source, counting in the order the
+   * calls finish (a call's operands before the call), as the effect inference sees them. The
+   * first such call when there are not that many.
+   */
+  private def callAt(node: Any, name: String, n: Int): Option[Location] = {
+    val found = scala.collection.mutable.Buffer[Location]()
+    def walk(node: Any): Unit = {
+      node match {
+        case p: Product => p.productIterator.foreach(walk)
+        case it: Iterable[?] => it.foreach(walk)
+        case _ => ()
+      }
+      node match {
+        case c: AST.MethodCall if c.name == name && c.location != null            => found += c.location
+        case c: AST.SafeMethodCall if c.name == name && c.location != null        => found += c.location
+        case c: AST.UnqualifiedMethodCall if c.name == name && c.location != null => found += c.location
+        case c: AST.StaticMethodCall if c.name == name && c.location != null      => found += c.location
+        case c: AST.SuperMethodCall if c.name == name && c.location != null       => found += c.location
+        case _ => ()
+      }
+    }
+    walk(node)
+    if (n < found.size) Some(found(n)) else found.headOption
   }
 
   /** `memory` (writes only), `world` (an outside effect only), `both`, or `unknown` (not in the table). */

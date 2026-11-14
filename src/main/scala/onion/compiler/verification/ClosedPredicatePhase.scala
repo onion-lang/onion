@@ -54,9 +54,13 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
           case None =>
             notRun(c, Message("warning.predicateNotRun.timeout", c.name, config.contractTimeoutMillis.toString))
           case Some(Left(e)) =>
-            errors += falseOrThrew(c, s"threw ${e.getClass.getSimpleName}: ${e.getMessage}")
+            errors += falseOrThrew(c, Message("error.semantic.predicateReason.threw",
+              Array[Any](e.getClass.getSimpleName, String.valueOf(e.getMessage), "")))
           case Some(Right(outcome)) =>
-            outcome.foreach(why => errors += falseOrThrew(c, why))
+            outcome.foreach {
+              case Left(type0) => errors += notSampled(c, type0)
+              case Right(why)  => errors += falseOrThrew(c, why)
+            }
         }
       }
     } finally thread.setContextClassLoader(previous)
@@ -71,6 +75,17 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
       Message(if (c.arity == 0) "error.semantic.closedPredicateFalse" else "error.semantic.sampledPredicateFalse",
         Array[Any](c.name, why)),
       Some(SemanticError.CLOSED_PREDICATE_FALSE.errorCode))
+
+  /** The predicate was not run at all: say so, rather than claiming it "did not hold" (#2752). */
+  private def notSampled(c: Candidate, typeName: String): CompileError =
+    CompileError(c.sourceFile, c.location,
+      Message("error.semantic.predicateNotSampled", Array[Any](c.name, typeName)),
+      Some(SemanticError.CLOSED_PREDICATE_FALSE.errorCode))
+
+  /** An argument's text for the report; a `toString` that throws must not stand in for the predicate failing. */
+  private def show(a: AnyRef): String =
+    try String.valueOf(a)
+    catch { case e: Throwable => s"<${a.getClass.getSimpleName}: toString threw ${e.getClass.getSimpleName}>" }
 
   /** Only `ensures result` itself marks a predicate. `ensures result == (x > 0)` describes a function and is left alone. */
   private def assertsResult(clauses: List[AST.Expression]): Boolean =
@@ -103,7 +118,7 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
     Modifier.isStatic(m.modifiers) && isBoolean(m.returnType) && assertsResult(m.ensures)
 
   /** `None` when the predicate holds (or cannot be found); the reason when it is false or throws. */
-  private def runOne(c: Candidate, classes: Seq[CompiledClass], loader: ClassLoader): Option[String] = {
+  private def runOne(c: Candidate, classes: Seq[CompiledClass], loader: ClassLoader): Option[Either[String, String]] = {
     val owners = c.owner match {
       case Some(o) if c.topLevel => classes.filter(_.className == o)
       case Some(o) => classes.filter(cc => cc.className == o || cc.className.endsWith("." + o))
@@ -121,8 +136,8 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
       val perParam = types.map(t => ArgGenerator.generateValues(t, loader, config.contractSamples, config.contractSeed).orNull)
       val bad = perParam.indexWhere(_ == null)
       // A parameter that cannot be sampled must not pass silently: that would look like a predicate that held.
-      if (bad >= 0) Some(Message("error.semantic.predicateReason.unsampleable", types(bad).getSimpleName))
-      else combos(perParam).iterator.map(args => call(m, args)).collectFirst { case Some(why) => why }
+      if (bad >= 0) Some(Left(types(bad).getSimpleName))
+      else combos(perParam).iterator.map(args => call(m, args)).collectFirst { case Some(why) => Right(why) }
     }
   }
 
@@ -130,7 +145,7 @@ final class ClosedPredicatePhase(config: CompilerConfig) extends CompilerPhase[S
   private def call(m: Method, args: Array[AnyRef]): Option[String] = {
     val shown = if (args.isEmpty) ""
       else Message("error.semantic.predicateReason.at",
-        Array[Any](args.map(String.valueOf).mkString(", "), config.contractSeed.toString, config.contractSamples.toString))
+        Array[Any](args.map(show).mkString(", "), config.contractSeed.toString, config.contractSamples.toString))
     try {
       if (m.invoke(null, args*).asInstanceOf[java.lang.Boolean]) None else Some(Message("error.semantic.predicateReason.false", shown))
     } catch {

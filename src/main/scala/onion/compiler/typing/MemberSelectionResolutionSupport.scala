@@ -64,14 +64,14 @@ private[compiler] final class MemberSelectionResolutionSupport(
       }
     } else {
       val field = MemberAccess.findField(targetType, name)
-      if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
+      if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition, targetType)) {
         Some(ResolvedFieldSelection(field))
       } else {
         val methodNames = Array(name, calls.getter(name), calls.getterBoolean(name))
         var methodIndex = 0
         while (methodIndex < methodNames.length) {
           val methodName = methodNames(methodIndex)
-          calls.tryFindMethod(node, targetType, methodName, Array.empty) match {
+          calls.tryFindMethod(node, targetType, methodName, Array.empty, receiver = targetType) match {
             case Right(method) =>
               return Some(ResolvedGetterSelection(method))
             case Left(false) =>

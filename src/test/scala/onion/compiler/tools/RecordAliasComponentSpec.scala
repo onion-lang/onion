@@ -201,5 +201,14 @@ class RecordAliasComponentSpec extends AbstractShellSpec {
       assert(codes.contains("E0061"), codes)
       assert(!codes.contains("E0005"), codes)
     }
+
+    // #2530: the E0061 named only java.lang.String, which it also lists as supported.
+    it("names the alias in the E0061 message") {
+      val out = compileAll(
+        "A.on" -> "import { java.lang.String as JS; }\ntype Name = JS\n",
+        "B.on" -> "record J(n: Name) {\n  shape doc = json\n}\n")
+      val msgs = out.swap.toOption.get.filter(_.startsWith("E0061"))
+      assert(msgs.exists(_.contains("Name (= java.lang.String)")), msgs)
+    }
   }
 }

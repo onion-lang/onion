@@ -71,7 +71,8 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
           // only failed (confusingly) at the use site, if at all
           val resolved = typing.table_.loadDottedOrNull(value)
           if (resolved == null) {
-            typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, value, importCandidates(value))
+            // Not found yet: a class of a later file is not registered until every header
+            // has run, so `checkImports` reports a name that is still missing then (#2776).
             imports.append(item)
           } else if (resolved.name == value) imports.append(item)
           else imports.append(ImportItem(key, resolved.name.split("\\.").toIndexedSeq))
@@ -81,15 +82,28 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
     imports.toSeq
   }
 
+  /** Reports each single-class and static import that names no class. Runs after every
+    * unit's header pass, so an import of a class declared in a file later on the command
+    * line is found (#2776). */
+  def checkImports(): Unit = {
+    if (unit.imports == null) return
+    def missing(name: String): Boolean = typing.table_.loadDottedOrNull(name) == null
+    for ((key, value) <- unit.imports.mapping) {
+      val item = ImportItem(key, value.split("\\.").toIndexedSeq)
+      if (!item.isOnDemand && missing(value))
+        typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, value, importCandidates(value))
+    }
+    for ((_, writtenName) <- unit.imports.staticImports)
+      if (missing(writtenName))
+        typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, writtenName, importCandidates(writtenName))
+  }
+
   def collectStaticImports(): StaticImportList = {
     val staticList = defaultStaticImports()
     if (unit.imports != null) {
       for ((methodName, writtenName) <- unit.imports.staticImports) {
         // `onion.Result.Ok::*` names a nested class with dots, like a type import does.
         val resolved = typing.table_.loadDottedOrNull(writtenName)
-        if (resolved == null) {
-          typing.report(SemanticError.CLASS_NOT_FOUND, unit.imports, writtenName, importCandidates(writtenName))
-        }
         val className = if (resolved == null) writtenName else resolved.name
         if (methodName == "*") staticList.add(new StaticImportItem(className, true))
         else staticList.add(new StaticImportItem(className, true, methodName))
@@ -247,6 +261,14 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
   }
 
   private def registerTopLevelContainer(imports: Seq[ImportItem]): Unit = {
+    // Two scripts with the same file name (d1/x.on, d2/x.on) would both become `xMain`.
+    val existing = typing.table_.lookup(typing.topClass)
+    if (existing != null) {
+      typing.report(SemanticError.DUPLICATE_CLASS, unit.location,
+        typing.topClass + " (the top-level code of " + unit.sourceFile + " and of " +
+          (existing match { case cd: ClassDefinition => cd.getSourceFile; case _ => "another file" }) + " would both become this class; rename one file)")
+      return
+    }
     val node = ClassDefinition.newClass(unit.location, 0, typing.topClass, typing.table_.rootClass, new Array[ClassType](0))
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
     node.isTopLevelContainer = true

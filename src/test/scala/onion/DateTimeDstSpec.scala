@@ -36,4 +36,22 @@ class DateTimeDstSpec extends AnyFunSpec {
       assert(DateTime.addDays(at(2026, 3, 1, 9), 14, ny) == at(2026, 3, 15, 9))
     }
   }
+
+  describe("DateTime.addDays/addMonths/addYears in the repeated fall-back hour (#2905)") {
+    // 06:30Z on 2026-11-01 is the second 01:30 (EST); 05:30Z is the first (EDT)
+    val second = java.time.Instant.parse("2026-11-01T06:30:00Z").toEpochMilli
+    val first = java.time.Instant.parse("2026-11-01T05:30:00Z").toEpochMilli
+    it("addDays(t, 0) returns t for either 01:30") {
+      assert(DateTime.addDays(second, 0, ny) == second)
+      assert(DateTime.addDays(first, 0, ny) == first)
+    }
+    it("addMonths and addYears by 0 return t") {
+      assert(DateTime.addMonths(second, 0, ny) == second)
+      assert(DateTime.addYears(second, 0, ny) == second)
+    }
+    it("keeps the offset when the shifted wall time is still valid") {
+      // 2026-10-31 01:30 is unambiguous EDT; one day later is the first 01:30
+      assert(DateTime.addDays(at(2026, 10, 31, 1) + 30 * 60000L, 1, ny) == first)
+    }
+  }
 }

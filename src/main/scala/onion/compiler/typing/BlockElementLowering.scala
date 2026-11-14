@@ -152,14 +152,18 @@ final class BlockElementLowering(
                       new ExpressionActionStatement(new SetLocal(counterVariable, new IntValue(0)))
                     )
 
+                  // The index increment is the loop's update, not the body's last
+                  // statement: `continue` jumps to the update, so a continue in the
+                  // body still advances to the next element (#2940).
                   block =
                     new ConditionalLoop(
+                      null,
                       new BinaryTerm(LESS_THAN, BasicType.BOOLEAN, ref(counterVariable), new ArrayLength(ref(collectionVar))),
                       new StatementBlock(
                         assign(elementVar, indexref(collectionVar, ref(counterVariable))),
-                        block,
-                        assign(counterVariable, new BinaryTerm(ADD, BasicType.INT, ref(counterVariable), new IntValue(1)))
-                      )
+                        block
+                      ),
+                      update = assign(counterVariable, new BinaryTerm(ADD, BasicType.INT, ref(counterVariable), new IntValue(1)))
                     )
                   new StatementBlock(init, block)
                 } else if (isMapType(collection.`type`)) {
@@ -357,19 +361,29 @@ final class BlockElementLowering(
           context.recordFailedDeclaration(node.name)
           return new NOP(node.location)
         }
-        val inferredType = inferred.`type`
+        // `x <- Result::ok(null)` gives the bind's lambda parameter the type `Object` (a Java
+        // type variable with an uninformative argument), so the `val` the rewriter makes from it
+        // is an `Object` too, not the null type, which would warn W0012 where it flows (#2537).
+        val inferredType =
+          if (inferred.`type`.isNullType && AST.hasModifier(node.modifiers, AST.M_DO_BINDING)) bodyContext.rootClass
+          else inferred.`type`
         if (inferredType == BasicType.VOID) {
           bodyContext.report(INCOMPATIBLE_TYPE, node.init, bodyContext.rootClass, inferredType)
           context.recordFailedDeclaration(node.name)
           return new NOP(node.location)
         }
-        typing.checkAndReportShadowing(node.name, node.location, context)
+        // A do-block bind's lambda parameter may reuse an outer name without W0005, so the
+        // `val` the rewriter makes from `x <- Result::ok(e)` may too (#2537).
+        if (!AST.hasModifier(node.modifiers, AST.M_DO_BINDING))
+          typing.checkAndReportShadowing(node.name, node.location, context)
         // A `var` never reassigned in its enclosing body is effectively final,
         // so it can be smart-cast like a `val` (issue #273). `val` (final) is
         // always immutable regardless.
         val mutable = !Modifier.isFinal(node.modifiers) && context.isReassigned(node.name)
         val index = context.add(node.name, inferredType, isMutable = mutable)
-        context.recordDeclaration(node.name, node.location)
+        // Likewise no W0001: the bind's lambda parameter was never checked for being unused.
+        if (!AST.hasModifier(node.modifiers, AST.M_DO_BINDING))
+          context.recordDeclaration(node.name, node.location)
         new ExpressionActionStatement(new SetLocal(node.location, 0, index, inferredType, inferred))
       } else {
         val lhsTypeOpt = mapFrom(node.typeRef)

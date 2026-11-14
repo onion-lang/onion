@@ -94,7 +94,7 @@ public final class Db {
     // ========== Connection ==========
 
     /** One open database connection. Not safe to share between threads. */
-    public static final class Conn {
+    public static final class Conn implements AutoCloseable {
         private final Connection connection;
         private final String url;
         private int transactionDepth = 0;

@@ -17,7 +17,12 @@ private[compiler] final class SuperMethodCallSupport(
 
   def typeSuperMethodCall(node: AST.SuperMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
     if (context.isStatic) {
-      bodyContext.report(SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE, node)
+      // An extension method compiles to a static method but has a receiver (`this`), so
+      // "static context" would be false for the user's code (#2688).
+      if (context.lookup("this") != null)
+        bodyContext.report(SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE, node, java.lang.Boolean.TRUE)
+      else
+        bodyContext.report(SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE, node)
       return None
     }
     if (ArgumentHelpers.hasNamedArguments(node.args)) return typeWithNamedArgs(node, context, expected)

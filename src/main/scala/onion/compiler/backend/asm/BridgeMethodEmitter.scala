@@ -44,7 +44,7 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 // A non-generic supertype: only a covariant return override, as
                 // in Java. `foo(x: Int)` beside an inherited `foo(Integer)` is
                 // an overload, so arguments must match exactly.
-                m.arguments.indices.forall(i => m.arguments(i).name == specializedArgs(i).name) &&
+                m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(specializedArgs(i)).name) &&
                 isCovariantReturn(rawMethod.returnType, m.returnType)
               else
                 m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))
@@ -58,7 +58,7 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
             if candidates.isEmpty then None
             else
               def exactCount(m: TypedAST.Method): Int =
-                m.arguments.indices.count(i => m.arguments(i).name == specializedArgs(i).name)
+                m.arguments.indices.count(i => plain(m.arguments(i)).name == plain(specializedArgs(i)).name)
               Some(candidates.reduceLeft((a, b) => if exactCount(b) > exactCount(a) then b else a))
 
           implOpt.foreach { impl =>
@@ -103,14 +103,19 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 gen.endMethod()
           }
 
+  // `T?` is the same JVM type as `T`; nullability does not change an override (#2719).
+  private def plain(tp: TypedAST.Type): TypedAST.Type = tp match
+    case nt: NullableType => nt.unwrap
+    case other => other
+
   private def isCovariantReturn(inherited: TypedAST.Type, own: TypedAST.Type): Boolean =
     !inherited.isBasicType && !own.isBasicType && TypeRules.isSuperType(inherited, own)
 
   private def isBridgeCompatible(implArg: TypedAST.Type, specializedArg: TypedAST.Type): Boolean = {
-    if implArg.name == specializedArg.name then return true
+    if plain(implArg).name == plain(specializedArg).name then return true
     // Allow primitive implementation argument to match boxed specialized arg
     // (e.g. Int vs Integer) and vice versa.
-    (implArg, specializedArg) match
+    (plain(implArg), plain(specializedArg)) match
       case (bt: TypedAST.BasicType, ct: TypedAST.ClassType) if bt != TypedAST.BasicType.VOID =>
         ct.name == boxedName(bt)
       case (ct: TypedAST.ClassType, bt: TypedAST.BasicType) if bt != TypedAST.BasicType.VOID =>
@@ -138,6 +143,7 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     case ap: AppliedClassType =>
       val newArgs = ap.typeArguments.map(substituteTypeVars(_, subst)).toList
       TypedAST.AppliedClassType(ap.raw, newArgs)
+    case nt: NullableType => NullableType.of(substituteTypeVars(nt.unwrap, subst))
     case other => other
 
   // Every supertype, each with the substitution for its own type parameters

@@ -78,7 +78,17 @@ private[compiler] final class InstanceMethodCallSupport(
       return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, untypedClosureIndices)
     }
 
-    val methods0 = MethodResolution.findMethods(targetType, name, params0, bodyContext.table)
+    val methods00 = MethodResolution.findMethods(targetType, name, params0, bodyContext.table)
+    // The most specific overload can be one the call may not name (`sb.append(sb2)` finds
+    // AbstractStringBuilder's package-private append(AbstractStringBuilder)). Java resolves
+    // among accessible members only, so retry without the inaccessible ones (#2818); when
+    // nothing else applies the E0013 below stays.
+    val methods0 =
+      if (methods00.length == 1 && !MemberAccess.isMemberAccessible(methods00(0), bodyContext.definition)) {
+        val accessible = MethodResolution.findMethods(targetType, name, params0, bodyContext.table,
+          m => MemberAccess.isMemberAccessible(m, bodyContext.definition))
+        if (accessible.length > 0) accessible else methods00
+      } else methods00
 
     // When no method applies, an argument that is a generic call (e.g.
     // `Result::ok(11)`) may have left its type parameters unbound (-> Object).

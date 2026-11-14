@@ -53,7 +53,7 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
         // outside world, and only for as long as the build waits (#2601). Otherwise it stays W0021.
         // A replay that is not run, or not waited for, also gets W0023 saying why (panel block on #2610).
         val effects = build.constructorEffects(r.cls.name) ++
-          build.methodEffects(Some(r.cls.name), r.method.name, r.method.args.size, static = false)
+          build.methodEffects(Some(r.owner), r.method.name, r.method.args.size, static = false)
         def notRun(message: String): Unit =
           warnings += CompileWarning(r.sourceFile, location, WarningCategory.PredicateNotRun, message)
         val replayed =

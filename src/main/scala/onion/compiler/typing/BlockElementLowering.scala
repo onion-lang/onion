@@ -141,6 +141,11 @@ final class BlockElementLowering(
               if (elementVar == null) {
                 // The element type failed to resolve (already reported)
                 new NOP(node.location)
+              } else if (annotationUnrelatedToElements(arg, elementVar.tp, collection.`type`)) {
+                // `foreach a: Int in strings` would otherwise compile and then fail
+                // in the verifier or with a cast error at the wrong line (#2946).
+                bodyContext.report(INCOMPATIBLE_TYPE, arg, elementVar.tp, actualElementType(collection.`type`))
+                new NOP(node.location)
               } else {
                 val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`, isMutable = true)
 
@@ -712,6 +717,19 @@ final class BlockElementLowering(
       }
     case _ => annotated
   }
+
+  private def actualElementType(collectionType: Type): Type = inferredElementType(collectionType)
+
+  /** An annotated loop variable must relate to the element type: the same type, a
+   *  supertype, or a narrowing (`foreach s: String in List[Object]` is a checked
+   *  cast). Two unrelated types, such as `Int` over `String` elements, never work. */
+  private def annotationUnrelatedToElements(arg: AST.Argument, annotated: Type, collectionType: Type): Boolean =
+    arg.typeRef != null && {
+      val actual = actualElementType(collectionType)
+      (actual ne bodyContext.rootClass) &&
+        !TypeRelations.isAssignableWithBoxing(annotated, actual, bodyContext.table) &&
+        !TypeRelations.isAssignableWithBoxing(actual, annotated, bodyContext.table)
+    }
 
   /** The type an unannotated foreach variable takes: an array's component type, an
    *  Iterable's element type, else Object (a raw collection, or a non-iterable one

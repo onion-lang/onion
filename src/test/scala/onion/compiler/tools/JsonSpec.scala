@@ -789,5 +789,55 @@ class JsonSpec extends AbstractShellSpec {
         assert(Shell.Success("[a]") == result)
       }
     }
+
+    describe("nesting depth") {
+      it("parseOrNull returns null on 5000 nested arrays instead of overflowing the stack") {
+        val result = shell.run(
+          """
+            |import { onion.Json; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val sb = new StringBuilder()
+            |    for var i: Int = 0; i < 5000; i++ { sb.append("[") }
+            |    for var i: Int = 0; i < 5000; i++ { sb.append("]") }
+            |    val deep = Json::parseOrNull(sb.toString())
+            |    var msg: String = "none"
+            |    try {
+            |      Json::parse(sb.toString())
+            |    } catch e: Json.JsonParseException {
+            |      msg = "threw"
+            |    }
+            |    return "" + (deep == null) + " " + msg
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("true threw") == result)
+      }
+
+      it("still parses 400 nested objects") {
+        val result = shell.run(
+          """
+            |import { onion.Json; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val sb = new StringBuilder()
+            |    for var i: Int = 0; i < 400; i++ { sb.append("{\"a\":") }
+            |    sb.append("1")
+            |    for var i: Int = 0; i < 400; i++ { sb.append("}") }
+            |    return "" + (Json::parseOrNull(sb.toString()) != null)
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("true") == result)
+      }
+    }
   }
 }

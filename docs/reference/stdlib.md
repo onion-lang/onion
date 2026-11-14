@@ -1705,6 +1705,9 @@ another "absent" case rather than an error to handle separately:
 val obj = Json::parseOrNull("not json")   // null, no exception
 ```
 
+Nesting is limited to 512 levels. Deeper input is a `Json.JsonParseException`
+("Nesting too deep"), so `parseOrNull` returns `null` for it.
+
 When you do want to handle a malformed-input failure, `Json.JsonParseException` carries
 `getPosition()` — the character offset into the input where parsing gave up — in addition
 to the usual `message()`:

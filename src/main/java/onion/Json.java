@@ -329,6 +329,15 @@ public final class Json {
             return at;
         }
 
+        private static final int MAX_DEPTH = 512;
+        private int depth = 0;
+
+        private void enter() throws JsonParseException {
+            if (++depth > MAX_DEPTH) {
+                throw new JsonParseException("Nesting too deep (limit " + MAX_DEPTH + ")", position);
+            }
+        }
+
         Object parseValue() throws JsonParseException {
             skipWhitespace();
             if (isEOF()) {
@@ -338,9 +347,11 @@ public final class Json {
             char c = peek();
             switch (c) {
                 case '{':
-                    return parseObject();
+                    enter();
+                    try { return parseObject(); } finally { depth--; }
                 case '[':
-                    return parseArray();
+                    enter();
+                    try { return parseArray(); } finally { depth--; }
                 case '"':
                     return parseString();
                 case 't':

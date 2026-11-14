@@ -41,6 +41,16 @@ class EffectTableStdlibCoverageSpec extends AnyFunSpec {
       .map(_.stripPrefix("onion."))
   }
 
+  it("every src/main/java/onion/typeclass/*.java class has an effect-table.txt entry") {
+    val dir = Path.of("src/main/java/onion/typeclass")
+    val classes = Files.list(dir).iterator().asScala
+      .map(_.getFileName.toString).filter(_.endsWith(".java")).map(n => "typeclass." + n.stripSuffix(".java")).toSet
+    assert(classes.contains("typeclass.Numeric"), "source scan found no onion.typeclass classes -- the scan has rotted")
+    val missing = classes -- registeredClasses
+    assert(missing.isEmpty,
+      s"onion.typeclass classes with no effect-table.txt entry: ${missing.toSeq.sorted.mkString(", ")}")
+  }
+
   it("every src/main/java/onion/*.java class has an effect-table.txt entry") {
     val classes = stdlibClassNames
     assert(classes.nonEmpty, "source scan found no onion.* stdlib classes — the scan has rotted")

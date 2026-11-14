@@ -38,7 +38,7 @@ public final class DateTime {
      */
     public static String nowString(String pattern) {
         if (pattern == null) return nowString();
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH));
+        return ZonedDateTime.now(LOCAL).format(patternFormatter(pattern));
     }
 
     // ========== Parsing ==========
@@ -116,8 +116,16 @@ public final class DateTime {
      */
     public static String format(long epochMillis, String pattern) {
         if (pattern == null) return format(epochMillis);
-        LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), LOCAL);
-        return ldt.format(DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH));
+        // A zoned value, so zone and offset letters (z, XXX, VV) work as well.
+        return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), LOCAL).format(patternFormatter(pattern));
+    }
+
+    private static DateTimeFormatter patternFormatter(String pattern) {
+        try {
+            return DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("invalid date-time pattern \"" + pattern + "\"", e);
+        }
     }
 
     // ========== Components ==========

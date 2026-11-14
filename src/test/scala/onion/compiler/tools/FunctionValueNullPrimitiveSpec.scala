@@ -15,6 +15,14 @@ class FunctionValueNullPrimitiveSpec extends AbstractShellSpec {
     }
   }
 
+  private def errorMessages(src: String): Seq[String] = {
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors.map(_.message)
+      case _ => Seq.empty
+    }
+  }
+
   describe("null passed to a primitive parameter of a function value") {
     it("is E0000 for f(null)") {
       assert(errorCodes("val f: (Int) -> String = (i) -> \"v\"\nprintln(f(null))\n") == Seq("E0000"))
@@ -53,6 +61,17 @@ class FunctionValueNullPrimitiveSpec extends AbstractShellSpec {
     }
     it("is E0000 for List[Int].add") {
       assert(errorCodes("val xs: List[Int] = [1, 2]\nxs.add(null)\nprintln(xs)\n") == Seq("E0000"))
+    }
+    it("is E0000 for Map[String, Int].put") {
+      val src = "import { java.util.* }\nval m: Map[String, Int] = new HashMap[String, Int]()\nm.put(\"a\", null)\nprintln(m)\n"
+      assert(errorCodes(src) == Seq("E0000"))
+    }
+    it("hints at the nullable type argument, with no cast advice") {
+      val messages = errorMessages("val xs: List[Long] = [1L]\nxs.add(null)\n")
+      assert(messages.size == 1)
+      assert(messages.head.contains("`Long?`"), messages.head)
+      assert(messages.head.contains("`List[Long?]`"), messages.head)
+      assert(!messages.head.contains("cast"), messages.head)
     }
     it("is E0000 for a user generic class's method") {
       val src =
@@ -100,7 +119,9 @@ class FunctionValueNullPrimitiveSpec extends AbstractShellSpec {
           |  xs.add(null)
           |  val ys: List[String] = ["a"]
           |  ys.add(null)
-          |  return xs.size + ys.size - 4
+          |  val m: Map[String, Int?] = new java.util.HashMap[String, Int?]()
+          |  m.put("a", null)
+          |  return xs.size + ys.size + m.size - 5
           |}
         """.stripMargin
       assert(Shell.Success(0) == shell.run(src, "None", Array()))

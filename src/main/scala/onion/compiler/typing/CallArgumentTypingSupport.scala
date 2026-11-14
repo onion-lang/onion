@@ -26,7 +26,7 @@ private[compiler] final class CallArgumentTypingSupport(
         // later, so `null` there crashes at run time. It is rejected as for an `Int`
         // method parameter (E0000), naming the primitive (#2872).
         case Some(primitive) =>
-          bodyContext.report(INCOMPATIBLE_TYPE, node, primitive, actual.`type`)
+          bodyContext.report(INCOMPATIBLE_TYPE, node, primitive, actual.`type`, onion.compiler.SemanticErrorReporter.PrimitiveTypeArgumentNullHint)
           return null
         case None =>
       }

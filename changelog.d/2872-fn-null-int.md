@@ -1,5 +1,5 @@
-### Fixed
+### Breaking
 
-- **`null` into an `Int`-typed slot of a generic is a compile error (#2872).**
-  - Before: W0012 naming `java.lang.Integer`, then a null-value crash at run time.
-  - Now: E0000 "type Int is expected, but type null is used", as for an `Int` method parameter. Covers `f(null)` on an `(Int) -> T`, `xs.add(null)` on a `List[Int]`, `g.apply(null)` on a `Function[Int, R]` and a user `Box[Int].put(null)`. `(Int?) -> T` and `List[Int?]` still take `null`.
+- **`null` into a generic slot whose type argument is a primitive is E0000 (#2872).**
+  - Before: W0012. `f(null)` on an `(Int) -> T` crashed at run time; `xs.add(null)` on a `List[Int]` stored `null` and crashed only when read back as an `Int`.
+  - Now: `[E0000] type Int is expected, but type null is used`, with a hint to write the type argument as `Int?` (`List[Int?]`, `Map[String, Int?]`). See `docs/migration/pre-1.0.md`.

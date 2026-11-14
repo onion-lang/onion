@@ -361,8 +361,8 @@ Java APIs are not checked, because the compiler does not know their nullness:
 - Except when the parameter is the receiver's own type argument: `xs.add(null)`
   on a `List[String]` warns, because you chose `String` there.
   When that type argument is a primitive, it is an error (E0000), not a warning:
-  `xs.add(null)` on a `List[Int]`, `f(null)` on an `(Int) -> T`. The value is
-  unboxed later, so it would crash.
+  `xs.add(null)` on a `List[Int]`, `f(null)` on an `(Int) -> T`. An `Int` is
+  never null; to store `null`, write the type argument as `Int?` (`List[Int?]`).
 
 A method written in Onion warns, also when it was compiled separately (a
 project's `tests/` calling `src/`, or an Onion library jar).

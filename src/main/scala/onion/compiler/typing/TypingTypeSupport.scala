@@ -297,6 +297,10 @@ final class TypingTypeSupport(private val typing: Typing) {
     }
   }
 
+  /** Bound check for type arguments inferred from `new C(args)` (#2539); explicit ones go through `validateTypeApplication`. */
+  def checkInferredTypeArgumentBounds(typeNode: AST.TypeNode, applied: TypedAST.AppliedClassType): Unit =
+    checkTypeArgumentBounds(typeNode, applied, applied.raw.typeParameters.toArray)
+
   private def checkTypeArgumentBounds(
     typeNode: AST.TypeNode,
     applied: TypedAST.AppliedClassType,

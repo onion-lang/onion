@@ -394,6 +394,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
     typeSupport.typesOf(arguments)
 
+  private[compiler] def checkInferredTypeArgumentBounds(typeNode: AST.TypeNode, applied: AppliedClassType): Unit =
+    typeSupport.checkInferredTypeArgumentBounds(typeNode, applied)
+
   private[compiler] def mapFrom(typeNode: AST.TypeNode): Option[Type] =
     typeSupport.mapFrom(typeNode)
 

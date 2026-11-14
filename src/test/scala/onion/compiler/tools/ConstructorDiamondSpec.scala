@@ -65,5 +65,22 @@ class ConstructorDiamondSpec extends AbstractShellSpec {
         "class Empty[T] { public: def this {} }\ndef main(args: String[]): Int { val e = new Empty()\n return 0 }",
         "None", Array()))
     }
+
+    it("checks a bound that names another type parameter against the inferred arguments (#2539)") {
+      val p =
+        """
+          |class P[B, T extends B] {
+          |public:
+          |  val b: B
+          |  val t: T
+          |  def this(b: B, t: T) { this.b = b; this.t = t }
+          |  def get(): B = (t as B)
+          |}
+          |""".stripMargin
+      assert(Shell.Failure(-1) == shell.run(p +
+        "def main(args: String[]): String { val p = new P(\"a\", Integer::valueOf(1))\n return p.get() }", "None", Array()))
+      assert(Shell.Success("b") == shell.run(p +
+        "def main(args: String[]): String { val p = new P(\"a\", \"b\")\n return p.get() }", "None", Array()))
+    }
   }
 }

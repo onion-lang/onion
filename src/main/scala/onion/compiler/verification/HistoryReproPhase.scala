@@ -49,6 +49,9 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
       val build = new BuildRun(config, ctx.debugArtifacts.typedClasses.getOrElse(Nil))
       for (r <- repros) {
         val location = r.method.location
+        // An inherited method is reported at the superclass's body, so the message names both classes
+        // and offers the override, as E0109 does for the same situation (panel block on #2953).
+        val inherited = r.owner != r.cls.name
         // A replay runs the constructor and the method; it runs only when neither reaches the
         // outside world, and only for as long as the build waits (#2601). Otherwise it stays W0021.
         // A replay that is not run, or not waited for, also gets W0023 saying why (panel block on #2610).
@@ -65,11 +68,13 @@ final class HistoryReproPhase(config: CompilerConfig) extends CompilerPhase[Seq[
           }
         if (replayed) {
           errors += CompileError(r.sourceFile, location,
-            Message("error.semantic.historyReproduced", Array[Any](r.method.name, r.history, r.shown)),
+            if (inherited) Message("error.semantic.historyReproduced.inherited", Array[Any](r.cls.name, r.method.name, r.owner, r.history, r.shown))
+            else Message("error.semantic.historyReproduced", Array[Any](r.method.name, r.history, r.shown)),
             Some(SemanticError.HISTORY_REPRODUCED.errorCode))
         } else {
           warnings += CompileWarning(r.sourceFile, location, WarningCategory.HistoryNotProved,
-            Message("warning.historyNotProved", Array[Any](r.method.name, r.history, r.shown)))
+            if (inherited) Message("warning.historyNotProved.inherited", Array[Any](r.cls.name, r.method.name, r.owner, r.history, r.shown))
+            else Message("warning.historyNotProved", Array[Any](r.method.name, r.history, r.shown)))
         }
       }
     } finally thread.setContextClassLoader(previous)

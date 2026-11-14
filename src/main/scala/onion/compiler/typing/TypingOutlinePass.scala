@@ -54,7 +54,11 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   private var constructorCount = 0
 
-  def run(): Unit = {
+  /**
+   * Phase A, run for every unit before any unit's [[registerTypeParameters]]: a placeholder
+   * type-parameter arity (Object bounds) for every generic type in this unit.
+   */
+  def registerTypeParameterPlaceholders(): Unit = {
     find(topClass).foreach(unitContext.currentMapper = _)
     // Phase A: register a placeholder type-parameter arity (Object bounds) for every
     // generic type BEFORE any bounds are resolved, so a self-referential bound like
@@ -69,9 +73,16 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       case node: AST.RecordDeclaration => placeholders(node, node.typeParameters)
       case _ =>
     }
+  }
+
+  /**
+   * Runs for every unit before any unit's [[run]], so a generic type declared in a later
+   * file already has its type parameters when an earlier file names it (`Crate[Int]`, #2853).
+   */
+  def registerTypeParameters(): Unit = {
     // Pre-pass: register every declared type's type parameters before any
     // hierarchy resolution, so 'class A : B[String]' works even when B is
-    // declared later in the file.
+    // declared later in the file, or in a later file.
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration =>
         typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
@@ -99,6 +110,9 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         }
       case _ =>
     }
+  }
+
+  def run(): Unit = {
     find(topClass).foreach(unitContext.currentMapper = _)
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)

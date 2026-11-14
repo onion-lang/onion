@@ -115,5 +115,32 @@ class GenericCallBoundCheckSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Failure(-1) == r)
     }
+    // A generic call that is the argument of another call was typed with its diagnostics
+    // muted, and the bound error was lost; the program then failed at run time.
+    for ((label, call) <- Seq(
+           "an Object parameter" -> "show(w(\"q\", l))",
+           "the top-level println" -> "println(w(\"q\", l))",
+           "a nested call" -> "println(use(w(\"q\", l)))",
+           "a constructor" -> "new Holder(w(\"q\", l))")) {
+      it(s"still rejects List[Integer] when B is String, as the argument of $label") {
+        val r = shell.run(
+          s"""import { java.util.* }
+             |class Holder { def this(o: Object) { } }
+             |def w[B, T extends List[B]](b: B, t: T): B = b
+             |def use(o: Object): Object = o
+             |def show(o: Object): void { IO::println(o) }
+             |def main(args: String[]): Int { val l: List[Integer] = [1]; $call; return 0 }
+             |""".stripMargin, "None", Array())
+        assert(Shell.Failure(-1) == r)
+      }
+    }
+    it("still rejects T extends B with B = String and T = Int, as an argument (#2325)") {
+      val r = shell.run(
+        """def w2[B, T extends B](b: B, t: T): B = b
+          |def showS(o: String): void { IO::println(o) }
+          |def main(args: String[]): Int { showS(w2("q", 3)); return 0 }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
   }
 }

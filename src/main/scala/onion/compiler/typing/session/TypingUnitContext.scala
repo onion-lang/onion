@@ -21,7 +21,10 @@ final class TypingUnitContext(
   // types, ...) still report eagerly. See TypingTypeSupport.validateTypeApplication.
   var deferringBoundChecks: Int,
   val deferredBoundChecks: scala.collection.mutable.Buffer[() => Unit]
-)
+) {
+  /** Generic-call bound errors dropped while reporting was suppressed (#2538). */
+  var mutedBoundErrors: Int = 0
+}
 
 object TypingUnitContext {
   def initial(unit: AST.CompilationUnit, emptyTypeParams: TypeParamScope): TypingUnitContext =

@@ -98,8 +98,12 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     val hasMalleable = calls.hasMalleableArgs(node.args)
     val params0 = {
       val eager =
-        if (hasMalleable) calls.typing.withSuppressedReporting(calls.typedTerms(node.args.toArray, context))
-        else calls.typedTerms(node.args.toArray, context)
+        if (!hasMalleable) calls.typedTerms(node.args.toArray, context)
+        else calls.typing.withSuppressedReportingNotingBoundErrors(calls.typedTerms(node.args.toArray, context)) match {
+          // A generic call's bound error does not fail typing; re-type to report it (#2538).
+          case (terms, true) if terms != null => calls.typedTerms(node.args.toArray, context)
+          case (terms, _) => terms
+        }
       if (eager != null || !hasMalleable) eager
       else {
         val topLevel = bodyContext.topLevelClass.filter(t => !(t eq targetType))

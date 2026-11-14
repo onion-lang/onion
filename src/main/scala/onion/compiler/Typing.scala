@@ -289,6 +289,22 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
 
   /**
+   * `withSuppressedReporting`, also telling whether `block` dropped a generic call's bound
+   * error. That error does not fail typing, so a speculative typing that keeps its result
+   * must re-type with reporting on, or the error is lost and the program fails at run time
+   * instead (#2538).
+   */
+  def withSuppressedReportingNotingBoundErrors[A](block: => A): (A, Boolean) = {
+    val unitContext = currentUnitContext
+    val before = unitContext.mutedBoundErrors
+    val result = withSuppressedReporting(block)
+    (result, unitContext.mutedBoundErrors != before)
+  }
+
+  private[compiler] def noteMutedBoundError(): Unit =
+    if (!reportingEnabled) currentUnitContext.mutedBoundErrors += 1
+
+  /**
    * The source expression of each typed contract clause, by identity. A typed clause and the
    * calls in it mostly carry no location, so a check over the typed clause (E0106) looks its
    * diagnostic's position up here instead of falling back to the owning `def` (#2605).

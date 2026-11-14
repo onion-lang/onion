@@ -232,7 +232,10 @@ private[typing] object GenericMethodTypeArguments {
   ) {
     val rootClass = typing.rootClass
     def reportError(node: AST.Node, error: SemanticError, items: AnyRef*): Unit =
-      if (reportErrors) typing.report(error, node, items*)
+      if (reportErrors) {
+        typing.noteMutedBoundError()
+        typing.report(error, node, items*)
+      }
     def boxedTypeArg(arg: Type): Type = typing.boxedTypeArgument(arg)
     val typeParams = method.typeParameters
 

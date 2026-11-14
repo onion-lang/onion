@@ -224,6 +224,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
+    for(unit <- source) {
+      new onion.compiler.typing.TypingHeaderPass(this, session.activate(unit)).checkImports()
+    }
+    processTypeParameters(source)
     for(unit <- source) processOutline(unit)
     // Every unit's defaults are typed before any body, so a call may omit a default
     // declared later in its file or in another file (#2653).
@@ -240,7 +244,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     // Pass 6 (RFC #2557): a contract expression must be pure. Same reason to run here.
     new onion.compiler.typing.ContractPurityPass(this).run(table_.classes.values.toSeq)
     // RFC #2557: a write that breaks a `history`, decided from the syntax alone.
-    new onion.compiler.typing.HistoryWritePass(this).run(source)
+    new onion.compiler.typing.HistoryWritePass(this, typedOf = lookupKernelNode).run(source)
     // RFC #2557 design 4: an override's body against the effective contract.
     new onion.compiler.typing.OverrideContractPass((file, location, message) => {
       warningReporter_.setSourceFile(file)
@@ -268,6 +272,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
   def processOutline(unit: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).run()
+  /** Every unit's type parameters, before any unit's outline, so file order does not matter (#2853). */
+  private def processTypeParameters(source: Seq[AST.CompilationUnit]): Unit = {
+    for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameterPlaceholders()
+    for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameters()
+  }
   def processTyping(unit: AST.CompilationUnit): Unit = {
     val pass = new onion.compiler.typing.TypingBodyPass(this, session.activate(unit))
     onion.compiler.typing.DefaultScheduling.run(pass.defaultJobs().map(unit -> _))(u => session.activate(u))
@@ -390,6 +399,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     paths.mkString(Systems.pathSeparator)
   private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
     typeSupport.typesOf(arguments)
+
+  private[compiler] def checkInferredTypeArgumentBounds(typeNode: AST.TypeNode, applied: AppliedClassType): Unit =
+    typeSupport.checkInferredTypeArgumentBounds(typeNode, applied)
 
   private[compiler] def mapFrom(typeNode: AST.TypeNode): Option[Type] =
     typeSupport.mapFrom(typeNode)

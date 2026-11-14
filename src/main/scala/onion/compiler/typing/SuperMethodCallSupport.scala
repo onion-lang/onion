@@ -11,19 +11,46 @@ import scala.jdk.CollectionConverters.*
 
 private[compiler] final class SuperMethodCallSupport(
   bodyContext: TypingBodyContext,
-  calls: MethodCallTyping
+  calls: MethodCallTyping,
+  fallback: MethodCallFallbackSupport
 ) {
   private val overloadSupport = new CallOverloadSupport(calls.typing, calls)
 
   def typeSuperMethodCall(node: AST.SuperMethodCall, context: LocalContext, expected: Type = null): Option[Term] = {
     if (context.isStatic) {
-      bodyContext.report(SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE, node)
+      // An extension method compiles to a static method but has a receiver (`this`), so
+      // "static context" would be false for the user's code (#2688).
+      if (context.lookup("this") != null)
+        bodyContext.report(SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE, node, java.lang.Boolean.TRUE)
+      else
+        bodyContext.report(SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE, node)
       return None
     }
     if (ArgumentHelpers.hasNamedArguments(node.args)) return typeWithNamedArgs(node, context, expected)
+    val contextClass = bodyContext.definition
+    // An untyped lambda argument takes its parameter types from the superclass method, as
+    // `this.f((s) -> ..)` does; typing it up front here was E0052 (#2674).
+    val untypedClosureIndices = ArgumentHelpers.untypedClosureIndicesOf(node.args)
+    if (untypedClosureIndices.nonEmpty &&
+        MethodResolution.candidatesOf(contextClass.superClass, node.name, calls.typing.table_).exists(calls.isInstanceMethod)) {
+      return fallback.typeCallWithBidirectionalInferenceCore(
+        node, node.name, node.args, node.typeArgs, new This(contextClass), contextClass.superClass,
+        context, expected, untypedClosureIndices,
+        (method, finalParams) =>
+          if (!MemberAccess.isMemberAccessible(method, contextClass)) {
+            // A private superclass method: the typed path reports E0013, and the call would
+            // otherwise compile and throw IllegalAccessError at run time.
+            bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, node.name, method.arguments, contextClass)
+            None
+          } else if (Modifier.isAbstract(method.modifier)) {
+            bodyContext.report(SemanticError.SUPER_CALL_ABSTRACT_METHOD, node, node.name, method.affiliation)
+            None
+          } else if (context.isClosure) Some(superCallThroughAccessor(contextClass, method, finalParams))
+          else Some(new CallSuper(new This(contextClass), method, finalParams))
+      )
+    }
     val parameters = calls.typedTerms(node.args.toArray, context)
     if (parameters == null) return None
-    val contextClass = bodyContext.definition
     calls.tryFindMethod(node, contextClass.superClass, node.name, parameters) match {
       case Right(method) if Modifier.isAbstract(method.modifier) =>
         // No body to call: the JVM would throw AbstractMethodError (#2656).

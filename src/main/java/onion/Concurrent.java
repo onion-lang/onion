@@ -77,7 +77,7 @@ public final class Concurrent {
     // ========== Pool ==========
 
     /** A fixed set of worker threads. */
-    public static final class Pool {
+    public static final class Pool implements AutoCloseable {
         private final ExecutorService executor;
         private final int size;
         private volatile boolean closed;
@@ -169,10 +169,7 @@ public final class Concurrent {
         }
 
         private static String rootMessage(Throwable error) {
-            Throwable cause = error;
-            while (cause.getCause() != null) cause = cause.getCause();
-            String message = cause.getMessage();
-            return message == null ? cause.getClass().getSimpleName() : message;
+            return Future.rootMessage(error);
         }
     }
 

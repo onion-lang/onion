@@ -1334,6 +1334,25 @@ public:
 
 Fix: call the override on `self` (`f()`), or give the superclass method a body.
 
+### `E0116` — Unrelated interface defaults for one method
+
+A class conforms to two interfaces that each give the same method a body, and neither
+interface extends the other. The JVM cannot pick one, so before this error the call compiled
+and threw `AbstractMethodError`. Java rejects such a class as well.
+
+```onion
+interface A { def g(): Int = 1 }
+interface B { def g(): Int = 2 }
+class C conforms A, B {   // E0116
+public:
+  def this {}
+}
+```
+
+Fix: override the method in the class (`override def g(): Int = 1`). A method the class
+inherits from a superclass also settles it, as does a default in an interface that extends
+the others.
+
 ## Declaration errors
 
 ### `E0007` — Duplicate local variable
@@ -1812,6 +1831,9 @@ public:
 
 Fix: drop `static`, or pass the instance in explicitly as a parameter.
 
+`super` inside an `extension` method is also E0050, with its own message:
+the receiver is `this`, so call the method on it.
+
 ### `E0058` — Label not found
 
 A labeled `break`/`continue` names a label that is not bound to any
@@ -2125,6 +2147,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0113` | the closed predicate … is … when the build runs it |
 | `E0114` | the Shape … breaks its round-trip contract |
 | `E0115` | `super.…(...)` calls an abstract method of … |
+| `E0116` | class … inherits a default …(…) from each of …, and none of them overrides the others |
 
 ## See also
 

@@ -150,6 +150,7 @@ onion.Server$Instance#handleAll=pure
 onion.Server$Instance#port=pure
 onion.Server$Instance#await=net
 onion.Server$Instance#stop=net
+onion.Server$Instance#close=net
 onion.Server$Request#*=pure
 onion.Server$Response#*=pure
 

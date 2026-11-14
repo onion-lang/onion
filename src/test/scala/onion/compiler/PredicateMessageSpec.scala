@@ -46,5 +46,19 @@ class PredicateMessageSpec extends AnyFunSpec {
       }
       else msgs.foreach(m => assert(!m.exists(c => c >= '぀' && c <= 'ヿ' || c >= '一' && c <= '鿿'), m))
     }
+
+    it("reports nothing for a true predicate whose sample's toString throws (#2752)") {
+      val src = "record Pt(x: Int, y: Int) {\npublic:\n  def toString(): String = { throw new IllegalStateException(\"ts\") }\n}\n" +
+        "def ok(p: Pt): Boolean\n  ensures result\n  = true\nIO::println(\"x\")\n"
+      assert(e0113(src) == "")
+    }
+
+    it("says an unsampleable parameter was not run, not that the predicate did not hold (#2752)") {
+      val msg = e0113("def un(t: Thread): Boolean\n  ensures result\n  = true\nIO::println(\"x\")\n")
+      assert(msg.nonEmpty, "E0113 was not reported")
+      assert(msg.contains("Thread"), msg)
+      assert(!msg.contains("did not hold") && !msg.contains("成り立ちません"), msg)
+      assert(!msg.contains("。）。"), msg)
+    }
   }
 }

@@ -9,7 +9,8 @@ final class ClosureCodegen(
   asmCodeGen: onion.compiler.backend.asm.AsmCodeGeneration,
   outputDirectory: String,
   nextClosureId: () => Int,
-  registerCompiledClass: CompiledClass => Unit
+  registerCompiledClass: CompiledClass => Unit,
+  sourceFile: String
 ) {
   private def asmType(tp: TypedAST.Type): AsmType = asmCodeGen.asmType(tp)
   private def boxAsmType(tp: TypedAST.Type): AsmType = asmCodeGen.boxAsmType(tp)
@@ -138,6 +139,11 @@ final class ClosureCodegen(
       Array(AsmUtil.internalName(interfaceType.name))
     )
 
+    // The closure's line numbers are lines of its host's source file. Without this
+    // attribute the JVM prints `Unknown Source` for its frames, and the runtime error
+    // report skips them, naming the line that called the lambda instead (#2804).
+    cw.visitSource(sourceFile, null)
+
     // Join the enclosing class's nest so private members stay accessible
     val nestHostEnd = className.indexOf("$Closure")
     cw.visitNestHost(if (nestHostEnd >= 0) className.substring(0, nestHostEnd) else className)
@@ -163,8 +169,13 @@ final class ClosureCodegen(
     cw.toByteArray
   }
 
+  // The erased signature the bridge must implement. An inherited SAM (`UnaryOperator`'s
+  // `apply`, declared on `Function`) is found on the superinterface (#2844).
   private def findInterfaceMethod(interfaceType: ClassType, name: String, argCount: Int): Option[TypedAST.Method] =
-    interfaceType.methods(name).find(_.arguments.length == argCount)
+    if interfaceType == null then None
+    else
+      interfaceType.methods(name).find(_.arguments.length == argCount)
+        .orElse(interfaceType.interfaces.iterator.map(findInterfaceMethod(_, name, argCount)).collectFirst { case Some(m) => m })
 
   private def generateBridgeMethod(
     cw: ClassWriter,

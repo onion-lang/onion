@@ -243,6 +243,9 @@ class SemanticErrorReporter(threshold: Int) {
         // already failed, so a name+arity match here can only be this stdlib method.
         val className = FormerDefaultImportLookup.find(name, argTypes.length).get
         Some(format(message("suggestion.stdlibNoLongerDefaultImported"), Seq(className, name)))
+      } else if (isUnqualifiedCall && NotDefaultImportedLookup.find(name, argTypes.length).isDefined) {
+        // `sum(xs)`, `sha256(s)`: pure helpers that were never default-imported (#2723).
+        Some(format(message("suggestion.stdlibNotDefaultImported"), Seq(NotDefaultImportedLookup.find(name, argTypes.length).get, name)))
       } else if (ForeignCollectionNames.contains(name) && isListType(targetType)) {
         // The name another language gives a List operation Onion also has, under its own
         // name (Scala `sortBy`/`foldLeft`/`forall`, Kotlin `joinToString`/`sumOf`, Ruby
@@ -285,10 +288,26 @@ class SemanticErrorReporter(threshold: Int) {
         val hint = format(message("suggestion.nullableArgument"), Seq((i + 1).toString, typeName(arg), typeName(param)))
         Some(withHexDigitB.fold("")(_ + Systems.lineSeparator + "  ") + hint)
       case None => withHexDigitB
+    // `Proc::run(cmd)` with `cmd: List[String]` and `run(String...)`: the list is the only
+    // thing missing an array, so show the call that works (#2773).
+    val listForVarargs: Option[TypedAST.ArrayType] =
+      sameName.iterator.filter(m => m.isVararg && m.argumentCount == argTypes.length).flatMap { m =>
+        (m.arguments.last, argTypes.last) match
+          case (arr: TypedAST.ArrayType, actual) if arr.dimension == 1 && !arr.component.isBasicType && actual != null &&
+              isListType(actual match { case n: TypedAST.NullableType => n.innerType; case o => o }) &&
+              listElementsFit(actual, arr) && snippetCompiles(actual, arr) &&
+              m.arguments.init.zip(argTypes.init).forall { case (p, a) => argPassable(p, a) } => Some(arr)
+          case _ => None
+      }.nextOption()
+    val withListHint = listForVarargs match
+      case Some(arr) =>
+        val written = onion.compiler.toolbox.TypeFormatting.componentWrittenForm(arr.component) + "[0]"
+        Some(withNullable.fold("")(_ + Systems.lineSeparator + "  ") + format(message("suggestion.listToVarargs"), Seq(written)))
+      case None => withNullable
     val heldBack = sameName.collectFirst {
       case m: TypedAST.MethodDefinition if m.defaultsPending && fitsLeadingParameters(m.arguments, m.defaultsOmittableFrom, argTypes) => (m.defaultsHeldBackBy, m.defaultsHeldBackVia)
     }
-    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withNullable, name, heldBack)))
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withListHint, name, heldBack)))
   }
 
   /**
@@ -593,6 +612,27 @@ class SemanticErrorReporter(threshold: Int) {
 
     // (name, arity) -> simple class name. A name/arity pair shared by two of these
     // classes is dropped rather than guessed at.
+    private lazy val index: Map[(String, Int), String] = {
+      val entries = for {
+        cls <- classes
+        m <- cls.getMethods
+        mods = m.getModifiers
+        if java.lang.reflect.Modifier.isStatic(mods) && java.lang.reflect.Modifier.isPublic(mods)
+        if m.getDeclaringClass == cls
+      } yield (m.getName, m.getParameterCount) -> cls.getSimpleName
+      entries.groupBy(_._1).collect {
+        case (key, matches) if matches.map(_._2).distinct.size == 1 => key -> matches.head._2
+      }
+    }
+
+    def find(name: String, arity: Int): Option[String] = index.get((name, arity))
+  }
+
+  /** Pure stdlib classes outside the default static imports; same reflection scheme as above. */
+  private object NotDefaultImportedLookup {
+    private val classes: Seq[Class[?]] =
+      Seq(classOf[onion.Stats], classOf[onion.Hash], classOf[onion.Codec], classOf[onion.Format])
+
     private lazy val index: Map[(String, Int), String] = {
       val entries = for {
         cls <- classes
@@ -921,8 +961,18 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportMethodNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
     val baseMessage = format(message("error.semantic.methodNotAccessible"),
       Seq(objectTypeName(items(0)), asString(items(1)), typeNames(asTypeArray(items(2))), classTypeName(items(3))))
-    problem(position, appendSuggestion(baseMessage, Some(message("suggestion.privateAccessHint"))))
+    problem(position, appendSuggestion(baseMessage, Some(message(privateAccessHintKey(items(0))))))
   }
+
+  /**
+   * The `public:` advice only helps when the owner is Onion source the user can edit; a
+   * Java or classpath class has no section to move the member to (#2764).
+   */
+  private def privateAccessHintKey(owner: AnyRef): String =
+    owner match {
+      case _: TypedAST.ClassDefinition => "suggestion.privateAccessHint"
+      case _ => "suggestion.privateAccessHintExternal"
+    }
 
   /**
    * Handles FIELD_NOT_ACCESSIBLE with the same hint as [[reportMethodNotAccessible]].
@@ -930,7 +980,7 @@ class SemanticErrorReporter(threshold: Int) {
   private def reportFieldNotAccessible(position: Location, items: Array[AnyRef]): Unit = {
     val baseMessage = format(message("error.semantic.fieldNotAccessible"),
       Seq(classTypeName(items(0)), asString(items(1)), classTypeName(items(2))))
-    problem(position, appendSuggestion(baseMessage, Some(message("suggestion.privateAccessHint"))))
+    problem(position, appendSuggestion(baseMessage, Some(message(privateAccessHintKey(items(0))))))
   }
 
   /**
@@ -1021,6 +1071,9 @@ class SemanticErrorReporter(threshold: Int) {
       // Special cases that need custom handling
       case SemanticError.VARIABLE_NOT_FOUND =>
         reportVariableNotFound(position, items)
+      case SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE if items.nonEmpty && items(0) == java.lang.Boolean.TRUE =>
+        // `super` inside an `extension` method: name the real reason (#2688).
+        problem(position, message("error.semantic.superInExtension"))
       case SemanticError.METHOD_NOT_FOUND =>
         reportMethodNotFound(position, items)
       case SemanticError.FIELD_NOT_FOUND =>
@@ -1135,6 +1188,14 @@ class SemanticErrorReporter(threshold: Int) {
    *  it reported a fresh error, so a redundant outer method-not-found can be
    *  suppressed (issue #316). */
   def problemCount: Int = problems.length
+
+  /** Drops the errors collected since `start` (a [[problemCount]] checkpoint) that `drop`
+   *  accepts. Lets a caller keep an inner diagnostic and discard a redundant outer one (#2550). */
+  def dropProblemsSince(start: Int)(drop: CompileError => Boolean): Unit = {
+    val kept = problems.drop(start).filterNot(drop)
+    problems.remove(start, problems.length - start)
+    problems ++= kept
+  }
 
   def setSourceFile(sourceFile: String): Unit = {
     this.sourceFile = sourceFile
@@ -1467,6 +1528,10 @@ object SemanticErrorReporter {
       "error.semantic.unimplementedAbstractMethod",
       Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)))
     ),
+    SemanticError.CONFLICTING_INTERFACE_DEFAULTS -> ErrorDef(
+      "error.semantic.conflictingInterfaceDefaults",
+      Seq(items => asString(items(0)), items => asString(items(1)), items => asString(items(2)), items => asString(items(3)))
+    ),
     SemanticError.ABSTRACT_CLASS_INSTANTIATION -> ErrorDef(
       "error.semantic.abstractClassInstantiation",
       Seq(items => typeName(items(0)))
@@ -1500,7 +1565,8 @@ object SemanticErrorReporter {
     SemanticError.HISTORY_BROKEN_BY_WRITE -> ErrorDef(
       "error.semantic.historyBrokenByWrite",
       // items: field, history as source text, reason kind (lower | set | any), the method that raises the field (or "");
-      // for an inherited method (#2603) also the class that declares the history, the method, and the class it comes from.
+      // for an inherited method (#2603) also the class that declares the history, the method, and the class it comes from;
+      // for one reached through `super` (#2782) also the class and the method that call it.
       Seq(
         items => asString(items(0)),
         items => asString(items(1)),
@@ -1508,7 +1574,13 @@ object SemanticErrorReporter {
           val reason = format(message("error.semantic.historyBrokenByWrite.reason." + asString(items(2))), Seq(asString(items(0)), asString(items(3))))
           if (items.length < 7) reason
           // A Japanese sentence ends in `。` and takes no space after it.
-          else reason + (if (reason.endsWith("\u3002")) "" else " ") + format(message("error.semantic.historyBrokenByWrite.inherited"), Seq(asString(items(4)), asString(items(5)), asString(items(6))))
+          else {
+            // Reached through `super` (#2782), items 7 and 8 name the class and method that hold the call.
+            val hint =
+              if (items.length >= 9) format(message("error.semantic.historyBrokenByWrite.super"), Seq(asString(items(4)), asString(items(5)), asString(items(6)), asString(items(7)), asString(items(8))))
+              else format(message("error.semantic.historyBrokenByWrite.inherited"), Seq(asString(items(4)), asString(items(5)), asString(items(6))))
+            reason + (if (reason.endsWith("\u3002")) "" else " ") + hint
+          }
         }
       )
     ),

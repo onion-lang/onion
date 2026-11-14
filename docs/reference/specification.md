@@ -359,6 +359,12 @@ record:
 | `Json` | `R::fromJson(s: String): R?` | `R::toJson(v: R): String` |
 | `Yaml` | `R::fromYaml(s: String): R?` | `R::toYaml(v: R): String` |
 
+The derived methods are static, so call them on the record type: `R::toJson(v)`,
+not `v.toJson()`. A component may share a name with one of them. In
+`record P(toJson: Int, n: Int) derive!(Json)`, `p.toJson()` is the component's accessor
+and `P::toJson(p)` is the serializer; both compile, as any static method and same-named
+accessor do.
+
 `Json` additionally synthesizes `R::fromJsonList(s: String): List[R]`, and `Yaml`
 `R::fromYamlList(s: String): List[R]`, each reading a top-level sequence (a JSON array,
 or a YAML block sequence of flat mappings) and converting each element through the same

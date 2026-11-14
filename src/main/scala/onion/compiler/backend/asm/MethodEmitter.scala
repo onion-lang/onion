@@ -32,6 +32,9 @@ final class DebugGeneratorAdapter(access: Int, method: AsmMethod, methodVisitor:
   ): Unit =
     if (mv != null) mv.visitLocalVariable(name, descriptor, null, start, end, slot)
 
+  /** Follows the operand stack for `break`/`continue` (#2932); null when not tracked. */
+  var stackTracker: OperandStackTracker = null
+
   // Where each line-number entry so far starts, so a caller can avoid a second entry at the
   // same instruction: the JVM then reports the first entry for an exception thrown exactly
   // there, and the last for one thrown later, so neither order gives the right line.
@@ -60,9 +63,11 @@ object MethodEmitter {
     signature: String = null
   ): DebugGeneratorAdapter = {
     val desc = AsmType.getMethodDescriptor(returnType, argTypes*)
-    val mv = cw.visitMethod(access, name, desc, signature, exceptions)
+    val tracker = new OperandStackTracker(access, name, desc)
+    val mv = new TrackingMethodVisitor(cw.visitMethod(access, name, desc, signature, exceptions), tracker)
     val asmMethod = AsmMethod(name, desc)
     val gen = new DebugGeneratorAdapter(access, asmMethod, mv)
+    gen.stackTracker = tracker
     gen.visitCode()
     gen
   }

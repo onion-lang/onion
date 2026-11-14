@@ -49,13 +49,24 @@ public final class Archive {
      */
     public static void zip(String zipPath, List files) {
         if (files == null) throw new IllegalArgumentException("Archive: files must not be null");
-        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(Paths.get(zipPath)))) {
-            for (Object entry : files) {
-                Path source = Paths.get(String.valueOf(entry));
-                if (!Files.isRegularFile(source)) {
-                    throw new IllegalArgumentException(
-                        "Archive: not a file: " + source);
-                }
+        // Check everything before the zip is opened: opening it truncates the file, so a
+        // check after that point has already destroyed a source that is the zip itself.
+        Path zipFile = Paths.get(zipPath);
+        List<Path> sources = new ArrayList<>();
+        for (Object entry : files) {
+            Path source = Paths.get(String.valueOf(entry));
+            if (!Files.isRegularFile(source)) {
+                throw new IllegalArgumentException(
+                    "Archive: not a file: " + source);
+            }
+            if (isSameFileQuietly(source, zipFile)) {
+                throw new IllegalArgumentException("Archive: could not zip " + source + " to " + zipPath
+                    + " (source and target are the same file)");
+            }
+            sources.add(source);
+        }
+        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zipFile))) {
+            for (Path source : sources) {
                 writeEntry(out, source.getFileName().toString(), source);
             }
         } catch (IOException e) {
@@ -126,6 +137,9 @@ public final class Archive {
      * hypothetical caution: a zip entry named {@code ../../.ssh/authorized_keys} is the
      * standard "zip slip" attack, and an extractor that resolves entry names naively
      * writes exactly where it is told to.
+     *
+     * <p>An entry whose target is the archive itself is refused too, before any entry is
+     * written: extracting it would replace the file being read.
      */
     public static List unzip(String zipPath, String targetDir) {
         Path target = Paths.get(targetDir).toAbsolutePath().normalize();
@@ -135,6 +149,18 @@ public final class Archive {
             try (ZipFile zip = new ZipFile(Paths.get(zipPath).toFile())) {
                 List<? extends ZipEntry> ordered = zip.stream().sorted(
                     java.util.Comparator.comparing(ZipEntry::getName)).toList();
+                // Before anything is written: an entry that lands on the archive itself would
+                // replace the file being read, so refuse the whole extraction up front.
+                Path source = Paths.get(zipPath);
+                for (ZipEntry entry : ordered) {
+                    Path destination = target.resolve(entry.getName()).normalize();
+                    if (!entry.isDirectory() && destination.startsWith(target)
+                            && isSameFileQuietly(destination, source)) {
+                        throw new IllegalArgumentException("Archive: could not extract entry "
+                            + entry.getName() + " of " + zipPath + " to " + destination
+                            + " (source and target are the same file)");
+                    }
+                }
                 for (ZipEntry entry : ordered) {
                     Path destination = target.resolve(entry.getName()).normalize();
                     if (!destination.startsWith(target)) {
@@ -190,6 +216,7 @@ public final class Archive {
 
     /** Compresses a file, streaming rather than reading it all into memory. */
     public static void gzipFile(String source, String target) {
+        checkFileTransfer("gzip", source, target);
         try (InputStream in = Files.newInputStream(Paths.get(source));
              GZIPOutputStream out = new GZIPOutputStream(Files.newOutputStream(Paths.get(target)))) {
             transfer(in, out);
@@ -201,6 +228,7 @@ public final class Archive {
 
     /** Decompresses a file, streaming. */
     public static void gunzipFile(String source, String target) {
+        checkFileTransfer("gunzip", source, target);
         try (GZIPInputStream in = new GZIPInputStream(Files.newInputStream(Paths.get(source)));
              OutputStream out = Files.newOutputStream(Paths.get(target))) {
             transfer(in, out);
@@ -211,6 +239,29 @@ public final class Archive {
     }
 
     // ========== Internals ==========
+
+    /** Says which path is missing; the JDK's message is just the path, with no reason. */
+    private static void checkFileTransfer(String verb, String source, String target) {
+        Path src = Paths.get(source);
+        if (!Files.isRegularFile(src)) {
+            String why = Files.isDirectory(src) ? "not a file: " : "no such file: ";
+            throw new RuntimeException("Archive: could not " + verb + " " + source + " to " + target
+                + " (" + why + source + ")");
+        }
+        try {
+            if (Files.exists(Paths.get(target)) && Files.isSameFile(src, Paths.get(target))) {
+                throw new RuntimeException("Archive: could not " + verb + " " + source + " to " + target
+                    + " (source and target are the same file)");
+            }
+        } catch (IOException e) {
+            // cannot compare; the transfer itself reports any real problem
+        }
+        Path parent = Paths.get(target).toAbsolutePath().getParent();
+        if (parent != null && !Files.isDirectory(parent)) {
+            throw new RuntimeException("Archive: could not " + verb + " " + source + " to " + target
+                + " (no such directory: " + parent + ")");
+        }
+    }
 
     /** An empty or header-short input makes the JDK throw an EOFException with no message. */
     private static String gunzipReason(IOException e) {

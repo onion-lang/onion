@@ -35,5 +35,24 @@ class SuperUntypedLambdaSpec extends AbstractShellSpec {
         "  def go(): String { val k: () -> String = () -> super.apply((s) -> s + \"!\", \"Z\"); return k() }\n}\n" +
         "class Main { public: static def main(args: String[]): String { return new B().go() } }"))
     }
+
+    it("reports E0013 for a private superclass method instead of crashing at run time") {
+      val out = new java.io.ByteArrayOutputStream()
+      val ps = new java.io.PrintStream(out, true, "UTF-8")
+      val savedErr = System.err
+      val result = try { System.setErr(ps); Console.withErr(ps) { run(
+        "class A {\npublic:\n  def this {}\nprivate:\n  def priv(f: String -> String): String = f(\"p\")\n}\n" +
+        "class B extends A {\npublic:\n  def this {}\n  def go2(): String = super.priv((s) -> s)\n}\n" +
+        "class Main { public: static def main(args: String[]): String { return new B().go2() } }") } } finally System.setErr(savedErr)
+      assert(result == Shell.Failure(-1))
+      assert(out.toString("UTF-8").contains("E0013"), out.toString("UTF-8"))
+    }
+
+    it("still calls a protected superclass method") {
+      assert(Shell.Success("q!") == run(
+        "class A {\npublic:\n  def this {}\nprotected:\n  def prot(f: String -> String): String = f(\"q\")\n}\n" +
+        "class B extends A {\npublic:\n  def this {}\n  def go(): String = super.prot((s) -> s + \"!\")\n}\n" +
+        "class Main { public: static def main(args: String[]): String { return new B().go() } }"))
+    }
   }
 }

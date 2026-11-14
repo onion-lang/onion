@@ -37,7 +37,12 @@ private[compiler] final class SuperMethodCallSupport(
         node, node.name, node.args, node.typeArgs, new This(contextClass), contextClass.superClass,
         context, expected, untypedClosureIndices,
         (method, finalParams) =>
-          if (Modifier.isAbstract(method.modifier)) {
+          if (!MemberAccess.isMemberAccessible(method, contextClass)) {
+            // A private superclass method: the typed path reports E0013, and the call would
+            // otherwise compile and throw IllegalAccessError at run time.
+            bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, node.name, method.arguments, contextClass)
+            None
+          } else if (Modifier.isAbstract(method.modifier)) {
             bodyContext.report(SemanticError.SUPER_CALL_ABSTRACT_METHOD, node, node.name, method.affiliation)
             None
           } else if (context.isClosure) Some(superCallThroughAccessor(contextClass, method, finalParams))

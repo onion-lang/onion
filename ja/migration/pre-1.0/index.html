@@ -2306,6 +2306,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#protected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        protected なコンストラクタは、どの呼び方でも同じようにアクセス検査されるようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5049,6 +5060,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#protected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        protected なコンストラクタは、どの呼び方でも同じようにアクセス検査されるようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5586,6 +5608,25 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li><strong>表示されるもの:</strong> メッセージなしで別のオーバーロードが実行されます。または呼び出しで <strong>E0006</strong> <code>method call is applicable for both …</code> になります。</li>
 <li><strong>これまでどおり動くもの:</strong> オーバーロードより下にある呼び出しと、すべての引数を渡す呼び出しです。</li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> どのオーバーロードを呼ぶつもりだったかは、書いた人にしか分かりません。引数を渡す（<code>f(1L)</code>、<code>f(1, 1)</code>）か、どちらかのメソッドの名前を変えてください。</li>
+</ul>
+<h2 id="protected"><code>protected</code> なコンストラクタは、どの呼び方でも同じようにアクセス検査されるようになりました<a class="headerlink" href="#protected" title="Permanent link">&para;</a></h2>
+<p>デフォルト値を省略する呼び出し、名前付き引数を渡す呼び出し、型を書かないラムダ引数を渡す呼び出し（<code>new A((x) -&gt; x + 1)</code>）も、すべての引数を渡す呼び出しと同じアクセス検査を受けるようになりました (#2827)。
+そのため、無関係なクラスからこの方法で <code>protected</code> なコンストラクタを呼ぶことはできなくなりました。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="kd">protected</span><span class="p">:</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="p">}</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Other</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">mk</span><span class="p">():</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">A</span><span class="p">(</span><span class="mi">9</span><span class="p">)</span><span class="w">          </span><span class="c1">// 以前: コンパイルでき、実行できた。今: E0013</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">all</span><span class="p">():</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">A</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w">      </span><span class="c1">// 以前も今も E0013</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> <code>new</code> の位置で <strong>E0013</strong> <code>method A.new(Int, Int) is not accessible from class Other.</code> になります。</li>
+<li><strong>これまでどおり動くもの:</strong> <code>A</code> の中や、<code>A</code> のサブクラスからの同じ呼び出しです。</li>
+<li><strong>直し方:</strong> コンストラクタを <code>public:</code> の下に移すか、<code>A</code> に <code>public</code> なファクトリメソッドを追加してください。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> コンストラクタのアクセスを広げるかどうかは、書いた人にしか決められない設計上の判断です。そのため、ヒントが直し方を示します。</li>
 </ul>
 
 

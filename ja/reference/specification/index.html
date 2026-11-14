@@ -6033,6 +6033,11 @@
 </tr>
 </tbody>
 </table>
+<p>合成されるメソッドは static です。<code>v.toJson()</code> ではなく、<code>R::toJson(v)</code> のように record 型に対して呼びます。
+コンポーネントがこれらと同じ名前を持っても構いません。
+<code>record P(toJson: Int, n: Int) derive!(Json)</code> では、<code>p.toJson()</code> はコンポーネントのアクセサ、
+<code>P::toJson(p)</code> はシリアライザです。
+static メソッドと同名のアクセサは常に共存できるので、どちらもコンパイルされます。</p>
 <p><code>Json</code> はさらに <code>R::fromJsonList(s: String): List[R]</code> を、<code>Yaml</code> は
 <code>R::fromYamlList(s: String): List[R]</code> を合成します。それぞれトップレベルのシーケンス
 （JSON 配列、または flat mapping の YAML block シーケンス）を読み、各要素を

@@ -4220,6 +4220,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-protected-constructor-is-checked-the-same-way-however-the-call-reaches-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A protected constructor is checked the same way however the call reaches it
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5028,6 +5039,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-protected-constructor-is-checked-the-same-way-however-the-call-reaches-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A protected constructor is checked the same way however the call reaches it
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5599,6 +5621,27 @@ set of overloads now sees their defaults, and picks the overload a call below th
 <li><strong>Still fine:</strong> a call below the overloads, and a call that passes every argument.</li>
 <li><strong>No <code>onion migrate</code> rule:</strong> only you know which overload the call meant. Pass the argument
   (<code>f(1L)</code>, <code>f(1, 1)</code>) or rename one method.</li>
+</ul>
+<h2 id="a-protected-constructor-is-checked-the-same-way-however-the-call-reaches-it">A <code>protected</code> constructor is checked the same way however the call reaches it<a class="headerlink" href="#a-protected-constructor-is-checked-the-same-way-however-the-call-reaches-it" title="Permanent link">&para;</a></h2>
+<p>A call that omits a default, passes named arguments, or passes an untyped lambda argument
+(<code>new A((x) -&gt; x + 1)</code>) now gets the same access check as a call that passes every argument
+(#2827). So an unrelated class can no longer reach a <code>protected</code> constructor that way.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="kd">protected</span><span class="p">:</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="p">}</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Other</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">mk</span><span class="p">():</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">A</span><span class="p">(</span><span class="mi">9</span><span class="p">)</span><span class="w">          </span><span class="c1">// Before: compiled and ran. Now: E0013</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">all</span><span class="p">():</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">A</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w">      </span><span class="c1">// E0013 before and now</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <strong>E0013</strong> <code>method A.new(Int, Int) is not accessible from class Other.</code> at the <code>new</code>.</li>
+<li><strong>Still fine:</strong> the same call from inside <code>A</code> or from a subclass of <code>A</code>.</li>
+<li><strong>To update:</strong> move the constructor under <code>public:</code>, or add a <code>public</code> factory method to <code>A</code>.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> widening a constructor's access is a design choice only you can
+  make, so the hint shows the edit instead.</li>
 </ul>
 
 

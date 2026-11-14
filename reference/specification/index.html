@@ -6033,6 +6033,11 @@ record:</p>
 </tr>
 </tbody>
 </table>
+<p>The derived methods are static, so call them on the record type: <code>R::toJson(v)</code>,
+not <code>v.toJson()</code>. A component may share a name with one of them. In
+<code>record P(toJson: Int, n: Int) derive!(Json)</code>, <code>p.toJson()</code> is the component's accessor
+and <code>P::toJson(p)</code> is the serializer; both compile, as any static method and same-named
+accessor do.</p>
 <p><code>Json</code> additionally synthesizes <code>R::fromJsonList(s: String): List[R]</code>, and <code>Yaml</code>
 <code>R::fromYamlList(s: String): List[R]</code>, each reading a top-level sequence (a JSON array,
 or a YAML block sequence of flat mappings) and converting each element through the same

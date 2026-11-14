@@ -559,6 +559,8 @@ xs.add(null)                // Before: W0012; null was stored. Now: E0000
 
 val ys: List[Int?] = [1]
 ys.add(null)                // fine: the type argument says the slot may be null
+
+val zs: List[Int] = [5, null]   // Before: compiled; the read of zs[1] crashed. Now: E0000 (#2895)
 ```
 
 - **What you see:** **E0000** `type Int is expected, but type null is used.` at the `null`,
@@ -566,6 +568,8 @@ ys.add(null)                // fine: the type argument says the slot may be null
 - **Where:** a method parameter declared with the class's type variable: `f(null)` and
   `f.call(null)` on a function value, `add`/`set`/`put` on `List` and `Map`, `apply` on a
   Java functional interface, and a method of your own generic class (`Box[Int].put(null)`).
+  Also a `null` element in a list or map literal written for such a type
+  (`val zs: List[Int] = [5, null]`, `val m: Map[String, Int] = ["b": null]`).
 - **To update:** if `null` is a value you mean to store, declare the type argument nullable:
   `List[Int?]`, `Map[String, Int?]`, `(Int?) -> T`. Reads then give an `Int?`, so handle
   `null` there (`?:` or `!!`). Otherwise, pass a real value instead of `null`.

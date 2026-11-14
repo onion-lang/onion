@@ -287,7 +287,12 @@ final class ConstructionTyping(
         }.distinct
 
         solutions match {
-          case only :: Nil => Some(AppliedClassType(raw, only))
+          case only :: Nil =>
+            val applied = AppliedClassType(raw, only)
+            // Inference read a bound that names another parameter (`T extends B`) with
+            // that parameter erased; check it with the real arguments (#2539).
+            if (typeParams.exists(_.upperBound.isDefined)) typing.checkInferredTypeArgumentBounds(node.typeRef, applied)
+            Some(applied)
           case _ => None
         }
       }

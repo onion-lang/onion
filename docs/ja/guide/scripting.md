@@ -26,7 +26,7 @@ println("hello")
 ```onion
 val opts = Args::parse(args)
 
-if opts.flag("verbose") { ... }          // --verbose または -v
+if opts.flag("verbose") { ... }          // --verbose（-v は flag("v")）
 val out = opts.option("output", "a.txt") // --output=x または --output x
 val n = opts.intOption("count", 1)       // デフォルト付きの数値
 val files = opts.positional()            // それ以外すべて

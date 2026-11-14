@@ -543,3 +543,31 @@ println(row[2])     // Now: "" (an empty string)
 - **No `onion migrate` rule:** most calls split text that does not end with the delimiter and
   give the same result. Only you know whether an empty last field is data (a CSV column) or
   noise (a final newline), so a rewrite would be wrong for one of them.
+
+## `null` into a type argument that is a primitive is an error
+
+`Int` is never `null` in Onion. A generic slot whose type argument is a primitive
+(`List[Int]`, `(Int) -> T`, `Map[String, Int]`) now rejects `null`, as an `Int` method
+parameter always did (#2872).
+
+```onion
+val f: (Int) -> String = (i) -> "v"
+f(null)                     // Before: W0012, then a crash at run time. Now: E0000
+
+val xs: List[Int] = [1]
+xs.add(null)                // Before: W0012; null was stored. Now: E0000
+
+val ys: List[Int?] = [1]
+ys.add(null)                // fine: the type argument says the slot may be null
+```
+
+- **What you see:** **E0000** `type Int is expected, but type null is used.` at the `null`,
+  with a hint to write the type argument as `Int?`.
+- **Where:** a method parameter declared with the class's type variable: `f(null)` and
+  `f.call(null)` on a function value, `add`/`set`/`put` on `List` and `Map`, `apply` on a
+  Java functional interface, and a method of your own generic class (`Box[Int].put(null)`).
+- **To update:** if `null` is a value you mean to store, declare the type argument nullable:
+  `List[Int?]`, `Map[String, Int?]`, `(Int?) -> T`. Reads then give an `Int?`, so handle
+  `null` there (`?:` or `!!`). Otherwise, pass a real value instead of `null`.
+- **No `onion migrate` rule:** the fix is either a different declared type or a different
+  value, and only you know which one the code means.

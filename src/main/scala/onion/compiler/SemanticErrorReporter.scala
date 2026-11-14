@@ -861,10 +861,11 @@ class SemanticErrorReporter(threshold: Int) {
       else None
     // A set or range is never a List at runtime either, so a cast is no fix for the widening case.
     val widenToIterable = items.length > 2 && items(2).isInstanceOf[SemanticErrorReporter.WidenToIterableHint]
+    val primitiveTypeArgumentNull = items.length > 2 && items(2) == SemanticErrorReporter.PrimitiveTypeArgumentNullHint
     val baseMessage = format(
       // "Consider a cast" is no advice on an `as` cast that was itself rejected, nor on the
       // widening case (a set or range is never a List at runtime either).
-      message(if (listArrayCast.isDefined || widenToIterable || castSource.isDefined || contractClause.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      message(if (listArrayCast.isDefined || widenToIterable || primitiveTypeArgumentNull || castSource.isDefined || contractClause.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
       Seq(written(expected), written(actual) + (if (sourceNullable) "?" else ""))
     )
     val hint =
@@ -872,6 +873,8 @@ class SemanticErrorReporter(threshold: Int) {
         Some(format(message("suggestion.contractClauseBoolean"), Seq(contractClause.get.keyword)))
       } else if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
         Some(message("suggestion.hexDigitB"))
+      } else if (primitiveTypeArgumentNull) {
+        Some(format(message("suggestion.primitiveTypeArgumentNull"), Seq(typeName(expected))))
       } else if (widenToIterable) {
         val widen = items(2).asInstanceOf[SemanticErrorReporter.WidenToIterableHint]
         Some(format(message("suggestion.widenVarToIterable"), Seq(widen.name, typeName(expected), typeName(widen.wider))))
@@ -1268,6 +1271,11 @@ object SemanticErrorReporter {
    * is a hex literal ending in `B`, which was a Byte before #2324, so the error says why.
    */
   private[compiler] case object HexDigitBHint
+
+  /** An extra (third) item on INCOMPATIBLE_TYPE: `null` went into a slot typed by a class
+   *  type variable whose type argument is a primitive (`xs.add(null)` on a `List[Int]`), so
+   *  the hint names the nullable type argument that accepts it (#2872). */
+  private[compiler] case object PrimitiveTypeArgumentNullHint
 
   /** An extra (third) item on INCOMPATIBLE_TYPE: the variable `name` is a `List`, the value
    *  another `Iterable`, and declaring the variable `wider` (`Iterable[E]`) would accept it.

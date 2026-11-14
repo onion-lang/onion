@@ -646,7 +646,11 @@ private[typing] object GenericMethodTypeArguments {
           case n: NullableType => n.innerType
           case other => other
         }
-        if (!isAssignableForBounds(upper, argInner)) reportError(callNode, INCOMPATIBLE_TYPE, upper, arg)
+        // A type variable the bound reaches through another parameter (`B := X`, the
+        // caller's own `X`) matches only itself: `List[Integer]` is not a `List[X]`, and
+        // `Integer` is not an `X` (#2976 panel).
+        if (!isAssignableForBounds(upper, argInner) || !TypeRelations.boundVariablesFit(typing.table_, upper, argInner))
+          reportError(callNode, INCOMPATIBLE_TYPE, upper, arg)
       }
 
       finalSubst

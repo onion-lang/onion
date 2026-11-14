@@ -181,4 +181,69 @@ class GenericCallBoundCheckSpec extends AbstractShellSpec {
       }
     }
   }
+  describe("a chained bound whose other parameter is fixed to the caller's own type variable (#2976 panel)") {
+    // A type variable in a type-argument slot of the bound matches only itself: `List[Integer]`
+    // is not a `List[X]`, whatever `X` is at run time.
+    for ((label, decl) <- Seq(
+      "a method type variable" -> "def outer[X](x: X, l: List[Integer]): X = w(x, l)",
+      "a method type variable through a local" -> "def outer[X](x: X, l: List[Integer]): X { val r = w(x, l); return r }"
+    )) {
+      it(s"rejects List[Integer] for T extends List[B] with B = $label") {
+        val src =
+          s"""import { java.util.* }
+             |def w[B, T extends List[B]](b: B, t: T): B = t[0]
+             |$decl
+             |def main(args: String[]): Int { val s: String = outer("q", [7]); IO::println(s); return 0 }
+             |""".stripMargin
+        assert(errorCodes(src) == Seq("E0000"))
+      }
+    }
+    it("rejects List[Integer] for T extends List[B] with B = a class type variable") {
+      val src =
+        """import { java.util.* }
+          |def w[B, T extends List[B]](b: B, t: T): B = t[0]
+          |class G[X] {
+          |public:
+          |  def this { }
+          |  def run(x: X, l: List[Integer]): X = w(x, l)
+          |}
+          |def main(args: String[]): Int { val s: String = new G[String]().run("q", [7]); IO::println(s); return 0 }
+          |""".stripMargin
+      assert(errorCodes(src) == Seq("E0000"))
+    }
+    it("rejects Int for T extends B with B = a method type variable") {
+      val src =
+        """def w2[B, T extends B](b: B, t: T): B = b
+          |def outer[X](x: X): X = w2(x, 3)
+          |def main(args: String[]): Int { val s: String = outer("q"); IO::println(s); return 0 }
+          |""".stripMargin
+      assert(errorCodes(src) == Seq("E0000"))
+    }
+    it("still rejects a bounded X extends CharSequence") {
+      val src =
+        """import { java.util.* }
+          |def w[B, T extends List[B]](b: B, t: T): B = t[0]
+          |def outer[X extends CharSequence](x: X, l: List[Integer]): X = w(x, l)
+          |def main(args: String[]): Int { IO::println(outer("q", [7])); return 0 }
+          |""".stripMargin
+      assert(errorCodes(src) == Seq("E0000"))
+    }
+    it("accepts List[X] for T extends List[B] with B = X") {
+      val r = shell.run(
+        """import { java.util.* }
+          |def w[B, T extends List[B]](b: B, t: T): B = t[0]
+          |def outer[X](x: X, l: List[X]): X = w(x, l)
+          |def main(args: String[]): Int { val s: String = outer("q", ["abc"]); return s.length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(3) == r)
+    }
+    it("accepts X for T extends B with B = X") {
+      val r = shell.run(
+        """def w2[B, T extends B](b: B, t: T): B = t
+          |def outer[X](x: X, y: X): X = w2(x, y)
+          |def main(args: String[]): Int { val s: String = outer("q", "abcd"); return s.length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(4) == r)
+    }
+  }
 }

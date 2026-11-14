@@ -98,6 +98,32 @@ private[typing] object TypeRelations {
         view.exists(v => sameTypeArguments(expected.typeArguments, v.typeArguments, table))
       case _ => false
 
+  /** A bound that, once another parameter is substituted, names a type variable of the
+   *  caller (`T extends List[B]` with `B := X`) admits only that variable where it names it:
+   *  `X` itself, or a variable whose bound chain reaches `X`, at the top level; the very `X`
+   *  inside a type argument. The general rule reads a variable slot as "anything", which
+   *  let `List[Integer]` through as a `List[X]` (#2976 panel). A bound with no type variable
+   *  in it is left to the general rule. */
+  def boundVariablesFit(table: ClassTable, upper: Type, actual: Type): Boolean = (upper, actual) match
+    case (u: NullableType, _) => boundVariablesFit(table, u.innerType, actual)
+    case (_, a: NullableType) => boundVariablesFit(table, upper, a.innerType)
+    case (uv: TypeVariableType, a) => TypeRules.isSuperTypeByIdentity(uv, a)
+    case (ua: AppliedClassType, av: TypeVariableType) if TypeCheckingHelpers.containsTypeVariable(ua) =>
+      typeVariableFitsAppliedBound(ua, av, table)
+    case (ua: AppliedClassType, a: ClassType) if TypeCheckingHelpers.containsTypeVariable(ua) =>
+      val view = a match
+        case aa: AppliedClassType if sameClass(aa.raw, ua.raw) => Some(aa)
+        case _ => table.appliedViewsOf(a)(AppliedTypeViews.collectAppliedViewsFrom(a))
+          .collectFirst { case (raw, v) if sameClass(raw, ua.raw) => v }
+      view match
+        case Some(v) if v.typeArguments.length == ua.typeArguments.length =>
+          ua.typeArguments.zip(v.typeArguments).forall { case (e, x) =>
+            !TypeCheckingHelpers.containsTypeVariable(e) || sameTypeArgument(e, x, table)
+          }
+        // A raw value, or one whose view of the bound's class is not applied: the general rule decides.
+        case _ => true
+    case _ => true
+
   private def sameTypeArguments(expected: Seq[Type], actual: Seq[Type], table: ClassTable): Boolean =
     expected.length == actual.length && expected.zip(actual).forall { case (e, a) => sameTypeArgument(e, a, table) }
 

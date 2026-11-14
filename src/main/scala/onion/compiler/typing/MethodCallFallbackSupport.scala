@@ -106,7 +106,9 @@ private[compiler] final class MethodCallFallbackSupport(
     targetType: ObjectType,
     context: LocalContext,
     expected: Type,
-    untypedClosureIndices: Set[Int]
+    untypedClosureIndices: Set[Int],
+    // How the resolved call is built; `super.f(..)` passes its own (#2674). Default: `target.f(..)`.
+    buildCall: (Method, Array[Term]) => Option[Term] = null
   ): Option[Term] = {
     val args = argList
 
@@ -258,8 +260,8 @@ private[compiler] final class MethodCallFallbackSupport(
 
     for {
       finalProcessedParams <- calls.prepareCallParams(node, argList, method, finalParams, finalExpectedArgs)
+      call <- if (buildCall == null) Some(new Call(target, method, finalProcessedParams)) else buildCall(method, finalProcessedParams)
     } yield {
-      val call = new Call(target, method, finalProcessedParams)
       val castType = TypeSubst.result(method.returnType, classSubst, finalMethodSubst)
       TypeSubst.withCast(call, castType)
     }

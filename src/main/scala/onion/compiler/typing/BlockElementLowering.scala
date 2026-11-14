@@ -141,6 +141,11 @@ final class BlockElementLowering(
               if (elementVar == null) {
                 // The element type failed to resolve (already reported)
                 new NOP(node.location)
+              } else if (annotationUnrelatedToElements(arg, elementVar.tp, collection.`type`)) {
+                // `foreach a: Int in strings` would otherwise compile and then fail
+                // in the verifier or with a cast error at the wrong line (#2946).
+                bodyContext.report(INCOMPATIBLE_TYPE, arg, elementVar.tp, actualElementType(collection.`type`))
+                new NOP(node.location)
               } else {
                 val collectionVar = new ClosureLocalBinding(0, context.add(context.newName, collection.`type`), collection.`type`, isMutable = true)
 
@@ -712,6 +717,18 @@ final class BlockElementLowering(
       }
     case _ => annotated
   }
+
+  private def actualElementType(collectionType: Type): Type = inferredElementType(collectionType)
+
+  /** An annotated loop variable means `element as T`: it is rejected only where that
+   *  cast is (#2946). So `foreach a: Int in strings` is an error, while a widening
+   *  (`foreach i: Long in 1..3`), a narrowing (`String` over `List[Object]`) and an
+   *  interface over a non-final class (`Runnable` over `List[Base]`) still compile. */
+  private def annotationUnrelatedToElements(arg: AST.Argument, annotated: Type, collectionType: Type): Boolean =
+    arg.typeRef != null && {
+      val actual = actualElementType(collectionType)
+      (actual ne bodyContext.rootClass) && !body.isValidCast(actual, annotated)
+    }
 
   /** The type an unannotated foreach variable takes: an array's component type, an
    *  Iterable's element type, else Object (a raw collection, or a non-iterable one

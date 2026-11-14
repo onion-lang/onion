@@ -1454,6 +1454,7 @@ Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
 Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
+Strings::split("a,b,,", ",")          // ["a","b","",""]: 末尾の空フィールドも残ります
 Strings::join(parts, "-")             // 配列・List どちらも可
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -2994,7 +2995,7 @@ Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- リテラル
 ### 分割
 
 ```
-Regex::split(input, pattern): List[String]
+Regex::split(input, pattern): List[String]   // 末尾の空フィールドも残ります: ("x;y;;", ";") は4フィールド
 Regex::split(input, pattern, limit): List[String]
 ```
 

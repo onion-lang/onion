@@ -60,9 +60,10 @@ class TailCallOptimization(config: CompilerConfig)
     environment: OptimizationEnvironment
   ): Seq[ClassDefinition] = {
     source.foreach { classDef =>
+      val mutualMembers = mutualRecursionMembers(classDef)
       classDef.methods.foreach {
         case methodDef: MethodDefinition =>
-          if (isTailRecursive(methodDef)) {
+          if (isTailRecursive(methodDef, mutualMembers)) {
             if (config.verbose) {
               trace(s"[TCO] Optimizing tail-recursive method: ${classDef.name}.${methodDef.name}")
             }
@@ -74,7 +75,25 @@ class TailCallOptimization(config: CompilerConfig)
     source
   }
 
-  private def isTailRecursive(method: MethodDefinition): Boolean = {
+  /**
+   * `@TailRecursive` methods that tail-call each other in a cycle. The mutual
+   * recursion pass owns these; a lone self-recursive one is an ordinary loop.
+   */
+  private def mutualRecursionMembers(classDef: ClassDefinition): Seq[MethodDefinition] = {
+    val annotated = classDef.methods.collect {
+      case m: MethodDefinition if m.annotations.contains("TailRecursive") => m
+    }
+    if (annotated.size < 2) Seq.empty
+    else {
+      val graph = TailCallGraphAnalysis.buildCallGraph(annotated)
+      StronglyConnectedComponents
+        .findSCCs(annotated, m => graph.getOrElse(m, Set.empty))
+        .filter(_.size > 1)
+        .flatten
+    }
+  }
+
+  private def isTailRecursive(method: MethodDefinition, mutualMembers: Seq[MethodDefinition]): Boolean = {
     val block = method.getBlock
     if (block == null || block.statements.isEmpty) return false
 
@@ -89,8 +108,8 @@ class TailCallOptimization(config: CompilerConfig)
       return false
     }
 
-    // Skip methods with @TailRecursive annotation (they may be part of mutual recursion)
-    if (method.annotations.contains("TailRecursive")) {
+    // Skip @TailRecursive methods in a mutual-recursion cycle (the next pass owns them)
+    if (mutualMembers.exists(_ eq method)) {
       if (config.verbose) {
         trace(s"[TCO] Skipping @TailRecursive annotated method: ${method.classType.name}.${method.name}")
       }

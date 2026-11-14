@@ -402,8 +402,13 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     additionTyping.typeAddition(node, context)
 
   def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = {
+    val mark = typing.mutedBoundErrorMark
     val result = expressionDispatchSupport.typed(node, context, expected)
     result.foreach(term => typing.put(node, term))
+    // A bound error muted while this call was typed belongs to its result; once a typing
+    // with reporting on keeps that term, its bound errors are reported (#2538).
+    typing.claimMutedBoundErrors(mark, node, result)
+    result.foreach(typing.reportBoundErrorsKeptIn)
     result
   }
   def translate(node: AST.BlockElement, context: LocalContext): ActionStatement =

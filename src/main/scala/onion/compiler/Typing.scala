@@ -289,20 +289,47 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
 
   /**
-   * `withSuppressedReporting`, also telling whether `block` dropped a generic call's bound
-   * error. That error does not fail typing, so a speculative typing that keeps its result
-   * must re-type with reporting on, or the error is lost and the program fails at run time
-   * instead (#2538).
+   * Reports a generic call's bound error, or, while reporting is suppressed, keeps it with
+   * the term that call produces (#2538). A bound error does not fail typing, so a
+   * speculative typing whose result is kept would otherwise lose it, and the program would
+   * fail at run time instead. The rule: a kept term reports its bound errors.
+   * [[claimMutedBoundErrors]] ties the kept errors to the term, and
+   * [[reportBoundErrorsKeptIn]] reports those of every term that reaches a final typing.
    */
-  def withSuppressedReportingNotingBoundErrors[A](block: => A): (A, Boolean) = {
-    val unitContext = currentUnitContext
-    val before = unitContext.mutedBoundErrors
-    val result = withSuppressedReporting(block)
-    (result, unitContext.mutedBoundErrors != before)
+  private[compiler] def reportBoundError(call: AST.Node, error: SemanticError, node: AST.Node, items: AnyRef*): Unit =
+    if (reportingEnabled) report(error, node, items*)
+    else currentUnitContext.mutedBoundErrors += (call -> (() => report(error, node, items*)))
+
+  private[compiler] def mutedBoundErrorMark: Int = currentUnitContext.mutedBoundErrors.length
+
+  /**
+   * Ties the bound errors muted since `mark` for the call `node` itself to `term`, its
+   * result. The rest were found by a typing whose result was not returned here, such as a
+   * speculative re-type the caller judged on its own, and are dropped as before.
+   */
+  private[compiler] def claimMutedBoundErrors(mark: Int, node: AST.Node, term: Option[TypedAST.Term]): Unit = {
+    val ctx = currentUnitContext
+    if (ctx.mutedBoundErrors.length > mark) {
+      val own = ctx.mutedBoundErrors.drop(mark).collect { case (call, report) if call eq node => report }.toList
+      ctx.mutedBoundErrors.dropRightInPlace(ctx.mutedBoundErrors.length - mark)
+      for (t <- term if own.nonEmpty) {
+        val prior = Option(ctx.boundErrorsByTerm.get(t)).getOrElse(Nil)
+        ctx.boundErrorsByTerm.put(t, prior ++ own)
+      }
+    }
   }
 
-  private[compiler] def noteMutedBoundError(): Unit =
-    if (!reportingEnabled) currentUnitContext.mutedBoundErrors += 1
+  /** Reports, once, the bound errors kept with `term` or any term beneath it. */
+  private[compiler] def reportBoundErrorsKeptIn(term: TypedAST.Term): Unit = {
+    val kept = currentUnitContext.boundErrorsByTerm
+    if (!kept.isEmpty && reportingEnabled) {
+      TermWalk.exists(term, intoClosures = true) { node =>
+        val errors = kept.remove(node)
+        if (errors != null) errors.foreach(_())
+        kept.isEmpty
+      }
+    }
+  }
 
   /**
    * The source expression of each typed contract clause, by identity. A typed clause and the

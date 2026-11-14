@@ -1,6 +1,8 @@
 package onion.compiler.tools
 
+import onion.compiler.{OnionCompiler, CompilerConfig, StreamInputSource, CompilationOutcome}
 import onion.tools.Shell
+import java.io.StringReader
 
 /**
  * A generic call checks the type arguments it infers against bounds that name
@@ -10,6 +12,13 @@ import onion.tools.Shell
  * ClassCastException.
  */
 class GenericCallBoundCheckSpec extends AbstractShellSpec {
+  private def errorCodes(src: String): Seq[String] = {
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors.flatMap(_.errorCode)
+      case _ => Seq.empty
+    }
+  }
   describe("a call whose inferred type arguments break a chained bound") {
     it("is rejected when the expected return type fixes B (issue repro)") {
       val r = shell.run(
@@ -116,31 +125,55 @@ class GenericCallBoundCheckSpec extends AbstractShellSpec {
       assert(Shell.Failure(-1) == r)
     }
     // A generic call that is the argument of another call was typed with its diagnostics
-    // muted, and the bound error was lost; the program then failed at run time.
+    // muted, and the bound error was lost; the program then failed at run time. The rule:
+    // wherever such a call's term is kept, its bound error is reported, once.
     for ((label, call) <- Seq(
            "an Object parameter" -> "show(w(\"q\", l))",
            "the top-level println" -> "println(w(\"q\", l))",
            "a nested call" -> "println(use(w(\"q\", l)))",
-           "a constructor" -> "new Holder(w(\"q\", l))")) {
+           "an instance method" -> "new Holder(\"x\").take(w(\"q\", l))",
+           "a static method" -> "Holder::st(w(\"q\", l))",
+           "a constructor" -> "new Holder(w(\"q\", l))",
+           "an Object constructor" -> "new Wide(w(\"q\", l))",
+           "a record constructor" -> "new R(w(\"q\", l))",
+           "a Java constructor" -> "new ArrayList[Object](w3(\"q\", l))",
+           "a constructor inside a lambda" -> "val f: () -> Object = () -> new Holder(w(\"q\", l)); f()")) {
       it(s"still rejects List[Integer] when B is String, as the argument of $label") {
-        val r = shell.run(
+        val src =
           s"""import { java.util.* }
-             |class Holder { def this(o: Object) { } }
-             |def w[B, T extends List[B]](b: B, t: T): B = b
+             |class Holder {
+             |public:
+             |  def this(s: String) { IO::println(s.length()) }
+             |  def take(o: Object): void { IO::println(o) }
+             |  static def st(o: Object): void { IO::println(o) }
+             |}
+             |class Wide {
+             |public:
+             |  def this(o: Object) { IO::println(o) }
+             |}
+             |record R(s: String)
+             |def w[B, T extends List[B]](b: B, t: T): B = t[0]
+             |def w3[B, T extends List[B]](b: B, t: T): T = t
              |def use(o: Object): Object = o
              |def show(o: Object): void { IO::println(o) }
              |def main(args: String[]): Int { val l: List[Integer] = [1]; $call; return 0 }
-             |""".stripMargin, "None", Array())
-        assert(Shell.Failure(-1) == r)
+             |""".stripMargin
+        assert(errorCodes(src) == Seq("E0000"))
       }
     }
-    it("still rejects T extends B with B = String and T = Int, as an argument (#2325)") {
-      val r = shell.run(
-        """def w2[B, T extends B](b: B, t: T): B = b
-          |def showS(o: String): void { IO::println(o) }
-          |def main(args: String[]): Int { showS(w2("q", 3)); return 0 }
-          |""".stripMargin, "None", Array())
-      assert(Shell.Failure(-1) == r)
+    for ((label, call) <- Seq("a String parameter" -> "showS(w2(\"q\", 3))", "a constructor" -> "new H(w2(\"q\", 3))")) {
+      it(s"still rejects T extends B with B = String and T = Int, as the argument of $label (#2325)") {
+        val src =
+          s"""class H {
+             |public:
+             |  def this(s: String) { IO::println(s.length()) }
+             |}
+             |def w2[B, T extends B](b: B, t: T): B = b
+             |def showS(o: String): void { IO::println(o) }
+             |def main(args: String[]): Int { $call; return 0 }
+             |""".stripMargin
+        assert(errorCodes(src) == Seq("E0000"))
+      }
     }
   }
 }

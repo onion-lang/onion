@@ -233,9 +233,15 @@ private[typing] object GenericMethodTypeArguments {
     val rootClass = typing.rootClass
     def reportError(node: AST.Node, error: SemanticError, items: AnyRef*): Unit =
       if (reportErrors) {
-        typing.noteMutedBoundError()
-        typing.report(error, node, items*)
+        if (finalInference) typing.reportBoundError(callNode, error, node, items*)
+        else typing.report(error, node, items*)
       }
+    // Set by `withDefaults()` once the constraints are collected: from there on it checks the
+    // type arguments the call is typed with against their bounds, and a bound error found
+    // while reporting is suppressed is kept with the call's term (#2538). A unification
+    // conflict met while collecting, or a preliminary `constrainedOnly()` reading, can come
+    // from a speculative expected type and keeps nothing.
+    private var finalInference = false
     def boxedTypeArg(arg: Type): Type = typing.boxedTypeArgument(arg)
     val typeParams = method.typeParameters
 
@@ -532,6 +538,7 @@ private[typing] object GenericMethodTypeArguments {
     /** Every type parameter: inferred, else its lower constraint, else its (upper-constrained) bound; violations reported. */
     def withDefaults(): scala.collection.immutable.Map[String, Type] = {
       collect()
+      finalInference = true
       // Parameters an argument or the expected type actually fixed. A `null` argument, an
       // empty `[]`/`[:]` literal, or no mention at all fixes nothing: such a parameter is its
       // bound (or `Object`) by default. Only fixed ones are re-checked against a chained bound.

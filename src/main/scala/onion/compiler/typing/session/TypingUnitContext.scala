@@ -22,8 +22,10 @@ final class TypingUnitContext(
   var deferringBoundChecks: Int,
   val deferredBoundChecks: scala.collection.mutable.Buffer[() => Unit]
 ) {
-  /** Generic-call bound errors dropped while reporting was suppressed (#2538). */
-  var mutedBoundErrors: Int = 0
+  /** Generic-call bound errors met while reporting was suppressed, not yet tied to a term (#2538). */
+  val mutedBoundErrors: scala.collection.mutable.ArrayBuffer[(AST.Node, () => Unit)] = scala.collection.mutable.ArrayBuffer()
+  /** Those errors, by the term (identity) they belong to; reported if that term is kept. */
+  val boundErrorsByTerm: java.util.IdentityHashMap[AnyRef, List[() => Unit]] = new java.util.IdentityHashMap()
 }
 
 object TypingUnitContext {

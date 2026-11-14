@@ -137,6 +137,9 @@ public final class Archive {
      * hypothetical caution: a zip entry named {@code ../../.ssh/authorized_keys} is the
      * standard "zip slip" attack, and an extractor that resolves entry names naively
      * writes exactly where it is told to.
+     *
+     * <p>An entry whose target is the archive itself is refused too, before any entry is
+     * written: extracting it would replace the file being read.
      */
     public static List unzip(String zipPath, String targetDir) {
         Path target = Paths.get(targetDir).toAbsolutePath().normalize();
@@ -146,6 +149,18 @@ public final class Archive {
             try (ZipFile zip = new ZipFile(Paths.get(zipPath).toFile())) {
                 List<? extends ZipEntry> ordered = zip.stream().sorted(
                     java.util.Comparator.comparing(ZipEntry::getName)).toList();
+                // Before anything is written: an entry that lands on the archive itself would
+                // replace the file being read, so refuse the whole extraction up front.
+                Path source = Paths.get(zipPath);
+                for (ZipEntry entry : ordered) {
+                    Path destination = target.resolve(entry.getName()).normalize();
+                    if (!entry.isDirectory() && destination.startsWith(target)
+                            && isSameFileQuietly(destination, source)) {
+                        throw new IllegalArgumentException("Archive: could not extract entry "
+                            + entry.getName() + " of " + zipPath + " to " + destination
+                            + " (source and target are the same file)");
+                    }
+                }
                 for (ZipEntry entry : ordered) {
                     Path destination = target.resolve(entry.getName()).normalize();
                     if (!destination.startsWith(target)) {

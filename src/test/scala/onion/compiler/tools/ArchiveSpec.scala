@@ -287,5 +287,38 @@ class ArchiveSpec extends AbstractShellSpec {
       }
       assert(!Files.exists(out), "a rejected call must not leave a half-written zip")
     }
+
+    it("unzip refuses an entry that would overwrite the archive it reads, before writing anything (#2957)") {
+      val work = Files.createTempDirectory("onion-unzip-same")
+      val archive = work.resolve("a.zip")
+      def writeZip(entries: (String, String)*): Unit = {
+        val out = new ZipOutputStream(Files.newOutputStream(archive))
+        try entries.foreach { case (name, text) =>
+          out.putNextEntry(new ZipEntry(name)); out.write(text.getBytes(UTF_8)); out.closeEntry()
+        } finally out.close()
+      }
+      // "0.txt" sorts before "a.zip": it must not be written either
+      writeZip("0.txt" -> "first", "a.zip" -> "not a zip")
+      val before = Files.readAllBytes(archive).toSeq
+      val e1 = intercept[RuntimeException] { onion.Archive.unzip(archive.toString, work.toString) }
+      assert(e1.getMessage.contains("same file"), e1.getMessage)
+      assert(e1.getMessage.contains("a.zip"), e1.getMessage)
+      assert(Files.readAllBytes(archive).toSeq == before)
+      assert(!Files.exists(work.resolve("0.txt")), "a rejected unzip must not extract any entry")
+
+      // also when the archive and the target directory are spelled differently
+      val e2 = intercept[RuntimeException] {
+        onion.Archive.unzip(work.resolve(".").resolve("a.zip").toString, work.resolve("..").resolve(work.getFileName).toString)
+      }
+      assert(e2.getMessage.contains("same file"), e2.getMessage)
+      assert(Files.readAllBytes(archive).toSeq == before)
+
+      // an entry of the same name in another directory is fine
+      val out = work.resolve("out")
+      val written = onion.Archive.unzip(archive.toString, out.toString)
+      assert(written.size == 2)
+      assert(Files.readString(out.resolve("a.zip")) == "not a zip")
+      assert(Files.readAllBytes(archive).toSeq == before)
+    }
   }
 }

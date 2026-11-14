@@ -196,7 +196,7 @@ final class ExpressionFormTyping(
    * between a primitive and its single boxed counterpart, and casts from Object
    * (which may fail at runtime). Rejects unrelated casts such as String -> Int.
    */
-  private def isValidCast(source: Type, destination: Type): Boolean = {
+  private[typing] def isValidCast(source: Type, destination: Type): Boolean = {
     if (source eq destination) return true
     (source, destination) match {
       // `?` only admits null, which passes any reference cast, so the inner types decide

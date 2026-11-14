@@ -9,6 +9,36 @@ import onion.tools.Shell
  */
 class TailCallOptimizationSpec extends AbstractShellSpec {
   describe("tail-call optimization") {
+    it("optimizes a lone self-recursive @TailRecursive function (#2802)") {
+      val result = shell.run(
+        """
+          |@TailRecursive def loop(n: Int): Int = if n == 0 { 0 } else { loop(n - 1) }
+          |IO::println(loop(1000000))
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result.isInstanceOf[Shell.Success])
+    }
+
+    it("optimizes a lone @TailRecursive static method with a block body (#2802)") {
+      val result = shell.run(
+        """
+          |class C {
+          |public:
+          |  static @TailRecursive def count(n: Int, acc: Int): Int {
+          |    if n == 0 { return acc }
+          |    return count(n - 1, acc + 1)
+          |  }
+          |  static def main(args: String[]): Int = count(1000000, 0)
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success(1000000) == result)
+    }
+
     it("optimizes a static method (no stack overflow at depth 100000)") {
       val result = shell.run(
         """

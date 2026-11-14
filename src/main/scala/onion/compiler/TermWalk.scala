@@ -16,29 +16,34 @@ import onion.compiler.TypedAST.*
  * caller wants to know about *this* method's evaluation -- what is on its operand
  * stack, whether `this` is touched before it is initialized -- stops at the closure
  * boundary. Callers that do want to look inside pass `intoClosures = true`.
+ *
+ * A `try`'s resource initializers are not entered either, for the callers that predate
+ * them (the backend's capture and try scans). A caller that must see every term typing
+ * produced, such as the report of bound errors kept with a term (#2538), passes
+ * `intoResources = true`.
  */
 object TermWalk:
 
   /** Whether `predicate` holds for `term` or any term or statement beneath it. */
-  def exists(term: Term, intoClosures: Boolean = false)(predicate: AnyRef => Boolean): Boolean =
-    walk(term, intoClosures, predicate)
+  def exists(term: Term, intoClosures: Boolean = false, intoResources: Boolean = false)(predicate: AnyRef => Boolean): Boolean =
+    walk(term, intoClosures, intoResources, predicate)
 
   /** Whether `predicate` holds for `statement` or any term or statement beneath it. */
   def existsIn(statement: ActionStatement, intoClosures: Boolean = false)(predicate: AnyRef => Boolean): Boolean =
-    walk(statement, intoClosures, predicate)
+    walk(statement, intoClosures, false, predicate)
 
-  private def walk(node: AnyRef, intoClosures: Boolean, predicate: AnyRef => Boolean): Boolean =
+  private def walk(node: AnyRef, intoClosures: Boolean, intoResources: Boolean, predicate: AnyRef => Boolean): Boolean =
+    def into(child: AnyRef): Boolean = child match
+      case t: Term => walk(t, intoClosures, intoResources, predicate)
+      case s: ActionStatement => walk(s, intoClosures, intoResources, predicate)
+      case _ => false
     if predicate(node) then true
     else
       node match
         case _: NewClosure if !intoClosures => false
-        case stmt: StatementTerm => walk(stmt.statement, intoClosures, predicate)
-        case other =>
-          children(other).exists {
-            case t: Term => walk(t, intoClosures, predicate)
-            case s: ActionStatement => walk(s, intoClosures, predicate)
-            case _ => false
-          }
+        case stmt: StatementTerm => into(stmt.statement)
+        case t: Try if intoResources && t.resources != null && t.resources.exists((_, init) => into(init)) => true
+        case other => children(other).exists(into)
 
   /**
    * The direct children of a node: every term and statement it holds. Written out per node

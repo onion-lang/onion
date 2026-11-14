@@ -398,6 +398,10 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
     expressionFormTyping.typeCast(node, context)
 
+  /** Whether `source as destination` is accepted, the relation `as` checks. */
+  def isValidCast(source: Type, destination: Type): Boolean =
+    expressionFormTyping.isValidCast(source, destination)
+
   def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
     expressionFormTyping.typeIsInstance(node, context)
 

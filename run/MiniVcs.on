@@ -111,7 +111,11 @@ extension String {
     while s.length() < n { s = s + " " }
     return s
   }
-  def splitLines(): List[String] = Strings::split(self, "\n")
+  // A final "\n" ends the last line; it does not start an empty one.
+  def splitLines(): List[String] {
+    if self.endsWith("\n") { return Strings::split(self.substring(0, self.length() - 1), "\n") }
+    return Strings::split(self, "\n")
+  }
 }
 
 extension Int {

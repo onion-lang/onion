@@ -174,10 +174,30 @@ public final class Regex {
     public static List<String> split(String input, String pattern) {
         if (input == null || pattern == null) return new ArrayList<String>();
         try {
-            return new ArrayList<String>(Arrays.asList(input.split(pattern, -1)));
+            return splitKeepingTrailing(input, Pattern.compile(pattern));
         } catch (PatternSyntaxException e) {
             throw invalidPattern("split", pattern, e);
         }
+    }
+
+    /**
+     * Java's {@code Pattern.split(input, -1)}, except that a zero-width match at the
+     * end of the input is not a split point (as in JavaScript): {@code split("abc", "")}
+     * is {@code [a, b, c]}, while {@code split("a;b;;", ";")} keeps its two trailing
+     * empty fields. Shared with {@link Strings#split} and {@link Strings#splitRegex}.
+     */
+    static List<String> splitKeepingTrailing(String input, Pattern pattern) {
+        List<String> parts = new ArrayList<String>();
+        Matcher m = pattern.matcher(input);
+        int index = 0;
+        while (m.find()) {
+            boolean zeroWidth = m.start() == m.end();
+            if (zeroWidth && (m.start() == 0 || m.start() == input.length())) continue;
+            parts.add(input.substring(index, m.start()));
+            index = m.end();
+        }
+        parts.add(input.substring(index));
+        return parts;
     }
 
     /**
@@ -263,7 +283,7 @@ public final class Regex {
 
     public static List<String> split(String input, Pattern pattern) {
         if (input == null || pattern == null) return new ArrayList<String>();
-        return new ArrayList<String>(Arrays.asList(pattern.split(input, -1)));
+        return splitKeepingTrailing(input, pattern);
     }
 
     public static List<String> split(String input, Pattern pattern, int limit) {

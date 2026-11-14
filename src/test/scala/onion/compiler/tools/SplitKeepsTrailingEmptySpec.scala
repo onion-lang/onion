@@ -37,6 +37,15 @@ class SplitKeepsTrailingEmptySpec extends AbstractShellSpec {
     it("an input with no trailing delimiter is unchanged") {
       assert(Shell.Success("[a, b, c]") == run("""Strings::split("a,b,c", ",")"""))
     }
+    it("an empty delimiter splits into characters, with no trailing empty field") {
+      assert(Shell.Success("[a, b, c]") == run("""Strings::split("abc", "")"""))
+      assert(Shell.Success("[a, b, c]") == run("""Strings::splitRegex("abc", "")"""))
+      assert(Shell.Success("[a, b, c]") == run("""Regex::split("abc", "")"""))
+      assert(Shell.Success("[a, b, c]") == run("""Regex::split("abc", re"")"""))
+    }
+    it("a pattern that can match empty adds no field at the end") {
+      assert(Shell.Success("[a, b, c]") == run("""Regex::split("abc", "x*")"""))
+    }
     it("an empty input gives one empty field") {
       assert(Shell.Success("1") == run("""Strings::split("", ",").size"""))
     }

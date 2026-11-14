@@ -356,7 +356,14 @@ public final class Server {
             response.headers.forEach((name, value) ->
                 exchange.getResponseHeaders().set(name, value));
             // A 204 or 304 must not carry a body length at all; -1 is how this API says so.
-            boolean bodiless = response.status == 204 || response.status == 304;
+            // A HEAD answer carries the headers a GET would, including its length, but no body;
+            // passing the length to sendResponseHeaders makes the JDK log a warning per request.
+            boolean head = "HEAD".equalsIgnoreCase(exchange.getRequestMethod());
+            boolean bodiless = head || response.status == 204 || response.status == 304;
+            if (head && response.status != 204 && response.status != 304
+                    && !response.headers.containsKey("Content-Length")) {
+                exchange.getResponseHeaders().set("Content-Length", Integer.toString(body.length));
+            }
             exchange.sendResponseHeaders(response.status, bodiless ? -1 : body.length);
             if (!bodiless) {
                 try (OutputStream out = exchange.getResponseBody()) {

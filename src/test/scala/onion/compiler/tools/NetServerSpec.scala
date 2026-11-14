@@ -131,6 +131,47 @@ class NetServerSpec extends AbstractShellSpec {
       assert(Shell.Success("routed") == result)
     }
 
+    it("answers HEAD with the headers and no body, without a JDK warning (#2808)") {
+      val records = new java.util.concurrent.CopyOnWriteArrayList[String]()
+      val logger = java.util.logging.Logger.getLogger("com.sun.net.httpserver")
+      val handler = new java.util.logging.Handler {
+        override def publish(r: java.util.logging.LogRecord): Unit = records.add(r.getMessage)
+        override def flush(): Unit = ()
+        override def close(): Unit = ()
+      }
+      logger.addHandler(handler)
+      try {
+        val result = shell.run(
+          """
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val server = Server::start("localhost", 0)
+            |    server.handle("/hi", (req) -> Server::text("hello"))
+            |    val conn = Net::connect("localhost", server.port())
+            |    conn.writeLine("HEAD /hi HTTP/1.0")
+            |    conn.writeLine("")
+            |    val text = conn.readAll()
+            |    conn.close()
+            |    server.stop()
+            |    return text
+            |  }
+            |}
+            |""".stripMargin,
+          "ServerHead.on",
+          Array()
+        )
+        result match {
+          case Shell.Success(text: String) =>
+            assert(text.startsWith("HTTP/1.0 200") || text.startsWith("HTTP/1.1 200"))
+            assert(text.toLowerCase.contains("content-length: 5"))
+            assert(!text.contains("hello"))
+          case other => fail(other.toString)
+        }
+        assert(records.isEmpty, records.toString)
+      } finally logger.removeHandler(handler)
+    }
+
     it("answers 500 instead of hanging when a handler throws") {
       // A handler that blows up must not take the server down or leave the client waiting
       // on a socket that never answers, which is the failure mode worth testing.

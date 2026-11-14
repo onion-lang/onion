@@ -227,6 +227,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     for(unit <- source) {
       new onion.compiler.typing.TypingHeaderPass(this, session.activate(unit)).checkImports()
     }
+    processTypeParameters(source)
     for(unit <- source) processOutline(unit)
     // Every unit's defaults are typed before any body, so a call may omit a default
     // declared later in its file or in another file (#2653).
@@ -271,6 +272,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
   def processOutline(unit: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).run()
+  /** Every unit's type parameters, before any unit's outline, so file order does not matter (#2853). */
+  private def processTypeParameters(source: Seq[AST.CompilationUnit]): Unit = {
+    for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameterPlaceholders()
+    for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameters()
+  }
   def processTyping(unit: AST.CompilationUnit): Unit = {
     val pass = new onion.compiler.typing.TypingBodyPass(this, session.activate(unit))
     onion.compiler.typing.DefaultScheduling.run(pass.defaultJobs().map(unit -> _))(u => session.activate(u))

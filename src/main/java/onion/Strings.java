@@ -16,12 +16,12 @@ public final class Strings {
     // Splitting and joining
     public static List<String> split(String str, String delimiter) {
         if (str == null) return new ArrayList<String>();
-        return new ArrayList<String>(Arrays.asList(str.split(Pattern.quote(delimiter))));
+        return Regex.splitKeepingTrailing(str, Pattern.compile(Pattern.quote(delimiter)));
     }
 
     public static List<String> splitRegex(String str, String regex) {
         if (str == null) return new ArrayList<String>();
-        return new ArrayList<String>(Arrays.asList(str.split(regex)));
+        return Regex.splitKeepingTrailing(str, Pattern.compile(regex));
     }
 
     public static String join(List<?> parts, String delimiter) {

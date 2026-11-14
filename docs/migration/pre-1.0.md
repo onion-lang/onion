@@ -514,3 +514,32 @@ public:
 - **To update:** move the constructor under `public:`, or add a `public` factory method to `A`.
 - **No `onion migrate` rule:** widening a constructor's access is a design choice only you can
   make, so the hint shows the edit instead.
+
+## `Strings::split` and `Regex::split` keep trailing empty fields
+
+Splitting used Java's `String.split`, which drops empty fields at the end. Now they are kept,
+as in Python and JavaScript, so a row with an empty last column keeps that column.
+
+```onion
+val row = Strings::split("alice,30,", ",")
+println(row.size)   // Before: 2, so row[2] threw. Now: 3
+println(row[2])     // Now: "" (an empty string)
+```
+
+- **What changed:** `Strings::split`, `Strings::splitRegex`, and `Regex::split` with a
+  `String` or a `Pattern` keep every field after the last delimiter.
+- **Unchanged:** an input that does not end with the delimiter; an empty delimiter
+  (`Strings::split("abc", "")` is still `[a, b, c]`); `Regex::split(s, p, limit)`;
+  and Java's own `s.split(",")`, which still drops trailing empties.
+- **What you see:** no error. A text that ends with the delimiter gives one more `""` for each
+  delimiter at the end. Splitting lines is the common case: `Strings::split(text, "\n")` on a
+  text that ends with `"\n"` now ends with an empty line.
+- **To keep the old result:**
+  - For lines, call `Strings::lines(text)`. `Strings::lines("l1\nl2\n")` gives `[l1, l2]`, as
+    `split` did before.
+  - For any other delimiter, call `Regex::split(s, pattern, 0)`. It drops every trailing empty
+    field, as before. Its delimiter is a regex, so escape `.` and `|`:
+    `Regex::split("a.b..", "\\.", 0)` gives `[a, b]`.
+- **No `onion migrate` rule:** most calls split text that does not end with the delimiter and
+  give the same result. Only you know whether an empty last field is data (a CSV column) or
+  noise (a final newline), so a rewrite would be wrong for one of them.

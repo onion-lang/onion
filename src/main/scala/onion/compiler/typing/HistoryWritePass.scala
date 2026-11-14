@@ -540,7 +540,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
 
   private def interfaceHistories(refs: Seq[AST.TypeNode], interfaces: Map[String, AST.InterfaceDeclaration],
                                  seen: Set[String]): Seq[AST.Expression] =
-    refs.map(_.desc).collect { case AST.ReferenceType(n, _) => n }.filterNot(seen.contains).flatMap { n =>
+    refs.flatMap(ContractSupertypes.name).filterNot(seen.contains).flatMap { n =>
       interfaces.get(n).toSeq.flatMap(i => i.histories ++ interfaceHistories(i.superInterfaces, interfaces, seen + n))
     }
 
@@ -548,7 +548,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
   private def hierarchy(cls: AST.ClassDeclaration, classes: Map[String, AST.ClassDeclaration]): Seq[AST.ClassDeclaration] = {
     @annotation.tailrec
     def go(c: AST.ClassDeclaration, seen: Seq[AST.ClassDeclaration]): Seq[AST.ClassDeclaration] = {
-      val next = Option(c.superClass).map(_.desc).collect { case AST.ReferenceType(n, _) => n }
+      val next = ContractSupertypes.name(c.superClass)
         .flatMap(classes.get).filterNot(seen.contains)
       next match {
         case Some(parent) => go(parent, seen :+ parent)

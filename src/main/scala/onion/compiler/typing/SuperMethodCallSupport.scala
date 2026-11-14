@@ -11,7 +11,8 @@ import scala.jdk.CollectionConverters.*
 
 private[compiler] final class SuperMethodCallSupport(
   bodyContext: TypingBodyContext,
-  calls: MethodCallTyping
+  calls: MethodCallTyping,
+  fallback: MethodCallFallbackSupport
 ) {
   private val overloadSupport = new CallOverloadSupport(calls.typing, calls)
 
@@ -26,9 +27,25 @@ private[compiler] final class SuperMethodCallSupport(
       return None
     }
     if (ArgumentHelpers.hasNamedArguments(node.args)) return typeWithNamedArgs(node, context, expected)
+    val contextClass = bodyContext.definition
+    // An untyped lambda argument takes its parameter types from the superclass method, as
+    // `this.f((s) -> ..)` does; typing it up front here was E0052 (#2674).
+    val untypedClosureIndices = ArgumentHelpers.untypedClosureIndicesOf(node.args)
+    if (untypedClosureIndices.nonEmpty &&
+        MethodResolution.candidatesOf(contextClass.superClass, node.name, calls.typing.table_).exists(calls.isInstanceMethod)) {
+      return fallback.typeCallWithBidirectionalInferenceCore(
+        node, node.name, node.args, node.typeArgs, new This(contextClass), contextClass.superClass,
+        context, expected, untypedClosureIndices,
+        (method, finalParams) =>
+          if (Modifier.isAbstract(method.modifier)) {
+            bodyContext.report(SemanticError.SUPER_CALL_ABSTRACT_METHOD, node, node.name, method.affiliation)
+            None
+          } else if (context.isClosure) Some(superCallThroughAccessor(contextClass, method, finalParams))
+          else Some(new CallSuper(new This(contextClass), method, finalParams))
+      )
+    }
     val parameters = calls.typedTerms(node.args.toArray, context)
     if (parameters == null) return None
-    val contextClass = bodyContext.definition
     calls.tryFindMethod(node, contextClass.superClass, node.name, parameters) match {
       case Right(method) if Modifier.isAbstract(method.modifier) =>
         // No body to call: the JVM would throw AbstractMethodError (#2656).

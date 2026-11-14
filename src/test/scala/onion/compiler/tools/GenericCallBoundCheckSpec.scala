@@ -137,7 +137,11 @@ class GenericCallBoundCheckSpec extends AbstractShellSpec {
            "an Object constructor" -> "new Wide(w(\"q\", l))",
            "a record constructor" -> "new R(w(\"q\", l))",
            "a Java constructor" -> "new ArrayList[Object](w3(\"q\", l))",
-           "a constructor inside a lambda" -> "val f: () -> Object = () -> new Holder(w(\"q\", l)); f()")) {
+           "a constructor inside a lambda" -> "val f: () -> Object = () -> new Holder(w(\"q\", l)); f()",
+           // A try's resource initializers are children of the kept term too (panel on f9909f6).
+           "a try resource inside a nested call" -> "val o = use(use(try (val r = res(w(\"q\", l))) { \"x\" }))",
+           "the second of two try resources" -> "val o = use(use(try (val r = res(\"a\"); val r2 = res(w(\"q\", l))) { \"x\" }))",
+           "a try resource under println" -> "println(use(try (val r = res(w(\"q\", l))) { \"x\" }))")) {
       it(s"still rejects List[Integer] when B is String, as the argument of $label") {
         val src =
           s"""import { java.util.* }
@@ -156,6 +160,7 @@ class GenericCallBoundCheckSpec extends AbstractShellSpec {
              |def w3[B, T extends List[B]](b: B, t: T): T = t
              |def use(o: Object): Object = o
              |def show(o: Object): void { IO::println(o) }
+             |def res(s: String): java.io.StringReader = new java.io.StringReader(s)
              |def main(args: String[]): Int { val l: List[Integer] = [1]; $call; return 0 }
              |""".stripMargin
         assert(errorCodes(src) == Seq("E0000"))

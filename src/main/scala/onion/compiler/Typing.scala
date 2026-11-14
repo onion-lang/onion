@@ -332,7 +332,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private[compiler] def reportBoundErrorsKeptIn(term: TypedAST.Term): Unit = {
     val kept = currentUnitContext.boundErrorsByTerm
     if (!kept.isEmpty && reportingEnabled) {
-      TermWalk.exists(term, intoClosures = true) { node =>
+      TermWalk.exists(term, intoClosures = true, intoResources = true) { node =>
         val errors = kept.remove(node)
         if (errors != null) errors.foreach(_())
         kept.isEmpty

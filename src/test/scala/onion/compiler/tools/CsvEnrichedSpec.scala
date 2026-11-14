@@ -41,7 +41,7 @@ class CsvEnrichedSpec extends AbstractShellSpec {
         "} catch e: IllegalArgumentException {\n" +
         "  return e.getMessage()\n" +
         "}",
-        Shell.Success("Csv: header \"h\" appears in column 1 and column 2; rename one so no value is lost"))
+        Shell.Success("Csv: header \"h\" appears in column 1 and column 2, so data row 1 would lose its value in column 1; rename one, or read the rows positionally with Csv::parse"))
     }
     it("treats a second blank header as a repeat too") {
       runStr(
@@ -52,6 +52,23 @@ class CsvEnrichedSpec extends AbstractShellSpec {
         "  return \"error\"\n" +
         "}",
         Shell.Success("error"))
+    }
+    it("reads repeated blank headers whose columns are empty in every row") {
+      runStr(
+        "val rows = Csv::parseWithHeader(\"name,age,,\\nAda,36,,\\nBob,40,,\\n\")\n" +
+        "return rows[0][\"name\"] + rows[1][\"name\"] + rows.size",
+        Shell.Success("AdaBob2"))
+    }
+    it("reads a header-only text with a repeated header as no rows") {
+      runInt(
+        "return Csv::parseWithHeader(\"a,b,a\\n\").size",
+        Shell.Success(0))
+    }
+    it("reads a repeat whose earlier column is empty, keeping the later value") {
+      runStr(
+        "val rows = Csv::parseWithHeader(\"h,h\\n,2\\n\")\n" +
+        "return rows[0][\"h\"]",
+        Shell.Success("2"))
     }
     it("still reads distinct headers") {
       runStr(

@@ -100,21 +100,34 @@ public final class Csv {
      * per data row (header name -> field value). Rows shorter than the header
      * map missing fields to ""; extra fields are ignored.
      *
-     * @throws IllegalArgumentException if a header name (a blank one included)
-     *         appears in two columns, since one of the two values would be lost
+     * A header name that repeats (a blank one included) maps to its last
+     * column; an earlier column with the same name must be empty in every row.
+     *
+     * @throws IllegalArgumentException if an earlier column of a repeated header
+     *         holds a value in some row, since that value would be lost
      */
     public static List<Map<String, String>> parseWithHeader(String text) {
         List<List<String>> rows = parse(text);
         List<Map<String, String>> result = new ArrayList<>();
         if (rows.isEmpty()) return result;
         List<String> header = rows.get(0);
-        Map<String, Integer> seen = new java.util.HashMap<>();
-        for (int c = 0; c < header.size(); c++) {
-            Integer first = seen.putIfAbsent(header.get(c), c);
-            if (first != null) {
-                throw new IllegalArgumentException("Csv: header \"" + header.get(c)
-                    + "\" appears in column " + (first + 1) + " and column " + (c + 1)
-                    + "; rename one so no value is lost");
+        // A repeated header keeps the value of its last column. Each earlier column
+        // with that name is shadowed; it is an error only when it holds a value.
+        int[] shadowedBy = new int[header.size()];
+        Map<String, Integer> next = new java.util.HashMap<>();
+        for (int c = header.size() - 1; c >= 0; c--) {
+            Integer later = next.put(header.get(c), c);
+            shadowedBy[c] = later == null ? -1 : later;
+        }
+        for (int r = 1; r < rows.size(); r++) {
+            List<String> row = rows.get(r);
+            for (int c = 0; c < header.size() && c < row.size(); c++) {
+                if (shadowedBy[c] >= 0 && !row.get(c).isEmpty()) {
+                    throw new IllegalArgumentException("Csv: header \"" + header.get(c)
+                        + "\" appears in column " + (c + 1) + " and column " + (shadowedBy[c] + 1)
+                        + ", so data row " + r + " would lose its value in column " + (c + 1)
+                        + "; rename one, or read the rows positionally with Csv::parse");
+                }
             }
         }
         for (int r = 1; r < rows.size(); r++) {

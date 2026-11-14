@@ -46,6 +46,30 @@ class FunctionValueNullPrimitiveSpec extends AbstractShellSpec {
     }
   }
 
+  describe("null passed to any class-type-variable slot bound to a primitive") {
+    it("is E0000 for a Java functional interface's apply") {
+      val src = "import { java.util.function.Function as JFunction }\nval g: JFunction[Int, String] = (i) -> \"v\"\nprintln(g.apply(null))\n"
+      assert(errorCodes(src) == Seq("E0000"))
+    }
+    it("is E0000 for List[Int].add") {
+      assert(errorCodes("val xs: List[Int] = [1, 2]\nxs.add(null)\nprintln(xs)\n") == Seq("E0000"))
+    }
+    it("is E0000 for a user generic class's method") {
+      val src =
+        """
+          |class Box[T] {
+          |  var v: T
+          |public:
+          |  def this(v: T) { this.v = v }
+          |  def put(x: T): void { v = x }
+          |}
+          |val b = new Box[Int](1)
+          |b.put(null)
+        """.stripMargin
+      assert(errorCodes(src) == Seq("E0000"))
+    }
+  }
+
   describe("what still compiles") {
     it("null for a nullable primitive parameter") {
       val src =
@@ -64,6 +88,19 @@ class FunctionValueNullPrimitiveSpec extends AbstractShellSpec {
           |def main(args: String[]): Int {
           |  val f: (Int) -> Int = (i) -> i + 1
           |  return f(1) - 2
+          |}
+        """.stripMargin
+      assert(Shell.Success(0) == shell.run(src, "None", Array()))
+    }
+    it("null for a List[Int?] element and a List[String] element") {
+      val src =
+        """
+          |def main(args: String[]): Int {
+          |  val xs: List[Int?] = [1]
+          |  xs.add(null)
+          |  val ys: List[String] = ["a"]
+          |  ys.add(null)
+          |  return xs.size + ys.size - 4
           |}
         """.stripMargin
       assert(Shell.Success(0) == shell.run(src, "None", Array()))

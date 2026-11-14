@@ -151,12 +151,15 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     // Rewriting); type their bodies like ordinary record methods. A record body
     // (`{ access-section* }`) contributes user methods that must have their bodies
     // typed too, mirroring enum bodies. Plain records with neither have nothing to do.
-    if (node.synthesizedMethods.nonEmpty || node.sections.nonEmpty || node.invariants.nonEmpty || node.histories.nonEmpty) {
+    if (node.synthesizedMethods.nonEmpty || node.sections.nonEmpty || node.invariants.nonEmpty || node.histories.nonEmpty ||
+        node.args.exists(_.defaultValue != null)) {
       typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
         unitContext.currentDefinition = definition
         typing.find(definition.name).foreach(unitContext.currentMapper = _)
         val recordTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
         typing.openTypeParams(typing.emptyTypeParams ++ recordTypeParams) {
+          // A component default held back by DefaultScheduling is typed here, in source order (#2829).
+          declarationBodySupport.predefineRecordDefaults(node)
           methodBodySupport.processTypeContracts(definition, node.invariants, node.histories)
           // A record is built by a constructor the compiler writes, which assigns the components and
           // runs no user code, so the `invariant` is not checked when one is built. Say so.

@@ -99,12 +99,24 @@ public final class Csv {
      * Parses CSV text whose first row is a header, yielding one ordered map
      * per data row (header name -> field value). Rows shorter than the header
      * map missing fields to ""; extra fields are ignored.
+     *
+     * @throws IllegalArgumentException if a header name (a blank one included)
+     *         appears in two columns, since one of the two values would be lost
      */
     public static List<Map<String, String>> parseWithHeader(String text) {
         List<List<String>> rows = parse(text);
         List<Map<String, String>> result = new ArrayList<>();
         if (rows.isEmpty()) return result;
         List<String> header = rows.get(0);
+        Map<String, Integer> seen = new java.util.HashMap<>();
+        for (int c = 0; c < header.size(); c++) {
+            Integer first = seen.putIfAbsent(header.get(c), c);
+            if (first != null) {
+                throw new IllegalArgumentException("Csv: header \"" + header.get(c)
+                    + "\" appears in column " + (first + 1) + " and column " + (c + 1)
+                    + "; rename one so no value is lost");
+            }
+        }
         for (int r = 1; r < rows.size(); r++) {
             List<String> row = rows.get(r);
             Map<String, String> rec = new LinkedHashMap<>();

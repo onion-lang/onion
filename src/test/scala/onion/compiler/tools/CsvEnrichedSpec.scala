@@ -32,6 +32,35 @@ class CsvEnrichedSpec extends AbstractShellSpec {
     }
   }
 
+  describe("Csv::parseWithHeader repeated header") {
+    it("throws naming the header and both columns instead of dropping a value") {
+      runStr(
+        "try {\n" +
+        "  Csv::parseWithHeader(\"h,h,k\\n1,2,3\\n\")\n" +
+        "  return \"no error\"\n" +
+        "} catch e: IllegalArgumentException {\n" +
+        "  return e.getMessage()\n" +
+        "}",
+        Shell.Success("Csv: header \"h\" appears in column 1 and column 2; rename one so no value is lost"))
+    }
+    it("treats a second blank header as a repeat too") {
+      runStr(
+        "try {\n" +
+        "  Csv::parseWithHeader(\"name,,\\nAda,x,y\\n\")\n" +
+        "  return \"no error\"\n" +
+        "} catch e: IllegalArgumentException {\n" +
+        "  return \"error\"\n" +
+        "}",
+        Shell.Success("error"))
+    }
+    it("still reads distinct headers") {
+      runStr(
+        "val rows = Csv::parseWithHeader(\"a,b\\n1,2\\n\")\n" +
+        "return rows[0][\"a\"] + rows[0][\"b\"]",
+        Shell.Success("12"))
+    }
+  }
+
   describe("Csv::parse unterminated quote") {
     it("throws naming the line where the quote was opened") {
       runStr(

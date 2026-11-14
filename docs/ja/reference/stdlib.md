@@ -2226,6 +2226,7 @@ RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（`onion.Cs
 ```onion
 val rows = Csv::parse(text)                  // List of List of String
 val recs = Csv::parseWithHeader(text)        // List of Map（ヘッダー -> 値）
+                                             // 同じヘッダーが2列にあると IllegalArgumentException
 
 Csv::column(rows, 0)                          // 位置指定で1列取得
 Csv::columnByName(recs, "age")                // ヘッダー名で1列取得

@@ -72,6 +72,15 @@ class ExtensionErasureDuplicateCallSpec extends AbstractShellSpec {
       assert(result.contains(Some("E0084")))
       assert(result.size == 2)
     }
+
+    it("still reports an error inside a lambda argument (#2550)") {
+      val typed = codes(lambdaTwins + "IO::println(\"a\".p((x: Int) -> undefinedName))\n")
+      assert(typed.sorted == Seq(Some("E0002"), Some("E0084")))
+      val untyped = codes(lambdaTwins + "IO::println(\"a\".p { x -> undefinedName2 })\n")
+      assert(untyped.sorted == Seq(Some("E0002"), Some("E0084")))
+      val member = codes(lambdaTwins + "IO::println(\"a\".p { x -> x.nope() })\n")
+      assert(member.contains(Some("E0005")) && member.contains(Some("E0084")))
+    }
   }
 
   describe("extension overloads that differ after erasure") {

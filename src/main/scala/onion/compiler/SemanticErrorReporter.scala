@@ -1189,6 +1189,14 @@ class SemanticErrorReporter(threshold: Int) {
    *  suppressed (issue #316). */
   def problemCount: Int = problems.length
 
+  /** Drops the errors collected since `start` (a [[problemCount]] checkpoint) that `drop`
+   *  accepts. Lets a caller keep an inner diagnostic and discard a redundant outer one (#2550). */
+  def dropProblemsSince(start: Int)(drop: CompileError => Boolean): Unit = {
+    val kept = problems.drop(start).filterNot(drop)
+    problems.remove(start, problems.length - start)
+    problems ++= kept
+  }
+
   def setSourceFile(sourceFile: String): Unit = {
     this.sourceFile = sourceFile
   }

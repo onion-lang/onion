@@ -183,6 +183,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
           from = holder(h, chain, cls)
           c <- conjuncts(h) if HistoryPreorder.simpleRelations(c).isEmpty
           named = namesIn(c).filter(f => fields.contains(f) && fieldOwner(from, f) == fieldOwner(owner, f))
+          if named.nonEmpty || callsAny(c)
           w <- writes.find(w => named.exists(w.ofField(m, _)))
         } unchecked += Unchecked(file, owner, m, w.field, None, line = lineOf(h), fieldType = None, at = w.node.location)
       }
@@ -412,6 +413,7 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
       h <- histories
       c <- conjuncts(h) if HistoryPreorder.simpleRelations(c).isEmpty
       named = namesIn(c).filter(fields.contains)
+      if named.nonEmpty || callsAny(c)
       m <- methodsOf(cls) if m.block != null
       // A history over method calls (`x() >= old(x())`) names no field, so any write may break it (#2735).
       w <- writesIn(m, cls).find(w => if (named.isEmpty) fields.contains(w.field) else named.exists(w.ofField(m, _)))
@@ -421,6 +423,21 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
   private def conjuncts(e: AST.Expression): Seq[AST.Expression] = e match {
     case AST.LogicalAnd(_, l, r) => conjuncts(l) ++ conjuncts(r)
     case other                   => Seq(other)
+  }
+
+  /** A conjunct with no field and no call (`1 >= 0`) reads no state, so no write can break it (#2901). */
+  private def callsAny(e: AST.Node): Boolean = {
+    var found = false
+    def visit(n: AST.Node): Unit = {
+      n match {
+        case _: AST.UnqualifiedMethodCall | _: AST.MethodCall | _: AST.SafeMethodCall | _: AST.StaticMethodCall |
+             _: AST.SuperMethodCall | _: AST.TraitMethodCall => found = true
+        case _ =>
+      }
+      if (!found) ASTWalk.visitChildren(n)(visit)
+    }
+    visit(e)
+    found
   }
 
   private def namesIn(e: AST.Node): Set[String] = {

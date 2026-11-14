@@ -82,5 +82,29 @@ class ConstructorDiamondSpec extends AbstractShellSpec {
       assert(Shell.Success("b") == shell.run(p +
         "def main(args: String[]): String { val p = new P(\"a\", \"b\")\n return p.get() }", "None", Array()))
     }
+
+    it("reads a nullable argument for the named parameter as its class when checking the bound (#2539 review)") {
+      val p =
+        """
+          |class P[B, T extends B] {
+          |public:
+          |  val b: B
+          |  val t: T
+          |  def this(b: B, t: T) { this.b = b; this.t = t }
+          |}
+          |""".stripMargin
+      // Inferred: B is String?, and "x" is a String
+      assert(Shell.Success("x|x") == shell.run(p +
+        "def f(ns: String?): String = new P(ns, \"x\").t\n" +
+        "def main(args: String[]): String { return f(null) + \"|\" + f(\"y\") }", "None", Array()))
+      // Explicit: the same instantiation written out
+      assert(Shell.Success("x") == shell.run(p +
+        "def main(args: String[]): String { val e: P[String?, String] = new P[String?, String](null, \"x\")\n return e.t }",
+        "None", Array()))
+      // Still checked: an unrelated class is not a String?
+      assert(Shell.Failure(-1) == shell.run(p +
+        "def f(ns: String?): Object = new P(ns, Integer::valueOf(1)).t\n" +
+        "def main(args: String[]): Object { return f(null) }", "None", Array()))
+    }
   }
 }

@@ -720,15 +720,14 @@ final class BlockElementLowering(
 
   private def actualElementType(collectionType: Type): Type = inferredElementType(collectionType)
 
-  /** An annotated loop variable must relate to the element type: the same type, a
-   *  supertype, or a narrowing (`foreach s: String in List[Object]` is a checked
-   *  cast). Two unrelated types, such as `Int` over `String` elements, never work. */
+  /** An annotated loop variable means `element as T`: it is rejected only where that
+   *  cast is (#2946). So `foreach a: Int in strings` is an error, while a widening
+   *  (`foreach i: Long in 1..3`), a narrowing (`String` over `List[Object]`) and an
+   *  interface over a non-final class (`Runnable` over `List[Base]`) still compile. */
   private def annotationUnrelatedToElements(arg: AST.Argument, annotated: Type, collectionType: Type): Boolean =
     arg.typeRef != null && {
       val actual = actualElementType(collectionType)
-      (actual ne bodyContext.rootClass) &&
-        !TypeRelations.isAssignableWithBoxing(annotated, actual, bodyContext.table) &&
-        !TypeRelations.isAssignableWithBoxing(actual, annotated, bodyContext.table)
+      (actual ne bodyContext.rootClass) && !body.isValidCast(actual, annotated)
     }
 
   /** The type an unannotated foreach variable takes: an array's component type, an

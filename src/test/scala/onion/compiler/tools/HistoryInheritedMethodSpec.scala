@@ -64,8 +64,8 @@ class HistoryInheritedMethodSpec extends AnyFunSpec {
     assert(o.errors.isEmpty, o.toString)
   }
 
-  it("accepts an inherited method that only raises or reads the field") {
-    val o = compile(program("def bump(): void { n = n + 2 }"))
+  it("accepts an inherited method that only raises (bounded by a requires) or reads the field") {
+    val o = compile(program("def bump(): void requires n < 1000 { n = n + 2 }"))
     assert(o.errors.isEmpty, o.toString)
     assert(o.w24.isEmpty, o.toString)
   }
@@ -242,6 +242,75 @@ class HistoryInheritedMethodSpec extends AnyFunSpec {
     val o = compile(src)
     assert(o.errors == Seq("E0109"), o.toString)
     assert(o.messages.exists(m => m.contains("`B`") && !m.contains("`C`")), o.toString)
+  }
+
+  it("is E0112 for an inherited `n = n + 1` that can overflow a subclass history (#2787)") {
+    val src =
+      """class Base {
+        |protected:
+        |  var n: Int
+        |public:
+        |  def this { n = 10 }
+        |  def inc(): void { n = n + 1 }
+        |  def get(): Int = n
+        |}
+        |class Up extends Base {
+        |  history n >= old(n)
+        |public:
+        |  def this { }
+        |  def bump(): void requires n < 1000 { n = n + 2 }
+        |}
+        |val u = new Up(); u.inc(); u.bump(); println(u.get())""".stripMargin
+    assert(compile(src).errors == Seq("E0112"))
+  }
+
+  it("accepts an inherited `n = n + 1` that a `requires` keeps from overflowing (#2787)") {
+    val src =
+      """class Base {
+        |protected:
+        |  var n: Int
+        |public:
+        |  def this { n = 10 }
+        |  def inc(): void requires n < 1000 { n = n + 1 }
+        |  def get(): Int = n
+        |}
+        |class Up extends Base {
+        |  history n >= old(n)
+        |public:
+        |  def this { }
+        |}
+        |val u = new Up(); u.inc(); println(u.get())""".stripMargin
+    assert(compile(src).errors.isEmpty)
+  }
+
+  // Panel block on #2953: the inherited E0112 names both classes and offers the override, as E0109 does,
+  // so two subclasses that inherit the same method get two distinguishable errors.
+  it("names the subclass and the superclass in an inherited E0112, one error per subclass (#2787)") {
+    val src =
+      """class Base {
+        |protected:
+        |  var n: Int
+        |public:
+        |  def this { n = 10 }
+        |  def inc(): void { n = n + 1 }
+        |  def get(): Int = n
+        |}
+        |class Up extends Base {
+        |  history n >= old(n)
+        |public:
+        |  def this { }
+        |}
+        |class Up2 extends Base {
+        |  history n >= old(n)
+        |public:
+        |  def this { }
+        |}
+        |val u = new Up(); u.inc(); println(u.get())""".stripMargin
+    val o = compile(src)
+    assert(o.errors == Seq("E0112", "E0112"), o.toString)
+    assert(o.messages.exists(m => m.contains("`Up`") && m.contains("`Base`") && m.contains("`inc`")), o.toString)
+    assert(o.messages.exists(m => m.contains("`Up2`") && m.contains("`Base`")), o.toString)
+    assert(o.messages.distinct.size == 2, o.toString)
   }
 
   // #2782: an override that delegates to `super` runs the superclass's body on the subclass.

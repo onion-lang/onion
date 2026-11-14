@@ -155,13 +155,25 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
             problem._1, problem._2, cls.name, via.name, owner.name) ++ through)*)
         }
         // A raise under `>=` (a lowering under `<=`, a constant nothing undoes) is settled by the syntax.
-        else if (broken.isEmpty) mine.find(_.kind == Other).foreach { w =>
-          val reason = caller match {
-            case Some((c, cm)) => ("super", s"$c.$cm")
-            case None          => ("inherited", cls.name)
+        else if (broken.isEmpty) {
+          mine.find(_.kind == Other).foreach { w =>
+            val reason = caller match {
+              case Some((c, cm)) => ("super", s"$c.$cm")
+              case None          => ("inherited", cls.name)
+            }
+            unchecked += Unchecked(file, owner, m, field, Some(s"$field $op old($field)"), line = lineOf(w.node),
+              fieldType = None, reason = Some(reason), at = w.node.location, via = via.name)
           }
-          unchecked += Unchecked(file, owner, m, field, Some(s"$field $op old($field)"), line = lineOf(w.node),
-            fieldType = None, reason = Some(reason), at = w.node.location, via = via.name)
+          // The syntax accepts `n = n + 1` under `>=`, but it can overflow: the solver is given the
+          // inherited body too, as it is for a method the class declares itself (#2787). A method
+          // reached through `super` is not replayed: the replay would run the override.
+          if (caller.isEmpty && mine.nonEmpty && mine.forall(_.kind != Other) && collected != null && intFieldNames(chain).contains(field)) {
+            val callees = chain.reverse.flatMap(methodsOf).map(x => x.name -> x).toMap
+            HistoryProver.prove(m, field, op, intFieldNames(chain), chain.flatMap(_.invariants), callees, builtCallees(m)) match {
+              case HistoryProver.Counterexample(before) => collected += Repro(file, cls, m, field, op, before, owner.name)
+              case _ =>
+            }
+          }
         }
       }
       if (!reporting) {
@@ -441,6 +453,11 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
    * (W0021), not an error: it may rest on a wrap-around the program never reaches, and only a
    * run can confirm it. A method with a syntactic E0109 is skipped; it is already reported.
    */
+  private def intFieldNames(chain: Seq[AST.ClassDeclaration]): Set[String] =
+    chain.flatMap(c => (c.defaultSection.toSeq ++ c.sections).flatMap(_.members)).collect {
+      case f: AST.FieldDeclaration if f.typeRef != null && f.typeRef.desc == AST.PrimitiveType(AST.KInt) => f.name
+    }.toSet
+
   private def proveRest(cls: AST.ClassDeclaration, chain: Seq[AST.ClassDeclaration], relations: Seq[(String, String)]): Unit = {
     val intFields = chain.flatMap(c => (c.defaultSection.toSeq ++ c.sections).flatMap(_.members)).collect {
       case f: AST.FieldDeclaration if f.typeRef != null && f.typeRef.desc == AST.PrimitiveType(AST.KInt) => f.name
@@ -643,7 +660,9 @@ final class HistoryWritePass(typing: Typing, builtType: String => Option[onion.c
 object HistoryWritePass {
   /** A counterexample the solver found: the method, the history, and the values before the call. */
   final case class Repro(sourceFile: String, cls: AST.ClassDeclaration, method: AST.MethodDeclaration,
-                         field: String, op: String, before: Map[String, Int]) {
+                         field: String, op: String, before: Map[String, Int], declaredIn: String = null) {
+    /** The class whose body holds the method: the class itself, or the superclass an inherited method comes from (#2787). */
+    def owner: String = if (declaredIn != null) declaredIn else cls.name
     def history: String = s"$field $op old($field)"
     def shown: String = before.toSeq.sortBy(_._1).map { case (k, v) => s"$k = $v" }.mkString(", ")
   }

@@ -1247,6 +1247,9 @@ v["users"][0]["name"].asString()
 val obj = Json::parseOrNull("not json")   // 例外を投げず null
 ```
 
+ネスト（`[` や `{` の入れ子）は 512 段までです。それより深い入力は `Json.JsonParseException`
+（"Nesting too deep"）になり、`parseOrNull` は `null` を返します。
+
 不正入力の失敗をその場で処理したい場合、`Json.JsonParseException` は通常の `message()` に加えて
 `getPosition()`（パースを諦めた位置の文字オフセット）を持っています:
 

@@ -134,6 +134,37 @@ def main(args: String[]): void {
 }
 ```
 
+## The built-in `Numeric`
+
+Onion ships one trait, `onion.typeclass.Numeric[T]`, with `zero`, `one`, `plus` and
+`times`. Import it, and the instances below need no `instance` declaration:
+
+| Type | Instance | Note |
+|---|---|---|
+| `Int`, `Long` | exact | overflow throws `ArithmeticException` |
+| `Double`, `Float` | floating point | `Float` adds in float precision |
+| `BigInteger`, `BigDecimal` | arbitrary precision | `BigDecimal` never rounds |
+
+```onion
+import { onion.typeclass.Numeric }
+
+def total[T: Numeric](xs: List[T]): T {
+  var acc = Numeric[T]::zero()
+  foreach x in xs { acc = Numeric[T]::plus(acc, x) }
+  return acc
+}
+
+def main(args: String[]): void {
+  println(total([3, 4]))        // => 7, an Int
+  println(total([1.5, 2.0]))    // => 3.5
+}
+```
+
+- For another type, write your own `instance Numeric[Short] { ... }` with all four methods.
+- Java code gets an instance from `Numeric.forInt()`, `forLong()`, `forDouble()`,
+  `forFloat()`, `forBigInteger()` or `forBigDecimal()`.
+- `Stats::sum` does not use it yet (RFC #2760).
+
 ## Your own traits
 
 Type classes are not limited to numbers — define any trait you need:
@@ -172,4 +203,6 @@ The first release focuses on the common cases:
   `value.method(...)` is not yet available.
 - Instances are for ground types (`instance Numeric[Integer]`), not parameterized
   (`instance Numeric[List[T]]`).
-- There is no built-in `Numeric`/`Eq`/`Ord` yet — define the traits you need.
+- `Numeric` is the only built-in trait; there is no built-in `Eq`/`Ord` yet.
+- Ground access to a trait from another package, such as `Numeric[Int]::zero()` for the
+  built-in one, is E0003 for now (#2962). Call it from a constrained function instead.

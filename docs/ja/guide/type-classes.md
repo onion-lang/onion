@@ -133,6 +133,38 @@ def main(args: String[]): void {
 }
 ```
 
+## 組込の `Numeric`
+
+Onion にはトレイトが一つ組み込まれています。`onion.typeclass.Numeric[T]` です。
+メソッドは `zero`、`one`、`plus`、`times` の四つです。import すれば、次のインスタンスは
+`instance` 宣言なしで使えます。
+
+| 型 | インスタンス | 備考 |
+|---|---|---|
+| `Int`、`Long` | 正確 | オーバーフローすると `ArithmeticException` を投げます |
+| `Double`、`Float` | 浮動小数点 | `Float` は float 精度で足します |
+| `BigInteger`、`BigDecimal` | 任意精度 | `BigDecimal` は丸めません |
+
+```onion
+import { onion.typeclass.Numeric }
+
+def total[T: Numeric](xs: List[T]): T {
+  var acc = Numeric[T]::zero()
+  foreach x in xs { acc = Numeric[T]::plus(acc, x) }
+  return acc
+}
+
+def main(args: String[]): void {
+  println(total([3, 4]))        // => 7（Int）
+  println(total([1.5, 2.0]))    // => 3.5
+}
+```
+
+- ほかの型には、四つのメソッドをすべて持つ `instance Numeric[Short] { ... }` を自分で書きます。
+- Java のコードは `Numeric.forInt()`、`forLong()`、`forDouble()`、`forFloat()`、
+  `forBigInteger()`、`forBigDecimal()` でインスタンスを受け取ります。
+- `Stats::sum` はまだこれを使いません（RFC #2760）。
+
 ## 自作のトレイト
 
 型クラスは数値に限りません。必要なトレイトを自由に定義できます。
@@ -171,4 +203,6 @@ def main(args: String[]): void {
   `value.method(...)` はまだ使えません。
 - インスタンスは具体型に対するもの（`instance Numeric[Integer]`）で、パラメータ化
   （`instance Numeric[List[T]]`）はまだ対象外です。
-- 組込の `Numeric`/`Eq`/`Ord` はまだありません。必要なトレイトは自分で定義します。
+- 組込のトレイトは `Numeric` だけです。組込の `Eq`/`Ord` はまだありません。
+- 別パッケージのトレイトへの具体型アクセス（組込の `Numeric[Int]::zero()` など）は、
+  今のところ E0003 になります（#2962）。代わりに制約付き関数から呼びます。

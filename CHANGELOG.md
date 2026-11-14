@@ -7,6 +7,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.158.0] - 2026-11-14
+
+### Breaking
+
+- **A `protected` constructor picked by a default, named arguments, or an untyped lambda argument is E0013 outside its subclasses.**
+  - Before: `new A(9)` from an unrelated class compiled and ran, while `new A(9, 2)` was already E0013.
+  - Now: both are E0013. Move the constructor under `public:`; see `docs/migration/pre-1.0.md`.
+
+### Fixed
+
+- **`Archive::unzip` refuses an entry that would overwrite the archive it reads (#2957).**
+  - Before: `unzip("a.zip", ".")` with an entry named `a.zip` returned normally, and the archive was replaced by that entry.
+  - Now: it throws "source and target are the same file" before extracting anything, as `zip` and `gunzipFile` already do.
+- **`continue` inside `foreach` over an array moves on to the next element (#2940).**
+  - Before: `foreach a in args { if a == "x" { continue } ... }` looped forever on the same element, with no error.
+  - Now: it skips that element, as it already did for lists and ranges.
+- **`10 + (if c { continue } else { i })` compiles: a `break`/`continue` works inside any operand (#2932).**
+  - Before: I0000 "Bytecode generation failed", a compiler crash, whenever another operand (a `+` left side, a string concatenation, a receiver, an earlier argument) was already evaluated.
+  - Now: the jump leaves or restarts the loop, and the half-evaluated expression is dropped.
+- **`Archive::zip(p, [p])` refuses to overwrite its own source (#2923).**
+  - Before: it returned normally and `p` became the zip; the file's text was lost.
+  - Now: it throws "source and target are the same file" and `p` stays intact, as `gzipFile` and `zipDir` already do.
+  - Every file is checked before the zip is created, so a missing file no longer leaves a half-written zip.
+- **`val y = if c { continue } else { i }` compiles after a lambda in the same method or script (#2913).**
+  - Before: I0000 "Continue statement outside of loop" (or "Break ..."), a compiler crash.
+  - Now: the jump leaves or restarts the loop, as it does without the lambda.
+- **`DateTime::addDays(t, 0)` returns `t` in the repeated hour of a fall-back night (#2905).**
+  - Before: the second 01:30 moved to the first 01:30, one hour earlier. `addMonths` and `addYears` did the same.
+  - Now: the offset is kept when the new wall time is still valid with it.
+- **A class with a `history` or `invariant` can extend a generic Onion class (#2888).**
+  - Before: `class Up extends Base[String] { history n >= old(n) }` was E0111, "extends the Java class `Base`".
+  - Now: it compiles, and `Base`'s inherited methods are checked against the history (E0109) as for a non-generic `Base`.
+- **Contract checks no longer skip a generic supertype (#2888).** An override that breaks a generic base's `ensures` is W0025, and a `history` on a generic interface (`conforms Counter[String]`) is checked (W0024), as without type arguments.
+- **`pb.command()` on a `ProcessBuilder` returns its `List[String]` (#2859).**
+  - Before: E0000, because `command(String...)` was chosen and returned the `ProcessBuilder`.
+  - Now: an instance call takes a fixed-arity overload over a varargs one, as in Java. `v.m("a")` picks `m(Object)` over `m(String...)` the same way.
+- **`val o: Object = Collections::max(xs, c)` compiles (#2857).**
+  - Before: E0000 "type String is expected, but type Object is used", although `xs` and `c` already fix `T = String`.
+  - Now: the arguments decide `T`, and the result is assigned to the wider target, as in Java.
+- **A generic class from a later source file can be used with type arguments (#2853).**
+  - Before: `onionc app.on lib.on` was E0030 "does not take type arguments" on `Crate[Int]` when `lib.on` declares `class Crate[T]`; `onionc lib.on app.on` compiled.
+  - Now: both orders compile, and bound and arity errors are reported the same way in either order.
+- **E0106 underlines the call that has the effect, even when an earlier call has the same name (#2847).**
+  - Before: in `requires p.add(1) > 0 && xs.add(1)`, the pure `p.add(1)` was underlined while the message named `List.add`.
+  - Now: `xs.add(1)` is underlined.
+- **A lambda can be a `UnaryOperator` or `BinaryOperator` (#2844).**
+  - Before: `val f: UnaryOperator[String] = (s) -> s + "!"` and `xs.replaceAll((s) -> ...)` were E0005 `.call(Object)`.
+  - Now: they compile, as in Java. This covers any interface whose one abstract method is inherited.
+  - A constructor overloaded on `Function` and `UnaryOperator` now picks `UnaryOperator` for a lambda, as Java does (before: `Function`).
+- **A class that inherits two unrelated defaults for one method is now E0116.**
+  - Before: `class C conforms A, B` compiled when `A` and `B` both give `g()` a body, then `c.g()` threw `AbstractMethodError`.
+  - Now: E0116 at the class, telling you to override `g()` in `C`, as Java does.
+- **`DateTime::format(t, "... z")` and `nowString("...XXX")` work.**
+  - Before: a raw `DateTimeException` for any zone or offset letter (`z`, `X`, `VV`).
+  - Now: the time is shown in the local zone, e.g. `2026-11-11 09:30 JST`. An invalid pattern names itself.
+- **`record R(a: Int, b: Int = 2)` can be built as `new R(1)` or `new R(a = 1)`.**
+  - Before: the default parsed, then every construction that omitted `b` was E0021.
+  - Now: `b` is filled with `2`, as a constructor default would be. A data-enum parameter default is still unsupported (#2948).
+- **`new A(7)` on a private constructor is E0013 when a default, a named argument or a lambda argument picks it.**
+  - Before: it compiled, then threw `IllegalAccessError` at run time.
+  - Now: E0013 at compile time, as a plain `new A(7, 2)` already gave. Calls inside the class still work.
+- **`a.append(b)` compiles when both are `StringBuilder`s.**
+  - Before: E0013, "append(StringBuilder) is not accessible", a method you cannot see.
+  - Now: `append(CharSequence)` is chosen, as in Java.
+- **A `HEAD` request to a `Server` route no longer makes the JDK log a warning (#2808).**
+  - Before: every `HEAD` printed `WARNING: sendResponseHeaders: being invoked with a content length for a HEAD request`.
+  - Now: the reply has the headers and `Content-Length` of the GET body, no body, and no warning.
+- **`Net.Conn.readLine()` after a read timeout returns the whole line.**
+  - Before: `"hel"` arrives, `readLine()` times out, the next call returned `"lo"`.
+  - Now: it returns `"hello"`. A `\r\n` split by a timeout is still one line break.
+- **`Yaml::stringify` of a key with an inner `"` parses back (#2806).**
+  - Before: `["5\" tv": "yes"]` wrote `5" tv: yes`, which `Yaml::parse` rejected.
+  - Now: such keys and values are quoted. Lists of strings, `{}` items and `NaN` are still open in #2806.
+- **An inherited `n = n + 1` that can overflow a subclass `history n >= old(n)` is reported (#2787).**
+  - Before: it compiled cleanly, while the same method written in the subclass was E0112.
+  - Now: W0021/E0112 with the overflow counterexample, naming the subclass and the superclass and offering the override.
+- **The `derive!` docs say the derived methods are static: call `R::toJson(v)`, not `v.toJson()`.**
+  - A component named `toJson` stays legal: `p.toJson()` is the component, `P::toJson(p)` the serializer.
+- **E0113 no longer blames a correct predicate.**
+  - Before: a sample whose `toString` throws gave "did not hold" (English even in ja); an unsampleable parameter type read "did not hold" too.
+  - Now: the first reports nothing; the second says the predicate was not run because the type cannot be sampled.
+- **A class implementing `g(x: T?)` of a generic interface no longer throws `AbstractMethodError` (#2719).**
+  - Before: `interface I[T] { def g(x: T?): String }` with `def g(x: String?)` compiled, then crashed on `i.g("a")`.
+  - Now: the bridge method is generated, so the call prints `got a`.
+- **Two scripts with the same file name (`d1/x.on`, `d2/x.on`) give E0008 instead of an internal error.**
+  - Before: `[I0000] Internal compiler error ... Duplicate method name "start"`.
+  - Now: E0008 names the shared class `xMain` and says to rename one file.
+- **`override` on a method that only matches a generic contract through boxing is E0068 when a sibling overload is the real override.**
+  - Before: `override def n(x: Int)` next to `def n(x: JInteger)` in `class C conforms G[JInteger]` compiled silently.
+  - Now: E0068 on `n(x: Int)`, as Java rejects `@Override` there.
+- **`new P("a", Integer::valueOf(1))` is a compile error when `P[B, T extends B]` needs `T` to be a `B`.**
+  - Before: compiled, then failed at run time with a cast error far from the mistake.
+  - Now: a compile error at the `new`, as for a method call and for explicit type arguments.
+- **`P[String?, String]` satisfies `class P[B, T extends B]`.**
+  - Before: E0000 `type B is expected, but type String is used`, for both `new P[String?, String](null, "x")` and an inferred `new P(ns, "x")`.
+  - Now: compiles; a nullable argument for `B` gives `T` the bound `String`.
+- **A json-shape record component typed with an alias from another file now names the alias in E0061 (#2530).**
+  - Before: `record T(n: Name)` with `type Name = JS` in another file said only `has type java.lang.String`, a type the message also lists as supported.
+  - Now: `has type Name (= java.lang.String)`.
+
 ## [0.157.0] - 2026-11-13
 
 ### Fixed

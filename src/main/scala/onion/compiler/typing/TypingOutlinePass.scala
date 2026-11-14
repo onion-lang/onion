@@ -214,7 +214,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // Create constructor
       val ctorModifier = Modifier.PUBLIC
       val ctor = new ConstructorDefinition(node.location, ctorModifier, definition_, argTypes, null, null)
-      // Set argument names for named argument support (records don't have default values)
+      // Argument names for named arguments; component defaults are typed by the body pass (#2829)
       val methodArgs = node.args.zip(argTypes).map { case (arg, argType) =>
         MethodArgument(arg.name, argType, None)
       }.toArray
@@ -388,7 +388,15 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         if (hasShapes && unsupportedFrom.isEmpty) unsupportedShape.foreach { case (arg, argType, sc) =>
           val supported =
             if (isJsonClause(sc)) JsonShapeComponents.supportedDescription else ScalarConversions.supportedNames
-          report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
+          // A component written as an alias (`n: Name`, `type Name = JS` in another file) is named
+          // by what it resolved to, so the message would never mention `Name` (#2530).
+          val resolvedName = argType.displayName
+          val shown = arg.typeRef.desc match {
+            case AST.ReferenceType(written, _) if written != resolvedName && !resolvedName.endsWith("." + written) =>
+              s"$written (= $resolvedName)"
+            case _ => resolvedName
+          }
+          report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, shown,
             supported, shapeClauseSyntax(sc))
         }
         // The `from` synthesis inherits E0059/E0060 by lowering to a regex select pattern;
@@ -879,6 +887,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     for (args <- argsOption) {
       val modifier = node.modifiers | access_
       val constructor = new ConstructorDefinition(node.location, modifier, definition_, args.toArray, null, null)
+      constructor.vararg = node.args.lastOption.exists(_.isVararg)
       // The parameter names are known now, so a named call or delegation typed before this
       // constructor's body (`: this(z = 1)` above the primary, `extends A(a = x)` above `A`)
       // binds them. The body pass replaces this with the typed defaults.

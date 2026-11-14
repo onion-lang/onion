@@ -155,7 +155,17 @@ private[compiler] object MethodResolution {
     // Narrowing (Onion's `takesByte(100)`) only rescues a call nothing else accepts.
     val applicableMethods =
       val strict = all.iterator.filter(m => support.applicable(m, narrowConstants = false)).toList
-      val found = if strict.nonEmpty then strict else all.iterator.filter(support.applicable).toList
+      val found0 = if strict.nonEmpty then strict else all.iterator.filter(support.applicable).toList
+      // Java's phasing: a varargs overload competes only when no overload applies by fixed
+      // arity, so `pb.command()` is the getter, not `command(String...)` (#2859). A varargs
+      // method handed its array (or null) in the last slot is a fixed-arity call and stays.
+      def fixedArity(m: Method): Boolean =
+        !m.isVararg || (params.length == m.argumentCount && params.nonEmpty && {
+          val last = params.last.`type`
+          last != null && (last.isArrayType || last.isNullType)
+        })
+      val found =
+        if found0.exists(fixedArity) then found0.filter(fixedArity) else found0
       // A slot typed by a class type variable (`List[T]` inside `N[T]`) is matched above
       // through T's bound, so `List[Number]` passes it; the argument check after selection
       // does not. Prefer the overloads that check would accept (Java picks `f(Object)`,

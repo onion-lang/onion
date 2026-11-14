@@ -227,6 +227,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       DuplicationChecks.checkOverrideContracts(typing, clazz, node.location)
       DuplicationChecks.checkOverrideTargets(typing, clazz, node.location)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
+      DuplicationChecks.checkConflictingInterfaceDefaults(typing, clazz, node.location)
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
     }
 
@@ -275,6 +276,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
         typing, clazz, node.location, skipObject = true, memberLocations = node.args.map(a => a.name -> a.location).toMap)
       DuplicationChecks.checkRecordFinalObjectOverrides(typing, clazz, node.args.map(_.name).toSet, node.location)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
+      DuplicationChecks.checkConflictingInterfaceDefaults(typing, clazz, node.location)
     }
 
   // A component name repeated in the record's parameter list (`record R(a: Int, a: Int)`)

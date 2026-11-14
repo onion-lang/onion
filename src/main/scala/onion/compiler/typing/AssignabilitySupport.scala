@@ -215,9 +215,12 @@ private[compiler] final class AssignabilitySupport(
         // there; say that it is not a `T` (#2328 review). Otherwise only when
         // the value without its `?` would fit; else the mismatch is elsewhere
         // (a type argument, say) and `!!`/`?:` do not help.
+        // A nullable target takes null too, so null is not why it failed either
+        // (`Int?` into `Long?` is a box mismatch, #2730): E0000, not a `!!` hint.
         case nullable: NullableType
             if !(expected match {
                   case tv: TypeVariableType => tv.acceptsNullable
+                  case _: NullableType => true
                   case _ => false
                 }) &&
                (if (containsTypeVariable(expected)) structurallyAssignable(expected, nullable.innerType)

@@ -224,6 +224,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
+    for(unit <- source) {
+      new onion.compiler.typing.TypingHeaderPass(this, session.activate(unit)).checkImports()
+    }
     for(unit <- source) processOutline(unit)
     // Every unit's defaults are typed before any body, so a call may omit a default
     // declared later in its file or in another file (#2653).
@@ -240,7 +243,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     // Pass 6 (RFC #2557): a contract expression must be pure. Same reason to run here.
     new onion.compiler.typing.ContractPurityPass(this).run(table_.classes.values.toSeq)
     // RFC #2557: a write that breaks a `history`, decided from the syntax alone.
-    new onion.compiler.typing.HistoryWritePass(this).run(source)
+    new onion.compiler.typing.HistoryWritePass(this, typedOf = lookupKernelNode).run(source)
     // RFC #2557 design 4: an override's body against the effective contract.
     new onion.compiler.typing.OverrideContractPass((file, location, message) => {
       warningReporter_.setSourceFile(file)

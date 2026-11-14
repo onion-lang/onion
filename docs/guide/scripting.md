@@ -120,7 +120,8 @@ val one  = Access::parse(line)                          // Access? (null on no m
 
 `derive!(Json)` / `derive!(Yaml)` synthesize both directions of a format from the
 record's shape — no hand-written serializer. `derive!` is a macro (the `!` marks
-expansion at the use site), not a type class:
+expansion at the use site), not a type class. The derived methods are static: call
+`User::toJson(u)`, not `u.toJson()`.
 
 ```onion
 record User(name: String, age: Int) derive!(Json, Yaml)

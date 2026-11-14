@@ -1,0 +1,286 @@
+package onion.compiler.tools
+
+import onion.tools.Shell
+
+/**
+ * #2839: a varargs constructor applies to spread arguments, as a varargs method does.
+ * `new ProcessBuilder("echo", "x")` and `new V("a", "b")` for `def this(xs: String...)`
+ * were E0021 even though the error listed the varargs constructor as available.
+ */
+class ConstructorVarargsSpec extends AbstractShellSpec {
+
+  private def run(body: String, name: String) =
+    shell.run(body.stripMargin, name, Array())
+
+  describe("A varargs constructor") {
+    it("takes spread arguments for a Java constructor (ProcessBuilder)") {
+      val result = run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    // Run it rather than read `pb.command()`, which picks the wrong overload (#2859).
+          |    val pb = new java.lang.ProcessBuilder("echo", "x")
+          |    val out = pb.redirectErrorStream(true).start()
+          |    val text = new String(out.getInputStream().readAllBytes()).trim()
+          |    out.waitFor()
+          |    return text
+          |  }
+          |}
+          |""", "CtorVarargsJava.on")
+      assert(Shell.Success("x") == result)
+    }
+
+    it("takes zero, one or many spread arguments for an Onion constructor") {
+      val result = run(
+        """
+          |class V {
+          |public:
+          |  val n: Int
+          |  def this(xs: String...) { this.n = xs.length }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new V().n + "," + new V("a").n + "," + new V("a", "b", "c").n
+          |  }
+          |}
+          |""", "CtorVarargsOnion.on")
+      assert(Shell.Success("0,1,3") == result)
+    }
+
+    it("still takes an array as the varargs parameter itself") {
+      val result = run(
+        """
+          |class V {
+          |public:
+          |  val n: Int
+          |  def this(xs: String...) { this.n = xs.length }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val arr = new String[4]
+          |    return new V(arr).n
+          |  }
+          |}
+          |""", "CtorVarargsArray.on")
+      assert(Shell.Success(4) == result)
+    }
+
+    it("checks the fixed parameters and boxes primitive elements") {
+      val result = run(
+        """
+          |class P {
+          |public:
+          |  val s: String
+          |  def this(label: String, xs: Object...) {
+          |    var acc = label
+          |    foreach x in xs { acc = acc + "|" + x }
+          |    this.s = acc
+          |  }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new P("p", 1, "two", 3.5).s
+          |  }
+          |}
+          |""", "CtorVarargsFixed.on")
+      assert(Shell.Success("p|1|two|3.5") == result)
+    }
+
+    it("takes spread arguments for a generic class's T... parameter") {
+      val result = run(
+        """
+          |class Bag[T] {
+          |public:
+          |  val n: Int
+          |  def this(xs: T...) { this.n = xs.length }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    val b: Bag[String] = new Bag[String]("a", "b")
+          |    return b.n
+          |  }
+          |}
+          |""", "CtorVarargsGeneric.on")
+      assert(Shell.Success(2) == result)
+    }
+
+    it("rejects an element of the wrong type (E0021)") {
+      val result = run(
+        """
+          |class V {
+          |public:
+          |  val n: Int
+          |  def this(xs: String...) { this.n = xs.length }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    return new V("a", 2).n
+          |  }
+          |}
+          |""", "CtorVarargsWrong.on")
+      assert(Shell.Failure(-1) == result)
+    }
+
+    it("is marked ACC_VARARGS so Java sees it as varargs") {
+      val result = run(
+        """
+          |class V {
+          |public:
+          |  def this(xs: String...) { }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): Boolean {
+          |    val c = Class::forName("V").getConstructors()[0]
+          |    return c.isVarArgs()
+          |  }
+          |}
+          |""", "CtorVarargsFlag.on")
+      assert(Shell.Success(true) == result)
+    }
+    it("loses to a default-parameter constructor, as for methods (panel repro on #2860)") {
+      val result = run(
+        """
+          |class C {
+          |public:
+          |  val tag: String
+          |  def this(a: String, b: String = "d") { this.tag = "defaults:" + a + b }
+          |  def this(xs: String...) { this.tag = "varargs:" + xs.length }
+          |}
+          |class M {
+          |public:
+          |  static def m(a: String, b: String = "d"): String = "defaults:" + a + b
+          |  static def m(xs: String...): String = "varargs:" + xs.length
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new C("a").tag + " " + M::m("a") + " " + new C("a", "b", "c").tag
+          |  }
+          |}
+          |""", "CtorVarargsVsDefaults.on")
+      assert(Shell.Success("defaults:ad defaults:ad varargs:3") == result)
+    }
+
+    it("loses to an all-defaults constructor for `new D()`") {
+      val result = run(
+        """
+          |class D {
+          |public:
+          |  val tag: String
+          |  def this(a: Int = 7) { this.tag = "defaults:" + a }
+          |  def this(xs: Object...) { this.tag = "varargs:" + xs.length }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new D().tag + " " + new D("x", "y").tag
+          |  }
+          |}
+          |""", "CtorVarargsVsAllDefaults.on")
+      assert(Shell.Success("defaults:7 varargs:2") == result)
+    }
+  
+    it("rejects an Object in a T... slot of a generic class (E0021)") {
+      val result = run(
+        """
+          |class Bag[T] {
+          |public:
+          |  val xs: T[]
+          |  def this(xs: T...) { this.xs = xs }
+          |  def get(i: Int): T = xs[i]
+          |}
+          |class W[U] {
+          |public:
+          |  def make(u: U, o: Object): Bag[U] = new Bag[U](u, o)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): void {
+          |    val s: String = new W[String]().make("a", 42).get(1)
+          |    IO::println(s.length())
+          |  }
+          |}
+          |""", "CtorVarargsTypeVarObject.on")
+      assert(result.isInstanceOf[Shell.Failure])
+      assert(result == Shell.Failure(-1))
+    }
+
+    it("rejects another type variable in a T... slot, one argument or two") {
+      val result = run(
+        """
+          |class Bag[T] {
+          |public:
+          |  val xs: T[]
+          |  def this(xs: T...) { this.xs = xs }
+          |  def get(i: Int): T = xs[i]
+          |}
+          |class W[U, V] {
+          |public:
+          |  def one(v: V): Bag[U] = new Bag[U](v)
+          |  def two(u: U, v: V): Bag[U] = new Bag[U](u, v)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): void { IO::println("x") }
+          |}
+          |""", "CtorVarargsTypeVarOther.on")
+      assert(result == Shell.Failure(-1))
+    }
+
+    it("still takes the same type variable and a concrete type argument") {
+      val result = run(
+        """
+          |class Bag[T] {
+          |public:
+          |  val xs: T[]
+          |  def this(xs: T...) { this.xs = xs }
+          |  def get(i: Int): T = xs[i]
+          |}
+          |class W[U] {
+          |public:
+          |  def make(a: U, b: U): Bag[U] = new Bag[U](a, b)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val b = new Bag[String]("p", "q", "r")
+          |    return b.get(2) + new W[String]().make("a", "b").get(1)
+          |  }
+          |}
+          |""", "CtorVarargsTypeVarOk.on")
+      assert(Shell.Success("rb") == result)
+    }
+    it("unboxes a boxed Integer spread into an Int... constructor") {
+      // A boxed element went into the int[] unconverted: VerifyError at class load.
+      val result = run(
+        """
+          |class I {
+          |public:
+          |  val n: Int
+          |  def this(xs: Int...) { this.n = xs[0] + xs[1] }
+          |}
+          |class L {
+          |public:
+          |  val n: Int
+          |  def this(tag: String, xs: Int...) { this.n = xs[0] + xs[1] }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val v: Integer = 7
+          |    val w: Int = 2
+          |    return new I(v, v).n + "," + new I(w, v).n + "," + new L("t", v, 3).n
+          |  }
+          |}
+          |""", "CtorVarargsUnbox.on")
+      assert(Shell.Success("14,9,10") == result)
+    }
+  }
+}

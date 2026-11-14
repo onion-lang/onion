@@ -31,7 +31,8 @@ final class TypingDiagnostics(private val typing: Typing, private val session: T
     context.unusedLocalVariables.foreach { variable =>
       warningReporter.unusedVariable(variable.location, variable.name)
     }
-    context.unusedParameters.foreach { parameter =>
+    // `dict$Trait$T` is synthesized for a `[T: Trait]` constraint; the user cannot rename or remove it.
+    context.unusedParameters.filterNot(_.name.startsWith("dict$")).foreach { parameter =>
       warningReporter.unusedParameter(parameter.location, parameter.name)
     }
   }

@@ -222,5 +222,70 @@ class ArchiveSpec extends AbstractShellSpec {
       assert(unzipError.getMessage.contains("no such file"), unzipError.getMessage)
       assert(unzipError.getMessage.contains(missing), unzipError.getMessage)
     }
+
+    it("gzipFile and gunzipFile say which path is missing") {
+      val work = Files.createTempDirectory("onion-gzip-missing")
+      val src = work.resolve("a.txt")
+      Files.writeString(src, "x")
+      val gz = work.resolve("a.gz").toString
+      onion.Archive.gzipFile(src.toString, gz)
+
+      val noTargetDir = work.resolve("nodir").resolve("out.gz").toString
+      val e1 = intercept[RuntimeException] { onion.Archive.gzipFile(src.toString, noTargetDir) }
+      assert(e1.getMessage.contains("no such directory: " + work.resolve("nodir")), e1.getMessage)
+
+      val noSrc = work.resolve("nope.txt").toString
+      val e2 = intercept[RuntimeException] { onion.Archive.gzipFile(noSrc, gz + "2") }
+      assert(e2.getMessage.contains("no such file: " + noSrc), e2.getMessage)
+
+      val e3 = intercept[RuntimeException] { onion.Archive.gunzipFile(noSrc, work.resolve("o").toString) }
+      assert(e3.getMessage.contains("no such file: " + noSrc), e3.getMessage)
+    }
+
+    it("gzipFile and gunzipFile refuse the same path as source and target, leaving the file intact") {
+      val work = Files.createTempDirectory("onion-gzip-same")
+      val f = work.resolve("same.txt")
+      Files.writeString(f, "hi\n")
+      val e1 = intercept[RuntimeException] { onion.Archive.gzipFile(f.toString, f.toString) }
+      assert(e1.getMessage.contains("same file"), e1.getMessage)
+      assert(Files.readString(f) == "hi\n")
+
+      val gz = work.resolve("a.gz")
+      onion.Archive.gzipFile(f.toString, gz.toString)
+      val before = Files.readAllBytes(gz).toSeq
+      val e2 = intercept[RuntimeException] { onion.Archive.gunzipFile(gz.toString, gz.toString) }
+      assert(e2.getMessage.contains("same file"), e2.getMessage)
+      assert(Files.readAllBytes(gz).toSeq == before)
+    }
+
+    it("zip refuses a zip path that is also one of its files, leaving every file intact") {
+      val work = Files.createTempDirectory("onion-zip-same")
+      val f = work.resolve("f.txt")
+      Files.writeString(f, "hello\n")
+      val g = work.resolve("g.txt")
+      Files.writeString(g, "other\n")
+      val e1 = intercept[RuntimeException] { onion.Archive.zip(f.toString, java.util.List.of(f.toString)) }
+      assert(e1.getMessage.contains("same file"), e1.getMessage)
+      assert(Files.readString(f) == "hello\n")
+
+      // not only when it is the sole file, and not only when spelled the same way
+      val e2 = intercept[RuntimeException] {
+        onion.Archive.zip(f.toString, java.util.List.of(g.toString, work.resolve(".").resolve("f.txt").toString))
+      }
+      assert(e2.getMessage.contains("same file"), e2.getMessage)
+      assert(Files.readString(f) == "hello\n")
+      assert(Files.readString(g) == "other\n")
+    }
+
+    it("zip checks every file before it creates the zip") {
+      val work = Files.createTempDirectory("onion-zip-precheck")
+      val ok = work.resolve("ok.txt")
+      Files.writeString(ok, "x")
+      val out = work.resolve("out.zip")
+      intercept[IllegalArgumentException] {
+        onion.Archive.zip(out.toString, java.util.List.of(ok.toString, work.resolve("missing.txt").toString))
+      }
+      assert(!Files.exists(out), "a rejected call must not leave a half-written zip")
+    }
   }
 }

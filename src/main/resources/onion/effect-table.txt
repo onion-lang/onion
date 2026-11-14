@@ -276,6 +276,15 @@ onion.Sets#*=pure
 onion.Shape#*=pure
 onion.Shapes#*=pure
 onion.Stats#*=pure
+# the built-in Numeric type class and its instances (RFC #2760); a call that passes
+# one as a dictionary also constructs it, so the constructors are pure too
+onion.typeclass.Numeric#*=pure
+onion.typeclass.Numeric$$Integer#*=pure
+onion.typeclass.Numeric$$Long#*=pure
+onion.typeclass.Numeric$$Double#*=pure
+onion.typeclass.Numeric$$Float#*=pure
+onion.typeclass.Numeric$$BigInteger#*=pure
+onion.typeclass.Numeric$$BigDecimal#*=pure
 onion.Strings#*=pure
 onion.Text#*=pure
 onion.View#*=pure

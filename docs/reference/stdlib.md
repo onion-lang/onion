@@ -1413,6 +1413,7 @@ String utilities (`onion.Strings`, auto-imported):
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
 Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
+Strings::split("a,b,,", ",")          // ["a","b","",""]: trailing empty fields are kept
 Strings::join(parts, "-")             // arrays or Lists
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -2850,7 +2851,7 @@ Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- literal doll
 ### Splitting
 
 ```
-Regex::split(input, pattern): List[String]
+Regex::split(input, pattern): List[String]   // trailing empty fields are kept: ("x;y;;", ";") is 4 fields
 Regex::split(input, pattern, limit): List[String]
 ```
 

@@ -168,12 +168,13 @@ public final class Regex {
     // ========== Splitting ==========
 
     /**
-     * Splits the input by the pattern.
+     * Splits the input by the pattern. Trailing empty fields are kept:
+     * {@code split("a;b;;", ";")} is {@code [a, b, , ]}.
      */
     public static List<String> split(String input, String pattern) {
         if (input == null || pattern == null) return new ArrayList<String>();
         try {
-            return new ArrayList<String>(Arrays.asList(input.split(pattern)));
+            return new ArrayList<String>(Arrays.asList(input.split(pattern, -1)));
         } catch (PatternSyntaxException e) {
             throw invalidPattern("split", pattern, e);
         }
@@ -262,7 +263,7 @@ public final class Regex {
 
     public static List<String> split(String input, Pattern pattern) {
         if (input == null || pattern == null) return new ArrayList<String>();
-        return new ArrayList<String>(Arrays.asList(pattern.split(input)));
+        return new ArrayList<String>(Arrays.asList(pattern.split(input, -1)));
     }
 
     public static List<String> split(String input, Pattern pattern, int limit) {

@@ -31,7 +31,7 @@ final class EnsuresVerifyPass(
   private def chainOf(cls: AST.ClassDeclaration, classes: Map[String, AST.ClassDeclaration]): Seq[AST.ClassDeclaration] = {
     @annotation.tailrec
     def go(c: AST.ClassDeclaration, seen: Seq[AST.ClassDeclaration]): Seq[AST.ClassDeclaration] =
-      Option(c.superClass).map(_.desc).collect { case AST.ReferenceType(n, _) => n }
+      ContractSupertypes.name(c.superClass)
         .flatMap(classes.get).filterNot(seen.contains) match {
         case Some(parent) => go(parent, seen :+ parent)
         case None         => seen

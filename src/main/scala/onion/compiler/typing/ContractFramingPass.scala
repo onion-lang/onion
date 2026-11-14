@@ -23,7 +23,10 @@ final class ContractFramingPass(typing: Typing) {
   def run(classes: Seq[ClassDefinition]): Unit = {
     // Rule 4: a Java superclass can have mutators the compiler can neither prove nor wrap.
     for (cd <- classes if cd.invariants.nonEmpty || cd.histories.nonEmpty) {
-      val sup = cd.superClass
+      val sup = cd.superClass match {
+        case applied: AppliedClassType => applied.raw // `extends Base[String]` (#2888)
+        case other                     => other
+      }
       if (sup != null && sup.name != "java.lang.Object" && !sup.isInstanceOf[ClassDefinition] && !cd.isRecord &&
           !Modifier.isEnum(cd.modifier))
         typing.report(SemanticError.CONTRACT_JAVA_SUPERCLASS, cd.location, cd.name, sup.name)

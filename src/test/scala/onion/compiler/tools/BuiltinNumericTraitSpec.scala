@@ -89,6 +89,30 @@ class BuiltinNumericTraitSpec extends AbstractShellSpec {
           |  return total(ss) as Int
           |}""".stripMargin))
     }
+    it("a second instance for a type the library already covers is E0097, as the guide says") {
+      val errs = errors(prelude +
+        """instance Numeric[Int] {
+          |  def zero(): Int = 100
+          |  def one(): Int = 1
+          |  def plus(a: Int, b: Int): Int = a + b
+          |  def times(a: Int, b: Int): Int = a * b
+          |}
+          |def main(args: String[]): Int { return total([1, 2]) }""".stripMargin)
+      assert(errs.exists(_.errorCode.contains("E0097")), errs.map(_.message).mkString("\n"))
+    }
+    it("a user instance in a module cannot shadow the built-in one either") {
+      val errs = errors(
+        """module a
+          |import { onion.typeclass.Numeric }
+          |instance Numeric[Double] {
+          |  def zero(): Double = 100.0
+          |  def one(): Double = 1.0
+          |  def plus(a: Double, b: Double): Double = a + b
+          |  def times(a: Double, b: Double): Double = a * b
+          |}
+          |class A { public: static def go(): Int = 1 }""".stripMargin)
+      assert(errs.exists(_.errorCode.contains("E0097")), errs.map(_.message).mkString("\n"))
+    }
     it("a Java-style caller takes a named instance") {
       assert(Shell.Success(42) == run("def main(args: String[]): Int { return Numeric::forInt().plus(40, 2) }"))
     }

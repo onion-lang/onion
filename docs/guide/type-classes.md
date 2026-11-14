@@ -161,6 +161,7 @@ def main(args: String[]): void {
 ```
 
 - For another type, write your own `instance Numeric[Short] { ... }` with all four methods.
+- A second instance for a type in the table, such as `instance Numeric[Int]`, is E0097.
 - Java code gets an instance from `Numeric.forInt()`, `forLong()`, `forDouble()`,
   `forFloat()`, `forBigInteger()` or `forBigDecimal()`.
 - `Stats::sum` does not use it yet (RFC #2760).

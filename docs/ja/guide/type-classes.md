@@ -161,6 +161,7 @@ def main(args: String[]): void {
 ```
 
 - ほかの型には、四つのメソッドをすべて持つ `instance Numeric[Short] { ... }` を自分で書きます。
+- 表にある型に2つ目のインスタンス（`instance Numeric[Int]` など）を書くと E0097 です。
 - Java のコードは `Numeric.forInt()`、`forLong()`、`forDouble()`、`forFloat()`、
   `forBigInteger()`、`forBigDecimal()` でインスタンスを受け取ります。
 - `Stats::sum` はまだこれを使いません（RFC #2760）。

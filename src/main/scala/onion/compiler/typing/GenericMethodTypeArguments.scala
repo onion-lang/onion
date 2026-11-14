@@ -587,7 +587,12 @@ private[typing] object GenericMethodTypeArguments {
         // A variable fixes an F-bound only through its own bound, by the rule on #2338:
         // `U extends Comparable[U]` meets `Comparable[U]`, `U extends Comparable[String]`
         // does not. Read by erasure, both would.
+        // A bound that names another parameter (`T extends List[B]`) is read here with that
+        // parameter erased (`List[Object]`), which refuses a valid `List[String]`; a fixed
+        // parameter is checked against the bound with every argument known, below (#2538).
+        val chained = fixedType.isDefined && tp.upperBound.exists(mentionsTypeParam(_, paramNames - name))
         def meetsBound(t: Type): Boolean = (selfBound, t) match
+          case _ if chained => true
           case (applied: AppliedClassType, tv: TypeVariableType) if !(selfBound eq bound) =>
             TypeRelations.typeVariableFitsAppliedBound(applied, tv, typing.table_)
           case _ => isAssignableForBounds(selfBound, t)

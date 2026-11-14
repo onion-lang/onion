@@ -98,4 +98,22 @@ class GenericCallBoundCheckSpec extends AbstractShellSpec {
       assert(Shell.Success(4) == r)
     }
   }
+  describe("a bound that is a generic type naming another parameter (#2538)") {
+    it("accepts List[String] for T extends List[B] with B = String") {
+      val r = shell.run(
+        """import { java.util.* }
+          |def w[B, T extends List[B]](b: B, t: T): B = b
+          |def main(args: String[]): Int { val l: List[String] = ["a"]; return w("q", l).length() }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success(1) == r)
+    }
+    it("still rejects List[Integer] when B is String") {
+      val r = shell.run(
+        """import { java.util.* }
+          |def w[B, T extends List[B]](b: B, t: T): B = b
+          |def main(args: String[]): Int { val l: List[Integer] = [1]; IO::println(w("q", l)); return 0 }
+          |""".stripMargin, "None", Array())
+      assert(Shell.Failure(-1) == r)
+    }
+  }
 }

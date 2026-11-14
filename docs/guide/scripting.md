@@ -26,7 +26,7 @@ Compile errors exit with a non-zero status.
 ```onion
 val opts = Args::parse(args)
 
-if opts.flag("verbose") { ... }          // --verbose or -v
+if opts.flag("verbose") { ... }          // --verbose (-v is flag("v"))
 val out = opts.option("output", "a.txt") // --output=x or --output x
 val n = opts.intOption("count", 1)       // numeric with default
 val files = opts.positional()            // everything else

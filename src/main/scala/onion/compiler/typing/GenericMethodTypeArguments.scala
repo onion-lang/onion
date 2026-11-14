@@ -474,10 +474,14 @@ private[typing] object GenericMethodTypeArguments {
               TypeRelations.boxSupertypeAccepts(typing.table_, applied, raw)
             case _ => true
         }
+        // A parameter fixed through a wildcard (`Collection[? extends T]` given a
+        // `List[String]`) has only a lower constraint, and counts as fixed too:
+        // `val o: Object = Collections::max(xs, c)` keeps T = String (#2857).
+        val argFixed = lowerConstraints.toMap ++ inferred.toMap
         val returnFitsArgs = {
           val names = typeParamsIn(formalReturn, paramNames)
-          names.nonEmpty && names.forall(inferred.contains) && {
-            val argReturn = TypeSubstitution.substituteType(formalReturn, classSubst, inferred.toMap, defaultToBound = false)
+          names.nonEmpty && names.forall(argFixed.contains) && {
+            val argReturn = TypeSubstitution.substituteType(formalReturn, classSubst, argFixed, defaultToBound = false)
             !expectedReturn.isBasicType && TypeRules.isAssignable(expectedReturn, argReturn) &&
               appliedViewFits(expectedReturn, argReturn)
           }

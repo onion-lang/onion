@@ -112,21 +112,37 @@ public final class Net {
             this.output = socket.getOutputStream();
         }
 
-        /** The next line, or null at end of stream. The line terminator is not included. */
+        // Bytes of a line already read when a read timed out; the next read continues them.
+        private final java.io.ByteArrayOutputStream partial = new java.io.ByteArrayOutputStream();
+        // The last line ended with a bare CR, so a following LF still has to be swallowed.
+        private boolean pendingCr = false;
+
+        private void skipLfAfterCr() throws IOException {
+            if (!pendingCr) return;
+            input.mark(1);
+            int c = input.read();
+            if (c != '\n' && c != -1) input.reset();
+            pendingCr = false;
+        }
+
+        /**
+         * The next line, or null at end of stream. The line terminator is not included.
+         *
+         * If a read times out partway through a line, the bytes already read are kept, so the
+         * next call returns the whole line.
+         */
         public String readLine() {
             try {
-                java.io.ByteArrayOutputStream line = new java.io.ByteArrayOutputStream();
-                int c = input.read();
-                if (c == -1) return null;
-                while (c != -1 && c != '\n' && c != '\r') {
-                    line.write(c);
-                    c = input.read();
+                skipLfAfterCr();
+                int c;
+                while ((c = input.read()) != -1 && c != '\n' && c != '\r') {
+                    partial.write(c);
                 }
-                if (c == '\r') {
-                    input.mark(1);
-                    if (input.read() != '\n') input.reset();
-                }
-                return new String(line.toByteArray(), StandardCharsets.UTF_8);
+                if (c == -1 && partial.size() == 0) return null;
+                if (c == '\r') pendingCr = true;
+                String line = new String(partial.toByteArray(), StandardCharsets.UTF_8);
+                partial.reset();
+                return line;
             } catch (IOException e) {
                 throw new RuntimeException("Net: read failed on " + remoteAddress()
                     + " (" + e.getMessage() + ")", e);
@@ -147,8 +163,11 @@ public final class Net {
          */
         public byte[] readBytes() {
             try {
+                skipLfAfterCr();
                 InputStream in = input;
                 java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                partial.writeTo(out);
+                partial.reset();
                 byte[] buffer = new byte[BUFFER];
                 int read;
                 while ((read = in.read(buffer)) != -1) {

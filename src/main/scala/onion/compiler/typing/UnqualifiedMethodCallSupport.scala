@@ -423,6 +423,11 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         None
       case CandidateSelection.Selected(method) =>
         if (!ensureInstanceAvailable(node, method, context)) return None
+        if (!MemberAccess.isMemberAccessible(method, bodyContext.definition)) {
+          // An inherited private method: E0013, not IllegalAccessError at run time (#2916).
+          bodyContext.report(METHOD_NOT_ACCESSIBLE, node, method.affiliation, node.name, method.arguments, bodyContext.definition)
+          return None
+        }
         val classSubst = selfClassSubstitution(method)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(

@@ -484,5 +484,65 @@ class ConstructorTypeVariableArgumentSpec extends AbstractShellSpec {
       assert(result == Shell.Failure(-1), out)
       assert(out.contains("E0021"), out)
     }
+    it("accepts a lambda super argument into a slot that mentions T, as new does (#3003 panel)") {
+      val src =
+        """import { java.util.* }
+          |class Lazy[T] {
+          |public:
+          |  val f: () -> T
+          |  def this(f: () -> T) { this.f = f }
+          |}
+          |class Empty[T] extends Lazy[T?](() -> null)
+          |class Lst[T] extends Lazy[List[T]](() -> [])
+          |class Mp[T] extends Lazy[Map[String, T]](() -> [:])
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new Empty[String]().f.call() + new Lst[String]().f.call() + new Mp[Int]().f.call()
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("null[]{}"), out)
+    }
+
+    it("keeps main's choice when two parent constructors would fit a retyped argument (#3003 panel)") {
+      val src =
+        """import { java.util.* }
+          |class C[T] {
+          |public:
+          |  val xs: Collection[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |  def this(xs: Collection[T]) { this.xs = xs }
+          |}
+          |class E[T] extends C[T](Collections::emptyList())
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "OUT " + new E[String]().xs }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("OUT []"), out)
+    }
+
+    it("still rejects a List[Number] into a List[T] slot when a second constructor takes Collection[T]") {
+      val src =
+        """import { java.util.* }
+          |class C[T extends Number] {
+          |public:
+          |  val xs: Collection[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |  def this(xs: Collection[T]) { this.xs = xs }
+          |}
+          |class S[T extends Number](ys: List[Number]) extends C[T](ys)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "ran" }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(out.contains("E0021"), out)
+    }
   }
 }

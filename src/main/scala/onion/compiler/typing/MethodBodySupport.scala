@@ -406,7 +406,7 @@ private[compiler] final class MethodBodySupport(
             formals.length != params0.length || formals.indices.forall { i =>
               params0(i) == null || !TypeRelations.ownViewRejects(bodyContext.table, formals(i), params0(i).`type`)
             }
-          }.filter(c => superTypeVariableSlotsFit(targetClass, c, params0))
+          }
         // Exact matching is substitution-blind: an applied Box[Int] still exposes
         // the constructor as Box(T) over the erased bound (Object), so a primitive
         // argument (Int) does not match. Retry against the type-argument-
@@ -416,19 +416,15 @@ private[compiler] final class MethodBodySupport(
         val (matched1, params1) =
           if matched0.nonEmpty || params0 == null then (matched0, params0)
           else findSuperConstructorWithBoxing(targetClass, params0)
+        // The rule for a slot that mentions the parent's type variables (#2840, #3003):
+        // the constructor is chosen exactly as before; then each argument that does not
+        // fit its substituted slot is typed again with that slot as its expected type, as
+        // `new C[T](..)` types its arguments. A program is rejected only when that retyping
+        // still does not fit. So `extends C[T](ys)` with `ys: List[Number]` is E0021, while
+        // `Collections::emptyList()`, `() -> null` or `[]` take the slot's type.
         val (matched, params) =
-          if matched1.nonEmpty || params0 == null || params0.contains(null) then (matched1, params1)
-          else
-            // Retype against each parent constructor of that arity; keep the retypings under
-            // which exactly one constructor fits. A parent with `this(xs: List[T])` and
-            // `this(n: Int)` still takes `Collections::emptyList()` (#3003's panel).
-            val fits = retypeSuperArguments(targetClass, node.superInits, params0, context)
-              .map(findSuperConstructorWithBoxing(targetClass, _))
-              .filter(_._1.length == 1)
-            val distinct = fits.map(_._1(0)).distinct
-            if distinct.length == 1 then fits.head
-            else if distinct.length > 1 then (distinct.toArray, params0)
-            else (matched1, params1)
+          if matched1.length != 1 || params0 == null || params0.contains(null) then (matched1, params1)
+          else fitSuperTypeVariableSlots(targetClass, matched1(0), node.superInits, params0, params1, context)
         // A constructor with defaults takes fewer positional arguments than it
         // declares: `extends A(7)` / `: this(4)` into `def this(a: Int = 1, b: Int = 2)`
         // fills `b`, as `new A(7)` does (#2660).
@@ -482,73 +478,72 @@ private[compiler] final class MethodBodySupport(
           bodyContext.warningReporter.nullToNonNullable(arg.location, f.displayName)
       }
 
-  /** A slot of the parent's constructor that is still a type variable, or mentions one, after
-   *  `extends C[T](..)` substitutes the parent's type arguments takes the assignment rule, as
-   *  `new C[T](..)` does (#2677, #2840): a `List[Number]` is not a `List[T]`, and a primitive
-   *  boxes to an `Integer`, which fits no abstract `T`. Only for an applied parent. */
-  private def superTypeVariableSlotsFit(targetClass: ClassType, c: ConstructorRef, params: Array[Term]): Boolean =
+  /** Whether one argument fits a slot of the parent's constructor that is still a type variable,
+   *  or mentions one, after `extends C[T](..)` substitutes the parent's type arguments: the
+   *  assignment rule, as `new C[T](..)` applies it (#2677, #2840). A `List[Number]` is not a
+   *  `List[T]`, and a primitive boxes to an `Integer`, which fits no abstract `T`. */
+  private def superSlotFits(formal: Type, param: Term): Boolean = {
+    // A Java wildcard slot (`ArrayList(Collection<? extends E>)`) keeps the erased match it
+    // had before: inference cannot yet make `List::of()` a `Collection[T]` (#3017). Onion
+    // declares no wildcards, so every Onion-declared `List[T]` slot is still checked.
+    val javaWildcardSlot = formal match {
+      case ap: TypedAST.AppliedClassType => ap.typeArguments.exists(_.isInstanceOf[TypedAST.WildcardType])
+      case _ => false
+    }
+    val primitiveIntoVar = param != null && param.`type` != null && param.`type`.isBasicType &&
+      (formal match {
+        case _: TypedAST.TypeVariableType => true
+        case n: TypedAST.NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
+        case _ => false
+      })
+    formal == null || javaWildcardSlot ||
+      (!primitiveIntoVar && AssignabilitySupport.typeVariableSlotFits(formal, param, bodyContext.table))
+  }
+
+  /** Checks the constructor that `extends C[T](..)` resolved against its type-variable slots.
+   *  An argument that does not fit is typed again with its substituted slot as the expected
+   *  type, whatever kind of expression it is (a generic call, a literal, a lambda). The
+   *  constructor stays when every argument then fits; otherwise nothing matches (E0021).
+   *  A parent that is not applied (`extends Box(..)`) has no substituted slots to check. */
+  private def fitSuperTypeVariableSlots(
+    targetClass: ClassType,
+    ctor: ConstructorRef,
+    args: List[AST.Expression],
+    params0: Array[Term],
+    resolved: Array[Term],
+    context: LocalContext
+  ): (Array[ConstructorRef], Array[Term]) =
     targetClass match {
-      case applied: TypedAST.AppliedClassType if params != null =>
+      case applied: TypedAST.AppliedClassType if ctor.getArgs.length == params0.length =>
         val classSubst = TypeSubstitution.classSubstitution(applied)
-        val formals = c.getArgs.map(t =>
+        val formals = ctor.getArgs.map(t =>
           TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-        formals.length != params.length || formals.indices.forall { i =>
-          // A Java wildcard slot (`ArrayList(Collection<? extends E>)`) keeps the erased match
-          // it had before: `extends ArrayList[T](List::of())` still compiles, because inference
-          // cannot yet make `List::of()` a `Collection[T]` (#3003's panel). Onion declares no
-          // wildcards, so every Onion-declared `List[T]` slot is still checked.
-          val javaWildcardSlot = formals(i) match {
-            case ap: TypedAST.AppliedClassType => ap.typeArguments.exists(_.isInstanceOf[TypedAST.WildcardType])
+        val misfits = formals.indices.filterNot(i => superSlotFits(formals(i), params0(i)))
+        if misfits.isEmpty then (Array(ctor), resolved)
+        else
+          val retyped = params0.clone()
+          misfits.foreach { i =>
+            if !formals(i).isBasicType then
+              typing.withSuppressedReporting(typed(args(i), context, formals(i))).foreach { term =>
+                if term.`type` != null then retyped(i) = term
+              }
+          }
+          // A lambda is judged as `new C[T](..)` judges one (ConstructionTyping's closure
+          // path): by assignability to the slot it was typed against. Both paths still let
+          // `() -> 5` into a `() -> T` slot; that is one bug in both places (#3018).
+          def isLambda(e: AST.Expression): Boolean = e match {
+            case _: AST.ClosureExpression => true
+            case b: AST.BlockExpression => b.elements.nonEmpty && b.elements.last.isInstanceOf[AST.ClosureExpression]
             case _ => false
           }
-          javaWildcardSlot || {
-          val primitiveIntoVar = params(i) != null && params(i).`type` != null && params(i).`type`.isBasicType &&
-            (formals(i) match {
-              case _: TypedAST.TypeVariableType => true
-              case n: TypedAST.NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
-              case _ => false
-            })
-          !primitiveIntoVar && AssignabilitySupport.typeVariableSlotFits(formals(i), params(i), bodyContext.table)
+          val fits = misfits.forall { i =>
+            (isLambda(args(i)) || superSlotFits(formals(i), retyped(i))) &&
+              TypeRelations.isConstructorArgAssignable(formals(i), retyped(i).`type`, bodyContext.table)
           }
-        }
-      case _ => true
+          if fits then (Array(ctor), Boxing.adaptArguments(bodyContext.table, retyped, formals))
+          else (Array.empty[ConstructorRef], params0)
+      case _ => (Array(ctor), resolved)
     }
-
-  /** A generic call or collection literal passed to `extends C[T](..)` is typed with no expected
-   *  type, so `Collections::emptyList()` is a `List[Object]` that no `List[T]` slot accepts.
-   *  Retype such arguments against each arity-matching constructor's substituted formals, as
-   *  `new C[T](..)` does (#2840): one retyped argument list per constructor whose formals
-   *  changed some argument's type, in declaration order. Empty when nothing changed. */
-  private def retypeSuperArguments(
-    targetClass: ClassType,
-    args: List[AST.Expression],
-    params: Array[Term],
-    context: LocalContext
-  ): Seq[Array[Term]] = {
-    def malleable(e: AST.Expression): Boolean = e match
-      case _: AST.StaticMethodCall | _: AST.UnqualifiedMethodCall | _: AST.NewObject |
-           _: AST.ListLiteral | _: AST.MapLiteral => true
-      case _ => false
-    val candidates = targetClass.constructors.filter(_.getArgs.length == params.length).toSeq
-    if params.isEmpty || !args.exists(malleable) then Seq.empty
-    else
-      val classSubst = TypeSubstitution.classSubstitution(targetClass)
-      candidates.flatMap { c =>
-        val formals = c.getArgs.map(t =>
-          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-        val updated = params.clone()
-        var changed = false
-        args.zipWithIndex.foreach { case (arg, i) =>
-          if malleable(arg) && formals(i) != null && !formals(i).isBasicType then
-            typing.withSuppressedReporting(typed(arg, context, formals(i))) match
-              case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
-                updated(i) = term
-                changed = true
-              case _ =>
-        }
-        if changed then Some(updated) else None
-      }
-  }
 
   /**
    * Boxing-aware super-constructor fallback: substitutes the parent's class type
@@ -567,8 +562,7 @@ private[compiler] final class MethodBodySupport(
     val candidates = targetClass.constructors.filter { c =>
       val formals = substitutedArgs(c)
       formals.length == params.length &&
-        formals.indices.forall(i => TypeRelations.isConstructorArgAssignable(formals(i), params(i).`type`, bodyContext.table)) &&
-        superTypeVariableSlotsFit(targetClass, c, params)
+        formals.indices.forall(i => TypeRelations.isConstructorArgAssignable(formals(i), params(i).`type`, bodyContext.table))
     }
     if (candidates.length != 1) (candidates, params)
     else {

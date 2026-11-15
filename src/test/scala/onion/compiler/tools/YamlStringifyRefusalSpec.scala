@@ -35,6 +35,21 @@ class YamlStringifyRefusalSpec extends AbstractShellSpec {
       assert(Shell.Success("refused") == refusal("""["b": Double::NaN]"""))
       assert(Shell.Success("refused") == refusal("""["b": Double::POSITIVE_INFINITY]"""))
     }
+    it("suggests a fix that round-trips: wrap each element in a Map") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    var hint = ""
+          |    try { Yaml::stringify(["apple"]) } catch e: IllegalArgumentException { hint = e.getMessage() }
+          |    val back = Yaml::parse(Yaml::stringify([["v": "apple"], ["v": "banana"]]))
+          |    return hint.contains("Map") + " " + hint.contains("Json") + " " + back
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(result == Shell.Success("true true [{v=apple}, {v=banana}]"))
+    }
     it("still writes a List of non-empty Maps and finite numbers") {
       assert(Shell.Success("no error") == refusal("""[["x": 1.5]]"""))
     }

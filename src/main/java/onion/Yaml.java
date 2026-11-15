@@ -66,8 +66,9 @@ public final class Yaml {
     /**
      * Convert a Java object (List, Map, or scalar) to YAML text. A {@code Map} renders
      * as a flat block mapping, {@code key: value\n} per entry; a {@code List} renders as
-     * a top-level block sequence, {@code - key: value\n} per element (a non-Map element
-     * renders as a bare {@code - scalar}). Keys go through the same quoting rule as
+     * a top-level block sequence, {@code - key: value\n} per element (a non-Map element,
+     * an empty Map element, NaN or an infinity throws {@code IllegalArgumentException},
+     * since {@link #parse} could not read it back). Keys go through the same quoting rule as
      * string values ({@link #needsQuoting}), so a key containing {@code :}, {@code #},
      * whitespace at either end, or a newline round-trips through {@link #parse} instead
      * of colliding with the {@code key: value} separator.
@@ -106,7 +107,7 @@ public final class Yaml {
     /**
      * Render one sequence element: a flat `Map` becomes a `- key: value` block (first
      * entry carries the `- `, later entries are indented two spaces to align under it);
-     * any other value is rendered as a bare `- scalar` item.
+     * an empty Map or any non-Map value throws, since parse could not read it back.
      */
     private static String renderSequenceItem(Object item) {
         if (item instanceof Map<?, ?> map) {
@@ -124,9 +125,10 @@ public final class Yaml {
             return sb.toString();
         }
         throw new IllegalArgumentException(
-            "Yaml::stringify supports a List only of flat Maps: a scalar element "
+            "Yaml::stringify supports a List only of flat Maps: a non-Map element "
                 + "(" + (item == null ? "null" : item.getClass().getSimpleName())
-                + ") would not parse back (wrap it in a Map, or write one scalar per call)");
+                + ") would not parse back (wrap each element in a Map, e.g. [\"v\": x], "
+                + "or use Json for a list of scalars)");
     }
 
     /**

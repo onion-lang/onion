@@ -458,6 +458,9 @@ public:
 Enums compile to JVM enums: `name()`, `ordinal()`, `values()`,
 `valueOf(String)` work. Record-style parameters become final fields with
 accessors; access sections after the constant list declare methods.
+A parameter may declare a default (`enum Level(code: Int, tag: String = "")`);
+a constant that omits the argument gets it (`LOW(1)`), as a record does.
+Arguments may be named, as in `new R(...)`: `HIGH(9, tag = "!")`.
 `select` over an enum checks exhaustiveness when no `else` is present.
 
 #### Algebraic data types (`case` cases)

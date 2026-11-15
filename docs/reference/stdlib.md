@@ -1930,7 +1930,8 @@ naming the line where the quote was opened, rather than swallowing the rest of t
 ```onion
 val rows = Csv::parse(text)                  // List of List of String
 val recs = Csv::parseWithHeader(text)        // List of Map (header -> value)
-                                             // a repeated header keeps its last column; a value in an earlier one throws IllegalArgumentException
+                                             // a repeated header keeps its last column;
+                                             // a different value in an earlier one throws
 
 Csv::column(rows, 0)                          // one positional column
 Csv::columnByName(recs, "age")                // one header-named column

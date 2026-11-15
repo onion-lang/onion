@@ -41,7 +41,7 @@ class CsvEnrichedSpec extends AbstractShellSpec {
         "} catch e: IllegalArgumentException {\n" +
         "  return e.getMessage()\n" +
         "}",
-        Shell.Success("Csv: header \"h\" appears in column 1 and column 2, so data row 1 would lose its value in column 1; rename one, or read the rows positionally with Csv::parse"))
+        Shell.Success("Csv: header \"h\" appears in column 1 and column 2 (the one kept), so data row 1 would lose its value in column 1; rename one, or read the rows positionally with Csv::parse"))
     }
     it("treats a second blank header as a repeat too") {
       runStr(
@@ -69,6 +69,47 @@ class CsvEnrichedSpec extends AbstractShellSpec {
         "val rows = Csv::parseWithHeader(\"h,h\\n,2\\n\")\n" +
         "return rows[0][\"h\"]",
         Shell.Success("2"))
+    }
+    it("reads a repeat whose cells hold the same value as the kept column") {
+      runStr(
+        "return Csv::parseWithHeader(\"id,name,id\\n1,Ada,1\\n\").toString()",
+        Shell.Success("[{id=1, name=Ada}]"))
+    }
+    it("reads three repeats when every non-empty cell equals the last one") {
+      runStr(
+        "val rows = Csv::parseWithHeader(\"h,h,h\\n1,,1\\n\")\n" +
+        "return rows[0][\"h\"]",
+        Shell.Success("1"))
+    }
+    it("throws for three repeats when an earlier value differs, naming the kept column") {
+      runStr(
+        "try {\n" +
+        "  Csv::parseWithHeader(\"h,h,h\\n1,1,2\\n\")\n" +
+        "  return \"no error\"\n" +
+        "} catch e: IllegalArgumentException {\n" +
+        "  return e.getMessage()\n" +
+        "}",
+        Shell.Success("Csv: header \"h\" appears in column 1 and column 3 (the one kept), so data row 1 would lose its value in column 1; rename one, or read the rows positionally with Csv::parse"))
+    }
+    it("throws when the row is too short to reach the kept column") {
+      runStr(
+        "try {\n" +
+        "  Csv::parseWithHeader(\"h,k,h\\n1,2\\n\")\n" +
+        "  return \"no error\"\n" +
+        "} catch e: IllegalArgumentException {\n" +
+        "  return \"error\"\n" +
+        "}",
+        Shell.Success("error"))
+    }
+    it("names a repeated blank header as a blank header") {
+      runStr(
+        "try {\n" +
+        "  Csv::parseWithHeader(\"name,,\\nAda,x,y\\n\")\n" +
+        "  return \"no error\"\n" +
+        "} catch e: IllegalArgumentException {\n" +
+        "  return e.getMessage()\n" +
+        "}",
+        Shell.Success("Csv: a blank header appears in column 2 and column 3 (the one kept), so data row 1 would lose its value in column 2; rename one, or read the rows positionally with Csv::parse"))
     }
     it("still reads distinct headers") {
       runStr(

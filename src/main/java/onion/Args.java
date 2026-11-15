@@ -119,7 +119,10 @@ public final class Args {
             return v != null ? v : defaultValue;
         }
 
-        /** Integer-valued option with a default. */
+        /**
+         * Integer-valued option with a default. The default is used only when the option is
+         * absent; a value that is not an {@code int} throws {@link IllegalArgumentException}.
+         */
         public int intOption(String name, int defaultValue) {
             askedOption.add(name);
             String v = options.get(name);
@@ -127,7 +130,8 @@ public final class Args {
             try {
                 return Integer.parseInt(v);
             } catch (NumberFormatException e) {
-                return defaultValue;
+                throw new IllegalArgumentException(
+                    "invalid value for --" + name + ": '" + v + "' (expected Int)");
             }
         }
 

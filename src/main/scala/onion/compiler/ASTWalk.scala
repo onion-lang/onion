@@ -112,6 +112,10 @@ object ASTWalk {
     case stringInterp: AST.StringInterpolation =>
       stringInterp.expressions.foreach(visit)
 
+    // `f = value` in a call's argument list: a lambda in `value` captures like a positional one (#3021).
+    case named: AST.NamedArgument =>
+      visit(named.value)
+
     case _ =>
       // Literals, identifiers, closures, etc. - no children to visit
   }

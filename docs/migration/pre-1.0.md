@@ -599,3 +599,33 @@ println(new A().pim(7, 3))           // E0013 before and now
 - **To update:** move the method under `public:`, or call it from a subclass.
 - **No `onion migrate` rule:** widening a method's access is a design choice only you can
   make, so the hint shows the edit instead.
+
+## `Yaml::stringify` writes only what `Yaml::parse` reads back
+
+`Yaml::stringify` used to write a list of scalars, an empty Map element and NaN. Other YAML
+tools could read some of that text, but `Yaml::parse` could not read it back. Now
+`Yaml::stringify` throws instead, as it already did for a nested Map (#2806).
+
+```onion
+import { onion.Yaml; onion.Json }
+Yaml::stringify(["apple", "banana"])   // Before: "- apple\n- banana\n". Now: throws
+Json::stringify(["apple", "banana"])   // ["apple","banana"]; JSON is also valid YAML 1.2
+Yaml::stringify(["apple", "banana"].map { x -> ["v": x] })   // - v: apple ...
+```
+
+- **What you see:** `IllegalArgumentException` at run time. Its message names the
+  problem and suggests the edit.
+- **Where:**
+  - a List element that is not a Map: a String, a number, `null`, a List
+  - an empty Map element (`[[:]]`)
+  - a `Double` or `Float` that is NaN or an infinity, anywhere in the value
+  - a record's `toYaml` (`derive!(Yaml)`) and a `shape ... = yaml` `print`, for a NaN or
+    infinite component
+- **Unchanged:** a flat Map, and a List of non-empty flat Maps. Both are written as before.
+- **To update:**
+  - For a list of scalars, call `Json::stringify` (YAML 1.2 tools read JSON), or wrap each
+    element in a Map: `xs.map { x -> ["v": x] }`.
+  - Leave empty Maps out of the list.
+  - Replace NaN or an infinity with a value you choose (`null`, a sentinel) before writing.
+- **No `onion migrate` rule:** the refused input is a value at run time, not a spelling in the
+  source, so no rewrite can find it. The exception's message shows the edit instead.

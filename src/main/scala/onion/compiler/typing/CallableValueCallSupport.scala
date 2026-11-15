@@ -56,7 +56,10 @@ private[compiler] final class CallableValueCallSupport(
       if (field != null && MemberAccess.isMemberAccessible(field, owner)) {
         field.`type` match
           case targetType: ObjectType =>
-            return callOnTarget(new RefField(new This(owner), field), targetType)
+            val fieldTerm: Term =
+              if ((field.modifier & AST.M_STATIC) != 0) new RefStaticField(node.location, owner, field)
+              else new RefField(new This(owner), field)
+            return callOnTarget(fieldTerm, targetType)
           case nullable: NullableType if hasCallMethod(nullable.innerType) => return reportNullable(nullable)
           case _ =>
       }

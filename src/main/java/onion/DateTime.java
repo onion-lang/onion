@@ -75,7 +75,7 @@ public final class DateTime {
     /**
      * Parses a date-time string with the given pattern to epoch milliseconds.
      * A date-only pattern (no time component) resolves to midnight in the local
-     * zone. Throws IllegalArgumentException if the input does not match, rather
+     * zone; an offset or zone in the text (`XXX`, `z`) is honoured, not read as local time. Throws IllegalArgumentException if the input does not match, rather
      * than silently returning epoch 0.
      */
     public static long parse(String dateTime, String pattern) {
@@ -89,15 +89,17 @@ public final class DateTime {
             throw new IllegalArgumentException("invalid date-time pattern \"" + pattern + "\"", e);
         }
         try {
-            return LocalDateTime.parse(dateTime, formatter).atZone(LOCAL).toInstant().toEpochMilli();
-        } catch (java.time.format.DateTimeParseException dt) {
-            // A date-only pattern cannot build a LocalDateTime; parse as a date.
-            try {
-                return LocalDate.parse(dateTime, formatter).atStartOfDay(LOCAL).toInstant().toEpochMilli();
-            } catch (java.time.format.DateTimeParseException d) {
-                throw new IllegalArgumentException(
-                    "cannot parse \"" + dateTime + "\" with pattern \"" + pattern + "\"", d);
-            }
+            // An offset or zone in the text wins over the local zone, as in parse(String).
+            java.time.temporal.TemporalAccessor t = formatter.parseBest(dateTime,
+                java.time.ZonedDateTime::from, java.time.OffsetDateTime::from,
+                LocalDateTime::from, LocalDate::from);
+            if (t instanceof java.time.ZonedDateTime z) return z.toInstant().toEpochMilli();
+            if (t instanceof java.time.OffsetDateTime o) return o.toInstant().toEpochMilli();
+            if (t instanceof LocalDateTime l) return l.atZone(LOCAL).toInstant().toEpochMilli();
+            return ((LocalDate) t).atStartOfDay(LOCAL).toInstant().toEpochMilli();
+        } catch (java.time.format.DateTimeParseException d) {
+            throw new IllegalArgumentException(
+                "cannot parse \"" + dateTime + "\" with pattern \"" + pattern + "\"", d);
         }
     }
 

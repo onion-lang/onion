@@ -163,6 +163,9 @@ object ASTWalk {
     case binding: AST.DoBinding =>
       visit(binding.expr)
 
+    case destructuring: AST.DestructuringDeclaration =>
+      visit(destructuring.init)
+
     case _ =>
       // Literals, identifiers, closures, etc. - no children to visit
   }

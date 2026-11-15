@@ -4,9 +4,10 @@ import onion.tools.Shell
 
 /**
  * A lambda writes through to the `var`s it captures wherever it appears: inside a `?.`
- * call, a `do ... while` loop, a labelled loop, a `select` guard, a `for` initializer or a
- * try-with-resources declaration. Before #3024 the capture scan never looked inside these
- * nodes, so the variable was copied instead of shared and every write was lost.
+ * call, a `do ... while` loop, a labelled loop, a `select` guard, a `for` initializer, a
+ * try-with-resources declaration or a destructuring `val`. Before #3024 the capture scan
+ * never looked inside these nodes, so the variable was copied instead of shared and every
+ * write was lost.
  */
 class CaptureWalkCoverageSpec extends AbstractShellSpec {
   private def runMain(body: String, file: String): Shell.Result =
@@ -88,6 +89,22 @@ class CaptureWalkCoverageSpec extends AbstractShellSpec {
           |    }
           |    return "try=" + t""".stripMargin, "CaptureTryResource.on")
       assert(result == Shell.Success("try=7"))
+    }
+
+    it("keeps its writes inside a destructuring val's initializer") {
+      val result = shell.run(
+        """record P(a: Int, b: Int)
+          |class Test {
+          |public:
+          |  static def bump(g: () -> Int): Int = g()
+          |  static def main(args: String[]): String {
+          |    var s = 0
+          |    val (a, b) = new P(bump(() -> { s += 1; return s }), 2)
+          |    return "s=" + s + " a=" + a + " b=" + b
+          |  }
+          |}
+          |""".stripMargin, "CaptureDestructuring.on", Array())
+      assert(result == Shell.Success("s=1 a=1 b=2"))
     }
   }
 }

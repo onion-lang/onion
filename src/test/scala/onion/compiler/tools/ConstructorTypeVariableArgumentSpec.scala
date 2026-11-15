@@ -338,4 +338,211 @@ class ConstructorTypeVariableArgumentSpec extends AbstractShellSpec {
       assert(result == Shell.Success("xy273"), out)
     }
   }
+
+  describe("a superclass constructor slot typed by a type variable (#2840)") {
+    def failing(name: String, parent: String, sub: String): Unit =
+      it(name) {
+        val src = parent + sub +
+          """class Test {
+            |public:
+            |  static def main(args: String[]): String { return "ran" }
+            |}
+            |""".stripMargin
+        val (result, out) = run(src)
+        assert(result == Shell.Failure(-1), out)
+        assert(out.contains("E0021"), out)
+      }
+
+    failing("rejects a List[Number] for extends C[T](ys) with T extends Number", boundedC,
+      """class S[T extends Number](ys: List[Number]) extends C[T](ys)
+        |""".stripMargin)
+
+    failing("rejects a primitive for extends Box[T](i) with an unbounded T",
+      """class Box[T] {
+        |public:
+        |  val v: T
+        |  def this(v: T) { this.v = v }
+        |}
+        |""".stripMargin,
+      """class S[T](i: Int) extends Box[T](i)
+        |""".stripMargin)
+
+    it("still accepts the parent's own T and concrete type arguments") {
+      val src =
+        """class Box[T] {
+          |public:
+          |  val v: T
+          |  def this(v: T) { this.v = v }
+          |}
+          |class Same[T](t: T) extends Box[T](t)
+          |class IntBox(i: Int) extends Box[Int](i)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new Same[String]("a").v + new IntBox(7).v
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("a7"), out)
+    }
+ 
+    it("accepts a zero-argument generic call as a super argument, as new does") {
+      val src =
+        """import { java.util.* }
+          |class C[T] {
+          |public:
+          |  val xs: List[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |}
+          |class E1[T] extends C[T](Collections::emptyList())
+          |class E2[T] extends C[T](List::of())
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new E1[String]().xs + new E2[Int]().xs
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("[][]"), out)
+    }
+
+    it("accepts a generic call as a super argument when the parent has another constructor of that arity") {
+      val src =
+        """import { java.util.* }
+          |class C[T] {
+          |public:
+          |  val xs: List[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |  def this(n: Int) { this.xs = new ArrayList[T]() }
+          |}
+          |class E[T] extends C[T](Collections::emptyList())
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new E[String]().xs + new C[String](3).xs
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("[][]"), out)
+    }
+
+    it("still rejects a List[Number] into a List[T] slot when the parent has another constructor of that arity") {
+      val src =
+        """import { java.util.* }
+          |class C[T] {
+          |public:
+          |  val xs: List[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |  def this(n: Int) { this.xs = new ArrayList[T]() }
+          |}
+          |class E[T] extends C[T](new ArrayList[Number]())
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "ran" }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(out.contains("E0021"), out)
+    }
+
+    it("keeps a JDK collection parent's Collection<? extends E> constructor reachable from extends") {
+      val src =
+        """import { java.util.* }
+          |class N1[T] extends ArrayList[T](List::of())
+          |class N2[T] extends ArrayList[T](Collections::emptyList())
+          |class H[T] extends HashSet[T](Collections::emptySet())
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new N1[String]() + new N2[String]() + new H[String]()
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("[][][]"), out)
+    }
+
+    it("still rejects a List[Number] argument written as a generic call result") {
+      val src =
+        """import { java.util.* }
+          |class C[T extends Number] {
+          |public:
+          |  val xs: List[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |}
+          |class S[T extends Number](ys: List[Number]) extends C[T](ys)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "ran" }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(out.contains("E0021"), out)
+    }
+    it("accepts a lambda super argument into a slot that mentions T, as new does (#3003 panel)") {
+      val src =
+        """import { java.util.* }
+          |class Lazy[T] {
+          |public:
+          |  val f: () -> T
+          |  def this(f: () -> T) { this.f = f }
+          |}
+          |class Empty[T] extends Lazy[T?](() -> null)
+          |class Lst[T] extends Lazy[List[T]](() -> [])
+          |class Mp[T] extends Lazy[Map[String, T]](() -> [:])
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new Empty[String]().f.call() + new Lst[String]().f.call() + new Mp[Int]().f.call()
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("null[]{}"), out)
+    }
+
+    it("keeps main's choice when two parent constructors would fit a retyped argument (#3003 panel)") {
+      val src =
+        """import { java.util.* }
+          |class C[T] {
+          |public:
+          |  val xs: Collection[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |  def this(xs: Collection[T]) { this.xs = xs }
+          |}
+          |class E[T] extends C[T](Collections::emptyList())
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "OUT " + new E[String]().xs }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("OUT []"), out)
+    }
+
+    it("still rejects a List[Number] into a List[T] slot when a second constructor takes Collection[T]") {
+      val src =
+        """import { java.util.* }
+          |class C[T extends Number] {
+          |public:
+          |  val xs: Collection[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |  def this(xs: Collection[T]) { this.xs = xs }
+          |}
+          |class S[T extends Number](ys: List[Number]) extends C[T](ys)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "ran" }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(out.contains("E0021"), out)
+    }
+  }
 }

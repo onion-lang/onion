@@ -239,6 +239,13 @@ final class ClosureTyping(
                     body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
                       Option(buildReturnBlock(node.body, bodyTerm, expectedRet))
                     }
+                  } else if (hasValueTail(node.body)) {
+                    // A block lambda with an early `return` returns its last expression
+                    // by the same rule as one without (#3025): the tail is typed against
+                    // the expected return type, as one more `return`.
+                    body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
+                      Option(buildTailReturnBlock(node.body, bodyTerm, expectedRet))
+                    }
                   } else {
                     Option(body.translate(node.body, context))
                   }
@@ -619,10 +626,17 @@ final class ClosureTyping(
         body.openClosure(context) {
           if (addClosureArguments(node.args, argTypes, context, node.body).isDefined) {
             val collected = context.startReturnTypeCollection()
-            val translated = body.translate(node.body, context)
+            // The last expression counts as one more `return` (#3025).
+            val (translated, tailType) =
+              if (hasValueTail(node.body)) {
+                body.typed(node.body, context, samReturnTemplate) match {
+                  case Some(term) => (term, Option(lastTerm(term).`type`))
+                  case None => (null, None)
+                }
+              } else (body.translate(node.body, context), None)
             context.stopReturnTypeCollection()
             if (translated != null) {
-              result = foldReturnLub(node, collected.toSeq)
+              result = foldReturnLub(node, collected.toSeq ++ tailType.filter(_ != BasicType.VOID))
             }
           }
         }
@@ -696,6 +710,51 @@ final class ClosureTyping(
       }
 
     statements += lastStatement
+    new StatementBlock(statements.asJava)
+  }
+
+  /**
+   * Whether a block lambda body ends in an expression that can be its value: anything
+   * but a `return`/`throw`/`break`/`continue`, which already end the path. An
+   * assignment counts, as it does in a lambda with no `return` (`{ k += 7 }` returns
+   * the new value).
+   */
+  private def hasValueTail(node: AST.BlockExpression): Boolean = node.elements.lastOption match {
+    case Some(_: AST.ReturnExpression | _: AST.ThrowExpression |
+              _: AST.BreakExpression | _: AST.ContinueExpression) => false
+    case Some(_: AST.Expression) => true
+    case _ => false
+  }
+
+  private def lastTerm(bodyTerm: Term): Term = bodyTerm match {
+    case begin: Begin if begin.terms.nonEmpty => begin.terms.last
+    case single => single
+  }
+
+  /**
+   * The body of a block lambda that has an early `return` and a value tail: the
+   * tail becomes one more `return`. A tail with no value (void, or one that never
+   * completes) stays a statement, and the caller appends the default return, as
+   * before. Returns null when the tail's type does not fit (reported).
+   */
+  private def buildTailReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type): ActionStatement = {
+    val terms = bodyTerm match {
+      case begin: Begin => begin.terms.toIndexedSeq
+      case single => IndexedSeq(single)
+    }
+    val statements = scala.collection.mutable.ArrayBuffer[ActionStatement]()
+    terms.init.foreach(t => statements += termToStatement(t))
+    if (terms.nonEmpty) {
+      val last = terms.last
+      if (returnType == BasicType.VOID || returnType.isBottomType ||
+          last.`type` == BasicType.VOID || last.`type`.isBottomType) {
+        statements += termToStatement(last)
+      } else {
+        val assigned = processAssignable(node, returnType, last)
+        if (assigned == null) return null
+        statements += new Return(assigned)
+      }
+    }
     new StatementBlock(statements.asJava)
   }
 

@@ -1674,6 +1674,9 @@ Json::stringify(0.0d / 0.0d)           // "null"
 record Point(x: Int, y: Int)
 Json::stringify(new Point(1, 2))       // {"x":1,"y":2}
 
+// A Set or a Java array is a JSON array too, in iteration order
+Json::stringify(Colls::toList(args))   // ["a","b"]; Json::stringify(args) gives the same
+
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
 v["users"][0]["name"].asString()

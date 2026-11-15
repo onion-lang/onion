@@ -1187,6 +1187,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#numeric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        組込の Numeric
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4808,6 +4819,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#numeric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        組込の Numeric
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4955,28 +4977,78 @@ trait のモジュール、型のモジュール、または <code>module</code>
 </span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="nf">sumTwice</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">]))</span><span class="w">  </span><span class="c1">// =&gt; 12</span>
 </span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="p">}</span>
 </span></code></pre></div>
+<h2 id="numeric">組込の <code>Numeric</code><a class="headerlink" href="#numeric" title="Permanent link">&para;</a></h2>
+<p>Onion にはトレイトが一つ組み込まれています。<code>onion.typeclass.Numeric[T]</code> です。
+メソッドは <code>zero</code>、<code>one</code>、<code>plus</code>、<code>times</code> の四つです。import すれば、次のインスタンスは
+<code>instance</code> 宣言なしで使えます。</p>
+<table>
+<thead>
+<tr>
+<th>型</th>
+<th>インスタンス</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Int</code>、<code>Long</code></td>
+<td>正確</td>
+<td>オーバーフローすると <code>ArithmeticException</code> を投げます</td>
+</tr>
+<tr>
+<td><code>Double</code>、<code>Float</code></td>
+<td>浮動小数点</td>
+<td><code>Float</code> は float 精度で足します</td>
+</tr>
+<tr>
+<td><code>BigInteger</code>、<code>BigDecimal</code></td>
+<td>任意精度</td>
+<td><code>BigDecimal</code> は丸めません</td>
+</tr>
+</tbody>
+</table>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="n">typeclass</span><span class="p">.</span><span class="nc">Numeric</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kd">def</span><span class="w"> </span><span class="n">total</span><span class="p">[</span><span class="nc">T</span><span class="p">:</span><span class="w"> </span><span class="nc">Numeric</span><span class="p">](</span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">T</span><span class="p">]):</span><span class="w"> </span><span class="nc">T</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">acc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Numeric</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="o">::</span><span class="nf">zero</span><span class="p">()</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="k">foreach</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">acc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Numeric</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="o">::</span><span class="nf">plus</span><span class="p">(</span><span class="n">acc</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">acc</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">}</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="nf">total</span><span class="p">([</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">]))</span><span class="w">        </span><span class="c1">// =&gt; 7（Int）</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="nf">total</span><span class="p">([</span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="mf">2.0</span><span class="p">]))</span><span class="w">    </span><span class="c1">// =&gt; 3.5</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li>ほかの型には、四つのメソッドをすべて持つ <code>instance Numeric[Short] { ... }</code> を自分で書きます。</li>
+<li>表にある型に2つ目のインスタンス（<code>instance Numeric[Int]</code> など）を書くと E0097 です。</li>
+<li>Java のコードは <code>Numeric.forInt()</code>、<code>forLong()</code>、<code>forDouble()</code>、<code>forFloat()</code>、
+  <code>forBigInteger()</code>、<code>forBigDecimal()</code> でインスタンスを受け取ります。</li>
+<li><code>Stats::sum</code> はまだこれを使いません（RFC #2760）。</li>
+</ul>
 <h2 id="_7">自作のトレイト<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <p>型クラスは数値に限りません。必要なトレイトを自由に定義できます。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">trait</span><span class="w"> </span><span class="nc">Eq</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">eq</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="p">}</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="kd">instance</span><span class="w"> </span><span class="nc">Eq</span><span class="p">[</span><span class="nc">Integer</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">eq</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">Integer</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">Integer</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">b</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">}</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="kd">def</span><span class="w"> </span><span class="n">allSame</span><span class="p">[</span><span class="nc">T</span><span class="p">:</span><span class="w"> </span><span class="nc">Eq</span><span class="p">](</span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">T</span><span class="p">]):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="n">xs</span><span class="p">.</span><span class="nf">size</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">head</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xs</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="k">foreach</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="o">!</span><span class="nc">Eq</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="o">::</span><span class="nf">eq</span><span class="p">(</span><span class="n">head</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span>
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="p">}</span>
-</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
-</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="nf">allSame</span><span class="p">([</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">]))</span><span class="w">  </span><span class="c1">// =&gt; true</span>
-</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="nf">allSame</span><span class="p">([</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">]))</span><span class="w">  </span><span class="c1">// =&gt; false</span>
-</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kd">trait</span><span class="w"> </span><span class="nc">Eq</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">eq</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="p">}</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="kd">instance</span><span class="w"> </span><span class="nc">Eq</span><span class="p">[</span><span class="nc">Integer</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">eq</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">Integer</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">Integer</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">b</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">}</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="kd">def</span><span class="w"> </span><span class="n">allSame</span><span class="p">[</span><span class="nc">T</span><span class="p">:</span><span class="w"> </span><span class="nc">Eq</span><span class="p">](</span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">T</span><span class="p">]):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="n">xs</span><span class="p">.</span><span class="nf">size</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">head</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xs</span><span class="p">.</span><span class="nf">get</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">  </span><span class="k">foreach</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">T</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="o">!</span><span class="nc">Eq</span><span class="p">[</span><span class="nc">T</span><span class="p">]</span><span class="o">::</span><span class="nf">eq</span><span class="p">(</span><span class="n">head</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="p">}</span>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="nf">allSame</span><span class="p">([</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">]))</span><span class="w">  </span><span class="c1">// =&gt; true</span>
+</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="nf">allSame</span><span class="p">([</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">]))</span><span class="w">  </span><span class="c1">// =&gt; false</span>
+</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a><span class="p">}</span>
 </span></code></pre></div>
 <h2 id="_8">現時点の制限<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <p>最初のリリースでは、よく使うケースに絞っています。</p>
@@ -4988,7 +5060,9 @@ trait のモジュール、型のモジュール、または <code>module</code>
   <code>value.method(...)</code> はまだ使えません。</li>
 <li>インスタンスは具体型に対するもの（<code>instance Numeric[Integer]</code>）で、パラメータ化
   （<code>instance Numeric[List[T]]</code>）はまだ対象外です。</li>
-<li>組込の <code>Numeric</code>/<code>Eq</code>/<code>Ord</code> はまだありません。必要なトレイトは自分で定義します。</li>
+<li>組込のトレイトは <code>Numeric</code> だけです。組込の <code>Eq</code>/<code>Ord</code> はまだありません。</li>
+<li>別パッケージのトレイトへの具体型アクセス（組込の <code>Numeric[Int]::zero()</code> など）は、
+  今のところ E0003 になります（#2962）。代わりに制約付き関数から呼びます。</li>
 </ul>
 
 

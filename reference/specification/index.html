@@ -6053,7 +6053,8 @@ it to <code>fromMap</code>. This means the core serialization logic is written o
 adding a new format requires only registering its <code>parse</code> / <code>stringify</code> pair
 in the stdlib — the macro itself does not change.</p>
 <p><code>from-R?</code> methods return <code>null</code> on parse failure or a type-conversion error;
-they never throw. <code>to-R</code> methods always produce a well-formed string.
+they never throw. <code>to-R</code> methods produce a well-formed string, except that <code>toYaml</code>
+throws <code>IllegalArgumentException</code> for a NaN or infinite component, which YAML cannot read back.
 Round-trips hold for scalar components: <code>fromJson(toJson(v)) == v</code>.</p>
 <p>Supported component types are the eight scalar primitives: <code>String</code>, <code>Int</code>,
 <code>Long</code>, <code>Double</code>, <code>Float</code>, <code>Boolean</code>, <code>Short</code>, <code>Byte</code>. A component of any

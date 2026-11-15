@@ -5651,7 +5651,10 @@ Promote it to an error with <code>--warn error</code>, or suppress it with
 <li>A <code>null</code> argument to a Java method: <code>String::format("%s", null)</code> and
   <code>Http::encodeUrl(null)</code> do not warn.</li>
 <li>Except when the parameter is the receiver's own type argument: <code>xs.add(null)</code>
-  on a <code>List[String]</code> warns, because you chose <code>String</code> there.</li>
+  on a <code>List[String]</code> warns, because you chose <code>String</code> there.
+  When that type argument is a primitive, it is an error (E0000), not a warning:
+  <code>xs.add(null)</code> on a <code>List[Int]</code>, <code>f(null)</code> on an <code>(Int) -&gt; T</code>. An <code>Int</code> is
+  never null; to store <code>null</code>, write the type argument as <code>Int?</code> (<code>List[Int?]</code>).</li>
 </ul>
 <p>A method written in Onion warns, also when it was compiled separately (a
 project's <code>tests/</code> calling <code>src/</code>, or an Onion library jar).</p>

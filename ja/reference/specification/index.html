@@ -6052,7 +6052,7 @@ static メソッドと同名のアクセサは常に共存できるので、ど�
 一度だけ記述され、新しい形式を追加するには stdlib でその <code>parse</code> / <code>stringify</code> ペアを
 登録するだけで済みます — マクロ自体は変更する必要がありません。</p>
 <p><code>from-R?</code> メソッドは、パース失敗または型変換エラー時に <code>null</code> を返し、例外は投げません。
-<code>to-R</code> メソッドは常に整形式の文字列を生成します。
+<code>to-R</code> メソッドは整形式の文字列を生成します。ただし <code>toYaml</code> は、NaN または無限大の成分があると <code>IllegalArgumentException</code> を投げます。YAML ではそれを読み戻せないためです。
 スカラー成分に対してはラウンドトリップが成立します: <code>fromJson(toJson(v)) == v</code>。</p>
 <p>サポートされるコンポーネント型は8つのスカラー primitive です: <code>String</code>、<code>Int</code>、
 <code>Long</code>、<code>Double</code>、<code>Float</code>、<code>Boolean</code>、<code>Short</code>、<code>Byte</code>。それ以外の型の成分は <strong>E0062</strong> です。

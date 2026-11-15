@@ -2317,6 +2317,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#stringssplit-regexsplit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strings::split と Regex::split は末尾の空のフィールドを残すようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#null" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリミティブの型引数への null はエラーになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protected_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        protected なメソッドは、どの呼び方でも同じようにアクセス検査されるようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#yamlstringify-yamlparse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Yaml::stringify は Yaml::parse が読み戻せるものだけを書くようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5071,6 +5115,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#stringssplit-regexsplit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strings::split と Regex::split は末尾の空のフィールドを残すようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#null" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリミティブの型引数への null はエラーになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protected_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        protected なメソッドは、どの呼び方でも同じようにアクセス検査されるようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#yamlstringify-yamlparse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Yaml::stringify は Yaml::parse が読み戻せるものだけを書くようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5627,6 +5715,80 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li><strong>これまでどおり動くもの:</strong> <code>A</code> の中や、<code>A</code> のサブクラスからの同じ呼び出しです。</li>
 <li><strong>直し方:</strong> コンストラクタを <code>public:</code> の下に移すか、<code>A</code> に <code>public</code> なファクトリメソッドを追加してください。</li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> コンストラクタのアクセスを広げるかどうかは、書いた人にしか決められない設計上の判断です。そのため、ヒントが直し方を示します。</li>
+</ul>
+<h2 id="stringssplit-regexsplit"><code>Strings::split</code> と <code>Regex::split</code> は末尾の空のフィールドを残すようになりました<a class="headerlink" href="#stringssplit-regexsplit" title="Permanent link">&para;</a></h2>
+<p>分割には Java の <code>String.split</code> を使っていました。これは末尾の空のフィールドを捨てます。今は Python や JavaScript と同じく残します。そのため、最後の列が空の行でも、その列が残ります。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Strings</span><span class="o">::</span><span class="nf">split</span><span class="p">(</span><span class="s2">"alice,30,"</span><span class="p">,</span><span class="w"> </span><span class="s2">","</span><span class="p">)</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="nf">println</span><span class="p">(</span><span class="n">row</span><span class="p">.</span><span class="n">size</span><span class="p">)</span><span class="w">   </span><span class="c1">// これまで: 2 で、row[2] は例外になった。今: 3</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="nf">println</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span><span class="w">     </span><span class="c1">// 今: ""（空文字列）</span>
+</span></code></pre></div>
+<ul>
+<li><strong>変わったこと:</strong> <code>Strings::split</code>、<code>Strings::splitRegex</code>、<code>String</code> または <code>Pattern</code> を渡す <code>Regex::split</code> は、最後の区切り文字の後のフィールドをすべて残します。</li>
+<li><strong>変わらないもの:</strong> 区切り文字で終わらない入力。空の区切り文字（<code>Strings::split("abc", "")</code> はこれまでどおり <code>[a, b, c]</code> です）。<code>Regex::split(s, p, limit)</code>。Java の <code>s.split(",")</code>。これは今も末尾の空のフィールドを捨てます。</li>
+<li><strong>表示されるもの:</strong> エラーは出ません。区切り文字で終わるテキストでは、末尾の区切り文字1つにつき <code>""</code> が1つ増えます。よくあるのは行への分割です。<code>"\n"</code> で終わるテキストに <code>Strings::split(text, "\n")</code> を使うと、最後に空の行が付くようになりました。</li>
+<li><strong>以前の結果を保つには:</strong></li>
+<li>行に分けるときは <code>Strings::lines(text)</code> を呼びます。<code>Strings::lines("l1\nl2\n")</code> は、以前の <code>split</code> と同じく <code>[l1, l2]</code> を返します。</li>
+<li>ほかの区切り文字では <code>Regex::split(s, pattern, 0)</code> を呼びます。以前と同じく、末尾の空のフィールドをすべて捨てます。区切り文字は正規表現なので、<code>.</code> や <code>|</code> はエスケープします。<code>Regex::split("a.b..", "\\.", 0)</code> は <code>[a, b]</code> を返します。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> ほとんどの呼び出しは区切り文字で終わらないテキストを分割するので、結果は変わりません。末尾の空のフィールドがデータ（CSV の列）なのか、不要なもの（最後の改行）なのかは、書いた人にしか分かりません。そのため、書き換えはどちらかの場合に必ず誤ります。</li>
+</ul>
+<h2 id="null">プリミティブの型引数への <code>null</code> はエラーになりました<a class="headerlink" href="#null" title="Permanent link">&para;</a></h2>
+<p>Onion の <code>Int</code> は <code>null</code> になりません。型引数がプリミティブの総称的な引数（<code>List[Int]</code>、<code>(Int) -&gt; T</code>、<code>Map[String, Int]</code>）は、<code>null</code> を受け付けなくなりました。<code>Int</code> のメソッド引数がこれまでずっとそうだったのと同じです（#2872）。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">f</span><span class="p">:</span><span class="w"> </span><span class="p">(</span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="s2">"v"</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="nf">f</span><span class="p">(</span><span class="kc">null</span><span class="p">)</span><span class="w">                     </span><span class="c1">// 以前: W0012 の後、実行時にクラッシュした。今: E0000</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="n">xs</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="kc">null</span><span class="p">)</span><span class="w">                </span><span class="c1">// 以前: W0012。null が格納された。今: E0000</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">ys</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="kt">Int</span><span class="p">?]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="n">ys</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="kc">null</span><span class="p">)</span><span class="w">                </span><span class="c1">// 問題なし: 型引数が null を許すと書いている</span>
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">zs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]</span><span class="w">   </span><span class="c1">// 以前: コンパイルでき、zs[1] の読み出しでクラッシュした。今: E0000（#2895）</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> <code>null</code> の位置で <strong>E0000</strong> <code>type Int is expected, but type null is used.</code> になります。型引数を <code>Int?</code> と書くよう促すヒントが付きます。</li>
+<li><strong>対象:</strong> クラスの型変数で宣言されたメソッド引数です。関数値への <code>f(null)</code> と <code>f.call(null)</code>、<code>List</code> と <code>Map</code> の <code>add</code>/<code>set</code>/<code>put</code>、Java の関数型インタフェースの <code>apply</code>、自分で書いた総称クラスのメソッド（<code>Box[Int].put(null)</code>）が該当します。そのような型として書いたリストやマップのリテラルの中の <code>null</code> の要素も該当します（<code>val zs: List[Int] = [5, null]</code>、<code>val m: Map[String, Int] = ["b": null]</code>）。</li>
+<li><strong>直し方:</strong> <code>null</code> を格納するつもりなら、型引数を null 許容にしてください。<code>List[Int?]</code>、<code>Map[String, Int?]</code>、<code>(Int?) -&gt; T</code> です。読み出した値は <code>Int?</code> になるので、そこで <code>null</code> を扱います（<code>?:</code> か <code>!!</code>）。そうでなければ、<code>null</code> ではなく実際の値を渡してください。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> 直し方は、宣言する型を変えるか、渡す値を変えるかのどちらかです。どちらが正しいかは、書いた人にしか分かりません。</li>
+</ul>
+<h2 id="protected_1"><code>protected</code> なメソッドは、どの呼び方でも同じようにアクセス検査されるようになりました<a class="headerlink" href="#protected_1" title="Permanent link">&para;</a></h2>
+<p>名前付き引数を渡すメソッド呼び出しと、型を書かないラムダ引数を渡すメソッド呼び出し（<code>a.lam((x) -&gt; x + 1)</code>、<code>a.lam { x -&gt; x + 1 }</code>）も、すべての引数を位置で渡す呼び出しと同じアクセス検査を受けるようになりました (#2916)。
+そのため、無関係なクラスからこの方法で <code>protected</code> なメソッドを呼ぶことはできなくなりました。
+これは、上のコンストラクタの変更のメソッド版です。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="kd">protected</span><span class="p">:</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">pim</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="p">}</span>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="nf">println</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="nc">A</span><span class="p">().</span><span class="nf">pim</span><span class="p">(</span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">7</span><span class="p">))</span><span class="w">   </span><span class="c1">// 以前: 10 と表示された。今: E0013</span>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="nf">println</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="nc">A</span><span class="p">().</span><span class="nf">pim</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">))</span><span class="w">           </span><span class="c1">// 以前も今も E0013</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> 呼び出しの位置で <strong>E0013</strong> <code>method A.pim(Int, Int) is not accessible from class ...</code> になります。</li>
+<li><strong>これまでどおり動くもの:</strong> <code>A</code> の中や、<code>A</code> のサブクラスからの同じ呼び出しです。</li>
+<li><strong>直し方:</strong> メソッドを <code>public:</code> の下に移すか、サブクラスから呼んでください。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> メソッドのアクセスを広げるかどうかは、書いた人にしか決められない設計上の判断です。そのため、ヒントが直し方を示します。</li>
+</ul>
+<h2 id="yamlstringify-yamlparse"><code>Yaml::stringify</code> は <code>Yaml::parse</code> が読み戻せるものだけを書くようになりました<a class="headerlink" href="#yamlstringify-yamlparse" title="Permanent link">&para;</a></h2>
+<p><code>Yaml::stringify</code> は、スカラーのリスト、空の Map の要素、NaN を書いていました。その一部は他の YAML ツールなら読めます。しかし <code>Yaml::parse</code> では読み戻せませんでした。今は、入れ子の Map と同じく、<code>Yaml::stringify</code> が例外を投げます (#2806)。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="nb">Yaml</span><span class="p">;</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="nb">Json</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="nb">Yaml</span><span class="o">::</span><span class="nf">stringify</span><span class="p">([</span><span class="s2">"apple"</span><span class="p">,</span><span class="w"> </span><span class="s2">"banana"</span><span class="p">])</span><span class="w">   </span><span class="c1">// 以前: "- apple\n- banana\n"。今: 例外</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="nb">Json</span><span class="o">::</span><span class="nf">stringify</span><span class="p">([</span><span class="s2">"apple"</span><span class="p">,</span><span class="w"> </span><span class="s2">"banana"</span><span class="p">])</span><span class="w">   </span><span class="c1">// ["apple","banana"]。JSON は YAML 1.2 としても正しい</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="nb">Yaml</span><span class="o">::</span><span class="nf">stringify</span><span class="p">([</span><span class="s2">"apple"</span><span class="p">,</span><span class="w"> </span><span class="s2">"banana"</span><span class="p">].</span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">[</span><span class="s2">"v"</span><span class="p">:</span><span class="w"> </span><span class="n">x</span><span class="p">]</span><span class="w"> </span><span class="p">})</span><span class="w">   </span><span class="c1">// - v: apple ...</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> 実行時の <code>IllegalArgumentException</code> です。メッセージが問題を示し、直し方を提案します。</li>
+<li><strong>対象:</strong></li>
+<li>Map でないリストの要素: String、数値、<code>null</code>、List</li>
+<li>空の Map の要素 (<code>[[:]]</code>)</li>
+<li>値のどこかにある、NaN または無限大の <code>Double</code> や <code>Float</code></li>
+<li>NaN または無限大の成分を持つレコードの <code>toYaml</code> (<code>derive!(Yaml)</code>) と、<code>shape ... = yaml</code> の <code>print</code></li>
+<li><strong>これまでどおり動くもの:</strong> フラットな Map と、空でないフラットな Map のリストです。どちらも以前と同じように書かれます。</li>
+<li><strong>直し方:</strong></li>
+<li>スカラーのリストには <code>Json::stringify</code> を使ってください (YAML 1.2 のツールは JSON を読めます)。または、各要素を Map で包んでください: <code>xs.map { x -&gt; ["v": x] }</code>。</li>
+<li>空の Map はリストから除いてください。</li>
+<li>書く前に、NaN や無限大を自分で選んだ値 (<code>null</code> や番兵値) に置き換えてください。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> 拒否される入力はソースの書き方ではなく実行時の値です。そのため、書き換えでは見つけられません。代わりに例外のメッセージが直し方を示します。</li>
 </ul>
 
 

@@ -4231,6 +4231,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#stringssplit-and-regexsplit-keep-trailing-empty-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strings::split and Regex::split keep trailing empty fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#null-into-a-type-argument-that-is-a-primitive-is-an-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        null into a type argument that is a primitive is an error
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-protected-method-is-checked-the-same-way-however-the-call-reaches-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A protected method is checked the same way however the call reaches it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#yamlstringify-writes-only-what-yamlparse-reads-back" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Yaml::stringify writes only what Yaml::parse reads back
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5050,6 +5094,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#stringssplit-and-regexsplit-keep-trailing-empty-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strings::split and Regex::split keep trailing empty fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#null-into-a-type-argument-that-is-a-primitive-is-an-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        null into a type argument that is a primitive is an error
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-protected-method-is-checked-the-same-way-however-the-call-reaches-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A protected method is checked the same way however the call reaches it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#yamlstringify-writes-only-what-yamlparse-reads-back" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Yaml::stringify writes only what Yaml::parse reads back
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5642,6 +5730,109 @@ set of overloads now sees their defaults, and picks the overload a call below th
 <li><strong>To update:</strong> move the constructor under <code>public:</code>, or add a <code>public</code> factory method to <code>A</code>.</li>
 <li><strong>No <code>onion migrate</code> rule:</strong> widening a constructor's access is a design choice only you can
   make, so the hint shows the edit instead.</li>
+</ul>
+<h2 id="stringssplit-and-regexsplit-keep-trailing-empty-fields"><code>Strings::split</code> and <code>Regex::split</code> keep trailing empty fields<a class="headerlink" href="#stringssplit-and-regexsplit-keep-trailing-empty-fields" title="Permanent link">&para;</a></h2>
+<p>Splitting used Java's <code>String.split</code>, which drops empty fields at the end. Now they are kept,
+as in Python and JavaScript, so a row with an empty last column keeps that column.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Strings</span><span class="o">::</span><span class="nf">split</span><span class="p">(</span><span class="s2">"alice,30,"</span><span class="p">,</span><span class="w"> </span><span class="s2">","</span><span class="p">)</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="nf">println</span><span class="p">(</span><span class="n">row</span><span class="p">.</span><span class="n">size</span><span class="p">)</span><span class="w">   </span><span class="c1">// Before: 2, so row[2] threw. Now: 3</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="nf">println</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span><span class="w">     </span><span class="c1">// Now: "" (an empty string)</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What changed:</strong> <code>Strings::split</code>, <code>Strings::splitRegex</code>, and <code>Regex::split</code> with a
+  <code>String</code> or a <code>Pattern</code> keep every field after the last delimiter.</li>
+<li><strong>Unchanged:</strong> an input that does not end with the delimiter; an empty delimiter
+  (<code>Strings::split("abc", "")</code> is still <code>[a, b, c]</code>); <code>Regex::split(s, p, limit)</code>;
+  and Java's own <code>s.split(",")</code>, which still drops trailing empties.</li>
+<li><strong>What you see:</strong> no error. A text that ends with the delimiter gives one more <code>""</code> for each
+  delimiter at the end. Splitting lines is the common case: <code>Strings::split(text, "\n")</code> on a
+  text that ends with <code>"\n"</code> now ends with an empty line.</li>
+<li><strong>To keep the old result:</strong></li>
+<li>For lines, call <code>Strings::lines(text)</code>. <code>Strings::lines("l1\nl2\n")</code> gives <code>[l1, l2]</code>, as
+    <code>split</code> did before.</li>
+<li>For any other delimiter, call <code>Regex::split(s, pattern, 0)</code>. It drops every trailing empty
+    field, as before. Its delimiter is a regex, so escape <code>.</code> and <code>|</code>:
+    <code>Regex::split("a.b..", "\\.", 0)</code> gives <code>[a, b]</code>.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> most calls split text that does not end with the delimiter and
+  give the same result. Only you know whether an empty last field is data (a CSV column) or
+  noise (a final newline), so a rewrite would be wrong for one of them.</li>
+</ul>
+<h2 id="null-into-a-type-argument-that-is-a-primitive-is-an-error"><code>null</code> into a type argument that is a primitive is an error<a class="headerlink" href="#null-into-a-type-argument-that-is-a-primitive-is-an-error" title="Permanent link">&para;</a></h2>
+<p><code>Int</code> is never <code>null</code> in Onion. A generic slot whose type argument is a primitive
+(<code>List[Int]</code>, <code>(Int) -&gt; T</code>, <code>Map[String, Int]</code>) now rejects <code>null</code>, as an <code>Int</code> method
+parameter always did (#2872).</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">f</span><span class="p">:</span><span class="w"> </span><span class="p">(</span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="s2">"v"</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="nf">f</span><span class="p">(</span><span class="kc">null</span><span class="p">)</span><span class="w">                     </span><span class="c1">// Before: W0012, then a crash at run time. Now: E0000</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">xs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="n">xs</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="kc">null</span><span class="p">)</span><span class="w">                </span><span class="c1">// Before: W0012; null was stored. Now: E0000</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">ys</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="kt">Int</span><span class="p">?]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="n">ys</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="kc">null</span><span class="p">)</span><span class="w">                </span><span class="c1">// fine: the type argument says the slot may be null</span>
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="kd">val</span><span class="w"> </span><span class="n">zs</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="kt">Int</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]</span><span class="w">   </span><span class="c1">// Before: compiled; the read of zs[1] crashed. Now: E0000 (#2895)</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <strong>E0000</strong> <code>type Int is expected, but type null is used.</code> at the <code>null</code>,
+  with a hint to write the type argument as <code>Int?</code>.</li>
+<li><strong>Where:</strong> a method parameter declared with the class's type variable: <code>f(null)</code> and
+  <code>f.call(null)</code> on a function value, <code>add</code>/<code>set</code>/<code>put</code> on <code>List</code> and <code>Map</code>, <code>apply</code> on a
+  Java functional interface, and a method of your own generic class (<code>Box[Int].put(null)</code>).
+  Also a <code>null</code> element in a list or map literal written for such a type
+  (<code>val zs: List[Int] = [5, null]</code>, <code>val m: Map[String, Int] = ["b": null]</code>).</li>
+<li><strong>To update:</strong> if <code>null</code> is a value you mean to store, declare the type argument nullable:
+  <code>List[Int?]</code>, <code>Map[String, Int?]</code>, <code>(Int?) -&gt; T</code>. Reads then give an <code>Int?</code>, so handle
+  <code>null</code> there (<code>?:</code> or <code>!!</code>). Otherwise, pass a real value instead of <code>null</code>.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> the fix is either a different declared type or a different
+  value, and only you know which one the code means.</li>
+</ul>
+<h2 id="a-protected-method-is-checked-the-same-way-however-the-call-reaches-it">A <code>protected</code> method is checked the same way however the call reaches it<a class="headerlink" href="#a-protected-method-is-checked-the-same-way-however-the-call-reaches-it" title="Permanent link">&para;</a></h2>
+<p>A method call that passes named arguments, or an untyped lambda argument
+(<code>a.lam((x) -&gt; x + 1)</code>, <code>a.lam { x -&gt; x + 1 }</code>), now gets the same access check as a call
+that passes every argument positionally (#2916). So an unrelated class can no longer reach a
+<code>protected</code> method that way. This is the method twin of the constructor change above.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">A</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="kd">protected</span><span class="p">:</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">pim</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">b</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="p">}</span>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="nf">println</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="nc">A</span><span class="p">().</span><span class="nf">pim</span><span class="p">(</span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">7</span><span class="p">))</span><span class="w">   </span><span class="c1">// Before: printed 10. Now: E0013</span>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="nf">println</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="nc">A</span><span class="p">().</span><span class="nf">pim</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">))</span><span class="w">           </span><span class="c1">// E0013 before and now</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <strong>E0013</strong> <code>method A.pim(Int, Int) is not accessible from class ...</code> at the call.</li>
+<li><strong>Still fine:</strong> the same call from inside <code>A</code> or from a subclass of <code>A</code>.</li>
+<li><strong>To update:</strong> move the method under <code>public:</code>, or call it from a subclass.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> widening a method's access is a design choice only you can
+  make, so the hint shows the edit instead.</li>
+</ul>
+<h2 id="yamlstringify-writes-only-what-yamlparse-reads-back"><code>Yaml::stringify</code> writes only what <code>Yaml::parse</code> reads back<a class="headerlink" href="#yamlstringify-writes-only-what-yamlparse-reads-back" title="Permanent link">&para;</a></h2>
+<p><code>Yaml::stringify</code> used to write a list of scalars, an empty Map element and NaN. Other YAML
+tools could read some of that text, but <code>Yaml::parse</code> could not read it back. Now
+<code>Yaml::stringify</code> throws instead, as it already did for a nested Map (#2806).</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="nb">Yaml</span><span class="p">;</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="nb">Json</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="nb">Yaml</span><span class="o">::</span><span class="nf">stringify</span><span class="p">([</span><span class="s2">"apple"</span><span class="p">,</span><span class="w"> </span><span class="s2">"banana"</span><span class="p">])</span><span class="w">   </span><span class="c1">// Before: "- apple\n- banana\n". Now: throws</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="nb">Json</span><span class="o">::</span><span class="nf">stringify</span><span class="p">([</span><span class="s2">"apple"</span><span class="p">,</span><span class="w"> </span><span class="s2">"banana"</span><span class="p">])</span><span class="w">   </span><span class="c1">// ["apple","banana"]; JSON is also valid YAML 1.2</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="nb">Yaml</span><span class="o">::</span><span class="nf">stringify</span><span class="p">([</span><span class="s2">"apple"</span><span class="p">,</span><span class="w"> </span><span class="s2">"banana"</span><span class="p">].</span><span class="n">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">[</span><span class="s2">"v"</span><span class="p">:</span><span class="w"> </span><span class="n">x</span><span class="p">]</span><span class="w"> </span><span class="p">})</span><span class="w">   </span><span class="c1">// - v: apple ...</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <code>IllegalArgumentException</code> at run time. Its message names the
+  problem and suggests the edit.</li>
+<li><strong>Where:</strong></li>
+<li>a List element that is not a Map: a String, a number, <code>null</code>, a List</li>
+<li>an empty Map element (<code>[[:]]</code>)</li>
+<li>a <code>Double</code> or <code>Float</code> that is NaN or an infinity, anywhere in the value</li>
+<li>a record's <code>toYaml</code> (<code>derive!(Yaml)</code>) and a <code>shape ... = yaml</code> <code>print</code>, for a NaN or
+    infinite component</li>
+<li><strong>Unchanged:</strong> a flat Map, and a List of non-empty flat Maps. Both are written as before.</li>
+<li><strong>To update:</strong></li>
+<li>For a list of scalars, call <code>Json::stringify</code> (YAML 1.2 tools read JSON), or wrap each
+    element in a Map: <code>xs.map { x -&gt; ["v": x] }</code>.</li>
+<li>Leave empty Maps out of the list.</li>
+<li>Replace NaN or an infinity with a value you choose (<code>null</code>, a sentinel) before writing.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> the refused input is a value at run time, not a spelling in the
+  source, so no rewrite can find it. The exception's message shows the edit instead.</li>
 </ul>
 
 

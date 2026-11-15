@@ -2192,7 +2192,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         val restExpr = desugarDoStatements(exprLoc, monadType, rest)
 
         // Create closure: (_) -> { restExpr }
-        val arg = AST.Argument(exprLoc, "_unused", null, null, false)
+        val arg = AST.Argument(exprLoc, AST.DoStatementParameter, null, null, false)
         val closureBody = AST.BlockExpression(exprLoc, List(restExpr))
         val closureType = AST.TypeNode(exprLoc, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(exprLoc, closureType, "call", List(arg), null, closureBody)

@@ -87,4 +87,16 @@ class GenericConstructorInferenceSpec extends AbstractShellSpec {
     assert(Shell.Failure(-1) == shell.run(
       named + "def main(args: String[]): void { val q = new NBox(a = 1, c = 2) }", "None", Array()))
   }
+
+  it("infers type arguments when a named call leaves a trailing default out") {
+    assert(Shell.Success("1:7") == shell.run(
+      "class TD[T](val a: T, val n: Int = 7)\ndef main(args: String[]): String { val d = new TD(a = 1)\n return \"\" + d.a + \":\" + d.n }",
+      "None", Array()))
+  }
+
+  it("infers type arguments when a named call skips a leading default") {
+    assert(Shell.Success("7:Z") == shell.run(
+      "class LD[T](val n: Int = 7, val a: T)\ndef main(args: String[]): String { val d = new LD(a = \"z\")\n return \"\" + d.n + \":\" + d.a.toUpperCase() }",
+      "None", Array()))
+  }
 }

@@ -254,8 +254,8 @@ final class ConstructionTyping(
         val named = hasNamedArguments(node.args)
 
         // Each candidate constructor with the arguments to type against it, in
-        // parameter order. A named call fills every parameter (no defaults) so
-        // that each class type parameter can still be pinned by an argument.
+        // parameter order. A named call may leave defaulted parameters out (null
+        // slots); each class type parameter must still be pinned by a real argument.
         val shaped: List[(ConstructorDefinition, List[AST.Expression])] =
           if (!named) {
             raw.constructors.toList.collect {
@@ -280,7 +280,10 @@ final class ConstructionTyping(
                     while (next < slots.length && slots(next) != null) next += 1
                     if (next >= slots.length) ok = false else { slots(next) = e; next += 1 }
                 }
-                if (ok && slots.forall(_ != null)) Some((cd, slots.toList)) else None
+                // A parameter left out is fine when it has a default: its slot stays
+                // null and is skipped when typing, as a generic method call does.
+                val omittable = params.indices.forall(i => slots(i) != null || params(i).defaultValue.nonEmpty || i >= cd.defaultsOmittableFrom)
+                if (ok && omittable) Some((cd, slots.toList)) else None
             }.flatten
           }
         if (shaped.isEmpty) break(None)
@@ -288,8 +291,15 @@ final class ConstructionTyping(
         // Probe-type the arguments: a genuine error here is reported once by the
         // real resolution path below, not twice by this speculative pass.
         val solutions: List[List[Type]] = shaped.flatMap { case (candidate, ordered) =>
-          val args = typing.withSuppressedReporting(typedTerms(ordered.toArray, context))
-          if (args == null || args.exists(_ == null)) None
+          val present = ordered.filter(_ != null)
+          val typedPresent = typing.withSuppressedReporting(typedTerms(present.toArray, context))
+          val args: Array[Term] =
+            if (typedPresent == null || typedPresent.exists(_ == null)) null
+            else {
+              var k = 0
+              ordered.toArray.map(e => if (e == null) null else { val t = typedPresent(k); k += 1; t })
+            }
+          if (args == null) None
           else {
             val synthetic = new MethodDefinition(
               node.location,

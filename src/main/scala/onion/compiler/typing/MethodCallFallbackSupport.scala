@@ -218,7 +218,14 @@ private[compiler] final class MethodCallFallbackSupport(
         reportNotFound(nonClosureTypes.values.toArray)
         return None
     }
-    val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
+    // The eager path reports E0013 for a method the caller may not name; without this a
+    // private method taking an untyped lambda compiled and threw IllegalAccessError (#2916).
+    // A `super.f(..)` caller passes `buildCall` and checks access itself.
+    if (buildCall == null && !MemberAccess.isMemberAccessible(method, typing.currentDefinition, target.`type`)) {
+      typing.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, name, method.arguments, typing.currentDefinition)
+      return None
+    }
+    val classSubst =TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
     // Preserve positions of the resolved (non-closure) arguments — closure slots
     // stay null — so each unifies against its own formal parameter. Collapsing
     // them shifted a determining argument that follows a closure onto the wrong

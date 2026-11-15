@@ -226,6 +226,12 @@ private[compiler] final class InstanceMethodCallSupport(
       case CandidateSelection.Ambiguous(first, second) =>
         calls.reportAmbiguousMethod(node, first, second, node.name)
         None
+      case CandidateSelection.Selected(method)
+          if !MemberAccess.isMemberAccessible(method, bodyContext.definition, target.`type`) =>
+        // The positional path reports E0013 here; this one compiled a private call that
+        // threw IllegalAccessError at run time (#2916).
+        bodyContext.report(METHOD_NOT_ACCESSIBLE, node, method.affiliation, node.name, method.arguments, bodyContext.definition)
+        None
       case CandidateSelection.Selected(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>

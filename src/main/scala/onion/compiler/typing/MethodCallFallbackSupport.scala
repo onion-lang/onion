@@ -23,8 +23,8 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Term] =
     extensionMethodFallbackSupport.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound)
 
-  def hasErasureTwinExtension(targetType: ObjectType, name: String): Boolean =
-    extensionMethodFallbackSupport.hasErasureTwinExtension(targetType, name)
+  def hasErasureTwinExtension(targetType: ObjectType, name: String, target: Term = null): Boolean =
+    extensionMethodFallbackSupport.hasErasureTwinExtension(targetType, name, target)
 
   def tryUserExtensionWithTypedArguments(
     node: AST.MethodCall,
@@ -35,8 +35,8 @@ private[compiler] final class MethodCallFallbackSupport(
   ): Option[Option[Term]] =
     extensionMethodFallbackSupport.tryUserExtensionWithTypedArguments(node, target, targetType, params, expected)
 
-  def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term]): Boolean =
-    extensionMethodFallbackSupport.isAmbiguousExtensionCall(targetType, name, params)
+  def isAmbiguousExtensionCall(targetType: ObjectType, name: String, params: Array[Term], target: Term = null): Boolean =
+    extensionMethodFallbackSupport.isAmbiguousExtensionCall(targetType, name, params, target)
 
   /** Zero-arg extension property access: `expr.name` resolves `def name: T` in an extension block. */
   def tryZeroArgExtensionAccess(
@@ -106,7 +106,9 @@ private[compiler] final class MethodCallFallbackSupport(
     targetType: ObjectType,
     context: LocalContext,
     expected: Type,
-    untypedClosureIndices: Set[Int]
+    untypedClosureIndices: Set[Int],
+    // How the resolved call is built; `super.f(..)` passes its own (#2674). Default: `target.f(..)`.
+    buildCall: (Method, Array[Term]) => Option[Term] = null
   ): Option[Term] = {
     val args = argList
 
@@ -216,7 +218,14 @@ private[compiler] final class MethodCallFallbackSupport(
         reportNotFound(nonClosureTypes.values.toArray)
         return None
     }
-    val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
+    // The eager path reports E0013 for a method the caller may not name; without this a
+    // private method taking an untyped lambda compiled and threw IllegalAccessError (#2916).
+    // A `super.f(..)` caller passes `buildCall` and checks access itself.
+    if (buildCall == null && !MemberAccess.isMemberAccessible(method, typing.currentDefinition, target.`type`)) {
+      typing.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, name, method.arguments, typing.currentDefinition)
+      return None
+    }
+    val classSubst =TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
     // Preserve positions of the resolved (non-closure) arguments — closure slots
     // stay null — so each unifies against its own formal parameter. Collapsing
     // them shifted a determining argument that follows a closure onto the wrong
@@ -258,8 +267,8 @@ private[compiler] final class MethodCallFallbackSupport(
 
     for {
       finalProcessedParams <- calls.prepareCallParams(node, argList, method, finalParams, finalExpectedArgs)
+      call <- if (buildCall == null) Some(new Call(target, method, finalProcessedParams)) else buildCall(method, finalProcessedParams)
     } yield {
-      val call = new Call(target, method, finalProcessedParams)
       val castType = TypeSubst.result(method.returnType, classSubst, finalMethodSubst)
       TypeSubst.withCast(call, castType)
     }

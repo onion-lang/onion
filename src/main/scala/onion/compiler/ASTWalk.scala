@@ -91,6 +91,7 @@ object ASTWalk {
       visit(throwExpr.target)
 
     case tryExpr: AST.TryExpression =>
+      tryExpr.resources.foreach(visit)
       visit(tryExpr.tryBlock)
       tryExpr.recClauses.foreach { case (_, block) =>
         visit(block)
@@ -111,6 +112,59 @@ object ASTWalk {
 
     case stringInterp: AST.StringInterpolation =>
       stringInterp.expressions.foreach(visit)
+
+    // `f = value` in a call's argument list: a lambda in `value` captures like a positional one (#3021).
+    case named: AST.NamedArgument =>
+      visit(named.value)
+
+    // Every node below has children too; a missing case hid a lambda from the capture scan (#3024).
+    case call: AST.SafeMethodCall =>
+      visit(call.target)
+      call.args.foreach(visit)
+
+    case memberSel: AST.SafeMemberSelection =>
+      visit(memberSel.target)
+
+    case call: AST.TraitMethodCall =>
+      call.args.foreach(visit)
+
+    case doWhile: AST.DoWhileExpression =>
+      visit(doWhile.block)
+      visit(doWhile.condition)
+
+    case labeled: AST.LabeledLoop =>
+      visit(labeled.loop)
+
+    case init: AST.ForInitDeclaration =>
+      visit(init.declaration)
+
+    case init: AST.ForInitExpression =>
+      visit(init.expression)
+
+    case p: AST.ExpressionPattern =>
+      visit(p.expr)
+
+    case p: AST.GuardedPattern =>
+      visit(p.pattern)
+      visit(p.guard)
+
+    case p: AST.DestructuringPattern =>
+      p.bindings.foreach(visit)
+
+    case yieldStmt: AST.YieldStatement =>
+      visit(yieldStmt.expr)
+
+    case doExpr: AST.DoExpression =>
+      doExpr.statements.foreach {
+        case node: AST.Node => visit(node)
+        case _ => ()
+      }
+
+    case binding: AST.DoBinding =>
+      visit(binding.expr)
+
+    case destructuring: AST.DestructuringDeclaration =>
+      visit(destructuring.init)
 
     case _ =>
       // Literals, identifiers, closures, etc. - no children to visit

@@ -609,6 +609,11 @@ object TypedAST {
 
     def affiliation: TypedAST.ClassType = classType
 
+    /** The last parameter is `xs: T...`; set by the outline pass (#2839). */
+    var vararg: Boolean = false
+
+    override def isVararg: Boolean = vararg
+
     var frame: LocalFrame = _
 
     /**
@@ -1588,6 +1593,9 @@ object TypedAST {
     def getArgs: Array[TypedAST.Type]
 
     def typeParameters: Array[TypedAST.TypeParameter] = Array()
+
+    /** Declared `xs: T...` (Onion) or `T...` (Java): trailing arguments may be spread (#2839). */
+    def isVararg: Boolean = false
   }
 
   /**
@@ -2020,6 +2028,12 @@ object TypedAST {
       // Handle NullableType
       (left, right) match {
         // T? ← T? : check inner types
+        // Two nullable primitives hold boxes, and a box never converts to another box
+        // (`Integer` is not a `Long`), so `Int?` fits `Long?` only as the same primitive:
+        // numeric widening would compile and then throw ClassCastException (#2730).
+        case (l: TypedAST.NullableType, r: TypedAST.NullableType)
+            if l.innerType.isBasicType && r.innerType.isBasicType =>
+          return l.innerType eq r.innerType
         case (l: TypedAST.NullableType, r: TypedAST.NullableType) =>
           return isSuperType(l.innerType, r.innerType)
         // T? ← T : allowed (widening)
@@ -2353,11 +2367,24 @@ object TypedAST {
           right eq BasicType.VOID
 
     /** Check if all types in arg1 are supertypes of corresponding types in arg2 */
+    /** Overload specificity for one parameter: is `left` at least as general as `right`?
+      * Assignability, except that two nullable primitives rank by their primitives:
+      * `Int?` does not convert to `Long?` (#2730), yet `f(Int?)` is still more specific
+      * than `f(Long?)`, as `f(Int)` is than `f(Long)`. */
+    def isSuperTypeForSpecificity(left: TypedAST.Type, right: TypedAST.Type): Boolean =
+      (left, right) match {
+        case (l: TypedAST.NullableType, r: TypedAST.NullableType)
+            if l.innerType.isBasicType && r.innerType.isBasicType =>
+          isSuperType(l.innerType, r.innerType)
+        case _ => isSuperType(left, right)
+      }
+
+    /** Overload specificity over a parameter list: see `isSuperTypeForSpecificity`. */
     def isAllSuperType(arg1: Array[TypedAST.Type], arg2: Array[TypedAST.Type]): Boolean = {
       val limit = if (arg1.length < arg2.length) arg1.length else arg2.length
       var i = 0
       while (i < limit) {
-        if (!isSuperType(arg1(i), arg2(i))) return false
+        if (!isSuperTypeForSpecificity(arg1(i), arg2(i))) return false
         i += 1
       }
       true

@@ -227,6 +227,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
       DuplicationChecks.checkOverrideContracts(typing, clazz, node.location)
       DuplicationChecks.checkOverrideTargets(typing, clazz, node.location)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
+      DuplicationChecks.checkConflictingInterfaceDefaults(typing, clazz, node.location)
       DuplicationChecks.checkErasureSignatureCollisions(typing, clazz, node.location)
     }
 
@@ -246,9 +247,26 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
         // Keyed on the type argument's full name: `Show[a.Foo]` and `Show[b.Foo]` are two
         // instances even though both lower to `Show$$Foo`.
         val key = (traitRaw.name, typeArg.getOrElse(node.name))
-        if (typing.traitInstances.contains(key))
+        if (typing.traitInstances.contains(key) || shippedInstanceExists(traitRaw, node.name, typeArg))
           typing.report(SemanticError.DUPLICATE_TRAIT_INSTANCE, node, traitType.displayName)
         else typing.traitInstances(key) = clazz.name
+      }
+    }
+
+  /** Whether a trait read from the classpath (`onion.typeclass.Numeric`) already ships an
+    * instance for this type beside it (`onion.typeclass.Numeric$$Integer`). A user instance
+    * for the same type would be a second one: which of the two a `[T: Trait]` dictionary got
+    * would depend on the caller's package (#2964). */
+  private def shippedInstanceExists(traitRaw: ClassType, mangled: String, typeArg: Option[String]): Boolean =
+    !traitRaw.isInstanceOf[ClassDefinition] && {
+      val i = traitRaw.name.lastIndexOf('.')
+      val pkg = if (i >= 0) traitRaw.name.substring(0, i) else null
+      typing.load(typing.createFQCN(pkg, mangled)).exists { c =>
+        !c.isInstanceOf[ClassDefinition] && c.interfaces.exists {
+          case a: AppliedClassType if a.raw.name == traitRaw.name =>
+            typeArg.forall(t => a.typeArguments.headOption.forall(arg => TraitInstanceKeys.typeArgumentName(arg) == t))
+          case c2 => c2.name == traitRaw.name
+        }
       }
     }
 
@@ -275,6 +293,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
         typing, clazz, node.location, skipObject = true, memberLocations = node.args.map(a => a.name -> a.location).toMap)
       DuplicationChecks.checkRecordFinalObjectOverrides(typing, clazz, node.args.map(_.name).toSet, node.location)
       DuplicationChecks.checkAbstractMethodImplementation(typing, clazz, node.location)
+      DuplicationChecks.checkConflictingInterfaceDefaults(typing, clazz, node.location)
     }
 
   // A component name repeated in the record's parameter list (`record R(a: Int, a: Int)`)

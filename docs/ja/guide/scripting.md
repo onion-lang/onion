@@ -26,7 +26,7 @@ println("hello")
 ```onion
 val opts = Args::parse(args)
 
-if opts.flag("verbose") { ... }          // --verbose または -v
+if opts.flag("verbose") { ... }          // --verbose（-v は flag("v")）
 val out = opts.option("output", "a.txt") // --output=x または --output x
 val n = opts.intOption("count", 1)       // デフォルト付きの数値
 val files = opts.positional()            // それ以外すべて
@@ -112,7 +112,7 @@ val one  = Access::parse(line)                          // Access?（不一致�
 
 ## シリアライズの導出（derive!）
 
-`derive!(Json)` / `derive!(Yaml)` でレコードの形から双方向のシリアライズを導出します。`derive!` は型クラスではなくマクロです（`!` が展開の印）。
+`derive!(Json)` / `derive!(Yaml)` でレコードの形から双方向のシリアライズを導出します。`derive!` は型クラスではなくマクロです（`!` が展開の印）。導出されるメソッドは static です。`u.toJson()` ではなく `User::toJson(u)` と呼びます。
 
 ```onion
 record User(name: String, age: Int) derive!(Json, Yaml)

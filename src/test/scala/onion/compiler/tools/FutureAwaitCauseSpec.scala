@@ -60,5 +60,17 @@ class FutureAwaitCauseSpec extends AbstractShellSpec {
       )
       assert(result == Shell.Success("Future.awaitTimeout() failed (For input string: \"nope\")"))
     }
+
+    it("does not hang when the cause chain is a cycle (#2784)") {
+      val result = run(
+        """    val a = new RuntimeException("a")
+          |    val b = new RuntimeException("b")
+          |    a.initCause(b)
+          |    b.initCause(a)
+          |    val f = Future::failed[String](a)
+          |    try { f.await(); return "no error" } catch e: RuntimeException { return e.getMessage() }""".stripMargin
+      )
+      assert(result == Shell.Success("Future.await() failed (b)"))
+    }
   }
 }

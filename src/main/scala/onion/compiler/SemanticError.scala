@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0115) for identification
+ * type checking. Each error has a unique code (E0000-E0116) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -35,10 +35,10 @@ package onion.compiler
  * '''Access Errors (E0013-E0015)'''
  *   - METHOD_NOT_ACCESSIBLE, FIELD_NOT_ACCESSIBLE, CLASS_NOT_ACCESSIBLE
  *
- * '''Inheritance Errors (E0016, E0018, E0023, E0037-E0039, E0068, E0072, E0104)'''
+ * '''Inheritance Errors (E0016, E0018, E0023, E0037-E0039, E0068, E0072, E0104, E0116)'''
  *   - CYCLIC_INHERITANCE, ILLEGAL_INHERITANCE, INTERFACE_REQUIRED
  *   - UNIMPLEMENTED_ABSTRACT_METHOD, ABSTRACT_CLASS_INSTANTIATION, FINAL_METHOD_OVERRIDE
- *   - OVERRIDE_TARGET_NOT_FOUND, ABSTRACT_METHOD_WITH_BODY, OVERRIDE_RETURN_TYPE_MISMATCH
+ *   - OVERRIDE_TARGET_NOT_FOUND, ABSTRACT_METHOD_WITH_BODY, OVERRIDE_RETURN_TYPE_MISMATCH, CONFLICTING_INTERFACE_DEFAULTS
  *   (E0017, E0024, E0056, E0064, E0065, E0074, E0075, and E0080 are retired codes, kept unassigned rather than reused.)
  *
  * '''Call and Value-Use Errors (E0019-E0020, E0040-E0041, E0071, E0091-E0092)'''
@@ -403,6 +403,12 @@ object SemanticError {
    * AbstractMethodError (issue #2656). Java rejects it as well.
    */
   case object SUPER_CALL_ABSTRACT_METHOD extends SemanticError(115)
+  /**
+   * A concrete class inherits two or more unrelated interface defaults for one method and does not
+   * override it: the call compiled, then threw AbstractMethodError (issue #2835). Java rejects the
+   * class as well.
+   */
+  case object CONFLICTING_INTERFACE_DEFAULTS extends SemanticError(116)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

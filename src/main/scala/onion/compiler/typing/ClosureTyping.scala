@@ -714,14 +714,13 @@ final class ClosureTyping(
   }
 
   /**
-   * Whether a block lambda body ends in an expression that can be its value: not an
-   * assignment (`count = n` stays a statement), and not a `return`/`throw`/`break`/
-   * `continue`, which already end the path.
+   * Whether a block lambda body ends in an expression that can be its value: anything
+   * but a `return`/`throw`/`break`/`continue`, which already end the path. An
+   * assignment counts, as it does in a lambda with no `return` (`{ k += 7 }` returns
+   * the new value).
    */
   private def hasValueTail(node: AST.BlockExpression): Boolean = node.elements.lastOption match {
-    case Some(_: AST.Assignment | _: AST.AdditionAssignment | _: AST.SubtractionAssignment |
-              _: AST.MultiplicationAssignment | _: AST.DivisionAssignment | _: AST.ModuloAssignment |
-              _: AST.ReturnExpression | _: AST.ThrowExpression |
+    case Some(_: AST.ReturnExpression | _: AST.ThrowExpression |
               _: AST.BreakExpression | _: AST.ContinueExpression) => false
     case Some(_: AST.Expression) => true
     case _ => false

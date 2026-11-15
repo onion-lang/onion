@@ -93,19 +93,44 @@ class ClosureTrailingValueSpec extends AbstractShellSpec {
       assert(Shell.Success(16) == result)
     }
 
-    it("keeps a void last expression a statement") {
+    it("returns an assignment's value, as a lambda with no return does") {
       val result = run(
-        """    var hits = 0
-          |    val f: (Boolean) -> Object = (c) -> {
+        """    var k = 0
+          |    val f: (Boolean) -> Int = (c) -> { k += 7 }
+          |    val g: (Boolean) -> Int = (c) -> {
+          |      if c { return 5 }
+          |      k += 7
+          |    }
+          |    var hits = 0
+          |    val h: (Boolean) -> Object = (c) -> {
           |      if c { return "x" }
           |      hits = hits + 1
           |    }
-          |    val g: (Boolean) -> Object = (c) -> {
+          |    return f(false) + g(false) + g(true) * 100 + (if h(false).toString() == "1" { 1000 } else { 0 })""".stripMargin)
+      // f: 7, g(false): 14, g(true): 5, h(false): 1
+      assert(Shell.Success(1521) == result)
+    }
+
+    it("returns an assignment's value through an inferred return type") {
+      val result = run(
+        """    val xs: List[Int] = [1, -2, 3]
+          |    val ys = xs.map { x ->
+          |      if x < 0 { return 0 }
+          |      var y = x
+          |      y = y * 10
+          |    }
+          |    return ys[0] + ys[1] + ys[2]""".stripMargin)
+      assert(Shell.Success(40) == result)
+    }
+
+    it("keeps a void last expression a statement") {
+      val result = run(
+        """    val g: (Boolean) -> Object = (c) -> {
           |      if c { return "x" }
           |      IO::print("")
           |    }
-          |    return (if f(false) == null { 1 } else { 0 }) + (if g(false) == null { 10 } else { 0 })""".stripMargin)
-      assert(Shell.Success(11) == result)
+          |    return if g(false) == null { 10 } else { 0 }""".stripMargin)
+      assert(Shell.Success(10) == result)
     }
 
     it("still ends in a throw") {

@@ -204,13 +204,13 @@ final class AssignmentTyping(
         // Pre-compute the field's (substituted) type so the RHS is target-typed
         // -- lets `this.items = []` adopt List[T] rather than defaulting Object.
         val fieldExpected: Type =
-          if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
+          if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition, targetType)) {
             val subst = TypeSubstitution.hierarchySubstitution(target.`type`, field.affiliation, TypeSubstitution.isSelfReceiver(target))
             TypeSubstitution.substituteType(field.`type`, subst, scala.collection.immutable.Map.empty, defaultToBound = false)
           } else null
         val value: Term = typed(expression, context, fieldExpected).getOrElse(null)
         if (value == null) return null
-        if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
+        if (field != null && MemberAccess.isMemberAccessible(field, bodyContext.definition, targetType)) {
           if (Modifier.isFinal(field.modifier) && (context.constructor == null || !target.isInstanceOf[This])) {
             bodyContext.report(CANNOT_ASSIGN_TO_VAL, selection, field.name)
             return null
@@ -231,7 +231,7 @@ final class AssignmentTyping(
           bodyContext.report(FIELD_NOT_ACCESSIBLE, selection, targetType, name, bodyContext.definition)
           return null
         }
-        tryFindMethod(selection, targetType, setter(name), Array[Term](value)) match {
+        tryFindMethod(selection, targetType, setter(name), Array[Term](value), receiver = targetType) match {
           case Right(method) =>
             if (value.`type`.isBottomType) value else new Call(target, method, Array[Term](value))
           case Left(_) =>
@@ -417,8 +417,8 @@ final class AssignmentTyping(
     } yield wider
   }
 
-  private def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Boolean, Method] =
-    body.tryFindMethod(node, target, name, params)
+  private def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term], receiver: Type = null): Either[Boolean, Method] =
+    body.tryFindMethod(node, target, name, params, receiver)
 
   private def types(terms: Array[Term]): Array[Type] =
     body.types(terms)

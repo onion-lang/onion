@@ -59,6 +59,10 @@ class GenericCallNullablePrimitiveSpec extends AbstractShellSpec {
     it("an Int? argument into an Int? result") {
       assert(Shell.Success(3) == run("    val w: Int? = 3\n    val r: Int? = ident(w)\n    return r ?: -1", "Int"))
     }
+    it("a list literal mixing a generic call with null fits List[Int?] (#2693)") {
+      assert(Shell.Success("[5, null]") == run("    val xs: List[Int?] = [ident(5), null]\n    return xs.toString()", "String"))
+      assert(Shell.Success("[null, 6]") == run("    val xs: List[Long?] = [null, ident(6L)]\n    return xs.toString()", "String"))
+    }
     it("String? still works") {
       assert(Shell.Success("s") == run("    val a: String? = ident(\"s\")\n    return a ?: \"\"", "String"))
     }

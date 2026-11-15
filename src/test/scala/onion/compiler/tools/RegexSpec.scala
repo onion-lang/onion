@@ -247,7 +247,7 @@ class RegexSpec extends AbstractShellSpec {
             |class Test {
             |public:
             |  static def main(args: String[]): String {
-            |    // "a1b2c3" split by "[0-9]" gives ["a", "b", "c"] (trailing empty dropped)
+            |    // "a1b2c3" split by "[0-9]" gives ["a", "b", "c"] (no trailing delimiter)
             |    val parts: List[String] = Regex::split("a1b2c3d", "[0-9]");
             |    return parts.size.toString();
             |  }

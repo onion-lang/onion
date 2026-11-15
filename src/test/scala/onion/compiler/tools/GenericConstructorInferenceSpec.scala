@@ -67,4 +67,36 @@ class GenericConstructorInferenceSpec extends AbstractShellSpec {
       box + "def main(args: String[]): String { val b: Box[java.lang.CharSequence] = new Box(\"hi\")\n return b.get().toString() }",
       "None", Array()))
   }
+
+  // #2810: naming the arguments must not change whether the program compiles.
+  private val named = "class NBox[T](val a: T, val b: T)\nclass NPair[A, B](val first: A, val second: B)\n"
+
+  it("infers type arguments from named constructor arguments, in any order") {
+    assert(Shell.Success("12") == shell.run(
+      named + "def main(args: String[]): String { val q = new NBox(b = 2, a = 1)\n return \"\" + q.a + q.b }",
+      "None", Array()))
+  }
+
+  it("infers each type argument when named and positional arguments are mixed") {
+    assert(Shell.Success("HIx") == shell.run(
+      named + "def main(args: String[]): String { val p = new NPair(\"hi\", second = \"x\")\n return p.first.toUpperCase() + p.second }",
+      "None", Array()))
+  }
+
+  it("still reports an unknown parameter name for a bare generic named call") {
+    assert(Shell.Failure(-1) == shell.run(
+      named + "def main(args: String[]): void { val q = new NBox(a = 1, c = 2) }", "None", Array()))
+  }
+
+  it("infers type arguments when a named call leaves a trailing default out") {
+    assert(Shell.Success("1:7") == shell.run(
+      "class TD[T](val a: T, val n: Int = 7)\ndef main(args: String[]): String { val d = new TD(a = 1)\n return \"\" + d.a + \":\" + d.n }",
+      "None", Array()))
+  }
+
+  it("infers type arguments when a named call skips a leading default") {
+    assert(Shell.Success("7:Z") == shell.run(
+      "class LD[T](val n: Int = 7, val a: T)\ndef main(args: String[]): String { val d = new LD(a = \"z\")\n return \"\" + d.n + \":\" + d.a.toUpperCase() }",
+      "None", Array()))
+  }
 }

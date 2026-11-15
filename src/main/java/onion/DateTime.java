@@ -38,7 +38,7 @@ public final class DateTime {
      */
     public static String nowString(String pattern) {
         if (pattern == null) return nowString();
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH));
+        return ZonedDateTime.now(LOCAL).format(patternFormatter(pattern));
     }
 
     // ========== Parsing ==========
@@ -116,8 +116,16 @@ public final class DateTime {
      */
     public static String format(long epochMillis, String pattern) {
         if (pattern == null) return format(epochMillis);
-        LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), LOCAL);
-        return ldt.format(DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH));
+        // A zoned value, so zone and offset letters (z, XXX, VV) work as well.
+        return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), LOCAL).format(patternFormatter(pattern));
+    }
+
+    private static DateTimeFormatter patternFormatter(String pattern) {
+        try {
+            return DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("invalid date-time pattern \"" + pattern + "\"", e);
+        }
     }
 
     // ========== Components ==========
@@ -193,8 +201,9 @@ public final class DateTime {
     }
 
     static long addDays(long epochMillis, int days, ZoneId zone) {
-        LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), zone).plusDays(days);
-        return ldt.atZone(zone).toInstant().toEpochMilli();
+        // ZonedDateTime keeps the offset when it is still valid, so the second 01:30 of a
+        // fall-back night stays the second 01:30 (a LocalDateTime round trip picked the first).
+        return Instant.ofEpochMilli(epochMillis).atZone(zone).plusDays(days).toInstant().toEpochMilli();
     }
 
     /**
@@ -222,16 +231,22 @@ public final class DateTime {
      * Adds months to the given time.
      */
     public static long addMonths(long epochMillis, int months) {
-        LocalDateTime ldt = toLocalDateTime(epochMillis).plusMonths(months);
-        return ldt.atZone(LOCAL).toInstant().toEpochMilli();
+        return addMonths(epochMillis, months, LOCAL);
+    }
+
+    static long addMonths(long epochMillis, int months, ZoneId zone) {
+        return Instant.ofEpochMilli(epochMillis).atZone(zone).plusMonths(months).toInstant().toEpochMilli();
     }
 
     /**
      * Adds years to the given time.
      */
     public static long addYears(long epochMillis, int years) {
-        LocalDateTime ldt = toLocalDateTime(epochMillis).plusYears(years);
-        return ldt.atZone(LOCAL).toInstant().toEpochMilli();
+        return addYears(epochMillis, years, LOCAL);
+    }
+
+    static long addYears(long epochMillis, int years, ZoneId zone) {
+        return Instant.ofEpochMilli(epochMillis).atZone(zone).plusYears(years).toInstant().toEpochMilli();
     }
 
     // ========== Comparison ==========

@@ -393,6 +393,7 @@ object AsmRefs {
   class AsmConstructorRef(method: MethodNode, override val affiliation: TypedAST.ClassType, table: ClassTable, classEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.ConstructorRef {
     override val modifier: Int = toOnionModifier(method.access)
     override val name: String = CONSTRUCTOR_NAME
+    override val isVararg: Boolean = (method.access & Opcodes.ACC_VARARGS) != 0
     private val bridge = new OnionTypeConversion(table)
     private val mapper = new SignatureTypeMapper(table, classEnv, () => table.loadRequired("java.lang.Object"))
     private val parsed =

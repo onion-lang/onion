@@ -23,7 +23,7 @@ final class MethodLookupSupport(
     }
   }
 
-  def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[Boolean, Method] = {
+  def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term], receiver: Type = null): Either[Boolean, Method] = {
     val methods = MethodResolution.findMethods(target, name, params, bodyContext.table)
     if (methods.nonEmpty) {
       if (methods.length > 1) {
@@ -34,7 +34,7 @@ final class MethodLookupSupport(
           Array[AnyRef](methods(1).affiliation, name, methods(1).arguments)
         )
         Left(false)
-      } else if (!MemberAccess.isMemberAccessible(methods(0), bodyContext.definition)) {
+      } else if (!MemberAccess.isMemberAccessible(methods(0), bodyContext.definition, receiver)) {
         bodyContext.report(METHOD_NOT_ACCESSIBLE, node, methods(0).affiliation, name, methods(0).arguments, bodyContext.definition)
         Left(false)
       } else {

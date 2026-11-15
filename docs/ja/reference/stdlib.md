@@ -1212,6 +1212,9 @@ Json::stringify(0.0d / 0.0d)                            // "null"
 // (ネストした record / List / Map も Map の値と同様に再帰的に処理される)
 record Point(x: Int, y: Int)
 Json::stringify(new Point(1, 2))                        // {"x":1,"y":2}
+
+// Set や Java の配列も、反復順の JSON 配列になる
+Json::stringify(Colls::toList(args))                    // ["a","b"]。Json::stringify(args) も同じ
 ```
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。
@@ -1247,6 +1250,9 @@ v["users"][0]["name"].asString()
 val obj = Json::parseOrNull("not json")   // 例外を投げず null
 ```
 
+ネスト（`[` や `{` の入れ子）は 512 段までです。それより深い入力は `Json.JsonParseException`
+（"Nesting too deep"）になり、`parseOrNull` は `null` を返します。
+
 不正入力の失敗をその場で処理したい場合、`Json.JsonParseException` は通常の `message()` に加えて
 `getPosition()`（パースを諦めた位置の文字オフセット）を持っています:
 
@@ -1278,8 +1284,8 @@ flat block mapping ドキュメント、およびそれらのトップレベル 
 対象範囲: flat block mapping、またはそれらのトップレベル block シーケンス
 （要素内のネストした map/シーケンス、アンカー、タグ、flow collection は非対応）。
 この範囲外の構文は、データを静かに失う代わりにエラーを発生させます:
-`Yaml::stringify` はネストした Map/List 値に対して `IllegalArgumentException` を
-投げます。`Yaml::parse` は次の場合に `Yaml.YamlParseException` を投げます:
+`Yaml::stringify` は、ネストした Map/List 値、Map でないリスト要素、空の Map 要素、
+NaN と無限大に対して `IllegalArgumentException` を投げます。`Yaml::parse` は次の場合に `Yaml.YamlParseException` を投げます:
 
 - ネストした mapping: 兄弟の行より深くインデントされた行（トップレベルでも、
   シーケンス要素の中でも）
@@ -1454,6 +1460,7 @@ Config::getWithEnvOverride(config, "database.host", "DB_HOST", "localhost")
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
 Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
+Strings::split("a,b,,", ",")          // ["a","b","",""]: 末尾の空フィールドも残ります
 Strings::join(parts, "-")             // 配列・List どちらも可
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -2225,6 +2232,8 @@ RFC 4180 準拠の自己完結型 CSV パース・シリアライズ（`onion.Cs
 ```onion
 val rows = Csv::parse(text)                  // List of List of String
 val recs = Csv::parseWithHeader(text)        // List of Map（ヘッダー -> 値）
+                                             // 重複ヘッダーは最後の列を使う。
+                                             // 前の列に異なる値があると IllegalArgumentException
 
 Csv::column(rows, 0)                          // 位置指定で1列取得
 Csv::columnByName(recs, "age")                // ヘッダー名で1列取得
@@ -2994,7 +3003,7 @@ Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- リテラル
 ### 分割
 
 ```
-Regex::split(input, pattern): List[String]
+Regex::split(input, pattern): List[String]   // 末尾の空フィールドも残ります: ("x;y;;", ";") は4フィールド
 Regex::split(input, pattern, limit): List[String]
 ```
 

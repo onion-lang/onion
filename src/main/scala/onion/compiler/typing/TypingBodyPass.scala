@@ -151,12 +151,15 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     // Rewriting); type their bodies like ordinary record methods. A record body
     // (`{ access-section* }`) contributes user methods that must have their bodies
     // typed too, mirroring enum bodies. Plain records with neither have nothing to do.
-    if (node.synthesizedMethods.nonEmpty || node.sections.nonEmpty || node.invariants.nonEmpty || node.histories.nonEmpty) {
+    if (node.synthesizedMethods.nonEmpty || node.sections.nonEmpty || node.invariants.nonEmpty || node.histories.nonEmpty ||
+        node.args.exists(_.defaultValue != null)) {
       typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
         unitContext.currentDefinition = definition
         typing.find(definition.name).foreach(unitContext.currentMapper = _)
         val recordTypeParams = typing.declaredTypeParams_.getOrElse(node, Seq())
         typing.openTypeParams(typing.emptyTypeParams ++ recordTypeParams) {
+          // A component default held back by DefaultScheduling is typed here, in source order (#2829).
+          declarationBodySupport.predefineRecordDefaults(node)
           methodBodySupport.processTypeContracts(definition, node.invariants, node.histories)
           // A record is built by a constructor the compiler writes, which assigns the components and
           // runs no user code, so the `invariant` is not checked when one is built. Say so.
@@ -395,6 +398,10 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
     expressionFormTyping.typeCast(node, context)
 
+  /** Whether `source as destination` is accepted, the relation `as` checks. */
+  def isValidCast(source: Type, destination: Type): Boolean =
+    expressionFormTyping.isValidCast(source, destination)
+
   def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
     expressionFormTyping.typeIsInstance(node, context)
 
@@ -402,8 +409,13 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     additionTyping.typeAddition(node, context)
 
   def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = {
+    val mark = typing.mutedBoundErrorMark
     val result = expressionDispatchSupport.typed(node, context, expected)
     result.foreach(term => typing.put(node, term))
+    // A bound error muted while this call was typed belongs to its result; once a typing
+    // with reporting on keeps that term, its bound errors are reported (#2538).
+    typing.claimMutedBoundErrors(mark, node, result)
+    result.foreach(typing.reportBoundErrorsKeptIn)
     result
   }
   def translate(node: AST.BlockElement, context: LocalContext): ActionStatement =
@@ -490,8 +502,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     methodLookupSupport.types(terms)
   private[typing] def typeNames(types: Array[Type]): Array[String] =
     methodLookupSupport.typeNames(types)
-  private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term]): Either[typing.Continuable, Method] =
-    methodLookupSupport.tryFindMethod(node, target, name, params)
+  private[typing] def tryFindMethod(node: AST.Node, target: ObjectType, name: String, params: Array[Term], receiver: Type = null): Either[typing.Continuable, Method] =
+    methodLookupSupport.tryFindMethod(node, target, name, params, receiver)
   private[typing] def tryExtensionOperatorMethod(node: AST.Node, name: String, target: Term, targetType: ObjectType, param: Term, expected: Type): Option[Term] =
     methodCallTyping.tryExtensionOperatorMethod(node, name, target, targetType, param, expected)
 

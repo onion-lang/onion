@@ -224,6 +224,10 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
+    for(unit <- source) {
+      new onion.compiler.typing.TypingHeaderPass(this, session.activate(unit)).checkImports()
+    }
+    processTypeParameters(source)
     for(unit <- source) processOutline(unit)
     // Every unit's defaults are typed before any body, so a call may omit a default
     // declared later in its file or in another file (#2653).
@@ -240,7 +244,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     // Pass 6 (RFC #2557): a contract expression must be pure. Same reason to run here.
     new onion.compiler.typing.ContractPurityPass(this).run(table_.classes.values.toSeq)
     // RFC #2557: a write that breaks a `history`, decided from the syntax alone.
-    new onion.compiler.typing.HistoryWritePass(this).run(source)
+    new onion.compiler.typing.HistoryWritePass(this, typedOf = lookupKernelNode).run(source)
     // RFC #2557 design 4: an override's body against the effective contract.
     new onion.compiler.typing.OverrideContractPass((file, location, message) => {
       warningReporter_.setSourceFile(file)
@@ -268,6 +272,11 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
   def processOutline(unit: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).run()
+  /** Every unit's type parameters, before any unit's outline, so file order does not matter (#2853). */
+  private def processTypeParameters(source: Seq[AST.CompilationUnit]): Unit = {
+    for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameterPlaceholders()
+    for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameters()
+  }
   def processTyping(unit: AST.CompilationUnit): Unit = {
     val pass = new onion.compiler.typing.TypingBodyPass(this, session.activate(unit))
     onion.compiler.typing.DefaultScheduling.run(pass.defaultJobs().map(unit -> _))(u => session.activate(u))
@@ -286,6 +295,49 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     unitContext.reportingSuppressed += 1
     try block
     finally unitContext.reportingSuppressed -= 1
+  }
+
+  /**
+   * Reports a generic call's bound error, or, while reporting is suppressed, keeps it with
+   * the term that call produces (#2538). A bound error does not fail typing, so a
+   * speculative typing whose result is kept would otherwise lose it, and the program would
+   * fail at run time instead. The rule: a kept term reports its bound errors.
+   * [[claimMutedBoundErrors]] ties the kept errors to the term, and
+   * [[reportBoundErrorsKeptIn]] reports those of every term that reaches a final typing.
+   */
+  private[compiler] def reportBoundError(call: AST.Node, error: SemanticError, node: AST.Node, items: AnyRef*): Unit =
+    if (reportingEnabled) report(error, node, items*)
+    else currentUnitContext.mutedBoundErrors += (call -> (() => report(error, node, items*)))
+
+  private[compiler] def mutedBoundErrorMark: Int = currentUnitContext.mutedBoundErrors.length
+
+  /**
+   * Ties the bound errors muted since `mark` for the call `node` itself to `term`, its
+   * result. The rest were found by a typing whose result was not returned here, such as a
+   * speculative re-type the caller judged on its own, and are dropped as before.
+   */
+  private[compiler] def claimMutedBoundErrors(mark: Int, node: AST.Node, term: Option[TypedAST.Term]): Unit = {
+    val ctx = currentUnitContext
+    if (ctx.mutedBoundErrors.length > mark) {
+      val own = ctx.mutedBoundErrors.drop(mark).collect { case (call, report) if call eq node => report }.toList
+      ctx.mutedBoundErrors.dropRightInPlace(ctx.mutedBoundErrors.length - mark)
+      for (t <- term if own.nonEmpty) {
+        val prior = Option(ctx.boundErrorsByTerm.get(t)).getOrElse(Nil)
+        ctx.boundErrorsByTerm.put(t, prior ++ own)
+      }
+    }
+  }
+
+  /** Reports, once, the bound errors kept with `term` or any term beneath it. */
+  private[compiler] def reportBoundErrorsKeptIn(term: TypedAST.Term): Unit = {
+    val kept = currentUnitContext.boundErrorsByTerm
+    if (!kept.isEmpty && reportingEnabled) {
+      TermWalk.exists(term, intoClosures = true, intoResources = true) { node =>
+        val errors = kept.remove(node)
+        if (errors != null) errors.foreach(_())
+        kept.isEmpty
+      }
+    }
   }
 
   /**
@@ -390,6 +442,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     paths.mkString(Systems.pathSeparator)
   private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
     typeSupport.typesOf(arguments)
+
+  private[compiler] def checkInferredTypeArgumentBounds(typeNode: AST.TypeNode, applied: AppliedClassType): Unit =
+    typeSupport.checkInferredTypeArgumentBounds(typeNode, applied)
 
   private[compiler] def mapFrom(typeNode: AST.TypeNode): Option[Type] =
     typeSupport.mapFrom(typeNode)

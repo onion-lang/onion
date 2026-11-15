@@ -490,3 +490,142 @@ println(run())   // Before: zero. Now: one, as when run() is declared below pick
 - **Still fine:** a call below the overloads, and a call that passes every argument.
 - **No `onion migrate` rule:** only you know which overload the call meant. Pass the argument
   (`f(1L)`, `f(1, 1)`) or rename one method.
+
+## A `protected` constructor is checked the same way however the call reaches it
+
+A call that omits a default, passes named arguments, or passes an untyped lambda argument
+(`new A((x) -> x + 1)`) now gets the same access check as a call that passes every argument
+(#2827). So an unrelated class can no longer reach a `protected` constructor that way.
+
+```onion
+class A {
+protected:
+  def this(a: Int, b: Int = 2) { }
+}
+class Other {
+public:
+  def mk(): A = new A(9)          // Before: compiled and ran. Now: E0013
+  def all(): A = new A(9, 2)      // E0013 before and now
+}
+```
+
+- **What you see:** **E0013** `method A.new(Int, Int) is not accessible from class Other.` at the `new`.
+- **Still fine:** the same call from inside `A` or from a subclass of `A`.
+- **To update:** move the constructor under `public:`, or add a `public` factory method to `A`.
+- **No `onion migrate` rule:** widening a constructor's access is a design choice only you can
+  make, so the hint shows the edit instead.
+
+## `Strings::split` and `Regex::split` keep trailing empty fields
+
+Splitting used Java's `String.split`, which drops empty fields at the end. Now they are kept,
+as in Python and JavaScript, so a row with an empty last column keeps that column.
+
+```onion
+val row = Strings::split("alice,30,", ",")
+println(row.size)   // Before: 2, so row[2] threw. Now: 3
+println(row[2])     // Now: "" (an empty string)
+```
+
+- **What changed:** `Strings::split`, `Strings::splitRegex`, and `Regex::split` with a
+  `String` or a `Pattern` keep every field after the last delimiter.
+- **Unchanged:** an input that does not end with the delimiter; an empty delimiter
+  (`Strings::split("abc", "")` is still `[a, b, c]`); `Regex::split(s, p, limit)`;
+  and Java's own `s.split(",")`, which still drops trailing empties.
+- **What you see:** no error. A text that ends with the delimiter gives one more `""` for each
+  delimiter at the end. Splitting lines is the common case: `Strings::split(text, "\n")` on a
+  text that ends with `"\n"` now ends with an empty line.
+- **To keep the old result:**
+  - For lines, call `Strings::lines(text)`. `Strings::lines("l1\nl2\n")` gives `[l1, l2]`, as
+    `split` did before.
+  - For any other delimiter, call `Regex::split(s, pattern, 0)`. It drops every trailing empty
+    field, as before. Its delimiter is a regex, so escape `.` and `|`:
+    `Regex::split("a.b..", "\\.", 0)` gives `[a, b]`.
+- **No `onion migrate` rule:** most calls split text that does not end with the delimiter and
+  give the same result. Only you know whether an empty last field is data (a CSV column) or
+  noise (a final newline), so a rewrite would be wrong for one of them.
+
+## `null` into a type argument that is a primitive is an error
+
+`Int` is never `null` in Onion. A generic slot whose type argument is a primitive
+(`List[Int]`, `(Int) -> T`, `Map[String, Int]`) now rejects `null`, as an `Int` method
+parameter always did (#2872).
+
+```onion
+val f: (Int) -> String = (i) -> "v"
+f(null)                     // Before: W0012, then a crash at run time. Now: E0000
+
+val xs: List[Int] = [1]
+xs.add(null)                // Before: W0012; null was stored. Now: E0000
+
+val ys: List[Int?] = [1]
+ys.add(null)                // fine: the type argument says the slot may be null
+
+val zs: List[Int] = [5, null]   // Before: compiled; the read of zs[1] crashed. Now: E0000 (#2895)
+```
+
+- **What you see:** **E0000** `type Int is expected, but type null is used.` at the `null`,
+  with a hint to write the type argument as `Int?`.
+- **Where:** a method parameter declared with the class's type variable: `f(null)` and
+  `f.call(null)` on a function value, `add`/`set`/`put` on `List` and `Map`, `apply` on a
+  Java functional interface, and a method of your own generic class (`Box[Int].put(null)`).
+  Also a `null` element in a list or map literal written for such a type
+  (`val zs: List[Int] = [5, null]`, `val m: Map[String, Int] = ["b": null]`).
+- **To update:** if `null` is a value you mean to store, declare the type argument nullable:
+  `List[Int?]`, `Map[String, Int?]`, `(Int?) -> T`. Reads then give an `Int?`, so handle
+  `null` there (`?:` or `!!`). Otherwise, pass a real value instead of `null`.
+- **No `onion migrate` rule:** the fix is either a different declared type or a different
+  value, and only you know which one the code means.
+
+## A `protected` method is checked the same way however the call reaches it
+
+A method call that passes named arguments, or an untyped lambda argument
+(`a.lam((x) -> x + 1)`, `a.lam { x -> x + 1 }`), now gets the same access check as a call
+that passes every argument positionally (#2916). So an unrelated class can no longer reach a
+`protected` method that way. This is the method twin of the constructor change above.
+
+```onion
+class A {
+public:
+  def this() { }
+protected:
+  def pim(a: Int, b: Int = 2): Int = a + b
+}
+println(new A().pim(b = 3, a = 7))   // Before: printed 10. Now: E0013
+println(new A().pim(7, 3))           // E0013 before and now
+```
+
+- **What you see:** **E0013** `method A.pim(Int, Int) is not accessible from class ...` at the call.
+- **Still fine:** the same call from inside `A` or from a subclass of `A`.
+- **To update:** move the method under `public:`, or call it from a subclass.
+- **No `onion migrate` rule:** widening a method's access is a design choice only you can
+  make, so the hint shows the edit instead.
+
+## `Yaml::stringify` writes only what `Yaml::parse` reads back
+
+`Yaml::stringify` used to write a list of scalars, an empty Map element and NaN. Other YAML
+tools could read some of that text, but `Yaml::parse` could not read it back. Now
+`Yaml::stringify` throws instead, as it already did for a nested Map (#2806).
+
+```onion
+import { onion.Yaml; onion.Json }
+Yaml::stringify(["apple", "banana"])   // Before: "- apple\n- banana\n". Now: throws
+Json::stringify(["apple", "banana"])   // ["apple","banana"]; JSON is also valid YAML 1.2
+Yaml::stringify(["apple", "banana"].map { x -> ["v": x] })   // - v: apple ...
+```
+
+- **What you see:** `IllegalArgumentException` at run time. Its message names the
+  problem and suggests the edit.
+- **Where:**
+  - a List element that is not a Map: a String, a number, `null`, a List
+  - an empty Map element (`[[:]]`)
+  - a `Double` or `Float` that is NaN or an infinity, anywhere in the value
+  - a record's `toYaml` (`derive!(Yaml)`) and a `shape ... = yaml` `print`, for a NaN or
+    infinite component
+- **Unchanged:** a flat Map, and a List of non-empty flat Maps. Both are written as before.
+- **To update:**
+  - For a list of scalars, call `Json::stringify` (YAML 1.2 tools read JSON), or wrap each
+    element in a Map: `xs.map { x -> ["v": x] }`.
+  - Leave empty Maps out of the list.
+  - Replace NaN or an infinity with a value you choose (`null`, a sentinel) before writing.
+- **No `onion migrate` rule:** the refused input is a value at run time, not a spelling in the
+  source, so no rewrite can find it. The exception's message shows the edit instead.

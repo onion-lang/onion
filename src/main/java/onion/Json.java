@@ -1,6 +1,7 @@
 package onion;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -94,7 +95,9 @@ public final class Json {
 
     /**
      * Convert a Java object to JSON string.
-     * @param obj Object to serialize (Map, List, String, Number, Boolean, or null)
+     * @param obj Object to serialize (Map, List or any other Collection, a Java array,
+     *            a record, String, Number, Boolean, or null). A Collection or array is
+     *            written as a JSON array, in its iteration order.
      * @return JSON string
      */
     public static String stringify(Object obj) {
@@ -329,6 +332,15 @@ public final class Json {
             return at;
         }
 
+        private static final int MAX_DEPTH = 512;
+        private int depth = 0;
+
+        private void enter() throws JsonParseException {
+            if (++depth > MAX_DEPTH) {
+                throw new JsonParseException("Nesting too deep (limit " + MAX_DEPTH + ")", position);
+            }
+        }
+
         Object parseValue() throws JsonParseException {
             skipWhitespace();
             if (isEOF()) {
@@ -338,9 +350,11 @@ public final class Json {
             char c = peek();
             switch (c) {
                 case '{':
-                    return parseObject();
+                    enter();
+                    try { return parseObject(); } finally { depth--; }
                 case '[':
-                    return parseArray();
+                    enter();
+                    try { return parseArray(); } finally { depth--; }
                 case '"':
                     return parseString();
                 case 't':
@@ -612,8 +626,19 @@ public final class Json {
             return obj.toString();
         } else if (obj instanceof Map) {
             return stringifyObject((Map<?, ?>) obj, depth, pretty);
-        } else if (obj instanceof List) {
-            return stringifyArray((List<?>) obj, depth, pretty);
+        } else if (obj instanceof Collection) {
+            // A List keeps its order; a Set or other Collection is written in its own
+            // iteration order. Before #2993 a Set fell through to the toString() fallback.
+            return stringifyArray((Collection<?>) obj, depth, pretty);
+        } else if (obj.getClass().isArray()) {
+            // Object and primitive arrays alike; the fallback below wrote the JVM
+            // identity string ("[I@2d1dee39"), which changes on every run (#2993).
+            int n = java.lang.reflect.Array.getLength(obj);
+            List<Object> items = new ArrayList<>(n);
+            for (int i = 0; i < n; i++) {
+                items.add(java.lang.reflect.Array.get(obj, i));
+            }
+            return stringifyArray(items, depth, pretty);
         } else if (obj.getClass().getAnnotation(OnionRecordMarker.class) != null) {
             return stringifyObject(recordToMap(obj), depth, pretty);
         } else {
@@ -681,7 +706,7 @@ public final class Json {
         return sb.toString();
     }
 
-    private static String stringifyArray(List<?> list, int depth, boolean pretty) {
+    private static String stringifyArray(Collection<?> list, int depth, boolean pretty) {
         if (list.isEmpty()) {
             return "[]";
         }

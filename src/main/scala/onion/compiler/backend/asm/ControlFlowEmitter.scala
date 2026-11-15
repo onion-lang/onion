@@ -114,11 +114,29 @@ final class ControlFlowEmitter(
     for stmt <- node.statements do
       visitStatement(stmt)
 
+  private def tracker: Option[OperandStackTracker] = gen match
+    case d: DebugGeneratorAdapter => Option(d.stackTracker)
+    case _ => None
+
+  /** The operand stack's size now, or -1 when it is not known. */
+  private def stackDepth: Int = tracker.map(_.depth).getOrElse(-1)
+
+  /** A `break`/`continue` inside an operand (`10 + (if c { continue } else { i })`) runs
+    * with the enclosing expression's operands still on the stack; the loop's labels
+    * expect the stack the loop started with, so drop the rest first (#2932). */
+  private def dropOperands(loopDepth: Option[Int]): Unit =
+    for
+      d <- loopDepth
+      t <- tracker
+      pops <- t.popsDownTo(d)
+    do pops.foreach(op => gen.visitInsn(op))
+
   def emitBreak(node: Break): Unit =
     val target = if (node.label != null) loops.endOf(node.label) else loops.currentEnd
     val depth = if (node.label != null) loops.finallyDepthOf(node.label) else loops.currentFinallyDepth
     target match
       case Some(label) =>
+        dropOperands(if (node.label != null) loops.stackDepthOf(node.label) else loops.currentStackDepth)
         // Run any finally blocks entered inside the loop before jumping out.
         depth.foreach(runFinalliesDownTo)
         gen.goTo(label)
@@ -129,6 +147,7 @@ final class ControlFlowEmitter(
     val depth = if (node.label != null) loops.finallyDepthOf(node.label) else loops.currentFinallyDepth
     target match
       case Some(label) =>
+        dropOperands(if (node.label != null) loops.stackDepthOf(node.label) else loops.currentStackDepth)
         depth.foreach(runFinalliesDownTo)
         gen.goTo(label)
       case None => throw new RuntimeException("Continue statement outside of loop")
@@ -182,7 +201,7 @@ final class ControlFlowEmitter(
       val bodyLabel = gen.newLabel()
       val condLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(node.label, condLabel, endLabel, finallyStack.length)
+      loops.push(node.label, condLabel, endLabel, finallyStack.length, stackDepth)
       try
         gen.visitLabel(bodyLabel)
         visitStatement(node.stmt)
@@ -197,7 +216,7 @@ final class ControlFlowEmitter(
       val condLabel = gen.newLabel()
       val continueLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(node.label, continueLabel, endLabel, finallyStack.length)
+      loops.push(node.label, continueLabel, endLabel, finallyStack.length, stackDepth)
       try
         gen.visitLabel(condLabel)
         visitTerm(node.condition)
@@ -212,7 +231,7 @@ final class ControlFlowEmitter(
     else
       val startLabel = gen.newLabel()
       val endLabel = gen.newLabel()
-      loops.push(node.label, startLabel, endLabel, finallyStack.length)
+      loops.push(node.label, startLabel, endLabel, finallyStack.length, stackDepth)
       try
         gen.visitLabel(startLabel)
         visitTerm(node.condition)
@@ -313,22 +332,46 @@ final class ControlFlowEmitter(
     // で、初期化子未実行のスロットも emitCloseResources の ifNull チェックで安全
     // にスキップされる。
     val resourceSlots = new Array[Int](node.resources.length)
+    // A resource a lambda captures lives in a box, as any captured local does (#3031). Its
+    // binding then maps to the box slot, while `resourceSlots` keeps the resource itself for
+    // the close() calls. -1 marks a resource that is not captured.
+    val resourceBoxSlots = Array.fill(node.resources.length)(-1)
     for i <- node.resources.indices do
       val (binding, _) = node.resources(i)
-      // Use getOrAllocateSlot to register the mapping from typing index to bytecode slot
-      // This allows user code in the try block to reference the resource variable
-      val slot = localVars.getOrAllocateSlot(binding.index, asmType(binding.tp))
-      resourceSlots(i) = slot
-      gen.visitInsn(Opcodes.ACONST_NULL)
-      gen.storeLocal(slot)
+      val resourceType = asmType(binding.tp)
+      if localVars.isBoxed(binding.index) then
+        val slot = gen.newLocal(resourceType)
+        resourceSlots(i) = slot
+        gen.visitInsn(Opcodes.ACONST_NULL)
+        gen.storeLocal(slot)
+        val boxType = AsmCodeGeneration.boxAsmType(binding.tp)
+        gen.newInstance(boxType)
+        gen.dup()
+        gen.visitInsn(Opcodes.ACONST_NULL)
+        gen.invokeConstructor(boxType, org.objectweb.asm.commons.Method("<init>", "(Ljava/lang/Object;)V"))
+        val boxSlot = localVars.allocateSlot(binding.index, boxType)
+        gen.storeLocal(boxSlot)
+        resourceBoxSlots(i) = boxSlot
+      else
+        // Use getOrAllocateSlot to register the mapping from typing index to bytecode slot
+        // This allows user code in the try block to reference the resource variable
+        val slot = localVars.getOrAllocateSlot(binding.index, resourceType)
+        resourceSlots(i) = slot
+        gen.visitInsn(Opcodes.ACONST_NULL)
+        gen.storeLocal(slot)
 
     // リソースの初期化子を実際に評価してスロットへ格納する。保護領域の内側
     // (markTryRegionWithResourceClose の先頭)で呼び出される。
     def emitResourceInit(): Unit =
       for i <- node.resources.indices do
-        val (_, init) = node.resources(i)
+        val (binding, init) = node.resources(i)
         visitTerm(init)
         gen.storeLocal(resourceSlots(i))
+        val boxSlot = resourceBoxSlots(i)
+        if boxSlot >= 0 then
+          gen.loadLocal(boxSlot)
+          gen.loadLocal(resourceSlots(i))
+          gen.putField(AsmCodeGeneration.boxAsmType(binding.tp), "value", AsmType.getType(classOf[Object]))
 
     // リソースを逆順でclose()するコードを生成するヘルパー。
     // `primarySlot` が渡された場合はそのスロットに既に伝播中の例外(primary)が

@@ -477,6 +477,73 @@ class JsonSpec extends AbstractShellSpec {
         )
         assert(Shell.Success("\"line1\\nline2\"") == result)
       }
+
+      // #2993: a Java array or a non-List Collection was written as a quoted toString()
+      // ("[I@2d1dee39", "[a]") instead of a JSON array.
+      it("writes a primitive array and a String array as JSON arrays") {
+        val result = shell.run(
+          """
+            |import { onion.Json; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val arr = new Int[3]
+            |    arr[0] = 1
+            |    val names = new String[2]
+            |    names[0] = "x"
+            |    names[1] = "y"
+            |    val empty = new Long[0]
+            |    return Json::stringify(arr) + " " + Json::stringify(names) + " " + Json::stringify(empty)
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("[1,0,0] [\"x\",\"y\"] []") == result)
+      }
+
+      it("writes a Set, and an array or Set nested in a Map, as JSON arrays") {
+        val result = shell.run(
+          """
+            |import { onion.Json; java.util.LinkedHashSet; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val s = new LinkedHashSet[String]()
+            |    s.add("b")
+            |    s.add("a")
+            |    val bytes = new Byte[2]
+            |    bytes[1] = 7 as Byte
+            |    return Json::stringify(s) + " " + Json::stringify(["tags": s, "raw": bytes])
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("[\"b\",\"a\"] {\"tags\":[\"b\",\"a\"],\"raw\":[0,7]}") == result)
+      }
+
+      it("pretty-prints an array like a List") {
+        val result = shell.run(
+          """
+            |import { onion.Json; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val arr = new Int[2]
+            |    arr[1] = 5
+            |    if Json::stringifyPretty(arr) == Json::stringifyPretty([0, 5]) { return "same" }
+            |    return "diff"
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("same") == result)
+      }
     }
 
     describe("stringifyPretty()") {
@@ -787,6 +854,56 @@ class JsonSpec extends AbstractShellSpec {
           Array()
         )
         assert(Shell.Success("[a]") == result)
+      }
+    }
+
+    describe("nesting depth") {
+      it("parseOrNull returns null on 5000 nested arrays instead of overflowing the stack") {
+        val result = shell.run(
+          """
+            |import { onion.Json; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val sb = new StringBuilder()
+            |    for var i: Int = 0; i < 5000; i++ { sb.append("[") }
+            |    for var i: Int = 0; i < 5000; i++ { sb.append("]") }
+            |    val deep = Json::parseOrNull(sb.toString())
+            |    var msg: String = "none"
+            |    try {
+            |      Json::parse(sb.toString())
+            |    } catch e: Json.JsonParseException {
+            |      msg = "threw"
+            |    }
+            |    return "" + (deep == null) + " " + msg
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("true threw") == result)
+      }
+
+      it("still parses 400 nested objects") {
+        val result = shell.run(
+          """
+            |import { onion.Json; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    val sb = new StringBuilder()
+            |    for var i: Int = 0; i < 400; i++ { sb.append("{\"a\":") }
+            |    sb.append("1")
+            |    for var i: Int = 0; i < 400; i++ { sb.append("}") }
+            |    return "" + (Json::parseOrNull(sb.toString()) != null)
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        assert(Shell.Success("true") == result)
       }
     }
   }

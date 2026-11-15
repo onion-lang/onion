@@ -142,7 +142,11 @@ final class ClosureTyping(
           applied
         case _ => typeRef
       }
-      val classSubst = TypeSubstitution.classSubstitution(typeRef)
+      // The interface that declares the method this closure implements: `typeRef` itself, or
+      // the superinterface an inherited SAM lives on (`UnaryOperator[String]` -> its
+      // `Function[String, String]`, #2844).
+      val samHolder = FunctionalInterfaces.functionalView(typeRef)
+      val classSubst = TypeSubstitution.classSubstitution(samHolder)
 
       def substitutedArgs(method: Method): Array[Type] =
         method.arguments.map(tp => TypeCheckingHelpers.effectiveType(
@@ -162,12 +166,12 @@ final class ClosureTyping(
         TypeCheckingHelpers.effectiveType(
           TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
 
-      val implName = implementedMethodName(typeRef, name, argTypes.length)
-      val candidates = typeRef.methods.filter(m => m.name == implName && m.arguments.length == argTypes.length)
+      val implName = implementedMethodName(samHolder, name, argTypes.length)
+      val candidates = samHolder.methods.filter(m => m.name == implName && m.arguments.length == argTypes.length)
       candidates.find(m => sameTypesOrBoxed(substitutedArgs(m), argTypes)) match {
-        case None if candidates.isEmpty && arityMismatch(typeRef, implName, argTypes.length).isDefined =>
+        case None if candidates.isEmpty && arityMismatch(samHolder, implName, argTypes.length).isDefined =>
           bodyContext.report(LAMBDA_ARITY_MISMATCH, node, Integer.valueOf(argTypes.length), typeRef,
-            Integer.valueOf(arityMismatch(typeRef, implName, argTypes.length).get))
+            Integer.valueOf(arityMismatch(samHolder, implName, argTypes.length).get))
           None
         case None =>
           bodyContext.report(METHOD_NOT_FOUND, node, typeRef, implName, argTypes)
@@ -290,7 +294,8 @@ final class ClosureTyping(
       // INCOMPATIBLE_TYPE instead of leaking the synthetic `.call` method and
       // the raw interface's unsubstituted type variable via a later E0005.
       if (inferredTarget != null) {
-        expectedMethodArgs(inferredTarget, implementedMethodName(inferredTarget, node.mname, args.length), args.length) match {
+        val holder = FunctionalInterfaces.functionalView(inferredTarget)
+        expectedMethodArgs(holder, implementedMethodName(holder, node.mname, args.length), args.length) match {
           case Some(expectedArgs) if expectedArgs.length == argTypes.length =>
             var j = 0
             var reported = false
@@ -323,13 +328,14 @@ final class ClosureTyping(
       }
       None
     } else {
-      val implName = implementedMethodName(inferredTarget, node.mname, args.length)
-      expectedMethodArgs(inferredTarget, implName, args.length) match {
+      val holder = FunctionalInterfaces.functionalView(inferredTarget)
+      val implName = implementedMethodName(holder, node.mname, args.length)
+      expectedMethodArgs(holder, implName, args.length) match {
         case None =>
           // No method of that arity: the lambda has the wrong parameter count for the
           // target. Say so (as the typed-parameter form does) instead of returning
           // silently, which let the closure through to a VerifyError or a no-op (#2069).
-          arityMismatch(inferredTarget, implName, args.length) match {
+          arityMismatch(holder, implName, args.length) match {
             case Some(expectedArity) =>
               bodyContext.report(LAMBDA_ARITY_MISMATCH, node, Integer.valueOf(args.length), inferredTarget,
                 Integer.valueOf(expectedArity))
@@ -407,7 +413,8 @@ final class ClosureTyping(
    */
   private[typing] def matchesSam(node: AST.ClosureExpression, context: LocalContext, target: Type): Option[Boolean] = {
     target match {
-      case ct: ClassType =>
+      case target: ClassType =>
+        val ct = FunctionalInterfaces.functionalView(target)
         val raw = ct match { case a: AppliedClassType => a.raw; case _ => ct }
         val abstracts = raw.methods.filter(m => Modifier.isAbstract(m.modifier) && !isPublicObjectMethod(m))
         abstracts.map(_.name).distinct.toList match {
@@ -425,7 +432,11 @@ final class ClosureTyping(
                     Some((bodyReturn == BasicType.VOID) == (samReturn == BasicType.VOID))
                   case None => None
                 }
-              case None => None
+              // No abstract method of the lambda's arity: it cannot fit this SAM, whatever
+              // its body. Answering "unknown" here kept a `(Int) -> Int` overload alive
+              // for `{ x, y -> ... }`, and the tie on the other arguments then went to
+              // whichever overload came first, which varied between passes (#2823).
+              case None => Some(false)
             }
           case _ => None
         }

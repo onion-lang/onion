@@ -230,10 +230,11 @@ private[compiler] object DuplicationChecks {
    * base class or an implemented interface. If nothing is overridden, report
    * OVERRIDE_TARGET_NOT_FOUND.
    *
-   * Conservative by design: an implementation counts as overriding a base method
-   * when they share the same name and the same erased parameter descriptor
-   * (boxing-aware, matching the abstract-method-implementation check). Only when
-   * NO base method matches by name+arity+param-types is the override rejected.
+   * An implementation counts as overriding a base method when they share the same
+   * name and the same erased parameter descriptor. Through an applied generic
+   * supertype a primitive/boxed difference also counts, because codegen bridges it;
+   * through a non-generic one it does not (#2896). Only when NO base method matches
+   * by name+arity+param-types is the override rejected.
    */
   def checkOverrideTargets(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     if clazz.isInterface then return
@@ -254,7 +255,10 @@ private[compiler] object DuplicationChecks {
     // Include both the specialized (type-argument substituted) and the raw erased
     // form, plus boxing variants, so that primitive/boxed parameter forms match.
     // One entry per base method: its boxing-aware patterns and its exact descriptors.
-    final case class BaseContract(patterns: Seq[ErasedParameterPattern], exact: Set[String])
+    // `viaBridge`: the supertype is applied (`G[JInteger]`), so codegen bridges a boxed or
+    // primitive form to it. A non-generic supertype gets no bridge, and `dec(Integer)` beside
+    // an inherited `dec(int)` is an overload that never runs through the base type (#2896).
+    final case class BaseContract(patterns: Seq[ErasedParameterPattern], exact: Set[String], viaBridge: Boolean)
     val baseContracts = mutable.HashMap[(String, Int), mutable.ArrayBuffer[BaseContract]]()
     val baseNames = mutable.HashSet[String]()
     val requestedKeys = overrideMethods.iterator.map(m => (m.name, m.arguments.length)).toSet
@@ -270,7 +274,8 @@ private[compiler] object DuplicationChecks {
               contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
             baseContracts.getOrElseUpdate(key, mutable.ArrayBuffer.empty) += BaseContract(
               Seq(parameterPattern(specializedArgs, typing), parameterPattern(contract.arguments, typing)),
-              Set(erasedParamDescriptor(specializedArgs), erasedParamDescriptor(contract.arguments)))
+              Set(erasedParamDescriptor(specializedArgs), erasedParamDescriptor(contract.arguments)),
+              viaBridge = viewSubst.nonEmpty)
       }
     }
 
@@ -285,7 +290,8 @@ private[compiler] object DuplicationChecks {
         clazz.methods.exists(o => (o ne impl) && o.name == impl.name && !Modifier.isStatic(o.modifier) &&
           o.arguments.length == impl.arguments.length && c.exact.contains(erasedParamDescriptor(o.arguments)))
       val overridesSomething = candidates.exists(c =>
-        c.patterns.exists(implPattern.overlaps) && (c.exact.contains(implExact) || !exactSibling(c)))
+        c.exact.contains(implExact) ||
+          (c.viaBridge && c.patterns.exists(implPattern.overlaps) && !exactSibling(c)))
       if !overridesSomething then
         val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
         val paramDescriptor = impl.arguments.map(_.name).mkString(", ")

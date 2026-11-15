@@ -24,11 +24,19 @@ private[compiler] final class InstanceMethodCallSupport(
 
     val untypedClosureIndices = untypedClosureIndicesOf(node.args)
 
+    // A named closure is typed against its parameter by the named-argument path (#2799),
+    // so it is not typed here with no expected type.
+    val namedClosure = node.args.exists {
+      case named: AST.NamedArgument => ArgumentHelpers.isClosureWithUntypedParams(named.value)
+      case _ => false
+    }
+    val deferred = untypedClosureIndices.nonEmpty || namedClosure
+
     val params =
-      if (untypedClosureIndices.isEmpty) calls.typedTerms(node.args.toArray, context)
+      if (!deferred) calls.typedTerms(node.args.toArray, context)
       else null
 
-    if (params == null && untypedClosureIndices.isEmpty) return None
+    if (params == null && !deferred) return None
 
     calls.normalizeMethodCallTarget(node, target).flatMap { resolved =>
       typeMethodCallOnObject(node, resolved.term, resolved.targetType, params, context, expected)

@@ -63,6 +63,10 @@ class GenericCallNullablePrimitiveSpec extends AbstractShellSpec {
       assert(Shell.Success("[5, null]") == run("    val xs: List[Int?] = [ident(5), null]\n    return xs.toString()", "String"))
       assert(Shell.Success("[null, 6]") == run("    val xs: List[Long?] = [null, ident(6L)]\n    return xs.toString()", "String"))
     }
+    it("a map literal mixing a generic call with null fits Map[String, Int?] (#2894)") {
+      assert(Shell.Success("{a=5, b=null}") == run("    val m: Map[String, Int?] = [\"a\": ident(5), \"b\": null]\n    return m.toString()", "String"))
+      assert(Shell.Success("{a=null, b=6}") == run("    val m: Map[String, Long?] = [\"a\": null, \"b\": ident(6L)]\n    return m.toString()", "String"))
+    }
     it("String? still works") {
       assert(Shell.Success("s") == run("    val a: String? = ident(\"s\")\n    return a ?: \"\"", "String"))
     }

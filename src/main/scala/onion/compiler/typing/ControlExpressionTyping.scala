@@ -183,6 +183,9 @@ final class ControlExpressionTyping(
   def typeWhileExpression(node: AST.WhileExpression, context: LocalContext): Option[Term] =
     Some(statementTerm(translate(node, context), BasicType.VOID, node.location))
 
+  def typeLoopStatement(node: AST.Expression, context: LocalContext): Option[Term] =
+    Some(statementTerm(translate(node, context), BasicType.VOID, node.location))
+
   def typeForExpression(node: AST.ForExpression, context: LocalContext): Option[Term] =
     Some(statementTerm(translate(node, context), BasicType.VOID, node.location))
 

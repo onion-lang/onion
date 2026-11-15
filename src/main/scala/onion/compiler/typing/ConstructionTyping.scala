@@ -243,47 +243,84 @@ final class ConstructionTyping(
    * place rather than silently guessing.
    */
   private def diamondTypeFromArguments(node: AST.NewObject, context: LocalContext): Option[ClassType] = {
-    // A closure argument cannot be typed before its target type is known, and
-    // named arguments take a separate resolution path; both keep the existing
-    // behavior rather than participating in inference.
-    if (node.args.exists(_.isInstanceOf[AST.ClosureExpression])) return None
-    if (hasNamedArguments(node.args)) return None
+    // A closure argument cannot be typed before its target type is known, so a
+    // closure keeps the existing behavior rather than participating in inference.
+    if (node.args.exists(c => c.isInstanceOf[AST.ClosureExpression] ||
+        (c.isInstanceOf[AST.NamedArgument] && c.asInstanceOf[AST.NamedArgument].value.isInstanceOf[AST.ClosureExpression]))) return None
 
     bareGenericTarget(node).flatMap { raw =>
       boundary[Option[ClassType]] {
+        val typeParams = raw.typeParameters
+        val named = hasNamedArguments(node.args)
+
+        // Each candidate constructor with the arguments to type against it, in
+        // parameter order. A named call may leave defaulted parameters out (null
+        // slots); each class type parameter must still be pinned by a real argument.
+        val shaped: List[(ConstructorDefinition, List[AST.Expression])] =
+          if (!named) {
+            raw.constructors.toList.collect {
+              case cd: ConstructorDefinition
+                if cd.getArgs.length == node.args.length ||
+                  (cd.argumentsWithDefaults != null && node.args.length < cd.argumentsWithDefaults.length && node.args.length >= cd.minArguments) =>
+                (cd, node.args)
+            }
+          } else {
+            val namedInfo = extractNamedArgInfo(node.args)
+            filterConstructorsByNamedArgs(raw.constructors.toIndexedSeq, namedInfo).toList.collect {
+              case cd: ConstructorDefinition if cd.argumentsWithDefaults != null =>
+                val params = cd.argumentsWithDefaults
+                val slots = new Array[AST.Expression](params.length)
+                var next = 0
+                var ok = true
+                node.args.foreach {
+                  case n: AST.NamedArgument =>
+                    val i = params.indexWhere(_.name == n.name)
+                    if (i < 0 || slots(i) != null) ok = false else slots(i) = n.value
+                  case e =>
+                    while (next < slots.length && slots(next) != null) next += 1
+                    if (next >= slots.length) ok = false else { slots(next) = e; next += 1 }
+                }
+                // A parameter left out is fine when it has a default: its slot stays
+                // null and is skipped when typing, as a generic method call does.
+                val omittable = params.indices.forall(i => slots(i) != null || params(i).defaultValue.nonEmpty || i >= cd.defaultsOmittableFrom)
+                if (ok && omittable) Some((cd, slots.toList)) else None
+            }.flatten
+          }
+        if (shaped.isEmpty) break(None)
+
         // Probe-type the arguments: a genuine error here is reported once by the
         // real resolution path below, not twice by this speculative pass.
-        val args = typing.withSuppressedReporting(typedTerms(node.args.toArray, context))
-        if (args == null || args.exists(_ == null)) break(None)
-
-        val typeParams = raw.typeParameters
-        val candidates = raw.constructors.collect {
-          case cd: ConstructorDefinition
-            if cd.getArgs.length == args.length ||
-              (cd.argumentsWithDefaults != null && args.length < cd.argumentsWithDefaults.length && args.length >= cd.minArguments) => cd
-        }
-        if (candidates.isEmpty) break(None)
-
-        val solutions: List[List[Type]] = candidates.toList.flatMap { candidate =>
-          val synthetic = new MethodDefinition(
-            node.location,
-            candidate.modifier,
-            raw,
-            "<init>",
-            candidate.getArgs.take(args.length),
-            raw,
-            null,
-            typeParams
-          )
-          val bindings = typing.withSuppressedReporting {
-            GenericMethodTypeArguments.inferWithoutDefaults(
-              typing, node, synthetic, args, scala.collection.immutable.Map.empty)
+        val solutions: List[List[Type]] = shaped.flatMap { case (candidate, ordered) =>
+          val present = ordered.filter(_ != null)
+          val typedPresent = typing.withSuppressedReporting(typedTerms(present.toArray, context))
+          val args: Array[Term] =
+            if (typedPresent == null || typedPresent.exists(_ == null)) null
+            else {
+              var k = 0
+              ordered.toArray.map(e => if (e == null) null else { val t = typedPresent(k); k += 1; t })
+            }
+          if (args == null) None
+          else {
+            val synthetic = new MethodDefinition(
+              node.location,
+              candidate.modifier,
+              raw,
+              "<init>",
+              candidate.getArgs.take(args.length),
+              raw,
+              null,
+              typeParams
+            )
+            val bindings = typing.withSuppressedReporting {
+              GenericMethodTypeArguments.inferWithoutDefaults(
+                typing, node, synthetic, args, scala.collection.immutable.Map.empty)
+            }
+            // Every class type parameter must be pinned by an argument; a partially
+            // inferred type would otherwise silently default the rest to their bound.
+            if (typeParams.forall(tp => bindings.contains(tp.name)))
+              Some(typeParams.map(tp => bindings(tp.name)).toList)
+            else None
           }
-          // Every class type parameter must be pinned by an argument; a partially
-          // inferred type would otherwise silently default the rest to their bound.
-          if (typeParams.forall(tp => bindings.contains(tp.name)))
-            Some(typeParams.map(tp => bindings(tp.name)).toList)
-          else None
         }.distinct
 
         solutions match {

@@ -406,7 +406,7 @@ private[compiler] final class MethodBodySupport(
             formals.length != params0.length || formals.indices.forall { i =>
               params0(i) == null || !TypeRelations.ownViewRejects(bodyContext.table, formals(i), params0(i).`type`)
             }
-          }
+          }.filter(c => superTypeVariableSlotsFit(targetClass, c, params0))
         // Exact matching is substitution-blind: an applied Box[Int] still exposes
         // the constructor as Box(T) over the erased bound (Object), so a primitive
         // argument (Int) does not match. Retry against the type-argument-
@@ -476,6 +476,28 @@ private[compiler] final class MethodBodySupport(
    * type argument (Box[Int]) resolves the erased-Object parent constructor.
    * Mirrors ConstructionTyping.findConstructorWithBoxing for the super path.
    */
+  /** A slot of the parent's constructor that is still a type variable, or mentions one, after
+   *  `extends C[T](..)` substitutes the parent's type arguments takes the assignment rule, as
+   *  `new C[T](..)` does (#2677, #2840): a `List[Number]` is not a `List[T]`, and a primitive
+   *  boxes to an `Integer`, which fits no abstract `T`. Only for an applied parent. */
+  private def superTypeVariableSlotsFit(targetClass: ClassType, c: ConstructorRef, params: Array[Term]): Boolean =
+    targetClass match {
+      case applied: TypedAST.AppliedClassType if params != null =>
+        val classSubst = TypeSubstitution.classSubstitution(applied)
+        val formals = c.getArgs.map(t =>
+          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+        formals.length != params.length || formals.indices.forall { i =>
+          val primitiveIntoVar = params(i) != null && params(i).`type` != null && params(i).`type`.isBasicType &&
+            (formals(i) match {
+              case _: TypedAST.TypeVariableType => true
+              case n: TypedAST.NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
+              case _ => false
+            })
+          !primitiveIntoVar && AssignabilitySupport.typeVariableSlotFits(formals(i), params(i), bodyContext.table)
+        }
+      case _ => true
+    }
+
   private def findSuperConstructorWithBoxing(
     targetClass: ClassType,
     params: Array[Term]
@@ -486,7 +508,8 @@ private[compiler] final class MethodBodySupport(
     val candidates = targetClass.constructors.filter { c =>
       val formals = substitutedArgs(c)
       formals.length == params.length &&
-        formals.indices.forall(i => TypeRelations.isAssignableWithBoxing(formals(i), params(i).`type`, bodyContext.table))
+        formals.indices.forall(i => TypeRelations.isAssignableWithBoxing(formals(i), params(i).`type`, bodyContext.table)) &&
+        superTypeVariableSlotsFit(targetClass, c, params)
     }
     if (candidates.length != 1) (candidates, params)
     else {

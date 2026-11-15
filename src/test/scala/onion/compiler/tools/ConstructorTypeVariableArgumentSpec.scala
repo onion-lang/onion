@@ -203,4 +203,53 @@ class ConstructorTypeVariableArgumentSpec extends AbstractShellSpec {
       assert(result == Shell.Success("234"), out)
     }
   }
+
+  describe("a superclass constructor slot typed by a type variable (#2840)") {
+    def failing(name: String, parent: String, sub: String): Unit =
+      it(name) {
+        val src = parent + sub +
+          """class Test {
+            |public:
+            |  static def main(args: String[]): String { return "ran" }
+            |}
+            |""".stripMargin
+        val (result, out) = run(src)
+        assert(result == Shell.Failure(-1), out)
+        assert(out.contains("E0021"), out)
+      }
+
+    failing("rejects a List[Number] for extends C[T](ys) with T extends Number", boundedC,
+      """class S[T extends Number](ys: List[Number]) extends C[T](ys)
+        |""".stripMargin)
+
+    failing("rejects a primitive for extends Box[T](i) with an unbounded T",
+      """class Box[T] {
+        |public:
+        |  val v: T
+        |  def this(v: T) { this.v = v }
+        |}
+        |""".stripMargin,
+      """class S[T](i: Int) extends Box[T](i)
+        |""".stripMargin)
+
+    it("still accepts the parent's own T and concrete type arguments") {
+      val src =
+        """class Box[T] {
+          |public:
+          |  val v: T
+          |  def this(v: T) { this.v = v }
+          |}
+          |class Same[T](t: T) extends Box[T](t)
+          |class IntBox(i: Int) extends Box[Int](i)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new Same[String]("a").v + new IntBox(7).v
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("a7"), out)
+    }
+  }
 }

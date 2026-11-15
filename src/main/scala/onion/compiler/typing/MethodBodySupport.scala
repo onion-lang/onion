@@ -413,9 +413,14 @@ private[compiler] final class MethodBodySupport(
         // substituted signatures with primitive boxing so that
         // `class IntBox(v: Int) : Box[Int](v)` boxes v into T, mirroring what the
         // `new Box[Int](42)` path already does (ConstructionTyping.findConstructorWithBoxing).
-        val (matched, params) =
+        val (matched1, params1) =
           if matched0.nonEmpty || params0 == null then (matched0, params0)
           else findSuperConstructorWithBoxing(targetClass, params0)
+        val (matched, params) =
+          if matched1.nonEmpty || params0 == null || params0.contains(null) then (matched1, params1)
+          else retypeSuperArguments(targetClass, node.superInits, params0, context) match
+            case Some(retyped) => findSuperConstructorWithBoxing(targetClass, retyped)
+            case None => (matched1, params1)
         // A constructor with defaults takes fewer positional arguments than it
         // declares: `extends A(7)` / `: this(4)` into `def this(a: Int = 1, b: Int = 2)`
         // fills `b`, as `new A(7)` does (#2660).
@@ -469,13 +474,6 @@ private[compiler] final class MethodBodySupport(
           bodyContext.warningReporter.nullToNonNullable(arg.location, f.displayName)
       }
 
-  /**
-   * Boxing-aware super-constructor fallback: substitutes the parent's class type
-   * arguments into each constructor signature, matches with primitive boxing,
-   * and (for the unique match) boxes the primitive argument terms so a primitive
-   * type argument (Box[Int]) resolves the erased-Object parent constructor.
-   * Mirrors ConstructionTyping.findConstructorWithBoxing for the super path.
-   */
   /** A slot of the parent's constructor that is still a type variable, or mentions one, after
    *  `extends C[T](..)` substitutes the parent's type arguments takes the assignment rule, as
    *  `new C[T](..)` does (#2677, #2840): a `List[Number]` is not a `List[T]`, and a primitive
@@ -498,6 +496,46 @@ private[compiler] final class MethodBodySupport(
       case _ => true
     }
 
+  /** A generic call or collection literal passed to `extends C[T](..)` is typed with no expected
+   *  type, so `Collections::emptyList()` is a `List[Object]` that no `List[T]` slot accepts.
+   *  Retype such arguments against the one arity-matching constructor's substituted formals,
+   *  as `new C[T](..)` does (#2840). None when nothing changed. */
+  private def retypeSuperArguments(
+    targetClass: ClassType,
+    args: List[AST.Expression],
+    params: Array[Term],
+    context: LocalContext
+  ): Option[Array[Term]] = {
+    def malleable(e: AST.Expression): Boolean = e match
+      case _: AST.StaticMethodCall | _: AST.UnqualifiedMethodCall | _: AST.NewObject |
+           _: AST.ListLiteral | _: AST.MapLiteral => true
+      case _ => false
+    val candidates = targetClass.constructors.filter(_.getArgs.length == params.length)
+    if params.isEmpty || candidates.length != 1 || !args.exists(malleable) then None
+    else
+      val classSubst = TypeSubstitution.classSubstitution(targetClass)
+      val formals = candidates(0).getArgs.map(t =>
+        TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      val updated = params.clone()
+      var changed = false
+      args.zipWithIndex.foreach { case (arg, i) =>
+        if malleable(arg) && formals(i) != null then
+          typing.withSuppressedReporting(typed(arg, context, formals(i))) match
+            case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
+              updated(i) = term
+              changed = true
+            case _ =>
+      }
+      if changed then Some(updated) else None
+  }
+
+  /**
+   * Boxing-aware super-constructor fallback: substitutes the parent's class type
+   * arguments into each constructor signature, matches with primitive boxing,
+   * and (for the unique match) boxes the primitive argument terms so a primitive
+   * type argument (Box[Int]) resolves the erased-Object parent constructor.
+   * Mirrors ConstructionTyping.findConstructorWithBoxing for the super path.
+   */
   private def findSuperConstructorWithBoxing(
     targetClass: ClassType,
     params: Array[Term]

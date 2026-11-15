@@ -386,5 +386,45 @@ class ConstructorTypeVariableArgumentSpec extends AbstractShellSpec {
       val (result, out) = run(src)
       assert(result == Shell.Success("a7"), out)
     }
+ 
+    it("accepts a zero-argument generic call as a super argument, as new does") {
+      val src =
+        """import { java.util.* }
+          |class C[T] {
+          |public:
+          |  val xs: List[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |}
+          |class E1[T] extends C[T](Collections::emptyList())
+          |class E2[T] extends C[T](List::of())
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new E1[String]().xs + new E2[Int]().xs
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("[][]"), out)
+    }
+
+    it("still rejects a List[Number] argument written as a generic call result") {
+      val src =
+        """import { java.util.* }
+          |class C[T extends Number] {
+          |public:
+          |  val xs: List[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |}
+          |class S[T extends Number](ys: List[Number]) extends C[T](ys)
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "ran" }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(out.contains("E0021"), out)
+    }
   }
 }

@@ -35,7 +35,16 @@ public final class Files {
     }
 
     public static String readText(File file, Charset charset) throws IOException {
-        return new String(java.nio.file.Files.readAllBytes(file.toPath()), charset);
+        return stripBom(new String(java.nio.file.Files.readAllBytes(file.toPath()), charset));
+    }
+
+    /**
+     * Drops a leading U+FEFF: a byte order mark (Windows Notepad's "UTF-8 with BOM") is an
+     * encoding marker, not text, so the first key or line must not carry it. Only a leading
+     * one is dropped; {@link Csv} does the same.
+     */
+    static String stripBom(String text) {
+        return !text.isEmpty() && text.charAt(0) == '\uFEFF' ? text.substring(1) : text;
     }
 
     public static List<String> readLines(String path) throws IOException {
@@ -48,7 +57,7 @@ public final class Files {
                 new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                lines.add(line);
+                lines.add(lines.isEmpty() ? stripBom(line) : line);
             }
         }
         return lines;

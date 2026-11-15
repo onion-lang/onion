@@ -367,6 +367,12 @@ private[typing] object GenericMethodTypeArguments {
                   // binding this same call already inferred from its own
                   // arguments (issue #1972).
                   ()
+                } else if (returnContext && inferredFromArgs.contains(tv.name)) {
+                  // The expected type only disagrees with what the arguments fixed. The call
+                  // keeps the arguments' T, and the use site reports the one mismatch, the
+                  // right way round: `val l: Long? = ident(5)` is "Long? expected, Int used"
+                  // (#2694), not a backwards "Int expected" first.
+                  ()
                 } else {
                   reportError(position, INCOMPATIBLE_TYPE, prev, bound)
                 }

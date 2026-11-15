@@ -432,7 +432,8 @@ public:
 Enums は JVM enum にコンパイルされます: `name()`、`ordinal()`、`values()`、
 `valueOf(String)` が動作します。record スタイルのパラメータは final フィールドになり、
 アクセサが生成されます。定数リストの後に `public:` などのセクションを書いてメソッドを
-宣言できます。enum に対する `select` は、`else` がない場合に網羅性をチェックします。
+宣言できます。パラメータにはデフォルトを書けます（`enum Level(code: Int, tag: String = "")`）。
+引数を省いた定数（`LOW(1)`）にはデフォルトが入ります。record と同じです。enum に対する `select` は、`else` がない場合に網羅性をチェックします。
 
 #### 代数的データ型（`case` case）
 

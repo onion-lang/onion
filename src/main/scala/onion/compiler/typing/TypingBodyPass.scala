@@ -211,11 +211,28 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
       val stringType = typing.loadRequired("java.lang.String")
       definition.constructors.headOption.foreach { ctor =>
         val paramTypes = ctor.getArgs.drop(2)
+        // A parameter default (`enum E(a: Int, b: Int = 7)`, #2948) becomes a default of the
+        // hidden constructor, as a record's does: a constant that omits `b` passes a
+        // DefaultArgument, computed by a synthesized static method that sees `a`. The two
+        // leading slots are the hidden name and ordinal, which never have a default.
+        val defaults: Array[Option[Term]] = ctor match {
+          case generated: ConstructorDefinition if node.params.exists(_.defaultValue != null) =>
+            val hidden = List(
+              AST.Argument(node.location, "$enumName", null),
+              AST.Argument(node.location, "$enumOrdinal", null)
+            )
+            methodBodySupport.predefineConstructorDefaults(generated, hidden ++ node.params)
+            val declared = generated.argumentsWithDefaults
+            paramTypes.indices.map(i => if (declared.length == generated.getArgs.length) declared(i + 2).defaultValue else None).toArray
+          case _ => Array.fill(paramTypes.length)(None)
+        }
         val enumContext = new LocalContext
         enumContext.setStatic(true)
         val statements = scala.collection.mutable.Buffer[ActionStatement]()
         node.constants.zipWithIndex.foreach { case (constant, ordinal) =>
-          if (constant.args.length != paramTypes.length) {
+          val fillsFromDefaults =
+            constant.args.length < paramTypes.length && (constant.args.length until paramTypes.length).forall(i => defaults(i).isDefined)
+          if (constant.args.length != paramTypes.length && !fillsFromDefaults) {
             typing.report(
               SemanticError.CONSTRUCTOR_NOT_FOUND, constant, definition,
               constant.args.map(_ => bodyContext.rootClass: Type).toArray, definition.constructors
@@ -229,7 +246,8 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
             if (typedArgs.forall(_ != null)) {
               val field = definition.field(constant.name)
               val callArgs: Array[Term] =
-                Array[Term](new StringValue(constant.name, stringType), new IntValue(constant.location, ordinal)) ++ typedArgs
+                Array[Term](new StringValue(constant.name, stringType), new IntValue(constant.location, ordinal)) ++ typedArgs ++
+                  (typedArgs.length until paramTypes.length).map(i => defaults(i).get)
               val init = new NewObject(ctor, callArgs)
               statements += new ExpressionActionStatement(new SetStaticField(constant.location, definition, field, init))
             }

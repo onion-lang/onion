@@ -236,7 +236,7 @@ final class ClosureTyping(
                       Option(buildReturnBlock(node.body, bodyTerm, expectedRet))
                     }
                   } else {
-                    Option(body.translate(node.body, context))
+                    Option(returnTrailingValue(node, body.translate(node.body, context), expectedRet))
                   }
                 if (baseBlockOpt.isEmpty) {
                   None
@@ -686,6 +686,36 @@ final class ClosureTyping(
 
     statements += lastStatement
     new StatementBlock(statements.asJava)
+  }
+
+  /**
+   * A block lambda with an early `return` also returns its last expression
+   * (`{ if c { return 1 }; 2 }`), as one with no `return` does. Without this the
+   * expression was evaluated and dropped, and the other path returned null (#3025).
+   * A void last expression (`{ if c { return null }; IO::println("x") }`) stays a
+   * statement, and so does anything a value-returning method would not return.
+   */
+  private def returnTrailingValue(node: AST.ClosureExpression, translated: ActionStatement, returnType: Type): ActionStatement =
+    translated match {
+      case block: StatementBlock
+          if returnType != BasicType.VOID && !returnType.isBottomType &&
+             block.statements.nonEmpty && isValueElement(node.body.elements.lastOption) =>
+        block.statements.last match {
+          case last: ExpressionActionStatement
+              if last.term.`type` != BasicType.VOID && !last.term.`type`.isBottomType =>
+            val assigned = processAssignable(node, returnType, last.term)
+            if (assigned == null) translated
+            else new StatementBlock(block.location, (block.statements.init :+ new Return(last.location, assigned)): _*)
+          case _ => translated
+        }
+      case _ => translated
+    }
+
+  private def isValueElement(element: Option[AST.BlockElement]): Boolean = element match {
+    case Some(_: AST.Assignment | _: AST.AdditionAssignment | _: AST.SubtractionAssignment |
+              _: AST.MultiplicationAssignment | _: AST.DivisionAssignment | _: AST.ModuloAssignment) => false
+    case Some(_: AST.Expression) => true
+    case _ => false
   }
 
   private def termToStatement(term: Term): ActionStatement = term match {

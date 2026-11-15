@@ -332,22 +332,46 @@ final class ControlFlowEmitter(
     // で、初期化子未実行のスロットも emitCloseResources の ifNull チェックで安全
     // にスキップされる。
     val resourceSlots = new Array[Int](node.resources.length)
+    // A resource a lambda captures lives in a box, as any captured local does (#3031). Its
+    // binding then maps to the box slot, while `resourceSlots` keeps the resource itself for
+    // the close() calls. -1 marks a resource that is not captured.
+    val resourceBoxSlots = Array.fill(node.resources.length)(-1)
     for i <- node.resources.indices do
       val (binding, _) = node.resources(i)
-      // Use getOrAllocateSlot to register the mapping from typing index to bytecode slot
-      // This allows user code in the try block to reference the resource variable
-      val slot = localVars.getOrAllocateSlot(binding.index, asmType(binding.tp))
-      resourceSlots(i) = slot
-      gen.visitInsn(Opcodes.ACONST_NULL)
-      gen.storeLocal(slot)
+      val resourceType = asmType(binding.tp)
+      if localVars.isBoxed(binding.index) then
+        val slot = gen.newLocal(resourceType)
+        resourceSlots(i) = slot
+        gen.visitInsn(Opcodes.ACONST_NULL)
+        gen.storeLocal(slot)
+        val boxType = AsmCodeGeneration.boxAsmType(binding.tp)
+        gen.newInstance(boxType)
+        gen.dup()
+        gen.visitInsn(Opcodes.ACONST_NULL)
+        gen.invokeConstructor(boxType, org.objectweb.asm.commons.Method("<init>", "(Ljava/lang/Object;)V"))
+        val boxSlot = localVars.allocateSlot(binding.index, boxType)
+        gen.storeLocal(boxSlot)
+        resourceBoxSlots(i) = boxSlot
+      else
+        // Use getOrAllocateSlot to register the mapping from typing index to bytecode slot
+        // This allows user code in the try block to reference the resource variable
+        val slot = localVars.getOrAllocateSlot(binding.index, resourceType)
+        resourceSlots(i) = slot
+        gen.visitInsn(Opcodes.ACONST_NULL)
+        gen.storeLocal(slot)
 
     // リソースの初期化子を実際に評価してスロットへ格納する。保護領域の内側
     // (markTryRegionWithResourceClose の先頭)で呼び出される。
     def emitResourceInit(): Unit =
       for i <- node.resources.indices do
-        val (_, init) = node.resources(i)
+        val (binding, init) = node.resources(i)
         visitTerm(init)
         gen.storeLocal(resourceSlots(i))
+        val boxSlot = resourceBoxSlots(i)
+        if boxSlot >= 0 then
+          gen.loadLocal(boxSlot)
+          gen.loadLocal(resourceSlots(i))
+          gen.putField(AsmCodeGeneration.boxAsmType(binding.tp), "value", AsmType.getType(classOf[Object]))
 
     // リソースを逆順でclose()するコードを生成するヘルパー。
     // `primarySlot` が渡された場合はそのスロットに既に伝播中の例外(primary)が

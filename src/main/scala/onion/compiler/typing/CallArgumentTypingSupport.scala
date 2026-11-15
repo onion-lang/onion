@@ -197,7 +197,13 @@ private[compiler] final class CallArgumentTypingSupport(
             bodyContext.report(DUPLICATE_ARGUMENT, named, named.name)
             hasError = true
           } else {
-            typed(named.value, context, null) match {
+            // A closure takes its parameter types from the named parameter, as a
+            // positional one does (#2799). Generic parameter types stay untyped here.
+            val declared = argsWithDefaults(paramIndex).argType
+            val expected =
+              if (named.value.isInstanceOf[AST.ClosureExpression] && !TypeCheckingHelpers.containsTypeVariable(declared)) declared
+              else null
+            typed(named.value, context, expected) match {
               case Some(term) =>
                 result(paramIndex) = term
                 filled(paramIndex) = true

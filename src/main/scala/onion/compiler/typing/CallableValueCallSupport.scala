@@ -58,7 +58,7 @@ private[compiler] final class CallableValueCallSupport(
           case targetType: ObjectType =>
             val fieldTerm: Term =
               if ((field.modifier & AST.M_STATIC) != 0) new RefStaticField(node.location, owner, field)
-              else new RefField(new This(owner), field)
+              else new RefField(if (context.isClosure) new OuterThis(owner) else new This(owner), field)
             return callOnTarget(fieldTerm, targetType)
           case nullable: NullableType if hasCallMethod(nullable.innerType) => return reportNullable(nullable)
           case _ =>

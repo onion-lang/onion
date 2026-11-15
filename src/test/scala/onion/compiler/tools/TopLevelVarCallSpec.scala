@@ -35,4 +35,33 @@ class TopLevelVarCallSpec extends AbstractShellSpec {
       assert(result == ((Shell.Success(null), "7")))
     }
   }
+
+  describe("calling an instance field that holds a function") {
+    it("works from a lambda in an instance method") {
+      val result = run(
+        """class C {
+          |  var inf: () -> Int = () -> 4
+          |public:
+          |  def this {}
+          |  def k(): Int { val l: () -> Int = () -> inf(); return l() }
+          |}
+          |IO::println(new C().k())""".stripMargin)
+      assert(result == ((Shell.Success(null), "4")))
+    }
+
+    it("works from a nested lambda and passes arguments") {
+      val result = run(
+        """class C {
+          |  var add: (Int) -> Int = (x: Int) -> x + 1
+          |public:
+          |  def this {}
+          |  def k(): Int {
+          |    val outer: () -> Int = () -> { val inner: () -> Int = () -> add(9); inner() }
+          |    return outer()
+          |  }
+          |}
+          |IO::println(new C().k())""".stripMargin)
+      assert(result == ((Shell.Success(null), "10")))
+    }
+  }
 }

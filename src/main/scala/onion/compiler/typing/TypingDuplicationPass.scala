@@ -34,7 +34,7 @@ final class TypingDuplicationPass(private val typing: Typing, private val unitCo
     typing.kernelNodeOf[T](ast).foreach(f)
 
   def run(): Unit = {
-    typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
+    typing.findTopClassMapper.foreach(unitContext.currentMapper = _)
     seenGlobalVariables.clear()
     seenFunctions.clear()
     seenFunctionErasures.clear()

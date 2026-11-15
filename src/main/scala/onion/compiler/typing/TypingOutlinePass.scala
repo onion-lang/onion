@@ -33,7 +33,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   private def loadRequired(name: String): ClassType =
     typing.loadRequired(name)
   private def loadTopClass: ClassType =
-    typing.loadRequired(typing.topClass)
+    typing.loadTopClass.orNull
   // Outline-pass type references are all declared positions (return types,
   // fields, globals, throws, inheritance, extension receivers), so raw generic
   // types are forbidden here.
@@ -59,7 +59,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
    * type-parameter arity (Object bounds) for every generic type in this unit.
    */
   def registerTypeParameterPlaceholders(): Unit = {
-    find(topClass).foreach(unitContext.currentMapper = _)
+    typing.findTopClassMapper.foreach(unitContext.currentMapper = _)
     // Phase A: register a placeholder type-parameter arity (Object bounds) for every
     // generic type BEFORE any bounds are resolved, so a self-referential bound like
     // `class C[T extends C[T]]` can resolve `C[T]` (C is already known to be generic)
@@ -113,7 +113,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   }
 
   def run(): Unit = {
-    find(topClass).foreach(unitContext.currentMapper = _)
+    typing.findTopClassMapper.foreach(unitContext.currentMapper = _)
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)

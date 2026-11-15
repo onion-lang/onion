@@ -429,7 +429,21 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   /** Loads a class the compiler itself depends on; throws if the classpath is broken. */
   def loadRequired(name: String): ClassType = table_.loadRequired(name)
   /** The top-level container class; absent when the unit has only type declarations. */
-  def loadTopClass: Option[ClassType] = table_.load(topClass)
+  def loadTopClass: Option[ClassType] = if (ownsTopClass) table_.load(topClass) else None
+  /** Which unit's top-level code became each container class (`xMain`). */
+  private[compiler] val topLevelContainerOwners = scala.collection.mutable.Map[String, AST.CompilationUnit]()
+  /** Units with top-level code whose container name another unit took (already E0008, #2690). */
+  private[compiler] val duplicateScriptUnits =
+    java.util.Collections.newSetFromMap(new java.util.IdentityHashMap[AST.CompilationUnit, java.lang.Boolean]())
+  /**
+   * False when another file with the same name owns `topClass`: a class-only `e1/y.on`
+   * must not take `e2/y.on`'s `yMain` as its own (#2956). A duplicate script still types
+   * against the other file's container, so it reports its E0008 and nothing else.
+   */
+  private[compiler] def ownsTopClass: Boolean =
+    topLevelContainerOwners.get(topClass).forall(_ eq unit_) || duplicateScriptUnits.contains(unit_)
+  /** The name resolver of this unit's own container, if it has one. */
+  private[compiler] def findTopClassMapper: Option[NameResolver] = if (ownsTopClass) find(topClass) else None
   def loadArray(base: Type, dimension: Int): ArrayType = table_.loadArray(base, dimension)
   def rootClass: ClassType = table_.rootClass
   def problems: Array[CompileError] = diagnostics.problems

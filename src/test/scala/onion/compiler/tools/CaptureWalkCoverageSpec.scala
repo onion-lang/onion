@@ -107,4 +107,31 @@ class CaptureWalkCoverageSpec extends AbstractShellSpec {
       assert(result == Shell.Success("s=1 a=1 b=2"))
     }
   }
+
+  describe("a lambda with a return nested in a loop the capture walk now visits") {
+    // #3025 drops the last expression of a lambda whose body has an early return. Until it is
+    // fixed, the early-return detector must keep its old reach, or these lambdas regress.
+    it("still returns its last expression after a return inside do/while") {
+      val result = runMain(
+        """    val d = (x: Int) -> {
+          |      do { if x > 0 { return "pos" } } while false
+          |      "neg"
+          |    }
+          |    return d(-1) + "," + d(1)""".stripMargin, "ReturnInDoWhile.on")
+      assert(result == Shell.Success("neg,pos"))
+    }
+
+    it("still returns its last expression after a return inside a labelled loop") {
+      val result = runMain(
+        """    val d = (x: Int) -> {
+          |      outer: while true {
+          |        if x > 0 { return "pos" }
+          |        break
+          |      }
+          |      "neg"
+          |    }
+          |    return d(-1) + "," + d(1)""".stripMargin, "ReturnInLabeled.on")
+      assert(result == Shell.Success("neg,pos"))
+    }
+  }
 }

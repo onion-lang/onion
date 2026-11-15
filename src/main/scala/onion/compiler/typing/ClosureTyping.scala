@@ -239,8 +239,15 @@ final class ClosureTyping(
                     body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
                       Option(buildReturnBlock(node.body, bodyTerm, expectedRet))
                     }
+                  } else if (hasValueTail(node.body)) {
+                    // A block lambda with an early `return` returns its last expression
+                    // by the same rule as one without (#3025): the tail is typed against
+                    // the expected return type, as one more `return`.
+                    body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
+                      Option(buildTailReturnBlock(node.body, bodyTerm, expectedRet))
+                    }
                   } else {
-                    Option(returnTrailingValue(node, body.translate(node.body, context), expectedRet))
+                    Option(body.translate(node.body, context))
                   }
                 if (baseBlockOpt.isEmpty) {
                   None
@@ -619,10 +626,17 @@ final class ClosureTyping(
         body.openClosure(context) {
           if (addClosureArguments(node.args, argTypes, context, node.body).isDefined) {
             val collected = context.startReturnTypeCollection()
-            val translated = body.translate(node.body, context)
+            // The last expression counts as one more `return` (#3025).
+            val (translated, tailType) =
+              if (hasValueTail(node.body)) {
+                body.typed(node.body, context, samReturnTemplate) match {
+                  case Some(term) => (term, Option(lastTerm(term).`type`))
+                  case None => (null, None)
+                }
+              } else (body.translate(node.body, context), None)
             context.stopReturnTypeCollection()
             if (translated != null) {
-              result = foldReturnLub(node, collected.toSeq)
+              result = foldReturnLub(node, collected.toSeq ++ tailType.filter(_ != BasicType.VOID))
             }
           }
         }
@@ -700,33 +714,49 @@ final class ClosureTyping(
   }
 
   /**
-   * A block lambda with an early `return` also returns its last expression
-   * (`{ if c { return 1 }; 2 }`), as one with no `return` does. Without this the
-   * expression was evaluated and dropped, and the other path returned null (#3025).
-   * A void last expression (`{ if c { return null }; IO::println("x") }`) stays a
-   * statement, and so does anything a value-returning method would not return.
+   * Whether a block lambda body ends in an expression that can be its value: not an
+   * assignment (`count = n` stays a statement), and not a `return`/`throw`/`break`/
+   * `continue`, which already end the path.
    */
-  private def returnTrailingValue(node: AST.ClosureExpression, translated: ActionStatement, returnType: Type): ActionStatement =
-    translated match {
-      case block: StatementBlock
-          if returnType != BasicType.VOID && !returnType.isBottomType &&
-             block.statements.nonEmpty && isValueElement(node.body.elements.lastOption) =>
-        block.statements.last match {
-          case last: ExpressionActionStatement
-              if last.term.`type` != BasicType.VOID && !last.term.`type`.isBottomType =>
-            val assigned = processAssignable(node, returnType, last.term)
-            if (assigned == null) translated
-            else new StatementBlock(block.location, (block.statements.init :+ new Return(last.location, assigned)): _*)
-          case _ => translated
-        }
-      case _ => translated
-    }
-
-  private def isValueElement(element: Option[AST.BlockElement]): Boolean = element match {
+  private def hasValueTail(node: AST.BlockExpression): Boolean = node.elements.lastOption match {
     case Some(_: AST.Assignment | _: AST.AdditionAssignment | _: AST.SubtractionAssignment |
-              _: AST.MultiplicationAssignment | _: AST.DivisionAssignment | _: AST.ModuloAssignment) => false
+              _: AST.MultiplicationAssignment | _: AST.DivisionAssignment | _: AST.ModuloAssignment |
+              _: AST.ReturnExpression | _: AST.ThrowExpression |
+              _: AST.BreakExpression | _: AST.ContinueExpression) => false
     case Some(_: AST.Expression) => true
     case _ => false
+  }
+
+  private def lastTerm(bodyTerm: Term): Term = bodyTerm match {
+    case begin: Begin if begin.terms.nonEmpty => begin.terms.last
+    case single => single
+  }
+
+  /**
+   * The body of a block lambda that has an early `return` and a value tail: the
+   * tail becomes one more `return`. A tail with no value (void, or one that never
+   * completes) stays a statement, and the caller appends the default return, as
+   * before. Returns null when the tail's type does not fit (reported).
+   */
+  private def buildTailReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type): ActionStatement = {
+    val terms = bodyTerm match {
+      case begin: Begin => begin.terms.toIndexedSeq
+      case single => IndexedSeq(single)
+    }
+    val statements = scala.collection.mutable.ArrayBuffer[ActionStatement]()
+    terms.init.foreach(t => statements += termToStatement(t))
+    if (terms.nonEmpty) {
+      val last = terms.last
+      if (returnType == BasicType.VOID || returnType.isBottomType ||
+          last.`type` == BasicType.VOID || last.`type`.isBottomType) {
+        statements += termToStatement(last)
+      } else {
+        val assigned = processAssignable(node, returnType, last)
+        if (assigned == null) return null
+        statements += new Return(assigned)
+      }
+    }
+    new StatementBlock(statements.asJava)
   }
 
   private def termToStatement(term: Term): ActionStatement = term match {

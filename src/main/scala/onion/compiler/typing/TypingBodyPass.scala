@@ -229,25 +229,53 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
         val enumContext = new LocalContext
         enumContext.setStatic(true)
         val statements = scala.collection.mutable.Buffer[ActionStatement]()
+        // A constant's arguments bind as `new R(...)` binds a record's (#3062, #3064): positional
+        // ones first, then `name = expr` by name; an unbound parameter takes its default.
+        val paramNames = node.params.map(_.name)
         node.constants.zipWithIndex.foreach { case (constant, ordinal) =>
-          val fillsFromDefaults =
-            constant.args.length < paramTypes.length && (constant.args.length until paramTypes.length).forall(i => defaults(i).isDefined)
-          if (constant.args.length != paramTypes.length && !fillsFromDefaults) {
+          val slots = new Array[AST.Expression](paramTypes.length)
+          var sawNamed = false
+          var hasError = false
+          var positional = 0
+          constant.args.foreach {
+            case named: AST.NamedArgument =>
+              sawNamed = true
+              val index = paramNames.indexOf(named.name)
+              if (index < 0 || index >= slots.length) {
+                bodyContext.report(SemanticError.UNKNOWN_PARAMETER_NAME, named, named.name, paramNames.toArray)
+                hasError = true
+              } else if (slots(index) != null) {
+                bodyContext.report(SemanticError.DUPLICATE_ARGUMENT, named, named.name)
+                hasError = true
+              } else slots(index) = named.value
+            case expr =>
+              if (sawNamed) {
+                bodyContext.report(SemanticError.POSITIONAL_AFTER_NAMED, expr)
+                hasError = true
+              } else {
+                if (positional < slots.length) slots(positional) = expr
+                positional += 1
+              }
+          }
+          val complete = positional <= slots.length && slots.indices.forall(i => slots(i) != null || defaults(i).isDefined)
+          if (hasError) {
+            // already reported
+          } else if (!complete) {
             typing.report(
               SemanticError.CONSTRUCTOR_NOT_FOUND, constant, definition,
               constant.args.map(_ => bodyContext.rootClass: Type).toArray, definition.constructors
             )
           } else {
-            val typedArgs = constant.args.zip(paramTypes).map { case (argExpr, expected) =>
-              typed(argExpr, enumContext, expected).map { term =>
-                assignabilitySupport.processAssignable(argExpr, expected, term)
+            val typedArgs = slots.indices.map { i =>
+              if (slots(i) == null) defaults(i).get
+              else typed(slots(i), enumContext, paramTypes(i)).map { term =>
+                assignabilitySupport.processAssignable(slots(i), paramTypes(i), term)
               }.orNull
             }
             if (typedArgs.forall(_ != null)) {
               val field = definition.field(constant.name)
               val callArgs: Array[Term] =
-                Array[Term](new StringValue(constant.name, stringType), new IntValue(constant.location, ordinal)) ++ typedArgs ++
-                  (typedArgs.length until paramTypes.length).map(i => defaults(i).get)
+                Array[Term](new StringValue(constant.name, stringType), new IntValue(constant.location, ordinal)) ++ typedArgs
               val init = new NewObject(ctor, callArgs)
               statements += new ExpressionActionStatement(new SetStaticField(constant.location, definition, field, init))
             }

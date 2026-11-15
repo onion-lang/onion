@@ -1,6 +1,8 @@
 package onion.compiler.tools
 
+import onion.compiler.{CompilationOutcome, CompilerConfig, OnionCompiler, StreamInputSource}
 import onion.tools.Shell
+import java.io.StringReader
 
 /**
  * Issue #2948: a data enum's parameter may declare a default, and a constant that omits the
@@ -11,6 +13,23 @@ class EnumParameterDefaultSpec extends AbstractShellSpec {
 
   private def runMain(source: String, name: String): Shell.Result =
     shell.run(source, name, Array())
+
+  private def errorCodes(src: String): Seq[String] = {
+    val config = new CompilerConfig(List("."), null, "UTF-8", "", 10)
+    new OnionCompiler(config).compile(Seq(new StreamInputSource(() => new StringReader(src), "test.on"))) match {
+      case CompilationOutcome.Failure(errors) => errors.flatMap(_.errorCode)
+      case _ => Seq.empty
+    }
+  }
+
+  private def enumProgram(decl: String, body: String): String =
+    s"""
+       |$decl
+       |class Test {
+       |public:
+       |  static def main(args: String[]): String { return $body }
+       |}
+       |""".stripMargin
 
   describe("Data-enum parameter defaults (#2948)") {
     it("fills an omitted trailing argument from its default") {
@@ -96,6 +115,57 @@ class EnumParameterDefaultSpec extends AbstractShellSpec {
         "EnumDefaultBadType.on"
       )
       assert(Shell.Failure(-1) == result)
+    }
+  }
+
+  describe("Named arguments in a data-enum constant (#3062, #3064)") {
+    it("binds a named argument by name and defaults the parameter it skips, as a record does") {
+      val src = enumProgram(
+        "enum E(a: Int, b: Int = 7, c: Int = 9) { X(1, c = 2) }",
+        "\"\" + E::X.a() + \",\" + E::X.b() + \",\" + E::X.c()"
+      )
+      assert(Shell.Success("1,7,2") == runMain(src, "EnumNamedSkip.on"))
+    }
+
+    it("binds named arguments written out of order") {
+      val src = enumProgram(
+        "enum S(a: Int, b: Int) { Y(b = 5, a = 2) }",
+        "\"\" + S::Y.a() + \" \" + S::Y.b()"
+      )
+      assert(Shell.Success("2 5") == runMain(src, "EnumNamedOrder.on"))
+    }
+
+    it("lets a default read an earlier parameter given by name") {
+      val src = enumProgram(
+        "enum S(a: Int, b: Int = a + 1) { Z(a = 4) }",
+        "\"\" + S::Z.a() + \" \" + S::Z.b()"
+      )
+      assert(Shell.Success("4 5") == runMain(src, "EnumNamedDefaultReads.on"))
+    }
+
+    it("rejects a constant that names only a defaulted parameter and omits a required one") {
+      val src = enumProgram("enum S(a: Int, b: Int = a + 1) { Z(b = 9) }", "\"no\"")
+      assert(errorCodes(src) == Seq("E0021"))
+    }
+
+    it("rejects an unknown parameter name (E0043)") {
+      val src = enumProgram("enum E(a: Int, b: Int = 7) { X(1, zz = 2) }", "\"no\"")
+      assert(errorCodes(src) == Seq("E0043"))
+    }
+
+    it("rejects a parameter given twice (E0044)") {
+      val src = enumProgram("enum E(a: Int, b: Int = 7) { X(1, a = 2) }", "\"no\"")
+      assert(errorCodes(src) == Seq("E0044"))
+    }
+
+    it("rejects a positional argument after a named one (E0045)") {
+      val src = enumProgram("enum E(a: Int, b: Int) { X(a = 1, 2) }", "\"no\"")
+      assert(errorCodes(src) == Seq("E0045"))
+    }
+
+    it("still type-checks a named argument against its parameter") {
+      val src = enumProgram("enum E(a: Int, b: String) { X(b = 3, a = 1) }", "\"no\"")
+      assert(errorCodes(src).nonEmpty)
     }
   }
 }

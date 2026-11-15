@@ -418,9 +418,17 @@ private[compiler] final class MethodBodySupport(
           else findSuperConstructorWithBoxing(targetClass, params0)
         val (matched, params) =
           if matched1.nonEmpty || params0 == null || params0.contains(null) then (matched1, params1)
-          else retypeSuperArguments(targetClass, node.superInits, params0, context) match
-            case Some(retyped) => findSuperConstructorWithBoxing(targetClass, retyped)
-            case None => (matched1, params1)
+          else
+            // Retype against each parent constructor of that arity; keep the retypings under
+            // which exactly one constructor fits. A parent with `this(xs: List[T])` and
+            // `this(n: Int)` still takes `Collections::emptyList()` (#3003's panel).
+            val fits = retypeSuperArguments(targetClass, node.superInits, params0, context)
+              .map(findSuperConstructorWithBoxing(targetClass, _))
+              .filter(_._1.length == 1)
+            val distinct = fits.map(_._1(0)).distinct
+            if distinct.length == 1 then fits.head
+            else if distinct.length > 1 then (distinct.toArray, params0)
+            else (matched1, params1)
         // A constructor with defaults takes fewer positional arguments than it
         // declares: `extends A(7)` / `: this(4)` into `def this(a: Int = 1, b: Int = 2)`
         // fills `b`, as `new A(7)` does (#2660).
@@ -485,6 +493,15 @@ private[compiler] final class MethodBodySupport(
         val formals = c.getArgs.map(t =>
           TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
         formals.length != params.length || formals.indices.forall { i =>
+          // A Java wildcard slot (`ArrayList(Collection<? extends E>)`) keeps the erased match
+          // it had before: `extends ArrayList[T](List::of())` still compiles, because inference
+          // cannot yet make `List::of()` a `Collection[T]` (#3003's panel). Onion declares no
+          // wildcards, so every Onion-declared `List[T]` slot is still checked.
+          val javaWildcardSlot = formals(i) match {
+            case ap: TypedAST.AppliedClassType => ap.typeArguments.exists(_.isInstanceOf[TypedAST.WildcardType])
+            case _ => false
+          }
+          javaWildcardSlot || {
           val primitiveIntoVar = params(i) != null && params(i).`type` != null && params(i).`type`.isBasicType &&
             (formals(i) match {
               case _: TypedAST.TypeVariableType => true
@@ -492,41 +509,45 @@ private[compiler] final class MethodBodySupport(
               case _ => false
             })
           !primitiveIntoVar && AssignabilitySupport.typeVariableSlotFits(formals(i), params(i), bodyContext.table)
+          }
         }
       case _ => true
     }
 
   /** A generic call or collection literal passed to `extends C[T](..)` is typed with no expected
    *  type, so `Collections::emptyList()` is a `List[Object]` that no `List[T]` slot accepts.
-   *  Retype such arguments against the one arity-matching constructor's substituted formals,
-   *  as `new C[T](..)` does (#2840). None when nothing changed. */
+   *  Retype such arguments against each arity-matching constructor's substituted formals, as
+   *  `new C[T](..)` does (#2840): one retyped argument list per constructor whose formals
+   *  changed some argument's type, in declaration order. Empty when nothing changed. */
   private def retypeSuperArguments(
     targetClass: ClassType,
     args: List[AST.Expression],
     params: Array[Term],
     context: LocalContext
-  ): Option[Array[Term]] = {
+  ): Seq[Array[Term]] = {
     def malleable(e: AST.Expression): Boolean = e match
       case _: AST.StaticMethodCall | _: AST.UnqualifiedMethodCall | _: AST.NewObject |
            _: AST.ListLiteral | _: AST.MapLiteral => true
       case _ => false
-    val candidates = targetClass.constructors.filter(_.getArgs.length == params.length)
-    if params.isEmpty || candidates.length != 1 || !args.exists(malleable) then None
+    val candidates = targetClass.constructors.filter(_.getArgs.length == params.length).toSeq
+    if params.isEmpty || !args.exists(malleable) then Seq.empty
     else
       val classSubst = TypeSubstitution.classSubstitution(targetClass)
-      val formals = candidates(0).getArgs.map(t =>
-        TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-      val updated = params.clone()
-      var changed = false
-      args.zipWithIndex.foreach { case (arg, i) =>
-        if malleable(arg) && formals(i) != null then
-          typing.withSuppressedReporting(typed(arg, context, formals(i))) match
-            case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
-              updated(i) = term
-              changed = true
-            case _ =>
+      candidates.flatMap { c =>
+        val formals = c.getArgs.map(t =>
+          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+        val updated = params.clone()
+        var changed = false
+        args.zipWithIndex.foreach { case (arg, i) =>
+          if malleable(arg) && formals(i) != null && !formals(i).isBasicType then
+            typing.withSuppressedReporting(typed(arg, context, formals(i))) match
+              case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
+                updated(i) = term
+                changed = true
+              case _ =>
+        }
+        if changed then Some(updated) else None
       }
-      if changed then Some(updated) else None
   }
 
   /**

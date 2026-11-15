@@ -408,6 +408,64 @@ class ConstructorTypeVariableArgumentSpec extends AbstractShellSpec {
       assert(result == Shell.Success("[][]"), out)
     }
 
+    it("accepts a generic call as a super argument when the parent has another constructor of that arity") {
+      val src =
+        """import { java.util.* }
+          |class C[T] {
+          |public:
+          |  val xs: List[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |  def this(n: Int) { this.xs = new ArrayList[T]() }
+          |}
+          |class E[T] extends C[T](Collections::emptyList())
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new E[String]().xs + new C[String](3).xs
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("[][]"), out)
+    }
+
+    it("still rejects a List[Number] into a List[T] slot when the parent has another constructor of that arity") {
+      val src =
+        """import { java.util.* }
+          |class C[T] {
+          |public:
+          |  val xs: List[T]
+          |  def this(xs: List[T]) { this.xs = xs }
+          |  def this(n: Int) { this.xs = new ArrayList[T]() }
+          |}
+          |class E[T] extends C[T](new ArrayList[Number]())
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return "ran" }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(out.contains("E0021"), out)
+    }
+
+    it("keeps a JDK collection parent's Collection<? extends E> constructor reachable from extends") {
+      val src =
+        """import { java.util.* }
+          |class N1[T] extends ArrayList[T](List::of())
+          |class N2[T] extends ArrayList[T](Collections::emptyList())
+          |class H[T] extends HashSet[T](Collections::emptySet())
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new N1[String]() + new N2[String]() + new H[String]()
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("[][][]"), out)
+    }
+
     it("still rejects a List[Number] argument written as a generic call result") {
       val src =
         """import { java.util.* }

@@ -431,7 +431,7 @@ instance Show[Int] {
 
 - **表示されるもの:** 2つ目のインスタンスで **E0097** `instance shapes.Show[java.lang.Integer] is already defined`。
 - **直し方:** インスタンスを1つだけ残し、もう1つを削除してください。
-- **同じパッケージの2つのファイル**（どちらも `module` 行なし）では、これまでどおり **E0008** `duplicated class definition Show$$Integer` になります。直し方は同じです。
+- **同じパッケージの2つのファイル**（どちらも `module` 行なし）でも、同じ **E0097** になります。
 - **型の型引数:** E0097 は外側の型だけを比べます。そのため `Show[List[String]]` と `Show[List[Integer]]` は同じインスタンスとみなされ、衝突します。
 - **`onion migrate` の規則はありません:** どちらのインスタンスを残すかは、あなたが決めることです。
 

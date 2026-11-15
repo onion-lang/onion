@@ -137,8 +137,15 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
   private def registerClass(declaration: AST.ClassDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
     val node = ClassDefinition.newClass(declaration.location, declaration.modifiers, typing.createFQCN(moduleName, declaration.name), null, null)
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
-    if (typing.table_.lookup(node.name) != null) {
-      typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+    val existing = typing.table_.lookup(node.name)
+    if (existing != null) {
+      // `$` is not an identifier character, so a `Trait$$Type` name is an `instance` lowered by
+      // Rewriting. Two of them in one package are a duplicate instance (E0097), not a class (#2777).
+      val i = declaration.name.indexOf("$$")
+      if (i > 0 && existing.isInstanceOf[ClassDefinition])
+        typing.report(SemanticError.DUPLICATE_TRAIT_INSTANCE, declaration,
+          declaration.name.substring(0, i) + "[" + declaration.name.substring(i + 2) + "]")
+      else typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
     } else {
       typing.table_.classes.add(node)
       typing.put(declaration, node)

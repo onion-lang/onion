@@ -137,7 +137,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
     definition_.ownTypeVariables = classTypeParams.map(_.variableType).toArray
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
-    if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
+    if (cyclic(definition_)) { report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name); typing.cyclicDefinitions += definition_ }
 
     openTypeParams(emptyTypeParams ++ classTypeParams) {
       node.defaultSection.foreach(processAccessSection)
@@ -156,7 +156,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
     definition_.ownTypeVariables = interfaceTypeParams.map(_.variableType).toArray
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
-    if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
+    if (cyclic(definition_)) { report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name); typing.cyclicDefinitions += definition_ }
 
     openTypeParams(emptyTypeParams ++ interfaceTypeParams) {
       node.methods.foreach(processInterfaceMethodDeclaration)

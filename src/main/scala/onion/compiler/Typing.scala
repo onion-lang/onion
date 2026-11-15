@@ -207,6 +207,31 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     loaded.table
   }
   private val diagnostics = new TypingDiagnostics(this, session)
+  /** Classes and interfaces the outline pass reported E0016 for, in source order. */
+  private[compiler] val cyclicDefinitions = scala.collection.mutable.Buffer[ClassDefinition]()
+
+  /** Once E0016 is reported, cut each cyclic supertype edge, so that every later walk
+   *  over supertypes (method lookup, extension lookup, subtyping) terminates (#2975).
+   *  An edge `d -> p` is cut when `p` leads back to `d`: a superclass becomes `Object`,
+   *  an interface is dropped. Only definitions E0016 was reported for are touched, so a
+   *  program that compiles is never changed, and the compile fails anyway. */
+  private def cutInheritanceCycles(): Unit = cyclicDefinitions.distinct.foreach { definition =>
+    def rawOf(t: ClassType): ClassType = t match {
+      case applied: AppliedClassType => applied.raw
+      case other => other
+    }
+    def reaches(from: ClassType): Boolean = {
+      val seen = scala.collection.mutable.Set[ClassType]()
+      def walk(t: ClassType): Boolean = t != null && {
+        val raw = rawOf(t)
+        (raw eq definition) || (seen.add(raw) && (walk(raw.superClass) || raw.interfaces.exists(walk)))
+      }
+      walk(from)
+    }
+    if (reaches(definition.superClass)) definition.setSuperClass(rootClass)
+    val kept = definition.interfaces.filterNot(reaches)
+    if (kept.length != definition.interfaces.length) definition.setInterfaces(kept.toArray)
+  }
   private val typeSupport = new TypingTypeSupport(this)
 
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
@@ -229,6 +254,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     }
     processTypeParameters(source)
     for(unit <- source) processOutline(unit)
+    cutInheritanceCycles()
     // Every unit's defaults are typed before any body, so a call may omit a default
     // declared later in its file or in another file (#2653).
     val bodyPasses = source.map(unit => unit -> new onion.compiler.typing.TypingBodyPass(this, session.activate(unit)))

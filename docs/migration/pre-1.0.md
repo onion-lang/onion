@@ -575,3 +575,27 @@ val zs: List[Int] = [5, null]   // Before: compiled; the read of zs[1] crashed. 
   `null` there (`?:` or `!!`). Otherwise, pass a real value instead of `null`.
 - **No `onion migrate` rule:** the fix is either a different declared type or a different
   value, and only you know which one the code means.
+
+## A `protected` method is checked the same way however the call reaches it
+
+A method call that passes named arguments, or an untyped lambda argument
+(`a.lam((x) -> x + 1)`, `a.lam { x -> x + 1 }`), now gets the same access check as a call
+that passes every argument positionally (#2916). So an unrelated class can no longer reach a
+`protected` method that way. This is the method twin of the constructor change above.
+
+```onion
+class A {
+public:
+  def this() { }
+protected:
+  def pim(a: Int, b: Int = 2): Int = a + b
+}
+println(new A().pim(b = 3, a = 7))   // Before: printed 10. Now: E0013
+println(new A().pim(7, 3))           // E0013 before and now
+```
+
+- **What you see:** **E0013** `method A.pim(Int, Int) is not accessible from class ...` at the call.
+- **Still fine:** the same call from inside `A` or from a subclass of `A`.
+- **To update:** move the method under `public:`, or call it from a subclass.
+- **No `onion migrate` rule:** widening a method's access is a design choice only you can
+  make, so the hint shows the edit instead.

@@ -41,6 +41,9 @@ object Boxing {
   def boxedClassName(`type`: TypedAST.BasicType): Option[String] =
     basicToIndex.get(`type`).map(index => TABLE(index)(1).asInstanceOf[String])
 
+  /** The primitive a `java.lang` box class stands for, by exact name (`java.lang.Integer` -> `Int`). */
+  def primitiveOfBoxName(name: String): Option[TypedAST.BasicType] = boxedNameToBasic.get(name)
+
   private val boxedTypeCache = new JWeakHashMap[ClassTable, Array[TypedAST.ClassType]]()
   private val valueOfMethodCache = new JWeakHashMap[ClassTable, Array[TypedAST.Method]]()
   private val unboxMethodCache = new JWeakHashMap[ClassTable, Array[TypedAST.Method]]()
@@ -219,7 +222,12 @@ object Boxing {
     }
 
     val aBoxedType = boxedType(table, targetType)
-    if (!TypedAST.TypeRules.isAssignable(aBoxedType, sourceType)) {
+    // A box widens as a primitive does (Integer -> long): `Number.longValue()` reads the same value.
+    val widens = !TypedAST.TypeRules.isAssignable(aBoxedType, sourceType) &&
+      unboxedType(table, sourceType).exists { from =>
+        (from.isInteger || from.isReal) && (targetType.isInteger || targetType.isReal) && TypedAST.TypeRules.isAssignable(targetType, from)
+      }
+    if (!widens && !TypedAST.TypeRules.isAssignable(aBoxedType, sourceType)) {
       throw new IllegalArgumentException(s"cannot unbox ${sourceType} to ${targetType}")
     }
 
@@ -236,8 +244,16 @@ object Boxing {
       case _ => throw new IllegalArgumentException(s"cannot unbox to ${targetType}")
     }
 
-    val cached = cachedUnboxMethod(table, targetType, methodName)
-    new TypedAST.Call(node, cached, emptyTerms)
+    if (widens) {
+      // Integer.longValue(), not Long.longValue(): the call's receiver is the narrower box.
+      val from = unboxedType(table, sourceType).get
+      val found = cachedBoxedType(table, from).findMethod(methodName, emptyTerms)
+      if (found.length != 1) throw new RuntimeException(s"couldn't find ${methodName} method")
+      new TypedAST.Call(node, found(0), emptyTerms)
+    } else {
+      val cached = cachedUnboxMethod(table, targetType, methodName)
+      new TypedAST.Call(node, cached, emptyTerms)
+    }
   }
 
   /** Try to unbox a term to a numeric primitive, returning the original term if not possible */

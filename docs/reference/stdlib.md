@@ -1413,6 +1413,7 @@ String utilities (`onion.Strings`, auto-imported):
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
 Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
+Strings::split("a,b,,", ",")          // ["a","b","",""]: trailing empty fields are kept
 Strings::join(parts, "-")             // arrays or Lists
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -1673,6 +1674,9 @@ Json::stringify(0.0d / 0.0d)           // "null"
 record Point(x: Int, y: Int)
 Json::stringify(new Point(1, 2))       // {"x":1,"y":2}
 
+// A Set or a Java array is a JSON array too, in iteration order
+Json::stringify(Colls::toList(args))   // ["a","b"]; Json::stringify(args) gives the same
+
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
 v["users"][0]["name"].asString()
@@ -1703,6 +1707,9 @@ another "absent" case rather than an error to handle separately:
 ```onion
 val obj = Json::parseOrNull("not json")   // null, no exception
 ```
+
+Nesting is limited to 512 levels. Deeper input is a `Json.JsonParseException`
+("Nesting too deep"), so `parseOrNull` returns `null` for it.
 
 When you do want to handle a malformed-input failure, `Json.JsonParseException` carries
 `getPosition()` — the character offset into the input where parsing gave up — in addition
@@ -1929,6 +1936,8 @@ naming the line where the quote was opened, rather than swallowing the rest of t
 ```onion
 val rows = Csv::parse(text)                  // List of List of String
 val recs = Csv::parseWithHeader(text)        // List of Map (header -> value)
+                                             // a repeated header keeps its last column;
+                                             // a different value in an earlier one throws
 
 Csv::column(rows, 0)                          // one positional column
 Csv::columnByName(recs, "age")                // one header-named column
@@ -2850,7 +2859,7 @@ Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- literal doll
 ### Splitting
 
 ```
-Regex::split(input, pattern): List[String]
+Regex::split(input, pattern): List[String]   // trailing empty fields are kept: ("x;y;;", ";") is 4 fields
 Regex::split(input, pattern, limit): List[String]
 ```
 

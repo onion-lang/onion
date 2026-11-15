@@ -205,5 +205,25 @@ class StringInterpolationSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("[hi]hi buf|hihi") == result)
     }
+
+    // #2818: the same package-private overload, reached by an explicit call
+    it("appends one StringBuilder to another with append (#2818)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val a = new StringBuilder("x")
+          |    val b = new StringBuilder("y")
+          |    a.append(b).append(b)
+          |    return a.toString()
+          |  }
+          |}
+        """.stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("xyy") == result)
+    }
   }
 }

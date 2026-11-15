@@ -45,9 +45,28 @@ private[compiler] final class InstanceMethodCallSupport(
   ): Option[Term] =
     // An extension block declaring two `name`s with one erasure is already E0084; a call to
     // that name, whichever twin it means, reports nothing of its own (#2475).
-    if (fallback.hasErasureTwinExtension(targetType, node.name))
-      calls.typing.withSuppressedReporting(typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected))
-    else typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected)
+    if (fallback.hasErasureTwinExtension(targetType, node.name, target)) {
+      // Only the call's own resolution errors (E0000/E0005/E0006 at the call) are redundant;
+      // an error inside a lambda argument is real and stays (#2550).
+      val start = calls.typing.problemCount
+      val result = typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected)
+      val callLocation = node.location
+      // An argument's start, and a typed lambda's parameters: the twin the call did not mean
+      // reports its mismatch there.
+      val argLocations: Set[Location] = node.args.flatMap {
+        case c: AST.ClosureExpression =>
+          c.location :: c.args.flatMap(a => List(a.location) ++ Option(a.typeRef).map(_.location))
+        case a => List(a.location)
+      }.toSet
+      calls.typing.reporter_.dropProblemsSince(start) { e =>
+        e.errorCode.exists {
+          case "E0005" => e.location == callLocation
+          case "E0000" | "E0006" => e.location == callLocation || argLocations.contains(e.location)
+          case _ => false
+        }
+      }
+      result
+    } else typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected)
 
   private def typeMethodCallOnObjectChecked(
     node: AST.MethodCall,
@@ -78,7 +97,17 @@ private[compiler] final class InstanceMethodCallSupport(
       return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, untypedClosureIndices)
     }
 
-    val methods0 = MethodResolution.findMethods(targetType, name, params0, bodyContext.table)
+    val methods00 = MethodResolution.findMethods(targetType, name, params0, bodyContext.table)
+    // The most specific overload can be one the call may not name (`sb.append(sb2)` finds
+    // AbstractStringBuilder's package-private append(AbstractStringBuilder)). Java resolves
+    // among accessible members only, so retry without the inaccessible ones (#2818); when
+    // nothing else applies the E0013 below stays.
+    val methods0 =
+      if (methods00.length == 1 && !MemberAccess.isMemberAccessible(methods00(0), bodyContext.definition)) {
+        val accessible = MethodResolution.findMethods(targetType, name, params0, bodyContext.table,
+          m => MemberAccess.isMemberAccessible(m, bodyContext.definition))
+        if (accessible.length > 0) accessible else methods00
+      } else methods00
 
     // When no method applies, an argument that is a generic call (e.g.
     // `Result::ok(11)`) may have left its type parameters unbound (-> Object).
@@ -124,7 +153,7 @@ private[compiler] final class InstanceMethodCallSupport(
       // `e.message` does, so parens are optional on property accessors too.
       val ext = fallback.tryExtensionMethodCall(node, target, targetType, params, expected, reportIfNotFound = false)
       if (ext.isDefined) return ext
-      if (fallback.isAmbiguousExtensionCall(targetType, name, params)) return None
+      if (fallback.isAmbiguousExtensionCall(targetType, name, params, target)) return None
       if (params != null && params.length == 0) {
         val getters = {
           val g = MethodResolution.findMethods(targetType, calls.getter(name), params, bodyContext.table)

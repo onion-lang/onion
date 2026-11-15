@@ -204,6 +204,141 @@ class ConstructorTypeVariableArgumentSpec extends AbstractShellSpec {
     }
   }
 
+  // #2840: a primitive was left alone by the slot check, so `new Box[T](i)` with `i: Int`
+  // boxed to an Integer into a `T` slot, and a `Box[String]` held it.
+  describe("a primitive argument into a constructor slot typed by a class type variable") {
+    val box =
+      """class Box[T] {
+        |public:
+        |  val v: T?
+        |  def this(v: T?) { this.v = v }
+        |}
+        |class Bare[T] {
+        |public:
+        |  val v: T
+        |  def this(v: T) { this.v = v }
+        |}
+        |""".stripMargin
+
+    it("rejects an Int into a bare T slot at compile time") {
+      val src = box +
+        """class G[T] {
+          |public:
+          |  def this {}
+          |  def wrapInt(i: Int): Bare[T] = new Bare[T](i)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s: String = new G[String]().wrapInt(3).v
+          |    return "ran " + s
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(!out.contains("ClassCastException") && !out.contains("cannot be cast"), out)
+    }
+
+    it("rejects a Double literal into a T? slot at compile time") {
+      val src = box +
+        """class G[T] {
+          |public:
+          |  def this {}
+          |  def wrap(): Box[T] = new Box[T](1.5)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s: String? = new G[String]().wrap().v
+          |    return "ran " + s
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Failure(-1), out)
+      assert(!out.contains("ClassCastException") && !out.contains("cannot be cast"), out)
+    }
+
+    it("still boxes a primitive into a concrete or inferred type argument") {
+      val src = box +
+        """class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val a = new Bare[Integer](3)
+          |    val b = new Bare(4)
+          |    val c: Box[Integer] = new Box[Integer](5)
+          |    val d = new Box[Object](6)
+          |    return "" + a.v + b.v + c.v + d.v
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("3456"), out)
+    }
+
+    val doors =
+      """class Dflt[T] {
+        |public:
+        |  val v: T
+        |  def this(v: T, d: Int = 1) { this.v = v }
+        |}
+        |class Va[T] {
+        |public:
+        |  val n: Int
+        |  def this(vs: T...) { this.n = vs.length }
+        |}
+        |""".stripMargin
+
+    Seq(
+      "by name" -> "def make(i: Int): Dflt[T] = new Dflt[T](v = i)",
+      "through a default parameter" -> "def make(i: Int): Dflt[T] = new Dflt[T](i)",
+      "into a T... vararg" -> "def make(i: Int): Va[T] = new Va[T](i, i)"
+    ).foreach { case (door, method) =>
+      it(s"rejects an Int into a T slot $door") {
+        val src = doors +
+          s"""class G[T] {
+             |public:
+             |  def this {}
+             |  $method
+             |}
+             |class Test {
+             |public:
+             |  static def main(args: String[]): String {
+             |    val g = new G[String]().make(3)
+             |    return "ran"
+             |  }
+             |}
+             |""".stripMargin
+        val (result, out) = run(src)
+        assert(result == Shell.Failure(-1), out)
+      }
+    }
+
+    it("still accepts a T by name, through a default and into a vararg, and an Int by name into Dflt[Integer]") {
+      val src = doors +
+        """class G[T] {
+          |public:
+          |  def this {}
+          |  def a(t: T): Dflt[T] = new Dflt[T](v = t)
+          |  def b(t: T): Dflt[T] = new Dflt[T](t)
+          |  def c(t: T): Va[T] = new Va[T](t, t)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val g = new G[String]()
+          |    val r = new Dflt[Integer](v = 7)
+          |    val w = new Va[Integer](1, 2, 3)
+          |    return g.a("x").v + g.b("y").v + g.c("z").n + r.v + w.n
+          |  }
+          |}
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result == Shell.Success("xy273"), out)
+    }
+  }
+
   describe("a superclass constructor slot typed by a type variable (#2840)") {
     def failing(name: String, parent: String, sub: String): Unit =
       it(name) {

@@ -508,7 +508,7 @@ private[compiler] final class MethodBodySupport(
     val candidates = targetClass.constructors.filter { c =>
       val formals = substitutedArgs(c)
       formals.length == params.length &&
-        formals.indices.forall(i => TypeRelations.isAssignableWithBoxing(formals(i), params(i).`type`, bodyContext.table)) &&
+        formals.indices.forall(i => TypeRelations.isConstructorArgAssignable(formals(i), params(i).`type`, bodyContext.table)) &&
         superTypeVariableSlotsFit(targetClass, c, params)
     }
     if (candidates.length != 1) (candidates, params)

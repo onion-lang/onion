@@ -136,6 +136,7 @@ public final class Yaml {
         }
 
         String[] rawLines = text.split("\r\n|\r|\n", -1);
+        skipDocumentMarkers(rawLines);
         for (String rawLine : rawLines) {
             if (!isBlankOrComment(rawLine)) {
                 return isSequenceItem(rawLine.trim()) ? parseSequence(rawLines) : parseMapping(rawLines);
@@ -155,6 +156,40 @@ public final class Yaml {
         } catch (YamlParseException e) {
             return null;
         }
+    }
+
+    /**
+     * Blank out the {@code ---} line that starts the document and the {@code ...} line that
+     * ends it (line numbers stay put). A second {@code ---}, or data after {@code ...}, is a
+     * multi-document stream, which is out of scope.
+     */
+    private static void skipDocumentMarkers(String[] rawLines) throws YamlParseException {
+        boolean seenData = false;
+        boolean ended = false;
+        for (int i = 0; i < rawLines.length; i++) {
+            String line = rawLines[i].stripTrailing();
+            if (line.equals("---") || line.equals("...")) {
+                if (line.equals("---") && !seenData && !ended) {
+                    rawLines[i] = "";
+                } else if (line.equals("...") && !ended) {
+                    rawLines[i] = "";
+                    ended = true;
+                } else {
+                    throw multiDocument(i + 1);
+                }
+            } else if (!isBlankOrComment(line)) {
+                if (ended) {
+                    throw multiDocument(i + 1);
+                }
+                seenData = true;
+            }
+        }
+    }
+
+    private static YamlParseException multiDocument(int lineNumber) {
+        return new YamlParseException(
+            "Multiple documents are out of scope (Yaml reads one document; split the stream first)",
+            lineNumber);
     }
 
     /** A blank line, or a whole-line {@code # comment}, carries no data. */
@@ -349,7 +384,7 @@ public final class Yaml {
      *   - leading or trailing whitespace
      *   - starts with a YAML indicator ([ ] { } & * ! | > % @ `)
      *   - equals "-" or "?", or starts with "- " or "? "
-     *   - contains ':', '#', newline, or tab
+     *   - contains ':', '#', '"', newline, or tab
      *   - looks like a number (would be parsed back as Long or Double)
      *   - equals "true", "false", or "null" (would be parsed back as Boolean/null)
      */
@@ -376,6 +411,8 @@ public final class Yaml {
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == ':' || c == '#' || c == '\n' || c == '\r' || c == '\t') return true;
+            // An inner " opens a quoted region in findKeySeparator/stripComment, hiding the ':' after it
+            if (c == '"') return true;
         }
         // Would be mis-parsed as a Boolean or null
         if (s.equals("true") || s.equals("false") || s.equals("null") || s.equals("~")) return true;

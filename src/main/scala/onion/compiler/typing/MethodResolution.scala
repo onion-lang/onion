@@ -82,15 +82,20 @@ private[compiler] object MethodResolution {
    * @return Array of applicable methods (0 if none found, 1 if unique, 2+ if ambiguous)
    */
   def findMethods(target: ObjectType, name: String, params: Array[Term], table: ClassTable): Array[Method] =
+    findMethods(target, name, params, table, null)
+
+  /** As above, but a candidate `visible` rejects is not considered, as Java only resolves among
+    * the members a call may name (JLS 15.12.2.1). `null` keeps every candidate. */
+  def findMethods(target: ObjectType, name: String, params: Array[Term], table: ClassTable, visible: Method => Boolean): Array[Method] =
     target match
       case ct: AppliedClassType =>
         val views = table.appliedViewsOf(ct)(AppliedTypeViews.collectAppliedViewsFrom(ct))
-        findMethodsWithViews(ct, name, params, views, table)
+        findMethodsWithViews(ct, name, params, views, table, visible)
       case ct: ClassType if table.specializedViewsRequired(ct)(requiresSpecializedViews(ct)) =>
         val views = table.appliedViewsOf(ct)(AppliedTypeViews.collectAppliedViewsFrom(ct))
-        findMethodsWithViews(ct, name, params, views, table)
+        findMethodsWithViews(ct, name, params, views, table, visible)
       case ct: ClassType =>
-        findMethodsWithViews(ct, name, params, scala.collection.immutable.Map.empty, table)
+        findMethodsWithViews(ct, name, params, scala.collection.immutable.Map.empty, table, visible)
       case _ =>
         target.findMethod(name, params)
 
@@ -147,15 +152,27 @@ private[compiler] object MethodResolution {
     name: String,
     params: Array[Term],
     views: scala.collection.immutable.Map[ClassType, AppliedClassType],
-    table: ClassTable
+    table: ClassTable,
+    visible: Method => Boolean = null
   ): Array[Method] =
     val support = new MethodResolutionSupport(views, params, table)
-    val all = candidatesOf(target, name, table)
+    val all0 = candidatesOf(target, name, table)
+    val all = if visible == null then all0 else all0.filter(visible)
     // Java never narrows an int literal while resolving a call, so `println(75)` is println(int).
     // Narrowing (Onion's `takesByte(100)`) only rescues a call nothing else accepts.
     val applicableMethods =
       val strict = all.iterator.filter(m => support.applicable(m, narrowConstants = false)).toList
-      val found = if strict.nonEmpty then strict else all.iterator.filter(support.applicable).toList
+      val found0 = if strict.nonEmpty then strict else all.iterator.filter(support.applicable).toList
+      // Java's phasing: a varargs overload competes only when no overload applies by fixed
+      // arity, so `pb.command()` is the getter, not `command(String...)` (#2859). A varargs
+      // method handed its array (or null) in the last slot is a fixed-arity call and stays.
+      def fixedArity(m: Method): Boolean =
+        !m.isVararg || (params.length == m.argumentCount && params.nonEmpty && {
+          val last = params.last.`type`
+          last != null && (last.isArrayType || last.isNullType)
+        })
+      val found =
+        if found0.exists(fixedArity) then found0.filter(fixedArity) else found0
       // A slot typed by a class type variable (`List[T]` inside `N[T]`) is matched above
       // through T's bound, so `List[Number]` passes it; the argument check after selection
       // does not. Prefer the overloads that check would accept (Java picks `f(Object)`,

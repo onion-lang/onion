@@ -59,8 +59,10 @@ object EffectInference {
   /** One direct call in a body: where it is, what it calls, and the callee's full
    *  effect set. `location` may be null for synthesized nodes — callers fall back. */
   /** `initializerOf` names the class when the site is the first use of a program class that runs its static initializer. */
+  /** `written` is true for the site of a call the expression itself makes, in the order the
+   *  calls finish (operands first); false for what such a call can reach beyond its callee. */
   final case class CallSite(location: onion.compiler.Location, callee: String, effects: Set[Effect],
-                            initializerOf: Option[String] = None)
+                            initializerOf: Option[String] = None, written: Boolean = false)
 
   /** Per-method rendering for `--effects`. */
   def infer(classes: Seq[ClassDefinition],
@@ -242,7 +244,8 @@ object EffectInference {
     collector.term(term)
     val sites = collector.rawSites.toSeq.map { raw =>
       CallSite(raw.location, raw.callee,
-        raw.resolved.getOrElse(unitEffects.getOrElse(raw.internal, Set(Effect.Unknown))))
+        raw.resolved.getOrElse(unitEffects.getOrElse(raw.internal, Set(Effect.Unknown))),
+        written = raw.written)
     }
     // A write inside the term has no call site; the collector's own set has it.
     (collector.effects.toSet ++ sites.flatMap(_.effects), sites)
@@ -285,7 +288,8 @@ object EffectInference {
                                    resolved: Option[Set[Effect]], internal: Unit0,
                                    className: String = null, member: TypedAST.Method = null,
                                    target: Term = null, args: Seq[Term] = Nil, depth: Int = 0,
-                                   tableOperands: Seq[(Effect, String)] = Nil)
+                                   tableOperands: Seq[(Effect, String)] = Nil,
+                                   written: Boolean = false)
 
   /**
    * One external (table-classified) call in a body, with what [[StaticOperands]] needs
@@ -550,13 +554,14 @@ object EffectInference {
       m match {
         case md: MethodDefinition if units.contains(md) =>
           internalCallees += md
-          rawSites += RawSite(location, callee, None, md)
+          rawSites += RawSite(location, callee, None, md, written = true)
         case _ =>
           // The compilation's table verdict (built-in + library tables), or Unknown.
           val eff = table.effectsOrUnknown(m.affiliation.name, m.name)
           effects ++= eff
           rawSites += RawSite(location, callee, Some(eff), null,
-            m.affiliation.name, m, target, args.toSeq, depth, table.operands(m.affiliation.name, m.name))
+            m.affiliation.name, m, target, args.toSeq, depth, table.operands(m.affiliation.name, m.name),
+            written = true)
           toLibrary(Option(target).toSeq ++ args.toSeq, location)
       }
       // A call on a receiver dispatches: any override the program defines may run instead.

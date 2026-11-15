@@ -90,5 +90,38 @@ class ContractPurityLocationSpec extends AnyFunSpec {
       assert(at.size == 1, at.toString)
       assert(at.head._1 == 3 && at.head._2 >= 26, at.toString)
     }
+
+    // #2847: the call is found by what it resolves to, not by its name alone.
+    it("is the impure call, not an earlier pure call of the same name") {
+      val src =
+        """record P(v: Int) {
+          |public:
+          |  def add(o: Int): Int = v + o
+          |}
+          |def f(p: P, xs: List[Int]): Int requires p.add(1) > 0 && xs.add(1) { return 1 }
+          |println(f(new P(1), []))""".stripMargin
+      val at = e0106(src)
+      assert(at == Seq((5, 61)), at.toString)
+    }
+
+    it("is the impure call when the pure one of the same name is nested inside it") {
+      val src =
+        """record P(v: Int) {
+          |public:
+          |  def add(o: Int): Int = v + o
+          |}
+          |def f(p: P, xs: List[Int]): Int requires xs.add(p.add(1)) { return 1 }
+          |println(f(new P(1), []))""".stripMargin
+      val at = e0106(src)
+      assert(at == Seq((5, 45)), at.toString)
+    }
+
+    it("is still the first call of a name when both are impure") {
+      val src =
+        """def f(xs: List[Int], ys: List[Int]): Int requires xs.add(1) && ys.add(2) { return 1 }
+          |println(f([], []))""".stripMargin
+      val at = e0106(src)
+      assert(at == Seq((1, 54)), at.toString)
+    }
   }
 }

@@ -326,12 +326,39 @@ public final class Files {
      *   foreach f: String in Files::glob(".", "*.on") { ... }
      *   Files::glob("src", "**&#47;*.java")
      *
+     * A {@code **&#47;} segment also matches zero directories, so
+     * {@code **&#47;*.java} finds files directly in {@code dir} too.
+     *
      * Returns relative paths (using /), sorted.
      */
     public static java.util.List<String> glob(String dir, String pattern) throws IOException {
         java.nio.file.Path base = java.nio.file.Paths.get(dir);
         java.nio.file.PathMatcher matcher =
             base.getFileSystem().getPathMatcher("glob:" + pattern);
+        // A "**/" segment also matches zero directories (as bash globstar and
+        // Python glob do); Java's matcher needs at least one.
+        java.util.ArrayList<java.nio.file.PathMatcher> matchers = new java.util.ArrayList<>();
+        matchers.add(matcher);
+        java.util.List<java.util.List<String>> variants = new java.util.ArrayList<>();
+        variants.add(new java.util.ArrayList<>());
+        String[] segs = pattern.split("/", -1);
+        for (int i = 0; i < segs.length; i++) {
+            java.util.List<java.util.List<String>> next = new java.util.ArrayList<>();
+            boolean skippable = segs[i].equals("**") && i < segs.length - 1;
+            for (java.util.List<String> v : variants) {
+                java.util.List<String> kept = new java.util.ArrayList<>(v);
+                kept.add(segs[i]);
+                next.add(kept);
+                if (skippable) next.add(v);
+            }
+            if (next.size() <= 64) variants = next;
+        }
+        for (java.util.List<String> v : variants) {
+            String joined = String.join("/", v);
+            if (!joined.isEmpty() && !joined.equals(pattern)) {
+                matchers.add(base.getFileSystem().getPathMatcher("glob:" + joined));
+            }
+        }
         java.util.ArrayList<String> result = new java.util.ArrayList<>();
         if (!java.nio.file.Files.isDirectory(base)) return result;
         // walkFileTree with a tolerant visitor: unreadable entries (other
@@ -339,8 +366,12 @@ public final class Files {
         java.nio.file.Files.walkFileTree(base, new java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
             private void check(java.nio.file.Path p) {
                 java.nio.file.Path rel = base.relativize(p);
-                if (!rel.toString().isEmpty() && matcher.matches(rel)) {
-                    result.add(rel.toString().replace(File.separatorChar, '/'));
+                if (rel.toString().isEmpty()) return;
+                for (java.nio.file.PathMatcher m : matchers) {
+                    if (m.matches(rel)) {
+                        result.add(rel.toString().replace(File.separatorChar, '/'));
+                        return;
+                    }
                 }
             }
             @Override

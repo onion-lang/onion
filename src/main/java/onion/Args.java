@@ -19,7 +19,11 @@ import java.util.Map;
  *   --name=value     option with value
  *   --name value     option with value (when the next token is not an option;
  *                    a negative number like -5 or -3.14 counts as a value,
- *                    not an option, so --count -5 works)
+ *                    not an option, so --count -5 works). The parser cannot tell
+ *                    this from a flag followed by a positional, so it decides when
+ *                    the script asks: if the script calls flag("name") and never
+ *                    option("name"), the value goes back to positional(), in
+ *                    its original place. Ask flag/option before positional().
  *   -abc             short flags a, b, c (each registered under its own
  *                    single-character name, e.g. flag("a"); NOT an alias for
  *                    any same-named long flag, e.g. -v does not satisfy
@@ -33,6 +37,7 @@ public final class Args {
         Map<String, String> options = new LinkedHashMap<>();
         List<String> flags = new ArrayList<>();
         List<String> positional = new ArrayList<>();
+        List<Pending> pending = new ArrayList<>();
         boolean afterSeparator = false;
 
         int i = 0;
@@ -49,6 +54,7 @@ public final class Args {
                     options.put(body.substring(0, eq), body.substring(eq + 1));
                 } else if (i + 1 < argv.length && isValue(argv[i + 1])) {
                     options.put(body, argv[i + 1]);
+                    pending.add(new Pending(body, argv[i + 1], positional.size()));
                     i++;
                 } else {
                     flags.add(body);
@@ -62,7 +68,7 @@ public final class Args {
             }
             i++;
         }
-        return new Parsed(options, flags, positional);
+        return new Parsed(options, flags, positional, pending);
     }
 
     /**
@@ -75,35 +81,47 @@ public final class Args {
             || (token.length() > 1 && Character.isDigit(token.charAt(1)));
     }
 
+    /** A {@code --name value} pair that may really be a flag followed by a positional. */
+    private record Pending(String name, String value, int at) {}
+
     public static final class Parsed {
         private final Map<String, String> options;
         private final List<String> flags;
         private final List<String> positional;
+        private final List<Pending> pending;
+        private final java.util.Set<String> askedFlag = new java.util.HashSet<>();
+        private final java.util.Set<String> askedOption = new java.util.HashSet<>();
 
-        Parsed(Map<String, String> options, List<String> flags, List<String> positional) {
+        Parsed(Map<String, String> options, List<String> flags, List<String> positional,
+               List<Pending> pending) {
             this.options = options;
             this.flags = flags;
             this.positional = positional;
+            this.pending = pending;
         }
 
         /** True when --name or the short flag was given (also true when --name=value was given). */
         public boolean flag(String name) {
+            askedFlag.add(name);
             return flags.contains(name) || options.containsKey(name);
         }
 
         /** The value of --name=v / --name v, or null. */
         public String option(String name) {
+            askedOption.add(name);
             return options.get(name);
         }
 
         /** The value of --name, or the default when absent. */
         public String option(String name, String defaultValue) {
+            askedOption.add(name);
             String v = options.get(name);
             return v != null ? v : defaultValue;
         }
 
         /** Integer-valued option with a default. */
         public int intOption(String name, int defaultValue) {
+            askedOption.add(name);
             String v = options.get(name);
             if (v == null) return defaultValue;
             try {
@@ -113,9 +131,21 @@ public final class Args {
             }
         }
 
-        /** Arguments that are not flags or option values, in order. */
+        /**
+         * Arguments that are not flags or option values, in order. A {@code --name value}
+         * pair read only through {@code flag("name")} gives its value back here.
+         */
         public List<String> positional() {
-            return positional;
+            List<String> out = new ArrayList<>();
+            for (int i = 0; i <= positional.size(); i++) {
+                for (Pending p : pending) {
+                    if (p.at() == i && askedFlag.contains(p.name()) && !askedOption.contains(p.name())) {
+                        out.add(p.value());
+                    }
+                }
+                if (i < positional.size()) out.add(positional.get(i));
+            }
+            return out;
         }
 
         @Override

@@ -33,6 +33,11 @@ final class SelectExpressionTyping(
     val branchExpected: Type =
       if (expected != null && !expected.isBottomType && expected != BasicType.VOID) expected else null
     val condition = typed(node.condition, context).getOrElse(break(None))
+    if (condition.`type` == BasicType.VOID) {
+      // A void call has no value to select on (#2891).
+      bodyContext.report(IS_NOT_BOXABLE_TYPE, node.condition, condition.`type`)
+      break(None)
+    }
 
     val name = context.newName
     val index = context.add(name, condition.`type`, isMutable = true)

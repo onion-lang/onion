@@ -62,4 +62,36 @@ class TextSpec extends AbstractShellSpec {
         Shell.Success("name      age\n\u5c71\u7530\u592a\u90ce  30\nBob       5"))
     }
   }
+  describe("Text::wrap on full-width text (#2942)") {
+    def wrapped(text: String, width: Int): String = {
+      val src =
+        "import { onion.Text }\n" +
+        "class Test {\npublic:\n  static def main(args: String[]): String {\n" +
+        "    return String::join(\"|\", Text::wrap(\"" + text + "\", " + width + "))\n  }\n}\n"
+      shell.run(src, "TextWrapWide.on", Array()) match {
+        case Shell.Success(v: String) => v
+        case other => fail(s"got: $other")
+      }
+    }
+
+    it("breaks Japanese text with no spaces, counting two columns per character") {
+      assert(wrapped("吾輩は猫である。名前はまだ無い。", 10) == "吾輩は猫で|ある。名前|はまだ無|い。")
+    }
+
+    it("never starts a line with closing punctuation or ends one with an opening bracket") {
+      assert(wrapped("彼は「はい」と言った。", 6) == "彼は|「は|い」と|言っ|た。")
+    }
+
+    it("measures spaced Japanese words in columns") {
+      assert(wrapped("日本語 の 単語 を 空白 で", 10) == "日本語 の|単語 を 空|白 で")
+    }
+
+    it("breaks between a full-width character and a Latin word without adding a space") {
+      assert(wrapped("Onionは静的型付けの言語です", 12) == "Onionは静的|型付けの言語|です")
+    }
+
+    it("keeps Latin-only wrapping unchanged") {
+      assert(wrapped("the quick brown fox jumps over the lazy dog", 15) == "the quick brown|fox jumps over|the lazy dog")
+    }
+  }
 }

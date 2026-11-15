@@ -2083,6 +2083,18 @@ Text::table([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]])
 // Bob    Sales
 ```
 
+`wrap` and `table` measure width in terminal columns: a full-width (Japanese,
+Chinese, Korean) character counts as two. `wrap` breaks at spaces, and also between
+full-width characters, so text with no spaces wraps too:
+
+```onion
+Text::wrap("吾輩は猫である。名前はまだ無い。", 10)
+// ["吾輩は猫で", "ある。名前", "はまだ無", "い。"]
+```
+
+Closing punctuation (`。`, `」`) never starts a line, and an opening bracket (`「`)
+never ends one.
+
 Each is also a builtin extension method on its receiver (`String` for
 `wrap`/`indent`/`dedent`, `List` for `table`):
 

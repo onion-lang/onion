@@ -772,13 +772,15 @@ final class ClosureTyping(
   }
 
   /**
-   * Whether a SAM result type leaves a void tail acceptable: `Object` (what an
-   * inferred side-effect body becomes) or a type variable nothing pinned. The body
+   * Whether a SAM result type leaves a void tail acceptable: `Object` or `Object?`
+   * (what an inferred side-effect body becomes) or a type variable nothing pinned. The body
    * then returns null. A concrete result such as `Int` or `String` needs a value,
    * as in Java (#3044).
    */
-  private def acceptsVoidTail(returnType: Type): Boolean =
-    returnType == bodyContext.rootClass || returnType.isInstanceOf[TypeVariableType]
+  private def acceptsVoidTail(returnType: Type): Boolean = returnType match {
+    case nullable: TypedAST.NullableType => acceptsVoidTail(nullable.innerType)
+    case t => t == bodyContext.rootClass || t.isInstanceOf[TypeVariableType]
+  }
 
   /** The block's last element, where a problem with the lambda's result is reported. */
   private def tailNode(node: AST.BlockExpression): AST.Node =

@@ -74,6 +74,8 @@ class ClosureVoidTailSpec extends AbstractShellSpec {
     it("still returns null for an Object or inferred result") {
       val result = run(
         """    val o: () -> Object = () -> { IO::print("") }
+          |    val on: () -> Object? = () -> { IO::print("") }
+          |    if on() != null { return 0 }
           |    val xs = [1, 2].map { x -> IO::print("") }
           |    val f = Future::async { IO::print("") }
           |    f.await()

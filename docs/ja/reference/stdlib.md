@@ -1284,8 +1284,8 @@ flat block mapping ドキュメント、およびそれらのトップレベル 
 対象範囲: flat block mapping、またはそれらのトップレベル block シーケンス
 （要素内のネストした map/シーケンス、アンカー、タグ、flow collection は非対応）。
 この範囲外の構文は、データを静かに失う代わりにエラーを発生させます:
-`Yaml::stringify` はネストした Map/List 値に対して `IllegalArgumentException` を
-投げます。`Yaml::parse` は次の場合に `Yaml.YamlParseException` を投げます:
+`Yaml::stringify` は、ネストした Map/List 値、Map でないリスト要素、空の Map 要素、
+NaN と無限大に対して `IllegalArgumentException` を投げます。`Yaml::parse` は次の場合に `Yaml.YamlParseException` を投げます:
 
 - ネストした mapping: 兄弟の行より深くインデントされた行（トップレベルでも、
   シーケンス要素の中でも）

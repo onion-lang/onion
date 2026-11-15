@@ -540,3 +540,27 @@ println(new A().pim(7, 3))           // 以前も今も E0013
 - **これまでどおり動くもの:** `A` の中や、`A` のサブクラスからの同じ呼び出しです。
 - **直し方:** メソッドを `public:` の下に移すか、サブクラスから呼んでください。
 - **`onion migrate` の規則はありません:** メソッドのアクセスを広げるかどうかは、書いた人にしか決められない設計上の判断です。そのため、ヒントが直し方を示します。
+
+## `Yaml::stringify` は `Yaml::parse` が読み戻せるものだけを書くようになりました
+
+`Yaml::stringify` は、スカラーのリスト、空の Map の要素、NaN を書いていました。その一部は他の YAML ツールなら読めます。しかし `Yaml::parse` では読み戻せませんでした。今は、入れ子の Map と同じく、`Yaml::stringify` が例外を投げます (#2806)。
+
+```onion
+import { onion.Yaml; onion.Json }
+Yaml::stringify(["apple", "banana"])   // 以前: "- apple\n- banana\n"。今: 例外
+Json::stringify(["apple", "banana"])   // ["apple","banana"]。JSON は YAML 1.2 としても正しい
+Yaml::stringify(["apple", "banana"].map { x -> ["v": x] })   // - v: apple ...
+```
+
+- **表示されるもの:** 実行時の `IllegalArgumentException` です。メッセージが問題を示し、直し方を提案します。
+- **対象:**
+  - Map でないリストの要素: String、数値、`null`、List
+  - 空の Map の要素 (`[[:]]`)
+  - 値のどこかにある、NaN または無限大の `Double` や `Float`
+  - NaN または無限大の成分を持つレコードの `toYaml` (`derive!(Yaml)`) と、`shape ... = yaml` の `print`
+- **これまでどおり動くもの:** フラットな Map と、空でないフラットな Map のリストです。どちらも以前と同じように書かれます。
+- **直し方:**
+  - スカラーのリストには `Json::stringify` を使ってください (YAML 1.2 のツールは JSON を読めます)。または、各要素を Map で包んでください: `xs.map { x -> ["v": x] }`。
+  - 空の Map はリストから除いてください。
+  - 書く前に、NaN や無限大を自分で選んだ値 (`null` や番兵値) に置き換えてください。
+- **`onion migrate` の規則はありません:** 拒否される入力はソースの書き方ではなく実行時の値です。そのため、書き換えでは見つけられません。代わりに例外のメッセージが直し方を示します。

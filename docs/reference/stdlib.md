@@ -1743,8 +1743,8 @@ exactly the same `toMap` / `fromMap` core as `derive!(Json)`.
 Scope: a flat block mapping, or a top-level block sequence of flat mappings (no
 nested maps/sequences within an element, no anchors, no tags, no flow collections). A
 construct outside that scope raises an error rather than silently losing data:
-`Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List value,
-and `Yaml::parse` throws `Yaml.YamlParseException` on:
+`Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List value, a
+List element that is not a Map, an empty Map element, and NaN or an infinity, and `Yaml::parse` throws `Yaml.YamlParseException` on:
 
 - a nested mapping: a line indented deeper than its siblings, at the top level or
   inside a sequence element

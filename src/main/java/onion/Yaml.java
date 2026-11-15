@@ -20,7 +20,9 @@ import java.util.Map;
  * value, or a block scalar ({@code |}/{@code >}).
  * A uniformly indented document is fine. {@link #stringify} quotes any string
  * that starts with such an indicator (or with {@code - }/{@code ? }), so a flat
- * Map, or a List of non-empty flat Maps, always parses back.
+ * Map, or a List of non-empty flat Maps, always parses back. Anything else that would
+ * not (a List element that is not a Map, an empty Map element, NaN or an infinity)
+ * makes {@link #stringify} throw {@code IllegalArgumentException}.
  *
  * YAML values share the same intermediate representation as Json:
  * - YAML mapping:  LinkedHashMap&lt;String, Object&gt;
@@ -64,8 +66,9 @@ public final class Yaml {
     /**
      * Convert a Java object (List, Map, or scalar) to YAML text. A {@code Map} renders
      * as a flat block mapping, {@code key: value\n} per entry; a {@code List} renders as
-     * a top-level block sequence, {@code - key: value\n} per element (a non-Map element
-     * renders as a bare {@code - scalar}). Keys go through the same quoting rule as
+     * a top-level block sequence, {@code - key: value\n} per element (a non-Map element,
+     * an empty Map element, NaN or an infinity throws {@code IllegalArgumentException},
+     * since {@link #parse} could not read it back). Keys go through the same quoting rule as
      * string values ({@link #needsQuoting}), so a key containing {@code :}, {@code #},
      * whitespace at either end, or a newline round-trips through {@link #parse} instead
      * of colliding with the {@code key: value} separator.
@@ -104,12 +107,14 @@ public final class Yaml {
     /**
      * Render one sequence element: a flat `Map` becomes a `- key: value` block (first
      * entry carries the `- `, later entries are indented two spaces to align under it);
-     * any other value is rendered as a bare `- scalar` item.
+     * an empty Map or any non-Map value throws, since parse could not read it back.
      */
     private static String renderSequenceItem(Object item) {
         if (item instanceof Map<?, ?> map) {
             if (map.isEmpty()) {
-                return "- {}\n";
+                throw new IllegalArgumentException(
+                    "Yaml::stringify cannot write an empty Map as a sequence element: "
+                        + "parse reads no flow collection back (leave the empty Map out)");
             }
             StringBuilder sb = new StringBuilder();
             boolean first = true;
@@ -119,7 +124,11 @@ public final class Yaml {
             }
             return sb.toString();
         }
-        return "- " + renderScalar(item) + "\n";
+        throw new IllegalArgumentException(
+            "Yaml::stringify supports a List only of flat Maps: a non-Map element "
+                + "(" + (item == null ? "null" : item.getClass().getSimpleName())
+                + ") would not parse back (wrap each element in a Map, e.g. [\"v\": x], "
+                + "or use Json for a list of scalars)");
     }
 
     /**
@@ -361,6 +370,11 @@ public final class Yaml {
         }
         if (value instanceof Boolean) {
             return value.toString();          // "true" / "false"
+        }
+        if ((value instanceof Double d && !Double.isFinite(d))
+                || (value instanceof Float f && !Float.isFinite(f))) {
+            throw new IllegalArgumentException(
+                "Yaml::stringify cannot write " + value + ": parse would read it back as a String");
         }
         if (value instanceof Number) {
             return value.toString();          // "100", "3.5", "1.0E10" – never quoted

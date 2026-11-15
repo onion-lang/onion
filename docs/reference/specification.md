@@ -382,7 +382,8 @@ adding a new format requires only registering its `parse` / `stringify` pair
 in the stdlib — the macro itself does not change.
 
 `from-R?` methods return `null` on parse failure or a type-conversion error;
-they never throw. `to-R` methods always produce a well-formed string.
+they never throw. `to-R` methods produce a well-formed string, except that `toYaml`
+throws `IllegalArgumentException` for a NaN or infinite component, which YAML cannot read back.
 Round-trips hold for scalar components: `fromJson(toJson(v)) == v`.
 
 Supported component types are the eight scalar primitives: `String`, `Int`,

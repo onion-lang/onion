@@ -1212,6 +1212,9 @@ Json::stringify(0.0d / 0.0d)                            // "null"
 // (ネストした record / List / Map も Map の値と同様に再帰的に処理される)
 record Point(x: Int, y: Int)
 Json::stringify(new Point(1, 2))                        // {"x":1,"y":2}
+
+// Set や Java の配列も、反復順の JSON 配列になる
+Json::stringify(Colls::toList(args))                    // ["a","b"]。Json::stringify(args) も同じ
 ```
 
 `getString` / `getInt` / `getLong` / `getDouble` / `getFloat` / `getBoolean` / `getShort` / `getByte` でキーから型別に取得します（見つからない・型不一致のときは null）。

@@ -169,5 +169,26 @@ class ArgsSpec extends AbstractShellSpec {
       )
       assert(Shell.Success("true:o.txt:[a.txt]") == result)
     }
+
+    it("toString shows the reading positional() gives, not the unresolved one (#3034)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    val before = o.toString()
+          |    o.flag("verbose")
+          |    return before + "|" + o.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsToString.on",
+        Array("--verbose", "a.txt", "b.txt")
+      )
+      assert(Shell.Success(
+        "Args(options={verbose=a.txt}, flags=[], positional=[b.txt])|" +
+        "Args(options={}, flags=[verbose], positional=[a.txt, b.txt])") == result)
+    }
   }
 }

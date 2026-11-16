@@ -2134,6 +2134,9 @@ parsed.intOption("level", 3)              // default only when absent; "--level 
 parsed.positional()                     // List of non-option arguments
 ```
 
+Call `flag`/`option` before `positional()`: `--name value` is an option or a flag plus a
+positional, and it is decided when asked. A `positional()` read earlier lacks that value.
+
 ## Cli Module
 
 `onion.Cli` is the lower-level runtime that the compiler's **auto-CLI**

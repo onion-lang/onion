@@ -32,6 +32,11 @@ val n = opts.intOption("count", 1)       // numeric with default
 val files = opts.positional()            // everything else
 ```
 
+Ask `flag(..)` and `option(..)` **before** `positional()`. `--verbose a.txt` could be a flag
+plus a file or an option with a value; the parser decides when you ask. If `flag("verbose")`
+is the only question, `a.txt` goes back to `positional()`. Read `positional()` first and
+`a.txt` is not there yet.
+
 ## Running External Commands
 
 ```onion

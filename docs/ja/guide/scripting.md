@@ -32,6 +32,11 @@ val n = opts.intOption("count", 1)       // デフォルト付きの数値
 val files = opts.positional()            // それ以外すべて
 ```
 
+`positional()` より**先に** `flag(..)` と `option(..)` を呼んでください。`--verbose a.txt` は、
+フラグとファイルにも、値つきオプションにも読めます。パーサーは問い合わせの時点で決めます。
+`flag("verbose")` だけを呼ぶと、`a.txt` は `positional()` に戻ります。
+`positional()` を先に読むと、その時点では `a.txt` は含まれません。
+
 ## 外部コマンドの実行
 
 ```onion

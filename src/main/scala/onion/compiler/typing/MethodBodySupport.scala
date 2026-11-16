@@ -678,7 +678,11 @@ private[compiler] final class MethodBodySupport(
    * method (`def run() = g()` ... `def g(n: Int = 5)`) already sees them (#2637).
    */
   def predefineDefaults(method: MethodDefinition, args: List[AST.Argument]): Unit =
-    if args.exists(_.defaultValue != null) && !predefinedDefaults.contains(method) then
+    if !args.exists(_.defaultValue != null) then
+      // No defaults to type, but a call written above the method may name its parameters (#3105).
+      method.setArgumentsWithDefaults(
+        args.zipWithIndex.map { case (arg, i) => TypedAST.MethodArgument(arg.name, method.arguments(i), None) }.toArray)
+    else if !predefinedDefaults.contains(method) then
       val used = scala.collection.mutable.Set.empty[String]
       val withDefaults = buildArgumentsWithDefaults(args, method.arguments, used += _, DefaultOwner(method.name, method.modifier, method.typeParameters))
       method.setArgumentsWithDefaults(withDefaults)

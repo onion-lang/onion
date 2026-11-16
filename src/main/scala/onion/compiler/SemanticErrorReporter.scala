@@ -302,7 +302,9 @@ class SemanticErrorReporter(threshold: Int) {
     val withListHint = listForVarargs match
       case Some(arr) =>
         val written = onion.compiler.toolbox.TypeFormatting.componentWrittenForm(arr.component) + "[0]"
-        Some(withNullable.fold("")(_ + Systems.lineSeparator + "  ") + format(message("suggestion.listToVarargs"), Seq(written)))
+        // A `List[T]?` needs `!!` first, or the suggested call is itself E0070 (#2903).
+        val receiver = if (argTypes.last.isNullable) "list!!" else "list"
+        Some(withNullable.fold("")(_ + Systems.lineSeparator + "  ") + format(message("suggestion.listToVarargs"), Seq(written, receiver)))
       case None => withNullable
     val heldBack = sameName.collectFirst {
       case m: TypedAST.MethodDefinition if m.defaultsPending && fitsLeadingParameters(m.arguments, m.defaultsOmittableFrom, argTypes) => (m.defaultsHeldBackBy, m.defaultsHeldBackVia)

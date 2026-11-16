@@ -71,6 +71,36 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
       assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
     }
 
+    it("does not warn when an Onion-typed List[Int]/Option[Int]/Result[Int, E] yields its non-null Int (#3071)") {
+      val result = compileWarnings(
+        """
+          |import { onion.Option; onion.Result; }
+          |val xs: List[Int] = [1, 2]
+          |val d: Int = xs[0]
+          |val o: Option[Int] = Option::some(1)
+          |val c: Int = o.get()
+          |val r: Result[Int, String] = Result::ok(20)
+          |val a: Int = r.getOrElse(0)
+          |println(d + c + a)
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
+    }
+
+    it("still warns for a Map lookup and for a nullable type argument (#3071)") {
+      val result = compileWarnings(
+        """
+          |val m: Map[String, Int] = ["a": 1]
+          |val v: Int = m["a"]
+          |val ys: List[Int?] = [1, null]
+          |val w: Int = ys[0]!!
+          |println(v + w)
+          |""".stripMargin)
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.length >= 1, s"expected W0015 for the Map lookup, got: ${result.diagnostics.warnings.map(_.message)}")
+    }
+
     it("does not warn for the defaulted accessor (already primitive)") {
       val result = compileWarnings(
         """

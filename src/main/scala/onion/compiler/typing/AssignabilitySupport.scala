@@ -183,7 +183,35 @@ private[compiler] final class AssignabilitySupport(
             }
           case _ => false
         }
-        if (!isElvis && !isNonNullFunctionCall) {
+        // A call whose declared return type is a type parameter of the receiver's
+        // class (`E` of `List[E]`, `T` of `Option[T]`), and the receiver's type
+        // argument is a non-nullable type the program wrote (`List[Int]`), yields
+        // that type: Onion's own type argument says it is not null (#3071). A Map
+        // lookup stays warned: a missing key is null by contract.
+        val isNonNullTypeArgumentCall = actual match {
+          case cast: AsInstanceOf =>
+            cast.target match {
+              case call: Call =>
+                call.method.returnType match {
+                  case tv: TypeVariableType
+                      if !call.method.typeParameters.exists(_.name == tv.name) =>
+                    val subst = TypeSubstitution.hierarchySubstitution(call.target.`type`, call.method.affiliation)
+                    val isMap = bodyContext.table.load("java.util.Map") match {
+                      case Some(map) => TypeRules.isAssignable(map, call.target.`type`)
+                      case None => true
+                    }
+                    !isMap && (subst.get(tv.name) match {
+                      case Some(_: NullableType) | None => false
+                      case Some(arg: TypeVariableType) => !arg.acceptsNullable
+                      case Some(_) => true
+                    })
+                  case _ => false
+                }
+              case _ => false
+            }
+          case _ => false
+        }
+        if (!isElvis && !isNonNullFunctionCall && !isNonNullTypeArgumentCall) {
           // Same reason as the nullToNonNullable call above (#2238): this can
           // be the first warning of the unit.
           bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)

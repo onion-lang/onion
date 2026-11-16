@@ -41,11 +41,12 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
           val candidates = if sameName.isEmpty then Nil else sameName.filter { m =>
             m.arguments.length == specializedArgs.length && (
               if subst.isEmpty then
-                // A non-generic supertype: only a covariant return override, as
-                // in Java. `foo(x: Int)` beside an inherited `foo(Integer)` is
-                // an overload, so arguments must match exactly.
+                // A non-generic supertype: a covariant return override, as in
+                // Java, or a parameter that differs only by `?` (`k: Int?` for an
+                // inherited `k: Int`, #2896). `foo(x: JInteger)` beside an inherited
+                // `foo(x: Int)` is an overload, so arguments must match up to `?`.
                 m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(specializedArgs(i)).name) &&
-                isCovariantReturn(rawMethod.returnType, m.returnType)
+                isBridgeableReturn(rawMethod.returnType, m.returnType)
               else
                 m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))
             )
@@ -110,6 +111,11 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
 
   private def isCovariantReturn(inherited: TypedAST.Type, own: TypedAST.Type): Boolean =
     !inherited.isBasicType && !own.isBasicType && TypeRules.isSuperType(inherited, own)
+
+  // The bridge returns what the inherited method returns: the same JVM type
+  // (`void`, `int`, ...) or a covariant reference.
+  private def isBridgeableReturn(inherited: TypedAST.Type, own: TypedAST.Type): Boolean =
+    asmType(inherited) == asmType(own) || isCovariantReturn(inherited, own)
 
   private def isBridgeCompatible(implArg: TypedAST.Type, specializedArg: TypedAST.Type): Boolean = {
     if plain(implArg).name == plain(specializedArg).name then return true

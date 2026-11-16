@@ -17,6 +17,19 @@ private[compiler] object DuplicationChecks {
   private def erasedParamDescriptor(args: Array[Type]): String =
     args.map(Erasure.asmType).map(_.getDescriptor).mkString("(", "", ")")
 
+  // Parameter types up to `?`, compared by name as `BridgeMethodEmitter` does for a
+  // non-generic supertype.
+  private def plainNames(args: Array[Type]): Seq[String] =
+    args.toSeq.map {
+      case nt: NullableType => nt.unwrap.name
+      case other => other.name
+    }
+
+  // Mirrors `BridgeMethodEmitter.isBridgeableReturn`: the same JVM type, or a covariant reference.
+  private def bridgeableReturn(inherited: Type, own: Type): Boolean =
+    Erasure.asmType(inherited) == Erasure.asmType(own) ||
+      (!inherited.isBasicType && !own.isBasicType && TypeRules.isSuperType(inherited, own))
+
   private def parameterPattern(args: Array[Type], typing: Typing): ErasedParameterPattern = {
     // Keep alternatives independent: materializing all complete signatures
     // would require 2^arity strings for primitive/boxed parameters.
@@ -231,10 +244,11 @@ private[compiler] object DuplicationChecks {
    * OVERRIDE_TARGET_NOT_FOUND.
    *
    * An implementation counts as overriding a base method when they share the same
-   * name and the same erased parameter descriptor. Through an applied generic
-   * supertype a primitive/boxed difference also counts, because codegen bridges it;
-   * through a non-generic one it does not (#2896). Only when NO base method matches
-   * by name+arity+param-types is the override rejected.
+   * name and the same erased parameter descriptor, or when codegen bridges the two
+   * (`BridgeMethodEmitter`): through an applied generic supertype a primitive/boxed
+   * difference counts; through a non-generic one only a difference in `?`
+   * (`k: Int?` for `k: Int`), with a return the bridge can pass on (#2896). Only
+   * when NO base method matches is the override rejected.
    */
   def checkOverrideTargets(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     if clazz.isInterface then return
@@ -256,9 +270,12 @@ private[compiler] object DuplicationChecks {
     // form, plus boxing variants, so that primitive/boxed parameter forms match.
     // One entry per base method: its boxing-aware patterns and its exact descriptors.
     // `viaBridge`: the supertype is applied (`G[JInteger]`), so codegen bridges a boxed or
-    // primitive form to it. A non-generic supertype gets no bridge, and `dec(Integer)` beside
-    // an inherited `dec(int)` is an overload that never runs through the base type (#2896).
-    final case class BaseContract(patterns: Seq[ErasedParameterPattern], exact: Set[String], viaBridge: Boolean)
+    // primitive form to it. A non-generic supertype is bridged only for a `?` difference
+    // (`plainNames`, with `returnType`); `dec(JInteger)` beside an inherited `dec(Int)` is an
+    // overload that never runs through the base type (#2896).
+    final case class BaseContract(
+      patterns: Seq[ErasedParameterPattern], exact: Set[String], viaBridge: Boolean,
+      plainNames: Seq[String], returnType: Type)
     val baseContracts = mutable.HashMap[(String, Int), mutable.ArrayBuffer[BaseContract]]()
     val baseNames = mutable.HashSet[String]()
     val requestedKeys = overrideMethods.iterator.map(m => (m.name, m.arguments.length)).toSet
@@ -275,7 +292,8 @@ private[compiler] object DuplicationChecks {
             baseContracts.getOrElseUpdate(key, mutable.ArrayBuffer.empty) += BaseContract(
               Seq(parameterPattern(specializedArgs, typing), parameterPattern(contract.arguments, typing)),
               Set(erasedParamDescriptor(specializedArgs), erasedParamDescriptor(contract.arguments)),
-              viaBridge = viewSubst.nonEmpty)
+              viaBridge = viewSubst.nonEmpty,
+              plainNames = plainNames(contract.arguments), returnType = contract.returnType)
       }
     }
 
@@ -289,9 +307,11 @@ private[compiler] object DuplicationChecks {
       def exactSibling(c: BaseContract): Boolean =
         clazz.methods.exists(o => (o ne impl) && o.name == impl.name && !Modifier.isStatic(o.modifier) &&
           o.arguments.length == impl.arguments.length && c.exact.contains(erasedParamDescriptor(o.arguments)))
+      def bridged(c: BaseContract): Boolean =
+        if c.viaBridge then c.patterns.exists(implPattern.overlaps)
+        else c.plainNames == plainNames(impl.arguments) && bridgeableReturn(c.returnType, impl.returnType)
       val overridesSomething = candidates.exists(c =>
-        c.exact.contains(implExact) ||
-          (c.viaBridge && c.patterns.exists(implPattern.overlaps) && !exactSibling(c)))
+        c.exact.contains(implExact) || (bridged(c) && !exactSibling(c)))
       if !overridesSomething then
         val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
         val paramDescriptor = impl.arguments.map(_.name).mkString(", ")

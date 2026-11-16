@@ -1,5 +1,6 @@
 ### Fixed
 
-- **`override` on a method that differs from the base one only by boxing is now E0068.**
-  - Before: `override def dec(k: Int?)` over `dec(k: Int)` compiled, but never ran: calls went to the base method.
-  - Now: E0068, as in Java. Through a generic supertype (`G[JInteger]`) the boxed form still overrides.
+- **An override whose parameter differs from the base one only by `?` now runs.**
+  - Before: `override def dec(k: Int?): void` over `dec(k: Int): void` compiled, but calls through `Base` ran the base method. With a `String` return the same override did run.
+  - Now: it overrides whatever the return type, also without `override`.
+- **`override def dec(k: JInteger)` over `dec(k: Int)` is E0068, as in Java.** It is an overload; through a generic supertype (`G[JInteger]`) it still overrides.

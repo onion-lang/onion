@@ -238,34 +238,63 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(results.map(_._1).contains(Some("E0068")), s"got: $results")
     }
   }
-  describe("an override that matches a non-generic base method only through boxing (#2896)") {
-    // A non-generic supertype gets no bridge, so `dec(Integer)` and `dec(int)` are two
-    // JVM methods: the "override" would never run.
-    def base(param: String) =
+  describe("an override of a non-generic base method that differs by `?` or by boxing (#2896)") {
+    // Through a non-generic supertype, `k: Int?` for an inherited `k: Int` (or the reverse)
+    // is bridged, so it overrides whatever the return type. `k: JInteger` for `k: Int` is
+    // not bridged: it is an overload, so `override` on it is E0068, as in Java.
+    def program(baseParam: String, subParam: String, ret: String) = {
+      def body(who: String) = ret match
+        case "void" => s"""who = "$who""""
+        case "Int" => s"""who = "$who"; return 1"""
+        case _ => s"""who = "$who"; return "$who""""
       s"""
          |class Base {
          |public:
+         |  var who: String
+         |  def this { who = "" }
+         |  def f(k: $baseParam): $ret { ${body("Base")} }
+         |}
+         |class Up extends Base {
+         |public:
          |  def this {}
-         |  def dec(k: $param): void {}
+         |  override def f(k: $subParam): $ret { ${body("Up")} }
          |}
          |""".stripMargin
+    }
 
-    it("reports E0068 for `override def dec(k: Int?)` over `dec(k: Int)`") {
-      val results = errors(base("Int") + "class Up extends Base {\npublic:\n  def this {}\n  override def dec(k: Int?): void {}\n}\n")
+    // Calls `f` through the base type and returns who ran.
+    def whoRuns(baseParam: String, subParam: String, ret: String): onion.tools.Shell.Result =
+      shell.run(
+        program(baseParam, subParam, ret) +
+          """class Test {
+            |public:
+            |  static def main(args: String[]): String { val b: Base = new Up(); b.f(3); return b.who }
+            |}
+            |""".stripMargin,
+        "BridgedOverride.on", Array())
+
+    it("runs `override def f(k: Int?): void` through the base type") {
+      assert(whoRuns("Int", "Int?", "void") == onion.tools.Shell.Success("Up"))
+    }
+
+    it("runs `override def f(k: Int): void` over `f(k: Int?)`") {
+      assert(whoRuns("Int?", "Int", "void") == onion.tools.Shell.Success("Up"))
+    }
+
+    it("runs `override def f(k: Int?): String` over `f(k: Int): String`") {
+      assert(whoRuns("Int", "Int?", "String") == onion.tools.Shell.Success("Up"))
+    }
+
+    it("runs `override def f(k: Int?): Int` over `f(k: Int): Int`") {
+      assert(whoRuns("Int", "Int?", "Int") == onion.tools.Shell.Success("Up"))
+    }
+
+    it("reports E0068 for `override def f(k: JInteger)` over `f(k: Int)`") {
+      val results = errors(program("Int", "JInteger", "void"))
       assert(results.map(_._1).contains(Some("E0068")), s"got: $results")
     }
 
-    it("reports E0068 for `override def dec(k: Int)` over `dec(k: Int?)`") {
-      val results = errors(base("Int?") + "class Up extends Base {\npublic:\n  def this {}\n  override def dec(k: Int): void {}\n}\n")
-      assert(results.map(_._1).contains(Some("E0068")), s"got: $results")
-    }
-
-    it("reports E0068 for `override def dec(k: JInteger)` over `dec(k: Int)`") {
-      val results = errors(base("Int") + "class Up extends Base {\npublic:\n  def this {}\n  override def dec(k: JInteger): void {}\n}\n")
-      assert(results.map(_._1).contains(Some("E0068")), s"got: $results")
-    }
-
-    it("reports E0068 for a primitive override of a boxed Java method") {
+    it("reports E0068 for a boxed override of a primitive Java method") {
       val results = errors(
         """
           |import { java.io.ByteArrayOutputStream }
@@ -276,27 +305,6 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
           |}
           |""".stripMargin)
       assert(results.map(_._1).contains(Some("E0068")), s"got: $results")
-    }
-
-    it("still accepts an exact override, which runs") {
-      val result = shell.run(
-        """
-          |class Base {
-          |public:
-          |  def this {}
-          |  def dec(k: Int?): Int = 1
-          |}
-          |class Up extends Base {
-          |public:
-          |  def this {}
-          |  override def dec(k: Int?): Int = 2
-          |}
-          |class Test {
-          |public:
-          |  static def main(args: String[]): Int { val b: Base = new Up(); return b.dec(3) }
-          |}
-          |""".stripMargin, "ExactOverride.on", Array())
-      assert(onion.tools.Shell.Success(2) == result)
     }
   }
 }

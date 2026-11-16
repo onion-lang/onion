@@ -29,13 +29,29 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     // method of every generic supertype, with per-argument compatibility checks.
     val ownByName = ownMethods.groupBy(_.name)
     def paramDesc(args: Array[TypedAST.Type]): String = args.map(asmType(_).getDescriptor).mkString("(", "", ")")
-    // Every inherited (name, parameter descriptor). A method whose own parameters
-    // match an inherited one exactly overrides that one, so a `?` bridge must not
-    // also send it a sibling overload (`f(Int?)` beside an inherited `f(Int)`).
-    lazy val inheritedSignatures: Set[(String, String)] =
-      sources.iterator.flatMap((raw, _) => raw.methods.iterator)
-        .filterNot(m => Modifier.isStatic(m.modifier) || Modifier.isPrivate(m.modifier))
-        .map(m => (m.name, paramDesc(m.arguments))).toSet
+    // The inherited (name, parameter descriptor) slots that already run code: the
+    // nearest superclass declaring the slot has a body, or no superclass declares it
+    // and an interface gives a default. Such a slot keeps its own method, so a `?`
+    // bridge must not take it over (`f(Int?)` beside a concrete `Base.f(Int)`). An
+    // abstract slot (`I.f(Int)` beside `J.f(Int?)`) has no code, so the bridge fills it.
+    lazy val concreteInheritedSlots: Set[(String, String)] =
+      def visible(m: TypedAST.Method) = !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier)
+      def rawOf(t: TypedAST.ClassType): TypedAST.ClassType = t match
+        case applied: AppliedClassType => applied.raw
+        case other => other
+      val decided = mutable.HashMap[(String, String), Boolean]()
+      var cls: TypedAST.ClassType = if classDef.isInterface then null else classDef.superClass
+      while cls != null do
+        val raw = rawOf(cls)
+        raw.methods.iterator.filter(visible).foreach { m =>
+          decided.getOrElseUpdate((m.name, paramDesc(m.arguments)), !Modifier.isAbstract(m.modifier))
+        }
+        cls = raw.superClass
+      sources.iterator.filter(_._1.isInterface).flatMap(_._1.methods.iterator).filter(visible).foreach { m =>
+        val slot = (m.name, paramDesc(m.arguments))
+        if !decided.contains(slot) && !Modifier.isAbstract(m.modifier) then decided(slot) = true
+      }
+      decided.iterator.collect { case (slot, true) => slot }.toSet
 
     for (sourceRaw, subst) <- sources do
       def substituteClassParams(tp: TypedAST.Type): TypedAST.Type = substituteTypeVars(tp, subst)
@@ -55,9 +71,10 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 // `foo(x: Int)` is an overload, so arguments must match up to `?`.
                 m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(specializedArgs(i)).name) &&
                 isBridgeableReturn(rawMethod.returnType, m.returnType) && {
-                  // A `?` bridge only for a method that overrides nothing exactly.
+                  // A `?` bridge only when no inherited method with the candidate's
+                  // own parameters already runs in its slot.
                   val own = paramDesc(m.arguments)
-                  own == paramDesc(rawMethod.arguments) || !inheritedSignatures.contains((m.name, own))
+                  own == paramDesc(rawMethod.arguments) || !concreteInheritedSlots.contains((m.name, own))
                 }
               else
                 m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))

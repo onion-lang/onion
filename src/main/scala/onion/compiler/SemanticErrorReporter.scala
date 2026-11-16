@@ -747,7 +747,13 @@ class SemanticErrorReporter(threshold: Int) {
     val className = asString(items(2))
     val baseMessage = format(message("error.semantic.overrideTargetNotFound"), Seq(name, paramDescriptor, className))
 
-    val suggestion = if (items.length > 3) {
+    // A supertype method with the same name and arity: name its signature, since the
+    // user already wrote the right name and only the types differ (#2896).
+    val nearMisses = if (items.length > 4) items(4).asInstanceOf[Array[String]].toSeq else Seq.empty
+    val suggestion = if (nearMisses.nonEmpty) {
+      Some((message("error.suggestion.overrideBaseSignatures") +: nearMisses.map("    " + _) :+
+        ("  " + message("error.suggestion.overrideBaseSignaturesFix"))).mkString(Systems.lineSeparator))
+    } else if (items.length > 3) {
       val candidates = items(3).asInstanceOf[Array[String]]
       toolbox.Suggestions.formatSuggestion(name, candidates.toSeq)
     } else None

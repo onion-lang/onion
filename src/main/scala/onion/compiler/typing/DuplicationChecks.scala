@@ -25,6 +25,19 @@ private[compiler] object DuplicationChecks {
       case other => other.name
     }
 
+  // A parameter or return type as written in source, keeping `JInteger` apart from `Int`:
+  // E0068's hint must show the difference that made the override miss (#2896).
+  private val boxedAliases: Map[String, String] = Map(
+    "java.lang.Integer" -> "JInteger", "java.lang.Long" -> "JLong", "java.lang.Double" -> "JDouble",
+    "java.lang.Float" -> "JFloat", "java.lang.Boolean" -> "JBoolean", "java.lang.Byte" -> "JByte",
+    "java.lang.Short" -> "JShort", "java.lang.Character" -> "JCharacter")
+  private def sourceForm(tp: Type): String = tp match
+    case nt: NullableType => sourceForm(nt.innerType) + "?"
+    case ct: ClassType if !ct.isInstanceOf[AppliedClassType] && boxedAliases.contains(ct.name) => boxedAliases(ct.name)
+    case other => onion.compiler.toolbox.TypeFormatting.sourceForm(other)
+  private def signatureForm(name: String, args: Array[Type], ret: Type): String =
+    s"$name(${args.map(sourceForm).mkString(", ")}): ${sourceForm(ret)}"
+
   // Mirrors `BridgeMethodEmitter.isBridgeableReturn`: the same JVM type, or a covariant reference.
   private def bridgeableReturn(inherited: Type, own: Type): Boolean =
     Erasure.asmType(inherited) == Erasure.asmType(own) ||
@@ -275,7 +288,7 @@ private[compiler] object DuplicationChecks {
     // overload that never runs through the base type (#2896).
     final case class BaseContract(
       patterns: Seq[ErasedParameterPattern], exact: Set[String], viaBridge: Boolean,
-      plainNames: Seq[String], returnType: Type)
+      plainNames: Seq[String], returnType: Type, signature: String)
     val baseContracts = mutable.HashMap[(String, Int), mutable.ArrayBuffer[BaseContract]]()
     val baseNames = mutable.HashSet[String]()
     val requestedKeys = overrideMethods.iterator.map(m => (m.name, m.arguments.length)).toSet
@@ -293,7 +306,8 @@ private[compiler] object DuplicationChecks {
               Seq(parameterPattern(specializedArgs, typing), parameterPattern(contract.arguments, typing)),
               Set(erasedParamDescriptor(specializedArgs), erasedParamDescriptor(contract.arguments)),
               viaBridge = viewSubst.nonEmpty,
-              plainNames = plainNames(contract.arguments), returnType = contract.returnType)
+              plainNames = plainNames(contract.arguments), returnType = contract.returnType,
+              signature = signatureForm(contract.name, specializedArgs, contract.returnType))
       }
     }
 
@@ -314,8 +328,10 @@ private[compiler] object DuplicationChecks {
         c.exact.contains(implExact) || (bridged(c) && !exactSibling(c)))
       if !overridesSomething then
         val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
-        val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
-        typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name, baseNames.toArray)
+        val paramDescriptor = impl.arguments.map(sourceForm).mkString(", ")
+        // Same name and arity in a supertype: show what the override would have to match.
+        val nearMisses = candidates.iterator.map(_.signature).distinct.toArray
+        typing.report(SemanticError.OVERRIDE_TARGET_NOT_FOUND, location, impl.name, paramDescriptor, clazz.name, baseNames.toArray, nearMisses)
     }
   }
 

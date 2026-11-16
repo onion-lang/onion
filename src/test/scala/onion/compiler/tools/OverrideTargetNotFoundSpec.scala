@@ -325,9 +325,52 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(bothOverloads("String") == onion.tools.Shell.Success("Base.f(Int);Up.f(Int?);"))
     }
 
+    // An exact inherited slot that is only abstract (`I.f(Int)` beside `J.f(Int?)`) still
+    // needs the `?` bridge: nothing else fills it (panel block on #3051 at 2bcde1e).
+    def abstractExactSlot(second: String, ret: String): onion.tools.Shell.Result = {
+      val (secondDecl, conformsClause) = second match
+        case "interface" => (s"interface J { def f(k: Int?): $ret }", "conforms I, J")
+        case _ => (s"abstract class J { public: def this {} abstract def f(k: Int?): $ret }", "extends J conforms I")
+      val body = if ret == "void" then "who = \"C\"" else "who = \"C\"; return \"C\""
+      shell.run(
+        s"""
+           |interface I { def f(k: Int): $ret }
+           |$secondDecl
+           |class C $conformsClause {
+           |public:
+           |  var who: String
+           |  def this { who = "" }
+           |  override def f(k: Int?): $ret { $body }
+           |}
+           |class Test {
+           |public:
+           |  static def main(args: String[]): String { val c = new C(); val i: I = c; i.f(1); return c.who }
+           |}
+           |""".stripMargin,
+        "AbstractExactSlot.on", Array())
+    }
+
+    it("bridges `f(k: Int?)` to an abstract interface `f(k: Int)` beside `J.f(k: Int?)` (String)") {
+      assert(abstractExactSlot("interface", "String") == onion.tools.Shell.Success("C"))
+    }
+
+    it("bridges `f(k: Int?)` to an abstract interface `f(k: Int)` beside `J.f(k: Int?)` (void)") {
+      assert(abstractExactSlot("interface", "void") == onion.tools.Shell.Success("C"))
+    }
+
+    it("bridges `f(k: Int?)` to an abstract interface `f(k: Int)` beside an abstract class's `f(k: Int?)`") {
+      assert(abstractExactSlot("abstract", "String") == onion.tools.Shell.Success("C"))
+    }
+
     it("reports E0068 for `override def f(k: JInteger)` over `f(k: Int)`") {
       val results = errors(program("Int", "JInteger", "void"))
       assert(results.map(_._1).contains(Some("E0068")), s"got: $results")
+    }
+
+    it("names the base signature in E0068 when only the types differ") {
+      val results = errors(program("Int", "JInteger", "void"))
+      val e0068 = results.filter(_._1.contains("E0068")).map(_._2)
+      assert(e0068.exists(m => m.contains("f(JInteger)") && m.contains("f(Int): void")), s"got: $results")
     }
 
     it("reports E0068 for a boxed override of a primitive Java method") {

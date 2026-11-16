@@ -414,9 +414,14 @@ object AST {
    */
   case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil, hasPrimary: Boolean = false,
     /** `invariant e` and `history e` clauses of the body, in source order (RFC #2557). */
-    invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration {
+    invariants: List[Expression] = Nil, histories: List[Expression] = Nil,
+    /** Set when Rewriting lowered an `instance Trait[T]` to this class: the trait application as written. */
+    loweredInstance: Option[TypeNode] = None) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
       this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil, false)
+    /** For the JavaCC parser, which cannot use the default for `loweredInstance`. */
+    def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter], hasPrimary: Boolean, invariants: List[Expression], histories: List[Expression]) =
+      this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, typeParameters, hasPrimary, invariants, histories, None)
   }
   case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration], typeParameters: List[TypeParameter] = Nil,
     invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration {

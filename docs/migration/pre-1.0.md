@@ -462,8 +462,7 @@ instance Show[Int] {
 - **What you see:** **E0097** `instance shapes.Show[java.lang.Integer] is already defined`, at
   the second instance.
 - **Fix:** keep one instance and delete the other.
-- **Two files in the same package** (both without a `module` line) still give **E0008**
-  `duplicated class definition Show$$Integer`. The fix is the same.
+- **Two files in the same package** (both without a `module` line) give the same **E0097**.
 - **Type arguments of the type:** E0097 compares only the outer type, so `Show[List[String]]`
   and `Show[List[Integer]]` are one instance and clash.
 - **No `onion migrate` rule:** which instance to keep is your choice.

@@ -138,8 +138,15 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
     val node = ClassDefinition.newClass(declaration.location, declaration.modifiers, typing.createFQCN(moduleName, declaration.name), null, null)
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
     if (typing.table_.lookup(node.name) != null) {
-      typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+      // Two `instance`s of one (trait, type) in a package lower to one class name. Say so (E0097,
+      // as across modules) only when both are lowered instances; a real class is E0008 (#2777).
+      declaration.loweredInstance match {
+        case Some(traitType) if typing.loweredInstanceNames.contains(node.name) =>
+          typing.report(SemanticError.DUPLICATE_TRAIT_INSTANCE, declaration, traitType.desc.toString)
+        case _ => typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+      }
     } else {
+      if (declaration.loweredInstance.isDefined) typing.loweredInstanceNames += node.name
       typing.table_.classes.add(node)
       typing.put(declaration, node)
       typing.add(node.name, new NameResolver(NameResolutionContext.fromTyping(typing, imports)))

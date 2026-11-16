@@ -837,7 +837,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val section = AST.AccessSection(declaration.location, AST.M_PUBLIC, declaration.methods)
     AST.ClassDeclaration(
       declaration.location, declaration.modifiers, mangleInstanceClassName(declaration.traitType.desc),
-      null, List(declaration.traitType), None, List(section), Nil
+      null, List(declaration.traitType), None, List(section), Nil,
+      loweredInstance = Some(declaration.traitType)
     )
   }
 

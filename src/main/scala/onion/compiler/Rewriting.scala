@@ -837,7 +837,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val section = AST.AccessSection(declaration.location, AST.M_PUBLIC, declaration.methods)
     AST.ClassDeclaration(
       declaration.location, declaration.modifiers, mangleInstanceClassName(declaration.traitType.desc),
-      null, List(declaration.traitType), None, List(section), Nil
+      null, List(declaration.traitType), None, List(section), Nil,
+      loweredInstance = Some(declaration.traitType)
     )
   }
 
@@ -1609,8 +1610,18 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val newBlock = withDictScope(declaration.typeParameters.map(_.name), dicts) {
       rewriteBlockWithReturnHint(declaration.block, declaration.returnType)
     }
-    declaration.copy(args = declaration.args ++ dictParams, block = newBlock)
+    declaration.copy(args = rewriteDefaults(declaration.args) ++ dictParams, block = newBlock)
   }
+
+  /** A default argument is an expression like any other: `do[M]` in it needs desugaring too (#3050). */
+  private def rewriteDefaults(args: List[AST.Argument]): List[AST.Argument] =
+    args.map { a =>
+      a.defaultValue match
+        case null => a
+        case doExpr: AST.DoExpression =>
+          a.copy(defaultValue = desugarDoExpression(doExpr, elementTypeHintFor(doExpr.monadType, a.typeRef)))
+        case d => a.copy(defaultValue = rewriteExpression(d))
+    }
 
   /**
    * Like `rewriteBlockExpression`, but when the body is exactly `return do[M] {...}`
@@ -1649,7 +1660,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   def rewriteMethodDeclaration(method: AST.MethodDeclaration): AST.MethodDeclaration = {
     val (dictParams, dicts) = dictionaryParametersFor(method.location, method.typeParameters)
     val newBlock = if (method.block != null) withDictScope(method.typeParameters.map(_.name), dicts) { rewriteBlockWithReturnHint(method.block, method.returnType) } else null
-    method.copy(args = method.args ++ dictParams, block = newBlock)
+    method.copy(args = rewriteDefaults(method.args) ++ dictParams, block = newBlock)
   }
 
   def rewriteFieldDeclaration(field: AST.FieldDeclaration): AST.FieldDeclaration = {
@@ -1666,7 +1677,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   def rewriteConstructorDeclaration(constructor: AST.ConstructorDeclaration): AST.ConstructorDeclaration = {
     val newSuperInits = constructor.superInits.map(rewriteExpression)
     val newBlock = rewriteBlockExpression(constructor.block)
-    constructor.copy(superInits = newSuperInits, block = newBlock)
+    constructor.copy(args = rewriteDefaults(constructor.args), superInits = newSuperInits, block = newBlock)
   }
 
   def rewriteBlockExpression(block: AST.BlockExpression): AST.BlockExpression = {
@@ -2182,7 +2193,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         val restExpr = desugarDoStatements(exprLoc, monadType, rest)
 
         // Create closure: (_) -> { restExpr }
-        val arg = AST.Argument(exprLoc, "_unused", null, null, false)
+        val arg = AST.Argument(exprLoc, AST.DoStatementParameter, null, null, false)
         val closureBody = AST.BlockExpression(exprLoc, List(restExpr))
         val closureType = AST.TypeNode(exprLoc, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(exprLoc, closureType, "call", List(arg), null, closureBody)

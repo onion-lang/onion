@@ -229,6 +229,14 @@ final class ClosureTyping(
                 }
 
                 val triesBefore = bodyContext.tryCount
+                // A side-effect-only tail returns null where the result is open: inferred
+                // from the body, `Object`, or an unpinned type variable. A concrete result
+                // the target fixed (`(Int) -> Int`) needs a value (#3044).
+                // A Java SAM whose result is a type variable (`Map[K, Integer].computeIfAbsent`)
+                // takes null as "no value", as in Java; an Onion function type does not.
+                val javaOpenResult = method.returnType.isInstanceOf[TypeVariableType] &&
+                  !method.affiliation.name.startsWith("onion.Function")
+                val voidTailOk = inferredReturnType.isDefined || javaOpenResult || acceptsVoidTail(expectedRet)
                 val baseBlockOpt =
                   if (useExpressionBody) {
                     // Type the closure body's final (value) expression against the
@@ -237,14 +245,14 @@ final class ClosureTyping(
                     // `Result[Int, String]`) so its type arguments are pinned by the
                     // expected type rather than defaulting to Object (issue #230).
                     body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
-                      Option(buildReturnBlock(node.body, bodyTerm, expectedRet))
+                      Option(buildReturnBlock(node.body, bodyTerm, expectedRet, voidTailOk))
                     }
                   } else if (hasValueTail(node.body)) {
                     // A block lambda with an early `return` returns its last expression
                     // by the same rule as one without (#3025): the tail is typed against
                     // the expected return type, as one more `return`.
                     body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
-                      Option(buildTailReturnBlock(node.body, bodyTerm, expectedRet))
+                      Option(buildTailReturnBlock(node.body, bodyTerm, expectedRet, voidTailOk))
                     }
                   } else {
                     Option(body.translate(node.body, context))
@@ -669,7 +677,7 @@ final class ClosureTyping(
     TypeCheckingHelpers.leastUpperBound(bodyContext.table, node, left, right, bodyContext.rootClass,
       (n, l, r) => bodyContext.report(INCOMPATIBLE_TYPE, n, l, r))
 
-  private def buildReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type): ActionStatement = {
+  private def buildReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type, voidTailOk: Boolean): ActionStatement = {
     val terms = bodyTerm match {
       case begin: Begin => begin.terms.toIndexedSeq
       case single => IndexedSeq(single)
@@ -691,11 +699,16 @@ final class ClosureTyping(
         val stmt = termToStatement(last)
         statements += stmt
         new Return(defaultValue(returnType))
-      } else if (last.`type` == BasicType.VOID && !returnType.isBasicType) {
-        // Side-effect-only body against a reference-typed SAM return
+      } else if (last.`type` == BasicType.VOID && (voidTailOk || neverCompletes(last))) {
+        // Side-effect-only body against an `Object` or still-open SAM return
         // (e.g. Future::async(() -> IO::println(...))): run it, return null
         statements += termToStatement(last)
         new Return(new NullValue(node.location))
+      } else if (last.`type` == BasicType.VOID) {
+        // A concrete result type (`(Int) -> Int`, `Supplier[String]`) and a tail
+        // with no value: the lambda would return null/0 (#3044). Report it at the tail.
+        bodyContext.report(INCOMPATIBLE_TYPE, tailNode(node), returnType, BasicType.VOID)
+        return null
       } else {
         last match {
           case st: StatementTerm =>
@@ -737,7 +750,7 @@ final class ClosureTyping(
    * completes) stays a statement, and the caller appends the default return, as
    * before. Returns null when the tail's type does not fit (reported).
    */
-  private def buildTailReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type): ActionStatement = {
+  private def buildTailReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type, voidTailOk: Boolean): ActionStatement = {
     val terms = bodyTerm match {
       case begin: Begin => begin.terms.toIndexedSeq
       case single => IndexedSeq(single)
@@ -746,9 +759,13 @@ final class ClosureTyping(
     terms.init.foreach(t => statements += termToStatement(t))
     if (terms.nonEmpty) {
       val last = terms.last
-      if (returnType == BasicType.VOID || returnType.isBottomType ||
-          last.`type` == BasicType.VOID || last.`type`.isBottomType) {
+      if (returnType == BasicType.VOID || returnType.isBottomType || last.`type`.isBottomType ||
+          (last.`type` == BasicType.VOID && (voidTailOk || neverCompletes(last)))) {
         statements += termToStatement(last)
+      } else if (last.`type` == BasicType.VOID) {
+        // As in buildReturnBlock: no value to return for a concrete result type (#3044).
+        bodyContext.report(INCOMPATIBLE_TYPE, tailNode(node), returnType, BasicType.VOID)
+        return null
       } else {
         val assigned = processAssignable(node, returnType, last)
         if (assigned == null) return null
@@ -757,6 +774,26 @@ final class ClosureTyping(
     }
     new StatementBlock(statements.asJava)
   }
+
+  /**
+   * Whether a SAM result type leaves a void tail acceptable: any nullable result, `Void`,
+   * `Object` (what an inferred side-effect body becomes) or a type variable nothing pinned.
+   * The body then returns null. A non-null result such as `Int` or `String` needs a value,
+   * as in Java (#3044). A tail that never completes (`while true`) is always fine.
+   */
+  private def acceptsVoidTail(returnType: Type): Boolean = returnType match {
+    case _: TypedAST.NullableType => true
+    case t: ClassType if t.name == "java.lang.Void" => true
+    case t => t == bodyContext.rootClass || t.isInstanceOf[TypeVariableType]
+  }
+
+  /** A tail that cannot complete normally (an infinite loop, `return`, `throw`) needs no value. */
+  private def neverCompletes(term: Term): Boolean =
+    StatementReachability.definitelyReturns(termToStatement(term))
+
+  /** The block's last element, where a problem with the lambda's result is reported. */
+  private def tailNode(node: AST.BlockExpression): AST.Node =
+    node.elements.lastOption.getOrElse(node)
 
   private def termToStatement(term: Term): ActionStatement = term match {
     case st: StatementTerm => st.statement

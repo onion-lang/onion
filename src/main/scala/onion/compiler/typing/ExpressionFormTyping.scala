@@ -149,7 +149,11 @@ final class ExpressionFormTyping(
     case _ =>
       typed(node.src, context).flatMap { term =>
         typing.mapFrom(node.to, bodyContext.mapper).flatMap { destination =>
-          if (!isValidCast(term.`type`, destination)) {
+          if (term.`type` == BasicType.VOID) {
+            // A void call has no value to cast (#2891).
+            bodyContext.report(IS_NOT_BOXABLE_TYPE, node.src, term.`type`)
+            None
+          } else if (!isValidCast(term.`type`, destination)) {
             // `!!` cannot fix a nullable cast that is rejected here: the non-null value
             // does not cast either. Report that type, so its own hint shows (#2309, #2388).
             // The message still shows the `?`, and a List/array hint stays null-safe (`xs!!`).

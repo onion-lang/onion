@@ -144,7 +144,7 @@ private[compiler] final class DeclarationBodySupport(
         job(node.name, node.args, typing.kernelNodeOf[MethodDefinition](node)) {
           typing.kernelNodeOf[MethodDefinition](node).foreach { function =>
             typing.loadTopClass.collect { case cd: ClassDefinition => cd }.foreach(unitContext.currentDefinition = _)
-            typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
+            typing.findTopClassMapper.foreach(unitContext.currentMapper = _)
             typing.openTypeParams(typing.emptyTypeParams ++ typeParams(node)) {
               methodBodySupport.predefineDefaults(function, node.args)
             }

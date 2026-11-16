@@ -13,9 +13,14 @@ public final class Text {
     }
 
     /**
-     * Greedily word-wraps {@code text} into lines no longer than {@code width}
-     * (a word longer than {@code width} still occupies its own line). Existing
-     * newlines are treated as hard breaks. Returns the wrapped lines.
+     * Greedily word-wraps {@code text} into lines at most {@code width} terminal
+     * columns wide, counted as {@link #table} counts them (a full-width character
+     * takes two). Lines break at spaces, and also before or after a full-width
+     * character, so Japanese or Chinese text with no spaces wraps too; no space is
+     * added at such a break. Closing punctuation ({@code 。、」）}) never starts a
+     * line and an opening bracket ({@code 「（}) never ends one. A piece that cannot
+     * be broken and is wider than {@code width} still occupies its own line.
+     * Existing newlines are treated as hard breaks. Returns the wrapped lines.
      */
     public static List<String> wrap(String text, int width) {
         List<String> lines = new ArrayList<>();
@@ -24,20 +29,65 @@ public final class Text {
         for (String paragraph : text.split("\n", -1)) {
             String[] words = paragraph.trim().split("\\s+");
             StringBuilder line = new StringBuilder();
+            int lineWidth = 0;
             for (String word : words) {
                 if (word.isEmpty()) continue;
-                if (line.length() == 0) {
-                    line.append(word);
-                } else if (line.length() + 1 + word.length() <= w) {
-                    line.append(' ').append(word);
-                } else {
-                    lines.add(line.toString());
-                    line = new StringBuilder(word);
+                boolean firstPiece = true;
+                for (String piece : breakablePieces(word)) {
+                    int pw = displayWidth(piece);
+                    int sep = (firstPiece && line.length() > 0) ? 1 : 0;
+                    if (line.length() == 0) {
+                        line.append(piece);
+                        lineWidth = pw;
+                    } else if (lineWidth + sep + pw <= w) {
+                        if (sep == 1) line.append(' ');
+                        line.append(piece);
+                        lineWidth += sep + pw;
+                    } else {
+                        lines.add(line.toString());
+                        line = new StringBuilder(piece);
+                        lineWidth = pw;
+                    }
+                    firstPiece = false;
                 }
             }
             lines.add(line.toString());
         }
         return lines;
+    }
+
+    /** Closing punctuation that must not start a line (kinsoku). */
+    private static final String NO_LINE_START = "、。，．・：；？！ー）」』】〕〉》〙〗｝］…‥ゝゞヽヾ々〆ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶ),.;:!?]}";
+    /** Opening brackets that must not end a line. */
+    private static final String NO_LINE_END = "（「『【〔〈《〘〖｛［([";
+
+    /**
+     * Splits one space-free word into the pieces a line may break between: a run of
+     * narrow characters stays whole, and each full-width character is its own piece.
+     * Closing punctuation and zero-width marks join the piece before them, and an
+     * opening bracket joins the piece after it.
+     */
+    private static List<String> breakablePieces(String word) {
+        List<String> pieces = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        boolean curWide = false;
+        boolean glueNext = false;
+        for (int i = 0; i < word.length(); ) {
+            int cp = word.codePointAt(i);
+            i += Character.charCount(cp);
+            boolean wide = isWide(cp);
+            boolean breakHere = cur.length() > 0 && (wide || curWide)
+                && !glueNext && !isZeroWidth(cp) && NO_LINE_START.indexOf(cp) < 0;
+            if (breakHere) {
+                pieces.add(cur.toString());
+                cur = new StringBuilder();
+            }
+            cur.appendCodePoint(cp);
+            if (!isZeroWidth(cp)) curWide = wide;
+            glueNext = NO_LINE_END.indexOf(cp) >= 0 || cp == 0x200D;
+        }
+        if (cur.length() > 0) pieces.add(cur.toString());
+        return pieces;
     }
 
     /** Prefixes every line of {@code text} with {@code prefix}. */
@@ -121,12 +171,16 @@ public final class Text {
         for (int i = 0; i < s.length(); ) {
             int cp = s.codePointAt(i);
             i += Character.charCount(cp);
-            int type = Character.getType(cp);
-            if (type == Character.NON_SPACING_MARK || type == Character.ENCLOSING_MARK
-                    || type == Character.FORMAT) continue;
+            if (isZeroWidth(cp)) continue;
             w += isWide(cp) ? 2 : 1;
         }
         return w;
+    }
+
+    private static boolean isZeroWidth(int cp) {
+        int type = Character.getType(cp);
+        return type == Character.NON_SPACING_MARK || type == Character.ENCLOSING_MARK
+            || type == Character.FORMAT;
     }
 
     private static boolean isWide(int cp) {

@@ -431,7 +431,7 @@ instance Show[Int] {
 
 - **表示されるもの:** 2つ目のインスタンスで **E0097** `instance shapes.Show[java.lang.Integer] is already defined`。
 - **直し方:** インスタンスを1つだけ残し、もう1つを削除してください。
-- **同じパッケージの2つのファイル**（どちらも `module` 行なし）では、これまでどおり **E0008** `duplicated class definition Show$$Integer` になります。直し方は同じです。
+- **同じパッケージの2つのファイル**（どちらも `module` 行なし）でも、同じ **E0097** になります。
 - **型の型引数:** E0097 は外側の型だけを比べます。そのため `Show[List[String]]` と `Show[List[Integer]]` は同じインスタンスとみなされ、衝突します。
 - **`onion migrate` の規則はありません:** どちらのインスタンスを残すかは、あなたが決めることです。
 
@@ -564,3 +564,21 @@ Yaml::stringify(["apple", "banana"].map { x -> ["v": x] })   // - v: apple ...
   - 空の Map はリストから除いてください。
   - 書く前に、NaN や無限大を自分で選んだ値 (`null` や番兵値) に置き換えてください。
 - **`onion migrate` の規則はありません:** 拒否される入力はソースの書き方ではなく実行時の値です。そのため、書き換えでは見つけられません。代わりに例外のメッセージが直し方を示します。
+
+## `Args` の `intOption` は `Int` でない値を拒否するようになりました
+
+`opts.intOption(name, default)` は、値が整数でないときに既定値を返していました。そのため、`--count 10O`（英字の O）のような打ち間違いも、何事もなかったように動いていました。今は例外を投げます。自動 CLI（`def main(count: Int = 3)`）は、同じ入力をすでに拒否していました（#2881）。
+
+```onion
+import { onion.Args }
+def main(args: String[]): void {
+  val opts = Args::parse(args)
+  println(opts.intOption("count", 3))   // --count abc  以前: 3。今: 例外
+}
+```
+
+- **表示されるもの:** 実行時に `IllegalArgumentException: invalid value for --count: 'abc' (expected Int)` が出て、終了コードは 1 です。メッセージはオプション名と値を示します。
+- **変わらないもの:** オプションがなければ、これまでどおり既定値を返します。正しい値（`--count 7`、`--count -5`）もこれまでどおり読み取れます。
+- **以前の結果を保つには:** 例外を捕まえて既定値を使います。
+  `val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }`
+- **`onion migrate` の規則はありません:** 以前の動作は、実行時のエラーを握りつぶしていただけです。ソースには書き換えるものがありません。不正な値でプログラムを止めるべきかどうかは、書いた人にしか分かりません。

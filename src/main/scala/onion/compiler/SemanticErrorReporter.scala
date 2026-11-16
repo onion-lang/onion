@@ -1085,6 +1085,10 @@ class SemanticErrorReporter(threshold: Int) {
         problem(position, message("error.semantic.superInExtension"))
       case SemanticError.METHOD_NOT_FOUND =>
         reportMethodNotFound(position, items)
+      case SemanticError.CANNOT_CALL_METHOD_ON_PRIMITIVE if items.length > 2 && items(2) == SemanticErrorReporter.DoStatementVoidHint =>
+        problem(position, appendSuggestion(
+          format(message("error.semantic.doStatementVoid"), Seq(typeName(items(0)))),
+          Some(message("suggestion.doStatementVoid"))))
       case SemanticError.FIELD_NOT_FOUND =>
         reportFieldNotFound(position, items)
       case SemanticError.LABEL_NOT_FOUND =>
@@ -1302,6 +1306,10 @@ object SemanticErrorReporter {
    * (#2605). No cast makes an `Int` a condition, so the message shows one instead.
    */
   private[compiler] final case class ContractClauseHint(keyword: String)
+
+  /** An extra (third) item on CANNOT_CALL_METHOD_ON_PRIMITIVE: the void value is a bare
+   *  statement of a `do[M]` block, which the rewriter turned into a `bind` call (#2715). */
+  private[compiler] case object DoStatementVoidHint
 
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */

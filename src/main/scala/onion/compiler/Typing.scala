@@ -184,6 +184,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   /** (trait FQCN, type argument FQCN) -> the instance class declared for it, across
     * every unit of this run; a second one is E0097 (TypingDuplicationPass, #2770). */
   private[compiler] val traitInstances = scala.collection.mutable.HashMap.empty[(String, String), String]
+  /** Names of classes registered from a lowered `instance` (TypingHeaderPass.registerClass). */
+  private[compiler] val loweredInstanceNames = scala.collection.mutable.Set.empty[String]
   /** Whether contract clauses are accepted (RFC #2557). */
   private[compiler] def contractMode: ContractMode = config.contracts
 
@@ -252,9 +254,13 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     for(unit <- source) {
       new onion.compiler.typing.TypingHeaderPass(this, session.activate(unit)).checkImports()
     }
-    processTypeParameters(source)
+    val heldBoundChecks = processTypeParameters(source)
     for(unit <- source) processOutline(unit)
     cutInheritanceCycles()
+    // A bound inside a type-parameter bound (`[T extends Num[String]]`) is checked only now:
+    // `Num` may be declared later, so its own bounds were placeholders then, and an argument's
+    // supertypes (`MyNum extends Number`) are known only after the outline (#2967).
+    for((unit, checks) <- heldBoundChecks) { session.activate(unit); checks.foreach(_()) }
     // Every unit's defaults are typed before any body, so a call may omit a default
     // declared later in its file or in another file (#2653).
     val bodyPasses = source.map(unit => unit -> new onion.compiler.typing.TypingBodyPass(this, session.activate(unit)))
@@ -299,9 +305,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   def processOutline(unit: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).run()
   /** Every unit's type parameters, before any unit's outline, so file order does not matter (#2853). */
-  private def processTypeParameters(source: Seq[AST.CompilationUnit]): Unit = {
+  private def processTypeParameters(source: Seq[AST.CompilationUnit]): Seq[(AST.CompilationUnit, List[() => Unit])] = {
     for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameterPlaceholders()
-    for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameters()
+    for (unit <- source) yield {
+      val pass = new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit))
+      unit -> holdBoundChecks(pass.registerTypeParameters())
+    }
   }
   def processTyping(unit: AST.CompilationUnit): Unit = {
     val pass = new onion.compiler.typing.TypingBodyPass(this, session.activate(unit))
@@ -398,6 +407,23 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     } finally ctx.deferringBoundChecks -= 1
   }
 
+  /**
+   * Runs `block` with bound checks deferred like [[withDeferredBoundChecks]], but returns the
+   * collected checks instead of running them, for the caller to run once later (#2967).
+   */
+  private[compiler] def holdBoundChecks(block: => Unit): List[() => Unit] = {
+    val ctx = currentUnitContext
+    ctx.deferringBoundChecks += 1
+    try {
+      block
+      if (ctx.deferringBoundChecks == 1) {
+        val pending = ctx.deferredBoundChecks.toList
+        ctx.deferredBoundChecks.clear()
+        pending
+      } else Nil
+    } finally ctx.deferringBoundChecks -= 1
+  }
+
   /** True while inside [[withDeferredBoundChecks]]; bound checks queue instead of run. */
   private[compiler] def boundChecksDeferred: Boolean = currentUnitContext.deferringBoundChecks > 0
 
@@ -429,7 +455,21 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   /** Loads a class the compiler itself depends on; throws if the classpath is broken. */
   def loadRequired(name: String): ClassType = table_.loadRequired(name)
   /** The top-level container class; absent when the unit has only type declarations. */
-  def loadTopClass: Option[ClassType] = table_.load(topClass)
+  def loadTopClass: Option[ClassType] = if (ownsTopClass) table_.load(topClass) else None
+  /** Which unit's top-level code became each container class (`xMain`). */
+  private[compiler] val topLevelContainerOwners = scala.collection.mutable.Map[String, AST.CompilationUnit]()
+  /** Units with top-level code whose container name another unit took (already E0008, #2690). */
+  private[compiler] val duplicateScriptUnits =
+    java.util.Collections.newSetFromMap(new java.util.IdentityHashMap[AST.CompilationUnit, java.lang.Boolean]())
+  /**
+   * False when another file with the same name owns `topClass`: a class-only `e1/y.on`
+   * must not take `e2/y.on`'s `yMain` as its own (#2956). A duplicate script still types
+   * against the other file's container, so it reports its E0008 and nothing else.
+   */
+  private[compiler] def ownsTopClass: Boolean =
+    topLevelContainerOwners.get(topClass).forall(_ eq unit_) || duplicateScriptUnits.contains(unit_)
+  /** The name resolver of this unit's own container, if it has one. */
+  private[compiler] def findTopClassMapper: Option[NameResolver] = if (ownsTopClass) find(topClass) else None
   def loadArray(base: Type, dimension: Int): ArrayType = table_.loadArray(base, dimension)
   def rootClass: ClassType = table_.rootClass
   def problems: Array[CompileError] = diagnostics.problems

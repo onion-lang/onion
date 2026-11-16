@@ -60,6 +60,44 @@ class ArgsSpec extends AbstractShellSpec {
       assert(Shell.Success("-5:-5:false") == result)
     }
 
+    it("rejects a non-integer --name value instead of silently using the default (#2881)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    try {
+          |      return "" + o.intOption("count", 3)
+          |    } catch e: IllegalArgumentException {
+          |      return e.getMessage()
+          |    }
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsBadInt.on",
+        Array("--count", "abc")
+      )
+      assert(Shell.Success("invalid value for --count: 'abc' (expected Int)") == result)
+    }
+
+    it("still uses the default when the option is absent (#2881)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    return "" + o.intOption("count", 3)
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsAbsentInt.on",
+        Array[String]()
+      )
+      assert(Shell.Success("3") == result)
+    }
+
     it("accepts a negative decimal as a --name value") {
       val result = shell.run(
         """

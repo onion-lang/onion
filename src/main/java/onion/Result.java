@@ -90,7 +90,7 @@ public sealed interface Result<T, E> permits Result.Ok, Result.Err {
 
         @Override
         public T get() {
-            throw new java.util.NoSuchElementException("Err.get()");
+            throw new java.util.NoSuchElementException("Err.get(): " + error);
         }
 
         @Override
@@ -119,7 +119,7 @@ public sealed interface Result<T, E> permits Result.Ok, Result.Err {
         @Override
         public T getOrThrow() {
             if (error instanceof Throwable t) {
-                throw new RuntimeException(t);
+                throw Result.<RuntimeException>sneakyThrow(t);
             }
             throw new RuntimeException(String.valueOf(error));
         }
@@ -243,9 +243,17 @@ public sealed interface Result<T, E> permits Result.Ok, Result.Err {
     }
 
     /**
-     * Gets the success value or throws the error (wrapped in RuntimeException if not Throwable).
+     * Gets the success value, or throws the error itself when it is a {@code Throwable}
+     * (checked ones included, unwrapped, so {@code catch e: IOException} still fires).
+     * Any other error is wrapped in a {@code RuntimeException} carrying its text.
      */
     T getOrThrow();
+
+    /** Throws {@code t} as itself, even a checked exception, without wrapping it. */
+    @SuppressWarnings("unchecked")
+    private static <X extends Throwable> X sneakyThrow(Throwable t) throws X {
+        throw (X) t;
+    }
 
     /**
      * Gets the success value or throws a custom exception.

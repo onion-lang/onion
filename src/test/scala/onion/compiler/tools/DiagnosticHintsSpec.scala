@@ -258,6 +258,13 @@ class DiagnosticHintsSpec extends AnyFunSpec {
       assert(errors.exists(_.contains("toArray(new String[0])")), s"expected a toArray hint, got: $errors")
     }
 
+    it("hints `list!!.toArray` for a nullable List, so the suggested call compiles (#2903)") {
+      val errors = callErrors("List[String]?", "[\"echo\", \"a\"]", "Proc::run(xs)")
+      assert(errors.exists(_.contains("list!!.toArray(new String[0])")), s"expected a null-safe hint, got: $errors")
+      val followed = callErrors("List[String]?", "[\"echo\", \"a\"]", "Proc::run(xs!!.toArray(new String[0]))")
+      assert(followed.isEmpty, s"the suggested call should compile, got: $followed")
+    }
+
     it("gives no toArray hint for a List[Int], whose elements would not fit") {
       val errors = callErrors("List[Int]", "[1]", "Proc::run(xs)")
       assert(errors.nonEmpty && errors.forall(!_.contains("toArray")), s"did not expect a toArray hint, got: $errors")

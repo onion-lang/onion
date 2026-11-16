@@ -70,5 +70,40 @@ class GenericInstanceCallViewInferenceSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, out)
       assert(out.trim == "object", out)
     }
+    it("falls back to Object when T sits inside another formal, Comparable[T]") {
+      val (r, out) = runCapturing(
+        """def pick[T](c: Comparable[T], d: Comparable[T]): String = "generic"
+          |def pick(c: Object, d: Object): String = "object"
+          |def main(args: String[]): Int { IO::println(pick("a", 1)); IO::println(pick("a", "b")); return 0 }
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim.linesIterator.toList == List("object", "generic"), out)
+    }
+    it("falls back to Object when T sits inside another formal, List[T]") {
+      val (r, out) = runCapturing(
+        """import { java.util.* }
+          |def pick[T](c: Comparable[T], d: List[T]): String = "generic"
+          |def pick(c: Object, d: Object): String = "object"
+          |def main(args: String[]): Int {
+          |  val xs: List[Integer] = new ArrayList[Integer]()
+          |  val ys: List[String] = new ArrayList[String]()
+          |  IO::println(pick("a", xs)); IO::println(pick("a", ys)); return 0
+          |}
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim.linesIterator.toList == List("object", "generic"), out)
+    }
+    it("falls back to an Object instance overload when T sits inside another formal") {
+      val (r, out) = runCapturing(
+        """class U {
+          |public:
+          |  def pick[T](c: Comparable[T], d: Comparable[T]): String = "generic"
+          |  def pick(c: Object, d: Object): String = "object"
+          |}
+          |def main(args: String[]): Int { IO::println(new U().pick("a", 1)); return 0 }
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim == "object", out)
+    }
   }
 }

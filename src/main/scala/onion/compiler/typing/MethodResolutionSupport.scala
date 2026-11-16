@@ -149,14 +149,40 @@ private[compiler] final class MethodResolutionSupport(
         case _ =>
       i += 1
     if bound.isEmpty then return true
+    // Every formal that mentions a bound variable must accept its argument with the binding
+    // substituted, wherever the variable sits: `d: T`, `d: Comparable[T]` and `d: List[T]`
+    // alike. This is the check the call gets after selection, so a candidate that passes here
+    // cannot fail there.
+    val subst = bound.toMap
+    val empty = scala.collection.immutable.Map.empty[String, Type]
     var j = 0
     while j < params.length && j < formals.length do
-      formals(j) match
-        case tv: TypeVariableType if bound.contains(tv.name) =>
-          if !isAssignableWithBoxing(bound(tv.name), params(j).`type`) then return false
-        case _ =>
+      if mentionsAny(formals(j), subst.keySet) then
+        val formal = TypeSubstitution.substituteType(formals(j), empty, subst, defaultToBound = false)
+        val ok =
+          if containsMethodTypeParam(formal, methodTypeParams) then
+            structuralMatch(formal, params(j).`type`, methodTypeParams)
+          else
+            isAssignableWithBoxing(formal, params(j).`type`) || viewFits(formal, params(j).`type`)
+        if !ok then return false
       j += 1
     true
+
+  private def mentionsAny(tp: Type, names: Set[String]): Boolean = tp match
+    case tv: TypeVariableType => names.contains(tv.name)
+    case ap: AppliedClassType => ap.typeArguments.exists(mentionsAny(_, names))
+    case at: ArrayType => mentionsAny(at.component, names)
+    case n: NullableType => mentionsAny(n.innerType, names)
+    case _ => false
+
+  /** A plain class fits an applied formal through its own applied view with equal arguments. */
+  private def viewFits(formal: Type, actual: Type): Boolean = (formal, actual) match
+    case (ae: AppliedClassType, aa: ClassType) if !aa.isInstanceOf[AppliedClassType] =>
+      table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
+        .collectFirst { case (raw, view) if sameClass(raw, ae.raw) => view }
+        .exists(view => view.typeArguments.length == ae.typeArguments.length &&
+          view.typeArguments.zip(ae.typeArguments).forall((a, e) => isAssignableWithBoxing(e, a) && isAssignableWithBoxing(a, e)))
+    case _ => false
 
   /**
    * Whether every reference argument fills its slot by the rule the argument check after

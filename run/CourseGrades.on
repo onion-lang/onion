@@ -50,8 +50,8 @@ class Enrollment {
 
   public:
   def this(s: Student) {
-    self.student = s
-    self.assignments = ([] as List[Assignment])
+    this.student = s
+    this.assignments = ([] as List[Assignment])
   }
 
   def getStudent(): Student = student
@@ -91,10 +91,10 @@ class Course {
 
   public:
   def this(id: String, title: String, instructor: String) {
-    self.courseId = id
-    self.title = title
-    self.instructor = instructor
-    self.enrollments = ([] as List[Enrollment])
+    this.courseId = id
+    this.title = title
+    this.instructor = instructor
+    this.enrollments = ([] as List[Enrollment])
   }
 
   def enroll(s: Student): Enrollment {

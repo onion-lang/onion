@@ -9,16 +9,16 @@
 
 extension Int {
   def minuteLabel(): String {
-    if self < 60 { return "#{self}min" }
-    val h: Int = self / 60
-    val m: Int = self % 60
+    if this < 60 { return "#{this}min" }
+    val h: Int = this / 60
+    val m: Int = this % 60
     if m == 0 { return "#{h}h" }
     val ms: String = if m < 10 { "0#{m}" } else { "#{m}" }
     return "#{h}h#{ms}m"
   }
   def centLabel(): String {
-    val dollars: Int = self / 100
-    val cents: Int   = self % 100
+    val dollars: Int = this / 100
+    val cents: Int   = this % 100
     val cs: String = if cents < 10 { "0#{cents}" } else { "#{cents}" }
     return "$#{dollars}.#{cs}"
   }
@@ -26,7 +26,7 @@ extension Int {
 
 extension String {
   def pad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }

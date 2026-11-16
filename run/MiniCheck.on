@@ -51,24 +51,24 @@ record TestResult(name: String, outcome: TestOutcome) {
 // ── Extension methods ─────────────────────────────────────────────────────────
 
 extension Int {
-  def absVal(): Int                   = Math::abs(self)
-  def clamp(lo: Int, hi: Int): Int    = Math::max(lo, Math::min(hi, self))
-  def sign(): Int = if self > 0 { 1 } else { if self < 0 { -1 } else { 0 } }
-  def between(lo: Int, hi: Int): Boolean = self >= lo && self <= hi
+  def absVal(): Int                   = Math::abs(this)
+  def clamp(lo: Int, hi: Int): Int    = Math::max(lo, Math::min(hi, this))
+  def sign(): Int = if this > 0 { 1 } else { if this < 0 { -1 } else { 0 } }
+  def between(lo: Int, hi: Int): Boolean = this >= lo && this <= hi
 }
 
 extension String {
-  def reversed(): String = new StringBuilder(self).reverse().toString()
+  def reversed(): String = new StringBuilder(this).reverse().toString()
   def padTo(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def freqOf(ch: Char): Int {
     var count: Int = 0
     var i: Int = 0
-    while i < self.length() {
-      if self.charAt(i) == ch { count++ }
+    while i < this.length() {
+      if this.charAt(i) == ch { count++ }
       i++
     }
     return count

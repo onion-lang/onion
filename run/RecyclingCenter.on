@@ -48,7 +48,7 @@ public:
 
 extension Int {
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -56,10 +56,10 @@ extension Int {
 
 extension Double {
   def round2(): Double {
-    return ((self * 100.0 + 0.5) as Int) * 1.0 / 100.0
+    return ((this * 100.0 + 0.5) as Int) * 1.0 / 100.0
   }
   def fmt(): String {
-    val r: Double = self.round2()
+    val r: Double = this.round2()
     val whole: Int = r as Int
     val frac: Int  = ((r - (whole as Double)) * 100.0 + 0.5) as Int
     val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }

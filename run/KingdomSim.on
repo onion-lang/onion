@@ -11,39 +11,39 @@ import { java.util.ArrayList; java.util.LinkedHashMap as JLinkedHashMap; }
 // ─── Extensions ───────────────────────────────────────────────────────────────
 
 extension Int {
-  def coins(): String = "#{self}g"
-  def pct(): String   = "#{self}%"
-  def abs(): Int { if self < 0 { return 0 - self } return self }
+  def coins(): String = "#{this}g"
+  def pct(): String   = "#{this}%"
+  def abs(): Int { if this < 0 { return 0 - this } return this }
   def clamp(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
+    if this < lo { return lo }
+    if this > hi { return hi }
+    return this
   }
 }
 
 extension Double {
   def round2(): Double {
-    val s: Long = (self * 100.0 + 0.5) as Long
+    val s: Long = (this * 100.0 + 0.5) as Long
     return (s as Double) / 100.0
   }
-  def pct(): String = "#{(self * 100.0).round2()}%"
+  def pct(): String = "#{(this * 100.0).round2()}%"
 }
 
 extension String {
   def pad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def center(w: Int): String {
-    val gap: Int = w - self.length()
-    if gap <= 0 { return self }
+    val gap: Int = w - this.length()
+    if gap <= 0 { return this }
     val left: Int = gap / 2
     val right: Int = gap - left
     var s: String = ""
     var i: Int = 0
     while i < left  { s = s + " "; i = i + 1 }
-    s = s + self
+    s = s + this
     i = 0
     while i < right { s = s + " "; i = i + 1 }
     return s
@@ -51,7 +51,7 @@ extension String {
   def rep(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
 }
@@ -146,7 +146,7 @@ public:
     = new Resource(ResourceType::Gold, n).times(0).amount() == 0
   def plus(o: Resource): Resource {
     if kind == o.kind() { return new Resource(kind, amount + o.amount()) }
-    return self
+    return this
   }
   def times(factor: Int): Resource = new Resource(kind, (amount * factor).clamp(0, 99999))
   def minus(n: Int): Resource = new Resource(kind, (amount - n).clamp(0, 99999))

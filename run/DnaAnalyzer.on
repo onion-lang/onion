@@ -126,14 +126,14 @@ public:
 extension Int {
   def toPercent(total: Int): String {
     if total == 0 { return "0.0%" }
-    val p: Double = (self * 100.0) / total
+    val p: Double = (this * 100.0) / total
     return "#{p}%"
   }
-  def formatBp(): String = "#{self} bp"
+  def formatBp(): String = "#{this} bp"
   def clamp(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
+    if this < lo { return lo }
+    if this > hi { return hi }
+    return this
   }
 }
 
@@ -141,26 +141,26 @@ extension String {
   def countChar(ch: String): Int {
     var count: Int = 0
     var i: Int = 0
-    while i < self.length() {
-      if self.substring(i, i + 1) == ch { count++ }
+    while i < this.length() {
+      if this.substring(i, i + 1) == ch { count++ }
       i++
     }
     return count
   }
   def reverseStr(): String {
     var result: String = ""
-    var i: Int = self.length() - 1
+    var i: Int = this.length() - 1
     while i >= 0 {
-      result = result + self.substring(i, i + 1)
+      result = result + this.substring(i, i + 1)
       i--
     }
     return result
   }
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + "..."
+    if this.length() <= n { return this }
+    return this.substring(0, n) + "..."
   }
-  def isPalindrome(): Boolean = self == self.reverseStr()
+  def isPalindrome(): Boolean = this == this.reverseStr()
 }
 
 // ── DnaSequence class ─────────────────────────────────────────────────────────

@@ -60,7 +60,11 @@ object Migrator:
       val (line, column) = lineColumnOf(source, offset)
       Edit(offset, 3, "yield", line, column, "ret -> yield")
     }
-    val all = (edits ++ clauses).sortBy(_.offset)
+    val selves = SelfToThis.find(source).filterNot(insideClause).map { offset =>
+      val (line, column) = lineColumnOf(source, offset)
+      Edit(offset, 4, "this", line, column, "self -> this", subject = "`self`")
+    }
+    val all = (edits ++ selves ++ clauses).sortBy(_.offset)
     Result(apply(source, all), all, (notes ++ clauseNotes).sortBy(n => (n.line, n.column)))
 
   /**
@@ -215,6 +219,27 @@ object Migrator:
           bodies += ((start + 2, image.substring(start + 2, i - 1)))
           from = i
     bodies.toSeq
+
+  /**
+   * `self` → `this` (RFC #2788, #2737). `self` is a reserved word that always meant the current
+   * instance, so every `self` code token is the old spelling, and so is every `self` in the
+   * code of a string's `#{...}`. Plain string text, raw and scheme strings, `\#{` escapes,
+   * comments and a backticked `` `self` `` are other tokens, and are left alone.
+   */
+  private object SelfToThis:
+    def find(source: String): Seq[Int] =
+      val tokens =
+        try codeTokens(source)
+        catch case _: Exception => IndexedSeq.empty
+      tokens.flatMap { token =>
+        offsetOf(source, token.beginLine, token.beginColumn)
+          .filter(offset => source.startsWith(token.image, offset))
+          .toSeq
+          .flatMap { offset =>
+            if token.kind == K.K_SELF then Seq(offset)
+            else interpolationBodies(token).flatMap((start, body) => find(body).map(offset + start + _))
+          }
+      }
 
   /**
    * `law name(p: T) { e }` and `example [name] { e }` → a contract predicate (#2740).

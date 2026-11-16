@@ -298,17 +298,17 @@ foreach hObj: Object in sorted {
 
 extension String {
   def pad(width: Int): String {
-    var s = self
+    var s = this
     while s.length() < width { s = s + " " }
     return s
   }
   def center(width: Int): String {
-    val spaces = width - self.length()
+    val spaces = width - this.length()
     val left   = spaces / 2
     var r      = ""
     var i      = 0
     while i < left { r = r + " "; i = i + 1 }
-    r = r + self
+    r = r + this
     while r.length() < width { r = r + " " }
     return r
   }

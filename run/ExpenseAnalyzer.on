@@ -54,11 +54,11 @@ public:
 // ── Extensions ────────────────────────────────────────────────────────────────
 
 extension Double {
-  def round2(): Double = (Math::round(self * 100.0) as Double) / 100.0
-  def fmt(): String = "#{(Math::round(self * 100.0) as Long) / 100.0}"
+  def round2(): Double = (Math::round(this * 100.0) as Double) / 100.0
+  def fmt(): String = "#{(Math::round(this * 100.0) as Long) / 100.0}"
   def bar(max: Double, width: Int): String {
     if max <= 0.0 { return "" }
-    val filled: Int = Math::min((self / max * width as Double) as Int, width)
+    val filled: Int = Math::min((this / max * width as Double) as Int, width)
     var s: String = ""
     for var i: Int = 0; i < filled; i++ { s = s + "#" }
     for var j: Int = filled; j < width; j++ { s = s + "." }
@@ -68,14 +68,14 @@ extension Double {
 
 extension String {
   def padRight(n: Int): String {
-    if self.length() >= n { return self.substring(0, n) }
-    var s: String = self
+    if this.length() >= n { return this.substring(0, n) }
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    if self.length() >= n { return self.substring(self.length() - n) }
-    var s: String = self
+    if this.length() >= n { return this.substring(this.length() - n) }
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
@@ -90,9 +90,9 @@ class BudgetTracker {
 
 public:
   def this(month: String, income: Double) {
-    self.month_        = month
-    self.income_       = income
-    self.transactions_ = []
+    this.month_        = month
+    this.income_       = income
+    this.transactions_ = []
   }
 
   def add(txn: Transaction): void { transactions_.add(txn) }

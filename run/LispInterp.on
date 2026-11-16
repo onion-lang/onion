@@ -33,7 +33,7 @@ class LispEnv {
 public:
   def this(parent: LispEnv?) {
     bindings = new LinkedHashMap[String, Object]()
-    self.parent = parent
+    this.parent = parent
   }
 
   def get(name: String): Object? {
@@ -90,7 +90,7 @@ class Lexer {
   var pos: Int
 
 public:
-  def this(src: String) { self.src = src; pos = 0 }
+  def this(src: String) { this.src = src; pos = 0 }
 
   def peek(): Char {
     if pos >= src.length() { return '\0' }
@@ -175,7 +175,7 @@ class Parser {
   var pos: Int
 
 public:
-  def this(tokens: ArrayList[Object]) { self.tokens = tokens; pos = 0 }
+  def this(tokens: ArrayList[Object]) { this.tokens = tokens; pos = 0 }
 
   def peek(): Token = (tokens[pos] as Token)
 

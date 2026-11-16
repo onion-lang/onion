@@ -18,7 +18,7 @@ class OperatorExtensionMethodSpec extends AbstractShellSpec {
         """
           |record Vec(x: Int, y: Int)
           |extension Vec {
-          |  def plus(o: Vec): Vec { return new Vec(self.x() + o.x(), self.y() + o.y()) }
+          |  def plus(o: Vec): Vec { return new Vec(this.x() + o.x(), this.y() + o.y()) }
           |}
           |class Test {
           |public:
@@ -41,8 +41,8 @@ class OperatorExtensionMethodSpec extends AbstractShellSpec {
         """
           |record Vec(x: Int, y: Int)
           |extension Vec {
-          |  def minus(o: Vec): Vec { return new Vec(self.x() - o.x(), self.y() - o.y()) }
-          |  def times(k: Int): Vec { return new Vec(self.x() * k, self.y() * k) }
+          |  def minus(o: Vec): Vec { return new Vec(this.x() - o.x(), this.y() - o.y()) }
+          |  def times(k: Int): Vec { return new Vec(this.x() * k, this.y() * k) }
           |}
           |class Test {
           |public:

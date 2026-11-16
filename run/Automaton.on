@@ -8,7 +8,7 @@
 extension String {
   def times(n: Int): String {
     var result: String = ""
-    for var i: Int = 0; i < n; i++ { result = result + self }
+    for var i: Int = 0; i < n; i++ { result = result + this }
     return result
   }
 }
@@ -16,7 +16,7 @@ extension String {
 // ─── Extension: Int left-padding ──────────────────────────────────────────────
 extension Int {
   def padLeft(width: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     if s.length() >= width { return s }
     return " ".times(width - s.length()) + s
   }

@@ -38,11 +38,11 @@ record Bid(bidder: String, amount: Int) {
 
 extension Int {
   def currency(): String {
-    if self < 0 { return "-$" + (0 - self) }
-    return "$" + self
+    if this < 0 { return "-$" + (0 - this) }
+    return "$" + this
   }
-  def max(other: Int): Int = if self >= other { self } else { other }
-  def min(other: Int): Int = if self <= other { self } else { other }
+  def max(other: Int): Int = if this >= other { this } else { other }
+  def min(other: Int): Int = if this <= other { this } else { other }
 }
 
 // ── Lot class ─────────────────────────────────────────────────────────────────

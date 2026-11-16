@@ -120,8 +120,8 @@ class Zipper[T] {
 
 public:
   def this(root: BTree[T]) {
-    self.focus = root
-    self.crumbs = new ArrayList[Crumb[T]]()
+    this.focus = root
+    this.crumbs = new ArrayList[Crumb[T]]()
   }
 
   def focus(): BTree[T]  = focus

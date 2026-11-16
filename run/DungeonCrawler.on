@@ -66,8 +66,8 @@ class Monster conforms Entity {
   var curHp: Int
 public:
   def this(kind: MonsterKind) {
-    self.kind = kind
-    self.curHp = kind.baseHp()
+    this.kind = kind
+    this.curHp = kind.baseHp()
   }
   def name(): String    = kind.displayName()
   def hp(): Int         = curHp

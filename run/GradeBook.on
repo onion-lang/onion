@@ -37,7 +37,7 @@ record SubjectSummary(
 
 // ── Extension methods on Int (exercises the previously-broken primitive-extension feature) ───
 extension Int {
-  def toCategory(): GradeCategory = select self {
+  def toCategory(): GradeCategory = select this {
     case s when s >= 90: new Excellent()
     case s when s >= 80: new Good()
     case s when s >= 70: new Average()
@@ -45,7 +45,7 @@ extension Int {
     else: new Failing()
   }
 
-  def toLetter(): String = select self.toCategory() {
+  def toLetter(): String = select this.toCategory() {
     case g is Excellent: "A"
     case g is Good:      "B"
     case g is Average:   "C"
@@ -53,7 +53,7 @@ extension Int {
     case g is Failing:   "F"
   }
 
-  def toGPA(): Double = select self.toCategory() {
+  def toGPA(): Double = select this.toCategory() {
     case g is Excellent: 4.0
     case g is Good:      3.0
     case g is Average:   2.0
@@ -64,9 +64,9 @@ extension Int {
 
 // ── Extension methods on Double ───────────────────────────────────────────────
 extension Double {
-  def round2(): Double = (self * 100.0 + 0.5) as Long / 100.0
+  def round2(): Double = (this * 100.0 + 0.5) as Long / 100.0
   def fmt(): String = {
-    val r = self.round2()
+    val r = this.round2()
     return "" + r
   }
 }

@@ -7,20 +7,20 @@
 // ─── primitive helpers ────────────────────────────────────────────────────────
 
 extension Int {
-  def abs(): Int = if self < 0 { -self } else { self }
-  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def abs(): Int = if this < 0 { -this } else { this }
+  def clamp(lo: Int, hi: Int): Int = if this < lo { lo } else if this > hi { hi } else { this }
   def thousands(): String {
-    if self < 0   { return "-" + (0 - self).thousands() }
-    if self < 1000 { return "" + self }
-    if self < 1000000 {
-      val hi = self / 1000
-      val lo = self - hi * 1000
+    if this < 0   { return "-" + (0 - this).thousands() }
+    if this < 1000 { return "" + this }
+    if this < 1000000 {
+      val hi = this / 1000
+      val lo = this - hi * 1000
       if lo < 10  { return "" + hi + ",00" + lo }
       if lo < 100 { return "" + hi + ",0"  + lo }
       return "" + hi + "," + lo
     }
-    val m = self / 1000000
-    val r = self - m * 1000000
+    val m = this / 1000000
+    val r = this - m * 1000000
     val k = r / 1000
     val u = r - k * 1000
     val kStr = if k < 10 { ",00" + k } else if k < 100 { ",0" + k } else { "," + k }
@@ -32,7 +32,7 @@ extension Int {
 extension Double {
   def round1(): Double {
     val f: Long = 10L
-    return (self * f.doubleValue()).longValue().doubleValue() / f.doubleValue()
+    return (this * f.doubleValue()).longValue().doubleValue() / f.doubleValue()
   }
 }
 

@@ -7,9 +7,9 @@
 // ── Extension helpers ─────────────────────────────────────────────────────────
 
 extension Double {
-  def fmt(places: Int): String = String::format("%.#{places}f", self)
-  def abs(): Double = if self < 0.0 { -self } else { self }
-  def approxEq(other: Double): Boolean = (self - other).abs() < 1e-9
+  def fmt(places: Int): String = String::format("%.#{places}f", this)
+  def abs(): Double = if this < 0.0 { -this } else { this }
+  def approxEq(other: Double): Boolean = (this - other).abs() < 1e-9
 }
 
 extension Int {
@@ -17,7 +17,7 @@ extension Int {
     if exp == 0 { return 1 }
     var r: Int = 1
     var i: Int = 0
-    while i < exp { r = r * self; i++ }
+    while i < exp { r = r * this; i++ }
     return r
   }
 }
@@ -257,7 +257,7 @@ public:
 
 extension String {
   def padEnd(w: Int): String =
-    if self.length() >= w { self } else { self + " ".repeat(w - self.length()) }
+    if this.length() >= w { this } else { this + " ".repeat(w - this.length()) }
 }
 
 // ── Demo ──────────────────────────────────────────────────────────────────────

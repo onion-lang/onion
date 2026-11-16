@@ -102,13 +102,13 @@ interface Alertable {
 
 extension Int {
   def wToKw(): String {
-    val kw = (self * 10) / 10000
-    val rem = ((self * 10) % 10000) / 1000
+    val kw = (this * 10) / 10000
+    val rem = ((this * 10) % 10000) / 1000
     return "#{kw}.#{rem}kW"
   }
   def bar(max: Int): String {
     if max == 0 { return "          " }
-    var n = (self * 10) / max
+    var n = (this * 10) / max
     if n > 10 { n = 10 }
     var s: String = ""
     var i: Int = 0
@@ -119,10 +119,10 @@ extension Int {
 }
 
 extension Double {
-  def round2(): Double = ((self * 100.0 + 0.5) as Int * 1.0) / 100.0
+  def round2(): Double = ((this * 100.0 + 0.5) as Int * 1.0) / 100.0
   def pct(total: Double): String {
     if total == 0.0 { return "0.0%" }
-    return "" + (((self / total) * 1000.0 + 0.5) as Int * 1.0 / 10.0) + "%"
+    return "" + (((this / total) * 1000.0 + 0.5) as Int * 1.0 / 10.0) + "%"
   }
 }
 
@@ -135,9 +135,9 @@ class SmartRoom {
 
 public:
   def this(name: String, floor: Int) {
-    self.name    = name
-    self.floor   = floor
-    self.devices = []
+    this.name    = name
+    this.floor   = floor
+    this.devices = []
   }
   def getName(): String = name
   def getFloor(): Int = floor
@@ -167,9 +167,9 @@ class HomeEnergyMonitor conforms Reportable, Alertable {
 
 public:
   def this {
-    self.rooms    = []
-    self.readings = []
-    self.devices  = []
+    this.rooms    = []
+    this.readings = []
+    this.devices  = []
   }
 
   def addRoom(r: SmartRoom): void { rooms.add(r) }

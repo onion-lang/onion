@@ -34,10 +34,10 @@ val defaultConfig = new SolveConfig(0.01, 100000, 1.0e-6)
 // ── Extension methods on Double ───────────────────────────────────────────────
 
 extension Double {
-  def abs(): Double  = if self < 0.0 { -self } else { self }
-  def sq():  Double  = self * self
-  def sign(): Double = if self > 0.0 { 1.0 } else if self < 0.0 { -1.0 } else { 0.0 }
-  def clamp(lo: Double, hi: Double): Double = if self < lo { lo } else if self > hi { hi } else { self }
+  def abs(): Double  = if this < 0.0 { -this } else { this }
+  def sq():  Double  = this * this
+  def sign(): Double = if this > 0.0 { 1.0 } else if this < 0.0 { -1.0 } else { 0.0 }
+  def clamp(lo: Double, hi: Double): Double = if this < lo { lo } else if this > hi { hi } else { this }
 }
 
 // ── Solver status ADT ─────────────────────────────────────────────────────────

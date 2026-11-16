@@ -80,9 +80,9 @@ public:
   def isAssigned(): Boolean = assignee() != null
   def isDone():     Boolean = col() == Column::Done
 
-  def moveTo(c: Column): Task   = self.copy(col = c)
-  def assignTo(who: String): Task = self.copy(assignee = who)
-  def block(b: Blocker): Task   = self.copy(blocker = b)
+  def moveTo(c: Column): Task   = this.copy(col = c)
+  def assignTo(who: String): Task = this.copy(assignee = who)
+  def block(b: Blocker): Task   = this.copy(blocker = b)
 
   def line(): String {
     val who = assignee() ?: "unassigned"
@@ -95,9 +95,9 @@ public:
 
 extension Int {
   def plural(one: String, many: String): String =
-    if self == 1 { "#{self} #{one}" } else { "#{self} #{many}" }
+    if this == 1 { "#{this} #{one}" } else { "#{this} #{many}" }
   def rpad(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }
@@ -105,12 +105,12 @@ extension Int {
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

@@ -12,13 +12,13 @@ import { java.util.ArrayList }
 
 extension Double {
   def clamp(lo: Double, hi: Double): Double =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
 
-  def pct(): String = "#{(self * 100.0).fmt(2)}%"
+  def pct(): String = "#{(this * 100.0).fmt(2)}%"
 
   def fmt(decimals: Int): String {
-    val neg: Boolean = self < 0.0
-    val abs: Double = if neg { -self } else { self }
+    val neg: Boolean = this < 0.0
+    val abs: Double = if neg { -this } else { this }
     val factor: Long = Math::pow(10.0, decimals as Double) as Long
     val scaled: Long = (abs * (factor as Double) + 0.5) as Long
     val intPart: Long = scaled / factor
@@ -32,7 +32,7 @@ extension Double {
 
 extension Int {
   def clampI(lo: Int, hi: Int): Int =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
 }
 
 // ─── ADT enum: intervention type ─────────────────────────────────────────────

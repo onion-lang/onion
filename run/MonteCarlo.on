@@ -17,13 +17,13 @@ import {
 // ─── Extensions ──────────────────────────────────────────────────────────────
 
 extension Double {
-  def dabs(): Double = if self < 0.0 { -self } else { self }
-  def dsqrt(): Double = Math::sqrt(self)
+  def dabs(): Double = if this < 0.0 { -this } else { this }
+  def dsqrt(): Double = Math::sqrt(this)
 
   // Format to dp decimal places (no locale dependency).
   def fmt(dp: Int): String {
-    val neg: Boolean  = self < 0.0
-    val v: Double     = if neg { -self } else { self }
+    val neg: Boolean  = this < 0.0
+    val v: Double     = if neg { -this } else { this }
     var scale: Long   = 1L
     foreach k: Int in 0..<dp { scale = scale * 10L }
     val shifted: Long = (v * (scale as Double) + 0.5) as Long
@@ -33,27 +33,27 @@ extension Double {
     while fs.length() < dp { fs = "0" + fs }
     return (if neg { "-" } else { "" }) + ip + "." + fs
   }
-  def pct(dp: Int): String = (self * 100.0).fmt(dp) + "%"
+  def pct(dp: Int): String = (this * 100.0).fmt(dp) + "%"
 }
 
 extension Int {
-  def iabs(): Int = if self < 0 { -self } else { self }
+  def iabs(): Int = if this < 0 { -this } else { this }
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
-  def toD(): Double = self as Double
+  def toD(): Double = this as Double
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def slpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }

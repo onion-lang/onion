@@ -8,9 +8,9 @@
 // ── Extension helpers ──────────────────────────────────────────────────────────
 
 extension Int {
-  def toVar(): String = "a" + self
+  def toVar(): String = "a" + this
   def pad(width: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     var r: String = s
     while r.length() < width { r = " " + r }
     return r
@@ -19,7 +19,7 @@ extension Int {
 
 extension String {
   def ljust(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
@@ -48,26 +48,26 @@ public:
   }
 
   def occurs(id: Int): Boolean {
-    if self is TVar { return (self as TVar).id() == id }
-    if self is TFun {
-      val f: TFun = self as TFun
+    if this is TVar { return (this as TVar).id() == id }
+    if this is TFun {
+      val f: TFun = this as TFun
       return f.from().occurs(id) || f.to().occurs(id)
     }
     return false
   }
 
   def applySubst(s: Map[String, Object]): Ty {
-    if self is TVar {
-      val v: TVar = self as TVar
+    if this is TVar {
+      val v: TVar = this as TVar
       val found: Object? = s.get(v.id().toVar())
       if found != null { return (found as Ty).applySubst(s) }
-      return self
+      return this
     }
-    if self is TFun {
-      val f: TFun = self as TFun
+    if this is TFun {
+      val f: TFun = this as TFun
       return new TFun(f.from().applySubst(s), f.to().applySubst(s))
     }
-    return self
+    return this
   }
 }
 

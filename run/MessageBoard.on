@@ -79,22 +79,22 @@ record SearchHit(threadId: Int, title: String, score: Int)
 
 extension String {
   def truncate(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n) + "..." }
+    if this.length() <= n { this } else { this.substring(0, n) + "..." }
 
   def padEnd(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
 
   def wordCount(): Int {
-    if self.trim().isEmpty() { return 0 }
-    return Strings::split(self.trim(), " ").size
+    if this.trim().isEmpty() { return 0 }
+    return Strings::split(this.trim(), " ").size
   }
 }
 
 extension Int {
-  def signed(): String = if self > 0 { "+" + self } else { "" + self }
+  def signed(): String = if this > 0 { "+" + this } else { "" + this }
 }
 
 // ── Interface ─────────────────────────────────────────────────────────────

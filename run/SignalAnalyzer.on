@@ -15,8 +15,8 @@ import { java.util.ArrayList }
 
 extension Double {
   def fmt2(): String {
-    val neg: Boolean = self < 0.0
-    val abs: Double = if neg { 0.0 - self } else { self }
+    val neg: Boolean = this < 0.0
+    val abs: Double = if neg { 0.0 - this } else { this }
     val i: Int = abs.intValue()
     val frac: Int = ((abs - i * 1.0) * 100.0 + 0.5).intValue()
     val fs: String = if frac < 10 { "0" + frac } else { "" + frac }
@@ -25,7 +25,7 @@ extension Double {
 }
 
 extension Int {
-  def asDouble(): Double = self * 1.0
+  def asDouble(): Double = this * 1.0
 }
 
 // ── Window functions ──────────────────────────────────────────────────────────

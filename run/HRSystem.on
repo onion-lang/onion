@@ -128,23 +128,23 @@ record DeptStats(
 // ─── Extension methods ─────────────────────────────────────────────────────────
 extension Int {
   def plural(word: String): String {
-    if self == 1 { return "1 " + word }
-    return "" + self + " " + word + "s"
+    if this == 1 { return "1 " + word }
+    return "" + this + " " + word + "s"
   }
 }
 
 extension Double {
   def fmtMoney(): String {
-    val whole = self as Long
-    val cents = ((self - (whole as Double)) * 100.0 + 0.5) as Long
+    val whole = this as Long
+    val cents = ((this - (whole as Double)) * 100.0 + 0.5) as Long
     val centsStr: String = if cents < 10L { "0" + cents } else { "" + cents }
     return "$" + whole + "." + centsStr
   }
   def fmtPct(): String {
-    val p = (self * 100.0 + 0.5) as Long
+    val p = (this * 100.0 + 0.5) as Long
     return "" + p + "%"
   }
-  def round2(): Double = ((self * 100.0 + 0.5) as Long as Double) / 100.0
+  def round2(): Double = ((this * 100.0 + 0.5) as Long as Double) / 100.0
 }
 
 extension String {

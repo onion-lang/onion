@@ -21,13 +21,13 @@ import {
 // ─── Double helpers ───────────────────────────────────────────────────────────
 
 extension Double {
-  def absVal(): Double  = if self < 0.0 { 0.0 - self } else { self }
-  def maxWith(b: Double): Double = if self > b { self } else { b }
-  def minWith(b: Double): Double = if self < b { self } else { b }
+  def absVal(): Double  = if this < 0.0 { 0.0 - this } else { this }
+  def maxWith(b: Double): Double = if this > b { this } else { b }
+  def minWith(b: Double): Double = if this < b { this } else { b }
 
   def fmt2(): String {
-    if self < 0.0 { return "-" + (0.0 - self).fmt2() }
-    val s: String = "" + Math::round(self * 100.0)
+    if this < 0.0 { return "-" + (0.0 - this).fmt2() }
+    val s: String = "" + Math::round(this * 100.0)
     val len: Int = s.length()
     if len <= 2 {
       return "0." + (if len == 1 { "0" + s } else { s })
@@ -36,8 +36,8 @@ extension Double {
   }
 
   def fmt4(): String {
-    if self < 0.0 { return "-" + (0.0 - self).fmt4() }
-    val s: String = "" + Math::round(self * 10000.0)
+    if this < 0.0 { return "-" + (0.0 - this).fmt4() }
+    val s: String = "" + Math::round(this * 10000.0)
     val len: Int = s.length()
     if len <= 4 {
       var pad: String = s

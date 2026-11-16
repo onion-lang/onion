@@ -9,13 +9,13 @@
 
 extension Int {
   def fmtVer(): String {
-    val major = self / 10000
-    val minor = (self % 10000) / 100
-    val patch = self % 100
+    val major = this / 10000
+    val minor = (this % 10000) / 100
+    val patch = this % 100
     return "#{major}.#{minor}.#{patch}"
   }
   def lpad(w: Int): String {
-    var s = "" + self
+    var s = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -23,7 +23,7 @@ extension Int {
 
 extension String {
   def rpad(w: Int): String {
-    var s = self
+    var s = this
     while s.length() < w { s = s + " " }
     return s
   }

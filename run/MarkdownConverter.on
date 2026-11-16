@@ -20,10 +20,10 @@ extension String {
   def repeated(n: Int): String {
     var acc: String = ""
     var i: Int = 0
-    while i < n { acc = acc + self; i++ }
+    while i < n { acc = acc + this; i++ }
     return acc
   }
-  def prefixedWith(p: String): Boolean = self.indexOf(p) == 0
+  def prefixedWith(p: String): Boolean = this.indexOf(p) == 0
 }
 
 // ── Block-level element (ADT enum) ───────────────────────────────────────────

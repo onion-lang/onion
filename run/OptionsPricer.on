@@ -35,10 +35,10 @@ public:
 // ─── Extension methods on Double ─────────────────────────────────────────────
 
 extension Double {
-  def absD(): Double  = if self < 0.0 { 0.0 - self } else { self }
-  def fmt2(): String  = Format::fixed(self, 2)
-  def fmt4(): String  = Format::fixed(self, 4)
-  def fmt6(): String  = Format::fixed(self, 6)
+  def absD(): Double  = if this < 0.0 { 0.0 - this } else { this }
+  def fmt2(): String  = Format::fixed(this, 2)
+  def fmt4(): String  = Format::fixed(this, 4)
+  def fmt6(): String  = Format::fixed(this, 6)
 }
 
 // ─── Records ─────────────────────────────────────────────────────────────────

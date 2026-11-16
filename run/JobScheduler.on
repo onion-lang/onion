@@ -75,10 +75,10 @@ record QueueSummary(
 
 // ─── Extension methods ────────────────────────────────────────────────────────
 extension Int {
-  def isCritical(): Boolean = self >= 9
+  def isCritical(): Boolean = this >= 9
   def plural(word: String): String {
-    if self == 1 { return "1 " + word }
-    return "" + self + " " + word + "s"
+    if this == 1 { return "1 " + word }
+    return "" + this + " " + word + "s"
   }
 }
 

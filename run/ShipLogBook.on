@@ -80,10 +80,10 @@ interface Reportable {
 // ─── Extension methods ────────────────────────────────────────────────────────
 
 extension Int {
-  def dayWord(): String = if self == 1 { "day"   } else { "days"   }
-  def tonWord(): String = if self == 1 { "tonne" } else { "tonnes" }
+  def dayWord(): String = if this == 1 { "day"   } else { "days"   }
+  def tonWord(): String = if this == 1 { "tonne" } else { "tonnes" }
   def bar10(): String {
-    val filled = self / 10
+    val filled = this / 10
     var s = ""
     var i = 0
     while i < 10 {
@@ -96,7 +96,7 @@ extension Int {
 
 extension Double {
   def fmt1(): String {
-    val sc = (self * 10.0) as Int
+    val sc = (this * 10.0) as Int
     val w  = sc / 10
     val f  = sc % 10
     return "" + w + "." + f

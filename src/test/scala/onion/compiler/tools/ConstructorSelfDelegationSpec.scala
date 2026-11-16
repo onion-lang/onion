@@ -11,7 +11,7 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
           |   val w: Int
           |   val h: Int
           | public:
-          |   def this(w: Int, h: Int) { self.w = w; self.h = h }
+          |   def this(w: Int, h: Int) { this.w = w; this.h = h }
           |   def this(s: Int) : this(s, s) { }
           |   def area(): Int { return w * h }
           |   static def main(args: String[]): String {
@@ -33,7 +33,7 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
           |   val b: Int
           |   val c: Int
           | public:
-          |   def this(a: Int, b: Int, c: Int) { self.a = a; self.b = b; self.c = c }
+          |   def this(a: Int, b: Int, c: Int) { this.a = a; this.b = b; this.c = c }
           |   def this(a: Int, b: Int) : this(a, b, 0) { }
           |   def this(a: Int) : this(a, 0) { }
           |   def sum(): Int { return a + b + c }
@@ -57,8 +57,8 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
           |   var log: String = "init;"
           |   val n: Int
           | public:
-          |   def this(n: Int) { self.n = n; self.log = self.log + "full;" }
-          |   def this() : this(99) { self.log = self.log + "deleg;" }
+          |   def this(n: Int) { this.n = n; this.log = this.log + "full;" }
+          |   def this() : this(99) { this.log = this.log + "deleg;" }
           |   def show(): String { return log + "n=" + n }
           |   static def main(args: String[]): String {
           |     return new D().show() + "|" + new D(7).show()
@@ -79,7 +79,7 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
           | class Base {
           |   val x: Int
           | public:
-          |   def this(x: Int) { self.x = x }
+          |   def this(x: Int) { this.x = x }
           |   def getX(): Int { return x }
           | }
           | class Sub(x: Int, val y: Int) extends Base(x) {
@@ -103,7 +103,7 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
           | class E {
           |   val a: Int
           | public:
-          |   def this(a: Int) { self.a = a }
+          |   def this(a: Int) { this.a = a }
           |   def this() : this("x") { }
           |   static def main(args: String[]): String { return "unreachable" }
           | }
@@ -122,7 +122,7 @@ class ConstructorSelfDelegationSpec extends AbstractShellSpec {
           | class Animal {
           |   val name: String
           | public:
-          |   def this(name: String) { self.name = name }
+          |   def this(name: String) { this.name = name }
           |   def getName(): String { return name }
           | }
           | class Dog extends Animal("Rex") {

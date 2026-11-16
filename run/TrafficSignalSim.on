@@ -30,13 +30,13 @@ public:
 // ─── Extension methods ────────────────────────────────────────────────────────
 
 extension Int {
-  def clampMin(lo: Int): Int = if self < lo { lo } else { self }
-  def asSeconds(): String = self + "s"
+  def clampMin(lo: Int): Int = if this < lo { lo } else { this }
+  def asSeconds(): String = this + "s"
 }
 
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length < width { s = s + " " }
     return s
   }
@@ -50,20 +50,20 @@ public:
   static def totalMatches(): Boolean
     ensures result
     = new CycleStats(3, 1, 5, 1).totalTicks() == 9
-  def totalTicks(): Int = self.redTicks() + self.yellowTicks() + self.greenTicks()
+  def totalTicks(): Int = this.redTicks() + this.yellowTicks() + this.greenTicks()
 
   def greenRatioPct(): Int {
-    val total: Int = self.totalTicks()
+    val total: Int = this.totalTicks()
     if total == 0 { return 0 }
-    return (self.greenTicks() * 100) / total
+    return (this.greenTicks() * 100) / total
   }
 
   def combine(other: CycleStats): CycleStats =
     new CycleStats(
-      self.redTicks() + other.redTicks(),
-      self.yellowTicks() + other.yellowTicks(),
-      self.greenTicks() + other.greenTicks(),
-      self.cycles() + other.cycles()
+      this.redTicks() + other.redTicks(),
+      this.yellowTicks() + other.yellowTicks(),
+      this.greenTicks() + other.greenTicks(),
+      this.cycles() + other.cycles()
     )
 }
 

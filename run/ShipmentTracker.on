@@ -32,7 +32,7 @@ record CsvRow(id: String, carrier: String, origin: String, dest: String, weightS
 
 // ── Extension methods ─────────────────────────────────────────────────────────
 extension Double {
-  def kgLabel(): String = "#{Math::round(self * 10.0) / 10.0}kg"
+  def kgLabel(): String = "#{Math::round(this * 10.0) / 10.0}kg"
 }
 
 extension String {

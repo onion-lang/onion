@@ -1038,8 +1038,8 @@ multi-catch 節（`catch e: A | B`）の候補同士は互いにチェックさ�
 
 ```onion
 extension Double {
-  def pct(): String = "" + self
-  def pct(): String = "" + self   // E0084: duplicated extension method pct() on Double
+  def pct(): String = "" + this
+  def pct(): String = "" + this   // E0084: duplicated extension method pct() on Double
 }
 ```
 
@@ -1210,7 +1210,7 @@ class A {
 
 直し方: 値型のフィールドを使うか、そのオブジェクトを読む純粋なメソッドを使います。
 
-契約が名指すフィールドには、`this` を通してだけ書き込めます (`n`、`this.n`、`self.n`)。
+契約が名指すフィールドには、`this` を通してだけ書き込めます (`n`、`this.n`)。
 ほかの参照を通した書き込みは、宣言された型にかかわらず E0110 です。
 一回の呼び出しごとの検査では、その書き込みを追えないからです。
 
@@ -1313,7 +1313,7 @@ public:
 }
 ```
 
-直し方: `self` 側のオーバーライドを呼ぶ（`f()`）か、スーパークラスのメソッドに本体を与えます。
+直し方: `this` 側のオーバーライドを呼ぶ（`f()`）か、スーパークラスのメソッドに本体を与えます。
 
 ### `E0116` — 一つのメソッドに無関係なインターフェースの既定実装が複数ある
 
@@ -1799,7 +1799,7 @@ public:
 
 ### `E0050` — static コンテキストで現在のインスタンスが利用できない
 
-`static` メソッドの内部で `this`/`self` が使われています。static メソッドには
+`static` メソッドの内部で `this` が使われています。static メソッドには
 レシーバインスタンスが存在しません。
 
 ```onion
@@ -1814,6 +1814,22 @@ public:
 
 `extension` メソッド内の `super` も E0050 です。専用のメッセージが出ます。
 レシーバは `this` なので、`this` に対してメソッドを呼んでください。
+
+### `E0117` — `self` は廃止された
+
+`self` は `this` の別の書き方でした。廃止されたため（RFC #2788）、`self` はすべてこのエラーになります。
+ファイル中の `self` は一度にすべて報告されます。static なコードでは E0050 の代わりに E0117 が出ます。
+
+```onion
+class Counter {
+  var n: Int
+public:
+  def this { self.n = 0 }   // E0117: this.n と書く
+}
+```
+
+対処: `this` と書いてください。`onion migrate <path>` は、指定したファイル中の `self` をすべて書き換えます。
+文字列の `#{...}` の中の `self` も対象です。
 
 ### `E0058` — ラベルが見つからない
 
@@ -2125,6 +2141,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0114` | the Shape … breaks its round-trip contract |
 | `E0115` | `super.…(...)` calls an abstract method of … |
 | `E0116` | class … inherits a default …(…) from each of …, and none of them overrides the others |
+| `E0117` | `self` is retired; write `this` |
 
 ## 関連項目
 

@@ -7,9 +7,9 @@
 // ── Extensions ──────────────────────────────────────────────────────────────
 
 extension Int {
-  def asDollars(): String = "$" + self
+  def asDollars(): String = "$" + this
   def pad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }

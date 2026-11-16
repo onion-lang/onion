@@ -3,15 +3,15 @@
 // select/match, foreach, string interpolation, while loops, for loop.
 
 extension Int {
-  def isLetter(): Boolean = (self >= 65 && self <= 90) || (self >= 97 && self <= 122)
-  def isUpper(): Boolean = self >= 65 && self <= 90
-  def isLower(): Boolean = self >= 97 && self <= 122
-  def toUpper(): Int = if self >= 97 && self <= 122 { self - 32 } else { self }
-  def toLower(): Int = if self >= 65 && self <= 90 { self + 32 } else { self }
+  def isLetter(): Boolean = (this >= 65 && this <= 90) || (this >= 97 && this <= 122)
+  def isUpper(): Boolean = this >= 65 && this <= 90
+  def isLower(): Boolean = this >= 97 && this <= 122
+  def toUpper(): Int = if this >= 97 && this <= 122 { this - 32 } else { this }
+  def toLower(): Int = if this >= 65 && this <= 90 { this + 32 } else { this }
   def rotateAlpha(n: Int): Int {
-    if !self.isLetter() { return self }
-    val base: Int = if self.isUpper() { 65 } else { 97 }
-    return ((self - base + n) % 26 + 26) % 26 + base
+    if !this.isLetter() { return this }
+    val base: Int = if this.isUpper() { 65 } else { 97 }
+    return ((this - base + n) % 26 + 26) % 26 + base
   }
 }
 

@@ -58,19 +58,19 @@ public:
 
 extension Int {
   def toHhMm(): String {
-    val h: Int = self / 60
-    val m: Int = self % 60
+    val h: Int = this / 60
+    val m: Int = this % 60
     val mm: String = if m < 10 { "0" + m } else { "" + m }
     return h + ":" + mm
   }
   def minutesToHours(): String {
-    val h: Int = self / 60
-    val tenths: Int = (self % 60) * 10 / 60
+    val h: Int = this / 60
+    val tenths: Int = (this % 60) * 10 / 60
     return h + "." + tenths
   }
-  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def clamp(lo: Int, hi: Int): Int = if this < lo { lo } else if this > hi { hi } else { this }
   def bar(maxVal: Int, width: Int): String {
-    val filled: Int = if maxVal > 0 { (self * width / maxVal).clamp(0, width) } else { 0 }
+    val filled: Int = if maxVal > 0 { (this * width / maxVal).clamp(0, width) } else { 0 }
     var out: String = ""
     foreach i: Int in 0..<width {
       out = out + (if i < filled { "█" } else { "░" })
@@ -81,12 +81,12 @@ extension Int {
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
-  def truncate(n: Int): String = if self.length() <= n { self } else { self.substring(0, n - 1) + "…" }
-  def lcFirst(): String = if self.length() == 0 { self } else { self.substring(0, 1).toLowerCase() + self.substring(1) }
+  def truncate(n: Int): String = if this.length() <= n { this } else { this.substring(0, n - 1) + "…" }
+  def lcFirst(): String = if this.length() == 0 { this } else { this.substring(0, 1).toLowerCase() + this.substring(1) }
 }
 
 // ─── Parsing helpers ──────────────────────────────────────────────────────────

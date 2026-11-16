@@ -99,7 +99,7 @@ class ExtensionMethodSpec extends AbstractShellSpec {
         """
           |extension Int {
           |  def double(): Int {
-          |    return self * 2
+          |    return this * 2
           |  }
           |}
           |
@@ -186,7 +186,7 @@ class ExtensionMethodSpec extends AbstractShellSpec {
     it("supports a single-line expression-bodied method (closing brace on the same line)") {
       val result = shell.run(
         """
-          |extension String { def shout(): String = self.toUpperCase() }
+          |extension String { def shout(): String = this.toUpperCase() }
           |
           |class Main {
           |public:
@@ -225,7 +225,7 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Int {
-          |  def applyFn(f: Int -> Int): Int = f(self)
+          |  def applyFn(f: Int -> Int): Int = f(this)
           |}
           |
           |class Main {
@@ -274,7 +274,7 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension String {
-          |  def rev: String = new StringBuilder(self).reverse().toString()
+          |  def rev: String = new StringBuilder(this).reverse().toString()
           |}
           |
           |class Main {
@@ -294,7 +294,7 @@ class ExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Int {
-          |  def tripled: Int = self * 3
+          |  def tripled: Int = this * 3
           |}
           |
           |class Main {
@@ -316,7 +316,7 @@ class ExtensionMethodSpec extends AbstractShellSpec {
         """
           |extension String {
           |  def myMapIf(f: Function1[String, String], cond: Boolean): String =
-          |    if cond { f(self) } else { self }
+          |    if cond { f(this) } else { this }
           |}
           |class Main {
           |public:

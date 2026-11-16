@@ -29,20 +29,20 @@ import {
 
 extension String {
   def padRight2(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }
   def toIntOpt(): Int? {
-    try { return Integer::parseInt(self) }
+    try { return Integer::parseInt(this) }
     catch e: java.lang.NumberFormatException { return null }
   }
-  def isValidHost2(): Boolean = self.length() > 0 && !self.contains(" ")
+  def isValidHost2(): Boolean = this.length() > 0 && !this.contains(" ")
 }
 
 extension Int {
-  def isPort2(): Boolean     = self >= 1 && self <= 65535
-  def isPositive2(): Boolean = self > 0
+  def isPort2(): Boolean     = this >= 1 && this <= 65535
+  def isPositive2(): Boolean = this > 0
 }
 
 // ─── DbConfig ─────────────────────────────────────────────────────────────────

@@ -20,6 +20,8 @@ val         var         when        while
 
 Keywords can be used as identifiers by escaping with backticks: `` `class` ``.
 
+`self` is reserved but retired: it is error E0117. Write `this` for the current instance.
+
 ### Identifiers
 
 - Start with a letter or underscore, followed by letters, digits, underscores

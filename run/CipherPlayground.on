@@ -13,38 +13,38 @@ import { java.util.ArrayList; java.util.LinkedHashMap as JLinkedHashMap }
 
 extension String {
   def padR(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def padL(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
   def rep(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
   def truncate(w: Int): String {
-    if self.length() <= w { return self }
-    return self.substring(0, w - 3) + "..."
+    if this.length() <= w { return this }
+    return this.substring(0, w - 3) + "..."
   }
-  def upper(): String = self.toUpperCase()
-  def lower(): String = self.toLowerCase()
+  def upper(): String = this.toUpperCase()
+  def lower(): String = this.toLowerCase()
 }
 
 extension Int {
   def padL(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
-  def plural(word: String): String = if self == 1 { "1 #{word}" } else { "#{self} #{word}s" }
+  def plural(word: String): String = if this == 1 { "1 #{word}" } else { "#{this} #{word}s" }
   def mod(n: Int): Int {
-    val r: Int = self % n
+    val r: Int = this % n
     return if r < 0 { r + n } else { r }
   }
 }

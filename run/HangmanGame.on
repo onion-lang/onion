@@ -84,20 +84,20 @@ public:
 // ── String extension methods ──────────────────────────────────────────────────
 extension String {
   def pad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
 
   def lpad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }
 
   def containsLetter(ch: String): Boolean {
-    foreach i: Int in 0..<self.length() {
-      if "" + self.charAt(i) == ch { return true }
+    foreach i: Int in 0..<this.length() {
+      if "" + this.charAt(i) == ch { return true }
     }
     return false
   }
@@ -105,8 +105,8 @@ extension String {
   // Show the word with unguessed letters replaced by _
   def maskedBy(guessed: List[String]): String {
     var result: String = ""
-    foreach i: Int in 0..<self.length() {
-      val ch: String = "" + self.charAt(i)
+    foreach i: Int in 0..<this.length() {
+      val ch: String = "" + this.charAt(i)
       if ch == " " {
         result = result + " "
       } else if guessed.contains(ch) {
@@ -120,8 +120,8 @@ extension String {
 
   // True when every non-space character has been guessed
   def allRevealed(guessed: List[String]): Boolean {
-    foreach i: Int in 0..<self.length() {
-      val ch: String = "" + self.charAt(i)
+    foreach i: Int in 0..<this.length() {
+      val ch: String = "" + this.charAt(i)
       if ch != " " && !guessed.contains(ch) { return false }
     }
     return true
@@ -132,7 +132,7 @@ extension String {
 extension Int {
   def repeatStr(ch: String): String {
     var s: String = ""
-    foreach i: Int in 0..<self { s = s + ch }
+    foreach i: Int in 0..<this { s = s + ch }
     return s
   }
 }

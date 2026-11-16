@@ -73,12 +73,12 @@ record BatchSummary(regions: Int, totalSales: Int, grandTotal: Double, topRegion
 
 extension String {
   def rpadTo(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def lpadTo(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
@@ -86,15 +86,15 @@ extension String {
 
 extension Double {
   def round2(): Double {
-    val scaled: Long = (self * 100.0 + 0.5) as Long
+    val scaled: Long = (this * 100.0 + 0.5) as Long
     return scaled as Double / 100.0
   }
-  def fmt(): String = Format::fixed(self, 2).lpadTo(10)
+  def fmt(): String = Format::fixed(this, 2).lpadTo(10)
 }
 
 extension Int {
   def lpadNum(n: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < n { s = " " + s }
     return s
   }

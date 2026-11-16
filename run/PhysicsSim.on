@@ -74,7 +74,7 @@ public:
 extension List[Particle] {
   def step(forces: List[Force], dt: Double): List[Particle] {
     val result: List[Particle] = []
-    foreach p: Particle in self {
+    foreach p: Particle in this {
       var cur: Particle = p
       foreach f: Force in forces { cur = cur.applyForce(f, dt) }
       result.add(cur)
@@ -83,7 +83,7 @@ extension List[Particle] {
   }
   def heaviest(): Particle? {
     var best: Particle? = null
-    foreach p: Particle in self {
+    foreach p: Particle in this {
       if best == null || p.mass() > best.mass() { best = p }
     }
     return best
@@ -128,17 +128,17 @@ public:
 
 extension List[SimSnapshot] {
   def computeStats(): SimStats {
-    if self.isEmpty() { return new SimStats(0.0, 0.0, 0.0, 0) }
+    if this.isEmpty() { return new SimStats(0.0, 0.0, 0.0, 0) }
     var minKE: Double = 1.0e300
     var maxKE: Double = -1.0e300
     var sumKE: Double = 0.0
-    foreach snap: SimSnapshot in self {
+    foreach snap: SimSnapshot in this {
       val ke = snap.totalKE()
       if ke < minKE { minKE = ke }
       if ke > maxKE { maxKE = ke }
       sumKE = sumKE + ke
     }
-    return new SimStats(minKE, maxKE, sumKE / self.size(), self.size())
+    return new SimStats(minKE, maxKE, sumKE / this.size(), this.size())
   }
 }
 

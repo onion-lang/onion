@@ -12,8 +12,8 @@ import { java.lang.StringBuilder }
 
 extension Int {
   def cents(): String {
-    val d: Int = self / 100
-    val c: Int = self % 100
+    val d: Int = this / 100
+    val c: Int = this % 100
     val cs: String = if c < 10 { "0#{c}" } else { "#{c}" }
     return "$#{d}.#{cs}"
   }
@@ -21,12 +21,12 @@ extension Int {
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

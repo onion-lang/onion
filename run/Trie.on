@@ -21,26 +21,26 @@ class TrieNode {
   var _count: Int
 public:
   def this() {
-    self._map   = new LinkedHashMap[String, Object]()
-    self._isEnd = false
-    self._count = 0
+    this._map   = new LinkedHashMap[String, Object]()
+    this._isEnd = false
+    this._count = 0
   }
-  def child(c: Int): TrieNode?         = self._map.get("" + c) as TrieNode?
-  def setChild(c: Int, n: TrieNode): void { self._map.put("" + c, n) }
-  def hasChild(c: Int): Boolean        = self._map.containsKey("" + c)
-  def isEnd(): Boolean                 = self._isEnd
-  def setIsEnd(v: Boolean): void       { self._isEnd = v }
-  def prefixCount(): Int               = self._count
-  def incPrefixCount(): void           { self._count++ }
+  def child(c: Int): TrieNode?         = this._map.get("" + c) as TrieNode?
+  def setChild(c: Int, n: TrieNode): void { this._map.put("" + c, n) }
+  def hasChild(c: Int): Boolean        = this._map.containsKey("" + c)
+  def isEnd(): Boolean                 = this._isEnd
+  def setIsEnd(v: Boolean): void       { this._isEnd = v }
+  def prefixCount(): Int               = this._count
+  def incPrefixCount(): void           { this._count++ }
 
   // Recursively collect all complete words rooted at this node into `result`.
   def collectInto(buf: String, result: List[Object]): void {
-    if self._isEnd { result.add(buf) }
-    val iter = self._map.keySet().iterator()
+    if this._isEnd { result.add(buf) }
+    val iter = this._map.keySet().iterator()
     while iter.hasNext() {
       val keyStr: String = iter.next() as String
       val c: Int = JInteger::parseInt(keyStr)
-      val ch: TrieNode = self._map.get(keyStr) as TrieNode
+      val ch: TrieNode = this._map.get(keyStr) as TrieNode
       val sb = new StringBuilder()
       sb.append(buf)
       sb.append(JChar::toChars(c))
@@ -55,8 +55,8 @@ class Trie {
   var wordCount: Int
 public:
   def this() {
-    self.root      = new TrieNode()
-    self.wordCount = 0
+    this.root      = new TrieNode()
+    this.wordCount = 0
   }
 
   def insert(word: String): void {
@@ -147,14 +147,14 @@ def lookup(trie: Trie, query: String): LookupResult {
 extension String {
   def repeat(n: Int): String {
     val sb = new StringBuilder()
-    for var i: Int = 0; i < n; i++ { sb.append(self) }
+    for var i: Int = 0; i < n; i++ { sb.append(this) }
     return sb.toString()
   }
   def padRight(n: Int): String {
-    if self.length() >= n { return self }
+    if this.length() >= n { return this }
     val sb = new StringBuilder()
-    sb.append(self)
-    for var i: Int = self.length(); i < n; i++ { sb.append(' ') }
+    sb.append(this)
+    for var i: Int = this.length(); i < n; i++ { sb.append(' ') }
     return sb.toString()
   }
 }

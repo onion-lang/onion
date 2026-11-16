@@ -39,18 +39,18 @@ extension String {
   def repeated(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
   def padEnd(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
 }
 
 extension Double {
-  def round2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+  def round2(): Double = (Math::round(this * 100.0) as Double) / 100.0
 }
 
 // ─── Postage calculation ──────────────────────────────────────────────────────

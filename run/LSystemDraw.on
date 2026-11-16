@@ -24,11 +24,11 @@ extension String {
   def rep(n: Int): String {
     val sb: StringBuilder = new StringBuilder()
     var i: Int = 0
-    while i < n { sb.append(self); i++ }
+    while i < n { sb.append(this); i++ }
     return sb.toString()
   }
   def trimR(): String {
-    var s: String = self
+    var s: String = this
     while s.length() > 0 && s.charAt(s.length() - 1) == ' ' {
       s = s.substring(0, s.length() - 1)
     }

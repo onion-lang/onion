@@ -22,8 +22,8 @@ public:
 // ── Extension methods ─────────────────────────────────────────────────────────
 
 extension Int {
-  def cellChar(): String = if self == 0 { "." } else { "" + self }
-  def boxStart(): Int = (self / 3) * 3
+  def cellChar(): String = if this == 0 { "." } else { "" + this }
+  def boxStart(): Int = (this / 3) * 3
 }
 
 // ── Grid helpers ──────────────────────────────────────────────────────────────

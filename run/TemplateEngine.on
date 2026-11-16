@@ -16,16 +16,16 @@ enum Token {
 
 // ── Extension helpers on String ────────────────────────────────────────
 extension String {
-  def trimmed(): String = self.trim()
+  def trimmed(): String = this.trim()
   def words(): List[String] {
     val parts: List[String] = []
-    foreach w: String in Strings::split(self, " ") {
+    foreach w: String in Strings::split(this, " ") {
       val t: String = w.trim()
       if t.length() > 0 { parts.add(t) }
     }
     return parts
   }
-  def containsStr(sub: String): Boolean = self.contains(sub)
+  def containsStr(sub: String): Boolean = this.contains(sub)
 }
 
 // ── Lexer: source text → List[Token] ──────────────────────────────────
@@ -122,11 +122,11 @@ class TemplateEngine {
 public:
   def set(key: String, value: String): TemplateEngine {
     context[key] = value
-    return self
+    return this
   }
   def setAll(vars: Map[String, String]): TemplateEngine {
     foreach (k, v) in vars { context[k] = v }
-    return self
+    return this
   }
   def render(source: String): String {
     val tokens: List[Token] = lex(source)

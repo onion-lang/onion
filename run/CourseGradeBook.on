@@ -37,19 +37,19 @@ record ScoreEntry(studentId: Int, courseCode: String, score: Int)
 
 extension Int {
   def gpaTier(): String {
-    if self >= 37 { return "A" }
-    else if self >= 30 { return "B" }
-    else if self >= 20 { return "C" }
-    else if self >= 10 { return "D" }
+    if this >= 37 { return "A" }
+    else if this >= 30 { return "B" }
+    else if this >= 20 { return "C" }
+    else if this >= 10 { return "D" }
     else               { return "F" }
   }
   def repeat(times: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < times { s = s + self.toString(); i++ }
+    while i < times { s = s + this.toString(); i++ }
     return s
   }
-  def times10(): Int = self * 10
+  def times10(): Int = this * 10
 }
 
 // Convert a raw score (0-100) to a LetterGrade

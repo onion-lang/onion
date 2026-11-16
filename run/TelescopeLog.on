@@ -11,19 +11,19 @@ extension Int {
   def repeatStr(ch: String): String {
     var s: String = ""
     var i: Int = 0
-    while i < self { s = s + ch; i++ }
+    while i < this { s = s + ch; i++ }
     return s
   }
   def pct(den: Int): String {
     if den == 0 { return "0%" }
-    return "" + (self * 100 / den) + "%"
+    return "" + (this * 100 / den) + "%"
   }
 }
 
 extension Double {
   def round2(): Double {
     val factor: Long = 100L
-    return (self * factor.doubleValue()).longValue().doubleValue() / factor.doubleValue()
+    return (this * factor.doubleValue()).longValue().doubleValue() / factor.doubleValue()
   }
 }
 

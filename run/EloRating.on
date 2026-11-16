@@ -25,18 +25,18 @@ public:
 
 extension Int {
   def clamp(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
+    if this < lo { return lo }
+    if this > hi { return hi }
+    return this
   }
 }
 
 extension Double {
   def roundTo(decimals: Int): Double {
     val factor = Math::pow(10.0, decimals * 1.0)
-    return Math::round(self * factor) * 1.0 / factor
+    return Math::round(this * factor) * 1.0 / factor
   }
-  def asPercent(): String = "" + (self * 100.0).roundTo(1) + "%"
+  def asPercent(): String = "" + (this * 100.0).roundTo(1) + "%"
 }
 
 class EloSystem {

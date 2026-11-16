@@ -3179,7 +3179,7 @@ AST.Expression primary_rest() : {
     // Handle: new Type() or new Type - object creation
   | [LOOKAHEAD(2) "(" eols() (es=terms()) ")"]  { return new AST.NewObject(p(t), ty, es); }
   )
-| t="self"                                                                {return new AST.CurrentInstance(p(t));}
+| t="self"                                                                {return new AST.CurrentInstance(p(t)).writtenAsSelf();}
 | t="this"                                                                {return new AST.CurrentInstance(p(t));}
 | e=integer_literal()                                                     {return e;}
 | e=float_literal()                                                       {return e;}

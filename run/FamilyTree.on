@@ -29,20 +29,20 @@ record Relation(fromId: Int, toId: Int, kind: String)  // "parent" | "spouse"
 // ── Int and String extensions ──────────────────────────────────────────────────
 
 extension Int {
-  def century(): Int = (self - 1) / 100 + 1
-  def ageIn(refYear: Int): Int = refYear - self
-  def decadeLabel(): String = "#{(self / 10) * 10}s"
-  def abs(): Int = if self < 0 { -self } else { self }
+  def century(): Int = (this - 1) / 100 + 1
+  def ageIn(refYear: Int): Int = refYear - this
+  def decadeLabel(): String = "#{(this / 10) * 10}s"
+  def abs(): Int = if this < 0 { -this } else { this }
 }
 
 extension String {
   def padEnd(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padStart(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = " " + s }
     return s
   }

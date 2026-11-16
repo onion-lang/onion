@@ -15,18 +15,18 @@
 
 // ── Extension methods ─────────────────────────────────────────────────────────
 extension String {
-  def lower(): String = self.toLowerCase()
+  def lower(): String = this.toLowerCase()
   def titleCase(): String {
-    if self.length() == 0 { return self }
-    return self.substring(0, 1).toUpperCase() + self.substring(1).toLowerCase()
+    if this.length() == 0 { return this }
+    return this.substring(0, 1).toUpperCase() + this.substring(1).toLowerCase()
   }
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

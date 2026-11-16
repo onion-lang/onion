@@ -32,10 +32,10 @@ class Election {
 
 public:
   def this(candidates: List[Candidate], ballots: List[List[Int]]) {
-    self.candidates = candidates
-    self.ballots = ballots
-    self.eliminated = []
-    self.currentRound = 0
+    this.candidates = candidates
+    this.ballots = ballots
+    this.eliminated = []
+    this.currentRound = 0
   }
 
   def nameOf(id: Int): String {
@@ -306,7 +306,7 @@ extension String {
   def repeated(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 }

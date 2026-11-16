@@ -11,7 +11,7 @@ extension String {
 
   // Convert to uppercase and strip non-alpha characters
   def normalize(): String {
-    val s: String = self.toUpperCase()
+    val s: String = this.toUpperCase()
     var result: String = ""
     foreach i: Int in 0..<s.length() {
       val code: Int = s.charAt(i) as Int
@@ -21,14 +21,14 @@ extension String {
   }
 
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
 
   // American Soundex: letter + 3 digits, rules per NIST spec
   def soundex(): String {
-    val n: String = self.normalize()
+    val n: String = this.normalize()
     if n.length() == 0 { return "0000" }
 
     // Coding table for letters A-Z (0=ignore/vowel, 1-6=code)
@@ -79,7 +79,7 @@ extension String {
 
   // Levenshtein edit distance
   def editDistance(other: String): Int {
-    val s: String = self
+    val s: String = this
     val t: String = other
     val m: Int = s.length()
     val n: Int = t.length()
@@ -109,7 +109,7 @@ extension String {
   }
 
   def startsWith(prefix: String): Boolean =
-    self.length() >= prefix.length() && self.substring(0, prefix.length()) == prefix
+    this.length() >= prefix.length() && this.substring(0, prefix.length()) == prefix
 
 }
 

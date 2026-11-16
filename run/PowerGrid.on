@@ -218,7 +218,7 @@ public:
 
 extension Double {
   def fmt2(): String {
-    val s: String = "" + (Math::round(self * 100.0) as Long)
+    val s: String = "" + (Math::round(this * 100.0) as Long)
     val len: Int = s.length()
     return (if len <= 2 {
       "0." + (if len == 1 { "0" + s } else { s })

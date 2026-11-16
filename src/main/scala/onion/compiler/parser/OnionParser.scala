@@ -2566,7 +2566,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           expect(K.RBRACE)
           AST.NewArrayWithValues(p(t), ty, es)
         } else newExpression()
-      case K.K_SELF => AST.CurrentInstance(p(next()))
+      case K.K_SELF => AST.CurrentInstance(p(next())).writtenAsSelf()
       case K.K_THIS => AST.CurrentInstance(p(next()))
       case K.INTEGER => integerLiteral()
       case K.FLOAT => floatLiteral()

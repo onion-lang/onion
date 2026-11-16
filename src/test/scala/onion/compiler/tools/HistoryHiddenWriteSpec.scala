@@ -52,14 +52,14 @@ class HistoryHiddenWriteSpec extends AnyFunSpec {
     }
 
     // Panel 14:56 on #2599: `t++` in a lambda was a false E0110, while `t = t + 1` passed.
-    for (spelling <- Seq("t++", "this.t++", "self.t++"))
+    for (spelling <- Seq("t++", "this.t++"))
       it(s"counts $spelling as a write through this (W0024, not E0110)") {
         val o = compile(clock(s"  def tick(): void { val f: () -> void = () -> { $spelling }; f() }"))
         assert(o.errors.isEmpty, o.toString)
         assert(o.w24.exists(_.contains("tick")), o.toString)
       }
 
-    for (spelling <- Seq("t--", "this.t--", "self.t--"))
+    for (spelling <- Seq("t--", "this.t--"))
       it(s"is E0109 alone for $spelling, as for t = t - 1") {
         val o = compile(clock(s"  def back(): void { val f: () -> void = () -> { $spelling }; f() }"))
         assert(o.errors == Seq("E0109"), o.toString)
@@ -200,15 +200,13 @@ class HistoryHiddenWriteSpec extends AnyFunSpec {
   }
 
   describe("what rule 2 still allows") {
-    it("checks a write through this or self like a bare one") {
+    it("checks a write through this like a bare one") {
       val o1 = compile(clock("  def back(): void { this.t = this.t - 1 }"))
       assert(o1.errors == Seq("E0109"), o1.toString)
-      val o2 = compile(clock("  def back(): void { self.t = self.t - 1 }"))
-      assert(o2.errors == Seq("E0109"), o2.toString)
     }
 
     it("does not count t++, this.t++ or t += 1 as another object") {
-      val o = compile(clock("  def a(): void { t++ }\n  def b(): void { this.t++ }\n  def c(): void { t += 1 }\n  def d(): void { self.t += 1 }"))
+      val o = compile(clock("  def a(): void { t++ }\n  def b(): void { this.t++ }\n  def c(): void { t += 1 }\n  def d(): void { this.t += 1 }"))
       assert(!o.errors.contains("E0110"), o.toString)
       assert(!o.errors.contains("E0109"), o.toString)
     }

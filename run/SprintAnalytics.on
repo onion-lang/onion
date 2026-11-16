@@ -150,19 +150,19 @@ public:
 
 extension Double {
   def pct(): String {
-    val v: Int = (self + 0.5) as Int
+    val v: Int = (this + 0.5) as Int
     return "#{v}%"
   }
   def hrs(): String {
-    val i: Int = self as Int
-    val f: Int = ((self - (i * 1.0)) * 10.0 + 0.5) as Int
+    val i: Int = this as Int
+    val f: Int = ((this - (i * 1.0)) * 10.0 + 0.5) as Int
     return "#{i}.#{f}h"
   }
 }
 
 extension Int {
   def pad(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }

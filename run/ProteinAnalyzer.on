@@ -108,9 +108,9 @@ class ProteinChain {
   var table:    Map[String, AminoAcid]
 public:
   def this(n: String, seq: String, tbl: Map[String, AminoAcid]) {
-    self.pname    = n
-    self.sequence = seq.toUpperCase()
-    self.table    = tbl
+    this.pname    = n
+    this.sequence = seq.toUpperCase()
+    this.table    = tbl
   }
 
   def pname(): String   = pname
@@ -170,7 +170,7 @@ public:
 
 extension Int {
   def pad(width: Int): String = {
-    var result: String = "" + self
+    var result: String = "" + this
     while result.length() < width { result = " " + result }
     result
   }
@@ -178,18 +178,18 @@ extension Int {
 
 extension Double {
   def fmt2(): String = {
-    val rounded: Long = JMath::round(self * 100.0)
+    val rounded: Long = JMath::round(this * 100.0)
     val whole: Long   = rounded / 100L
     val frac: Long    = JMath::abs(rounded % 100L)
     val fracStr: String = if frac < 10L { "0" + frac } else { "" + frac }
     whole + "." + fracStr
   }
-  def pct2(): String = (self * 100.0).fmt2() + "%"
+  def pct2(): String = (this * 100.0).fmt2() + "%"
 }
 
 extension String {
   def padR(width: Int): String = {
-    var result: String = self
+    var result: String = this
     while result.length() < width { result = result + " " }
     result
   }

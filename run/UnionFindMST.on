@@ -10,16 +10,16 @@
 
 extension Int {
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
-  def absVal(): Int = if self < 0 { 0 - self } else { self }
+  def absVal(): Int = if this < 0 { 0 - this } else { this }
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }

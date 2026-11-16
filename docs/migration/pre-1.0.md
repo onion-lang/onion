@@ -302,7 +302,7 @@ println(c.t)   // 9
   time. A write from outside that object's methods is one no such check can follow.
 - **What you see:** `E0110`, with the caret on the receiver (`o`, `c`, `cs[0]`). The message
   says to call a method of that object or set the value in a constructor.
-- **Still fine:** `t = v`, `this.t = v`, `self.t = v`, `t++` and `t += 1` in the class's own
+- **Still fine:** `t = v`, `this.t = v`, `t++` and `t += 1` in the class's own
   methods, also inside a lambda. Reading `o.t` from anywhere is fine too.
 - **No `onion migrate` rule, on purpose:** the fix adds a method or a constructor to the
   receiver's class, and which one fits is a design choice.
@@ -651,3 +651,25 @@ def main(args: String[]): void {
   `val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }`.
 - **No `onion migrate` rule:** the old behaviour swallowed an error at run time. The source
   has nothing to rewrite, and only you know whether a bad value should stop the program.
+
+## `self` is now `this`
+
+`self` was a second spelling of `this`. Onion keeps one spelling: `this` (RFC #2788).
+
+```onion
+// Before
+def this(name: String) { self.name = name }
+def greet(): String = "Hi, #{self.name}"
+
+// Now
+def this(name: String) { this.name = name }
+def greet(): String = "Hi, #{this.name}"
+```
+
+- **What you see:** `E0117: `self` is retired; write `this`.` at every `self`, all at once.
+  In static code it replaces E0050.
+- **Still a reserved word:** `self` is not a free name now. A field written `` `self` `` keeps
+  working.
+- **Update a whole project:** `onion migrate src/ tests/`. It rewrites every `self` in code
+  and inside `#{...}` in strings. It leaves comments, plain string text, `\#{self}` and
+  `` `self` `` alone.

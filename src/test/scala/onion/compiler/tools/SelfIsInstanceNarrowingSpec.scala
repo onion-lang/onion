@@ -23,10 +23,10 @@ class SelfIsInstanceNarrowingSpec extends AbstractShellSpec {
           |  case Square(side: Double)
           |}
           |extension Shape {
-          |  def area(): Double = if self is Circle {
-          |    self.radius() * self.radius() * 3.14
-          |  } else if self is Square {
-          |    self.side() * self.side()
+          |  def area(): Double = if this is Circle {
+          |    this.radius() * this.radius() * 3.14
+          |  } else if this is Square {
+          |    this.side() * this.side()
           |  } else { 0.0 }
           |}
           |class Test {
@@ -79,10 +79,10 @@ class SelfIsInstanceNarrowingSpec extends AbstractShellSpec {
           |  case Square(side: Double)
           |}
           |extension Shape {
-          |  def area(): Double = if !(self is Circle) {
+          |  def area(): Double = if !(this is Circle) {
           |    0.0
           |  } else {
-          |    self.radius() * self.radius() * 3.14
+          |    this.radius() * this.radius() * 3.14
           |  }
           |}
           |class Test {

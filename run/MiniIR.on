@@ -244,13 +244,13 @@ public:
 
 extension String {
   def center(width: Int): String {
-    val pad: Int = width - self.length()
-    if pad <= 0 { return self }
+    val pad: Int = width - this.length()
+    if pad <= 0 { return this }
     val left: Int = pad / 2
     val right: Int = pad - left
     var s: String = ""
     foreach i: Int in 0..<left { s = s + " " }
-    s = s + self
+    s = s + this
     foreach i: Int in 0..<right { s = s + " " }
     return s
   }
@@ -303,7 +303,7 @@ public:
   }
 
   def optimise(): Program {
-    var p: Program = self
+    var p: Program = this
     foreach pass: Int in 0..<3 {
       p = p.applyConstFold()
       p = p.applyCopyProp()

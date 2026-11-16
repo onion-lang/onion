@@ -82,7 +82,7 @@ public:
 
 extension Int {
   def bar(max: Int, width: Int): String {
-    val filled: Int = if max == 0 { 0 } else { (self * width) / max }
+    val filled: Int = if max == 0 { 0 } else { (this * width) / max }
     var s: String = ""
     foreach i: Int in 0..<width {
       s = s + (if i < filled { "█" } else { "░" })
@@ -93,12 +93,12 @@ extension Int {
 
 extension String {
   def padRight(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def truncate(max: Int): String =
-    if self.length() <= max { self } else { self.substring(0, max - 1) + "…" }
+    if this.length() <= max { this } else { this.substring(0, max - 1) + "…" }
 }
 
 // ─── Workflow Engine ──────────────────────────────────────────────────────────

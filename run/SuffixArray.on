@@ -27,19 +27,19 @@ import {
 // ─── Extensions ───────────────────────────────────────────────────────────────
 
 extension String {
-  def at(i: Int): String = self.substring(i, i + 1)
-  def suffix(i: Int): String = self.substring(i)
-  def isPrefixOf(other: String): Boolean = other.startsWith(self)
+  def at(i: Int): String = this.substring(i, i + 1)
+  def suffix(i: Int): String = this.substring(i)
+  def isPrefixOf(other: String): Boolean = other.startsWith(this)
   def times(n: Int): String {
     var result: String = ""
-    foreach _: Int in 0..<n { result = result + self }
+    foreach _: Int in 0..<n { result = result + this }
     return result
   }
 }
 
 extension Int {
-  def max(other: Int): Int = if self > other { self } else { other }
-  def min(other: Int): Int = if self < other { self } else { other }
+  def max(other: Int): Int = if this > other { this } else { other }
+  def min(other: Int): Int = if this < other { this } else { other }
 }
 
 // ─── Records ──────────────────────────────────────────────────────────────────
@@ -104,13 +104,13 @@ class SuffixArray conforms StringSearcher {
 
 public:
   def this(text: String) {
-    self.text = text
-    self.n = text.length()
-    self.sa = new Int[n]
-    self.rank = new Int[n]
-    self.lcp = new Int[n]
-    self.build()
-    self.buildLcp()
+    this.text = text
+    this.n = text.length()
+    this.sa = new Int[n]
+    this.rank = new Int[n]
+    this.lcp = new Int[n]
+    this.build()
+    this.buildLcp()
   }
 
   def getSa(): Int[] = sa
@@ -322,7 +322,7 @@ def longestCommonSubstring(s1: String, s2: String): String {
 class NaiveSearcher conforms StringSearcher {
   val text: String
 public:
-  def this(text: String) { self.text = text }
+  def this(text: String) { this.text = text }
 
   override def count(pattern: String): Int {
     if pattern.length() == 0 { return 0 }

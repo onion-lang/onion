@@ -413,6 +413,52 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(concreteOwnAbstractTarget("abstract") == onion.tools.Shell.Success("D"))
     }
 
+    // A chain of `?` overrides: `B`'s bridge and its `f(Int?)` are one method, so `C`
+    // overriding either one overrides both (panel block 5 on #3051 at 1218324).
+    def chain(aParam: String, bParam: String, cParam: String): onion.tools.Shell.Result =
+      shell.run(
+        s"""
+           |class A { public: def this {} def f(x: $aParam): String = "A" }
+           |class B extends A { public: def this {} override def f(x: $bParam): String = "B" }
+           |class C extends B { public: def this {} override def f(x: $cParam): String = "C" }
+           |class Test {
+           |public:
+           |  static def main(args: String[]): String {
+           |    val c = new C(); val a: A = c; val b: B = c
+           |    val n: Int? = 2
+           |    return a.f(1) + b.f(1) + c.f(1) + b.f(n) + c.f(n)
+           |  }
+           |}
+           |""".stripMargin,
+        "BridgeChain.on", Array())
+
+    it("dispatches a three-level chain `f(Int)`, `f(Int?)`, `f(Int)` to the last override") {
+      assert(chain("Int", "Int?", "Int") == onion.tools.Shell.Success("CCCCC"))
+    }
+
+    it("dispatches a three-level chain `f(Int?)`, `f(Int)`, `f(Int?)` to the last override") {
+      assert(chain("Int?", "Int", "Int?") == onion.tools.Shell.Success("CCCCC"))
+    }
+
+    // Without `override`, a `f(k: Int?)` beside an inherited concrete `f(k: Int)` stays an
+    // overload, as on `main`: only `override` asks for the bridge (panel block 5 on #3051).
+    it("keeps an unmarked `f(k: Int?)` beside a concrete base `f(k: Int)` an overload") {
+      val result = shell.run(
+        """
+          |class Base { public: def this {} def dec(k: Int): String = "Base" }
+          |class Up extends Base { public: def this {} def dec(k: Int?): String = "Up" }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val u = new Up(); val b: Base = u
+          |    return u.dec(3) + b.dec(3)
+          |  }
+          |}
+          |""".stripMargin,
+        "UnmarkedOverload.on", Array())
+      assert(result == onion.tools.Shell.Success("BaseBase"))
+    }
+
     it("reports E0068 for `override def f(k: JInteger)` over `f(k: Int)`") {
       val results = errors(program("Int", "JInteger", "void"))
       assert(results.map(_._1).contains(Some("E0068")), s"got: $results")

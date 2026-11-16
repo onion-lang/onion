@@ -674,9 +674,10 @@ val b: Base = new Up(); b.dec(1)                           // Before: printed Ba
 
 - **What you see:** **E0068** `method dec(JInteger) is marked override but does not override
   any method ...`, followed by the base signature (`dec(Int): void`).
-- **Still fine:** a parameter that differs only by `?` (`dec(k: Int?)` over `dec(k: Int)`) now
-  really overrides. A boxed parameter through a generic supertype (`G[JInteger]`) overrides
-  too.
+- **Still fine:** `override def dec(k: Int?)` over `dec(k: Int)`, where the parameter differs
+  only by `?`, now really overrides. Without `override`, the same method beside a base
+  `dec(k: Int)` that has a body stays a separate overload, as before. A boxed parameter
+  through a generic supertype (`G[JInteger]`) overrides too.
 - **To update:** to override, write the base types (`dec(k: Int)`, or `dec(k: Int?)`). To keep
   a separate overload, remove `override`.
 - **No `onion migrate` rule:** whether the method was meant to override or to overload is

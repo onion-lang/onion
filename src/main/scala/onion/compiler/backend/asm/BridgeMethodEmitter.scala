@@ -1,6 +1,6 @@
 package onion.compiler.backend.asm
 
-import onion.compiler.{Modifier, TypedAST}
+import onion.compiler.{AST, Modifier, TypedAST}
 import onion.compiler.TypedAST.*
 import org.objectweb.asm.{ClassWriter, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{Method => AsmMethod}
@@ -28,30 +28,23 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     // Indexed by name: the search below ran over every method of the class for every
     // method of every generic supertype, with per-argument compatibility checks.
     val ownByName = ownMethods.groupBy(_.name)
-    def paramDesc(args: Array[TypedAST.Type]): String = args.map(asmType(_).getDescriptor).mkString("(", "", ")")
-    // The inherited (name, parameter descriptor) slots that already run code: the
-    // nearest superclass declaring the slot has a body, or no superclass declares it
-    // and an interface gives a default. Such a slot keeps its own method, so a `?`
-    // bridge must not take it over (`f(Int?)` beside a concrete `Base.f(Int)`). An
-    // abstract slot (`I.f(Int)` beside `J.f(Int?)`) has no code, so the bridge fills it.
-    lazy val concreteInheritedSlots: Set[(String, String)] =
-      def visible(m: TypedAST.Method) = !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier)
-      def rawOf(t: TypedAST.ClassType): TypedAST.ClassType = t match
-        case applied: AppliedClassType => applied.raw
-        case other => other
-      val decided = mutable.HashMap[(String, String), Boolean]()
-      var cls: TypedAST.ClassType = if classDef.isInterface then null else classDef.superClass
-      while cls != null do
-        val raw = rawOf(cls)
-        raw.methods.iterator.filter(visible).foreach { m =>
-          decided.getOrElseUpdate((m.name, paramDesc(m.arguments)), !Modifier.isAbstract(m.modifier))
-        }
-        cls = raw.superClass
-      sources.iterator.filter(_._1.isInterface).flatMap(_._1.methods.iterator).filter(visible).foreach { m =>
-        val slot = (m.name, paramDesc(m.arguments))
-        if !decided.contains(slot) && !Modifier.isAbstract(m.modifier) then decided(slot) = true
-      }
-      decided.iterator.collect { case (slot, true) => slot }.toSet
+    // For each inherited (name, parameter descriptor) slot: a method declaring it, and
+    // the method whose code runs for it (None = abstract). The nearest superclass
+    // decides; an interface decides only a slot no superclass declares. A superclass's
+    // own `?` bridge counts: in `B extends A` with `override def f(x: Int?)` over
+    // `A.f(Int)`, both slots run `B.f(Int?)`, so they are one slot to a subclass.
+    val inheritedSlots = inheritedOwners(classDef)
+
+    // Whether `m` (own slot `own`) takes over the `?`-different slot `target` with a
+    // bridge (#2896's table):
+    // - `target` has no code: the bridge is its only code (rows 2 and 4);
+    // - `target` and `own` run the same inherited method: overriding one is
+    //   overriding both (a chain of `?` overrides);
+    // - both run different methods: no bridge, `target` keeps its own (row 3);
+    // - only `target` has code: a bridge only when `m` says `override`. An unmarked
+    //   `f(k: Int?)` beside a concrete `f(k: Int)` stays an overload, as on `main`.
+    def takesOverSlot(m: TypedAST.Method, own: String, target: String): Boolean =
+      takesOver(m, inheritedSlots.get((m.name, target)).flatMap(_._2), inheritedSlots.get((m.name, own)).flatMap(_._2))
 
     for (sourceRaw, subst) <- sources do
       def substituteClassParams(tp: TypedAST.Type): TypedAST.Type = substituteTypeVars(tp, subst)
@@ -71,14 +64,10 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 // `foo(x: Int)` is an overload, so arguments must match up to `?`.
                 m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(specializedArgs(i)).name) &&
                 isBridgeableReturn(rawMethod.returnType, m.returnType) && {
-                  // No `?` bridge when the class only re-overrides an inherited
-                  // `f(Q)` with a body while the target `f(P)` also has one: `f(P)`
-                  // keeps its own method (row 3 of #2896's table). If `f(P)` is
-                  // still abstract, the bridge is its only code (row 4).
+                  // Whether a `?` bridge takes over the target slot: `takesOverSlot`.
                   val own = paramDesc(m.arguments)
                   val target = paramDesc(rawMethod.arguments)
-                  own == target ||
-                    !(concreteInheritedSlots.contains((m.name, own)) && concreteInheritedSlots.contains((m.name, target)))
+                  own == target || takesOverSlot(m, own, target)
                 }
               else
                 m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))
@@ -136,6 +125,69 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 gen.returnValue()
                 gen.endMethod()
           }
+
+  private type Slot = (String, String)
+  // A slot's declaring method, and the method whose code runs for it (None = abstract).
+  private type SlotOwners = Map[Slot, (TypedAST.Method, Option[TypedAST.Method])]
+
+  private def paramDesc(args: Array[TypedAST.Type]): String = args.map(asmType(_).getDescriptor).mkString("(", "", ")")
+
+  private def isVisibleInstance(m: TypedAST.Method): Boolean =
+    !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier)
+
+  private def rawOf(t: TypedAST.ClassType): TypedAST.ClassType = t match
+    case applied: AppliedClassType => applied.raw
+    case other => other
+
+  private def takesOver(m: TypedAST.Method, targetOwner: Option[TypedAST.Method], ownOwner: Option[TypedAST.Method]): Boolean =
+    targetOwner match
+      case None => true
+      case Some(t) => ownOwner match
+        case Some(o) => t eq o
+        case None => AST.hasModifier(m.modifier, AST.M_OVERRIDE)
+
+  private val ownersMemo = mutable.HashMap[TypedAST.ClassType, SlotOwners]()
+
+  // The slots `cls` inherits: from its superclass chain (with the bridges each level
+  // emits), then from its interfaces for any slot no superclass declares.
+  private def inheritedOwners(cls: TypedAST.ClassType): SlotOwners =
+    val out = mutable.LinkedHashMap.from(if cls.isInterface || cls.superClass == null then Map.empty else ownersOf(cls.superClass))
+    val seen = mutable.HashSet[TypedAST.ClassType]()
+    def addInterfaces(t: TypedAST.ClassType): Unit =
+      val raw = rawOf(t)
+      if seen.add(raw) then
+        raw.methods.iterator.filter(isVisibleInstance).foreach { m =>
+          val slot = (m.name, paramDesc(m.arguments))
+          if !out.contains(slot) then out(slot) = (m, if Modifier.isAbstract(m.modifier) then None else Some(m))
+        }
+        raw.interfaces.foreach(addInterfaces)
+    cls.interfaces.foreach(addInterfaces)
+    out.toMap
+
+  // The slots of an instance of `cls`: inherited ones, its own methods, and the `?`
+  // bridges it emits (the same rule as `emitBridges` for a non-generic supertype).
+  private def ownersOf(cls0: TypedAST.ClassType): SlotOwners =
+    val cls = rawOf(cls0)
+    ownersMemo.get(cls) match
+      case Some(done) => done
+      case None =>
+        val inherited = inheritedOwners(cls)
+        val out = mutable.LinkedHashMap.from(inherited)
+        val own = cls.methods.filter(isVisibleInstance)
+        val ownSlots = own.map(m => (m.name, paramDesc(m.arguments))).toSet
+        own.foreach { m => out((m.name, paramDesc(m.arguments))) = (m, if Modifier.isAbstract(m.modifier) then None else Some(m)) }
+        for
+          m <- own if !Modifier.isAbstract(m.modifier)
+          ownSlot = (m.name, paramDesc(m.arguments))
+          (slot, (sample, targetOwner)) <- inherited
+          if slot._1 == m.name && !ownSlots.contains(slot) && sample.arguments.length == m.arguments.length
+          if m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(sample.arguments(i)).name)
+          if isBridgeableReturn(sample.returnType, m.returnType)
+          if takesOver(m, targetOwner, inherited.get(ownSlot).flatMap(_._2))
+        do out(slot) = (sample, Some(m))
+        val result = out.toMap
+        ownersMemo(cls) = result
+        result
 
   // `T?` is the same JVM type as `T`; nullability does not change an override (#2719).
   private def plain(tp: TypedAST.Type): TypedAST.Type = tp match

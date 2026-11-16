@@ -85,5 +85,44 @@ class AmbiguousLambdaConstructorSpec extends AbstractShellSpec {
       val src = imports + mix + """def main(args: String[]): String = new Mix(new Object(), (a) -> a + "!").tag""" + "\n"
       assert(Shell.Success("OU") == shell.run(src, "None", Array()))
     }
+    it("still takes the Onion function type for a typed lambda (panel repro 1)") {
+      val src =
+        """import { java.util.function.Function }
+          |class A {
+          |public:
+          |  val tag: String
+          |  def this(f: onion.Function1[String, String]) { this.tag = "O1" }
+          |  def this(f: Function[String, String]) { this.tag = "F" }
+          |}
+          |def main(args: String[]): String = new A((s: String) -> s + "!").tag
+          |""".stripMargin
+      assert(Shell.Success("O1") == shell.run(src, "None", Array()))
+    }
+    it("still takes the Onion function type for a zero-parameter lambda (panel repro 2)") {
+      val src =
+        """import { java.util.function.Supplier }
+          |class C {
+          |public:
+          |  val tag: String
+          |  def this(f: () -> Int) { this.tag = "F0" }
+          |  def this(f: Supplier[Integer]) { this.tag = "SUP" }
+          |}
+          |def main(args: String[]): String = new C(() -> 1).tag
+          |""".stripMargin
+      assert(Shell.Success("F0") == shell.run(src, "None", Array()))
+    }
+    it("still takes the Onion function type for a typed lambda against UnaryOperator") {
+      val src =
+        """import { java.util.function.UnaryOperator }
+          |class D {
+          |public:
+          |  val tag: String
+          |  def this(f: String -> String) { this.tag = "F1" }
+          |  def this(f: UnaryOperator[String]) { this.tag = "U" }
+          |}
+          |def main(args: String[]): String = new D((s: String) -> s + "!").tag
+          |""".stripMargin
+      assert(Shell.Success("F1") == shell.run(src, "None", Array()))
+    }
   }
 }

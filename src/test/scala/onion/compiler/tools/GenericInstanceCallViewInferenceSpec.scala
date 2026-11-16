@@ -37,5 +37,38 @@ class GenericInstanceCallViewInferenceSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Failure(-1) == r)
     }
+
+    def runCapturing(src: String): (Shell.Result, String) = {
+      val buf = new java.io.ByteArrayOutputStream()
+      val ps = new java.io.PrintStream(buf, true, "UTF-8")
+      val (o, e) = (System.out, System.err)
+      val r =
+        try {
+          System.setOut(ps); System.setErr(ps)
+          Console.withOut(ps) { Console.withErr(ps) { shell.run(src, "None", Array()) } }
+        } finally { System.setOut(o); System.setErr(e) }
+      (r, new String(buf.toByteArray, "UTF-8"))
+    }
+    it("falls back to an Object overload when the view's T contradicts another argument") {
+      val (r, out) = runCapturing(
+        """def pick[T](c: Comparable[T], d: T): String = "generic"
+          |def pick(c: Object, d: Object): String = "object"
+          |def main(args: String[]): Int { IO::println(pick("a", 1)); IO::println(pick("a", "b")); return 0 }
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim.linesIterator.toList == List("object", "generic"), out)
+    }
+    it("falls back to an Object instance overload the same way") {
+      val (r, out) = runCapturing(
+        """class U {
+          |public:
+          |  def pick[T](c: Comparable[T], d: T): String = "generic"
+          |  def pick(c: Object, d: Object): String = "object"
+          |}
+          |def main(args: String[]): Int { IO::println(new U().pick("a", 1)); return 0 }
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim == "object", out)
+    }
   }
 }

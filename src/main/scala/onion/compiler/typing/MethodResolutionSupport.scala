@@ -121,8 +121,42 @@ private[compiler] final class MethodResolutionSupport(
       while i < params.length do
         if !checkArg(i) then return false
         i += 1
-      true
+      viewBindingsAgree(argsWithTypeParams, methodTypeParams)
   }
+
+  /**
+   * A method type variable bound through a plain class's applied view (`String` as
+   * `Comparable[String]`, #2845) is invariant there, so every argument whose formal is that
+   * bare variable must fit the binding: `pick[T](c: Comparable[T], d: T)` does not accept
+   * `("a", 1)`, and the `Object` overload must win as in Java.
+   */
+  private def viewBindingsAgree(formals: Array[Type], methodTypeParams: Set[String]): Boolean =
+    if methodTypeParams.isEmpty then return true
+    val bound = scala.collection.mutable.Map.empty[String, Type]
+    var i = 0
+    while i < params.length && i < formals.length do
+      (formals(i), params(i).`type`) match
+        case (ae: AppliedClassType, aa: ClassType) if !aa.isInstanceOf[AppliedClassType] && !sameClass(ae.raw, aa) =>
+          table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
+            .collectFirst { case (raw, view) if sameClass(raw, ae.raw) => view }
+            .foreach { view =>
+              ae.typeArguments.zip(view.typeArguments).foreach {
+                case (tv: TypeVariableType, a: ClassType) if methodTypeParams.contains(tv.name) && !bound.contains(tv.name) =>
+                  bound(tv.name) = a
+                case _ =>
+              }
+            }
+        case _ =>
+      i += 1
+    if bound.isEmpty then return true
+    var j = 0
+    while j < params.length && j < formals.length do
+      formals(j) match
+        case tv: TypeVariableType if bound.contains(tv.name) =>
+          if !isAssignableWithBoxing(bound(tv.name), params(j).`type`) then return false
+        case _ =>
+      j += 1
+    true
 
   /**
    * Whether every reference argument fills its slot by the rule the argument check after

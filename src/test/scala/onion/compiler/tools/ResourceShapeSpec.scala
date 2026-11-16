@@ -107,6 +107,40 @@ class ResourceShapeSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Success("a readable file") == r)
     }
+
+    it("names why a missing file could not be read, not just its path (#2882)") {
+      val r = shell.run(
+        """
+          |record Pt(x: Int, y: Int) {
+          |  shape doc = json
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = file"/definitely/not/here.json".read(Pt::doc())
+          |    return (o.defects()[0] as Defect).actual()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("no such file") == r)
+    }
+
+    it("prints a top-level defect without an empty path (#2882)") {
+      val r = shell.run(
+        """
+          |record Pt(x: Int, y: Int) {
+          |  shape doc = json
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = file"/definitely/not/here.json".read(Pt::doc())
+          |    return (o.defects()[0] as Defect).describe()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(Shell.Success("/definitely/not/here.json:1: expected a readable file, found no such file") == r)
+    }
   }
 
   private def withHttpServer(body: String)(test: String => Unit): Unit = {

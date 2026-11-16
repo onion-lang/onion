@@ -112,7 +112,10 @@ public final class FileResource {
     }
 
     private static String describe(Exception e) {
+        if (e instanceof java.nio.file.NoSuchFileException) return "no such file";
+        if (e instanceof java.nio.file.AccessDeniedException) return "permission denied";
         String m = e.getMessage();
+        if (m != null && m.endsWith("Is a directory")) return "a directory";
         return m == null || m.isEmpty() ? e.getClass().getSimpleName() : m;
     }
 

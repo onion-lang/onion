@@ -28,6 +28,14 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     // Indexed by name: the search below ran over every method of the class for every
     // method of every generic supertype, with per-argument compatibility checks.
     val ownByName = ownMethods.groupBy(_.name)
+    def paramDesc(args: Array[TypedAST.Type]): String = args.map(asmType(_).getDescriptor).mkString("(", "", ")")
+    // Every inherited (name, parameter descriptor). A method whose own parameters
+    // match an inherited one exactly overrides that one, so a `?` bridge must not
+    // also send it a sibling overload (`f(Int?)` beside an inherited `f(Int)`).
+    lazy val inheritedSignatures: Set[(String, String)] =
+      sources.iterator.flatMap((raw, _) => raw.methods.iterator)
+        .filterNot(m => Modifier.isStatic(m.modifier) || Modifier.isPrivate(m.modifier))
+        .map(m => (m.name, paramDesc(m.arguments))).toSet
 
     for (sourceRaw, subst) <- sources do
       def substituteClassParams(tp: TypedAST.Type): TypedAST.Type = substituteTypeVars(tp, subst)
@@ -46,7 +54,11 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 // inherited `k: Int`, #2896). `foo(x: JInteger)` beside an inherited
                 // `foo(x: Int)` is an overload, so arguments must match up to `?`.
                 m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(specializedArgs(i)).name) &&
-                isBridgeableReturn(rawMethod.returnType, m.returnType)
+                isBridgeableReturn(rawMethod.returnType, m.returnType) && {
+                  // A `?` bridge only for a method that overrides nothing exactly.
+                  val own = paramDesc(m.arguments)
+                  own == paramDesc(rawMethod.arguments) || !inheritedSignatures.contains((m.name, own))
+                }
               else
                 m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))
             )

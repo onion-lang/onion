@@ -289,6 +289,42 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(whoRuns("Int", "Int?", "Int") == onion.tools.Shell.Success("Up"))
     }
 
+    // The base declares both `f(k: Int)` and `f(k: Int?)`; `Up` overrides only the second.
+    // No `?` bridge may take over the first (panel block on #3051 at eef87b7).
+    def bothOverloads(ret: String): onion.tools.Shell.Result = {
+      def body(who: String) = if ret == "void" then s"""who = who + "$who;"""" else s"""who = who + "$who;"; return "$who""""
+      shell.run(
+        s"""
+           |class Base {
+           |public:
+           |  var who: String
+           |  def this { who = "" }
+           |  def f(k: Int): $ret { ${body("Base.f(Int)")} }
+           |  def f(k: Int?): $ret { ${body("Base.f(Int?)")} }
+           |}
+           |class Up extends Base {
+           |public:
+           |  def this {}
+           |  override def f(k: Int?): $ret { ${body("Up.f(Int?)")} }
+           |}
+           |class Test {
+           |public:
+           |  static def main(args: String[]): String {
+           |    val b: Base = new Up(); b.f(3); val j: Int? = 4; b.f(j); return b.who
+           |  }
+           |}
+           |""".stripMargin,
+        "BothOverloads.on", Array())
+    }
+
+    it("leaves an inherited `f(k: Int)` alone when only `f(k: Int?)` is overridden (void)") {
+      assert(bothOverloads("void") == onion.tools.Shell.Success("Base.f(Int);Up.f(Int?);"))
+    }
+
+    it("leaves an inherited `f(k: Int)` alone when only `f(k: Int?)` is overridden (String)") {
+      assert(bothOverloads("String") == onion.tools.Shell.Success("Base.f(Int);Up.f(Int?);"))
+    }
+
     it("reports E0068 for `override def f(k: JInteger)` over `f(k: Int)`") {
       val results = errors(program("Int", "JInteger", "void"))
       assert(results.map(_._1).contains(Some("E0068")), s"got: $results")

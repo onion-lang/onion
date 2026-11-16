@@ -302,6 +302,8 @@ first(maybe, "solid")   // T := String?  (String? + String がマージされる
 
 Java のクラス由来の型変数は *プラットフォーム* パラメータとして扱われます。nullability が不明なため、nullable な引数を受け付け、（他の Java の値と同様に）デリファレンス可能なままです。
 
+そうした値を `Int` にアンボックスすると警告（W0015）が出ます。Java の呼び出しは「何もない」を null で返すことがあるためです（`Deque.poll()`、`Map.get`）。要素を返すか例外を投げる読み出しは、型引数が非 null なら警告しません。対象は `List.get` と `xs[i]`、`Iterator.next`、`Map.Entry.getKey`/`getValue`、そして `get` や `getOrElse` などの `Option`/`Result` の読み出しです。
+
 詳細は[仕様](../reference/specification.md)を参照してください。
 
 ## 次のステップ

@@ -325,6 +325,13 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   def processDuplication(node: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingDuplicationPass(this, session.activate(node)).run()
 
+  /**
+   * How many errors were reported, and dropped, while reporting was suppressed. A speculative
+   * typing whose result is kept compares it before and after, so it can tell a clean typing
+   * from one whose errors were only muted (#3067).
+   */
+  private[compiler] var suppressedErrorCount: Long = 0L
+
   def withSuppressedReporting[A](block: => A): A = {
     val unitContext = currentUnitContext
     unitContext.reportingSuppressed += 1

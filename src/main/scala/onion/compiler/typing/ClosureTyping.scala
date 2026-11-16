@@ -237,7 +237,10 @@ final class ClosureTyping(
                 val javaOpenResult = method.returnType.isInstanceOf[TypeVariableType] &&
                   !method.affiliation.name.startsWith("onion.Function")
                 val voidTailOk = inferredReturnType.isDefined || javaOpenResult || acceptsVoidTail(expectedRet)
-                val baseBlockOpt =
+                val savedBareReturn = context.bareReturnYieldsNull
+                context.bareReturnYieldsNull =
+                  inferredReturnType.contains(BasicType.VOID) && !expectedRet.isBasicType
+                val baseBlockOpt = try {
                   if (useExpressionBody) {
                     // Type the closure body's final (value) expression against the
                     // SAM's expected return type. This flows the expected type into a
@@ -257,6 +260,7 @@ final class ClosureTyping(
                   } else {
                     Option(body.translate(node.body, context))
                   }
+                } finally context.bareReturnYieldsNull = savedBareReturn
                 if (baseBlockOpt.isEmpty) {
                   None
                 } else {

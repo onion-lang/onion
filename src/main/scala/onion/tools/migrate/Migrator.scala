@@ -33,7 +33,9 @@ object Migrator:
     column: Int,
     note: String,
     subject: String = "`ret`",
-    clause: Boolean = false
+    clause: Boolean = false,
+    oldSpelling: Option[String] = None,
+    rewrittenAs: String = "rewritten as a contract predicate"
   )
 
   /** A place a rule left alone, or could not change, with why. */
@@ -60,8 +62,10 @@ object Migrator:
       val (line, column) = lineColumnOf(source, offset)
       Edit(offset, 3, "yield", line, column, "ret -> yield")
     }
-    val all = (edits ++ clauses).sortBy(_.offset)
-    Result(apply(source, all), all, (notes ++ clauseNotes).sortBy(n => (n.line, n.column)))
+    val (randomInts, randomIntNotes) = RandomIntToNextInt.find(source)
+    val calls = randomInts.filterNot(e => insideClause(e.offset))
+    val all = (edits ++ clauses ++ calls).sortBy(_.offset)
+    Result(apply(source, all), all, (notes ++ clauseNotes ++ randomIntNotes).sortBy(n => (n.line, n.column)))
 
   /**
    * Where the character at `line`:`column` of `result.text` was in `source`, and the edit whose
@@ -215,6 +219,158 @@ object Migrator:
           bodies += ((start + 2, image.substring(start + 2, i - 1)))
           from = i
     bodies.toSeq
+
+  /**
+   * `OnionMath::randomInt(min, max)` → `Rand::nextInt(min, max + 1)` (#3069).
+   *
+   * `randomInt` included `max`; `Rand::nextInt` excludes it, so the rewrite adds one to the
+   * second argument. A decimal literal is incremented (`6` → `7`), an argument ending in
+   * `- 1` loses it (`n - 1` → `n`), an argument built only from names, literals, calls and
+   * `+ - * / %` gets `+ 1`, and anything else is parenthesized first (`(a ?: b) + 1`).
+   * `onion.OnionMath::randomInt` is matched too. A `max` of `2147483647` has no `+ 1`, so it
+   * is noted and left as written. As for `ret`, [[MigrateCommand]] keeps a rewrite only when
+   * the file does not compile as written and does compile rewritten, so a user's own class
+   * named `OnionMath` is never touched.
+   */
+  private object RandomIntToNextInt:
+    private val Subject = "`OnionMath::randomInt`"
+
+    /** Tokens that bind at least as tightly as a binary `+`, so `arg + 1` keeps its meaning. */
+    private val Tight = Set(".", "::", "?.", "+", "-", "*", "/", "%")
+
+    /**
+     * Every call in `source`, including those in the code of a string's `#{...}`, which the
+     * lexer keeps inside one string token. A call there is a plain edit inside that token, so
+     * [[MigrateCommand]] checks it as a rewrite within the token, not as whole tokens.
+     */
+    def find(source: String): (Seq[Edit], Seq[Note]) =
+      val tokens =
+        try codeTokens(source)
+        catch case _: Exception => IndexedSeq.empty
+      val (edits, notes) = inThisCode(source, tokens)
+      val interpolated = tokens.flatMap { token =>
+        val bodies = interpolationBodies(token)
+        if bodies.isEmpty then Seq.empty
+        else
+          offsetOf(source, token.beginLine, token.beginColumn)
+            .filter(offset => source.startsWith(token.image, offset))
+            .toSeq
+            .flatMap { offset =>
+              bodies.flatMap { (start, body) =>
+                val (inner, innerNotes) = find(body)
+                val base = offset + start
+                val at = (bodyOffset: Int) => lineColumnOf(source, base + bodyOffset)
+                inner.map { e =>
+                  val (line, column) = at(body.indexOf("randomInt", e.offset))
+                  Left(e.copy(offset = base + e.offset, line = line, column = column, clause = false))
+                } ++ innerNotes.map { n =>
+                  val (line, column) = offsetOf(body, n.line, n.column).map(at).getOrElse((token.beginLine, token.beginColumn))
+                  Right(n.copy(line = line, column = column))
+                }
+              }
+            }
+      }
+      (edits ++ interpolated.collect { case Left(e) => e }, notes ++ interpolated.collect { case Right(n) => n })
+
+    private def inThisCode(source: String, tokens: IndexedSeq[Token]): (Seq[Edit], Seq[Note]) =
+      val edits = mutable.Buffer[Edit]()
+      val notes = mutable.Buffer[Note]()
+      var i = 0
+      while i + 3 < tokens.length do
+        if tokens(i).image == "OnionMath" && tokens(i + 1).image == "::" && tokens(i + 2).image == "randomInt" &&
+            tokens(i + 3).image == "(" && !(i > 0 && Set(".", "::").contains(tokens(i - 1).image) &&
+              !(i > 1 && tokens(i - 1).image == "." && tokens(i - 2).image == "onion" &&
+                !(i > 2 && Set(".", "::").contains(tokens(i - 3).image)))) then
+          val first = if i > 1 && tokens(i - 1).image == "." && tokens(i - 2).image == "onion" then i - 2 else i
+          rewrite(source, tokens, first, i + 3) match
+            case Right(e) => edits += e
+            case Left(Some(n)) => notes += n
+            case Left(None) => ()
+          i += 4
+        else i += 1
+      (edits.toSeq, notes.toSeq)
+
+    private def rewrite(source: String, tokens: IndexedSeq[Token], first: Int, open: Int): Either[Option[Note], Edit] =
+      val args = arguments(tokens, open)
+      val result = for
+        (comma, close) <- args
+        from <- start(source, tokens(first))
+        paren <- start(source, tokens(open))
+        maxFrom <- start(source, tokens(comma + 1))
+        last = tokens(close - 1)
+        maxTo <- start(source, last).map(_ + last.image.length)
+        closeAt <- start(source, tokens(close))
+      yield (comma, close, from, paren, maxFrom, maxTo, closeAt)
+      result match
+        case None => Left(None)
+        case Some((comma, close, from, paren, maxFrom, maxTo, closeAt)) =>
+          val max = tokens.slice(comma + 1, close)
+          // The compiler reports the missing method at `randomInt`, so the edit is placed there.
+          val name = tokens(open - 1)
+          val (line, column) = (name.beginLine, name.beginColumn)
+          plusOne(source.substring(maxFrom, maxTo), max) match
+            case None =>
+              Left(Some(Note(line, column,
+                s"this $Subject has a max of 2147483647, which Rand::nextInt cannot include (its max is exclusive); " +
+                  "left as written. Write Rand::nextInt() for any Int, or pick the bound by hand")))
+            case Some(newMax) =>
+              val replacement = "Rand::nextInt" + source.substring(paren, maxFrom) + newMax + source.substring(maxTo, closeAt + 1)
+              Right(Edit(from, closeAt + 1 - from, replacement, line, column,
+                "OnionMath::randomInt(min, max) -> Rand::nextInt(min, max + 1)",
+                subject = Subject, clause = true, oldSpelling = Some(s"the removed $Subject"),
+                rewrittenAs = "rewritten as Rand::nextInt"))
+
+    /** `Some(text)` for the new max, or `None` when it cannot be one more (`2147483647`). */
+    private def plusOne(text: String, max: IndexedSeq[Token]): Option[String] =
+      val digits = text.replace("_", "")
+      if max.length == 1 && max.head.kind == K.INTEGER && digits.forall(_.isDigit) then
+        val value = BigInt(digits)
+        if value >= Int.MaxValue then None else Some((value + 1).toString)
+      else
+        val simple = topLevel(max).forall(t => t.kind == K.ID || t.kind == K.INTEGER || Tight.contains(t.image) ||
+          t.kind == K.K_THIS || t.kind == K.K_SELF || t.image == "(" || t.image == "[")
+        val beforeMinus = if max.length >= 3 then Some(max(max.length - 3)) else None
+        val operand = beforeMinus.exists(t => t.kind == K.ID || t.kind == K.INTEGER || t.image == ")" || t.image == "]")
+        if simple && operand && max(max.length - 2).image == "-" && max.last.image == "1" then
+          Some(text.substring(0, text.lastIndexOf('-')).stripTrailing)
+        else if simple then Some(text + " + 1")
+        else Some("(" + text + ") + 1")
+
+    /** The tokens of `max` outside any bracket; a bracket's opener stands for its group. */
+    private def topLevel(max: IndexedSeq[Token]): Seq[Token] =
+      var depth = 0
+      max.filter { t =>
+        val atTop = depth == 0
+        t.image match
+          case "(" | "[" | "{" => depth += 1
+          case ")" | "]" | "}" => depth -= 1
+          case _ => ()
+        atTop && !Set(")", "]", "}").contains(t.image)
+      }
+
+    /** For the `(` at `open`: the index of the one top-level comma and of the closing `)`. */
+    private def arguments(tokens: IndexedSeq[Token], open: Int): Option[(Int, Int)] =
+      var depth = 0
+      var i = open
+      var commas = List.empty[Int]
+      var close: Option[Int] = None
+      while close.isEmpty && i < tokens.length do
+        tokens(i).image match
+          case "(" | "[" | "{" => depth += 1
+          case ")" | "]" | "}" =>
+            depth -= 1
+            if depth == 0 then close = Some(i)
+          case "," if depth == 1 => commas ::= i
+          case _ => ()
+        i += 1
+      close.flatMap { c =>
+        commas match
+          case comma :: Nil if comma > open + 1 && c > comma + 1 => Some((comma, c))
+          case _ => None
+      }
+
+    private def start(source: String, token: Token): Option[Int] =
+      offsetOf(source, token.beginLine, token.beginColumn).filter(source.startsWith(token.image, _))
 
   /**
    * `law name(p: T) { e }` and `example [name] { e }` → a contract predicate (#2740).

@@ -81,11 +81,10 @@ class EffectTableSpec extends AnyFunSpec {
       assert(of("onion.Timing", "sleep") == Set(Clock))
       assert(of("onion.Timing", "formatMillis").isEmpty)
     }
-    it("marks all of Rand, and OnionMath's two random entries") {
+    it("marks all of Rand, and OnionMath's random entry") {
       assert(of("onion.Rand", "nextInt") == Set(Rand))
       assert(of("onion.Rand", "shuffle") == Set(Rand))
       assert(of("onion.OnionMath", "random") == Set(Rand))
-      assert(of("onion.OnionMath", "randomInt") == Set(Rand))
       assert(of("onion.OnionMath", "sin").isEmpty)
     }
     it("classifies Config: fs load, env reads, pure accessors") {

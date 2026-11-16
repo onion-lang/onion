@@ -651,3 +651,26 @@ def main(args: String[]): void {
   `val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }`.
 - **No `onion migrate` rule:** the old behaviour swallowed an error at run time. The source
   has nothing to rewrite, and only you know whether a bad value should stop the program.
+
+## `OnionMath::randomInt` is removed; use `Rand::nextInt`
+
+Onion had two ways to get a random `Int` in a range, with opposite upper bounds (#3069).
+`Rand::nextInt(min, max)` stays. Its `max` is exclusive, as in `a..<b`, Java and Kotlin.
+
+```onion
+val die = OnionMath::randomInt(1, 6)   // Before: 1 to 6. Now: E0005
+val die = Rand::nextInt(1, 7)          // 1 to 6
+```
+
+- **What you see:** `E0005`, with a hint that shows `Rand::nextInt(min, max + 1)`.
+- **Unchanged:** `Rand::nextInt(min, max)` and `OnionMath::random()`.
+- **`onion migrate` rewrites it.** It writes `Rand::nextInt(min, max + 1)`, so every value the
+  old call could return stays possible:
+  - `OnionMath::randomInt(1, 6)` becomes `Rand::nextInt(1, 7)`.
+  - `OnionMath::randomInt(0, xs.size - 1)` becomes `Rand::nextInt(0, xs.size)`.
+  - `OnionMath::randomInt(a, b)` becomes `Rand::nextInt(a, b + 1)`.
+  - Calls inside `"#{...}"` are rewritten too.
+- **Not rewritten:** a `max` of `2147483647`, since `max + 1` does not fit in an `Int`. The
+  migrate run notes the line. Write `Rand::nextInt()` for any `Int`, or choose the bound by hand.
+- **Run it on one program at a time.** Unrelated scripts named together can hide each other's
+  errors, and then a call is left as written.

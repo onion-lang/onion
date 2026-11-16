@@ -157,7 +157,7 @@ object MigrateCommand:
             err.println(s"$where: this ${e.subject} is false ($FalsePredicate): it does not hold when the build runs it, " +
               "so onion migrate left the file as written.")
           else
-            err.println(s"$where: this ${e.subject}, rewritten as a contract predicate, does not compile, " +
+            err.println(s"$where: this ${e.subject}, ${e.rewrittenAs}, does not compile, " +
               s"so onion migrate left the file as written: ${p.message}")
         }
         err.println("  Fix or remove it, then run onion migrate again, or make the change by hand.")
@@ -284,7 +284,7 @@ object MigrateCommand:
 
   /** What a rule's edit replaced, for messages. */
   private def oldSpelling(edit: Migrator.Edit): String =
-    if edit.clause then s"the old ${edit.subject} clause" else "the old do-block keyword"
+    edit.oldSpelling.getOrElse(if edit.clause then s"the old ${edit.subject} clause" else "the old do-block keyword")
 
   /**
    * The migrated text lexes to the original tokens and comments, except for the rewrites.

@@ -223,6 +223,14 @@ class SemanticErrorReporter(threshold: Int) {
         // FormerDefaultImportLookup below, so a real method named `puts` on some other
         // type is unaffected.
         Some(message("suggestion.rubyPuts"))
+      } else if (name == "randomInt" && argTypes.length == 2 && (targetType match {
+          case obj: TypedAST.ObjectType => obj.name == "onion.OnionMath"
+          case _ => false
+        })) {
+        // `OnionMath::randomInt(min, max)` included max; it was removed so that `Rand::nextInt`,
+        // whose max is exclusive, is the one random Int in a range (#3069). Show the call that
+        // keeps the old result rather than a name-similarity guess.
+        Some(message("suggestion.onionMathRandomInt"))
       } else if ((fieldNamed(targetType, name) && !inaccessibleFieldNamed(items)) || isArrayLengthProperty(targetType, name)) {
         // `p.name()` where `name` is a field, not a method -- a common mix-up
         // with record component accessors (which really are methods). A

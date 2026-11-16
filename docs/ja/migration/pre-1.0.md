@@ -582,3 +582,23 @@ def main(args: String[]): void {
 - **以前の結果を保つには:** 例外を捕まえて既定値を使います。
   `val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }`
 - **`onion migrate` の規則はありません:** 以前の動作は、実行時のエラーを握りつぶしていただけです。ソースには書き換えるものがありません。不正な値でプログラムを止めるべきかどうかは、書いた人にしか分かりません。
+
+## `OnionMath::randomInt` は削除されました。`Rand::nextInt` を使ってください
+
+範囲内のランダムな `Int` を得る方法が二つあり、上限の扱いが逆でした（#3069）。
+残るのは `Rand::nextInt(min, max)` です。`max` は含まれません。`a..<b`、Java、Kotlin と同じです。
+
+```onion
+val die = OnionMath::randomInt(1, 6)   // 以前: 1から6。現在: E0005
+val die = Rand::nextInt(1, 7)          // 1から6
+```
+
+- **表示されるもの:** `E0005` と、`Rand::nextInt(min, max + 1)` を示すヒントです。
+- **変わらないもの:** `Rand::nextInt(min, max)` と `OnionMath::random()` です。
+- **`onion migrate` が書き換えます。** `Rand::nextInt(min, max + 1)` と書くので、以前の呼び出しが返せた値はすべて出ます。
+  - `OnionMath::randomInt(1, 6)` は `Rand::nextInt(1, 7)` になります。
+  - `OnionMath::randomInt(0, xs.size - 1)` は `Rand::nextInt(0, xs.size)` になります。
+  - `OnionMath::randomInt(a, b)` は `Rand::nextInt(a, b + 1)` になります。
+  - `"#{...}"` の中の呼び出しも書き換えます。
+- **書き換えないもの:** `max` が `2147483647` の呼び出しです。`max + 1` が `Int` に収まらないためです。migrate はその行を知らせます。任意の `Int` なら `Rand::nextInt()` と書くか、上限を自分で選んでください。
+- **プログラムは一つずつ migrate してください。** 無関係なスクリプトを一緒に渡すと、互いのエラーが隠れることがあります。その場合、呼び出しは書き換えられずに残ります。

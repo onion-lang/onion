@@ -231,7 +231,6 @@ onion.Future$ThrowingSupplier#*=pure
 onion.Rand#*=rand
 onion.OnionMath#*=pure
 onion.OnionMath#random=rand
-onion.OnionMath#randomInt=rand
 
 # ---- pure onion stdlib -----------------------------------------------------
 

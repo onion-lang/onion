@@ -152,9 +152,22 @@ public final class Args {
             return out;
         }
 
+        /** The reading {@link #positional()} and {@link #option(String)} would give now. */
         @Override
         public String toString() {
-            return "Args(options=" + options + ", flags=" + flags + ", positional=" + positional + ")";
+            Map<String, String> opts = new LinkedHashMap<>(options);
+            for (Pending p : pending) {
+                if (askedFlag.contains(p.name()) && !askedOption.contains(p.name())) {
+                    opts.remove(p.name());
+                }
+            }
+            List<String> fl = new ArrayList<>(flags);
+            for (Pending p : pending) {
+                if (askedFlag.contains(p.name()) && !askedOption.contains(p.name())) {
+                    fl.add(p.name());
+                }
+            }
+            return "Args(options=" + opts + ", flags=" + fl + ", positional=" + positional() + ")";
         }
     }
 }

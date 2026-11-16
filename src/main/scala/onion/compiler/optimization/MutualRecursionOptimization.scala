@@ -296,10 +296,11 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // class-load time) instead of either compiling correctly or failing to compile.
     // The temporaries that hold out-of-order named arguments are the one exception:
     // `relocateArgumentTemporaries` moves them past the state machine's own slots, one
-    // fresh slot each, before the bodies are spliced together (#2800).
+    // fresh slot each, before the bodies are spliced together (#2800). So does the
+    // temporary that holds a `copy(..)` receiver (#3098).
     val paramCountForLocals = group.head.arguments.length
     val declaresExtraLocal = group.find { m =>
-      referencesLocalBeyondParams(m.getBlock, paramCountForLocals, callArgumentTemporaries(m.getBlock, paramCountForLocals))
+      referencesLocalBeyondParams(m.getBlock, paramCountForLocals, compilerTemporaries(m.getBlock, paramCountForLocals))
     }
     declaresExtraLocal.foreach { method =>
       break(Some(s"method ${method.name} declares a local variable beyond its parameter list, " +
@@ -375,6 +376,35 @@ class MutualRecursionOptimization(config: CompilerConfig)
       case _                      => false
     }
 
+  /** The temporaries the compiler introduced in `body`: see the two methods below. */
+  private def compilerTemporaries(body: StatementBlock, paramCount: Int): Set[Int] =
+    callArgumentTemporaries(body, paramCount) ++ copyReceiverTemporaries(body, paramCount)
+
+  /**
+   * The temporaries that hold a `copy(..)` receiver, so it runs once (#3098): a `Begin`
+   * of exactly a store to a slot past the parameters and a call on a read of that slot.
+   */
+  private def copyReceiverTemporaries(body: StatementBlock, paramCount: Int): Set[Int] = {
+    val found = mutable.Set[Int]()
+    def readsSlot(t: Term, index: Int): Boolean = t match {
+      case ref: RefLocal => ref.frame == 0 && ref.index == index
+      case _             => false
+    }
+    TermWalk.existsIn(body) {
+      case b: Begin if b.terms.length == 2 =>
+        (b.terms(0), b.terms(1)) match {
+          case (set: SetLocal, call: Call) if set.frame == 0 && set.index >= paramCount && readsSlot(call.target, set.index) =>
+            found += set.index
+          case (set: SetLocal, call: SafeCall) if set.frame == 0 && set.index >= paramCount && readsSlot(call.target, set.index) =>
+            found += set.index
+          case _ =>
+        }
+        false
+      case _ => false
+    }
+    found.toSet
+  }
+
   /** The temporaries of every call in `body` whose named arguments are out of order. */
   private def callArgumentTemporaries(body: StatementBlock, paramCount: Int): Set[Int] = {
     val found = mutable.Set[Int]()
@@ -407,7 +437,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     var next = 2 * paramCount + 1
     val moved = mutable.ArrayBuffer[(Term, Int)]()
     group.foreach { method =>
-      val temporaries = callArgumentTemporaries(method.getBlock, paramCount).toSeq.sorted
+      val temporaries = compilerTemporaries(method.getBlock, paramCount).toSeq.sorted
       if (temporaries.nonEmpty) {
         val target = temporaries.map { t => val i = next; next += 1; t -> i }.toMap
         val nodes = new java.util.IdentityHashMap[Term, Integer]()

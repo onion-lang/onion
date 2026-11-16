@@ -96,5 +96,49 @@ class RecordCopyReceiverOnceSpec extends AbstractShellSpec {
           |""".stripMargin, "CopyLocal.on")
       assert(Shell.Success("R(a=a1, b=B, c=c1) calls=1") == result)
     }
+
+    it("keeps a @TailRecursive mutual group optimized when it copies a call result") {
+      // Panel block on #3102: the receiver's temporary made the group fall back (W0016)
+      // and overflow the stack.
+      val result = shell.run(
+        """record R(a: String, b: String, c: String)
+          |class MR {
+          |public:
+          |  static def mk(): R = new R("a", "b", "c")
+          |  static def main(args: String[]): String = "" + ev(1000000, 0)
+          |private:
+          |  static @TailRecursive def ev(k: Int, acc: Int): Int {
+          |    if k == 0 { return acc }
+          |    return od(k - 1, acc + mk().copy(a = "E").b().length())
+          |  }
+          |  static @TailRecursive def od(k: Int, acc: Int): Int {
+          |    if k == 0 { return acc }
+          |    return ev(k - 1, acc + mk().copy(a = "O").c().length())
+          |  }
+          |}
+          |""".stripMargin, "CopyInMutualGroup.on", Array())
+      assert(Shell.Success("1000000") == result)
+    }
+
+    it("keeps a @TailRecursive mutual group optimized when a tail call's argument is a copy") {
+      val result = shell.run(
+        """record R(a: String, b: String, c: String)
+          |class MR {
+          |public:
+          |  static def mk(s: String): R = new R(s, "b", "c")
+          |  static def main(args: String[]): String = ev(1000000, mk("x")).toString()
+          |private:
+          |  static @TailRecursive def ev(k: Int, r: R): R {
+          |    if k == 0 { return r }
+          |    return od(k - 1, mk(r.a()).copy(b = "E"))
+          |  }
+          |  static @TailRecursive def od(k: Int, r: R): R {
+          |    if k == 0 { return r }
+          |    return ev(k - 1, mk(r.a()).copy(c = "O"))
+          |  }
+          |}
+          |""".stripMargin, "CopyAsTailArgument.on", Array())
+      assert(Shell.Success("R(a=x, b=b, c=O)") == result)
+    }
   }
 }

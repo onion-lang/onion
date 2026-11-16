@@ -74,7 +74,7 @@ private[compiler] final class SafeNavigationTypingSupport(
     // Zero-arg record copy is a full clone: p?.copy()
     if (name == "copy" && node.args.isEmpty) {
       calls.tryRecordCopy(node, name, node.args, node.typeArgs, context, target, targetType) {
-        (method, finalParams) => new SafeCall(node.location, target, method, finalParams)
+        (receiver, method, finalParams) => new SafeCall(node.location, receiver, method, finalParams)
       } match {
         case Some(result) => return result
         case None =>
@@ -114,7 +114,7 @@ private[compiler] final class SafeNavigationTypingSupport(
     expected: Type
   ): Option[Term] = {
     val recordCopy = calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, target, targetType) {
-      (method, finalParams) => new SafeCall(node.location, target, method, finalParams)
+      (receiver, method, finalParams) => new SafeCall(node.location, receiver, method, finalParams)
     }
     recordCopy match { case Some(result) => return result; case None => }
 

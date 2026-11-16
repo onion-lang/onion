@@ -27,7 +27,7 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
     context: LocalContext,
     target: Term,
     targetType: ObjectType
-  )(buildRawCall: (Method, Array[Term]) => Term): Option[Option[Term]] = {
+  )(buildCallOn: (Term, Method, Array[Term]) => Term): Option[Option[Term]] = {
     if (name != "copy") return None
     val definition = targetType match {
       case d: ClassDefinition => d
@@ -55,6 +55,23 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
         if (declaresCopy) break(None)
         calls.reportMethodNotFound(node, targetType, s"copy(${argName} = ...)", Array[Type]())
         break(Some(None)) // reported; the regular path would add a second error
+      }
+
+      // The receiver runs once, however many components the copy keeps: an omitted
+      // component is read from a temporary, not by running `mk()` again (#3098).
+      // `this` and a local are read in place, which keeps the call free of temporaries.
+      val omitsComponent = components.exists(c => !named.contains(c._1))
+      val (receiver, receiverStore): (Term, Term) = target match {
+        case _: This | _: OuterThis | _: RefLocal => (target, null)
+        case _ if !omitsComponent || context == null => (target, null)
+        case _ =>
+          val tp = target.`type`
+          val bind = new ClosureLocalBinding(0, context.add(context.newName, tp, isMutable = false), tp, isMutable = false)
+          (new RefLocal(bind), new SetLocal(bind, target))
+      }
+      def buildRawCall(method: Method, finalParams: Array[Term]): Term = {
+        val call = buildCallOn(receiver, method, finalParams)
+        if (receiverStore == null) call else new Begin(receiverStore, call)
       }
 
       val classSubst = TypeSubstitution.classSubstitution(targetType)
@@ -107,7 +124,7 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
                 // The receiver here is already known non-null by the point the
                 // (possibly safe-nav) outer call is built, so a plain getter
                 // call is correct for both the plain and safe-nav callers.
-                val call = new Call(target, getter, Array[Term]())
+                val call = new Call(receiver, getter, Array[Term]())
                 fullParams(i) = TypeSubst.withCast(call, TypeSubst.withClassOnly(getter.returnType, targetType))
               case _ => break(None)
             }

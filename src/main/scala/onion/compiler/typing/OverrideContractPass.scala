@@ -45,26 +45,38 @@ final class OverrideContractPass(report: (String, onion.compiler.Location, Strin
     }.toSet
     val invariants = chain.flatMap(_.invariants)
     val callees = chain.reverse.flatMap(methodsOf).map(m => m.name -> m).toMap
-    for {
-      sub <- methodsOf(cls) if sub.block != null
-      sup <- supers.flatMap(methodsOf).find(p => p.name == sub.name && p.args.size == sub.args.size)
-      if sup.requires.nonEmpty || sup.ensures.nonEmpty
-    } {
-      val eff = EffectiveContract.of(
-        EffectiveContract.Clauses(sup.requires, sup.ensures),
-        EffectiveContract.Clauses(sub.requires, sub.ensures))
-      eff.post.foreach { post =>
-        // the body runs under pre_eff (and the invariants); the caller's own `requires` is replaced by it
-        val assumed = invariants ++ eff.pre.toList
-        val asMethod = sub.copy(requires = Nil)
-        HistoryProver.proveEnsures(asMethod, List(post), assumed, intFields, callees) match {
-          case HistoryProver.Counterexample(before) =>
-            val shown = before.toSeq.sortBy(_._1).map { case (k, v) => s"$k = $v" }.mkString(", ")
-            report(unit.sourceFile, sub.location,
-              s"'${sub.name}' can break the contract it inherits: for example when $shown. " +
+    def isStatic(m: AST.MethodDeclaration): Boolean = (m.modifiers & AST.M_STATIC) != 0
+    val ancestors = supers.flatMap(methodsOf)
+    for (sub <- methodsOf(cls) if sub.block != null && !isStatic(sub)) {
+      // Every ancestor method it overrides (instance, same name and arity) that promises something:
+      // a clause-less override in between does not end the contract.
+      val overridden = ancestors.filter { p =>
+        !isStatic(p) && p.name == sub.name && p.args.size == sub.args.size && (p.requires.nonEmpty || p.ensures.nonEmpty)
+      }
+      val reported = overridden.iterator.map(sup => checkOverride(sup, sub)).collectFirst { case Some(msg) => msg }
+      reported.foreach(report(unit.sourceFile, sub.location, _))
+    }
+
+    def checkOverride(sup: AST.MethodDeclaration, sub: AST.MethodDeclaration): Option[String] = {
+      // the base's clauses name its own parameters: read them as the override's, by position
+      val aliases = sup.args.map(_.name).zip(sub.args.map(_.name)).filter { case (a, b) => a != b }.toMap
+      if (aliases.keys.exists(a => sub.args.exists(_.name == a))) None // swapped names: not modelled
+      else {
+        val eff = EffectiveContract.of(
+          EffectiveContract.Clauses(sup.requires, sup.ensures),
+          EffectiveContract.Clauses(sub.requires, sub.ensures))
+        eff.post.flatMap { post =>
+          // the body runs under pre_eff (and the invariants); the caller's own `requires` is replaced by it
+          val assumed = invariants ++ eff.pre.toList
+          val asMethod = sub.copy(requires = Nil)
+          HistoryProver.proveEnsures(asMethod, List(post), assumed, intFields, callees, aliases = aliases) match {
+            case HistoryProver.Counterexample(before) =>
+              val shown = before.toSeq.sortBy(_._1).map { case (k, v) => s"$k = $v" }.mkString(", ")
+              Some(s"'${sub.name}' can break the contract it inherits: for example when $shown. " +
                 "Its body must keep the effective postcondition whenever the effective precondition held; " +
                 "strengthen its requires, or weaken what it promises")
-          case _ =>
+            case _ => None
+          }
         }
       }
     }

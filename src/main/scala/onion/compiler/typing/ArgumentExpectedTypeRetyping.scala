@@ -174,8 +174,8 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
    * gives `Option::none()` its type argument.
    *
    * Only with a target type, and only when that leaves no method type variable
-   * in the lambda's parameter type; a re-type that fails or changes nothing
-   * keeps the original argument, so its own diagnostics stand.
+   * in the lambda's parameter type; a re-type that fails, reports an error, or
+   * changes nothing keeps the original argument, so its own diagnostics stand.
    */
   def retypeTargetTypedClosures(
     callNode: AST.Node,
@@ -206,7 +206,11 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     for (i <- weak) {
       val formal = TypeSubstitution.substituteType(method.arguments(i), classSubst, subst, defaultToBound = false)
       if (formal != null && !mentionsAny(formal, names)) {
-        retypeArgument(args(i), context, formal) match {
+        // A re-type that muted an error (a `return 42` in a lambda now typed to return
+        // `Option[Int]`) is not kept: the original lambda reports it, as without the re-type.
+        val errorsBefore = typing.suppressedErrorCount
+        val retyped = retypeArgument(args(i), context, formal)
+        retyped.filter(_ => typing.suppressedErrorCount == errorsBefore) match {
           case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) &&
               TypeRules.isAssignable(formal, term.`type`) =>
             if (updated == null) updated = params.clone()

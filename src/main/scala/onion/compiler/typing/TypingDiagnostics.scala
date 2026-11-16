@@ -13,7 +13,7 @@ final class TypingDiagnostics(private val typing: Typing, private val session: T
   }
 
   def report(error: SemanticError, location: Location, items: Seq[AnyRef]): Unit = {
-    if (!typing.reportingEnabled) return
+    if (!typing.reportingEnabled) { typing.suppressedErrorCount += 1; return }
     reporter.setSourceFile(typing.unit_.sourceFile)
     reporter.report(error, location, items.toArray)
   }

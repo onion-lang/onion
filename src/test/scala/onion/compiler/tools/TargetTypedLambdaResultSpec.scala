@@ -78,5 +78,30 @@ class TargetTypedLambdaResultSpec extends AbstractShellSpec {
       )
       assert(Shell.Failure(-1) == result)
     }
+
+    it("a lambda body with a type error is still rejected, not compiled (panel block on #3097)") {
+      val fold = run(
+        """val o: Option[String] = Option::none()
+          |val q: Option[Int] = o.fold(() -> {
+          |  if 1 < 2 { return 42 }
+          |  Option::none()
+          |}, (s) -> Option::some(s.length()))
+          |def main(args: String[]): String = "" + q
+          |""".stripMargin,
+        "FoldBadReturn.on"
+      )
+      assert(Shell.Failure(-1) == fold)
+      val choose = run(
+        """def choose[U](f: () -> U, g: (Int) -> U): U = if 1 > 2 { f() } else { g(5) }
+          |val a: Option[Int] = choose(() -> {
+          |  if 1 < 2 { return "oops" }
+          |  Option::none()
+          |}, (n) -> Option::some(n))
+          |def main(args: String[]): String = "" + a
+          |""".stripMargin,
+        "ChooseBadReturn.on"
+      )
+      assert(Shell.Failure(-1) == choose)
+    }
   }
 }

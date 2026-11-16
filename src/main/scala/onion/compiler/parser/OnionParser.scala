@@ -2059,8 +2059,8 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
     case K.K_WHILE => whileExpression()
     case K.K_FOR => forExpression()
     case K.K_SELECT => selectExpression()
-    // `{ -> body }` as a value is a zero-parameter lambda, as in the grammar (#3070).
-    case K.LBRACE if looksLike { expect(K.LBRACE); eols(); expect(K.ARROW) } => trailingLambda()
+    // `{ [params] -> body }` as a value is a lambda, as in the grammar (#3070).
+    case K.LBRACE if looksLike(trailingLambdaHead()) => trailingLambda()
     case K.LBRACE => block()
     case K.K_TRY => tryExpression()
     case K.K_THROW => throwExpression()

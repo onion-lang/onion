@@ -10,7 +10,8 @@ import java.io.StringReader
  * trailing lambda (#3070). Before, `twice({ -> "d" })` was a syntax error at the `->`, so a
  * call taking two lambdas (`opt.fold(ifEmpty, ifPresent)`) could not use the arrow form for
  * its first one. A block never starts with `->`, so no program that parsed before changes
- * meaning: `{ x -> x }` and `{ 3 }` in parentheses keep their old parse.
+ * meaning: `{ 3 }` in parentheses keeps its old parse. `{ x -> body }` there is the same lambda
+ * as the trailing form, so its body may span several statements too (the panel's block on #3111).
  */
 class ArrowLambdaAsValueSpec extends AbstractShellSpec {
 
@@ -59,6 +60,25 @@ class ArrowLambdaAsValueSpec extends AbstractShellSpec {
           |""".stripMargin
       parity(src)
       assert(Shell.Success(4221) == run(src, "ArrowTwoLambdas.on"))
+    }
+
+    it("takes a multi-line body when it has parameters, as the second lambda argument") {
+      val src =
+        """
+          |class Test {
+          |public:
+          |  static def fold(present: Boolean, ifEmpty: () -> Int, ifPresent: (Int) -> Int): Int =
+          |    if present { ifPresent(20) } else { ifEmpty() }
+          |  static def main(args: String[]): Int {
+          |    return fold(true, { -> 0 }, { n ->
+          |      val t = n + 1
+          |      t * 2
+          |    })
+          |  }
+          |}
+          |""".stripMargin
+      parity(src)
+      assert(Shell.Success(42) == run(src, "ArrowParamMultiLine.on"))
     }
 
     it("is a lambda as an initializer and as a constructor argument") {

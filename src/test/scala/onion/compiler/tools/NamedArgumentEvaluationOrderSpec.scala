@@ -19,6 +19,7 @@ class NamedArgumentEvaluationOrderSpec extends AbstractShellSpec {
          |  val text: String
          |  def this(a: String, b: String) { text = a + b }
          |}
+         |record Rec(a: String, b: String, c: String)
          |class Base {
          |public:
          |  def join(a: String, b: String): String = a + b
@@ -77,6 +78,13 @@ class NamedArgumentEvaluationOrderSpec extends AbstractShellSpec {
         """    val log = new Log()
           |    val p = new Pair(b = log.t("B"), a = log.t("A"))
           |    return log.sb.toString() + ":" + p.text""".stripMargin) == Shell.Success("BA:AB"))
+    }
+
+    it("evaluates a record copy's arguments in written order (#2801)") {
+      assert(run(
+        """    val log = new Log()
+          |    val r = new Rec("x", "y", "z").copy(c = log.t("C"), a = log.t("A"))
+          |    return log.sb.toString() + ":" + r.a() + r.b() + r.c()""".stripMargin) == Shell.Success("CA:AyC"))
     }
 
     it("keeps positional arguments first and fills defaults after the written ones") {

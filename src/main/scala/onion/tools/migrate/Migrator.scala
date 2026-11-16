@@ -54,8 +54,13 @@ object Migrator:
   /**
    * `declared` holds the type names other files named alongside declare: a rewrite never
    * writes a bare name one of them could capture.
+   *
+   * `reported` holds the places the compiler reported an error at in `source` as written, once
+   * a compile has run. A removed library call is rewritten only at such a place (#3116 block 5):
+   * a call the compiler resolved, to a user's own `OnionMath` or an inherited `randomInt`, keeps
+   * its meaning however the rest of the file fails.
    */
-  def migrate(source: String, declared: Set[String] = Set.empty): Result =
+  def migrate(source: String, declared: Set[String] = Set.empty, reported: Option[Set[(Int, Int)]] = None): Result =
     val (clauses, clauseNotes) = LawExampleToPredicate.find(source)
     val insideClause = (offset: Int) => clauses.exists(c => offset >= c.offset && offset < c.offset + c.length)
     val (last, notLast) = RetToYield.find(source).filterNot((offset, _) => insideClause(offset)).partition(_._2)
@@ -76,7 +81,8 @@ object Migrator:
     // `self` -> `this` keeps every offset, so the randomInt rule reads the text with it applied:
     // a `self` in a call's arguments is rewritten inside that call's one edit, and its
     // position, where the compiler reports E0117, is one of that edit's places.
-    val (randomInts, randomIntNotes) = RandomIntToNextInt.find(apply(source, selfEdits), declared)
+    val (randomInts, randomIntNotes) = RandomIntToNextInt.find(apply(source, selfEdits), declared,
+      (line, column) => reported.forall(_.contains((line, column))))
     val within = (offset: Int, e: Edit) => offset >= e.offset && offset < e.offset + e.length
     val calls = randomInts.filterNot(e => insideClause(e.offset)).map { call =>
       val folded = selfEdits.filter(s => within(s.offset, call))
@@ -257,9 +263,9 @@ object Migrator:
    * `- 1` loses it (`n - 1` → `n`), an argument built only from names, literals, calls and
    * `+ - * / %` gets `+ 1`, and anything else is parenthesized first (`(a ?: b) + 1`).
    * `onion.OnionMath::randomInt` is matched too. A `max` of `2147483647` has no `+ 1`, so it
-   * is noted and left as written. As for `ret`, [[MigrateCommand]] keeps a rewrite only when
-   * the file does not compile as written and does compile rewritten, so a user's own class
-   * named `OnionMath` is never touched.
+   * is noted and left as written. [[MigrateCommand]] rewrites a call only where the compiler
+   * reported an error at its name (`reported`), and keeps the file only when it compiles
+   * rewritten, so a user's own `OnionMath` or an inherited `randomInt` is never touched.
    */
   private object RandomIntToNextInt:
     private val Subject = "`OnionMath::randomInt`"
@@ -272,14 +278,24 @@ object Migrator:
      * lexer keeps inside one string token. A call there is a plain edit inside that token, so
      * [[MigrateCommand]] checks it as a rewrite within the token, not as whole tokens.
      */
-    def find(source: String, declared: Set[String] = Set.empty): (Seq[Edit], Seq[Note]) =
+    def find(
+      source: String,
+      declared: Set[String] = Set.empty,
+      reported: (Int, Int) => Boolean = (_, _) => true
+    ): (Seq[Edit], Seq[Note]) =
       val tokens =
         try codeTokens(source)
         catch case _: Exception => IndexedSeq.empty
-      find(source, tokens, Spelling(source, tokens, declared))
+      find(source, tokens, Spelling(source, tokens, declared), reported)
 
-    private def find(source: String, tokens: IndexedSeq[Token], spelling: Spelling): (Seq[Edit], Seq[Note]) =
-      val (edits, notes) = calls(source, tokens, 0, tokens.length, spelling)
+    /** `reported(line, column)`: may the call whose name is there be the removed method? */
+    private def find(
+      source: String,
+      tokens: IndexedSeq[Token],
+      spelling: Spelling,
+      reported: (Int, Int) => Boolean
+    ): (Seq[Edit], Seq[Note]) =
+      val (edits, notes) = calls(source, tokens, 0, tokens.length, spelling, reported)
       val interpolated = tokens.flatMap { token =>
         val bodies = interpolationBodies(token)
         if bodies.isEmpty then Seq.empty
@@ -292,10 +308,10 @@ object Migrator:
                 val bodyTokens =
                   try codeTokens(body)
                   catch case _: Exception => IndexedSeq.empty
-                val (inner, innerNotes) = find(body, bodyTokens, spelling)
                 val base = offset + start
                 val at = (line: Int, column: Int) =>
                   offsetOf(body, line, column).map(o => lineColumnOf(source, base + o)).getOrElse((token.beginLine, token.beginColumn))
+                val (inner, innerNotes) = find(body, bodyTokens, spelling, (line, column) => reported.tupled(at(line, column)))
                 inner.map { e =>
                   val (line, column) = at(e.line, e.column)
                   Left(e.copy(offset = base + e.offset, line = line, column = column, clause = false,
@@ -363,7 +379,14 @@ object Migrator:
      * rewritten inside that call's one edit, so edits never overlap; its position is kept as
      * one of that edit's places, since the compiler reports the inner call first.
      */
-    private def calls(source: String, tokens: IndexedSeq[Token], from: Int, until: Int, spelling: Spelling): (Seq[Edit], Seq[Note]) =
+    private def calls(
+      source: String,
+      tokens: IndexedSeq[Token],
+      from: Int,
+      until: Int,
+      spelling: Spelling,
+      reported: (Int, Int) => Boolean
+    ): (Seq[Edit], Seq[Note]) =
       val edits = mutable.Buffer[Edit]()
       val notes = mutable.Buffer[Note]()
       var i = from
@@ -373,13 +396,16 @@ object Migrator:
             arguments(tokens, i).filter(_._2 < until) match
               case None => i += 1
               case Some((comma, close)) =>
-                val (inner, innerNotes) = calls(source, tokens, i + 1, close, spelling)
+                val (inner, innerNotes) = calls(source, tokens, i + 1, close, spelling, reported)
                 notes ++= innerNotes
-                rewrite(source, tokens, first, i, comma, close, inner, spelling) match
-                  case Right(e) => edits += e
-                  case Left(n) =>
-                    notes ++= n
-                    edits ++= inner
+                val name = tokens(i - 1)
+                if !reported(name.beginLine, name.beginColumn) then edits ++= inner
+                else
+                  rewrite(source, tokens, first, i, comma, close, inner, spelling) match
+                    case Right(e) => edits += e
+                    case Left(n) =>
+                      notes ++= n
+                      edits ++= inner
                 i = close + 1
           case _ => i += 1
       (edits.toSeq, notes.toSeq)

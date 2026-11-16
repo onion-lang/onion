@@ -243,6 +243,60 @@ class OneRandomIntSpec extends AbstractShellSpec {
       assert(after.startsWith("println(randomInt(1, 6))\n"), s"$after\n$output")
     }
 
+    // #3116 block 5: the rule is "rewrite only where the compiler reported the removed
+    // method". A call the compiler resolved keeps its meaning, however the rest of the file fails.
+    def migrateDir(files: (String, String)*): (Int, Map[String, String], String) = {
+      val root = Files.createTempDirectory("onion-migrate-3069-own").toRealPath()
+      files.foreach((name, text) => Files.writeString(root.resolve(name), text, UTF_8))
+      val out = new ByteArrayOutputStream()
+      val code = MigrateCommand.run(root, Array(root.toString), new PrintStream(out, true, UTF_8), new PrintStream(out, true, UTF_8))
+      (code, files.map((name, _) => name -> Files.readString(root.resolve(name), UTF_8)).toMap, out.toString(UTF_8))
+    }
+
+    val ownOnionMath = "class OnionMath {\npublic:\n  static def randomInt(a: Int, b: Int): Int = 100\n}\n"
+    val mixedCalls = "    IO::println(OnionMath::randomInt(1, 6))\n    IO::println(onion.OnionMath::randomInt(5, 5))\n"
+
+    it("leaves a call to a sibling file's own OnionMath alone beside a removed call (#3116 block 5)") {
+      val main = "class Main {\npublic:\n  static def main(args: String[]): void {\n" + mixedCalls + "  }\n}\n"
+      val (code, after, output) = migrateDir("OnionMath.on" -> ownOnionMath, "Main.on" -> main)
+      assert(code == 0, output)
+      assert(after("Main.on").contains("IO::println(OnionMath::randomInt(1, 6))"), s"${after("Main.on")}\n$output")
+      assert(after("Main.on").contains("IO::println(Rand::nextInt(5, 6))"), s"${after("Main.on")}\n$output")
+      assert(after("OnionMath.on") == ownOnionMath)
+    }
+
+    it("leaves a call to the file's own OnionMath alone beside a removed call") {
+      val source = ownOnionMath + mixedCalls.replace("    ", "")
+      val (code, after, output) = migrate(source)
+      assert(code == 0, output)
+      assert(after.contains("IO::println(OnionMath::randomInt(1, 6))"), s"$after\n$output")
+      assert(after.contains("IO::println(Rand::nextInt(5, 6))"), s"$after\n$output")
+    }
+
+    it("leaves a bare randomInt inherited from another file alone beside a removed call") {
+      val base = "class Base {\npublic:\n  def this {}\n  def randomInt(a: Int, b: Int): Int = 100\n}\n"
+      val kid =
+        """import { onion.OnionMath::* }
+          |class Kid extends Base {
+          |public:
+          |  def this {}
+          |  def roll(): Int = randomInt(1, 6)
+          |  def real(): Int = OnionMath::randomInt(5, 5)
+          |}
+          |""".stripMargin
+      val (code, after, output) = migrateDir("Base.on" -> base, "Kid.on" -> kid)
+      assert(code == 0, output)
+      assert(after("Kid.on").contains("def roll(): Int = randomInt(1, 6)"), s"${after("Kid.on")}\n$output")
+      assert(after("Kid.on").contains("def real(): Int = Rand::nextInt(5, 6)"), s"${after("Kid.on")}\n$output")
+    }
+
+    it("leaves the file's own OnionMath call around a removed call alone, and rewrites the inner one") {
+      val source = ownOnionMath + "println(OnionMath::randomInt(1, onion.OnionMath::randomInt(2, 2)))\n"
+      val (code, after, output) = migrate(source)
+      assert(code == 0, output)
+      assert(after.contains("println(OnionMath::randomInt(1, Rand::nextInt(2, 3)))"), s"$after\n$output")
+    }
+
     it("notes a max of 2147483647, which has no max + 1, and leaves it as written") {
       val source = "val n = OnionMath::randomInt(0, 2147483647)\n"
       val (_, after, output) = migrate(source)

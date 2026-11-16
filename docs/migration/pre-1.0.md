@@ -697,6 +697,8 @@ val die = Rand::nextInt(1, 7)          // 1 to 6
     still compiles, so it is left as written.
   - When the file, or another file named with it, has its own `Rand` (a class, an import, a
     variable), migrate writes `onion.Rand::nextInt`, so the call keeps meaning Onion's `Rand`.
+- **Only calls the compiler reports are rewritten.** A `randomInt` that still compiles is
+  your own (a class of yours named `OnionMath`, an inherited method), so it is left as written.
 - **Not rewritten:** a `max` of `2147483647`, since `max + 1` does not fit in an `Int`. The
   migrate run notes the line and leaves the whole file as written. Write `Rand::nextInt()` for
   any `Int`, or choose the bound by hand, then run migrate again.

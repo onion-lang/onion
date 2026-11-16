@@ -258,9 +258,36 @@ object MigrateCommand:
       }
       val decides = asWritten.typed && other.isEmpty
       val candidates = pending.keySet.filter(file => !unparsed(file) && failing(asWritten.problems, file).nonEmpty).toSet
+      // A removed library call is rewritten only where the compiler reports it (#3116 block 5):
+      // a `randomInt` it resolved (a user's own `OnionMath`, an inherited method) keeps its
+      // meaning. The compiler reports an inner call before the call around it, so the rewrite
+      // goes in rounds: each round rewrites what the last compile reported at a rewrite's place.
       val withYield =
         if decides && candidates.nonEmpty then
-          located(Compile.check(unit(candidates), classpath), file => candidates(file) || unparsed(file))
+          val full = pending.map { case (file, (_, result)) => file -> result }.toMap
+          val positions = (report: Compile.Report, file: Path) =>
+            report.problems.filter(_.file.contains(file.toString)).map(p => (p.line, p.column)).toSet
+          val reported = mutable.Map[Path, Set[(Int, Int)]]()
+          candidates.foreach(file => reported(file) = positions(asWritten, file))
+          def round(): Compile.Report =
+            candidates.foreach { file =>
+              val (source, _) = pending(file)
+              pending(file) = (source, Migrator.migrate(source, declared, Some(reported(file))))
+            }
+            located(Compile.check(unit(candidates), classpath), file => candidates(file) || unparsed(file))
+          var report = round()
+          var rounds = 1
+          var more = true
+          while more && rounds < MaxRounds do
+            val fresh = candidates.toSeq.map { file =>
+              file -> positions(report, file).filter(at => !reported(file)(at) && full(file).edits.exists(_.allPlaces.contains(at)))
+            }.filter(_._2.nonEmpty)
+            more = fresh.nonEmpty
+            if more then
+              fresh.foreach((file, at) => reported(file) = reported(file) ++ at)
+              report = round()
+              rounds += 1
+          report
         else asWritten
       pending.foreach { case (file, (source, result)) =>
         val mine = failing(asWritten.problems, file)
@@ -288,6 +315,9 @@ object MigrateCommand:
     else 0
 
   private val FalsePredicate = "E0113"
+
+  /** How many times a nested removed call may be rewritten from the inside out. */
+  private val MaxRounds = 32
 
   /** What a rule's edit replaced, for messages. */
   private def oldSpelling(edit: Migrator.Edit): String =

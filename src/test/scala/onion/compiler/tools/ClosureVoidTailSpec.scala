@@ -87,6 +87,23 @@ class ClosureVoidTailSpec extends AbstractShellSpec {
       assert(Shell.Success(4) == result)
     }
 
+    it("compiles when the tail is a `for` loop with no way out but `return`") {
+      val result = run(
+        """    var i = 0
+          |    val g: () -> Int = () -> {
+          |      for ; true; { i++; if i > 2 { return i } }
+          |    }
+          |    var j = 0
+          |    val h: () -> Int = () -> {
+          |      for ;; { j++; if j > 3 { return j } }
+          |    }
+          |    val k: () -> Int = () -> {
+          |      for var n: Int = 0; ; n++ { if n > 4 { return n } }
+          |    }
+          |    return g() * 100 + h() * 10 + k()""".stripMargin)
+      assert(Shell.Success(345) == result)
+    }
+
     it("still returns null for an Object or inferred result") {
       val result = run(
         """    val o: () -> Object = () -> { IO::print("") }

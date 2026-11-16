@@ -787,12 +787,9 @@ final class ClosureTyping(
     case t => t == bodyContext.rootClass || t.isInstanceOf[TypeVariableType]
   }
 
-  /** An infinite loop (constant-true or absent condition) never completes normally. */
-  private def neverCompletes(term: Term): Boolean = termToStatement(term) match {
-    case loop: ConditionalLoop =>
-      loop.condition == null || (loop.condition match { case b: BoolValue => b.value; case _ => false })
-    case _ => false
-  }
+  /** A tail that cannot complete normally (an infinite loop, `return`, `throw`) needs no value. */
+  private def neverCompletes(term: Term): Boolean =
+    StatementReachability.definitelyReturns(termToStatement(term))
 
   /** The block's last element, where a problem with the lambda's result is reported. */
   private def tailNode(node: AST.BlockExpression): AST.Node =

@@ -651,3 +651,34 @@ def main(args: String[]): void {
   `val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }`.
 - **No `onion migrate` rule:** the old behaviour swallowed an error at run time. The source
   has nothing to rewrite, and only you know whether a bad value should stop the program.
+
+## `override` must match the base method's types up to `?`
+
+An `override` whose parameter is `JInteger` where the base has `Int`, or whose return is
+`Int?` where the base returns `Int`, never overrode anything. It compiled as a new overload,
+and a call through the base type still ran the base method. Now it is **E0068** (#2896).
+
+```onion
+class Base {
+public:
+  def this {}
+  def dec(k: Int): void { println("Base") }
+}
+class Up extends Base {
+public:
+  def this {}
+  override def dec(k: JInteger): void { println("Up") }   // Before: compiled. Now: E0068
+}
+val b: Base = new Up(); b.dec(1)                           // Before: printed Base
+```
+
+- **What you see:** **E0068** `method dec(JInteger) is marked override but does not override
+  any method ...`, followed by the base signature (`dec(Int): void`).
+- **Still fine:** a parameter that differs only by `?` (`dec(k: Int?)` over `dec(k: Int)`) now
+  really overrides. A boxed parameter through a generic supertype (`G[JInteger]`) overrides
+  too.
+- **To update:** to override, write the base types (`dec(k: Int)`, or `dec(k: Int?)`). To keep
+  a separate overload, remove `override`.
+- **No `onion migrate` rule:** whether the method was meant to override or to overload is
+  your choice, and the two edits run different code. The error shows the base signature
+  instead.

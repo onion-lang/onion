@@ -582,3 +582,28 @@ def main(args: String[]): void {
 - **以前の結果を保つには:** 例外を捕まえて既定値を使います。
   `val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }`
 - **`onion migrate` の規則はありません:** 以前の動作は、実行時のエラーを握りつぶしていただけです。ソースには書き換えるものがありません。不正な値でプログラムを止めるべきかどうかは、書いた人にしか分かりません。
+
+## `override` は、`?` の違いを除いて基底メソッドと同じ型でなければならなくなりました
+
+基底が `Int` のところを `JInteger` にした `override` や、基底の戻り値が `Int` のところを `Int?` にした `override` は、何もオーバーライドしていませんでした。
+新しいオーバーロードとしてコンパイルされ、基底型を通した呼び出しは基底のメソッドを実行していました。
+今は **E0068** になります (#2896)。
+
+```onion
+class Base {
+public:
+  def this {}
+  def dec(k: Int): void { println("Base") }
+}
+class Up extends Base {
+public:
+  def this {}
+  override def dec(k: JInteger): void { println("Up") }   // 以前: コンパイルできた。今: E0068
+}
+val b: Base = new Up(); b.dec(1)                           // 以前: Base と表示された
+```
+
+- **表示されるもの:** **E0068** `メソッド dec(JInteger) に override が付いていますが、...` と、基底のシグネチャ（`dec(Int): void`）です。
+- **これまでどおり動くもの:** `?` だけが違うパラメータ（`dec(k: Int)` に対する `dec(k: Int?)`）は、今は本当にオーバーライドします。ジェネリックな上位型（`G[JInteger]`）を通したボックス型のパラメータもオーバーライドします。
+- **直し方:** オーバーライドするなら、基底の型（`dec(k: Int)` か `dec(k: Int?)`）を書いてください。別のオーバーロードとして残すなら、`override` を外してください。
+- **`onion migrate` の規則はありません:** オーバーライドのつもりかオーバーロードのつもりかは、書いた人にしか決められません。二つの直し方は別のコードを実行します。そのため、エラーが基底のシグネチャを示します。

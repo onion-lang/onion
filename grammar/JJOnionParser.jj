@@ -2804,6 +2804,10 @@ AST.Expression expression() :{AST.Expression e;}{
 | e=while_expression()       {return e;}
 | e=for_expression()         {return e;}
 | e=select_expression()      {return e;}
+// `{ [params] -> body }` where a value is expected (a call argument, an initializer) is a lambda,
+// the same as the trailing form, so a multi-line body works in `f({ -> a }, { s -> ... })` (#3070).
+// It used to be a block around the arrow lambda `s -> e`, which took one expression only.
+| LOOKAHEAD(trailing_lambda_head()) e=trailing_lambda() {return e;}
 | e=block()                  {return e;}
 | e=try_expression()         {return e;}
 | e=throw_expression()       {return e;}

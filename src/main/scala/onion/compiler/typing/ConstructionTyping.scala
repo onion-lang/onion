@@ -990,6 +990,18 @@ final class ConstructionTyping(
         }
         if (mostSpecific.length == 1) mostSpecific else pool
       }
+    // Several left and none most specific: an ambiguous call, as javac and a method call
+    // (E0006) say. Falling through would type the lambdas with no target, which reported
+    // E0052 "must specify a type", a fix that does not help (#2950).
+    if (candidates.length > 1) {
+      bodyContext.report(
+        AMBIGUOUS_CONSTRUCTOR,
+        node,
+        Array[AnyRef](candidates(0).affiliation, candidates(0).getArgs),
+        Array[AnyRef](candidates(1).affiliation, candidates(1).getArgs)
+      )
+      break(Some(None))
+    }
     if (candidates.length != 1) break(None)
 
     val ctor = candidates(0)

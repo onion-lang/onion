@@ -287,7 +287,9 @@ final class TypingTypeSupport(private val typing: Typing) {
             // once the chain is in place; otherwise run it now. Genuine violations
             // (`Base[String]`) still fail — the deferred check reports on flush.
             if (typing.boundChecksDeferred) {
-              typing.deferBoundCheck(() => checkTypeArgumentBounds(typeNode, applied, rawParams))
+              // Read the parameters when the check runs: a type declared later still
+              // had its placeholder (Object) bounds when this was queued (#2967).
+              typing.deferBoundCheck(() => checkTypeArgumentBounds(typeNode, applied, applied.raw.typeParameters))
             } else {
               checkTypeArgumentBounds(typeNode, applied, rawParams)
             }

@@ -254,9 +254,13 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     for(unit <- source) {
       new onion.compiler.typing.TypingHeaderPass(this, session.activate(unit)).checkImports()
     }
-    processTypeParameters(source)
+    val heldBoundChecks = processTypeParameters(source)
     for(unit <- source) processOutline(unit)
     cutInheritanceCycles()
+    // A bound inside a type-parameter bound (`[T extends Num[String]]`) is checked only now:
+    // `Num` may be declared later, so its own bounds were placeholders then, and an argument's
+    // supertypes (`MyNum extends Number`) are known only after the outline (#2967).
+    for((unit, checks) <- heldBoundChecks) { session.activate(unit); checks.foreach(_()) }
     // Every unit's defaults are typed before any body, so a call may omit a default
     // declared later in its file or in another file (#2653).
     val bodyPasses = source.map(unit => unit -> new onion.compiler.typing.TypingBodyPass(this, session.activate(unit)))
@@ -301,9 +305,12 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   def processOutline(unit: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).run()
   /** Every unit's type parameters, before any unit's outline, so file order does not matter (#2853). */
-  private def processTypeParameters(source: Seq[AST.CompilationUnit]): Unit = {
+  private def processTypeParameters(source: Seq[AST.CompilationUnit]): Seq[(AST.CompilationUnit, List[() => Unit])] = {
     for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameterPlaceholders()
-    for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameters()
+    for (unit <- source) yield {
+      val pass = new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit))
+      unit -> holdBoundChecks(pass.registerTypeParameters())
+    }
   }
   def processTyping(unit: AST.CompilationUnit): Unit = {
     val pass = new onion.compiler.typing.TypingBodyPass(this, session.activate(unit))
@@ -397,6 +404,23 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
         pending.foreach(_())
       }
       result
+    } finally ctx.deferringBoundChecks -= 1
+  }
+
+  /**
+   * Runs `block` with bound checks deferred like [[withDeferredBoundChecks]], but returns the
+   * collected checks instead of running them, for the caller to run once later (#2967).
+   */
+  private[compiler] def holdBoundChecks(block: => Unit): List[() => Unit] = {
+    val ctx = currentUnitContext
+    ctx.deferringBoundChecks += 1
+    try {
+      block
+      if (ctx.deferringBoundChecks == 1) {
+        val pending = ctx.deferredBoundChecks.toList
+        ctx.deferredBoundChecks.clear()
+        pending
+      } else Nil
     } finally ctx.deferringBoundChecks -= 1
   }
 

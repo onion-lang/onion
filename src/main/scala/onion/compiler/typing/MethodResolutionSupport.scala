@@ -298,10 +298,23 @@ private[compiler] final class MethodResolutionSupport(
             case None =>
               isAssignableWithBoxing(expected, actual)
       case (ae: AppliedClassType, aa: ClassType) if !aa.isInstanceOf[AppliedClassType] =>
-        sameClass(ae.raw, aa) && ae.typeArguments.forall {
-          case tv: TypeVariableType => methodTypeParams.contains(tv.name)
-          case _ => false
-        }
+        if sameClass(ae.raw, aa) then
+          ae.typeArguments.forall {
+            case tv: TypeVariableType => methodTypeParams.contains(tv.name)
+            case _ => false
+          }
+        else
+          // A plain class reaches the formal through its own applied view of it:
+          // `String` is a `Comparable[String]`, so `id("a")` against
+          // `[T](c: Comparable[T])` can bind T (#2845).
+          table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
+            .collectFirst { case (raw, view) if sameClass(raw, ae.raw) => view } match
+            case Some(view) =>
+              ae.typeArguments.length == view.typeArguments.length &&
+                ae.typeArguments.zip(view.typeArguments).forall { (e, a) =>
+                  structuralMatchWithBoxing(e, a, methodTypeParams)
+                }
+            case None => false
       case _ =>
         isAssignableWithBoxing(expected, actual)
 }

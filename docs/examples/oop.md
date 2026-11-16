@@ -349,7 +349,7 @@ class Calculator extends JFrame conforms ActionListener {
 - Multiple inheritance (extends JFrame, conforms ActionListener)
 - Swing GUI components
 - Event handling
-- `self` reference
+- `this` reference
 - `select` statement for operations
 
 ## Next Steps

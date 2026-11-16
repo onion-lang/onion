@@ -60,12 +60,12 @@ record ClearanceLog(callsign: String, action: String, runway: String, hhmm: Int)
 // ─── Extension methods ────────────────────────────────────────────────────────
 
 extension Int {
-  def toAltitudeLabel(): String = if self <= 0 { "ground" } else { "#{self}ft" }
+  def toAltitudeLabel(): String = if this <= 0 { "ground" } else { "#{this}ft" }
 }
 
 extension String {
   def rpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }

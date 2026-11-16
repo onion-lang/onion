@@ -89,27 +89,27 @@ public:
 
 extension String {
   def centerPad(width: Int): String {
-    val pad: Int = width - self.length()
-    if pad <= 0 { return self }
+    val pad: Int = width - this.length()
+    if pad <= 0 { return this }
     val left: Int = pad / 2
     val right: Int = pad - left
     var result: String = ""
     var i: Int = 0
     while i < left  { result = result + " "; i = i + 1 }
-    result = result + self
+    result = result + this
     i = 0
     while i < right { result = result + " "; i = i + 1 }
     return result
   }
   def truncate(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n - 1) + "…" }
+    if this.length() <= n { this } else { this.substring(0, n - 1) + "…" }
 }
 
 extension Int {
   def toTimeLabel(): String {
-    val h: Int = self / 3600
-    val m: Int = (self % 3600) / 60
-    val s: Int = self % 60
+    val h: Int = this / 3600
+    val m: Int = (this % 3600) / 60
+    val s: Int = this % 60
     if h > 0 { return "#{h}h #{m}m" }
     return "#{m}m #{s}s"
   }
@@ -223,7 +223,7 @@ class Playlist {
   val name: String
   val entries: List[PlaylistEntry] = []
 public:
-  def this(name: String) { self.name = name }
+  def this(name: String) { this.name = name }
   def add(e: Episode): void {
     entries.add(new PlaylistEntry(e, entries.size + 1))
   }

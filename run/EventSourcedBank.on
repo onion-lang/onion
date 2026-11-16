@@ -41,8 +41,8 @@ record AccountSnapshot(
 
 extension Double {
   def fmtMoney(): String {
-    val sign: String  = if self < 0.0d { "-" } else { "" }
-    val abs: Double   = if self < 0.0d { 0.0d - self } else { self }
+    val sign: String  = if this < 0.0d { "-" } else { "" }
+    val abs: Double   = if this < 0.0d { 0.0d - this } else { this }
     val whole: Long   = abs.longValue()
     val fracRaw: Long = ((abs - whole.doubleValue()) * 100.0d).longValue()
     val frac: String  = if fracRaw < 10L { "0" + fracRaw } else { "" + fracRaw }

@@ -53,15 +53,15 @@ class Transition {
   var action: (WorkflowState, WorkflowState) -> void
 public:
   def this(from: WorkflowState, event: String, to: WorkflowState) {
-    self.from = from
-    self.event = event
-    self.to = to
+    this.from = from
+    this.event = event
+    this.to = to
     guard = (s) -> null
     action = (a, b) -> {}
   }
 
-  def withGuard(g: (WorkflowState) -> String?): Transition { guard = g; return self }
-  def withAction(a: (WorkflowState, WorkflowState) -> void): Transition { action = a; return self }
+  def withGuard(g: (WorkflowState) -> String?): Transition { guard = g; return this }
+  def withAction(a: (WorkflowState, WorkflowState) -> void): Transition { action = a; return this }
 
   def from(): WorkflowState = from
   def event(): String = event
@@ -84,14 +84,14 @@ class Workflow {
   var step: Int
 public:
   def this(name: String, initial: WorkflowState) {
-    self.name = name
+    this.name = name
     current = initial
     transitions = []
     history = []
     step = 0
   }
 
-  def add(t: Transition): Workflow { transitions.add(t); return self }
+  def add(t: Transition): Workflow { transitions.add(t); return this }
 
   def fire(event: String): EventResult {
     step = step + 1
@@ -231,7 +231,7 @@ public:
 extension Workflow {
   def fireAll(events: List[String]): List[EventResult] {
     val results = new java.util.ArrayList[EventResult]()
-    foreach ev: String in events { results.add(self.fire(ev)) }
+    foreach ev: String in events { results.add(this.fire(ev)) }
     return results
   }
 }

@@ -35,13 +35,13 @@ class PetriNet {
 public:
   def this(places: List[Place], trans: List[Transition],
            inArcs: List[Arc], outArcs: List[Arc], initial: Map[String, Object]) {
-    self.places   = places
-    self.trans    = trans
-    self.inArcs   = inArcs
-    self.outArcs  = outArcs
-    self.marking  = initial
-    self.history_ = []
-    self.step_    = 0
+    this.places   = places
+    this.trans    = trans
+    this.inArcs   = inArcs
+    this.outArcs  = outArcs
+    this.marking  = initial
+    this.history_ = []
+    this.step_    = 0
   }
 
   def stepCount(): Int = step_
@@ -158,27 +158,27 @@ public:
   }
 
   def place(id: String, label: String): NetBuilder {
-    places_.add(new Place(id, label)); return self
+    places_.add(new Place(id, label)); return this
   }
 
   def transition(id: String, label: String): NetBuilder {
-    trans_.add(new Transition(id, label)); return self
+    trans_.add(new Transition(id, label)); return this
   }
 
   def consumes(placeId: String, transId: String, weight: Int): NetBuilder {
-    inArcs_.add(new Arc(placeId, transId, weight)); return self
+    inArcs_.add(new Arc(placeId, transId, weight)); return this
   }
 
   def consumes(placeId: String, transId: String): NetBuilder = consumes(placeId, transId, 1)
 
   def produces(transId: String, placeId: String, weight: Int): NetBuilder {
-    outArcs_.add(new Arc(transId, placeId, weight)); return self
+    outArcs_.add(new Arc(transId, placeId, weight)); return this
   }
 
   def produces(transId: String, placeId: String): NetBuilder = produces(transId, placeId, 1)
 
   def tokens(placeId: String, count: Int): NetBuilder {
-    marking_[placeId] = count; return self
+    marking_[placeId] = count; return this
   }
 
   def build(): PetriNet = new PetriNet(places_, trans_, inArcs_, outArcs_, marking_)

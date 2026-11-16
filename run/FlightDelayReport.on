@@ -60,24 +60,24 @@ interface Reportable {
 
 extension Int {
   def toHHMM(): String {
-    if self < 0 { return "--:--" }
-    val h: Int = self / 60
-    val m: Int = self % 60
+    if this < 0 { return "--:--" }
+    val h: Int = this / 60
+    val m: Int = this % 60
     val hh: String = if h < 10 { "0" + h } else { "" + h }
     val mm: String = if m < 10 { "0" + m } else { "" + m }
     return hh + ":" + mm
   }
   def classify(): DelayCategory {
-    if self < 0   { return new Cancelled()  }
-    if self <= 5  { return new OnTime()     }
-    if self <= 30 { return new Minor(self)  }
-    return new Major(self)
+    if this < 0   { return new Cancelled()  }
+    if this <= 5  { return new OnTime()     }
+    if this <= 30 { return new Minor(this)  }
+    return new Major(this)
   }
 }
 
 extension Double {
   def fmt1(): String {
-    val scaled: Int = (self * 10.0) as Int
+    val scaled: Int = (this * 10.0) as Int
     val whole: Int  = scaled / 10
     val frac: Int   = scaled % 10
     return "#{whole}.#{frac}"
@@ -152,27 +152,27 @@ class FlightReport conforms Reportable {
 
 public:
   def this(flights: List[Flight]) {
-    self.flights = flights
+    this.flights = flights
     val grouped = flights.groupBy { f: Flight -> f.airline() }
     val statsList: List[AirlineStats] = []
     foreach (airline, group) in grouped {
       statsList.add(buildStats(airline as String, group as List[Flight]))
     }
-    self.stats = statsList.sortedBy { s: AirlineStats -> s.name() }
+    this.stats = statsList.sortedBy { s: AirlineStats -> s.name() }
   }
 
   def title(): String = "=== Flight Delay Report ==="
 
   def printSummary(): void {
-    println(self.title())
-    println("Flights analysed: #{self.flights.size}")
-    val cancelled: List[Flight] = self.flights.filter { f: Flight -> f.delayMin() < 0 }
-    val active:    List[Flight] = self.flights.filter { f: Flight -> f.delayMin() >= 0 }
+    println(this.title())
+    println("Flights analysed: #{this.flights.size}")
+    val cancelled: List[Flight] = this.flights.filter { f: Flight -> f.delayMin() < 0 }
+    val active:    List[Flight] = this.flights.filter { f: Flight -> f.delayMin() >= 0 }
     println("  Active: #{active.size}   Cancelled: #{cancelled.size}")
     val totalDelay: Int = active.fold(0) { acc: Int, f: Flight -> acc + f.delayMin() }
     val avg: Double = if active.size == 0 { 0.0 } else { (totalDelay as Double) / (active.size as Double) }
     println("  Overall avg delay (active): #{avg.fmt1()} min")
-    val worst: Flight? = self.findWorstFlight()
+    val worst: Flight? = this.findWorstFlight()
     if worst != null {
       val w: Flight = worst
       println("  Worst flight: #{w.id()} (#{w.airline()}) #{w.origin()}-#{w.destination()} +#{w.delayMin()} min")
@@ -184,7 +184,7 @@ public:
     println("── Airline breakdown ──────────────────────────────────────────────────")
     println("Airline           Total Cancl OnTime Minor Major AvgDly MaxDly")
     println("──────────────────────────────────────────────────────────────────────")
-    foreach s: AirlineStats in self.stats {
+    foreach s: AirlineStats in this.stats {
       val row: String = "#{padRight(s.name(),17)}#{padLeft(""+s.total(),5)} #{padLeft(""+s.cancelled(),5)} #{padLeft(""+s.onTime(),6)} #{padLeft(""+s.minorDelay(),5)} #{padLeft(""+s.majorDelay(),5)} #{padLeft(s.avgDelay().fmt1(),6)} #{padLeft(""+s.maxDelay(),6)}"
       println(row)
     }
@@ -195,7 +195,7 @@ public:
     println("── Per-flight detail (by delay, descending) ──────────────────────────")
     println("ID      Airline         Route       Sched  Actual  Category")
     println("──────────────────────────────────────────────────────────────────────")
-    val sorted: List[Flight] = self.flights.sortedBy { f: Flight -> -f.delayMin() }
+    val sorted: List[Flight] = this.flights.sortedBy { f: Flight -> -f.delayMin() }
     foreach f: Flight in sorted {
       val cat: DelayCategory = f.delayMin().classify()
       val route: String      = f.origin() + "-" + f.destination()
@@ -206,7 +206,7 @@ public:
 
   def printRouteAnalysis(): void {
     println("── Top 5 most-delayed routes ──────────────────────────────────────────")
-    val delayed: List[Flight] = self.flights
+    val delayed: List[Flight] = this.flights
       .filter   { f: Flight -> f.delayMin() > 5 }
       .sortedBy { f: Flight -> -f.delayMin() }
     var rank: Int = 1
@@ -222,8 +222,8 @@ public:
     println("── Category summary ───────────────────────────────────────────────────")
     var onTimeCnt: Int = 0; var minorCnt: Int = 0
     var majorCnt: Int  = 0; var cancelCnt: Int = 0
-    val total: Int = self.flights.size
-    foreach f: Flight in self.flights {
+    val total: Int = this.flights.size
+    foreach f: Flight in this.flights {
       select f.delayMin().classify() {
         case o is OnTime:    onTimeCnt = onTimeCnt + 1
         case d is Minor:     minorCnt  = minorCnt  + 1
@@ -240,7 +240,7 @@ public:
 
   def printDistinctAirports(): void {
     val airports: List[String] = []
-    foreach f: Flight in self.flights {
+    foreach f: Flight in this.flights {
       airports.add(f.origin())
       airports.add(f.destination())
     }
@@ -254,10 +254,10 @@ public:
 
   def printRankings(): void {
     println("── Airline rankings by average delay ──────────────────────────────────")
-    val sorted: List[AirlineStats] = self.stats.sortedBy { s: AirlineStats -> s.avgDelay() }
+    val sorted: List[AirlineStats] = this.stats.sortedBy { s: AirlineStats -> s.avgDelay() }
     var rank: Int = 1
     foreach s: AirlineStats in sorted {
-      val bar: String = self.buildBar(s.avgDelay())
+      val bar: String = this.buildBar(s.avgDelay())
       println("  #{rank}. #{padRight(s.name(),15)}  avg=#{padLeft(s.avgDelay().fmt1(),6)} min  #{bar}")
       rank = rank + 1
     }
@@ -266,7 +266,7 @@ public:
 
 private:
   def findWorstFlight(): Flight? {
-    val active: List[Flight] = self.flights.filter { f: Flight -> f.delayMin() > 0 }
+    val active: List[Flight] = this.flights.filter { f: Flight -> f.delayMin() > 0 }
     if active.size == 0 { return null }
     val bySeverity: List[Flight] = active.sortedBy { f: Flight -> f.delayMin() }
     return bySeverity.get(bySeverity.size - 1)

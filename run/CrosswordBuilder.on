@@ -57,12 +57,12 @@ public:
 // ─── Extensions ───────────────────────────────────────────────────────────────
 
 extension Double {
-  def round1(): Double = ((self * 10.0 + 0.5) as Int).doubleValue() / 10.0
+  def round1(): Double = ((this * 10.0 + 0.5) as Int).doubleValue() / 10.0
 }
 
 extension Int {
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -70,11 +70,11 @@ extension Int {
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
-  def ch(i: Int): String = self.substring(i, i + 1)
+  def ch(i: Int): String = this.substring(i, i + 1)
 }
 
 // ─── CrosswordGrid ─────────────────────────────────────────────────────────────

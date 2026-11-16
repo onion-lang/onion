@@ -200,7 +200,7 @@ public:
 
 extension Int {
   def padLeft(n: Int): String {
-    var s: String = self + ""
+    var s: String = this + ""
     while s.length() < n { s = " " + s }
     return s
   }
@@ -209,7 +209,7 @@ extension Int {
 extension String {
   def repeat(n: Int): String {
     var s: String = ""
-    foreach i: Int in 0..<n { s = s + self }
+    foreach i: Int in 0..<n { s = s + this }
     return s
   }
 }

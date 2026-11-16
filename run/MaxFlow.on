@@ -54,34 +54,34 @@ class FlowGraph {
 
 public:
   def this(nodeLabels: List[String]) {
-    self.n = nodeLabels.size
-    self.cap   = new Int[self.n * self.n]
-    self.flow_ = new Int[self.n * self.n]
-    self.labels = nodeLabels
-    self.index  = new HashMap[String, Int]()
-    for var i: Int = 0; i < self.n; i++ {
-      self.index.put(nodeLabels[i] as String, i)
+    this.n = nodeLabels.size
+    this.cap   = new Int[this.n * this.n]
+    this.flow_ = new Int[this.n * this.n]
+    this.labels = nodeLabels
+    this.index  = new HashMap[String, Int]()
+    for var i: Int = 0; i < this.n; i++ {
+      this.index.put(nodeLabels[i] as String, i)
     }
   }
 
   def nodeId(name: String): Int {
-    val v = self.index.get(name)
+    val v = this.index.get(name)
     return if v == null { -1 } else { v as Int }
   }
 
   def addEdge(from: String, to: String, capacity: Int): void {
-    val u: Int = self.nodeId(from)
-    val v: Int = self.nodeId(to)
+    val u: Int = this.nodeId(from)
+    val v: Int = this.nodeId(to)
     if u < 0 || v < 0 { return }
-    self.cap[u * self.n + v] = self.cap[u * self.n + v] + capacity
+    this.cap[u * this.n + v] = this.cap[u * this.n + v] + capacity
   }
 
   def residual(u: Int, v: Int): Int =
-    self.cap[u * self.n + v] - self.flow_[u * self.n + v]
+    this.cap[u * this.n + v] - this.flow_[u * this.n + v]
 
   def augment(u: Int, v: Int, delta: Int): void {
-    self.flow_[u * self.n + v] = self.flow_[u * self.n + v] + delta
-    self.flow_[v * self.n + u] = self.flow_[v * self.n + u] - delta
+    this.flow_[u * this.n + v] = this.flow_[u * this.n + v] + delta
+    this.flow_[v * this.n + u] = this.flow_[v * this.n + u] - delta
   }
 
   // BFS: find augmenting path from s to t.
@@ -94,8 +94,8 @@ public:
     while head < queue.size {
       val u: Int = queue[head] as Int
       head = head + 1
-      for var v: Int = 0; v < self.n; v++ {
-        if parent.get(v) == null && self.residual(u, v) > 0 {
+      for var v: Int = 0; v < this.n; v++ {
+        if parent.get(v) == null && this.residual(u, v) > 0 {
           parent.put(v, u)
           if v == t { return parent }
           queue.add(v)
@@ -107,12 +107,12 @@ public:
 
   // Edmonds-Karp: repeatedly find shortest augmenting path via BFS.
   def computeMaxFlow(source: String, sink: String): FlowOutcome {
-    val s: Int = self.nodeId(source)
-    val t: Int = self.nodeId(sink)
+    val s: Int = this.nodeId(source)
+    val t: Int = this.nodeId(sink)
     if s < 0 || t < 0 { return new NoPath(source, sink) }
 
     var totalFlow: Int = 0
-    var parent: HashMap[Int, Int]? = self.bfsParent(s, t)
+    var parent: HashMap[Int, Int]? = this.bfsParent(s, t)
 
     while parent != null {
       val p: HashMap[Int, Int] = parent as HashMap[Int, Int]
@@ -121,7 +121,7 @@ public:
       var v: Int = t
       while v != s {
         val u: Int = p.get(v) as Int
-        val r: Int = self.residual(u, v)
+        val r: Int = this.residual(u, v)
         if r < bottleneck { bottleneck = r }
         v = u
       }
@@ -129,14 +129,14 @@ public:
       v = t
       while v != s {
         val u: Int = p.get(v) as Int
-        self.augment(u, v, bottleneck)
+        this.augment(u, v, bottleneck)
         v = u
       }
       totalFlow = totalFlow + bottleneck
-      parent = self.bfsParent(s, t)
+      parent = this.bfsParent(s, t)
     }
 
-    val result = new FlowResult(totalFlow, self.cutEdgeNames(s), self.reachableNames(s))
+    val result = new FlowResult(totalFlow, this.cutEdgeNames(s), this.reachableNames(s))
     return new Solved(result)
   }
 
@@ -149,37 +149,37 @@ public:
     while head < queue.size {
       val u: Int = queue[head] as Int
       head = head + 1
-      for var v: Int = 0; v < self.n; v++ {
-        if visited.get(v) == null && self.residual(u, v) > 0 {
+      for var v: Int = 0; v < this.n; v++ {
+        if visited.get(v) == null && this.residual(u, v) > 0 {
           visited.put(v, true)
           queue.add(v)
         }
       }
     }
     val result: List[Int] = []
-    for var i: Int = 0; i < self.n; i++ {
+    for var i: Int = 0; i < this.n; i++ {
       if visited.get(i) != null { result.add(i) }
     }
     return result
   }
 
   def reachableNames(s: Int): List[String] {
-    val side: List[Int] = self.reachable(s)
-    return side.map { i -> self.labels[i as Int] as String }
+    val side: List[Int] = this.reachable(s)
+    return side.map { i -> this.labels[i as Int] as String }
   }
 
   def cutEdgeNames(s: Int): List[String] {
-    val side: List[Int] = self.reachable(s)
+    val side: List[Int] = this.reachable(s)
     val inS: HashMap[Int, Boolean] = new HashMap[Int, Boolean]()
     foreach u: Int in side { inS.put(u, true) }
     val result: List[String] = []
     foreach u: Int in side {
-      for var v: Int = 0; v < self.n; v++ {
-        if inS.get(v) == null && self.cap[u * self.n + v] > 0 {
-          val uName: String = self.labels[u] as String
-          val vName: String = self.labels[v] as String
-          val c: Int = self.cap[u * self.n + v]
-          val f: Int = self.flow_[u * self.n + v]
+      for var v: Int = 0; v < this.n; v++ {
+        if inS.get(v) == null && this.cap[u * this.n + v] > 0 {
+          val uName: String = this.labels[u] as String
+          val vName: String = this.labels[v] as String
+          val c: Int = this.cap[u * this.n + v]
+          val f: Int = this.flow_[u * this.n + v]
           result.add("#{uName}->#{vName}(#{f}/#{c})")
         }
       }
@@ -189,11 +189,11 @@ public:
 
   // Total flow leaving the source node.
   def sourceFlow(source: String): Int {
-    val s: Int = self.nodeId(source)
+    val s: Int = this.nodeId(source)
     if s < 0 { return 0 }
     var total: Int = 0
-    for var v: Int = 0; v < self.n; v++ {
-      val f: Int = self.flow_[s * self.n + v]
+    for var v: Int = 0; v < this.n; v++ {
+      val f: Int = this.flow_[s * this.n + v]
       if f > 0 { total = total + f }
     }
     return total
@@ -204,7 +204,7 @@ public:
 
 extension Int {
   def rpad(width: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     var r: String = s
     while r.length() < width { r = r + " " }
     return r

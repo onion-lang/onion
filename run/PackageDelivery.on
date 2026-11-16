@@ -58,14 +58,14 @@ record RouteStop(hub: String, arrivalTime: Int) {
 
 extension Int {
   def asTime(): String {
-    val h: Int = self / 60
-    val m: Int = self % 60
+    val h: Int = this / 60
+    val m: Int = this % 60
     val hh: String = if h < 10 { "0" + h } else { "" + h }
     val mm: String = if m < 10 { "0" + m } else { "" + m }
     return hh + ":" + mm
   }
-  def asCurrency(): String = "$" + self
-  def asWeight(): String = self + "g"
+  def asCurrency(): String = "$" + this
+  def asWeight(): String = this + "g"
 }
 
 // ── Package class ─────────────────────────────────────────────────────────────

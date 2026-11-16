@@ -14,7 +14,7 @@ record RunStats(problem: String, solved: Boolean, generations: Int, bestFitness:
 
 extension Double {
   def pct2(): String {
-    val p: Int = (self * 10000.0 + 0.5) as Int
+    val p: Int = (this * 10000.0 + 0.5) as Int
     val frac: Int = p % 100
     val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
     return (p / 100) + "." + fracStr + "%"

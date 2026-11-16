@@ -161,7 +161,14 @@ object AST {
   }
   case class CharacterLiteral(location: Location, value: Char) extends Expression
   case class ClosureExpression(location: Location, typeRef: TypeNode, mname: String, args: List[Argument], returns: TypeNode/*nullable*/, body: BlockExpression) extends Expression
-  case class CurrentInstance(location: Location) extends Expression
+  /** `this`. `spelledSelf` marks the retired spelling `self` (RFC #2788), which the type checker
+    * reports as E0117; it is not a case-class field, so patterns and equality ignore it. */
+  case class CurrentInstance(location: Location) extends Expression {
+    private var self_ = false
+    def spelledSelf: Boolean = self_
+    /** Marks this node as written `self`; returns it. */
+    def writtenAsSelf(): CurrentInstance = { self_ = true; this }
+  }
   case class Division(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("/")
   case class DivisionAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("/=")
   case class DoubleLiteral(location: Location, value: Double) extends Expression

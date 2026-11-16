@@ -52,25 +52,25 @@ record EncodeStats(
 // ── Extension methods ─────────────────────────────────────────────────────────
 extension Int {
   def rjust(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def ljust(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = s + " " }
     return s
   }
   def percent(of: Int): String {
     if of == 0 { return "0.0%" }
-    val p = (self * 1000) / of
+    val p = (this * 1000) / of
     return "" + (p / 10) + "." + (p % 10) + "%"
   }
 }
 
 extension Double {
   def fmt2(): String {
-    val scaled = (self * 100.0) as Int
+    val scaled = (this * 100.0) as Int
     return "" + (scaled / 100) + "." + (scaled % 100).rjust(2)
   }
 }
@@ -78,16 +78,16 @@ extension Double {
 extension String {
   def times(n: Int): String {
     var s: String = ""
-    for var i: Int = 0; i < n; i++ { s = s + self }
+    for var i: Int = 0; i < n; i++ { s = s + this }
     return s
   }
   def padLeft(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
   def padRight(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }

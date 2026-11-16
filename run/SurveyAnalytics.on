@@ -17,17 +17,17 @@ import {
 // ── Extension methods ──────────────────────────────────────────────────────
 
 extension Double {
-  def toInt(): Int = (self as Int)
+  def toInt(): Int = (this as Int)
   def pct(): String {
-    val p: Int = ((self * 100.0) as Int)
+    val p: Int = ((this * 100.0) as Int)
     return "#{p}%"
   }
   def r2(): Double {
-    val i: Int = ((self * 100.0 + 0.5) as Int)
+    val i: Int = ((this * 100.0 + 0.5) as Int)
     return (i as Double) / 100.0
   }
   def bar20(): String {
-    val filled: Int = ((self * 20.0 + 0.5) as Int)
+    val filled: Int = ((this * 20.0 + 0.5) as Int)
     var s: String = ""
     var i: Int = 0
     while i < 20 {
@@ -39,10 +39,10 @@ extension Double {
 }
 
 extension Int {
-  def toDouble(): Double = self * 1.0
+  def toDouble(): Double = this * 1.0
   def ratio(total: Int): Double {
     if total == 0 { return 0.0 }
-    return self.toDouble() / total.toDouble()
+    return this.toDouble() / total.toDouble()
   }
 }
 

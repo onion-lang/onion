@@ -9,10 +9,10 @@ import {
 
 extension Int {
   def factorial(): Long {
-    if self <= 1 { return 1L }
+    if this <= 1 { return 1L }
     var result: Long = 1L
     var i: Int = 2
-    while i <= self {
+    while i <= this {
       result = result * (i as Long)
       i++
     }
@@ -20,25 +20,25 @@ extension Int {
   }
 
   def choose(k: Int): Long {
-    if k < 0 || k > self { return 0L }
-    if k == 0 || k == self { return 1L }
-    val kk: Int = if k > self - k { self - k } else { k }
+    if k < 0 || k > this { return 0L }
+    if k == 0 || k == this { return 1L }
+    val kk: Int = if k > this - k { this - k } else { k }
     var result: Long = 1L
     var i: Int = 0
     while i < kk {
-      result = result * ((self - i) as Long) / ((i + 1) as Long)
+      result = result * ((this - i) as Long) / ((i + 1) as Long)
       i++
     }
     return result
   }
 
   def isPrime(): Boolean {
-    if self < 2 { return false }
-    if self == 2 { return true }
-    if self % 2 == 0 { return false }
+    if this < 2 { return false }
+    if this == 2 { return true }
+    if this % 2 == 0 { return false }
     var d: Int = 3
-    while d * d <= self {
-      if self % d == 0 { return false }
+    while d * d <= this {
+      if this % d == 0 { return false }
       d = d + 2
     }
     return true
@@ -50,16 +50,16 @@ extension String {
     var s: String = ""
     var i: Int = 0
     while i < n {
-      s = s + self
+      s = s + this
       i++
     }
     return s
   }
 
   def padLeft(width: Int): String {
-    val pad: Int = width - self.length
-    if pad <= 0 { return self }
-    return " ".repeatStr(pad) + self
+    val pad: Int = width - this.length
+    if pad <= 0 { return this }
+    return " ".repeatStr(pad) + this
   }
 }
 

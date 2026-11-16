@@ -12,31 +12,31 @@ import { java.lang.Math as JMath }
 
 extension Double {
   def fmt2(): String {
-    val r: Long = JMath::round(self * 100.0)
+    val r: Long = JMath::round(this * 100.0)
     val ip: Long = r / 100L
     val fp: Long = if r % 100L < 0L { -(r % 100L) } else { r % 100L }
     return if fp < 10L { "#{ip}.0#{fp}" } else { "#{ip}.#{fp}" }
   }
-  def pct2(): String = "#{(self * 100.0).fmt2()}%"
-  def dollars(): String = "$#{self.fmt2()}"
-  def round2(): Double = JMath::round(self * 100.0) as Double / 100.0
+  def pct2(): String = "#{(this * 100.0).fmt2()}%"
+  def dollars(): String = "$#{this.fmt2()}"
+  def round2(): Double = JMath::round(this * 100.0) as Double / 100.0
 }
 
 extension String {
   def lpadN(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
   def rpadN(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def rep(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 }

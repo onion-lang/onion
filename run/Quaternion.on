@@ -9,11 +9,11 @@ import { java.lang.Math as JMath; }
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 extension Double {
-  def abs(): Double = if self >= 0.0 { self } else { -self }
-  def sqrt(): Double = JMath::sqrt(self)
-  def sq(): Double = self * self
-  def approxEq(other: Double): Boolean = (self - other).abs() < 1.0e-9
-  def fmt3(): String = java.lang.String::format("%.3f", self)
+  def abs(): Double = if this >= 0.0 { this } else { -this }
+  def sqrt(): Double = JMath::sqrt(this)
+  def sq(): Double = this * this
+  def approxEq(other: Double): Boolean = (this - other).abs() < 1.0e-9
+  def fmt3(): String = java.lang.String::format("%.3f", this)
 }
 
 // ─── Vec3: an immutable 3-component vector ───────────────────────────────────
@@ -222,7 +222,7 @@ public:
   def rotate(axis: Axis, angleDeg: Double): RotationSeq {
     val q = Quaternion::fromAxisAngle(axis.unitVec(), angleDeg * JMath::PI / 180.0)
     steps.add(q)
-    return self
+    return this
   }
   def combined(): Quaternion {
     var result = Quaternion::identity()

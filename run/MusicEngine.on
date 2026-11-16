@@ -100,13 +100,13 @@ public:
 
 record Note(pitch: PitchName, octave: Int) {
 public:
-  def midiPitch(): Int = self.pitch().semitone() + (self.octave() + 1) * 12
-  def label(): String = "#{self.pitch().label()}#{self.octave()}"
+  def midiPitch(): Int = this.pitch().semitone() + (this.octave() + 1) * 12
+  def label(): String = "#{this.pitch().label()}#{this.octave()}"
 }
 
 record Interval(semitones: Int) {
 public:
-  def name(): String = select self.semitones() {
+  def name(): String = select this.semitones() {
     case 0:  "Unison"
     case 1:  "Minor 2nd"
     case 2:  "Major 2nd"
@@ -120,37 +120,37 @@ public:
     case 10: "Minor 7th"
     case 11: "Major 7th"
     case 12: "Octave"
-    else:    "#{self.semitones()} semitones"
+    else:    "#{this.semitones()} semitones"
   }
   def isConsonant(): Boolean {
-    val s: Int = self.semitones()
+    val s: Int = this.semitones()
     return s == 0 || s == 4 || s == 5 || s == 7 || s == 9 || s == 12
   }
 }
 
 record Scale(root: Note, scaleType: ScaleType, notes: List[Note]) {
 public:
-  def label(): String = "#{self.root().pitch().label()} #{self.scaleType().label()}"
-  def pitchLabels(): List[String] = self.notes().map { n: Note -> n.pitch().label() }
-  def size(): Int = self.notes().size()
+  def label(): String = "#{this.root().pitch().label()} #{this.scaleType().label()}"
+  def pitchLabels(): List[String] = this.notes().map { n: Note -> n.pitch().label() }
+  def size(): Int = this.notes().size()
 }
 
 record Chord(root: Note, quality: ChordQuality, notes: List[Note]) {
 public:
-  def label(): String = "#{self.root().pitch().label()}#{self.quality().symbol()}"
+  def label(): String = "#{this.root().pitch().label()}#{this.quality().symbol()}"
   def voicing(): String {
     val sb: StringBuilder = new StringBuilder()
     sb.append("[")
     var i: Int = 0
-    while i < self.notes().size() {
+    while i < this.notes().size() {
       if i > 0 { sb.append("-") }
-      sb.append(self.notes().get(i).label())
+      sb.append(this.notes().get(i).label())
       i++
     }
     sb.append("]")
     return sb.toString()
   }
-  def noteCount(): Int = self.notes().size()
+  def noteCount(): Int = this.notes().size()
 }
 
 // ─── Interface ────────────────────────────────────────────────────────────────
@@ -163,7 +163,7 @@ interface Transposable {
 
 extension Int {
   def mod12(): Int {
-    val r: Int = self % 12
+    val r: Int = this % 12
     return if r < 0 { r + 12 } else { r }
   }
 }
@@ -213,7 +213,7 @@ public:
     val notes: List[Note] = [root]
     var current: Note = root
     foreach step: Int in steps {
-      current = self.transpose(current, step)
+      current = this.transpose(current, step)
       notes.add(current)
     }
     return new Scale(root, scaleType, notes)
@@ -225,7 +225,7 @@ public:
     val notes: List[Note] = [root]
     var current: Note = root
     foreach step: Int in steps {
-      current = self.transpose(current, step)
+      current = this.transpose(current, step)
       notes.add(current)
     }
     return new Chord(root, quality, notes)
@@ -236,7 +236,7 @@ public:
 
   // Check whether two notes are enharmonic equivalents (same pitch class)
   def areEnharmonic(a: Note, b: Note): Boolean =
-    self.pitchClass(a) == self.pitchClass(b)
+    this.pitchClass(a) == this.pitchClass(b)
 
   // 1-based diatonic degree of a pitch within a scale (0 = not a member)
   def degreeOf(scale: Scale, pitch: PitchName): Int {
@@ -251,11 +251,11 @@ public:
 
   // Return chord tones whose pitch class appears in the scale
   def chordTonesInScale(chord: Chord, scale: Scale): List[Note] =
-    chord.notes().filter { n: Note -> self.degreeOf(scale, n.pitch()) > 0 }
+    chord.notes().filter { n: Note -> this.degreeOf(scale, n.pitch()) > 0 }
 
   // True if every chord tone is diatonic to the scale
   def isChordDiatonic(chord: Chord, scale: Scale): Boolean {
-    val inside: List[Note] = self.chordTonesInScale(chord, scale)
+    val inside: List[Note] = this.chordTonesInScale(chord, scale)
     return inside.size() == chord.noteCount()
   }
 
@@ -265,8 +265,8 @@ public:
     var consonant: Int = 0
     var total: Int = 0
     foreach n: Note in chord.notes() {
-      if !self.areEnharmonic(n, root) {
-        val iv: Interval = self.intervalBetween(root, n)
+      if !this.areEnharmonic(n, root) {
+        val iv: Interval = this.intervalBetween(root, n)
         if iv.isConsonant() { consonant++ }
         total++
       }
@@ -277,13 +277,13 @@ public:
   // Transpose an entire scale up or down by semitones (recursive helper)
   def transposeScaleRec(notes: List[Note], semitones: Int, idx: Int, acc: List[Note]): List[Note] {
     if idx >= notes.size() { return acc }
-    acc.add(self.transpose(notes.get(idx), semitones))
-    return self.transposeScaleRec(notes, semitones, idx + 1, acc)
+    acc.add(this.transpose(notes.get(idx), semitones))
+    return this.transposeScaleRec(notes, semitones, idx + 1, acc)
   }
 
   def transposeScale(scale: Scale, semitones: Int): Scale {
-    val newRoot: Note = self.transpose(scale.root(), semitones)
-    val newNotes: List[Note] = self.transposeScaleRec(scale.notes(), semitones, 0, [])
+    val newRoot: Note = this.transpose(scale.root(), semitones)
+    val newNotes: List[Note] = this.transposeScaleRec(scale.notes(), semitones, 0, [])
     return new Scale(newRoot, scale.scaleType(), newNotes)
   }
 }

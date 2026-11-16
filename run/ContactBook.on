@@ -206,7 +206,7 @@ IO::println("Removed 'Nobody Here': #{removedFake}")
 
 extension Contact {
   def initials(): String {
-    val parts = self.name().split(" ")
+    val parts = this.name().split(" ")
     var result: String = ""
     foreach part: String in parts {
       if part.length() > 0 {
@@ -217,10 +217,10 @@ extension Contact {
   }
 
   def isHighValue(): Boolean =
-    self.group() == Priority::VIP || self.group() == Priority::HIGH
+    this.group() == Priority::VIP || this.group() == Priority::HIGH
 
   def domainOf(): String {
-    val email = self.email()
+    val email = this.email()
     val at = email.indexOf("@")
     if at < 0 { return "unknown" }
     return email.substring(at + 1)

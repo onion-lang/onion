@@ -68,7 +68,7 @@ record Config(width: Int, numberHeadings: Boolean)
 extension Int {
   def tile(ch: String): String = {
     val sb = new StringBuilder()
-    foreach i: Int in 0..<self { sb.append(ch) }
+    foreach i: Int in 0..<this { sb.append(ch) }
     sb.toString()
   }
 }
@@ -122,8 +122,8 @@ class Renderer {
   val counter: HeadingCounter
 public:
   def this(cfg: Config) {
-    self.cfg = cfg
-    self.counter = new HeadingCounter()
+    this.cfg = cfg
+    this.counter = new HeadingCounter()
   }
 
   def renderBlock(b: Block): List[String] = {

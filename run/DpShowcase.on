@@ -13,23 +13,23 @@ import {
 
 extension Int {
   def clamp(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
+    if this < lo { return lo }
+    if this > hi { return hi }
+    return this
   }
   def maxWith(other: Int): Int {
-    if self > other { return self }
+    if this > other { return this }
     return other
   }
   def minWith(other: Int): Int {
-    if self < other { return self }
+    if this < other { return this }
     return other
   }
 }
 
 extension Long {
   def maxWith(other: Long): Long {
-    if self > other { return self }
+    if this > other { return this }
     return other
   }
 }

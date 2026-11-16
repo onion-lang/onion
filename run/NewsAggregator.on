@@ -61,25 +61,25 @@ interface Renderable {
 // ── Extension methods on String ───────────────────────────────────────────────
 extension String {
   def truncate(maxLen: Int): String {
-    if self.length() <= maxLen { return self }
-    return self.substring(0, maxLen - 3) + "..."
+    if this.length() <= maxLen { return this }
+    return this.substring(0, maxLen - 3) + "..."
   }
   def wordCount(): Int {
-    if self.trim().length() == 0 { return 0 }
-    return self.trim().split("\\s+").length
+    if this.trim().length() == 0 { return 0 }
+    return this.trim().split("\\s+").length
   }
   def capitalize(): String {
-    if self.length() == 0 { return self }
-    return self.substring(0, 1).toUpperCase() + self.substring(1)
+    if this.length() == 0 { return this }
+    return this.substring(0, 1).toUpperCase() + this.substring(1)
   }
 }
 
 // ── Extension methods on Double ───────────────────────────────────────────────
 extension Double {
-  def asPercent(): String = "#{(self * 100.0).intValue()}%"
+  def asPercent(): String = "#{(this * 100.0).intValue()}%"
   def format2(): String {
-    val whole: Int = self.intValue()
-    val frac: Int = ((self - (whole as Double)) * 100.0).intValue()
+    val whole: Int = this.intValue()
+    val frac: Int = ((this - (whole as Double)) * 100.0).intValue()
     val fracStr: String = if frac < 10 { "0#{frac}" } else { "#{frac}" }
     return "#{whole}.#{fracStr}"
   }

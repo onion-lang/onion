@@ -499,7 +499,7 @@ So E0109 is reported only when the syntax settles it. Take the history `n >= old
 | any other expression | `Not proved` | The prover decides (stage 7) |
 
 **What counts as a write** (#2597, #2599). A write by a method is any assignment, `+=`, `-=`,
-`++` or `--` to the field through `this` (bare `n`, `this.n`, `self.n`), including inside a
+`++` or `--` to the field through `this` (bare `n`, `this.n`), including inside a
 lambda the body creates (the lambda may run during the call). A write the syntax does not
 settle as breaking the history gets W0024 at its line when it is inside a lambda, since the
 solver reads only the method body.

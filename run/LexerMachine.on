@@ -20,18 +20,18 @@ record ParityResult(value: Int, even: Boolean)
 extension String {
   def rep(n: Int): String {
     var s = ""
-    foreach i: Int in 1..n { s = s + self }
+    foreach i: Int in 1..n { s = s + this }
     return s
   }
   def padRight(width: Int): String {
-    var s = self
+    var s = this
     while s.length() < width { s = s + " " }
     return s
   }
 }
 
 extension Double {
-  def r2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+  def r2(): Double = (Math::round(this * 100.0) as Double) / 100.0
 }
 
 // ── @TailRecursive mutual recursion demonstration ─────────────────────────

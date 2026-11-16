@@ -67,14 +67,14 @@ public:
   static def example_4(): Boolean
     ensures result
     = new ColumnStats("x", 0, 0, 0, 0).errorRate() == 0.0
-  def errorRate(): Double = if self.total() == 0 { 0.0 }
-    else { (self.errors() as Double) / (self.total() as Double) * 100.0 }
-  def missingRate(): Double = if self.total() == 0 { 0.0 }
-    else { (self.missing() as Double) / (self.total() as Double) * 100.0 }
+  def errorRate(): Double = if this.total() == 0 { 0.0 }
+    else { (this.errors() as Double) / (this.total() as Double) * 100.0 }
+  def missingRate(): Double = if this.total() == 0 { 0.0 }
+    else { (this.missing() as Double) / (this.total() as Double) * 100.0 }
   def summary(): String {
-    val er = self.errorRate()
-    val mr = self.missingRate()
-    return "#{self.name()}: #{self.total()} rows | missing=#{self.missing()} (#{mr}%) | errors=#{self.errors()} (#{er}%)"
+    val er = this.errorRate()
+    val mr = this.missingRate()
+    return "#{this.name()}: #{this.total()} rows | missing=#{this.missing()} (#{mr}%) | errors=#{this.errors()} (#{er}%)"
   }
 }
 
@@ -86,39 +86,39 @@ public:
   static def example_5(): Boolean
     ensures result
     = new ValidationError(1, "age", Severity::ERROR, "too young").row() == 1
-  def isError(): Boolean = self.severity() == Severity::ERROR
-  def describe(): String = "row #{self.row()} | #{self.column()} [#{self.severity()}]: #{self.message()}"
+  def isError(): Boolean = this.severity() == Severity::ERROR
+  def describe(): String = "row #{this.row()} | #{this.column()} [#{this.severity()}]: #{this.message()}"
 }
 
 // ── Extension methods for value parsing ──────────────────────────────────────
 
 extension String {
   def isBlank(): Boolean {
-    if self.length() == 0 { return true }
-    foreach i: Int in 0..<self.length() {
-      if self.charAt(i) != ' ' { return false }
+    if this.length() == 0 { return true }
+    foreach i: Int in 0..<this.length() {
+      if this.charAt(i) != ' ' { return false }
     }
     return true
   }
 
   def tryParseInt(): Int? {
-    try { return JInt::parseInt(self.trim()) } catch e: Exception { return null }
+    try { return JInt::parseInt(this.trim()) } catch e: Exception { return null }
   }
 
   def tryParseDouble(): Double? {
-    try { return JDouble::parseDouble(self.trim()) } catch e: Exception { return null }
+    try { return JDouble::parseDouble(this.trim()) } catch e: Exception { return null }
   }
 
   def truncated(maxLen: Int): String {
-    if self.length() <= maxLen { return self }
-    return self.substring(0, maxLen) + "..."
+    if this.length() <= maxLen { return this }
+    return this.substring(0, maxLen) + "..."
   }
 }
 
 extension Int {
   def pct(total: Int): String {
     if total == 0 { return "0%" }
-    val p: Int = self * 100 / total
+    val p: Int = this * 100 / total
     return p.toString() + "%"
   }
 }
@@ -191,21 +191,21 @@ class DataSet {
 
 public:
   def this(schema: List[SchemaColumn]) {
-    self.schema = schema
-    self.allErrors = []
-    self.rowCount = 0
+    this.schema = schema
+    this.allErrors = []
+    this.rowCount = 0
   }
 
   def addRow(values: Map[String, String]): void {
-    self.rowCount = self.rowCount + 1
-    val rowNum = self.rowCount
-    foreach col: SchemaColumn in self.schema {
+    this.rowCount = this.rowCount + 1
+    val rowNum = this.rowCount
+    foreach col: SchemaColumn in this.schema {
       val raw: String? = values[col.name()] as String?
       val result = Validator::checkValue(raw, col)
       if !result.isOk() {
         select result {
           case f is Fail: {
-            self.allErrors.add(new ValidationError(rowNum, f.column(), f.severity(), f.message()))
+            this.allErrors.add(new ValidationError(rowNum, f.column(), f.severity(), f.message()))
           }
           else: {}
         }
@@ -215,29 +215,29 @@ public:
 
   def stats(): List[ColumnStats] {
     val errorsByCol: Map[String, List[ValidationError]] =
-      self.allErrors.groupBy { e -> (e as ValidationError).column() }
-    return self.schema.map { col ->
+      this.allErrors.groupBy { e -> (e as ValidationError).column() }
+    return this.schema.map { col ->
       val rawErrs = errorsByCol[col.name()]
       val colErrors: List[ValidationError] = if rawErrs == null { [] } else { rawErrs as List[ValidationError] }
       val errs = colErrors.filter { e -> (e as ValidationError).severity() == Severity::ERROR }
       val warns = colErrors.filter { e -> (e as ValidationError).severity() == Severity::WARNING }
-      new ColumnStats(col.name(), self.rowCount, 0, errs.size, warns.size)
+      new ColumnStats(col.name(), this.rowCount, 0, errs.size, warns.size)
     }
   }
 
   def report(): String {
     val sb = new StringBuilder()
     sb.append("=== Data Quality Report ===\n")
-    sb.append("Schema:  #{self.schema.size()} columns | Rows: #{self.rowCount}\n")
-    sb.append("Errors:  #{self.allErrors.filter { e -> (e as ValidationError).severity() == Severity::ERROR }.size}\n")
-    sb.append("Warnings:#{self.allErrors.filter { e -> (e as ValidationError).severity() == Severity::WARNING }.size}\n\n")
+    sb.append("Schema:  #{this.schema.size()} columns | Rows: #{this.rowCount}\n")
+    sb.append("Errors:  #{this.allErrors.filter { e -> (e as ValidationError).severity() == Severity::ERROR }.size}\n")
+    sb.append("Warnings:#{this.allErrors.filter { e -> (e as ValidationError).severity() == Severity::WARNING }.size}\n\n")
     sb.append("Column breakdown:\n")
-    foreach s: ColumnStats in self.stats() {
+    foreach s: ColumnStats in this.stats() {
       sb.append("  " + s.summary() + "\n")
     }
-    if self.allErrors.size() > 0 {
+    if this.allErrors.size() > 0 {
       sb.append("\nSample errors (first 5):\n")
-      val sample = self.allErrors
+      val sample = this.allErrors
         .filter { e -> (e as ValidationError).isError() }
         .sortedBy { e -> (e as ValidationError).row() }
       var shown: Int = 0

@@ -86,17 +86,17 @@ record KilnLoad(loadId: String, kilnName: String, firingType: FiringType, durati
 
 extension Int {
   def plural(word: String): String =
-    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+    if this == 1 { "1 " + word } else { "#{this} " + word + "s" }
 }
 
 extension String {
   def padRight(n: Int): String = {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def trunc(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n - 2) + ".." }
+    if this.length() <= n { this } else { this.substring(0, n - 2) + ".." }
 }
 
 // ─── PotteryStudio class ──────────────────────────────────────────────────────

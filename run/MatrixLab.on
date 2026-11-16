@@ -10,20 +10,20 @@
 // ─── Extensions ───────────────────────────────────────────────────────────────
 
 extension Double {
-  def fmt(d: Int): String = Format::fixed(self, d)
-  def sq(): Double = self * self
-  def abs(): Double = if self < 0.0 { -self } else { self }
+  def fmt(d: Int): String = Format::fixed(this, d)
+  def sq(): Double = this * this
+  def abs(): Double = if this < 0.0 { -this } else { this }
 }
 
 extension Int {
   def upto(hi: Int): List[Int] {
     val xs: List[Int] = []
-    var i: Int = self
+    var i: Int = this
     while i < hi { xs.add(i); i++ }
     return xs
   }
   def pad(w: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     var r: String = s
     while r.length < w { r = " " + r }
     return r

@@ -76,22 +76,22 @@ record Loan(id: Int, memberId: Int, isbn: String, borrowDay: Int, dueDay: Int, r
 // ─── Extension methods ────────────────────────────────────────────────────────
 
 extension Int {
-  def absVal(): Int = if self < 0 { 0 - self } else { self }
-  def maxOf(other: Int): Int = if self >= other { self } else { other }
-  def minOf(other: Int): Int = if self <= other { self } else { other }
+  def absVal(): Int = if this < 0 { 0 - this } else { this }
+  def maxOf(other: Int): Int = if this >= other { this } else { other }
+  def minOf(other: Int): Int = if this <= other { this } else { other }
 }
 
 extension String {
   def hasAt(): Boolean {
-    val idx: Int = self.indexOf("@")
-    return idx > 0 && self.indexOf(".", idx) > idx
+    val idx: Int = this.indexOf("@")
+    return idx > 0 && this.indexOf(".", idx) > idx
   }
   def shorten(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + "…"
+    if this.length() <= n { return this }
+    return this.substring(0, n) + "…"
   }
   def padEnd(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
@@ -99,7 +99,7 @@ extension String {
     if n <= 0 { return "" }
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
 }

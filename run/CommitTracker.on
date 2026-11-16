@@ -29,7 +29,7 @@ import {
 extension Int {
   def pct(total: Int): String {
     if total == 0 { return "0%" }
-    val p = (self * 100) / total
+    val p = (this * 100) / total
     return "#{p}%"
   }
   def bar(width: Int): String {
@@ -39,7 +39,7 @@ extension Int {
     return s
   }
   def pad(n: Int): String {
-    val s = "#{self}"
+    val s = "#{this}"
     var r = s
     while r.length() < n { r = " " + r }
     return r
@@ -48,7 +48,7 @@ extension Int {
 
 extension String {
   def trim2(): String {
-    var s = self
+    var s = this
     while s.length() > 0 && s.charAt(0) == ' ' { s = s.substring(1) }
     while s.length() > 0 && s.charAt(s.length() - 1) == ' ' {
       s = s.substring(0, s.length() - 1)
@@ -56,17 +56,17 @@ extension String {
     return s
   }
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n - 3) + "..."
+    if this.length() <= n { return this }
+    return this.substring(0, n - 3) + "..."
   }
   def padRight(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }
   def startsWith2(prefix: String): Boolean {
-    if self.length() < prefix.length() { return false }
-    return self.substring(0, prefix.length()) == prefix
+    if this.length() < prefix.length() { return false }
+    return this.substring(0, prefix.length()) == prefix
   }
 }
 

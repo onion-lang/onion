@@ -14,12 +14,12 @@ import {
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
@@ -47,8 +47,8 @@ public:
 
 record Project(code: String, name: String, category: Category) {
 public:
-  def isBillable(): Boolean = self.category().isBillable()
-  def summary(): String = "#{self.code()} #{self.name()} [#{self.category().label()}]"
+  def isBillable(): Boolean = this.category().isBillable()
+  def summary(): String = "#{this.code()} #{this.name()} [#{this.category().label()}]"
 }
 
 // ── TimeEntry record ──────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ record TimeEntry(employeeId: String, projectCode: String, weekDay: Int, hours: D
 record Employee(id: String, name: String, hourlyRate: Double, isContractor: Boolean) {
 public:
   def typeLabel(): String {
-    if self.isContractor() { return "Contractor" }
+    if this.isContractor() { return "Contractor" }
     return "Full-time"
   }
 }

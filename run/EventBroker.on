@@ -112,10 +112,10 @@ extension Int {
       } else {
         unit + "s"
       }
-    return if self == 1 { "1 #{unit}" } else { "#{self} #{p}" }
+    return if this == 1 { "1 #{unit}" } else { "#{this} #{p}" }
   }
   def pct(total: Int): String =
-    if total == 0 { "0%" } else { "#{self * 100 / total}%" }
+    if total == 0 { "0%" } else { "#{this * 100 / total}%" }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

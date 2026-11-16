@@ -2,14 +2,14 @@
 
 extension Int {
   def toTimeStr(): String {
-    val m: Int = self / 60
-    val s: Int = self - m * 60
+    val m: Int = this / 60
+    val s: Int = this - m * 60
     val ms: String = if m < 10 { "0" + m } else { "" + m }
     val ss: String = if s < 10 { "0" + s } else { "" + s }
     return ms + ":" + ss
   }
   def lpad(w: Int): String {
-    var r: String = "" + self
+    var r: String = "" + this
     while r.length() < w { r = " " + r }
     return r
   }
@@ -17,7 +17,7 @@ extension Int {
 
 extension String {
   def rpad(w: Int): String {
-    var r: String = self
+    var r: String = this
     while r.length() < w { r = r + " " }
     return r
   }
@@ -25,8 +25,8 @@ extension String {
 
 extension Double {
   def fmt1(): String {
-    val whole: Int  = self as Int
-    val frac:  Int  = ((self - (whole as Double)) * 10.0) as Int
+    val whole: Int  = this as Int
+    val frac:  Int  = ((this - (whole as Double)) * 10.0) as Int
     return "" + whole + "." + frac
   }
 }

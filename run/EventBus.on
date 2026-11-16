@@ -37,32 +37,32 @@ public:
 
 extension Int {
   def zeroPad(width: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     var r: String = s
     while r.length < width { r = "0" + r }
     return r
   }
 
   def cents(): String {
-    val d: Int = self / 100
-    val c: Int = self % 100
+    val d: Int = this / 100
+    val c: Int = this % 100
     return "$" + d + "." + c.zeroPad(2)
   }
 
-  def absInt(): Int = if self < 0 { 0 - self } else { self }
+  def absInt(): Int = if this < 0 { 0 - this } else { this }
 
   def clamp(lo: Int, hi: Int): Int =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
 }
 
 extension String {
   def truncate(max: Int): String {
-    if self.length <= max { return self }
-    return self.substring(0, max) + "..."
+    if this.length <= max { return this }
+    return this.substring(0, max) + "..."
   }
 
   def padRight(width: Int): String {
-    var r: String = self
+    var r: String = this
     while r.length < width { r = r + " " }
     return r
   }
@@ -70,7 +70,7 @@ extension String {
   def repeatStr(n: Int): String {
     var r: String = ""
     var i: Int = 0
-    while i < n { r = r + self; i = i + 1 }
+    while i < n { r = r + this; i = i + 1 }
     return r
   }
 }

@@ -11,17 +11,17 @@
 extension Int {
   def pct(total: Int): String {
     if total == 0 { return "0%" }
-    return "#{self * 100 / total}%"
+    return "#{this * 100 / total}%"
   }
   def plural(word: String): String {
-    if self == 1 { return "1 " + word } else { return "#{self} " + word + "s" }
+    if this == 1 { return "1 " + word } else { return "#{this} " + word + "s" }
   }
 }
 
 extension String {
   def abbrev(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + ".."
+    if this.length() <= n { return this }
+    return this.substring(0, n) + ".."
   }
 }
 
@@ -48,7 +48,7 @@ public:
     case Status::BLOCKED:     "[!]"
     else:                     "[ ]"
   }
-  def isOpen(): Boolean = self != Status::DONE
+  def isOpen(): Boolean = this != Status::DONE
 }
 
 // ─── CapacityStatus: ADT enum for sprint health ──────────────────────────────

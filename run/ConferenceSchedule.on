@@ -58,20 +58,20 @@ record Proposal(title: String, speakerName: String, preferredTrack: Track, verdi
 
 extension Int {
   def hourStr(): String {
-    return if self < 10 { "0" + self + ":00" } else { self + ":00" }
+    return if this < 10 { "0" + this + ":00" } else { this + ":00" }
   }
 }
 
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width {
       s = s + " "
     }
     return s
   }
   def truncate(maxLen: Int): String {
-    return if self.length() <= maxLen { self } else { self.substring(0, maxLen - 2) + ".." }
+    return if this.length() <= maxLen { this } else { this.substring(0, maxLen - 2) + ".." }
   }
 }
 

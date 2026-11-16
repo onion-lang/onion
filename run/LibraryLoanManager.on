@@ -9,27 +9,27 @@ import { java.util.ArrayList }
 // ─── Extensions ──────────────────────────────────────────────────────────────
 
 extension Int {
-  def dayLabel(): String = if self == 1 { "1 day" } else { self + " days" }
-  def fineAmount(): Int = self * 10
+  def dayLabel(): String = if this == 1 { "1 day" } else { this + " days" }
+  def fineAmount(): Int = this * 10
   def clamp(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
+    if this < lo { return lo }
+    if this > hi { return hi }
+    return this
   }
 }
 
 extension String {
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + "~"
+    if this.length() <= n { return this }
+    return this.substring(0, n) + "~"
   }
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

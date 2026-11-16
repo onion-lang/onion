@@ -90,7 +90,7 @@ class RecordMethodsSpec extends AbstractShellSpec {
           |record Person(name: String, age: Int) conforms Named {
           |public:
           |  def label(): String = name() + "(" + age() + ")"
-          |  def older(): Person = self.copy(age = age() + 1)
+          |  def older(): Person = this.copy(age = age() + 1)
           |}
           |class Test {
           |public:

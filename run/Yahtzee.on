@@ -16,7 +16,7 @@ import {
 // ─── Extension: Int display helpers ──────────────────────────────────────────
 extension Int {
   def padLeft(width: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     var result: String = s
     while result.length() < width {
       result = " " + result
@@ -26,7 +26,7 @@ extension Int {
   def stars(): String {
     var s: String = ""
     var i: Int = 0
-    while i < self {
+    while i < this {
       s = s + "*"
       i++
     }
@@ -36,7 +36,7 @@ extension Int {
 
 extension String {
   def padLeft(width: Int): String {
-    var result: String = self
+    var result: String = this
     while result.length() < width {
       result = " " + result
     }
@@ -45,14 +45,14 @@ extension String {
   def repeat(n: Int): String {
     var result: String = ""
     var i: Int = 0
-    while i < n { result = result + self; i++ }
+    while i < n { result = result + this; i++ }
     return result
   }
 }
 
 extension Double {
   def fmt2(): String {
-    val rounded: Long = Math::round(self * 100.0)
+    val rounded: Long = Math::round(this * 100.0)
     val whole: Long = rounded / 100L
     val frac: Long = rounded % 100L
     val fracStr: String = if frac < 10L { "0" + frac } else { "" + frac }
@@ -76,7 +76,7 @@ enum Category {
 class LCG {
   var seed: Long
 public:
-  def this(s: Long) { self.seed = s }
+  def this(s: Long) { this.seed = s }
   def nextInt(bound: Int): Int {
     seed = (seed * 6364136223846793005L + 1442695040888963407L) & 0x7fffffffffffffffL
     return ((seed >>> 17) % (bound as Long)) as Int
@@ -233,8 +233,8 @@ class ScoreCard {
   val used: List[String]
 public:
   def this() {
-    self.scores = [:]
-    self.used = []
+    this.scores = [:]
+    this.used = []
   }
 
   def isUsed(cat: Category): Boolean {
@@ -323,9 +323,9 @@ class YahtzeeAI {
   val rng: LCG
 public:
   def this(n: String, seed: Long) {
-    self.playerName = n
-    self.card = new ScoreCard()
-    self.rng = new LCG(seed)
+    this.playerName = n
+    this.card = new ScoreCard()
+    this.rng = new LCG(seed)
   }
 
   def getName(): String = playerName
@@ -412,7 +412,7 @@ class YahtzeeGame {
   val players: List[YahtzeeAI]
 public:
   def this(ps: List[YahtzeeAI]) {
-    self.players = ps
+    this.players = ps
   }
 
   def run(): void {

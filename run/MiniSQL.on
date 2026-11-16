@@ -71,8 +71,8 @@ class Row {
   var schema: List[String]
 public:
   def this(colDefs: List[ColDef]) {
-    self.schema = []
-    self.vals   = []
+    this.schema = []
+    this.vals   = []
     foreach d: ColDef in colDefs {
       schema.add(d.name())
       vals.add(new CNull())
@@ -101,9 +101,9 @@ class Table {
   var rowList: List[Row]
 public:
   def this(name: String, defs: List[ColDef]) {
-    self.tblName = name
-    self.colDefs = defs
-    self.rowList = []
+    this.tblName = name
+    this.colDefs = defs
+    this.rowList = []
   }
 
   def name(): String = tblName
@@ -125,8 +125,8 @@ class QueryResult {
   var dat: List[List[String]]
 public:
   def this(hdr: List[String], dat: List[List[String]]) {
-    self.hdr = hdr
-    self.dat = dat
+    this.hdr = hdr
+    this.dat = dat
   }
 
   def rowCount(): Int           = dat.size
@@ -192,22 +192,22 @@ class Query {
   var aggExprs: List[String]
 public:
   def this(t: Table) {
-    self.tbl      = t
-    self.projCols = []
-    self.pred     = (r) -> true
-    self.ordCol   = null
-    self.ordAsc   = true
-    self.lim      = -1
-    self.grpCol   = null
-    self.aggExprs = []
+    this.tbl      = t
+    this.projCols = []
+    this.pred     = (r) -> true
+    this.ordCol   = null
+    this.ordAsc   = true
+    this.lim      = -1
+    this.grpCol   = null
+    this.aggExprs = []
   }
 
-  def project(cols: List[String]): Query { projCols = cols; return self }
-  def where(p: (Row) -> Boolean): Query  { pred = p; return self }
-  def orderBy(col: String, asc: Boolean): Query { ordCol = col; ordAsc = asc; return self }
-  def limit(n: Int): Query  { lim = n; return self }
-  def groupBy(col: String): Query { grpCol = col; return self }
-  def agg(expr: String): Query { aggExprs.add(expr); return self }
+  def project(cols: List[String]): Query { projCols = cols; return this }
+  def where(p: (Row) -> Boolean): Query  { pred = p; return this }
+  def orderBy(col: String, asc: Boolean): Query { ordCol = col; ordAsc = asc; return this }
+  def limit(n: Int): Query  { lim = n; return this }
+  def groupBy(col: String): Query { grpCol = col; return this }
+  def agg(expr: String): Query { aggExprs.add(expr); return this }
 
   def execute(): QueryResult {
     val myPred = pred
@@ -314,7 +314,7 @@ public:
 class Database {
   var tables: Map[String, Table]
 public:
-  def this { self.tables = [:] }
+  def this { this.tables = [:] }
 
   def create(name: String, cols: List[ColDef]): Table {
     val t = new Table(name, cols)

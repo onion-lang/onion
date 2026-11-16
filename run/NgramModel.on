@@ -20,17 +20,17 @@ def fmt1(d: Double): String {
 
 extension String {
   def rpad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def lpad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }
   def tokenize(): List[String] {
-    val raw: List[String] = Strings::splitRegex(self, "\\s+")
+    val raw: List[String] = Strings::splitRegex(this, "\\s+")
     val result: List[String] = []
     foreach w: Object in raw {
       val cleaned: String = Strings::lower(Strings::replaceRegex(w as String, "[^a-zA-Z']", ""))
@@ -43,7 +43,7 @@ extension String {
 extension Int {
   def bar(max: Int, width: Int): String {
     if max <= 0 { return "".rpad(width) }
-    val filled: Int = self * width / max
+    val filled: Int = this * width / max
     var b: String = ""
     for var i: Int = 0; i < filled; i++ { b = b + "#" }
     while b.length() < width { b = b + "." }
@@ -51,7 +51,7 @@ extension Int {
   }
   def pct(total: Int): String {
     if total <= 0 { return " 0.0%" }
-    val p: Double = (self as Double) * 100.0 / (total as Double)
+    val p: Double = (this as Double) * 100.0 / (total as Double)
     val pi: Int = p as Int
     val pd: Int = ((p - (pi as Double)) * 10.0) as Int
     return (" " + pi + "." + pd + "%").lpad(6)

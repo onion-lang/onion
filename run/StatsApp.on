@@ -36,28 +36,28 @@ public:
 // User-defined extension methods on primitive types.
 extension Int {
   def squared(): Int {
-    return self * self
+    return this * this
   }
   def times(n: Int): Int {
-    return self * n
+    return this * n
   }
 }
 
 extension Double {
   def clamped(min: Double, max: Double): Double {
-    if self < min {
+    if this < min {
       return min
     }
-    if self > max {
+    if this > max {
       return max
     }
-    return self
+    return this
   }
   def percentOf(total: Double): Double {
     if total == 0.0 {
       return 0.0
     }
-    return (self / total) * 100.0
+    return (this / total) * 100.0
   }
 }
 
@@ -65,20 +65,20 @@ extension Double {
 extension List {
   def sumInts(): Int {
     var total: Int = 0
-    foreach x: Object in self {
+    foreach x: Object in this {
       total = total + (x as Int)
     }
     return total
   }
   def mean(): Double {
-    if self.size == 0 {
+    if this.size == 0 {
       return 0.0
     }
     var total: Double = 0.0
-    foreach x: Object in self {
+    foreach x: Object in this {
       total = total + (x as Double)
     }
-    return total / (self.size as Double)
+    return total / (this.size as Double)
   }
 }
 

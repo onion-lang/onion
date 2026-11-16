@@ -10,26 +10,26 @@
 extension String {
   // Count whitespace-separated non-empty tokens.
   def wordCount(): Int {
-    val parts: List[String] = Strings::splitRegex(self, "\\s+")
+    val parts: List[String] = Strings::splitRegex(this, "\\s+")
     val nonEmpty: List[String] = parts.filter { w -> (w as String).length() > 0 } as List[String]
     return nonEmpty.size
   }
 
   // Uppercase the first character, leaving the rest unchanged.
   def capitalize(): String {
-    if self.length() == 0 { return self }
-    return self.substring(0, 1).toUpperCase() + self.substring(1)
+    if this.length() == 0 { return this }
+    return this.substring(0, 1).toUpperCase() + this.substring(1)
   }
 
   // True when the string ends a sentence.
   def isSentenceEnd(): Boolean =
-    self.endsWith(".") || self.endsWith("!") || self.endsWith("?")
+    this.endsWith(".") || this.endsWith("!") || this.endsWith("?")
 }
 
 extension Int {
   // Clamp to [lo, hi].
   def clamp(lo: Int, hi: Int): Int =
-    if self < lo { lo } else { if self > hi { hi } else { self } }
+    if this < lo { lo } else { if this > hi { hi } else { this } }
 }
 
 // ─── Text category ADT ────────────────────────────────────────────────────────

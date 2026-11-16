@@ -225,12 +225,12 @@ foreach p: Product in products {
 
 // --- Extension methods on Int and String ---
 extension Int {
-  def asCurrency(): String = "¥#{self}"
-  def asGrams(): String = "#{self}g"
+  def asCurrency(): String = "¥#{this}"
+  def asGrams(): String = "#{this}g"
 }
 extension String {
   def rightPad(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }

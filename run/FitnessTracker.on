@@ -202,7 +202,7 @@ IO::println("  Short (≤30 min): #{(partitioned[1] as List[WorkoutEntry]).size}
 // ── Extension methods on Double for formatting ────────────────────────────────
 extension Double {
   def twoDecimals(): String {
-    val scaled = (self * 100.0 + 0.5) as Int
+    val scaled = (this * 100.0 + 0.5) as Int
     val cents = scaled % 100
     val centStr = if cents < 10 { "0" + cents } else { "" + cents }
     return (scaled / 100) + "." + centStr
@@ -211,7 +211,7 @@ extension Double {
 
 extension Int {
   def bar(max: Int): String {
-    val filled = (self * 20) / max
+    val filled = (this * 20) / max
     var s = ""
     var i = 0
     while i < 20 {

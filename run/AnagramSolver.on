@@ -27,8 +27,8 @@ extension String {
   def anagramKey(): String {
     val chars: List[String] = []
     var i: Int = 0
-    while i < self.length() {
-      chars.add(self.substring(i, i + 1).toUpperCase())
+    while i < this.length() {
+      chars.add(this.substring(i, i + 1).toUpperCase())
       i++
     }
     return chars.sortedBy { c -> c as String }.fold("") { acc, c -> acc + c }
@@ -37,8 +37,8 @@ extension String {
   def scrabbleScore(): Int {
     var total: Int = 0
     var i: Int = 0
-    while i < self.length() {
-      val ch: String = self.substring(i, i + 1).toUpperCase()
+    while i < this.length() {
+      val ch: String = this.substring(i, i + 1).toUpperCase()
       val v: Int? = SCRABBLE_VALUES.get(ch) as Int?
       if v != null { total = total + v }
       i++
@@ -49,8 +49,8 @@ extension String {
   def letterCount(): Map[String, Int] {
     val counts: Map[String, Int] = new LinkedHashMap[String, Int]()
     var i: Int = 0
-    while i < self.length() {
-      val ch: String = self.substring(i, i + 1).toUpperCase()
+    while i < this.length() {
+      val ch: String = this.substring(i, i + 1).toUpperCase()
       val cur: Int? = counts.get(ch) as Int?
       counts.put(ch, if cur == null { 1 } else { cur + 1 })
       i++
@@ -59,11 +59,11 @@ extension String {
   }
 
   def isAnagramOf(other: String): Boolean =
-    self.anagramKey() == other.anagramKey()
+    this.anagramKey() == other.anagramKey()
 
   def containsOnlyLettersFrom(pool: String): Boolean {
     val available: Map[String, Int] = pool.letterCount()
-    val needed: Map[String, Int] = self.letterCount()
+    val needed: Map[String, Int] = this.letterCount()
     foreach (ch, cnt) in needed {
       val have: Int? = available.get(ch) as Int?
       if have == null || have < (cnt as Int) { return false }
@@ -72,7 +72,7 @@ extension String {
   }
 
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
@@ -83,15 +83,15 @@ extension String {
 extension Int {
   def stars(): String {
     var s: String = ""
-    foreach i: Int in 0..<self { s = s + "*" }
+    foreach i: Int in 0..<this { s = s + "*" }
     return s
   }
   def padLeft(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }
-  def clampMax(limit: Int): Int = if self > limit { limit } else { self }
+  def clampMax(limit: Int): Int = if this > limit { limit } else { this }
 }
 
 // ─── Search result ADT ───────────────────────────────────────────────────────

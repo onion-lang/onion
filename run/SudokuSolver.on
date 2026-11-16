@@ -17,10 +17,10 @@ record SolveResult(name: String, difficulty: String, clues: Int,
 
 extension Int {
   def toCell(): String {
-    if self == 0 { return "." }
-    return self.toString()
+    if this == 0 { return "." }
+    return this.toString()
   }
-  def isGiven(): Boolean = self != 0
+  def isGiven(): Boolean = this != 0
 }
 
 // ── 9×9 board ─────────────────────────────────────────────────────────────────

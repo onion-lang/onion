@@ -13,13 +13,13 @@ extension Int {
   def stars(): String {
     var s: String = ""
     var i: Int = 0
-    while i < self { s = s + "★"; i = i + 1 }
-    var j: Int = self
+    while i < this { s = s + "★"; i = i + 1 }
+    var j: Int = this
     while j < 5 { s = s + "☆"; j = j + 1 }
     return s
   }
   def clamp(lo: Int, hi: Int): Int =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
 }
 
 // ──────────────────────── genre enum ────────────────────────────────────────

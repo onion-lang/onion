@@ -52,7 +52,7 @@ enum Tier {
 
 extension Double {
   def fmt2(): String {
-    val i100 = (self * 100.0 + 0.5) as Int
+    val i100 = (this * 100.0 + 0.5) as Int
     val whole = i100 / 100
     val frac  = i100 % 100
     val fracStr = if frac < 10 { "0" + frac } else { "" + frac }
@@ -62,17 +62,17 @@ extension Double {
 
 extension String {
   def rpad(w: Int): String {
-    var s = self
+    var s = this
     while s.length < w { s = s + " " }
     return s
   }
   def lpad(w: Int): String {
-    var s = self
+    var s = this
     while s.length < w { s = " " + s }
     return s
   }
   def truncate(w: Int): String {
-    return if self.length <= w { self } else { self.substring(0, w) }
+    return if this.length <= w { this } else { this.substring(0, w) }
   }
 }
 

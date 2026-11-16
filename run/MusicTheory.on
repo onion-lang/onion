@@ -16,13 +16,13 @@ record ProgressionStep(degree: Int, chord: Chord)
 // ── Extension methods ─────────────────────────────────────────────────────────
 
 extension Int {
-  def semitoneWrap(): Int = ((self % 12) + 12) % 12
-  def toNoteName(): String = noteName(noteAt(self))
+  def semitoneWrap(): Int = ((this % 12) + 12) % 12
+  def toNoteName(): String = noteName(noteAt(this))
 }
 
 extension String {
   def padTo(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }

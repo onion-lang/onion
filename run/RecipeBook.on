@@ -138,7 +138,7 @@ public:
 
 extension Double {
   def fmt1(): String {
-    val scaled: Long = (self * 10.0).longValue()
+    val scaled: Long = (this * 10.0).longValue()
     val neg = scaled < 0L
     val abs: Long = if neg { -scaled } else { scaled }
     val i: Long = abs / 10L
@@ -147,7 +147,7 @@ extension Double {
     return "#{sign}#{i}.#{f}"
   }
   def fmt2(): String {
-    val scaled: Long = (self * 100.0).longValue()
+    val scaled: Long = (this * 100.0).longValue()
     val neg = scaled < 0L
     val abs: Long = if neg { -scaled } else { scaled }
     val i: Long = abs / 100L
@@ -159,24 +159,24 @@ extension Double {
 }
 
 extension Int {
-  def toDouble(): Double = (self * 1.0)
+  def toDouble(): Double = (this * 1.0)
 }
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
   def repeat(n: Int): String {
     var s = ""
     var i = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 }

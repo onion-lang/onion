@@ -35,4 +35,38 @@ class DuplicateInstanceSamePackageSpec extends AnyFunSpec {
   it("distinct instances in two files still compile") {
     assert(errors("s1.on" -> s1, "s3.on" -> """instance Show[String] { def show(x: String): String = x }""") == "")
   }
+
+  it("a generic type argument is printed as written, not mangled (E0097)") {
+    val t = "import { java.util.* }\ntrait Show[T] { def show(x: T): String }\n"
+    val body = """instance Show[List[String]] { def show(x: List[String]): String = "x" }"""
+    val out = errors("t1.on" -> (t + body), "t2.on" -> ("import { java.util.* }\n" + body))
+    assert(out.contains("E0097"), out)
+    assert(out.contains("Show[List[String]]"), out)
+    assert(!out.contains("$$"), out)
+  }
+
+  it("a two-parameter trait instance is printed as written (E0097)") {
+    val t = "trait Conv[A, B] { def conv(a: A): B }\n"
+    val body = """instance Conv[Int, String] { def conv(a: Int): String = "" + a }"""
+    val out = errors("c1.on" -> (t + body), "c2.on" -> body)
+    assert(out.contains("E0097"), out)
+    assert(out.contains("Conv[int,String]"), out)
+    assert(!out.contains("$"), out)
+  }
+
+  it("two classes whose names contain `$$` are E0008, not an instance") {
+    val out = errors("a.on" -> "class `Foo$$Bar` {}", "b.on" -> "class `Foo$$Bar` {}")
+    assert(out.contains("E0008"), out)
+    assert(!out.contains("E0097"), out)
+  }
+
+  it("a class named like an instance's lowered name is E0008 in either order") {
+    val cls = "class `Show$$Integer` {}"
+    val inst = s1
+    for (order <- Seq(Seq("a.on" -> cls, "b.on" -> inst), Seq("a.on" -> inst, "b.on" -> cls))) {
+      val out = errors(order: _*)
+      assert(out.contains("E0008"), out)
+      assert(!out.contains("E0097"), out)
+    }
+  }
 }

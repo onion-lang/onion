@@ -137,16 +137,16 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
   private def registerClass(declaration: AST.ClassDeclaration, moduleName: String, imports: Seq[ImportItem]): Unit = {
     val node = ClassDefinition.newClass(declaration.location, declaration.modifiers, typing.createFQCN(moduleName, declaration.name), null, null)
     node.setSourceFile(Paths.nameOf(unit.sourceFile))
-    val existing = typing.table_.lookup(node.name)
-    if (existing != null) {
-      // `$` is not an identifier character, so a `Trait$$Type` name is an `instance` lowered by
-      // Rewriting. Two of them in one package are a duplicate instance (E0097), not a class (#2777).
-      val i = declaration.name.indexOf("$$")
-      if (i > 0 && existing.isInstanceOf[ClassDefinition])
-        typing.report(SemanticError.DUPLICATE_TRAIT_INSTANCE, declaration,
-          declaration.name.substring(0, i) + "[" + declaration.name.substring(i + 2) + "]")
-      else typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+    if (typing.table_.lookup(node.name) != null) {
+      // Two `instance`s of one (trait, type) in a package lower to one class name. Say so (E0097,
+      // as across modules) only when both are lowered instances; a real class is E0008 (#2777).
+      declaration.loweredInstance match {
+        case Some(traitType) if typing.loweredInstanceNames.contains(node.name) =>
+          typing.report(SemanticError.DUPLICATE_TRAIT_INSTANCE, declaration, traitType.desc.toString)
+        case _ => typing.report(SemanticError.DUPLICATE_CLASS, declaration, node.name)
+      }
     } else {
+      if (declaration.loweredInstance.isDefined) typing.loweredInstanceNames += node.name
       typing.table_.classes.add(node)
       typing.put(declaration, node)
       typing.add(node.name, new NameResolver(NameResolutionContext.fromTyping(typing, imports)))

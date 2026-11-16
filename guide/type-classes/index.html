@@ -4883,7 +4883,7 @@ at each call. They are declared Rust-trait style, with <code>trait</code>, <code
 <p>There is at most <strong>one instance per <code>(trait, type)</code></strong> (coherence). Primitive and
 boxed forms are the same type, so <code>Numeric[Int]</code> and <code>Numeric[Integer]</code> are one
 instance — declaring both is an error. The rule holds across the whole program: a
-second <code>instance Numeric[Int]</code> in another <code>module</code> is the same error (E0097).</p>
+second <code>instance Numeric[Int]</code> in another <code>module</code> or another file is the same error (E0097).</p>
 <p>An instance is found when it is declared in the module of the code that needs it, in the
 trait's module, in the type's module, or in a file with no <code>module</code> line.</p>
 <h2 id="constrained-generics">Constrained generics<a class="headerlink" href="#constrained-generics" title="Permanent link">&para;</a></h2>

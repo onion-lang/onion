@@ -5333,6 +5333,7 @@ null-to-non-nullable</code> で抑制も可能）。</p>
 </span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="nf">first</span><span class="p">(</span><span class="n">maybe</span><span class="p">,</span><span class="w"> </span><span class="s2">"solid"</span><span class="p">)</span><span class="w">   </span><span class="c1">// T := String?  (String? + String がマージされる)</span>
 </span></code></pre></div>
 <p>Java のクラス由来の型変数は <em>プラットフォーム</em> パラメータとして扱われます。nullability が不明なため、nullable な引数を受け付け、（他の Java の値と同様に）デリファレンス可能なままです。</p>
+<p>そうした値を <code>Int</code> にアンボックスすると警告（W0015）が出ます。Java の呼び出しは「何もない」を null で返すことがあるためです（<code>Deque.poll()</code>、<code>Map.get</code>）。要素を返すか例外を投げる読み出しは、型引数が非 null なら警告しません。対象は <code>List.get</code> と <code>xs[i]</code>、<code>Iterator.next</code>、<code>Map.Entry.getKey</code>/<code>getValue</code>、そして <code>get</code> や <code>getOrElse</code> などの <code>Option</code>/<code>Result</code> の読み出しです。</p>
 <p>詳細は<a href="../../reference/specification/">仕様</a>を参照してください。</p>
 <h2 id="_4">次のステップ<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <ul>

@@ -6108,7 +6108,9 @@ static メソッドと同名のアクセサは常に共存できるので、ど�
 <p>Enums は JVM enum にコンパイルされます: <code>name()</code>、<code>ordinal()</code>、<code>values()</code>、
 <code>valueOf(String)</code> が動作します。record スタイルのパラメータは final フィールドになり、
 アクセサが生成されます。定数リストの後に <code>public:</code> などのセクションを書いてメソッドを
-宣言できます。enum に対する <code>select</code> は、<code>else</code> がない場合に網羅性をチェックします。</p>
+宣言できます。パラメータにはデフォルトを書けます（<code>enum Level(code: Int, tag: String = "")</code>）。
+引数を省いた定数（<code>LOW(1)</code>）にはデフォルトが入ります。record と同じです。
+引数は <code>new R(...)</code> と同じく名前でも渡せます（<code>HIGH(9, tag = "!")</code>）。enum に対する <code>select</code> は、<code>else</code> がない場合に網羅性をチェックします。</p>
 <h4 id="case-case">代数的データ型（<code>case</code> case）<a class="headerlink" href="#case-case" title="Permanent link">&para;</a></h4>
 <p>case が <code>case</code> キーワードを使うと、各 case は自分自身のフィールドを宣言でき、<code>enum</code> は
 同種の <code>java.lang.Enum</code> ではなく積の和（Scala 3 風の ADT）になります：</p>

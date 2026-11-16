@@ -2361,6 +2361,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#args-intoption-int" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Args の intOption は Int でない値を拒否するようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5159,6 +5170,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#args-intoption-int" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Args の intOption は Int でない値を拒否するようになりました
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5652,7 +5674,7 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <ul>
 <li><strong>表示されるもの:</strong> 2つ目のインスタンスで <strong>E0097</strong> <code>instance shapes.Show[java.lang.Integer] is already defined</code>。</li>
 <li><strong>直し方:</strong> インスタンスを1つだけ残し、もう1つを削除してください。</li>
-<li><strong>同じパッケージの2つのファイル</strong>（どちらも <code>module</code> 行なし）では、これまでどおり <strong>E0008</strong> <code>duplicated class definition Show$$Integer</code> になります。直し方は同じです。</li>
+<li><strong>同じパッケージの2つのファイル</strong>（どちらも <code>module</code> 行なし）でも、同じ <strong>E0097</strong> になります。</li>
 <li><strong>型の型引数:</strong> E0097 は外側の型だけを比べます。そのため <code>Show[List[String]]</code> と <code>Show[List[Integer]]</code> は同じインスタンスとみなされ、衝突します。</li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> どちらのインスタンスを残すかは、あなたが決めることです。</li>
 </ul>
@@ -5789,6 +5811,21 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li>空の Map はリストから除いてください。</li>
 <li>書く前に、NaN や無限大を自分で選んだ値 (<code>null</code> や番兵値) に置き換えてください。</li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> 拒否される入力はソースの書き方ではなく実行時の値です。そのため、書き換えでは見つけられません。代わりに例外のメッセージが直し方を示します。</li>
+</ul>
+<h2 id="args-intoption-int"><code>Args</code> の <code>intOption</code> は <code>Int</code> でない値を拒否するようになりました<a class="headerlink" href="#args-intoption-int" title="Permanent link">&para;</a></h2>
+<p><code>opts.intOption(name, default)</code> は、値が整数でないときに既定値を返していました。そのため、<code>--count 10O</code>（英字の O）のような打ち間違いも、何事もなかったように動いていました。今は例外を投げます。自動 CLI（<code>def main(count: Int = 3)</code>）は、同じ入力をすでに拒否していました（#2881）。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="nb">Args</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">opts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Args</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="n">opts</span><span class="p">.</span><span class="nf">intOption</span><span class="p">(</span><span class="s2">"count"</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">))</span><span class="w">   </span><span class="c1">// --count abc  以前: 3。今: 例外</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> 実行時に <code>IllegalArgumentException: invalid value for --count: 'abc' (expected Int)</code> が出て、終了コードは 1 です。メッセージはオプション名と値を示します。</li>
+<li><strong>変わらないもの:</strong> オプションがなければ、これまでどおり既定値を返します。正しい値（<code>--count 7</code>、<code>--count -5</code>）もこれまでどおり読み取れます。</li>
+<li><strong>以前の結果を保つには:</strong> 例外を捕まえて既定値を使います。
+  <code>val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }</code></li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> 以前の動作は、実行時のエラーを握りつぶしていただけです。ソースには書き換えるものがありません。不正な値でプログラムを止めるべきかどうかは、書いた人にしか分かりません。</li>
 </ul>
 
 

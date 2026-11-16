@@ -4275,6 +4275,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#args-intoption-rejects-a-value-that-is-not-an-int" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Args intOption rejects a value that is not an Int
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5138,6 +5149,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#args-intoption-rejects-a-value-that-is-not-an-int" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Args intOption rejects a value that is not an Int
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5662,8 +5684,7 @@ Before, a second one in another <code>module</code> compiled, and only the one i
 <li><strong>What you see:</strong> <strong>E0097</strong> <code>instance shapes.Show[java.lang.Integer] is already defined</code>, at
   the second instance.</li>
 <li><strong>Fix:</strong> keep one instance and delete the other.</li>
-<li><strong>Two files in the same package</strong> (both without a <code>module</code> line) still give <strong>E0008</strong>
-  <code>duplicated class definition Show$$Integer</code>. The fix is the same.</li>
+<li><strong>Two files in the same package</strong> (both without a <code>module</code> line) give the same <strong>E0097</strong>.</li>
 <li><strong>Type arguments of the type:</strong> E0097 compares only the outer type, so <code>Show[List[String]]</code>
   and <code>Show[List[Integer]]</code> are one instance and clash.</li>
 <li><strong>No <code>onion migrate</code> rule:</strong> which instance to keep is your choice.</li>
@@ -5833,6 +5854,26 @@ tools could read some of that text, but <code>Yaml::parse</code> could not read 
 <li>Replace NaN or an infinity with a value you choose (<code>null</code>, a sentinel) before writing.</li>
 <li><strong>No <code>onion migrate</code> rule:</strong> the refused input is a value at run time, not a spelling in the
   source, so no rewrite can find it. The exception's message shows the edit instead.</li>
+</ul>
+<h2 id="args-intoption-rejects-a-value-that-is-not-an-int"><code>Args</code> <code>intOption</code> rejects a value that is not an <code>Int</code><a class="headerlink" href="#args-intoption-rejects-a-value-that-is-not-an-int" title="Permanent link">&para;</a></h2>
+<p><code>opts.intOption(name, default)</code> used to return the default when the value was not an integer.
+So a typo such as <code>--count 10O</code> (a letter O) ran as if nothing were wrong. Now it throws, as
+the auto-CLI (<code>def main(count: Int = 3)</code>) already did for the same input (#2881).</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">onion</span><span class="p">.</span><span class="nb">Args</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">opts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Args</span><span class="o">::</span><span class="nf">parse</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span><span class="nf">println</span><span class="p">(</span><span class="n">opts</span><span class="p">.</span><span class="nf">intOption</span><span class="p">(</span><span class="s2">"count"</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">))</span><span class="w">   </span><span class="c1">// --count abc  Before: 3. Now: throws</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <code>IllegalArgumentException: invalid value for --count: 'abc' (expected Int)</code>
+  at run time, and exit code 1. The message names the option and the value.</li>
+<li><strong>Unchanged:</strong> an absent option still gives the default, and a valid value (<code>--count 7</code>,
+  <code>--count -5</code>) still parses.</li>
+<li><strong>To keep the old result:</strong> catch the exception and use the default:
+  <code>val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }</code>.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> the old behaviour swallowed an error at run time. The source
+  has nothing to rewrite, and only you know whether a bad value should stop the program.</li>
 </ul>
 
 

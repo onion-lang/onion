@@ -5771,6 +5771,11 @@ it, and merges mixed nullability:</p>
 their nullability is unknown, so they accept nullable arguments and
 remain dereferenceable (matching how Java values are treated
 elsewhere).</p>
+<p>Unboxing such a value to <code>Int</code> warns (W0015), since a Java call may return
+null to mean "nothing here" (<code>Deque.poll()</code>, <code>Map.get</code>). A read that returns an
+element or throws does not warn when the type argument is non-null:
+<code>List.get</code> and <code>xs[i]</code>, <code>Iterator.next</code>, <code>Map.Entry.getKey</code>/<code>getValue</code>, and
+<code>Option</code>/<code>Result</code> reads such as <code>get</code> and <code>getOrElse</code>.</p>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../control-flow/">Control Flow</a> - if, while, for, select</li>

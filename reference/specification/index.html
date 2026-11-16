@@ -6113,6 +6113,9 @@ every compile, so a grammar change that breaks the round-trip fails the build im
 <p>Enums compile to JVM enums: <code>name()</code>, <code>ordinal()</code>, <code>values()</code>,
 <code>valueOf(String)</code> work. Record-style parameters become final fields with
 accessors; access sections after the constant list declare methods.
+A parameter may declare a default (<code>enum Level(code: Int, tag: String = "")</code>);
+a constant that omits the argument gets it (<code>LOW(1)</code>), as a record does.
+Arguments may be named, as in <code>new R(...)</code>: <code>HIGH(9, tag = "!")</code>.
 <code>select</code> over an enum checks exhaustiveness when no <code>else</code> is present.</p>
 <h4 id="algebraic-data-types-case-cases">Algebraic data types (<code>case</code> cases)<a class="headerlink" href="#algebraic-data-types-case-cases" title="Permanent link">&para;</a></h4>
 <p>When the cases use the <code>case</code> keyword, each case declares its own fields, so an

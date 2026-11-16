@@ -2279,7 +2279,7 @@ val parsed = Args::parse(args)
 parsed.flag("verbose")                  // --verbose
 parsed.option("out", "a.out")           // --out path（デフォルト値付き）
 parsed.option("out")                    // --out path。無ければ null
-parsed.intOption("level", 3)
+parsed.intOption("level", 3)              // 省略時のみ既定値。"--level x" は例外
 parsed.positional()                     // オプション以外の引数の List
 ```
 

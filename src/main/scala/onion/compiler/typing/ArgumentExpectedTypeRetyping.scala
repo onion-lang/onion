@@ -161,6 +161,90 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     Some(updated)
   }
 
+  /**
+   * Re-types a lambda argument whose result is a generic call or literal with
+   * nothing of its own to pin its type arguments, against the parameter type
+   * that the call's target type and its other arguments fix (#3067).
+   *
+   * `o.fold(() -> Option::none(), (s) -> Option::some(s.length()))` assigned to
+   * an `Option[Int]`: typed on its own, the first lambda is a
+   * `Function0[Option[Object]]`, which binds `U = Option[Object]` before the
+   * target type is seen. Left out of the inference, `U` comes from the target
+   * (`Option[Int]`), and the lambda typed against `Function0[Option[Int]]`
+   * gives `Option::none()` its type argument.
+   *
+   * Only with a target type, and only when that leaves no method type variable
+   * in the lambda's parameter type; a re-type that fails or changes nothing
+   * keeps the original argument, so its own diagnostics stand.
+   */
+  def retypeTargetTypedClosures(
+    callNode: AST.Node,
+    method: Method,
+    args: Seq[AST.Expression],
+    params: Array[Term],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    context: LocalContext,
+    expected: Type
+  ): Array[Term] = {
+    if (expected == null || params == null || method.typeParameters.isEmpty || method.isVararg) return params
+    if (params.length != method.argumentCount || args.length != params.length) return params
+    // `Option[Int]?` pins `U` as `Option[Int]`, which then fits the nullable target.
+    val target = expected match {
+      case n: NullableType => n.innerType
+      case t => t
+    }
+    if (target.isBasicType) return params
+    val weak = args.indices.filter(i => params(i) != null && isTargetTypedClosure(args(i)))
+    if (weak.isEmpty) return params
+    val withoutWeak = params.clone()
+    weak.foreach(withoutWeak(_) = null)
+    val subst = typing.withSuppressedReporting {
+      GenericMethodTypeArguments.inferWithoutDefaults(typing, callNode, method, withoutWeak, classSubst, target)
+    }
+    val names = method.typeParameters.map(_.name).toSet
+    var updated: Array[Term] = null
+    for (i <- weak) {
+      val formal = TypeSubstitution.substituteType(method.arguments(i), classSubst, subst, defaultToBound = false)
+      if (formal != null && !mentionsAny(formal, names)) {
+        retypeArgument(args(i), context, formal) match {
+          case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) &&
+              TypeRules.isAssignable(formal, term.`type`) =>
+            if (updated == null) updated = params.clone()
+            updated(i) = term
+          case _ =>
+        }
+      }
+    }
+    if (updated == null) params else updated
+  }
+
+  private def mentionsAny(t: Type, names: Set[String]): Boolean = t match {
+    case tv: TypeVariableType => names.contains(tv.name)
+    case applied: AppliedClassType => applied.typeArguments.exists(mentionsAny(_, names))
+    case at: ArrayType => mentionsAny(at.base, names)
+    case n: NullableType => mentionsAny(n.innerType, names)
+    case w: WildcardType => mentionsAny(w.upperBound, names) || w.lowerBound.exists(mentionsAny(_, names))
+    case _ => false
+  }
+
+  /**
+   * A lambda that declares its parameter types (or has none) and no result type,
+   * whose result is malleable (a generic call or a collection literal).
+   */
+  private def isTargetTypedClosure(expr: AST.Expression): Boolean = {
+    val closure = expr match {
+      case c: AST.ClosureExpression => c
+      case AST.BlockExpression(_, List(c: AST.ClosureExpression), _) => c
+      case _ => return false
+    }
+    closure.returns == null && closure.args.forall(_.typeRef != null) &&
+      closure.body != null && closure.body.elements.nonEmpty && (closure.body.elements.last match {
+        case AST.ReturnExpression(_, result) => result != null && isMalleable(result)
+        case e: AST.Expression => isMalleable(e)
+        case _ => false
+      })
+  }
+
   /** A single method (by name) whose arity accepts `argCount` arguments, else None. */
   private def uniqueCandidate(
     sourceType: ObjectType,

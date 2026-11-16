@@ -629,3 +629,26 @@ Yaml::stringify(["apple", "banana"].map { x -> ["v": x] })   // - v: apple ...
   - Replace NaN or an infinity with a value you choose (`null`, a sentinel) before writing.
 - **No `onion migrate` rule:** the refused input is a value at run time, not a spelling in the
   source, so no rewrite can find it. The exception's message shows the edit instead.
+
+## `Args` `intOption` rejects a value that is not an `Int`
+
+`opts.intOption(name, default)` used to return the default when the value was not an integer.
+So a typo such as `--count 10O` (a letter O) ran as if nothing were wrong. Now it throws, as
+the auto-CLI (`def main(count: Int = 3)`) already did for the same input (#2881).
+
+```onion
+import { onion.Args }
+def main(args: String[]): void {
+  val opts = Args::parse(args)
+  println(opts.intOption("count", 3))   // --count abc  Before: 3. Now: throws
+}
+```
+
+- **What you see:** `IllegalArgumentException: invalid value for --count: 'abc' (expected Int)`
+  at run time, and exit code 1. The message names the option and the value.
+- **Unchanged:** an absent option still gives the default, and a valid value (`--count 7`,
+  `--count -5`) still parses.
+- **To keep the old result:** catch the exception and use the default:
+  `val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }`.
+- **No `onion migrate` rule:** the old behaviour swallowed an error at run time. The source
+  has nothing to rewrite, and only you know whether a bad value should stop the program.

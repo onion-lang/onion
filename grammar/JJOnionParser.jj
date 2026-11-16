@@ -2804,6 +2804,10 @@ AST.Expression expression() :{AST.Expression e;}{
 | e=while_expression()       {return e;}
 | e=for_expression()         {return e;}
 | e=select_expression()      {return e;}
+// `{ -> body }` where a value is expected (a call argument, an initializer) is a zero-parameter
+// lambda, the same as the trailing form; a block cannot start with `->`, so nothing that parsed
+// before changes meaning (#3070).
+| LOOKAHEAD("{" eols() <ARROW>) e=trailing_lambda() {return e;}
 | e=block()                  {return e;}
 | e=try_expression()         {return e;}
 | e=throw_expression()       {return e;}

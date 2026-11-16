@@ -8,6 +8,29 @@ import onion.tools.Shell
  */
 class RangeSpec extends AbstractShellSpec {
 
+  describe("Range equality (#3068)") {
+    it("compares ranges by the values they produce") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val same = (1..3) == (1..3)
+          |    val inclusiveVsExclusive = (1..3) == (1..<4)
+          |    val differ = (1..3) == (1..4)
+          |    val empties = (5..1) == (2..<2)
+          |    val hashes = (1..3).hashCode() == (1..<4).hashCode()
+          |    return "" + same + inclusiveVsExclusive + differ + empties + hashes
+          |  }
+          |}
+          |""".stripMargin,
+        "RangeEquality.on",
+        Array()
+      )
+      assert(Shell.Success("truetruefalsetruetrue") == result)
+    }
+  }
+
   describe("Range literals") {
     it("iterates an inclusive range") {
       val result = shell.run(

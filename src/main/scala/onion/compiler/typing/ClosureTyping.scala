@@ -236,7 +236,11 @@ final class ClosureTyping(
                       Option(buildReturnBlock(node.body, bodyTerm, expectedRet))
                     }
                   } else {
-                    Option(body.translate(node.body, context))
+                    val saved = context.bareReturnYieldsNull
+                    context.bareReturnYieldsNull =
+                      inferredReturnType.contains(BasicType.VOID) && !expectedRet.isBasicType
+                    try Option(body.translate(node.body, context))
+                    finally context.bareReturnYieldsNull = saved
                   }
                 if (baseBlockOpt.isEmpty) {
                   None

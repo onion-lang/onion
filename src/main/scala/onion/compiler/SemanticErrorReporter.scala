@@ -393,12 +393,14 @@ class SemanticErrorReporter(threshold: Int) {
    * lenient -- it only orders suggestions, never rejects a call: anything involving a type
    * variable, a function value (SAM conversion) or an unknown type counts as passable.
    */
-  private def acceptsTypes(m: TypedAST.Method, argTypes: Array[TypedAST.Type]): Boolean = {
-    val params = m.arguments
+  private def acceptsTypes(m: TypedAST.Method, argTypes: Array[TypedAST.Type]): Boolean =
+    acceptsTypes(m.arguments, m.isVararg, argTypes)
+
+  private def acceptsTypes(params: Array[TypedAST.Type], isVararg: Boolean, argTypes: Array[TypedAST.Type]): Boolean = {
     argTypes.indices.forall { i =>
       val p =
-        if (i < params.length && !(m.isVararg && i == params.length - 1)) params(i)
-        else if (m.isVararg && params.nonEmpty) params.last match
+        if (i < params.length && !(isVararg && i == params.length - 1)) params(i)
+        else if (isVararg && params.nonEmpty) params.last match
           case arr: TypedAST.ArrayType if !(argTypes.length == params.length && argTypes(i).isArrayType) => arr.component
           case other => other
         else null
@@ -778,7 +780,25 @@ class SemanticErrorReporter(threshold: Int) {
       case c: TypedAST.ConstructorDefinition if c.defaultsPending && fitsLeadingParameters(c.arguments, c.defaultsOmittableFrom, argTypes) => (c.defaultsHeldBackBy, c.defaultsHeldBackVia)
     } else None
 
-    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(suggestion, s"class ${typeName(typeRef)}", heldBack)))
+    // `new StringBuilder(s)` with `s: String?`: the signature in the list fits once
+    // nullability is set aside, so name the argument and the ways out, as E0005 does (#2877).
+    val nullableArg: Option[(Int, TypedAST.Type, TypedAST.Type)] =
+      if (items.length > 2) items(2).asInstanceOf[Array[TypedAST.ConstructorRef]].iterator
+        .filter(c => !c.isVararg && c.getArgs.length == argTypes.length && acceptsTypes(c.getArgs, false, argTypes))
+        .flatMap { c =>
+          argTypes.indices.find { i =>
+            val p = c.getArgs(i)
+            argTypes(i) != null && argTypes(i).isNullable && !p.isNullable && !p.isInstanceOf[TypedAST.TypeVariableType]
+          }.map(i => (i, c.getArgs(i), argTypes(i)))
+        }.nextOption()
+      else None
+    val withNullable = nullableArg match
+      case Some((i, param, arg)) =>
+        val hint = format(message("suggestion.nullableArgument"), Seq((i + 1).toString, typeName(arg), typeName(param)))
+        Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + hint)
+      case None => suggestion
+
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withNullable, s"class ${typeName(typeRef)}", heldBack)))
   }
 
   /**

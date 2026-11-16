@@ -100,7 +100,8 @@ private[compiler] final class MethodResolutionSupport(
         if lastParamType.isArrayType && TypeRules.isSuperType(varargType, lastParamType) then
           true
         else if methodTypeParams.nonEmpty && containsMethodTypeParam(componentTypeWithParams, methodTypeParams) then
-          structuralMatch(componentTypeWithParams, lastParamType, methodTypeParams)
+          structuralMatch(componentTypeWithParams, lastParamType, methodTypeParams) &&
+            viewBindingsAgree(slotPairs(argsWithTypeParams, componentTypeWithParams, fixedArgCount), methodTypeParams)
         else
           isAssignableWithBoxing(componentType, lastParamType)
       else if params.length > expected.length then
@@ -113,7 +114,7 @@ private[compiler] final class MethodResolutionSupport(
               isAssignableWithBoxing(componentType, params(j).`type`)
           if !argOk then return false
           j += 1
-        true
+        viewBindingsAgree(slotPairs(argsWithTypeParams, componentTypeWithParams, fixedArgCount), methodTypeParams)
       else
         true
     else
@@ -121,7 +122,7 @@ private[compiler] final class MethodResolutionSupport(
       while i < params.length do
         if !checkArg(i) then return false
         i += 1
-      viewBindingsAgree(argsWithTypeParams, methodTypeParams)
+      viewBindingsAgree(argsWithTypeParams.toSeq.zip(params.map(_.`type`)), methodTypeParams)
   }
 
   /**
@@ -130,12 +131,16 @@ private[compiler] final class MethodResolutionSupport(
    * bare variable must fit the binding: `pick[T](c: Comparable[T], d: T)` does not accept
    * `("a", 1)`, and the `Object` overload must win as in Java.
    */
-  private def viewBindingsAgree(formals: Array[Type], methodTypeParams: Set[String]): Boolean =
+  private def slotPairs(formals: Array[Type], component: Type, fixed: Int): Seq[(Type, Type)] =
+    (0 until params.length).map { k =>
+      (if k < fixed then formals(k) else component, params(k).`type`)
+    }
+
+  private def viewBindingsAgree(slots: Seq[(Type, Type)], methodTypeParams: Set[String]): Boolean =
     if methodTypeParams.isEmpty then return true
     val bound = scala.collection.mutable.Map.empty[String, Type]
-    var i = 0
-    while i < params.length && i < formals.length do
-      (formals(i), params(i).`type`) match
+    slots.foreach { (formal, actual) =>
+      (formal, actual) match
         case (ae: AppliedClassType, aa: ClassType) if !aa.isInstanceOf[AppliedClassType] && !sameClass(ae.raw, aa) =>
           table.appliedViewsOf(aa)(AppliedTypeViews.collectAppliedViewsFrom(aa))
             .collectFirst { case (raw, view) if sameClass(raw, ae.raw) => view }
@@ -147,7 +152,7 @@ private[compiler] final class MethodResolutionSupport(
               }
             }
         case _ =>
-      i += 1
+    }
     if bound.isEmpty then return true
     // Every formal that mentions a bound variable must accept its argument with the binding
     // substituted, wherever the variable sits: `d: T`, `d: Comparable[T]` and `d: List[T]`
@@ -155,18 +160,15 @@ private[compiler] final class MethodResolutionSupport(
     // cannot fail there.
     val subst = bound.toMap
     val empty = scala.collection.immutable.Map.empty[String, Type]
-    var j = 0
-    while j < params.length && j < formals.length do
-      if mentionsAny(formals(j), subst.keySet) then
-        val formal = TypeSubstitution.substituteType(formals(j), empty, subst, defaultToBound = false)
-        val ok =
-          if containsMethodTypeParam(formal, methodTypeParams) then
-            structuralMatch(formal, params(j).`type`, methodTypeParams)
-          else
-            isAssignableWithBoxing(formal, params(j).`type`) || viewFits(formal, params(j).`type`)
-        if !ok then return false
-      j += 1
-    true
+    slots.forall { (formal0, actual) =>
+      if mentionsAny(formal0, subst.keySet) then
+        val formal = TypeSubstitution.substituteType(formal0, empty, subst, defaultToBound = false)
+        if containsMethodTypeParam(formal, methodTypeParams) then
+          structuralMatch(formal, actual, methodTypeParams)
+        else
+          isAssignableWithBoxing(formal, actual) || viewFits(formal, actual)
+      else true
+    }
 
   private def mentionsAny(tp: Type, names: Set[String]): Boolean = tp match
     case tv: TypeVariableType => names.contains(tv.name)
@@ -309,17 +311,19 @@ private[compiler] final class MethodResolutionSupport(
   private def sameClass(c1: ClassType, c2: ClassType): Boolean =
     TypeRelations.sameClass(c1, c2)
 
+  // Only a type argument is "nested": a plain class's applied view binds a variable at the top
+  // level of a formal, never inside another type's argument (javac does not look there; #2845).
   private def structuralMatchWithBoxing(expected: Type, actual: Type, methodTypeParams: Set[String]): Boolean =
     if expected.isBasicType && !actual.isBasicType then
       val boxedExpected = onion.compiler.toolbox.Boxing.boxedType(table, expected.asInstanceOf[BasicType])
       sameClass(boxedExpected, actual.asInstanceOf[ClassType])
     else if !expected.isBasicType && actual.isBasicType then
       val boxedActual = onion.compiler.toolbox.Boxing.boxedType(table, actual.asInstanceOf[BasicType])
-      structuralMatch(expected, boxedActual, methodTypeParams)
+      structuralMatch(expected, boxedActual, methodTypeParams, nested = true)
     else
-      structuralMatch(expected, actual, methodTypeParams)
+      structuralMatch(expected, actual, methodTypeParams, nested = true)
 
-  private def structuralMatch(expected: Type, actual: Type, methodTypeParams: Set[String]): Boolean =
+  private def structuralMatch(expected: Type, actual: Type, methodTypeParams: Set[String], nested: Boolean = false): Boolean =
     (expected, actual) match
       case (tv: TypeVariableType, _) if methodTypeParams.contains(tv.name) =>
         if actual.isBasicType then
@@ -335,8 +339,8 @@ private[compiler] final class MethodResolutionSupport(
       // existing wildcard rules in isAssignable keep applying (issue #274).
       case (w: WildcardType, _) if containsMethodTypeParam(w, methodTypeParams) =>
         w.lowerBound match
-          case Some(lb) => structuralMatch(lb, actual, methodTypeParams)
-          case None => structuralMatch(w.upperBound, actual, methodTypeParams)
+          case Some(lb) => structuralMatch(lb, actual, methodTypeParams, nested)
+          case None => structuralMatch(w.upperBound, actual, methodTypeParams, nested)
       case (ae: AppliedClassType, aa: AppliedClassType) =>
         if sameClass(ae.raw, aa.raw) && ae.typeArguments.length == aa.typeArguments.length then
           ae.typeArguments.zip(aa.typeArguments).forall { (e, a) =>
@@ -363,6 +367,7 @@ private[compiler] final class MethodResolutionSupport(
             case tv: TypeVariableType => methodTypeParams.contains(tv.name)
             case _ => false
           }
+        else if nested then false
         else
           // A plain class reaches the formal through its own applied view of it:
           // `String` is a `Comparable[String]`, so `id("a")` against
@@ -371,8 +376,12 @@ private[compiler] final class MethodResolutionSupport(
             .collectFirst { case (raw, view) if sameClass(raw, ae.raw) => view } match
             case Some(view) =>
               ae.typeArguments.length == view.typeArguments.length &&
-                ae.typeArguments.zip(view.typeArguments).forall { (e, a) =>
-                  structuralMatchWithBoxing(e, a, methodTypeParams)
+                ae.typeArguments.zip(view.typeArguments).forall {
+                  // The view's argument binds a bare variable; a variable buried in a
+                  // larger argument (`Comparable[List[T]]`) is not looked into.
+                  case (tv: TypeVariableType, a) if methodTypeParams.contains(tv.name) =>
+                    structuralMatchWithBoxing(tv, a, methodTypeParams)
+                  case (e, a) => !containsMethodTypeParam(e, methodTypeParams) && structuralMatchWithBoxing(e, a, methodTypeParams)
                 }
             case None => false
       case _ =>

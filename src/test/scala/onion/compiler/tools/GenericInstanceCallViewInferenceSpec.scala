@@ -105,5 +105,42 @@ class GenericInstanceCallViewInferenceSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, out)
       assert(out.trim == "object", out)
     }
+    it("does not look for T inside the view's own type argument") {
+      val (r, out) = runCapturing(
+        """import { java.util.* }
+          |class LC conforms Comparable[List[String]] {
+          |public:
+          |  def this {}
+          |  def compareTo(o: List[String]): Int = 0
+          |}
+          |def pick[T](c: Comparable[List[T]], d: T): String = "generic"
+          |def pick(c: Object, d: Object): String = "object"
+          |def main(args: String[]): Int { IO::println(pick(new LC(), 1)); return 0 }
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim == "object", out)
+    }
+    it("checks every vararg element against the view's T") {
+      val (r, out) = runCapturing(
+        """def f[T](xs: Comparable[T]...): String = "generic"
+          |def f(xs: Object...): String = "object"
+          |def main(args: String[]): Int { IO::println(f("a", 1)); IO::println(f("a", "b")); return 0 }
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim.linesIterator.toList == List("object", "generic"), out)
+    }
+    it("does not apply the view inside a type argument of the argument") {
+      val (r, out) = runCapturing(
+        """import { java.util.* }
+          |def f[T](xs: List[Comparable[T]]): String = "generic"
+          |def f(xs: Object): String = "object"
+          |def main(args: String[]): Int {
+          |  val xs: List[String] = ["a", "b"]
+          |  IO::println(f(xs)); return 0
+          |}
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim == "object", out)
+    }
   }
 }

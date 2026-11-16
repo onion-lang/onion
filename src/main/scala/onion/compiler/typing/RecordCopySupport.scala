@@ -132,10 +132,12 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
         i += 1
       }
 
-      targetType.findMethod("copy", fullParams) match {
+      // `copy(b = f(), a = g())` runs `f()` first, as every other named call does (#2801).
+      val orderedParams = ArgumentHelpers.evaluateInWrittenOrder(args, components.map(_._1), fullParams, context)
+      targetType.findMethod("copy", orderedParams) match {
         case Array(method, _*) =>
-          calls.buildResolvedCall(node, method, fullParams, typeArgs, classSubst, null)(
-            expectedArgs => calls.processParamsWithExpected(node, fullParams, expectedArgs),
+          calls.buildResolvedCall(node, method, orderedParams, typeArgs, classSubst, null)(
+            expectedArgs => calls.processParamsWithExpected(node, orderedParams, expectedArgs),
             finalParams => buildRawCall(method, finalParams)
           ) match {
             case built @ Some(_) => Some(built)

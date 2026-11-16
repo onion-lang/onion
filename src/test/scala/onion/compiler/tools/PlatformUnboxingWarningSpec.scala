@@ -101,6 +101,47 @@ class PlatformUnboxingWarningSpec extends AnyFunSpec {
       assert(w15.length >= 1, s"expected W0015 for the Map lookup, got: ${result.diagnostics.warnings.map(_.message)}")
     }
 
+    it("still warns for a Java read that returns null to mean nothing is there (#3071)") {
+      // Only the allowlisted reads (List.get, Iterator.next, Map.Entry, Option,
+      // Result) are non-null by their type argument; these return null by
+      // contract, so their type variable stays a platform type.
+      val cases = Seq(
+        "val q: ArrayDeque[Int] = new ArrayDeque[Int]()\nval x: Int = q.poll()",
+        "val q: Deque[Int] = new ArrayDeque[Int]()\nval x: Int = q.peekFirst()",
+        "val t: TreeSet[Int] = new TreeSet[Int]()\nval x: Int = t.floor(5)",
+        "val a: AtomicReference[Int] = new AtomicReference[Int]()\nval x: Int = a.get()",
+        "val l: ThreadLocal[Int] = new ThreadLocal[Int]()\nval x: Int = l.get()",
+        "val d: Dictionary[String, Int] = new Hashtable[String, Int]()\nval x: Int = d.get(\"a\")"
+      )
+      cases.foreach { body =>
+        val result = compileWarnings(
+          s"import { java.util.*; java.util.concurrent.atomic.AtomicReference; }\n$body\nprintln(x)\n")
+        assert(!result.hasErrors, s"unexpected errors for: $body")
+        val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+        assert(w15.length == 1, s"expected 1 W0015 for: $body, got: ${result.diagnostics.warnings.map(_.message)}")
+      }
+    }
+
+    it("does not warn for Iterator.next or a Map entry's value with a non-null type argument (#3071)") {
+      val result = compileWarnings(
+        """
+          |import { java.util.*; }
+          |val xs: List[Int] = [1, 2]
+          |val it: Iterator[Int] = xs.iterator()
+          |val a: Int = it.next()
+          |val m: Map[String, Int] = ["a": 1]
+          |val e: Map.Entry[String, Int] = m.entrySet().iterator().next()
+          |val b: Int = e.getValue()
+          |val al: ArrayList[Int] = new ArrayList[Int]()
+          |al.add(3)
+          |val c: Int = al.get(0)
+          |println(a + b + c)
+          |""".stripMargin)
+      assert(!result.hasErrors, s"${result.diagnostics}")
+      val w15 = result.diagnostics.warnings.filter(_.category.code == "W0015")
+      assert(w15.isEmpty, s"unexpected W0015: ${w15.map(_.message)}")
+    }
+
     it("does not warn for the defaulted accessor (already primitive)") {
       val result = compileWarnings(
         """

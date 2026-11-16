@@ -9,34 +9,34 @@
 // ─── Extension helpers ────────────────────────────────────────────────────────
 
 extension Int {
-  def abs(): Int = if self < 0 { 0 - self } else { self }
-  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def abs(): Int = if this < 0 { 0 - this } else { this }
+  def clamp(lo: Int, hi: Int): Int = if this < lo { lo } else if this > hi { hi } else { this }
   def padLeft(w: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     var r: String = s
     while r.length() < w { r = " " + r }
     return r
   }
-  def sign(): String = if self > 0 { "+" } else if self < 0 { "-" } else { "0" }
+  def sign(): String = if this > 0 { "+" } else if this < 0 { "-" } else { "0" }
 }
 
 extension String {
   def pad(w: Int): String {
-    if self.length() >= w { return self.substring(0, w) }
-    var r: String = self
+    if this.length() >= w { return this.substring(0, w) }
+    var r: String = this
     while r.length() < w { r = r + " " }
     return r
   }
   def repeat(n: Int): String {
     var s: String = ""
-    for var i: Int = 0; i < n; i++ { s = s + self }
+    for var i: Int = 0; i < n; i++ { s = s + this }
     return s
   }
   def isPalindrome(): Boolean {
-    val len: Int = self.length()
+    val len: Int = this.length()
     var ok: Boolean = true
     for var i: Int = 0; i < len / 2; i++ {
-      if self.charAt(i) != self.charAt(len - 1 - i) { ok = false }
+      if this.charAt(i) != this.charAt(len - 1 - i) { ok = false }
     }
     return ok
   }

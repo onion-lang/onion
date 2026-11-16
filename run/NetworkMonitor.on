@@ -11,16 +11,16 @@ import { java.util.* }
 
 extension Int {
   def fmtMs(): String {
-    if self < 1000 { return "#{self}ms" }
-    return "#{self / 1000}.#{(self % 1000) / 100}s"
+    if this < 1000 { return "#{this}ms" }
+    return "#{this / 1000}.#{(this % 1000) / 100}s"
   }
   def fmtBytes(): String {
-    if self < 1024          { return "#{self}B"  }
-    if self < 1024 * 1024   { return "#{self / 1024}KB" }
-    return "#{self / 1024 / 1024}MB"
+    if this < 1024          { return "#{this}B"  }
+    if this < 1024 * 1024   { return "#{this / 1024}KB" }
+    return "#{this / 1024 / 1024}MB"
   }
   def pad(w: Int): String {
-    val s: String = "#{self}"
+    val s: String = "#{this}"
     if s.length() >= w { return s }
     var r: String = s
     while r.length() < w { r = " " + r }
@@ -30,19 +30,19 @@ extension Int {
 
 extension String {
   def padRight(w: Int): String {
-    if self.length() >= w { return self }
-    var s: String = self
+    if this.length() >= w { return this }
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def pad(w: Int): String {
-    if self.length() >= w { return self }
-    var s: String = self
+    if this.length() >= w { return this }
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
   def pathCategory(): String {
-    return select self {
+    return select this {
       case re"/(api|v\d+)/(.+)" (_, sub): "api/#{sub.split("/")[0]}"
       case re"/static/(.+)"     (_):       "static"
       case re"/health.*":                  "health"
@@ -50,7 +50,7 @@ extension String {
       else:                                "other"
     }
   }
-  def isApiPath(): Boolean = select self {
+  def isApiPath(): Boolean = select this {
     case re"/(api|v\d+)/.*": true
     else:                    false
   }

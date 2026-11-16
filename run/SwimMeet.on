@@ -110,7 +110,7 @@ public:
 
 extension Int {
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -118,18 +118,18 @@ extension Int {
 
 extension Double {
   def round3(): Double {
-    return ((self * 1000.0 + 0.5) as Int) * 1.0 / 1000.0
+    return ((this * 1000.0 + 0.5) as Int) * 1.0 / 1000.0
   }
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def lpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }

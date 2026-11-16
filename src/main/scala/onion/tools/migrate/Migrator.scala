@@ -69,9 +69,21 @@ object Migrator:
       val (line, column) = lineColumnOf(source, offset)
       Edit(offset, 3, "yield", line, column, "ret -> yield")
     }
-    val (randomInts, randomIntNotes) = RandomIntToNextInt.find(source, declared)
-    val calls = randomInts.filterNot(e => insideClause(e.offset))
-    val all = (edits ++ clauses ++ calls).sortBy(_.offset)
+    val selfEdits = SelfToThis.find(source).filterNot(insideClause).map { offset =>
+      val (line, column) = lineColumnOf(source, offset)
+      Edit(offset, 4, "this", line, column, "self -> this", subject = "`self`")
+    }
+    // `self` -> `this` keeps every offset, so the randomInt rule reads the text with it applied:
+    // a `self` in a call's arguments is rewritten inside that call's one edit, and its
+    // position, where the compiler reports E0117, is one of that edit's places.
+    val (randomInts, randomIntNotes) = RandomIntToNextInt.find(apply(source, selfEdits), declared)
+    val within = (offset: Int, e: Edit) => offset >= e.offset && offset < e.offset + e.length
+    val calls = randomInts.filterNot(e => insideClause(e.offset)).map { call =>
+      val folded = selfEdits.filter(s => within(s.offset, call))
+      call.copy(places = call.places ++ folded.map(s => (s.line, s.column)))
+    }
+    val selves = selfEdits.filterNot(s => calls.exists(call => within(s.offset, call)))
+    val all = (edits ++ selves ++ clauses ++ calls).sortBy(_.offset)
     Result(apply(source, all), all, (notes ++ clauseNotes ++ randomIntNotes).sortBy(n => (n.line, n.column)))
 
   /**
@@ -452,6 +464,27 @@ object Migrator:
 
     private def start(source: String, token: Token): Option[Int] =
       offsetOf(source, token.beginLine, token.beginColumn).filter(source.startsWith(token.image, _))
+
+  /**
+   * `self` → `this` (RFC #2788, #2737). `self` is a reserved word that always meant the current
+   * instance, so every `self` code token is the old spelling, and so is every `self` in the
+   * code of a string's `#{...}`. Plain string text, raw and scheme strings, `\#{` escapes,
+   * comments and a backticked `` `self` `` are other tokens, and are left alone.
+   */
+  private object SelfToThis:
+    def find(source: String): Seq[Int] =
+      val tokens =
+        try codeTokens(source)
+        catch case _: Exception => IndexedSeq.empty
+      tokens.flatMap { token =>
+        offsetOf(source, token.beginLine, token.beginColumn)
+          .filter(offset => source.startsWith(token.image, offset))
+          .toSeq
+          .flatMap { offset =>
+            if token.kind == K.K_SELF then Seq(offset)
+            else interpolationBodies(token).flatMap((start, body) => find(body).map(offset + start + _))
+          }
+      }
 
   /**
    * `law name(p: T) { e }` and `example [name] { e }` → a contract predicate (#2740).

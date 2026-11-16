@@ -11,7 +11,7 @@
 
 extension Int {
   def rjust(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -19,7 +19,7 @@ extension Int {
 
 extension Double {
   def fmt1(): String = {
-    val s: String = "" + self
+    val s: String = "" + this
     val dot: Int = s.indexOf(".")
     if dot < 0 { return s + ".0" }
     val end: Int = dot + 2

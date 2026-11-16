@@ -205,7 +205,7 @@ class SemanticErrorReporter(threshold: Int) {
             Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
       } else if (extensionReceiverCandidates.nonEmpty) {
         val signatures = extensionReceiverCandidates.take(3).map { m =>
-          s"self.${m.name}(${m.arguments.map(typeName).mkString(", ")})"
+          s"this.${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
         Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
       } else if (name == "f" && args == "String") {
@@ -1725,6 +1725,10 @@ object SemanticErrorReporter {
     ),
     SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE -> ErrorDef(
       "error.semantic.currentInstanceNotAvailable",
+      Seq()
+    ),
+    SemanticError.SELF_RETIRED -> ErrorDef(
+      "error.semantic.selfRetired",
       Seq()
     ),
     SemanticError.RETURN_TYPE_REQUIRED -> ErrorDef(

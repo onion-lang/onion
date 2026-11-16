@@ -22,19 +22,19 @@ enum Waveform {
 // ─── Extension Double ─────────────────────────────────────────────────────────
 
 extension Double {
-  def abs(): Double  = if self < 0.0 { -self } else { self }
-  def sq():  Double  = self * self
+  def abs(): Double  = if this < 0.0 { -this } else { this }
+  def sq():  Double  = this * this
   def clamp(lo: Double, hi: Double): Double =
-    if self < lo { lo } else if self > hi { hi } else { self }
-  def f2(): String = Format::fixed(self, 2)
-  def f4(): String = Format::fixed(self, 4)
-  def f6(): String = Format::fixed(self, 6)
+    if this < lo { lo } else if this > hi { hi } else { this }
+  def f2(): String = Format::fixed(this, 2)
+  def f4(): String = Format::fixed(this, 4)
+  def f6(): String = Format::fixed(this, 6)
 }
 
 // ─── Extension Int ────────────────────────────────────────────────────────────
 
 extension Int {
-  def toDouble(): Double = self as Double
+  def toDouble(): Double = this as Double
 }
 
 // ─── Record: signal statistics ───────────────────────────────────────────────

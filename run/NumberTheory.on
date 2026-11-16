@@ -14,25 +14,25 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 extension Int {
-  def isEven(): Boolean = self % 2 == 0
-  def isOdd(): Boolean  = self % 2 != 0
+  def isEven(): Boolean = this % 2 == 0
+  def isOdd(): Boolean  = this % 2 != 0
 
   // integer square-root (floor)
   def isqrt(): Int {
-    if self < 0 { return -1 }
-    if self == 0 { return 0 }
-    var r: Int = self
+    if this < 0 { return -1 }
+    if this == 0 { return 0 }
+    var r: Int = this
     var r1: Int = (r + 1) / 2
     while r1 < r {
       r = r1
-      r1 = (r + self / r) / 2
+      r1 = (r + this / r) / 2
     }
     return r
   }
 
   def pow(e: Int): Long {
     var result: Long = 1L
-    var base: Long = self as Long
+    var base: Long = this as Long
     var exp: Int = e
     while exp > 0 {
       if exp % 2 == 1 { result = result * base }
@@ -46,7 +46,7 @@ extension Int {
 extension Long {
   def modPow(exp: Long, mod: Long): Long {
     var result: Long = 1L
-    var b: Long = self % mod
+    var b: Long = this % mod
     var e: Long = exp
     while e > 0L {
       if e % 2L == 1L { result = result * b % mod }

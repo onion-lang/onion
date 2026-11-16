@@ -31,9 +31,9 @@ class ExplicitThisFieldSmartCastSpec extends AbstractShellSpec {
           |class C {
           |  val name: String?
           |public:
-          |  def this(n: String?) { self.name = n }
+          |  def this(n: String?) { this.name = n }
           |  def show(): String {
-          |    if self.name != null { return self.name.toUpperCase() } else { return "none" }
+          |    if this.name != null { return this.name.toUpperCase() } else { return "none" }
           |  }
           |}
           |def main(args: String[]): String { return new C("yo").show() }

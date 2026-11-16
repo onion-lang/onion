@@ -295,7 +295,7 @@ def circleOfFifths(): List[NoteName] {
 // ─── Extension: note with accidentals description ─────────────────────────
 extension NoteName {
   def isNatural(): Boolean {
-    val idx: Int = noteIndex(self)
+    val idx: Int = noteIndex(this)
     return idx == 0 || idx == 2 || idx == 4 || idx == 5 ||
            idx == 7 || idx == 9 || idx == 11
   }

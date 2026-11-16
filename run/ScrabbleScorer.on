@@ -236,16 +236,16 @@ extension String {
   def scrabbleScore(): Int {
     var total: Int = 0
     var i: Int = 0
-    while i < self.length() {
-      total = total + tileScore(self.substring(i, i + 1))
+    while i < this.length() {
+      total = total + tileScore(this.substring(i, i + 1))
       i = i + 1
     }
     return total
   }
   def avgLetterValue(): Double {
-    val len: Int = self.length()
+    val len: Int = this.length()
     if len == 0 { return 0.0 }
-    return (self.scrabbleScore() as Double) / (len as Double)
+    return (this.scrabbleScore() as Double) / (len as Double)
   }
 }
 

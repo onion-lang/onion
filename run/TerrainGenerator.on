@@ -13,11 +13,11 @@ import { java.lang.Double as JDouble; }
 extension String {
   def repeatStr(n: Int): String {
     var s: String = ""
-    for var i: Int = 0; i < n; i++ { s = s + self }
+    for var i: Int = 0; i < n; i++ { s = s + this }
     return s
   }
   def rpad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
@@ -26,7 +26,7 @@ extension String {
 // ─── Extension: Int ───────────────────────────────────────────────────────────
 extension Int {
   def lpad(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }
@@ -36,8 +36,8 @@ extension Int {
 extension Double {
   // Format with 3 decimal places (e.g. 0.732)
   def fmt3(): String {
-    val whole: Int = self.intValue()
-    val frac3: Int = ((self - (whole as Double)) * 1000.0 + 0.5).intValue()
+    val whole: Int = this.intValue()
+    val frac3: Int = ((this - (whole as Double)) * 1000.0 + 0.5).intValue()
     var fs: String = "" + frac3
     if frac3 < 10 { fs = "00" + frac3 }
     else if frac3 < 100 { fs = "0" + frac3 }

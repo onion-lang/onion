@@ -62,20 +62,20 @@ record CitationEdge(fromId: Int, toId: Int)
 
 extension String {
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + "…"
+    if this.length() <= n { return this }
+    return this.substring(0, n) + "…"
   }
   def repeat(n: Int): String {
     var result: String = ""
     var i = 0
-    while i < n { result = result + self; i = i + 1 }
+    while i < n { result = result + this; i = i + 1 }
     return result
   }
 }
 
 extension Int {
   def pad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }

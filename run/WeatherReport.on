@@ -50,9 +50,9 @@ interface Reportable {
 // ── Extension methods on Double ───────────────────────────────────────────────
 
 extension Double {
-  def r1(): Double = (Math::round(self * 10.0) as Double) / 10.0
-  def r2(): Double = (Math::round(self * 100.0) as Double) / 100.0
-  def degStr(): String = "" + self.r1() + "°C"
+  def r1(): Double = (Math::round(this * 10.0) as Double) / 10.0
+  def r2(): Double = (Math::round(this * 100.0) as Double) / 100.0
+  def degStr(): String = "" + this.r1() + "°C"
 }
 
 // ── Extension methods on String ───────────────────────────────────────────────
@@ -60,7 +60,7 @@ extension Double {
 extension String {
   def rep(n: Int): String {
     var s = ""
-    foreach i: Int in 1..n { s = s + self }
+    foreach i: Int in 1..n { s = s + this }
     return s
   }
 }

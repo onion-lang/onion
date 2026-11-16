@@ -2,12 +2,10 @@ package onion.compiler.tools
 
 /**
  * docs/guide/classes-and-objects.md documents instance methods, method
- * overloading, getter/setter methods (under "## Methods") and the `self`
- * reference (under "## The `self` Reference") — real, tested features (`self`
- * is a reserved-word alias for `this`, see `SelfReferentialInitializerSpec`,
- * `SelfReferentialBoundSpec`). docs/ja/guide/classes-and-objects.md had no
- * counterpart for either section, so a Japanese-only reader had no way to
- * learn `self` exists at all. This guards that the Japanese guide documents
+ * overloading, getter/setter methods (under "## Methods") and the `this`
+ * reference (under "## The `this` Reference", which also notes that `self` is
+ * retired, RFC #2788). docs/ja/guide/classes-and-objects.md once had no
+ * counterpart for either section. This guards that the Japanese guide documents
  * both.
  */
 class ClassesAndObjectsDocMethodsParitySpec extends AbstractShellSpec {
@@ -27,14 +25,15 @@ class ClassesAndObjectsDocMethodsParitySpec extends AbstractShellSpec {
         "\"### Method Overloading\" subsection")
     }
 
-    it("documents the `self` reference, like the English guide does") {
+    it("documents the `this` reference and the retired `self`, like the English guide does") {
       val doc = read("docs/ja/guide/classes-and-objects.md")
-      assert(doc.contains("self"),
-        "docs/ja/guide/classes-and-objects.md never mentions `self` — already documented in " +
-        "docs/guide/classes-and-objects.md's \"## The `self` Reference\" section, and `self` is a " +
-        "real, tested reserved-word alias for `this`")
+      assert(doc.contains("## `this` 参照"),
+        "docs/ja/guide/classes-and-objects.md has no `this` reference section — already documented in " +
+        "docs/guide/classes-and-objects.md's \"## The `this` Reference\" section")
+      assert(doc.contains("E0117"),
+        "the ja `this` section should say that `self` is retired (E0117), like the English guide does")
       assert(doc.contains("static"),
-        "the ja self-reference mention should note that `this`/`self` are unavailable in static " +
+        "the ja `this` section should note that `this` is unavailable in static " +
         "contexts, like the English guide does")
     }
   }

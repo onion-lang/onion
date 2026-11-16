@@ -191,8 +191,12 @@ private[compiler] final class InstanceMethodCallSupport(
         None
       case Some(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
-        calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-          expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
+        // `() -> Option::none()` takes its result type from the target type (#3067).
+        val targetTyped =
+          if (node.typeArgs.nonEmpty) params
+          else calls.retypeTargetTypedClosures(node, method, node.args, params, classSubst, context, expected)
+        calls.buildResolvedCall(node, method, targetTyped, node.typeArgs, classSubst, expected)(
+          expectedArgs => calls.prepareCallParams(node, node.args, method, targetTyped, expectedArgs),
           finalParams => new Call(target, method, finalParams)
         )
     }

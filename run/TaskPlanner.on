@@ -127,17 +127,17 @@ record SprintSummary(
 // ─── Extension methods ────────────────────────────────────────────────────────
 extension Int {
   def plural(word: String): String {
-    if self == 1 { return "1 " + word }
-    return "" + self + " " + word + "s"
+    if this == 1 { return "1 " + word }
+    return "" + this + " " + word + "s"
   }
 }
 
 extension Double {
-  def round1(): Double = (self * 10.0 + 0.5) as Long / 10.0
-  def pct(): String = "" + ((self * 100.0 + 0.5) as Long) + "%"
+  def round1(): Double = (this * 10.0 + 0.5) as Long / 10.0
+  def pct(): String = "" + ((this * 100.0 + 0.5) as Long) + "%"
   def fmtHrs(): String {
-    val h = self as Int
-    val frac = self - (h as Double)
+    val h = this as Int
+    val frac = this - (h as Double)
     val m = (frac * 60.0 + 0.5) as Int
     if m == 0 { return "" + h + "h" }
     return "" + h + "h " + m + "m"

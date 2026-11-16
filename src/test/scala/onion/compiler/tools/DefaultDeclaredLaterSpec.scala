@@ -177,7 +177,7 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
         """
           |def run(): String = "ab".twice()
           |extension String {
-          |  def twice(sep: String = "-"): String = self + sep + self
+          |  def twice(sep: String = "-"): String = this + sep + this
           |}
           |println(run())
         """) == "ab-ab")
@@ -222,7 +222,7 @@ class DefaultDeclaredLaterSpec extends AbstractShellSpec {
           |  def f(n: Int = base + v): Int = n
           |}
           |extension String {
-          |  def tag(t: String = greeting): String = t + self
+          |  def tag(t: String = greeting): String = t + this
           |}
           |println(new K().f())
           |println(new C().x)

@@ -70,7 +70,7 @@ public:
 
   def trainName(): String = name
 
-  def addMesh(m: GearMesh): GearTrain { meshes << m; return self }
+  def addMesh(m: GearMesh): GearTrain { meshes << m; return this }
 
   // Overall speed ratio = product of individual speed ratios.
   def overallRatio(): Double {

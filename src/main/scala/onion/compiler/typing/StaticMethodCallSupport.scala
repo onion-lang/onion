@@ -258,7 +258,11 @@ private[compiler] final class StaticMethodCallSupport(
     // closure slots stay null — so they unify against the correct formal
     // parameters. Collapsing them shifted a determining argument that follows a
     // closure onto the wrong formal, leaving its type variable unbound (#256).
-    val positionalKnownParams = preliminaryParams
+    // A lambda like `() -> Option::none()` takes its result type from the call's target
+    // type, not the other way round (#3067).
+    val positionalKnownParams =
+      if (typeArgs.nonEmpty) preliminaryParams
+      else calls.retypeTargetTypedClosures(node, method, args, preliminaryParams, classSubst, context, expected)
     // With explicit type arguments (Future::async[String](...)), the closure's
     // expected parameter type is pinned by those arguments rather than inferred
     // from the other call arguments. Feeding them in here lets a throw-only
@@ -292,7 +296,7 @@ private[compiler] final class StaticMethodCallSupport(
             hasError = true
         }
       } else {
-        finalParams(i) = preliminaryParams(i)
+        finalParams(i) = positionalKnownParams(i)
       }
     }
     if (hasError) return None

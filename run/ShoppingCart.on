@@ -12,39 +12,39 @@ import { java.util.ArrayList }
 
 extension Int {
   def formatCents(): String {
-    val dollars: Int = self / 100
-    val cents: Int = self % 100
+    val dollars: Int = this / 100
+    val cents: Int = this % 100
     val centsStr: String = if cents < 10 { "0" + cents } else { "" + cents }
     return "$#{dollars}.#{centsStr}"
   }
   def stars(): String {
     var s: String = ""
     var i: Int = 0
-    while i < self { s = s + "*"; i = i + 1 }
+    while i < this { s = s + "*"; i = i + 1 }
     return s
   }
 }
 
 extension Double {
-  def fmtPct(): String = (self * 100.0).intValue() + "%"
-  def roundCents(): Int = (self + 0.5).intValue()
+  def fmtPct(): String = (this * 100.0).intValue() + "%"
+  def roundCents(): Int = (this + 0.5).intValue()
 }
 
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def padLeft(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }
   def rep(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
 }

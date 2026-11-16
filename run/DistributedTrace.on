@@ -91,13 +91,13 @@ public:
 
 extension Long {
   def humanMs(): String {
-    if self < 1000L  { return "" + self + "ms" }
-    if self < 60000L { return Format::fixed(self / 1000.0d, 1) + "s" }
-    return Format::fixed(self / 60000.0d, 1) + "min"
+    if this < 1000L  { return "" + this + "ms" }
+    if this < 60000L { return Format::fixed(this / 1000.0d, 1) + "s" }
+    return Format::fixed(this / 60000.0d, 1) + "min"
   }
   def bar(maxVal: Long, width: Int): String {
     if maxVal <= 0L { return "│" + " ".repeat(width) + "│" }
-    val filled = ((self * width) / maxVal) as Int
+    val filled = ((this * width) / maxVal) as Int
     val cap: Int = if filled > width { width } else { filled }
     return "│" + "█".repeat(cap) + " ".repeat(width - cap) + "│"
   }
@@ -105,12 +105,12 @@ extension Long {
 
 extension String {
   def rpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def lpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

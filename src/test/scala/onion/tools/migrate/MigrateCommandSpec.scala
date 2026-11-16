@@ -944,3 +944,47 @@ class MigrateCommandSpec extends AnyFunSuite with Matchers:
     val lines = "p\\.on:(\\d+):".r.findAllMatchIn(result.stderr).map(_.group(1).toInt).toSeq
     lines should not be empty
     all(lines) should be <= 6
+
+  test("self becomes this in code and in #{...}, and nothing else changes (RFC #2788)"):
+    val source =
+      """// self in a comment stays
+        |class Room {
+        |  val name: String
+        |public:
+        |  def this(n: String) { self.name = n }
+        |  def label(): String = "#{self.name} (incl. self) \#{self}"
+        |  def block(): String = TQ
+        |  #{self.name}
+        |  TQ
+        |}
+        |val `self` = 1
+        |IO::println(new Room("hall").label())
+        |""".stripMargin.replace("TQ", "\"\"\"")
+    val (root, file) = script(source)
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 0
+    read(file) shouldBe source
+      .replace("{ self.name = n }", "{ this.name = n }")
+      .replace("\"#{self.name} (incl. self)", "\"#{this.name} (incl. self)")
+      .replace("  #{self.name}\n", "  #{this.name}\n")
+    result.stdout should include("old.on:5:25: self -> this")
+    result.stdout should include("old.on:6:28: self -> this")
+    result.stdout should include("old.on:8:5: self -> this")
+    Shell(Seq()).run(read(file), "old.on", Array()) shouldBe a[Shell.Success]
+
+  test("a self in static code is left for a manual change: this is E0050 there"):
+    val source =
+      """class S {
+        |public:
+        |  static def s(): Object = self
+        |}
+        |""".stripMargin
+    val (root, file) = script(source)
+
+    val result = invoke(root, file.toString)
+
+    result.exitCode shouldBe 1
+    read(file) shouldBe source
+    result.stderr should include("old.on:3:28: this `self` may be the retired spelling of `this`")

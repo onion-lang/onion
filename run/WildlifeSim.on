@@ -13,11 +13,11 @@
 
 extension Double {
   def clamp(lo: Double, hi: Double): Double =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
 
   def fmt(d: Int): String {
-    val neg: Boolean = self < 0.0
-    val abs: Double  = if neg { 0.0 - self } else { self }
+    val neg: Boolean = this < 0.0
+    val abs: Double  = if neg { 0.0 - this } else { this }
     val factor: Long = Math::pow(10.0, d as Double) as Long
     val scaled: Long = (abs * (factor as Double) + 0.5) as Long
     val ip: Long     = scaled / factor
@@ -29,7 +29,7 @@ extension Double {
 }
 
 extension Int {
-  def toD(): Double = self as Double
+  def toD(): Double = this as Double
 }
 
 // ─── Season: data-carrying enum ───────────────────────────────────────────────

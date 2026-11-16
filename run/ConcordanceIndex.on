@@ -15,10 +15,10 @@ enum WordClass {
 // ---------- extensions --------------------------------------------------------
 
 extension String {
-  def trimLower(): String = self.trim().toLowerCase()
+  def trimLower(): String = this.trim().toLowerCase()
 
   def centred(width: Int): String {
-    val s = self
+    val s = this
     val pad = width - s.length
     if pad <= 0 { return s }
     val left  = pad / 2
@@ -31,7 +31,7 @@ extension String {
   }
 
   def padRight(width: Int): String {
-    val s = self
+    val s = this
     if s.length >= width { return s }
     var out = s
     foreach i: Int in s.length..<width { out = out + " " }
@@ -39,15 +39,15 @@ extension String {
   }
 
   def truncate(max: Int): String {
-    if self.length <= max { return self }
-    return self.substring(0, max - 1) + "..."
+    if this.length <= max { return this }
+    return this.substring(0, max - 1) + "..."
   }
 }
 
 extension Int {
   def repeatChar(ch: String): String {
     var out = ""
-    foreach i: Int in 0..<self { out = out + ch }
+    foreach i: Int in 0..<this { out = out + ch }
     return out
   }
 }

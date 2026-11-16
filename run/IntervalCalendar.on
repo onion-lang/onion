@@ -87,12 +87,12 @@ public:
 
 extension Int {
   def hhmm(): String {
-    val h = self / 60
-    val m = self % 60
+    val h = this / 60
+    val m = this % 60
     return String::format("%02d:%02d", h, m)
   }
   def padLeft(w: Int): String {
-    val s = "" + self
+    val s = "" + this
     if s.length() >= w { return s }
     return " ".repeat(w - s.length()) + s
   }
@@ -100,9 +100,9 @@ extension Int {
 
 extension String {
   def ljust(w: Int): String =
-    if self.length() >= w { self } else { self + " ".repeat(w - self.length()) }
+    if this.length() >= w { this } else { this + " ".repeat(w - this.length()) }
   def rjust(w: Int): String =
-    if self.length() >= w { self } else { " ".repeat(w - self.length()) + self }
+    if this.length() >= w { this } else { " ".repeat(w - this.length()) + this }
 }
 
 // ── Observer interface ────────────────────────────────────────────────────────

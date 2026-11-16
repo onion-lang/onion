@@ -22,13 +22,13 @@ trait Formattable[T] {
 // ─── Extensions ──────────────────────────────────────────────────────────────
 extension Int {
   def padLeft(w: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     if s.length() >= w { return s }
     var pad: String = ""
     for var i: Int = s.length(); i < w; i++ { pad = pad + " " }
     return pad + s
   }
-  def medal(): String = select self {
+  def medal(): String = select this {
     case 1: " GOLD"
     case 2: "  SLV"
     case 3: "  BRZ"
@@ -38,8 +38,8 @@ extension Int {
 
 extension String {
   def pad(w: Int): String {
-    if self.length() >= w { return self.substring(0, w) }
-    var result: String = self
+    if this.length() >= w { return this.substring(0, w) }
+    var result: String = this
     while result.length() < w { result = result + " " }
     return result
   }
@@ -50,7 +50,7 @@ extension String {
   }
   def rep(n: Int): String {
     var s: String = ""
-    for var i: Int = 0; i < n; i++ { s = s + self }
+    for var i: Int = 0; i < n; i++ { s = s + this }
     return s
   }
 }

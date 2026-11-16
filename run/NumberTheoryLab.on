@@ -40,10 +40,10 @@ record PrimeRange(lo: Int, hi: Int, count: Int) {
 // ─── Extension methods on Int ────────────────────────────────────────────────
 
 extension Int {
-  def isNeg(): Boolean = self < 0
-  def isPos(): Boolean = self > 0
-  def squared(): Int = self * self
-  def cubed(): Int = self * self * self
+  def isNeg(): Boolean = this < 0
+  def isPos(): Boolean = this > 0
+  def squared(): Int = this * this
+  def cubed(): Int = this * this * this
 }
 
 // ─── GCD / LCM (iterative) ───────────────────────────────────────────────────

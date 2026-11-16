@@ -26,15 +26,15 @@ enum GameResult {
 
 extension Int {
   def clamp(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
+    if this < lo { return lo }
+    if this > hi { return hi }
+    return this
   }
 }
 
 extension String {
   def padEnd(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
@@ -53,14 +53,14 @@ public:
       c << new Empty()
       i = i + 1
     }
-    self.cells = c
+    this.cells = c
   }
 
   def cellAt(row: Int, col: Int): Cell =
-    self.cells[row * 3 + col] as Cell
+    this.cells[row * 3 + col] as Cell
 
   def isOpen(row: Int, col: Int): Boolean =
-    (self.cellAt(row, col)) is Empty
+    (this.cellAt(row, col)) is Empty
 
   def place(row: Int, col: Int, p: Player): Board {
     val newCells: List[Cell] = []
@@ -69,7 +69,7 @@ public:
       if i == row * 3 + col {
         newCells << new Filled(p)
       } else {
-        newCells << (self.cells[i] as Cell)
+        newCells << (this.cells[i] as Cell)
       }
       i = i + 1
     }
@@ -88,7 +88,7 @@ public:
     val result: List[Int] = []
     var i: Int = 0
     while i < 9 {
-      if (self.cells[i] as Cell) is Empty {
+      if (this.cells[i] as Cell) is Empty {
         result << i
       }
       i = i + 1
@@ -96,13 +96,13 @@ public:
     return result
   }
 
-  def isFull(): Boolean = self.openIndices().size == 0
+  def isFull(): Boolean = this.openIndices().size == 0
 
   // Check if a player occupies all three positions of a line.
   def lineWin(p: Player, a: Int, b: Int, c: Int): Boolean {
-    val ca = self.cells[a] as Cell
-    val cb = self.cells[b] as Cell
-    val cc = self.cells[c] as Cell
+    val ca = this.cells[a] as Cell
+    val cb = this.cells[b] as Cell
+    val cc = this.cells[c] as Cell
     val ma = ca is Filled && (ca as Filled).player() == p
     val mb = cb is Filled && (cb as Filled).player() == p
     val mc = cc is Filled && (cc as Filled).player() == p
@@ -111,23 +111,23 @@ public:
 
   def hasWon(p: Player): Boolean {
     // rows
-    if self.lineWin(p, 0, 1, 2) { return true }
-    if self.lineWin(p, 3, 4, 5) { return true }
-    if self.lineWin(p, 6, 7, 8) { return true }
+    if this.lineWin(p, 0, 1, 2) { return true }
+    if this.lineWin(p, 3, 4, 5) { return true }
+    if this.lineWin(p, 6, 7, 8) { return true }
     // cols
-    if self.lineWin(p, 0, 3, 6) { return true }
-    if self.lineWin(p, 1, 4, 7) { return true }
-    if self.lineWin(p, 2, 5, 8) { return true }
+    if this.lineWin(p, 0, 3, 6) { return true }
+    if this.lineWin(p, 1, 4, 7) { return true }
+    if this.lineWin(p, 2, 5, 8) { return true }
     // diagonals
-    if self.lineWin(p, 0, 4, 8) { return true }
-    if self.lineWin(p, 2, 4, 6) { return true }
+    if this.lineWin(p, 0, 4, 8) { return true }
+    if this.lineWin(p, 2, 4, 6) { return true }
     return false
   }
 
   def result(): GameResult {
-    if self.hasWon(Player::X) { return new Winner(Player::X) }
-    if self.hasWon(Player::O) { return new Winner(Player::O) }
-    if self.isFull()          { return new Draw() }
+    if this.hasWon(Player::X) { return new Winner(Player::X) }
+    if this.hasWon(Player::O) { return new Winner(Player::O) }
+    if this.isFull()          { return new Draw() }
     return new InProgress()
   }
 
@@ -137,7 +137,7 @@ public:
     while row < 3 {
       var col: Int = 0
       while col < 3 {
-        val c = self.cellAt(row, col)
+        val c = this.cellAt(row, col)
         val ch: String = select c {
           case e is Empty:  "."
           case f is Filled: if f.player() == Player::X { "X" } else { "O" }

@@ -51,8 +51,8 @@ class RollingBuffer[T] {
 
 public:
   def this(capacity: Int) {
-    self.cap = capacity
-    self.buf = new ArrayList[Object]()
+    this.cap = capacity
+    this.buf = new ArrayList[Object]()
   }
 
   def push(v: T): void {
@@ -102,8 +102,8 @@ class ZScoreDetector conforms AnomalyDetector {
 
 public:
   def this(thresh: Double, windowSize: Int) {
-    self.threshold = thresh
-    self.window = new RollingBuffer[Double](windowSize)
+    this.threshold = thresh
+    this.window = new RollingBuffer[Double](windowSize)
   }
 
   def check(sensor: Sensor, reading: Reading): Alert? {
@@ -142,11 +142,11 @@ class PidController {
 
 public:
   def this(kp: Double, ki: Double, kd: Double) {
-    self.kp       = kp
-    self.ki       = ki
-    self.kd       = kd
-    self.prevErr  = 0.0
-    self.integral = 0.0
+    this.kp       = kp
+    this.ki       = ki
+    this.kd       = kd
+    this.prevErr  = 0.0
+    this.integral = 0.0
   }
 
   def step(setpoint: Double, measured: Double): ControlAction {
@@ -175,10 +175,10 @@ class SensorNetwork {
 
 public:
   def this(det: AnomalyDetector) {
-    self.sensors     = new ArrayList[Object]()
-    self.detector    = det
-    self.alertList   = new ArrayList[Object]()
-    self.readingList = new ArrayList[Object]()
+    this.sensors     = new ArrayList[Object]()
+    this.detector    = det
+    this.alertList   = new ArrayList[Object]()
+    this.readingList = new ArrayList[Object]()
   }
 
   def addSensor(s: Sensor): void {

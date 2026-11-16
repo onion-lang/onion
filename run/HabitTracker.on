@@ -78,30 +78,30 @@ record Streak(habitId: Int, start: Int, length: Int) {
 // ─── Extension methods ────────────────────────────────────────────────────────
 
 extension Int {
-  def maxOf(other: Int): Int = if self >= other { self } else { other }
-  def minOf(other: Int): Int = if self <= other { self } else { other }
-  def inRange(lo: Int, hi: Int): Boolean = self >= lo && self <= hi
+  def maxOf(other: Int): Int = if this >= other { this } else { other }
+  def minOf(other: Int): Int = if this <= other { this } else { other }
+  def inRange(lo: Int, hi: Int): Boolean = this >= lo && this <= hi
 }
 
 extension String {
   def padEnd(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def padStart(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n - 1) + "…"
+    if this.length() <= n { return this }
+    return this.substring(0, n - 1) + "…"
   }
 }
 
 extension Frequency {
-  def label(): String = select self {
+  def label(): String = select this {
     case Frequency::DAILY:    "Daily"
     case Frequency::WEEKDAYS: "Weekdays"
     case Frequency::WEEKENDS: "Weekends"

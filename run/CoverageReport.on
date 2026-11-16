@@ -12,24 +12,24 @@ import { java.util.ArrayList }
 
 extension Double {
   def fmtPct(): String = {
-    val i = (self * 10.0 + 0.5) as Int
+    val i = (this * 10.0 + 0.5) as Int
     return (i / 10) + "." + (i % 10) + "%"
   }
-  def roundTo1(): Double = ((self * 10.0 + 0.5) as Int) / 10.0
+  def roundTo1(): Double = ((this * 10.0 + 0.5) as Int) / 10.0
 }
 
 extension Int {
   def hashBar(width: Int): String {
     var s = ""
-    foreach _: Int in 0..<self   { s = s + "#" }
-    foreach _: Int in self..<width { s = s + "." }
+    foreach _: Int in 0..<this   { s = s + "#" }
+    foreach _: Int in this..<width { s = s + "." }
     return s
   }
 }
 
 extension String {
   def padRight(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }

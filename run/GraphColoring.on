@@ -74,25 +74,25 @@ public:
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def lpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
   def repeated(n: Int): String {
     var s: String = ""
-    foreach _: Int in 0..<n { s = s + self }
+    foreach _: Int in 0..<n { s = s + this }
     return s
   }
 }
 
 extension Int {
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }

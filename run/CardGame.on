@@ -90,14 +90,14 @@ public:
 
 extension Int {
   def pad2(): String {
-    if self < 10 { return " " + self }
-    return "" + self
+    if this < 10 { return " " + this }
+    return "" + this
   }
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }

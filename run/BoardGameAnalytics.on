@@ -72,7 +72,7 @@ public:
 // ─── Extension method ─────────────────────────────────────────────────────────
 
 extension Double {
-  def fmt2(): Double = (self * 100.0).intValue().doubleValue() / 100.0
+  def fmt2(): Double = (this * 100.0).intValue().doubleValue() / 100.0
 }
 
 // ─── Elo helpers ─────────────────────────────────────────────────────────────

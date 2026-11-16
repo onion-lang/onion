@@ -8,19 +8,19 @@
 // ─── primitive helpers ───────────────────────────────────────────────────────
 
 extension Int {
-  def abs(): Int = if self < 0 { -self } else { self }
-  def maxWith(other: Int): Int = if self > other { self } else { other }
-  def minWith(other: Int): Int = if self < other { self } else { other }
+  def abs(): Int = if this < 0 { -this } else { this }
+  def maxWith(other: Int): Int = if this > other { this } else { other }
+  def minWith(other: Int): Int = if this < other { this } else { other }
 }
 
 extension Double {
   def round2(): Double {
     val factor: Long = 100L
-    return (self * factor.doubleValue()).longValue().doubleValue() / factor.doubleValue()
+    return (this * factor.doubleValue()).longValue().doubleValue() / factor.doubleValue()
   }
   def toPercent(total: Int): String {
     if total == 0 { return "0.00%" }
-    val pct = (self / total.doubleValue() * 100.0).round2()
+    val pct = (this / total.doubleValue() * 100.0).round2()
     return "" + pct + "%"
   }
 }

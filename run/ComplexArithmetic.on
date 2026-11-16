@@ -79,8 +79,8 @@ public:
 // ─── Extension Double for convenience ────────────────────────────────────────
 
 extension Double {
-  def toComplex(): Complex = new Complex(self, 0.0)
-  def i(): Complex = new Complex(0.0, self)
+  def toComplex(): Complex = new Complex(this, 0.0)
+  def i(): Complex = new Complex(0.0, this)
 }
 
 // ─── Helper: round to N decimal places ──────────────────────────────────────

@@ -20,27 +20,27 @@ record MetricLog(ts: String, name: String, value: Int)
 
 extension Int {
   def statusClass(): String {
-    if self >= 500 { return "5xx" }
-    if self >= 400 { return "4xx" }
-    if self >= 300 { return "3xx" }
-    if self >= 200 { return "2xx" }
+    if this >= 500 { return "5xx" }
+    if this >= 400 { return "4xx" }
+    if this >= 300 { return "3xx" }
+    if this >= 200 { return "2xx" }
     return "1xx"
   }
   def msLabel(): String {
-    if self < 50  { return "fast" }
-    if self < 200 { return "ok  " }
-    if self < 500 { return "slow" }
+    if this < 50  { return "fast" }
+    if this < 200 { return "ok  " }
+    if this < 500 { return "slow" }
     return "very slow"
   }
 }
 
 extension String {
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + "…"
+    if this.length() <= n { return this }
+    return this.substring(0, n) + "…"
   }
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }

@@ -28,16 +28,16 @@ extension String {
   def rep(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def lpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -51,7 +51,7 @@ extension Int {
     case  0: "."
     else:    "?"
   }
-  def maxWith(other: Int): Int = if self >= other { self } else { other }
+  def maxWith(other: Int): Int = if this >= other { this } else { other }
 }
 
 // ─── Records ───────────────────────────────────────────────────────────────
@@ -200,11 +200,11 @@ public:
   var changed: Boolean
 
   def this(p: Puzzle) {
-    self.puzzle  = p
-    self.changed = false
-    self.cells   = new Int[p.height()][p.width()]
+    this.puzzle  = p
+    this.changed = false
+    this.cells   = new Int[p.height()][p.width()]
     foreach r: Int in 0..<p.height() {
-      foreach c: Int in 0..<p.width() { self.cells[r][c] = -1 }
+      foreach c: Int in 0..<p.width() { this.cells[r][c] = -1 }
     }
   }
 
@@ -245,7 +245,7 @@ public:
       if line[c] != -1 && cells[r][c] == -1 {
         cells[r][c] = line[c]
         n = n + 1
-        self.changed = true
+        this.changed = true
       }
     }
     return n
@@ -257,7 +257,7 @@ public:
       if line[r] != -1 && cells[r][c] == -1 {
         cells[r][c] = line[r]
         n = n + 1
-        self.changed = true
+        this.changed = true
       }
     }
     return n

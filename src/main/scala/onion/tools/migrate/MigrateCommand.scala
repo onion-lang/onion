@@ -291,7 +291,10 @@ object MigrateCommand:
 
   /** What a rule's edit replaced, for messages. */
   private def oldSpelling(edit: Migrator.Edit): String =
-    edit.oldSpelling.getOrElse(if edit.clause then s"the old ${edit.subject} clause" else "the old do-block keyword")
+    edit.oldSpelling.getOrElse(
+      if edit.clause then s"the old ${edit.subject} clause"
+      else if edit.subject == "`self`" then "the retired spelling of `this`"
+      else "the old do-block keyword")
 
   /**
    * The migrated text lexes to the original tokens and comments, except for the rewrites.

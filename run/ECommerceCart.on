@@ -10,8 +10,8 @@
 
 extension Double {
   def fmt2(): String {
-    if self < 0.0 { return "-" + (0.0 - self).fmt2() }
-    val totalCents: Int = (self * 100.0 + 0.5).intValue()
+    if this < 0.0 { return "-" + (0.0 - this).fmt2() }
+    val totalCents: Int = (this * 100.0 + 0.5).intValue()
     val whole: Int = totalCents / 100
     val frac: Int  = totalCents % 100
     val cs: String = if frac < 10 { "0" + frac } else { "" + frac }
@@ -20,9 +20,9 @@ extension Double {
 }
 
 extension Int {
-  def plural(w: String): String = if self == 1 { "1 " + w } else { "" + self + " " + w + "s" }
+  def plural(w: String): String = if this == 1 { "1 " + w } else { "" + this + " " + w + "s" }
   def padLeft(n: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < n { s = " " + s }
     return s
   }
@@ -30,11 +30,11 @@ extension Int {
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
-  def truncate(n: Int): String = if self.length() <= n { self } else { self.substring(0, n - 1) + "…" }
+  def truncate(n: Int): String = if this.length() <= n { this } else { this.substring(0, n - 1) + "…" }
 }
 
 // ─── Product category (ADT enum) ─────────────────────────────────────────────

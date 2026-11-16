@@ -36,11 +36,11 @@ enum VotingMethod {
 
 extension String {
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + "…"
+    if this.length() <= n { return this }
+    return this.substring(0, n) + "…"
   }
   def padRight(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }
@@ -48,7 +48,7 @@ extension String {
 
 extension Int {
   def padLeft(n: Int): String {
-    var s = "" + self
+    var s = "" + this
     while s.length() < n { s = " " + s }
     return s
   }

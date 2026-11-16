@@ -12,25 +12,25 @@
 
 extension Int {
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def pct(total: Int): String {
     if total == 0 { return "n/a" }
-    val p: Int = self * 100 / total
+    val p: Int = this * 100 / total
     return p.lpad(3) + "%"
   }
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   // Shadows built-in charAt, returning Int to avoid Char-typed local VerifyError.
-  def charAt(i: Int): Int = self.charAt(i) as Int
+  def charAt(i: Int): Int = this.charAt(i) as Int
 }
 
 // ─── Records ────────────────────────────────────────────────────────────────

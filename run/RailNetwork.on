@@ -59,19 +59,19 @@ public:
 // ─── Extension methods ──────────────────────────────────────────────────────
 
 extension Int {
-  def pct(total: Int): Int = if total == 0 { 0 } else { self * 100 / total }
+  def pct(total: Int): Int = if total == 0 { 0 } else { this * 100 / total }
   def stars(): String {
     var s: String = ""
     var i: Int = 0
-    while i < self { s = s + "*"; i = i + 1 }
+    while i < this { s = s + "*"; i = i + 1 }
     return s
   }
 }
 
 extension String {
-  def truncate(n: Int): String = if self.length() <= n { self } else { self.substring(0, n) + "…" }
+  def truncate(n: Int): String = if this.length() <= n { this } else { this.substring(0, n) + "…" }
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }

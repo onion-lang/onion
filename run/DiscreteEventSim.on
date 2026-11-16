@@ -51,17 +51,17 @@ public:
 
 extension Double {
   def fmt2(): String {
-    val ip = self as Int
-    val fp = ((self - ip as Double) * 100.0) as Int
+    val ip = this as Int
+    val fp = ((this - ip as Double) * 100.0) as Int
     val fs = if fp < 10 { "0" + fp } else { "" + fp }
     return "#{ip}.#{fs}"
   }
-  def pct(): String = "" + (self * 100.0) as Int + "%"
+  def pct(): String = "" + (this * 100.0) as Int + "%"
 }
 
 extension Int {
   def plural(word: String): String =
-    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+    if this == 1 { "1 " + word } else { "#{this} " + word + "s" }
 }
 
 // ── Teller state (mutable, public fields via getters) ────────────────────────

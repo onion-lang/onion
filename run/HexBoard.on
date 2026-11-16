@@ -87,19 +87,19 @@ public:
 
 extension Int {
   // True when self is a valid index for a grid of size n.
-  def inGrid(n: Int): Boolean = self >= 0 && self < n
+  def inGrid(n: Int): Boolean = this >= 0 && this < n
 
   // Repeat a string self times (used for indent / separators).
   def times(s: String): String {
     var r: String = ""
     var i: Int = 0
-    while i < self { r = r + s; i = i + 1 }
+    while i < this { r = r + s; i = i + 1 }
     return r
   }
 
   // Right-align self in a field of the given width.
   def pad(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }

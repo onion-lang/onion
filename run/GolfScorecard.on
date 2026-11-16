@@ -14,21 +14,21 @@
 
 extension Int {
   def rjust(w: Int): String {
-    var r: String = self.toString()
+    var r: String = this.toString()
     while r.length() < w { r = " " + r }
     return r
   }
 
   def toParStr(): String {
-    if self == 0 { return "E" }
-    if self > 0 { return "+" + self }
-    return "" + self
+    if this == 0 { return "E" }
+    if this > 0 { return "+" + this }
+    return "" + this
   }
 }
 
 extension String {
   def rpad(w: Int): String {
-    var r: String = self
+    var r: String = this
     while r.length() < w { r = r + " " }
     return r
   }
@@ -166,8 +166,8 @@ class Tournament {
 
 public:
   def this(course: Course, players: List[PlayerRound]) {
-    self.course = course
-    self.players = players
+    this.course = course
+    this.players = players
   }
 
 private:

@@ -11,36 +11,36 @@ import { java.util.ArrayList }
 
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def padLeft(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }
   def rep(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
 }
 
 extension Double {
-  def dabs(): Double { if self < 0.0 { return 0.0 - self } return self }
+  def dabs(): Double { if this < 0.0 { return 0.0 - this } return this }
   def usd(): String {
-    val sign: String  = if self < 0.0 { "-" } else { "" }
-    val a: Double     = self.dabs()
+    val sign: String  = if this < 0.0 { "-" } else { "" }
+    val a: Double     = this.dabs()
     val whole: Int    = a.intValue()
     val frac: Int     = ((a - (whole as Double)) * 100.0 + 0.5).intValue()
     val fs: String    = if frac < 10 { "0" + frac } else { "" + frac }
     return sign + "$" + whole + "." + fs
   }
   def pct(): String {
-    val sign: String  = if self < 0.0 { "-" } else { "+" }
-    val a: Double     = self.dabs()
+    val sign: String  = if this < 0.0 { "-" } else { "+" }
+    val a: Double     = this.dabs()
     val whole: Int    = a.intValue()
     val frac: Int     = ((a - (whole as Double)) * 100.0 + 0.5).intValue()
     val fs: String    = if frac < 10 { "0" + frac } else { "" + frac }
@@ -49,9 +49,9 @@ extension Double {
 }
 
 extension Int {
-  def shareWord(): String = if self == 1 { "share" } else { "shares" }
+  def shareWord(): String = if this == 1 { "share" } else { "shares" }
   def ipad(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }
@@ -121,16 +121,16 @@ record Stock(
   prevClose: Double
 ) {
 public:
-  def change(): Double    = self.price() - self.prevClose()
-  def changePct(): Double = (self.change() / self.prevClose()) * 100.0
-  def isUp(): Boolean     = self.change() >= 0.0
+  def change(): Double    = this.price() - this.prevClose()
+  def changePct(): Double = (this.change() / this.prevClose()) * 100.0
+  def isUp(): Boolean     = this.change() >= 0.0
   def summary(): String =
-    self.ticker().padRight(6) + "  " +
-    self.name().padRight(24) +
-    self.sector().icon() + "  " +
-    self.price().usd().padLeft(9) + "  " +
-    self.change().usd().padLeft(8) + "  " +
-    self.changePct().pct().padLeft(8)
+    this.ticker().padRight(6) + "  " +
+    this.name().padRight(24) +
+    this.sector().icon() + "  " +
+    this.price().usd().padLeft(9) + "  " +
+    this.change().usd().padLeft(8) + "  " +
+    this.changePct().pct().padLeft(8)
 }
 
 record Trade(
@@ -140,11 +140,11 @@ record Trade(
   kind: TradeKind
 ) {
 public:
-  def total(): Double = (self.shares() as Double) * self.pricePerShare()
+  def total(): Double = (this.shares() as Double) * this.pricePerShare()
   def describe(): String =
-    self.kind().label() + " " + self.shares() + " " + self.ticker() +
-    " @ " + self.pricePerShare().usd() +
-    "  (total: " + self.total().usd() + ")"
+    this.kind().label() + " " + this.shares() + " " + this.ticker() +
+    " @ " + this.pricePerShare().usd() +
+    "  (total: " + this.total().usd() + ")"
 }
 
 record Position(
@@ -154,19 +154,19 @@ record Position(
   currentPrice: Double
 ) {
 public:
-  def costBasis(): Double     = (self.shares() as Double) * self.avgCost()
-  def marketValue(): Double   = (self.shares() as Double) * self.currentPrice()
-  def unrealizedPnL(): Double = self.marketValue() - self.costBasis()
-  def unrealizedPct(): Double = (self.unrealizedPnL() / self.costBasis()) * 100.0
-  def isProfit(): Boolean     = self.unrealizedPnL() >= 0.0
+  def costBasis(): Double     = (this.shares() as Double) * this.avgCost()
+  def marketValue(): Double   = (this.shares() as Double) * this.currentPrice()
+  def unrealizedPnL(): Double = this.marketValue() - this.costBasis()
+  def unrealizedPct(): Double = (this.unrealizedPnL() / this.costBasis()) * 100.0
+  def isProfit(): Boolean     = this.unrealizedPnL() >= 0.0
   def row(): String =
-    self.ticker().padRight(6) + "  " +
-    ("" + self.shares() + " " + self.shares().shareWord()).padRight(14) +
-    self.avgCost().usd().padLeft(8) + "  " +
-    self.currentPrice().usd().padLeft(9) + "  " +
-    self.marketValue().usd().padLeft(11) + "  " +
-    self.unrealizedPnL().usd().padLeft(10) + "  " +
-    self.unrealizedPct().pct().padLeft(8)
+    this.ticker().padRight(6) + "  " +
+    ("" + this.shares() + " " + this.shares().shareWord()).padRight(14) +
+    this.avgCost().usd().padLeft(8) + "  " +
+    this.currentPrice().usd().padLeft(9) + "  " +
+    this.marketValue().usd().padLeft(11) + "  " +
+    this.unrealizedPnL().usd().padLeft(10) + "  " +
+    this.unrealizedPct().pct().padLeft(8)
 }
 
 // ─── Interface ────────────────────────────────────────────────────────────────
@@ -185,45 +185,45 @@ class Portfolio conforms Reportable {
 
 public:
   def this(name: String, initialCash: Double) {
-    self.name = name
-    self.positions = []
-    self.cash = initialCash
+    this.name = name
+    this.positions = []
+    this.cash = initialCash
   }
 
   def addPosition(pos: Position): void {
-    self.positions << pos
+    this.positions << pos
   }
 
   def investedValue(): Double =
-    self.positions.fold(0.0) { acc, p ->
+    this.positions.fold(0.0) { acc, p ->
       (acc as Double) + (p as Position).marketValue()
     } as Double
 
-  def totalValue(): Double = self.cash + self.investedValue()
+  def totalValue(): Double = this.cash + this.investedValue()
 
   def totalCost(): Double =
-    self.positions.fold(0.0) { acc, p ->
+    this.positions.fold(0.0) { acc, p ->
       (acc as Double) + (p as Position).costBasis()
     } as Double
 
-  def totalPnL(): Double  = self.investedValue() - self.totalCost()
+  def totalPnL(): Double  = this.investedValue() - this.totalCost()
 
   def pnlPct(): Double {
-    val cost: Double = self.totalCost()
+    val cost: Double = this.totalCost()
     if cost <= 0.0 { return 0.0 }
-    return (self.totalPnL() / cost) * 100.0
+    return (this.totalPnL() / cost) * 100.0
   }
 
-  def header(): String = "=== Portfolio: " + self.name + " ==="
+  def header(): String = "=== Portfolio: " + this.name + " ==="
 
   def body(): void {
-    IO::println("  Cash reserve:    " + self.cash.usd())
-    IO::println("  Invested value:  " + self.investedValue().usd())
-    IO::println("  Total value:     " + self.totalValue().usd())
-    IO::println("  Cost basis:      " + self.totalCost().usd())
-    IO::println("  Net P&L:         " + self.totalPnL().usd() +
-                " (" + self.pnlPct().pct() + ")")
-    IO::println("  Positions held:  " + self.positions.size)
+    IO::println("  Cash reserve:    " + this.cash.usd())
+    IO::println("  Invested value:  " + this.investedValue().usd())
+    IO::println("  Total value:     " + this.totalValue().usd())
+    IO::println("  Cost basis:      " + this.totalCost().usd())
+    IO::println("  Net P&L:         " + this.totalPnL().usd() +
+                " (" + this.pnlPct().pct() + ")")
+    IO::println("  Positions held:  " + this.positions.size)
   }
 }
 

@@ -10,36 +10,36 @@
 
 extension String {
   def padRight(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def padLeft(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
   def truncate(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n - 3) + "..." }
+    if this.length() <= n { this } else { this.substring(0, n - 3) + "..." }
   def wordCount(): Int {
-    val parts: List[String] = Strings::split(self, " ")
+    val parts: List[String] = Strings::split(this, " ")
     return parts.filter { p -> (p as String).length() > 0 }.size
   }
 }
 
 extension Int {
   def ipad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
-  def abs(): Int = if self < 0 { -self } else { self }
+  def abs(): Int = if this < 0 { -this } else { this }
 }
 
 extension Double {
   def fmt2(): String {
-    val whole: Int = self.intValue()
-    val frac: Int  = ((self - (whole as Double)) * 100.0 + 0.5).intValue()
+    val whole: Int = this.intValue()
+    val frac: Int  = ((this - (whole as Double)) * 100.0 + 0.5).intValue()
     val fs: String = "" + frac
     return "" + whole + "." + (if fs.length() < 2 { "0" + fs } else { fs })
   }

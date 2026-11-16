@@ -18,7 +18,7 @@ public:
   def div(o: Rational): Rational =
     Rational::of(num() * o.den(), den() * o.num())
   def negate(): Rational = Rational::of(0 - num(), den())
-  def abs(): Rational = if num() < 0 { negate() } else { self }
+  def abs(): Rational = if num() < 0 { negate() } else { this }
   def isZero(): Boolean = num() == 0
   def isWhole(): Boolean = den() == 1
   def isPositive(): Boolean = num() > 0 && den() > 0

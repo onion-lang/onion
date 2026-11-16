@@ -18,13 +18,13 @@ import {
 
 extension Int {
   def nextPow2(): Int {
-    if self <= 0 { return 1 }
+    if this <= 0 { return 1 }
     var n: Int = 1
-    while n < self { n = n * 2 }
+    while n < this { n = n * 2 }
     return n
   }
   def rjust(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -32,24 +32,24 @@ extension Int {
 
 extension String {
   def ljust(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def rjust(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
   def truncate(w: Int): String {
-    if self.length() <= w { return self }
-    return self.substring(0, w)
+    if this.length() <= w { return this }
+    return this.substring(0, w)
   }
 }
 
 extension Double {
   def fmt1(): String {
-    val s: String = "" + self
+    val s: String = "" + this
     val dot: Int = s.indexOf(".")
     if dot < 0 { return s + ".0" }
     val end: Int = dot + 2

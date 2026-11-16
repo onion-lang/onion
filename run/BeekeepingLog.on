@@ -75,7 +75,7 @@ record Harvest(hiveId: String, season: Season, year: Int, kg: Double, quality: S
 
 extension Double {
   def kgFmt(): String = {
-    val tenths: Int = (self * 10.0 + 0.5) as Int
+    val tenths: Int = (this * 10.0 + 0.5) as Int
     val whole: Int  = tenths / 10
     val frac: Int   = tenths % 10
     return "#{whole}.#{frac} kg"
@@ -84,12 +84,12 @@ extension Double {
 
 extension Int {
   def plural(word: String): String =
-    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+    if this == 1 { "1 " + word } else { "#{this} " + word + "s" }
 }
 
 extension String {
   def padRight(n: Int): String = {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }

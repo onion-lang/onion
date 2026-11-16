@@ -18,17 +18,17 @@ import {
 
 extension Int {
   def padLeft(width: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     var r: String = s
     while r.length() < width { r = " " + r }
     return r
   }
-  def toDouble2(): Double = self * 1.0
+  def toDouble2(): Double = this * 1.0
 }
 
 extension String {
   def padRight2(width: Int): String {
-    var r: String = self
+    var r: String = this
     while r.length() < width { r = r + " " }
     return r
   }

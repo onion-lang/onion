@@ -7,9 +7,9 @@
 // ── Extension methods ────────────────────────────────────────────────────────
 
 extension Int {
-  def hoursLabel(): String = if self == 1 { "1 hr" } else { "#{self} hrs" }
+  def hoursLabel(): String = if this == 1 { "1 hr" } else { "#{this} hrs" }
   def padLeft2(): String {
-    val s: String = "" + self
+    val s: String = "" + this
     if s.length() >= 2 { return s }
     return " " + s
   }
@@ -17,11 +17,11 @@ extension Int {
 
 extension String {
   def truncate(max: Int): String {
-    if self.length() <= max { return self }
-    return self.substring(0, max - 2) + ".."
+    if this.length() <= max { return this }
+    return this.substring(0, max - 2) + ".."
   }
   def rpad(width: Int): String {
-    var result: String = self
+    var result: String = this
     while result.length() < width { result = result + " " }
     return result
   }

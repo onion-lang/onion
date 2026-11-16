@@ -14,10 +14,10 @@
 // A SAT literal is a non-zero Int: positive means the variable is true,
 // negative means it is false.  Variable index = |lit|.
 extension Int {
-  def litVar(): Int = if self >= 0 { self } else { 0 - self }
-  def litPos(): Boolean = self > 0
-  def litNeg(): Int = 0 - self
-  def litStr(): String = if self > 0 { "x#{self}" } else { "!x#{0 - self}" }
+  def litVar(): Int = if this >= 0 { this } else { 0 - this }
+  def litPos(): Boolean = this > 0
+  def litNeg(): Int = 0 - this
+  def litStr(): String = if this > 0 { "x#{this}" } else { "!x#{0 - this}" }
 }
 
 // ── Records ───────────────────────────────────────────────────────────────────

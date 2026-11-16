@@ -59,16 +59,16 @@ record MonthlySummary(month: Int, totalIncome: Double, totalExpenses: Double, ne
 
 extension Double {
   def fmtCurrency(): String {
-    val whole: Long = self.longValue()
-    val fracRaw: Double = (self - whole.doubleValue()) * 100.0d
+    val whole: Long = this.longValue()
+    val fracRaw: Double = (this - whole.doubleValue()) * 100.0d
     val frac: Int = Math::abs(fracRaw.intValue())
     val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
     return "$" + whole + "." + fracStr
   }
 
-  def fmtPct(): String = self.intValue() + "%"
+  def fmtPct(): String = this.intValue() + "%"
 
-  def roundCents(): Double = self.longValue().doubleValue()
+  def roundCents(): Double = this.longValue().doubleValue()
 }
 
 // ── Extension methods on Int (month names) ────────────────────────────────────
@@ -95,13 +95,13 @@ extension Int {
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
 
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

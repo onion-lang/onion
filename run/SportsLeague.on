@@ -12,17 +12,17 @@ import {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 extension Int {
-  def abs(): Int = if self < 0 { -self } else { self }
+  def abs(): Int = if this < 0 { -this } else { this }
 }
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
@@ -98,7 +98,7 @@ public:
 
 // Sort key: pts desc, gd desc, gf desc (all negative so sortedBy ascending works)
 extension TeamStats {
-  def sortKey(): Int = -(self.pts() * 100000 + self.gd() * 1000 + self.gf())
+  def sortKey(): Int = -(this.pts() * 100000 + this.gd() * 1000 + this.gf())
 }
 
 // ─── Award record ─────────────────────────────────────────────────────────────

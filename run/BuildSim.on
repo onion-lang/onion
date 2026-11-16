@@ -12,9 +12,9 @@ import { java.util.* }
 // ─── Extensions ──────────────────────────────────────────────────────────────
 
 extension Int {
-  def plural(unit: String): String = if self == 1 { "1 #{unit}" } else { "#{self} #{unit}s" }
+  def plural(unit: String): String = if this == 1 { "1 #{unit}" } else { "#{this} #{unit}s" }
   def padStart(width: Int): String {
-    val s = "#{self}"
+    val s = "#{this}"
     var r = s
     while r.length < width { r = " " + r }
     return r
@@ -25,11 +25,11 @@ extension String {
   def rep(n: Int): String {
     var r = ""
     var i: Int = 0
-    while i < n { r = r + self; i++ }
+    while i < n { r = r + this; i++ }
     return r
   }
   def truncate(max: Int): String =
-    if self.length <= max { self } else { self.substring(0, max - 1) + "…" }
+    if this.length <= max { this } else { this.substring(0, max - 1) + "…" }
 }
 
 // ─── Core Data Types ─────────────────────────────────────────────────────────

@@ -48,8 +48,8 @@ class HealthInsurance conforms Deduction {
   val premium: Double
 public:
   def this(plan: String, premium: Double) {
-    self.plan = plan
-    self.premium = premium
+    this.plan = plan
+    this.premium = premium
   }
   def name(): String = "Health (#{plan})"
   def amount(gross: Double): Double = premium
@@ -58,7 +58,7 @@ public:
 class Retirement401k conforms Deduction {
   val contributionPct: Double
 public:
-  def this(pct: Double) { self.contributionPct = pct }
+  def this(pct: Double) { this.contributionPct = pct }
   def name(): String = "401k (#{contributionPct * 100.0}%)"
   def amount(gross: Double): Double = gross * contributionPct
 }
@@ -68,8 +68,8 @@ class FlatDeduction conforms Deduction {
   val flatAmount: Double
 public:
   def this(label: String, flatAmount: Double) {
-    self.label = label
-    self.flatAmount = flatAmount
+    this.label = label
+    this.flatAmount = flatAmount
   }
   def name(): String = label
   def amount(gross: Double): Double = flatAmount
@@ -79,7 +79,7 @@ public:
 class TaxEngine {
   val brackets: List[TaxBracket]
 public:
-  def this(brackets: List[TaxBracket]) { self.brackets = brackets }
+  def this(brackets: List[TaxBracket]) { this.brackets = brackets }
 
   def federalTax(gross: Double): Double {
     var remaining: Double = gross
@@ -123,8 +123,8 @@ class Payroll {
   val employees: List[Employee]
 public:
   def this() {
-    self.engine = TaxEngine::standard()
-    self.employees = []
+    this.engine = TaxEngine::standard()
+    this.employees = []
   }
 
   def addEmployee(e: Employee): void {

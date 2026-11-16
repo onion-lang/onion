@@ -294,6 +294,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     ).run(source)
     // RFC #2557 3.2: an invariant or history may name only value-typed fields.
     new onion.compiler.typing.ContractFramingPass(this).run(table_.classes.values.toSeq)
+    reportMutedRetiredSelf()
     diagnostics.finishOrThrow()
     table_.classes.values.toSeq
   }
@@ -324,6 +325,34 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
   def processDuplication(node: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingDuplicationPass(this, session.activate(node)).run()
+
+  /**
+   * How many errors were reported, and dropped, while reporting was suppressed. A speculative
+   * typing whose result is kept compares it before and after, so it can tell a clean typing
+   * from one whose errors were only muted (#3067).
+   */
+  private[compiler] var suppressedErrorCount: Long = 0L
+
+  /**
+   * E0117, a retired `self` (RFC #2788), is about spelling, so it holds however the code around
+   * it is typed. It is reported once per place, and a place met only by a speculative typing,
+   * with reporting suppressed, is reported when typing ends. It never counts as a muted error,
+   * so `self` types exactly as `this` does, and `onion migrate` finds no other error.
+   */
+  private val retiredSelfReported = scala.collection.mutable.Set[(String, Int, Int)]()
+  private val retiredSelfMuted = scala.collection.mutable.LinkedHashMap[(String, Int, Int), Location]()
+
+  private[compiler] def reportRetiredSelf(node: AST.Node): Unit = {
+    val location = node.location
+    val key = (unit_.sourceFile, location.line, location.column)
+    if (reportingEnabled) { if (retiredSelfReported.add(key)) report(SemanticError.SELF_RETIRED, node) }
+    else if (!retiredSelfReported.contains(key)) retiredSelfMuted.getOrElseUpdate(key, location)
+  }
+
+  private def reportMutedRetiredSelf(): Unit =
+    retiredSelfMuted.foreach { case (key @ (file, _, _), location) =>
+      if (retiredSelfReported.add(key)) diagnostics.reportIn(file, SemanticError.SELF_RETIRED, location, Seq())
+    }
 
   def withSuppressedReporting[A](block: => A): A = {
     val unitContext = currentUnitContext

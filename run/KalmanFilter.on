@@ -22,10 +22,10 @@ import {
 // ── Extension helpers ─────────────────────────────────────────────────────────
 
 extension Double {
-  def absd():  Double = if self >= 0.0 { self } else { -self }
-  def f2():    String = Format::fixed(self, 2)
-  def f3():    String = Format::fixed(self, 3)
-  def f4():    String = Format::fixed(self, 4)
+  def absd():  Double = if this >= 0.0 { this } else { -this }
+  def f2():    String = Format::fixed(this, 2)
+  def f3():    String = Format::fixed(this, 3)
+  def f4():    String = Format::fixed(this, 4)
 }
 
 // ── State: 2-vector [x,v] + 2×2 covariance ────────────────────────────────────
@@ -47,8 +47,8 @@ class KalmanFilter {
 
 public:
   def this(dt: Double, sigQ: Double) {
-    self.dt   = dt
-    self.sigQ = sigQ
+    this.dt   = dt
+    this.sigQ = sigQ
   }
 
   // Predict step: advance state one dt forward.

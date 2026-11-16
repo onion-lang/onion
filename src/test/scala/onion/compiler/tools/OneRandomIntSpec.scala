@@ -182,6 +182,24 @@ class OneRandomIntSpec extends AbstractShellSpec {
       }
     }
 
+    it("rewrites a retired `self` inside a call's arguments along with the call") {
+      val source =
+        """class Die {
+          |  var sides: Int
+          |public:
+          |  def this { sides = 6 }
+          |  def roll(): Int = OnionMath::randomInt(1, self.sides)
+          |  def size(): Int = self.sides
+          |}
+          |println(new Die().roll() <= new Die().size())
+          |""".stripMargin
+      val (code, after, output) = migrate(source)
+      assert(code == 0, output)
+      assert(after.contains("def roll(): Int = Rand::nextInt(1, this.sides + 1)"), after)
+      assert(after.contains("def size(): Int = this.sides"), after)
+      assert(compile(after).allErrors.isEmpty, compile(after).allErrors.map(_.message))
+    }
+
     it("rewrites a call through an import alias of OnionMath") {
       val source = "import { onion.OnionMath as OM; }\nprintln(OM::randomInt(1, 6) < 7)\n"
       val (code, after, output) = migrate(source)

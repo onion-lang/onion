@@ -13,30 +13,30 @@ import {
 // ─── extension Int ────────────────────────────────────────────────────────────
 
 extension Int {
-  def abs(): Int     = if self < 0 { -self } else { self }
-  def sign(): Int    = if self < 0 { -1 } else if self > 0 { 1 } else { 0 }
-  def squared(): Int = self * self
-  def cubed(): Int   = self * self * self
+  def abs(): Int     = if this < 0 { -this } else { this }
+  def sign(): Int    = if this < 0 { -1 } else if this > 0 { 1 } else { 0 }
+  def squared(): Int = this * this
+  def cubed(): Int   = this * this * this
 
   def clamp(lo: Int, hi: Int): Int =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
 
-  def isEven(): Boolean = self % 2 == 0
-  def isOdd():  Boolean = self % 2 != 0
+  def isEven(): Boolean = this % 2 == 0
+  def isOdd():  Boolean = this % 2 != 0
   def isPrime(): Boolean {
-    if self < 2 { return false }
-    if self == 2 { return true }
-    if self % 2 == 0 { return false }
+    if this < 2 { return false }
+    if this == 2 { return true }
+    if this % 2 == 0 { return false }
     var d: Int = 3
-    while d * d <= self {
-      if self % d == 0 { return false }
+    while d * d <= this {
+      if this % d == 0 { return false }
       d = d + 2
     }
     return true
   }
 
   def gcd(b: Int): Int {
-    var a: Int = self.abs()
+    var a: Int = this.abs()
     var n: Int = b.abs()
     while n != 0 {
       val t: Int = n
@@ -46,12 +46,12 @@ extension Int {
     return a
   }
 
-  def lcm(b: Int): Int = (self.abs() / self.gcd(b)) * b.abs()
+  def lcm(b: Int): Int = (this.abs() / this.gcd(b)) * b.abs()
 
   def pow(exp: Int): Int {
     var result: Int = 1
     var e: Int = exp
-    var base: Int = self
+    var base: Int = this
     while e > 0 {
       if e % 2 == 1 { result = result * base }
       base = base * base
@@ -61,22 +61,22 @@ extension Int {
   }
 
   def digitCount(): Int {
-    if self == 0 { return 1 }
-    var n: Int = self.abs()
+    if this == 0 { return 1 }
+    var n: Int = this.abs()
     var count: Int = 0
     while n > 0 { n = n / 10; count++ }
     return count
   }
 
   def sumDigits(): Int {
-    var n: Int = self.abs()
+    var n: Int = this.abs()
     var s: Int = 0
     while n > 0 { s = s + n % 10; n = n / 10 }
     return s
   }
 
   def lpad(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }
@@ -85,31 +85,31 @@ extension Int {
 // ─── extension Long ───────────────────────────────────────────────────────────
 
 extension Long {
-  def abs(): Long = if self < 0L { -self } else { self }
+  def abs(): Long = if this < 0L { -this } else { this }
 
   def toHex(): String {
-    if self == 0L { return "0" }
+    if this == 0L { return "0" }
     val chars: String = "0123456789abcdef"
-    var n: Long = self.abs()
+    var n: Long = this.abs()
     var s: String = ""
     while n > 0L {
       val digit: Int = (n % 16L) as Int
       s = chars.charAt(digit) + s
       n = n / 16L
     }
-    if self < 0L { s = "-" + s }
+    if this < 0L { s = "-" + s }
     return s
   }
 
   def toBinary(): String {
-    if self == 0L { return "0" }
-    var n: Long = self.abs()
+    if this == 0L { return "0" }
+    var n: Long = this.abs()
     var s: String = ""
     while n > 0L {
       s = (n % 2L) + s
       n = n / 2L
     }
-    if self < 0L { s = "-" + s }
+    if this < 0L { s = "-" + s }
     return s
   }
 
@@ -117,53 +117,53 @@ extension Long {
     val kb: Long = 1024L
     val mb: Long = 1024L * 1024L
     val gb: Long = 1024L * 1024L * 1024L
-    if self >= gb { return (self / gb) + "." + ((self % gb) * 10L / gb) + " GB" }
-    if self >= mb { return (self / mb) + "." + ((self % mb) * 10L / mb) + " MB" }
-    if self >= kb { return (self / kb) + " KB" }
-    return self + " B"
+    if this >= gb { return (this / gb) + "." + ((this % gb) * 10L / gb) + " GB" }
+    if this >= mb { return (this / mb) + "." + ((this % mb) * 10L / mb) + " MB" }
+    if this >= kb { return (this / kb) + " KB" }
+    return this + " B"
   }
 }
 
 // ─── extension Double ─────────────────────────────────────────────────────────
 
 extension Double {
-  def abs(): Double = if self < 0.0 { -self } else { self }
+  def abs(): Double = if this < 0.0 { -this } else { this }
 
   def round(places: Int): Double {
     val factor: Double = 10.0.pow(places)
-    return (Math::round(self * factor) as Double) / factor
+    return (Math::round(this * factor) as Double) / factor
   }
 
   def clamp(lo: Double, hi: Double): Double =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
 
-  def lerp(to: Double, t: Double): Double = self + (to - self) * t
+  def lerp(to: Double, t: Double): Double = this + (to - this) * t
 
-  def pow(exp: Double): Double = Math::pow(self, exp)
+  def pow(exp: Double): Double = Math::pow(this, exp)
 
-  def percent(of: Double): Double = if of == 0.0 { 0.0 } else { (self / of * 100.0).round(1) }
+  def percent(of: Double): Double = if of == 0.0 { 0.0 } else { (this / of * 100.0).round(1) }
 
-  def between(lo: Double, hi: Double): Boolean = self >= lo && self <= hi
+  def between(lo: Double, hi: Double): Boolean = this >= lo && this <= hi
 }
 
 // ─── extension Boolean ────────────────────────────────────────────────────────
 
 extension Boolean {
-  def toInt(): Int    = if self { 1 } else { 0 }
-  def toYesNo(): String = if self { "yes" } else { "no" }
-  def toggle(): Boolean = !self
+  def toInt(): Int    = if this { 1 } else { 0 }
+  def toYesNo(): String = if this { "yes" } else { "no" }
+  def toggle(): Boolean = !this
 }
 
 // ─── extension String ─────────────────────────────────────────────────────────
 
 extension String {
   def lpad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }
   def rpad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
@@ -171,17 +171,17 @@ extension String {
   def repeat(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 
-  def shout(): String = self.toUpperCase() + "!"
+  def shout(): String = this.toUpperCase() + "!"
 
   def countChar(ch: String): Int {
     var count: Int = 0
     var i: Int = 0
-    while i < self.length() {
-      if self.substring(i, i + 1) == ch { count++ }
+    while i < this.length() {
+      if this.substring(i, i + 1) == ch { count++ }
       i++
     }
     return count
@@ -189,9 +189,9 @@ extension String {
 
   def isPalindrome(): Boolean {
     var lo: Int = 0
-    var hi: Int = self.length() - 1
+    var hi: Int = this.length() - 1
     while lo < hi {
-      if self.charAt(lo) != self.charAt(hi) { return false }
+      if this.charAt(lo) != this.charAt(hi) { return false }
       lo++
       hi--
     }
@@ -202,11 +202,11 @@ extension String {
     val parts: List[String] = []
     var start: Int = 0
     var i: Int = 0
-    while i <= self.length() {
-      val atEnd: Boolean = i == self.length()
-      val isSpace: Boolean = !atEnd && self.substring(i, i + 1) == " "
+    while i <= this.length() {
+      val atEnd: Boolean = i == this.length()
+      val isSpace: Boolean = !atEnd && this.substring(i, i + 1) == " "
       if (atEnd || isSpace) && i > start {
-        parts.add(self.substring(start, i))
+        parts.add(this.substring(start, i))
         start = i + 1
       } else if isSpace {
         start = i + 1
@@ -225,7 +225,7 @@ extension List[String] {
   def joinWith(sep: String): String {
     var s: String = ""
     var first: Boolean = true
-    foreach item: String in self {
+    foreach item: String in this {
       if !first { s = s + sep }
       s = s + item
       first = false
@@ -235,7 +235,7 @@ extension List[String] {
 
   def longestLength(): Int {
     var max: Int = 0
-    foreach item: String in self {
+    foreach item: String in this {
       if item.length() > max { max = item.length() }
     }
     return max

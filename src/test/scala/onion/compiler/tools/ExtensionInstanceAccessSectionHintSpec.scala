@@ -25,9 +25,9 @@ class ExtensionInstanceAccessSectionHintSpec extends AbstractShellSpec {
         """
           |extension String {
           |private:
-          |  def helper(): String = self + "-helper"
+          |  def helper(): String = this + "-helper"
           |public:
-          |  def greet(): String = self.helper() + "!"
+          |  def greet(): String = this.helper() + "!"
           |}
           |""".stripMargin
       ).mkString("\n")
@@ -53,7 +53,7 @@ class ExtensionInstanceAccessSectionHintSpec extends AbstractShellSpec {
       val msgs = messages(
         """
           |extension String {
-          |  def shout(): String = self.toUpperCase() + "!"
+          |  def shout(): String = this.toUpperCase() + "!"
           |}
           |""".stripMargin
       ).mkString("\n")

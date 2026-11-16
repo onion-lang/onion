@@ -216,8 +216,8 @@ public:
 // ─── Extension methods ────────────────────────────────────────────────────────
 
 extension Int {
-  def usd(): String   = "$#{self}"
-  def nts(): String   = if self == 1 { "1 night" } else { "#{self} nights" }
+  def usd(): String   = "$#{this}"
+  def nts(): String   = if this == 1 { "1 night" } else { "#{this} nights" }
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

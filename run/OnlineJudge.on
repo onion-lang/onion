@@ -80,20 +80,20 @@ interface Summarizable {
 // ── Extension on String: pad to width ────────────────────────────────────
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width {
       s = s + " "
     }
     return s
   }
   def truncate(max: Int): String =
-    if self.length() <= max { self } else { self.substring(0, max - 1) + "…" }
+    if this.length() <= max { this } else { this.substring(0, max - 1) + "…" }
 }
 
 // ── Extension on Int: format as ms ───────────────────────────────────────
 extension Int {
-  def ms(): String = self + "ms"
-  def kb(): String = self + "KB"
+  def ms(): String = this + "ms"
+  def kb(): String = this + "KB"
 }
 
 // ── Helper: difficulty label ──────────────────────────────────────────────

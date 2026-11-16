@@ -11,21 +11,21 @@
 
 extension String {
   def clip(maxLen: Int): String {
-    if self.length() <= maxLen { return self }
-    return self.substring(0, maxLen) + "..."
+    if this.length() <= maxLen { return this }
+    return this.substring(0, maxLen) + "..."
   }
   def times(n: Int): String {
     var out = ""
-    foreach i: Int in 0..<n { out = out + self }
+    foreach i: Int in 0..<n { out = out + this }
     return out
   }
   def padR(w: Int): String {
-    var s = self
+    var s = this
     while s.length() < w { s = s + " " }
     return s
   }
   def padL(w: Int): String {
-    var s = self
+    var s = this
     while s.length() < w { s = " " + s }
     return s
   }

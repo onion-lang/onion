@@ -163,8 +163,8 @@ interface Evaluatable {
 record Calculation(label: String, expr: Expr) conforms Evaluatable {
 public:
   def evaluate(): String {
-    val r = self.expr().eval()
-    return "#{self.label()}: #{self.expr().show()} = #{r.describe()}"
+    val r = this.expr().eval()
+    return "#{this.label()}: #{this.expr().show()} = #{r.describe()}"
   }
 }
 

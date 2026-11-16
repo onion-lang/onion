@@ -188,8 +188,8 @@ class NullableAssignabilitySpec extends AbstractShellSpec {
         |class Box[T] {
         |  var value: T
         |public:
-        |  def this(v: T) { self.value = v }
-        |  def put(v: T): void { self.value = v }
+        |  def this(v: T) { this.value = v }
+        |  def put(v: T): void { this.value = v }
         |}
         |class Foo {}
         |class Test {

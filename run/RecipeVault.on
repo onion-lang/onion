@@ -9,11 +9,11 @@
 // ─── Extensions ──────────────────────────────────────────────────────────────
 
 extension Int {
-  def kcal(): String = "#{self} kcal"
+  def kcal(): String = "#{this} kcal"
   def plural(word: String): String =
-    if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+    if this == 1 { "1 " + word } else { "#{this} " + word + "s" }
   def padLeft(n: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < n { s = " " + s }
     return s
   }
@@ -21,19 +21,19 @@ extension Int {
 
 extension Double {
   def rounded1(): String {
-    val tenth: Int = (self * 10.0 + 0.5) as Int
+    val tenth: Int = (this * 10.0 + 0.5) as Int
     return "#{tenth / 10}.#{tenth % 10}"
   }
 }
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def trunc(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n - 2) + ".." }
+    if this.length() <= n { this } else { this.substring(0, n - 2) + ".." }
 }
 
 // ─── MealType: data-carrying enum with serving time window ───────────────────
@@ -48,7 +48,7 @@ public:
     case MealType::SNACK:     "Snack"
     else:                     "Dessert"
   }
-  def window(): String = "#{self.startH()}:00-#{self.endH()}:00"
+  def window(): String = "#{this.startH()}:00-#{this.endH()}:00"
 }
 
 // ─── DietaryFlag: ADT enum for dietary tags ──────────────────────────────────
@@ -71,9 +71,9 @@ public:
 
 record Ingredient(name: String, grams: Int, kcalPer100g: Int) {
 public:
-  def kcalTotal(): Int = self.grams() * self.kcalPer100g() / 100
+  def kcalTotal(): Int = this.grams() * this.kcalPer100g() / 100
   def line(): String =
-    "  • #{self.name().padRight(22)} #{self.grams().padLeft(4)}g   #{self.kcalTotal().kcal()}"
+    "  • #{this.name().padRight(22)} #{this.grams().padLeft(4)}g   #{this.kcalTotal().kcal()}"
 }
 
 def example_1(): Boolean
@@ -91,20 +91,20 @@ record Recipe(name: String, mealType: MealType, servings: Int,
 public:
   def totalKcal(): Int = {
     var total: Int = 0
-    foreach ing: Ingredient in self.ingredients() { total = total + ing.kcalTotal() }
+    foreach ing: Ingredient in this.ingredients() { total = total + ing.kcalTotal() }
     return total
   }
-  def kcalPerServing(): Int = self.totalKcal() / self.servings()
-  def totalMins(): Int = self.prepMins() + self.cookMins()
+  def kcalPerServing(): Int = this.totalKcal() / this.servings()
+  def totalMins(): Int = this.prepMins() + this.cookMins()
   def hasFlag(target: DietaryFlag): Boolean = {
-    foreach f: DietaryFlag in self.flags() {
+    foreach f: DietaryFlag in this.flags() {
       if f == target { return true }
     }
     return false
   }
   def badgeRow(): String = {
     var row: String = ""
-    foreach f: DietaryFlag in self.flags() { row = row + "[" + f.badge() + "] " }
+    foreach f: DietaryFlag in this.flags() { row = row + "[" + f.badge() + "] " }
     if row.length() == 0 { return "—" }
     return row.trunc(32)
   }

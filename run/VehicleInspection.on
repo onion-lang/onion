@@ -92,8 +92,8 @@ class DefectSummary conforms Reportable {
   val defects: List[Defect]
 public:
   def this(vehicleId: String, defects: List[Defect]) {
-    self.vehicleId = vehicleId
-    self.defects = defects
+    this.vehicleId = vehicleId
+    this.defects = defects
   }
   def report(): String {
     if defects.isEmpty {
@@ -117,7 +117,7 @@ class FleetStats {
 public:
   val inspections: List[Inspection]
   def this(inspections: List[Inspection]) {
-    self.inspections = inspections
+    this.inspections = inspections
   }
   def passCount(): Int = inspections.filter { i ->
     select i.status() { case p is Pass: true; else: false }

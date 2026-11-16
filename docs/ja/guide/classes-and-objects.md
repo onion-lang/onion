@@ -255,9 +255,9 @@ class Person {
 }
 ```
 
-## `self` 参照
+## `this` 参照
 
-現在のインスタンスは `self` でも参照できます：
+現在のインスタンスは `this` で参照します：
 
 ```onion
 import {
@@ -270,12 +270,14 @@ class ButtonHandler conforms ActionListener {
   public:
     def actionPerformed(event :ActionEvent) {
       val button: JButton = event.getSource() as JButton
-      button.addActionListener(self)  // このインスタンスへの参照
+      button.addActionListener(this)  // このインスタンスへの参照
     }
 }
 ```
 
-`this` と `self` が使えるのはインスタンスのコンテキストだけです。static メソッドや static フィールドから参照することはできません。
+`this` が使えるのはインスタンスのコンテキストだけです。static メソッドや static フィールドから参照することはできません。
+
+以前の Onion は `this` の別の書き方として `self` も受け付けていました。`self` は廃止されました。今はエラー E0117 になり、`onion migrate` が書き換えます（[移行ガイド](../migration/pre-1.0.md)を参照）。
 
 ## staticメンバー
 

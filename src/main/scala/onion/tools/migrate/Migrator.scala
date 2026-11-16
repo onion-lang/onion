@@ -314,7 +314,8 @@ object Migrator:
      *  - `heads`: the qualifiers that name `onion.OnionMath` here: `OnionMath`, and any alias an
      *    import gives it (`import { onion.OnionMath as OM; }`).
      *  - `bare`: a bare `randomInt(...)` may be the old method through a static import
-     *    (`import { onion.OnionMath::* }`), unless the file declares a `randomInt` of its own.
+     *    (`import { onion.OnionMath::* }`), and only there, unless the file names a `randomInt`
+     *    of its own anywhere (a `def`, a `val`, a parameter, a field).
      *  - `rand`: `Rand`, or `onion.Rand` when this file, or another file named alongside it,
      *    gives the name `Rand` a meaning of its own (a class, an import, a variable).
      */
@@ -327,11 +328,22 @@ object Migrator:
           case i if image(i) == "onion" && image(i + 1) == "." && image(i + 2) == "OnionMath" && image(i + 3) == "as" &&
               i + 4 < tokens.length && tokens(i + 4).kind == K.ID => image(i + 4)
         }.toSet
-        val ownRandomInt = tokens.indices.exists(i => image(i) == "randomInt" && image(i - 1) == "def")
+        // OnionMath was never imported by default, so a bare `randomInt` was the old method
+        // only through a static import of it (#3116 block 4).
+        val staticImport = tokens.indices.exists { i =>
+          image(i) == "onion" && image(i + 1) == "." && image(i + 2) == "OnionMath" && image(i + 3) == "::" &&
+            Set("*", "randomInt")(image(i + 4))
+        }
+        // Any other bare `randomInt` (a `def`, a `val`, a parameter, a field) is the file's own
+        // name, and may shadow the import where the call is, so no bare call is rewritten.
+        val member = Set(".", "::", "?.")
+        val ownRandomInt = tokens.indices.exists { i =>
+          image(i) == "randomInt" && !member(image(i - 1)) && (image(i + 1) != "(" || image(i - 1) == "def")
+        }
         val ownRand = declared.contains("Rand") || tokens.indices.exists { i =>
           image(i) == "Rand" && image(i + 1) != "::" && !(image(i - 1) == "." && image(i - 2) == "onion")
         }
-        Spelling(Set("OnionMath") ++ aliases, !ownRandomInt, if ownRand then "onion.Rand" else "Rand")
+        Spelling(Set("OnionMath") ++ aliases, staticImport && !ownRandomInt, if ownRand then "onion.Rand" else "Rand")
 
     /** The index of the first token of an old call whose `(` is at `open`, if one ends there. */
     private def head(tokens: IndexedSeq[Token], open: Int, spelling: Spelling): Option[Int] =

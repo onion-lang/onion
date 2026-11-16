@@ -221,6 +221,28 @@ class OneRandomIntSpec extends AbstractShellSpec {
       assert(after == source)
     }
 
+    // #3116 block 4: a bare `randomInt` that is the file's own value must keep meaning that
+    // value; only the qualified call beside it is the removed method.
+    Seq(
+      "val randomInt: (Int, Int) -> Int = (a, b) -> 100\nprintln(randomInt(1, 6))\nprintln(OnionMath::randomInt(1, 6) < 7)\n",
+      "import { onion.OnionMath::* }\nval randomInt: (Int, Int) -> Int = (a, b) -> 100\nprintln(randomInt(1, 6))\nprintln(OnionMath::randomInt(1, 6) < 7)\n",
+      "def pick(randomInt: (Int, Int) -> Int): Int = randomInt(1, 6)\nprintln(pick((a, b) -> 100))\nprintln(OnionMath::randomInt(1, 6) < 7)\n",
+      "import { onion.OnionMath::* }\ndef pick(randomInt: (Int, Int) -> Int): Int = randomInt(1, 6)\nprintln(pick((a, b) -> 100))\nprintln(OnionMath::randomInt(1, 6) < 7)\n"
+    ).foreach { source =>
+      it(s"leaves a bare call of the file's own function value alone: `${source.linesIterator.take(2).mkString("; ")}`") {
+        val (_, after, output) = migrate(source)
+        assert(after.contains("randomInt(1, 6))") || after.contains("Int = randomInt(1, 6)"), s"$after\n$output")
+        assert(!after.contains("OnionMath::randomInt"), s"$after\n$output")
+        assert(after.contains("println(Rand::nextInt(1, 7) < 7)"), s"$after\n$output")
+      }
+    }
+
+    it("leaves a bare randomInt alone in a file with no static import of OnionMath") {
+      val source = "println(randomInt(1, 6))\nprintln(OnionMath::randomInt(1, 6) < 7)\n"
+      val (_, after, output) = migrate(source)
+      assert(after.startsWith("println(randomInt(1, 6))\n"), s"$after\n$output")
+    }
+
     it("notes a max of 2147483647, which has no max + 1, and leaves it as written") {
       val source = "val n = OnionMath::randomInt(0, 2147483647)\n"
       val (_, after, output) = migrate(source)

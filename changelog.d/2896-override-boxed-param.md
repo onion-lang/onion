@@ -8,5 +8,5 @@
 
 - **An override whose parameter differs from the base one only by `?` now runs.**
   - Before: `override def dec(k: Int?): void` over `dec(k: Int): void` compiled, but calls through `Base` ran the base method. With a `String` return the same override did run.
-  - Now: it overrides for any return type both share, also without `override`. It also fills an abstract `f(k: Int)` beside another interface's `f(k: Int?)`, so that no longer throws `AbstractMethodError`. A base that declares both `f(k: Int)` and `f(k: Int?)` keeps its `f(k: Int)` when a subclass overrides only `f(k: Int?)`.
+  - Now: it overrides for any return type both share, also without `override`. It also fills an abstract `f(k: Int)` beside another type's `f(k: Int?)`, abstract or not, so that no longer throws `AbstractMethodError`. A base that declares both `f(k: Int)` and `f(k: Int?)` keeps its `f(k: Int)` when a subclass overrides only `f(k: Int?)`.
   - Still open (#3053): with a `?` base parameter and a plain override (`f(k: Int?)` in the base, `f(k: Int)` in the subclass), passing `null` through the base type throws, for every return type.

@@ -362,6 +362,57 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(abstractExactSlot("abstract", "String") == onion.tools.Shell.Success("C"))
     }
 
+    // The class's own slot `f(Int?)` is inherited with a body, but the slot the bridge
+    // fills, `I.f(Int)`, is still abstract: the bridge is the only code for it
+    // (panel block on #3051 at 17ebd20).
+    def concreteOwnAbstractTarget(provider: String): onion.tools.Shell.Result = {
+      val (decls, header) = provider match
+        case "class" =>
+          ("""interface I { def f(k: Int): String }
+             |class Base {
+             |public:
+             |  def this {}
+             |  def f(k: Int?): String = "Base"
+             |}""".stripMargin, "extends Base conforms I")
+        case "default" =>
+          ("""interface I { def f(k: Int): String }
+             |interface J { def f(k: Int?): String = "J" }""".stripMargin, "conforms I, J")
+        case _ =>
+          ("""interface J { def f(k: Int?): String = "J" }
+             |abstract class A {
+             |public:
+             |  def this {}
+             |  abstract def f(k: Int): String
+             |}""".stripMargin, "extends A conforms J")
+      val call = if provider == "abstract" then "val a: A = new D(); return a.f(1)" else "val i: I = new D(); return i.f(1)"
+      shell.run(
+        s"""
+           |$decls
+           |class D $header {
+           |public:
+           |  def this {}
+           |  override def f(k: Int?): String = "D"
+           |}
+           |class Test {
+           |public:
+           |  static def main(args: String[]): String { $call }
+           |}
+           |""".stripMargin,
+        "ConcreteOwnAbstractTarget.on", Array())
+    }
+
+    it("bridges to an abstract `I.f(k: Int)` when `f(k: Int?)` is inherited from a class") {
+      assert(concreteOwnAbstractTarget("class") == onion.tools.Shell.Success("D"))
+    }
+
+    it("bridges to an abstract `I.f(k: Int)` when `f(k: Int?)` is an interface default") {
+      assert(concreteOwnAbstractTarget("default") == onion.tools.Shell.Success("D"))
+    }
+
+    it("bridges to an abstract class's `f(k: Int)` when `f(k: Int?)` is an interface default") {
+      assert(concreteOwnAbstractTarget("abstract") == onion.tools.Shell.Success("D"))
+    }
+
     it("reports E0068 for `override def f(k: JInteger)` over `f(k: Int)`") {
       val results = errors(program("Int", "JInteger", "void"))
       assert(results.map(_._1).contains(Some("E0068")), s"got: $results")

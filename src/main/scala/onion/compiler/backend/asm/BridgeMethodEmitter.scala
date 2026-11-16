@@ -71,10 +71,14 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 // `foo(x: Int)` is an overload, so arguments must match up to `?`.
                 m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(specializedArgs(i)).name) &&
                 isBridgeableReturn(rawMethod.returnType, m.returnType) && {
-                  // A `?` bridge only when no inherited method with the candidate's
-                  // own parameters already runs in its slot.
+                  // No `?` bridge when the class only re-overrides an inherited
+                  // `f(Q)` with a body while the target `f(P)` also has one: `f(P)`
+                  // keeps its own method (row 3 of #2896's table). If `f(P)` is
+                  // still abstract, the bridge is its only code (row 4).
                   val own = paramDesc(m.arguments)
-                  own == paramDesc(rawMethod.arguments) || !concreteInheritedSlots.contains((m.name, own))
+                  val target = paramDesc(rawMethod.arguments)
+                  own == target ||
+                    !(concreteInheritedSlots.contains((m.name, own)) && concreteInheritedSlots.contains((m.name, target)))
                 }
               else
                 m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))

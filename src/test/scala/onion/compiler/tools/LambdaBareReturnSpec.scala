@@ -12,7 +12,7 @@ class LambdaBareReturnSpec extends AbstractShellSpec {
           |public:
           |  static def main(args: String[]): String {
           |    var total = 0
-          |    val add = (x: Int) -> { if x < 0 { return } total += x }
+          |    val add = (x: Int) -> { if x < 0 { return } total += x; val done = 1 }
           |    add(5)
           |    add(-3)
           |    add(2)

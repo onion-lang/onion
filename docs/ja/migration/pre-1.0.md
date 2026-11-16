@@ -599,6 +599,8 @@ val die = Rand::nextInt(1, 7)          // 1から6
   - `OnionMath::randomInt(1, 6)` は `Rand::nextInt(1, 7)` になります。
   - `OnionMath::randomInt(0, xs.size - 1)` は `Rand::nextInt(0, xs.size)` になります。
   - `OnionMath::randomInt(a, b)` は `Rand::nextInt(a, b + 1)` になります。
-  - `"#{...}"` の中の呼び出しも書き換えます。
-- **書き換えないもの:** `max` が `2147483647` の呼び出しです。`max + 1` が `Int` に収まらないためです。migrate はその行を知らせます。任意の `Int` なら `Rand::nextInt()` と書くか、上限を自分で選んでください。
+  - `"#{...}"` の中の呼び出しと、別の呼び出しの引数の中の呼び出しも書き換えます。
+  - インポート経由の呼び出しも書き換えます。`import { onion.OnionMath::* }` の後の `randomInt(1, 6)` や、`import { onion.OnionMath as OM; }` の後の `OM::randomInt(1, 6)` です。インポート自体はそのままでもコンパイルできるので、書き換えません。
+  - ファイル自身、または一緒に渡したファイルに独自の `Rand`（クラス、インポート、変数）があるときは、`onion.Rand::nextInt` と書きます。呼び出しが Onion の `Rand` を指したままになります。
+- **書き換えないもの:** `max` が `2147483647` の呼び出しです。`max + 1` が `Int` に収まらないためです。migrate はその行を知らせ、ファイル全体をそのまま残します。任意の `Int` なら `Rand::nextInt()` と書くか、上限を自分で選んでから、もう一度 migrate を実行してください。
 - **プログラムは一つずつ migrate してください。** 無関係なスクリプトを一緒に渡すと、互いのエラーが隠れることがあります。その場合、呼び出しは書き換えられずに残ります。

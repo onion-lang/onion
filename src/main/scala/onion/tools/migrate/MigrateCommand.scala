@@ -185,11 +185,18 @@ object MigrateCommand:
       leftOut.foreach(skippedFile => err.println(s"  left out: ${display(skippedFile)}"))
       err.println("  Fix the error reported for that file and run onion migrate again, or make the change by hand.")
 
+    // The type names the named files declare: a rewrite must not write a bare name another
+    // file gives a meaning of its own (a class `Rand` beside a script that used OnionMath).
+    val declared = files.flatMap { file =>
+      try Migrator.declaredTypes(Files.readString(file, UTF_8))
+      catch case _: IOException => Set.empty
+    }.toSet
+
     files.foreach { file =>
       try
         val source = Files.readString(file, UTF_8)
         texts(file) = source
-        val result = Migrator.migrate(source)
+        val result = Migrator.migrate(source, declared)
         result.notes.foreach(n => note(file, n.line, n.column, n.message))
         if result.changed then
           val alone = Compile.check(Seq(file -> source), classpath)
@@ -230,7 +237,7 @@ object MigrateCommand:
     val failing = (problems: Seq[Compile.Problem], file: Path) =>
       problems.filter(p => p.file.forall(_ == file.toString))
     val atPlace = (p: Compile.Problem, result: Migrator.Result) =>
-      p.file.nonEmpty && result.edits.exists(e => e.line == p.line && e.column == p.column)
+      p.file.nonEmpty && result.edits.exists(_.allPlaces.contains((p.line, p.column)))
 
     // A file may use classes, or a `ret`, another named file declares, so every undecided
     // file is compiled together with every named file that could be read: once as written,

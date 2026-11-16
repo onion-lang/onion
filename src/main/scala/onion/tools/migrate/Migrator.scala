@@ -35,8 +35,11 @@ object Migrator:
     subject: String = "`ret`",
     clause: Boolean = false,
     oldSpelling: Option[String] = None,
-    rewrittenAs: String = "rewritten as a contract predicate"
-  )
+    rewrittenAs: String = "rewritten as a contract predicate",
+    places: Seq[(Int, Int)] = Seq.empty
+  ):
+    /** Every position a compile error may name for this edit: its own, and those of the edits folded into it. */
+    def allPlaces: Seq[(Int, Int)] = (line, column) +: places
 
   /** A place a rule left alone, or could not change, with why. */
   final case class Note(line: Int, column: Int, message: String)
@@ -48,7 +51,11 @@ object Migrator:
   final case class Result(text: String, edits: Seq[Edit], notes: Seq[Note]):
     def changed: Boolean = edits.nonEmpty
 
-  def migrate(source: String): Result =
+  /**
+   * `declared` holds the type names other files named alongside declare: a rewrite never
+   * writes a bare name one of them could capture.
+   */
+  def migrate(source: String, declared: Set[String] = Set.empty): Result =
     val (clauses, clauseNotes) = LawExampleToPredicate.find(source)
     val insideClause = (offset: Int) => clauses.exists(c => offset >= c.offset && offset < c.offset + c.length)
     val (last, notLast) = RetToYield.find(source).filterNot((offset, _) => insideClause(offset)).partition(_._2)
@@ -62,7 +69,7 @@ object Migrator:
       val (line, column) = lineColumnOf(source, offset)
       Edit(offset, 3, "yield", line, column, "ret -> yield")
     }
-    val (randomInts, randomIntNotes) = RandomIntToNextInt.find(source)
+    val (randomInts, randomIntNotes) = RandomIntToNextInt.find(source, declared)
     val calls = randomInts.filterNot(e => insideClause(e.offset))
     val all = (edits ++ clauses ++ calls).sortBy(_.offset)
     Result(apply(source, all), all, (notes ++ clauseNotes ++ randomIntNotes).sortBy(n => (n.line, n.column)))
@@ -125,6 +132,16 @@ object Migrator:
     }
     out ++= source.substring(cursor)
     out.toString
+
+  /** The names `source` declares a type under (`class`, `interface`, `record`, `enum`). */
+  def declaredTypes(source: String): Set[String] =
+    val tokens =
+      try codeTokens(source)
+      catch case _: Exception => IndexedSeq.empty
+    tokens.indices.collect {
+      case i if i + 1 < tokens.length && Set("class", "interface", "record", "enum")(tokens(i).image) &&
+          tokens(i + 1).kind == K.ID => tokens(i + 1).image
+    }.toSet
 
   /** The code tokens of `source`, without comments, in order. */
   private def codeTokens(source: String): IndexedSeq[Token] =
@@ -243,11 +260,14 @@ object Migrator:
      * lexer keeps inside one string token. A call there is a plain edit inside that token, so
      * [[MigrateCommand]] checks it as a rewrite within the token, not as whole tokens.
      */
-    def find(source: String): (Seq[Edit], Seq[Note]) =
+    def find(source: String, declared: Set[String] = Set.empty): (Seq[Edit], Seq[Note]) =
       val tokens =
         try codeTokens(source)
         catch case _: Exception => IndexedSeq.empty
-      val (edits, notes) = inThisCode(source, tokens)
+      find(source, tokens, Spelling(source, tokens, declared))
+
+    private def find(source: String, tokens: IndexedSeq[Token], spelling: Spelling): (Seq[Edit], Seq[Note]) =
+      val (edits, notes) = calls(source, tokens, 0, tokens.length, spelling)
       val interpolated = tokens.flatMap { token =>
         val bodies = interpolationBodies(token)
         if bodies.isEmpty then Seq.empty
@@ -257,14 +277,19 @@ object Migrator:
             .toSeq
             .flatMap { offset =>
               bodies.flatMap { (start, body) =>
-                val (inner, innerNotes) = find(body)
+                val bodyTokens =
+                  try codeTokens(body)
+                  catch case _: Exception => IndexedSeq.empty
+                val (inner, innerNotes) = find(body, bodyTokens, spelling)
                 val base = offset + start
-                val at = (bodyOffset: Int) => lineColumnOf(source, base + bodyOffset)
+                val at = (line: Int, column: Int) =>
+                  offsetOf(body, line, column).map(o => lineColumnOf(source, base + o)).getOrElse((token.beginLine, token.beginColumn))
                 inner.map { e =>
-                  val (line, column) = at(body.indexOf("randomInt", e.offset))
-                  Left(e.copy(offset = base + e.offset, line = line, column = column, clause = false))
+                  val (line, column) = at(e.line, e.column)
+                  Left(e.copy(offset = base + e.offset, line = line, column = column, clause = false,
+                    places = e.places.map(at.tupled)))
                 } ++ innerNotes.map { n =>
-                  val (line, column) = offsetOf(body, n.line, n.column).map(at).getOrElse((token.beginLine, token.beginColumn))
+                  val (line, column) = at(n.line, n.column)
                   Right(n.copy(line = line, column = column))
                 }
               }
@@ -272,53 +297,109 @@ object Migrator:
       }
       (edits ++ interpolated.collect { case Left(e) => e }, notes ++ interpolated.collect { case Right(n) => n })
 
-    private def inThisCode(source: String, tokens: IndexedSeq[Token]): (Seq[Edit], Seq[Note]) =
+    /**
+     * How a file spells the old call and the new one.
+     *  - `heads`: the qualifiers that name `onion.OnionMath` here: `OnionMath`, and any alias an
+     *    import gives it (`import { onion.OnionMath as OM; }`).
+     *  - `bare`: a bare `randomInt(...)` may be the old method through a static import
+     *    (`import { onion.OnionMath::* }`), unless the file declares a `randomInt` of its own.
+     *  - `rand`: `Rand`, or `onion.Rand` when this file, or another file named alongside it,
+     *    gives the name `Rand` a meaning of its own (a class, an import, a variable).
+     */
+    private final case class Spelling(heads: Set[String], bare: Boolean, rand: String)
+
+    private object Spelling:
+      def apply(source: String, tokens: IndexedSeq[Token], declared: Set[String]): Spelling =
+        val image = (i: Int) => if i >= 0 && i < tokens.length then tokens(i).image else ""
+        val aliases = tokens.indices.collect {
+          case i if image(i) == "onion" && image(i + 1) == "." && image(i + 2) == "OnionMath" && image(i + 3) == "as" &&
+              i + 4 < tokens.length && tokens(i + 4).kind == K.ID => image(i + 4)
+        }.toSet
+        val ownRandomInt = tokens.indices.exists(i => image(i) == "randomInt" && image(i - 1) == "def")
+        val ownRand = declared.contains("Rand") || tokens.indices.exists { i =>
+          image(i) == "Rand" && image(i + 1) != "::" && !(image(i - 1) == "." && image(i - 2) == "onion")
+        }
+        Spelling(Set("OnionMath") ++ aliases, !ownRandomInt, if ownRand then "onion.Rand" else "Rand")
+
+    /** The index of the first token of an old call whose `(` is at `open`, if one ends there. */
+    private def head(tokens: IndexedSeq[Token], open: Int, spelling: Spelling): Option[Int] =
+      val image = (i: Int) => if i >= 0 && i < tokens.length then tokens(i).image else ""
+      val member = Set(".", "::", "?.")
+      if image(open) != "(" || image(open - 1) != "randomInt" then None
+      else if image(open - 2) == "::" then
+        val q = open - 3
+        if image(q) == "OnionMath" && image(q - 1) == "." && image(q - 2) == "onion" && !member(image(q - 3)) then Some(q - 2)
+        else if spelling.heads(image(q)) && q >= 0 && tokens(q).kind == K.ID && !member(image(q - 1)) then Some(q)
+        else None
+      else if spelling.bare && !member(image(open - 2)) && image(open - 2) != "def" then Some(open - 1)
+      else None
+
+    /**
+     * The calls whose tokens lie in `[from, until)`. A call in another call's arguments is
+     * rewritten inside that call's one edit, so edits never overlap; its position is kept as
+     * one of that edit's places, since the compiler reports the inner call first.
+     */
+    private def calls(source: String, tokens: IndexedSeq[Token], from: Int, until: Int, spelling: Spelling): (Seq[Edit], Seq[Note]) =
       val edits = mutable.Buffer[Edit]()
       val notes = mutable.Buffer[Note]()
-      var i = 0
-      while i + 3 < tokens.length do
-        if tokens(i).image == "OnionMath" && tokens(i + 1).image == "::" && tokens(i + 2).image == "randomInt" &&
-            tokens(i + 3).image == "(" && !(i > 0 && Set(".", "::").contains(tokens(i - 1).image) &&
-              !(i > 1 && tokens(i - 1).image == "." && tokens(i - 2).image == "onion" &&
-                !(i > 2 && Set(".", "::").contains(tokens(i - 3).image)))) then
-          val first = if i > 1 && tokens(i - 1).image == "." && tokens(i - 2).image == "onion" then i - 2 else i
-          rewrite(source, tokens, first, i + 3) match
-            case Right(e) => edits += e
-            case Left(Some(n)) => notes += n
-            case Left(None) => ()
-          i += 4
-        else i += 1
+      var i = from
+      while i < until do
+        head(tokens, i, spelling) match
+          case Some(first) if first >= from =>
+            arguments(tokens, i).filter(_._2 < until) match
+              case None => i += 1
+              case Some((comma, close)) =>
+                val (inner, innerNotes) = calls(source, tokens, i + 1, close, spelling)
+                notes ++= innerNotes
+                rewrite(source, tokens, first, i, comma, close, inner, spelling) match
+                  case Right(e) => edits += e
+                  case Left(n) =>
+                    notes ++= n
+                    edits ++= inner
+                i = close + 1
+          case _ => i += 1
       (edits.toSeq, notes.toSeq)
 
-    private def rewrite(source: String, tokens: IndexedSeq[Token], first: Int, open: Int): Either[Option[Note], Edit] =
-      val args = arguments(tokens, open)
+    private def rewrite(
+      source: String,
+      tokens: IndexedSeq[Token],
+      first: Int,
+      open: Int,
+      comma: Int,
+      close: Int,
+      inner: Seq[Edit],
+      spelling: Spelling
+    ): Either[Option[Note], Edit] =
       val result = for
-        (comma, close) <- args
         from <- start(source, tokens(first))
         paren <- start(source, tokens(open))
         maxFrom <- start(source, tokens(comma + 1))
         last = tokens(close - 1)
         maxTo <- start(source, last).map(_ + last.image.length)
         closeAt <- start(source, tokens(close))
-      yield (comma, close, from, paren, maxFrom, maxTo, closeAt)
+      yield (from, paren, maxFrom, maxTo, closeAt)
       result match
         case None => Left(None)
-        case Some((comma, close, from, paren, maxFrom, maxTo, closeAt)) =>
+        case Some((from, paren, maxFrom, maxTo, closeAt)) =>
           val max = tokens.slice(comma + 1, close)
           // The compiler reports the missing method at `randomInt`, so the edit is placed there.
           val name = tokens(open - 1)
           val (line, column) = (name.beginLine, name.beginColumn)
-          plusOne(source.substring(maxFrom, maxTo), max) match
+          // `source` from `a` to `b`, with the calls inside it already rewritten.
+          val rewritten = (a: Int, b: Int) =>
+            apply(source.substring(a, b), inner.filter(e => e.offset >= a && e.offset < b).map(e => e.copy(offset = e.offset - a)))
+          plusOne(rewritten(maxFrom, maxTo), max) match
             case None =>
               Left(Some(Note(line, column,
                 s"this $Subject has a max of 2147483647, which Rand::nextInt cannot include (its max is exclusive); " +
                   "left as written. Write Rand::nextInt() for any Int, or pick the bound by hand")))
             case Some(newMax) =>
-              val replacement = "Rand::nextInt" + source.substring(paren, maxFrom) + newMax + source.substring(maxTo, closeAt + 1)
+              val replacement = spelling.rand + "::nextInt" + rewritten(paren, maxFrom) + newMax + rewritten(maxTo, closeAt + 1)
               Right(Edit(from, closeAt + 1 - from, replacement, line, column,
                 "OnionMath::randomInt(min, max) -> Rand::nextInt(min, max + 1)",
                 subject = Subject, clause = true, oldSpelling = Some(s"the removed $Subject"),
-                rewrittenAs = "rewritten as Rand::nextInt"))
+                rewrittenAs = "rewritten as Rand::nextInt",
+                places = inner.flatMap(_.allPlaces)))
 
     /** `Some(text)` for the new max, or `None` when it cannot be one more (`2147483647`). */
     private def plusOne(text: String, max: IndexedSeq[Token]): Option[String] =

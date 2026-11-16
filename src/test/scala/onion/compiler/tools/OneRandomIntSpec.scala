@@ -127,6 +127,82 @@ class OneRandomIntSpec extends AbstractShellSpec {
       assert(after == source)
     }
 
+    it("rewrites a call nested in another call's arguments, and the script runs (#3116 block 1)") {
+      val source =
+        """val a = OnionMath::randomInt(1, OnionMath::randomInt(2, 6))
+          |val b = OnionMath::randomInt(OnionMath::randomInt(0, 2), 9)
+          |println(a >= 1 && a <= 6 && b >= 0 && b <= 9)
+          |""".stripMargin
+      val (code, after, output) = migrate(source)
+      assert(code == 0, output)
+      assert(after ==
+        """val a = Rand::nextInt(1, Rand::nextInt(2, 7) + 1)
+          |val b = Rand::nextInt(Rand::nextInt(0, 3), 10)
+          |println(a >= 1 && a <= 6 && b >= 0 && b <= 9)
+          |""".stripMargin)
+      assert(compile(after).allErrors.isEmpty, compile(after).allErrors.map(_.message))
+    }
+
+    it("writes onion.Rand where the file's own Rand would capture the call (#3116 block 2)") {
+      val source =
+        """class Rand {
+          |public:
+          |  static def nextInt(a: Int, b: Int): Int = 42
+          |}
+          |println(OnionMath::randomInt(1, 6) < 7)
+          |""".stripMargin
+      val (code, after, output) = migrate(source)
+      assert(code == 0, output)
+      assert(after.contains("println(onion.Rand::nextInt(1, 7) < 7)"), after)
+      assert(compile(after).allErrors.isEmpty, compile(after).allErrors.map(_.message))
+    }
+
+    it("writes onion.Rand where another file named alongside declares Rand") {
+      val root = Files.createTempDirectory("onion-migrate-3069-dir").toRealPath()
+      Files.writeString(root.resolve("Rand.on"),
+        "class Rand {\npublic:\n  static def nextInt(a: Int, b: Int): Int = 42\n}\n", UTF_8)
+      val script = root.resolve("Dice.on")
+      Files.writeString(script, "class Dice {\npublic:\n  static def roll(): Int = OnionMath::randomInt(1, 6)\n}\n", UTF_8)
+      val out = new ByteArrayOutputStream()
+      val code = MigrateCommand.run(root, Array(root.toString), new PrintStream(out, true, UTF_8), new PrintStream(out, true, UTF_8))
+      assert(code == 0, out.toString(UTF_8))
+      assert(Files.readString(script, UTF_8).contains("= onion.Rand::nextInt(1, 7)"), Files.readString(script, UTF_8))
+    }
+
+    Seq("onion.OnionMath::*", "onion.OnionMath::randomInt").foreach { imported =>
+      it(s"rewrites a bare call through `import { $imported }`, which also gets the hint (#3116 block 3)") {
+        val source = s"import { $imported }\nprintln(randomInt(1, 6) < 7)\n"
+        val errors = compile(source).allErrors
+        assert(errors.exists(_.errorCode.contains("E0005")), errors.map(_.message))
+        assert(errors.exists(_.message.contains(hint)), errors.map(_.message))
+        val (code, after, output) = migrate(source)
+        assert(code == 0, output)
+        assert(after == s"import { $imported }\nprintln(Rand::nextInt(1, 7) < 7)\n")
+        assert(compile(after).allErrors.isEmpty, compile(after).allErrors.map(_.message))
+      }
+    }
+
+    it("rewrites a call through an import alias of OnionMath") {
+      val source = "import { onion.OnionMath as OM; }\nprintln(OM::randomInt(1, 6) < 7)\n"
+      val (code, after, output) = migrate(source)
+      assert(code == 0, output)
+      assert(after == "import { onion.OnionMath as OM; }\nprintln(Rand::nextInt(1, 7) < 7)\n")
+    }
+
+    it("leaves a bare randomInt the file declares itself, and a method of that name, alone") {
+      val source =
+        """def randomInt(a: Int, b: Int): Int = a
+          |class Die {
+          |public:
+          |  def randomInt(a: Int, b: Int): Int = b
+          |}
+          |println(randomInt(1, 6) + new Die().randomInt(1, 6))
+          |""".stripMargin
+      val (code, after, output) = migrate(source)
+      assert(code == 0, output)
+      assert(after == source)
+    }
+
     it("notes a max of 2147483647, which has no max + 1, and leaves it as written") {
       val source = "val n = OnionMath::randomInt(0, 2147483647)\n"
       val (_, after, output) = migrate(source)

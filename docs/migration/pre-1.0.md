@@ -669,8 +669,14 @@ val die = Rand::nextInt(1, 7)          // 1 to 6
   - `OnionMath::randomInt(1, 6)` becomes `Rand::nextInt(1, 7)`.
   - `OnionMath::randomInt(0, xs.size - 1)` becomes `Rand::nextInt(0, xs.size)`.
   - `OnionMath::randomInt(a, b)` becomes `Rand::nextInt(a, b + 1)`.
-  - Calls inside `"#{...}"` are rewritten too.
+  - Calls inside `"#{...}"`, and a call inside another call's arguments, are rewritten too.
+  - So is a call through an import: `randomInt(1, 6)` after `import { onion.OnionMath::* }`,
+    or `OM::randomInt(1, 6)` after `import { onion.OnionMath as OM; }`. The import itself
+    still compiles, so it is left as written.
+  - When the file, or another file named with it, has its own `Rand` (a class, an import, a
+    variable), migrate writes `onion.Rand::nextInt`, so the call keeps meaning Onion's `Rand`.
 - **Not rewritten:** a `max` of `2147483647`, since `max + 1` does not fit in an `Int`. The
-  migrate run notes the line. Write `Rand::nextInt()` for any `Int`, or choose the bound by hand.
+  migrate run notes the line and leaves the whole file as written. Write `Rand::nextInt()` for
+  any `Int`, or choose the bound by hand, then run migrate again.
 - **Run it on one program at a time.** Unrelated scripts named together can hide each other's
   errors, and then a call is left as written.

@@ -6,7 +6,7 @@ import java.io.StringReader
 
 /**
  * A block lambda whose function type returns a concrete value type (`(Int) -> Int`,
- * `Supplier[String]`) and whose last expression is void is E0000 at that expression.
+ * `() -> String`) and whose last expression is void is E0000 at that expression.
  * It used to compile and return null, which failed later as an NPE (#3044).
  * A void, `Object` or inferred result still accepts a side-effect-only body.
  */
@@ -43,10 +43,8 @@ class ClosureVoidTailSpec extends AbstractShellSpec {
       assert(errors("val k: () -> Int = () -> { println(\"k\") }\nprintln(k())\n").map(_._1) == Seq("E0000"))
     }
 
-    it("is E0000 for a Java SAM with a String result") {
-      assert(errors(
-        "val s: java.util.function.Supplier[String] = () -> { println(\"s\") }\nprintln(s.get())\n"
-      ).map(_._1) == Seq("E0000"))
+    it("is E0000 for a String result of an Onion function type") {
+      assert(errors("val s: () -> String = () -> { println(\"s\") }\nprintln(s())\n").map(_._1) == Seq("E0000"))
     }
 
     it("is E0000 after an early return") {
@@ -69,6 +67,24 @@ class ClosureVoidTailSpec extends AbstractShellSpec {
           |    c.accept("")
           |    return total""".stripMargin)
       assert(Shell.Success(3) == result)
+    }
+
+    it("compiles when the tail never completes, or the result is nullable, Void or a Java type variable") {
+      val result = run(
+        """    var i = 0
+          |    val k: () -> Int = () -> {
+          |      while true {
+          |        i = i + 1
+          |        if i > 3 { return i }
+          |      }
+          |    }
+          |    val s: java.util.function.Supplier[Void] = () -> { IO::print("") }
+          |    val f: () -> String? = () -> { IO::print("") }
+          |    val m: java.util.Map[String, Integer] = new java.util.HashMap[String, Integer]()
+          |    if m.computeIfAbsent("a", (k) -> { IO::print("") }) != null { return 0 }
+          |    if s.get() != null || f() != null { return 0 }
+          |    return k()""".stripMargin)
+      assert(Shell.Success(4) == result)
     }
 
     it("still returns null for an Object or inferred result") {

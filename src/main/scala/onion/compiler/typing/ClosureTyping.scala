@@ -232,7 +232,11 @@ final class ClosureTyping(
                 // A side-effect-only tail returns null where the result is open: inferred
                 // from the body, `Object`, or an unpinned type variable. A concrete result
                 // the target fixed (`(Int) -> Int`) needs a value (#3044).
-                val voidTailOk = inferredReturnType.isDefined || acceptsVoidTail(expectedRet)
+                // A Java SAM whose result is a type variable (`Map[K, Integer].computeIfAbsent`)
+                // takes null as "no value", as in Java; an Onion function type does not.
+                val javaOpenResult = method.returnType.isInstanceOf[TypeVariableType] &&
+                  !method.affiliation.name.startsWith("onion.Function")
+                val voidTailOk = inferredReturnType.isDefined || javaOpenResult || acceptsVoidTail(expectedRet)
                 val baseBlockOpt =
                   if (useExpressionBody) {
                     // Type the closure body's final (value) expression against the
@@ -695,7 +699,7 @@ final class ClosureTyping(
         val stmt = termToStatement(last)
         statements += stmt
         new Return(defaultValue(returnType))
-      } else if (last.`type` == BasicType.VOID && voidTailOk) {
+      } else if (last.`type` == BasicType.VOID && (voidTailOk || neverCompletes(last))) {
         // Side-effect-only body against an `Object` or still-open SAM return
         // (e.g. Future::async(() -> IO::println(...))): run it, return null
         statements += termToStatement(last)
@@ -756,7 +760,7 @@ final class ClosureTyping(
     if (terms.nonEmpty) {
       val last = terms.last
       if (returnType == BasicType.VOID || returnType.isBottomType || last.`type`.isBottomType ||
-          (last.`type` == BasicType.VOID && voidTailOk)) {
+          (last.`type` == BasicType.VOID && (voidTailOk || neverCompletes(last)))) {
         statements += termToStatement(last)
       } else if (last.`type` == BasicType.VOID) {
         // As in buildReturnBlock: no value to return for a concrete result type (#3044).
@@ -772,14 +776,22 @@ final class ClosureTyping(
   }
 
   /**
-   * Whether a SAM result type leaves a void tail acceptable: `Object` or `Object?`
-   * (what an inferred side-effect body becomes) or a type variable nothing pinned. The body
-   * then returns null. A concrete result such as `Int` or `String` needs a value,
-   * as in Java (#3044).
+   * Whether a SAM result type leaves a void tail acceptable: any nullable result, `Void`,
+   * `Object` (what an inferred side-effect body becomes) or a type variable nothing pinned.
+   * The body then returns null. A non-null result such as `Int` or `String` needs a value,
+   * as in Java (#3044). A tail that never completes (`while true`) is always fine.
    */
   private def acceptsVoidTail(returnType: Type): Boolean = returnType match {
-    case nullable: TypedAST.NullableType => acceptsVoidTail(nullable.innerType)
+    case _: TypedAST.NullableType => true
+    case t: ClassType if t.name == "java.lang.Void" => true
     case t => t == bodyContext.rootClass || t.isInstanceOf[TypeVariableType]
+  }
+
+  /** An infinite loop (constant-true or absent condition) never completes normally. */
+  private def neverCompletes(term: Term): Boolean = termToStatement(term) match {
+    case loop: ConditionalLoop =>
+      loop.condition == null || (loop.condition match { case b: BoolValue => b.value; case _ => false })
+    case _ => false
   }
 
   /** The block's last element, where a problem with the lambda's result is reported. */

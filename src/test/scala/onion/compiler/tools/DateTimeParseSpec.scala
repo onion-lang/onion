@@ -15,6 +15,16 @@ class DateTimeParseSpec extends AbstractShellSpec {
           |}""".stripMargin, "None", Array())
       assert(Shell.Success("2026-07-02T00:00:00") == r)
     }
+    it("honours an offset in the text of a patterned parse (#3014)") {
+      val r = shell.run(
+        """def main(args: String[]): String {
+          |  val p = "yyyy-MM-dd'T'HH:mmXXX"
+          |  val a = DateTime::parse("2026-11-11T09:30Z", p)
+          |  val b = DateTime::parse("2026-11-11T18:30+09:00", p)
+          |  return (a == DateTime::parse("2026-11-11T09:30:00Z")) + " " + (a == b)
+          |}""".stripMargin, "None", Array())
+      assert(Shell.Success("true true") == r)
+    }
     it("throws on unparseable input instead of returning 0") {
       val r = shell.run(
         """def main(args: String[]): String {

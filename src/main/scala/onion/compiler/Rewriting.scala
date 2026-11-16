@@ -102,8 +102,20 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
             a.name -> a.targetType.desc
         }.toMap
       }.toMap
+    val typeNamesByModule: scala.collection.immutable.Map[String, Set[String]] =
+      source.groupBy(moduleOf).view.mapValues { units =>
+        units.flatMap(_.toplevels).flatMap {
+          case e: AST.EnumDeclaration => e.name :: e.constants.collect { case c if c.caseFields.isDefined => c.name }
+          case d: AST.TypeDeclaration => List(d.name)
+          case a: AST.TypeAliasDeclaration => List(a.name)
+          case _ => Nil
+        }.toSet
+      }.toMap
     for (unit <- source) {
       try {
+        currentModuleName = moduleOf(unit)
+        currentModuleTypeNames = typeNamesByModule.getOrElse(currentModuleName, Set.empty)
+        currentImports = if (unit.imports == null) Nil else unit.imports.mapping
         cliAliases = aliasesByModule.getOrElse(moduleOf(unit), scala.collection.immutable.Map.empty)
         recordAliases = recordAliasesOf(unit, cliAliases)
         rewritten += rewrite(unit)
@@ -128,6 +140,11 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   // parameter; a ground `Trait[Int]::m(...)` still resolves to the instance
   // class. `typeParamsInScope` distinguishes the two.
   private var typeParamsInScope: Set[String] = Set.empty
+  // The unit being rewritten: its module, the type names its module declares in any source
+  // file, and its written imports (simple name -> qualified name). `namesOnionResult` reads them.
+  private var currentModuleName: String = ""
+  private var currentModuleTypeNames: Set[String] = Set.empty
+  private var currentImports: List[(String, String)] = Nil
   private var dictScope: scala.collection.immutable.Map[(String, String), String] = scala.collection.immutable.Map.empty
 
   /** The dictionary parameters a constrained generic declaration needs: one per
@@ -820,7 +837,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val section = AST.AccessSection(declaration.location, AST.M_PUBLIC, declaration.methods)
     AST.ClassDeclaration(
       declaration.location, declaration.modifiers, mangleInstanceClassName(declaration.traitType.desc),
-      null, List(declaration.traitType), None, List(section), Nil
+      null, List(declaration.traitType), None, List(section), Nil,
+      loweredInstance = Some(declaration.traitType)
     )
   }
 
@@ -1592,8 +1610,18 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     val newBlock = withDictScope(declaration.typeParameters.map(_.name), dicts) {
       rewriteBlockWithReturnHint(declaration.block, declaration.returnType)
     }
-    declaration.copy(args = declaration.args ++ dictParams, block = newBlock)
+    declaration.copy(args = rewriteDefaults(declaration.args) ++ dictParams, block = newBlock)
   }
+
+  /** A default argument is an expression like any other: `do[M]` in it needs desugaring too (#3050). */
+  private def rewriteDefaults(args: List[AST.Argument]): List[AST.Argument] =
+    args.map { a =>
+      a.defaultValue match
+        case null => a
+        case doExpr: AST.DoExpression =>
+          a.copy(defaultValue = desugarDoExpression(doExpr, elementTypeHintFor(doExpr.monadType, a.typeRef)))
+        case d => a.copy(defaultValue = rewriteExpression(d))
+    }
 
   /**
    * Like `rewriteBlockExpression`, but when the body is exactly `return do[M] {...}`
@@ -1632,7 +1660,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   def rewriteMethodDeclaration(method: AST.MethodDeclaration): AST.MethodDeclaration = {
     val (dictParams, dicts) = dictionaryParametersFor(method.location, method.typeParameters)
     val newBlock = if (method.block != null) withDictScope(method.typeParameters.map(_.name), dicts) { rewriteBlockWithReturnHint(method.block, method.returnType) } else null
-    method.copy(args = method.args ++ dictParams, block = newBlock)
+    method.copy(args = rewriteDefaults(method.args) ++ dictParams, block = newBlock)
   }
 
   def rewriteFieldDeclaration(field: AST.FieldDeclaration): AST.FieldDeclaration = {
@@ -1649,7 +1677,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   def rewriteConstructorDeclaration(constructor: AST.ConstructorDeclaration): AST.ConstructorDeclaration = {
     val newSuperInits = constructor.superInits.map(rewriteExpression)
     val newBlock = rewriteBlockExpression(constructor.block)
-    constructor.copy(superInits = newSuperInits, block = newBlock)
+    constructor.copy(args = rewriteDefaults(constructor.args), superInits = newSuperInits, block = newBlock)
   }
 
   def rewriteBlockExpression(block: AST.BlockExpression): AST.BlockExpression = {
@@ -1866,7 +1894,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
 
     val pinned = pinThrowOnlyGenerativeBinds(pinEmptyBindElementTypes(statements, elementHint), elementHint)
-    desugarDoStatements(doExpr.location, monadType, pinned)
+    desugarDoStatements(doExpr.location, monadType, pinned, leading = true)
   }
 
   /**
@@ -2042,7 +2070,58 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
   }
 
-  private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any]): AST.Expression = {
+  /** True when the written type `desc` names `onion.Result`, decided as the typer's
+    * NameResolver would: a type parameter, a class of the unit's own module (from source or
+    * from the classpath) and an explicit import all outrank the default `onion.*` import. */
+  private def namesOnionResult(desc: AST.TypeDescriptor): Boolean = desc match {
+    case AST.ReferenceType("onion.Result", _) => true
+    case AST.ReferenceType("Result", false) =>
+      !typeParamsInScope.contains("Result") &&
+        !currentModuleTypeNames.contains("Result") &&
+        !currentImports.exists { case (key, value) => key == "Result" && value != "onion.Result" } &&
+        !onClasspath(if (currentModuleName.isEmpty) "Result" else currentModuleName + ".Result")
+    case _ => false
+  }
+
+  private def onClasspath(fqcn: String): Boolean =
+    classpathLoader.getResource(fqcn.replace('.', '/') + ".class") != null
+
+  private lazy val classpathLoader: java.net.URLClassLoader = {
+    val urls = config.classPath.iterator.filter(p => p != null && p.nonEmpty).flatMap { p =>
+      scala.util.Try(new java.io.File(p).toURI.toURL).toOption
+    }.toArray
+    new java.net.URLClassLoader(urls, null: ClassLoader)
+  }
+
+  /** True for `Result::successful(e)` or `Result::ok(e)` (no type arguments) bound inside
+    * `do[Result]`, where both `Result`s name `onion.Result`. */
+  private def isResultUnitBind(expr: AST.Expression, monadType: AST.TypeNode): Boolean = expr match {
+    case c: AST.StaticMethodCall =>
+      (c.name == "successful" || c.name == "ok") && c.args.size == 1 && c.typeArgs.isEmpty &&
+        namesOnionResult(c.typeRef.desc) && namesOnionResult(monadType.desc)
+    case _ => false
+  }
+
+  /** `val x = e` for the unit bind `x <- Result::ok(e)`. */
+  private def unitBindDeclaration(binding: AST.DoBinding): AST.LocalVariableDeclaration = {
+    val call = binding.expr.asInstanceOf[AST.StaticMethodCall]
+    AST.LocalVariableDeclaration(binding.location, AST.M_FINAL | AST.M_DO_BINDING, binding.name, null, rewriteExpression(call.args.head))
+  }
+
+  /** When `statements` is zero or more Result unit binds followed by the final `yield`,
+    * those binds and the `yield`. */
+  private def unitBindsThenYield(statements: List[Any], monadType: AST.TypeNode): Option[(List[AST.DoBinding], AST.YieldStatement)] = {
+    val (binds, tail) = statements.span {
+      case b: AST.DoBinding => isResultUnitBind(b.expr, monadType)
+      case _ => false
+    }
+    tail match {
+      case List(y: AST.YieldStatement) => Some((binds.map(_.asInstanceOf[AST.DoBinding]), y))
+      case _ => None
+    }
+  }
+
+  private def desugarDoStatements(loc: Location, monadType: AST.TypeNode, statements: List[Any], leading: Boolean = false): AST.Expression = {
     statements match {
       // Final expression: yield e => M::successful(e)
       // The synthesized call is anchored at yield's own location, not the caller-supplied
@@ -2057,18 +2136,38 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         val rewritten = rewriteExpression(expr)
         AST.StaticMethodCall(loc, monadType, "successful", List(rewritten))
 
+      // `x <- Result::successful(e); rest` (or `Result::ok(e)`) => `val x = e; rest` (left identity:
+      // unit(e).bind(f) == f(e)). `Result::successful(e)` alone cannot pin its error
+      // type, so left as a bind it types as `Result[T, Object]` (#2537).
+      // Not when nothing is bound before them and only unit binds lie between the block's start
+      // and `yield`: there main builds `Result::ok(e).map((y) -> v)` and types a wrong `yield`
+      // with one correct error, so that block stays as main desugars it (#2537).
+      case (binding: AST.DoBinding) :: rest
+          if rest.nonEmpty && isResultUnitBind(binding.expr, monadType) &&
+            !(leading && unitBindsThenYield(statements, monadType).isDefined) =>
+        AST.BlockExpression(binding.location, List(unitBindDeclaration(binding), desugarDoStatements(binding.location, monadType, rest)))
+
       // Binding followed directly by the final yield: x <- e1; yield e2
       // => e1.map((x) -> e2). Using map instead of bind+M::successful means
       // a monad only needs map/bind instance (or extension) methods — no
       // static successful — which is what lets do[List] work over plain
       // java.util.List via the Colls extension methods.
-      case (binding: AST.DoBinding) :: List(AST.YieldStatement(yieldLoc, retExpr)) =>
+      // Result unit binds between them (`x <- e1; y <- Result::ok(e); yield e2`) are left out,
+      // as the case above leaves them out: the block desugars as if they were not written,
+      // so `e1.map((x) -> { val y = e; e2 })`, the shape main gives `x <- e1; yield e2` (#2537).
+      case (binding: AST.DoBinding) :: rest if unitBindsThenYield(rest, monadType).isDefined =>
+        val (unitBinds, AST.YieldStatement(yieldLoc, retExpr)) = unitBindsThenYield(rest, monadType).get: @unchecked
         val bindExpr = rewriteExpression(binding.expr)
+        val decls = unitBinds.map(unitBindDeclaration)
         val rewrittenRet = rewriteExpression(retExpr)
         val arg = AST.Argument(binding.location, binding.name, null, null, false)
         // The closure body is anchored at ret's own location, not the preceding binding's,
         // so a type mismatch in `retExpr` is reported at `ret`, not at `x <- e1`.
-        val closureBody = AST.BlockExpression(yieldLoc, List(rewrittenRet))
+        // Each `val` gets its own nested block, as a bind's lambda parameter gets its own
+        // scope, so a later bind may reuse an earlier one's name (`y <- ok(1); y <- ok(y + 1)`).
+        val closureBody = decls.foldRight(AST.BlockExpression(yieldLoc, List(rewrittenRet))) { (decl, inner) =>
+          AST.BlockExpression(yieldLoc, List(decl, inner))
+        }
         val closureType = AST.TypeNode(binding.location, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(binding.location, closureType, "call", List(arg), null, closureBody)
         AST.MethodCall(binding.location, bindExpr, "map", List(closure))
@@ -2094,7 +2193,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         val restExpr = desugarDoStatements(exprLoc, monadType, rest)
 
         // Create closure: (_) -> { restExpr }
-        val arg = AST.Argument(exprLoc, "_unused", null, null, false)
+        val arg = AST.Argument(exprLoc, AST.DoStatementParameter, null, null, false)
         val closureBody = AST.BlockExpression(exprLoc, List(restExpr))
         val closureType = AST.TypeNode(exprLoc, AST.ReferenceType("onion.Function1", true), true)
         val closure = AST.ClosureExpression(exprLoc, closureType, "call", List(arg), null, closureBody)

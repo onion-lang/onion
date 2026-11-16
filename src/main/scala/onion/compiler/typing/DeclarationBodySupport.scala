@@ -119,7 +119,11 @@ private[compiler] final class DeclarationBodySupport(
           }
       case node: AST.RecordDeclaration =>
         methodJobs(node, typeParams(node),
-          node.synthesizedMethods ++ node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m })
+          node.synthesizedMethods ++ node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m }) ++
+          // A component default is a default of the record's one constructor (#2829).
+          job(node.name, node.args, recordConstructor(node))(inDefinition(node, typeParams(node)) { _ =>
+            predefineRecordDefaults(node)
+          })
       case node: AST.EnumDeclaration =>
         methodJobs(node, Seq(), node.sections.flatMap(_.members).collect { case m: AST.MethodDeclaration => m })
       case node: AST.InterfaceDeclaration =>
@@ -140,7 +144,7 @@ private[compiler] final class DeclarationBodySupport(
         job(node.name, node.args, typing.kernelNodeOf[MethodDefinition](node)) {
           typing.kernelNodeOf[MethodDefinition](node).foreach { function =>
             typing.loadTopClass.collect { case cd: ClassDefinition => cd }.foreach(unitContext.currentDefinition = _)
-            typing.find(typing.topClass).foreach(unitContext.currentMapper = _)
+            typing.findTopClassMapper.foreach(unitContext.currentMapper = _)
             typing.openTypeParams(typing.emptyTypeParams ++ typeParams(node)) {
               methodBodySupport.predefineDefaults(function, node.args)
             }
@@ -199,6 +203,18 @@ private[compiler] final class DeclarationBodySupport(
     definition.primaryParameterNames = (node.defaultSection ++ node.sections).flatMap(_.members).collect {
       case ctor: AST.ConstructorDeclaration if ctor.primary => ctor.args.map(_.name)
     }.flatten.toSet
+
+  /** The constructor the outline pass built from a record's component list. */
+  def recordConstructor(node: AST.RecordDeclaration): Option[ConstructorDefinition] =
+    typing.kernelNodeOf[ClassDefinition](node).flatMap { definition =>
+      definition.constructors.collectFirst {
+        case c: ConstructorDefinition if c.getArgs.length == node.args.length => c
+      }
+    }
+
+  /** Types a record's component defaults, so `new R(1)` can omit `b` in `record R(a: Int, b: Int = 2)` (#2829). */
+  def predefineRecordDefaults(node: AST.RecordDeclaration): Unit =
+    recordConstructor(node).foreach(methodBodySupport.predefineConstructorDefaults(_, node.args))
 
   private def inDefinition(node: AST.TypeDeclaration, typeParams: Seq[TypeParam])(body: ClassDefinition => Unit): Unit =
     typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>

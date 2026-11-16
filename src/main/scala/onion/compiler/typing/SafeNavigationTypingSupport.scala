@@ -142,6 +142,11 @@ private[compiler] final class SafeNavigationTypingSupport(
       case CandidateSelection.Ambiguous(first, second) =>
         calls.reportAmbiguousMethod(node, first, second, node.name)
         None
+      case CandidateSelection.Selected(method)
+          if !MemberAccess.isMemberAccessible(method, bodyContext.definition, target.`type`) =>
+        // As in the plain named-argument path: E0013, not IllegalAccessError at run time (#2916).
+        bodyContext.report(METHOD_NOT_ACCESSIBLE, node, method.affiliation, node.name, method.arguments, bodyContext.definition)
+        None
       case CandidateSelection.Selected(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(targetType, method.affiliation)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>

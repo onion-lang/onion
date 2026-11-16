@@ -25,9 +25,43 @@ public class IO {
         java.io.InputStream current = System.in;
         if (stdinReader == null || stdinSource != current) {
             stdinSource = current;
-            stdinReader = new BufferedReader(new InputStreamReader(current, stdinCharset()));
+            stdinReader = new BufferedReader(new BomSkippingReader(new InputStreamReader(current, stdinCharset())));
         }
         return stdinReader;
+    }
+
+    /** Drops a leading U+FEFF (a UTF-8 byte order mark), as the file readers do. */
+    private static final class BomSkippingReader extends java.io.FilterReader {
+        private boolean first = true;
+
+        BomSkippingReader(java.io.Reader in) {
+            super(in);
+        }
+
+        @Override
+        public int read() throws IOException {
+            int c = in.read();
+            if (first) {
+                first = false;
+                if (c == 0xFEFF) return in.read();
+            }
+            return c;
+        }
+
+        @Override
+        public int read(char[] buf, int off, int len) throws IOException {
+            if (len == 0) return 0;
+            int n = in.read(buf, off, len);
+            if (first && n > 0) {
+                first = false;
+                if (buf[off] == 0xFEFF) {
+                    System.arraycopy(buf, off + 1, buf, off, n - 1);
+                    n--;
+                    if (n == 0) return read(buf, off, len);
+                }
+            }
+            return n;
+        }
     }
 
     /**

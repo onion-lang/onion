@@ -142,7 +142,11 @@ final class ClosureTyping(
           applied
         case _ => typeRef
       }
-      val classSubst = TypeSubstitution.classSubstitution(typeRef)
+      // The interface that declares the method this closure implements: `typeRef` itself, or
+      // the superinterface an inherited SAM lives on (`UnaryOperator[String]` -> its
+      // `Function[String, String]`, #2844).
+      val samHolder = FunctionalInterfaces.functionalView(typeRef)
+      val classSubst = TypeSubstitution.classSubstitution(samHolder)
 
       def substitutedArgs(method: Method): Array[Type] =
         method.arguments.map(tp => TypeCheckingHelpers.effectiveType(
@@ -162,12 +166,12 @@ final class ClosureTyping(
         TypeCheckingHelpers.effectiveType(
           TypeSubstitution.substituteType(method.returnType, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
 
-      val implName = implementedMethodName(typeRef, name, argTypes.length)
-      val candidates = typeRef.methods.filter(m => m.name == implName && m.arguments.length == argTypes.length)
+      val implName = implementedMethodName(samHolder, name, argTypes.length)
+      val candidates = samHolder.methods.filter(m => m.name == implName && m.arguments.length == argTypes.length)
       candidates.find(m => sameTypesOrBoxed(substitutedArgs(m), argTypes)) match {
-        case None if candidates.isEmpty && arityMismatch(typeRef, implName, argTypes.length).isDefined =>
+        case None if candidates.isEmpty && arityMismatch(samHolder, implName, argTypes.length).isDefined =>
           bodyContext.report(LAMBDA_ARITY_MISMATCH, node, Integer.valueOf(argTypes.length), typeRef,
-            Integer.valueOf(arityMismatch(typeRef, implName, argTypes.length).get))
+            Integer.valueOf(arityMismatch(samHolder, implName, argTypes.length).get))
           None
         case None =>
           bodyContext.report(METHOD_NOT_FOUND, node, typeRef, implName, argTypes)
@@ -225,6 +229,14 @@ final class ClosureTyping(
                 }
 
                 val triesBefore = bodyContext.tryCount
+                // A side-effect-only tail returns null where the result is open: inferred
+                // from the body, `Object`, or an unpinned type variable. A concrete result
+                // the target fixed (`(Int) -> Int`) needs a value (#3044).
+                // A Java SAM whose result is a type variable (`Map[K, Integer].computeIfAbsent`)
+                // takes null as "no value", as in Java; an Onion function type does not.
+                val javaOpenResult = method.returnType.isInstanceOf[TypeVariableType] &&
+                  !method.affiliation.name.startsWith("onion.Function")
+                val voidTailOk = inferredReturnType.isDefined || javaOpenResult || acceptsVoidTail(expectedRet)
                 val baseBlockOpt =
                   if (useExpressionBody) {
                     // Type the closure body's final (value) expression against the
@@ -233,7 +245,14 @@ final class ClosureTyping(
                     // `Result[Int, String]`) so its type arguments are pinned by the
                     // expected type rather than defaulting to Object (issue #230).
                     body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
-                      Option(buildReturnBlock(node.body, bodyTerm, expectedRet))
+                      Option(buildReturnBlock(node.body, bodyTerm, expectedRet, voidTailOk))
+                    }
+                  } else if (hasValueTail(node.body)) {
+                    // A block lambda with an early `return` returns its last expression
+                    // by the same rule as one without (#3025): the tail is typed against
+                    // the expected return type, as one more `return`.
+                    body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
+                      Option(buildTailReturnBlock(node.body, bodyTerm, expectedRet, voidTailOk))
                     }
                   } else {
                     val saved = context.bareReturnYieldsNull
@@ -294,7 +313,8 @@ final class ClosureTyping(
       // INCOMPATIBLE_TYPE instead of leaking the synthetic `.call` method and
       // the raw interface's unsubstituted type variable via a later E0005.
       if (inferredTarget != null) {
-        expectedMethodArgs(inferredTarget, implementedMethodName(inferredTarget, node.mname, args.length), args.length) match {
+        val holder = FunctionalInterfaces.functionalView(inferredTarget)
+        expectedMethodArgs(holder, implementedMethodName(holder, node.mname, args.length), args.length) match {
           case Some(expectedArgs) if expectedArgs.length == argTypes.length =>
             var j = 0
             var reported = false
@@ -327,13 +347,14 @@ final class ClosureTyping(
       }
       None
     } else {
-      val implName = implementedMethodName(inferredTarget, node.mname, args.length)
-      expectedMethodArgs(inferredTarget, implName, args.length) match {
+      val holder = FunctionalInterfaces.functionalView(inferredTarget)
+      val implName = implementedMethodName(holder, node.mname, args.length)
+      expectedMethodArgs(holder, implName, args.length) match {
         case None =>
           // No method of that arity: the lambda has the wrong parameter count for the
           // target. Say so (as the typed-parameter form does) instead of returning
           // silently, which let the closure through to a VerifyError or a no-op (#2069).
-          arityMismatch(inferredTarget, implName, args.length) match {
+          arityMismatch(holder, implName, args.length) match {
             case Some(expectedArity) =>
               bodyContext.report(LAMBDA_ARITY_MISMATCH, node, Integer.valueOf(args.length), inferredTarget,
                 Integer.valueOf(expectedArity))
@@ -411,7 +432,8 @@ final class ClosureTyping(
    */
   private[typing] def matchesSam(node: AST.ClosureExpression, context: LocalContext, target: Type): Option[Boolean] = {
     target match {
-      case ct: ClassType =>
+      case target: ClassType =>
+        val ct = FunctionalInterfaces.functionalView(target)
         val raw = ct match { case a: AppliedClassType => a.raw; case _ => ct }
         val abstracts = raw.methods.filter(m => Modifier.isAbstract(m.modifier) && !isPublicObjectMethod(m))
         abstracts.map(_.name).distinct.toList match {
@@ -429,7 +451,11 @@ final class ClosureTyping(
                     Some((bodyReturn == BasicType.VOID) == (samReturn == BasicType.VOID))
                   case None => None
                 }
-              case None => None
+              // No abstract method of the lambda's arity: it cannot fit this SAM, whatever
+              // its body. Answering "unknown" here kept a `(Int) -> Int` overload alive
+              // for `{ x, y -> ... }`, and the tie on the other arguments then went to
+              // whichever overload came first, which varied between passes (#2823).
+              case None => Some(false)
             }
           case _ => None
         }
@@ -612,10 +638,17 @@ final class ClosureTyping(
         body.openClosure(context) {
           if (addClosureArguments(node.args, argTypes, context, node.body).isDefined) {
             val collected = context.startReturnTypeCollection()
-            val translated = body.translate(node.body, context)
+            // The last expression counts as one more `return` (#3025).
+            val (translated, tailType) =
+              if (hasValueTail(node.body)) {
+                body.typed(node.body, context, samReturnTemplate) match {
+                  case Some(term) => (term, Option(lastTerm(term).`type`))
+                  case None => (null, None)
+                }
+              } else (body.translate(node.body, context), None)
             context.stopReturnTypeCollection()
             if (translated != null) {
-              result = foldReturnLub(node, collected.toSeq)
+              result = foldReturnLub(node, collected.toSeq ++ tailType.filter(_ != BasicType.VOID))
             }
           }
         }
@@ -648,7 +681,7 @@ final class ClosureTyping(
     TypeCheckingHelpers.leastUpperBound(bodyContext.table, node, left, right, bodyContext.rootClass,
       (n, l, r) => bodyContext.report(INCOMPATIBLE_TYPE, n, l, r))
 
-  private def buildReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type): ActionStatement = {
+  private def buildReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type, voidTailOk: Boolean): ActionStatement = {
     val terms = bodyTerm match {
       case begin: Begin => begin.terms.toIndexedSeq
       case single => IndexedSeq(single)
@@ -670,11 +703,16 @@ final class ClosureTyping(
         val stmt = termToStatement(last)
         statements += stmt
         new Return(defaultValue(returnType))
-      } else if (last.`type` == BasicType.VOID && !returnType.isBasicType) {
-        // Side-effect-only body against a reference-typed SAM return
+      } else if (last.`type` == BasicType.VOID && (voidTailOk || neverCompletes(last))) {
+        // Side-effect-only body against an `Object` or still-open SAM return
         // (e.g. Future::async(() -> IO::println(...))): run it, return null
         statements += termToStatement(last)
         new Return(new NullValue(node.location))
+      } else if (last.`type` == BasicType.VOID) {
+        // A concrete result type (`(Int) -> Int`, `Supplier[String]`) and a tail
+        // with no value: the lambda would return null/0 (#3044). Report it at the tail.
+        bodyContext.report(INCOMPATIBLE_TYPE, tailNode(node), returnType, BasicType.VOID)
+        return null
       } else {
         last match {
           case st: StatementTerm =>
@@ -691,6 +729,75 @@ final class ClosureTyping(
     statements += lastStatement
     new StatementBlock(statements.asJava)
   }
+
+  /**
+   * Whether a block lambda body ends in an expression that can be its value: anything
+   * but a `return`/`throw`/`break`/`continue`, which already end the path. An
+   * assignment counts, as it does in a lambda with no `return` (`{ k += 7 }` returns
+   * the new value).
+   */
+  private def hasValueTail(node: AST.BlockExpression): Boolean = node.elements.lastOption match {
+    case Some(_: AST.ReturnExpression | _: AST.ThrowExpression |
+              _: AST.BreakExpression | _: AST.ContinueExpression) => false
+    case Some(_: AST.Expression) => true
+    case _ => false
+  }
+
+  private def lastTerm(bodyTerm: Term): Term = bodyTerm match {
+    case begin: Begin if begin.terms.nonEmpty => begin.terms.last
+    case single => single
+  }
+
+  /**
+   * The body of a block lambda that has an early `return` and a value tail: the
+   * tail becomes one more `return`. A tail with no value (void, or one that never
+   * completes) stays a statement, and the caller appends the default return, as
+   * before. Returns null when the tail's type does not fit (reported).
+   */
+  private def buildTailReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type, voidTailOk: Boolean): ActionStatement = {
+    val terms = bodyTerm match {
+      case begin: Begin => begin.terms.toIndexedSeq
+      case single => IndexedSeq(single)
+    }
+    val statements = scala.collection.mutable.ArrayBuffer[ActionStatement]()
+    terms.init.foreach(t => statements += termToStatement(t))
+    if (terms.nonEmpty) {
+      val last = terms.last
+      if (returnType == BasicType.VOID || returnType.isBottomType || last.`type`.isBottomType ||
+          (last.`type` == BasicType.VOID && (voidTailOk || neverCompletes(last)))) {
+        statements += termToStatement(last)
+      } else if (last.`type` == BasicType.VOID) {
+        // As in buildReturnBlock: no value to return for a concrete result type (#3044).
+        bodyContext.report(INCOMPATIBLE_TYPE, tailNode(node), returnType, BasicType.VOID)
+        return null
+      } else {
+        val assigned = processAssignable(node, returnType, last)
+        if (assigned == null) return null
+        statements += new Return(assigned)
+      }
+    }
+    new StatementBlock(statements.asJava)
+  }
+
+  /**
+   * Whether a SAM result type leaves a void tail acceptable: any nullable result, `Void`,
+   * `Object` (what an inferred side-effect body becomes) or a type variable nothing pinned.
+   * The body then returns null. A non-null result such as `Int` or `String` needs a value,
+   * as in Java (#3044). A tail that never completes (`while true`) is always fine.
+   */
+  private def acceptsVoidTail(returnType: Type): Boolean = returnType match {
+    case _: TypedAST.NullableType => true
+    case t: ClassType if t.name == "java.lang.Void" => true
+    case t => t == bodyContext.rootClass || t.isInstanceOf[TypeVariableType]
+  }
+
+  /** A tail that cannot complete normally (an infinite loop, `return`, `throw`) needs no value. */
+  private def neverCompletes(term: Term): Boolean =
+    StatementReachability.definitelyReturns(termToStatement(term))
+
+  /** The block's last element, where a problem with the lambda's result is reported. */
+  private def tailNode(node: AST.BlockExpression): AST.Node =
+    node.elements.lastOption.getOrElse(node)
 
   private def termToStatement(term: Term): ActionStatement = term match {
     case st: StatementTerm => st.statement

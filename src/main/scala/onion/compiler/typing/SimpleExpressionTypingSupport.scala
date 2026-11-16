@@ -258,6 +258,42 @@ private[compiler] final class SimpleExpressionTypingSupport(
     // of `Comparable` says `Integer` (#2649), whatever the erasure allows.
     else TypeRules.isAssignable(expected, actual) && !TypeRelations.ownViewRejects(bodyContext.table, expected, actual)
 
+  /** The primitive a non-nullable expected element type stands for (`Int` in `List[Int]`). */
+  private def primitiveElement(expectedElem: Type): Option[BasicType] = expectedElem match {
+    case null => None
+    case b: BasicType if b != BasicType.VOID => Some(b)
+    case ct: ClassType if !expectedElem.isNullable => onion.compiler.toolbox.Boxing.primitiveOfBoxName(ct.name)
+    case _ => None
+  }
+
+  /** Reports a `null` literal element for a primitive slot (`[5, null]` as a `List[Int]`,
+   *  `["b": null]` as a `Map[String, Int]`): it would only fail at the first read (#2895).
+   *  Rejected at the `null`, as `xs.add(null)` is (#2872). */
+  private def nullIntoPrimitive(node: AST.Node, term: Term, expectedSlot: Type): Boolean =
+    term.`type`.isNullType && (primitiveElement(expectedSlot) match {
+      case Some(primitive) =>
+        bodyContext.report(INCOMPATIBLE_TYPE, node, primitive, term.`type`, onion.compiler.SemanticErrorReporter.PrimitiveTypeArgumentNullHint)
+        true
+      case None => false
+    })
+
+  /**
+   * Whether a literal's typed element/value fits the expected slot type: the one fit rule
+   * shared by list and map literals. A nullable slot also accepts the non-null inner type
+   * (#255), and a generic call into `Int?` may come back typed `Integer?` (#2666, #2693).
+   */
+  private def fitsExpectedSlot(slot: Type, t: Term): Boolean = {
+    val nonNull = slot match { case n: NullableType => n.innerType; case _ => slot }
+    val boxedNullable: Type = slot match {
+      case n: NullableType if n.innerType.isBasicType && n.innerType != BasicType.VOID =>
+        NullableType.of(Boxing.boxedType(bodyContext.table, n.innerType.asInstanceOf[BasicType]))
+      case _ => null
+    }
+    fitsLiteralSlot(slot, t.`type`) ||
+      (nonNull != null && fitsLiteralSlot(nonNull, normalizeListElementType(t.`type`))) ||
+      (boxedNullable != null && fitsLiteralSlot(boxedNullable, t.`type`))
+  }
+
   private def typeListLiteral(node: AST.ListLiteral, context: LocalContext, expected: Type): Option[Term] = {
     val typedElements = new Array[Term](node.elements.size)
     val expectedElem = expectedListElement(expected)
@@ -279,6 +315,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
           // collection element; report it rather than trying to box `void`,
           // which used to crash the compiler (I0000).
           bodyContext.report(INCOMPATIBLE_TYPE, element, bodyContext.rootClass, BasicType.VOID)
+          failed = true
+        } else if (nullIntoPrimitive(element, typedElement, expectedElem)) {
           failed = true
         } else {
           typedElements(index) = typedElement
@@ -315,9 +353,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
         case n: NullableType => n.innerType
         case _ => expectedElem
       }
-      def fitsExpectedElement(t: Term): Boolean =
-        fitsLiteralSlot(expectedElem, t.`type`) ||
-          (expectedNonNull != null && fitsLiteralSlot(expectedNonNull, normalizeListElementType(t.`type`)))
+      def fitsExpectedElement(t: Term): Boolean = fitsExpectedSlot(expectedElem, t)
       val finalElementType =
         if (typedElements.isEmpty) (if (expectedElem != null) expectedElem else bodyContext.rootClass)
         // Target-type the literal: if every element fits the expected element type,
@@ -536,6 +572,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
         } else if (typedValue.`type` eq BasicType.VOID) {
           bodyContext.report(INCOMPATIBLE_TYPE, valueExpr, bodyContext.rootClass, BasicType.VOID)
           failed = true
+        } else if (nullIntoPrimitive(keyExpr, typedKey, expectedKey) || nullIntoPrimitive(valueExpr, typedValue, expectedValue)) {
+          failed = true
         } else {
           keys(index) = typedKey
           values(index) = typedValue
@@ -570,11 +608,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
       // honored instead of failing on the elements' widened join. A nullable-wrapper
       // expected (`Map[String, Integer?]`) also accepts an element that fits its
       // non-null boxed inner, matching the primitive `Int?` form (#255).
-      def fitsExpected(expected: Type, actual: Term): Boolean = {
-        val nonNull = expected match { case n: NullableType => n.innerType; case _ => expected }
-        fitsLiteralSlot(expected, actual.`type`) ||
-          (nonNull != null && fitsLiteralSlot(nonNull, normalizeListElementType(actual.`type`)))
-      }
+      def fitsExpected(expected: Type, actual: Term): Boolean = fitsExpectedSlot(expected, actual)
       val finalKeyType =
         if (keys.isEmpty) (if (expectedKey != null) expectedKey else bodyContext.rootClass)
         else if (expectedKey != null && keys.forall(k => fitsExpected(expectedKey, k))) expectedKey

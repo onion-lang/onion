@@ -184,6 +184,8 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   /** (trait FQCN, type argument FQCN) -> the instance class declared for it, across
     * every unit of this run; a second one is E0097 (TypingDuplicationPass, #2770). */
   private[compiler] val traitInstances = scala.collection.mutable.HashMap.empty[(String, String), String]
+  /** Names of classes registered from a lowered `instance` (TypingHeaderPass.registerClass). */
+  private[compiler] val loweredInstanceNames = scala.collection.mutable.Set.empty[String]
   /** Whether contract clauses are accepted (RFC #2557). */
   private[compiler] def contractMode: ContractMode = config.contracts
 
@@ -207,6 +209,31 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     loaded.table
   }
   private val diagnostics = new TypingDiagnostics(this, session)
+  /** Classes and interfaces the outline pass reported E0016 for, in source order. */
+  private[compiler] val cyclicDefinitions = scala.collection.mutable.Buffer[ClassDefinition]()
+
+  /** Once E0016 is reported, cut each cyclic supertype edge, so that every later walk
+   *  over supertypes (method lookup, extension lookup, subtyping) terminates (#2975).
+   *  An edge `d -> p` is cut when `p` leads back to `d`: a superclass becomes `Object`,
+   *  an interface is dropped. Only definitions E0016 was reported for are touched, so a
+   *  program that compiles is never changed, and the compile fails anyway. */
+  private def cutInheritanceCycles(): Unit = cyclicDefinitions.distinct.foreach { definition =>
+    def rawOf(t: ClassType): ClassType = t match {
+      case applied: AppliedClassType => applied.raw
+      case other => other
+    }
+    def reaches(from: ClassType): Boolean = {
+      val seen = scala.collection.mutable.Set[ClassType]()
+      def walk(t: ClassType): Boolean = t != null && {
+        val raw = rawOf(t)
+        (raw eq definition) || (seen.add(raw) && (walk(raw.superClass) || raw.interfaces.exists(walk)))
+      }
+      walk(from)
+    }
+    if (reaches(definition.superClass)) definition.setSuperClass(rootClass)
+    val kept = definition.interfaces.filterNot(reaches)
+    if (kept.length != definition.interfaces.length) definition.setInterfaces(kept.toArray)
+  }
   private val typeSupport = new TypingTypeSupport(this)
 
   def newEnvironment(source: Seq[AST.CompilationUnit]) = new TypingEnvironment
@@ -224,7 +251,16 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
 
   def processBody(source: Seq[AST.CompilationUnit], environment: TypingEnvironment): Seq[ClassDefinition] = {
     for(unit <- source) processHeader(unit)
+    for(unit <- source) {
+      new onion.compiler.typing.TypingHeaderPass(this, session.activate(unit)).checkImports()
+    }
+    val heldBoundChecks = processTypeParameters(source)
     for(unit <- source) processOutline(unit)
+    cutInheritanceCycles()
+    // A bound inside a type-parameter bound (`[T extends Num[String]]`) is checked only now:
+    // `Num` may be declared later, so its own bounds were placeholders then, and an argument's
+    // supertypes (`MyNum extends Number`) are known only after the outline (#2967).
+    for((unit, checks) <- heldBoundChecks) { session.activate(unit); checks.foreach(_()) }
     // Every unit's defaults are typed before any body, so a call may omit a default
     // declared later in its file or in another file (#2653).
     val bodyPasses = source.map(unit => unit -> new onion.compiler.typing.TypingBodyPass(this, session.activate(unit)))
@@ -240,7 +276,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     // Pass 6 (RFC #2557): a contract expression must be pure. Same reason to run here.
     new onion.compiler.typing.ContractPurityPass(this).run(table_.classes.values.toSeq)
     // RFC #2557: a write that breaks a `history`, decided from the syntax alone.
-    new onion.compiler.typing.HistoryWritePass(this).run(source)
+    new onion.compiler.typing.HistoryWritePass(this, typedOf = lookupKernelNode).run(source)
     // RFC #2557 design 4: an override's body against the effective contract.
     new onion.compiler.typing.OverrideContractPass((file, location, message) => {
       warningReporter_.setSourceFile(file)
@@ -268,6 +304,14 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   }
   def processOutline(unit: AST.CompilationUnit): Unit =
     new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).run()
+  /** Every unit's type parameters, before any unit's outline, so file order does not matter (#2853). */
+  private def processTypeParameters(source: Seq[AST.CompilationUnit]): Seq[(AST.CompilationUnit, List[() => Unit])] = {
+    for (unit <- source) new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit)).registerTypeParameterPlaceholders()
+    for (unit <- source) yield {
+      val pass = new onion.compiler.typing.TypingOutlinePass(this, session.activate(unit))
+      unit -> holdBoundChecks(pass.registerTypeParameters())
+    }
+  }
   def processTyping(unit: AST.CompilationUnit): Unit = {
     val pass = new onion.compiler.typing.TypingBodyPass(this, session.activate(unit))
     onion.compiler.typing.DefaultScheduling.run(pass.defaultJobs().map(unit -> _))(u => session.activate(u))
@@ -286,6 +330,49 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     unitContext.reportingSuppressed += 1
     try block
     finally unitContext.reportingSuppressed -= 1
+  }
+
+  /**
+   * Reports a generic call's bound error, or, while reporting is suppressed, keeps it with
+   * the term that call produces (#2538). A bound error does not fail typing, so a
+   * speculative typing whose result is kept would otherwise lose it, and the program would
+   * fail at run time instead. The rule: a kept term reports its bound errors.
+   * [[claimMutedBoundErrors]] ties the kept errors to the term, and
+   * [[reportBoundErrorsKeptIn]] reports those of every term that reaches a final typing.
+   */
+  private[compiler] def reportBoundError(call: AST.Node, error: SemanticError, node: AST.Node, items: AnyRef*): Unit =
+    if (reportingEnabled) report(error, node, items*)
+    else currentUnitContext.mutedBoundErrors += (call -> (() => report(error, node, items*)))
+
+  private[compiler] def mutedBoundErrorMark: Int = currentUnitContext.mutedBoundErrors.length
+
+  /**
+   * Ties the bound errors muted since `mark` for the call `node` itself to `term`, its
+   * result. The rest were found by a typing whose result was not returned here, such as a
+   * speculative re-type the caller judged on its own, and are dropped as before.
+   */
+  private[compiler] def claimMutedBoundErrors(mark: Int, node: AST.Node, term: Option[TypedAST.Term]): Unit = {
+    val ctx = currentUnitContext
+    if (ctx.mutedBoundErrors.length > mark) {
+      val own = ctx.mutedBoundErrors.drop(mark).collect { case (call, report) if call eq node => report }.toList
+      ctx.mutedBoundErrors.dropRightInPlace(ctx.mutedBoundErrors.length - mark)
+      for (t <- term if own.nonEmpty) {
+        val prior = Option(ctx.boundErrorsByTerm.get(t)).getOrElse(Nil)
+        ctx.boundErrorsByTerm.put(t, prior ++ own)
+      }
+    }
+  }
+
+  /** Reports, once, the bound errors kept with `term` or any term beneath it. */
+  private[compiler] def reportBoundErrorsKeptIn(term: TypedAST.Term): Unit = {
+    val kept = currentUnitContext.boundErrorsByTerm
+    if (!kept.isEmpty && reportingEnabled) {
+      TermWalk.exists(term, intoClosures = true, intoResources = true) { node =>
+        val errors = kept.remove(node)
+        if (errors != null) errors.foreach(_())
+        kept.isEmpty
+      }
+    }
   }
 
   /**
@@ -320,6 +407,23 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     } finally ctx.deferringBoundChecks -= 1
   }
 
+  /**
+   * Runs `block` with bound checks deferred like [[withDeferredBoundChecks]], but returns the
+   * collected checks instead of running them, for the caller to run once later (#2967).
+   */
+  private[compiler] def holdBoundChecks(block: => Unit): List[() => Unit] = {
+    val ctx = currentUnitContext
+    ctx.deferringBoundChecks += 1
+    try {
+      block
+      if (ctx.deferringBoundChecks == 1) {
+        val pending = ctx.deferredBoundChecks.toList
+        ctx.deferredBoundChecks.clear()
+        pending
+      } else Nil
+    } finally ctx.deferringBoundChecks -= 1
+  }
+
   /** True while inside [[withDeferredBoundChecks]]; bound checks queue instead of run. */
   private[compiler] def boundChecksDeferred: Boolean = currentUnitContext.deferringBoundChecks > 0
 
@@ -351,7 +455,21 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   /** Loads a class the compiler itself depends on; throws if the classpath is broken. */
   def loadRequired(name: String): ClassType = table_.loadRequired(name)
   /** The top-level container class; absent when the unit has only type declarations. */
-  def loadTopClass: Option[ClassType] = table_.load(topClass)
+  def loadTopClass: Option[ClassType] = if (ownsTopClass) table_.load(topClass) else None
+  /** Which unit's top-level code became each container class (`xMain`). */
+  private[compiler] val topLevelContainerOwners = scala.collection.mutable.Map[String, AST.CompilationUnit]()
+  /** Units with top-level code whose container name another unit took (already E0008, #2690). */
+  private[compiler] val duplicateScriptUnits =
+    java.util.Collections.newSetFromMap(new java.util.IdentityHashMap[AST.CompilationUnit, java.lang.Boolean]())
+  /**
+   * False when another file with the same name owns `topClass`: a class-only `e1/y.on`
+   * must not take `e2/y.on`'s `yMain` as its own (#2956). A duplicate script still types
+   * against the other file's container, so it reports its E0008 and nothing else.
+   */
+  private[compiler] def ownsTopClass: Boolean =
+    topLevelContainerOwners.get(topClass).forall(_ eq unit_) || duplicateScriptUnits.contains(unit_)
+  /** The name resolver of this unit's own container, if it has one. */
+  private[compiler] def findTopClassMapper: Option[NameResolver] = if (ownsTopClass) find(topClass) else None
   def loadArray(base: Type, dimension: Int): ArrayType = table_.loadArray(base, dimension)
   def rootClass: ClassType = table_.rootClass
   def problems: Array[CompileError] = diagnostics.problems
@@ -390,6 +508,9 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     paths.mkString(Systems.pathSeparator)
   private[compiler] def typesOf(arguments: List[AST.Argument]): Option[List[Type]] =
     typeSupport.typesOf(arguments)
+
+  private[compiler] def checkInferredTypeArgumentBounds(typeNode: AST.TypeNode, applied: AppliedClassType): Unit =
+    typeSupport.checkInferredTypeArgumentBounds(typeNode, applied)
 
   private[compiler] def mapFrom(typeNode: AST.TypeNode): Option[Type] =
     typeSupport.mapFrom(typeNode)

@@ -113,5 +113,16 @@ class Utf8TextIOSpec extends AnyFunSpec with Matchers with BeforeAndAfterEach {
       System.setIn(new ByteArrayInputStream((japanese + "\n二行目\n").getBytes(StandardCharsets.UTF_8)))
       onion.IO.readLines().asScala.toList shouldBe List(japanese, "二行目")
     }
+
+    it("drops a leading BOM, and only a leading one (#3036)") {
+      System.setIn(new ByteArrayInputStream(("\uFEFFline1\n\uFEFFline2\n").getBytes(StandardCharsets.UTF_8)))
+      onion.IO.readLine() shouldBe "line1"
+      onion.IO.readLine() shouldBe "\uFEFFline2"
+    }
+
+    it("drops a BOM that is the whole first chunk of readAll") {
+      System.setIn(new ByteArrayInputStream("\uFEFF".getBytes(StandardCharsets.UTF_8)))
+      onion.IO.readAll() shouldBe ""
+    }
   }
 }

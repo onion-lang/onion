@@ -360,6 +360,9 @@ Java APIs are not checked, because the compiler does not know their nullness:
   `Http::encodeUrl(null)` do not warn.
 - Except when the parameter is the receiver's own type argument: `xs.add(null)`
   on a `List[String]` warns, because you chose `String` there.
+  When that type argument is a primitive, it is an error (E0000), not a warning:
+  `xs.add(null)` on a `List[Int]`, `f(null)` on an `(Int) -> T`. An `Int` is
+  never null; to store `null`, write the type argument as `Int?` (`List[Int?]`).
 
 A method written in Onion warns, also when it was compiled separately (a
 project's `tests/` calling `src/`, or an Onion library jar).
@@ -518,6 +521,12 @@ Type variables coming from Java classes are *platform* parameters:
 their nullability is unknown, so they accept nullable arguments and
 remain dereferenceable (matching how Java values are treated
 elsewhere).
+
+Unboxing such a value to `Int` warns (W0015), since a Java call may return
+null to mean "nothing here" (`Deque.poll()`, `Map.get`). A read that returns an
+element or throws does not warn when the type argument is non-null:
+`List.get` and `xs[i]`, `Iterator.next`, `Map.Entry.getKey`/`getValue`, and
+`Option`/`Result` reads such as `get` and `getOrElse`.
 
 ## Next Steps
 

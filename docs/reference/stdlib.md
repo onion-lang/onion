@@ -1413,6 +1413,7 @@ String utilities (`onion.Strings`, auto-imported):
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
 Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
+Strings::split("a,b,,", ",")          // ["a","b","",""]: trailing empty fields are kept
 Strings::join(parts, "-")             // arrays or Lists
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -1673,6 +1674,9 @@ Json::stringify(0.0d / 0.0d)           // "null"
 record Point(x: Int, y: Int)
 Json::stringify(new Point(1, 2))       // {"x":1,"y":2}
 
+// A Set or a Java array is a JSON array too, in iteration order
+Json::stringify(Colls::toList(args))   // ["a","b"]; Json::stringify(args) gives the same
+
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
 v["users"][0]["name"].asString()
@@ -1703,6 +1707,9 @@ another "absent" case rather than an error to handle separately:
 ```onion
 val obj = Json::parseOrNull("not json")   // null, no exception
 ```
+
+Nesting is limited to 512 levels. Deeper input is a `Json.JsonParseException`
+("Nesting too deep"), so `parseOrNull` returns `null` for it.
 
 When you do want to handle a malformed-input failure, `Json.JsonParseException` carries
 `getPosition()` — the character offset into the input where parsing gave up — in addition
@@ -1736,8 +1743,8 @@ exactly the same `toMap` / `fromMap` core as `derive!(Json)`.
 Scope: a flat block mapping, or a top-level block sequence of flat mappings (no
 nested maps/sequences within an element, no anchors, no tags, no flow collections). A
 construct outside that scope raises an error rather than silently losing data:
-`Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List value,
-and `Yaml::parse` throws `Yaml.YamlParseException` on:
+`Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List value, a
+List element that is not a Map, an empty Map element, and NaN or an infinity, and `Yaml::parse` throws `Yaml.YamlParseException` on:
 
 - a nested mapping: a line indented deeper than its siblings, at the top level or
   inside a sequence element
@@ -1929,6 +1936,8 @@ naming the line where the quote was opened, rather than swallowing the rest of t
 ```onion
 val rows = Csv::parse(text)                  // List of List of String
 val recs = Csv::parseWithHeader(text)        // List of Map (header -> value)
+                                             // a repeated header keeps its last column;
+                                             // a different value in an earlier one throws
 
 Csv::column(rows, 0)                          // one positional column
 Csv::columnByName(recs, "age")                // one header-named column
@@ -2074,6 +2083,18 @@ Text::table([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]])
 // Bob    Sales
 ```
 
+`wrap` and `table` measure width in terminal columns: a full-width (Japanese,
+Chinese, Korean) character counts as two. `wrap` breaks at spaces, and also between
+full-width characters, so text with no spaces wraps too:
+
+```onion
+Text::wrap("吾輩は猫である。名前はまだ無い。", 10)
+// ["吾輩は猫で", "ある。名前", "はまだ無", "い。"]
+```
+
+Closing punctuation (`。`, `」`) never starts a line, and an opening bracket (`「`)
+never ends one.
+
 Each is also a builtin extension method on its receiver (`String` for
 `wrap`/`indent`/`dedent`, `List` for `table`):
 
@@ -2109,7 +2130,7 @@ val parsed = Args::parse(args)
 parsed.flag("verbose")                  // --verbose
 parsed.option("out", "a.out")           // --out path (with default)
 parsed.option("out")                    // --out path, or null if absent
-parsed.intOption("level", 3)
+parsed.intOption("level", 3)              // default only when absent; "--level x" throws
 parsed.positional()                     // List of non-option arguments
 ```
 
@@ -2850,7 +2871,7 @@ Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- literal doll
 ### Splitting
 
 ```
-Regex::split(input, pattern): List[String]
+Regex::split(input, pattern): List[String]   // trailing empty fields are kept: ("x;y;;", ";") is 4 fields
 Regex::split(input, pattern, limit): List[String]
 ```
 

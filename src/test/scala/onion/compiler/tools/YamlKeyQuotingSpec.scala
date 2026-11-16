@@ -57,6 +57,27 @@ class YamlKeyQuotingSpec extends AbstractShellSpec {
       assert(Shell.Success("ok") == result)
     }
 
+    it("round-trips a key and a value containing an inner double quote") {
+      val result = shell.run(
+        """
+          |import { onion.Yaml::*; java.util.Map; }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val m = ["5\" tv": "a\"b"]
+          |    val back = (Yaml::parse(Yaml::stringify(m)) as Map)
+          |    if !back.containsKey("5\" tv") { return "key lost" }
+          |    if back.get("5\" tv") != "a\"b" { return "value corrupted" }
+          |    return "ok"
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(Shell.Success("ok") == result)
+    }
+
     it("still renders a plain identifier-like key unquoted") {
       val result = shell.run(
         """

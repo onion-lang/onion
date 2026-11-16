@@ -178,6 +178,7 @@ true
 do ブロックに書けるのは `x <- expr` のバインドと、最後の `yield` だけです。`val`/`var` や、単独の文は書けません。
 
 - 途中の値に名前を付けるときは、バインドします：`doubled <- Option::some(x * 2)`。
+- `do[Result]` の中の `y <- Result::ok(e)`（または `Result::successful(e)`）は `val y = e` と同じです。ブロックのエラー型は、ほかのバインドから決まります。これは `onion.Result` だけに当てはまり、自分で定義した `Result` という名前のクラスには当てはまりません。
 - 副作用を実行するときは、`yield` のブロックの中で、結果の前に書きます。
 
 ```onion

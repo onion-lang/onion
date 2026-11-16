@@ -64,8 +64,8 @@ class HistoryInheritedMethodSpec extends AnyFunSpec {
     assert(o.errors.isEmpty, o.toString)
   }
 
-  it("accepts an inherited method that only raises or reads the field") {
-    val o = compile(program("def bump(): void { n = n + 2 }"))
+  it("accepts an inherited method that only raises (bounded by a requires) or reads the field") {
+    val o = compile(program("def bump(): void requires n < 1000 { n = n + 2 }"))
     assert(o.errors.isEmpty, o.toString)
     assert(o.w24.isEmpty, o.toString)
   }
@@ -242,5 +242,217 @@ class HistoryInheritedMethodSpec extends AnyFunSpec {
     val o = compile(src)
     assert(o.errors == Seq("E0109"), o.toString)
     assert(o.messages.exists(m => m.contains("`B`") && !m.contains("`C`")), o.toString)
+  }
+
+  it("is E0112 for an inherited `n = n + 1` that can overflow a subclass history (#2787)") {
+    val src =
+      """class Base {
+        |protected:
+        |  var n: Int
+        |public:
+        |  def this { n = 10 }
+        |  def inc(): void { n = n + 1 }
+        |  def get(): Int = n
+        |}
+        |class Up extends Base {
+        |  history n >= old(n)
+        |public:
+        |  def this { }
+        |  def bump(): void requires n < 1000 { n = n + 2 }
+        |}
+        |val u = new Up(); u.inc(); u.bump(); println(u.get())""".stripMargin
+    assert(compile(src).errors == Seq("E0112"))
+  }
+
+  it("accepts an inherited `n = n + 1` that a `requires` keeps from overflowing (#2787)") {
+    val src =
+      """class Base {
+        |protected:
+        |  var n: Int
+        |public:
+        |  def this { n = 10 }
+        |  def inc(): void requires n < 1000 { n = n + 1 }
+        |  def get(): Int = n
+        |}
+        |class Up extends Base {
+        |  history n >= old(n)
+        |public:
+        |  def this { }
+        |}
+        |val u = new Up(); u.inc(); println(u.get())""".stripMargin
+    assert(compile(src).errors.isEmpty)
+  }
+
+  // Panel block on #2953: the inherited E0112 names both classes and offers the override, as E0109 does,
+  // so two subclasses that inherit the same method get two distinguishable errors.
+  it("names the subclass and the superclass in an inherited E0112, one error per subclass (#2787)") {
+    val src =
+      """class Base {
+        |protected:
+        |  var n: Int
+        |public:
+        |  def this { n = 10 }
+        |  def inc(): void { n = n + 1 }
+        |  def get(): Int = n
+        |}
+        |class Up extends Base {
+        |  history n >= old(n)
+        |public:
+        |  def this { }
+        |}
+        |class Up2 extends Base {
+        |  history n >= old(n)
+        |public:
+        |  def this { }
+        |}
+        |val u = new Up(); u.inc(); println(u.get())""".stripMargin
+    val o = compile(src)
+    assert(o.errors == Seq("E0112", "E0112"), o.toString)
+    assert(o.messages.exists(m => m.contains("`Up`") && m.contains("`Base`") && m.contains("`inc`")), o.toString)
+    assert(o.messages.exists(m => m.contains("`Up2`") && m.contains("`Base`")), o.toString)
+    assert(o.messages.distinct.size == 2, o.toString)
+  }
+
+  // #2782: an override that delegates to `super` runs the superclass's body on the subclass.
+  it("is E0109 for an override that calls a lowering `super` method (the #2782 repro)") {
+    val o = compile(program("def dec(): void { n = n - 1 }", "override def dec(): void { super.dec() }"))
+    assert(o.errors == Seq("E0109"), o.toString)
+    assert(o.messages.exists(m => m.contains("super.dec") && m.contains("`Base`") && !m.contains("without overriding")), o.toString)
+  }
+
+  it("is E0109 when any method of the subclass calls the lowering `super` method") {
+    val o = compile(program("def dec(): void { n = n - 1 }", "override def dec(): void { }\n  def twice(): void { super.dec(); super.dec() }"))
+    assert(o.errors == Seq("E0109"), o.toString)
+  }
+
+  it("accepts an override that calls a `super` method that only raises the field") {
+    val o = compile(program("def bump(): void { n = n + 2 }", "override def bump(): void { super.bump() }"))
+    assert(o.errors.isEmpty, o.toString)
+    assert(o.w24.isEmpty, o.toString)
+  }
+
+  it("warns W0024 for a `super` method whose write the syntax does not settle, without saying it is not overridden") {
+    val o = compile(program("def scale(k: Int): void { n = n * k }", "override def scale(k: Int): void { super.scale(k) }"))
+    assert(o.errors.isEmpty, o.toString)
+    assert(o.w24.exists(m => m.contains("Base.scale") && m.contains("super.scale") && !m.contains("without overriding")), o.toString)
+  }
+
+  it("follows a `super` call to a private write the superclass method reaches") {
+    val o = compile(program("def dec(): void { lower() }\nprivate:\n  def lower(): void { n = n - 1 }\npublic:",
+      "override def dec(): void { super.dec() }"))
+    assert(o.errors == Seq("E0109"), o.toString)
+  }
+
+  it("follows `super` through a middle class, both from the subclass and from an inherited override") {
+    def src(mid: String, up: String) =
+      s"""class A {
+         |protected:
+         |  var n: Int
+         |public:
+         |  def this { n = 10 }
+         |  def dec(): void { n = n - 1 }
+         |}
+         |class B extends A {
+         |public:
+         |  $mid
+         |}
+         |class C extends B {
+         |  history n >= old(n)
+         |public:
+         |  $up
+         |}""".stripMargin
+    // B does not declare `dec`, so C's `super.dec()` runs A's.
+    assert(compile(src("", "override def dec(): void { super.dec() }")).errors == Seq("E0109"))
+    // C inherits B's override, which delegates to A's.
+    assert(compile(src("override def dec(): void { super.dec() }", "")).errors == Seq("E0109"))
+    // B's override does not delegate, so nothing lowers `n`.
+    assert(compile(src("override def dec(): void { }", "override def dec(): void { super.dec() }")).errors.isEmpty)
+  }
+
+  // Panel block on #2870: `super.set(x)` is matched to the overload it resolves to, not to the
+  // first method of the same name and arity.
+  describe("a `super` call to one of two same-arity overloads") {
+    def src(first: String, second: String) =
+      s"""class Base {
+         |protected:
+         |  var n: Int
+         |  var s: String
+         |public:
+         |  def this { n = 10; s = "" }
+         |  $first
+         |  $second
+         |  def get(): Int = n
+         |}
+         |class Up extends Base {
+         |  history n >= old(n)
+         |public:
+         |  override def set(x: Int): void { if n < 1000 { n = n + 1 } }
+         |  override def set(x: String): void { super.set(x) }
+         |}
+         |val u = new Up(); u.set("a"); println(u.get())""".stripMargin
+    val lowersInt = "def set(x: Int): void { n = n - 1 }"
+    val keepsString = "def set(x: String): void { s = x }"
+    val lowersString = "def set(x: String): void { n = n - 1 }"
+    val keepsInt = "def set(x: Int): void { s = \"\" + x }"
+
+    it("accepts the call when the overload it runs does not lower the field, in either declaration order") {
+      for (o <- Seq(compile(src(lowersInt, keepsString)), compile(src(keepsString, lowersInt)))) {
+        assert(o.errors.isEmpty, o.toString)
+        assert(o.w24.isEmpty, o.toString)
+      }
+    }
+
+    it("follows the overload a `super` call inside a lambda runs") {
+      def viaLambda(first: String, second: String) =
+        src(first, second).replace("{ super.set(x) }", "{ val f: () -> void = () -> super.set(x); f() }")
+      val ok = compile(viaLambda(lowersInt, keepsString))
+      assert(ok.errors.isEmpty && ok.w24.isEmpty, ok.toString)
+      assert(compile(viaLambda(keepsInt, lowersString)).errors == Seq("E0109"))
+    }
+
+    it("is E0109 when the overload it runs lowers the field, in either declaration order") {
+      assert(compile(src(keepsInt, lowersString)).errors == Seq("E0109"))
+      assert(compile(src(lowersString, keepsInt)).errors == Seq("E0109"))
+    }
+  }
+
+  // #2786: a method of the same name and arity but other parameter types is an overload, not an
+  // override (E0068 already says so), so the inherited method still runs on the subclass.
+  describe("a same-arity overload in the subclass") {
+    it("does not hide an inherited method that lowers the field (the issue's repro)") {
+      val o = compile(program("def dec(k: Int): void { n = n - 1 }", "def dec(k: Long): void { }"))
+      assert(o.errors == Seq("E0109"), o.toString)
+      assert(o.messages.exists(m => m.contains("Base") && m.contains("dec")), o.toString)
+    }
+
+    it("still lets an override with the same parameter types replace it") {
+      val o = compile(program("def dec(k: Int): void { n = n - 1 }", "override def dec(k: Int): void { }"))
+      assert(o.errors.isEmpty, o.toString)
+      assert(o.w24.isEmpty, o.toString)
+    }
+
+    it("does not hide an inherited override whose `super` call lowers the field (the #2870 repro)") {
+      val src =
+        """class A {
+          |protected:
+          |  var n: Int
+          |public:
+          |  def this { n = 10 }
+          |  def set(x: Int): void { }
+          |  def set(x: String): void { n = n - 1 }
+          |  def get(): Int = n
+          |}
+          |class B extends A {
+          |public:
+          |  override def set(x: Int): void { super.set("q") }
+          |}
+          |class C extends B {
+          |  history n >= old(n)
+          |public:
+          |  override def set(x: String): void { }
+          |}
+          |val c = new C(); c.set(1); println(c.get())""".stripMargin
+      assert(compile(src).errors == Seq("E0109"), compile(src).toString)
+    }
   }
 }

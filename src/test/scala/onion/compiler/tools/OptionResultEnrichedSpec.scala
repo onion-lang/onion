@@ -123,5 +123,44 @@ class OptionResultEnrichedSpec extends AbstractShellSpec {
         "c.getOrElse(\"X\") + \"|\" + c.isOk() + \"|\" + d.getError().getMessage() + \"|\" + d.isErr()",
         Shell.Success("v|true|boom|true|ok|true|bad|true"))
     }
+
+    // #3066: a Throwable error is rethrown as itself, so `catch e: IOException` still fires.
+    it("getOrThrow rethrows a checked Throwable error unwrapped") {
+      run(
+        "val r: Result[String, Throwable] = Result::trying { throw new java.io.IOException(\"gone\") }\n" +
+        "try { r.getOrThrow() }\n" +
+        "catch e: java.io.IOException { return \"io:\" + e.getMessage() }\n" +
+        "catch e: RuntimeException { return \"wrapped\" }\n" +
+        "return \"none\"",
+        Shell.Success("io:gone"))
+    }
+
+    it("getOrThrow rethrows an unchecked Throwable error as the same object") {
+      run(
+        "val boom: Throwable = new IllegalStateException(\"bad\")\n" +
+        "val r: Result[String, Throwable] = Result::err(boom)\n" +
+        "try { r.getOrThrow() }\n" +
+        "catch e: IllegalStateException { return if e === boom { \"same\" } else { \"copy\" } }\n" +
+        "return \"none\"",
+        Shell.Success("same"))
+    }
+
+    it("getOrThrow still wraps a non-Throwable error in a RuntimeException with its text") {
+      run(
+        "val r: Result[String, String] = Result::err(\"disk full\")\n" +
+        "try { r.getOrThrow() }\n" +
+        "catch e: RuntimeException { return e.getMessage() }\n" +
+        "return \"none\"",
+        Shell.Success("disk full"))
+    }
+
+    it("get on an Err names the error") {
+      run(
+        "val r: Result[Int, String] = Result::err(\"disk full\")\n" +
+        "try { r.get() }\n" +
+        "catch e: java.util.NoSuchElementException { return e.getMessage() }\n" +
+        "return \"none\"",
+        Shell.Success("Err.get(): disk full"))
+    }
   }
 }

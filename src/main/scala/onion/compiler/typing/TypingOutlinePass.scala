@@ -33,7 +33,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   private def loadRequired(name: String): ClassType =
     typing.loadRequired(name)
   private def loadTopClass: ClassType =
-    typing.loadRequired(typing.topClass)
+    typing.loadTopClass.orNull
   // Outline-pass type references are all declared positions (return types,
   // fields, globals, throws, inheritance, extension receivers), so raw generic
   // types are forbidden here.
@@ -54,8 +54,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   private var constructorCount = 0
 
-  def run(): Unit = {
-    find(topClass).foreach(unitContext.currentMapper = _)
+  /**
+   * Phase A, run for every unit before any unit's [[registerTypeParameters]]: a placeholder
+   * type-parameter arity (Object bounds) for every generic type in this unit.
+   */
+  def registerTypeParameterPlaceholders(): Unit = {
+    typing.findTopClassMapper.foreach(unitContext.currentMapper = _)
     // Phase A: register a placeholder type-parameter arity (Object bounds) for every
     // generic type BEFORE any bounds are resolved, so a self-referential bound like
     // `class C[T extends C[T]]` can resolve `C[T]` (C is already known to be generic)
@@ -69,9 +73,16 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       case node: AST.RecordDeclaration => placeholders(node, node.typeParameters)
       case _ =>
     }
+  }
+
+  /**
+   * Runs for every unit before any unit's [[run]], so a generic type declared in a later
+   * file already has its type parameters when an earlier file names it (`Crate[Int]`, #2853).
+   */
+  def registerTypeParameters(): Unit = {
     // Pre-pass: register every declared type's type parameters before any
     // hierarchy resolution, so 'class A : B[String]' works even when B is
-    // declared later in the file.
+    // declared later in the file, or in a later file.
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration =>
         typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
@@ -99,7 +110,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         }
       case _ =>
     }
-    find(topClass).foreach(unitContext.currentMapper = _)
+  }
+
+  def run(): Unit = {
+    typing.findTopClassMapper.foreach(unitContext.currentMapper = _)
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
@@ -123,7 +137,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
     definition_.ownTypeVariables = classTypeParams.map(_.variableType).toArray
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
-    if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
+    if (cyclic(definition_)) { report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name); typing.cyclicDefinitions += definition_ }
 
     openTypeParams(emptyTypeParams ++ classTypeParams) {
       node.defaultSection.foreach(processAccessSection)
@@ -142,7 +156,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
     definition_.ownTypeVariables = interfaceTypeParams.map(_.variableType).toArray
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
-    if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
+    if (cyclic(definition_)) { report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name); typing.cyclicDefinitions += definition_ }
 
     openTypeParams(emptyTypeParams ++ interfaceTypeParams) {
       node.methods.foreach(processInterfaceMethodDeclaration)
@@ -214,7 +228,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       // Create constructor
       val ctorModifier = Modifier.PUBLIC
       val ctor = new ConstructorDefinition(node.location, ctorModifier, definition_, argTypes, null, null)
-      // Set argument names for named argument support (records don't have default values)
+      // Argument names for named arguments; component defaults are typed by the body pass (#2829)
       val methodArgs = node.args.zip(argTypes).map { case (arg, argType) =>
         MethodArgument(arg.name, argType, None)
       }.toArray
@@ -388,7 +402,15 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         if (hasShapes && unsupportedFrom.isEmpty) unsupportedShape.foreach { case (arg, argType, sc) =>
           val supported =
             if (isJsonClause(sc)) JsonShapeComponents.supportedDescription else ScalarConversions.supportedNames
-          report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, argType.displayName,
+          // A component written as an alias (`n: Name`, `type Name = JS` in another file) is named
+          // by what it resolved to, so the message would never mention `Name` (#2530).
+          val resolvedName = argType.displayName
+          val shown = arg.typeRef.desc match {
+            case AST.ReferenceType(written, _) if written != resolvedName && !resolvedName.endsWith("." + written) =>
+              s"$written (= $resolvedName)"
+            case _ => resolvedName
+          }
+          report(SemanticError.RECORD_FROM_COMPONENT_UNSUPPORTED, arg, arg.name, shown,
             supported, shapeClauseSyntax(sc))
         }
         // The `from` synthesis inherits E0059/E0060 by lowering to a regex select pattern;
@@ -879,6 +901,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     for (args <- argsOption) {
       val modifier = node.modifiers | access_
       val constructor = new ConstructorDefinition(node.location, modifier, definition_, args.toArray, null, null)
+      constructor.vararg = node.args.lastOption.exists(_.isVararg)
       // The parameter names are known now, so a named call or delegation typed before this
       // constructor's body (`: this(z = 1)` above the primary, `extends A(a = x)` above `A`)
       // binds them. The body pass replaces this with the typed defaults.

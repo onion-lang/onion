@@ -145,6 +145,7 @@ object ReflectionRefs {
   private class ReflectConstructorRef(constructor: Constructor[?], override val affiliation: TypedAST.ClassType, mapper: GenericTypeMapper, baseEnv: Map[String, TypedAST.TypeVariableType]) extends TypedAST.ConstructorRef {
     override val modifier: Int = toOnionModifier(constructor.getModifiers)
     override val name: String = "<init>"
+    override val isVararg: Boolean = constructor.isVarArgs
     private val (typeParams0, env0) = mapper.typeParamsFrom(constructor.getTypeParameters, baseEnv)
     override val typeParameters: Array[TypedAST.TypeParameter] = typeParams0.clone()
     private val args0: Array[TypedAST.Type] = constructor.getGenericParameterTypes.map(t => mapper.toOnionType(t, env0))

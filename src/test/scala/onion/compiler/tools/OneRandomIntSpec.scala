@@ -297,11 +297,45 @@ class OneRandomIntSpec extends AbstractShellSpec {
       assert(after.contains("println(OnionMath::randomInt(1, Rand::nextInt(2, 3)))"), s"$after\n$output")
     }
 
-    it("notes a max of 2147483647, which has no max + 1, and leaves it as written") {
-      val source = "val n = OnionMath::randomInt(0, 2147483647)\n"
+    // #3116 block 5: `max + 1` of Int.MAX_VALUE overflows, whatever spells the constant.
+    Seq(
+      "2147483647",
+      "2_147_483_647",
+      "0x7FFFFFFF",
+      "0x7fff_ffff",
+      "0b1111111111111111111111111111111",
+      "Integer::MAX_VALUE",
+      "JInteger::MAX_VALUE",
+      "java.lang.Integer::MAX_VALUE",
+      "(Integer::MAX_VALUE)",
+      "Integer::MIN_VALUE - 1",
+      "2147483646 + 1"
+    ).foreach { max =>
+      it(s"notes a max of Int.MAX_VALUE spelled `$max`, and leaves it as written") {
+        val source = s"val n = OnionMath::randomInt(0, $max)\n"
+        val (_, after, output) = migrate(source)
+        assert(after == source, output)
+        assert(output.contains("old.on:1:20: note:"), output)
+      }
+    }
+
+    it("notes a max of Int.MAX_VALUE through an import alias of Integer") {
+      val source = "import { java.lang.Integer as I; }\nval n = OnionMath::randomInt(0, I::MAX_VALUE)\n"
       val (_, after, output) = migrate(source)
-      assert(after == source)
-      assert(output.contains("old.on:1:20: note:"), output)
+      assert(after == source, output)
+      assert(output.contains("old.on:2:20: note:"), output)
+    }
+
+    it("still rewrites a max that is a constant below Int.MAX_VALUE, in any spelling") {
+      Seq(
+        "0x7FFFFFFE" -> "Rand::nextInt(0, 0x7FFFFFFE + 1)",
+        "Integer::MAX_VALUE - 1" -> "Rand::nextInt(0, Integer::MAX_VALUE)",
+        "Short::MAX_VALUE" -> "Rand::nextInt(0, (Short::MAX_VALUE) + 1)"
+      ).foreach { (max, expected) =>
+        val (code, after, output) = migrate(s"val n = OnionMath::randomInt(0, $max)\nprintln(n >= 0)\n")
+        assert(code == 0, output)
+        assert(after.contains(expected), s"$after\n$output")
+      }
     }
   }
 }

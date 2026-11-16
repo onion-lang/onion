@@ -217,8 +217,8 @@ val e: Double = Math::E         // 2.71828...
 
 ## OnionMath モジュール
 
-JDKの`Math`とは別の`onion.*`数値モジュールで、双曲線関数、安全な丸め・クランプ、範囲付きの
-乱数整数を提供します。標準ライブラリの他のモジュールと同様デフォルトでインポートされるため、
+JDKの`Math`とは別の`onion.*`数値モジュールで、双曲線関数、安全な丸め・クランプ、乱数の
+`Double`を提供します。範囲内の乱数の`Int`には`Rand::nextInt(min, max)`を使います。標準ライブラリの他のモジュールと同様デフォルトでインポートされるため、
 明示的なインポートは不要です。
 
 ### OnionMath::sin / OnionMath::cos / OnionMath::tan / OnionMath::asin / OnionMath::acos / OnionMath::atan / OnionMath::atan2

@@ -275,7 +275,8 @@ val e: Double = Math::E         // 2.71828...
 ## OnionMath Module
 
 An `onion.*` numeric module, distinct from the JDK's `Math`, covering hyperbolic
-trig, safe rounding/clamping, and a bounded random integer. It is default-imported
+trig, safe rounding/clamping, and a random `Double`. For a random `Int` in a range, use
+`Rand::nextInt(min, max)`. It is default-imported
 like the rest of the standard library, so no explicit import is needed.
 
 ### OnionMath::sin / OnionMath::cos / OnionMath::tan / OnionMath::asin / OnionMath::acos / OnionMath::atan / OnionMath::atan2

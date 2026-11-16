@@ -262,8 +262,10 @@ object Migrator:
    * second argument. A decimal literal is incremented (`6` → `7`), an argument ending in
    * `- 1` loses it (`n - 1` → `n`), an argument built only from names, literals, calls and
    * `+ - * / %` gets `+ 1`, and anything else is parenthesized first (`(a ?: b) + 1`).
-   * `onion.OnionMath::randomInt` is matched too. A `max` of `2147483647` has no `+ 1`, so it
-   * is noted and left as written. [[MigrateCommand]] rewrites a call only where the compiler
+   * `onion.OnionMath::randomInt` is matched too. A `max` that is a constant equal to
+   * `Int.MAX_VALUE`, however it is spelled (`2147483647`, `0x7FFFFFFF`, `Integer::MAX_VALUE`,
+   * `JInteger::MAX_VALUE`, `Integer::MIN_VALUE - 1`), has no `+ 1`, so it is noted and left
+   * as written (#3116 block 5). [[MigrateCommand]] rewrites a call only where the compiler
    * reported an error at its name (`reported`), and keeps the file only when it compiles
    * rewritten, so a user's own `OnionMath` or an inherited `randomInt` is never touched.
    */
@@ -334,8 +336,11 @@ object Migrator:
      *    of its own anywhere (a `def`, a `val`, a parameter, a field).
      *  - `rand`: `Rand`, or `onion.Rand` when this file, or another file named alongside it,
      *    gives the name `Rand` a meaning of its own (a class, an import, a variable).
+     *  - `integers`: the qualifiers that may name `java.lang.Integer` here: `Integer`,
+     *    `JInteger` (a default import) and any alias an import gives it. A max read through one
+     *    of them as a constant is only ever left as written, so a false match is safe.
      */
-    private final case class Spelling(heads: Set[String], bare: Boolean, rand: String)
+    private final case class Spelling(heads: Set[String], bare: Boolean, rand: String, integers: Set[String])
 
     private object Spelling:
       def apply(source: String, tokens: IndexedSeq[Token], declared: Set[String]): Spelling =
@@ -359,7 +364,13 @@ object Migrator:
         val ownRand = declared.contains("Rand") || tokens.indices.exists { i =>
           image(i) == "Rand" && image(i + 1) != "::" && !(image(i - 1) == "." && image(i - 2) == "onion")
         }
-        Spelling(Set("OnionMath") ++ aliases, staticImport && !ownRandomInt, if ownRand then "onion.Rand" else "Rand")
+        val integerAliases = tokens.indices.collect {
+          case i if image(i) == "java" && image(i + 1) == "." && image(i + 2) == "lang" && image(i + 3) == "." &&
+              image(i + 4) == "Integer" && image(i + 5) == "as" && i + 6 < tokens.length && tokens(i + 6).kind == K.ID =>
+            image(i + 6)
+        }.toSet
+        Spelling(Set("OnionMath") ++ aliases, staticImport && !ownRandomInt, if ownRand then "onion.Rand" else "Rand",
+          Set("Integer", "JInteger") ++ integerAliases)
 
     /** The index of the first token of an old call whose `(` is at `open`, if one ends there. */
     private def head(tokens: IndexedSeq[Token], open: Int, spelling: Spelling): Option[Int] =
@@ -438,10 +449,11 @@ object Migrator:
           // `source` from `a` to `b`, with the calls inside it already rewritten.
           val rewritten = (a: Int, b: Int) =>
             apply(source.substring(a, b), inner.filter(e => e.offset >= a && e.offset < b).map(e => e.copy(offset = e.offset - a)))
-          plusOne(rewritten(maxFrom, maxTo), max) match
+          plusOne(rewritten(maxFrom, maxTo), max, spelling) match
             case None =>
               Left(Some(Note(line, column,
-                s"this $Subject has a max of 2147483647, which Rand::nextInt cannot include (its max is exclusive); " +
+                s"this $Subject has a max of Int.MAX_VALUE (2147483647), which Rand::nextInt cannot include " +
+                  "(its max is exclusive, and max + 1 overflows); " +
                   "left as written. Write Rand::nextInt() for any Int, or pick the bound by hand")))
             case Some(newMax) =>
               val replacement = spelling.rand + "::nextInt" + rewritten(paren, maxFrom) + newMax + rewritten(maxTo, closeAt + 1)
@@ -451,12 +463,15 @@ object Migrator:
                 rewrittenAs = "rewritten as Rand::nextInt",
                 places = inner.flatMap(_.allPlaces)))
 
-    /** `Some(text)` for the new max, or `None` when it cannot be one more (`2147483647`). */
-    private def plusOne(text: String, max: IndexedSeq[Token]): Option[String] =
+    /**
+     * `Some(text)` for the new max, or `None` when it cannot be one more: a constant equal to
+     * `Int.MAX_VALUE`, whose `+ 1` would overflow to `Int.MIN_VALUE` and make the call throw.
+     */
+    private def plusOne(text: String, max: IndexedSeq[Token], spelling: Spelling): Option[String] =
       val digits = text.replace("_", "")
-      if max.length == 1 && max.head.kind == K.INTEGER && digits.forall(_.isDigit) then
-        val value = BigInt(digits)
-        if value >= Int.MaxValue then None else Some((value + 1).toString)
+      if constant(max, spelling.integers).contains(Int.MaxValue) then None
+      else if max.length == 1 && max.head.kind == K.INTEGER && digits.forall(_.isDigit) then
+        Some((BigInt(digits) + 1).toString)
       else
         val simple = topLevel(max).forall(t => t.kind == K.ID || t.kind == K.INTEGER || Tight.contains(t.image) ||
           t.kind == K.K_THIS || t.kind == K.K_SELF || t.image == "(" || t.image == "[")
@@ -466,6 +481,72 @@ object Migrator:
           Some(text.substring(0, text.lastIndexOf('-')).stripTrailing)
         else if simple then Some(text + " + 1")
         else Some("(" + text + ") + 1")
+
+    /**
+     * The value of `max` when it is an `Int` constant the compiler folds: integer literals in
+     * any radix, `Integer::MAX_VALUE`/`MIN_VALUE` (also `java.lang.Integer::` and an alias),
+     * unary `+`/`-`, `+ - * / %` and parentheses, with `Int`'s wraparound. `None` otherwise.
+     */
+    private def constant(max: IndexedSeq[Token], integers: Set[String]): Option[Int] =
+      var i = 0
+      val image = (j: Int) => if j < max.length then max(j).image else ""
+      def literal(t: Token): Option[Int] =
+        val s = t.image.replace("_", "")
+        val radix =
+          if s.startsWith("0x") || s.startsWith("0X") then Some((s.drop(2), 16))
+          else if s.startsWith("0b") || s.startsWith("0B") then Some((s.drop(2), 2))
+          else if s.forall(_.isDigit) then Some((s, 10))
+          else None // a B, S or L suffix: not an Int
+        radix.flatMap { (digits, r) =>
+          try
+            val v = java.lang.Long.parseLong(digits, r)
+            if v > 0xFFFFFFFFL then None else Some(v.toInt)
+          catch case _: NumberFormatException => None
+        }
+      def field(): Option[Int] =
+        // `Integer::MAX_VALUE`, `JInteger::MIN_VALUE`, `java.lang.Integer::MAX_VALUE`
+        val qualified = image(i) == "java" && image(i + 1) == "." && image(i + 2) == "lang" && image(i + 3) == "." &&
+          image(i + 4) == "Integer"
+        val q = if qualified then i + 4 else i
+        if (qualified || integers(image(i))) && image(q + 1) == "::" then
+          val v = image(q + 2) match
+            case "MAX_VALUE" => Some(Int.MaxValue)
+            case "MIN_VALUE" => Some(Int.MinValue)
+            case _ => None
+          if v.isDefined then i = q + 3
+          v
+        else None
+      def primary(): Option[Int] =
+        if i >= max.length then None
+        else if image(i) == "-" then { i += 1; primary().map(v => -v) }
+        else if image(i) == "+" then { i += 1; primary() }
+        else if image(i) == "(" then
+          i += 1
+          val v = sum()
+          if image(i) == ")" then { i += 1; v } else None
+        else if max(i).kind == K.INTEGER then { val v = literal(max(i)); i += 1; v }
+        else field()
+      def product(): Option[Int] =
+        var acc = primary()
+        while acc.isDefined && Set("*", "/", "%")(image(i)) do
+          val op = image(i)
+          i += 1
+          acc = for a <- acc; b <- primary(); r <- op match
+              case "*" => Some(a * b)
+              case _ if b == 0 => None
+              case "/" => Some(a / b)
+              case _ => Some(a % b)
+          yield r
+        acc
+      def sum(): Option[Int] =
+        var acc = product()
+        while acc.isDefined && Set("+", "-")(image(i)) do
+          val op = image(i)
+          i += 1
+          acc = for a <- acc; b <- product() yield if op == "+" then a + b else a - b
+        acc
+      val v = sum()
+      if i == max.length then v else None
 
     /** The tokens of `max` outside any bracket; a bracket's opener stands for its group. */
     private def topLevel(max: IndexedSeq[Token]): Seq[Token] =

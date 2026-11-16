@@ -210,7 +210,7 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `Colls` - Collection factories and pipelines (map/filter/fold, chunked/windowed, sumBy/maxBy)
 - `Iterables`, `Maps`, `Sets` - Iteration and map/set utility functions
 - `Text` - Console text layout (wrap, indent, aligned tables)
-- `OnionMath` - Hyperbolic trig, safe rounding/clamping, bounded random int
+- `OnionMath` - Hyperbolic trig, safe rounding/clamping, random Double
 - `Stats` - Numeric aggregation (sum, average, median, stddev)
 - `Format` - Locale-independent formatting (grouping, byte sizes, durations)
 - `Yaml`, `Csv` - YAML and RFC 4180 CSV parsing/serialization

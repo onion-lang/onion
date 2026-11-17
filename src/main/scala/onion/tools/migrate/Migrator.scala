@@ -458,8 +458,7 @@ object Migrator:
           plusOne(rewritten(maxFrom, maxTo), max) match
             case Left(why) =>
               Left(Some(Note(line, column,
-                s"this $Subject $why; left as written. " +
-                  "Write Rand::nextInt() for any Int, or pick the bound by hand")))
+                s"this $Subject $why; left as written")))
             case Right(newMax) =>
               val replacement = spelling.rand + "::nextInt" + rewritten(paren, maxFrom) + newMax + rewritten(maxTo, closeAt + 1)
               Right(Edit(from, closeAt + 1 - from, replacement, line, column,
@@ -481,9 +480,11 @@ object Migrator:
       val literal = max.length == 1 && max.head.kind == K.INTEGER && digits.nonEmpty && digits.forall(_.isDigit)
       if literal && BigInt(digits) >= Int.MaxValue then
         Left("has a max of Int.MAX_VALUE (2147483647), which Rand::nextInt cannot include " +
-          "(its max is exclusive, and max + 1 overflows)")
+          "(its max is exclusive, and max + 1 overflows). Write Rand::nextInt(min - 1, max) + 1 by hand; " +
+          "Rand::nextInt() fits only when min is also Int.MIN_VALUE")
       else if !literal && !readsVariableOrCall(max) then
-        Left("has a constant max other than a plain number, which the migrate tool does not evaluate")
+        Left("has a constant max other than a plain number, which the migrate tool does not evaluate. " +
+          "Write Rand::nextInt(min, (max) + 1) by hand, or Rand::nextInt(min - 1, max) + 1 when max is Int.MAX_VALUE")
       else if literal then
         Right((BigInt(digits) + 1).toString)
       else

@@ -411,5 +411,55 @@ class OneRandomIntSpec extends AbstractShellSpec {
         assert(output.contains("Rand::nextInt(min, max + 1)"), output)
       }
     }
+
+    // #3116 block 9: `Rand::nextInt()` returns any Int, negatives included, so it replaces
+    // `randomInt(min, Int.MAX_VALUE)` only when min is Int.MIN_VALUE. The advice for a max of
+    // Int.MAX_VALUE is `Rand::nextInt(min - 1, max) + 1`, which keeps min..max inclusive.
+    it("never offers bare Rand::nextInt() for a max of Int.MAX_VALUE with another min (#3116 block 9)") {
+      val keys = Seq("suggestion.onionMathRandomInt", "suggestion.onionMathRandomIntByHand")
+      Seq(java.util.Locale.ENGLISH, java.util.Locale.JAPANESE).foreach { locale =>
+        val bundle = java.util.ResourceBundle.getBundle("errorMessage", locale)
+        keys.foreach { key =>
+          val text = bundle.getString(key)
+          assert(text.contains("Rand::nextInt(min - 1, max) + 1"), s"$locale $key: $text")
+          // Every sentence naming bare `Rand::nextInt()` limits it to a min of Int.MIN_VALUE.
+          text.split("(?<=[。;])|(?<=\\.)(?=\\s|$)").filter(_.contains("Rand::nextInt()")).foreach { sentence =>
+            assert(sentence.contains("Int.MIN_VALUE"), s"$locale $key: $sentence")
+          }
+        }
+      }
+      Seq("2147483647", "Integer::MAX_VALUE", "1 << 4").foreach { max =>
+        val (_, _, output) = migrate(s"val n = OnionMath::randomInt(0, $max)\n")
+        val note = output.linesIterator.find(_.contains("old.on:1:20: note:")).getOrElse(fail(output))
+        assert(!note.contains("Write Rand::nextInt() for any Int"), note)
+        note.split("(?<=;)|(?<=\\.)(?=\\s|$)").filter(_.contains("Rand::nextInt()")).foreach { sentence =>
+          assert(sentence.contains("Int.MIN_VALUE"), s"$max: $sentence")
+        }
+        assert(note.contains("Rand::nextInt(min - 1, max) + 1"), s"$max: $note")
+      }
+      val (_, _, constant) = migrate("val n = OnionMath::randomInt(0, 1 << 4)\n")
+      assert(constant.contains("Rand::nextInt(min, (max) + 1) by hand"), constant)
+    }
+
+    it("advises a replacement that keeps a min of 0 and a max of Int.MAX_VALUE in range (#3116 block 9)") {
+      val result = shell.run(
+        """class Test {
+          |public:
+          |  static def main(args: String[]): Int {
+          |    for var i: Int = 0; i < 10000; i++ {
+          |      if Rand::nextInt(0 - 1, Integer::MAX_VALUE) + 1 < 0 { return -1 }
+          |    }
+          |    for var i: Int = 0; i < 1000; i++ {
+          |      if Rand::nextInt(2147483646 - 1, Integer::MAX_VALUE) + 1 == 2147483647 { return 1 }
+          |    }
+          |    return 0
+          |  }
+          |}
+          |""".stripMargin,
+        "None",
+        Array()
+      )
+      assert(result == Shell.Success(1), result)
+    }
   }
 }

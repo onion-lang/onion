@@ -622,8 +622,9 @@ val die = Rand::nextInt(1, 7)          // 1から6
   - ファイル自身、または一緒に渡したファイルに独自の `Rand`（クラス、インポート、変数）があるときは、`onion.Rand::nextInt` と書きます。呼び出しが Onion の `Rand` を指したままになります。
 - **書き換えるのは、コンパイラがエラーを報告した呼び出しだけです。** コンパイルできる `randomInt` はあなた自身のもの（`OnionMath` という名前の自作クラスや、継承したメソッド）なので、そのまま残します。
 - **`+ 1` を付ける `max`:** `Int.MAX_VALUE` より小さい数字そのもの（`6`）か、変数、引数、フィールド、呼び出しを読む `max`（`n`、`xs.size`、`Math::abs(n)`）です。
-- **それ以外の定数の max は知らせるだけです。手で直してください。** `2147483647` や、定数の式（`1 << 4`、`Integer::MAX_VALUE`）が該当します。migrate はファイルをそのまま残します。`Rand::nextInt(min, max + 1)` と書くか、max が `Int.MAX_VALUE` なら `Rand::nextInt()` と書いてから、もう一度 migrate を実行してください。
+- **それ以外の定数の max は知らせるだけです。手で直してください。** `2147483647` や、定数の式（`1 << 4`、`Integer::MAX_VALUE`）が該当します。migrate はファイルをそのまま残します。`Rand::nextInt(min, (max) + 1)` と書いてから、もう一度 migrate を実行してください。max が `Int.MAX_VALUE` のときは、代わりに `Rand::nextInt(min - 1, max) + 1` と書いてください。
 - **独自の `randomInt` も持つファイルの、修飾なしの `randomInt(a, b)`** はどちらを指すかわからないので、migrate は知らせるだけで書き換えません。
 - **`import { onion.OnionMath::* }` のないファイルの `randomInt(a, b)`** は削除されたメソッドではないので、migrate は書き換えません。ヒントが手で直す書き換えを示します。
-- **変数に入った max は確認してください。** migrate にはその値がわかりません。実行時に `Int.MAX_VALUE` になりうるなら、そこで `max + 1` が桁あふれし、呼び出しは `IllegalArgumentException` を投げます。その場合は `Rand::nextInt()` と書いてください。
+- **変数に入った max は確認してください。** migrate にはその値がわかりません。実行時に `Int.MAX_VALUE` になりうるなら、そこで `max + 1` が桁あふれし、呼び出しは `IllegalArgumentException` を投げます。その場合は `Rand::nextInt(min - 1, max) + 1` と書いてください。
+- **`Rand::nextInt()` で置き換えられるのは、min が `Int.MIN_VALUE` で max が `Int.MAX_VALUE` の呼び出しだけです。** 負の数も含むあらゆる `Int` を返すので、`randomInt(0, Int.MAX_VALUE)` の代わりにはなりません。
 - **プログラムは一つずつ migrate してください。** 無関係なスクリプトを一緒に渡すと、互いのエラーが隠れることがあります。その場合、呼び出しは書き換えられずに残ります。

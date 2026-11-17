@@ -703,14 +703,17 @@ val die = Rand::nextInt(1, 7)          // 1 to 6
   reads a variable, a parameter, a field or a call (`n`, `xs.size`, `Math::abs(n)`).
 - **Other constant maxes are noted; edit them by hand.** That covers `2147483647` and any
   expression of constants (`1 << 4`, `Integer::MAX_VALUE`). Migrate leaves the file as
-  written. Write `Rand::nextInt(min, max + 1)`, or `Rand::nextInt()` when max is
-  `Int.MAX_VALUE`, then run migrate again.
+  written. Write `Rand::nextInt(min, (max) + 1)`, then run migrate again. When max is
+  `Int.MAX_VALUE`, write `Rand::nextInt(min - 1, max) + 1` instead.
 - **A bare `randomInt(a, b)` in a file that also names its own `randomInt`** may be either
   one, so migrate notes it and leaves it as written.
 - **A bare `randomInt(a, b)` with no `import { onion.OnionMath::* }`** is not the removed
   method, so migrate leaves it alone. Its hint shows the edit to make by hand.
 - **Check a max held in a variable.** Migrate cannot know its value. If it can be
   `Int.MAX_VALUE` at run time, `max + 1` overflows there and the call throws
-  `IllegalArgumentException`. Write `Rand::nextInt()` for that case.
+  `IllegalArgumentException`. For that case, write `Rand::nextInt(min - 1, max) + 1`.
+- **`Rand::nextInt()` replaces a call only when min is `Int.MIN_VALUE` and max is
+  `Int.MAX_VALUE`.** It returns any `Int`, negatives included, so it does not replace
+  `randomInt(0, Int.MAX_VALUE)`.
 - **Run it on one program at a time.** Unrelated scripts named together can hide each other's
   errors, and then a call is left as written.

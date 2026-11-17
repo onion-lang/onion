@@ -92,6 +92,13 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
 
   private val bridgeMethodEmitter = new BridgeMethodEmitter(this)
 
+  /** The method a `super.f(...)` call must run when the direct superclass `superClass`
+   *  fills `method`'s slot with a `?` bridge (`B.f(Int?)` over `A.f(Int)`): that bridge's
+   *  target, or None for a plain `invokespecial`. Calling the slot itself would reach the
+   *  bridge, which dispatches virtually back into the caller's own override (#2896). */
+  private[asm] def superCallTarget(superClass: TypedAST.ClassType, method: TypedAST.Method): Option[TypedAST.Method] =
+    bridgeMethodEmitter.superSlotTarget(superClass, method)
+
   private def generateClassIsolated(classDef: TypedAST.ClassDefinition): (CompiledClass, Seq[CompiledClass]) =
     val st = new ClassGenState(classDef)
     val previous = genState.get

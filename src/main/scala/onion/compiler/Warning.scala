@@ -49,6 +49,7 @@ enum WarningCategory(val code: String, val description: String):
   case HistoryNotChecked extends WarningCategory("W0024", "A method writes a field that a history names, and no check settled whether the history still holds")
   case EnsuresNotProved extends WarningCategory("W0028", "A method can break its ensures; the solver found a counterexample")
   case OverrideBreaksContract extends WarningCategory("W0025", "An override can break the contract it inherits; the solver found a counterexample")
+  case UnmarkedNullableOverride extends WarningCategory("W0029", "A method without `override` overrides an inherited one that differs from it only by `?`")
 
 object WarningCategory:
   private val aliases: Map[String, WarningCategory] = Map(
@@ -81,7 +82,8 @@ object WarningCategory:
     "override-breaks-contract" -> WarningCategory.OverrideBreaksContract,
     "contract-not-enforced" -> WarningCategory.ContractNotEnforced,
     "contract-trusted" -> WarningCategory.ContractTrusted,
-    "ensures-not-proved" -> WarningCategory.EnsuresNotProved
+    "ensures-not-proved" -> WarningCategory.EnsuresNotProved,
+    "unmarked-nullable-override" -> WarningCategory.UnmarkedNullableOverride
   )
 
   def fromString(value: String): Option[WarningCategory] =

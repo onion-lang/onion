@@ -43,8 +43,10 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     // - both run different methods: no bridge, `target` keeps its own (row 3);
     // - only `target` has code: a bridge, `override` or not. Differing only by `?`
     //   is the same slot, so `override` stays a check and never decides what runs.
-    def takesOverSlot(m: TypedAST.Method, own: String, target: String): Boolean =
-      takesOver(inheritedSlots.get((m.name, target)).flatMap(_._2), inheritedSlots.get((m.name, own)).flatMap(_._2))
+    //   Except in the unboxing direction (own `f(Int)` over an inherited `f(Int?)`): a
+    //   `null` through the base would throw, so that stays as it was (row 10).
+    def takesOverSlot(m: TypedAST.Method, targetMethod: TypedAST.Method, own: String, target: String): Boolean =
+      takesOver(m, targetMethod, inheritedSlots.get((m.name, target)).flatMap(_._2), inheritedSlots.get((m.name, own)).flatMap(_._2))
 
     for (sourceRaw, subst) <- sources do
       def substituteClassParams(tp: TypedAST.Type): TypedAST.Type = substituteTypeVars(tp, subst)
@@ -68,7 +70,7 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                   // Whether a `?` bridge takes over the target slot: `takesOverSlot`.
                   val own = paramDesc(m.arguments)
                   val target = paramDesc(rawMethod.arguments)
-                  own == target || takesOverSlot(m, own, target)
+                  own == target || takesOverSlot(m, rawMethod, own, target)
                 }
               else
                 m.arguments.indices.forall(i => isBridgeCompatible(m.arguments(i), specializedArgs(i)))
@@ -140,12 +142,38 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     case applied: AppliedClassType => applied.raw
     case other => other
 
-  private def takesOver(targetOwner: Option[TypedAST.Method], ownOwner: Option[TypedAST.Method]): Boolean =
+  private def takesOver(
+    m: TypedAST.Method, target: TypedAST.Method,
+    targetOwner: Option[TypedAST.Method], ownOwner: Option[TypedAST.Method]
+  ): Boolean =
     targetOwner match
       case None => true
-      case Some(t) => ownOwner.forall(_ eq t)
+      case Some(t) => ownOwner match
+        case Some(o) => o eq t
+        case None => !keepsBaseSlot(m, target)
+
+  // Row 10 of #2896's table: an own `f(Int)` (no code inherited for it) beside an
+  // inherited concrete `f(Int?)` takes the slot only as it did before the `?` rule, with
+  // a reference return (a covariant override). With a `void` or primitive return it is
+  // an overload: a bridge would unbox, and a `null` through the base would throw (#3053).
+  private[asm] def keepsBaseSlot(m: TypedAST.Method, target: TypedAST.Method): Boolean =
+    unboxes(m.arguments, target.arguments) && !isCovariantReturn(target.returnType, m.returnType)
+
+  // Some parameter is a primitive where the inherited one is its boxed `?` form.
+  private def unboxes(own: Array[TypedAST.Type], inherited: Array[TypedAST.Type]): Boolean =
+    own.indices.exists(i => isPrimitive(asmType(own(i))) && !isPrimitive(asmType(inherited(i))))
+
+  private def isPrimitive(t: AsmType): Boolean = t.getSort != AsmType.OBJECT && t.getSort != AsmType.ARRAY
 
   private val ownersMemo = mutable.HashMap[TypedAST.ClassType, SlotOwners]()
+
+  // What an instance of `superClass` runs for `m`'s slot, when that is a `?` bridge's
+  // target (a method with other parameter types): `AsmCodeGeneration.superCallTarget`.
+  def superSlotTarget(superClass: TypedAST.ClassType, m: TypedAST.Method): Option[TypedAST.Method] =
+    if superClass == null || superClass.isInterface then None
+    else
+      val desc = paramDesc(m.arguments)
+      ownersOf(superClass).get((m.name, desc)).flatMap(_._2).filter(x => paramDesc(x.arguments) != desc)
 
   // The slots `cls` inherits: from its superclass chain (with the bridges each level
   // emits), then from its interfaces for any slot no superclass declares.
@@ -183,7 +211,7 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
           if m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(sample.arguments(i)).name)
           if isBridgeableReturn(sample.returnType, m.returnType)
           if !Modifier.isFinal(sample.modifier)
-          if takesOver(targetOwner, inherited.get(ownSlot).flatMap(_._2))
+          if takesOver(m, sample, targetOwner, inherited.get(ownSlot).flatMap(_._2))
         do out(slot) = (sample, Some(m))
         val result = out.toMap
         ownersMemo(cls) = result

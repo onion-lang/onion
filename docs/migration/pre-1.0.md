@@ -714,7 +714,12 @@ now, with or without `override`:
   (`String`), the same method already overrode. `override` changed nothing for a reference
   return but decided the outcome for `void` and primitive returns.
 - **Now:** it overrides for every return type. `override` is a check, as for exact types,
-  and never decides which method runs. Over a `final` base method this is **E0039**, as for
-  the exact types (`setDaemon(on: Boolean?)` in a `Thread` subclass included).
+  and never decides which method runs. Without `override`, the compiler warns **W0029**
+  (`'dec(Int?)' overrides 'dec(Int): void' of Base ...`). Over a `final` base method this is
+  **E0039**, as for the exact types (`setDaemon(on: Boolean?)` in a `Thread` subclass included).
+- **The other direction is unchanged:** an own `f(k: Int): void` beside a base
+  `f(k: Int?): void` stays an overload, so `null` through `Base` still reaches the base
+  method. Marked `override`, it is **E0068**; make the parameter `Int?` to override.
+- **To silence W0029:** add `override` if the method is meant to replace the base one.
 - **To keep a separate overload:** rename the method (`decOrSkip(k: Int?)`). No `onion
   migrate` rule: only you know whether the method was meant to replace the base one.

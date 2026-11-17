@@ -2045,6 +2045,7 @@ pass reports it yet -- it can never actually appear in a build log.
 | `W0026` | a contract clause is not enforced at run time by `--contracts runtime`, with the reason (a warning, so a clause that is not guarded is never silent) |
 | `W0027` | the contract of a method is trusted, not verified (`@Trusted`): its body is not checked and callers rely on it; each use is listed |
 | `W0028` | a method can break its `ensures`: the solver found values for which the body ends with the clause false |
+| `W0029` | a method without `override` overrides an inherited method that differs from it only by `?` (`dec(k: Int?)` beside `Base.dec(k: Int)`), so a call through the base type runs it. Add `override`, or rename it to keep a separate method |
 
 ## Every diagnostic code
 

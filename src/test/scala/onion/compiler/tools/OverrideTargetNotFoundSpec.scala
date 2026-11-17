@@ -277,8 +277,10 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(whoRuns("Int", "Int?", "void") == onion.tools.Shell.Success("Up"))
     }
 
-    it("runs `override def f(k: Int): void` over `f(k: Int?)`") {
-      assert(whoRuns("Int?", "Int", "void") == onion.tools.Shell.Success("Up"))
+    // Row 10 (panel block 7 on #3051): a bridge from `f(Int?)` to `f(Int): void` would unbox,
+    // so a `null` through the base threw. It is E0068, whose hint names `f(Int?): void`.
+    it("reports E0068 for `override def f(k: Int): void` over `f(k: Int?)`") {
+      assert(whoRuns("Int?", "Int", "void") == onion.tools.Shell.Failure(-1))
     }
 
     it("runs `override def f(k: Int?): String` over `f(k: Int): String`") {
@@ -563,6 +565,120 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
           |}
           |""".stripMargin)
       assert(results.map(_._1).contains(Some("E0068")), s"got: $results")
+    }
+  }
+
+  // Panel block 7 on #3051 at d19ac02. Rows 10 and 11 of #2896's table.
+  describe("an own `f(Int)` beside an inherited `f(Int?)`, and `super` through a `?` bridge") {
+    def w29(src: String): Seq[String] = {
+      val config = onion.compiler.CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = onion.compiler.WarningLevel.On)
+      new OnionCompiler(config).compileDetailed(Seq(new StreamInputSource(() => new StringReader(src), "W29.on")))
+        .diagnostics.warnings.filter(_.category.code == "W0029").map(_.message)
+    }
+
+    // Row 11: `super.f(x)` in `C` reaches `B.f(Int?)`, which fills `A.f(Int)`'s slot with a
+    // bridge. Calling the slot ran the bridge, which dispatched back into `C`: a stack overflow.
+    def superThroughBridge(ret: String): onion.tools.Shell.Result = {
+      def tail(call: String) = if ret == "void" then call else s"return $call"
+      def leaf(who: String) = if ret == "void" then s"""who = who + "$who"""" else s"""who = who + "$who"; return "$who""""
+      shell.run(
+        s"""
+           |class A { public: var who: String; def this { who = "" } def f(x: Int): $ret { ${leaf("A")} } }
+           |class B extends A { public: def this {} override def f(x: Int?): $ret { who = who + "B"; ${tail("super.f(1)")} } }
+           |class C extends B { public: def this {} override def f(x: Int): $ret { who = who + "C"; ${tail("super.f(x)")} } }
+           |class Test {
+           |public:
+           |  static def main(args: String[]): String { val a: A = new C(); a.f(1); return a.who }
+           |}
+           |""".stripMargin,
+        "SuperBridge.on", Array())
+    }
+
+    it("runs the superclass's `?` override for `super.f(x)` (void)") {
+      assert(superThroughBridge("void") == onion.tools.Shell.Success("CBA"))
+    }
+
+    it("runs the superclass's `?` override for `super.f(x)` (String)") {
+      assert(superThroughBridge("String") == onion.tools.Shell.Success("CBA"))
+    }
+
+    // Row 10: a bridge from `f(Int?)` to an own `f(Int)` would unbox, and a `null` through
+    // the base type threw. With a `void` or primitive return the two stay overloads, as before.
+    it("keeps an unmarked `f(k: Int): void` an overload beside a concrete base `f(k: Int?)`") {
+      val result = shell.run(
+        """
+          |class Base { public: var who: String; def this { who = "" } def dec(k: Int?): void { who = who + "Base" } }
+          |class Up extends Base { public: def this {} def dec(k: Int): void { who = who + "Up" } }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { val u = new Up(); val b: Base = u; u.dec(3); b.dec(3); return u.who }
+          |}
+          |""".stripMargin,
+        "UnmarkedUnbox.on", Array())
+      assert(result == onion.tools.Shell.Success("UpBase"))
+    }
+
+    it("passes a `null` through the base to the base's `f(k: Int?)`") {
+      val result = shell.run(
+        """
+          |class Base { public: var who: String; def this { who = "" } def f(k: Int?): void { who = "Base" } }
+          |class Up extends Base { public: def this {} def f(k: Int): void { who = "Up" } }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { val b: Base = new Up(); val j: Int? = null; b.f(j); return b.who }
+          |}
+          |""".stripMargin,
+        "NullThroughBase.on", Array())
+      assert(result == onion.tools.Shell.Success("Base"))
+    }
+
+    it("reports E0068, naming `f(Int?): void`, for `override def f(k: Int): void` over `f(k: Int?)`") {
+      val results = errors(
+        """
+          |class Base { public: def this {} def f(k: Int?): void {} }
+          |class Up extends Base { public: def this {} override def f(k: Int): void {} }
+          |""".stripMargin)
+      val e0068 = results.filter(_._1.contains("E0068")).map(_._2)
+      assert(e0068.exists(_.contains("f(Int?): void")), s"got: $results")
+    }
+
+    it("still compiles `override def f(k: Int): String` over `f(k: Int?): String`") {
+      val results = errors(
+        """
+          |class Base { public: def this {} def f(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} override def f(k: Int): String = "Up" }
+          |""".stripMargin)
+      assert(results.isEmpty, s"got: $results")
+    }
+
+    // An unmarked method that takes over a `?`-different base method changes what a call
+    // through the base runs, with nothing in the source to say so: W0029.
+    it("warns W0029 for an unmarked `dec(k: Int?)` beside a concrete `dec(k: Int)`") {
+      val ws = w29(
+        """
+          |class Base { public: def this {} def dec(k: Int): void {} }
+          |class Up extends Base { public: def this {} def dec(k: Int?): void {} }
+          |""".stripMargin)
+      assert(ws.length == 1 && ws.head.contains("dec(Int): void") && ws.head.contains("override"), s"got: $ws")
+    }
+
+    it("does not warn W0029 with `override`, for an overload, or for an exact signature") {
+      val marked = w29(
+        """
+          |class Base { public: def this {} def dec(k: Int): void {} }
+          |class Up extends Base { public: def this {} override def dec(k: Int?): void {} }
+          |""".stripMargin)
+      val overload = w29(
+        """
+          |class Base { public: def this {} def f(k: Int?): void {} }
+          |class Up extends Base { public: def this {} def f(k: Int): void {} }
+          |""".stripMargin)
+      val exact = w29(
+        """
+          |class Base { public: def this {} def dec(k: Int): void {} }
+          |class Up extends Base { public: def this {} def dec(k: Int): void {} }
+          |""".stripMargin)
+      assert(marked.isEmpty && overload.isEmpty && exact.isEmpty, s"got: $marked / $overload / $exact")
     }
   }
 }

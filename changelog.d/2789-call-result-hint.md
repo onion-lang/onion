@@ -2,4 +2,4 @@
 
 - **`mk()()` now says what to write instead of a bare syntax error.**
   - Before: `Encountered "(", but expecting ")"`, no hint.
-  - Now: the hint quotes your first call and the second call's arguments: `val g = adder(1)` then `g(2)`, or `adder(1).call(2)`.
+  - Now: the hint quotes your call: `adder(1).call(2)`, or bind it first with a name your file does not use yet (`val f = adder(1)` then `f(2)`).

@@ -1,6 +1,11 @@
 package onion.compiler.parser
 
-private[compiler] final case class SourceContext(context: String, sourceLine: String, precedingText: String = "")
+private[compiler] final case class SourceContext(
+  context: String,
+  sourceLine: String,
+  precedingText: String = "",
+  followingText: String = ""
+)
 
 private[compiler] object SourceContext {
   private val ContextLimit = 200
@@ -12,7 +17,8 @@ private[compiler] object SourceContext {
    * `sourceLine` contains the entire reported line. Context is bounded so syntax
    * hint matching stays predictable for pathological input. `precedingText` is
    * everything before the reported line, for hints that name an enclosing
-   * declaration.
+   * declaration; `followingText` is everything after it, for hints that must
+   * suggest a name the file does not already use.
    */
   def at(sourceText: String, line: Int, column: Int): SourceContext = {
     val lineStart = lineStartOffset(sourceText, line)
@@ -28,7 +34,8 @@ private[compiler] object SourceContext {
         math.min(sourceText.length, contextStart + ContextLimit)
       ),
       sourceLine = sourceText.substring(lineStart, lineEnd),
-      precedingText = sourceText.substring(0, lineStart)
+      precedingText = sourceText.substring(0, lineStart),
+      followingText = sourceText.substring(lineEnd)
     )
   }
 

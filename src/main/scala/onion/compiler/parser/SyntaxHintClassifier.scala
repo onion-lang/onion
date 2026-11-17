@@ -308,7 +308,8 @@ private[compiler] object SyntaxHintClassifier {
     expected: String,
     context: String,
     sourceLine: String,
-    precedingText: String = ""
+    precedingText: String = "",
+    followingText: String = ""
   ): Option[SyntaxHint] = {
     lazy val controlFlowHint = ControlFlowSyntaxHints.classify(found, sourceLine)
 
@@ -628,14 +629,19 @@ private[compiler] object SyntaxHintClassifier {
       // source-line rule, so `switch (x)(1)`, `unless (x)(...)` keep their own hints; and it is
       // not given where a block is expected (`if (c) (`), for a C-style cast (`(String)(o)`) or
       // inside a declaration header (#2789's rule). The hint quotes the first call as written
-      // (`obj.f()`, `adder(1)`) and carries the second call's arguments.
+      // (`obj.f()`, `adder(1)`) and carries the second call's arguments. A header that wraps
+      // onto earlier lines is still a header; the `val` it suggests is named with a name the
+      // file does not use, so typing the advice in never calls an existing method instead.
       case "(" if !expected.contains("{") && CStyleCast.findFirstMatchIn(sourceLine).isEmpty &&
           CallResultCall.findFirstIn(textBefore(context, sourceLine)).isDefined &&
-          !inDeclarationHeader(textBefore(context, sourceLine)) =>
+          !inDeclarationHeader(statementBefore(precedingText, textBefore(context, sourceLine))) =>
         val args = callResultArguments(context)
+        val name = unusedBindingName(precedingText + sourceLine + followingText)
         callResultFirstCall(textBefore(context, sourceLine)) match {
-          case Some(firstCall) => hint("error.parsing.hint.call_result_call", firstCall, args)
-          case None            => hint("error.parsing.hint.call_result_call_unnamed", args)
+          case Some(firstCall) =>
+            val call = if (firstCall.contains("?.")) "?.call" else ".call"
+            hint("error.parsing.hint.call_result_call", firstCall, args, name, call)
+          case None => hint("error.parsing.hint.call_result_call_unnamed", args, name)
         }
       case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
         hint("error.parsing.hint.block_expected")
@@ -858,6 +864,38 @@ private[compiler] object SyntaxHintClassifier {
     val call = newPrefix + s.substring(i)
     val head = s.substring(i).headOption
     if (head.exists(c => c.isLetter || c == '_' || c == '(') && call.exists(_.isLetter)) Some(call) else None
+  }
+
+  // The text of the statement that ends at `lineBefore` (the current line up to the offending
+  // `(`): the current line, extended back over earlier lines while a bracket opened on an
+  // earlier line is still open, so `def f(a: Int,\n      b: Int)(` reaches back to `def f(`.
+  // At most 50 earlier lines; brackets inside string literals are not told apart.
+  private def statementBefore(precedingText: String, lineBefore: String): String = {
+    def unclosed(text: String): Int = text.foldLeft(0) { (depth, c) =>
+      c match {
+        case '(' | '[' => depth - 1
+        case ')' | ']' => depth + 1
+        case _ => depth
+      }
+    }
+    val earlier = precedingText.split("\n", -1).toVector.dropRight(1)
+    var depth = unclosed(lineBefore)
+    var taken = List.empty[String]
+    var i = earlier.length - 1
+    while (depth > 0 && i >= 0 && taken.length < 50) {
+      depth += unclosed(earlier(i))
+      taken = earlier(i) :: taken
+      i -= 1
+    }
+    (taken :+ lineBefore).mkString("\n")
+  }
+
+  // A `val` name for the call-result hint that appears nowhere in the file as a word, so the
+  // advice cannot shadow or call the user's own `f` (#3138's block: `def g(): Int = mk()()`
+  // with the old fixed `val g` advice loops forever).
+  private def unusedBindingName(source: String): String = {
+    val candidates = Iterator("f", "fn", "callee") ++ Iterator.from(1).map(n => s"f$n")
+    candidates.find(name => !s"\\b$name\\b".r.findFirstIn(source).isDefined).get
   }
 
   // #2789's rule: `text` (the line before the offending `(`) ends inside a declaration header

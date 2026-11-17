@@ -335,10 +335,17 @@ public final class Files {
         int open = -1;
         int level = 0;
         java.util.List<Integer> commas = new java.util.ArrayList<>();
+        boolean inClass = false; // inside [...]: braces and commas are literal
         for (int i = 0; i < p.length(); i++) {
             char c = p.charAt(i);
             if (c == '\\') { i++; continue; }
-            if (c == '{') {
+            if (inClass) {
+                if (c == ']') inClass = false;
+                continue;
+            }
+            if (c == '[') {
+                inClass = true;
+            } else if (c == '{') {
                 if (level == 0) { open = i; commas.clear(); }
                 level++;
             } else if (c == ',' && level == 1) {
@@ -410,7 +417,12 @@ public final class Files {
         }
         for (String joined : patterns) {
             if (!joined.isEmpty() && !joined.equals(pattern)) {
-                matchers.add(base.getFileSystem().getPathMatcher("glob:" + joined));
+                try {
+                    matchers.add(base.getFileSystem().getPathMatcher("glob:" + joined));
+                } catch (java.util.regex.PatternSyntaxException e) {
+                    // an expanded alternative that does not compile adds nothing;
+                    // the original pattern above is always kept
+                }
             }
         }
         java.util.ArrayList<String> result = new java.util.ArrayList<>();

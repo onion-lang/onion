@@ -843,32 +843,86 @@ private[compiler] object SyntaxHintClassifier {
   // call-result scans read only this text, so a bracket, quote or keyword inside a literal or
   // comment is never counted (#2789's rule); the hint quotes the original text at the same
   // offsets. A literal or comment still open at the end masks to the end.
-  private def maskLiterals(s: String): String = {
+  private def maskLiterals(s: String): String = maskLiteralsWithState(s)._1
+
+  // `maskLiterals`, and whether a literal or comment is still open at the end of `s`. A
+  // `"…"` string's `#{…}` interpolation is read the way the lexer reads it: its body is code,
+  // so a nested string literal inside it (`"#{g("(x")}"`) does not end the outer string. The
+  // whole interpolation is masked with the string that holds it.
+  private def maskLiteralsWithState(s: String): (String, Boolean) = {
     val out = s.toCharArray
-    def blank(k: Int): Unit = if (out(k) != '\n' && out(k) != '\r') out(k) = ' '
+    def blank(k: Int): Unit = if (k < out.length && out(k) != '\n' && out(k) != '\r') out(k) = ' '
+    // After `#{` at `from`: the index after the interpolation's closing `}` on this line, or -1.
+    def interpolationEnd(from: Int): Int = {
+      var j = from
+      var depth = 0
+      while (j < s.length) {
+        s(j) match {
+          case '}' =>
+            if (depth == 0) return j + 1
+            depth -= 1
+            j += 1
+          case '{' => depth += 1; j += 1
+          case '"' =>
+            j += 1
+            while (j < s.length && s(j) != '"') {
+              if (s(j) == '\n' || s(j) == '\r') return -1
+              j += (if (s(j) == '\\') 2 else 1)
+            }
+            if (j >= s.length) return -1
+            j += 1
+          case '\n' | '\r' => return -1
+          case _ => j += 1
+        }
+      }
+      -1
+    }
+    var open = false
     var i = 0
     while (i < s.length) {
       val c = s(i)
       if (s.startsWith("\"\"\"", i)) {
         i += 3
         while (i < s.length && !s.startsWith("\"\"\"", i)) { blank(i); i += 1 }
+        if (i >= s.length) open = true
         i += 3
       } else if (c == '"' || c == '\'') {
         i += 1
-        while (i < s.length && s(i) != c && s(i) != '\n') {
-          if (s(i) == '\\' && i + 1 < s.length) { blank(i); i += 1 }
-          blank(i); i += 1
+        var closed = false
+        while (!closed && i < s.length && s(i) != '\n') {
+          if (s(i) == c) closed = true
+          else if (s(i) == '\\' && i + 1 < s.length) { blank(i); blank(i + 1); i += 2 }
+          else if (c == '"' && s.startsWith("#{", i) && interpolationEnd(i + 2) >= 0) {
+            val end = interpolationEnd(i + 2)
+            while (i < end) { blank(i); i += 1 }
+          } else { blank(i); i += 1 }
         }
+        if (!closed) open = true
         i += 1
       } else if (s.startsWith("//", i)) {
         while (i < s.length && s(i) != '\n') { blank(i); i += 1 }
       } else if (s.startsWith("/*", i)) {
         while (i < s.length && !s.startsWith("*/", i)) { blank(i); i += 1 }
-        if (i < s.length) { blank(i); blank(i + 1) }
+        if (i < s.length) { blank(i); blank(i + 1) } else open = true
         i += 2
       } else i += 1
     }
-    new String(out)
+    (new String(out), open)
+  }
+
+  // A callee the hint may quote: read on its own, every literal in it closes and its brackets
+  // balance. The last check before quoting, so a literal form the masking misreads falls back
+  // to the unnamed `(...).call(...)` form instead of quoting a broken callee (#2789's rule).
+  private def quotableCallee(call: String): Boolean = {
+    val (masked, open) = maskLiteralsWithState(call)
+    !open && masked.foldLeft(0) { (depth, c) =>
+      if (depth < 0) depth
+      else c match {
+        case '(' | '[' => depth + 1
+        case ')' | ']' => depth - 1
+        case _ => depth
+      }
+    } == 0
   }
 
   // `lineBefore` (the current line up to the offending `(`) masked as part of the whole file
@@ -913,7 +967,8 @@ private[compiler] object SyntaxHintClassifier {
     val newPrefix = """(?:^|[^\w])(new\s+)\z""".r.findFirstMatchIn(m.substring(0, i)).map(_.group(1)).getOrElse("")
     val call = newPrefix + s.substring(i)
     val head = s.substring(i).headOption
-    if (head.exists(c => c.isLetter || c == '_' || c == '(') && call.exists(_.isLetter)) Some(call) else None
+    if (head.exists(c => c.isLetter || c == '_' || c == '(') && call.exists(_.isLetter) && quotableCallee(call)) Some(call)
+    else None
   }
 
   // The masked text of the statement that ends at `lineBefore` (the current line up to the
@@ -946,8 +1001,9 @@ private[compiler] object SyntaxHintClassifier {
   // advice cannot shadow or call the user's own `f` (#3138's block: `def g(): Int = mk()()`
   // with the old fixed `val g` advice loops forever).
   private def unusedBindingName(source: String): String = {
+    val words = """\w+""".r.findAllIn(source).toSet
     val candidates = Iterator("f", "fn", "callee") ++ Iterator.from(1).map(n => s"f$n")
-    candidates.find(name => !s"\\b$name\\b".r.findFirstIn(source).isDefined).get
+    candidates.find(name => !words.contains(name)).get
   }
 
   // #2789's rule: `text` (the masked statement before the offending `(`) ends inside a

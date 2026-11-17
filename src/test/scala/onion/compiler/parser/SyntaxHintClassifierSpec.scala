@@ -864,6 +864,20 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       }
     }
 
+    it("reads a string inside `#{...}` interpolation as code, not as the end of the outer string (#3138 block 7)") {
+      Seq(
+        ("println(wrap(\"#{g(\"(x\")}\")(1))", "(1))", Seq("wrap(\"#{g(\"(x\")}\")", "1")),
+        ("println(wrap(\"a#{g(\")\")}b\")(1))", "(1))", Seq("wrap(\"a#{g(\")\")}b\")", "1")),
+        ("println(wrap(\"#{ m[\"k(\"] }\")(1))", "(1))", Seq("wrap(\"#{ m[\"k(\"] }\")", "1"))
+      ).foreach { case (line, context, arguments) =>
+        withClue(line) {
+          val hint = classify(found = "(", expected = "\")\"", context = context, sourceLine = line)
+          hint.messageKey shouldBe "error.parsing.hint.call_result_call"
+          hint.arguments.take(2) shouldBe arguments
+        }
+      }
+    }
+
     it("does not cut the second call's arguments at a `)` inside a string") {
       classify(
         found = "(",

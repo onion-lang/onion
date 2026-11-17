@@ -726,16 +726,64 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       )
 
       hint.messageKey shouldBe "error.parsing.hint.call_result_call"
-      hint.arguments shouldBe Seq("adder")
+      hint.arguments shouldBe Seq("adder(1)", "2")
     }
 
-    it("names the callee of a parenthesized call: `(mk())()`") {
+    it("quotes a parenthesized first call as written: `(mk())()`") {
       classify(
         found = "(",
         expected = "\")\"",
         context = "())",
         sourceLine = "println((mk())())"
-      ).arguments shouldBe Seq("mk")
+      ).arguments shouldBe Seq("(mk())", "")
+    }
+
+    it("quotes the whole callee chain of the first call") {
+      val statementEnd = "\";\", <EOL>, <EOF>, \"}\""
+      Seq(
+        ("val v = obj.f()()", "()", Seq("obj.f()", "")),
+        ("val v = a.b().c(1)(2, 3)", "(2, 3)", Seq("a.b().c(1)", "2, 3")),
+        ("val v = Strings::id(f(1))(2)", "(2)", Seq("Strings::id(f(1))", "2")),
+        ("val v = new Foo()()", "()", Seq("new Foo()", "")),
+        ("val v = x?.f()(y)", "(y)", Seq("x?.f()", "y"))
+      ).foreach { case (line, context, arguments) =>
+        val hint = classify(found = "(", expected = statementEnd, context = context, sourceLine = line)
+        hint.messageKey shouldBe "error.parsing.hint.call_result_call"
+        hint.arguments shouldBe arguments
+      }
+    }
+
+    it("leaves the name out when the first expression names nothing: `(1 + 2)(3)`") {
+      val hint = classify(
+        found = "(",
+        expected = "\")\"",
+        context = "(3))",
+        sourceLine = "println((1 + 2)(3))"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.call_result_call_unnamed"
+      hint.arguments shouldBe Seq("3")
+    }
+
+    it("writes `...` for second-call arguments that do not close on the line") {
+      classify(
+        found = "(",
+        expected = "\")\"",
+        context = "(1,",
+        sourceLine = "println(mk()(1,"
+      ).arguments shouldBe Seq("mk()", "...")
+    }
+
+    it("keeps the `switch`/`unless`/`until`/`match` hints for `keyword (x)(...)`") {
+      val statementEnd = "\";\", <EOL>, <EOF>, \"}\""
+      Seq(
+        ("switch (x)(1)", "(1)", "error.parsing.hint.switch_not_supported"),
+        ("unless (x)(println(1))", "(println(1))", "error.parsing.hint.unless_not_supported"),
+        ("until (x)(println(1))", "(println(1))", "error.parsing.hint.until_not_supported"),
+        ("match (x)(y)", "(y)", "error.parsing.hint.match_not_supported")
+      ).foreach { case (line, context, key) =>
+        SyntaxHintClassifier.classify("(", statementEnd, context, line).map(_.messageKey) shouldBe Some(key)
+      }
     }
 
     it("keeps the block hint for `if (c) (` rather than the call-result hint") {

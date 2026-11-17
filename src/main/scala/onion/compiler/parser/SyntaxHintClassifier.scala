@@ -17,8 +17,6 @@ private[compiler] object SyntaxHintClassifier {
   private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
   // Text just before the offending `(` ends in `)`: a second call suffix after a call.
   private val CallResultCall = """\)\s*\z""".r
-  // The callee's own name, when the first call is a plain `name(...)`.
-  private val CallResultCallee = """([A-Za-z_]\w*)\s*\([^()]*\)\s*\)?\s*\z""".r
   // A curried-looking `def f(a: Int)(` header is a declaration, not a call.
   private val CurriedDefHeader = """\bdef\s+[A-Za-z_]\w*\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*\z""".r
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
@@ -416,14 +414,6 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.constructor_body_this_call")
       case "(" if ConstructorDelegationCall.findFirstMatchIn(textBefore(context, sourceLine)).exists(_.group(1) == "super") =>
         hint("error.parsing.hint.constructor_body_super_call")
-      // `mk()()`: a call's result cannot be called in the same expression.
-      // Not where a block is expected (`if (c) (`), not a C-style cast (`(String)(o)`),
-      // and not a curried-looking `def` header: those keep their own hints.
-      case "(" if !expected.contains("{") && CStyleCast.findFirstMatchIn(sourceLine).isEmpty &&
-          CallResultCall.findFirstIn(textBefore(context, sourceLine)).isDefined &&
-          CurriedDefHeader.findFirstIn(textBefore(context, sourceLine)).isEmpty =>
-        val callee = CallResultCallee.findFirstMatchIn(textBefore(context, sourceLine)).map(_.group(1)).getOrElse("make")
-        hint("error.parsing.hint.call_result_call", callee)
       case "(" if expected.contains("<ID>") && ParenthesizedCatchClause.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.catch_parens")
       // Specific foreach syntax must win over the generic removed `for ... in` form.
@@ -634,6 +624,19 @@ private[compiler] object SyntaxHintClassifier {
       case ":" if expected.contains("{") && PythonStyleColonBlockHeader.findFirstMatchIn(sourceLine).isDefined =>
         val matched = PythonStyleColonBlockHeader.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.python_style_colon_block", matched.group(1), matched.group(2).trim)
+      // `mk()()`: a call's result cannot be called in the same expression. It sits below every
+      // source-line rule, so `switch (x)(1)`, `unless (x)(...)` keep their own hints; and it is
+      // not given where a block is expected (`if (c) (`), for a C-style cast (`(String)(o)`) or
+      // for a curried-looking `def` header. The hint quotes the first call as written
+      // (`obj.f()`, `adder(1)`) and carries the second call's arguments.
+      case "(" if !expected.contains("{") && CStyleCast.findFirstMatchIn(sourceLine).isEmpty &&
+          CallResultCall.findFirstIn(textBefore(context, sourceLine)).isDefined &&
+          CurriedDefHeader.findFirstIn(textBefore(context, sourceLine)).isEmpty =>
+        val args = callResultArguments(context)
+        callResultFirstCall(textBefore(context, sourceLine)) match {
+          case Some(firstCall) => hint("error.parsing.hint.call_result_call", firstCall, args)
+          case None            => hint("error.parsing.hint.call_result_call_unnamed", args)
+        }
       case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
         hint("error.parsing.hint.block_expected")
       // A Swift-style `guard let x = expr else { ... }` early exit reads as a bare
@@ -818,6 +821,62 @@ private[compiler] object SyntaxHintClassifier {
       val header = text.substring(0, open).reverse.takeWhile(c => c != '{' && c != '}' && c != ';').reverse
       TypeKeyword.findAllMatchIn(header).toList.lastOption.map(_.group(1))
     }
+  }
+
+  // The first call of `mk()()` as written, scanned back from the `)` that ends `text`:
+  // `obj.f()`, `Strings::id(1)`, `new Foo()`, `adder(1)`, `(mk())`. None when no name is in
+  // it (`(1 + 2)`) or its brackets do not balance on the line.
+  private def callResultFirstCall(text: String): Option[String] = {
+    val s = text.reverse.dropWhile(_.isWhitespace).reverse
+    def isWord(c: Char) = c.isLetterOrDigit || c == '_'
+    var i = s.length
+    var scanning = true
+    while (scanning && i > 0) {
+      val c = s(i - 1)
+      if (c == ')' || c == ']') {
+        var depth = 0
+        var closed = false
+        while (!closed && i > 0) {
+          s(i - 1) match {
+            case ')' | ']' => depth += 1
+            case '(' | '[' => depth -= 1; if (depth == 0) closed = true
+            case _ =>
+          }
+          i -= 1
+        }
+        if (!closed) return None
+      } else if (isWord(c)) {
+        while (i > 0 && isWord(s(i - 1))) i -= 1
+      } else if (c == '.') {
+        i -= 1
+        if (i > 0 && s(i - 1) == '?') i -= 1
+      } else if (c == ':' && i > 1 && s(i - 2) == ':') {
+        i -= 2
+      } else scanning = false
+    }
+    val newPrefix = """(?:^|[^\w])(new\s+)\z""".r.findFirstMatchIn(s.substring(0, i)).map(_.group(1)).getOrElse("")
+    val call = newPrefix + s.substring(i)
+    val head = s.substring(i).headOption
+    if (head.exists(c => c.isLetter || c == '_' || c == '(') && call.exists(_.isLetter)) Some(call) else None
+  }
+
+  // The second call's arguments, from the `(` that starts `context`; `...` when they do not
+  // close on the same line.
+  private def callResultArguments(context: String): String = {
+    val line = context.takeWhile(c => c != '\n' && c != '\r')
+    var depth = 0
+    var idx = 0
+    while (idx < line.length) {
+      line(idx) match {
+        case '(' => depth += 1
+        case ')' =>
+          depth -= 1
+          if (depth == 0) return line.substring(1, idx).trim
+        case _ =>
+      }
+      idx += 1
+    }
+    "..."
   }
 
   private def textBefore(context: String, sourceLine: String): String = {

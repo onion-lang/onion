@@ -2,4 +2,4 @@
 
 - **`mk()()` now says what to write instead of a bare syntax error.**
   - Before: `Encountered "(", but expecting ")"`, no hint.
-  - Now: a hint naming your function: bind it first (`val f = mk(...)` then `f()`), or call it in one expression with `mk(...).call()`.
+  - Now: the hint quotes your first call and the second call's arguments: `val g = adder(1)` then `g(2)`, or `adder(1).call(2)`.

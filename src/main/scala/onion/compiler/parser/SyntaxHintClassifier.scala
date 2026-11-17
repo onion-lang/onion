@@ -829,21 +829,51 @@ private[compiler] object SyntaxHintClassifier {
     }
   }
 
+  // `s` with every bracket inside a string literal, char literal or comment replaced by `x`
+  // (same length), so a bracket scan over the result never counts one; the hint quotes `s`.
+  // A literal or block comment still open at the end of the line masks to the end.
+  private def maskLiteralBrackets(s: String): String = {
+    val out = s.toCharArray
+    def mask(k: Int): Unit = if ("()[]".indexOf(out(k)) >= 0) out(k) = 'x'
+    def skipQuoted(quote: Char, from: Int): Int = {
+      var i = from + 1
+      while (i < s.length && s(i) != quote) {
+        if (s(i) == '\\' && i + 1 < s.length) { mask(i); i += 1 }
+        mask(i); i += 1
+      }
+      i + 1
+    }
+    var i = 0
+    while (i < s.length) {
+      val c = s(i)
+      if (c == '"' || c == '\'') i = skipQuoted(c, i)
+      else if (c == '/' && i + 1 < s.length && s(i + 1) == '/') {
+        while (i < s.length) { mask(i); i += 1 }
+      } else if (c == '/' && i + 1 < s.length && s(i + 1) == '*') {
+        i += 2
+        while (i < s.length && !(s(i) == '*' && i + 1 < s.length && s(i + 1) == '/')) { mask(i); i += 1 }
+        i += 2
+      } else i += 1
+    }
+    new String(out)
+  }
+
   // The first call of `mk()()` as written, scanned back from the `)` that ends `text`:
   // `obj.f()`, `Strings::id(1)`, `new Foo()`, `adder(1)`, `(mk())`. None when no name is in
   // it (`(1 + 2)`) or its brackets do not balance on the line.
   private def callResultFirstCall(text: String): Option[String] = {
     val s = text.reverse.dropWhile(_.isWhitespace).reverse
+    val m = maskLiteralBrackets(s)
     def isWord(c: Char) = c.isLetterOrDigit || c == '_'
     var i = s.length
     var scanning = true
     while (scanning && i > 0) {
-      val c = s(i - 1)
+      val c = m(i - 1)
       if (c == ')' || c == ']') {
         var depth = 0
         var closed = false
         while (!closed && i > 0) {
-          s(i - 1) match {
+          m(i - 1) match {
             case ')' | ']' => depth += 1
             case '(' | '[' => depth -= 1; if (depth == 0) closed = true
             case _ =>

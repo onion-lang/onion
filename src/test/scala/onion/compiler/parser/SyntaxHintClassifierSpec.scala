@@ -848,6 +848,22 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       }
     }
 
+    it("does not count brackets inside string or char literals or comments in the first call") {
+      Seq(
+        ("println(wrap(\")\")(1))", "(1))", Seq("wrap(\")\")", "1")),
+        ("println(foo(\"(a\")(1))", "(1))", Seq("foo(\"(a\")", "1")),
+        ("println(foo(\"\\\")\")(1))", "(1))", Seq("foo(\"\\\")\")", "1")),
+        ("println(foo(')')(1))", "(1))", Seq("foo(')')", "1")),
+        ("println(foo(1 /* ) */)(2))", "(2))", Seq("foo(1 /* ) */)", "2"))
+      ).foreach { case (line, context, arguments) =>
+        withClue(line) {
+          val hint = classify(found = "(", expected = "\")\"", context = context, sourceLine = line)
+          hint.messageKey shouldBe "error.parsing.hint.call_result_call"
+          hint.arguments.take(2) shouldBe arguments
+        }
+      }
+    }
+
     it("does not cut the second call's arguments at a `)` inside a string") {
       classify(
         found = "(",

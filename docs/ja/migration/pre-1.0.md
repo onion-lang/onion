@@ -600,3 +600,30 @@ def greet(): String = "Hi, #{this.name}"
 - **表示されるもの:** すべての `self` で、一度に `E0117: `self` は廃止されました。`this` と書いてください。` が出ます。static なコードでは E0050 の代わりに出ます。
 - **予約語のままです:** `self` は自由な名前にはなりません。`` `self` `` と書いたフィールドはこれまでどおり使えます。
 - **プロジェクト全体を更新するには:** `onion migrate src/ tests/` を実行します。コード中の `self` と、文字列の `#{...}` の中の `self` をすべて書き換えます。コメント、文字列の地の文、`\#{self}`、`` `self` `` はそのままです。
+
+## 総称メソッドの多重定義が、Java と同じように通常の多重定義と競合するようになりました
+
+通常のクラスは、実装しているインタフェースを通じて総称メソッドの引数に当てはまるようになりました（#2845）。
+`String` は `Comparable[String]` なので、`g[T](c: Comparable[T])` は `g("a")` に当てはまります。
+通常の多重定義も当てはまる場合は、Java の規則でどちらかを選びます。
+
+```onion
+import { java.lang.CharSequence }
+def g(c: CharSequence): String = "charseq"
+def g[T](c: Comparable[T]): String = "generic"
+IO::println(g("a"))                    // 以前: charseq。現在: E0006
+IO::println(g("a" as CharSequence))    // 以前も現在も charseq
+```
+
+| 多重定義 | 呼び出し | 以前 | 現在 | 以前の結果を保つには |
+|---|---|---|---|---|
+| `g(CharSequence)`、`g[T](Comparable[T])` | `g("a")` | `charseq` | E0006 | `g("a" as CharSequence)` |
+| `f(Serializable)`、`f[T](Comparable[T])` | `f("a")` | `serializable` | E0006 | `f("a" as Serializable)` |
+| `f(Object)`、`f[T](Comparable[T])` | `f("a")` | `object` | `generic` | `f("a" as Object)` |
+
+- **表示されるもの:** **E0006** `method call is applicable for both …` と、`as` による変換を示すヒントです。
+  `f(Object)` と並ぶ場合は、メッセージなしで総称メソッドの方が実行されます。
+- **今までどおり動くもの:** 引数のクラスが総称メソッドの引数のインタフェースを実装していない呼び出しと、
+  どちらか一方の多重定義しか当てはまらない呼び出しです。
+- **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
+  また、どの多重定義を意図したかは書いた人にしか分かりません。代わりにヒントが `as` を示します。

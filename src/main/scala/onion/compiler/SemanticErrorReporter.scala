@@ -850,8 +850,30 @@ class SemanticErrorReporter(threshold: Int) {
       Seq(target1, name1, args1, target2, name2, args2))
     val hint =
       if (items.length > 2 && items(2) == SemanticErrorReporter.LambdaOverloadHint) Some(message("suggestion.lambdaOverloadAmbiguous"))
-      else None
+      else genericOverloadCastHint(name1, asTypeArray(item1(2)), asTypeArray(item2(2)))
+        .orElse(genericOverloadCastHint(name2, asTypeArray(item2(2)), asTypeArray(item1(2))))
     problem(position, appendSuggestion(baseMessage, hint))
+  }
+
+  /**
+   * One candidate is generic and the other is not (`g(CharSequence)` beside
+   * `g[T](Comparable[T])`, #2845): name the cast that picks the plain one, on the first
+   * parameter where the generic candidate has a type variable.
+   */
+  private def genericOverloadCastHint(name: String, plain: Array[TypedAST.Type], generic: Array[TypedAST.Type]): Option[String] = {
+    if (plain.length != generic.length || plain.exists(mentionsTypeVariable)) None
+    else plain.indices.find(i => mentionsTypeVariable(generic(i)) && !plain(i).isBasicType).map { i =>
+      format(message("suggestion.genericOverloadCast"), Seq(name, typeNames(plain), typeName(plain(i))))
+    }
+  }
+
+  private def mentionsTypeVariable(tp: TypedAST.Type): Boolean = tp match {
+    case _: TypedAST.TypeVariableType => true
+    case ap: TypedAST.AppliedClassType => ap.typeArguments.exists(mentionsTypeVariable)
+    case at: TypedAST.ArrayType => mentionsTypeVariable(at.component)
+    case n: TypedAST.NullableType => mentionsTypeVariable(n.innerType)
+    case w: TypedAST.WildcardType => mentionsTypeVariable(w.upperBound) || w.lowerBound.exists(mentionsTypeVariable)
+    case _ => false
   }
 
   /**

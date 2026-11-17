@@ -673,3 +673,30 @@ def greet(): String = "Hi, #{this.name}"
 - **Update a whole project:** `onion migrate src/ tests/`. It rewrites every `self` in code
   and inside `#{...}` in strings. It leaves comments, plain string text, `\#{self}` and
   `` `self` `` alone.
+
+## A generic overload competes with a plain one, as in Java
+
+A plain class now reaches a generic parameter through an interface it implements (#2845).
+`String` is a `Comparable[String]`, so `g[T](c: Comparable[T])` now fits `g("a")`. Where a
+plain overload fits too, Java's rules pick between them.
+
+```onion
+import { java.lang.CharSequence }
+def g(c: CharSequence): String = "charseq"
+def g[T](c: Comparable[T]): String = "generic"
+IO::println(g("a"))                    // Before: charseq. Now: E0006
+IO::println(g("a" as CharSequence))    // charseq, before and now
+```
+
+| Overloads | Call | Before | Now | To keep the old result |
+|---|---|---|---|---|
+| `g(CharSequence)`, `g[T](Comparable[T])` | `g("a")` | `charseq` | E0006 | `g("a" as CharSequence)` |
+| `f(Serializable)`, `f[T](Comparable[T])` | `f("a")` | `serializable` | E0006 | `f("a" as Serializable)` |
+| `f(Object)`, `f[T](Comparable[T])` | `f("a")` | `object` | `generic` | `f("a" as Object)` |
+
+- **What you see:** **E0006** `method call is applicable for both …`, with a hint naming the
+  `as` cast. Or, beside `f(Object)`, the generic overload runs with no message.
+- **Still fine:** a call whose argument class does not implement the generic parameter's
+  interface, and a call to only one of the overloads.
+- **No `onion migrate` rule:** finding the affected calls needs overload resolution, and
+  only you know which overload a call meant. The hint shows the cast instead.

@@ -244,5 +244,31 @@ class GenericInstanceCallViewInferenceSpec extends AbstractShellSpec {
       assert(out.trim == "GREEN", out)
     }
   }
+  describe("a plain overload beside a generic one that both fit (migration, #2845)") {
+    val decls =
+      """import { java.lang.CharSequence }
+        |def g(c: CharSequence): String = "charseq"
+        |def g[T](c: Comparable[T]): String = "generic"
+        |""".stripMargin
+    def errors(src: String): Seq[onion.compiler.CompileError] = {
+      val config = new onion.compiler.CompilerConfig(List("."), null, "UTF-8", "", 10)
+      new onion.compiler.OnionCompiler(config).compile(Seq(
+        new onion.compiler.StreamInputSource(() => new java.io.StringReader(src), "test.on"))) match {
+        case onion.compiler.CompilationOutcome.Failure(errs) => errs
+        case _ => Seq.empty
+      }
+    }
+    it("is E0006, and the hint names the cast that picks the plain overload") {
+      val errs = errors(decls + "IO::println(g(\"a\"))\n")
+      assert(errs.map(_.errorCode) == Seq(Some("E0006")), errs)
+      assert(errs.head.message.contains("as CharSequence"), errs.head.message)
+    }
+    it("runs the plain overload once the argument is cast as the hint says") {
+      val (r, out) = runCapturing(decls +
+        "def main(args: String[]): Int { IO::println(g(\"a\" as CharSequence)); return 0 }\n")
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim == "charseq", out)
+    }
+  }
 }
 }

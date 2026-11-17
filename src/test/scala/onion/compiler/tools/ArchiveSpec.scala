@@ -242,6 +242,20 @@ class ArchiveSpec extends AbstractShellSpec {
       assert(e3.getMessage.contains("no such file: " + noSrc), e3.getMessage)
     }
 
+    it("gzipFile reads a non-regular source such as /dev/null, and a file-as-parent target says not a directory") {
+      val work = Files.createTempDirectory("onion-gzip-special")
+      val gz = work.resolve("n.gz")
+      onion.Archive.gzipFile("/dev/null", gz.toString)
+      val back = work.resolve("n.txt")
+      onion.Archive.gunzipFile(gz.toString, back.toString)
+      assert(Files.size(back) == 0L)
+
+      val f = work.resolve("f.txt")
+      Files.writeString(f, "x")
+      val e = intercept[RuntimeException] { onion.Archive.gzipFile(f.toString, f.resolve("x.gz").toString) }
+      assert(e.getMessage.contains("not a directory: " + f), e.getMessage)
+    }
+
     it("gzipFile and gunzipFile refuse the same path as source and target, leaving the file intact") {
       val work = Files.createTempDirectory("onion-gzip-same")
       val f = work.resolve("same.txt")

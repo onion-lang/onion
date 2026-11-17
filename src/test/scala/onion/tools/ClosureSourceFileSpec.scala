@@ -63,4 +63,43 @@ class ClosureSourceFileSpec extends AnyFunSuite with Matchers {
     closureFrames.foreach(f => f.getFileName shouldBe fileName)
     closureFrames.exists(_.getLineNumber == 3) shouldBe true
   }
+
+  test("an error in a lambda's last expression is reported at that expression's line (#2902)") {
+    val source = script(
+      """val xs = [1, 0]
+        |val ys = xs.map { x ->
+        |  println(x)
+        |  10 / x
+        |}
+        |println(ys)
+        |""".stripMargin)
+    val (exit, text) = runReport(source)
+    exit shouldBe 1
+    text should include(s"${source.getFileName}:4: error")
+  }
+
+  test("a one-expression lambda reports its own line, not its caller's (#2902)") {
+    val source = script(
+      """val f: Int -> Int = (x) -> 10 / x
+        |println(
+        |  f(0))
+        |""".stripMargin)
+    val (exit, text) = runReport(source)
+    exit shouldBe 1
+    text should include(s"${source.getFileName}:1: error")
+  }
+
+  test("an error in a non-final statement of a lambda block is reported at its own line (#2902)") {
+    val source = script(
+      """val f: () -> Int = () -> {
+        |  val s: String? = null
+        |  val n = s!!.length()
+        |  n
+        |}
+        |f()
+        |""".stripMargin)
+    val (exit, text) = runReport(source)
+    exit shouldBe 1
+    text should include(s"${source.getFileName}:3: error")
+  }
 }

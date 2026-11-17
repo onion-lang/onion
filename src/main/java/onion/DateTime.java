@@ -96,7 +96,9 @@ public final class DateTime {
             if (t instanceof java.time.ZonedDateTime z) return z.toInstant().toEpochMilli();
             if (t instanceof java.time.OffsetDateTime o) return o.toInstant().toEpochMilli();
             if (t instanceof LocalDateTime l) return l.atZone(LOCAL).toInstant().toEpochMilli();
-            return ((LocalDate) t).atStartOfDay(LOCAL).toInstant().toEpochMilli();
+            // Date only: midnight at the offset or zone written in the text, else local.
+            java.time.ZoneId zone = formatter.parse(dateTime).query(java.time.temporal.TemporalQueries.zone());
+            return ((LocalDate) t).atStartOfDay(zone != null ? zone : LOCAL).toInstant().toEpochMilli();
         } catch (java.time.format.DateTimeParseException d) {
             throw new IllegalArgumentException(
                 "cannot parse \"" + dateTime + "\" with pattern \"" + pattern + "\"", d);

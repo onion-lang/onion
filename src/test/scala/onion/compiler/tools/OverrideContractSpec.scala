@@ -62,4 +62,35 @@ class OverrideContractSpec extends AnyFunSpec {
   it("accepts an override with no contract of its own that keeps the base's ensures (#2639)") {
     assert(w25(bare("return x + x")).isEmpty)
   }
+
+  private val base2753 =
+    """class P {
+      |public:
+      |  def f(k: Int): Int requires k >= 0 && k < 100 ensures result >= 0 { return k }
+      |}
+      |""".stripMargin
+
+  it("warns about an override two levels down, past a middle class with no contract (#2753)") {
+    val src = base2753 +
+      "class M extends P {\npublic:\n  override def f(k: Int): Int { return k + 1 }\n}\n" +
+      "class C extends M {\npublic:\n  override def f(k: Int): Int { return 0 - 1 }\n}"
+    val ws = w25(src)
+    assert(ws.size == 1 && ws.head.contains("'f'"), ws.toString)
+  }
+
+  it("warns about an override that renames the parameter (#2753)") {
+    val src = base2753 + "class C extends P {\npublic:\n  override def f(x: Int): Int { return 0 - 1 }\n}"
+    val ws = w25(src)
+    assert(ws.size == 1 && ws.head.contains("'f'"), ws.toString)
+  }
+
+  it("accepts a renamed parameter when the body keeps the promise (#2753)") {
+    val src = base2753 + "class C extends P {\npublic:\n  override def f(x: Int): Int { return x }\n}"
+    assert(w25(src).isEmpty)
+  }
+
+  it("says nothing about a static method, which overrides nothing (#2753)") {
+    val src = base2753 + "class C extends P {\npublic:\n  static def f(k: Int): Int { return 0 - 1 }\n}"
+    assert(w25(src).isEmpty)
+  }
 }

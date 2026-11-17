@@ -568,7 +568,9 @@ val zs: List[Int] = [5, null]   // Before: compiled; the read of zs[1] crashed. 
   `f.call(null)` on a function value, `add`/`set`/`put` on `List` and `Map`, `apply` on a
   Java functional interface, and a method of your own generic class (`Box[Int].put(null)`).
   Also a `null` element in a list or map literal written for such a type
-  (`val zs: List[Int] = [5, null]`, `val m: Map[String, Int] = ["b": null]`).
+  (`val zs: List[Int] = [5, null]`, `val m: Map[String, Int] = ["b": null]`), and the other
+  ways into the same slot (#2991): a constructor (`new Box[Int](null)`, `new R[Int](null)`),
+  and an indexed assignment (`xs[0] = null`, `m["b"] = null`).
 - **To update:** if `null` is a value you mean to store, declare the type argument nullable:
   `List[Int?]`, `Map[String, Int?]`, `(Int?) -> T`. Reads then give an `Int?`, so handle
   `null` there (`?:` or `!!`). Otherwise, pass a real value instead of `null`.

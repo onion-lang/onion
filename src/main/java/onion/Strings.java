@@ -214,6 +214,7 @@ public final class Strings {
         String tail = suffix == null ? "" : suffix;
         int keep = maxLength - tail.length();
         if (keep <= 0) return tail.length() <= maxLength ? tail : tail.substring(0, maxLength);
+        if (Character.isHighSurrogate(str.charAt(keep - 1)) && Character.isLowSurrogate(str.charAt(keep))) keep--;
         return str.substring(0, keep) + tail;
     }
 
@@ -245,12 +246,15 @@ public final class Strings {
         return new ArrayList<String>(Arrays.asList(trimmed.split("\\s+")));
     }
 
-    /** Returns each character as a single-character string. */
+    /** Returns each character as a single-character string; a surrogate pair (an emoji) stays one entry. */
     public static List<String> chars(String str) {
         List<String> result = new ArrayList<>();
         if (str == null) return result;
-        for (int i = 0; i < str.length(); i++) {
-            result.add(String.valueOf(str.charAt(i)));
+        for (int i = 0; i < str.length(); ) {
+            int cp = str.codePointAt(i);
+            int n = Character.charCount(cp);
+            result.add(str.substring(i, i + n));
+            i += n;
         }
         return result;
     }

@@ -19,7 +19,7 @@ private[compiler] final class CallArgumentTypingSupport(
    *  ordinary path. */
   private def assign(node: AST.Node, expected: Type, actual: Term, method: Method, index: Int, element: Boolean = false): Term =
     if (actual.`type`.isNullType && method != null && isClassTypeVariable(method, index, element))
-      primitiveSlot(expected) match {
+      ArgumentHelpers.primitiveOfNonNullBox(expected) match {
         // A parameter declared as a class type variable (`T1` in `Function1.call`, `E` in
         // `List.add`, `T` in a user's `Box[T].put`) whose type argument is a primitive
         // (`(Int) -> T`, `List[Int]`, `Box[Int]`) holds an `Int`: the value is unboxed
@@ -33,12 +33,6 @@ private[compiler] final class CallArgumentTypingSupport(
     if (method != null && method.isJavaOrigin && !isClassTypeVariable(method, index, element))
       processAssignableForJavaCallee(node, expected, actual)
     else processAssignable(node, expected, actual)
-
-  /** The primitive a non-nullable box-class parameter type stands for, if it is one. */
-  private def primitiveSlot(expected: Type): Option[BasicType] = expected match {
-    case ct: ClassType if !expected.isNullable => onion.compiler.toolbox.Boxing.primitiveOfBoxName(ct.name)
-    case _ => None
-  }
 
   /** Whether the callee declares parameter `index` as one of its class's type variables
    *  (`E` in `List<E>.add(E)`). The caller chose that type as the receiver's type

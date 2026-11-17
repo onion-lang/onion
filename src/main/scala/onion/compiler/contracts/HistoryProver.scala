@@ -70,9 +70,10 @@ object HistoryProver {
    */
   def proveEnsures(method: AST.MethodDeclaration, ensures: Seq[AST.Expression], assume: Seq[AST.Expression],
                    intFields: Set[String], callees: Map[String, AST.MethodDeclaration] = Map.empty,
-                   external: Map[(String, String), Callee] = Map.empty): Outcome =
+                   external: Map[(String, String), Callee] = Map.empty,
+                   aliases: Map[String, String] = Map.empty): Outcome =
     if (method.block == null || ensures.isEmpty) Unsupported
-    else new Run(method, "", ">=", intFields, assume, callees, external, checkObligations = false).runEnsures(ensures)
+    else new Run(method, "", ">=", intFields, assume, callees, external, checkObligations = false).runEnsures(ensures, aliases)
 
   private final class Run(method: AST.MethodDeclaration, field: String, op: String, intFields: Set[String],
                           invariants: Seq[AST.Expression], callees: Map[String, AST.MethodDeclaration],
@@ -125,11 +126,13 @@ object HistoryProver {
     }
 
     /** The body is run symbolically; `result` is the value of its trailing `return`. */
-    def runEnsures(ensures: Seq[AST.Expression]): Outcome = {
+    /** `aliases` maps a name the clauses use (an overridden method's parameter) to this method's own. */
+    def runEnsures(ensures: Seq[AST.Expression], aliases: Map[String, String] = Map.empty): Outcome = {
       val intParams = method.args.filter(a => isInt(a.typeRef)).map(_.name)
       if (method.args.size != intParams.size) return Unsupported
       if (shadowsField) return Unsupported
-      val pre: Env = (intFields.toSeq ++ intParams).map(n => n -> bb.fresh(W)).toMap
+      val own: Env = (intFields.toSeq ++ intParams).map(n => n -> bb.fresh(W)).toMap
+      val pre: Env = own ++ aliases.collect { case (from, to) if own.contains(to) => from -> own(to) }
       val assumptions = (invariants ++ method.requires).map(cond(_, pre))
       if (assumptions.exists(_.isEmpty)) return Unsupported
       val post = exec(method.block.elements, pre).getOrElse(return Unsupported)
@@ -143,7 +146,7 @@ object HistoryProver {
       bb.solve() match {
         case Sat.Unsatisfiable(proof) => if (Rup.check(bb.numVars, bb.allClauses, proof)) Proved else Unsupported
         case Sat.Satisfiable(model) =>
-          Counterexample(pre.view.mapValues(w => bb.valueOf(model, w).toInt).toMap)
+          Counterexample(own.view.mapValues(w => bb.valueOf(model, w).toInt).toMap)
         case Sat.Unknown => Unsupported
       }
     }

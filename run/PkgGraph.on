@@ -142,7 +142,7 @@ public:
         found = true
       }
     }
-    onPath[name] = null
+    onPath.remove(name)
     path.remove(path.size - 1)
     return found
   }

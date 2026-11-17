@@ -648,9 +648,13 @@ IO::println(g("a" as CharSequence))    // 以前も現在も charseq
 | `g(CharSequence)`、`g[T](Comparable[T])` | `g("a")` | `charseq` | E0006 | `g("a" as CharSequence)` |
 | `f(Serializable)`、`f[T](Comparable[T])` | `f("a")` | `serializable` | E0006 | `f("a" as Serializable)` |
 | `f(Object)`、`f[T](Comparable[T])` | `f("a")` | `object` | `generic` | `f("a" as Object)` |
+| `show(Int)`、`show[T](Comparable[T])`、`xs = [1, 2, 3]` | `show(xs[0])` | `int 1` | `comparable` | `show(xs[0] as Int)` |
+| `log(String, CharSequence)`、`log[T](T, Comparable[T])` | `log("t", "m")` | `plain` | E0006 | `log("t", "m" as CharSequence)` |
 
 - **表示されるもの:** **E0006** `method call is applicable for both …` と、`as` による変換を示すヒントです。
-  `f(Object)` と並ぶ場合は、メッセージなしで総称メソッドの方が実行されます。
+  `f(Object)` や `show(Int)` と並ぶ場合は、メッセージなしで総称メソッドの方が実行されます。
+- **ヒントが示す引数:** 変換すると総称メソッドが当てはまらなくなる、最初の引数です（`log("t", "m")` では第 2 引数）。
+  可変長引数は要素の型に変換します。`g(c: CharSequence...)` なら `g("a" as CharSequence)` です。
 - **今までどおり動くもの:** 引数のクラスが総称メソッドの引数のインタフェースを実装していない呼び出しと、
   どちらか一方の多重定義しか当てはまらない呼び出しです。
 - **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。

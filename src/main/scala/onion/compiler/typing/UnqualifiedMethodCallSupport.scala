@@ -168,7 +168,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
           }
       }
     } else if (methods.length > 1) {
-      calls.reportAmbiguousMethods(node, node.name, methods)
+      calls.reportAmbiguousMethods(node, node.name, methods, calls.types(params))
       None
     } else {
       val method = methods(0)

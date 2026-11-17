@@ -739,9 +739,14 @@ IO::println(g("a" as CharSequence))    // charseq, before and now
 | `g(CharSequence)`, `g[T](Comparable[T])` | `g("a")` | `charseq` | E0006 | `g("a" as CharSequence)` |
 | `f(Serializable)`, `f[T](Comparable[T])` | `f("a")` | `serializable` | E0006 | `f("a" as Serializable)` |
 | `f(Object)`, `f[T](Comparable[T])` | `f("a")` | `object` | `generic` | `f("a" as Object)` |
+| `show(Int)`, `show[T](Comparable[T])`, with `xs = [1, 2, 3]` | `show(xs[0])` | `int 1` | `comparable` | `show(xs[0] as Int)` |
+| `log(String, CharSequence)`, `log[T](T, Comparable[T])` | `log("t", "m")` | `plain` | E0006 | `log("t", "m" as CharSequence)` |
 
 - **What you see:** **E0006** `method call is applicable for both …`, with a hint naming the
-  `as` cast. Or, beside `f(Object)`, the generic overload runs with no message.
+  `as` cast. Or, beside `f(Object)` or `show(Int)`, the generic overload runs with no message.
+- **Which argument the hint names:** the first one whose cast rules the generic overload
+  out (the 2nd in `log("t", "m")`). A varargs argument is cast to the element type:
+  `g("a" as CharSequence)` for `g(c: CharSequence...)`.
 - **Still fine:** a call whose argument class does not implement the generic parameter's
   interface, and a call to only one of the overloads.
 - **No `onion migrate` rule:** finding the affected calls needs overload resolution, and

@@ -19,6 +19,9 @@ object Message {
 
   def apply(property: String): String =  ERROR_MESSAGES.getString(property)
 
+  /** The language of the bundle messages come from ("ja", or "" for the English default). */
+  def language: String = ERROR_MESSAGES.getLocale.getLanguage
+
   def apply(property: String, arguments: Array[Any]): String =  MessageFormat.format(apply(property), arguments.map(_.asInstanceOf[AnyRef]):_*)
 
   def apply(property: String, arg1: Any): String = MessageFormat.format(apply(property), arg1.asInstanceOf[AnyRef])

@@ -269,6 +269,87 @@ class GenericInstanceCallViewInferenceSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, out)
       assert(out.trim == "charseq", out)
     }
+    // Error text is bilingual: accept the English or the Japanese way of naming argument n.
+    def namesArgument(msg: String, n: Int): Boolean =
+      msg.contains((if (n == 1) "1st" else if (n == 2) "2nd" else s"${n}th") + " argument") || msg.contains(s"第 $n 引数")
+    // The hint's rule (#2845): name the first argument whose cast to the plain overload's
+    // parameter type makes the generic overload inapplicable; for a varargs slot, cast to
+    // the element type. Following the hint must compile and run the plain overload.
+    it("names the argument by its position") {
+      val errs = errors(decls + "IO::println(g(\"a\"))\n")
+      assert(namesArgument(errs.head.message, 1), errs.head.message)
+    }
+    it("names the second argument when only its cast rules the generic overload out") {
+      val src =
+        """import { java.lang.CharSequence }
+          |def log(tag: String, msg: CharSequence): String = "plain"
+          |def log[T](tag: T, v: Comparable[T]): String = "generic"
+          |""".stripMargin
+      val errs = errors(src + "IO::println(log(\"t\", \"m\"))\n")
+      assert(errs.map(_.errorCode) == Seq(Some("E0006")), errs)
+      val msg = errs.head.message
+      assert(namesArgument(msg, 2) && msg.contains("as CharSequence"), msg)
+      assert(!msg.contains("as String"), msg)
+      val (r, out) = runCapturing(src +
+        "def main(args: String[]): Int { IO::println(log(\"t\", \"m\" as CharSequence)); return 0 }\n")
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim == "plain", out)
+    }
+    it("names the second argument when the first parameters of both overloads are Comparable") {
+      val src =
+        """import { java.lang.CharSequence }
+          |def h(a: Comparable[String], b: CharSequence): String = "plain"
+          |def h[T](a: Comparable[T], b: Comparable[T]): String = "generic"
+          |""".stripMargin
+      val errs = errors(src + "IO::println(h(\"x\", \"y\"))\n")
+      assert(errs.map(_.errorCode) == Seq(Some("E0006")), errs)
+      val msg = errs.head.message
+      assert(namesArgument(msg, 2) && msg.contains("as CharSequence"), msg)
+    }
+    it("casts a varargs argument to the element type, not the array type") {
+      val src =
+        """import { java.lang.CharSequence }
+          |def g(c: CharSequence...): String = "charseq"
+          |def g[T](c: Comparable[T]...): String = "generic"
+          |""".stripMargin
+      val errs = errors(src + "IO::println(g(\"a\"))\n")
+      assert(errs.map(_.errorCode) == Seq(Some("E0006")), errs)
+      val msg = errs.head.message
+      assert(msg.contains("as CharSequence") && !msg.contains("as CharSequence[]"), msg)
+      val (r, out) = runCapturing(src +
+        "def main(args: String[]): Int { IO::println(g(\"a\" as CharSequence)); return 0 }\n")
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim == "charseq", out)
+    }
+    it("gives the same hint for a static call") {
+      val src =
+        """import { java.lang.CharSequence }
+          |class K {
+          |public:
+          |  static def g(a: String, c: CharSequence): String = "charseq"
+          |  static def g[T](a: T, c: Comparable[T]): String = "generic"
+          |}
+          |""".stripMargin
+      val errs = errors(src + "IO::println(K::g(\"a\", \"b\"))\n")
+      assert(errs.map(_.errorCode) == Seq(Some("E0006")), errs)
+      val msg = errs.head.message
+      assert(namesArgument(msg, 2) && msg.contains("as CharSequence"), msg)
+    }
+    it("gives the same hint for an instance call") {
+      val src =
+        """import { java.lang.CharSequence }
+          |class K {
+          |public:
+          |  def this {}
+          |  def g(a: String, c: CharSequence): String = "charseq"
+          |  def g[T](a: T, c: Comparable[T]): String = "generic"
+          |}
+          |""".stripMargin
+      val errs = errors(src + "IO::println(new K().g(\"a\", \"b\"))\n")
+      assert(errs.map(_.errorCode) == Seq(Some("E0006")), errs)
+      val msg = errs.head.message
+      assert(namesArgument(msg, 2) && msg.contains("as CharSequence"), msg)
+    }
   }
 }
 }

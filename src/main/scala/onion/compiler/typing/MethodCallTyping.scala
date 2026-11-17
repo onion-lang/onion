@@ -92,7 +92,7 @@ final class MethodCallTyping(
         None
       } else Some(m)
     case _ =>
-      reportAmbiguousMethods(node, name, methods)
+      reportAmbiguousMethods(node, name, methods, argTypes)
       None
   }
 
@@ -313,17 +313,19 @@ final class MethodCallTyping(
   private[typing] def reportAmbiguousMethods(
     node: AST.Node,
     name: String,
-    methods: Array[Method]
+    methods: Array[Method],
+    argTypes: Array[Type] = null
   ): Unit =
-    methodCallReportingSupport.reportAmbiguousMethods(node, name, methods)
+    methodCallReportingSupport.reportAmbiguousMethods(node, name, methods, argTypes)
 
   private[typing] def reportAmbiguousMethod(
     node: AST.Node,
     first: Method,
     second: Method,
-    name: String = null
+    name: String = null,
+    argTypes: Array[Type] = null
   ): Unit =
-    methodCallReportingSupport.reportAmbiguousMethod(node, first, second, name)
+    methodCallReportingSupport.reportAmbiguousMethod(node, first, second, name, argTypes)
 
   private[typing] def reportAmbiguousSignature(
     node: AST.Node,

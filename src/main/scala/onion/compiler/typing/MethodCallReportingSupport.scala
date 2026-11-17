@@ -88,18 +88,24 @@ private[compiler] final class MethodCallReportingSupport(
   def reportAmbiguousMethods(
     node: AST.Node,
     name: String,
-    methods: Array[Method]
+    methods: Array[Method],
+    argTypes: Array[Type] = null
   ): Unit =
-    reportAmbiguousMethod(node, methods(0), methods(1), name)
+    reportAmbiguousMethod(node, methods(0), methods(1), name, argTypes)
 
+  /** `argTypes` (null for a lambda argument) lets the error name an argument to cast (#2845). */
   def reportAmbiguousMethod(
     node: AST.Node,
     first: Method,
     second: Method,
-    name: String = null
+    name: String = null,
+    argTypes: Array[Type] = null
   ): Unit = {
     val methodName = if (name != null) name else first.name
-    reportAmbiguousSignature(node, first.affiliation, methodName, first.arguments, second.affiliation, methodName, second.arguments)
+    val callInfo =
+      if (argTypes == null) null
+      else onion.compiler.SemanticErrorReporter.AmbiguousCallArguments(argTypes, first.isVararg, second.isVararg)
+    reportAmbiguousSignature(node, first.affiliation, methodName, first.arguments, second.affiliation, methodName, second.arguments, callInfo)
   }
 
   def reportAmbiguousSignature(

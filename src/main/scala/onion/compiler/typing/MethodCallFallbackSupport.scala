@@ -212,7 +212,8 @@ private[compiler] final class MethodCallFallbackSupport(
       case CandidateSelection.Selected(selected) =>
         selected.method
       case CandidateSelection.Ambiguous(first, second) =>
-        calls.reportAmbiguousMethod(node, first.method, second.method, name)
+        calls.reportAmbiguousMethod(node, first.method, second.method, name,
+          preliminaryParams.map(t => if (t == null) null else t.`type`))
         return None
       case CandidateSelection.NoMatch =>
         reportNotFound(nonClosureTypes.values.toArray)

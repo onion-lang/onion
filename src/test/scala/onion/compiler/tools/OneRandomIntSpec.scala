@@ -346,8 +346,8 @@ class OneRandomIntSpec extends AbstractShellSpec {
       assert(output.contains("old.on:2:20: note:"), output)
     }
 
-    // #3116 block 7: the rule lists what is rewritten (a value migrate works out below
-    // Int.MAX_VALUE, or a max that reads a variable or a call); every other constant is noted.
+    // #3116 block 8: the rule lists what is rewritten (a plain decimal literal below
+    // Int.MAX_VALUE, or a max that reads a variable or a call); every other max is noted.
     Seq(
       "'a' as Int",
       "2147483647.0 as Int",
@@ -357,12 +357,12 @@ class OneRandomIntSpec extends AbstractShellSpec {
       "Short::MAX_VALUE",
       "6L as Int"
     ).foreach { max =>
-      it(s"notes a constant max it cannot show is below Int.MAX_VALUE: `$max`") {
+      it(s"notes a constant max it does not evaluate: `$max`") {
         val source = s"val n = OnionMath::randomInt(0, $max)\n"
         val (_, after, output) = migrate(source)
         assert(after == source, output)
         assert(output.contains("old.on:1:20: note:"), output)
-        assert(output.contains("cannot show"), output)
+        assert(output.contains("does not evaluate"), output)
       }
     }
 
@@ -385,18 +385,30 @@ class OneRandomIntSpec extends AbstractShellSpec {
       assert(compile(after).allErrors.isEmpty, compile(after).allErrors.map(_.message))
     }
 
-    it("still rewrites a max that is a constant below Int.MAX_VALUE, in any spelling") {
+    it("rewrites a plain decimal max below Int.MAX_VALUE, and notes every other constant (#3116 block 8)") {
+      Seq("6" -> "Rand::nextInt(0, 7)", "1_000" -> "Rand::nextInt(0, 1001)", "2147483646" -> "Rand::nextInt(0, 2147483647)")
+        .foreach { (max, expected) =>
+          val (code, after, output) = migrate(s"val n = OnionMath::randomInt(0, $max)\nprintln(n >= 0)\n")
+          assert(code == 0, output)
+          assert(after.contains(expected), s"$after\n$output")
+        }
+      Seq("1 << 4", "6 - 1", "0x10", "-5", "Integer::MAX_VALUE - 1", "2147450879 - (-32768 as Short)").foreach { max =>
+        val source = s"val n = OnionMath::randomInt(0, $max)\nprintln(n >= 0)\n"
+        val (_, after, output) = migrate(source)
+        assert(after == source, s"$max\n$after\n$output")
+        assert(output.contains("old.on:1:20: note:"), s"$max\n$output")
+      }
+    }
+
+    it("notes a bare call in a file that imports randomInt and also names its own (#3116 block 8)") {
       Seq(
-        "(1 << 4)" -> "Rand::nextInt(0, (1 << 4) + 1)",
-        "1 << 4" -> "Rand::nextInt(0, (1 << 4) + 1)",
-        "~0 >>> 2" -> "Rand::nextInt(0, (~0 >>> 2) + 1)",
-        "~Integer::MIN_VALUE * 1 - 1" -> "Rand::nextInt(0, (~Integer::MIN_VALUE * 1 - 1) + 1)",
-        "0x7FFFFFFE" -> "Rand::nextInt(0, 0x7FFFFFFE + 1)",
-        "Integer::MAX_VALUE - 1" -> "Rand::nextInt(0, Integer::MAX_VALUE)"
-      ).foreach { (max, expected) =>
-        val (code, after, output) = migrate(s"val n = OnionMath::randomInt(0, $max)\nprintln(n >= 0)\n")
-        assert(code == 0, output)
-        assert(after.contains(expected), s"$after\n$output")
+        "import { onion.OnionMath::* }\nclass Dice {\npublic:\n  def randomInt(n: Int): Int = n\n}\nval d = randomInt(1, 6)\nprintln(d)\n" -> 6,
+        "import { onion.OnionMath::* }\nval randomInt = 3\nval d = randomInt(1, 6)\nprintln(d)\n" -> 3
+      ).foreach { (source, line) =>
+        val (_, after, output) = migrate(source)
+        assert(after == source, output)
+        assert(output.contains(s"old.on:$line:9: note:"), output)
+        assert(output.contains("Rand::nextInt(min, max + 1)"), output)
       }
     }
   }

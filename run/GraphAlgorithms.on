@@ -59,8 +59,8 @@ public:
 // ── Extension Int helpers ─────────────────────────────────────────────────────
 
 extension Int {
-  def isInfinity(): Boolean = self >= 2147483647
-  def minWith(other: Int): Int = if self < other { self } else { other }
+  def isInfinity(): Boolean = this >= 2147483647
+  def minWith(other: Int): Int = if this < other { this } else { other }
 }
 
 // ── Graph class ───────────────────────────────────────────────────────────────

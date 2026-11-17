@@ -12,14 +12,14 @@
 extension Int {
   def pct(total: Int): String {
     if total == 0 { return "  0%" }
-    val p: Int = self * 100 / total
+    val p: Int = this * 100 / total
     if p < 10 { return "  " + p + "%" }
     if p < 100 { return " " + p + "%" }
     return "" + p + "%"
   }
   def bar(total: Int, width: Int): String {
     if total == 0 { return "" }
-    val filled: Int = self * width / total
+    val filled: Int = this * width / total
     var s: String = ""
     var i: Int = 0
     while i < width {
@@ -32,18 +32,18 @@ extension Int {
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def trimTo(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + "~"
+    if this.length() <= n { return this }
+    return this.substring(0, n) + "~"
   }
   def repeated(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 }

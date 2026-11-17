@@ -30,12 +30,12 @@ public:
   def getRevealedCount(): Int   = revealedCount
 
   def this(rows: Int, cols: Int, mines: List[Pos]) {
-    self.rows = rows
-    self.cols = cols
-    self.mineCount = mines.size
-    self.state = new Playing()
-    self.revealedCount = 0
-    self.cells = []
+    this.rows = rows
+    this.cols = cols
+    this.mineCount = mines.size
+    this.state = new Playing()
+    this.revealedCount = 0
+    this.cells = []
 
     // Fill with empty cells
     foreach i: Int in 0..<(rows * cols) {

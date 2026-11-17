@@ -35,12 +35,12 @@ record Tx(seq: Int, kind: TxKind, note: String) {
 
 extension Int {
   def currency(): String {
-    if self < 0 { return "-$" + (0 - self) }
-    return "$" + self
+    if this < 0 { return "-$" + (0 - this) }
+    return "$" + this
   }
   def abs(): Int {
-    if self < 0 { return 0 - self }
-    return self
+    if this < 0 { return 0 - this }
+    return this
   }
 }
 

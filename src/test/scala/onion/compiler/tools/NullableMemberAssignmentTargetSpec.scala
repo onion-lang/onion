@@ -34,7 +34,7 @@ class NullableMemberAssignmentTargetSpec extends AbstractShellSpec {
       |class Box {
       |public:
       |  var count: Int
-      |  def this { self.count = 0 }
+      |  def this { this.count = 0 }
       |}
       |""".stripMargin
 

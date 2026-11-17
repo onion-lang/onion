@@ -11,30 +11,30 @@ import { java.lang.Integer as JInt; }
 
 extension String {
   def rpad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def lpad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }
   def truncate(max: Int): String {
-    if self.length() <= max { return self }
-    return self.substring(0, max - 3) + "..."
+    if this.length() <= max { return this }
+    return this.substring(0, max - 3) + "..."
   }
 }
 
 extension Int {
   def pct(total: Int): String {
     if total == 0 { return " N/A%" }
-    val p = self * 100 / total
+    val p = this * 100 / total
     return ("#{p}%").lpad(5)
   }
-  def hrs(): String = if self == 1 { "1 hr" } else { "#{self} hrs" }
+  def hrs(): String = if this == 1 { "1 hr" } else { "#{this} hrs" }
   def bar(total: Int, width: Int): String {
-    val filled = if total == 0 { 0 } else { self * width / total }
+    val filled = if total == 0 { 0 } else { this * width / total }
     var bar = "["
     var i = 0
     while i < width {
@@ -46,7 +46,7 @@ extension Int {
 }
 
 extension Double {
-  def fmt1(): String = String::format("%.1f", self)
+  def fmt1(): String = String::format("%.1f", this)
 }
 
 // ─── Priority ─────────────────────────────────────────────────────────────────
@@ -115,8 +115,8 @@ class Milestone {
   val tasks: List[Object]
 public:
   def this(name: String) {
-    self.name = name
-    self.tasks = []
+    this.name = name
+    this.tasks = []
   }
   def getName(): String = name
   def getTasks(): List[Object] = tasks
@@ -169,8 +169,8 @@ class Project {
   val milestones: List[Object]
 public:
   def this(title: String) {
-    self.title = title
-    self.milestones = []
+    this.title = title
+    this.milestones = []
   }
   def getTitle(): String = title
   def getMilestones(): List[Object] = milestones

@@ -73,15 +73,15 @@ record ManifestRef(repo: String, tag: String, digest: Digest, totalSize: Long, l
 
 extension Long {
   def humanSize(): String {
-    if self < 1024L { return "#{self} B" }
-    if self < 1048576L { return "#{self / 1024L} KiB" }
-    if self < 1073741824L { return "#{self / 1048576L} MiB" }
-    return "#{self / 1073741824L} GiB"
+    if this < 1024L { return "#{this} B" }
+    if this < 1048576L { return "#{this / 1024L} KiB" }
+    if this < 1073741824L { return "#{this / 1048576L} MiB" }
+    return "#{this / 1073741824L} GiB"
   }
 }
 
 extension Int {
-  def plural(word: String): String = if self == 1 { "#{self} #{word}" } else { "#{self} #{word}s" }
+  def plural(word: String): String = if this == 1 { "#{this} #{word}" } else { "#{this} #{word}s" }
 }
 
 // ── Interface ─────────────────────────────────────────────────────────────────

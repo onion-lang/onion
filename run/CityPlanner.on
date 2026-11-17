@@ -10,20 +10,20 @@
 // ─── Extensions ───────────────────────────────────────────────────────────────
 
 extension Int {
-  def abs(): Int = if self < 0 { 0 - self } else { self }
+  def abs(): Int = if this < 0 { 0 - this } else { this }
   def padLeft(w: Int): String {
-    val s = "" + self
+    val s = "" + this
     var r = s
     while r.length() < w { r = " " + r }
     return r
   }
   def clamp(lo: Int, hi: Int): Int =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
 }
 
 extension Double {
   def fmt2(): String {
-    val scaled = (self * 100.0) as Int
+    val scaled = (this * 100.0) as Int
     val ipart  = scaled / 100
     val fpart  = (scaled % 100).abs()
     val fs     = "" + fpart

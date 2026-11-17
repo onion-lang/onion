@@ -10,7 +10,7 @@ import {
 extension String {
   def shiftChars(offset: Int): String {
     val sb = new StringBuilder()
-    foreach c: Char in self.toCharArray() {
+    foreach c: Char in this.toCharArray() {
       if c >= 'A' && c <= 'Z' {
         val shifted: Int = (((c as Int) - 65 + ((offset % 26) + 26)) % 26) + 65
         sb.append(shifted as Char)
@@ -26,7 +26,7 @@ extension String {
 
   def alphaOnly: String {
     val sb = new StringBuilder()
-    foreach c: Char in self.toCharArray() {
+    foreach c: Char in this.toCharArray() {
       if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
         sb.append(c)
       }
@@ -34,7 +34,7 @@ extension String {
     return sb.toString()
   }
 
-  def toUpperAlpha: String = self.alphaOnly.toUpperCase()
+  def toUpperAlpha: String = this.alphaOnly.toUpperCase()
 }
 
 // ─── Cipher ADT ──────────────────────────────────────────────────────────────

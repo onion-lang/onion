@@ -97,24 +97,24 @@ interface Resolver {
 
 extension String {
   def parentDomain(): String? {
-    val idx: Int = self.indexOf(".")
+    val idx: Int = this.indexOf(".")
     if idx < 0 { return null }
-    return self.substring(idx + 1)
+    return this.substring(idx + 1)
   }
   def normalize(): String {
-    if self.endsWith(".") { return self.substring(0, self.length() - 1) }
-    return self
+    if this.endsWith(".") { return this.substring(0, this.length() - 1) }
+    return this
   }
   def splitDots(): List[String] {
     val parts: List[String] = []
-    val segs = Strings::split(self, "\\.")
+    val segs = Strings::split(this, "\\.")
     foreach s: Object in segs { parts.add(s as String) }
     return parts
   }
   def tld(): String {
-    val idx: Int = self.lastIndexOf(".")
-    if idx < 0 { return self }
-    return self.substring(idx + 1)
+    val idx: Int = this.lastIndexOf(".")
+    if idx < 0 { return this }
+    return this.substring(idx + 1)
   }
 }
 

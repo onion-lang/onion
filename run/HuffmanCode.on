@@ -63,14 +63,14 @@ def example_2(): Boolean
 
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def repeated(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 }
@@ -80,7 +80,7 @@ extension String {
 extension Int {
   def toPercent(total: Int): String {
     if total == 0 { return "0%" }
-    return "" + (self * 100 / total) + "%"
+    return "" + (this * 100 / total) + "%"
   }
 }
 

@@ -59,24 +59,24 @@ public:
 record Block(name: String, variety: GrapeVariety, acres: Double, brixAtHarvest: Double) {
 public:
   def quality(): String {
-    if self.brixAtHarvest() >= 24.0 { return "premium" }
-    else if self.brixAtHarvest() >= 21.0 { return "standard" }
+    if this.brixAtHarvest() >= 24.0 { return "premium" }
+    else if this.brixAtHarvest() >= 21.0 { return "standard" }
     else { return "table" }
   }
-  def estYieldTons(): Double = self.acres() * 3.5
+  def estYieldTons(): Double = this.acres() * 3.5
 }
 
 record Batch(id: String, blockName: String, variety: GrapeVariety, stage: FermentationStage, volumeLiters: Double) {
 public:
   def statusLine(): String =
-    "  #{self.id().pad(10)} #{self.blockName().pad(14)} #{self.variety().label().pad(18)} #{self.stage().label()}"
+    "  #{this.id().pad(10)} #{this.blockName().pad(14)} #{this.variety().label().pad(18)} #{this.stage().label()}"
 }
 
 // ─── Extension helpers ─────────────────────────────────────────────────────────
 
 extension String {
   def pad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }

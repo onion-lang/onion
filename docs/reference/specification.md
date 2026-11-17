@@ -20,6 +20,8 @@ val         var         when        while
 
 Keywords can be used as identifiers by escaping with backticks: `` `class` ``.
 
+`self` is reserved but retired: it is error E0117. Write `this` for the current instance.
+
 ### Identifiers
 
 - Start with a letter or underscore, followed by letters, digits, underscores
@@ -160,8 +162,8 @@ def generic[T](x: T): T { ... }                     // method type params
 Call sites may pass arguments by name (`f(b = 2, a = 1)`); omitted
 parameters fill from defaults. Methods, constructors and records all
 support named arguments and defaults.
-Arguments run in the order they are written; `copy(..)`, `extends A(..)`
-and `: this(..)` still run them in parameter order (#2801).
+Arguments run in the order they are written, `copy(..)` included;
+`extends A(..)` and `: this(..)` still run them in parameter order (#2801).
 
 ### Classes
 

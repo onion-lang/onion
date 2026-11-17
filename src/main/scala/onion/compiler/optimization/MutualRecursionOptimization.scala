@@ -296,10 +296,11 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // class-load time) instead of either compiling correctly or failing to compile.
     // The temporaries that hold out-of-order named arguments are the one exception:
     // `relocateArgumentTemporaries` moves them past the state machine's own slots, one
-    // fresh slot each, before the bodies are spliced together (#2800).
+    // fresh slot each, before the bodies are spliced together (#2800). So does the
+    // temporary that holds a `copy(..)` receiver (#3098).
     val paramCountForLocals = group.head.arguments.length
     val declaresExtraLocal = group.find { m =>
-      referencesLocalBeyondParams(m.getBlock, paramCountForLocals, callArgumentTemporaries(m.getBlock, paramCountForLocals))
+      referencesLocalBeyondParams(m.getBlock, paramCountForLocals, compilerTemporaries(m.getBlock, paramCountForLocals))
     }
     declaresExtraLocal.foreach { method =>
       break(Some(s"method ${method.name} declares a local variable beyond its parameter list, " +
@@ -375,6 +376,35 @@ class MutualRecursionOptimization(config: CompilerConfig)
       case _                      => false
     }
 
+  /** The temporaries the compiler introduced in `body`: see the two methods below. */
+  private def compilerTemporaries(body: StatementBlock, paramCount: Int): Set[Int] =
+    callArgumentTemporaries(body, paramCount) ++ copyReceiverTemporaries(body, paramCount)
+
+  /**
+   * The temporaries that hold a `copy(..)` receiver, so it runs once (#3098): a `Begin`
+   * of exactly a store to a slot past the parameters and a call on a read of that slot.
+   */
+  private def copyReceiverTemporaries(body: StatementBlock, paramCount: Int): Set[Int] = {
+    val found = mutable.Set[Int]()
+    def readsSlot(t: Term, index: Int): Boolean = t match {
+      case ref: RefLocal => ref.frame == 0 && ref.index == index
+      case _             => false
+    }
+    TermWalk.existsIn(body) {
+      case b: Begin if b.terms.length == 2 =>
+        (b.terms(0), b.terms(1)) match {
+          case (set: SetLocal, call: Call) if set.frame == 0 && set.index >= paramCount && readsSlot(call.target, set.index) =>
+            found += set.index
+          case (set: SetLocal, call: SafeCall) if set.frame == 0 && set.index >= paramCount && readsSlot(call.target, set.index) =>
+            found += set.index
+          case _ =>
+        }
+        false
+      case _ => false
+    }
+    found.toSet
+  }
+
   /** The temporaries of every call in `body` whose named arguments are out of order. */
   private def callArgumentTemporaries(body: StatementBlock, paramCount: Int): Set[Int] = {
     val found = mutable.Set[Int]()
@@ -407,7 +437,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
     var next = 2 * paramCount + 1
     val moved = mutable.ArrayBuffer[(Term, Int)]()
     group.foreach { method =>
-      val temporaries = callArgumentTemporaries(method.getBlock, paramCount).toSeq.sorted
+      val temporaries = compilerTemporaries(method.getBlock, paramCount).toSeq.sorted
       if (temporaries.nonEmpty) {
         val target = temporaries.map { t => val i = next; next += 1; t -> i }.toMap
         val nodes = new java.util.IdentityHashMap[Term, Integer]()
@@ -820,7 +850,6 @@ class MutualRecursionOptimization(config: CompilerConfig)
           }
 
         case block: StatementBlock =>
-          // Transform statements, and move tail calls into if-else structure
           val transformed = transformStatementsInBlock(block.statements.toSeq)
           new StatementBlock(block.location, transformed: _*)
 
@@ -836,86 +865,12 @@ class MutualRecursionOptimization(config: CompilerConfig)
       }
     }
 
-    // Transform statements in a block, merging tail calls into preceding if statements
-    def transformStatementsInBlock(stmts: Seq[ActionStatement]): Seq[ActionStatement] = {
-      if (config.verbose) {
-        trace(s"[Mutual TCO]         transformStatementsInBlock: ${stmts.length} statements")
-      }
+    // Each statement keeps its place. A tail call after an `if` with no `else` used to be
+    // moved into that `else`, so a `then` branch that did not return left the state with
+    // no transition, and the group returned the default value (#3107).
+    def transformStatementsInBlock(stmts: Seq[ActionStatement]): Seq[ActionStatement] =
+      stmts.map(transformStatement)
 
-      if (stmts.length < 2) {
-        stmts.map(transformStatement)
-      } else {
-        val lastIdx = stmts.length - 1
-        val last = stmts(lastIdx)
-
-        // Check if last statement is a tail call return
-        last match {
-          case ret: Return if ret.term != null && isTailCallInGroup(ret.term) =>
-            if (config.verbose) {
-              trace(s"[Mutual TCO]         Last statement is tail call return!")
-            }
-            // Check if second-to-last is an if statement with return in then branch
-            if (lastIdx > 0) {
-              stmts(lastIdx - 1) match {
-                case ifStmt: IfStatement if ifStmt.elseStatement == null =>
-                  if (config.verbose) {
-                    trace(s"[Mutual TCO]         Merging tail call into else branch of if statement")
-                  }
-                  // Merge tail call into else branch
-                  val tailCallTransform = transformStatement(ret)
-                  val newIfStmt = new IfStatement(
-                    ifStmt.location,
-                    ifStmt.condition,
-                    transformStatement(ifStmt.thenStatement),
-                    tailCallTransform
-                  )
-                  stmts.take(lastIdx - 1).map(transformStatement) :+ newIfStmt
-                case other =>
-                  if (config.verbose) {
-                    trace(s"[Mutual TCO]         Second-to-last is not suitable if statement: ${other.getClass.getSimpleName}")
-                  }
-                  stmts.map(transformStatement)
-              }
-            } else {
-              stmts.map(transformStatement)
-            }
-          case _ =>
-            if (config.verbose) {
-              trace(s"[Mutual TCO]         Last statement is not tail call: ${last.getClass.getSimpleName}")
-            }
-            stmts.map(transformStatement)
-        }
-      }
-    }
-
-    def isTailCallInGroup(term: Term): Boolean = {
-      val result = term match {
-        case call: Call =>
-          call.method match {
-            case targetMethod: MethodDefinition =>
-              val inGroup = stateIdOf(targetMethod).isDefined
-              if (config.verbose) {
-                trace(s"[Mutual TCO]         Checking Call: ${targetMethod.name}, in group: $inGroup")
-              }
-              inGroup
-            case _ => false
-          }
-        case call: CallStatic =>
-          call.method match {
-            case targetMethod: MethodDefinition =>
-              val inGroup = stateIdOf(targetMethod).isDefined
-              if (config.verbose) {
-                trace(s"[Mutual TCO]         Checking CallStatic: ${targetMethod.name}, in group: $inGroup")
-              }
-              inGroup
-            case _ => false
-          }
-        case _ => false
-      }
-      result
-    }
-
-    // Transform statements, merging tail calls into if-else structure
     val transformedStatements = transformStatementsInBlock(body.statements.toSeq)
     new StatementBlock(loc, transformedStatements: _*)
   }

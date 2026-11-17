@@ -132,11 +132,11 @@ class Order conforms Discountable {
 
 public:
   def this(id: Int, customer: Customer) {
-    self.id = id
-    self.customer = customer
-    self.lines = []
-    self.status = new Pending()
-    self.discountCode = null
+    this.id = id
+    this.customer = customer
+    this.lines = []
+    this.status = new Pending()
+    this.discountCode = null
   }
 
   def orderId(): Int = id
@@ -225,9 +225,9 @@ class InventoryItem {
 
 public:
   def this(name: String, stock: Int, unit: String) {
-    self.name = name
-    self.stock = stock
-    self.unit = unit
+    this.name = name
+    this.stock = stock
+    this.unit = unit
   }
 
   def consume(amount: Int): void {
@@ -506,20 +506,20 @@ public:
 // ─── Extension methods ────────────────────────────────────────────────────────
 
 extension Int {
-  def yen(): String = "¥" + self
-  def isValidItemId(): Boolean = self >= 1 && self <= 10
+  def yen(): String = "¥" + this
+  def isValidItemId(): Boolean = this >= 1 && this <= 10
 }
 
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width {
       s = s + " "
     }
     return s
   }
   def truncate(max: Int): String =
-    if self.length() <= max { self } else { self.substring(0, max - 3) + "..." }
+    if this.length() <= max { this } else { this.substring(0, max - 3) + "..." }
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

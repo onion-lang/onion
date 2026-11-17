@@ -90,7 +90,7 @@ public:
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
@@ -98,7 +98,7 @@ extension String {
 
 extension Double {
   def round4(): Double {
-    val i: Int = (self * 10000.0 + 0.5) as Int
+    val i: Int = (this * 10000.0 + 0.5) as Int
     return i * 1.0 / 10000.0
   }
 }

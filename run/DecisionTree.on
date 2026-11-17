@@ -17,10 +17,10 @@ import {
 
 extension Double {
   def log2(): Double {
-    if self <= 0.0 { return 0.0 }
-    return Math::log(self) / Math::log(2.0)
+    if this <= 0.0 { return 0.0 }
+    return Math::log(this) / Math::log(2.0)
   }
-  def pct(): String = "" + (self * 100.0).intValue() + "%"
+  def pct(): String = "" + (this * 100.0).intValue() + "%"
 }
 
 // ── Core Records ──────────────────────────────────────────────────────────────

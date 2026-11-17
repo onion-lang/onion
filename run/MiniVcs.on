@@ -103,24 +103,24 @@ public:
 
 extension String {
   def shorten(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n)
+    if this.length() <= n { return this }
+    return this.substring(0, n)
   }
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   // A final "\n" ends the last line; it does not start an empty one.
   def splitLines(): List[String] {
-    if self.endsWith("\n") { return Strings::split(self.substring(0, self.length() - 1), "\n") }
-    return Strings::split(self, "\n")
+    if this.endsWith("\n") { return Strings::split(this.substring(0, this.length() - 1), "\n") }
+    return Strings::split(this, "\n")
   }
 }
 
 extension Int {
   def zeroPad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = "0" + s }
     return s
   }

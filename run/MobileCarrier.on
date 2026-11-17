@@ -9,7 +9,7 @@ import { java.util.ArrayList }
 
 // Int.toDouble() is not built-in; define it as an extension
 extension Int {
-  def toDouble(): Double = self * 1.0
+  def toDouble(): Double = this * 1.0
 }
 
 // ── Status enum ──────────────────────────────────────────────────────────────

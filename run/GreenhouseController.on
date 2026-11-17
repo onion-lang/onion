@@ -49,9 +49,9 @@ public:
 // ─── Extensions ─────────────────────────────────────────────────────────────
 
 extension Double {
-  def toF(): Double = self * 9.0 / 5.0 + 32.0
+  def toF(): Double = this * 9.0 / 5.0 + 32.0
   def round1(): String {
-    val scaled: Int = ((self * 10.0) + 0.5) as Int
+    val scaled: Int = ((this * 10.0) + 0.5) as Int
     val whole: Int = scaled / 10
     val frac: Int = scaled % 10
     return whole + "." + frac
@@ -59,9 +59,9 @@ extension Double {
 }
 
 extension Int {
-  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def clamp(lo: Int, hi: Int): Int = if this < lo { lo } else if this > hi { hi } else { this }
   def bar(maxVal: Int, width: Int): String {
-    val filled: Int = if maxVal > 0 { (self * width / maxVal).clamp(0, width) } else { 0 }
+    val filled: Int = if maxVal > 0 { (this * width / maxVal).clamp(0, width) } else { 0 }
     var out: String = ""
     foreach i: Int in 0..<width {
       out = out + (if i < filled { "#" } else { "." })
@@ -72,7 +72,7 @@ extension Int {
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }

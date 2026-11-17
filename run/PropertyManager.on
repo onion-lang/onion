@@ -63,7 +63,7 @@ public:
 
 record Address(street: String, city: String, postcode: String) {
 public:
-  def full(): String = "#{self.street()}, #{self.city()} #{self.postcode()}"
+  def full(): String = "#{this.street()}, #{this.city()} #{this.postcode()}"
 }
 
 record Property(
@@ -75,14 +75,14 @@ record Property(
   monthlyRent: Double
 ) {
 public:
-  def label(): String = "P#{self.id()} [#{self.kind().label()}]"
-  def rentPerSqm(): Double = self.monthlyRent() / self.areaSqm()
+  def label(): String = "P#{this.id()} [#{this.kind().label()}]"
+  def rentPerSqm(): Double = this.monthlyRent() / this.areaSqm()
 }
 
 record Tenant(id: Int, name: String, email: String, annualIncome: Double) {
 public:
   def affordabilityRatio(monthlyRent: Double): Double =
-    (monthlyRent * 12.0) / self.annualIncome()
+    (monthlyRent * 12.0) / this.annualIncome()
 }
 
 record Lease(
@@ -96,9 +96,9 @@ record Lease(
 ) {
 public:
   def durationMonths(): Int =
-    (self.endYear() - self.startYear()) * 12 + (self.endMonth() - self.startMonth())
-  def totalValue(): Double = self.monthlyRent() * (self.durationMonths() * 1.0)
-  def isActive(): Boolean  = self.status().isLive()
+    (this.endYear() - this.startYear()) * 12 + (this.endMonth() - this.startMonth())
+  def totalValue(): Double = this.monthlyRent() * (this.durationMonths() * 1.0)
+  def isActive(): Boolean  = this.status().isLive()
 }
 
 record MaintenanceRequest(
@@ -109,36 +109,36 @@ record MaintenanceRequest(
   resolved: Boolean
 ) {
 public:
-  def label(): String = "[#{self.priority().label()}] #{self.description()}"
+  def label(): String = "[#{this.priority().label()}] #{this.description()}"
 }
 
 // ── Extension methods ─────────────────────────────────────────────────────────
 
 extension Int {
-  def bedroomLabel(): String = select self {
+  def bedroomLabel(): String = select this {
     case 0: "Studio"
     case 1: "1 bed"
-    else:   "#{self} beds"
+    else:   "#{this} beds"
   }
-  def monthName(): String = select self {
+  def monthName(): String = select this {
     case 1:  "Jan"; case 2:  "Feb"; case 3:  "Mar"; case 4:  "Apr"
     case 5:  "May"; case 6:  "Jun"; case 7:  "Jul"; case 8:  "Aug"
     case 9:  "Sep"; case 10: "Oct"; case 11: "Nov"; case 12: "Dec"
     else: "???"
   }
-  def toDouble(): Double = self * 1.0
+  def toDouble(): Double = this * 1.0
 }
 
 extension Double {
-  def gbp(): String = "£#{String::format("%.2f", self)}"
-  def pct(): String = "#{String::format("%.1f", self * 100.0)}%"
+  def gbp(): String = "£#{String::format("%.2f", this)}"
+  def pct(): String = "#{String::format("%.1f", this * 100.0)}%"
 }
 
 extension String {
   def truncate(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n - 1) + "…" }
+    if this.length() <= n { this } else { this.substring(0, n - 1) + "…" }
   def rpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }

@@ -17,14 +17,14 @@ import {
 // ── Extensions ────────────────────────────────────────────────────────────────
 
 extension String {
-  def lower(): String = self.toLowerCase()
-  def blank(): Boolean = self.trim().length == 0
+  def lower(): String = this.toLowerCase()
+  def blank(): Boolean = this.trim().length == 0
   def truncate(n: Int): String {
-    if self.length <= n { return self }
-    return self.substring(0, n) + "..."
+    if this.length <= n { return this }
+    return this.substring(0, n) + "..."
   }
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length < n { s = s + " " }
     return s
   }

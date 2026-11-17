@@ -224,7 +224,7 @@ def dealHand(deck: ArrayList[Card], start: Int, count: Int): List[Card] {
 
 extension Int {
   def padLeft(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }
@@ -232,8 +232,8 @@ extension Int {
 
 extension Double {
   def pct(): String {
-    val whole: Int = (self * 100.0) as Int
-    val frac: Int  = ((self * 1000.0) as Int) % 10
+    val whole: Int = (this * 100.0) as Int
+    val frac: Int  = ((this * 1000.0) as Int) % 10
     return "" + whole + "." + frac + "%"
   }
 }

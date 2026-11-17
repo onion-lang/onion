@@ -169,14 +169,14 @@ def computePremium(policy: Policy, table: LifeTable): PremiumResult = {
 // ── Extension methods ──────────────────────────────────────────────────────────
 extension Double {
   def fmt2(): String = {
-    val r: Long = JMath::round(self * 100.0)
+    val r: Long = JMath::round(this * 100.0)
     val i: Long = r / 100L
     val f: Long = r - i * 100L
     if f < 10L { "#{i}.0#{f}" } else { "#{i}.#{f}" }
   }
-  def pct(): String = "#{(self * 100.0).fmt2()}%"
+  def pct(): String = "#{(this * 100.0).fmt2()}%"
   def fmt5(): String = {
-    val r: Long = JMath::round(self * 100000.0)
+    val r: Long = JMath::round(this * 100000.0)
     val i: Long = r / 100000L
     val f: Long = r - i * 100000L
     val fs: String =
@@ -191,19 +191,19 @@ extension Double {
 
 extension String {
   def padR(w: Int): String = {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     s
   }
   def padL(w: Int): String = {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     s
   }
   def rep(n: Int): String = {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     s
   }
 }

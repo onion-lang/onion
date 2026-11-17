@@ -25,7 +25,7 @@ import {
 
 extension Double {
   def fmt2(): String {
-    val rounded: Double = Math::round(self * 100.0) / 100.0
+    val rounded: Double = Math::round(this * 100.0) / 100.0
     val s: String = "" + rounded
     val dot: Int = s.indexOf(".")
     if dot < 0 { return s + ".00" }
@@ -34,12 +34,12 @@ extension Double {
     return s + "0"
   }
 
-  def approxEq(other: Double, eps: Double): Boolean = Math::abs(self - other) <= eps
+  def approxEq(other: Double, eps: Double): Boolean = Math::abs(this - other) <= eps
 }
 
 extension Int {
   def padLeft(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }

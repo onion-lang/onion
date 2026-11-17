@@ -18,35 +18,35 @@
 
 extension Int {
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def pct(total: Int): String {
     if total == 0 { return "n/a" }
-    val p: Int = self * 100 / total
+    val p: Int = this * 100 / total
     return p.lpad(3) + "%"
   }
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n - 1) + "~"
+    if this.length() <= n { return this }
+    return this.substring(0, n - 1) + "~"
   }
   // Shadows built-in charAt, returning Int to avoid Char-typed VerifyError.
-  def charAt(i: Int): Int = self.charAt(i) as Int
+  def charAt(i: Int): Int = this.charAt(i) as Int
   // Polynomial rolling hash (Horner): result in [0, modulus).
   def hashMod(base: Int, modulus: Int): Int {
     var h: Int = 0
     var i: Int = 0
-    while i < self.length() {
-      val ch: Int = self.charAt(i)
+    while i < this.length() {
+      val ch: Int = this.charAt(i)
       h = ((h * base) % modulus + ch) % modulus
       i++
     }

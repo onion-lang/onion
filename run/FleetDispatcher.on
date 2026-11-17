@@ -76,8 +76,8 @@ public:
 // ─── Extension on Double ──────────────────────────────────────────────────────
 
 extension Double {
-  def usd(): String = "$#{(self * 100.0).intValue().doubleValue() / 100.0}"
-  def pct(): String = "#{(self * 1000.0).intValue().doubleValue() / 10.0}%"
+  def usd(): String = "$#{(this * 100.0).intValue().doubleValue() / 100.0}"
+  def pct(): String = "#{(this * 1000.0).intValue().doubleValue() / 10.0}%"
 }
 
 // ─── Assignment record ────────────────────────────────────────────────────────

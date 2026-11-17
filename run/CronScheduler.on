@@ -107,12 +107,12 @@ public:
 
 extension Int {
   def msLabel(): String {
-    if self < 1000 { return self + "ms" }
-    return (self / 1000) + "." + ((self % 1000) / 100) + "s"
+    if this < 1000 { return this + "ms" }
+    return (this / 1000) + "." + ((this % 1000) / 100) + "s"
   }
   def pct(total: Int): String {
     if total == 0 { return "0%" }
-    return ((self * 100) / total) + "%"
+    return ((this * 100) / total) + "%"
   }
 }
 

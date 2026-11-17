@@ -327,6 +327,45 @@ public final class Files {
         return result;
     }
 
+    /** Expands {a,b} alternatives (nested too) into separate patterns; capped at 64. */
+    private static java.util.List<String> expandBraces(String p, int depth) {
+        java.util.List<String> one = new java.util.ArrayList<>();
+        one.add(p);
+        if (depth > 8) return one;
+        int open = -1;
+        int level = 0;
+        java.util.List<Integer> commas = new java.util.ArrayList<>();
+        for (int i = 0; i < p.length(); i++) {
+            char c = p.charAt(i);
+            if (c == '\\') { i++; continue; }
+            if (c == '{') {
+                if (level == 0) { open = i; commas.clear(); }
+                level++;
+            } else if (c == ',' && level == 1) {
+                commas.add(i);
+            } else if (c == '}' && level > 0) {
+                level--;
+                if (level == 0) {
+                    String pre = p.substring(0, open);
+                    String post = p.substring(i + 1);
+                    java.util.List<String> out = new java.util.ArrayList<>();
+                    int from = open + 1;
+                    commas.add(i);
+                    for (int cut : commas) {
+                        String alt = p.substring(from, cut);
+                        from = cut + 1;
+                        for (String e : expandBraces(pre + alt + post, depth + 1)) {
+                            out.add(e);
+                            if (out.size() > 64) return one;
+                        }
+                    }
+                    return out;
+                }
+            }
+        }
+        return one;
+    }
+
     /**
      * Glob-matches files under a directory. The pattern uses standard glob
      * syntax: * (within a segment), ** (across directories), ? and ranges.
@@ -336,34 +375,40 @@ public final class Files {
      *   Files::glob("src", "**&#47;*.java")
      *
      * A {@code **&#47;} segment also matches zero directories, so
-     * {@code **&#47;*.java} finds files directly in {@code dir} too.
+     * {@code **&#47;*.java} finds files directly in {@code dir} too, also inside
+     * a brace alternative ({@code {**&#47;*.on,*.md}}). A leading {@code ./} is ignored.
      *
      * Returns relative paths (using /), sorted.
      */
     public static java.util.List<String> glob(String dir, String pattern) throws IOException {
         java.nio.file.Path base = java.nio.file.Paths.get(dir);
+        if (pattern.startsWith("./")) pattern = pattern.substring(2);
         java.nio.file.PathMatcher matcher =
             base.getFileSystem().getPathMatcher("glob:" + pattern);
         // A "**/" segment also matches zero directories (as bash globstar and
-        // Python glob do); Java's matcher needs at least one.
+        // Python glob do); Java's matcher needs at least one. Brace
+        // alternatives are expanded first, so each one gets the same rule.
         java.util.ArrayList<java.nio.file.PathMatcher> matchers = new java.util.ArrayList<>();
         matchers.add(matcher);
-        java.util.List<java.util.List<String>> variants = new java.util.ArrayList<>();
-        variants.add(new java.util.ArrayList<>());
-        String[] segs = pattern.split("/", -1);
-        for (int i = 0; i < segs.length; i++) {
-            java.util.List<java.util.List<String>> next = new java.util.ArrayList<>();
-            boolean skippable = segs[i].equals("**") && i < segs.length - 1;
-            for (java.util.List<String> v : variants) {
-                java.util.List<String> kept = new java.util.ArrayList<>(v);
-                kept.add(segs[i]);
-                next.add(kept);
-                if (skippable) next.add(v);
+        java.util.LinkedHashSet<String> patterns = new java.util.LinkedHashSet<>();
+        for (String alt : expandBraces(pattern, 0)) {
+            java.util.List<java.util.List<String>> variants = new java.util.ArrayList<>();
+            variants.add(new java.util.ArrayList<>());
+            String[] segs = alt.split("/", -1);
+            for (int i = 0; i < segs.length; i++) {
+                java.util.List<java.util.List<String>> next = new java.util.ArrayList<>();
+                boolean skippable = segs[i].equals("**") && i < segs.length - 1;
+                for (java.util.List<String> v : variants) {
+                    java.util.List<String> kept = new java.util.ArrayList<>(v);
+                    kept.add(segs[i]);
+                    next.add(kept);
+                    if (skippable) next.add(v);
+                }
+                if (next.size() <= 64) variants = next;
             }
-            if (next.size() <= 64) variants = next;
+            for (java.util.List<String> v : variants) patterns.add(String.join("/", v));
         }
-        for (java.util.List<String> v : variants) {
-            String joined = String.join("/", v);
+        for (String joined : patterns) {
             if (!joined.isEmpty() && !joined.equals(pattern)) {
                 matchers.add(base.getFileSystem().getPathMatcher("glob:" + joined));
             }

@@ -91,14 +91,14 @@ public:
 // ── Extension methods ─────────────────────────────────────────────────────────
 
 extension Double {
-  def round2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+  def round2(): Double = (Math::round(this * 100.0) as Double) / 100.0
 }
 
 extension String {
   def minuteOf(): String {
-    val i = self.lastIndexOf(":")
-    if i < 0 { return self }
-    return self.substring(0, i)
+    val i = this.lastIndexOf(":")
+    if i < 0 { return this }
+    return this.substring(0, i)
   }
 }
 

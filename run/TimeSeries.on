@@ -54,7 +54,7 @@ record FiredAlert(alertName: String, ts: Long, value: Double, msg: String)
 // ── Extension method on Double ────────────────────────────────────────────────
 
 extension Double {
-  def rounded2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+  def rounded2(): Double = (Math::round(this * 100.0) as Double) / 100.0
 }
 
 // ── TimeSeries: single named sensor series ────────────────────────────────────
@@ -65,8 +65,8 @@ class TimeSeries {
 
 public:
   def this(name: String) {
-    self.name_   = name
-    self.points_ = []
+    this.name_   = name
+    this.points_ = []
   }
 
   def name(): String = name_

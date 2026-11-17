@@ -7,12 +7,12 @@
 extension Int {
   // 2^n via recursion — tests that Int extension methods work
   def pow2(): Int {
-    if self == 0 { return 1 }
-    return 2 * (self - 1).pow2()
+    if this == 0 { return 1 }
+    return 2 * (this - 1).pow2()
   }
   def repeat(ch: String): String {
     var s: String = ""
-    var i: Int = self
+    var i: Int = this
     while i > 0 {
       s = s + ch
       i--

@@ -12,25 +12,25 @@ import {
 
 extension String {
   def padLeft(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n - 1) + "…"
+    if this.length() <= n { return this }
+    return this.substring(0, n - 1) + "…"
   }
 }
 
 extension Double {
   def fmt(): String {
-    val whole: Int  = self.intValue()
-    val frac: Int   = ((self - whole) * 100 + 0.5).intValue()
+    val whole: Int  = this.intValue()
+    val frac: Int   = ((this - whole) * 100 + 0.5).intValue()
     val fracS: String = if frac < 10 { "0" + frac } else { "" + frac }
     return "" + whole + "." + fracS
   }

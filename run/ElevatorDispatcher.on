@@ -14,17 +14,17 @@ val MAX_FLOOR: Int = 20
 // ─── Extensions ────────────────────────────────────────────────────────────
 
 extension Int {
-  def floorLabel(): String = "F#{self}"
+  def floorLabel(): String = "F#{this}"
   def clampFloor(): Int {
-    if self < 1 { return 1 }
-    if self > MAX_FLOOR { return MAX_FLOOR }
-    return self
+    if this < 1 { return 1 }
+    if this > MAX_FLOOR { return MAX_FLOOR }
+    return this
   }
 }
 
 extension String {
   def padRight(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }

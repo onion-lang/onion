@@ -7,24 +7,24 @@
 // ── Double formatting helpers ─────────────────────────────────────────────────
 extension Double {
   def fmt1(): String {
-    if self < 0.0 {
-      return "-" + (0.0 - self).fmt1()
+    if this < 0.0 {
+      return "-" + (0.0 - this).fmt1()
     }
-    val whole: Int = self.intValue()
-    val frac: Int  = ((self - (whole as Double)) * 10.0 + 0.5).intValue()
+    val whole: Int = this.intValue()
+    val frac: Int  = ((this - (whole as Double)) * 10.0 + 0.5).intValue()
     return "" + whole + "." + frac
   }
   def fmt2(): String {
-    if self < 0.0 {
-      return "-" + (0.0 - self).fmt2()
+    if this < 0.0 {
+      return "-" + (0.0 - this).fmt2()
     }
-    val whole: Int = self.intValue()
-    val frac: Int  = ((self - (whole as Double)) * 100.0 + 0.5).intValue()
+    val whole: Int = this.intValue()
+    val frac: Int  = ((this - (whole as Double)) * 100.0 + 0.5).intValue()
     val fs: String = if frac < 10 { "0" + frac } else { "" + frac }
     return "" + whole + "." + fs
   }
   def pct(): String {
-    val p: Double = self * 100.0
+    val p: Double = this * 100.0
     return p.fmt1() + "%"
   }
 }

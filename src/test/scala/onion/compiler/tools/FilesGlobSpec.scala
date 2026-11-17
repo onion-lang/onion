@@ -27,4 +27,27 @@ class FilesGlobSpec extends AbstractShellSpec {
     )
     assert(Shell.Success("[a.on, sub/b.on, sub/deep/c.on] [sub/b.on, sub/deep/c.on]") == result)
   }
+
+  it("a **/ inside a brace alternative matches zero directories; a leading ./ is ignored (#2906)") {
+    val dir = (System.getProperty("java.io.tmpdir") + "/onion-files-glob-2906").replace('\\', '/')
+    val result = shell.run(
+      s"""
+        |class Test {
+        |public:
+        |  static def main(args: String[]): String {
+        |    Files::mkdirs("$dir/sub")
+        |    Files::writeText("$dir/a.on", "")
+        |    Files::writeText("$dir/README.md", "")
+        |    Files::writeText("$dir/sub/b.on", "")
+        |    val braces = Files::glob("$dir", "{**/*.on,*.md}")
+        |    val dotted = Files::glob("$dir", "./**/*.on")
+        |    return braces.toString() + " " + dotted.toString()
+        |  }
+        |}
+        |""".stripMargin,
+      "FilesGlobBrace.on",
+      Array()
+    )
+    assert(Shell.Success("[README.md, a.on, sub/b.on] [a.on, sub/b.on]") == result)
+  }
 }

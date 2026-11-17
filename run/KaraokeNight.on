@@ -136,7 +136,7 @@ extension Int {
   def stars(): String {
     var s: String = ""
     var i: Int = 0
-    while i < self {
+    while i < this {
       s = s + "*"
       i++
     }
@@ -146,8 +146,8 @@ extension Int {
 
 extension Double {
   def fmt2(): String {
-    val i: Int = self as Int
-    val frac: Int = ((self - (i as Double)) * 100.0) as Int
+    val i: Int = this as Int
+    val frac: Int = ((this - (i as Double)) * 100.0) as Int
     val pad: String = if frac < 10 { "0" + frac } else { "" + frac }
     return "#{i}.#{pad}"
   }
@@ -155,12 +155,12 @@ extension Double {
 
 extension String {
   def padEnd(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padStart(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

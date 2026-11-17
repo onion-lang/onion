@@ -7,10 +7,10 @@ class ArrayReceiverExtensionSpec extends AbstractShellSpec {
     shell.run(
       s"""
          |extension String[] {
-         |  def total(): Int = self.length
+         |  def total(): Int = this.length
          |}
          |extension Int[] {
-         |  def sum2(): Int = self[0] + self[1]
+         |  def sum2(): Int = this[0] + this[1]
          |}
          |class Main {
          |public:

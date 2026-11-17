@@ -95,7 +95,7 @@ None open.
 
 Previously tracked and resolved:
 
-1. **Primitive-type extensions** — fixed. `extension Int { def double(): Int = self * 2 }` and `(5).double()` now work. Extension methods on primitive receivers are registered under the boxed class name and the call target is unboxed before invoking the backing static method.
+1. **Primitive-type extensions** — fixed. `extension Int { def double(): Int = this * 2 }` and `(5).double()` now work. Extension methods on primitive receivers are registered under the boxed class name and the call target is unboxed before invoking the backing static method.
 2. **Top-level function called from a class method** — fixed. Top-level `val`/`var` and functions are emitted as static members of the synthetic top-level class, and bare identifiers / unqualified calls in class methods fall back to these static members.
 3. **Constant narrowing does not reach constructor arguments.** `val b: Byte = 100`
    narrows, but `new R(..., -3)` against a `Short` component was `E0021`

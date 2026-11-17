@@ -78,7 +78,7 @@ class EntryPointDiscoverySpec extends AnyFunSuite with Matchers:
           |def helper(): Int = answer
           |class Helper {}
           |extension String {
-          |  def identity(): String = self
+          |  def identity(): String = this
           |}
           |""".stripMargin
     )

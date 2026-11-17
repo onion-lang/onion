@@ -57,7 +57,8 @@ public record Defect(Origin origin, String path, String expected, String actual)
      * there is none.
      */
     public String describe() {
-        String body = path + ": expected " + expected + ", found " + actual;
+        String where = (path == null || path.isEmpty()) ? "" : path + ": ";
+        String body = where + "expected " + expected + ", found " + actual;
         return origin == null ? body : origin.describe() + ": " + body;
     }
 

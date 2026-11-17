@@ -10,33 +10,33 @@ import { java.lang.Integer as JInteger; }
 // ── Extension helpers ──────────────────────────────────────────────────────
 
 extension Int {
-  def abs(): Int = if self < 0 { 0 - self } else { self }
-  def max(other: Int): Int = if self >= other { self } else { other }
+  def abs(): Int = if this < 0 { 0 - this } else { this }
+  def max(other: Int): Int = if this >= other { this } else { other }
   def padLeft(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }
   def repeat(n: Int): String {
     var out: String = ""
     var i: Int = 0
-    while i < n { out = out + self.toString(); i++ }
+    while i < n { out = out + this.toString(); i++ }
     return out
   }
 }
 
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def center(width: Int): String {
-    if self.length() >= width { return self }
-    val total = width - self.length()
+    if this.length() >= width { return this }
+    val total = width - this.length()
     val left  = total / 2
     val right = total - left
-    var s: String = self
+    var s: String = this
     var i: Int = 0
     while i < left  { s = " " + s; i++ }
     i = 0

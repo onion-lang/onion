@@ -65,21 +65,21 @@ class Ledger {
   var entries:  List[JournalEntry]
 public:
   def this() {
-    self.accounts = [:]
-    self.entries  = []
+    this.accounts = [:]
+    this.entries  = []
   }
   def addAccount(id: String, name: String, t: AccountType): void {
-    self.accounts.put(id, new Account(id, name, t))
+    this.accounts.put(id, new Account(id, name, t))
   }
   def post(date: String, memo: String, debitId: String, creditId: String, amount: Int): void {
-    self.entries.add(new JournalEntry(date, memo, debitId, creditId, amount))
+    this.entries.add(new JournalEntry(date, memo, debitId, creditId, amount))
   }
   def balances(): Map[String, Int] {
     val bal: Map[String, Int] = [:]
-    foreach (id, _) in self.accounts {
+    foreach (id, _) in this.accounts {
       bal.put(id as String, 0)
     }
-    foreach e: JournalEntry in self.entries {
+    foreach e: JournalEntry in this.entries {
       val dr = e.debitId()
       val cr = e.creditId()
       val drCur = bal[dr]
@@ -89,11 +89,11 @@ public:
     }
     return bal
   }
-  def journalEntries(): List[JournalEntry] = self.entries
+  def journalEntries(): List[JournalEntry] = this.entries
   def trialBalance(): List[AccountBalance] {
-    val bal = self.balances()
+    val bal = this.balances()
     val result: List[AccountBalance] = []
-    foreach (id, acct) in self.accounts {
+    foreach (id, acct) in this.accounts {
       val b = bal[id as String]
       result.add(new AccountBalance(acct as Account, b ?: 0))
     }

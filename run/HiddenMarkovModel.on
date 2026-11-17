@@ -36,15 +36,15 @@ enum Activity {
 extension Double {
   // log-sum-exp: log(exp(a) + exp(b)) computed in a numerically stable way
   def logAdd(b: Double): Double {
-    if self == Double::NEGATIVE_INFINITY { return b }
-    if b == Double::NEGATIVE_INFINITY { return self }
-    val m: Double = if self > b { self } else { b }
-    return m + Math::log(Math::exp(self - m) + Math::exp(b - m))
+    if this == Double::NEGATIVE_INFINITY { return b }
+    if b == Double::NEGATIVE_INFINITY { return this }
+    val m: Double = if this > b { this } else { b }
+    return m + Math::log(Math::exp(this - m) + Math::exp(b - m))
   }
 
   def fmt(): String {
-    if self == Double::NEGATIVE_INFINITY { return "-inf" }
-    val s: String = "" + (Math::round(self * 10000.0d) / 10000.0d)
+    if this == Double::NEGATIVE_INFINITY { return "-inf" }
+    val s: String = "" + (Math::round(this * 10000.0d) / 10000.0d)
     return s
   }
 }

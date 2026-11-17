@@ -269,7 +269,7 @@ class UnrelatedTypeVariableAssignSpec extends AbstractShellSpec {
         """class Mid[U](v: U) extends Box[U](v) {
           |public:
           |  def lam(): U {
-          |    val f: () -> U = () -> { val x: U = self.get(); x }
+          |    val f: () -> U = () -> { val x: U = this.get(); x }
           |    return f()
           |  }
           |}

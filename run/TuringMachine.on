@@ -8,11 +8,11 @@
 extension String {
   def times(n: Int): String {
     var r: String = ""
-    for var i: Int = 0; i < n; i++ { r = r + self }
+    for var i: Int = 0; i < n; i++ { r = r + this }
     return r
   }
   def padEnd(width: Int, ch: String): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + ch }
     return s
   }
@@ -55,27 +55,27 @@ public:
 
 extension Tape {
   def write(sym: String): Tape {
-    val c: String = self.cells()
-    val p: Int = self.pos()
+    val c: String = this.cells()
+    val p: Int = this.pos()
     val after: String = if p + 1 < c.length() { c.substring(p + 1) } else { "" }
     return new Tape(c.substring(0, p) + sym + after, p)
   }
 
   def moveLeft(): Tape {
-    if self.pos() == 0 { return new Tape("_" + self.cells(), 0) }
-    return new Tape(self.cells(), self.pos() - 1)
+    if this.pos() == 0 { return new Tape("_" + this.cells(), 0) }
+    return new Tape(this.cells(), this.pos() - 1)
   }
 
   def moveRight(): Tape {
-    val newPos: Int = self.pos() + 1
-    if newPos >= self.cells().length() { return new Tape(self.cells() + "_", newPos) }
-    return new Tape(self.cells(), newPos)
+    val newPos: Int = this.pos() + 1
+    if newPos >= this.cells().length() { return new Tape(this.cells() + "_", newPos) }
+    return new Tape(this.cells(), newPos)
   }
 
   def applyDir(dir: Direction): Tape = select dir {
-    case d is MoveLeft:  self.moveLeft()
-    case d is MoveRight: self.moveRight()
-    case d is Stay:      self
+    case d is MoveLeft:  this.moveLeft()
+    case d is MoveRight: this.moveRight()
+    case d is Stay:      this
   }
 }
 

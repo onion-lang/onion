@@ -10,15 +10,15 @@ import { java.util.ArrayList }
 // ─── Extensions ───────────────────────────────────────────────────────────────
 
 extension Int {
-  def daysLabel(): String = if self == 1 { "1 day" } else { "#{self} days" }
+  def daysLabel(): String = if this == 1 { "1 day" } else { "#{this} days" }
   def centsToUsd(): String {
-    val dollars: Int = self / 100
-    val cents: Int   = self - dollars * 100
+    val dollars: Int = this / 100
+    val cents: Int   = this - dollars * 100
     val cs: String   = if cents < 10 { "0" + cents } else { "" + cents }
     return "$" + dollars + "." + cs
   }
   def ipad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -26,16 +26,16 @@ extension Int {
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def trunc(max: Int): String =
-    if self.length() <= max { self } else { self.substring(0, max - 1) + "…" }
+    if this.length() <= max { this } else { this.substring(0, max - 1) + "…" }
 }
 
 extension Double {
-  def round2(): Double = ((self * 100.0 + 0.5).intValue() as Double) / 100.0
+  def round2(): Double = ((this * 100.0 + 0.5).intValue() as Double) / 100.0
 }
 
 // ─── Plain enum: billing cycle ─────────────────────────────────────────────

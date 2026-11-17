@@ -67,14 +67,14 @@ public:
 
 extension Int {
   def asHoursMinutes(): String {
-    val h = self / 60
-    val m = self % 60
+    val h = this / 60
+    val m = this % 60
     if h == 0 { return "#{m}m" }
     return "#{h}h #{m}m"
   }
 
   def padLeft(width: Int): String {
-    val s = self.toString()
+    val s = this.toString()
     if s.length() >= width { return s }
     var result: String = s
     var i: Int = 0
@@ -109,10 +109,10 @@ record Session(
 }
 
 extension Session {
-  def velocity(): Int = if self.durationMins() > 0 { self.linesChanged() * 60 / self.durationMins() } else { 0 }
-  def hoursLabel(): String = self.durationMins().asHoursMinutes()
-  def hasNotes(): Boolean = self.notes() != null
-  def noteText(): String  = if self.notes() != null { self.notes() as String } else { "—" }
+  def velocity(): Int = if this.durationMins() > 0 { this.linesChanged() * 60 / this.durationMins() } else { 0 }
+  def hoursLabel(): String = this.durationMins().asHoursMinutes()
+  def hasNotes(): Boolean = this.notes() != null
+  def noteText(): String  = if this.notes() != null { this.notes() as String } else { "—" }
 }
 
 // ── Summarizable interface ────────────────────────────────────────────────────

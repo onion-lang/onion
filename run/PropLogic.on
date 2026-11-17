@@ -65,14 +65,14 @@ def repeatStr(s: String, n: Int): String {
 // ─── Extension methods ────────────────────────────────────────────────────────
 
 extension Boolean {
-  def toBit(): String = if self { "1" } else { "0" }
-  def toLabel(): String = if self { "T" } else { "F" }
+  def toBit(): String = if this { "1" } else { "0" }
+  def toLabel(): String = if this { "T" } else { "F" }
 }
 
 extension Int {
   // Bit at position `pos` (0 = least significant) of this integer.
   def bitAt(pos: Int): Boolean {
-    var n: Int = self
+    var n: Int = this
     var i: Int = 0
     while i < pos { n = n / 2; i++ }
     return n % 2 == 1
@@ -134,9 +134,9 @@ public:
 
   // Negation Normal Form: push all negations inward to literals.
   def nnf(): Formula = select this {
-    case _v is Var:  self
-    case _t is Top:  self
-    case _b is Bot:  self
+    case _v is Var:  this
+    case _t is Top:  this
+    case _b is Bot:  this
     case n is Not: select n.f() {
       case _it is Top:     new Bot()
       case _ib is Bot:     new Top()
@@ -163,9 +163,9 @@ public:
 
   // Simple constant folding (Top/Bot propagation).
   def simplify(): Formula = select this {
-    case _v is Var:  self
-    case _t is Top:  self
-    case _b is Bot:  self
+    case _v is Var:  this
+    case _t is Top:  this
+    case _b is Bot:  this
     case n is Not:
       val sf: Formula = n.f().simplify()
       select sf {

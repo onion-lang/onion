@@ -76,7 +76,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     if (node.name == "copy" && node.args.isEmpty && !context.isStatic) {
       val receiver: Term = if (context.isClosure) new OuterThis(targetType) else new This(targetType)
       calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, receiver, targetType) {
-        (method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
+        (_, method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
       } match {
         case Some(result) => return result
         case None =>
@@ -392,7 +392,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     if (node.name == "copy" && !context.isStatic) {
       val receiver: Term = if (context.isClosure) new OuterThis(targetType) else new This(targetType)
       val recordCopy = calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, receiver, targetType) {
-        (method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
+        (_, method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
       }
       recordCopy match { case Some(result) => return result; case None => }
     }

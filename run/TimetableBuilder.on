@@ -96,16 +96,16 @@ interface Auditable {
 // ─── Extension Methods ────────────────────────────────────────────────────────
 
 extension Int {
-  def sessionWord(): String = if self == 1 { "session" } else { "sessions" }
+  def sessionWord(): String = if this == 1 { "session" } else { "sessions" }
   def pctOf(total: Int): Int {
     if total == 0 { return 0 }
-    return (self * 100) / total
+    return (this * 100) / total
   }
 }
 
 extension Double {
   def fmt1(): String {
-    val sc = (self * 10.0) as Int
+    val sc = (this * 10.0) as Int
     val w  = sc / 10
     val f  = sc % 10
     return "#{w}.#{f}"

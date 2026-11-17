@@ -21,11 +21,11 @@ public:
   def minus(b: Vec3): Vec3  = new Vec3(x() - b.x(), y() - b.y(), z() - b.z())
   def scale(s: Double): Vec3 = new Vec3(x() * s, y() * s, z() * s)
   def dot(b: Vec3): Double  = x() * b.x() + y() * b.y() + z() * b.z()
-  def lengthSq(): Double    = dot(self)
+  def lengthSq(): Double    = dot(this)
   def length(): Double      = Math::sqrt(lengthSq())
   def normalize(): Vec3 {
     val len: Double = length()
-    if len < 1.0e-15 { return self }
+    if len < 1.0e-15 { return this }
     return scale(1.0 / len)
   }
   def reflect(n: Vec3): Vec3 = minus(n.scale(2.0 * dot(n)))

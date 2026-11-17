@@ -13,8 +13,8 @@ import { java.lang.Exception; }
 
 extension Double {
   def fmtMs(): String {
-    if self < 0.0 { return "-" + (-self).fmtMs() }
-    val scaled: Int = (self * 100.0 + 0.5) as Int
+    if this < 0.0 { return "-" + (-this).fmtMs() }
+    val scaled: Int = (this * 100.0 + 0.5) as Int
     val ip: Int = scaled / 100
     val fp: Int = scaled % 100
     return if fp == 0           { "#{ip}ms" }
@@ -26,12 +26,12 @@ extension Double {
 
 extension String {
   def rpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def lpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

@@ -22,9 +22,9 @@ val elapsed: Long = currentTimeMillis() - start
 println("squared=" + squared + " computed in " + elapsed + "ms")
 
 extension Double {
-  def squared(): Double = self * self
+  def squared(): Double = this * this
   def rounded(decimals: Int): Double {
     val factor = Math::pow(10.0, decimals as Double)
-    return (Math::round(self * factor) as Double) / factor
+    return (Math::round(this * factor) as Double) / factor
   }
 }

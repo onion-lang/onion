@@ -67,8 +67,8 @@ public:
 
 extension Double {
   def fmt2(): String = {
-    val neg: Boolean = self < 0.0
-    val abs: Double  = if neg { 0.0 - self } else { self }
+    val neg: Boolean = this < 0.0
+    val abs: Double  = if neg { 0.0 - this } else { this }
     val r: Long      = JMath::round(abs * 100.0)
     val i: Long      = r / 100L
     val f: Long      = r - i * 100L
@@ -80,19 +80,19 @@ extension Double {
 
 extension String {
   def padL(w: Int): String = {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     s
   }
   def padR(w: Int): String = {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     s
   }
   def rep(n: Int): String = {
     var s: String = ""
     var i: Int    = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     s
   }
 }

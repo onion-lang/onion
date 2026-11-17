@@ -170,8 +170,8 @@ class AirQualityMonitor {
 
   public:
     def this() {
-      self.stations = [:]
-      self.measurements = []
+      this.stations = [:]
+      this.measurements = []
     }
 
     def addStation(s: Station): void { stations[s.id()] = s }

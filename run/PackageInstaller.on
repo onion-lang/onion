@@ -61,7 +61,7 @@ public:
 
   def add(p: Package): Resolver {
     registry.put(p.name(), p)
-    return self
+    return this
   }
 
   def get(name: String): Package? {
@@ -99,7 +99,7 @@ public:
     }
     if visited.contains(name) { return true }
     inStack.add(name)
-    val pkg: Package? = self.get(name)
+    val pkg: Package? = this.get(name)
     if pkg != null {
       foreach dep: String in pkg.deps() {
         if !visit(dep) {
@@ -154,7 +154,7 @@ extension List[String] {
   def joinWith(sep: String): String {
     val sb: StringBuffer = new StringBuffer()
     var first: Boolean = true
-    foreach s: Object in self {
+    foreach s: Object in this {
       if !first { sb.append(sep) }
       sb.append(s as String)
       first = false
@@ -164,7 +164,7 @@ extension List[String] {
 
   def countWhere(pred: String -> Boolean): Int {
     var n: Int = 0
-    foreach s: Object in self { if pred(s as String) { n = n + 1 } }
+    foreach s: Object in this { if pred(s as String) { n = n + 1 } }
     return n
   }
 }

@@ -14,19 +14,19 @@
 // ─── Extensions ──────────────────────────────────────────────────────────────
 
 extension Int {
-  def times(label: String): String = "#{self}x #{label}"
+  def times(label: String): String = "#{this}x #{label}"
 }
 
 extension String {
   def padTo(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def rep(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 }

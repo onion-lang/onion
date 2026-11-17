@@ -16,11 +16,11 @@ import { java.lang.Math }
 extension Int {
   def pctStr(total: Int): String {
     if total == 0 { return "0.0%" }
-    return Format::fixed(self as Double * 100.0 / total as Double, 1) + "%"
+    return Format::fixed(this as Double * 100.0 / total as Double, 1) + "%"
   }
   def hashBar(total: Int, width: Int): String {
     val len = if total == 0 { 0 } else {
-      (self as Double / total as Double * width as Double) as Int
+      (this as Double / total as Double * width as Double) as Int
     }
     var s: String = ""
     foreach _i: Int in 0..<len { s = s + "#" }
@@ -29,17 +29,17 @@ extension Int {
 }
 
 extension Double {
-  def fmt2(): String = Format::fixed(self, 2)
+  def fmt2(): String = Format::fixed(this, 2)
 }
 
 extension String {
   def padL(width: Int): String {
-    var r = self
+    var r = this
     while r.length() < width { r = " " + r }
     return r
   }
   def padR(width: Int): String {
-    var r = self
+    var r = this
     while r.length() < width { r = r + " " }
     return r
   }
@@ -123,13 +123,13 @@ class Roller {
 
 public:
   def this(d: DieType, m: Mechanic) {
-    self.die      = d
-    self.mechanic = m
+    this.die      = d
+    this.mechanic = m
   }
 
   def rollOnce(): Int {
     val f = die.faces()
-    return select self.mechanic {
+    return select this.mechanic {
       case _n is Normal:
         Rand::nextInt(f) + 1
       case _a is Advantage: {

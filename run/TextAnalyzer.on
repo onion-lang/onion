@@ -45,7 +45,7 @@ extension String {
 extension List {
   def distinctStrings(): List[String] {
     val result: List[String] = []
-    foreach s: Object in self {
+    foreach s: Object in this {
       val str = s as String
       if !result.contains(str) {
         result << str
@@ -56,7 +56,7 @@ extension List {
 
   def countString(target: String): Int {
     var count: Int = 0
-    foreach s: Object in self {
+    foreach s: Object in this {
       if (s as String) == target {
         count = count + 1
       }

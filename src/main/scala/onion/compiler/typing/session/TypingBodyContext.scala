@@ -19,8 +19,12 @@ final class TypingBodyContext(
   private val problemCountProvider: () => Int = () => 0,
   private val unitProvider: () => AST.CompilationUnit = () => null,
   /** Whether contract clauses are accepted (RFC #2557); `Off` makes a clause an error. */
-  val contractMode: ContractMode = ContractMode.Off
+  val contractMode: ContractMode = ContractMode.Off,
+  private val reportRetiredSelfNode: AST.Node => Unit = _ => ()
 ) {
+  /** E0117 at a `self`, once, even while a speculative typing mutes errors (RFC #2788). */
+  def reportRetiredSelf(node: AST.Node): Unit = reportRetiredSelfNode(node)
+
   /**
    * Names assigned by code that can run at an arbitrary point of the script: every top-level
    * `def`, every class/record/enum/extension body, and every lambda anywhere in the unit.
@@ -89,6 +93,7 @@ object TypingBodyContext {
       topLevelClassProvider = () => typing.loadTopClass,
       problemCountProvider = () => typing.problemCount,
       unitProvider = () => unitContext.unit,
-      contractMode = typing.contractMode
+      contractMode = typing.contractMode,
+      reportRetiredSelfNode = typing.reportRetiredSelf
     )
 }

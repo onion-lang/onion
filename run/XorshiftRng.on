@@ -21,12 +21,12 @@ import {
 
 extension Int {
   def rj(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def hbar(maxV: Int, width: Int): String {
-    val filled: Int = if maxV == 0 { 0 } else { (self * width) / maxV }
+    val filled: Int = if maxV == 0 { 0 } else { (this * width) / maxV }
     var b: String = ""
     var i: Int = 0
     while i < width { b = b + (if i < filled { "#" } else { "." }); i++ }
@@ -35,7 +35,7 @@ extension Int {
 }
 
 extension Double {
-  def absVal(): Double = if self < 0.0 { 0.0 - self } else { self }
+  def absVal(): Double = if this < 0.0 { 0.0 - this } else { this }
 }
 
 // ─── RNG interface ────────────────────────────────────────────────────────────

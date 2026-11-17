@@ -54,8 +54,8 @@ public:
 
 extension Int {
   def toHHMM(): String {
-    val h: Int = self / 60
-    val m: Int = self % 60
+    val h: Int = this / 60
+    val m: Int = this % 60
     val ms: String = if m < 10 { "0" + m } else { "" + m }
     return h + "h " + ms + "m"
   }

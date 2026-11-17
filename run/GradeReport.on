@@ -55,7 +55,7 @@ public:
 
 extension Double {
   def round2(): Double {
-    return Math::round(self * 100.0) / 100.0
+    return Math::round(this * 100.0) / 100.0
   }
 }
 
@@ -64,7 +64,7 @@ extension Int {
   def bar(): String {
     var s = ""
     var i = 0
-    while i < self {
+    while i < this {
       s = s + "#"
       i = i + 1
     }

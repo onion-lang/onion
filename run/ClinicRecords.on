@@ -12,28 +12,28 @@ import { java.util.ArrayList }
 
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def padLeft(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }
   def rep(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
   def truncate(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n - 3) + "..." }
+    if this.length() <= n { this } else { this.substring(0, n - 3) + "..." }
 }
 
 extension Int {
   def ipad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -41,8 +41,8 @@ extension Int {
 
 extension Double {
   def fmt1(): String {
-    val whole: Int = self.intValue()
-    val frac: Int  = ((self - (whole as Double)) * 10.0 + 0.5).intValue()
+    val whole: Int = this.intValue()
+    val frac: Int  = ((this - (whole as Double)) * 10.0 + 0.5).intValue()
     return "" + whole + "." + frac
   }
 }

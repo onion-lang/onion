@@ -45,8 +45,8 @@ enum Season(label: String, startMonth: Int, endMonth: Int, rainfall: Int) {
 // --- Extension methods on Double for display ---
 
 extension Double {
-  def dollar(): String = "$#{self}"
-  def pct(): String    = "#{self}%"
+  def dollar(): String = "$#{this}"
+  def pct(): String    = "#{this}%"
 }
 
 // --- Helper functions ---

@@ -385,7 +385,7 @@ class SemanticErrorCodeCoverageSpec extends AbstractShellSpec {
           |  val x: Int
           |  val y: Int
           |public:
-          |  def this(x: Int, y: Int) { self.x = x; self.y = y }
+          |  def this(x: Int, y: Int) { this.x = x; this.y = y }
           |}
           |class Test {
           |public:

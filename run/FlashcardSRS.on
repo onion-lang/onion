@@ -13,10 +13,10 @@ import { java.util.* }
 
 extension Int {
   def plural(word: String): String =
-    if self == 1 { "1 #{word}" } else { "#{self} #{word}s" }
+    if this == 1 { "1 #{word}" } else { "#{this} #{word}s" }
 
   def rjust(w: Int): String {
-    val s: String = self.toString()
+    val s: String = this.toString()
     if s.length() >= w { return s }
     var r: String = s
     while r.length() < w { r = " " + r }
@@ -24,7 +24,7 @@ extension Int {
   }
 
   def bar(max: Int, width: Int): String {
-    val filled: Int = if max == 0 { 0 } else { (self * width) / max }
+    val filled: Int = if max == 0 { 0 } else { (this * width) / max }
     var b: String = ""
     var i: Int = 0
     while i < filled { b = b + "#"; i = i + 1 }
@@ -35,7 +35,7 @@ extension Int {
 
 extension Double {
   def fmt2(): String {
-    val scaled: Long = Math::round(self * 100.0)
+    val scaled: Long = Math::round(this * 100.0)
     val whole: Long  = scaled / 100L
     val frac: Long   = scaled % 100L
     val fs: String   = if frac < 10L { "0#{frac}" } else { "#{frac}" }

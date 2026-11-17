@@ -18,9 +18,9 @@ record StockMovement(productId: Int, delta: Int, reason: String)
 // === Extension methods ===
 
 extension Double {
-  def cents(): Int = (self * 100.0) as Int
+  def cents(): Int = (this * 100.0) as Int
   def formatted(): String {
-    val c = (self * 100.0) as Int
+    val c = (this * 100.0) as Int
     val whole = c / 100
     val frac = c % 100
     if frac < 10 {
@@ -31,7 +31,7 @@ extension Double {
 }
 
 extension Int {
-  def absVal(): Int = if self < 0 { 0 - self } else { self }
+  def absVal(): Int = if this < 0 { 0 - this } else { this }
 }
 
 // === Stock-status helpers ===

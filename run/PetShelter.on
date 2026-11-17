@@ -53,11 +53,11 @@ record FosterRecord(fosterName: String, phone: String, petId: Int, startDate: St
 
 extension String {
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + "…"
+    if this.length() <= n { return this }
+    return this.substring(0, n) + "…"
   }
   def padEnd(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }
@@ -67,13 +67,13 @@ extension Int {
   def stars(): String {
     var s = ""
     var i = 0
-    while i < self { s = s + "★"; i = i + 1 }
+    while i < this { s = s + "★"; i = i + 1 }
     return s
   }
   def ageLabel(): String {
-    if self < 12 { return self + " months" }
-    val years: Int = self / 12
-    val months: Int = self % 12
+    if this < 12 { return this + " months" }
+    val years: Int = this / 12
+    val months: Int = this % 12
     if months == 0 { return years + " yr" }
     return years + " yr " + months + " mo"
   }
@@ -96,20 +96,20 @@ public:
   var fosters: List[Object]
 
   def this(name: String) {
-    self.name = name
-    self.pets = []
-    self.adopters = []
-    self.fosters = []
-    self.nextId = 1
+    this.name = name
+    this.pets = []
+    this.adopters = []
+    this.fosters = []
+    this.nextId = 1
   }
 
   def intake(petName: String, petType: PetType, ageMonths: Int, breed: String): Pet? {
     try {
       if petName == null { throw new Exception("name required") }
       if breed == null { throw new Exception("breed required") }
-      val pet: Pet = new Pet(self.nextId, petName, petType, ageMonths, breed, new Available())
-      self.nextId = self.nextId + 1
-      self.pets.add(pet)
+      val pet: Pet = new Pet(this.nextId, petName, petType, ageMonths, breed, new Available())
+      this.nextId = this.nextId + 1
+      this.pets.add(pet)
       return pet
     } catch e: Exception {
       IO::println("Intake error: " + e.message())
@@ -118,54 +118,54 @@ public:
   }
 
   def adopt(petId: Int, adopterName: String, email: String, date: String): Boolean {
-    val found = self.pets.find { p -> (p as Pet).id() == petId && (p as Pet).status().isAvailable() }
+    val found = this.pets.find { p -> (p as Pet).id() == petId && (p as Pet).status().isAvailable() }
     if found == null {
       IO::println("Pet #" + petId + " is not available for adoption.")
       return false
     }
     val f: Pet = found as Pet
     val updated: Pet = new Pet(f.id(), f.name(), f.petType(), f.ageMonths(), f.breed(), new Adopted(adopterName, date))
-    self.pets.remove(f)
-    self.pets.add(updated)
-    self.adopters.add(new Adopter(adopterName, email, petId, date))
+    this.pets.remove(f)
+    this.pets.add(updated)
+    this.adopters.add(new Adopter(adopterName, email, petId, date))
     return true
   }
 
   def foster(petId: Int, fosterName: String, phone: String, date: String): Boolean {
-    val found = self.pets.find { p -> (p as Pet).id() == petId && (p as Pet).status().isAvailable() }
+    val found = this.pets.find { p -> (p as Pet).id() == petId && (p as Pet).status().isAvailable() }
     if found == null {
       IO::println("Pet #" + petId + " is not available for fostering.")
       return false
     }
     val f: Pet = found as Pet
     val updated: Pet = new Pet(f.id(), f.name(), f.petType(), f.ageMonths(), f.breed(), new Foster(fosterName))
-    self.pets.remove(f)
-    self.pets.add(updated)
-    self.fosters.add(new FosterRecord(fosterName, phone, petId, date))
+    this.pets.remove(f)
+    this.pets.add(updated)
+    this.fosters.add(new FosterRecord(fosterName, phone, petId, date))
     return true
   }
 
   def quarantine(petId: Int, reason: String): Boolean {
-    val found = self.pets.find { p -> (p as Pet).id() == petId }
+    val found = this.pets.find { p -> (p as Pet).id() == petId }
     if found == null { return false }
     val f: Pet = found as Pet
     val updated: Pet = new Pet(f.id(), f.name(), f.petType(), f.ageMonths(), f.breed(), new Quarantine(reason))
-    self.pets.remove(f)
-    self.pets.add(updated)
+    this.pets.remove(f)
+    this.pets.add(updated)
     return true
   }
 
-  def available(): List[Object] = self.pets.filter { p -> (p as Pet).status().isAvailable() }
+  def available(): List[Object] = this.pets.filter { p -> (p as Pet).status().isAvailable() }
 
-  def adoptedCount(): Int = self.pets.filter { p -> (p as Pet).status().isAdopted() }.size
+  def adoptedCount(): Int = this.pets.filter { p -> (p as Pet).status().isAdopted() }.size
 
   def printRoster(): void {
-    IO::println("\n═══ " + self.name + " — Pet Roster ═══")
-    if self.pets.isEmpty {
+    IO::println("\n═══ " + this.name + " — Pet Roster ═══")
+    if this.pets.isEmpty {
       IO::println("  (no pets on record)")
       return
     }
-    val sorted: List[Object] = self.pets.sortedBy { p -> (p as Pet).name() }
+    val sorted: List[Object] = this.pets.sortedBy { p -> (p as Pet).name() }
     foreach p: Object in sorted {
       val pet: Pet = p as Pet
       val typeTag: String = select pet.petType() {
@@ -180,8 +180,8 @@ public:
   }
 
   def printSummary(): void {
-    IO::println("\n── Summary for " + self.name + " ──")
-    val byType: Map[Object, List[Object]] = self.pets.groupBy { p -> (p as Pet).petType() }
+    IO::println("\n── Summary for " + this.name + " ──")
+    val byType: Map[Object, List[Object]] = this.pets.groupBy { p -> (p as Pet).petType() }
     foreach (pt, list) in byType {
       val petType: PetType = pt as PetType
       val subList: List[Object] = list as List[Object]
@@ -190,12 +190,12 @@ public:
       val bar: String = avail.stars()
       IO::println("  " + petType.name().padEnd(8) + " total=" + total + " available=" + avail + "  " + bar)
     }
-    IO::println("  Adoptions this period: " + self.adoptedCount())
-    IO::println("  Avg days-to-adopt forecast: " + self.forecastDays())
+    IO::println("  Adoptions this period: " + this.adoptedCount())
+    IO::println("  Avg days-to-adopt forecast: " + this.forecastDays())
   }
 
   def forecastDays(): Double {
-    val avail: List[Object] = self.available()
+    val avail: List[Object] = this.available()
     if avail.isEmpty { return 0.0 }
     var total: Double = 0.0
     foreach p: Object in avail {

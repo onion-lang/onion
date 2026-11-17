@@ -50,12 +50,12 @@ record ExecStats(name: String, steps: Int, peakStack: Int)
 // ── Extension on Int ──────────────────────────────────────────────────────────
 extension Int {
   def rjust(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def ljust(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = s + " " }
     return s
   }
@@ -63,12 +63,12 @@ extension Int {
 
 extension String {
   def rjustS(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
   def ljustS(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }

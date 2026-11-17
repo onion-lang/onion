@@ -990,6 +990,26 @@ final class ConstructionTyping(
         }
         if (mostSpecific.length == 1) mostSpecific else pool
       }
+    // Several left and none most specific: an ambiguous call, as javac and a method call
+    // (E0006) say. Falling through would type the lambdas with no target, which reported
+    // E0052 "must specify a type", a fix that does not help (#2950). Only a lambda with an
+    // untyped parameter needs a target: a typed or zero-parameter one still falls through,
+    // where the eager path types it on its own and picks the Onion function type.
+    def needsTarget(i: Int): Boolean = (args(i) match {
+      case c: AST.ClosureExpression => Some(c)
+      case block: AST.BlockExpression if block.elements.nonEmpty =>
+        block.elements.last match { case c: AST.ClosureExpression => Some(c); case _ => None }
+      case _ => None
+    }).exists(_.args.exists(_.typeRef == null))
+    if (candidates.length > 1 && closureIndices.exists(needsTarget)) {
+      bodyContext.report(
+        AMBIGUOUS_CONSTRUCTOR,
+        node,
+        Array[AnyRef](candidates(0).affiliation, candidates(0).getArgs),
+        Array[AnyRef](candidates(1).affiliation, candidates(1).getArgs)
+      )
+      break(Some(None))
+    }
     if (candidates.length != 1) break(None)
 
     val ctor = candidates(0)

@@ -18,12 +18,12 @@ import {
 
 extension String {
   def rpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def lpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
@@ -31,7 +31,7 @@ extension String {
 
 extension Int {
   def pad2(): String {
-    val s: String = "" + self
+    val s: String = "" + this
     if s.length() < 2 { return "0" + s }
     return s
   }

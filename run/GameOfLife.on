@@ -52,19 +52,19 @@ public:
 
 extension Int {
   // Modular wrap for toroidal grid edges
-  def wrapIn(size: Int): Int = ((self % size) + size) % size
+  def wrapIn(size: Int): Int = ((this % size) + size) % size
   // Sign of an integer: -1, 0, or 1
-  def sign(): Int = if self > 0 { 1 } else if self < 0 { -1 } else { 0 }
+  def sign(): Int = if this > 0 { 1 } else if this < 0 { -1 } else { 0 }
 }
 
 extension String {
   def padLeft(width: Int, ch: String): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = ch + s }
     return s
   }
   def padRight(width: Int, ch: String): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + ch }
     return s
   }

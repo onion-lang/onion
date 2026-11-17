@@ -37,19 +37,19 @@ record MortgagePlan(
 
 // === Extension methods ===
 extension Int {
-  def toDouble(): Double = self * 1.0
+  def toDouble(): Double = this * 1.0
 }
 
 extension Double {
   def fmt2(): String = {
-    val rounded: Long = Math::round(self * 100.0)
+    val rounded: Long = Math::round(this * 100.0)
     val whole: Long = rounded / 100L
     val frac: Long = rounded % 100L
     val fracStr: String = if frac < 10L { "0" + frac } else { "" + frac }
     whole + "." + fracStr
   }
   def fmtPct(): String = {
-    val rounded: Long = Math::round(self * 100.0)
+    val rounded: Long = Math::round(this * 100.0)
     val whole: Long = rounded / 100L
     val frac: Long = rounded % 100L
     val fracStr: String = if frac < 10L { "0" + frac } else { "" + frac }
@@ -63,7 +63,7 @@ class MortgageCalculator {
 
 public:
   def this(p: MortgagePlan) {
-    self.plan = p
+    this.plan = p
   }
 
   def periodsPerYear(): Int = select plan.frequency {

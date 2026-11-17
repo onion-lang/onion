@@ -13,8 +13,8 @@ extension String {
   def hash1(): Int {
     var h: Int = 31
     var i: Int = 0
-    while i < self.length() {
-      h = h * 31 + self.charAt(i)
+    while i < this.length() {
+      h = h * 31 + this.charAt(i)
       i++
     }
     return if h < 0 { -h } else { h }
@@ -23,8 +23,8 @@ extension String {
   def hash2(): Int {
     var h: Int = 37
     var i: Int = 0
-    while i < self.length() {
-      h = h * 17 + self.charAt(i) * 3
+    while i < this.length() {
+      h = h * 17 + this.charAt(i) * 3
       i++
     }
     return if h < 0 { -h } else { h }
@@ -33,8 +33,8 @@ extension String {
   def hash3(): Int {
     var h: Int = 53
     var i: Int = 0
-    while i < self.length() {
-      h = h * 7 + self.charAt(i) * 11
+    while i < this.length() {
+      h = h * 7 + this.charAt(i) * 11
       i++
     }
     return if h < 0 { -h } else { h }

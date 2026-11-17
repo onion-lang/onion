@@ -9,7 +9,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension String {
-          |  def shout(): String = self.toUpperCase() + "!"
+          |  def shout(): String = this.toUpperCase() + "!"
           |}
           |
           |class Main {
@@ -35,7 +35,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension String {
-          |  def shout(): String = self.toUpperCase() + "!"
+          |  def shout(): String = this.toUpperCase() + "!"
           |}
           |
           |class Main {
@@ -61,7 +61,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Int {
-          |  def double(): Int = self * 2
+          |  def double(): Int = this * 2
           |}
           |
           |class Main {
@@ -87,7 +87,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Int {
-          |  def double(): Int = self * 2
+          |  def double(): Int = this * 2
           |}
           |
           |class Main {
@@ -113,7 +113,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension String {
-          |  def shout: String = self.toUpperCase() + "!"
+          |  def shout: String = this.toUpperCase() + "!"
           |}
           |
           |class Main {
@@ -139,7 +139,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension String {
-          |  def shout: String = self.toUpperCase() + "!"
+          |  def shout: String = this.toUpperCase() + "!"
           |}
           |
           |class Main {
@@ -165,7 +165,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Int {
-          |  def tripled: Int = self * 3
+          |  def tripled: Int = this * 3
           |}
           |
           |class Main {
@@ -191,7 +191,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Int {
-          |  def tripled: Int = self * 3
+          |  def tripled: Int = this * 3
           |}
           |
           |class Main {
@@ -217,7 +217,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Double {
-          |  def halved: Double = self / 2.0
+          |  def halved: Double = this / 2.0
           |}
           |
           |class Main {
@@ -243,7 +243,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Double {
-          |  def halved: Double = self / 2.0
+          |  def halved: Double = this / 2.0
           |}
           |
           |class Main {
@@ -269,7 +269,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Boolean {
-          |  def negated: Boolean = !self
+          |  def negated: Boolean = !this
           |}
           |
           |class Main {
@@ -295,7 +295,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Boolean {
-          |  def negated: Boolean = !self
+          |  def negated: Boolean = !this
           |}
           |
           |class Main {
@@ -321,7 +321,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Long {
-          |  def doubled: Long = self * 2L
+          |  def doubled: Long = this * 2L
           |}
           |
           |class Main {
@@ -347,7 +347,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Long {
-          |  def doubled: Long = self * 2L
+          |  def doubled: Long = this * 2L
           |}
           |
           |class Main {
@@ -373,7 +373,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Int {
-          |  def plusN(n: Int): Int = self + n
+          |  def plusN(n: Int): Int = this + n
           |}
           |
           |class Main {
@@ -399,7 +399,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
       val result = shell.run(
         """
           |extension Int {
-          |  def plusN(n: Int): Int = self + n
+          |  def plusN(n: Int): Int = this + n
           |}
           |
           |class Main {
@@ -428,7 +428,7 @@ class SafeCallExtensionMethodSpec extends AbstractShellSpec {
           |
           |extension Int {
           |  def half: Int? {
-          |    if self % 2 == 0 { return self / 2 }
+          |    if this % 2 == 0 { return this / 2 }
           |    return null
           |  }
           |}

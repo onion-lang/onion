@@ -144,11 +144,11 @@ public:
 extension Int {
   def pct(of: Int): String {
     if of == 0 { return "0%" }
-    val v: Int = (self * 100) / of
+    val v: Int = (this * 100) / of
     return "" + v + "%"
   }
   def pad(width: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     var result: String = s
     while result.length() < width {
       result = " " + result
@@ -159,8 +159,8 @@ extension Int {
 
 extension Double {
   def fmt1(): String {
-    val whole: Int = self as Int
-    val frac: Int = ((self - (whole as Double)) * 10.0) as Int
+    val whole: Int = this as Int
+    val frac: Int = ((this - (whole as Double)) * 10.0) as Int
     return "" + whole + "." + frac
   }
 }

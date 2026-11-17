@@ -119,7 +119,7 @@ def matchGlob(pattern: String, text: String): Boolean {
 // ── Extension on String ───────────────────────────────────────────────────────
 
 extension String {
-  def matchesGlob(pattern: String): Boolean = matchGlob(pattern, self)
+  def matchesGlob(pattern: String): Boolean = matchGlob(pattern, this)
 }
 
 // ── Test infrastructure ───────────────────────────────────────────────────────

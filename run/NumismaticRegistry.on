@@ -12,32 +12,32 @@
 
 extension Double {
   def fmt2(): String {
-    if self < 0.0 { return "-" + (0.0 - self).fmt2() }
-    val r: Long = Math::round(self * 100.0)
+    if this < 0.0 { return "-" + (0.0 - this).fmt2() }
+    val r: Long = Math::round(this * 100.0)
     val ip: Long = r / 100L
     val fp: Long = r % 100L
     return "" + ip + "." + (if fp < 10L { "0" + fp } else { "" + fp })
   }
-  def fmt0(): String = "" + Math::round(self)
+  def fmt0(): String = "" + Math::round(this)
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def repeat(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
 }
 
 extension Int {
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }

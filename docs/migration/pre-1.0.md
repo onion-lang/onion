@@ -302,7 +302,7 @@ println(c.t)   // 9
   time. A write from outside that object's methods is one no such check can follow.
 - **What you see:** `E0110`, with the caret on the receiver (`o`, `c`, `cs[0]`). The message
   says to call a method of that object or set the value in a constructor.
-- **Still fine:** `t = v`, `this.t = v`, `self.t = v`, `t++` and `t += 1` in the class's own
+- **Still fine:** `t = v`, `this.t = v`, `t++` and `t += 1` in the class's own
   methods, also inside a lambda. Reading `o.t` from anywhere is fine too.
 - **No `onion migrate` rule, on purpose:** the fix adds a method or a constructor to the
   receiver's class, and which one fits is a design choice.
@@ -652,6 +652,28 @@ def main(args: String[]): void {
 - **No `onion migrate` rule:** the old behaviour swallowed an error at run time. The source
   has nothing to rewrite, and only you know whether a bad value should stop the program.
 
+## `self` is now `this`
+
+`self` was a second spelling of `this`. Onion keeps one spelling: `this` (RFC #2788).
+
+```onion
+// Before
+def this(name: String) { self.name = name }
+def greet(): String = "Hi, #{self.name}"
+
+// Now
+def this(name: String) { this.name = name }
+def greet(): String = "Hi, #{this.name}"
+```
+
+- **What you see:** `E0117: `self` is retired; write `this`.` at every `self`, all at once.
+  In static code it replaces E0050.
+- **Still a reserved word:** `self` is not a free name now. A field written `` `self` `` keeps
+  working.
+- **Update a whole project:** `onion migrate src/ tests/`. It rewrites every `self` in code
+  and inside `#{...}` in strings. It leaves comments, plain string text, `\#{self}` and
+  `` `self` `` alone.
+
 ## `override` must match the base method's types up to `?`
 
 An `override` whose parameter is `JInteger` where the base has `Int`, or whose return is
@@ -680,6 +702,9 @@ val b: Base = new Up(); b.dec(1)                           // Before: printed Ba
 - **To update:** to override, write the base types (`dec(k: Int)`, or `dec(k: Int?)`). To keep
   a separate overload, remove `override` and give it parameter types that differ by more
   than `?`, or another name.
+- **No `onion migrate` rule:** whether the method was meant to override or to overload is
+  your choice, and the two edits run different code. The error shows the base signature
+  instead.
 
 A method whose parameters differ from a base method's **only by `?`** is the same method
 now, with or without `override`:
@@ -693,6 +718,3 @@ now, with or without `override`:
   the exact types (`setDaemon(on: Boolean?)` in a `Thread` subclass included).
 - **To keep a separate overload:** rename the method (`decOrSkip(k: Int?)`). No `onion
   migrate` rule: only you know whether the method was meant to replace the base one.
-- **No `onion migrate` rule:** whether the method was meant to override or to overload is
-  your choice, and the two edits run different code. The error shows the base signature
-  instead.

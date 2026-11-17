@@ -374,6 +374,9 @@ private[compiler] final class SimpleExpressionTypingSupport(
   }
 
   private def typeCurrentInstance(node: AST.CurrentInstance, context: LocalContext): Option[Term] = {
+    // `self` is retired (RFC #2788): report it at every use, and keep typing it as `this` so
+    // a file shows all of them at once. In static code it replaces E0050.
+    if (node.spelledSelf) bodyContext.reportRetiredSelf(node)
     val thisBinding = context.lookup("this")
     if (thisBinding != null) {
       context.recordUsage("this")
@@ -385,7 +388,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
       if (effectiveType != thisBinding.tp) Some(new AsInstanceOf(new RefLocal(thisBinding), effectiveType))
       else Some(new RefLocal(thisBinding))
     } else if (context.isStatic) {
-      bodyContext.report(CURRENT_INSTANCE_NOT_AVAILABLE, node)
+      if (!node.spelledSelf) bodyContext.report(CURRENT_INSTANCE_NOT_AVAILABLE, node)
       None
     } else if (context.isClosure) {
       // Inside a closure 'this'/'self' denotes the enclosing instance,
@@ -513,7 +516,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
     else context.getEffectiveType("this") match {
       case receiver: ObjectType =>
         val hasMember = receiver.field(name) != null || receiver.findMethod(name, Array.empty).nonEmpty
-        if (hasMember) Some(s"self.$name") else None
+        if (hasMember) Some(s"this.$name") else None
       case _ => None
     }
 

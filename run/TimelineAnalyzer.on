@@ -44,18 +44,18 @@ enum Significance(label: String, weight: Int) {
 // ── Extension methods ──────────────────────────────────────────────────────────
 
 extension Int {
-  def decade(): Int = (self / 10) * 10
+  def decade(): Int = (this / 10) * 10
 }
 
 extension String {
   def rpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n - 1) + "~"
+    if this.length() <= n { return this }
+    return this.substring(0, n - 1) + "~"
   }
   def bar(n: Int): String {
     var b: String = ""

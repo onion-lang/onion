@@ -9,29 +9,29 @@
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
 }
 
 extension Double {
-  def dabs(): Double = if self < 0.0 { 0.0 - self } else { self }
+  def dabs(): Double = if this < 0.0 { 0.0 - this } else { this }
   def fmt2(): String {
-    val w: Int = self.intValue()
-    val frac: Int = ((self.dabs() - (w.dabs() as Double)) * 100.0 + 0.5).intValue()
+    val w: Int = this.intValue()
+    val frac: Int = ((this.dabs() - (w.dabs() as Double)) * 100.0 + 0.5).intValue()
     val fs: String = if frac < 10 { "0" + frac } else { "" + frac }
     return "" + w + "." + fs
   }
 }
 
 extension Int {
-  def dabs(): Int = if self < 0 { 0 - self } else { self }
+  def dabs(): Int = if this < 0 { 0 - this } else { this }
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────

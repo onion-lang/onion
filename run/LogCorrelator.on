@@ -14,25 +14,25 @@ import {
 
 extension String {
   def padL(w: Int): String {
-    var s = self
+    var s = this
     while s.length() < w { s = " " + s }
     return s
   }
   def padR(w: Int): String {
-    var s = self
+    var s = this
     while s.length() < w { s = s + " " }
     return s
   }
 }
 
 extension Double {
-  def fmt1(): String = String::format("%.1f", self)
+  def fmt1(): String = String::format("%.1f", this)
 }
 
 extension Int {
   def bar(max: Int, width: Int): String {
     if max == 0 { return "".padR(width) }
-    val filled = if self * width / max > width { width } else { self * width / max }
+    val filled = if this * width / max > width { width } else { this * width / max }
     var s = ""
     foreach i: Int in 0..<filled       { s = s + "#" }
     foreach i: Int in filled..<width   { s = s + "." }
@@ -60,7 +60,7 @@ public:
     case LogLevel::Error: 3
     case LogLevel::Fatal: 4
   }
-  def isAlert(): Boolean = self.severity() >= 2
+  def isAlert(): Boolean = this.severity() >= 2
 }
 
 // ─── Source: log-origin enum ──────────────────────────────────────────────────

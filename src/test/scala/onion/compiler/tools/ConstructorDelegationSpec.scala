@@ -57,7 +57,7 @@ class ConstructorDelegationSpec extends AbstractShellSpec {
           |class Base {
           |  val tag: String
           |public:
-          |  def this(tag: String) { self.tag = tag }
+          |  def this(tag: String) { this.tag = tag }
           |  def getTag(): String = tag
           |}
           |class Sub(tag: String, val n: Int) extends Base(tag) {

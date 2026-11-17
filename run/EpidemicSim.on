@@ -7,11 +7,11 @@
 
 extension Double {
   def fmt1(): String {
-    val v: Int = (self * 10.0 + 0.5) as Int
+    val v: Int = (this * 10.0 + 0.5) as Int
     return (v / 10) + "." + (v % 10)
   }
   def fmt2(): String {
-    val v: Int = (self * 100.0 + 0.5) as Int
+    val v: Int = (this * 100.0 + 0.5) as Int
     val frac: Int = v % 100
     val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
     return (v / 100) + "." + fracStr

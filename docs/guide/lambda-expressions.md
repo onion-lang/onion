@@ -50,6 +50,17 @@ if (once { 1 }) == 1 { println("one") }             // parenthesized: a lambda
 if ready { println("go") }                          // block of the if
 ```
 
+Inside an argument list, or anywhere else a value is expected, a brace lambda
+needs its arrow. `{ -> body }` is a zero-parameter lambda there, so a call
+that takes two lambdas can still use the brace form for both. Without the
+arrow, `{ "c" }` is a block whose value is `"c"`, not a lambda:
+
+```onion
+opt.fold({ -> "none" }, { s -> s.toUpperCase() })
+val h: () -> Int = { -> 7 }
+twice({ "c" })     // E0005: the argument is the String "c"
+```
+
 ## Type Inference
 
 When the target function type is known, parameter types can be omitted:

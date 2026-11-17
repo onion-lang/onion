@@ -74,7 +74,7 @@ class JavaStyleFieldHintSpec extends AbstractShellSpec {
           |class Point {
           |  val x: Int
           |public:
-          |  def this(x: Int) { self.x = x }
+          |  def this(x: Int) { this.x = x }
           |}
           |class Main {
           |public:

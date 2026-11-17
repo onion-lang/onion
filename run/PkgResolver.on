@@ -9,7 +9,7 @@ record Version(major: Int, minor: Int, patch: Int) from re"(\d+)\.(\d+)\.(\d+)" 
     if minor() != other.minor() { return minor() - other.minor() }
     return patch() - other.patch()
   }
-  def isCompatibleWith(req: VersionReq): Boolean = req.accepts(self)
+  def isCompatibleWith(req: VersionReq): Boolean = req.accepts(this)
   def show(): String = "#{major()}.#{minor()}.#{patch()}"
   def isBreakingFrom(older: Version): Boolean = major() > older.major()
   def bumpMajor(): Version = new Version(major() + 1, 0, 0)

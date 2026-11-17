@@ -38,6 +38,26 @@ private[compiler] final class AssignabilitySupport(
     }
   }
 
+  // Reads that return an element that is there, or throw: never null when the
+  // receiver's type argument is non-null (#3071). Keyed by the class the
+  // receiver must conform to; values are method name -> parameter count.
+  private val nonNullElementReads: Seq[(String, Map[String, Int])] = Seq(
+    "onion.Option" -> Map("get" -> 0, "getOrElse" -> 1, "orElseThrow" -> 0),
+    "onion.Result" -> Map("get" -> 0, "getOrElse" -> 1, "getOrThrow" -> 0, "getError" -> 0),
+    "java.util.List" -> Map("get" -> 1, "getFirst" -> 0, "getLast" -> 0),
+    "java.util.Iterator" -> Map("next" -> 0),
+    "java.util.Map$Entry" -> Map("getKey" -> 0, "getValue" -> 0)
+  )
+
+  private def isNonNullElementRead(call: Call): Boolean = {
+    val name = call.method.name
+    val arity = call.method.arguments.length
+    nonNullElementReads.exists { case (className, methods) =>
+      methods.get(name).contains(arity) &&
+        bodyContext.table.load(className).exists(cls => TypeRules.isAssignable(cls, call.target.`type`))
+    }
+  }
+
   private def containsTypeVariable(typeToCheck: Type): Boolean =
     TypeCheckingHelpers.containsTypeVariable(typeToCheck)
 
@@ -183,7 +203,34 @@ private[compiler] final class AssignabilitySupport(
             }
           case _ => false
         }
-        if (!isElvis && !isNonNullFunctionCall) {
+        // A read that cannot return null when the receiver's type argument is a
+        // non-nullable type the program wrote (`E` of `List[Int]`, `T` of
+        // `Option[Int]`): it returns an element that is there, or throws
+        // (#3071). This is an allowlist on purpose: a Java call that returns
+        // null to mean "nothing here" (`Deque.poll`, `TreeSet.floor`,
+        // `Map.get`, `Dictionary.get`, `AtomicReference.get`) keeps W0015,
+        // since its type variable is a platform type (null-safety.md).
+        val isNonNullTypeArgumentCall = actual match {
+          case cast: AsInstanceOf =>
+            cast.target match {
+              case call: Call =>
+                call.method.returnType match {
+                  case tv: TypeVariableType
+                      if !call.method.typeParameters.exists(_.name == tv.name) &&
+                        isNonNullElementRead(call) =>
+                    val subst = TypeSubstitution.hierarchySubstitution(call.target.`type`, call.method.affiliation)
+                    subst.get(tv.name) match {
+                      case Some(_: NullableType) | None => false
+                      case Some(arg: TypeVariableType) => !arg.acceptsNullable
+                      case Some(_) => true
+                    }
+                  case _ => false
+                }
+              case _ => false
+            }
+          case _ => false
+        }
+        if (!isElvis && !isNonNullFunctionCall && !isNonNullTypeArgumentCall) {
           // Same reason as the nullToNonNullable call above (#2238): this can
           // be the first warning of the unit.
           bodyContext.warningReporter.setSourceFile(bodyContext.sourceFile)

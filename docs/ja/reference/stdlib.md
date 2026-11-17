@@ -2283,6 +2283,9 @@ parsed.intOption("level", 3)              // 省略時のみ既定値。"--level
 parsed.positional()                     // オプション以外の引数の List
 ```
 
+`positional()` の前に `flag`/`option` を呼んでください。`--name value` はオプションにも、
+フラグと位置引数にも読めるため、問い合わせの時点で決まります。先に読んだ `positional()` にはその値が入りません。
+
 ## Cli モジュール
 
 `onion.Cli` は、コンパイラの **auto-CLI** 機能（トップレベルの `def main(...)`

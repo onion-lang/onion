@@ -28,8 +28,8 @@ class NullableSelfNarrowingSpec extends AnyFunSpec {
       compile(
         """extension String? {
           |  def orEmpty(): String {
-          |    if self == null { return "" }
-          |    return self
+          |    if this == null { return "" }
+          |    return this
           |  }
           |}
           |""".stripMargin
@@ -52,8 +52,8 @@ class NullableSelfNarrowingSpec extends AnyFunSpec {
       compile(
         """extension String? {
           |  def describe(): String {
-          |    if self != null {
-          |      return self
+          |    if this != null {
+          |      return this
           |    } else {
           |      return "none"
           |    }

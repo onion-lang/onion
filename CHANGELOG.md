@@ -7,6 +7,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.160.0] - 2026-11-16
+
+### Breaking
+
+- **`Args` `intOption("count", 3)` rejects `--count abc` instead of returning `3` (#2881).**
+  - Before: a typo such as `--count 10O` silently ran with the default.
+  - Now: `IllegalArgumentException: invalid value for --count: 'abc' (expected Int)`, as the auto-CLI reports. The default still applies when the option is absent.
+
+### Fixed
+
+- **`val d: Int = xs[0]` no longer warns W0015 when `xs` is a `List[Int]` (#3071).**
+  - Before: `xs[0]`, `opt.get()` and `res.getOrElse(0)` on `List[Int]`, `Option[Int]` and `Result[Int, E]` warned "NullPointerException at runtime".
+  - Now: no warning, since the type argument `Int` is not null. `Iterator.next()` and `Map.Entry.getValue()` are quiet too. A call that returns null for "nothing here" (`Map.get`, `Deque.poll()`) and `Json::getInt` still warn.
+- **`(1..3) == (1..3)` is `true` (#3068).**
+  - Before: `false`, because `Range` had no `equals`/`hashCode`.
+  - Now: ranges that produce the same values are equal and hash alike.
+- **`Result::trying { ... }.getOrThrow()` rethrows the original exception, so `catch e: IOException` fires.**
+  - Before: a `Throwable` error was wrapped in a `RuntimeException`, and `get()` on an `Err` said only `Err.get()`.
+  - Now: the error is thrown as itself, as the docs said; `get()` says `Err.get(): <error>`.
+- **A `do[Option] { ... }` default argument works.**
+  - Before: the call that omitted it was E0005 (or E0021 for a constructor).
+  - Now: the block is desugared like any other expression.
+- **A block lambda typed `(Int) -> Int` that ends in a void call is now a compile error.**
+  - Before: `(n) -> { println(n) }` compiled, returned null, and failed later as an NPE.
+  - Now: E0000 at the last expression. A `void`, `Object`, nullable (`String?`), `Void`, Java-generic (`Supplier[T]`, `Map.computeIfAbsent`) or inferred result still allows it, as does a tail that never ends (`while true`).
+- **`g()` works when `g` is a top-level `var` holding a function.**
+  - Before: `var g: () -> Int = () -> 5; println(g())` compiled, then threw `IncompatibleClassChangeError`.
+  - Now: it prints `5`, as it does for a `val`.
+- **`f()` works inside a lambda when `f` is a field holding a function.**
+  - Before: `val l: () -> Int = () -> inf()` in a method compiled, then threw `VerifyError`.
+  - Now: it calls the field's function, as `inf.call()` already did.
+- **`IO::readLine()` no longer returns a leading BOM from piped stdin (#3036).**
+  - Before: `printf '\xef\xbb\xbfline1\n' | onion s.on` read `\uFEFFline1`, so the first key looked wrong.
+  - Now: the BOM is dropped, as the file readers already do.
+- **A lambda whose last statement is a `do`/`while` or a labelled loop now runs the loop.**
+  - Before: it compiled, then silently did nothing.
+  - Now: the loop runs, as it does when another statement follows it.
+- **A block lambda with an early `return` now returns its last expression on the other path.**
+  - Before: `(c) -> { if c { return 5 }; 40 }` returned `null` when `c` was false, so `n(false) + 1` threw an NPE. A trailing `if`/`else`, `try` or assignment (`k += 7`) was dropped the same way.
+  - Now: the last expression is one more `return`, typed by the same rule as a lambda with no `return`. A last value of the wrong type is now a compile error (E0000, or E0070 for a nullable value), where it used to be a silent `null`. An inferred return type now includes the last expression, so it can widen (for example to `Object`).
+- **`DateTime::parse(text, pattern)` honours an offset or zone in the text (#3014).**
+  - Before: `parse("2026-11-11T09:30Z", "yyyy-MM-dd'T'HH:mmXXX")` read the time as local, so it was off by the local offset.
+  - Now: the `Z`/`+09:00` in the text decides the instant, as `parse(text)` already did.
+- **A cyclic class or interface hierarchy that code uses reports E0016, not a crash (#2975).**
+  - Before: `interface I conforms J` with `interface J conforms I`, plus a class or call that used them, crashed `onionc` with `StackOverflowError`. So did `class A extends B` / `class B extends A` with `new A().f()`.
+  - Now: only `[E0016] inheritance relations which include I have cyclicity.`, and the rest of the file is still checked.
+- **A bound inside a type-parameter bound is checked the same way in any declaration order.**
+  - Before: `class Bad1[T extends Num[String]]` compiled when `class Num[T extends Number]` came later; `class A[T extends Box[MyNum]]` was E0000 though `MyNum extends Number`.
+  - Now: the first is E0000 in every order (and across files); the second compiles.
+- **A class-only file and a script with the same file name (`e1/y.on`, `e2/y.on`) compile together.**
+  - Before: a false W0014, then `[I0000] Internal compiler error ... Duplicate method name "start"`.
+  - Now: both compile; the class-only file no longer takes the script's `yMain` as its own.
+- **E0008 for two same-named scripts names both paths** (`d2/x.on and of d1/x.on`, was `x.on`).
+- **An ambiguous constructor call with an untyped lambda says it is ambiguous (#2950).**
+  - Before: `new Two((a) -> a + "1", (b) -> b + "2")`, with constructors over `Function` and `UnaryOperator` and none most specific, was E0052 "lambda parameter a must specify a type". Adding the type did not help.
+  - Now: E0022 names two of the constructors, as javac does. A typed or zero-parameter lambda still picks the Onion function type, as before.
+- **A data-enum constant can omit a parameter that has a default.**
+  - Before: `enum E(a: Int, b: Int = 7) { X(1) }` was E0021, naming a hidden constructor `E(String, Int, Int, Int)`.
+  - Now: `X(1)` gets `b = 7`, as a record does; a default may read an earlier parameter.
+- **A named argument in a data-enum constant binds by name.**
+  - Before: `enum S(a: Int, b: Int) { Y(b = 5, a = 2) }` put `5` in `a`, by position (#3064).
+  - Now: `a = 2, b = 5`, as `new R(...)` does; an unknown or repeated name is E0043/E0044.
+- **`Text::wrap` wraps Japanese and other full-width text by terminal columns.**
+  - Before: text with no spaces stayed one line, and width was counted in characters.
+  - Now: lines break between full-width characters (2 columns each), as `Text::table` counts them; `。` and `」` never start a line.
+- **`Files::glob(dir, "{**/*.on,*.md}")` finds `.on` files directly in `dir`.**
+  - Before: only `*.md` and nested `.on` files matched; `./**/*.on` returned `[]`.
+  - Now: each brace alternative matches zero directories for `**/`, and a leading `./` is ignored.
+- **The E0013/E0014 hint for a protected Java member no longer calls it "private" (#2904).**
+  - Before: `a.removeRange(0, 0)` said the member "is private ... cannot be changed from here".
+  - Now: "not public in a class that is not Onion source, so it cannot be used from here".
+- **The "pass the elements as `list.toArray(...)`" hint now compiles for a nullable List (#2903).**
+  - Before: for `Proc::run(cmd)` with `cmd: List[String]?`, following the hint gave E0070.
+  - Now: the hint reads `list!!.toArray(new String[0])`.
+- **The Japanese `Result` sample in `examples/functional.md` compiles (#2899).**
+  - Before: E0000 and E0002; it used a `case Result::ok(value):` pattern that is not Onion syntax.
+  - Now: it is the English program, and prints `Result: 10`.
+- **`val m: Map[String, Int?] = ["a": ident(5), "b": null]` compiles.**
+  - Before: E0000, `Map[String, Int]` is used where `Map[String, Int?]` is expected.
+  - Now: prints `{a=5, b=null}`, as the list form `[ident(5), null]` already did.
+- **`u() as Object` and `select u() { ... }` on a `void` call report E0027 (#2891).**
+  - Before: an internal compiler error (I0000).
+  - Now: `E0027` at the call, as for `val o: Object = u()`.
+- **A duplicate `instance` in two files of one package is E0097.**
+  - Before: E0008 `duplicated class definition Show$$Integer`, a name you never wrote.
+  - Now: E0097 `instance Show[int] is already defined`, as across modules.
+- **A bare `void` statement in a `do[M]` block gets an error about the do block (#2715).**
+  - Before: `E0040 cannot call method bind on primitive type void`, naming a call you never wrote.
+  - Now: `E0040 a do block statement must be x <- expr or a value of the monad`, with a hint to put the side effect in `yield { println(..); x }`.
+- **`val l: Long? = ident(5)` reports one error, the right way round.**
+  - Before: two E0000s; the first said "Int is expected, but Long? is used" and suggested `!!`.
+  - Now: one E0000, "Long? is expected, but Int is used".
+
+### Documentation
+
+- **`docs/ja/CLAUDE_ja.md` says `--contracts` is on by default.**
+  - Before: "既定は off", the pre-#2591 default.
+  - Now: the default is `check`, as in `CLAUDE.md`.
+
 ## [0.159.0] - 2026-11-15
 
 ### Breaking

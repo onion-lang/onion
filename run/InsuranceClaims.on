@@ -9,14 +9,14 @@
 
 extension Int {
   def usd(): String {
-    if self < 0 {
-      val abs: Int = -self
+    if this < 0 {
+      val abs: Int = -this
       return "-$" + abs
     }
-    return "$" + self
+    return "$" + this
   }
   def pad(n: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < n { s = " " + s }
     return s
   }
@@ -24,12 +24,12 @@ extension Int {
 
 extension Double {
   def pct(): String {
-    val p: Int = (self * 100.0).intValue()
+    val p: Int = (this * 100.0).intValue()
     return p + "%"
   }
   def usd2(): String {
-    val neg: Boolean  = self < 0.0
-    val abs: Double   = if neg { -self } else { self }
+    val neg: Boolean  = this < 0.0
+    val abs: Double   = if neg { -this } else { this }
     val cents: Long   = (abs * 100.0).longValue()
     val ip: Long      = cents / 100L
     val fp: Long      = cents % 100L
@@ -41,13 +41,13 @@ extension Double {
 
 extension String {
   def padRight(n: Int): String {
-    var r: String = self
+    var r: String = this
     while r.length() < n { r = r + " " }
     return r
   }
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n - 3) + "..."
+    if this.length() <= n { return this }
+    return this.substring(0, n - 3) + "..."
   }
 }
 
@@ -145,11 +145,11 @@ class ClaimsProcessor conforms Auditable {
 
 public:
   def this(pid: String) {
-    self.processorId = pid
-    self.claimants   = []
-    self.policies    = []
-    self.claims      = []
-    self.adjustments = []
+    this.processorId = pid
+    this.claimants   = []
+    this.policies    = []
+    this.claims      = []
+    this.adjustments = []
   }
 
   def addClaimant(c: Claimant): void { claimants.add(c) }

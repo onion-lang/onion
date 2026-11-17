@@ -13,18 +13,18 @@ import { java.lang.Math }
 
 extension Double {
   def round1(): Double {
-    val s: Int = (self * 10.0) as Int
+    val s: Int = (this * 10.0) as Int
     return s.doubleValue() / 10.0
   }
-  def formatElev(): String = "#{self.round1()}m"
-  def formatDist(): String = "#{self.round1()}km"
-  def abs(): Double = if self < 0.0 { 0.0 - self } else { self }
+  def formatElev(): String = "#{this.round1()}m"
+  def formatDist(): String = "#{this.round1()}km"
+  def abs(): Double = if this < 0.0 { 0.0 - this } else { this }
 }
 
 extension Int {
-  def plural(word: String): String = if self == 1 { "1 #{word}" } else { "#{self} #{word}s" }
+  def plural(word: String): String = if this == 1 { "1 #{word}" } else { "#{this} #{word}s" }
   def padL(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -32,13 +32,13 @@ extension Int {
 
 extension String {
   def padR(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def truncate(w: Int): String {
-    if self.length() <= w { return self }
-    return self.substring(0, w - 3) + "..."
+    if this.length() <= w { return this }
+    return this.substring(0, w - 3) + "..."
   }
 }
 

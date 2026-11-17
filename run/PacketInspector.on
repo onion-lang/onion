@@ -11,34 +11,34 @@ import { java.util.ArrayList; java.util.LinkedHashMap as JLinkedHashMap; }
 
 extension Int {
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def kb(): String {
-    if self >= 1024 { return "" + (self / 1024) + "KB" }
-    return "" + self + "B"
+    if this >= 1024 { return "" + (this / 1024) + "KB" }
+    return "" + this + "B"
   }
   def abs(): Int {
-    if self < 0 { return 0 - self }
-    return self
+    if this < 0 { return 0 - this }
+    return this
   }
 }
 
 extension String {
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + ".."
+    if this.length() <= n { return this }
+    return this.substring(0, n) + ".."
   }
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def rep(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
 }

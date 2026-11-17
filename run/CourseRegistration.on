@@ -286,7 +286,7 @@ public:
 // ── Extension method on Student for concise display ─────────────────────────
 
 extension Student {
-  def shortLabel(): String = "#{self.name()} (#{self.id()})"
+  def shortLabel(): String = "#{this.name()} (#{this.id()})"
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────

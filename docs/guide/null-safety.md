@@ -522,6 +522,12 @@ their nullability is unknown, so they accept nullable arguments and
 remain dereferenceable (matching how Java values are treated
 elsewhere).
 
+Unboxing such a value to `Int` warns (W0015), since a Java call may return
+null to mean "nothing here" (`Deque.poll()`, `Map.get`). A read that returns an
+element or throws does not warn when the type argument is non-null:
+`List.get` and `xs[i]`, `Iterator.next`, `Map.Entry.getKey`/`getValue`, and
+`Option`/`Result` reads such as `get` and `getOrElse`.
+
 ## Next Steps
 
 - [Control Flow](control-flow.md) - if, while, for, select

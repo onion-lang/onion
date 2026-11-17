@@ -19,7 +19,7 @@ class SelfReferentialInterfaceSpec extends AbstractShellSpec {
   }
   it("implements a user-defined self-referential generic interface") {
     assert(Shell.Success("ok") == shell.run(
-      "interface Holder[T] { def value(): T }\nclass Node conforms Holder[Node] { public: def this{}\n def value(): Node = self }\ndef main(args: String[]): String { return if new Node().value() != null { \"ok\" } else { \"no\" } }", "None", Array()))
+      "interface Holder[T] { def value(): T }\nclass Node conforms Holder[Node] { public: def this{}\n def value(): Node = this }\ndef main(args: String[]): String { return if new Node().value() != null { \"ok\" } else { \"no\" } }", "None", Array()))
   }
   it("still requires abstract methods of the implemented interface") {
     assert(Shell.Failure(-1) == shell.run(

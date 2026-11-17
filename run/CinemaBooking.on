@@ -69,13 +69,13 @@ def bookingRevenue(b: Booking): Int =
 extension Int {
   def pct(total: Int): String {
     if total == 0 { return "N/A" }
-    return "" + (self * 100 / total) + "%"
+    return "" + (this * 100 / total) + "%"
   }
 }
 
 // ── Extension methods on Double ───────────────────────────────────────────────
 extension Double {
-  def round1(): Double = (self * 10.0 + 0.5) as Long / 10.0
+  def round1(): Double = (this * 10.0 + 0.5) as Long / 10.0
 }
 
 // ── Movie catalogue ───────────────────────────────────────────────────────────

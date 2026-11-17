@@ -42,7 +42,7 @@ record LabeledInt(label: String, value: Int)
 
 extension Int {
   def pad(width: Int): String {
-    val s = "" + self
+    val s = "" + this
     var r: String = s
     var i: Int = s.length()
     while i < width {
@@ -52,8 +52,8 @@ extension Int {
     return r
   }
   def abs2(): Int {
-    if self < 0 { return 0 - self }
-    return self
+    if this < 0 { return 0 - this }
+    return this
   }
 }
 
@@ -61,8 +61,8 @@ extension Int {
 
 extension String {
   def rpad(width: Int): String {
-    var r: String = self
-    var i: Int = self.length()
+    var r: String = this
+    var i: Int = this.length()
     while i < width {
       r = r + " "
       i = i + 1

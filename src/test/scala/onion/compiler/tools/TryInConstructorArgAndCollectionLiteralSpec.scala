@@ -47,7 +47,7 @@ class TryInConstructorArgAndCollectionLiteralSpec extends AbstractShellSpec {
         """
           |class Base {
           |public:
-          |  def this(v: Int) { self.v = v }
+          |  def this(v: Int) { this.v = v }
           |  val v: Int
           |}
           |class Sub(x: Int) extends Base(try { Integer::parseInt(x + "") } catch _: Exception { -1 }) { }
@@ -72,7 +72,7 @@ class TryInConstructorArgAndCollectionLiteralSpec extends AbstractShellSpec {
         """
           |class Box {
           |public:
-          |  def this(v: Int) { self.v = v }
+          |  def this(v: Int) { this.v = v }
           |  val v: Int
           |  def add(x: Int): Int { return v + x }
           |}

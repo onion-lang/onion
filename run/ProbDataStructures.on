@@ -10,7 +10,7 @@
 // Multiplicative hash: mix the key with a prime seed, return a non-negative int
 extension Int {
   def hashMix(seed: Int): Int {
-    var h: Int = self ^ seed
+    var h: Int = this ^ seed
     h = h ^ (h >> 16)
     h = h * (0 - 2048144789)   // -2048144789 = 0x84222325 (prime-ish)
     h = h ^ (h >> 13)
@@ -24,15 +24,15 @@ extension String {
   def hashCode32(): Int {
     var h: Int = 0
     var i: Int = 0
-    while i < self.length {
-      val c: Int = self.charAt(i) as Int
+    while i < this.length {
+      val c: Int = this.charAt(i) as Int
       h = h * 31 + c
       i = i + 1
     }
     if h < 0 { return h & 2147483647 } else { return h }
   }
 
-  def hashWithSeed(seed: Int): Int = self.hashCode32().hashMix(seed)
+  def hashWithSeed(seed: Int): Int = this.hashCode32().hashMix(seed)
 }
 
 // ─── Bloom Filter ─────────────────────────────────────────────────────────────
@@ -53,8 +53,8 @@ public:
   def this(m: Int, k: Int) {
     bits = new Boolean[m]
     for var i: Int = 0; i < m; i++ { bits[i] = false }
-    self.k = k
-    self.m = m
+    this.k = k
+    this.m = m
     inserted = 0
   }
 
@@ -137,8 +137,8 @@ class CountMinSketch {
 
 public:
   def this(w: Int, d: Int) {
-    self.w = w
-    self.d = d
+    this.w = w
+    this.d = d
     counts = new Int[d * w]
     for var i: Int = 0; i < d * w; i++ { counts[i] = 0 }
     total = 0

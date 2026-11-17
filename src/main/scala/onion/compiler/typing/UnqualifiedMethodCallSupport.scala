@@ -172,6 +172,13 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       None
     } else {
       val method = methods(0)
+      // An inherited private method is found by name but cannot be called from here: the
+      // JVM rejects it at run time (IllegalAccessError). `this.f(..)`, named arguments and
+      // a trailing lambda already say E0013; the bare positional call does too (#3012).
+      if (!MemberAccess.isMemberAccessible(method, targetType)) {
+        bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, method.name, method.arguments, targetType)
+        return None
+      }
       if (!ensureInstanceAvailable(node, method, context)) return None
       val classSubst = selfClassSubstitution(method)
       calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(

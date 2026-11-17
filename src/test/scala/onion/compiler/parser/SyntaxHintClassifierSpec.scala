@@ -813,6 +813,50 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).map(_.messageKey) should not be Some("error.parsing.hint.call_result_call")
     }
 
+    it("gives no call-result hint inside any declaration header (#2789 rule)") {
+      val statementEnd = "\";\", <EOL>, <EOF>"
+      Seq(
+        ("def apply(f: (Int) -> Int)(x: Int): Int = f(x)", "(x: Int): Int = f(x)", statementEnd),
+        ("def f[T extends Comparable[T]](a: T)(b: T): T = a", "(b: T): T = a", statementEnd),
+        ("def f(a: Int = g(1))(b: Int): Int = a", "(b: Int): Int = a", statementEnd),
+        ("enum E { case A(x: Int)(y: Int) }", "(y: Int) }", "\"}\""),
+        ("public: static def f(a: Int)(b: Int): Int = a", "(b: Int): Int = a", statementEnd),
+        ("record R(a: Int)(b: Int)", "(b: Int)", statementEnd)
+      ).foreach { case (line, context, expected) =>
+        withClue(line) {
+          SyntaxHintClassifier.classify("(", expected, context, line).map(_.messageKey) should not be
+            Some("error.parsing.hint.call_result_call")
+          SyntaxHintClassifier.classify("(", expected, context, line).map(_.messageKey) should not be
+            Some("error.parsing.hint.call_result_call_unnamed")
+        }
+      }
+    }
+
+    it("still gives the call-result hint in a body on a declaration line") {
+      val statementEnd = "\";\", <EOL>, <EOF>, \"}\""
+      Seq(
+        ("def g(): Int = mk()()", "()", Seq("mk()", "")),
+        ("def g(a: Int = 1): Int { return adder(a)(2) }", "(2) }", Seq("adder(a)", "2")),
+        ("select v { case 1: mk()(3) }", "(3) }", Seq("mk()", "3")),
+        ("val h = xs.map { x -> mk()(x) }", "(x) }", Seq("mk()", "x"))
+      ).foreach { case (line, context, arguments) =>
+        withClue(line) {
+          val hint = classify(found = "(", expected = statementEnd, context = context, sourceLine = line)
+          hint.messageKey shouldBe "error.parsing.hint.call_result_call"
+          hint.arguments shouldBe arguments
+        }
+      }
+    }
+
+    it("does not cut the second call's arguments at a `)` inside a string") {
+      classify(
+        found = "(",
+        expected = "\")\"",
+        context = "(\"a)(b\"))",
+        sourceLine = "println(foo(1)(\"a)(b\"))"
+      ).arguments shouldBe Seq("foo(1)", "\"a)(b\"")
+    }
+
     it("recognizes a JS/Python-style `typeof` operator in an `if` condition") {
       val hint = classify(
         found = "x",

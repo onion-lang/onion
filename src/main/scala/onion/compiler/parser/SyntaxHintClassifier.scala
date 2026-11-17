@@ -17,8 +17,8 @@ private[compiler] object SyntaxHintClassifier {
   private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
   // Text just before the offending `(` ends in `)`: a second call suffix after a call.
   private val CallResultCall = """\)\s*\z""".r
-  // A curried-looking `def f(a: Int)(` header is a declaration, not a call.
-  private val CurriedDefHeader = """\bdef\s+[A-Za-z_]\w*\s*(?:\[[^\]]*\])?\s*\([^()]*\)\s*\z""".r
+  // The keywords that open a declaration header (`def f(a: Int)(`, `case A(x: Int)(`).
+  private val DeclarationKeyword = """\b(def|case|class|record|enum|tool|interface|extension|trait)\b""".r
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
   private val TypeofCondition =
     """^\s*(?:if|while|else\s+if)\s+typeof\s+([A-Za-z_][\w.]*)""".r
@@ -627,11 +627,11 @@ private[compiler] object SyntaxHintClassifier {
       // `mk()()`: a call's result cannot be called in the same expression. It sits below every
       // source-line rule, so `switch (x)(1)`, `unless (x)(...)` keep their own hints; and it is
       // not given where a block is expected (`if (c) (`), for a C-style cast (`(String)(o)`) or
-      // for a curried-looking `def` header. The hint quotes the first call as written
+      // inside a declaration header (#2789's rule). The hint quotes the first call as written
       // (`obj.f()`, `adder(1)`) and carries the second call's arguments.
       case "(" if !expected.contains("{") && CStyleCast.findFirstMatchIn(sourceLine).isEmpty &&
           CallResultCall.findFirstIn(textBefore(context, sourceLine)).isDefined &&
-          CurriedDefHeader.findFirstIn(textBefore(context, sourceLine)).isEmpty =>
+          !inDeclarationHeader(textBefore(context, sourceLine)) =>
         val args = callResultArguments(context)
         callResultFirstCall(textBefore(context, sourceLine)) match {
           case Some(firstCall) => hint("error.parsing.hint.call_result_call", firstCall, args)
@@ -860,14 +860,55 @@ private[compiler] object SyntaxHintClassifier {
     if (head.exists(c => c.isLetter || c == '_' || c == '(') && call.exists(_.isLetter)) Some(call) else None
   }
 
+  // #2789's rule: `text` (the line before the offending `(`) ends inside a declaration header
+  // when, scanning from the nearest declaration keyword, no body starts at bracket depth 0:
+  // `=` (not `==`/`!=`/`<=`/`>=`/`=>`), `{`, `->`, or `:` after `case`. Brackets in type
+  // parameters, default arguments and function types sit at depth 1 or more, so
+  // `def f[T extends Comparable[T]](a: T)(`, `def f(a: Int = g(1))(` and
+  // `def apply(f: (Int) -> Int)(` are headers, while `def g(): Int = mk()(` is a body.
+  private def inDeclarationHeader(text: String): Boolean =
+    DeclarationKeyword.findAllMatchIn(text).toSeq.lastOption match {
+      case None => false
+      case Some(m) =>
+        val rest = text.substring(m.end)
+        val isCase = m.group(1) == "case"
+        var depth = 0
+        var inString = false
+        var i = 0
+        while (i < rest.length) {
+          val c = rest(i)
+          val prev = if (i > 0) rest(i - 1) else ' '
+          val next = if (i + 1 < rest.length) rest(i + 1) else ' '
+          if (inString) {
+            if (c == '\\') i += 1 else if (c == '"') inString = false
+          } else c match {
+            case '"' => inString = true
+            case '(' | '[' => depth += 1
+            case ')' | ']' => depth -= 1
+            case '{' if depth == 0 => return false
+            case '=' if depth == 0 && !"=!<>".contains(prev) && next != '=' && next != '>' => return false
+            case '-' if depth == 0 && next == '>' => return false
+            case ':' if depth == 0 && isCase && next != ':' && prev != ':' => return false
+            case _ =>
+          }
+          i += 1
+        }
+        true
+    }
+
   // The second call's arguments, from the `(` that starts `context`; `...` when they do not
-  // close on the same line.
+  // close on the same line. A `)` inside a string literal does not close them.
   private def callResultArguments(context: String): String = {
     val line = context.takeWhile(c => c != '\n' && c != '\r')
     var depth = 0
+    var inString = false
     var idx = 0
     while (idx < line.length) {
-      line(idx) match {
+      val c = line(idx)
+      if (inString) {
+        if (c == '\\') idx += 1 else if (c == '"') inString = false
+      } else c match {
+        case '"' => inString = true
         case '(' => depth += 1
         case ')' =>
           depth -= 1

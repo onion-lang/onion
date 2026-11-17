@@ -440,23 +440,105 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(chain("Int?", "Int", "Int?") == onion.tools.Shell.Success("CCCCC"))
     }
 
-    // Without `override`, a `f(k: Int?)` beside an inherited concrete `f(k: Int)` stays an
-    // overload, as on `main`: only `override` asks for the bridge (panel block 5 on #3051).
-    it("keeps an unmarked `f(k: Int?)` beside a concrete base `f(k: Int)` an overload") {
+    // Differing only by `?` is the same slot, `override` or not: `override` is a check and
+    // never decides which method runs (panel block 6 on #3051). Before, an unmarked `void`
+    // or primitive-return method stayed an overload while a reference return overrode.
+    def unmarked(baseParam: String, subParam: String, ret: String): onion.tools.Shell.Result = {
+      def body(who: String) = if ret == "void" then s"""{ who = who + "$who" }""" else s"""{ who = who + "$who"; return "$who" }"""
+      shell.run(
+        s"""
+           |class Base { public: var who: String; def this { who = "" } def dec(k: $baseParam): $ret ${body("Base")} }
+           |class Up extends Base { public: def this {} def dec(k: $subParam): $ret ${body("Up")} }
+           |class Test {
+           |public:
+           |  static def main(args: String[]): String {
+           |    val u = new Up(); val b: Base = u
+           |    u.dec(3); b.dec(3)
+           |    return u.who
+           |  }
+           |}
+           |""".stripMargin,
+        "UnmarkedOverride.on", Array())
+    }
+
+    it("runs an unmarked `f(k: Int?): void` beside a concrete base `f(k: Int)`") {
+      assert(unmarked("Int", "Int?", "void") == onion.tools.Shell.Success("UpUp"))
+    }
+
+    it("runs an unmarked `f(k: Int?): String` beside a concrete base `f(k: Int)`") {
+      assert(unmarked("Int", "Int?", "String") == onion.tools.Shell.Success("UpUp"))
+    }
+
+    it("runs an unmarked `f(k: Int): String` beside a concrete base `f(k: Int?)`") {
+      assert(unmarked("Int?", "Int", "String") == onion.tools.Shell.Success("UpUp"))
+    }
+
+    it("runs an unmarked `handle(code: Int?)` for an interface default `handle(code: Int)`") {
       val result = shell.run(
         """
-          |class Base { public: def this {} def dec(k: Int): String = "Base" }
-          |class Up extends Base { public: def this {} def dec(k: Int?): String = "Up" }
+          |interface H { def handle(code: Int): String = "default" }
+          |class Mine conforms H { public: def this {} def handle(code: Int?): String = "Mine" }
           |class Test {
           |public:
-          |  static def main(args: String[]): String {
-          |    val u = new Up(); val b: Base = u
-          |    return u.dec(3) + b.dec(3)
-          |  }
+          |  static def main(args: String[]): String { val h: H = new Mine(); return h.handle(1) }
           |}
           |""".stripMargin,
-        "UnmarkedOverload.on", Array())
-      assert(result == onion.tools.Shell.Success("BaseBase"))
+        "UnmarkedDefault.on", Array())
+      assert(result == onion.tools.Shell.Success("Mine"))
+    }
+
+    // A `?` bridge over a final method made the JVM reject the class (panel block 6 on #3051).
+    it("reports E0039 for `override def f(k: Int?)` over a final `f(k: Int)`") {
+      val results = errors(
+        """
+          |class A { public: def this {} final def f(k: Int): void { println("A") } }
+          |class B extends A { public: def this {} override def f(k: Int?): void { println("B") } }
+          |""".stripMargin)
+      assert(results.map(_._1).contains(Some("E0039")), s"got: $results")
+    }
+
+    it("reports E0039 for an unmarked `f(k: Int?): String` beside a final `f(k: Int): String`") {
+      val results = errors(
+        """
+          |class A { public: def this {} final def f(k: Int): String = "A" }
+          |class B extends A { public: def this {} def f(k: Int?): String = "B" }
+          |""".stripMargin)
+      assert(results.map(_._1).contains(Some("E0039")), s"got: $results")
+    }
+
+    it("reports E0039 for `setDaemon(on: Boolean?)` over the final JDK `Thread.setDaemon`") {
+      val results = errors(
+        """
+          |class T extends Thread { public: def this {} override def setDaemon(on: Boolean?): void {} }
+          |""".stripMargin)
+      assert(results.map(_._1).contains(Some("E0039")), s"got: $results")
+    }
+
+    // The hint shows the base signature at the subclass's type arguments: following it
+    // must compile, so a type variable never appears in it (panel block 6 on #3051).
+    it("substitutes a generic base's return type in the E0068 hint") {
+      val results = errors(
+        """
+          |class Box[T] { public: def this {} def put(x: T): T = x }
+          |class SBox extends Box[String] { public: def this {} override def put(x: Int): String = "s" }
+          |""".stripMargin)
+      val e0068 = results.filter(_._1.contains("E0068")).map(_._2)
+      assert(e0068.exists(m => m.contains("put(String): String") && !m.contains(": T")), s"got: $results")
+    }
+
+    it("substitutes a Java generic base's return type in the E0068 hint") {
+      val results = errors(
+        """
+          |import { java.util.AbstractList }
+          |class L extends AbstractList[String] {
+          |public:
+          |  def this {}
+          |  def size(): Int = 0
+          |  override def get(i: Long): String = ""
+          |}
+          |""".stripMargin)
+      val e0068 = results.filter(_._1.contains("E0068")).map(_._2)
+      assert(e0068.exists(m => m.contains("get(Int): String") && !m.contains(": E")), s"got: $results")
     }
 
     it("reports E0068 for `override def f(k: JInteger)` over `f(k: Int)`") {

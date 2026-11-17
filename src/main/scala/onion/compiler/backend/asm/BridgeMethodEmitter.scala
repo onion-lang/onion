@@ -1,6 +1,6 @@
 package onion.compiler.backend.asm
 
-import onion.compiler.{AST, Modifier, TypedAST}
+import onion.compiler.{Modifier, TypedAST}
 import onion.compiler.TypedAST.*
 import org.objectweb.asm.{ClassWriter, Opcodes, Type => AsmType}
 import org.objectweb.asm.commons.{Method => AsmMethod}
@@ -41,16 +41,17 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     // - `target` and `own` run the same inherited method: overriding one is
     //   overriding both (a chain of `?` overrides);
     // - both run different methods: no bridge, `target` keeps its own (row 3);
-    // - only `target` has code: a bridge only when `m` says `override`. An unmarked
-    //   `f(k: Int?)` beside a concrete `f(k: Int)` stays an overload, as on `main`.
+    // - only `target` has code: a bridge, `override` or not. Differing only by `?`
+    //   is the same slot, so `override` stays a check and never decides what runs.
     def takesOverSlot(m: TypedAST.Method, own: String, target: String): Boolean =
-      takesOver(m, inheritedSlots.get((m.name, target)).flatMap(_._2), inheritedSlots.get((m.name, own)).flatMap(_._2))
+      takesOver(inheritedSlots.get((m.name, target)).flatMap(_._2), inheritedSlots.get((m.name, own)).flatMap(_._2))
 
     for (sourceRaw, subst) <- sources do
       def substituteClassParams(tp: TypedAST.Type): TypedAST.Type = substituteTypeVars(tp, subst)
 
       for rawMethod <- sourceRaw.methods do
-        if Modifier.isStatic(rawMethod.modifier) || Modifier.isPrivate(rawMethod.modifier) then
+        // A final slot is never bridged: the JVM rejects the class (typing reports E0039).
+        if Modifier.isStatic(rawMethod.modifier) || Modifier.isPrivate(rawMethod.modifier) || Modifier.isFinal(rawMethod.modifier) then
           ()
         else
           val sameName = ownByName.getOrElse(rawMethod.name, Nil)
@@ -139,12 +140,10 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     case applied: AppliedClassType => applied.raw
     case other => other
 
-  private def takesOver(m: TypedAST.Method, targetOwner: Option[TypedAST.Method], ownOwner: Option[TypedAST.Method]): Boolean =
+  private def takesOver(targetOwner: Option[TypedAST.Method], ownOwner: Option[TypedAST.Method]): Boolean =
     targetOwner match
       case None => true
-      case Some(t) => ownOwner match
-        case Some(o) => t eq o
-        case None => AST.hasModifier(m.modifier, AST.M_OVERRIDE)
+      case Some(t) => ownOwner.forall(_ eq t)
 
   private val ownersMemo = mutable.HashMap[TypedAST.ClassType, SlotOwners]()
 
@@ -183,7 +182,8 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
           if slot._1 == m.name && !ownSlots.contains(slot) && sample.arguments.length == m.arguments.length
           if m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(sample.arguments(i)).name)
           if isBridgeableReturn(sample.returnType, m.returnType)
-          if takesOver(m, targetOwner, inherited.get(ownSlot).flatMap(_._2))
+          if !Modifier.isFinal(sample.modifier)
+          if takesOver(targetOwner, inherited.get(ownSlot).flatMap(_._2))
         do out(slot) = (sample, Some(m))
         val result = out.toMap
         ownersMemo(cls) = result

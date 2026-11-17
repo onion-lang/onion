@@ -675,11 +675,24 @@ val b: Base = new Up(); b.dec(1)                           // Before: printed Ba
 - **What you see:** **E0068** `method dec(JInteger) is marked override but does not override
   any method ...`, followed by the base signature (`dec(Int): void`).
 - **Still fine:** `override def dec(k: Int?)` over `dec(k: Int)`, where the parameter differs
-  only by `?`, now really overrides. Without `override`, the same method beside a base
-  `dec(k: Int)` that has a body stays a separate overload, as before. A boxed parameter
-  through a generic supertype (`G[JInteger]`) overrides too.
+  only by `?`, now really overrides. A boxed parameter through a generic supertype
+  (`G[JInteger]`) overrides too.
 - **To update:** to override, write the base types (`dec(k: Int)`, or `dec(k: Int?)`). To keep
-  a separate overload, remove `override`.
+  a separate overload, remove `override` and give it parameter types that differ by more
+  than `?`, or another name.
+
+A method whose parameters differ from a base method's **only by `?`** is the same method
+now, with or without `override`:
+
+- **Before:** an unmarked `def dec(k: Int?): void` beside a base `dec(k: Int): void` was a
+  separate overload, and `b.dec(1)` through `Base` ran the base. With a reference return
+  (`String`), the same method already overrode. `override` changed nothing for a reference
+  return but decided the outcome for `void` and primitive returns.
+- **Now:** it overrides for every return type. `override` is a check, as for exact types,
+  and never decides which method runs. Over a `final` base method this is **E0039**, as for
+  the exact types (`setDaemon(on: Boolean?)` in a `Thread` subclass included).
+- **To keep a separate overload:** rename the method (`decOrSkip(k: Int?)`). No `onion
+  migrate` rule: only you know whether the method was meant to replace the base one.
 - **No `onion migrate` rule:** whether the method was meant to override or to overload is
   your choice, and the two edits run different code. The error shows the base signature
   instead.

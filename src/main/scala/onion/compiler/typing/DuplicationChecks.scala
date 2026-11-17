@@ -201,7 +201,24 @@ private[compiler] object DuplicationChecks {
           // look the contract up under both keys.
           val specializedKey = erasedParamDescriptor(specializedArgs)
           val erasedKey = typing.table_.erasedParamsOf(contract)(erasedParamDescriptor(contract.arguments))
-          implByErasedParams.get(specializedKey).orElse(implByErasedParams.get(erasedKey)).foreach { impl =>
+          val exactImpl = implByErasedParams.get(specializedKey).orElse(implByErasedParams.get(erasedKey))
+          // A parameter differing only by `?` (`k: Int?` for `k: Int`) is the same slot, and
+          // codegen would bridge it: over a final method that is E0039, as for the exact
+          // types (#2896). The bridge itself is never emitted for a final target.
+          if exactImpl.isEmpty && Modifier.isFinal(contract.modifier) then
+            val specializedRet =
+              TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
+            implByName(contract.name).find(impl =>
+              impl.arguments.length == specializedArgs.length &&
+                plainNames(impl.arguments) == plainNames(specializedArgs) &&
+                bridgeableReturn(specializedRet, impl.returnType)
+            ).foreach { impl =>
+              val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location)
+                .orElse(memberLocations.get(impl.name)).getOrElse(fallback)
+              val paramDescriptor = impl.arguments.map(_.name).mkString(", ")
+              typing.report(SemanticError.FINAL_METHOD_OVERRIDE, location, impl.name, paramDescriptor, view.raw.name)
+            }
+          exactImpl.foreach { impl =>
             val specializedRet =
               TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
 
@@ -307,7 +324,8 @@ private[compiler] object DuplicationChecks {
               Set(erasedParamDescriptor(specializedArgs), erasedParamDescriptor(contract.arguments)),
               viaBridge = viewSubst.nonEmpty,
               plainNames = plainNames(contract.arguments), returnType = contract.returnType,
-              signature = signatureForm(contract.name, specializedArgs, contract.returnType))
+              signature = signatureForm(contract.name, specializedArgs,
+                TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)))
       }
     }
 

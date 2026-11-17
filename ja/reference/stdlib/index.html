@@ -2323,10 +2323,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#onionmathrandom-onionmathrandomint" class="md-nav__link">
+  <a href="#onionmathrandom" class="md-nav__link">
     <span class="md-ellipsis">
       
-        OnionMath::random / OnionMath::randomInt
+        OnionMath::random
       
     </span>
   </a>
@@ -7187,10 +7187,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#onionmathrandom-onionmathrandomint" class="md-nav__link">
+  <a href="#onionmathrandom" class="md-nav__link">
     <span class="md-ellipsis">
       
-        OnionMath::random / OnionMath::randomInt
+        OnionMath::random
       
     </span>
   </a>
@@ -9072,7 +9072,7 @@
 </tr>
 <tr>
 <td><strong>数値</strong></td>
-<td><code>Math</code>, <code>OnionMath</code>（双曲線関数, <code>clamp</code>, <code>hypot</code>, 範囲付き<code>randomInt</code>）, <code>Stats</code>（sum/average/median/stddev）, <code>Format</code>（桁区切り・bytes・duration）</td>
+<td><code>Math</code>, <code>OnionMath</code>（双曲線関数, <code>clamp</code>, <code>hypot</code>）, <code>Stats</code>（sum/average/median/stddev）, <code>Format</code>（桁区切り・bytes・duration）</td>
 </tr>
 <tr>
 <td><strong>データ形式</strong></td>
@@ -9218,8 +9218,8 @@
 </span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">e</span><span class="p">:</span><span class="w"> </span><span class="kt">Double</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Math</span><span class="o">::</span><span class="nc">E</span><span class="w">         </span><span class="c1">// 2.71828...</span>
 </span></code></pre></div>
 <h2 id="onionmath">OnionMath モジュール<a class="headerlink" href="#onionmath" title="Permanent link">&para;</a></h2>
-<p>JDKの<code>Math</code>とは別の<code>onion.*</code>数値モジュールで、双曲線関数、安全な丸め・クランプ、範囲付きの
-乱数整数を提供します。標準ライブラリの他のモジュールと同様デフォルトでインポートされるため、
+<p>JDKの<code>Math</code>とは別の<code>onion.*</code>数値モジュールで、双曲線関数、安全な丸め・クランプ、乱数の
+<code>Double</code>を提供します。範囲内の乱数の<code>Int</code>には<code>Rand::nextInt(min, max)</code>を使います。標準ライブラリの他のモジュールと同様デフォルトでインポートされるため、
 明示的なインポートは不要です。</p>
 <h3 id="onionmathsin-onionmathcos-onionmathtan-onionmathasin-onionmathacos-onionmathatan-onionmathatan2">OnionMath::sin / OnionMath::cos / OnionMath::tan / OnionMath::asin / OnionMath::acos / OnionMath::atan / OnionMath::atan2<a class="headerlink" href="#onionmathsin-onionmathcos-onionmathtan-onionmathasin-onionmathacos-onionmathatan-onionmathatan2" title="Permanent link">&para;</a></h3>
 <p>三角関数と逆三角関数（ラジアン）：</p>
@@ -9260,11 +9260,11 @@
 </span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">round</span><span class="p">(</span><span class="mf">3.5</span><span class="p">)</span><span class="w">       </span><span class="c1">// 4</span>
 </span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="kd">val</span><span class="w"> </span><span class="n">rf</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">roundFloat</span><span class="p">(</span><span class="mf">3.5f</span><span class="p">)</span><span class="w"> </span><span class="c1">// 4</span>
 </span></code></pre></div>
-<h3 id="onionmathrandom-onionmathrandomint">OnionMath::random / OnionMath::randomInt<a class="headerlink" href="#onionmathrandom-onionmathrandomint" title="Permanent link">&para;</a></h3>
-<p>乱数生成。<code>Math::random</code>と異なり、<code>randomInt</code>は範囲を直接指定でき、エフェクトチェッカーに
-よって<code>Rand</code>エフェクトとして追跡されます：</p>
+<h3 id="onionmathrandom">OnionMath::random<a class="headerlink" href="#onionmathrandom" title="Permanent link">&para;</a></h3>
+<p>ランダムな<code>Double</code>を返します。エフェクトチェッカーは<code>Rand</code>エフェクトとして追跡します。範囲内の
+ランダムな<code>Int</code>には<code>Rand::nextInt(min, max)</code>（後述）を使ってください。その<code>max</code>は含まれません。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="kt">Double</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">random</span><span class="p">()</span><span class="w">          </span><span class="c1">// [0.0, 1.0)</span>
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">)</span><span class="w">     </span><span class="c1">// [1, 10]（両端含む）</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">11</span><span class="p">)</span><span class="w">            </span><span class="c1">// 1から10</span>
 </span></code></pre></div>
 <h3 id="onionmathsignum-onionmathsignumfloat">OnionMath::signum / OnionMath::signumFloat<a class="headerlink" href="#onionmathsignum-onionmathsignumfloat" title="Permanent link">&para;</a></h3>
 <p>数値の符号（<code>-1.0</code>、<code>0.0</code>、または<code>1.0</code>）：</p>
@@ -9650,6 +9650,9 @@ JDK 自身のパーサが緩すぎてそのままでは使えない場面のた�
 </span><span id="__span-62-2"><a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">percent</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w">     </span><span class="c1">// 0から99</span>
 </span><span id="__span-62-3"><a id="__codelineno-62-3" name="__codelineno-62-3" href="#__codelineno-62-3"></a><span class="kd">val</span><span class="w"> </span><span class="n">d20</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">)</span><span class="w">       </span><span class="c1">// 1から20（min, 排他的max）</span>
 </span></code></pre></div>
+<p><code>max</code>は含まれません。<code>a..&lt;b</code>、Javaの<code>ThreadLocalRandom</code>、Kotlinの<code>Random.nextInt(from, until)</code>と
+同じです。そのため<code>Rand::nextInt(0, xs.size)</code>は<code>xs</code>の有効な添字になります。
+<code>max</code>を含んでいた<code>OnionMath</code>の<code>randomInt</code>は削除されました（<code>docs/ja/migration/pre-1.0.md</code>を参照）。</p>
 <h3 id="randnextlong">Rand::nextLong（範囲指定）<a class="headerlink" href="#randnextlong" title="Permanent link">&para;</a></h3>
 <p>範囲内の乱数longを生成：</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-63-1"><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">bigId</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextLong</span><span class="p">(</span><span class="mi">1000000L</span><span class="p">)</span><span class="w">   </span><span class="c1">// 0から999999</span>
@@ -10755,6 +10758,8 @@ OS にそのままリテラルな1引数として渡され、シェルには解�
 </span><span id="__span-142-5"><a id="__codelineno-142-5" name="__codelineno-142-5" href="#__codelineno-142-5"></a><span class="n">parsed</span><span class="p">.</span><span class="nf">intOption</span><span class="p">(</span><span class="s2">"level"</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">)</span><span class="w">              </span><span class="c1">// 省略時のみ既定値。"--level x" は例外</span>
 </span><span id="__span-142-6"><a id="__codelineno-142-6" name="__codelineno-142-6" href="#__codelineno-142-6"></a><span class="n">parsed</span><span class="p">.</span><span class="nf">positional</span><span class="p">()</span><span class="w">                     </span><span class="c1">// オプション以外の引数の List</span>
 </span></code></pre></div>
+<p><code>positional()</code> の前に <code>flag</code>/<code>option</code> を呼んでください。<code>--name value</code> はオプションにも、
+フラグと位置引数にも読めるため、問い合わせの時点で決まります。先に読んだ <code>positional()</code> にはその値が入りません。</p>
 <h2 id="cli">Cli モジュール<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h2>
 <p><code>onion.Cli</code> は、コンパイラの <strong>auto-CLI</strong> 機能（トップレベルの <code>def main(...)</code>
 や <code>tool</code> 宣言 — <a href="../../guide/tools/">ツール・ケーパビリティ・エフェクト</a> 参照）

@@ -6072,7 +6072,7 @@ Anthropic Messages API 経由で Claude を呼び出し、応答を <code>Shape<
 </tr>
 <tr>
 <td><code>this.field = value</code> コンストラクタ内</td>
-<td>✓ 正しい - <code>this.</code>/<code>self.</code>は使える。今は省略も可能（裸の<code>field</code>は暗黙アクセスでフィールドに解決される）</td>
+<td>✓ 正しい - <code>this.</code>は使える。今は省略も可能（裸の<code>field</code>は暗黙アクセスでフィールドに解決される）</td>
 </tr>
 <tr>
 <td><code>Long.toString(0)</code></td>
@@ -6501,8 +6501,8 @@ Anthropic Messages API 経由で Claude を呼び出し、応答を <code>Shape<
 <td><code>"text #{expr}"</code> - <code>#{}</code> 構文を使用</td>
 </tr>
 <tr>
-<td><code>this</code>のみ</td>
-<td><code>self</code>も使用可 - 両方とも現在のインスタンスを参照</td>
+<td><code>self.x</code>（Python/Swift/Rust）</td>
+<td><code>this.x</code> - <code>self</code> は廃止（E0117）。<code>onion migrate</code> が書き換える</td>
 </tr>
 <tr>
 <td>予約語を識別子に</td>

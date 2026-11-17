@@ -2372,6 +2372,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#self-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        self は this になりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#onionmathrandomint-randnextint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OnionMath::randomInt は削除されました。Rand::nextInt を使ってください
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5181,6 +5203,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#self-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        self は this になりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#onionmathrandomint-randnextint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OnionMath::randomInt は削除されました。Rand::nextInt を使ってください
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5521,7 +5565,7 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
   そのオブジェクトのメソッドの外からの書き込みは、この検査では追えません。</li>
 <li><strong>見えるもの:</strong> <code>E0110</code>（契約フィールドへの書き込みを禁じるエラー）が出ます。キャレットは受け手（<code>o</code>、<code>c</code>、<code>cs[0]</code>）を指します。
   メッセージは、そのオブジェクトのメソッドを呼ぶか、コンストラクタで値を設定するよう促します。</li>
-<li><strong>そのまま動くもの:</strong> クラス自身のメソッドでの <code>t = v</code>、<code>this.t = v</code>、<code>self.t = v</code>、<code>t++</code>、<code>t += 1</code> です。ラムダの中でも同じです。
+<li><strong>そのまま動くもの:</strong> クラス自身のメソッドでの <code>t = v</code>、<code>this.t = v</code>、<code>t++</code>、<code>t += 1</code> です。ラムダの中でも同じです。
   <code>o.t</code> を読むことは、どこからでもできます。</li>
 <li><strong><code>onion migrate</code> の書き換え規則はありません（意図的です）:</strong> 直すには受け手のクラスにメソッドかコンストラクタを足します。
   どれが合うかは設計の判断です。</li>
@@ -5768,7 +5812,7 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 </span></code></pre></div>
 <ul>
 <li><strong>表示されるもの:</strong> <code>null</code> の位置で <strong>E0000</strong> <code>type Int is expected, but type null is used.</code> になります。型引数を <code>Int?</code> と書くよう促すヒントが付きます。</li>
-<li><strong>対象:</strong> クラスの型変数で宣言されたメソッド引数です。関数値への <code>f(null)</code> と <code>f.call(null)</code>、<code>List</code> と <code>Map</code> の <code>add</code>/<code>set</code>/<code>put</code>、Java の関数型インタフェースの <code>apply</code>、自分で書いた総称クラスのメソッド（<code>Box[Int].put(null)</code>）が該当します。そのような型として書いたリストやマップのリテラルの中の <code>null</code> の要素も該当します（<code>val zs: List[Int] = [5, null]</code>、<code>val m: Map[String, Int] = ["b": null]</code>）。</li>
+<li><strong>対象:</strong> クラスの型変数で宣言されたメソッド引数です。関数値への <code>f(null)</code> と <code>f.call(null)</code>、<code>List</code> と <code>Map</code> の <code>add</code>/<code>set</code>/<code>put</code>、Java の関数型インタフェースの <code>apply</code>、自分で書いた総称クラスのメソッド（<code>Box[Int].put(null)</code>）が該当します。そのような型として書いたリストやマップのリテラルの中の <code>null</code> の要素も該当します（<code>val zs: List[Int] = [5, null]</code>、<code>val m: Map[String, Int] = ["b": null]</code>）。同じ枠に届くほかの書き方も該当します（#2991）。コンストラクタ（<code>new Box[Int](null)</code>、<code>new R[Int](null)</code>）、添字への代入（<code>xs[0] = null</code>、<code>m["b"] = null</code>）です。</li>
 <li><strong>直し方:</strong> <code>null</code> を格納するつもりなら、型引数を null 許容にしてください。<code>List[Int?]</code>、<code>Map[String, Int?]</code>、<code>(Int?) -&gt; T</code> です。読み出した値は <code>Int?</code> になるので、そこで <code>null</code> を扱います（<code>?:</code> か <code>!!</code>）。そうでなければ、<code>null</code> ではなく実際の値を渡してください。</li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> 直し方は、宣言する型を変えるか、渡す値を変えるかのどちらかです。どちらが正しいかは、書いた人にしか分かりません。</li>
 </ul>
@@ -5826,6 +5870,46 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li><strong>以前の結果を保つには:</strong> 例外を捕まえて既定値を使います。
   <code>val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }</code></li>
 <li><strong><code>onion migrate</code> の規則はありません:</strong> 以前の動作は、実行時のエラーを握りつぶしていただけです。ソースには書き換えるものがありません。不正な値でプログラムを止めるべきかどうかは、書いた人にしか分かりません。</li>
+</ul>
+<h2 id="self-this"><code>self</code> は <code>this</code> になりました<a class="headerlink" href="#self-this" title="Permanent link">&para;</a></h2>
+<p><code>self</code> は <code>this</code> の別の書き方でした。Onion は書き方を <code>this</code> の一つにします（RFC #2788）。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1">// 以前</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kp">self</span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="kd">def</span><span class="w"> </span><span class="nf">greet</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Hi, </span><span class="si">#{</span><span class="kp">self</span><span class="p">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="c1">// 今</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kp">this</span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="kd">def</span><span class="w"> </span><span class="nf">greet</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Hi, </span><span class="si">#{</span><span class="kp">this</span><span class="p">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> すべての <code>self</code> で、一度に <code>E0117:</code>self<code>は廃止されました。</code>this<code>と書いてください。</code> が出ます。static なコードでは E0050 の代わりに出ます。</li>
+<li><strong>予約語のままです:</strong> <code>self</code> は自由な名前にはなりません。<code>`self`</code> と書いたフィールドはこれまでどおり使えます。</li>
+<li><strong>プロジェクト全体を更新するには:</strong> <code>onion migrate src/ tests/</code> を実行します。コード中の <code>self</code> と、文字列の <code>#{...}</code> の中の <code>self</code> をすべて書き換えます。コメント、文字列の地の文、<code>\#{self}</code>、<code>`self`</code> はそのままです。</li>
+</ul>
+<h2 id="onionmathrandomint-randnextint"><code>OnionMath::randomInt</code> は削除されました。<code>Rand::nextInt</code> を使ってください<a class="headerlink" href="#onionmathrandomint-randnextint" title="Permanent link">&para;</a></h2>
+<p>範囲内のランダムな <code>Int</code> を得る方法が二つあり、上限の扱いが逆でした（#3069）。
+残るのは <code>Rand::nextInt(min, max)</code> です。<code>max</code> は含まれません。<code>a..&lt;b</code>、Java、Kotlin と同じです。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w">   </span><span class="c1">// 以前: 1から6。現在: E0005</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">          </span><span class="c1">// 1から6</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> <code>E0005</code> と、<code>Rand::nextInt(min, max + 1)</code> を示すヒントです。</li>
+<li><strong>変わらないもの:</strong> <code>Rand::nextInt(min, max)</code> と <code>OnionMath::random()</code> です。</li>
+<li><strong><code>onion migrate</code> が書き換えます。</strong> <code>Rand::nextInt(min, max + 1)</code> と書くので、以前の呼び出しが返せた値はすべて出ます。</li>
+<li><code>OnionMath::randomInt(1, 6)</code> は <code>Rand::nextInt(1, 7)</code> になります。</li>
+<li><code>OnionMath::randomInt(0, xs.size - 1)</code> は <code>Rand::nextInt(0, xs.size)</code> になります。</li>
+<li><code>OnionMath::randomInt(a, b)</code> は <code>Rand::nextInt(a, b + 1)</code> になります。</li>
+<li><code>"#{...}"</code> の中の呼び出しと、別の呼び出しの引数の中の呼び出しも書き換えます。</li>
+<li>インポート経由の呼び出しも書き換えます。<code>import { onion.OnionMath::* }</code> の後の <code>randomInt(1, 6)</code> や、<code>import { onion.OnionMath as OM; }</code> の後の <code>OM::randomInt(1, 6)</code> です。インポート自体はそのままでもコンパイルできるので、書き換えません。</li>
+<li>ファイル自身、または一緒に渡したファイルに独自の <code>Rand</code>（クラス、インポート、変数）があるときは、<code>onion.Rand::nextInt</code> と書きます。呼び出しが Onion の <code>Rand</code> を指したままになります。</li>
+<li><strong>書き換えるのは、コンパイラがエラーを報告した呼び出しだけです。</strong> コンパイルできる <code>randomInt</code> はあなた自身のもの（<code>OnionMath</code> という名前の自作クラスや、継承したメソッド）なので、そのまま残します。</li>
+<li><strong><code>+ 1</code> を付ける <code>max</code>:</strong> <code>Int.MAX_VALUE</code> より小さい数字そのもの（<code>6</code>）か、変数、引数、フィールド、呼び出しを読む <code>max</code>（<code>n</code>、<code>xs.size</code>、<code>Math::abs(n)</code>）です。</li>
+<li><strong>それ以外の定数の max は知らせるだけです。手で直してください。</strong> <code>2147483647</code> や、定数の式（<code>1 &lt;&lt; 4</code>、<code>Integer::MAX_VALUE</code>）が該当します。migrate はファイルをそのまま残します。<code>Rand::nextInt(min, (max) + 1)</code> と書いてから、もう一度 migrate を実行してください。max が <code>Int.MAX_VALUE</code> のときは、代わりに <code>Rand::nextInt(min - 1, max) + 1</code> と書いてください。</li>
+<li><strong>独自の <code>randomInt</code> も持つファイルの、修飾なしの <code>randomInt(a, b)</code></strong> はどちらを指すかわからないので、migrate は知らせるだけで書き換えません。</li>
+<li><strong><code>import { onion.OnionMath::* }</code> のないファイルの <code>randomInt(a, b)</code></strong> は削除されたメソッドではないので、migrate は書き換えません。ヒントが手で直す書き換えを示します。</li>
+<li><strong>変数に入った max は確認してください。</strong> migrate にはその値がわかりません。実行時に <code>Int.MAX_VALUE</code> になりうるなら、そこで <code>max + 1</code> が桁あふれし、呼び出しは <code>IllegalArgumentException</code> を投げます。その場合は <code>Rand::nextInt(min - 1, max) + 1</code> と書いてください。</li>
+<li><strong><code>Rand::nextInt()</code> で置き換えられるのは、min が <code>Int.MIN_VALUE</code> で max が <code>Int.MAX_VALUE</code> の呼び出しだけです。</strong> 負の数も含むあらゆる <code>Int</code> を返すので、<code>randomInt(0, Int.MAX_VALUE)</code> の代わりにはなりません。</li>
+<li><strong>プログラムは一つずつ migrate してください。</strong> 無関係なスクリプトを一緒に渡すと、互いのエラーが隠れることがあります。その場合、呼び出しは書き換えられずに残ります。</li>
 </ul>
 
 

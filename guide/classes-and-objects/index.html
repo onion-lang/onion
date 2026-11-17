@@ -3133,10 +3133,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-self-reference" class="md-nav__link">
+  <a href="#the-this-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The self Reference
+        The this Reference
       
     </span>
   </a>
@@ -5168,10 +5168,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-self-reference" class="md-nav__link">
+  <a href="#the-this-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The self Reference
+        The this Reference
       
     </span>
   </a>
@@ -5525,8 +5525,8 @@ default (private) section.</p>
 </span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="w">    </span><span class="p">}</span>
 </span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="p">}</span>
 </span></code></pre></div>
-<h2 id="the-self-reference">The <code>self</code> Reference<a class="headerlink" href="#the-self-reference" title="Permanent link">&para;</a></h2>
-<p>Access the current instance with <code>self</code>:</p>
+<h2 id="the-this-reference">The <code>this</code> Reference<a class="headerlink" href="#the-this-reference" title="Permanent link">&para;</a></h2>
+<p>Refer to the current instance with <code>this</code>:</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="n">javax</span><span class="p">.</span><span class="n">swing</span><span class="p">.</span><span class="nc">JButton</span><span class="p">;</span>
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="n">java</span><span class="p">.</span><span class="n">awt</span><span class="p">.</span><span class="n">event</span><span class="p">.</span><span class="nc">ActionEvent</span><span class="p">;</span>
@@ -5537,11 +5537,12 @@ default (private) section.</p>
 </span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">  </span><span class="kd">public</span><span class="p">:</span>
 </span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">    </span><span class="kd">def</span><span class="w"> </span><span class="nf">actionPerformed</span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="p">:</span><span class="nc">ActionEvent</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">      </span><span class="kd">val</span><span class="w"> </span><span class="n">button</span><span class="p">:</span><span class="w"> </span><span class="nc">JButton</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">event</span><span class="p">.</span><span class="nf">getSource</span><span class="p">()</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">JButton</span>
-</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">      </span><span class="n">button</span><span class="p">.</span><span class="nf">addActionListener</span><span class="p">(</span><span class="kp">self</span><span class="p">)</span><span class="w">  </span><span class="c1">// Reference to this instance</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">      </span><span class="n">button</span><span class="p">.</span><span class="nf">addActionListener</span><span class="p">(</span><span class="kp">this</span><span class="p">)</span><span class="w">  </span><span class="c1">// Reference to this instance</span>
 </span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">    </span><span class="p">}</span>
 </span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="p">}</span>
 </span></code></pre></div>
-<p><code>this</code> and <code>self</code> are only available in instance contexts; static methods and static fields cannot reference them.</p>
+<p><code>this</code> is only available in instance contexts; static methods and static fields cannot reference it.</p>
+<p>Onion used to accept <code>self</code> as a second spelling of <code>this</code>. It is retired: <code>self</code> is now error E0117, and <code>onion migrate</code> rewrites it (see the <a href="../../migration/pre-1.0/">migration guide</a>).</p>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../inheritance/">Inheritance</a> - Extending classes and implementing interfaces</li>

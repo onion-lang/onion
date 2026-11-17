@@ -1192,10 +1192,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#self" class="md-nav__link">
+  <a href="#this" class="md-nav__link">
     <span class="md-ellipsis">
       
-        self 参照
+        this 参照
       
     </span>
   </a>
@@ -5069,10 +5069,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#self" class="md-nav__link">
+  <a href="#this" class="md-nav__link">
     <span class="md-ellipsis">
       
-        self 参照
+        this 参照
       
     </span>
   </a>
@@ -5396,8 +5396,8 @@
 </span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">    </span><span class="p">}</span>
 </span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="p">}</span>
 </span></code></pre></div>
-<h2 id="self"><code>self</code> 参照<a class="headerlink" href="#self" title="Permanent link">&para;</a></h2>
-<p>現在のインスタンスは <code>self</code> でも参照できます：</p>
+<h2 id="this"><code>this</code> 参照<a class="headerlink" href="#this" title="Permanent link">&para;</a></h2>
+<p>現在のインスタンスは <code>this</code> で参照します：</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="n">javax</span><span class="p">.</span><span class="n">swing</span><span class="p">.</span><span class="nc">JButton</span><span class="p">;</span>
 </span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="n">java</span><span class="p">.</span><span class="n">awt</span><span class="p">.</span><span class="n">event</span><span class="p">.</span><span class="nc">ActionEvent</span><span class="p">;</span>
@@ -5408,11 +5408,12 @@
 </span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">  </span><span class="kd">public</span><span class="p">:</span>
 </span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span><span class="kd">def</span><span class="w"> </span><span class="nf">actionPerformed</span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="p">:</span><span class="nc">ActionEvent</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">      </span><span class="kd">val</span><span class="w"> </span><span class="n">button</span><span class="p">:</span><span class="w"> </span><span class="nc">JButton</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">event</span><span class="p">.</span><span class="nf">getSource</span><span class="p">()</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">JButton</span>
-</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="w">      </span><span class="n">button</span><span class="p">.</span><span class="nf">addActionListener</span><span class="p">(</span><span class="kp">self</span><span class="p">)</span><span class="w">  </span><span class="c1">// このインスタンスへの参照</span>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="w">      </span><span class="n">button</span><span class="p">.</span><span class="nf">addActionListener</span><span class="p">(</span><span class="kp">this</span><span class="p">)</span><span class="w">  </span><span class="c1">// このインスタンスへの参照</span>
 </span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="w">    </span><span class="p">}</span>
 </span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="p">}</span>
 </span></code></pre></div>
-<p><code>this</code> と <code>self</code> が使えるのはインスタンスのコンテキストだけです。static メソッドや static フィールドから参照することはできません。</p>
+<p><code>this</code> が使えるのはインスタンスのコンテキストだけです。static メソッドや static フィールドから参照することはできません。</p>
+<p>以前の Onion は <code>this</code> の別の書き方として <code>self</code> も受け付けていました。<code>self</code> は廃止されました。今はエラー E0117 になり、<code>onion migrate</code> が書き換えます（<a href="../../migration/pre-1.0/">移行ガイド</a>を参照）。</p>
 <h2 id="static">staticメンバー<a class="headerlink" href="#static" title="Permanent link">&para;</a></h2>
 <p><code>static</code> キーワードでクラスレベルのメンバーを宣言します。アクセスには <code>::</code> を使います：</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">MathUtils</span><span class="w"> </span><span class="p">{</span>

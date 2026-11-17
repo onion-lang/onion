@@ -4759,7 +4759,7 @@ goal "reach practical quality" into a checkable state.</p>
 <p>None open.</p>
 <p>Previously tracked and resolved:</p>
 <ol>
-<li><strong>Primitive-type extensions</strong> — fixed. <code>extension Int { def double(): Int = self * 2 }</code> and <code>(5).double()</code> now work. Extension methods on primitive receivers are registered under the boxed class name and the call target is unboxed before invoking the backing static method.</li>
+<li><strong>Primitive-type extensions</strong> — fixed. <code>extension Int { def double(): Int = this * 2 }</code> and <code>(5).double()</code> now work. Extension methods on primitive receivers are registered under the boxed class name and the call target is unboxed before invoking the backing static method.</li>
 <li><strong>Top-level function called from a class method</strong> — fixed. Top-level <code>val</code>/<code>var</code> and functions are emitted as static members of the synthetic top-level class, and bare identifiers / unqualified calls in class methods fall back to these static members.</li>
 <li><strong>Constant narrowing does not reach constructor arguments.</strong> <code>val b: Byte = 100</code>
    narrows, but <code>new R(..., -3)</code> against a <code>Short</code> component was <code>E0021</code>

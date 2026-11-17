@@ -4867,7 +4867,7 @@ CI は影響を受けません。差分実行の状態は <code>target/</code> �
 <p>未解決なし。</p>
 <p>以前追跡していて解決済みのもの:</p>
 <ol>
-<li><strong>プリミティブ型の拡張メソッド</strong> — 修正済み。<code>extension Int { def double(): Int = self * 2 }</code> と <code>(5).double()</code> が動作します。プリミティブ受信側の拡張メソッドはボックス化されたクラス名で登録され、呼び出し時にターゲットをアンボックスしてから静的メソッドを呼び出します。</li>
+<li><strong>プリミティブ型の拡張メソッド</strong> — 修正済み。<code>extension Int { def double(): Int = this * 2 }</code> と <code>(5).double()</code> が動作します。プリミティブ受信側の拡張メソッドはボックス化されたクラス名で登録され、呼び出し時にターゲットをアンボックスしてから静的メソッドを呼び出します。</li>
 <li><strong>クラスメソッドから呼ばれるトップレベル関数</strong> — 修正済み。トップレベルの <code>val</code>/<code>var</code> と関数は合成トップレベルクラスの static メンバーとして出力され、クラスメソッド内の裸識別子/修飾なし呼び出しはこれらの static メンバーにフォールバックします。</li>
 <li><strong>定数ナローイングがコンストラクタ引数位置に届かない。</strong> <code>val b: Byte = 100</code> はナローイング
    されますが、<code>Short</code> 成分に対する <code>new R(..., -3)</code> は <code>E0021</code>（「constructor applicable for

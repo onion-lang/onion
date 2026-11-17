@@ -3368,6 +3368,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#e0117-self" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0117 — self は廃止された
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#e0058" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7393,6 +7404,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#e0117-self" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0117 — self は廃止された
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#e0058" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8306,8 +8328,8 @@ multi-catch 節（<code>catch e: A | B</code>）の候補同士は互いにチ�
 持つメソッドを2つ持つことになり、コンパイル時ではなくクラスをロードした瞬間に初めて
 （<code>ClassFormatError</code> が内部エラー I0000 として現れる形で）失敗します。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-62-1"><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a><span class="kd">extension</span><span class="w"> </span><span class="kt">Double</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-62-2"><a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">pct</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="kp">self</span>
-</span><span id="__span-62-3"><a id="__codelineno-62-3" name="__codelineno-62-3" href="#__codelineno-62-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">pct</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="kp">self</span><span class="w">   </span><span class="c1">// E0084: duplicated extension method pct() on Double</span>
+</span><span id="__span-62-2"><a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">pct</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="kp">this</span>
+</span><span id="__span-62-3"><a id="__codelineno-62-3" name="__codelineno-62-3" href="#__codelineno-62-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">pct</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="kp">this</span><span class="w">   </span><span class="c1">// E0084: duplicated extension method pct() on Double</span>
 </span><span id="__span-62-4"><a id="__codelineno-62-4" name="__codelineno-62-4" href="#__codelineno-62-4"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>対処: 重複を削除するかリネームしてください。名前は同じでもパラメータ型が異なる
@@ -8427,7 +8449,7 @@ private メソッドも対象です。継承メソッドから呼ばれるとき
 </span><span id="__span-72-4"><a id="__codelineno-72-4" name="__codelineno-72-4" href="#__codelineno-72-4"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>直し方: 値型のフィールドを使うか、そのオブジェクトを読む純粋なメソッドを使います。</p>
-<p>契約が名指すフィールドには、<code>this</code> を通してだけ書き込めます (<code>n</code>、<code>this.n</code>、<code>self.n</code>)。
+<p>契約が名指すフィールドには、<code>this</code> を通してだけ書き込めます (<code>n</code>、<code>this.n</code>)。
 ほかの参照を通した書き込みは、宣言された型にかかわらず E0110 です。
 一回の呼び出しごとの検査では、その書き込みを追えないからです。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-73-1"><a id="__codelineno-73-1" name="__codelineno-73-1" href="#__codelineno-73-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Counter</span><span class="w"> </span><span class="p">{</span>
@@ -8502,7 +8524,7 @@ E0114 になり、その値と、再現用の <code>--contract-seed</code> / <co
 </span><span id="__span-77-8"><a id="__codelineno-77-8" name="__codelineno-77-8" href="#__codelineno-77-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">g</span><span class="p">():</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">super</span><span class="p">.</span><span class="nf">f</span><span class="p">()</span><span class="w">   </span><span class="c1">// E0115</span>
 </span><span id="__span-77-9"><a id="__codelineno-77-9" name="__codelineno-77-9" href="#__codelineno-77-9"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>直し方: <code>self</code> 側のオーバーライドを呼ぶ（<code>f()</code>）か、スーパークラスのメソッドに本体を与えます。</p>
+<p>直し方: <code>this</code> 側のオーバーライドを呼ぶ（<code>f()</code>）か、スーパークラスのメソッドに本体を与えます。</p>
 <h3 id="e0116"><code>E0116</code> — 一つのメソッドに無関係なインターフェースの既定実装が複数ある<a class="headerlink" href="#e0116" title="Permanent link">&para;</a></h3>
 <p>クラスが二つのインターフェースに準拠し、どちらも同じメソッドに本体を与えています。
 どちらのインターフェースも他方を継承していません。JVM はどちらも選べません。
@@ -8837,7 +8859,7 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 </span></code></pre></div>
 <p>対処: <code>continue</code> は <code>while</code>・<code>for</code>・<code>foreach</code> ループの内側でのみ使用してください。</p>
 <h3 id="e0050-static"><code>E0050</code> — static コンテキストで現在のインスタンスが利用できない<a class="headerlink" href="#e0050-static" title="Permanent link">&para;</a></h3>
-<p><code>static</code> メソッドの内部で <code>this</code>/<code>self</code> が使われています。static メソッドには
+<p><code>static</code> メソッドの内部で <code>this</code> が使われています。static メソッドには
 レシーバインスタンスが存在しません。</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-108-1"><a id="__codelineno-108-1" name="__codelineno-108-1" href="#__codelineno-108-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-108-2"><a id="__codelineno-108-2" name="__codelineno-108-2" href="#__codelineno-108-2"></a><span class="kd">public</span><span class="p">:</span>
@@ -8848,108 +8870,119 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 <p>対処: <code>static</code> を外すか、インスタンスを明示的にパラメータとして渡してください。</p>
 <p><code>extension</code> メソッド内の <code>super</code> も E0050 です。専用のメッセージが出ます。
 レシーバは <code>this</code> なので、<code>this</code> に対してメソッドを呼んでください。</p>
+<h3 id="e0117-self"><code>E0117</code> — <code>self</code> は廃止された<a class="headerlink" href="#e0117-self" title="Permanent link">&para;</a></h3>
+<p><code>self</code> は <code>this</code> の別の書き方でした。廃止されたため（RFC #2788）、<code>self</code> はすべてこのエラーになります。
+ファイル中の <code>self</code> は一度にすべて報告されます。static なコードでは E0050 の代わりに E0117 が出ます。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-109-1"><a id="__codelineno-109-1" name="__codelineno-109-1" href="#__codelineno-109-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Counter</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-109-2"><a id="__codelineno-109-2" name="__codelineno-109-2" href="#__codelineno-109-2"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span>
+</span><span id="__span-109-3"><a id="__codelineno-109-3" name="__codelineno-109-3" href="#__codelineno-109-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-109-4"><a id="__codelineno-109-4" name="__codelineno-109-4" href="#__codelineno-109-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kp">self</span><span class="p">.</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// E0117: this.n と書く</span>
+</span><span id="__span-109-5"><a id="__codelineno-109-5" name="__codelineno-109-5" href="#__codelineno-109-5"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>対処: <code>this</code> と書いてください。<code>onion migrate &lt;path&gt;</code> は、指定したファイル中の <code>self</code> をすべて書き換えます。
+文字列の <code>#{...}</code> の中の <code>self</code> も対象です。</p>
 <h3 id="e0058"><code>E0058</code> — ラベルが見つからない<a class="headerlink" href="#e0058" title="Permanent link">&para;</a></h3>
 <p>ラベル付きの <code>break</code>/<code>continue</code> が、囲んでいるどのループにも束縛されていない
 ラベルを指定しています。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-109-1"><a id="__codelineno-109-1" name="__codelineno-109-1" href="#__codelineno-109-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-109-2"><a id="__codelineno-109-2" name="__codelineno-109-2" href="#__codelineno-109-2"></a><span class="kd">public</span><span class="p">:</span>
-</span><span id="__span-109-3"><a id="__codelineno-109-3" name="__codelineno-109-3" href="#__codelineno-109-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-109-4"><a id="__codelineno-109-4" name="__codelineno-109-4" href="#__codelineno-109-4"></a><span class="w">    </span><span class="k">foreach</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">0</span><span class="o">..</span><span class="mi">3</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-109-5"><a id="__codelineno-109-5" name="__codelineno-109-5" href="#__codelineno-109-5"></a><span class="w">      </span><span class="k">break</span><span class="w"> </span><span class="n">nosuch</span><span class="w">   </span><span class="c1">// E0058: nosuch というラベルの付いた囲みループがない</span>
-</span><span id="__span-109-6"><a id="__codelineno-109-6" name="__codelineno-109-6" href="#__codelineno-109-6"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-109-7"><a id="__codelineno-109-7" name="__codelineno-109-7" href="#__codelineno-109-7"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-109-8"><a id="__codelineno-109-8" name="__codelineno-109-8" href="#__codelineno-109-8"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-110-1"><a id="__codelineno-110-1" name="__codelineno-110-1" href="#__codelineno-110-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-110-2"><a id="__codelineno-110-2" name="__codelineno-110-2" href="#__codelineno-110-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-110-3"><a id="__codelineno-110-3" name="__codelineno-110-3" href="#__codelineno-110-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-110-4"><a id="__codelineno-110-4" name="__codelineno-110-4" href="#__codelineno-110-4"></a><span class="w">    </span><span class="k">foreach</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">0</span><span class="o">..</span><span class="mi">3</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-110-5"><a id="__codelineno-110-5" name="__codelineno-110-5" href="#__codelineno-110-5"></a><span class="w">      </span><span class="k">break</span><span class="w"> </span><span class="n">nosuch</span><span class="w">   </span><span class="c1">// E0058: nosuch というラベルの付いた囲みループがない</span>
+</span><span id="__span-110-6"><a id="__codelineno-110-6" name="__codelineno-110-6" href="#__codelineno-110-6"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-110-7"><a id="__codelineno-110-7" name="__codelineno-110-7" href="#__codelineno-110-7"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-110-8"><a id="__codelineno-110-8" name="__codelineno-110-8" href="#__codelineno-110-8"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>対処: 対象のループにラベルを付ける（<code>outer: foreach ... { break outer }</code>）か、
 ラベルの綴りを修正してください。</p>
 <h2 id="_7">パターンマッチングエラー<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <h3 id="e0042"><code>E0042</code> — 網羅性のないパターンマッチング<a class="headerlink" href="#e0042" title="Permanent link">&para;</a></h3>
 <p>sealed 型に対する <code>select</code> がすべてのケースを網羅していません。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-110-1"><a id="__codelineno-110-1" name="__codelineno-110-1" href="#__codelineno-110-1"></a><span class="kd">sealed</span><span class="w"> </span><span class="kd">interface</span><span class="w"> </span><span class="nb">Shape</span><span class="w"> </span><span class="p">{}</span>
-</span><span id="__span-110-2"><a id="__codelineno-110-2" name="__codelineno-110-2" href="#__codelineno-110-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Circle</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="k">conforms</span><span class="w"> </span><span class="nb">Shape</span>
-</span><span id="__span-110-3"><a id="__codelineno-110-3" name="__codelineno-110-3" href="#__codelineno-110-3"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Rect</span><span class="p">(</span><span class="n">w</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="k">conforms</span><span class="w"> </span><span class="nb">Shape</span>
-</span><span id="__span-110-4"><a id="__codelineno-110-4" name="__codelineno-110-4" href="#__codelineno-110-4"></a>
-</span><span id="__span-110-5"><a id="__codelineno-110-5" name="__codelineno-110-5" href="#__codelineno-110-5"></a><span class="k">select</span><span class="w"> </span><span class="n">shape</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-110-6"><a id="__codelineno-110-6" name="__codelineno-110-6" href="#__codelineno-110-6"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">Circle</span><span class="p">(</span><span class="n">r</span><span class="p">):</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"circle"</span><span class="p">)</span>
-</span><span id="__span-110-7"><a id="__codelineno-110-7" name="__codelineno-110-7" href="#__codelineno-110-7"></a><span class="w">  </span><span class="c1">// Rect ケースが欠けている → E0042</span>
-</span><span id="__span-110-8"><a id="__codelineno-110-8" name="__codelineno-110-8" href="#__codelineno-110-8"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-111-1"><a id="__codelineno-111-1" name="__codelineno-111-1" href="#__codelineno-111-1"></a><span class="kd">sealed</span><span class="w"> </span><span class="kd">interface</span><span class="w"> </span><span class="nb">Shape</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-111-2"><a id="__codelineno-111-2" name="__codelineno-111-2" href="#__codelineno-111-2"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Circle</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="k">conforms</span><span class="w"> </span><span class="nb">Shape</span>
+</span><span id="__span-111-3"><a id="__codelineno-111-3" name="__codelineno-111-3" href="#__codelineno-111-3"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Rect</span><span class="p">(</span><span class="n">w</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span><span class="w"> </span><span class="k">conforms</span><span class="w"> </span><span class="nb">Shape</span>
+</span><span id="__span-111-4"><a id="__codelineno-111-4" name="__codelineno-111-4" href="#__codelineno-111-4"></a>
+</span><span id="__span-111-5"><a id="__codelineno-111-5" name="__codelineno-111-5" href="#__codelineno-111-5"></a><span class="k">select</span><span class="w"> </span><span class="n">shape</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-111-6"><a id="__codelineno-111-6" name="__codelineno-111-6" href="#__codelineno-111-6"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">Circle</span><span class="p">(</span><span class="n">r</span><span class="p">):</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"circle"</span><span class="p">)</span>
+</span><span id="__span-111-7"><a id="__codelineno-111-7" name="__codelineno-111-7" href="#__codelineno-111-7"></a><span class="w">  </span><span class="c1">// Rect ケースが欠けている → E0042</span>
+</span><span id="__span-111-8"><a id="__codelineno-111-8" name="__codelineno-111-8" href="#__codelineno-111-8"></a><span class="p">}</span>
 </span></code></pre></div>
 <h3 id="e0043"><code>E0043</code> — 未知の名前付き引数<a class="headerlink" href="#e0043" title="Permanent link">&para;</a></h3>
 <p>呼び出しが <code>name = value</code> 構文を使ったが、その名前が解決されたメソッド・
 コンストラクタ・関数のどのパラメータとも一致しません。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-111-1"><a id="__codelineno-111-1" name="__codelineno-111-1" href="#__codelineno-111-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">T</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-111-2"><a id="__codelineno-111-2" name="__codelineno-111-2" href="#__codelineno-111-2"></a><span class="kd">public</span><span class="p">:</span>
-</span><span id="__span-111-3"><a id="__codelineno-111-3" name="__codelineno-111-3" href="#__codelineno-111-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span>
-</span><span id="__span-111-4"><a id="__codelineno-111-4" name="__codelineno-111-4" href="#__codelineno-111-4"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">nope</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// E0043: f に nope という名前のパラメータはない</span>
-</span><span id="__span-111-5"><a id="__codelineno-111-5" name="__codelineno-111-5" href="#__codelineno-111-5"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-112-1"><a id="__codelineno-112-1" name="__codelineno-112-1" href="#__codelineno-112-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">T</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-112-2"><a id="__codelineno-112-2" name="__codelineno-112-2" href="#__codelineno-112-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-112-3"><a id="__codelineno-112-3" name="__codelineno-112-3" href="#__codelineno-112-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span>
+</span><span id="__span-112-4"><a id="__codelineno-112-4" name="__codelineno-112-4" href="#__codelineno-112-4"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">nope</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// E0043: f に nope という名前のパラメータはない</span>
+</span><span id="__span-112-5"><a id="__codelineno-112-5" name="__codelineno-112-5" href="#__codelineno-112-5"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>対処: 引数名のスペルを対象の宣言と照らし合わせてください。</p>
 <h3 id="e0044"><code>E0044</code> — 引数の重複<a class="headerlink" href="#e0044" title="Permanent link">&para;</a></h3>
 <p>同じパラメータが1回の呼び出しの中で2回束縛されています — 例えば、同じ呼び出し内で
 既に使われた名前を繰り返す名前付き引数などです。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-112-1"><a id="__codelineno-112-1" name="__codelineno-112-1" href="#__codelineno-112-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-112-2"><a id="__codelineno-112-2" name="__codelineno-112-2" href="#__codelineno-112-2"></a><span class="kd">public</span><span class="p">:</span>
-</span><span id="__span-112-3"><a id="__codelineno-112-3" name="__codelineno-112-3" href="#__codelineno-112-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span>
-</span><span id="__span-112-4"><a id="__codelineno-112-4" name="__codelineno-112-4" href="#__codelineno-112-4"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// E0044: x は既に束縛されている</span>
-</span><span id="__span-112-5"><a id="__codelineno-112-5" name="__codelineno-112-5" href="#__codelineno-112-5"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-113-1"><a id="__codelineno-113-1" name="__codelineno-113-1" href="#__codelineno-113-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-113-2"><a id="__codelineno-113-2" name="__codelineno-113-2" href="#__codelineno-113-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-113-3"><a id="__codelineno-113-3" name="__codelineno-113-3" href="#__codelineno-113-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span>
+</span><span id="__span-113-4"><a id="__codelineno-113-4" name="__codelineno-113-4" href="#__codelineno-113-4"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// E0044: x は既に束縛されている</span>
+</span><span id="__span-113-5"><a id="__codelineno-113-5" name="__codelineno-113-5" href="#__codelineno-113-5"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>対処: 重複した束縛を削除してください。</p>
 <h3 id="e0045"><code>E0045</code> — 名前付き引数の後の位置引数<a class="headerlink" href="#e0045" title="Permanent link">&para;</a></h3>
 <p>呼び出しで、名前付き引数の後に位置引数が置かれています。呼び出しが一度名前付き
 引数を使い始めたら、それ以降の引数もすべて名前で指定する必要があります —
 そうでなければ、位置引数がどのパラメータを埋めるのか曖昧になるためです。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-113-1"><a id="__codelineno-113-1" name="__codelineno-113-1" href="#__codelineno-113-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-113-2"><a id="__codelineno-113-2" name="__codelineno-113-2" href="#__codelineno-113-2"></a><span class="kd">public</span><span class="p">:</span>
-</span><span id="__span-113-3"><a id="__codelineno-113-3" name="__codelineno-113-3" href="#__codelineno-113-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span>
-</span><span id="__span-113-4"><a id="__codelineno-113-4" name="__codelineno-113-4" href="#__codelineno-113-4"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// E0045: 2 が名前付き引数の後に来ている</span>
-</span><span id="__span-113-5"><a id="__codelineno-113-5" name="__codelineno-113-5" href="#__codelineno-113-5"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-114-1"><a id="__codelineno-114-1" name="__codelineno-114-1" href="#__codelineno-114-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-114-2"><a id="__codelineno-114-2" name="__codelineno-114-2" href="#__codelineno-114-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-114-3"><a id="__codelineno-114-3" name="__codelineno-114-3" href="#__codelineno-114-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">y</span>
+</span><span id="__span-114-4"><a id="__codelineno-114-4" name="__codelineno-114-4" href="#__codelineno-114-4"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// E0045: 2 が名前付き引数の後に来ている</span>
+</span><span id="__span-114-5"><a id="__codelineno-114-5" name="__codelineno-114-5" href="#__codelineno-114-5"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>対処: 残りの引数もすべて名前付きにするか、位置引数を先頭にまとめてください。</p>
 <h3 id="e0046"><code>E0046</code> — 分割宣言パターンの束縛数が一致しない<a class="headerlink" href="#e0046" title="Permanent link">&para;</a></h3>
 <p>分割宣言の <code>val</code>/<code>var (a, b, ...)</code>（またはネストした分割パターン）で指定した
 変数の数が、record のコンポーネント数と一致していません。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-114-1"><a id="__codelineno-114-1" name="__codelineno-114-1" href="#__codelineno-114-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Point</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
-</span><span id="__span-114-2"><a id="__codelineno-114-2" name="__codelineno-114-2" href="#__codelineno-114-2"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-114-3"><a id="__codelineno-114-3" name="__codelineno-114-3" href="#__codelineno-114-3"></a><span class="kd">public</span><span class="p">:</span>
-</span><span id="__span-114-4"><a id="__codelineno-114-4" name="__codelineno-114-4" href="#__codelineno-114-4"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-114-5"><a id="__codelineno-114-5" name="__codelineno-114-5" href="#__codelineno-114-5"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="n">c</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Point</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w">   </span><span class="c1">// E0046: Point は2フィールドだが3つの束縛が指定された</span>
-</span><span id="__span-114-6"><a id="__codelineno-114-6" name="__codelineno-114-6" href="#__codelineno-114-6"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span>
-</span><span id="__span-114-7"><a id="__codelineno-114-7" name="__codelineno-114-7" href="#__codelineno-114-7"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-114-8"><a id="__codelineno-114-8" name="__codelineno-114-8" href="#__codelineno-114-8"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-115-1"><a id="__codelineno-115-1" name="__codelineno-115-1" href="#__codelineno-115-1"></a><span class="kd">record</span><span class="w"> </span><span class="nc">Point</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">)</span>
+</span><span id="__span-115-2"><a id="__codelineno-115-2" name="__codelineno-115-2" href="#__codelineno-115-2"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-115-3"><a id="__codelineno-115-3" name="__codelineno-115-3" href="#__codelineno-115-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-115-4"><a id="__codelineno-115-4" name="__codelineno-115-4" href="#__codelineno-115-4"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-115-5"><a id="__codelineno-115-5" name="__codelineno-115-5" href="#__codelineno-115-5"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="n">c</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Point</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w">   </span><span class="c1">// E0046: Point は2フィールドだが3つの束縛が指定された</span>
+</span><span id="__span-115-6"><a id="__codelineno-115-6" name="__codelineno-115-6" href="#__codelineno-115-6"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span>
+</span><span id="__span-115-7"><a id="__codelineno-115-7" name="__codelineno-115-7" href="#__codelineno-115-7"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-115-8"><a id="__codelineno-115-8" name="__codelineno-115-8" href="#__codelineno-115-8"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>対処: 束縛の数を record のコンポーネント数に合わせてください。</p>
 <h3 id="e0047-record"><code>E0047</code> — record 型ではない<a class="headerlink" href="#e0047-record" title="Permanent link">&para;</a></h3>
 <p>分割宣言の <code>val</code>/<code>var (a, b, ...) = expr</code> が、record ではない型の値に対して
 使われたため、位置で束縛できるコンポーネントがありません。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-115-1"><a id="__codelineno-115-1" name="__codelineno-115-1" href="#__codelineno-115-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-115-2"><a id="__codelineno-115-2" name="__codelineno-115-2" href="#__codelineno-115-2"></a><span class="kd">public</span><span class="p">:</span>
-</span><span id="__span-115-3"><a id="__codelineno-115-3" name="__codelineno-115-3" href="#__codelineno-115-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-115-4"><a id="__codelineno-115-4" name="__codelineno-115-4" href="#__codelineno-115-4"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"not a record"</span><span class="w">   </span><span class="c1">// E0047: String は record 型ではない</span>
-</span><span id="__span-115-5"><a id="__codelineno-115-5" name="__codelineno-115-5" href="#__codelineno-115-5"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span>
-</span><span id="__span-115-6"><a id="__codelineno-115-6" name="__codelineno-115-6" href="#__codelineno-115-6"></a><span class="w">  </span><span class="p">}</span>
-</span><span id="__span-115-7"><a id="__codelineno-115-7" name="__codelineno-115-7" href="#__codelineno-115-7"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-116-1"><a id="__codelineno-116-1" name="__codelineno-116-1" href="#__codelineno-116-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Test</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-116-2"><a id="__codelineno-116-2" name="__codelineno-116-2" href="#__codelineno-116-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-116-3"><a id="__codelineno-116-3" name="__codelineno-116-3" href="#__codelineno-116-3"></a><span class="w">  </span><span class="kd">static</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">[]):</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-116-4"><a id="__codelineno-116-4" name="__codelineno-116-4" href="#__codelineno-116-4"></a><span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"not a record"</span><span class="w">   </span><span class="c1">// E0047: String は record 型ではない</span>
+</span><span id="__span-116-5"><a id="__codelineno-116-5" name="__codelineno-116-5" href="#__codelineno-116-5"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span>
+</span><span id="__span-116-6"><a id="__codelineno-116-6" name="__codelineno-116-6" href="#__codelineno-116-6"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-116-7"><a id="__codelineno-116-7" name="__codelineno-116-7" href="#__codelineno-116-7"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>対処: record の値を分割するか、通常の <code>val</code>/<code>var</code> で値全体を束縛してください。</p>
 <h3 id="e0059"><code>E0059</code> — 不正な正規表現リテラル<a class="headerlink" href="#e0059" title="Permanent link">&para;</a></h3>
 <p><code>re"..."</code> リテラル（裸の式、<code>select case</code>、<code>from re"..."</code> 句のいずれでも）が
 正しい正規表現になっていません。コンパイル時に検証されるため、不正なパターンは
 実行時に <code>PatternSyntaxException</code> をスローする代わりにここで捕捉されます。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-116-1"><a id="__codelineno-116-1" name="__codelineno-116-1" href="#__codelineno-116-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="sr">unclosed"</span><span class="w">   </span><span class="c1">// E0059: 不正な正規表現リテラル</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-117-1"><a id="__codelineno-117-1" name="__codelineno-117-1" href="#__codelineno-117-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="sr">unclosed"</span><span class="w">   </span><span class="c1">// E0059: 不正な正規表現リテラル</span>
 </span></code></pre></div>
 <p>対処: パターンを修正してください。</p>
 <h3 id="e0060"><code>E0060</code> — 正規表現のキャプチャグループ数とバインディング数の不一致<a class="headerlink" href="#e0060" title="Permanent link">&para;</a></h3>
 <p><code>case re"..." (b1, b2, ...)</code> パターン（または <code>record ... from re"..."</code> 句）が、
 パターンのキャプチャグループ数とは異なる数のバインディング／成分を指定しています。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-117-1"><a id="__codelineno-117-1" name="__codelineno-117-1" href="#__codelineno-117-1"></a><span class="k">select</span><span class="w"> </span><span class="s2">"x"</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-117-2"><a id="__codelineno-117-2" name="__codelineno-117-2" href="#__codelineno-117-2"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="se">\d</span><span class="o">+)</span><span class="sr">-</span><span class="o">(</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">):</span><span class="w"> </span><span class="n">a</span><span class="w">   </span><span class="c1">// E0060: パターンは2グループだが、バインディングは1個</span>
-</span><span id="__span-117-3"><a id="__codelineno-117-3" name="__codelineno-117-3" href="#__codelineno-117-3"></a><span class="w">  </span><span class="k">else</span><span class="p">:</span><span class="w"> </span><span class="s2">"no"</span>
-</span><span id="__span-117-4"><a id="__codelineno-117-4" name="__codelineno-117-4" href="#__codelineno-117-4"></a><span class="p">}</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-118-1"><a id="__codelineno-118-1" name="__codelineno-118-1" href="#__codelineno-118-1"></a><span class="k">select</span><span class="w"> </span><span class="s2">"x"</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-118-2"><a id="__codelineno-118-2" name="__codelineno-118-2" href="#__codelineno-118-2"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nf">re</span><span class="sr">"</span><span class="o">(</span><span class="se">\d</span><span class="o">+)</span><span class="sr">-</span><span class="o">(</span><span class="se">\d</span><span class="o">+)</span><span class="sr">"</span><span class="w"> </span><span class="p">(</span><span class="n">a</span><span class="p">):</span><span class="w"> </span><span class="n">a</span><span class="w">   </span><span class="c1">// E0060: パターンは2グループだが、バインディングは1個</span>
+</span><span id="__span-118-3"><a id="__codelineno-118-3" name="__codelineno-118-3" href="#__codelineno-118-3"></a><span class="w">  </span><span class="k">else</span><span class="p">:</span><span class="w"> </span><span class="s2">"no"</span>
+</span><span id="__span-118-4"><a id="__codelineno-118-4" name="__codelineno-118-4" href="#__codelineno-118-4"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>対処: バインディング（またはレコード成分）の数をパターンのキャプチャグループ数に
 合わせてください。</p>
 <h2 id="_8">パーサーエラー<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <p>パーサーエラーには <code>E</code> コードは付きません。出現したトークンと期待されるトークンが報告されます。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-118-1"><a id="__codelineno-118-1" name="__codelineno-118-1" href="#__codelineno-118-1"></a>Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
+<div class="language-text highlight"><pre><span></span><code><span id="__span-119-1"><a id="__codelineno-119-1" name="__codelineno-119-1" href="#__codelineno-119-1"></a>Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 </span></code></pre></div>
 <h2 id="_9">警告<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <p><code>E</code> コードと異なり <code>W</code> コードは既定ではコンパイルを失敗させません（<code>--warn error</code> で
@@ -9530,6 +9563,10 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 <tr>
 <td><code>E0116</code></td>
 <td>class … inherits a default …(…) from each of …, and none of them overrides the others</td>
+</tr>
+<tr>
+<td><code>E0117</code></td>
+<td><code>self</code> is retired; write <code>this</code></td>
 </tr>
 </tbody>
 </table>

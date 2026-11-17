@@ -5751,6 +5751,7 @@
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>val         var         when        while
 </span></code></pre></div>
 <p>キーワードはバッククォートでエスケープすれば識別子として使えます: <code>`class`</code>。</p>
+<p><code>self</code> は予約語のままですが、廃止されました。使うとエラー E0117 になります。現在のインスタンスは <code>this</code> と書きます。</p>
 <h3 id="_4">識別子<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>文字またはアンダースコアで始まり、文字、数字、アンダースコアが続く</li>
@@ -5876,7 +5877,7 @@
 <p>呼び出し側は名前付き引数を渡せます（<code>f(b = 2, a = 1)</code>）。省略されたパラメータは
 デフォルトから埋められます。メソッド、コンストラクタ、records はすべて
 名前付き引数とデフォルトをサポートします。
-引数は書いた順に評価されます。ただし <code>copy(..)</code>、<code>extends A(..)</code>、
+引数は書いた順に評価されます。<code>copy(..)</code> も同じです。ただし <code>extends A(..)</code> と
 <code>: this(..)</code> では、まだパラメータ順に評価されます（#2801）。</p>
 <h3 id="_13">クラス<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Name</span><span class="w"> </span><span class="p">[</span><span class="nc">TypeParams</span><span class="p">]</span><span class="w"> </span><span class="p">[(</span><span class="n">primary</span><span class="w"> </span><span class="n">params</span><span class="p">)]</span><span class="w"> </span><span class="p">[</span><span class="k">extends</span><span class="w"> </span><span class="nc">Super</span><span class="p">[(</span><span class="n">args</span><span class="p">)]]</span><span class="w"> </span><span class="p">[</span><span class="k">conforms</span><span class="w"> </span><span class="nc">I1</span><span class="p">,</span><span class="w"> </span><span class="nc">I2</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>

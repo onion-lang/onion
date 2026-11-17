@@ -4286,6 +4286,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#self-is-now-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        self is now this
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#onionmathrandomint-is-removed-use-randnextint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OnionMath::randomInt is removed; use Rand::nextInt
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5160,6 +5182,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#self-is-now-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        self is now this
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#onionmathrandomint-is-removed-use-randnextint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OnionMath::randomInt is removed; use Rand::nextInt
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5518,7 +5562,7 @@ object is E0110.</p>
   time. A write from outside that object's methods is one no such check can follow.</li>
 <li><strong>What you see:</strong> <code>E0110</code>, with the caret on the receiver (<code>o</code>, <code>c</code>, <code>cs[0]</code>). The message
   says to call a method of that object or set the value in a constructor.</li>
-<li><strong>Still fine:</strong> <code>t = v</code>, <code>this.t = v</code>, <code>self.t = v</code>, <code>t++</code> and <code>t += 1</code> in the class's own
+<li><strong>Still fine:</strong> <code>t = v</code>, <code>this.t = v</code>, <code>t++</code> and <code>t += 1</code> in the class's own
   methods, also inside a lambda. Reading <code>o.t</code> from anywhere is fine too.</li>
 <li><strong>No <code>onion migrate</code> rule, on purpose:</strong> the fix adds a method or a constructor to the
   receiver's class, and which one fits is a design choice.</li>
@@ -5800,7 +5844,9 @@ parameter always did (#2872).</p>
   <code>f.call(null)</code> on a function value, <code>add</code>/<code>set</code>/<code>put</code> on <code>List</code> and <code>Map</code>, <code>apply</code> on a
   Java functional interface, and a method of your own generic class (<code>Box[Int].put(null)</code>).
   Also a <code>null</code> element in a list or map literal written for such a type
-  (<code>val zs: List[Int] = [5, null]</code>, <code>val m: Map[String, Int] = ["b": null]</code>).</li>
+  (<code>val zs: List[Int] = [5, null]</code>, <code>val m: Map[String, Int] = ["b": null]</code>), and the other
+  ways into the same slot (#2991): a constructor (<code>new Box[Int](null)</code>, <code>new R[Int](null)</code>),
+  and an indexed assignment (<code>xs[0] = null</code>, <code>m["b"] = null</code>).</li>
 <li><strong>To update:</strong> if <code>null</code> is a value you mean to store, declare the type argument nullable:
   <code>List[Int?]</code>, <code>Map[String, Int?]</code>, <code>(Int?) -&gt; T</code>. Reads then give an <code>Int?</code>, so handle
   <code>null</code> there (<code>?:</code> or <code>!!</code>). Otherwise, pass a real value instead of <code>null</code>.</li>
@@ -5874,6 +5920,66 @@ the auto-CLI (<code>def main(count: Int = 3)</code>) already did for the same in
   <code>val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }</code>.</li>
 <li><strong>No <code>onion migrate</code> rule:</strong> the old behaviour swallowed an error at run time. The source
   has nothing to rewrite, and only you know whether a bad value should stop the program.</li>
+</ul>
+<h2 id="self-is-now-this"><code>self</code> is now <code>this</code><a class="headerlink" href="#self-is-now-this" title="Permanent link">&para;</a></h2>
+<p><code>self</code> was a second spelling of <code>this</code>. Onion keeps one spelling: <code>this</code> (RFC #2788).</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1">// Before</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kp">self</span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="kd">def</span><span class="w"> </span><span class="nf">greet</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Hi, </span><span class="si">#{</span><span class="kp">self</span><span class="p">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="c1">// Now</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kp">this</span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="kd">def</span><span class="w"> </span><span class="nf">greet</span><span class="p">():</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Hi, </span><span class="si">#{</span><span class="kp">this</span><span class="p">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <code>E0117:</code>self<code>is retired; write</code>this<code>.</code> at every <code>self</code>, all at once.
+  In static code it replaces E0050.</li>
+<li><strong>Still a reserved word:</strong> <code>self</code> is not a free name now. A field written <code>`self`</code> keeps
+  working.</li>
+<li><strong>Update a whole project:</strong> <code>onion migrate src/ tests/</code>. It rewrites every <code>self</code> in code
+  and inside <code>#{...}</code> in strings. It leaves comments, plain string text, <code>\#{self}</code> and
+  <code>`self`</code> alone.</li>
+</ul>
+<h2 id="onionmathrandomint-is-removed-use-randnextint"><code>OnionMath::randomInt</code> is removed; use <code>Rand::nextInt</code><a class="headerlink" href="#onionmathrandomint-is-removed-use-randnextint" title="Permanent link">&para;</a></h2>
+<p>Onion had two ways to get a random <code>Int</code> in a range, with opposite upper bounds (#3069).
+<code>Rand::nextInt(min, max)</code> stays. Its <code>max</code> is exclusive, as in <code>a..&lt;b</code>, Java and Kotlin.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w">   </span><span class="c1">// Before: 1 to 6. Now: E0005</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">          </span><span class="c1">// 1 to 6</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <code>E0005</code>, with a hint that shows <code>Rand::nextInt(min, max + 1)</code>.</li>
+<li><strong>Unchanged:</strong> <code>Rand::nextInt(min, max)</code> and <code>OnionMath::random()</code>.</li>
+<li><strong><code>onion migrate</code> rewrites it.</strong> It writes <code>Rand::nextInt(min, max + 1)</code>, so every value the
+  old call could return stays possible:</li>
+<li><code>OnionMath::randomInt(1, 6)</code> becomes <code>Rand::nextInt(1, 7)</code>.</li>
+<li><code>OnionMath::randomInt(0, xs.size - 1)</code> becomes <code>Rand::nextInt(0, xs.size)</code>.</li>
+<li><code>OnionMath::randomInt(a, b)</code> becomes <code>Rand::nextInt(a, b + 1)</code>.</li>
+<li>Calls inside <code>"#{...}"</code>, and a call inside another call's arguments, are rewritten too.</li>
+<li>So is a call through an import: <code>randomInt(1, 6)</code> after <code>import { onion.OnionMath::* }</code>,
+    or <code>OM::randomInt(1, 6)</code> after <code>import { onion.OnionMath as OM; }</code>. The import itself
+    still compiles, so it is left as written.</li>
+<li>When the file, or another file named with it, has its own <code>Rand</code> (a class, an import, a
+    variable), migrate writes <code>onion.Rand::nextInt</code>, so the call keeps meaning Onion's <code>Rand</code>.</li>
+<li><strong>Only calls the compiler reports are rewritten.</strong> A <code>randomInt</code> that still compiles is
+  your own (a class of yours named <code>OnionMath</code>, an inherited method), so it is left as written.</li>
+<li><strong>Which <code>max</code> gets <code>+ 1</code>:</strong> a plain number below <code>Int.MAX_VALUE</code> (<code>6</code>), or a <code>max</code> that
+  reads a variable, a parameter, a field or a call (<code>n</code>, <code>xs.size</code>, <code>Math::abs(n)</code>).</li>
+<li><strong>Other constant maxes are noted; edit them by hand.</strong> That covers <code>2147483647</code> and any
+  expression of constants (<code>1 &lt;&lt; 4</code>, <code>Integer::MAX_VALUE</code>). Migrate leaves the file as
+  written. Write <code>Rand::nextInt(min, (max) + 1)</code>, then run migrate again. When max is
+  <code>Int.MAX_VALUE</code>, write <code>Rand::nextInt(min - 1, max) + 1</code> instead.</li>
+<li><strong>A bare <code>randomInt(a, b)</code> in a file that also names its own <code>randomInt</code></strong> may be either
+  one, so migrate notes it and leaves it as written.</li>
+<li><strong>A bare <code>randomInt(a, b)</code> with no <code>import { onion.OnionMath::* }</code></strong> is not the removed
+  method, so migrate leaves it alone. Its hint shows the edit to make by hand.</li>
+<li><strong>Check a max held in a variable.</strong> Migrate cannot know its value. If it can be
+  <code>Int.MAX_VALUE</code> at run time, <code>max + 1</code> overflows there and the call throws
+  <code>IllegalArgumentException</code>. For that case, write <code>Rand::nextInt(min - 1, max) + 1</code>.</li>
+<li><strong><code>Rand::nextInt()</code> replaces a call only when min is <code>Int.MIN_VALUE</code> and max is
+  <code>Int.MAX_VALUE</code>.</strong> It returns any <code>Int</code>, negatives included, so it does not replace
+  <code>randomInt(0, Int.MAX_VALUE)</code>.</li>
+<li><strong>Run it on one program at a time.</strong> Unrelated scripts named together can hide each other's
+  errors, and then a call is left as written.</li>
 </ul>
 
 

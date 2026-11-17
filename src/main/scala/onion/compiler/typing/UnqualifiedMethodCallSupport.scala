@@ -113,7 +113,15 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       if (hasMalleable) calls.typedTerms(node.args.toArray, context) // re-type unsuppressed to report the real diagnostic
       return None
     }
-    val methods0 = MethodResolution.findMethods(targetType, node.name, params0, bodyContext.table)
+    val methods00 = MethodResolution.findMethods(targetType, node.name, params0, bodyContext.table)
+    // The most specific overload can be an inherited private one; like `this.f(..)` (#2818),
+    // resolve among the accessible members first, so E0013 stays only when nothing else applies.
+    val methods0 =
+      if (methods00.length == 1 && !MemberAccess.isMemberAccessible(methods00(0), targetType)) {
+        val accessible = MethodResolution.findMethods(targetType, node.name, params0, bodyContext.table,
+          m => MemberAccess.isMemberAccessible(m, targetType))
+        if (accessible.length > 0) accessible else methods00
+      } else methods00
 
     // When no method applies, an argument that is a generic call (e.g.
     // `Result::ok(7)`) may have left its type parameters unbound (-> Object).

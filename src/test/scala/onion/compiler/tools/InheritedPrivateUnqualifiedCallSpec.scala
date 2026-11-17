@@ -109,5 +109,24 @@ class InheritedPrivateUnqualifiedCallSpec extends AbstractShellSpec {
           |""".stripMargin
       assert(shell.run(src, "None", Array()) == Shell.Success(4))
     }
+
+    it("a bare call skips an inherited private overload for an accessible one, as this.f(..) does") {
+      val src =
+        """
+          |class A {
+          |  def foo(a: Int): Int = 1
+          |public:
+          |  def this {}
+          |  def foo(a: Object): Int = 2
+          |}
+          |class B extends A {
+          |public:
+          |  def this {}
+          |  def run(): Int = foo(1) * 10 + this.foo(1)
+          |}
+          |def main(args: String[]): Int { return new B().run() }
+          |""".stripMargin
+      assert(shell.run(src, "None", Array()) == Shell.Success(22))
+    }
   }
 }

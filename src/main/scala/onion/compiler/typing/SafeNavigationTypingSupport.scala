@@ -9,7 +9,7 @@ import java.util.{TreeSet => JTreeSet}
 
 import scala.jdk.CollectionConverters.*
 
-import ArgumentHelpers.hasNamedArguments
+import ArgumentHelpers.{hasNamedArguments, untypedClosureIndicesOf}
 
 private[compiler] final class SafeNavigationTypingSupport(
   bodyContext: TypingBodyContext,
@@ -49,12 +49,78 @@ private[compiler] final class SafeNavigationTypingSupport(
     val target = calls.typed(node.target, context).getOrElse(null)
     if (target == null) return None
 
+    // An untyped lambda (`xs?.map { x -> x * 2 }`) takes its parameter types from the method,
+    // so it cannot be typed before the method is chosen (#3007).
+    if (untypedClosureIndicesOf(node.args).nonEmpty && !hasNamedArguments(node.args)) {
+      typeSafeMethodCallWithUntypedLambdas(node, target, context, expected) match {
+        case Some(result) => return result
+        case None =>
+      }
+    }
+
     val params = calls.typedTerms(node.args.toArray, context)
     if (params == null) return None
 
     calls.normalizeSafeMethodCallTarget(node, target).flatMap { resolved =>
       typeSafeMethodCallOnObject(node, resolved.term, resolved.targetType, params, context, expected)
     }
+  }
+
+  /** The plain call each `x?.m(..)` with an untyped lambda is typed as, kept per node so that
+   *  memoised overload decisions keyed by the call node are found again on a retyping. */
+  private val plainCallOf = new java.util.IdentityHashMap[AST.SafeMethodCall, AST.MethodCall]()
+
+  /**
+   * `x?.m(.., y -> ..)`: typed as `x.m(..)` on a non-null view of `x`, through the same
+   * bidirectional inference the `.` path uses, then rebuilt as a safe call on `x` itself.
+   * The view is never emitted. Outer `None`: not handled here (a nullable primitive receiver),
+   * so the eager path runs as before; `Some(None)`: handled, with its errors reported.
+   */
+  private def typeSafeMethodCallWithUntypedLambdas(
+    node: AST.SafeMethodCall,
+    target: Term,
+    context: LocalContext,
+    expected: Type
+  ): Option[Option[Term]] = {
+    val receiverType = target.`type` match {
+      case n: NullableType => n.innerType
+      case other => other
+    }
+    receiverType match {
+      case objectType: ObjectType =>
+        val view = new AsInstanceOf(node.target.location, target, objectType)
+        val plain = plainCallOf.computeIfAbsent(node, n => AST.MethodCall(n.location, n.target, n.name, n.args, n.typeArgs))
+        val plainExpected = expected match {
+          case n: NullableType => n.innerType
+          case other => other
+        }
+        Some(calls.typeMethodCallOnObject(plain, view, objectType, null, context, plainExpected).flatMap(asSafeCall(node, target, _)))
+      case _ => None
+    }
+  }
+
+  /** Rebuilds the plain call `typeSafeMethodCallWithUntypedLambdas` typed as a safe call on `target`. */
+  private def asSafeCall(node: AST.SafeMethodCall, target: Term, plain: Term): Option[Term] = plain match {
+    case cast: AsInstanceOf =>
+      asSafeCall(node, target, cast.target).map { safe =>
+        // As for the eager path: the result stays nullable, and a primitive is not unboxed.
+        cast.destination match {
+          case _: NullableType | _: NullType => TypeSubst.withCast(safe, cast.destination)
+          case _: BasicType => safe
+          case other => TypeSubst.withCast(safe, NullableType.of(other))
+        }
+      }
+    case call: Call =>
+      Some(new SafeCall(node.location, target, call.method, call.parameters))
+    case call: CallStatic if call.parameters.nonEmpty =>
+      // An extension method: its static's first parameter is the receiver, which codegen
+      // takes from `target` after the null check.
+      val receiverBasicType = call.method.arguments.headOption.collect { case bt: BasicType => bt }
+      Some(new SafeStaticExtensionCall(node.location, target, call.target, call.method, receiverBasicType, call.parameters.tail))
+    case _ =>
+      // No other shape comes back from an instance call today; say so rather than miscompile.
+      calls.reportMethodNotFound(node, target.`type`, node.name, Array[Type]())
+      None
   }
 
   private def typeSafeMethodCallOnObject(

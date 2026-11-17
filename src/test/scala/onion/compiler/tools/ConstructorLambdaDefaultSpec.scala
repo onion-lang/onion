@@ -40,5 +40,23 @@ class ConstructorLambdaDefaultSpec extends AbstractShellSpec {
           |""".stripMargin, "ld2.on", Array[String]())
       assert(Shell.Success("12") == result)
     }
+    it("still types the lambda when an unrelated constructor has the same arity") {
+      val result = shell.run(
+        """
+          |class A {
+          |public:
+          |  val r: Int
+          |  def this(f: Int -> Int, k: Int = 1) { this.r = f(k) }
+          |  def this(s: String) { this.r = s.length() }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + new A(x -> x * 2).r + "," + new A("abc").r
+          |  }
+          |}
+          |""".stripMargin, "ld3.on", Array[String]())
+      assert(Shell.Success("2,3") == result)
+    }
   }
 }

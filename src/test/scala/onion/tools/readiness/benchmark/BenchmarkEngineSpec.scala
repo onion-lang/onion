@@ -4,7 +4,7 @@ import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.OptionValues
 
-import java.util.concurrent.{CountDownLatch, Executors, TimeUnit}
+import java.util.concurrent.{CountDownLatch, ExecutorService, Executors, TimeUnit}
 import java.util.concurrent.atomic.AtomicBoolean
 
 class BenchmarkEngineSpec extends AnyFunSpec with Matchers with OptionValues:
@@ -14,6 +14,15 @@ class BenchmarkEngineSpec extends AnyFunSpec with Matchers with OptionValues:
 
   private def metadata =
     ScenarioMetadata("steady-fresh:test", ScenarioKind.SteadyFresh, "test", "hash")
+
+  // The timeout counts from submit, so a thread that has not started yet can
+  // time out a task that never ran (#3141). Start it first, and give the
+  // timeout room: the iteration blocks until the test releases it anyway.
+  private val iterationTimeoutMillis = 500L
+
+  private def started(executor: ExecutorService): ExecutorService =
+    executor.submit(new Runnable { def run(): Unit = () }).get(10L, TimeUnit.SECONDS)
+    executor
 
   private def payload =
     IterationPayload(
@@ -81,9 +90,9 @@ class BenchmarkEngineSpec extends AnyFunSpec with Matchers with OptionValues:
             release.await()
             payload
 
-      val executor = Executors.newSingleThreadExecutor()
+      val executor = started(Executors.newSingleThreadExecutor())
       val engine = new BenchmarkEngine(
-        BenchmarkRunConfig(0, 1, 25L),
+        BenchmarkRunConfig(0, 1, iterationTimeoutMillis),
         NanoClock.System,
         executor
       )
@@ -119,9 +128,9 @@ class BenchmarkEngineSpec extends AnyFunSpec with Matchers with OptionValues:
             closeWhileRunning.set(running.get())
             closed.countDown()
 
-      val executor = Executors.newSingleThreadExecutor()
+      val executor = started(Executors.newSingleThreadExecutor())
       val engine = new BenchmarkEngine(
-        BenchmarkRunConfig(0, 1, 25L),
+        BenchmarkRunConfig(0, 1, iterationTimeoutMillis),
         NanoClock.System,
         executor
       )

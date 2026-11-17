@@ -113,7 +113,15 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       if (hasMalleable) calls.typedTerms(node.args.toArray, context) // re-type unsuppressed to report the real diagnostic
       return None
     }
-    val methods0 = MethodResolution.findMethods(targetType, node.name, params0, bodyContext.table)
+    val methods00 = MethodResolution.findMethods(targetType, node.name, params0, bodyContext.table)
+    // The most specific overload can be an inherited private one; like `this.f(..)` (#2818),
+    // resolve among the accessible members first, so E0013 stays only when nothing else applies.
+    val methods0 =
+      if (methods00.length == 1 && !MemberAccess.isMemberAccessible(methods00(0), targetType)) {
+        val accessible = MethodResolution.findMethods(targetType, node.name, params0, bodyContext.table,
+          m => MemberAccess.isMemberAccessible(m, targetType))
+        if (accessible.length > 0) accessible else methods00
+      } else methods00
 
     // When no method applies, an argument that is a generic call (e.g.
     // `Result::ok(7)`) may have left its type parameters unbound (-> Object).
@@ -172,6 +180,13 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       None
     } else {
       val method = methods(0)
+      // An inherited private method is found by name but cannot be called from here: the
+      // JVM rejects it at run time (IllegalAccessError). `this.f(..)`, named arguments and
+      // a trailing lambda already say E0013; the bare positional call does too (#3012).
+      if (!MemberAccess.isMemberAccessible(method, targetType)) {
+        bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, method.name, method.arguments, targetType)
+        return None
+      }
       if (!ensureInstanceAvailable(node, method, context)) return None
       val classSubst = selfClassSubstitution(method)
       calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
@@ -422,6 +437,10 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         calls.reportAmbiguousMethod(node, first, second, node.name)
         None
       case CandidateSelection.Selected(method) =>
+        if (!MemberAccess.isMemberAccessible(method, targetType)) {
+          bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, method.name, method.arguments, targetType)
+          return None
+        }
         if (!ensureInstanceAvailable(node, method, context)) return None
         if (!MemberAccess.isMemberAccessible(method, bodyContext.definition)) {
           // An inherited private method: E0013, not IllegalAccessError at run time (#2916).

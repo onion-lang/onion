@@ -309,7 +309,18 @@ class OneRandomIntSpec extends AbstractShellSpec {
       "java.lang.Integer::MAX_VALUE",
       "(Integer::MAX_VALUE)",
       "Integer::MIN_VALUE - 1",
-      "2147483646 + 1"
+      "2147483646 + 1",
+      // #3116 block 6: the rule is by form, so every operator the compiler folds counts.
+      "(1 << 31) - 1",
+      "~0 >>> 1",
+      "-1 >>> 1",
+      "Integer::MAX_VALUE as Int",
+      "Integer::MAX_VALUE | 0",
+      "Integer::MAX_VALUE & -1",
+      "Integer::MIN_VALUE ^ -1",
+      "~Integer::MIN_VALUE",
+      "~(Integer::MIN_VALUE * 1)",
+      "0x3FFFFFFF << 1 | 1"
     ).foreach { max =>
       it(s"notes a max of Int.MAX_VALUE spelled `$max`, and leaves it as written") {
         val source = s"val n = OnionMath::randomInt(0, $max)\n"
@@ -326,8 +337,20 @@ class OneRandomIntSpec extends AbstractShellSpec {
       assert(output.contains("old.on:2:20: note:"), output)
     }
 
+    it("notes a constant max it cannot evaluate, since it may be Int.MAX_VALUE") {
+      val source = "val n = OnionMath::randomInt(0, 'a' as Int)\n"
+      val (_, after, output) = migrate(source)
+      assert(after == source, output)
+      assert(output.contains("old.on:1:20: note:"), output)
+      assert(output.contains("cannot evaluate"), output)
+    }
+
     it("still rewrites a max that is a constant below Int.MAX_VALUE, in any spelling") {
       Seq(
+        "(1 << 4)" -> "Rand::nextInt(0, (1 << 4) + 1)",
+        "1 << 4" -> "Rand::nextInt(0, (1 << 4) + 1)",
+        "~0 >>> 2" -> "Rand::nextInt(0, (~0 >>> 2) + 1)",
+        "~Integer::MIN_VALUE * 1 - 1" -> "Rand::nextInt(0, (~Integer::MIN_VALUE * 1 - 1) + 1)",
         "0x7FFFFFFE" -> "Rand::nextInt(0, 0x7FFFFFFE + 1)",
         "Integer::MAX_VALUE - 1" -> "Rand::nextInt(0, Integer::MAX_VALUE)",
         "Short::MAX_VALUE" -> "Rand::nextInt(0, (Short::MAX_VALUE) + 1)"

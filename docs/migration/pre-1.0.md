@@ -700,7 +700,8 @@ val die = Rand::nextInt(1, 7)          // 1 to 6
 - **Only calls the compiler reports are rewritten.** A `randomInt` that still compiles is
   your own (a class of yours named `OnionMath`, an inherited method), so it is left as written.
 - **Not rewritten:** a `max` that is a constant equal to `Int.MAX_VALUE`, however it is
-  spelled: `2147483647`, `0x7FFFFFFF`, `Integer::MAX_VALUE`, `JInteger::MAX_VALUE`.
+  spelled: `2147483647`, `0x7FFFFFFF`, `Integer::MAX_VALUE`, `(1 << 31) - 1`,
+  `Integer::MAX_VALUE | 0`. A constant migrate cannot evaluate is left the same way.
   `max + 1` would overflow to `Int.MIN_VALUE`, and `Rand::nextInt` would throw. The migrate
   run notes the line and leaves the whole file as written. Write `Rand::nextInt()` for any
   `Int`, or choose the bound by hand, then run migrate again.

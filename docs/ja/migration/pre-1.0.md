@@ -621,6 +621,6 @@ val die = Rand::nextInt(1, 7)          // 1から6
   - インポート経由の呼び出しも書き換えます。`import { onion.OnionMath::* }` の後の `randomInt(1, 6)` や、`import { onion.OnionMath as OM; }` の後の `OM::randomInt(1, 6)` です。インポート自体はそのままでもコンパイルできるので、書き換えません。
   - ファイル自身、または一緒に渡したファイルに独自の `Rand`（クラス、インポート、変数）があるときは、`onion.Rand::nextInt` と書きます。呼び出しが Onion の `Rand` を指したままになります。
 - **書き換えるのは、コンパイラがエラーを報告した呼び出しだけです。** コンパイルできる `randomInt` はあなた自身のもの（`OnionMath` という名前の自作クラスや、継承したメソッド）なので、そのまま残します。
-- **書き換えないもの:** `max` が `Int.MAX_VALUE` に等しい定数の呼び出しです。書き方は問いません（`2147483647`、`0x7FFFFFFF`、`Integer::MAX_VALUE`、`JInteger::MAX_VALUE`）。`max + 1` は桁あふれ（オーバーフロー）して `Int.MIN_VALUE` になり、`Rand::nextInt` が例外を投げるためです。migrate はその行を知らせ、ファイル全体をそのまま残します。任意の `Int` なら `Rand::nextInt()` と書くか、上限を自分で選んでから、もう一度 migrate を実行してください。
+- **書き換えないもの:** `max` が `Int.MAX_VALUE` に等しい定数の呼び出しです。書き方は問いません（`2147483647`、`0x7FFFFFFF`、`Integer::MAX_VALUE`、`(1 << 31) - 1`、`Integer::MAX_VALUE | 0`）。migrate が値を計算できない定数も、同じくそのまま残します。`max + 1` は桁あふれ（オーバーフロー）して `Int.MIN_VALUE` になり、`Rand::nextInt` が例外を投げるためです。migrate はその行を知らせ、ファイル全体をそのまま残します。任意の `Int` なら `Rand::nextInt()` と書くか、上限を自分で選んでから、もう一度 migrate を実行してください。
 - **変数に入った max は確認してください。** migrate にはその値がわかりません。実行時に `Int.MAX_VALUE` になりうるなら、そこで `max + 1` が桁あふれし、呼び出しは `IllegalArgumentException` を投げます。その場合は `Rand::nextInt()` と書いてください。
 - **プログラムは一つずつ migrate してください。** 無関係なスクリプトを一緒に渡すと、互いのエラーが隠れることがあります。その場合、呼び出しは書き換えられずに残ります。

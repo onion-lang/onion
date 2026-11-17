@@ -450,12 +450,12 @@ object Migrator:
           val rewritten = (a: Int, b: Int) =>
             apply(source.substring(a, b), inner.filter(e => e.offset >= a && e.offset < b).map(e => e.copy(offset = e.offset - a)))
           plusOne(rewritten(maxFrom, maxTo), max, spelling) match
-            case None =>
+            case Left(why) =>
               Left(Some(Note(line, column,
-                s"this $Subject has a max of Int.MAX_VALUE (2147483647), which Rand::nextInt cannot include " +
+                s"this $Subject $why, which Rand::nextInt cannot include " +
                   "(its max is exclusive, and max + 1 overflows); " +
                   "left as written. Write Rand::nextInt() for any Int, or pick the bound by hand")))
-            case Some(newMax) =>
+            case Right(newMax) =>
               val replacement = spelling.rand + "::nextInt" + rewritten(paren, maxFrom) + newMax + rewritten(maxTo, closeAt + 1)
               Right(Edit(from, closeAt + 1 - from, replacement, line, column,
                 "OnionMath::randomInt(min, max) -> Rand::nextInt(min, max + 1)",
@@ -464,28 +464,66 @@ object Migrator:
                 places = inner.flatMap(_.allPlaces)))
 
     /**
-     * `Some(text)` for the new max, or `None` when it cannot be one more: a constant equal to
-     * `Int.MAX_VALUE`, whose `+ 1` would overflow to `Int.MIN_VALUE` and make the call throw.
+     * `Right(text)` for the new max, or `Left(why)` when it cannot be one more: a constant equal
+     * to `Int.MAX_VALUE`, whose `+ 1` would overflow to `Int.MIN_VALUE` and make the call throw,
+     * or a constant the tool cannot evaluate, which may be that value (#3116 block 6). The rule
+     * is by form, not by operator: a max with no variable and no call is a constant, and is
+     * rewritten only when its value is known and below `Int.MAX_VALUE`.
      */
-    private def plusOne(text: String, max: IndexedSeq[Token], spelling: Spelling): Option[String] =
+    private def plusOne(text: String, max: IndexedSeq[Token], spelling: Spelling): Either[String, String] =
       val digits = text.replace("_", "")
-      if constant(max, spelling.integers).contains(Int.MaxValue) then None
+      val value = constant(max, spelling.integers)
+      if value.contains(Int.MaxValue) then Left("has a max of Int.MAX_VALUE (2147483647)")
+      else if value.isEmpty && constantForm(max, spelling.integers) then
+        Left("has a constant max the migrate tool cannot evaluate, so it may be Int.MAX_VALUE (2147483647)")
       else if max.length == 1 && max.head.kind == K.INTEGER && digits.forall(_.isDigit) then
-        Some((BigInt(digits) + 1).toString)
+        Right((BigInt(digits) + 1).toString)
       else
         val simple = topLevel(max).forall(t => t.kind == K.ID || t.kind == K.INTEGER || Tight.contains(t.image) ||
           t.kind == K.K_THIS || t.kind == K.K_SELF || t.image == "(" || t.image == "[")
         val beforeMinus = if max.length >= 3 then Some(max(max.length - 3)) else None
         val operand = beforeMinus.exists(t => t.kind == K.ID || t.kind == K.INTEGER || t.image == ")" || t.image == "]")
         if simple && operand && max(max.length - 2).image == "-" && max.last.image == "1" then
-          Some(text.substring(0, text.lastIndexOf('-')).stripTrailing)
-        else if simple then Some(text + " + 1")
-        else Some("(" + text + ") + 1")
+          Right(text.substring(0, text.lastIndexOf('-')).stripTrailing)
+        else if simple then Right(text + " + 1")
+        else Right("(" + text + ") + 1")
+
+    /** Operators that may appear in a constant `Int` expression. */
+    private val ConstantOperators =
+      Set("+", "-", "*", "/", "%", "<<", ">>", ">>>", "&", "|", "^", "~", "(", ")")
+
+    /**
+     * Whether `max` is a constant in form: literals, `Integer`'s `MAX_VALUE`/`MIN_VALUE`, the
+     * operators above and `as` casts, with no variable and no call. A max whose value
+     * [[constant]] cannot work out is then left as written, whatever operator hides it.
+     */
+    private def constantForm(max: IndexedSeq[Token], integers: Set[String]): Boolean =
+      val image = (j: Int) => if j >= 0 && j < max.length then max(j).image else ""
+      max.nonEmpty && max.indices.forall { j =>
+        val t = max(j)
+        t.kind == K.INTEGER || t.kind == K.CHARACTER || ConstantOperators(t.image) || t.kind == K.K_AS ||
+          image(j - 1) == "as" ||
+          (Set("MAX_VALUE", "MIN_VALUE")(t.image) && image(j - 1) == "::") ||
+          (t.image == "::" && (integers(image(j - 1)) || image(j - 1) == "Integer")) ||
+          (integers(t.image) && image(j + 1) == "::") ||
+          ((t.image == "java" || t.image == "lang" || t.image == "Integer" || t.image == ".") &&
+            javaLangInteger(max, j))
+      }
+
+    /** Whether token `j` is part of a `java.lang.Integer` qualifier in `max`. */
+    private def javaLangInteger(max: IndexedSeq[Token], j: Int): Boolean =
+      val image = (k: Int) => if k >= 0 && k < max.length then max(k).image else ""
+      (0 to 4).exists { back =>
+        val s = j - back
+        image(s) == "java" && image(s + 1) == "." && image(s + 2) == "lang" && image(s + 3) == "." &&
+          image(s + 4) == "Integer" && image(s + 5) == "::"
+      }
 
     /**
      * The value of `max` when it is an `Int` constant the compiler folds: integer literals in
      * any radix, `Integer::MAX_VALUE`/`MIN_VALUE` (also `java.lang.Integer::` and an alias),
-     * unary `+`/`-`, `+ - * / %` and parentheses, with `Int`'s wraparound. `None` otherwise.
+     * prefix `+ - ~`, `+ - * / % << >> >>> & | ^`, `as Int`/`Short`/`Byte`/`Char` and
+     * parentheses, with `Int`'s wraparound. `None` otherwise.
      */
     private def constant(max: IndexedSeq[Token], integers: Set[String]): Option[Int] =
       var i = 0
@@ -516,36 +554,76 @@ object Migrator:
           if v.isDefined then i = q + 3
           v
         else None
+      // Onion's precedence (grammar/JJOnionParser.jj), loosest first: `|`, `^`, `&`, shifts,
+      // binary `+ -`, prefix `+ - ~`, `* / %` (whose right operand may carry a prefix), and
+      // the postfix `as`. A prefix binds looser than `*`: `~a * b` is `~(a * b)`.
       def primary(): Option[Int] =
-        if i >= max.length then None
-        else if image(i) == "-" then { i += 1; primary().map(v => -v) }
-        else if image(i) == "+" then { i += 1; primary() }
-        else if image(i) == "(" then
-          i += 1
-          val v = sum()
-          if image(i) == ")" then { i += 1; v } else None
-        else if max(i).kind == K.INTEGER then { val v = literal(max(i)); i += 1; v }
-        else field()
+        val v =
+          if i >= max.length then None
+          else if image(i) == "(" then
+            i += 1
+            val v = or()
+            if image(i) == ")" then { i += 1; v } else None
+          else if max(i).kind == K.INTEGER then { val v = literal(max(i)); i += 1; v }
+          else field()
+        cast(v)
+      def cast(v: Option[Int]): Option[Int] =
+        if v.isDefined && image(i) == "as" then
+          val target = image(i + 1)
+          i += 2
+          cast(target match
+            case "Int" => v
+            case "Short" => v.map(_.toShort.toInt)
+            case "Byte" => v.map(_.toByte.toInt)
+            case "Char" => v.map(_.toChar.toInt)
+            case _ => None)
+        else v
+      def prefixed(operand: () => Option[Int]): Option[Int] =
+        image(i) match
+          case "-" => i += 1; prefixed(operand).map(v => -v)
+          case "+" => i += 1; prefixed(operand)
+          case "~" => i += 1; prefixed(operand).map(v => ~v)
+          case _ => operand()
       def product(): Option[Int] =
         var acc = primary()
         while acc.isDefined && Set("*", "/", "%")(image(i)) do
           val op = image(i)
           i += 1
-          acc = for a <- acc; b <- primary(); r <- op match
+          acc = for a <- acc; b <- prefixed(() => primary()); r <- op match
               case "*" => Some(a * b)
               case _ if b == 0 => None
               case "/" => Some(a / b)
               case _ => Some(a % b)
           yield r
         acc
+      def unary(): Option[Int] = prefixed(() => product())
       def sum(): Option[Int] =
-        var acc = product()
+        var acc = unary()
         while acc.isDefined && Set("+", "-")(image(i)) do
           val op = image(i)
           i += 1
-          acc = for a <- acc; b <- product() yield if op == "+" then a + b else a - b
+          acc = for a <- acc; b <- unary() yield if op == "+" then a + b else a - b
         acc
-      val v = sum()
+      def shift(): Option[Int] =
+        var acc = sum()
+        while acc.isDefined && Set("<<", ">>", ">>>")(image(i)) do
+          val op = image(i)
+          i += 1
+          acc = for a <- acc; b <- sum() yield op match
+            case "<<" => a << b
+            case ">>" => a >> b
+            case _ => a >>> b
+        acc
+      def binary(next: () => Option[Int], op: String, f: (Int, Int) => Int): Option[Int] =
+        var acc = next()
+        while acc.isDefined && image(i) == op do
+          i += 1
+          acc = for a <- acc; b <- next() yield f(a, b)
+        acc
+      def and(): Option[Int] = binary(() => shift(), "&", _ & _)
+      def xor(): Option[Int] = binary(() => and(), "^", _ ^ _)
+      def or(): Option[Int] = binary(() => xor(), "|", _ | _)
+      val v = or()
       if i == max.length then v else None
 
     /** The tokens of `max` outside any bracket; a bracket's opener stands for its group. */

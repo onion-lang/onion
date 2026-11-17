@@ -384,6 +384,20 @@ final class ConstructionTyping(
         case Some(result) => break(result)
         case None => // ambiguous/unresolved: fall through to the eager path, which reports E0052 / constructor-not-found
       }
+      // `new A(x -> x * 2)` for `A(f: Int -> Int, k: Int = 1)`: no constructor takes exactly
+      // this many arguments, but exactly one takes them with defaults filled in. Its formals
+      // type the lambda, as they do on the named-argument path (#2919).
+      val ctors = typeRef.constructors
+      val fillsDefaults = ctors.filter {
+        case cd: ConstructorDefinition =>
+          cd.argumentsWithDefaults != null &&
+            node.args.length < cd.argumentsWithDefaults.length &&
+            node.args.length >= cd.minArguments
+        case _ => false
+      }
+      if (fillsDefaults.length == 1 && !ctors.exists(_.getArgs.length == node.args.length)) {
+        break(typeNewObjectWithNamedArgs(node, typeRef, context))
+      }
     }
 
     // Existing positional argument handling. A malleable argument (a

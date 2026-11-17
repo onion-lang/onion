@@ -160,7 +160,7 @@ private[compiler] final class SafeNavigationTypingSupport(
         None
       case Some(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(targetType, method.affiliation)
-        calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
+        calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
           expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
           finalParams => new SafeCall(node.location, target, method, finalParams)
         )
@@ -216,7 +216,7 @@ private[compiler] final class SafeNavigationTypingSupport(
       case CandidateSelection.Selected(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(targetType, method.affiliation)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
-          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
+          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
             expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
               .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams => new SafeCall(node.location, target, method, finalParams)

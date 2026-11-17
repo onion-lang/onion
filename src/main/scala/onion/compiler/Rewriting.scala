@@ -269,11 +269,14 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     }
     // `import { java.lang.String as JS }` in this very file: `JS` is java.lang.String here, so a
     // component written `JS` is a scalar, not a nested record (#2959). Typing still checks the
-    // resolved type against this reading.
+    // resolved type against this reading. A type the module declares under the same name
+    // (`record JS(..)` in any of its files) is what typing resolves `JS` to, so such an alias is
+    // skipped, as `own` is.
     val importedStrings: scala.collection.immutable.Map[String, AST.TypeDescriptor] =
       if (unit.imports == null) scala.collection.immutable.Map.empty
       else unit.imports.mapping.collect {
-        case (alias, "java.lang.String") if alias != "String" && !own.contains(alias) =>
+        case (alias, "java.lang.String")
+            if alias != "String" && !own.contains(alias) && !currentModuleTypeNames.contains(alias) =>
           alias -> (AST.ReferenceType("java.lang.String", true): AST.TypeDescriptor)
       }.toMap
     moduleAliases.filter { case (name, target) => !own.contains(name) && unambiguous(target) } ++ importedStrings ++ own

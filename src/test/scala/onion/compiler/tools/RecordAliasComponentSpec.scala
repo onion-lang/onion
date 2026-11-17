@@ -230,5 +230,26 @@ class RecordAliasComponentSpec extends AbstractShellSpec {
           |""".stripMargin)
       assert(Shell.Success("x null") == r)
     }
+
+    // #2959 panel block: a record the module declares under the alias's name is what typing
+    // resolves `JS` to, so the component stays a nested record, as it was before the fix.
+    it("keeps a record named like an imported String alias a nested record") {
+      val r = runMain(
+        """import { java.lang.String as JS; }
+          |record JS(v: Int) {
+          |  shape doc = json
+          |}
+          |record J(n: JS) {
+          |  shape doc = json
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + J::doc().parse("{\"n\":{\"v\":3}}")
+          |  }
+          |}
+          |""".stripMargin)
+      assert(Shell.Success("Ok[value=J(n=JS(v=3))]") == r)
+    }
   }
 }

@@ -157,7 +157,7 @@ object MigrateCommand:
             err.println(s"$where: this ${e.subject} is false ($FalsePredicate): it does not hold when the build runs it, " +
               "so onion migrate left the file as written.")
           else
-            err.println(s"$where: this ${e.subject}, rewritten as a contract predicate, does not compile, " +
+            err.println(s"$where: this ${e.subject}, ${e.rewrittenAs}, does not compile, " +
               s"so onion migrate left the file as written: ${p.message}")
         }
         err.println("  Fix or remove it, then run onion migrate again, or make the change by hand.")
@@ -185,11 +185,18 @@ object MigrateCommand:
       leftOut.foreach(skippedFile => err.println(s"  left out: ${display(skippedFile)}"))
       err.println("  Fix the error reported for that file and run onion migrate again, or make the change by hand.")
 
+    // The type names the named files declare: a rewrite must not write a bare name another
+    // file gives a meaning of its own (a class `Rand` beside a script that used OnionMath).
+    val declared = files.flatMap { file =>
+      try Migrator.declaredTypes(Files.readString(file, UTF_8))
+      catch case _: IOException => Set.empty
+    }.toSet
+
     files.foreach { file =>
       try
         val source = Files.readString(file, UTF_8)
         texts(file) = source
-        val result = Migrator.migrate(source)
+        val result = Migrator.migrate(source, declared)
         result.notes.foreach(n => note(file, n.line, n.column, n.message))
         if result.changed then
           val alone = Compile.check(Seq(file -> source), classpath)
@@ -230,7 +237,7 @@ object MigrateCommand:
     val failing = (problems: Seq[Compile.Problem], file: Path) =>
       problems.filter(p => p.file.forall(_ == file.toString))
     val atPlace = (p: Compile.Problem, result: Migrator.Result) =>
-      p.file.nonEmpty && result.edits.exists(e => e.line == p.line && e.column == p.column)
+      p.file.nonEmpty && result.edits.exists(_.allPlaces.contains((p.line, p.column)))
 
     // A file may use classes, or a `ret`, another named file declares, so every undecided
     // file is compiled together with every named file that could be read: once as written,
@@ -251,9 +258,36 @@ object MigrateCommand:
       }
       val decides = asWritten.typed && other.isEmpty
       val candidates = pending.keySet.filter(file => !unparsed(file) && failing(asWritten.problems, file).nonEmpty).toSet
+      // A removed library call is rewritten only where the compiler reports it (#3116 block 5):
+      // a `randomInt` it resolved (a user's own `OnionMath`, an inherited method) keeps its
+      // meaning. The compiler reports an inner call before the call around it, so the rewrite
+      // goes in rounds: each round rewrites what the last compile reported at a rewrite's place.
       val withYield =
         if decides && candidates.nonEmpty then
-          located(Compile.check(unit(candidates), classpath), file => candidates(file) || unparsed(file))
+          val full = pending.map { case (file, (_, result)) => file -> result }.toMap
+          val positions = (report: Compile.Report, file: Path) =>
+            report.problems.filter(_.file.contains(file.toString)).map(p => (p.line, p.column)).toSet
+          val reported = mutable.Map[Path, Set[(Int, Int)]]()
+          candidates.foreach(file => reported(file) = positions(asWritten, file))
+          def round(): Compile.Report =
+            candidates.foreach { file =>
+              val (source, _) = pending(file)
+              pending(file) = (source, Migrator.migrate(source, declared, Some(reported(file))))
+            }
+            located(Compile.check(unit(candidates), classpath), file => candidates(file) || unparsed(file))
+          var report = round()
+          var rounds = 1
+          var more = true
+          while more && rounds < MaxRounds do
+            val fresh = candidates.toSeq.map { file =>
+              file -> positions(report, file).filter(at => !reported(file)(at) && full(file).edits.exists(_.allPlaces.contains(at)))
+            }.filter(_._2.nonEmpty)
+            more = fresh.nonEmpty
+            if more then
+              fresh.foreach((file, at) => reported(file) = reported(file) ++ at)
+              report = round()
+              rounds += 1
+          report
         else asWritten
       pending.foreach { case (file, (source, result)) =>
         val mine = failing(asWritten.problems, file)
@@ -282,11 +316,15 @@ object MigrateCommand:
 
   private val FalsePredicate = "E0113"
 
+  /** How many times a nested removed call may be rewritten from the inside out. */
+  private val MaxRounds = 32
+
   /** What a rule's edit replaced, for messages. */
   private def oldSpelling(edit: Migrator.Edit): String =
-    if edit.clause then s"the old ${edit.subject} clause"
-    else if edit.subject == "`self`" then "the retired spelling of `this`"
-    else "the old do-block keyword"
+    edit.oldSpelling.getOrElse(
+      if edit.clause then s"the old ${edit.subject} clause"
+      else if edit.subject == "`self`" then "the retired spelling of `this`"
+      else "the old do-block keyword")
 
   /**
    * The migrated text lexes to the original tokens and comments, except for the rewrites.

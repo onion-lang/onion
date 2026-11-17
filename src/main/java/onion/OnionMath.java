@@ -328,20 +328,8 @@ public final class OnionMath {
         return java.lang.Math.random();
     }
 
-    /**
-     * Returns a random integer between min (inclusive) and max (inclusive).
-     * @param min the minimum value (inclusive)
-     * @param max the maximum value (inclusive)
-     * @return a random integer in the range [min, max]
-     * @throws IllegalArgumentException if max is less than min
-     */
-    public static int randomInt(int min, int max) {
-        if (max < min) {
-            throw new IllegalArgumentException("randomInt: max (" + max + ") must be >= min (" + min + ")");
-        }
-        long span = (long) max - (long) min + 1L;
-        return (int) (min + (long) (java.lang.Math.random() * span));
-    }
+    // A random Int in a range is Rand::nextInt(min, max), whose max is exclusive.
+    // OnionMath::randomInt, whose max was inclusive, was removed (#3069).
 
     // Sign functions
 

@@ -66,13 +66,13 @@ public:
     }
     if !near(OnionMath::hypot(3.0, 4.0), 5.0, "hypot(3, 4)") { failures = failures + 1 }
 
-    // random()/randomInt() are non-deterministic, so only their contract is checked:
+    // random() and Rand::nextInt() are non-deterministic, so only their contract is checked:
     // the value must land inside the documented bounds, not against a fixed answer.
     val r = OnionMath::random()
-    val n = OnionMath::randomInt(1, 10)
+    val n = Rand::nextInt(1, 11)
     val randomInBounds = r >= 0.0 && r < 1.0 && n >= 1 && n <= 10
-    if !randomInBounds { IO::println("  FAIL random()/randomInt(1, 10) out of bounds"); failures = failures + 1 }
-    else { IO::println("\n  ok   random() and randomInt(1, 10) landed in bounds") }
+    if !randomInBounds { IO::println("  FAIL random()/Rand::nextInt(1, 11) out of bounds"); failures = failures + 1 }
+    else { IO::println("\n  ok   random() and Rand::nextInt(1, 11) landed in bounds") }
 
     IO::println("\n" + failures + " failure(s)")
     return failures

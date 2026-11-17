@@ -41,6 +41,12 @@ class StringsEnrichedSpec extends AbstractShellSpec {
         Shell.Success("hello..."))
     }
 
+    it("chars and truncate keep an emoji (surrogate pair) whole") {
+      run(
+        "return Strings::chars(\"a\\uD83D\\uDE00b\").size() + \"|\" + Strings::truncate(\"\\uD83D\\uDE00\\uD83D\\uDE00\\uD83D\\uDE00\", 3, \"\").length()",
+        Shell.Success("3|2"))
+    }
+
     it("center pads on both sides") {
       run(
         "return Strings::center(\"hi\", 6, '*')",

@@ -78,6 +78,33 @@ class PrivateAccessHintSpec extends AbstractShellSpec {
     }
   }
 
+  describe("a protected member of a class that is not Onion source (#2904)") {
+    it("E0013 on a protected JDK method does not call it private") {
+      val msgs = messages(
+        """
+          |import { java.util.ArrayList }
+          |val a = new ArrayList[String]()
+          |a.removeRange(0, 0)
+          |""".stripMargin
+      ).mkString("\n")
+      assert(msgs.contains("E0013"), s"expected E0013, got: $msgs")
+      assert(!msgs.contains("private"), s"removeRange is protected, got: $msgs")
+      assert(!msgs.contains("changed"), s"a call is not a change, got: $msgs")
+    }
+
+    it("E0014 on a protected JDK field does not call it private") {
+      val msgs = messages(
+        """
+          |import { java.util.ArrayList }
+          |val a = new ArrayList[String]()
+          |println(a.modCount)
+          |""".stripMargin
+      ).mkString("\n")
+      assert(msgs.contains("E0014"), s"expected E0014, got: $msgs")
+      assert(!msgs.contains("private"), s"modCount is protected, got: $msgs")
+    }
+  }
+
   describe("a constructor correctly placed under `public:`") {
     it("does not fire the private-access hint") {
       val msgs = messages(

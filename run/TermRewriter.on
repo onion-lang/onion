@@ -12,18 +12,18 @@ import {
 
 // ─── Extension methods ─────────────────────────────────────────────────────────
 extension Int {
-  def abs2(): Int = if self < 0 { 0 - self } else { self }
-  def sign(): Int = if self > 0 { 1 } else if self < 0 { 0 - 1 } else { 0 }
+  def abs2(): Int = if this < 0 { 0 - this } else { this }
+  def sign(): Int = if this > 0 { 1 } else if this < 0 { 0 - 1 } else { 0 }
 }
 
 extension String {
   def repeatS(n: Int): String {
     val sb = new java.lang.StringBuilder()
-    for var i: Int = 0; i < n; i++ { sb.append(self) }
+    for var i: Int = 0; i < n; i++ { sb.append(this) }
     return sb.toString()
   }
   def padR(w: Int): String {
-    var s = self
+    var s = this
     while s.length() < w { s = s + " " }
     return s
   }

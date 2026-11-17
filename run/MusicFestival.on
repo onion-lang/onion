@@ -10,22 +10,22 @@ import { java.util.ArrayList }
 // ── Extension helpers ──────────────────────────────────────────────────────────
 
 extension Int {
-  def pad2(): String = if self < 10 { "0" + self } else { "" + self }
+  def pad2(): String = if this < 10 { "0" + this } else { "" + this }
   def toHHMM(): String {
-    val h: Int = self / 60 + 9
-    val m: Int = self % 60
+    val h: Int = this / 60 + 9
+    val m: Int = this % 60
     return h.pad2() + ":" + m.pad2()
   }
 }
 
 extension String {
   def padR(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }
   def trunc(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n - 2) + ".." }
+    if this.length() <= n { this } else { this.substring(0, n - 2) + ".." }
 }
 
 // ── Enums ─────────────────────────────────────────────────────────────────────

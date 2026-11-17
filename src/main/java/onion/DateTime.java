@@ -38,7 +38,7 @@ public final class DateTime {
      */
     public static String nowString(String pattern) {
         if (pattern == null) return nowString();
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH));
+        return ZonedDateTime.now(LOCAL).format(patternFormatter(pattern));
     }
 
     // ========== Parsing ==========
@@ -75,7 +75,7 @@ public final class DateTime {
     /**
      * Parses a date-time string with the given pattern to epoch milliseconds.
      * A date-only pattern (no time component) resolves to midnight in the local
-     * zone. Throws IllegalArgumentException if the input does not match, rather
+     * zone; an offset or zone in the text (`XXX`, `z`) is honoured, not read as local time. Throws IllegalArgumentException if the input does not match, rather
      * than silently returning epoch 0.
      */
     public static long parse(String dateTime, String pattern) {
@@ -89,15 +89,19 @@ public final class DateTime {
             throw new IllegalArgumentException("invalid date-time pattern \"" + pattern + "\"", e);
         }
         try {
-            return LocalDateTime.parse(dateTime, formatter).atZone(LOCAL).toInstant().toEpochMilli();
-        } catch (java.time.format.DateTimeParseException dt) {
-            // A date-only pattern cannot build a LocalDateTime; parse as a date.
-            try {
-                return LocalDate.parse(dateTime, formatter).atStartOfDay(LOCAL).toInstant().toEpochMilli();
-            } catch (java.time.format.DateTimeParseException d) {
-                throw new IllegalArgumentException(
-                    "cannot parse \"" + dateTime + "\" with pattern \"" + pattern + "\"", d);
-            }
+            // An offset or zone in the text wins over the local zone, as in parse(String).
+            java.time.temporal.TemporalAccessor t = formatter.parseBest(dateTime,
+                java.time.ZonedDateTime::from, java.time.OffsetDateTime::from,
+                LocalDateTime::from, LocalDate::from);
+            if (t instanceof java.time.ZonedDateTime z) return z.toInstant().toEpochMilli();
+            if (t instanceof java.time.OffsetDateTime o) return o.toInstant().toEpochMilli();
+            if (t instanceof LocalDateTime l) return l.atZone(LOCAL).toInstant().toEpochMilli();
+            // Date only: midnight at the offset or zone written in the text, else local.
+            java.time.ZoneId zone = formatter.parse(dateTime).query(java.time.temporal.TemporalQueries.zone());
+            return ((LocalDate) t).atStartOfDay(zone != null ? zone : LOCAL).toInstant().toEpochMilli();
+        } catch (java.time.format.DateTimeParseException d) {
+            throw new IllegalArgumentException(
+                "cannot parse \"" + dateTime + "\" with pattern \"" + pattern + "\"", d);
         }
     }
 
@@ -116,8 +120,16 @@ public final class DateTime {
      */
     public static String format(long epochMillis, String pattern) {
         if (pattern == null) return format(epochMillis);
-        LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), LOCAL);
-        return ldt.format(DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH));
+        // A zoned value, so zone and offset letters (z, XXX, VV) work as well.
+        return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), LOCAL).format(patternFormatter(pattern));
+    }
+
+    private static DateTimeFormatter patternFormatter(String pattern) {
+        try {
+            return DateTimeFormatter.ofPattern(pattern, java.util.Locale.ENGLISH);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("invalid date-time pattern \"" + pattern + "\"", e);
+        }
     }
 
     // ========== Components ==========

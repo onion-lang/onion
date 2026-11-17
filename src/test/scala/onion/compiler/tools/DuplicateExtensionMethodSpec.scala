@@ -28,8 +28,8 @@ class DuplicateExtensionMethodSpec extends AbstractShellSpec {
       val results = errors(
         """
           |extension Double {
-          |  def pct(): String = "" + self
-          |  def pct(): String = "" + self
+          |  def pct(): String = "" + this
+          |  def pct(): String = "" + this
           |}
           |class Test {
           |public:
@@ -48,8 +48,8 @@ class DuplicateExtensionMethodSpec extends AbstractShellSpec {
       val results = errors(
         """
           |extension Double {
-          |  def fmt(): String = "" + self
-          |  def fmt(prefix: String): String = prefix + self
+          |  def fmt(): String = "" + this
+          |  def fmt(prefix: String): String = prefix + this
           |}
           |class Test {
           |public:
@@ -64,10 +64,10 @@ class DuplicateExtensionMethodSpec extends AbstractShellSpec {
       val results = errors(
         """
           |extension Double {
-          |  def label(): String = "" + self
+          |  def label(): String = "" + this
           |}
           |extension Int {
-          |  def label(): String = "" + self
+          |  def label(): String = "" + this
           |}
           |class Test {
           |public:

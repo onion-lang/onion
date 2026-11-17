@@ -101,7 +101,7 @@ class StdlibNoLongerDefaultImportedHintSpec extends AbstractShellSpec {
           |class Box {
           |public:
           |  val value: Int
-          |  def this(value: Int) { self.value = value }
+          |  def this(value: Int) { this.value = value }
           |}
           |def main(): void {
           |  val b = new Box(1)

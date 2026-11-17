@@ -54,12 +54,12 @@ public:
 // ── Extension methods ────────────────────────────────────────────────────
 
 extension Int {
-  def dayLabel(): String = if self == 1 { "1 day" } else { "#{self} days" }
+  def dayLabel(): String = if this == 1 { "1 day" } else { "#{this} days" }
 }
 
 extension Double {
   def pct(): String {
-    val i: Int = (self * 10.0).intValue()
+    val i: Int = (this * 10.0).intValue()
     val whole: Int = i / 10
     val frac: Int = i % 10
     return "#{whole}.#{frac}%"
@@ -101,8 +101,8 @@ public:
   val name: String
 
   def this(n: String) {
-    self.name = n
-    self.patients = []
+    this.name = n
+    this.patients = []
   }
 
   def admit(p: Patient): void {

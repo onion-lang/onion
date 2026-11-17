@@ -65,9 +65,9 @@ public final class FileResource {
             // Byte-faithful on purpose: readText() reassembles lines through the
             // platform separator and drops a trailing newline, either of which would
             // silently break L2. A lossless read must see the file as it is.
-            String text = new String(
+            String text = Files.stripBom(new String(
                 java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)),
-                java.nio.charset.StandardCharsets.UTF_8);
+                java.nio.charset.StandardCharsets.UTF_8));
             return shape.parseLossless(text, Origin.atLine(path, 1));
         } catch (Exception e) {
             return Outcome.bad(Defect.at(Origin.atLine(path, 1), "", "a readable file", describe(e)));
@@ -112,7 +112,10 @@ public final class FileResource {
     }
 
     private static String describe(Exception e) {
+        if (e instanceof java.nio.file.NoSuchFileException) return "no such file";
+        if (e instanceof java.nio.file.AccessDeniedException) return "permission denied";
         String m = e.getMessage();
+        if (m != null && m.endsWith("Is a directory")) return "a directory";
         return m == null || m.isEmpty() ? e.getClass().getSimpleName() : m;
     }
 

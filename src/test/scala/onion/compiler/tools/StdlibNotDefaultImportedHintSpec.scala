@@ -25,4 +25,25 @@ class StdlibNotDefaultImportedHintSpec extends AbstractShellSpec {
       assert(msgs.contains("Hash::sha256"), msgs)
     }
   }
+
+  describe("#2925: the hint only names a class whose overload takes the arguments") {
+    it("does not point bytes(String) at Format::bytes(Long)") {
+      val (codes, msgs) = messagesOf("def main(): void {\n  val d = bytes(\"abc\")\n}\n")
+      assert(codes.contains("E0005"), codes.toString)
+      assert(!msgs.contains("Format::bytes"), msgs)
+    }
+    it("does not point sha256(Int) at Hash::sha256(String)") {
+      val (codes, msgs) = messagesOf("def main(): void {\n  val h = sha256(42)\n}\n")
+      assert(codes.contains("E0005"), codes.toString)
+      assert(!msgs.contains("Hash::sha256"), msgs)
+    }
+    it("still hints at Format::bytes for a Long") {
+      val (_, msgs) = messagesOf("def main(): void {\n  IO::println(bytes(1024L))\n}\n")
+      assert(msgs.contains("Format::bytes"), msgs)
+    }
+    it("still hints at Stats::average for a List[Int]") {
+      val (_, msgs) = messagesOf("def main(): void {\n  IO::println(average([1, 2, 3]))\n}\n")
+      assert(msgs.contains("Stats::average"), msgs)
+    }
+  }
 }

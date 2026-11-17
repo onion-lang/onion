@@ -64,7 +64,7 @@ class LambdaBeforeInferredArgSpec extends AbstractShellSpec {
           |class Test {
           |public:
           |  def apply2[A, B](f: Function1[A, B], x: A): B = f.call(x)
-          |  def go(): Integer = self.apply2((s) -> s.length(), "hello")
+          |  def go(): Integer = this.apply2((s) -> s.length(), "hello")
           |  static def main(args: String[]): Integer = new Test().go()
           |}
           |""".stripMargin,

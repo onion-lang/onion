@@ -12,19 +12,19 @@ import {
 
 extension Int {
   def isPrime(): Boolean {
-    if self < 2 { return false }
-    if self == 2 { return true }
-    if self % 2 == 0 { return false }
+    if this < 2 { return false }
+    if this == 2 { return true }
+    if this % 2 == 0 { return false }
     var i: Int = 3
-    while i * i <= self {
-      if self % i == 0 { return false }
+    while i * i <= this {
+      if this % i == 0 { return false }
       i = i + 2
     }
     return true
   }
 
   def gcd(other: Int): Int {
-    var a: Int = if self < 0 { -self } else { self }
+    var a: Int = if this < 0 { -this } else { this }
     var b: Int = if other < 0 { -other } else { other }
     while b != 0 {
       val tmp: Int = b
@@ -34,32 +34,32 @@ extension Int {
     return a
   }
 
-  def lcm(other: Int): Int = (self * other).abs() / self.gcd(other)
+  def lcm(other: Int): Int = (this * other).abs() / this.gcd(other)
 
-  def abs(): Int = if self < 0 { -self } else { self }
+  def abs(): Int = if this < 0 { -this } else { this }
 
   def factorial(): Long {
-    if self < 0 { return -1L }
+    if this < 0 { return -1L }
     var result: Long = 1L
-    foreach i: Int in 2..self {
+    foreach i: Int in 2..this {
       result = result * i
     }
     return result
   }
 
   def toBinary(): String {
-    if self == 0 { return "0" }
-    var n: Int = if self < 0 { -self } else { self }
+    if this == 0 { return "0" }
+    var n: Int = if this < 0 { -this } else { this }
     var bits: String = ""
     while n > 0 {
       bits = "" + (n % 2) + bits
       n = n / 2
     }
-    return if self < 0 { "-" + bits } else { bits }
+    return if this < 0 { "-" + bits } else { bits }
   }
 
   def digits(): List[Int] {
-    val s: String = "" + self.abs()
+    val s: String = "" + this.abs()
     val result: List[Int] = []
     foreach i: Int in 0..<s.length() {
       result.add(s.charAt(i) - '0')
@@ -67,7 +67,7 @@ extension Int {
     return result
   }
 
-  def digitSum(): Int = self.digits().fold(0) { acc, d -> acc + d }
+  def digitSum(): Int = this.digits().fold(0) { acc, d -> acc + d }
 }
 
 extension Double {
@@ -76,40 +76,40 @@ extension Double {
     foreach i: Int in 0..<places {
       factor = factor * 10.0
     }
-    return Math::round(self * factor) / factor
+    return Math::round(this * factor) / factor
   }
 
-  def between(lo: Double, hi: Double): Boolean = self >= lo && self <= hi
+  def between(lo: Double, hi: Double): Boolean = this >= lo && this <= hi
 
-  def lerp(target: Double, t: Double): Double = self + (target - self) * t
+  def lerp(target: Double, t: Double): Double = this + (target - this) * t
 }
 
 extension Long {
-  def isEven(): Boolean = self % 2L == 0L
-  def isOdd(): Boolean = self % 2L != 0L
-  def abs(): Long = if self < 0L { -self } else { self }
+  def isEven(): Boolean = this % 2L == 0L
+  def isOdd(): Boolean = this % 2L != 0L
+  def abs(): Long = if this < 0L { -this } else { this }
 }
 
 extension String {
   def isPalindrome(): Boolean {
-    val n: Int = self.length()
+    val n: Int = this.length()
     foreach i: Int in 0..<(n / 2) {
-      if self.charAt(i) != self.charAt(n - 1 - i) { return false }
+      if this.charAt(i) != this.charAt(n - 1 - i) { return false }
     }
     return true
   }
 
   def countChar(c: Char): Int {
     var count: Int = 0
-    foreach i: Int in 0..<self.length() {
-      if self.charAt(i) == c { count = count + 1 }
+    foreach i: Int in 0..<this.length() {
+      if this.charAt(i) == c { count = count + 1 }
     }
     return count
   }
 
   def toIntOrNull(): Int? {
     try {
-      return JInteger::parseInt(self)
+      return JInteger::parseInt(this)
     } catch e: Exception {
       return null
     }

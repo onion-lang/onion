@@ -33,8 +33,13 @@ object Migrator:
     column: Int,
     note: String,
     subject: String = "`ret`",
-    clause: Boolean = false
-  )
+    clause: Boolean = false,
+    oldSpelling: Option[String] = None,
+    rewrittenAs: String = "rewritten as a contract predicate",
+    places: Seq[(Int, Int)] = Seq.empty
+  ):
+    /** Every position a compile error may name for this edit: its own, and those of the edits folded into it. */
+    def allPlaces: Seq[(Int, Int)] = (line, column) +: places
 
   /** A place a rule left alone, or could not change, with why. */
   final case class Note(line: Int, column: Int, message: String)
@@ -46,7 +51,16 @@ object Migrator:
   final case class Result(text: String, edits: Seq[Edit], notes: Seq[Note]):
     def changed: Boolean = edits.nonEmpty
 
-  def migrate(source: String): Result =
+  /**
+   * `declared` holds the type names other files named alongside declare: a rewrite never
+   * writes a bare name one of them could capture.
+   *
+   * `reported` holds the places the compiler reported an error at in `source` as written, once
+   * a compile has run. A removed library call is rewritten only at such a place (#3116 block 5):
+   * a call the compiler resolved, to a user's own `OnionMath` or an inherited `randomInt`, keeps
+   * its meaning however the rest of the file fails.
+   */
+  def migrate(source: String, declared: Set[String] = Set.empty, reported: Option[Set[(Int, Int)]] = None): Result =
     val (clauses, clauseNotes) = LawExampleToPredicate.find(source)
     val insideClause = (offset: Int) => clauses.exists(c => offset >= c.offset && offset < c.offset + c.length)
     val (last, notLast) = RetToYield.find(source).filterNot((offset, _) => insideClause(offset)).partition(_._2)
@@ -60,8 +74,23 @@ object Migrator:
       val (line, column) = lineColumnOf(source, offset)
       Edit(offset, 3, "yield", line, column, "ret -> yield")
     }
-    val all = (edits ++ clauses).sortBy(_.offset)
-    Result(apply(source, all), all, (notes ++ clauseNotes).sortBy(n => (n.line, n.column)))
+    val selfEdits = SelfToThis.find(source).filterNot(insideClause).map { offset =>
+      val (line, column) = lineColumnOf(source, offset)
+      Edit(offset, 4, "this", line, column, "self -> this", subject = "`self`")
+    }
+    // `self` -> `this` keeps every offset, so the randomInt rule reads the text with it applied:
+    // a `self` in a call's arguments is rewritten inside that call's one edit, and its
+    // position, where the compiler reports E0117, is one of that edit's places.
+    val (randomInts, randomIntNotes) = RandomIntToNextInt.find(apply(source, selfEdits), declared,
+      (line, column) => reported.forall(_.contains((line, column))))
+    val within = (offset: Int, e: Edit) => offset >= e.offset && offset < e.offset + e.length
+    val calls = randomInts.filterNot(e => insideClause(e.offset)).map { call =>
+      val folded = selfEdits.filter(s => within(s.offset, call))
+      call.copy(places = call.places ++ folded.map(s => (s.line, s.column)))
+    }
+    val selves = selfEdits.filterNot(s => calls.exists(call => within(s.offset, call)))
+    val all = (edits ++ selves ++ clauses ++ calls).sortBy(_.offset)
+    Result(apply(source, all), all, (notes ++ clauseNotes ++ randomIntNotes).sortBy(n => (n.line, n.column)))
 
   /**
    * Where the character at `line`:`column` of `result.text` was in `source`, and the edit whose
@@ -121,6 +150,16 @@ object Migrator:
     }
     out ++= source.substring(cursor)
     out.toString
+
+  /** The names `source` declares a type under (`class`, `interface`, `record`, `enum`). */
+  def declaredTypes(source: String): Set[String] =
+    val tokens =
+      try codeTokens(source)
+      catch case _: Exception => IndexedSeq.empty
+    tokens.indices.collect {
+      case i if i + 1 < tokens.length && Set("class", "interface", "record", "enum")(tokens(i).image) &&
+          tokens(i + 1).kind == K.ID => tokens(i + 1).image
+    }.toSet
 
   /** The code tokens of `source`, without comments, in order. */
   private def codeTokens(source: String): IndexedSeq[Token] =
@@ -215,6 +254,327 @@ object Migrator:
           bodies += ((start + 2, image.substring(start + 2, i - 1)))
           from = i
     bodies.toSeq
+
+  /**
+   * `OnionMath::randomInt(min, max)` → `Rand::nextInt(min, max + 1)` (#3069).
+   *
+   * `randomInt` included `max`; `Rand::nextInt` excludes it, so the rewrite adds one to the
+   * second argument. A decimal literal is incremented (`6` → `7`), an argument ending in
+   * `- 1` loses it (`n - 1` → `n`), an argument built only from names, literals, calls and
+   * `+ - * / %` gets `+ 1`, and anything else is parenthesized first (`(a ?: b) + 1`).
+   * `onion.OnionMath::randomInt` is matched too. A `max` is rewritten only when it is a plain
+   * decimal literal below `Int.MAX_VALUE`, or when it reads a variable or a call; any other
+   * max (`2147483647`, `1 << 4`, `Integer::MAX_VALUE - 1`) is noted and left as written
+   * (#3116 block 8). [[MigrateCommand]] rewrites a call only where the compiler
+   * reported an error at its name (`reported`), and keeps the file only when it compiles
+   * rewritten, so a user's own `OnionMath` or an inherited `randomInt` is never touched.
+   */
+  private object RandomIntToNextInt:
+    private val Subject = "`OnionMath::randomInt`"
+
+    /** Tokens that bind at least as tightly as a binary `+`, so `arg + 1` keeps its meaning. */
+    private val Tight = Set(".", "::", "?.", "+", "-", "*", "/", "%")
+
+    /**
+     * Every call in `source`, including those in the code of a string's `#{...}`, which the
+     * lexer keeps inside one string token. A call there is a plain edit inside that token, so
+     * [[MigrateCommand]] checks it as a rewrite within the token, not as whole tokens.
+     */
+    def find(
+      source: String,
+      declared: Set[String] = Set.empty,
+      reported: (Int, Int) => Boolean = (_, _) => true
+    ): (Seq[Edit], Seq[Note]) =
+      val tokens =
+        try codeTokens(source)
+        catch case _: Exception => IndexedSeq.empty
+      find(source, tokens, Spelling(source, tokens, declared), reported)
+
+    /** `reported(line, column)`: may the call whose name is there be the removed method? */
+    private def find(
+      source: String,
+      tokens: IndexedSeq[Token],
+      spelling: Spelling,
+      reported: (Int, Int) => Boolean
+    ): (Seq[Edit], Seq[Note]) =
+      val (edits, notes) = calls(source, tokens, 0, tokens.length, spelling, reported)
+      val interpolated = tokens.flatMap { token =>
+        val bodies = interpolationBodies(token)
+        if bodies.isEmpty then Seq.empty
+        else
+          offsetOf(source, token.beginLine, token.beginColumn)
+            .filter(offset => source.startsWith(token.image, offset))
+            .toSeq
+            .flatMap { offset =>
+              bodies.flatMap { (start, body) =>
+                val bodyTokens =
+                  try codeTokens(body)
+                  catch case _: Exception => IndexedSeq.empty
+                val base = offset + start
+                val at = (line: Int, column: Int) =>
+                  offsetOf(body, line, column).map(o => lineColumnOf(source, base + o)).getOrElse((token.beginLine, token.beginColumn))
+                val (inner, innerNotes) = find(body, bodyTokens, spelling, (line, column) => reported.tupled(at(line, column)))
+                inner.map { e =>
+                  val (line, column) = at(e.line, e.column)
+                  Left(e.copy(offset = base + e.offset, line = line, column = column, clause = false,
+                    places = e.places.map(at.tupled)))
+                } ++ innerNotes.map { n =>
+                  val (line, column) = at(n.line, n.column)
+                  Right(n.copy(line = line, column = column))
+                }
+              }
+            }
+      }
+      (edits ++ interpolated.collect { case Left(e) => e }, notes ++ interpolated.collect { case Right(n) => n })
+
+    /**
+     * How a file spells the old call and the new one.
+     *  - `heads`: the qualifiers that name `onion.OnionMath` here: `OnionMath`, and any alias an
+     *    import gives it (`import { onion.OnionMath as OM; }`).
+     *  - `bare`: a bare `randomInt(...)` may be the old method through a static import
+     *    (`import { onion.OnionMath::* }`), and only there, unless the file names a `randomInt`
+     *    of its own anywhere (a `def`, a `val`, a parameter, a field).
+     *  - `rand`: `Rand`, or `onion.Rand` when this file, or another file named alongside it,
+     *    gives the name `Rand` a meaning of its own (a class, an import, a variable).
+     *  - `skipsBare`: the file imports `randomInt` statically but also names its own, so a bare
+     *    call may be either; each one the compiler reports is noted, never rewritten.
+     */
+    private final case class Spelling(heads: Set[String], bare: Boolean, rand: String, skipsBare: Boolean)
+
+    private object Spelling:
+      def apply(source: String, tokens: IndexedSeq[Token], declared: Set[String]): Spelling =
+        val image = (i: Int) => if i >= 0 && i < tokens.length then tokens(i).image else ""
+        val aliases = tokens.indices.collect {
+          case i if image(i) == "onion" && image(i + 1) == "." && image(i + 2) == "OnionMath" && image(i + 3) == "as" &&
+              i + 4 < tokens.length && tokens(i + 4).kind == K.ID => image(i + 4)
+        }.toSet
+        // OnionMath was never imported by default, so a bare `randomInt` was the old method
+        // only through a static import of it (#3116 block 4).
+        val staticImport = tokens.indices.exists { i =>
+          image(i) == "onion" && image(i + 1) == "." && image(i + 2) == "OnionMath" && image(i + 3) == "::" &&
+            Set("*", "randomInt")(image(i + 4))
+        }
+        // Any other bare `randomInt` (a `def`, a `val`, a parameter, a field) is the file's own
+        // name, and may shadow the import where the call is, so no bare call is rewritten.
+        val member = Set(".", "::", "?.")
+        val ownRandomInt = tokens.indices.exists { i =>
+          image(i) == "randomInt" && !member(image(i - 1)) && (image(i + 1) != "(" || image(i - 1) == "def")
+        }
+        val ownRand = declared.contains("Rand") || tokens.indices.exists { i =>
+          image(i) == "Rand" && image(i + 1) != "::" && !(image(i - 1) == "." && image(i - 2) == "onion")
+        }
+        Spelling(Set("OnionMath") ++ aliases, staticImport && !ownRandomInt, if ownRand then "onion.Rand" else "Rand",
+          staticImport && ownRandomInt)
+
+    /** The index of the first token of an old call whose `(` is at `open`, if one ends there. */
+    private def head(tokens: IndexedSeq[Token], open: Int, spelling: Spelling): Option[Int] =
+      val image = (i: Int) => if i >= 0 && i < tokens.length then tokens(i).image else ""
+      val member = Set(".", "::", "?.")
+      if image(open) != "(" || image(open - 1) != "randomInt" then None
+      else if image(open - 2) == "::" then
+        val q = open - 3
+        if image(q) == "OnionMath" && image(q - 1) == "." && image(q - 2) == "onion" && !member(image(q - 3)) then Some(q - 2)
+        else if spelling.heads(image(q)) && q >= 0 && tokens(q).kind == K.ID && !member(image(q - 1)) then Some(q)
+        else None
+      else if spelling.bare && !member(image(open - 2)) && image(open - 2) != "def" then Some(open - 1)
+      else None
+
+    /**
+     * The calls whose tokens lie in `[from, until)`. A call in another call's arguments is
+     * rewritten inside that call's one edit, so edits never overlap; its position is kept as
+     * one of that edit's places, since the compiler reports the inner call first.
+     */
+    private def calls(
+      source: String,
+      tokens: IndexedSeq[Token],
+      from: Int,
+      until: Int,
+      spelling: Spelling,
+      reported: (Int, Int) => Boolean
+    ): (Seq[Edit], Seq[Note]) =
+      val edits = mutable.Buffer[Edit]()
+      val notes = mutable.Buffer[Note]()
+      var i = from
+      while i < until do
+        head(tokens, i, spelling) match
+          case Some(first) if first >= from =>
+            arguments(tokens, i).filter(_._2 < until) match
+              case None => i += 1
+              case Some((comma, close)) =>
+                val (inner, innerNotes) = calls(source, tokens, i + 1, close, spelling, reported)
+                notes ++= innerNotes
+                val name = tokens(i - 1)
+                if !reported(name.beginLine, name.beginColumn) then edits ++= inner
+                else
+                  rewrite(source, tokens, first, i, comma, close, inner, spelling) match
+                    case Right(e) => edits += e
+                    case Left(n) =>
+                      notes ++= n
+                      edits ++= inner
+                i = close + 1
+          case _ =>
+            if spelling.skipsBare && skippedBare(tokens, i) then
+              val name = tokens(i - 1)
+              if reported(name.beginLine, name.beginColumn) then
+                notes += Note(name.beginLine, name.beginColumn,
+                  s"this randomInt may be $Subject or the file's own randomInt; left as written. " +
+                    "If it is the removed method, write Rand::nextInt(min, max + 1)")
+            i += 1
+      (edits.toSeq, notes.toSeq)
+
+    /** Whether the `(` at `open` follows a bare `randomInt` name that is not a declaration. */
+    private def skippedBare(tokens: IndexedSeq[Token], open: Int): Boolean =
+      val image = (i: Int) => if i >= 0 && i < tokens.length then tokens(i).image else ""
+      image(open) == "(" && image(open - 1) == "randomInt" && !Set(".", "::", "?.", "def")(image(open - 2))
+
+    private def rewrite(
+      source: String,
+      tokens: IndexedSeq[Token],
+      first: Int,
+      open: Int,
+      comma: Int,
+      close: Int,
+      inner: Seq[Edit],
+      spelling: Spelling
+    ): Either[Option[Note], Edit] =
+      val result = for
+        from <- start(source, tokens(first))
+        paren <- start(source, tokens(open))
+        maxFrom <- start(source, tokens(comma + 1))
+        last = tokens(close - 1)
+        maxTo <- start(source, last).map(_ + last.image.length)
+        closeAt <- start(source, tokens(close))
+      yield (from, paren, maxFrom, maxTo, closeAt)
+      result match
+        case None => Left(None)
+        case Some((from, paren, maxFrom, maxTo, closeAt)) =>
+          val max = tokens.slice(comma + 1, close)
+          // The compiler reports the missing method at `randomInt`, so the edit is placed there.
+          val name = tokens(open - 1)
+          val (line, column) = (name.beginLine, name.beginColumn)
+          // `source` from `a` to `b`, with the calls inside it already rewritten.
+          val rewritten = (a: Int, b: Int) =>
+            apply(source.substring(a, b), inner.filter(e => e.offset >= a && e.offset < b).map(e => e.copy(offset = e.offset - a)))
+          plusOne(rewritten(maxFrom, maxTo), max) match
+            case Left(why) =>
+              Left(Some(Note(line, column,
+                s"this $Subject $why; left as written")))
+            case Right(newMax) =>
+              val replacement = spelling.rand + "::nextInt" + rewritten(paren, maxFrom) + newMax + rewritten(maxTo, closeAt + 1)
+              Right(Edit(from, closeAt + 1 - from, replacement, line, column,
+                "OnionMath::randomInt(min, max) -> Rand::nextInt(min, max + 1)",
+                subject = Subject, clause = true, oldSpelling = Some(s"the removed $Subject"),
+                rewrittenAs = "rewritten as Rand::nextInt",
+                places = inner.flatMap(_.allPlaces)))
+
+    /**
+     * `Right(text)` for the new max, or `Left(why)` when it is left as written (#3116 block 8).
+     * The rule lists what is rewritten: a plain decimal literal below `Int.MAX_VALUE`, or a max
+     * that reads a variable, a parameter, a field or a call, which the guide tells the user to
+     * check. Every other max is a constant migrate does not evaluate (`1 << 4`,
+     * `Integer::MAX_VALUE - 1`, `2147483647.0 as Int`); it is noted and left for the user to
+     * edit by hand, so no spelling can turn `max + 1` into an overflow.
+     */
+    private def plusOne(text: String, max: IndexedSeq[Token]): Either[String, String] =
+      val digits = text.replace("_", "")
+      val literal = max.length == 1 && max.head.kind == K.INTEGER && digits.nonEmpty && digits.forall(_.isDigit)
+      if literal && BigInt(digits) >= Int.MaxValue then
+        Left("has a max of Int.MAX_VALUE (2147483647), which Rand::nextInt cannot include " +
+          "(its max is exclusive, and max + 1 overflows). Write Rand::nextInt(min - 1, max) + 1 by hand; " +
+          "Rand::nextInt() fits only when min is also Int.MIN_VALUE")
+      else if !literal && !readsVariableOrCall(max) then
+        Left("has a constant max other than a plain number, which the migrate tool does not evaluate. " +
+          "Write Rand::nextInt(min, (max) + 1) by hand, or Rand::nextInt(min - 1, max) + 1 when max is Int.MAX_VALUE")
+      else if literal then
+        Right((BigInt(digits) + 1).toString)
+      else
+        val simple = topLevel(max).forall(t => t.kind == K.ID || t.kind == K.INTEGER || Tight.contains(t.image) ||
+          t.kind == K.K_THIS || t.kind == K.K_SELF || t.image == "(" || t.image == "[")
+        val beforeMinus = if max.length >= 3 then Some(max(max.length - 3)) else None
+        val operand = beforeMinus.exists(t => t.kind == K.ID || t.kind == K.INTEGER || t.image == ")" || t.image == "]")
+        if simple && operand && max(max.length - 2).image == "-" && max.last.image == "1" then
+          Right(text.substring(0, text.lastIndexOf('-')).stripTrailing)
+        else if simple then Right(text + " + 1")
+        else Right("(" + text + ") + 1")
+
+    /**
+     * Whether `max` reads something known only at run time: `this`, a local variable, a
+     * parameter or a field (`n`, `xs.size`), or any call (`f(x)`, `Math::abs(n)`). A name
+     * after `as` is a type, and a dotted name followed by `::` (`Long::`, `java.lang.Integer::`)
+     * is a class, so neither is a variable; a static field read through `::`
+     * (`Long::MAX_VALUE`) is a constant.
+     */
+    private def readsVariableOrCall(max: IndexedSeq[Token]): Boolean =
+      val image = (j: Int) => if j >= 0 && j < max.length then max(j).image else ""
+      val member = Set(".", "::", "?.")
+      // Whether the dotted name that starts at `j` (`a`, `a.b.C`) is followed by `::`.
+      def qualifier(j: Int): Boolean =
+        var k = j
+        while image(k + 1) == "." && k + 2 < max.length && max(k + 2).kind == K.ID do k += 2
+        image(k + 1) == "::"
+      max.indices.exists { j =>
+        val t = max(j)
+        t.kind == K.K_THIS || t.kind == K.K_SELF ||
+          (t.kind == K.ID && image(j + 1) == "(") ||
+          (t.kind == K.ID && !member(image(j - 1)) && image(j - 1) != "as" && !qualifier(j))
+      }
+
+    /** The tokens of `max` outside any bracket; a bracket's opener stands for its group. */
+    private def topLevel(max: IndexedSeq[Token]): Seq[Token] =
+      var depth = 0
+      max.filter { t =>
+        val atTop = depth == 0
+        t.image match
+          case "(" | "[" | "{" => depth += 1
+          case ")" | "]" | "}" => depth -= 1
+          case _ => ()
+        atTop && !Set(")", "]", "}").contains(t.image)
+      }
+
+    /** For the `(` at `open`: the index of the one top-level comma and of the closing `)`. */
+    private def arguments(tokens: IndexedSeq[Token], open: Int): Option[(Int, Int)] =
+      var depth = 0
+      var i = open
+      var commas = List.empty[Int]
+      var close: Option[Int] = None
+      while close.isEmpty && i < tokens.length do
+        tokens(i).image match
+          case "(" | "[" | "{" => depth += 1
+          case ")" | "]" | "}" =>
+            depth -= 1
+            if depth == 0 then close = Some(i)
+          case "," if depth == 1 => commas ::= i
+          case _ => ()
+        i += 1
+      close.flatMap { c =>
+        commas match
+          case comma :: Nil if comma > open + 1 && c > comma + 1 => Some((comma, c))
+          case _ => None
+      }
+
+    private def start(source: String, token: Token): Option[Int] =
+      offsetOf(source, token.beginLine, token.beginColumn).filter(source.startsWith(token.image, _))
+
+  /**
+   * `self` → `this` (RFC #2788, #2737). `self` is a reserved word that always meant the current
+   * instance, so every `self` code token is the old spelling, and so is every `self` in the
+   * code of a string's `#{...}`. Plain string text, raw and scheme strings, `\#{` escapes,
+   * comments and a backticked `` `self` `` are other tokens, and are left alone.
+   */
+  private object SelfToThis:
+    def find(source: String): Seq[Int] =
+      val tokens =
+        try codeTokens(source)
+        catch case _: Exception => IndexedSeq.empty
+      tokens.flatMap { token =>
+        offsetOf(source, token.beginLine, token.beginColumn)
+          .filter(offset => source.startsWith(token.image, offset))
+          .toSeq
+          .flatMap { offset =>
+            if token.kind == K.K_SELF then Seq(offset)
+            else interpolationBodies(token).flatMap((start, body) => find(body).map(offset + start + _))
+          }
+      }
 
   /**
    * `law name(p: T) { e }` and `example [name] { e }` → a contract predicate (#2740).

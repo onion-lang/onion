@@ -13,7 +13,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 | **Concurrency** | `Future`, `Concurrent` (pools, counters, locks, channels) |
 | **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets`, `Range` (the `a..b`/`a..<b` literal type) |
 | **Text** | `Strings` (case, split, pad, parse), `Text` (wrap/indent/table), `Regex` |
-| **Numbers** | `Math`, `OnionMath` (hyperbolic trig, `clamp`, `hypot`, bounded `randomInt`), `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
+| **Numbers** | `Math`, `OnionMath` (hyperbolic trig, `clamp`, `hypot`), `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
 | **Data formats** | `Json`, `Yaml`, `Csv`, `Config` (dot-notation config access) |
 | **Encoding** | `Codec` (base64/hex/url), `Hash` (md5/sha256/…) |
 | **Functional** | `Option`, `Result`, `Future`, `Outcome` + `Defect` (reading external data) |
@@ -275,7 +275,8 @@ val e: Double = Math::E         // 2.71828...
 ## OnionMath Module
 
 An `onion.*` numeric module, distinct from the JDK's `Math`, covering hyperbolic
-trig, safe rounding/clamping, and a bounded random integer. It is default-imported
+trig, safe rounding/clamping, and a random `Double`. For a random `Int` in a range, use
+`Rand::nextInt(min, max)`. It is default-imported
 like the rest of the standard library, so no explicit import is needed.
 
 ### OnionMath::sin / OnionMath::cos / OnionMath::tan / OnionMath::asin / OnionMath::acos / OnionMath::atan / OnionMath::atan2
@@ -345,14 +346,14 @@ val r: Long = OnionMath::round(3.5)       // 4
 val rf: Int = OnionMath::roundFloat(3.5f) // 4
 ```
 
-### OnionMath::random / OnionMath::randomInt
+### OnionMath::random
 
-Random number generation. Unlike `Math::random`, `randomInt` takes bounds directly
-and is tracked by the effect checker as a `Rand` effect:
+A random `Double`, tracked by the effect checker as a `Rand` effect. For a random `Int` in a
+range, use `Rand::nextInt(min, max)` (below); its `max` is exclusive.
 
 ```onion
 val r: Double = OnionMath::random()          // [0.0, 1.0)
-val n: Int = OnionMath::randomInt(1, 10)     // [1, 10], inclusive
+val n: Int = Rand::nextInt(1, 11)            // 1 to 10
 ```
 
 ### OnionMath::signum / OnionMath::signumFloat
@@ -1251,6 +1252,11 @@ val percent: Int = Rand::nextInt(100)     // 0 to 99
 val d20: Int = Rand::nextInt(1, 21)       // 1 to 20 (min, exclusive max)
 ```
 
+The `max` is exclusive, as in `a..<b`, Java's `ThreadLocalRandom` and Kotlin's
+`Random.nextInt(from, until)`. So `Rand::nextInt(0, xs.size)` is a valid index of `xs`.
+`OnionMath`'s `randomInt`, whose `max` was inclusive, was removed
+(see `docs/migration/pre-1.0.md`).
+
 ### Rand::nextLong (bounded)
 
 Generate a random long in a range:
@@ -1413,6 +1419,7 @@ String utilities (`onion.Strings`, auto-imported):
 ```onion
 Strings::split("a,b,c", ",")          // List[String] ["a","b","c"]
 Strings::splitRegex("a1b2c", "[0-9]") // List[String] ["a","b","c"]
+Strings::split("a,b,,", ",")          // ["a","b","",""]: trailing empty fields are kept
 Strings::join(parts, "-")             // arrays or Lists
 Strings::upper(s) / Strings::lower(s) / Strings::trim(s)
 Strings::replace(s, "a", "b") / Strings::replaceRegex(s, "[0-9]+", "#")
@@ -1673,6 +1680,9 @@ Json::stringify(0.0d / 0.0d)           // "null"
 record Point(x: Int, y: Int)
 Json::stringify(new Point(1, 2))       // {"x":1,"y":2}
 
+// A Set or a Java array is a JSON array too, in iteration order
+Json::stringify(Colls::toList(args))   // ["a","b"]; Json::stringify(args) gives the same
+
 // Navigable wrapper: index with [] and convert with as-methods
 val v = Json::value(jsonText)
 v["users"][0]["name"].asString()
@@ -1703,6 +1713,9 @@ another "absent" case rather than an error to handle separately:
 ```onion
 val obj = Json::parseOrNull("not json")   // null, no exception
 ```
+
+Nesting is limited to 512 levels. Deeper input is a `Json.JsonParseException`
+("Nesting too deep"), so `parseOrNull` returns `null` for it.
 
 When you do want to handle a malformed-input failure, `Json.JsonParseException` carries
 `getPosition()` — the character offset into the input where parsing gave up — in addition
@@ -1736,8 +1749,8 @@ exactly the same `toMap` / `fromMap` core as `derive!(Json)`.
 Scope: a flat block mapping, or a top-level block sequence of flat mappings (no
 nested maps/sequences within an element, no anchors, no tags, no flow collections). A
 construct outside that scope raises an error rather than silently losing data:
-`Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List value,
-and `Yaml::parse` throws `Yaml.YamlParseException` on:
+`Yaml::stringify` throws `IllegalArgumentException` on a nested Map/List value, a
+List element that is not a Map, an empty Map element, and NaN or an infinity, and `Yaml::parse` throws `Yaml.YamlParseException` on:
 
 - a nested mapping: a line indented deeper than its siblings, at the top level or
   inside a sequence element
@@ -1929,6 +1942,8 @@ naming the line where the quote was opened, rather than swallowing the rest of t
 ```onion
 val rows = Csv::parse(text)                  // List of List of String
 val recs = Csv::parseWithHeader(text)        // List of Map (header -> value)
+                                             // a repeated header keeps its last column;
+                                             // a different value in an earlier one throws
 
 Csv::column(rows, 0)                          // one positional column
 Csv::columnByName(recs, "age")                // one header-named column
@@ -2074,6 +2089,18 @@ Text::table([["Name", "Dept"], ["Alice", "Eng"], ["Bob", "Sales"]])
 // Bob    Sales
 ```
 
+`wrap` and `table` measure width in terminal columns: a full-width (Japanese,
+Chinese, Korean) character counts as two. `wrap` breaks at spaces, and also between
+full-width characters, so text with no spaces wraps too:
+
+```onion
+Text::wrap("吾輩は猫である。名前はまだ無い。", 10)
+// ["吾輩は猫で", "ある。名前", "はまだ無", "い。"]
+```
+
+Closing punctuation (`。`, `」`) never starts a line, and an opening bracket (`「`)
+never ends one.
+
 Each is also a builtin extension method on its receiver (`String` for
 `wrap`/`indent`/`dedent`, `List` for `table`):
 
@@ -2109,9 +2136,12 @@ val parsed = Args::parse(args)
 parsed.flag("verbose")                  // --verbose
 parsed.option("out", "a.out")           // --out path (with default)
 parsed.option("out")                    // --out path, or null if absent
-parsed.intOption("level", 3)
+parsed.intOption("level", 3)              // default only when absent; "--level x" throws
 parsed.positional()                     // List of non-option arguments
 ```
+
+Call `flag`/`option` before `positional()`: `--name value` is an option or a flag plus a
+positional, and it is decided when asked. A `positional()` read earlier lacks that value.
 
 ## Cli Module
 
@@ -2850,7 +2880,7 @@ Regex::replace("a.b", ".", "\\$")                      // "$$$"  -- literal doll
 ### Splitting
 
 ```
-Regex::split(input, pattern): List[String]
+Regex::split(input, pattern): List[String]   // trailing empty fields are kept: ("x;y;;", ";") is 4 fields
 Regex::split(input, pattern, limit): List[String]
 ```
 

@@ -30,7 +30,7 @@ class SafeNavigationPostUpdateSpec extends AbstractShellSpec {
           |class Box {
           |public:
           |  var count: Int
-          |  def this { self.count = 0 }
+          |  def this { this.count = 0 }
           |}
           |def main: void {
           |  val b: Box? = new Box()
@@ -47,7 +47,7 @@ class SafeNavigationPostUpdateSpec extends AbstractShellSpec {
           |class Box {
           |public:
           |  var count: Int
-          |  def this { self.count = 0 }
+          |  def this { this.count = 0 }
           |}
           |def main: void {
           |  val b: Box? = new Box()
@@ -79,7 +79,7 @@ class SafeNavigationPostUpdateSpec extends AbstractShellSpec {
           |class Box {
           |public:
           |  var count: Int
-          |  def this { self.count = 41 }
+          |  def this { this.count = 41 }
           |}
           |class Main {
           |public:
@@ -102,7 +102,7 @@ class SafeNavigationPostUpdateSpec extends AbstractShellSpec {
           |class Box {
           |public:
           |  var count: Int
-          |  def this { self.count = 42 }
+          |  def this { this.count = 42 }
           |}
           |class Main {
           |public:

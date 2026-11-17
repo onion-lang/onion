@@ -97,13 +97,13 @@ public:
 
 extension Int {
   def pluralize(word: String): String =
-    if self == 1 { "1 " + word } else { "" + self + " " + word + "s" }
+    if this == 1 { "1 " + word } else { "" + this + " " + word + "s" }
 }
 
 extension Double {
   def oneDecimal(): String = {
-    val i   = self as Int
-    val frac = ((self - (i as Double)) * 10.0) as Int
+    val i   = this as Int
+    val frac = ((this - (i as Double)) * 10.0) as Int
     "" + i + "." + frac
   }
 }

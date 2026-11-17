@@ -13,14 +13,14 @@ import { java.util.ArrayList }
 extension Double {
   def round2(): Double {
     val factor = 100.0
-    return java.lang.Math::round(self * factor) as Double / factor
+    return java.lang.Math::round(this * factor) as Double / factor
   }
   def round4(): Double {
     val factor = 10000.0
-    return java.lang.Math::round(self * factor) as Double / factor
+    return java.lang.Math::round(this * factor) as Double / factor
   }
   def fmt2(): String {
-    val r = self.round2()
+    val r = this.round2()
     if r < 0.0 { return "-" + (0.0 - r).fmt2() }
     val whole: Long  = r as Long
     val fracRaw: Int = ((r - (whole as Double)) * 100.0 + 0.5) as Int
@@ -28,15 +28,15 @@ extension Double {
     if frac < 10 { return "" + whole + ".0" + frac }
     return "" + whole + "." + frac
   }
-  def fmt4(): String = "" + self.round4()
-  def absD(): Double { if self < 0.0 { return 0.0 - self } else { return self } }
+  def fmt4(): String = "" + this.round4()
+  def absD(): Double { if this < 0.0 { return 0.0 - this } else { return this } }
 }
 
 extension Int {
   def rep(s: String): String {
     var out = ""
     var i   = 0
-    while i < self { out = out + s; i = i + 1 }
+    while i < this { out = out + s; i = i + 1 }
     return out
   }
 }
@@ -216,7 +216,7 @@ class Portfolio {
 
 public:
   def this(name: String) {
-    self.name = name
+    this.name = name
     entries = new ArrayList[PriceResult]()
   }
 

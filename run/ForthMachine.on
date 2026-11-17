@@ -44,18 +44,18 @@ public:
 
 extension String {
   def isInt(): Boolean {
-    try { JInteger::parseInt(self); return true } catch e: Exception { return false }
+    try { JInteger::parseInt(this); return true } catch e: Exception { return false }
   }
-  def toInt(): Int = JInteger::parseInt(self)
+  def toInt(): Int = JInteger::parseInt(this)
   def padLeft(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
   def repeatStr(n: Int): String {
     val sb: StringBuilder = new StringBuilder()
     var i: Int = 0
-    while i < n { sb.append(self); i++ }
+    while i < n { sb.append(this); i++ }
     return sb.toString()
   }
 }

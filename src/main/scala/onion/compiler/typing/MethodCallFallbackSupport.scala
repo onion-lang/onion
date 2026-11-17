@@ -106,7 +106,9 @@ private[compiler] final class MethodCallFallbackSupport(
     targetType: ObjectType,
     context: LocalContext,
     expected: Type,
-    untypedClosureIndices: Set[Int]
+    untypedClosureIndices: Set[Int],
+    // How the resolved call is built; `super.f(..)` passes its own (#2674). Default: `target.f(..)`.
+    buildCall: (Method, Array[Term]) => Option[Term] = null
   ): Option[Term] = {
     val args = argList
 
@@ -216,19 +218,22 @@ private[compiler] final class MethodCallFallbackSupport(
         reportNotFound(nonClosureTypes.values.toArray)
         return None
     }
-    // A method found here may still be out of reach: a superclass's private method called
-    // bare with a lambda (`pim { x -> x }`) compiled and threw IllegalAccessError (#3012).
-    // The eager paths check this in selectSingleMethod; the static core does the same.
-    if (!MemberAccess.isMemberAccessible(method, typing.currentDefinition, targetType)) {
+    // The eager path reports E0013 for a method the caller may not name; without this a
+    // private method taking an untyped lambda compiled and threw IllegalAccessError (#2916).
+    // A `super.f(..)` caller passes `buildCall` and checks access itself.
+    if (buildCall == null && !MemberAccess.isMemberAccessible(method, typing.currentDefinition, target.`type`)) {
       typing.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, name, method.arguments, typing.currentDefinition)
       return None
     }
-    val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
+    val classSubst =TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
     // Preserve positions of the resolved (non-closure) arguments — closure slots
     // stay null — so each unifies against its own formal parameter. Collapsing
     // them shifted a determining argument that follows a closure onto the wrong
     // formal, leaving its type variable unbound (#256).
-    val positionalKnownParams = preliminaryParams
+    // A lambda like `() -> Option::none()` takes its result type from the call's target
+    // type, not the other way round (#3067).
+    val positionalKnownParams =
+      calls.retypeTargetTypedClosures(node, method, args, preliminaryParams, classSubst, context, expected)
     val preliminaryMethodSubst = GenericMethodTypeArguments.inferWithoutDefaults(
       typing, node, method, positionalKnownParams, classSubst, expected
     )
@@ -249,7 +254,7 @@ private[compiler] final class MethodCallFallbackSupport(
             finalParams(i) = null
         }
       } else {
-        finalParams(i) = preliminaryParams(i)
+        finalParams(i) = positionalKnownParams(i)
       }
     }
 
@@ -265,8 +270,8 @@ private[compiler] final class MethodCallFallbackSupport(
 
     for {
       finalProcessedParams <- calls.prepareCallParams(node, argList, method, finalParams, finalExpectedArgs)
+      call <- if (buildCall == null) Some(new Call(target, method, finalProcessedParams)) else buildCall(method, finalProcessedParams)
     } yield {
-      val call = new Call(target, method, finalProcessedParams)
       val castType = TypeSubst.result(method.returnType, classSubst, finalMethodSubst)
       TypeSubst.withCast(call, castType)
     }

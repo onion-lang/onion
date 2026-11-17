@@ -132,6 +132,9 @@ private[compiler] final class ExpressionDispatchSupport(body: TypingBodyPass) {
         body.controlExpressionTyping.typeTryExpression(node, context, expected)
       case node: AST.WhileExpression =>
         body.controlExpressionTyping.typeWhileExpression(node, context)
+      case node @ (_: AST.DoWhileExpression | _: AST.LabeledLoop) =>
+        // A loop as a block's last element (a lambda's tail, #3030) is a statement.
+        body.controlExpressionTyping.typeLoopStatement(node, context)
       case _: AST.YieldStatement | _: AST.DoExpression =>
         None
       case node =>

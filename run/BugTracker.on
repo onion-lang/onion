@@ -96,7 +96,7 @@ public:
 // ── Extension methods on Int ──────────────────────────────────────────────────
 
 extension Int {
-  def storyLabel(): String = select self {
+  def storyLabel(): String = select this {
     case n when n <= 1: "XS"
     case n when n <= 3: "S "
     case n when n <= 5: "M "
@@ -106,7 +106,7 @@ extension Int {
   def priorityBar(): String {
     var s: String = ""
     var i: Int = 0
-    while i < self { s = s + "#"; i++ }
+    while i < this { s = s + "#"; i++ }
     while i < 10  { s = s + "-"; i++ }
     return s
   }
@@ -116,7 +116,7 @@ extension Int {
 
 extension Double {
   def pctStr(): String {
-    val tenths = (self * 10.0) as Int
+    val tenths = (this * 10.0) as Int
     return (tenths / 10) + "." + (tenths % 10) + "%"
   }
 }

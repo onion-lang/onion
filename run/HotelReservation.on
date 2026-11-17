@@ -7,28 +7,28 @@
 // ── Extensions ────────────────────────────────────────────────────────────────
 
 extension Int {
-  def abs(): Int = if self < 0 { -self } else { self }
-  def max(other: Int): Int = if self >= other { self } else { other }
-  def min(other: Int): Int = if self <= other { self } else { other }
+  def abs(): Int = if this < 0 { -this } else { this }
+  def max(other: Int): Int = if this >= other { this } else { other }
+  def min(other: Int): Int = if this <= other { this } else { other }
 }
 
 extension Double {
   def roundCents(): Double {
-    val cents: Int = (self * 100.0 + 0.5).intValue()
+    val cents: Int = (this * 100.0 + 0.5).intValue()
     return (cents as Double) / 100.0
   }
 }
 
 extension String {
   def center(width: Int): String {
-    if self.length() >= width { return self }
-    val pad = width - self.length()
+    if this.length() >= width { return this }
+    val pad = width - this.length()
     val left = pad / 2
     val right = pad - left
     var s = ""
     var i = 0
     while i < left { s = s + " "; i = i + 1 }
-    s = s + self
+    s = s + this
     i = 0
     while i < right { s = s + " "; i = i + 1 }
     return s
@@ -36,7 +36,7 @@ extension String {
   def repeat(n: Int): String {
     var s = ""
     var i = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
 }

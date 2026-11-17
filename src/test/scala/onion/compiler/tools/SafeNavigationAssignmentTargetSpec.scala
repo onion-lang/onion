@@ -28,7 +28,7 @@ class SafeNavigationAssignmentTargetSpec extends AbstractShellSpec {
           |class Box {
           |public:
           |  var count: Int
-          |  def this { self.count = 0 }
+          |  def this { this.count = 0 }
           |}
           |def main: void {
           |  val b: Box? = new Box()
@@ -44,7 +44,7 @@ class SafeNavigationAssignmentTargetSpec extends AbstractShellSpec {
           |class Box {
           |public:
           |  var count: Int
-          |  def this { self.count = 0 }
+          |  def this { this.count = 0 }
           |}
           |def main: void {
           |  val b: Box? = new Box()
@@ -70,7 +70,7 @@ class SafeNavigationAssignmentTargetSpec extends AbstractShellSpec {
           |class Box {
           |public:
           |  var count: Int
-          |  def this { self.count = 42 }
+          |  def this { this.count = 42 }
           |}
           |class Main {
           |public:

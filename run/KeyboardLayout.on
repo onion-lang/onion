@@ -161,7 +161,7 @@ public:
 
 extension Double {
   def fmt2(): String {
-    val x100: Int = (self * 100.0 + 0.5) as Int
+    val x100: Int = (this * 100.0 + 0.5) as Int
     val whole: Int = x100 / 100
     val frac: Int = x100 % 100
     val fracStr: String = if frac < 10 { "0" + frac } else { "" + frac }
@@ -171,7 +171,7 @@ extension Double {
 
 extension Int {
   def lpad(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }

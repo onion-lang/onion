@@ -232,7 +232,16 @@ private[typing] object GenericMethodTypeArguments {
   ) {
     val rootClass = typing.rootClass
     def reportError(node: AST.Node, error: SemanticError, items: AnyRef*): Unit =
-      if (reportErrors) typing.report(error, node, items*)
+      if (reportErrors) {
+        if (finalInference) typing.reportBoundError(callNode, error, node, items*)
+        else typing.report(error, node, items*)
+      }
+    // Set by `withDefaults()` once the constraints are collected: from there on it checks the
+    // type arguments the call is typed with against their bounds, and a bound error found
+    // while reporting is suppressed is kept with the call's term (#2538). A unification
+    // conflict met while collecting, or a preliminary `constrainedOnly()` reading, can come
+    // from a speculative expected type and keeps nothing.
+    private var finalInference = false
     def boxedTypeArg(arg: Type): Type = typing.boxedTypeArgument(arg)
     val typeParams = method.typeParameters
 
@@ -358,6 +367,12 @@ private[typing] object GenericMethodTypeArguments {
                   // binding this same call already inferred from its own
                   // arguments (issue #1972).
                   ()
+                } else if (returnContext && inferredFromArgs.contains(tv.name)) {
+                  // The expected type only disagrees with what the arguments fixed. The call
+                  // keeps the arguments' T, and the use site reports the one mismatch, the
+                  // right way round: `val l: Long? = ident(5)` is "Long? expected, Int used"
+                  // (#2694), not a backwards "Int expected" first.
+                  ()
                 } else {
                   reportError(position, INCOMPATIBLE_TYPE, prev, bound)
                 }
@@ -474,10 +489,14 @@ private[typing] object GenericMethodTypeArguments {
               TypeRelations.boxSupertypeAccepts(typing.table_, applied, raw)
             case _ => true
         }
+        // A parameter fixed through a wildcard (`Collection[? extends T]` given a
+        // `List[String]`) has only a lower constraint, and counts as fixed too:
+        // `val o: Object = Collections::max(xs, c)` keeps T = String (#2857).
+        val argFixed = lowerConstraints.toMap ++ inferred.toMap
         val returnFitsArgs = {
           val names = typeParamsIn(formalReturn, paramNames)
-          names.nonEmpty && names.forall(inferred.contains) && {
-            val argReturn = TypeSubstitution.substituteType(formalReturn, classSubst, inferred.toMap, defaultToBound = false)
+          names.nonEmpty && names.forall(argFixed.contains) && {
+            val argReturn = TypeSubstitution.substituteType(formalReturn, classSubst, argFixed, defaultToBound = false)
             !expectedReturn.isBasicType && TypeRules.isAssignable(expectedReturn, argReturn) &&
               appliedViewFits(expectedReturn, argReturn)
           }
@@ -529,6 +548,7 @@ private[typing] object GenericMethodTypeArguments {
     /** Every type parameter: inferred, else its lower constraint, else its (upper-constrained) bound; violations reported. */
     def withDefaults(): scala.collection.immutable.Map[String, Type] = {
       collect()
+      finalInference = true
       // Parameters an argument or the expected type actually fixed. A `null` argument, an
       // empty `[]`/`[:]` literal, or no mention at all fixes nothing: such a parameter is its
       // bound (or `Object`) by default. Only fixed ones are re-checked against a chained bound.
@@ -587,7 +607,12 @@ private[typing] object GenericMethodTypeArguments {
         // A variable fixes an F-bound only through its own bound, by the rule on #2338:
         // `U extends Comparable[U]` meets `Comparable[U]`, `U extends Comparable[String]`
         // does not. Read by erasure, both would.
+        // A bound that names another parameter (`T extends List[B]`) is read here with that
+        // parameter erased (`List[Object]`), which refuses a valid `List[String]`; a fixed
+        // parameter is checked against the bound with every argument known, below (#2538).
+        val chained = fixedType.isDefined && tp.upperBound.exists(mentionsTypeParam(_, paramNames - name))
         def meetsBound(t: Type): Boolean = (selfBound, t) match
+          case _ if chained => true
           case (applied: AppliedClassType, tv: TypeVariableType) if !(selfBound eq bound) =>
             TypeRelations.typeVariableFitsAppliedBound(applied, tv, typing.table_)
           case _ => isAssignableForBounds(selfBound, t)
@@ -627,7 +652,11 @@ private[typing] object GenericMethodTypeArguments {
           case n: NullableType => n.innerType
           case other => other
         }
-        if (!isAssignableForBounds(upper, argInner)) reportError(callNode, INCOMPATIBLE_TYPE, upper, arg)
+        // A type variable the bound reaches through another parameter (`B := X`, the
+        // caller's own `X`) matches only itself: `List[Integer]` is not a `List[X]`, and
+        // `Integer` is not an `X` (#2976 panel).
+        if (!isAssignableForBounds(upper, argInner) || !TypeRelations.boundVariablesFit(typing.table_, upper, argInner))
+          reportError(callNode, INCOMPATIBLE_TYPE, upper, arg)
       }
 
       finalSubst

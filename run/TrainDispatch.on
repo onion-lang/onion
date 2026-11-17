@@ -34,7 +34,7 @@ interface Reportable {
 
 extension String {
   def padRight(width: Int): String {
-    var s = self
+    var s = this
     while s.length() < width { s = s + " " }
     return s
   }
@@ -42,7 +42,7 @@ extension String {
 
 extension Int {
   def padLeft(width: Int): String {
-    var s = "" + self
+    var s = "" + this
     while s.length() < width { s = " " + s }
     return s
   }

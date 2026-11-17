@@ -22,10 +22,10 @@ import {
 // ── Extension helpers ─────────────────────────────────────────────────────────
 
 extension Int {
-  def abs(): Int = if self < 0 { 0 - self } else { self }
+  def abs(): Int = if this < 0 { 0 - this } else { this }
   def digits(): Int {
-    if self == 0 { return 1 }
-    var n: Int = self.abs()
+    if this == 0 { return 1 }
+    var n: Int = this.abs()
     var d: Int = 0
     while n > 0 { n = n / 10; d++ }
     return d
@@ -33,7 +33,7 @@ extension Int {
 }
 
 extension Long {
-  def abs(): Long = if self < 0L { 0L - self } else { self }
+  def abs(): Long = if this < 0L { 0L - this } else { this }
 }
 
 // ── Core ADT ─────────────────────────────────────────────────────────────────

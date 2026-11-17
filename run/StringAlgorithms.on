@@ -22,37 +22,37 @@ import {
 
 extension Int {
   def rpad(w: Int): String {
-    var s: String = "#{self}"
+    var s: String = "#{this}"
     while s.length() < w { s = s + " " }
     return s
   }
   def lpad(w: Int): String {
-    var s: String = "#{self}"
+    var s: String = "#{this}"
     while s.length() < w { s = " " + s }
     return s
   }
-  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def clamp(lo: Int, hi: Int): Int = if this < lo { lo } else if this > hi { hi } else { this }
 }
 
 extension String {
   def rep(n: Int): String {
     var r: String = ""
     var i: Int = 0
-    while i < n { r = r + self; i++ }
+    while i < n { r = r + this; i++ }
     return r
   }
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def lpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
   def truncate(w: Int): String =
-    if self.length() <= w { self } else { self.substring(0, w - 1) + "…" }
+    if this.length() <= w { this } else { this.substring(0, w - 1) + "…" }
 }
 
 // ─── Domain records ───────────────────────────────────────────────────────────

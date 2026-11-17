@@ -55,7 +55,7 @@ record Order(orderId: String, customer: String, lines: List[OrderLine], status: 
 
 extension Double {
   def fmt(): String = {
-    val cents: Int = (self * 100.0 + 0.5) as Int
+    val cents: Int = (this * 100.0 + 0.5) as Int
     val dollars: Int = cents / 100
     val c: Int = cents % 100
     return "$#{dollars}.#{if c < 10 { "0" + c } else { "#{c}" }}"
@@ -63,12 +63,12 @@ extension Double {
 }
 
 extension Int {
-  def plural(word: String): String = if self == 1 { "1 " + word } else { "#{self} " + word + "s" }
+  def plural(word: String): String = if this == 1 { "1 " + word } else { "#{this} " + word + "s" }
 }
 
 extension String {
   def padRight(n: Int): String = {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }

@@ -107,7 +107,7 @@ public:
   var results: List[MatchReport]  = []
 
   def this(teamList: List[Team]) {
-    self.teams = teamList
+    this.teams = teamList
   }
 
   def addResult(r: MatchReport): void {

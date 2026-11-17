@@ -11,10 +11,10 @@ enum ShapeKind {
 
 extension Double {
   def squared(): Double {
-    return self * self
+    return this * this
   }
   def approx(other: Double): Boolean {
-    return Math::abs(self - other) < 0.0001
+    return Math::abs(this - other) < 0.0001
   }
 }
 

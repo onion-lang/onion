@@ -68,7 +68,7 @@ extension Int {
   def rep(ch: String): String {
     var s = ""
     var i = 0
-    while i < self {
+    while i < this {
       s = s + ch
       i = i + 1
     }
@@ -76,7 +76,7 @@ extension Int {
   }
   // Right-align an integer in a field of width w
   def padNum(w: Int): String {
-    var s = "" + self
+    var s = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -84,7 +84,7 @@ extension Int {
 
 extension String {
   def padRight(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }

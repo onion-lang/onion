@@ -43,6 +43,14 @@ private[compiler] final class MethodTargetTypingSupport(private val bodyContext:
     resolve(node, node.name, target, targetType, isNullablePrimitive)
   }
 
+  /** The `bind` the rewriter makes from a bare statement of a `do[M]` block: its closure
+   *  parameter is the reserved `AST.DoStatementParameter`. */
+  private def isDoStatementBind(node: AST.Node, name: String): Boolean =
+    name == "bind" && (node match {
+      case AST.MethodCall(_, _, _, List(AST.ClosureExpression(_, _, _, List(arg), _, _)), _) => arg.name == AST.DoStatementParameter
+      case _ => false
+    })
+
   /** The receiver a method can be looked up on: an object type as is, a primitive boxed, a wildcard through its upper bound. */
   private def resolve(node: AST.Node, name: String, target: Term, targetType: Type, isNullablePrimitive: Boolean): Option[ResolvedMethodTarget] =
     targetType match {
@@ -50,7 +58,10 @@ private[compiler] final class MethodTargetTypingSupport(private val bodyContext:
         Some(ResolvedMethodTarget(target, objType))
       case basicType: BasicType =>
         if (basicType == BasicType.VOID) {
-          bodyContext.report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, name)
+          if (isDoStatementBind(node, name))
+            bodyContext.report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, name, SemanticErrorReporter.DoStatementVoidHint)
+          else
+            bodyContext.report(CANNOT_CALL_METHOD_ON_PRIMITIVE, node, basicType, name)
           None
         } else if (isNullablePrimitive) {
           // A nullable primitive (e.g. Int?) is already a boxed value at runtime,

@@ -15,16 +15,16 @@ class FenwickTree {
 
 public:
   def this(size: Int) {
-    self.n = size
-    self.tree = new Int[size + 1]
+    this.n = size
+    this.tree = new Int[size + 1]
   }
 
   def this(arr: Int[], size: Int) {
-    self.n = size
-    self.tree = new Int[size + 1]
+    this.n = size
+    this.tree = new Int[size + 1]
     var i: Int = 0
     while i < size {
-      self.update(i + 1, arr[i])
+      this.update(i + 1, arr[i])
       i++
     }
   }
@@ -32,8 +32,8 @@ public:
   // Add delta to the element at 1-based position i.
   def update(i: Int, delta: Int): void {
     var pos: Int = i
-    while pos <= self.n {
-      self.tree[pos] = self.tree[pos] + delta
+    while pos <= this.n {
+      this.tree[pos] = this.tree[pos] + delta
       pos = pos + (pos & (-pos))
     }
   }
@@ -43,7 +43,7 @@ public:
     var sum: Int = 0
     var pos: Int = i
     while pos > 0 {
-      sum = sum + self.tree[pos]
+      sum = sum + this.tree[pos]
       pos = pos - (pos & (-pos))
     }
     return sum
@@ -51,17 +51,17 @@ public:
 
   // Sum of elements in the closed range [l, r] (1-based).
   def rangeQuery(l: Int, r: Int): Int {
-    if l == 1 { return self.query(r) }
-    return self.query(r) - self.query(l - 1)
+    if l == 1 { return this.query(r) }
+    return this.query(r) - this.query(l - 1)
   }
 
   // O(log^2 n) k-th prefix: smallest index i with prefix_sum(i) >= k.
   def kthPrefix(k: Int): Int {
     var lo: Int = 1
-    var hi: Int = self.n
+    var hi: Int = this.n
     while lo < hi {
       val mid: Int = (lo + hi) / 2
-      if self.query(mid) >= k {
+      if this.query(mid) >= k {
         hi = mid
       } else {
         lo = mid + 1
@@ -81,36 +81,36 @@ class SparseTable {
 
 public:
   def this(arr: Int[], size: Int) {
-    self.n = size
+    this.n = size
 
     // Precompute integer log2 table: log2[i] = floor(log2(i)).
-    self.log2 = new Int[size + 1]
+    this.log2 = new Int[size + 1]
     var i: Int = 2
     while i <= size {
-      self.log2[i] = self.log2[i / 2] + 1
+      this.log2[i] = this.log2[i / 2] + 1
       i++
     }
 
     // levels = floor(log2(size)) + 1
-    self.levels = self.log2[size] + 1
+    this.levels = this.log2[size] + 1
 
     // table[j][i] = minimum of arr[i .. i + 2^j - 1]
-    self.table = new Int[self.levels][size]
+    this.table = new Int[this.levels][size]
 
     i = 0
     while i < size {
-      self.table[0][i] = arr[i]
+      this.table[0][i] = arr[i]
       i++
     }
 
     var j: Int = 1
-    while j < self.levels {
+    while j < this.levels {
       val half: Int = 1 << (j - 1)
       i = 0
       while i + (1 << j) - 1 < size {
-        val a: Int = self.table[j - 1][i]
-        val b: Int = self.table[j - 1][i + half]
-        self.table[j][i] = if a < b { a } else { b }
+        val a: Int = this.table[j - 1][i]
+        val b: Int = this.table[j - 1][i + half]
+        this.table[j][i] = if a < b { a } else { b }
         i++
       }
       j++
@@ -119,9 +119,9 @@ public:
 
   // Range minimum of arr[l..r] (0-based, inclusive) in O(1).
   def query(l: Int, r: Int): Int {
-    val k: Int = self.log2[r - l + 1]
-    val a: Int = self.table[k][l]
-    val b: Int = self.table[k][r - (1 << k) + 1]
+    val k: Int = this.log2[r - l + 1]
+    val a: Int = this.table[k][l]
+    val b: Int = this.table[k][r - (1 << k) + 1]
     return if a < b { a } else { b }
   }
 }

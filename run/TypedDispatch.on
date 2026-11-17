@@ -21,9 +21,9 @@
 // ─── Extension methods ─────────────────────────────────────────────────────────
 
 extension Int {
-  def plural(word: String): String = "" + self + " " + (if self == 1 { word } else { word + "s" })
+  def plural(word: String): String = "" + this + " " + (if this == 1 { word } else { word + "s" })
   def pad(n: Int): String {
-    val s = "" + self
+    val s = "" + this
     var r = s
     while r.length() < n { r = " " + r }
     return r
@@ -32,13 +32,13 @@ extension Int {
 
 extension String {
   def padRight(n: Int): String {
-    var r = self
+    var r = this
     while r.length() < n { r = r + " " }
     return r
   }
   def cap(): String {
-    if self.length() == 0 { return self }
-    return self.substring(0, 1).toUpperCase() + self.substring(1)
+    if this.length() == 0 { return this }
+    return this.substring(0, 1).toUpperCase() + this.substring(1)
   }
 }
 
@@ -156,9 +156,9 @@ public:
   var filteredOut: Int
 
   def this(inner: EventBus, minLevel: Int) {
-    self.inner       = inner
-    self.minLevel    = minLevel
-    self.filteredOut = 0
+    this.inner       = inner
+    this.minLevel    = minLevel
+    this.filteredOut = 0
   }
 
   def publish(event: Event): void {
@@ -179,7 +179,7 @@ public:
   val errors:  List[String] = []
 
   def this(callback: (String, String) -> void) {
-    self.onError = callback
+    this.onError = callback
   }
 
   def capture(source: String, msg: String): void {

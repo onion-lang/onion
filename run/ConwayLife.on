@@ -8,19 +8,19 @@
 
 extension Int {
   def clamp(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
+    if this < lo { return lo }
+    if this > hi { return hi }
+    return this
   }
   def padLeft(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }
 }
 
 extension Boolean {
-  def toChar(): String = if self { "#" } else { "." }
+  def toChar(): String = if this { "#" } else { "." }
 }
 
 // ── Grid class ─────────────────────────────────────────────────────────────

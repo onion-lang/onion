@@ -89,8 +89,8 @@ class StaticMethodViaInstanceSelectionSpec extends AbstractShellSpec {
           |class C {
           |public:
           |  static def greet(): String = "hi"
-          |  def wrap2: String = self.greet
-          |  def wrap3: String = self.greet()
+          |  def wrap2: String = this.greet
+          |  def wrap3: String = this.greet()
           |  static def main(args: String[]): void { }
           |}
           |""".stripMargin

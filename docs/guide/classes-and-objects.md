@@ -307,9 +307,9 @@ class Person {
 }
 ```
 
-## The `self` Reference
+## The `this` Reference
 
-Access the current instance with `self`:
+Refer to the current instance with `this`:
 
 ```onion
 import {
@@ -322,12 +322,14 @@ class ButtonHandler conforms ActionListener {
   public:
     def actionPerformed(event :ActionEvent) {
       val button: JButton = event.getSource() as JButton
-      button.addActionListener(self)  // Reference to this instance
+      button.addActionListener(this)  // Reference to this instance
     }
 }
 ```
 
-`this` and `self` are only available in instance contexts; static methods and static fields cannot reference them.
+`this` is only available in instance contexts; static methods and static fields cannot reference it.
+
+Onion used to accept `self` as a second spelling of `this`. It is retired: `self` is now error E0117, and `onion migrate` rewrites it (see the [migration guide](../migration/pre-1.0.md)).
 
 ## Next Steps
 

@@ -45,11 +45,11 @@ record EventLog(timestamp: Long, deviceId: String, action: String, result: Strin
 // === Extension methods on Device (use self.accessor()) ===
 
 extension Device {
-  def label(): String = "[#{self.room()}/#{self.name()}]"
-  def isLight(): Boolean = self.kind() is Light
-  def isThermostat(): Boolean = self.kind() is Thermostat
-  def isCamera(): Boolean = self.kind() is SecurityCamera
-  def isLock(): Boolean = self.kind() is SmartLock
+  def label(): String = "[#{this.room()}/#{this.name()}]"
+  def isLight(): Boolean = this.kind() is Light
+  def isThermostat(): Boolean = this.kind() is Thermostat
+  def isCamera(): Boolean = this.kind() is SecurityCamera
+  def isLock(): Boolean = this.kind() is SmartLock
 }
 
 // === Controller ===

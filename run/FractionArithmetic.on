@@ -7,7 +7,7 @@
 
 extension Int {
   def gcd(other: Int): Int = {
-    val a = if self < 0 { -self } else { self }
+    val a = if this < 0 { -this } else { this }
     val b = if other < 0 { -other } else { other }
     if b == 0 { a } else { b.gcd(a % b) }
   }

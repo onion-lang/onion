@@ -26,12 +26,12 @@ extension Int {
   def repeated(n: Int): String {
     var s = ""
     var i = 0
-    while i < n { s = s + self.toString(); i++ }
+    while i < n { s = s + this.toString(); i++ }
     return s
   }
   def bar(max: Int, width: Int): String {
     if max == 0 { return " ".times(width) }
-    val filled = (self * width) / max
+    val filled = (this * width) / max
     var s = ""
     var i = 0
     while i < width { s = s + (if i < filled { "█" } else { "░" }); i++ }
@@ -41,9 +41,9 @@ extension Int {
 
 extension Double {
   def fmt(dec: Int): String {
-    if dec == 0 { return "" + (self as Int) }
+    if dec == 0 { return "" + (this as Int) }
     val scale = if dec == 1 { 10.0 } else if dec == 2 { 100.0 } else { 1000.0 }
-    val scaled = (self * scale) as Int
+    val scaled = (this * scale) as Int
     val intPart = scaled / (scale as Int)
     val fracPart = scaled % (scale as Int)
     val fracStr = "" + fracPart
@@ -52,7 +52,7 @@ extension Double {
     return "" + intPart + "." + padded
   }
   def padFmt(dec: Int, width: Int): String {
-    val s = self.fmt(dec)
+    val s = this.fmt(dec)
     var r = s
     while r.length() < width { r = " " + r }
     return r
@@ -63,16 +63,16 @@ extension String {
   def times(n: Int): String {
     var s = ""
     var i = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
   def padRight(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = " " + s }
     return s
   }
@@ -105,18 +105,18 @@ class Pheromone {
   var n: Int
 public:
   def this(size: Int) {
-    self.n = size
-    self.matrix = []
+    this.n = size
+    this.matrix = []
     var i = 0
-    while i < size * size { self.matrix.add(1.0); i++ }
+    while i < size * size { this.matrix.add(1.0); i++ }
   }
-  def get(i: Int, j: Int): Double = self.matrix[i * self.n + j]
-  def set(i: Int, j: Int, v: Double): void { self.matrix[i * self.n + j] = v }
+  def get(i: Int, j: Int): Double = this.matrix[i * this.n + j]
+  def set(i: Int, j: Int, v: Double): void { this.matrix[i * this.n + j] = v }
   def evaporate(rate: Double): void {
     var k = 0
-    while k < self.matrix.size {
-      val cur = self.matrix[k]
-      self.matrix[k] = cur * (1.0 - rate)
+    while k < this.matrix.size {
+      val cur = this.matrix[k]
+      this.matrix[k] = cur * (1.0 - rate)
       k++
     }
   }
@@ -124,13 +124,13 @@ public:
     var i = 0
     while i < tour.size - 1 {
       val a = tour[i]; val b = tour[i + 1]
-      self.set(a, b, self.get(a, b) + amount)
-      self.set(b, a, self.get(b, a) + amount)
+      this.set(a, b, this.get(a, b) + amount)
+      this.set(b, a, this.get(b, a) + amount)
       i++
     }
     val last = tour[tour.size - 1]; val first = tour[0]
-    self.set(last, first, self.get(last, first) + amount)
-    self.set(first, last, self.get(first, last) + amount)
+    this.set(last, first, this.get(last, first) + amount)
+    this.set(first, last, this.get(first, last) + amount)
   }
 }
 
@@ -219,29 +219,29 @@ class AntColonyOptimizer {
 public:
   def this(cs: List[City], ants: Int, iters: Int,
            alpha: Double, beta: Double, evap: Double) {
-    self.cities    = cs
-    self.ants      = ants
-    self.iterations = iters
-    self.alpha     = alpha
-    self.beta      = beta
-    self.evapRate  = evap
+    this.cities    = cs
+    this.ants      = ants
+    this.iterations = iters
+    this.alpha     = alpha
+    this.beta      = beta
+    this.evapRate  = evap
   }
 
   def run(): AntTour {
-    val n = self.cities.size
+    val n = this.cities.size
     val phero = new Pheromone(n)
 
     // Nearest-neighbour greedy tour as initial best
     var bestTour: AntTour? = null
 
     var iter = 0
-    while iter < self.iterations {
+    while iter < this.iterations {
       // Each ant builds a tour
       var iterBestTour: AntTour? = null
       var ant = 0
-      while ant < self.ants {
+      while ant < this.ants {
         val start = ant % n
-        val tour  = buildAntTour(start, self.cities, phero, self.alpha, self.beta)
+        val tour  = buildAntTour(start, this.cities, phero, this.alpha, this.beta)
         if iterBestTour == null || tour.isImprovement(iterBestTour) {
           iterBestTour = tour
         }
@@ -255,7 +255,7 @@ public:
       }
 
       // Pheromone update: evaporate then deposit
-      phero.evaporate(self.evapRate)
+      phero.evaporate(this.evapRate)
       if iterBestTour != null {
         val t = (iterBestTour as AntTour)
         val deposit = if t.totalDist() > 0.0001 { 100.0 / t.totalDist() } else { 1.0 }

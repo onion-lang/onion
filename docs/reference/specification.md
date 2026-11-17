@@ -20,6 +20,8 @@ val         var         when        while
 
 Keywords can be used as identifiers by escaping with backticks: `` `class` ``.
 
+`self` is reserved but retired: it is error E0117. Write `this` for the current instance.
+
 ### Identifiers
 
 - Start with a letter or underscore, followed by letters, digits, underscores
@@ -160,8 +162,8 @@ def generic[T](x: T): T { ... }                     // method type params
 Call sites may pass arguments by name (`f(b = 2, a = 1)`); omitted
 parameters fill from defaults. Methods, constructors and records all
 support named arguments and defaults.
-Arguments run in the order they are written; `copy(..)`, `extends A(..)`
-and `: this(..)` still run them in parameter order (#2801).
+Arguments run in the order they are written, `copy(..)` included;
+`extends A(..)` and `: this(..)` still run them in parameter order (#2801).
 
 ### Classes
 
@@ -382,7 +384,8 @@ adding a new format requires only registering its `parse` / `stringify` pair
 in the stdlib — the macro itself does not change.
 
 `from-R?` methods return `null` on parse failure or a type-conversion error;
-they never throw. `to-R` methods always produce a well-formed string.
+they never throw. `to-R` methods produce a well-formed string, except that `toYaml`
+throws `IllegalArgumentException` for a NaN or infinite component, which YAML cannot read back.
 Round-trips hold for scalar components: `fromJson(toJson(v)) == v`.
 
 Supported component types are the eight scalar primitives: `String`, `Int`,
@@ -457,6 +460,9 @@ public:
 Enums compile to JVM enums: `name()`, `ordinal()`, `values()`,
 `valueOf(String)` work. Record-style parameters become final fields with
 accessors; access sections after the constant list declare methods.
+A parameter may declare a default (`enum Level(code: Int, tag: String = "")`);
+a constant that omits the argument gets it (`LOW(1)`), as a record does.
+Arguments may be named, as in `new R(...)`: `HIGH(9, tag = "!")`.
 `select` over an enum checks exhaustiveness when no `else` is present.
 
 #### Algebraic data types (`case` cases)

@@ -362,7 +362,7 @@ class KVStore {
 
 public:
   def this(nodeId: String) {
-    self.nodeId = nodeId
+    this.nodeId = nodeId
     store       = new LinkedHashMap[String, LWWRegister]()
   }
 

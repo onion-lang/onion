@@ -9,35 +9,35 @@
 
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def padLeft(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }
   def rep(n: Int): String {
     var s: String = ""
     var i: Int    = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
 }
 
 extension Int {
   def ipad(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }
-  def thousands(): String = (self as Int).thousandsRec()
+  def thousands(): String = (this as Int).thousandsRec()
   def thousandsRec(): String {
-    if self < 0 { return "-" + (0 - self).thousandsRec() }
-    if self < 1000 { return "" + self }
-    val hi: Int  = self / 1000
-    val lo: Int  = self % 1000
+    if this < 0 { return "-" + (0 - this).thousandsRec() }
+    if this < 1000 { return "" + this }
+    val hi: Int  = this / 1000
+    val lo: Int  = this % 1000
     val loStr: String = if lo < 10 { "00" + lo } else if lo < 100 { "0" + lo } else { "" + lo }
     return hi.thousandsRec() + "," + loStr
   }
@@ -46,11 +46,11 @@ extension Int {
 extension Double {
   def round1(): Double {
     val factor: Long = 10L
-    return (self * factor.doubleValue()).longValue().doubleValue() / factor.doubleValue()
+    return (this * factor.doubleValue()).longValue().doubleValue() / factor.doubleValue()
   }
   def dfmt(): String {
-    val whole: Int  = self.intValue()
-    val rem: Double = self - (whole as Double)
+    val whole: Int  = this.intValue()
+    val rem: Double = this - (whole as Double)
     val frac: Int   = (rem * 10.0 + 0.5).intValue()
     return "" + whole + "." + frac
   }

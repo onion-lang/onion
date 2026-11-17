@@ -229,7 +229,18 @@ final class ClosureTyping(
                 }
 
                 val triesBefore = bodyContext.tryCount
-                val baseBlockOpt =
+                // A side-effect-only tail returns null where the result is open: inferred
+                // from the body, `Object`, or an unpinned type variable. A concrete result
+                // the target fixed (`(Int) -> Int`) needs a value (#3044).
+                // A Java SAM whose result is a type variable (`Map[K, Integer].computeIfAbsent`)
+                // takes null as "no value", as in Java; an Onion function type does not.
+                val javaOpenResult = method.returnType.isInstanceOf[TypeVariableType] &&
+                  !method.affiliation.name.startsWith("onion.Function")
+                val voidTailOk = inferredReturnType.isDefined || javaOpenResult || acceptsVoidTail(expectedRet)
+                val savedBareReturn = context.bareReturnYieldsNull
+                context.bareReturnYieldsNull =
+                  inferredReturnType.contains(BasicType.VOID) && !expectedRet.isBasicType
+                val baseBlockOpt = try {
                   if (useExpressionBody) {
                     // Type the closure body's final (value) expression against the
                     // SAM's expected return type. This flows the expected type into a
@@ -237,11 +248,19 @@ final class ClosureTyping(
                     // `Result[Int, String]`) so its type arguments are pinned by the
                     // expected type rather than defaulting to Object (issue #230).
                     body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
-                      Option(buildReturnBlock(node.body, bodyTerm, expectedRet))
+                      Option(buildReturnBlock(node.body, bodyTerm, expectedRet, voidTailOk))
+                    }
+                  } else if (hasValueTail(node.body)) {
+                    // A block lambda with an early `return` returns its last expression
+                    // by the same rule as one without (#3025): the tail is typed against
+                    // the expected return type, as one more `return`.
+                    body.typed(node.body, context, expectedRet).flatMap { bodyTerm =>
+                      Option(buildTailReturnBlock(node.body, bodyTerm, expectedRet, voidTailOk))
                     }
                   } else {
                     Option(body.translate(node.body, context))
                   }
+                } finally context.bareReturnYieldsNull = savedBareReturn
                 if (baseBlockOpt.isEmpty) {
                   None
                 } else {
@@ -619,10 +638,17 @@ final class ClosureTyping(
         body.openClosure(context) {
           if (addClosureArguments(node.args, argTypes, context, node.body).isDefined) {
             val collected = context.startReturnTypeCollection()
-            val translated = body.translate(node.body, context)
+            // The last expression counts as one more `return` (#3025).
+            val (translated, tailType) =
+              if (hasValueTail(node.body)) {
+                body.typed(node.body, context, samReturnTemplate) match {
+                  case Some(term) => (term, Option(lastTerm(term).`type`))
+                  case None => (null, None)
+                }
+              } else (body.translate(node.body, context), None)
             context.stopReturnTypeCollection()
             if (translated != null) {
-              result = foldReturnLub(node, collected.toSeq)
+              result = foldReturnLub(node, collected.toSeq ++ tailType.filter(_ != BasicType.VOID))
             }
           }
         }
@@ -655,7 +681,7 @@ final class ClosureTyping(
     TypeCheckingHelpers.leastUpperBound(bodyContext.table, node, left, right, bodyContext.rootClass,
       (n, l, r) => bodyContext.report(INCOMPATIBLE_TYPE, n, l, r))
 
-  private def buildReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type): ActionStatement = {
+  private def buildReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type, voidTailOk: Boolean): ActionStatement = {
     val terms = bodyTerm match {
       case begin: Begin => begin.terms.toIndexedSeq
       case single => IndexedSeq(single)
@@ -664,34 +690,40 @@ final class ClosureTyping(
       return new StatementBlock(node.location, new Return(defaultValue(returnType)))
     }
 
+    val locations = elementLocations(node, terms.length)
     val statements = scala.collection.mutable.ArrayBuffer[ActionStatement]()
     var i = 0
     while (i < terms.length - 1) {
-      statements += termToStatement(terms(i))
+      statements += termToStatement(terms(i), locations(i))
       i += 1
     }
 
     val last = terms.last
     val lastStatement =
       if (returnType == BasicType.VOID || returnType.isBottomType) {
-        val stmt = termToStatement(last)
+        val stmt = termToStatement(last, locations.last)
         statements += stmt
         new Return(defaultValue(returnType))
-      } else if (last.`type` == BasicType.VOID && !returnType.isBasicType) {
-        // Side-effect-only body against a reference-typed SAM return
+      } else if (last.`type` == BasicType.VOID && (voidTailOk || neverCompletes(last))) {
+        // Side-effect-only body against an `Object` or still-open SAM return
         // (e.g. Future::async(() -> IO::println(...))): run it, return null
-        statements += termToStatement(last)
+        statements += termToStatement(last, locations.last)
         new Return(new NullValue(node.location))
+      } else if (last.`type` == BasicType.VOID) {
+        // A concrete result type (`(Int) -> Int`, `Supplier[String]`) and a tail
+        // with no value: the lambda would return null/0 (#3044). Report it at the tail.
+        bodyContext.report(INCOMPATIBLE_TYPE, tailNode(node), returnType, BasicType.VOID)
+        return null
       } else {
         last match {
           case st: StatementTerm =>
             val assigned = processAssignable(node, returnType, st)
             if (assigned == null) return null
-            new Return(assigned)
+            returnAt(locations.last, assigned)
           case _ =>
             val assigned = processAssignable(node, returnType, last)
             if (assigned == null) return null
-            new Return(assigned)
+            returnAt(locations.last, assigned)
         }
       }
 
@@ -699,10 +731,96 @@ final class ClosureTyping(
     new StatementBlock(statements.asJava)
   }
 
-  private def termToStatement(term: Term): ActionStatement = term match {
-    case st: StatementTerm => st.statement
-    case other => new ExpressionActionStatement(other)
+  /**
+   * Whether a block lambda body ends in an expression that can be its value: anything
+   * but a `return`/`throw`/`break`/`continue`, which already end the path. An
+   * assignment counts, as it does in a lambda with no `return` (`{ k += 7 }` returns
+   * the new value).
+   */
+  private def hasValueTail(node: AST.BlockExpression): Boolean = node.elements.lastOption match {
+    case Some(_: AST.ReturnExpression | _: AST.ThrowExpression |
+              _: AST.BreakExpression | _: AST.ContinueExpression) => false
+    case Some(_: AST.Expression) => true
+    case _ => false
   }
+
+  private def lastTerm(bodyTerm: Term): Term = bodyTerm match {
+    case begin: Begin if begin.terms.nonEmpty => begin.terms.last
+    case single => single
+  }
+
+  /**
+   * The body of a block lambda that has an early `return` and a value tail: the
+   * tail becomes one more `return`. A tail with no value (void, or one that never
+   * completes) stays a statement, and the caller appends the default return, as
+   * before. Returns null when the tail's type does not fit (reported).
+   */
+  private def buildTailReturnBlock(node: AST.BlockExpression, bodyTerm: Term, returnType: Type, voidTailOk: Boolean): ActionStatement = {
+    val terms = bodyTerm match {
+      case begin: Begin => begin.terms.toIndexedSeq
+      case single => IndexedSeq(single)
+    }
+    val locations = elementLocations(node, terms.length)
+    val statements = scala.collection.mutable.ArrayBuffer[ActionStatement]()
+    terms.init.zip(locations).foreach { case (t, at) => statements += termToStatement(t, at) }
+    if (terms.nonEmpty) {
+      val last = terms.last
+      if (returnType == BasicType.VOID || returnType.isBottomType || last.`type`.isBottomType ||
+          (last.`type` == BasicType.VOID && (voidTailOk || neverCompletes(last)))) {
+        statements += termToStatement(last, locations.last)
+      } else if (last.`type` == BasicType.VOID) {
+        // As in buildReturnBlock: no value to return for a concrete result type (#3044).
+        bodyContext.report(INCOMPATIBLE_TYPE, tailNode(node), returnType, BasicType.VOID)
+        return null
+      } else {
+        val assigned = processAssignable(node, returnType, last)
+        if (assigned == null) return null
+        statements += returnAt(locations.last, assigned)
+      }
+    }
+    new StatementBlock(statements.asJava)
+  }
+
+  /**
+   * Whether a SAM result type leaves a void tail acceptable: any nullable result, `Void`,
+   * `Object` (what an inferred side-effect body becomes) or a type variable nothing pinned.
+   * The body then returns null. A non-null result such as `Int` or `String` needs a value,
+   * as in Java (#3044). A tail that never completes (`while true`) is always fine.
+   */
+  private def acceptsVoidTail(returnType: Type): Boolean = returnType match {
+    case _: TypedAST.NullableType => true
+    case t: ClassType if t.name == "java.lang.Void" => true
+    case t => t == bodyContext.rootClass || t.isInstanceOf[TypeVariableType]
+  }
+
+  /** A tail that cannot complete normally (an infinite loop, `return`, `throw`) needs no value. */
+  private def neverCompletes(term: Term): Boolean =
+    StatementReachability.definitelyReturns(termToStatement(term))
+
+  /** The block's last element, where a problem with the lambda's result is reported. */
+  private def tailNode(node: AST.BlockExpression): AST.Node =
+    node.elements.lastOption.getOrElse(node)
+
+  private def termToStatement(term: Term, at: Location = null): ActionStatement = term match {
+    case st: StatementTerm => st.statement
+    case other => new ExpressionActionStatement(if (other.location != null) other.location else at, other)
+  }
+
+  /**
+   * The source location of each term of a block lambda's body, so the statement built
+   * for it carries a line number (#2902). Most typed terms carry no location of their
+   * own, so take it from the element they were typed from; the two line up one-to-one
+   * unless typing split or merged elements, and then there is nothing reliable to use.
+   */
+  private def elementLocations(node: AST.BlockExpression, count: Int): IndexedSeq[Location] = {
+    val elements = node.elements
+    if (elements.length == count) elements.map(_.location).toIndexedSeq
+    else IndexedSeq.fill(count)(null)
+  }
+
+  /** A `return` of a lambda's value, at the line of the expression it returns (#2902). */
+  private def returnAt(at: Location, value: Term): Return =
+    new Return(if (value.location != null) value.location else at, value)
 
   private def processAssignable(node: AST.Node, expected: Type, term: Term): Term =
     body.processAssignable(node, expected, term)

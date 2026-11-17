@@ -73,11 +73,11 @@ interface Summarizable {
 
 extension Double {
   def round1(): Double {
-    val x = (self * 10.0 + 0.5) as Int
+    val x = (this * 10.0 + 0.5) as Int
     return (x as Double) / 10.0
   }
   def fmt1(): String {
-    val i = (self * 10.0 + 0.5) as Int
+    val i = (this * 10.0 + 0.5) as Int
     val whole = i / 10
     val frac  = i % 10
     return "" + whole + "." + frac
@@ -87,14 +87,14 @@ extension Double {
 extension Int {
   def pct(total: Int): String {
     if total == 0 { return "0.0%" }
-    val p = ((self as Double) / (total as Double) * 100.0).round1()
+    val p = ((this as Double) / (total as Double) * 100.0).round1()
     return p.fmt1() + "%"
   }
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
@@ -108,9 +108,9 @@ class SurveyRound conforms Summarizable {
   var statuses: List[FeedbackStatus]
 public:
   def this(title: String) {
-    self.title    = title
-    self.entries  = []
-    self.statuses = []
+    this.title    = title
+    this.entries  = []
+    this.statuses = []
   }
   def addEntry(e: FeedbackEntry): void {
     entries.add(e)
@@ -146,8 +146,8 @@ class FeedbackRepository {
   val profiles: List[CustomerProfile]
 public:
   def this() {
-    self.rounds   = []
-    self.profiles = []
+    this.rounds   = []
+    this.profiles = []
   }
   def addRound(r: SurveyRound): void    { rounds.add(r) }
   def addProfile(p: CustomerProfile): void { profiles.add(p) }

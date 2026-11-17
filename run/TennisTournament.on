@@ -26,15 +26,15 @@ enum Round(label: String, loserPrizeUSD: Int, winnerPrizeUSD: Int) {
 
 record Player(name: String, ranking: Int, nationality: String) {
 public:
-  def display(): String = "#{self.name} (#{self.nationality}, ##{self.ranking})"
+  def display(): String = "#{this.name} (#{this.nationality}, ##{this.ranking})"
 }
 
 record SetScore(playerOneGames: Int, playerTwoGames: Int, wasTiebreak: Boolean) {
 public:
-  def winner(): Int = if self.playerOneGames > self.playerTwoGames { 1 } else { 2 }
+  def winner(): Int = if this.playerOneGames > this.playerTwoGames { 1 } else { 2 }
   def show(): String {
-    val base: String = "#{self.playerOneGames}-#{self.playerTwoGames}"
-    return if self.wasTiebreak { base + "(TB)" } else { base }
+    val base: String = "#{this.playerOneGames}-#{this.playerTwoGames}"
+    return if this.wasTiebreak { base + "(TB)" } else { base }
   }
 }
 
@@ -46,19 +46,19 @@ record MatchResult(
   round: Round
 ) {
 public:
-  def winner(): Player = if self.winnerIndex == 1 { self.player1 } else { self.player2 }
-  def loser(): Player = if self.winnerIndex == 1 { self.player2 } else { self.player1 }
-  def setsWonByP1(): Int = self.sets.filter((s: SetScore) -> s.winner() == 1).size
-  def setsWonByP2(): Int = self.sets.filter((s: SetScore) -> s.winner() == 2).size
+  def winner(): Player = if this.winnerIndex == 1 { this.player1 } else { this.player2 }
+  def loser(): Player = if this.winnerIndex == 1 { this.player2 } else { this.player1 }
+  def setsWonByP1(): Int = this.sets.filter((s: SetScore) -> s.winner() == 1).size
+  def setsWonByP2(): Int = this.sets.filter((s: SetScore) -> s.winner() == 2).size
   def showScore(): String {
-    val parts: List[String] = self.sets.map((s: SetScore) -> s.show())
+    val parts: List[String] = this.sets.map((s: SetScore) -> s.show())
     var s: String = ""
     foreach p: String in parts { s = s + p + " " }
     return s.trim()
   }
   def summary(): String {
-    return "#{self.round.label()}: #{self.player1.name()} vs #{self.player2.name()} → " +
-           "#{self.winner().name()} d. #{self.loser().name()} #{self.showScore()}"
+    return "#{this.round.label()}: #{this.player1.name()} vs #{this.player2.name()} → " +
+           "#{this.winner().name()} d. #{this.loser().name()} #{this.showScore()}"
   }
 }
 

@@ -302,7 +302,7 @@ println(c.t)   // 9
   time. A write from outside that object's methods is one no such check can follow.
 - **What you see:** `E0110`, with the caret on the receiver (`o`, `c`, `cs[0]`). The message
   says to call a method of that object or set the value in a constructor.
-- **Still fine:** `t = v`, `this.t = v`, `self.t = v`, `t++` and `t += 1` in the class's own
+- **Still fine:** `t = v`, `this.t = v`, `t++` and `t += 1` in the class's own
   methods, also inside a lambda. Reading `o.t` from anywhere is fine too.
 - **No `onion migrate` rule, on purpose:** the fix adds a method or a constructor to the
   receiver's class, and which one fits is a design choice.
@@ -462,8 +462,7 @@ instance Show[Int] {
 - **What you see:** **E0097** `instance shapes.Show[java.lang.Integer] is already defined`, at
   the second instance.
 - **Fix:** keep one instance and delete the other.
-- **Two files in the same package** (both without a `module` line) still give **E0008**
-  `duplicated class definition Show$$Integer`. The fix is the same.
+- **Two files in the same package** (both without a `module` line) give the same **E0097**.
 - **Type arguments of the type:** E0097 compares only the outer type, so `Show[List[String]]`
   and `Show[List[Integer]]` are one instance and clash.
 - **No `onion migrate` rule:** which instance to keep is your choice.
@@ -514,3 +513,209 @@ public:
 - **To update:** move the constructor under `public:`, or add a `public` factory method to `A`.
 - **No `onion migrate` rule:** widening a constructor's access is a design choice only you can
   make, so the hint shows the edit instead.
+
+## `Strings::split` and `Regex::split` keep trailing empty fields
+
+Splitting used Java's `String.split`, which drops empty fields at the end. Now they are kept,
+as in Python and JavaScript, so a row with an empty last column keeps that column.
+
+```onion
+val row = Strings::split("alice,30,", ",")
+println(row.size)   // Before: 2, so row[2] threw. Now: 3
+println(row[2])     // Now: "" (an empty string)
+```
+
+- **What changed:** `Strings::split`, `Strings::splitRegex`, and `Regex::split` with a
+  `String` or a `Pattern` keep every field after the last delimiter.
+- **Unchanged:** an input that does not end with the delimiter; an empty delimiter
+  (`Strings::split("abc", "")` is still `[a, b, c]`); `Regex::split(s, p, limit)`;
+  and Java's own `s.split(",")`, which still drops trailing empties.
+- **What you see:** no error. A text that ends with the delimiter gives one more `""` for each
+  delimiter at the end. Splitting lines is the common case: `Strings::split(text, "\n")` on a
+  text that ends with `"\n"` now ends with an empty line.
+- **To keep the old result:**
+  - For lines, call `Strings::lines(text)`. `Strings::lines("l1\nl2\n")` gives `[l1, l2]`, as
+    `split` did before.
+  - For any other delimiter, call `Regex::split(s, pattern, 0)`. It drops every trailing empty
+    field, as before. Its delimiter is a regex, so escape `.` and `|`:
+    `Regex::split("a.b..", "\\.", 0)` gives `[a, b]`.
+- **No `onion migrate` rule:** most calls split text that does not end with the delimiter and
+  give the same result. Only you know whether an empty last field is data (a CSV column) or
+  noise (a final newline), so a rewrite would be wrong for one of them.
+
+## `null` into a type argument that is a primitive is an error
+
+`Int` is never `null` in Onion. A generic slot whose type argument is a primitive
+(`List[Int]`, `(Int) -> T`, `Map[String, Int]`) now rejects `null`, as an `Int` method
+parameter always did (#2872).
+
+```onion
+val f: (Int) -> String = (i) -> "v"
+f(null)                     // Before: W0012, then a crash at run time. Now: E0000
+
+val xs: List[Int] = [1]
+xs.add(null)                // Before: W0012; null was stored. Now: E0000
+
+val ys: List[Int?] = [1]
+ys.add(null)                // fine: the type argument says the slot may be null
+
+val zs: List[Int] = [5, null]   // Before: compiled; the read of zs[1] crashed. Now: E0000 (#2895)
+```
+
+- **What you see:** **E0000** `type Int is expected, but type null is used.` at the `null`,
+  with a hint to write the type argument as `Int?`.
+- **Where:** a method parameter declared with the class's type variable: `f(null)` and
+  `f.call(null)` on a function value, `add`/`set`/`put` on `List` and `Map`, `apply` on a
+  Java functional interface, and a method of your own generic class (`Box[Int].put(null)`).
+  Also a `null` element in a list or map literal written for such a type
+  (`val zs: List[Int] = [5, null]`, `val m: Map[String, Int] = ["b": null]`), and the other
+  ways into the same slot (#2991): a constructor (`new Box[Int](null)`, `new R[Int](null)`),
+  and an indexed assignment (`xs[0] = null`, `m["b"] = null`).
+- **To update:** if `null` is a value you mean to store, declare the type argument nullable:
+  `List[Int?]`, `Map[String, Int?]`, `(Int?) -> T`. Reads then give an `Int?`, so handle
+  `null` there (`?:` or `!!`). Otherwise, pass a real value instead of `null`.
+- **No `onion migrate` rule:** the fix is either a different declared type or a different
+  value, and only you know which one the code means.
+
+## A `protected` method is checked the same way however the call reaches it
+
+A method call that passes named arguments, or an untyped lambda argument
+(`a.lam((x) -> x + 1)`, `a.lam { x -> x + 1 }`), now gets the same access check as a call
+that passes every argument positionally (#2916). So an unrelated class can no longer reach a
+`protected` method that way. This is the method twin of the constructor change above.
+
+```onion
+class A {
+public:
+  def this() { }
+protected:
+  def pim(a: Int, b: Int = 2): Int = a + b
+}
+println(new A().pim(b = 3, a = 7))   // Before: printed 10. Now: E0013
+println(new A().pim(7, 3))           // E0013 before and now
+```
+
+- **What you see:** **E0013** `method A.pim(Int, Int) is not accessible from class ...` at the call.
+- **Still fine:** the same call from inside `A` or from a subclass of `A`.
+- **To update:** move the method under `public:`, or call it from a subclass.
+- **No `onion migrate` rule:** widening a method's access is a design choice only you can
+  make, so the hint shows the edit instead.
+
+## `Yaml::stringify` writes only what `Yaml::parse` reads back
+
+`Yaml::stringify` used to write a list of scalars, an empty Map element and NaN. Other YAML
+tools could read some of that text, but `Yaml::parse` could not read it back. Now
+`Yaml::stringify` throws instead, as it already did for a nested Map (#2806).
+
+```onion
+import { onion.Yaml; onion.Json }
+Yaml::stringify(["apple", "banana"])   // Before: "- apple\n- banana\n". Now: throws
+Json::stringify(["apple", "banana"])   // ["apple","banana"]; JSON is also valid YAML 1.2
+Yaml::stringify(["apple", "banana"].map { x -> ["v": x] })   // - v: apple ...
+```
+
+- **What you see:** `IllegalArgumentException` at run time. Its message names the
+  problem and suggests the edit.
+- **Where:**
+  - a List element that is not a Map: a String, a number, `null`, a List
+  - an empty Map element (`[[:]]`)
+  - a `Double` or `Float` that is NaN or an infinity, anywhere in the value
+  - a record's `toYaml` (`derive!(Yaml)`) and a `shape ... = yaml` `print`, for a NaN or
+    infinite component
+- **Unchanged:** a flat Map, and a List of non-empty flat Maps. Both are written as before.
+- **To update:**
+  - For a list of scalars, call `Json::stringify` (YAML 1.2 tools read JSON), or wrap each
+    element in a Map: `xs.map { x -> ["v": x] }`.
+  - Leave empty Maps out of the list.
+  - Replace NaN or an infinity with a value you choose (`null`, a sentinel) before writing.
+- **No `onion migrate` rule:** the refused input is a value at run time, not a spelling in the
+  source, so no rewrite can find it. The exception's message shows the edit instead.
+
+## `Args` `intOption` rejects a value that is not an `Int`
+
+`opts.intOption(name, default)` used to return the default when the value was not an integer.
+So a typo such as `--count 10O` (a letter O) ran as if nothing were wrong. Now it throws, as
+the auto-CLI (`def main(count: Int = 3)`) already did for the same input (#2881).
+
+```onion
+import { onion.Args }
+def main(args: String[]): void {
+  val opts = Args::parse(args)
+  println(opts.intOption("count", 3))   // --count abc  Before: 3. Now: throws
+}
+```
+
+- **What you see:** `IllegalArgumentException: invalid value for --count: 'abc' (expected Int)`
+  at run time, and exit code 1. The message names the option and the value.
+- **Unchanged:** an absent option still gives the default, and a valid value (`--count 7`,
+  `--count -5`) still parses.
+- **To keep the old result:** catch the exception and use the default:
+  `val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }`.
+- **No `onion migrate` rule:** the old behaviour swallowed an error at run time. The source
+  has nothing to rewrite, and only you know whether a bad value should stop the program.
+
+## `self` is now `this`
+
+`self` was a second spelling of `this`. Onion keeps one spelling: `this` (RFC #2788).
+
+```onion
+// Before
+def this(name: String) { self.name = name }
+def greet(): String = "Hi, #{self.name}"
+
+// Now
+def this(name: String) { this.name = name }
+def greet(): String = "Hi, #{this.name}"
+```
+
+- **What you see:** `E0117: `self` is retired; write `this`.` at every `self`, all at once.
+  In static code it replaces E0050.
+- **Still a reserved word:** `self` is not a free name now. A field written `` `self` `` keeps
+  working.
+- **Update a whole project:** `onion migrate src/ tests/`. It rewrites every `self` in code
+  and inside `#{...}` in strings. It leaves comments, plain string text, `\#{self}` and
+  `` `self` `` alone.
+
+## `OnionMath::randomInt` is removed; use `Rand::nextInt`
+
+Onion had two ways to get a random `Int` in a range, with opposite upper bounds (#3069).
+`Rand::nextInt(min, max)` stays. Its `max` is exclusive, as in `a..<b`, Java and Kotlin.
+
+```onion
+val die = OnionMath::randomInt(1, 6)   // Before: 1 to 6. Now: E0005
+val die = Rand::nextInt(1, 7)          // 1 to 6
+```
+
+- **What you see:** `E0005`, with a hint that shows `Rand::nextInt(min, max + 1)`.
+- **Unchanged:** `Rand::nextInt(min, max)` and `OnionMath::random()`.
+- **`onion migrate` rewrites it.** It writes `Rand::nextInt(min, max + 1)`, so every value the
+  old call could return stays possible:
+  - `OnionMath::randomInt(1, 6)` becomes `Rand::nextInt(1, 7)`.
+  - `OnionMath::randomInt(0, xs.size - 1)` becomes `Rand::nextInt(0, xs.size)`.
+  - `OnionMath::randomInt(a, b)` becomes `Rand::nextInt(a, b + 1)`.
+  - Calls inside `"#{...}"`, and a call inside another call's arguments, are rewritten too.
+  - So is a call through an import: `randomInt(1, 6)` after `import { onion.OnionMath::* }`,
+    or `OM::randomInt(1, 6)` after `import { onion.OnionMath as OM; }`. The import itself
+    still compiles, so it is left as written.
+  - When the file, or another file named with it, has its own `Rand` (a class, an import, a
+    variable), migrate writes `onion.Rand::nextInt`, so the call keeps meaning Onion's `Rand`.
+- **Only calls the compiler reports are rewritten.** A `randomInt` that still compiles is
+  your own (a class of yours named `OnionMath`, an inherited method), so it is left as written.
+- **Which `max` gets `+ 1`:** a plain number below `Int.MAX_VALUE` (`6`), or a `max` that
+  reads a variable, a parameter, a field or a call (`n`, `xs.size`, `Math::abs(n)`).
+- **Other constant maxes are noted; edit them by hand.** That covers `2147483647` and any
+  expression of constants (`1 << 4`, `Integer::MAX_VALUE`). Migrate leaves the file as
+  written. Write `Rand::nextInt(min, (max) + 1)`, then run migrate again. When max is
+  `Int.MAX_VALUE`, write `Rand::nextInt(min - 1, max) + 1` instead.
+- **A bare `randomInt(a, b)` in a file that also names its own `randomInt`** may be either
+  one, so migrate notes it and leaves it as written.
+- **A bare `randomInt(a, b)` with no `import { onion.OnionMath::* }`** is not the removed
+  method, so migrate leaves it alone. Its hint shows the edit to make by hand.
+- **Check a max held in a variable.** Migrate cannot know its value. If it can be
+  `Int.MAX_VALUE` at run time, `max + 1` overflows there and the call throws
+  `IllegalArgumentException`. For that case, write `Rand::nextInt(min - 1, max) + 1`.
+- **`Rand::nextInt()` replaces a call only when min is `Int.MIN_VALUE` and max is
+  `Int.MAX_VALUE`.** It returns any `Int`, negatives included, so it does not replace
+  `randomInt(0, Int.MAX_VALUE)`.
+- **Run it on one program at a time.** Unrelated scripts named together can hide each other's
+  errors, and then a call is left as written.

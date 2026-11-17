@@ -76,7 +76,7 @@ record ReviewMetrics(
 
 extension ReviewMetrics {
   def average(): Int =
-    (self.deliveryScore() + self.qualityScore() + self.teamworkScore() + self.innovationScore()) / 4
+    (this.deliveryScore() + this.qualityScore() + this.teamworkScore() + this.innovationScore()) / 4
 }
 
 def scoreToBand(avg: Int): PerformanceBand = {
@@ -98,8 +98,8 @@ record Review(
 )
 
 extension Review {
-  def score(): Int            = self.metrics().average()
-  def band():  PerformanceBand = scoreToBand(self.score())
+  def score(): Int            = this.metrics().average()
+  def band():  PerformanceBand = scoreToBand(this.score())
 }
 
 def mkReview(emp: Employee, q: String, d: Int, qual: Int, team: Int, inn: Int, note: String): Review =

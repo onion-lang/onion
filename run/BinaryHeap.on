@@ -50,38 +50,38 @@ class MinHeap {
   var data: List[HeapEntry]
   var sz:   Int
 public:
-  def this() { self.data = []; self.sz = 0 }
-  def size():    Int     = self.sz
-  def isEmpty(): Boolean = self.sz == 0
+  def this() { this.data = []; this.sz = 0 }
+  def size():    Int     = this.sz
+  def isEmpty(): Boolean = this.sz == 0
 
   def push(priority: Int, label: String): void {
     val e = new HeapEntry(priority, label)
-    if self.sz == self.data.size { self.data.add(e) }
-    else { self.data[self.sz] = e }
-    self.siftUp(self.sz)
-    self.sz++
+    if this.sz == this.data.size { this.data.add(e) }
+    else { this.data[this.sz] = e }
+    this.siftUp(this.sz)
+    this.sz++
   }
 
   def pop(): HeapEntry? {
-    if self.sz == 0 { return null }
-    val top: HeapEntry = self.data[0]
-    self.sz--
-    if self.sz > 0 { self.data[0] = self.data[self.sz]; self.siftDown(0) }
+    if this.sz == 0 { return null }
+    val top: HeapEntry = this.data[0]
+    this.sz--
+    if this.sz > 0 { this.data[0] = this.data[this.sz]; this.siftDown(0) }
     return top
   }
 
 private:
   def swap(i: Int, j: Int): void {
-    val t: HeapEntry = self.data[i]
-    self.data[i] = self.data[j]
-    self.data[j] = t
+    val t: HeapEntry = this.data[i]
+    this.data[i] = this.data[j]
+    this.data[j] = t
   }
 
   def siftUp(start: Int): void {
     var i: Int = start
     while i > 0 {
       val p: Int = (i - 1) / 2
-      if self.data[i].priority() < self.data[p].priority() { self.swap(i, p); i = p }
+      if this.data[i].priority() < this.data[p].priority() { this.swap(i, p); i = p }
       else { break }
     }
   }
@@ -90,9 +90,9 @@ private:
     var i: Int = start
     while true {
       val l: Int = 2 * i + 1; val r: Int = 2 * i + 2; var s: Int = i
-      if l < self.sz && self.data[l].priority() < self.data[s].priority() { s = l }
-      if r < self.sz && self.data[r].priority() < self.data[s].priority() { s = r }
-      if s != i { self.swap(i, s); i = s } else { break }
+      if l < this.sz && this.data[l].priority() < this.data[s].priority() { s = l }
+      if r < this.sz && this.data[r].priority() < this.data[s].priority() { s = r }
+      if s != i { this.swap(i, s); i = s } else { break }
     }
   }
 }
@@ -112,20 +112,20 @@ class Graph {
   var nodeList: List[String]
 public:
   def this() {
-    self.adj      = new LinkedHashMap[String, Object]()
-    self.nodeList = []
+    this.adj      = new LinkedHashMap[String, Object]()
+    this.nodeList = []
   }
 
   def addNode(name: String): void {
-    if !self.adj.containsKey(name) {
-      self.adj.put(name, new ArrayList[Object]())
-      self.nodeList.add(name)
+    if !this.adj.containsKey(name) {
+      this.adj.put(name, new ArrayList[Object]())
+      this.nodeList.add(name)
     }
   }
 
   def addEdge(from: String, to: String, w: Int): void {
-    self.addNode(from); self.addNode(to)
-    val edges: ArrayList[Object] = self.adj.get(from) as ArrayList[Object]
+    this.addNode(from); this.addNode(to)
+    val edges: ArrayList[Object] = this.adj.get(from) as ArrayList[Object]
     edges.add(new Edge(to, w))
   }
 
@@ -134,7 +134,7 @@ public:
     val INF: Int = JInt::MAX_VALUE / 2
     val dist: LinkedHashMap[String, Object] = new LinkedHashMap[String, Object]()
     val prev: LinkedHashMap[String, Object] = new LinkedHashMap[String, Object]()
-    foreach name: String in self.nodeList {
+    foreach name: String in this.nodeList {
       dist.put(name, JInt::valueOf(INF))
       prev.put(name, "")
     }
@@ -147,7 +147,7 @@ public:
       val u: String = entry.label()
       val du: Int   = (dist.get(u) as JInt).intValue()
       if entry.priority() > du { continue }
-      val nbs: ArrayList[Object] = self.neighbors(u)
+      val nbs: ArrayList[Object] = this.neighbors(u)
       for var i: Int = 0; i < nbs.size(); i++ {
         val e: Edge   = nbs.get(i) as Edge
         val v: String = e.to()
@@ -162,7 +162,7 @@ public:
     }
 
     val results: List[Object] = []
-    foreach name: String in self.nodeList {
+    foreach name: String in this.nodeList {
       val d:   Int    = (dist.get(name) as JInt).intValue()
       val via: String = prev.get(name) as String
       if d >= INF {
@@ -177,7 +177,7 @@ public:
 
 private:
   def neighbors(node: String): ArrayList[Object] {
-    val v: Object? = self.adj.get(node)
+    val v: Object? = this.adj.get(node)
     return if v == null { new ArrayList[Object]() } else { v as ArrayList[Object] }
   }
 }
@@ -186,11 +186,11 @@ private:
 extension String {
   def repeat(n: Int): String {
     var s: String = ""
-    for var i: Int = 0; i < n; i++ { s = s + self }
+    for var i: Int = 0; i < n; i++ { s = s + this }
     return s
   }
   def padRight(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }

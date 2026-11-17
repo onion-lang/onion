@@ -15,13 +15,13 @@ enum SortKind {
 // ── Extension on Int ──────────────────────────────────────────────────────────
 
 extension Int {
-  def absVal(): Int = if self < 0 { 0 - self } else { self }
+  def absVal(): Int = if this < 0 { 0 - this } else { this }
   def clamp(lo: Int, hi: Int): Int =
-    if self < lo { lo } else if self > hi { hi } else { self }
-  def times(n: Int): Int = self * n
-  def isEven(): Boolean = self % 2 == 0
-  def isOdd(): Boolean = self % 2 != 0
-  def squared(): Int = self * self
+    if this < lo { lo } else if this > hi { hi } else { this }
+  def times(n: Int): Int = this * n
+  def isEven(): Boolean = this % 2 == 0
+  def isOdd(): Boolean = this % 2 != 0
+  def squared(): Int = this * this
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

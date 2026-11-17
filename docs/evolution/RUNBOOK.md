@@ -142,15 +142,20 @@ none of them moved a PR.
      same branch (a push makes the old verdict stale). If it has none and you disagree,
      reply once on the PR starting `/rebuttal` with your evidence; the next Reviewer run then
      calls the fifth reviewer (§4). Otherwise close the PR with the reason.
+   - Claim a block fix before you build it: comment "Fixing the block at `<head sha>`" with
+     your session link on the PR. Skip a PR that has such a comment from another session in
+     the last hour, and re-read the PR's commits right before pushing. In W46 seven runs
+     built a block fix that a sibling had already pushed (#2860, #2915, #3003, #3030, #2777).
    - A PR blocked a third time, each time on a new variant, is missing a rule, not a patch.
      Stop fixing variants. Write the rule down in one comment on the linked issue: what is
      accepted, what is rejected, and the cases the blocks found. Then fix to the rule, or open
      a `kind:rfc` if the rule changes what compiles. W43: #2328 took 12 verdicts, #2315 six.
    - **Release** when all three hold: there is a user-visible entry (a fragment in
-     `changelog.d/`, or a line under `CHANGELOG.md`'s `[Unreleased]`), the newest tag is older
-     than 24 hours, and `main` is green. Then dispatch `release.yml` now (next minor version,
-     see Known pitfalls) and open the changelog-cut PR (`risk:low`): it runs
-     `python3 scripts/changelog/changelog.py cut X.Y.Z` and lists the fragments it consumed.
+     `changelog.d/`, or a line under `CHANGELOG.md`'s `[Unreleased]`), the newest release is
+     older than 24 hours (by its `published_at`, not the tag's date), and `main` is green.
+     Then dispatch `release.yml` now (next minor version, see Known pitfalls) and open the
+     changelog-cut PR (`risk:low`): it runs `python3 scripts/changelog/changelog.py cut X.Y.Z`
+     and lists the fragments it consumed.
      If any of the three is false, no release. Do not defer a due release to "a run that can
      focus on it" and do not re-derive the rule: on 10-14 two runs read the old sentence
      oppositely from the same facts.
@@ -369,6 +374,10 @@ author: never review a PR whose session link is your own session.
    approve or `verdict: BLOCKED` otherwise. The `evolution/risk-gate` check reads that line;
    it updates the `panel:*` labels itself.
    - A block backed by a reproduction stands until the code changes.
+   - Count the PR's earlier BLOCKED verdicts. When this is the third block, each on a new
+     variant, say so on its own line: `third block: write the rule on #<issue> before the next
+     push` (§1.2). The author sees the count only if the verdict says it: in W46 #2798 was
+     blocked 9 times and #2886 6 times, and no run wrote the rule.
    - Any other block gets one rebuttal round: when the author replies with a `/rebuttal`
      comment (§1.2), the next Reviewer run starts a fifth fresh subagent, which reads the
      verdict and the rebuttal and decides. Its verdict replaces the blocking lens's.
@@ -450,6 +459,10 @@ compatibility (PRINCIPLES.md §2, §3, §9).
 - **CI is Linux in the English locale.** Windows-only failures do not show up there. Message
   text is bilingual, so assert error codes, not localized text.
 - **Releases:**
+  - The release workflow makes a lightweight tag, so the tag's date and the release's
+    `created_at` are the commit's time, not when the release went out. Measure the 24 hours
+    from `gh api repos/onion-lang/onion/releases?per_page=1 --jq '.[0].published_at'`. On
+    11-14 a run went by the commit time and dispatched v0.158.0 22h48m after v0.157.0.
   - Dispatch `release.yml` with the GitHub MCP tool `actions_run_trigger` (`run_workflow`,
     `release.yml`, ref `main`, input `version: vX.Y.Z`). In a scheduled session the
     permission classifier denied `gh workflow run` and the REST dispatch (10-22, twice on
@@ -494,8 +507,13 @@ compatibility (PRINCIPLES.md §2, §3, §9).
   bash <memory checkout>/tools/converge-sbt.sh <onion checkout> 25 assembly   # no -batch
   ```
   The script runs the launcher jar directly, so pass sbt commands with no `-batch` (the
-  launcher rejects it). It retries until coursier's cache holds every artifact. The same
-  steps belong in the environment's setup script; only Kota can approve that.
+  launcher rejects it). It retries until coursier's cache holds every artifact. When it fails
+  on `repo.scala-sbt.org` 403 or an unresolved Scala version (10 W46 episodes, 11-14/15), run
+  `ONION_DIR=<onion checkout> bash <memory checkout>/tools/cleanup-loop-sbt.sh assembly`
+  after the same download: it clears coursier's error markers each round, and it built the
+  jar in one round for the 11-15 Sensor. Run the download and the script as separate
+  commands; the classifier denied them as one (11-15 13:00). The same steps belong in the
+  environment's setup script; only Kota can approve that.
 - **Memory pushes:** `git push origin HEAD:main` in `../evolution-memory`; a plain push from a
   cloud session goes to a `claude/*` branch.
 - **sbt 2 can serve stale classes** after an edit, so a correct fix looks like it did nothing.

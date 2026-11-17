@@ -210,7 +210,7 @@ All phases extend `Processor[A, B]` trait and can be composed using `andThen()`:
 - `Colls` - Collection factories and pipelines (map/filter/fold, chunked/windowed, sumBy/maxBy)
 - `Iterables`, `Maps`, `Sets` - Iteration and map/set utility functions
 - `Text` - Console text layout (wrap, indent, aligned tables)
-- `OnionMath` - Hyperbolic trig, safe rounding/clamping, bounded random int
+- `OnionMath` - Hyperbolic trig, safe rounding/clamping, random Double
 - `Stats` - Numeric aggregation (sum, average, median, stddev)
 - `Format` - Locale-independent formatting (grouping, byte sizes, durations)
 - `Yaml`, `Csv` - YAML and RFC 4180 CSV parsing/serialization
@@ -602,7 +602,7 @@ These are frequently confused with other languages. **Always check these:**
 | `fun String.twice()` (Kotlin) | `extension String { def twice() { } }` - extension block |
 | `extension List[T] { ... }` (T meant as a fresh type parameter) | not supported - `extension` has no `[T]` parameter list of its own (unlike `class Box[T]`); `T` resolves as an ordinary type reference, so this is E0003 "type not found", not a fresh parameter. Write `extension List { ... }` to extend every instantiation (erasure-based), or `extension List[Int] { ... }` for one concrete instantiation (and `extension List[String]` alongside it is fine - distinct instantiations don't collide) |
 | `extension List[Int] { ... }` twice, or `extension List { ... }` split across two blocks | E0102 - at most one `extension` block per exact receiver type per file; combine the methods into the first block instead |
-| `this.field = value` in constructor | ✓ correct - `this.`/`self.` works; also optional (bare `field` resolves to the field via implicit access) |
+| `this.field = value` in constructor | ✓ correct - `this.` works; also optional (bare `field` resolves to the field via implicit access) |
 | `Long.toString(0)` | `Long::toString(0L)` - `::` for static, `L` suffix for long |
 | `System.out` | `System::out` - `::` for static fields too |
 | `C::field = v` unsupported? | ✓ correct - static field assignment works (public fields) |
@@ -733,7 +733,7 @@ These are frequently confused with other languages. **Always check these:**
 | `operator fun plus` (Kotlin) | `def plus(o: T): T` - `+ - * / %` map to plus/minus/times/div/rem on the left operand |
 | `a.compareTo(b) < 0` for Strings/dates | `a < b` - `<` `<=` `>` `>=` work on any non-null `Comparable` via `compareTo` |
 | String templates `$var` or `${expr}` | `"text #{expr}"` - use `#{}` syntax |
-| `this` only | `self` also works - both refer to current instance |
+| `self.x` (Python/Swift/Rust) | `this.x` - `self` is retired (E0117); `onion migrate` rewrites it |
 | Reserved word as identifier | `` `class` `` - use backticks to escape keywords |
 | `println("Hi")` | ✓ correct - top-level function, or `IO::println` |
 | `Pattern.compile("\\d+")` | `re"\d+"` - raw regex literal (no double escaping) |

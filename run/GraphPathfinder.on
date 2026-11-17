@@ -19,9 +19,9 @@ public:
   var found: Boolean
 
   def this {
-    self.visited = [:]
-    self.path = []
-    self.found = false
+    this.visited = [:]
+    this.path = []
+    this.found = false
   }
 }
 
@@ -31,45 +31,45 @@ class Graph {
 
 public:
   def this {
-    self.vertices = [:]
-    self.adjacency = [:]
+    this.vertices = [:]
+    this.adjacency = [:]
   }
 
   def addVertex(v: Vertex): void {
-    self.vertices[v.id()] = v
-    if self.adjacency[v.id()] == null {
-      self.adjacency[v.id()] = []
+    this.vertices[v.id()] = v
+    if this.adjacency[v.id()] == null {
+      this.adjacency[v.id()] = []
     }
   }
 
   def addEdge(e: Edge): void {
-    val neighbors: List[Edge] = self.adjacency[e.fromId()]
+    val neighbors: List[Edge] = this.adjacency[e.fromId()]
     neighbors.add(e)
   }
 
   def addUndirectedEdge(from: Int, to: Int, weight: Int): void {
-    self.addEdge(new Edge(from, to, weight))
-    self.addEdge(new Edge(to, from, weight))
+    this.addEdge(new Edge(from, to, weight))
+    this.addEdge(new Edge(to, from, weight))
   }
 
   def vertexLabel(id: Int): String {
-    val v: Vertex? = self.vertices[id]
+    val v: Vertex? = this.vertices[id]
     if v == null { return "#" + id }
     return v.label()
   }
 
   def neighborsOf(id: Int): List[Edge] {
-    val nb: List[Edge]? = self.adjacency[id]
+    val nb: List[Edge]? = this.adjacency[id]
     if nb == null { return [] }
     return nb
   }
 
-  def vertexCount: Int = self.vertices.size
+  def vertexCount: Int = this.vertices.size
 
   // DFS: recursive depth-first search; returns path or empty list
   def dfs(startId: Int, goalId: Int): List[Int] {
     val state: DfsState = new DfsState()
-    self.dfsVisit(startId, goalId, state)
+    this.dfsVisit(startId, goalId, state)
     return if state.found { state.path } else { [] }
   }
 
@@ -81,10 +81,10 @@ public:
       state.found = true
       return
     }
-    foreach edge: Edge in self.neighborsOf(current) {
+    foreach edge: Edge in this.neighborsOf(current) {
       val nb: Int = edge.toId()
       if state.visited[nb] == null && !state.found {
-        self.dfsVisit(nb, goal, state)
+        this.dfsVisit(nb, goal, state)
       }
     }
     if !state.found {
@@ -103,7 +103,7 @@ public:
 
     while queue.size > 0 {
       val current: Int = queue.remove(0) as Int
-      foreach edge: Edge in self.neighborsOf(current) {
+      foreach edge: Edge in this.neighborsOf(current) {
         val nb: Int = edge.toId()
         if visited[nb] == null {
           visited[nb] = true
@@ -132,7 +132,7 @@ public:
     val unvisited: List[Int] = []
 
     // initialize distances
-    foreach id: Int in self.vertices.keySet() {
+    foreach id: Int in this.vertices.keySet() {
       dist[id] = if id == startId { 0 } else { 999999 }
       unvisited.add(id)
     }
@@ -166,7 +166,7 @@ public:
         return new Found(path, bestDist)
       }
 
-      foreach edge: Edge in self.neighborsOf(bestId) {
+      foreach edge: Edge in this.neighborsOf(bestId) {
         val nb: Int = edge.toId()
         if unvisited.contains(nb) {
           val newDist: Int = bestDist + edge.weight()

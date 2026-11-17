@@ -19,7 +19,7 @@ import {
 
 extension Double {
   def fmt2(): String {
-    val s = "" + self
+    val s = "" + this
     val dot = s.indexOf(".")
     if dot < 0 { return s + ".00" }
     val frac = s.substring(dot + 1)
@@ -27,24 +27,24 @@ extension Double {
     if frac.length() > 2 { return s.substring(0, dot + 3) }
     return s
   }
-  def abs(): Double = if self < 0.0 { -self } else { self }
+  def abs(): Double = if this < 0.0 { -this } else { this }
 }
 
 extension String {
   def padRight(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s = self
+    var s = this
     while s.length() < n { s = " " + s }
     return s
   }
   def repeatStr(n: Int): String {
     var s = ""
     var i = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 }
@@ -52,7 +52,7 @@ extension String {
 extension Int {
   def bar(max: Int, width: Int): String {
     if max == 0 { return "[" + " ".repeatStr(width) + "]" }
-    val filled = self * width / max
+    val filled = this * width / max
     val rest = width - filled
     return "[" + "#".repeatStr(filled) + " ".repeatStr(rest) + "]"
   }

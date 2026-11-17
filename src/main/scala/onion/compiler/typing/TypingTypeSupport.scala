@@ -287,7 +287,9 @@ final class TypingTypeSupport(private val typing: Typing) {
             // once the chain is in place; otherwise run it now. Genuine violations
             // (`Base[String]`) still fail — the deferred check reports on flush.
             if (typing.boundChecksDeferred) {
-              typing.deferBoundCheck(() => checkTypeArgumentBounds(typeNode, applied, rawParams))
+              // Read the parameters when the check runs: a type declared later still
+              // had its placeholder (Object) bounds when this was queued (#2967).
+              typing.deferBoundCheck(() => checkTypeArgumentBounds(typeNode, applied, applied.raw.typeParameters))
             } else {
               checkTypeArgumentBounds(typeNode, applied, rawParams)
             }
@@ -296,6 +298,10 @@ final class TypingTypeSupport(private val typing: Typing) {
       case _ =>
     }
   }
+
+  /** Bound check for type arguments inferred from `new C(args)` (#2539); explicit ones go through `validateTypeApplication`. */
+  def checkInferredTypeArgumentBounds(typeNode: AST.TypeNode, applied: TypedAST.AppliedClassType): Unit =
+    checkTypeArgumentBounds(typeNode, applied, applied.raw.typeParameters.toArray)
 
   private def checkTypeArgumentBounds(
     typeNode: AST.TypeNode,
@@ -336,10 +342,16 @@ final class TypingTypeSupport(private val typing: Typing) {
               // a genuine cross-reference to an earlier parameter is
               // unaffected.
               val selfSubst = fullSubst - param.name
-              val upper = TypeSubstitution.substituteType(declaredUpper, selfSubst, Map.empty, defaultToBound = false) match {
-                case ct: TypedAST.ClassType => ct
-                case _ => declaredUpper
+              // A bound naming a parameter whose argument is nullable (`T extends B`
+              // with B = String?) reads as that argument's class: nullability is
+              // checked apart from the class below (#2539 review).
+              def classOf(t: TypedAST.Type): Option[TypedAST.ClassType] = t match {
+                case ct: TypedAST.ClassType => Some(ct)
+                case n: TypedAST.NullableType => classOf(typing.boxedTypeArgument(n.innerType))
+                case _ => None
               }
+              val upper = classOf(TypeSubstitution.substituteType(declaredUpper, selfSubst, Map.empty, defaultToBound = false))
+                .getOrElse(declaredUpper)
               val arg = typeArguments(i)
               if (arg eq BasicType.VOID) {
                 typing.report(TYPE_ARGUMENT_MUST_BE_REFERENCE, typeNode, arg.name)
@@ -381,7 +393,8 @@ final class TypingTypeSupport(private val typing: Typing) {
                     // type arguments, not by erasure (`Integer` is no `Comparable[String]`, #2780).
                     val appliedUpper: TypedAST.Type = checkedArg match {
                       case c: TypedAST.ClassType if !TypeCheckingHelpers.containsTypeVariable(c) =>
-                        TypeSubstitution.substituteType(declaredUpper, fullSubst, Map.empty, defaultToBound = false)
+                        val full = TypeSubstitution.substituteType(declaredUpper, fullSubst, Map.empty, defaultToBound = false)
+                        classOf(full).getOrElse(full)
                       case _ => upper
                     }
                     val satisfied = upper match {

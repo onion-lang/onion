@@ -11,10 +11,10 @@ import { java.util.ArrayList }
 
 extension Int {
   def clamp(lo: Int, hi: Int): Int =
-    if self < lo { lo } else if self > hi { hi } else { self }
-  def orZero(): Int = if self < 0 { 0 } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
+  def orZero(): Int = if this < 0 { 0 } else { this }
   def pct(total: Int): String =
-    if total == 0 { "0%" } else { "" + (self * 100 / total) + "%" }
+    if total == 0 { "0%" } else { "" + (this * 100 / total) + "%" }
 }
 
 // ──────────────────────── character class enum ───────────────────────────

@@ -64,26 +64,26 @@ public:
   var name: String
   var phone: String
   def this(id: Int, name: String, phone: String) {
-    self.id    = id
-    self.name  = name
-    self.phone = phone
+    this.id    = id
+    this.name  = name
+    this.phone = phone
   }
   def role(): String = "Staff"
-  def summary(): String = "#{role()}: #{self.name} (id=#{self.id})"
+  def summary(): String = "#{role()}: #{this.name} (id=#{this.id})"
 }
 
 class Veterinarian(id: Int, name: String, phone: String, var speciality: String, var licenseNumber: String)
     extends Staff(id, name, phone) {
 public:
   override def role(): String = "Veterinarian"
-  override def summary(): String = "#{role()} #{self.name} [#{self.speciality}] license=#{self.licenseNumber}"
+  override def summary(): String = "#{role()} #{this.name} [#{this.speciality}] license=#{this.licenseNumber}"
 }
 
 class Receptionist(id: Int, name: String, phone: String, var shift: String)
     extends Staff(id, name, phone) {
 public:
   override def role(): String = "Receptionist"
-  override def summary(): String = "#{role()}: #{self.name} shift=#{self.shift}"
+  override def summary(): String = "#{role()}: #{this.name} shift=#{this.shift}"
 }
 
 // ─── Clinic registry ──────────────────────────────────────────────────────────

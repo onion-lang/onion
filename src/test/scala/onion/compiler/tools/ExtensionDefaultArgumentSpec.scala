@@ -55,17 +55,17 @@ class ExtensionDefaultArgumentSpec extends AbstractShellSpec {
     // into the call site. A default now runs in the callee (#2375, #2398), so it reads the
     // receiver it is called on and the arguments before it, never the caller's slots.
     it("a default that reads self sees the call's receiver, not the caller's slot (repro 2)") {
-      val decls = """extension String { def g(c: String = self + "!"): String = self + "/" + c }"""
+      val decls = """extension String { def g(c: String = this + "!"): String = this + "/" + c }"""
       assert(run(decls, "\"s\".g() + \",\" + \"t\".g(\"x\")") == Shell.Success("s/s!,t/x"))
     }
 
     it("a default that reads an earlier parameter sees its argument, not a VerifyError") {
-      val decls = """extension String { def g(a: Int, b: Int = a * 10): String = self + a + "," + b }"""
+      val decls = """extension String { def g(a: Int, b: Int = a * 10): String = this + a + "," + b }"""
       assert(run(decls, "\"s\".g(1) + \";\" + \"s\".g(1, 2)") == Shell.Success("s1,10;s1,2"))
     }
 
     it("a default that reads a later parameter is E0002, with no E0005 at the call") {
-      val src = main("""extension String { def g(a: Int = b, b: Int = 1): String = self + a + b }""", "\"s\".g()")
+      val src = main("""extension String { def g(a: Int = b, b: Int = 1): String = this + a + b }""", "\"s\".g()")
       assert(errorCodes(src) == Seq("E0002"))
     }
 
@@ -91,7 +91,7 @@ class ExtensionDefaultArgumentSpec extends AbstractShellSpec {
     }
 
     it("a default that names a constant still works") {
-      val decls = """extension String { def pad(w: Int = 3 * 2): String = self + "|" + w }"""
+      val decls = """extension String { def pad(w: Int = 3 * 2): String = this + "|" + w }"""
       assert(run(decls, "\"ab\".pad() + \",\" + \"ab\".pad(1)") == Shell.Success("ab|6,ab|1"))
     }
   }

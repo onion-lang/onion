@@ -128,6 +128,10 @@ class LocalContext {
     }
   }
 
+  /** True while typing a closure body whose result was inferred as `void` but whose synthesized
+   *  method returns a reference type: a bare `return` then returns `null` (#3041). */
+  var bareReturnYieldsNull: Boolean = false
+
   def setMethod(method: TypedAST.Method): Unit = {
     this.method = method
     this.isMethod = true

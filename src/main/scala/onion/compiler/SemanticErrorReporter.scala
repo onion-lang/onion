@@ -205,7 +205,7 @@ class SemanticErrorReporter(threshold: Int) {
             Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
       } else if (extensionReceiverCandidates.nonEmpty) {
         val signatures = extensionReceiverCandidates.take(3).map { m =>
-          s"self.${m.name}(${m.arguments.map(typeName).mkString(", ")})"
+          s"this.${m.name}(${m.arguments.map(typeName).mkString(", ")})"
         }
         Some(format(message("error.suggestion.candidates"), Seq(signatures.mkString(", "))))
       } else if (name == "f" && args == "String") {
@@ -223,6 +223,18 @@ class SemanticErrorReporter(threshold: Int) {
         // FormerDefaultImportLookup below, so a real method named `puts` on some other
         // type is unaffected.
         Some(message("suggestion.rubyPuts"))
+      } else if (name == "randomInt" && argTypes.length == 2 && (isUnqualifiedCall || (targetType match {
+          case obj: TypedAST.ObjectType => obj.name == "onion.OnionMath"
+          case _ => false
+        }))) {
+        // `OnionMath::randomInt(min, max)` included max; it was removed so that `Rand::nextInt`,
+        // whose max is exclusive, is the one random Int in a range (#3069). Show the call that
+        // keeps the old result rather than a name-similarity guess. A bare `randomInt(a, b)`
+        // that nothing resolves is the same call through `import { onion.OnionMath::* }`, which
+        // still compiles but no longer brings it in. Only there, or on a qualified call, does
+        // `onion migrate` make the edit, so only then does the hint say it will (#3116 block 7).
+        val migrates = if (items.length > 9) items(9) == java.lang.Boolean.TRUE else !isUnqualifiedCall
+        Some(message(if (migrates) "suggestion.onionMathRandomInt" else "suggestion.onionMathRandomIntByHand"))
       } else if ((fieldNamed(targetType, name) && !inaccessibleFieldNamed(items)) || isArrayLengthProperty(targetType, name)) {
         // `p.name()` where `name` is a field, not a method -- a common mix-up
         // with record component accessors (which really are methods). A
@@ -243,9 +255,11 @@ class SemanticErrorReporter(threshold: Int) {
         // already failed, so a name+arity match here can only be this stdlib method.
         val className = FormerDefaultImportLookup.find(name, argTypes.length).get
         Some(format(message("suggestion.stdlibNoLongerDefaultImported"), Seq(className, name)))
-      } else if (isUnqualifiedCall && NotDefaultImportedLookup.find(name, argTypes.length).isDefined) {
+      } else if (isUnqualifiedCall && NotDefaultImportedLookup.find(name, argTypes).isDefined) {
         // `sum(xs)`, `sha256(s)`: pure helpers that were never default-imported (#2723).
-        Some(format(message("suggestion.stdlibNotDefaultImported"), Seq(NotDefaultImportedLookup.find(name, argTypes.length).get, name)))
+        // Only when an overload takes these argument types (#2925): `bytes("abc")` must not be
+        // pointed at `Format::bytes(Long)`, which would fail again.
+        Some(format(message("suggestion.stdlibNotDefaultImported"), Seq(NotDefaultImportedLookup.find(name, argTypes).get, name)))
       } else if (ForeignCollectionNames.contains(name) && isListType(targetType)) {
         // The name another language gives a List operation Onion also has, under its own
         // name (Scala `sortBy`/`foldLeft`/`forall`, Kotlin `joinToString`/`sumOf`, Ruby
@@ -302,7 +316,9 @@ class SemanticErrorReporter(threshold: Int) {
     val withListHint = listForVarargs match
       case Some(arr) =>
         val written = onion.compiler.toolbox.TypeFormatting.componentWrittenForm(arr.component) + "[0]"
-        Some(withNullable.fold("")(_ + Systems.lineSeparator + "  ") + format(message("suggestion.listToVarargs"), Seq(written)))
+        // A `List[T]?` needs `!!` first, or the suggested call is itself E0070 (#2903).
+        val receiver = if (argTypes.last.isNullable) "list!!" else "list"
+        Some(withNullable.fold("")(_ + Systems.lineSeparator + "  ") + format(message("suggestion.listToVarargs"), Seq(written, receiver)))
       case None => withNullable
     val heldBack = sameName.collectFirst {
       case m: TypedAST.MethodDefinition if m.defaultsPending && fitsLeadingParameters(m.arguments, m.defaultsOmittableFrom, argTypes) => (m.defaultsHeldBackBy, m.defaultsHeldBackVia)
@@ -391,12 +407,14 @@ class SemanticErrorReporter(threshold: Int) {
    * lenient -- it only orders suggestions, never rejects a call: anything involving a type
    * variable, a function value (SAM conversion) or an unknown type counts as passable.
    */
-  private def acceptsTypes(m: TypedAST.Method, argTypes: Array[TypedAST.Type]): Boolean = {
-    val params = m.arguments
+  private def acceptsTypes(m: TypedAST.Method, argTypes: Array[TypedAST.Type]): Boolean =
+    acceptsTypes(m.arguments, m.isVararg, argTypes)
+
+  private def acceptsTypes(params: Array[TypedAST.Type], isVararg: Boolean, argTypes: Array[TypedAST.Type]): Boolean = {
     argTypes.indices.forall { i =>
       val p =
-        if (i < params.length && !(m.isVararg && i == params.length - 1)) params(i)
-        else if (m.isVararg && params.nonEmpty) params.last match
+        if (i < params.length && !(isVararg && i == params.length - 1)) params(i)
+        else if (isVararg && params.nonEmpty) params.last match
           case arr: TypedAST.ArrayType if !(argTypes.length == params.length && argTypes(i).isArrayType) => arr.component
           case other => other
         else null
@@ -633,20 +651,51 @@ class SemanticErrorReporter(threshold: Int) {
     private val classes: Seq[Class[?]] =
       Seq(classOf[onion.Stats], classOf[onion.Hash], classOf[onion.Codec], classOf[onion.Format])
 
-    private lazy val index: Map[(String, Int), String] = {
+    private lazy val index: Map[(String, Int), Seq[(String, Array[Class[?]])]] = {
       val entries = for {
         cls <- classes
         m <- cls.getMethods
         mods = m.getModifiers
         if java.lang.reflect.Modifier.isStatic(mods) && java.lang.reflect.Modifier.isPublic(mods)
         if m.getDeclaringClass == cls
-      } yield (m.getName, m.getParameterCount) -> cls.getSimpleName
-      entries.groupBy(_._1).collect {
-        case (key, matches) if matches.map(_._2).distinct.size == 1 => key -> matches.head._2
-      }
+      } yield (m.getName, m.getParameterCount) -> (cls.getSimpleName, m.getParameterTypes.asInstanceOf[Array[Class[?]]])
+      entries.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
     }
 
-    def find(name: String, arity: Int): Option[String] = index.get((name, arity))
+    /** The one class whose `name` overload accepts `argTypes`; none if no or several classes do. */
+    def find(name: String, argTypes: Array[TypedAST.Type]): Option[String] =
+      val owners = index.getOrElse((name, argTypes.length), Seq.empty)
+        .filter { case (_, params) => params.indices.forall(i => javaParamAccepts(params(i), argTypes(i))) }
+        .map(_._1).distinct
+      if owners.size == 1 then Some(owners.head) else None
+  }
+
+  /** Lenient: an unknown, generic or function-valued argument counts as accepted. */
+  private def javaParamAccepts(param: Class[?], arg: TypedAST.Type): Boolean = {
+    val a = arg match
+      case n: TypedAST.NullableType => n.innerType
+      case other => other
+    def load(n: String): Option[Class[?]] = try Some(Class.forName(n)) catch case _: Throwable => None
+    a match
+      case null => true
+      case _: TypedAST.TypeVariableType => true
+      case _ if a.isNullType || a.isBottomType => !param.isPrimitive
+      case ab: TypedAST.BasicType =>
+        if param.isPrimitive then
+          val order = Seq("byte", "short", "int", "long", "float", "double")
+          (param.getName, ab.name) match
+            case ("boolean", n) => n == "boolean"
+            case (_, "boolean") => false
+            case ("char", n) => n == "char"
+            case (p, "char") => Seq("int", "long", "float", "double").contains(p)
+            case (p, n) => order.indexOf(p) >= order.indexOf(n) && order.contains(n) && order.contains(p)
+        else load(boxedName(ab)).forall(param.isAssignableFrom)
+      case ct: TypedAST.ClassType =>
+        val n = rawOf(ct).name
+        if n.startsWith("onion.Function") then true
+        else if param.isPrimitive then n == java.lang.reflect.Array.get(java.lang.reflect.Array.newInstance(param, 1), 0).getClass.getName
+        else load(n).forall(param.isAssignableFrom)
+      case _ => true
   }
 
   private def fieldNamed(targetType: TypedAST.Type, name: String): Boolean =
@@ -776,7 +825,25 @@ class SemanticErrorReporter(threshold: Int) {
       case c: TypedAST.ConstructorDefinition if c.defaultsPending && fitsLeadingParameters(c.arguments, c.defaultsOmittableFrom, argTypes) => (c.defaultsHeldBackBy, c.defaultsHeldBackVia)
     } else None
 
-    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(suggestion, s"class ${typeName(typeRef)}", heldBack)))
+    // `new StringBuilder(s)` with `s: String?`: the signature in the list fits once
+    // nullability is set aside, so name the argument and the ways out, as E0005 does (#2877).
+    val nullableArg: Option[(Int, TypedAST.Type, TypedAST.Type)] =
+      if (items.length > 2) items(2).asInstanceOf[Array[TypedAST.ConstructorRef]].iterator
+        .filter(c => !c.isVararg && c.getArgs.length == argTypes.length && acceptsTypes(c.getArgs, false, argTypes))
+        .flatMap { c =>
+          argTypes.indices.find { i =>
+            val p = c.getArgs(i)
+            argTypes(i) != null && argTypes(i).isNullable && !p.isNullable && !p.isInstanceOf[TypedAST.TypeVariableType]
+          }.map(i => (i, c.getArgs(i), argTypes(i)))
+        }.nextOption()
+      else None
+    val withNullable = nullableArg match
+      case Some((i, param, arg)) =>
+        val hint = format(message("suggestion.nullableArgument"), Seq((i + 1).toString, typeName(arg), typeName(param)))
+        Some(suggestion.fold("")(_ + Systems.lineSeparator + "  ") + hint)
+      case None => suggestion
+
+    problem(position, appendSuggestion(baseMessage, withHeldBackDefault(withNullable, s"class ${typeName(typeRef)}", heldBack)))
   }
 
   /**
@@ -861,10 +928,11 @@ class SemanticErrorReporter(threshold: Int) {
       else None
     // A set or range is never a List at runtime either, so a cast is no fix for the widening case.
     val widenToIterable = items.length > 2 && items(2).isInstanceOf[SemanticErrorReporter.WidenToIterableHint]
+    val primitiveTypeArgumentNull = items.length > 2 && items(2) == SemanticErrorReporter.PrimitiveTypeArgumentNullHint
     val baseMessage = format(
       // "Consider a cast" is no advice on an `as` cast that was itself rejected, nor on the
       // widening case (a set or range is never a List at runtime either).
-      message(if (listArrayCast.isDefined || widenToIterable || castSource.isDefined || contractClause.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
+      message(if (listArrayCast.isDefined || widenToIterable || primitiveTypeArgumentNull || castSource.isDefined || contractClause.isDefined) "error.semantic.incompatibleType.noCast" else "error.semantic.incompatibleType"),
       Seq(written(expected), written(actual) + (if (sourceNullable) "?" else ""))
     )
     val hint =
@@ -872,6 +940,8 @@ class SemanticErrorReporter(threshold: Int) {
         Some(format(message("suggestion.contractClauseBoolean"), Seq(contractClause.get.keyword)))
       } else if (items.length > 2 && items(2) == SemanticErrorReporter.HexDigitBHint) {
         Some(message("suggestion.hexDigitB"))
+      } else if (primitiveTypeArgumentNull) {
+        Some(format(message("suggestion.primitiveTypeArgumentNull"), Seq(typeName(expected))))
       } else if (widenToIterable) {
         val widen = items(2).asInstanceOf[SemanticErrorReporter.WidenToIterableHint]
         Some(format(message("suggestion.widenVarToIterable"), Seq(widen.name, typeName(expected), typeName(widen.wider))))
@@ -1076,6 +1146,10 @@ class SemanticErrorReporter(threshold: Int) {
         problem(position, message("error.semantic.superInExtension"))
       case SemanticError.METHOD_NOT_FOUND =>
         reportMethodNotFound(position, items)
+      case SemanticError.CANNOT_CALL_METHOD_ON_PRIMITIVE if items.length > 2 && items(2) == SemanticErrorReporter.DoStatementVoidHint =>
+        problem(position, appendSuggestion(
+          format(message("error.semantic.doStatementVoid"), Seq(typeName(items(0)))),
+          Some(message("suggestion.doStatementVoid"))))
       case SemanticError.FIELD_NOT_FOUND =>
         reportFieldNotFound(position, items)
       case SemanticError.LABEL_NOT_FOUND =>
@@ -1189,6 +1263,14 @@ class SemanticErrorReporter(threshold: Int) {
    *  suppressed (issue #316). */
   def problemCount: Int = problems.length
 
+  /** Drops the errors collected since `start` (a [[problemCount]] checkpoint) that `drop`
+   *  accepts. Lets a caller keep an inner diagnostic and discard a redundant outer one (#2550). */
+  def dropProblemsSince(start: Int)(drop: CompileError => Boolean): Unit = {
+    val kept = problems.drop(start).filterNot(drop)
+    problems.remove(start, problems.length - start)
+    problems ++= kept
+  }
+
   def setSourceFile(sourceFile: String): Unit = {
     this.sourceFile = sourceFile
   }
@@ -1261,6 +1343,11 @@ object SemanticErrorReporter {
    */
   private[compiler] case object HexDigitBHint
 
+  /** An extra (third) item on INCOMPATIBLE_TYPE: `null` went into a slot typed by a class
+   *  type variable whose type argument is a primitive (`xs.add(null)` on a `List[Int]`), so
+   *  the hint names the nullable type argument that accepts it (#2872). */
+  private[compiler] case object PrimitiveTypeArgumentNullHint
+
   /** An extra (third) item on INCOMPATIBLE_TYPE: the variable `name` is a `List`, the value
    *  another `Iterable`, and declaring the variable `wider` (`Iterable[E]`) would accept it.
    *  `var xs = (1..3).map { ... }` is a `List` since #2496, so this is the migration hint. */
@@ -1280,6 +1367,10 @@ object SemanticErrorReporter {
    * (#2605). No cast makes an `Int` a condition, so the message shows one instead.
    */
   private[compiler] final case class ContractClauseHint(keyword: String)
+
+  /** An extra (third) item on CANNOT_CALL_METHOD_ON_PRIMITIVE: the void value is a bare
+   *  statement of a `do[M]` block, which the rewriter turned into a `bind` call (#2715). */
+  private[compiler] case object DoStatementVoidHint
 
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */
@@ -1689,6 +1780,10 @@ object SemanticErrorReporter {
     ),
     SemanticError.CURRENT_INSTANCE_NOT_AVAILABLE -> ErrorDef(
       "error.semantic.currentInstanceNotAvailable",
+      Seq()
+    ),
+    SemanticError.SELF_RETIRED -> ErrorDef(
+      "error.semantic.selfRetired",
       Seq()
     ),
     SemanticError.RETURN_TYPE_REQUIRED -> ErrorDef(

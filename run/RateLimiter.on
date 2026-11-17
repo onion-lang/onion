@@ -14,7 +14,7 @@ import {
 
 extension Int {
   def rjust(width: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     if s.length() >= width { return s }
     var pad: String = ""
     for var i: Int = s.length(); i < width; i++ { pad = pad + " " }
@@ -24,8 +24,8 @@ extension Int {
 
 extension String {
   def trunc(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n)
+    if this.length() <= n { return this }
+    return this.substring(0, n)
   }
 }
 

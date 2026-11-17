@@ -18,6 +18,18 @@ private[compiler] final class CallArgumentTypingSupport(
    *  element when `element`) is declared as a concrete Java type; otherwise the
    *  ordinary path. */
   private def assign(node: AST.Node, expected: Type, actual: Term, method: Method, index: Int, element: Boolean = false): Term =
+    if (actual.`type`.isNullType && method != null && isClassTypeVariable(method, index, element))
+      ArgumentHelpers.primitiveOfNonNullBox(expected) match {
+        // A parameter declared as a class type variable (`T1` in `Function1.call`, `E` in
+        // `List.add`, `T` in a user's `Box[T].put`) whose type argument is a primitive
+        // (`(Int) -> T`, `List[Int]`, `Box[Int]`) holds an `Int`: the value is unboxed
+        // later, so `null` there crashes at run time. It is rejected as for an `Int`
+        // method parameter (E0000), naming the primitive (#2872).
+        case Some(primitive) =>
+          bodyContext.report(INCOMPATIBLE_TYPE, node, primitive, actual.`type`, onion.compiler.SemanticErrorReporter.PrimitiveTypeArgumentNullHint)
+          return null
+        case None =>
+      }
     if (method != null && method.isJavaOrigin && !isClassTypeVariable(method, index, element))
       processAssignableForJavaCallee(node, expected, actual)
     else processAssignable(node, expected, actual)
@@ -179,7 +191,13 @@ private[compiler] final class CallArgumentTypingSupport(
             bodyContext.report(DUPLICATE_ARGUMENT, named, named.name)
             hasError = true
           } else {
-            typed(named.value, context, null) match {
+            // A closure takes its parameter types from the named parameter, as a
+            // positional one does (#2799). Generic parameter types stay untyped here.
+            val declared = argsWithDefaults(paramIndex).argType
+            val expected =
+              if (named.value.isInstanceOf[AST.ClosureExpression] && !TypeCheckingHelpers.containsTypeVariable(declared)) declared
+              else null
+            typed(named.value, context, expected) match {
               case Some(term) =>
                 result(paramIndex) = term
                 filled(paramIndex) = true

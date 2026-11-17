@@ -39,7 +39,7 @@ record TrainingExample(text: String, label: Label)
 // ── Extension for Double log-probability formatting ───────────────────────────
 
 extension Double {
-  def asPercent(): String = "" + ((self * 100.0) as Int) + "%"
+  def asPercent(): String = "" + ((this * 100.0) as Int) + "%"
 }
 
 // ── Classifier interface ──────────────────────────────────────────────────────

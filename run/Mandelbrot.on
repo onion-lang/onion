@@ -55,8 +55,8 @@ def example_2(): Boolean
 
 extension Double {
   def sqrt2(): Double {
-    if self <= 0.0 { return 0.0 }
-    var x: Double = self
+    if this <= 0.0 { return 0.0 }
+    var x: Double = this
     var guess: Double = x / 2.0
     var i: Int = 0
     while i < 40 {
@@ -67,7 +67,7 @@ extension Double {
     }
     return guess
   }
-  def abs2(): Double = if self < 0.0 { 0.0 - self } else { self }
+  def abs2(): Double = if this < 0.0 { 0.0 - this } else { this }
 }
 
 // ── Core iteration ──────────────────────────────────────────────────────────

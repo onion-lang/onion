@@ -16,12 +16,12 @@ public final class Strings {
     // Splitting and joining
     public static List<String> split(String str, String delimiter) {
         if (str == null) return new ArrayList<String>();
-        return new ArrayList<String>(Arrays.asList(str.split(Pattern.quote(delimiter))));
+        return Regex.splitKeepingTrailing(str, Pattern.compile(Pattern.quote(delimiter)));
     }
 
     public static List<String> splitRegex(String str, String regex) {
         if (str == null) return new ArrayList<String>();
-        return new ArrayList<String>(Arrays.asList(str.split(regex)));
+        return Regex.splitKeepingTrailing(str, Pattern.compile(regex));
     }
 
     public static String join(List<?> parts, String delimiter) {
@@ -214,6 +214,7 @@ public final class Strings {
         String tail = suffix == null ? "" : suffix;
         int keep = maxLength - tail.length();
         if (keep <= 0) return tail.length() <= maxLength ? tail : tail.substring(0, maxLength);
+        if (Character.isHighSurrogate(str.charAt(keep - 1)) && Character.isLowSurrogate(str.charAt(keep))) keep--;
         return str.substring(0, keep) + tail;
     }
 
@@ -245,12 +246,15 @@ public final class Strings {
         return new ArrayList<String>(Arrays.asList(trimmed.split("\\s+")));
     }
 
-    /** Returns each character as a single-character string. */
+    /** Returns each character as a single-character string; a surrogate pair (an emoji) stays one entry. */
     public static List<String> chars(String str) {
         List<String> result = new ArrayList<>();
         if (str == null) return result;
-        for (int i = 0; i < str.length(); i++) {
-            result.add(String.valueOf(str.charAt(i)));
+        for (int i = 0; i < str.length(); ) {
+            int cp = str.codePointAt(i);
+            int n = Character.charCount(cp);
+            result.add(str.substring(i, i + n));
+            i += n;
         }
         return result;
     }

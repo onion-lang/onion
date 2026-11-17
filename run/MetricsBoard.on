@@ -52,11 +52,11 @@ record Alert(metric: String, threshold: Double, message: String) {
 extension Double {
   def rounded(places: Int): Double {
     val factor: Double = JMath::pow(10.0, places as Double)
-    return JMath::round(self * factor) as Double / factor
+    return JMath::round(this * factor) as Double / factor
   }
   def pctOf(total: Double): Double {
     if total == 0.0 { return 0.0 }
-    return (self / total * 100.0).rounded(1)
+    return (this / total * 100.0).rounded(1)
   }
 }
 
@@ -64,16 +64,16 @@ extension Int {
   def repeat(ch: String): String {
     var s: String = ""
     var i: Int = 0
-    while i < self { s = s + ch; i++ }
+    while i < this { s = s + ch; i++ }
     return s
   }
 }
 
 extension String {
   def padLeft(width: Int): String {
-    val pad: Int = width - self.length
-    if pad <= 0 { return self }
-    return pad.repeat(" ") + self
+    val pad: Int = width - this.length
+    if pad <= 0 { return this }
+    return pad.repeat(" ") + this
   }
   def bar(pct: Double, width: Int): String {
     val filled: Int = (pct / 100.0 * width as Double) as Int
@@ -90,55 +90,55 @@ public:
   val kind: String
   val points: List[DataPoint]
   def this(name: String, kind: String) {
-    self.name = name
-    self.kind = kind
-    self.points = []
+    this.name = name
+    this.kind = kind
+    this.points = []
   }
   def add(point: DataPoint): void {
-    self.points.add(point)
+    this.points.add(point)
   }
-  def size: Int = self.points.size
+  def size: Int = this.points.size
   def average: Double {
-    if self.points.isEmpty() { return 0.0 }
-    return self.points.fold(0.0) { acc, p -> acc + p.value() } / self.points.size as Double
+    if this.points.isEmpty() { return 0.0 }
+    return this.points.fold(0.0) { acc, p -> acc + p.value() } / this.points.size as Double
   }
   def max: Double {
-    if self.points.isEmpty() { return 0.0 }
-    var best: Double = self.points[0].value() as Double
-    foreach pt: DataPoint in self.points {
+    if this.points.isEmpty() { return 0.0 }
+    var best: Double = this.points[0].value() as Double
+    foreach pt: DataPoint in this.points {
       if pt.value() > best { best = pt.value() }
     }
     return best
   }
   def min: Double {
-    if self.points.isEmpty() { return 0.0 }
-    var best: Double = self.points[0].value() as Double
-    foreach pt: DataPoint in self.points {
+    if this.points.isEmpty() { return 0.0 }
+    var best: Double = this.points[0].value() as Double
+    foreach pt: DataPoint in this.points {
       if pt.value() < best { best = pt.value() }
     }
     return best
   }
   def latest: Double {
-    if self.points.isEmpty() { return 0.0 }
-    return self.points[self.points.size - 1].value()
+    if this.points.isEmpty() { return 0.0 }
+    return this.points[this.points.size - 1].value()
   }
   def trend: String {
-    if self.points.size < 2 { return "stable" }
-    val first: Double = self.points[0].value()
-    val last: Double = self.latest
+    if this.points.size < 2 { return "stable" }
+    val first: Double = this.points[0].value()
+    val last: Double = this.latest
     val diff: Double = last - first
     if diff > first * 0.05 { return "up" }
     if diff < -(first * 0.05) { return "down" }
     return "stable"
   }
   def stddev: Double {
-    if self.points.size < 2 { return 0.0 }
-    val avg: Double = self.average
+    if this.points.size < 2 { return 0.0 }
+    val avg: Double = this.average
     val variance: Double =
-      self.points.fold(0.0) { acc, p ->
+      this.points.fold(0.0) { acc, p ->
         val d: Double = p.value() - avg
         acc + d * d
-      } / self.points.size as Double
+      } / this.points.size as Double
     return JMath::sqrt(variance)
   }
 }
@@ -176,31 +176,31 @@ public:
   val series: Map[String, MetricSeries]
   val alerts: List[Alert]
   def this {
-    self.series = [:]
-    self.alerts = []
+    this.series = [:]
+    this.alerts = []
   }
   def addPoint(name: String, kind: String, ts: Long, value: Double): void {
-    if !self.series.containsKey(name) {
-      self.series[name] = new MetricSeries(name, kind)
+    if !this.series.containsKey(name) {
+      this.series[name] = new MetricSeries(name, kind)
     }
-    val ms: MetricSeries = self.series[name] as MetricSeries
+    val ms: MetricSeries = this.series[name] as MetricSeries
     ms.add(new DataPoint(name, ts, value))
   }
   def addAlert(alert: Alert): void {
-    self.alerts.add(alert)
+    this.alerts.add(alert)
   }
   def seriesFor(name: String): MetricSeries? {
-    if !self.series.containsKey(name) { return null }
-    return self.series[name] as MetricSeries
+    if !this.series.containsKey(name) { return null }
+    return this.series[name] as MetricSeries
   }
   def report: void {
     val hr: String = 53.repeat("─")
     IO::println("┌" + hr + "┐")
     IO::println("│        METRICS BOARD REPORT" + 25.repeat(" ") + "│")
     IO::println("├" + hr + "┤")
-    val names: List[String] = Colls::toList(self.series.keySet())
+    val names: List[String] = Colls::toList(this.series.keySet())
     foreach n: String in names {
-      val ms: MetricSeries = self.series[n] as MetricSeries
+      val ms: MetricSeries = this.series[n] as MetricSeries
       val avg: Double = ms.average.rounded(2)
       val lat: Double = ms.latest.rounded(2)
       val mn: Double = ms.min
@@ -209,7 +209,7 @@ public:
       val pct: Double = (lat - mn).pctOf(range)
       val bbar: String = "".bar(pct, 18)
       var sev: Severity = new SevOk
-      foreach alert: Alert in self.alerts {
+      foreach alert: Alert in this.alerts {
         sev = worstOf(sev, checkSeverity(ms, alert))
       }
       val label: String = severityLabel(sev)

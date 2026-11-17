@@ -66,16 +66,16 @@ class Assembler {
 
 public:
   def this(src: String) {
-    self.lines = Strings::split(src, "\n")
-    self.symbols = [:]
-    self.errors = []
+    this.lines = Strings::split(src, "\n")
+    this.symbols = [:]
+    this.errors = []
   }
 
   // Pass 1: collect labels and compute addresses
   def pass1(): List[AsmLine] {
     val result: List[AsmLine] = []
     var addr: Int = 0
-    foreach line: String in self.lines {
+    foreach line: String in this.lines {
       val trimmed: String = line.trim()
       if trimmed.length() == 0 { continue }
       if trimmed.startsWith(";") { continue }
@@ -90,7 +90,7 @@ public:
         val lbl: String = stripped.substring(0, colonPos).trim()
         if lbl.length() > 0 && !lbl.contains(" ") {
           label = lbl
-          self.symbols[lbl] = addr
+          this.symbols[lbl] = addr
           rest = stripped.substring(colonPos + 1).trim()
           if rest.length() == 0 {
             result.add(new AsmLine(addr, label, "", []))
@@ -121,7 +121,7 @@ public:
     val result: List[Word] = []
     foreach line: AsmLine in parsed {
       if line.mnemonic().length() == 0 { continue }
-      val word: Word? = self.encode(line)
+      val word: Word? = this.encode(line)
       if word != null { result.add(word) }
     }
     return result
@@ -135,39 +135,39 @@ public:
       case "HALT": new Word(0x01, 0, 0, 1)
       case "RET":  new Word(0x02, 0, 0, 1)
       case "LOAD":
-        if args.size < 2 { self.errWord(line, "LOAD Rd, imm8") }
+        if args.size < 2 { this.errWord(line, "LOAD Rd, imm8") }
         else {
           val rd: Int = Assembler::parseReg(args[0] as String)
           val imm: Int = Assembler::parseImm(args[1] as String)
-          if rd < 0 || imm < 0 { self.errWord(line, "bad LOAD args") }
+          if rd < 0 || imm < 0 { this.errWord(line, "bad LOAD args") }
           else { new Word(0x10 | rd, imm, 0, 2) }
         }
       case "MOVE":
-        if args.size < 2 { self.errWord(line, "MOVE Rd, Rs") }
+        if args.size < 2 { this.errWord(line, "MOVE Rd, Rs") }
         else {
           val rd: Int = Assembler::parseReg(args[0] as String)
           val rs: Int = Assembler::parseReg(args[1] as String)
-          if rd < 0 || rs < 0 { self.errWord(line, "bad MOVE args") }
+          if rd < 0 || rs < 0 { this.errWord(line, "bad MOVE args") }
           else { new Word(0x18, (rd << 4) | rs, 0, 2) }
         }
-      case "ADD":  self.encodeRR(line, 0x20)
-      case "SUB":  self.encodeRR(line, 0x28)
-      case "AND":  self.encodeRR(line, 0x30)
-      case "OR":   self.encodeRR(line, 0x38)
-      case "XOR":  self.encodeRR(line, 0x40)
-      case "CMP":  self.encodeRR(line, 0x48)
-      case "NOT":  self.encodeR1(line, 0x50)
-      case "INC":  self.encodeR1(line, 0x58)
-      case "DEC":  self.encodeR1(line, 0x60)
-      case "PUSH": self.encodeR1(line, 0x68)
-      case "POP":  self.encodeR1(line, 0x70)
-      case "JMP":  self.encodeJmp(line, 0xE0)
-      case "JEQ":  self.encodeJmp(line, 0xE1)
-      case "JNE":  self.encodeJmp(line, 0xE2)
-      case "JLT":  self.encodeJmp(line, 0xE3)
-      case "CALL": self.encodeJmp(line, 0xE8)
+      case "ADD":  this.encodeRR(line, 0x20)
+      case "SUB":  this.encodeRR(line, 0x28)
+      case "AND":  this.encodeRR(line, 0x30)
+      case "OR":   this.encodeRR(line, 0x38)
+      case "XOR":  this.encodeRR(line, 0x40)
+      case "CMP":  this.encodeRR(line, 0x48)
+      case "NOT":  this.encodeR1(line, 0x50)
+      case "INC":  this.encodeR1(line, 0x58)
+      case "DEC":  this.encodeR1(line, 0x60)
+      case "PUSH": this.encodeR1(line, 0x68)
+      case "POP":  this.encodeR1(line, 0x70)
+      case "JMP":  this.encodeJmp(line, 0xE0)
+      case "JEQ":  this.encodeJmp(line, 0xE1)
+      case "JNE":  this.encodeJmp(line, 0xE2)
+      case "JLT":  this.encodeJmp(line, 0xE3)
+      case "CALL": this.encodeJmp(line, 0xE8)
       else: {
-        self.errors.add("unknown mnemonic: " + m + " at address " + line.address())
+        this.errors.add("unknown mnemonic: " + m + " at address " + line.address())
         null
       }
     }
@@ -175,33 +175,33 @@ public:
 
   def encodeRR(line: AsmLine, op: Int): Word? {
     val args: List[String] = line.args()
-    return if args.size < 2 { self.errWord(line, line.mnemonic() + " Rd, Rs") }
+    return if args.size < 2 { this.errWord(line, line.mnemonic() + " Rd, Rs") }
     else {
       val rd: Int = Assembler::parseReg(args[0] as String)
       val rs: Int = Assembler::parseReg(args[1] as String)
-      if rd < 0 || rs < 0 { self.errWord(line, "bad register") }
+      if rd < 0 || rs < 0 { this.errWord(line, "bad register") }
       else { new Word(op, (rd << 4) | rs, 0, 2) }
     }
   }
 
   def encodeR1(line: AsmLine, op: Int): Word? {
     val args: List[String] = line.args()
-    return if args.size < 1 { self.errWord(line, line.mnemonic() + " Rd") }
+    return if args.size < 1 { this.errWord(line, line.mnemonic() + " Rd") }
     else {
       val rd: Int = Assembler::parseReg(args[0] as String)
-      if rd < 0 { self.errWord(line, "bad register") }
+      if rd < 0 { this.errWord(line, "bad register") }
       else { new Word(op | rd, 0, 0, 1) }
     }
   }
 
   def encodeJmp(line: AsmLine, op: Int): Word? {
     val args: List[String] = line.args()
-    return if args.size < 1 { self.errWord(line, line.mnemonic() + " label") }
+    return if args.size < 1 { this.errWord(line, line.mnemonic() + " label") }
     else {
       val lbl: String = args[0] as String
-      val addr: Int? = self.symbols.get(lbl) as Int?
+      val addr: Int? = this.symbols.get(lbl) as Int?
       if addr == null {
-        self.errors.add("undefined label: " + lbl)
+        this.errors.add("undefined label: " + lbl)
         null
       } else {
         new Word(op, addr, 0, 2)
@@ -210,14 +210,14 @@ public:
   }
 
   def errWord(line: AsmLine, msg: String): Word? {
-    self.errors.add("[addr " + Word::hexByte(line.address()) + "] " + msg)
+    this.errors.add("[addr " + Word::hexByte(line.address()) + "] " + msg)
     return null
   }
 
   def assemble(): AsmResult {
-    val parsed: List[AsmLine] = self.pass1()
-    val words: List[Word] = self.pass2(parsed)
-    return new AsmResult(words, self.symbols, self.errors)
+    val parsed: List[AsmLine] = this.pass1()
+    val words: List[Word] = this.pass2(parsed)
+    return new AsmResult(words, this.symbols, this.errors)
   }
 
   static def instrSize(m: String): Int {
@@ -273,18 +273,18 @@ class Disassembler {
 
 public:
   def this(words: List[Word]) {
-    self.mem = []
+    this.mem = []
     foreach w: Word in words {
-      foreach b: Int in w.bytes() { self.mem.add(b) }
+      foreach b: Int in w.bytes() { this.mem.add(b) }
     }
   }
 
   def disassemble(): List[String] {
     val result: List[String] = []
     var pc: Int = 0
-    while pc < self.mem.size {
-      val op: Int = self.mem[pc] as Int
-      result.add(Word::hexByte(pc) + ": " + self.decode(op, pc))
+    while pc < this.mem.size {
+      val op: Int = this.mem[pc] as Int
+      result.add(Word::hexByte(pc) + ": " + this.decode(op, pc))
       pc = pc + Disassembler::opSize(op)
     }
     return result
@@ -293,7 +293,7 @@ public:
   def decode(op: Int, pc: Int): String {
     val hi: Int = op & 0xF8
     val lo: Int = op & 0x07
-    val b1: Int = if pc + 1 < self.mem.size { self.mem[pc + 1] as Int } else { 0 }
+    val b1: Int = if pc + 1 < this.mem.size { this.mem[pc + 1] as Int } else { 0 }
     return select hi {
       case 0x00: select op {
         case 0x00: "NOP"
@@ -350,120 +350,120 @@ class Simulator {
 
 public:
   def this(image: List[Int]) {
-    self.regs  = new Int[8]
-    self.mem   = new Int[256]
-    self.stack = []
-    self.pc    = 0
-    self.flagEQ = false
-    self.flagLT = false
-    self.halted = false
-    self.steps  = 0
+    this.regs  = new Int[8]
+    this.mem   = new Int[256]
+    this.stack = []
+    this.pc    = 0
+    this.flagEQ = false
+    this.flagLT = false
+    this.halted = false
+    this.steps  = 0
     var i: Int = 0
     while i < image.size && i < 256 {
-      self.mem[i] = image[i] as Int
+      this.mem[i] = image[i] as Int
       i++
     }
   }
 
   def run(maxSteps: Int): void {
-    while !self.halted && self.steps < maxSteps { self.step() }
+    while !this.halted && this.steps < maxSteps { this.step() }
   }
 
-  def stepsCount(): Int = self.steps
-  def isHalted(): Boolean = self.halted
+  def stepsCount(): Int = this.steps
+  def isHalted(): Boolean = this.halted
 
   def step(): void {
-    if self.pc >= 256 { self.halted = true; return }
-    val op: Int = self.mem[self.pc]
+    if this.pc >= 256 { this.halted = true; return }
+    val op: Int = this.mem[this.pc]
     val hi: Int = op & 0xF8
     val lo: Int = op & 0x07
-    self.steps++
+    this.steps++
 
     if hi == 0x00 {
-      if op == 0x00 { self.pc++ }
-      else if op == 0x01 { self.halted = true }
+      if op == 0x00 { this.pc++ }
+      else if op == 0x01 { this.halted = true }
       else if op == 0x02 {
-        if self.stack.size > 0 {
-          self.pc = self.stack[self.stack.size - 1] as Int
-          self.stack.remove(self.stack.size - 1)
+        if this.stack.size > 0 {
+          this.pc = this.stack[this.stack.size - 1] as Int
+          this.stack.remove(this.stack.size - 1)
         } else {
-          self.halted = true
+          this.halted = true
         }
-      } else { self.pc++ }
+      } else { this.pc++ }
     } else if hi == 0x10 {
-      self.regs[lo] = self.mem[self.pc + 1]
-      self.pc = self.pc + 2
+      this.regs[lo] = this.mem[this.pc + 1]
+      this.pc = this.pc + 2
     } else if hi == 0x18 {
-      val rr: Int = self.mem[self.pc + 1]
-      self.regs[(rr >> 4) & 0x7] = self.regs[rr & 0x7]
-      self.pc = self.pc + 2
+      val rr: Int = this.mem[this.pc + 1]
+      this.regs[(rr >> 4) & 0x7] = this.regs[rr & 0x7]
+      this.pc = this.pc + 2
     } else if hi == 0x20 {
-      val rr: Int = self.mem[self.pc + 1]
+      val rr: Int = this.mem[this.pc + 1]
       val d: Int = (rr >> 4) & 0x7
-      self.regs[d] = (self.regs[d] + self.regs[rr & 0x7]) & 0xFF
-      self.pc = self.pc + 2
+      this.regs[d] = (this.regs[d] + this.regs[rr & 0x7]) & 0xFF
+      this.pc = this.pc + 2
     } else if hi == 0x28 {
-      val rr: Int = self.mem[self.pc + 1]
+      val rr: Int = this.mem[this.pc + 1]
       val d: Int = (rr >> 4) & 0x7
-      self.regs[d] = (self.regs[d] - self.regs[rr & 0x7]) & 0xFF
-      self.pc = self.pc + 2
+      this.regs[d] = (this.regs[d] - this.regs[rr & 0x7]) & 0xFF
+      this.pc = this.pc + 2
     } else if hi == 0x30 {
-      val rr: Int = self.mem[self.pc + 1]
+      val rr: Int = this.mem[this.pc + 1]
       val d: Int = (rr >> 4) & 0x7
-      self.regs[d] = self.regs[d] & self.regs[rr & 0x7]
-      self.pc = self.pc + 2
+      this.regs[d] = this.regs[d] & this.regs[rr & 0x7]
+      this.pc = this.pc + 2
     } else if hi == 0x38 {
-      val rr: Int = self.mem[self.pc + 1]
+      val rr: Int = this.mem[this.pc + 1]
       val d: Int = (rr >> 4) & 0x7
-      self.regs[d] = self.regs[d] | self.regs[rr & 0x7]
-      self.pc = self.pc + 2
+      this.regs[d] = this.regs[d] | this.regs[rr & 0x7]
+      this.pc = this.pc + 2
     } else if hi == 0x40 {
-      val rr: Int = self.mem[self.pc + 1]
+      val rr: Int = this.mem[this.pc + 1]
       val d: Int = (rr >> 4) & 0x7
-      self.regs[d] = self.regs[d] ^ self.regs[rr & 0x7]
-      self.pc = self.pc + 2
+      this.regs[d] = this.regs[d] ^ this.regs[rr & 0x7]
+      this.pc = this.pc + 2
     } else if hi == 0x48 {
-      val rr: Int = self.mem[self.pc + 1]
+      val rr: Int = this.mem[this.pc + 1]
       val d: Int = (rr >> 4) & 0x7
-      val diff: Int = self.regs[d] - self.regs[rr & 0x7]
-      self.flagEQ = diff == 0
-      self.flagLT = diff < 0
-      self.pc = self.pc + 2
+      val diff: Int = this.regs[d] - this.regs[rr & 0x7]
+      this.flagEQ = diff == 0
+      this.flagLT = diff < 0
+      this.pc = this.pc + 2
     } else if hi == 0x50 {
-      self.regs[lo] = (~self.regs[lo]) & 0xFF; self.pc++
+      this.regs[lo] = (~this.regs[lo]) & 0xFF; this.pc++
     } else if hi == 0x58 {
-      self.regs[lo] = (self.regs[lo] + 1) & 0xFF; self.pc++
+      this.regs[lo] = (this.regs[lo] + 1) & 0xFF; this.pc++
     } else if hi == 0x60 {
-      self.regs[lo] = (self.regs[lo] - 1) & 0xFF; self.pc++
+      this.regs[lo] = (this.regs[lo] - 1) & 0xFF; this.pc++
     } else if hi == 0x68 {
-      self.stack.add(self.regs[lo]); self.pc++
+      this.stack.add(this.regs[lo]); this.pc++
     } else if hi == 0x70 {
-      if self.stack.size > 0 {
-        self.regs[lo] = self.stack[self.stack.size - 1] as Int
-        self.stack.remove(self.stack.size - 1)
+      if this.stack.size > 0 {
+        this.regs[lo] = this.stack[this.stack.size - 1] as Int
+        this.stack.remove(this.stack.size - 1)
       }
-      self.pc++
+      this.pc++
     } else if hi == 0xE0 {
-      val tgt: Int = self.mem[self.pc + 1]
+      val tgt: Int = this.mem[this.pc + 1]
       if op == 0xE0 {
-        self.pc = tgt
+        this.pc = tgt
       } else if op == 0xE1 {
-        if self.flagEQ { self.pc = tgt } else { self.pc = self.pc + 2 }
+        if this.flagEQ { this.pc = tgt } else { this.pc = this.pc + 2 }
       } else if op == 0xE2 {
-        if !self.flagEQ { self.pc = tgt } else { self.pc = self.pc + 2 }
+        if !this.flagEQ { this.pc = tgt } else { this.pc = this.pc + 2 }
       } else if op == 0xE3 {
-        if self.flagLT { self.pc = tgt } else { self.pc = self.pc + 2 }
+        if this.flagLT { this.pc = tgt } else { this.pc = this.pc + 2 }
       } else if op == 0xE8 {
-        self.stack.add(self.pc + 2); self.pc = tgt
-      } else { self.pc++ }
-    } else { self.pc++ }
+        this.stack.add(this.pc + 2); this.pc = tgt
+      } else { this.pc++ }
+    } else { this.pc++ }
   }
 
   def dumpRegs(): String {
     val parts: List[String] = []
     var i: Int = 0
     while i < 8 {
-      parts.add("R" + i + "=" + Word::hexByte(self.regs[i]))
+      parts.add("R" + i + "=" + Word::hexByte(this.regs[i]))
       i++
     }
     val sb: StringBuilder = new StringBuilder()

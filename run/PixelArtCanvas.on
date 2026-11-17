@@ -370,17 +370,17 @@ private:
 
 extension Int {
   def clamp(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
+    if this < lo { return lo }
+    if this > hi { return hi }
+    return this
   }
   def bar(maxVal: Int, width: Int): String {
-    val filled: Int = if maxVal == 0 { 0 } else { (self * width / maxVal).clamp(0, width) }
+    val filled: Int = if maxVal == 0 { 0 } else { (this * width / maxVal).clamp(0, width) }
     var s: String = "["
     foreach i: Int in 0..<width {
       s = s + (if i < filled { "#" } else { " " })
     }
-    return s + "] " + self
+    return s + "] " + this
   }
 }
 

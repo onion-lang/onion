@@ -18,13 +18,13 @@ record IpAddress(a: Int, b: Int, c: Int, d: Int)
 extension IpAddress {
   def toLong(): Long {
     var v: Long = 0L
-    v = v * 256L + self.a()
-    v = v * 256L + self.b()
-    v = v * 256L + self.c()
-    v = v * 256L + self.d()
+    v = v * 256L + this.a()
+    v = v * 256L + this.b()
+    v = v * 256L + this.c()
+    v = v * 256L + this.d()
     return v
   }
-  def format(): String = "#{self.a()}.#{self.b()}.#{self.c()}.#{self.d()}"
+  def format(): String = "#{this.a()}.#{this.b()}.#{this.c()}.#{this.d()}"
 }
 
 def longToIp(v: Long): IpAddress {
@@ -45,29 +45,29 @@ def prefixToMask(prefix: Int): Long {
 record CidrBlock(ip: IpAddress, prefix: Int)
 
 extension CidrBlock {
-  def mask(): Long = prefixToMask(self.prefix())
+  def mask(): Long = prefixToMask(this.prefix())
 
-  def networkLong(): Long = self.ip().toLong() & self.mask()
+  def networkLong(): Long = this.ip().toLong() & this.mask()
 
-  def broadcastLong(): Long = self.networkLong() | (~self.mask() & 0xFFFFFFFFL)
+  def broadcastLong(): Long = this.networkLong() | (~this.mask() & 0xFFFFFFFFL)
 
-  def networkAddr(): IpAddress = longToIp(self.networkLong())
+  def networkAddr(): IpAddress = longToIp(this.networkLong())
 
-  def broadcastAddr(): IpAddress = longToIp(self.broadcastLong())
+  def broadcastAddr(): IpAddress = longToIp(this.broadcastLong())
 
   def contains(addr: IpAddress): Boolean =
-    (addr.toLong() & self.mask()) == self.networkLong()
+    (addr.toLong() & this.mask()) == this.networkLong()
 
-  def hostCount(): Long = self.broadcastLong() - self.networkLong() - 1L
+  def hostCount(): Long = this.broadcastLong() - this.networkLong() - 1L
 
-  def firstHost(): IpAddress = longToIp(self.networkLong() + 1L)
+  def firstHost(): IpAddress = longToIp(this.networkLong() + 1L)
 
-  def lastHost(): IpAddress = longToIp(self.broadcastLong() - 1L)
+  def lastHost(): IpAddress = longToIp(this.broadcastLong() - 1L)
 
-  def format(): String = "#{self.networkAddr().format()}/#{self.prefix()}"
+  def format(): String = "#{this.networkAddr().format()}/#{this.prefix()}"
 
   def summary(): String {
-    return "Network #{self.format()}: hosts #{self.firstHost().format()} — #{self.lastHost().format()} (#{self.hostCount()} usable)"
+    return "Network #{this.format()}: hosts #{this.firstHost().format()} — #{this.lastHost().format()} (#{this.hostCount()} usable)"
   }
 }
 

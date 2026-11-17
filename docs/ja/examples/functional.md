@@ -408,17 +408,16 @@ def divide(a: Int, b: Int): Result[Int, String] {
 }
 
 val calculation: Result[Int, String] = do[Result] {
-  x <- Result::ok(100)
+  x <- divide(100, 1)    // 100
   y <- divide(x, 5)      // 20
   z <- divide(y, 4)      // 5
   yield z * 2              // 10
 }
 
-select calculation {
-  case Result::ok(value):
-    println("Result: " + value)
-  case Result::err(msg):
-    println("Error: " + msg)
+if calculation.isOk() {
+  println("Result: " + calculation.get())
+} else {
+  println("Error: " + calculation.getError())
 }
 ```
 

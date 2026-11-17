@@ -136,21 +136,21 @@ static def round1(v: Double): Double {
 // ── extension methods on Double for ergonomic construction ───────────────────
 
 extension Double {
-  def meters(): Length      = new Length(self, new Meter())
-  def centimeters(): Length = new Length(self, new Centimeter())
-  def kilometers(): Length  = new Length(self, new Kilometer())
-  def feet(): Length        = new Length(self, new Foot())
-  def inches(): Length      = new Length(self, new Inch())
-  def miles(): Length       = new Length(self, new Mile())
+  def meters(): Length      = new Length(this, new Meter())
+  def centimeters(): Length = new Length(this, new Centimeter())
+  def kilometers(): Length  = new Length(this, new Kilometer())
+  def feet(): Length        = new Length(this, new Foot())
+  def inches(): Length      = new Length(this, new Inch())
+  def miles(): Length       = new Length(this, new Mile())
 
-  def kilograms(): Mass     = new Mass(self, new Kilogram())
-  def grams(): Mass         = new Mass(self, new Gram())
-  def pounds(): Mass        = new Mass(self, new Pound())
-  def ounces(): Mass        = new Mass(self, new Ounce())
+  def kilograms(): Mass     = new Mass(this, new Kilogram())
+  def grams(): Mass         = new Mass(this, new Gram())
+  def pounds(): Mass        = new Mass(this, new Pound())
+  def ounces(): Mass        = new Mass(this, new Ounce())
 
-  def celsius(): Temperature    = new Temperature(self, new Celsius())
-  def fahrenheit(): Temperature = new Temperature(self, new Fahrenheit())
-  def kelvin(): Temperature     = new Temperature(self, new Kelvin())
+  def celsius(): Temperature    = new Temperature(this, new Celsius())
+  def fahrenheit(): Temperature = new Temperature(this, new Fahrenheit())
+  def kelvin(): Temperature     = new Temperature(this, new Kelvin())
 }
 
 // ── demo ──────────────────────────────────────────────────────────────────────
@@ -268,12 +268,12 @@ IO::println("=== Int Extension Methods ===")
 
 // Extension methods on Int for creating integer-valued measurements
 extension Int {
-  def centimeters(): Length = new Length(self as Double, new Centimeter())
-  def inches(): Length      = new Length(self as Double, new Inch())
-  def grams(): Mass         = new Mass(self as Double, new Gram())
-  def ounces(): Mass        = new Mass(self as Double, new Ounce())
-  def celsius(): Temperature    = new Temperature(self as Double, new Celsius())
-  def fahrenheit(): Temperature = new Temperature(self as Double, new Fahrenheit())
+  def centimeters(): Length = new Length(this as Double, new Centimeter())
+  def inches(): Length      = new Length(this as Double, new Inch())
+  def grams(): Mass         = new Mass(this as Double, new Gram())
+  def ounces(): Mass        = new Mass(this as Double, new Ounce())
+  def celsius(): Temperature    = new Temperature(this as Double, new Celsius())
+  def fahrenheit(): Temperature = new Temperature(this as Double, new Fahrenheit())
 }
 
 val pencil: Length = 19.centimeters()

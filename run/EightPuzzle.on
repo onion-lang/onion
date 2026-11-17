@@ -43,7 +43,7 @@ def dirLabel(d: Dir): String = select d {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 extension Int {
-  def absVal(): Int = if self >= 0 { self } else { -self }
+  def absVal(): Int = if this >= 0 { this } else { -this }
 }
 
 val DRS: Int[] = new Int[4]

@@ -59,14 +59,14 @@ class AmountThresholdRule conforms FraudRule {
   private:
     val multiplier: Double
   public:
-    def this(multiplier: Double) { self.multiplier = multiplier }
+    def this(multiplier: Double) { this.multiplier = multiplier }
     def name(): String = "AmountThreshold"
     def check(tx: Transaction, profile: CardProfile): FraudAlert? {
       val limit: Double = profile.maxSingleTx() * multiplier
       if tx.amount() > limit {
         val risk: RiskLevel =
           if tx.amount() > limit * 2.0 { RiskLevel::CRITICAL } else { RiskLevel::HIGH }
-        return new FraudAlert(tx.id(), self.name(), risk,
+        return new FraudAlert(tx.id(), this.name(), risk,
           "#{tx.amount()} #{tx.currency()} exceeds limit #{limit}")
       }
       return null
@@ -85,7 +85,7 @@ class ForeignTransactionRule conforms FraudRule {
           if flagged { RiskLevel::CRITICAL }
           else if tx.amount() > 300.0 { RiskLevel::HIGH }
           else { RiskLevel::MEDIUM }
-        return new FraudAlert(tx.id(), self.name(), risk,
+        return new FraudAlert(tx.id(), this.name(), risk,
           "Country #{tx.country()} (home=#{profile.homeCountry()}#{if flagged { ", FLAGGED" } else { "" }})")
       }
       return null
@@ -98,7 +98,7 @@ class LargeCashRule conforms FraudRule {
   private:
     val threshold: Double
   public:
-    def this(threshold: Double) { self.threshold = threshold }
+    def this(threshold: Double) { this.threshold = threshold }
     def name(): String = "LargeCash"
     def check(tx: Transaction, profile: CardProfile): FraudAlert? {
       select tx.txType() {
@@ -109,7 +109,7 @@ class LargeCashRule conforms FraudRule {
               if tx.amount() > threshold * 2.0 { RiskLevel::CRITICAL }
               else if overProfile            { RiskLevel::HIGH }
               else                            { RiskLevel::MEDIUM }
-            return new FraudAlert(tx.id(), self.name(), risk,
+            return new FraudAlert(tx.id(), this.name(), risk,
               "Cash withdrawal #{tx.amount()} #{tx.currency()} at #{w.location()}")
           }
         else: {}
@@ -127,7 +127,7 @@ class RapidTransferRule conforms FraudRule {
       select tx.txType() {
         case t is Transfer:
           if tx.amount() > profile.avgMonthlySpend() * 0.5 {
-            return new FraudAlert(tx.id(), self.name(), RiskLevel::HIGH,
+            return new FraudAlert(tx.id(), this.name(), RiskLevel::HIGH,
               "Large transfer #{tx.amount()} to #{t.toAccount()} (avg monthly=#{profile.avgMonthlySpend()})")
           }
         else: {}
@@ -144,22 +144,22 @@ class FraudDetector {
     val profiles: Map[String, CardProfile]
   public:
     def this {
-      self.rules    = []
-      self.profiles = [:]
+      this.rules    = []
+      this.profiles = [:]
     }
-    def addRule(r: FraudRule): void { self.rules.add(r) }
-    def register(p: CardProfile): void { self.profiles[p.last4()] = p }
+    def addRule(r: FraudRule): void { this.rules.add(r) }
+    def register(p: CardProfile): void { this.profiles[p.last4()] = p }
 
     def analyze(tx: Transaction): List[FraudAlert] {
       val alerts: List[FraudAlert] = []
-      val maybeProfile: CardProfile? = self.profiles[tx.cardLast4()]
+      val maybeProfile: CardProfile? = this.profiles[tx.cardLast4()]
       if maybeProfile == null {
         alerts.add(new FraudAlert(tx.id(), "UnknownCard", RiskLevel::MEDIUM,
           "No profile found for card *#{tx.cardLast4()}"))
         return alerts
       }
       val profile: CardProfile = (maybeProfile as CardProfile)
-      foreach rule: FraudRule in self.rules {
+      foreach rule: FraudRule in this.rules {
         val alert: FraudAlert? = rule.check(tx, profile)
         if alert != null { alerts.add(alert) }
       }

@@ -243,51 +243,93 @@ final class ConstructionTyping(
    * place rather than silently guessing.
    */
   private def diamondTypeFromArguments(node: AST.NewObject, context: LocalContext): Option[ClassType] = {
-    // A closure argument cannot be typed before its target type is known, and
-    // named arguments take a separate resolution path; both keep the existing
-    // behavior rather than participating in inference.
-    if (node.args.exists(_.isInstanceOf[AST.ClosureExpression])) return None
-    if (hasNamedArguments(node.args)) return None
+    // A closure argument cannot be typed before its target type is known, so a
+    // closure keeps the existing behavior rather than participating in inference.
+    if (node.args.exists(c => c.isInstanceOf[AST.ClosureExpression] ||
+        (c.isInstanceOf[AST.NamedArgument] && c.asInstanceOf[AST.NamedArgument].value.isInstanceOf[AST.ClosureExpression]))) return None
 
     bareGenericTarget(node).flatMap { raw =>
       boundary[Option[ClassType]] {
+        val typeParams = raw.typeParameters
+        val named = hasNamedArguments(node.args)
+
+        // Each candidate constructor with the arguments to type against it, in
+        // parameter order. A named call may leave defaulted parameters out (null
+        // slots); each class type parameter must still be pinned by a real argument.
+        val shaped: List[(ConstructorDefinition, List[AST.Expression])] =
+          if (!named) {
+            raw.constructors.toList.collect {
+              case cd: ConstructorDefinition
+                if cd.getArgs.length == node.args.length ||
+                  (cd.argumentsWithDefaults != null && node.args.length < cd.argumentsWithDefaults.length && node.args.length >= cd.minArguments) =>
+                (cd, node.args)
+            }
+          } else {
+            val namedInfo = extractNamedArgInfo(node.args)
+            filterConstructorsByNamedArgs(raw.constructors.toIndexedSeq, namedInfo).toList.collect {
+              case cd: ConstructorDefinition if cd.argumentsWithDefaults != null =>
+                val params = cd.argumentsWithDefaults
+                val slots = new Array[AST.Expression](params.length)
+                var next = 0
+                var ok = true
+                node.args.foreach {
+                  case n: AST.NamedArgument =>
+                    val i = params.indexWhere(_.name == n.name)
+                    if (i < 0 || slots(i) != null) ok = false else slots(i) = n.value
+                  case e =>
+                    while (next < slots.length && slots(next) != null) next += 1
+                    if (next >= slots.length) ok = false else { slots(next) = e; next += 1 }
+                }
+                // A parameter left out is fine when it has a default: its slot stays
+                // null and is skipped when typing, as a generic method call does.
+                val omittable = params.indices.forall(i => slots(i) != null || params(i).defaultValue.nonEmpty || i >= cd.defaultsOmittableFrom)
+                if (ok && omittable) Some((cd, slots.toList)) else None
+            }.flatten
+          }
+        if (shaped.isEmpty) break(None)
+
         // Probe-type the arguments: a genuine error here is reported once by the
         // real resolution path below, not twice by this speculative pass.
-        val args = typing.withSuppressedReporting(typedTerms(node.args.toArray, context))
-        if (args == null || args.exists(_ == null)) break(None)
-
-        val typeParams = raw.typeParameters
-        val candidates = raw.constructors.collect {
-          case cd: ConstructorDefinition
-            if cd.getArgs.length == args.length ||
-              (cd.argumentsWithDefaults != null && args.length < cd.argumentsWithDefaults.length && args.length >= cd.minArguments) => cd
-        }
-        if (candidates.isEmpty) break(None)
-
-        val solutions: List[List[Type]] = candidates.toList.flatMap { candidate =>
-          val synthetic = new MethodDefinition(
-            node.location,
-            candidate.modifier,
-            raw,
-            "<init>",
-            candidate.getArgs.take(args.length),
-            raw,
-            null,
-            typeParams
-          )
-          val bindings = typing.withSuppressedReporting {
-            GenericMethodTypeArguments.inferWithoutDefaults(
-              typing, node, synthetic, args, scala.collection.immutable.Map.empty)
+        val solutions: List[List[Type]] = shaped.flatMap { case (candidate, ordered) =>
+          val present = ordered.filter(_ != null)
+          val typedPresent = typing.withSuppressedReporting(typedTerms(present.toArray, context))
+          val args: Array[Term] =
+            if (typedPresent == null || typedPresent.exists(_ == null)) null
+            else {
+              var k = 0
+              ordered.toArray.map(e => if (e == null) null else { val t = typedPresent(k); k += 1; t })
+            }
+          if (args == null) None
+          else {
+            val synthetic = new MethodDefinition(
+              node.location,
+              candidate.modifier,
+              raw,
+              "<init>",
+              candidate.getArgs.take(args.length),
+              raw,
+              null,
+              typeParams
+            )
+            val bindings = typing.withSuppressedReporting {
+              GenericMethodTypeArguments.inferWithoutDefaults(
+                typing, node, synthetic, args, scala.collection.immutable.Map.empty)
+            }
+            // Every class type parameter must be pinned by an argument; a partially
+            // inferred type would otherwise silently default the rest to their bound.
+            if (typeParams.forall(tp => bindings.contains(tp.name)))
+              Some(typeParams.map(tp => bindings(tp.name)).toList)
+            else None
           }
-          // Every class type parameter must be pinned by an argument; a partially
-          // inferred type would otherwise silently default the rest to their bound.
-          if (typeParams.forall(tp => bindings.contains(tp.name)))
-            Some(typeParams.map(tp => bindings(tp.name)).toList)
-          else None
         }.distinct
 
         solutions match {
-          case only :: Nil => Some(AppliedClassType(raw, only))
+          case only :: Nil =>
+            val applied = AppliedClassType(raw, only)
+            // Inference read a bound that names another parameter (`T extends B`) with
+            // that parameter erased; check it with the real arguments (#2539).
+            if (typeParams.exists(_.upperBound.isDefined)) typing.checkInferredTypeArgumentBounds(node.typeRef, applied)
+            Some(applied)
           case _ => None
         }
       }
@@ -415,7 +457,8 @@ final class ConstructionTyping(
         val formals = c.getArgs.map(t =>
           TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
         formals.length != params.length || formals.indices.forall { i =>
-          AssignabilitySupport.typeVariableSlotFits(formals(i), params(i), bodyContext.table)
+          AssignabilitySupport.typeVariableSlotFits(formals(i), params(i), bodyContext.table) &&
+            !primitiveIntoTypeVariable(typeRef, formals(i), params(i))
         }
       case _ => true
     }
@@ -535,8 +578,11 @@ final class ConstructionTyping(
           val classSubst = TypeSubstitution.classSubstitution(applied)
           val formals = constructors(0).getArgs.map(t =>
             TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-          warnNullArguments(constructors(0), node.args.toArray, parameters, formals)
-          Some(new NewObject(appliedCtor, adaptToFormals(parameters, formals)))
+          if (nullIntoPrimitiveTypeArgument(node.args.toArray, parameters, constructors(0).getArgs, formals)) None
+          else {
+            warnNullArguments(constructors(0), node.args.toArray, parameters, formals)
+            Some(new NewObject(appliedCtor, adaptToFormals(parameters, formals)))
+          }
         case _ =>
           warnNullArguments(constructors(0), node.args.toArray, parameters, constructors(0).getArgs)
           Some(new NewObject(constructors(0), adaptToFormals(parameters, constructors(0).getArgs)))
@@ -569,10 +615,12 @@ final class ConstructionTyping(
           // as on the exact-arity path, so `T...` never takes an `Object` (#2839).
           val fixedFit = (0 until fixed).forall(i =>
             TypeRelations.isAssignableWithBoxing(formals(i), parameters(i).`type`, table) &&
-              AssignabilitySupport.typeVariableSlotFits(formals(i), parameters(i), table))
+              AssignabilitySupport.typeVariableSlotFits(formals(i), parameters(i), table) &&
+              !primitiveIntoTypeVariable(typeRef, formals(i), parameters(i)))
           val restFit = parameters.drop(fixed).forall(p =>
             TypeRelations.isAssignableWithBoxing(arrayType.base, p.`type`, table) &&
-              AssignabilitySupport.typeVariableSlotFits(arrayType.base, p, table))
+              AssignabilitySupport.typeVariableSlotFits(arrayType.base, p, table) &&
+              !primitiveIntoTypeVariable(typeRef, arrayType.base, p))
           if (fixedFit && restFit) Some((c, formals, arrayType)) else None
         case _ => None
       }
@@ -648,6 +696,26 @@ final class ConstructionTyping(
   private def adaptToFormals(parameters: Array[Term], formals: Array[Type]): Array[Term] =
     Boxing.adaptArguments(bodyContext.table, parameters, formals)
 
+  /** `null` into a constructor slot declared as a class type variable whose type argument is
+   *  a primitive (`new Box[Int](null)`, `new R[Int](null)`) is E0000 with the `Int?` hint, as
+   *  for a method parameter (#2991): the stored value is unboxed later and crashes then.
+   *  True when it reported. */
+  private def nullIntoPrimitiveTypeArgument(args: Array[? <: AST.Node], params: Array[Term], declared: Array[Type], formals: Array[Type]): Boolean = {
+    var reported = false
+    var i = 0
+    while (i < params.length && i < args.length && i < formals.length && i < declared.length) {
+      val p = params(i)
+      if (p != null && args(i) != null && p.`type`.isNullType && declared(i).isInstanceOf[TypedAST.TypeVariableType]) {
+        ArgumentHelpers.primitiveOfNonNullBox(formals(i)).foreach { primitive =>
+          bodyContext.report(INCOMPATIBLE_TYPE, args(i), primitive, p.`type`, onion.compiler.SemanticErrorReporter.PrimitiveTypeArgumentNullHint)
+          reported = true
+        }
+      }
+      i += 1
+    }
+    reported
+  }
+
   /** W0012 for a `null` argument to an Onion-declared constructor's non-null
    *  parameter, as a method call already warns (#2464). A Java constructor's
    *  parameter nullness is unknown, so it stays silent (#2116). */
@@ -692,9 +760,28 @@ final class ConstructionTyping(
     typeRef.constructors.filter { c =>
       val formals = substitutedArgs(c)
       formals.length == parameters.length &&
-        formals.indices.forall(i => formalAccepts(formals(i), parameters(i)))
+        formals.indices.forall(i =>
+          formalAccepts(formals(i), parameters(i)) && !primitiveIntoTypeVariable(typeRef, formals(i), parameters(i)))
     }
   }
+
+  /**
+   * A primitive argument for a slot that is still a type variable after the class's type
+   * arguments are substituted (`new Box[T](i)` inside `G[T]`, with `i: Int`). Boxing gives an
+   * `Integer`, which fits no abstract `T`: `new G[String]().wrapInt(3)` compiled and its `v`
+   * read threw a ClassCastException (#2840). A method call `take(3)` against `take(t: T)` is
+   * already rejected. Only for an applied type (`Box[T]`, `Box[String]`): there every slot
+   * left as a type variable is the caller's own; a raw `new Box(3)` still infers `T`.
+   */
+  private def primitiveIntoTypeVariable(typeRef: ClassType, formal: Type, arg: Term): Boolean =
+    typeRef.isInstanceOf[TypedAST.AppliedClassType] && primitiveIntoTypeVariable(formal, arg)
+
+  private def primitiveIntoTypeVariable(formal: Type, arg: Term): Boolean =
+    arg != null && arg.`type` != null && arg.`type`.isBasicType && (formal match {
+      case _: TypedAST.TypeVariableType => true
+      case n: TypedAST.NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
+      case _ => false
+    })
 
   /**
    * When no constructor matched the eagerly-typed arguments, retype malleable
@@ -926,6 +1013,26 @@ final class ConstructionTyping(
         }
         if (mostSpecific.length == 1) mostSpecific else pool
       }
+    // Several left and none most specific: an ambiguous call, as javac and a method call
+    // (E0006) say. Falling through would type the lambdas with no target, which reported
+    // E0052 "must specify a type", a fix that does not help (#2950). Only a lambda with an
+    // untyped parameter needs a target: a typed or zero-parameter one still falls through,
+    // where the eager path types it on its own and picks the Onion function type.
+    def needsTarget(i: Int): Boolean = (args(i) match {
+      case c: AST.ClosureExpression => Some(c)
+      case block: AST.BlockExpression if block.elements.nonEmpty =>
+        block.elements.last match { case c: AST.ClosureExpression => Some(c); case _ => None }
+      case _ => None
+    }).exists(_.args.exists(_.typeRef == null))
+    if (candidates.length > 1 && closureIndices.exists(needsTarget)) {
+      bodyContext.report(
+        AMBIGUOUS_CONSTRUCTOR,
+        node,
+        Array[AnyRef](candidates(0).affiliation, candidates(0).getArgs),
+        Array[AnyRef](candidates(1).affiliation, candidates(1).getArgs)
+      )
+      break(Some(None))
+    }
     if (candidates.length != 1) break(None)
 
     val ctor = candidates(0)
@@ -1228,11 +1335,13 @@ final class ConstructionTyping(
     // positional path: `new C[T](xs = xs)` with `xs: List[Number]` is not a `List[T]`.
     if (!suppliedIndices.forall(i =>
         formalAccepts(formals(i), result(i)) &&
-          AssignabilitySupport.typeVariableSlotFits(formals(i), result(i), bodyContext.table))) {
+          AssignabilitySupport.typeVariableSlotFits(formals(i), result(i), bodyContext.table) &&
+          !primitiveIntoTypeVariable(typeRef, formals(i), result(i)))) {
       bodyContext.report(CONSTRUCTOR_NOT_FOUND, node, ctor.affiliation,
         suppliedTypes, ctor.affiliation.constructors)
       return None
     }
+    if (nullIntoPrimitiveTypeArgument(sources, result, argsWithDefaults.map(_.argType), formals)) return None
     warnNullArguments(ctor, sources, result, formals)
 
     // Fill missing arguments with default values

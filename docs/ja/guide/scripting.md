@@ -26,11 +26,16 @@ println("hello")
 ```onion
 val opts = Args::parse(args)
 
-if opts.flag("verbose") { ... }          // --verbose または -v
+if opts.flag("verbose") { ... }          // --verbose（-v は flag("v")）
 val out = opts.option("output", "a.txt") // --output=x または --output x
 val n = opts.intOption("count", 1)       // デフォルト付きの数値
 val files = opts.positional()            // それ以外すべて
 ```
+
+`positional()` より**先に** `flag(..)` と `option(..)` を呼んでください。`--verbose a.txt` は、
+フラグとファイルにも、値つきオプションにも読めます。パーサーは問い合わせの時点で決めます。
+`flag("verbose")` だけを呼ぶと、`a.txt` は `positional()` に戻ります。
+`positional()` を先に読むと、その時点では `a.txt` は含まれません。
 
 ## 外部コマンドの実行
 

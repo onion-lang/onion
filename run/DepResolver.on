@@ -10,19 +10,19 @@
 record SemVer(major: Int, minor: Int, patch: Int) {
 public:
   def compareTo(other: SemVer): Int {
-    if self.major() != other.major() { return self.major() - other.major() }
-    if self.minor() != other.minor() { return self.minor() - other.minor() }
-    return self.patch() - other.patch()
+    if this.major() != other.major() { return this.major() - other.major() }
+    if this.minor() != other.minor() { return this.minor() - other.minor() }
+    return this.patch() - other.patch()
   }
-  def isSameMajor(other: SemVer): Boolean = self.major() == other.major()
-  def isAtLeast(other: SemVer): Boolean = self.compareTo(other) >= 0
-  def render(): String = "#{self.major()}.#{self.minor()}.#{self.patch()}"
-  def sortKey(): Int = self.major() * 10000 + self.minor() * 100 + self.patch()
+  def isSameMajor(other: SemVer): Boolean = this.major() == other.major()
+  def isAtLeast(other: SemVer): Boolean = this.compareTo(other) >= 0
+  def render(): String = "#{this.major()}.#{this.minor()}.#{this.patch()}"
+  def sortKey(): Int = this.major() * 10000 + this.minor() * 100 + this.patch()
 }
 
 extension String {
   def toSemVer(): SemVer? {
-    val parts: List[String] = Strings::split(self, ".")
+    val parts: List[String] = Strings::split(this, ".")
     if parts.size != 3 { return null }
     try {
       val maj: Int = Integer::parseInt(parts[0])
@@ -70,13 +70,13 @@ public:
 
 record Dep(name: String, constraint: VersionConstraint) {
 public:
-  def render(): String = "#{self.name()} #{self.constraint().render()}"
+  def render(): String = "#{this.name()} #{this.constraint().render()}"
 }
 
 record Pkg(name: String, version: SemVer, deps: List[Dep]) {
 public:
-  def id(): String = "#{self.name()}@#{self.version().render()}"
-  def depCount(): Int = self.deps().size
+  def id(): String = "#{this.name()}@#{this.version().render()}"
+  def depCount(): Int = this.deps().size
 }
 
 // ─── Resolution ADT ──────────────────────────────────────────────────────────
@@ -124,10 +124,10 @@ public:
     return entries.filter { p -> (p as Pkg).name() == name }
   }
   def satisfying(name: String, c: VersionConstraint): List[Pkg] {
-    return self.versionsOf(name).filter { p -> c.isSatisfiedBy((p as Pkg).version()) }
+    return this.versionsOf(name).filter { p -> c.isSatisfiedBy((p as Pkg).version()) }
   }
   def bestMatch(name: String, c: VersionConstraint): Pkg? {
-    val candidates: List[Pkg] = self.satisfying(name, c)
+    val candidates: List[Pkg] = this.satisfying(name, c)
     if candidates.size == 0 { return null }
     val sorted: List[Pkg] = candidates.sortedBy { p -> (p as Pkg).version().sortKey() }
     return sorted[sorted.size - 1] as Pkg
@@ -143,7 +143,7 @@ class Resolver {
 
 public:
   def this(reg: Registry) {
-    self.registry = reg
+    this.registry = reg
   }
 
   def resolve(name: String, c: VersionConstraint): Resolution {
@@ -174,7 +174,7 @@ public:
 
     // Resolve transitive deps
     foreach dep: Dep in pkg.deps() {
-      val sub: Resolution = self.resolve(dep.name(), dep.constraint())
+      val sub: Resolution = this.resolve(dep.name(), dep.constraint())
       if !sub.isOk() { return sub }
     }
 
@@ -192,12 +192,12 @@ class TreePrinter {
 
 public:
   def this(reg: Registry) {
-    self.registry = reg
+    this.registry = reg
   }
 
   def printTree(pkg: Pkg, depth: Int): void {
     val alreadySeen: Boolean = shown.any { s -> s == pkg.id() }
-    val indent: String = self.indent(depth)
+    val indent: String = this.indent(depth)
     if alreadySeen {
       IO::println("#{indent}#{pkg.id()}  (↑ dedup)")
       return
@@ -207,7 +207,7 @@ public:
     foreach dep: Dep in pkg.deps() {
       val f: Pkg? = registry.bestMatch(dep.name(), dep.constraint())
       if f != null {
-        self.printTree(f, depth + 2)
+        this.printTree(f, depth + 2)
       } else {
         IO::println("#{indent}  #{dep.name()} (MISSING)")
       }
@@ -225,7 +225,7 @@ public:
 // ─── Constraint helpers ───────────────────────────────────────────────────────
 
 extension Int {
-  def dotZero(): String = "" + self + ".0"
+  def dotZero(): String = "" + this + ".0"
 }
 
 // ─── Registry builder ────────────────────────────────────────────────────────

@@ -36,7 +36,7 @@ public:
 
 extension Double {
   def fmt4(): String {
-    val scaled: Long = (self * 10000.0) as Long
+    val scaled: Long = (this * 10000.0) as Long
     val whole:  Long = scaled / 10000L
     val frac:   Long = scaled % 10000L
     val fs:     String = if frac < 10L   { "000" + frac }
@@ -45,17 +45,17 @@ extension Double {
                          else                 { "" + frac }
     return Long::toString(whole) + "." + fs
   }
-  def absDiff(other: Double): Double = if self > other { self - other } else { other - self }
+  def absDiff(other: Double): Double = if this > other { this - other } else { other - this }
 }
 
 extension String {
   def rpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def lpad(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
@@ -63,7 +63,7 @@ extension String {
 
 extension Int {
   def lpad(n: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < n { s = " " + s }
     return s
   }

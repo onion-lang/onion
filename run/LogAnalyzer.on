@@ -53,18 +53,18 @@ record LevelCount(level: String, count: Int)
 
 extension String {
   def padEnd(width: Int): String = {
-    val pad = width - self.length()
-    if pad <= 0 { self } else { self + " ".repeat(pad) }
+    val pad = width - this.length()
+    if pad <= 0 { this } else { this + " ".repeat(pad) }
   }
   def padStart(width: Int): String = {
-    val pad = width - self.length()
-    if pad <= 0 { self } else { " ".repeat(pad) + self }
+    val pad = width - this.length()
+    if pad <= 0 { this } else { " ".repeat(pad) + this }
   }
   def center(width: Int): String = {
-    val pad = width - self.length()
-    if pad <= 0 { self } else {
+    val pad = width - this.length()
+    if pad <= 0 { this } else {
       val l = pad / 2
-      " ".repeat(l) + self + " ".repeat(pad - l)
+      " ".repeat(l) + this + " ".repeat(pad - l)
     }
   }
 }

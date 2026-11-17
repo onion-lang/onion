@@ -76,7 +76,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     if (node.name == "copy" && node.args.isEmpty && !context.isStatic) {
       val receiver: Term = if (context.isClosure) new OuterThis(targetType) else new This(targetType)
       calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, receiver, targetType) {
-        (method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
+        (_, method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
       } match {
         case Some(result) => return result
         case None =>
@@ -399,7 +399,7 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     if (node.name == "copy" && !context.isStatic) {
       val receiver: Term = if (context.isClosure) new OuterThis(targetType) else new This(targetType)
       val recordCopy = calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, receiver, targetType) {
-        (method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
+        (_, method, finalParams) => rawUnqualifiedCall(targetType, method, finalParams, context)
       }
       recordCopy match { case Some(result) => return result; case None => }
     }
@@ -434,6 +434,11 @@ private[compiler] final class UnqualifiedMethodCallSupport(
           return None
         }
         if (!ensureInstanceAvailable(node, method, context)) return None
+        if (!MemberAccess.isMemberAccessible(method, bodyContext.definition)) {
+          // An inherited private method: E0013, not IllegalAccessError at run time (#2916).
+          bodyContext.report(METHOD_NOT_ACCESSIBLE, node, method.affiliation, node.name, method.arguments, bodyContext.definition)
+          return None
+        }
         val classSubst = selfClassSubstitution(method)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
           calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(

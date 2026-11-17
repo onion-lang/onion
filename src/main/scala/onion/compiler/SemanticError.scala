@@ -11,7 +11,7 @@ package onion.compiler
  * Semantic Error Codes for the Onion Compiler
  *
  * This object defines all semantic error types that can be reported during
- * type checking. Each error has a unique code (E0000-E0116) for identification
+ * type checking. Each error has a unique code (E0000-E0117) for identification
  * and i18n message lookup.
  *
  * == Error Categories ==
@@ -59,8 +59,8 @@ package onion.compiler
  * '''Nullability Errors (E0070)'''
  *   - NULLABLE_MEMBER_ACCESS: Member access on a value whose static type may be null
  *
- * '''Control Flow Errors (E0048-E0050, E0067, E0073, E0083)'''
- *   - BREAK_OUTSIDE_LOOP, CONTINUE_OUTSIDE_LOOP, CURRENT_INSTANCE_NOT_AVAILABLE
+ * '''Control Flow Errors (E0048-E0050, E0067, E0073, E0083, E0117)'''
+ *   - BREAK_OUTSIDE_LOOP, CONTINUE_OUTSIDE_LOOP, CURRENT_INSTANCE_NOT_AVAILABLE, SELF_RETIRED
  *   - MISSING_RETURN, MAP_NOT_DIRECTLY_ITERABLE, UNREACHABLE_CATCH_CLAUSE
  *
  * '''Pattern Matching Errors (E0042-E0047)'''
@@ -409,6 +409,12 @@ object SemanticError {
    * class as well.
    */
   case object CONFLICTING_INTERFACE_DEFAULTS extends SemanticError(116)
+  /**
+   * `self`, the retired spelling of `this` (RFC #2788, issue #2737). It still parses as the current
+   * instance, so every use in a file is reported at once, and `onion migrate` rewrites each one.
+   * It takes precedence over E0050 in static code.
+   */
+  case object SELF_RETIRED extends SemanticError(117)
 }
 sealed abstract class SemanticError(val code: Int) {
   /** Returns the error code in format "E0001" */

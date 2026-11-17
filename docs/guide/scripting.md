@@ -26,11 +26,16 @@ Compile errors exit with a non-zero status.
 ```onion
 val opts = Args::parse(args)
 
-if opts.flag("verbose") { ... }          // --verbose or -v
+if opts.flag("verbose") { ... }          // --verbose (-v is flag("v"))
 val out = opts.option("output", "a.txt") // --output=x or --output x
 val n = opts.intOption("count", 1)       // numeric with default
 val files = opts.positional()            // everything else
 ```
+
+Ask `flag(..)` and `option(..)` **before** `positional()`. `--verbose a.txt` could be a flag
+plus a file or an option with a value; the parser decides when you ask. If `flag("verbose")`
+is the only question, `a.txt` goes back to `positional()`. Read `positional()` first and
+`a.txt` is not there yet.
 
 ## Running External Commands
 

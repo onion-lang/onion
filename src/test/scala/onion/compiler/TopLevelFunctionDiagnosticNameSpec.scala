@@ -56,6 +56,18 @@ class TopLevelFunctionDiagnosticNameSpec extends AnyFunSpec {
           |""".stripMargin), "E0077")
       assert(msg.contains("Loader::load"), msg)
     }
+
+    it("names an extension method as the call is written, not its synthetic container (#2846)") {
+      val msg = messagesOf(errors(
+        """extension String {
+          |  def shout(): String { IO::println("x"); return this }
+          |}
+          |tool a(): void { "a".shout() }
+          |""".stripMargin), "E0077")
+      assert(msg.contains("String.shout"), msg)
+      assert(!msg.contains("Extension$"), msg)
+      assert(!msg.contains("::shout"), msg)
+    }
   }
 
   describe("E0005 (no applicable method)") {

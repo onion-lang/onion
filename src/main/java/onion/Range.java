@@ -51,6 +51,21 @@ public final class Range implements Iterable<Integer> {
         };
     }
 
+    /** Two ranges are equal when they produce the same values; all empty ranges are equal. */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Range)) return false;
+        Range r = (Range) o;
+        if (isEmpty() || r.isEmpty()) return isEmpty() && r.isEmpty();
+        return start == r.start && endExclusive == r.endExclusive;
+    }
+
+    @Override
+    public int hashCode() {
+        return isEmpty() ? 0 : 31 * start + Long.hashCode(endExclusive);
+    }
+
     @Override
     public String toString() {
         return isEmpty() ? "Range(empty)" : "Range(" + start + "..<" + endExclusive + ")";

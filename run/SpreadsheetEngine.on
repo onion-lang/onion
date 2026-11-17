@@ -55,9 +55,9 @@ class Evaluator {
 
 public:
   def this(s: Sheet) {
-    self.sheet = s
-    self.computed = [:]
-    self.visiting = []
+    this.sheet = s
+    this.computed = [:]
+    this.visiting = []
   }
 
   def resolve(id: String): Double? {
@@ -157,22 +157,22 @@ class SheetBuilder {
 
 public:
   def this() {
-    self.data = [:]
+    this.data = [:]
   }
 
   def num(id: String, v: Double): SheetBuilder {
     data.put(id, new Cell(id, new Num(v)))
-    return self
+    return this
   }
 
   def text(id: String, s: String): SheetBuilder {
     data.put(id, new Cell(id, new Text(s)))
-    return self
+    return this
   }
 
   def formula(id: String, fn: String, refs: List[String]): SheetBuilder {
     data.put(id, new Cell(id, new Formula(fn, refs)))
-    return self
+    return this
   }
 
   def build(): Sheet = new Sheet(data)
@@ -183,8 +183,8 @@ public:
 extension Double {
   // Round to 2 decimal places for display.
   def fmt2(): String {
-    val bump: Double = if self >= 0.0 { 0.5 } else { -0.5 }
-    val shifted: Double = self * 100.0 + bump
+    val bump: Double = if this >= 0.0 { 0.5 } else { -0.5 }
+    val shifted: Double = this * 100.0 + bump
     val scaled: Long = shifted as Long
     val int_part: Long = scaled / 100L
     val frac: Long = scaled - int_part * 100L
@@ -194,8 +194,8 @@ extension Double {
   }
 
   def isWholeNumber(): Boolean {
-    val asLong: Long = self as Long
-    return (asLong as Double) == self
+    val asLong: Long = this as Long
+    return (asLong as Double) == this
   }
 }
 

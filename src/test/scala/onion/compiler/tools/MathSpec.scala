@@ -705,63 +705,7 @@ class MathSpec extends AbstractShellSpec {
         assert(result == Shell.Success(true))
       }
 
-      it("generates random int in range") {
-        val result = shell.run(
-          """
-            |class Test {
-            |public:
-            |  static def main(args: String[]): Boolean {
-            |    val x = OnionMath::randomInt(1, 10)
-            |    if(x < 1) { return false; }
-            |    if(x > 10) { return false; }
-            |    return true
-            |  }
-            |}
-          """.stripMargin,
-          "None",
-          Array()
-        )
-        assert(result == Shell.Success(true))
-      }
-
-      it("throws instead of silently returning min when max < min") {
-        val result = shell.run(
-          """
-            |class Test {
-            |public:
-            |  static def main(args: String[]): Boolean {
-            |    try {
-            |      OnionMath::randomInt(5, 3)
-            |      return false
-            |    } catch e: IllegalArgumentException {
-            |      return true
-            |    }
-            |  }
-            |}
-          """.stripMargin,
-          "None",
-          Array()
-        )
-        assert(result == Shell.Success(true))
-      }
-
-      it("accepts min == max and the full Int range") {
-        val result = shell.run(
-          """
-            |class Test {
-            |public:
-            |  static def main(args: String[]): Boolean {
-            |    val a = OnionMath::randomInt(7, 7)
-            |    val b = OnionMath::randomInt(-2147483648, 2147483647)
-            |    return a == 7
-            |  }
-            |}
-          """.stripMargin,
-          "None",
-          Array()
-        )
-        assert(result == Shell.Success(true))
-      }
+      // OnionMath::randomInt was removed (#3069); Rand::nextInt and the hint are in OneRandomIntSpec.
     }
 
     describe("constants") {

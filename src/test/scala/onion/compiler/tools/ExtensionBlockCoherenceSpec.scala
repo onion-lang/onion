@@ -63,7 +63,7 @@ class ExtensionBlockCoherenceSpec extends AbstractShellSpec {
     }
     it("allows a single extension block to coexist peacefully (no false positive)") {
       assert(Shell.Success("OK") == shell.run(
-        "extension String { def shout(): String = self.toUpperCase() }\ndef main(args: String[]): String { return \"ok\".shout() }",
+        "extension String { def shout(): String = this.toUpperCase() }\ndef main(args: String[]): String { return \"ok\".shout() }",
         "None", Array()))
     }
   }

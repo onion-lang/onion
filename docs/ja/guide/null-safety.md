@@ -33,6 +33,7 @@ Java の API は検査しません。コンパイラはその null 許容性を�
 - Java メソッドの戻り値。
 - Java メソッドへの `null` 引数。`String::format("%s", null)` や `Http::encodeUrl(null)` は警告しません。
 - ただし、引数の型がレシーバの型引数そのものなら警告します。`List[String]` への `xs.add(null)` は警告されます。`String` を選んだのが自分だからです。
+  その型引数がプリミティブなら、警告ではなくエラー（E0000）です。`List[Int]` への `xs.add(null)` や、`(Int) -> T` への `f(null)` が該当します。`Int` は null になりません。`null` を入れるには、型引数を `Int?` と書いてください（`List[Int?]`）。
 
 Onion で書いたメソッドは警告します。別にコンパイルしたもの（プロジェクトの `tests/` から `src/` を呼ぶ場合や、Onion ライブラリの jar）も同じです。
 
@@ -300,6 +301,8 @@ first(maybe, "solid")   // T := String?  (String? + String がマージされる
 ```
 
 Java のクラス由来の型変数は *プラットフォーム* パラメータとして扱われます。nullability が不明なため、nullable な引数を受け付け、（他の Java の値と同様に）デリファレンス可能なままです。
+
+そうした値を `Int` にアンボックスすると警告（W0015）が出ます。Java の呼び出しは「何もない」を null で返すことがあるためです（`Deque.poll()`、`Map.get`）。要素を返すか例外を投げる読み出しは、型引数が非 null なら警告しません。対象は `List.get` と `xs[i]`、`Iterator.next`、`Map.Entry.getKey`/`getValue`、そして `get` や `getOrElse` などの `Option`/`Result` の読み出しです。
 
 詳細は[仕様](../reference/specification.md)を参照してください。
 

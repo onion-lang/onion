@@ -24,11 +24,19 @@ private[compiler] final class InstanceMethodCallSupport(
 
     val untypedClosureIndices = untypedClosureIndicesOf(node.args)
 
+    // A named closure is typed against its parameter by the named-argument path (#2799),
+    // so it is not typed here with no expected type.
+    val namedClosure = node.args.exists {
+      case named: AST.NamedArgument => ArgumentHelpers.isClosureWithUntypedParams(named.value)
+      case _ => false
+    }
+    val deferred = untypedClosureIndices.nonEmpty || namedClosure
+
     val params =
-      if (untypedClosureIndices.isEmpty) calls.typedTerms(node.args.toArray, context)
+      if (!deferred) calls.typedTerms(node.args.toArray, context)
       else null
 
-    if (params == null && untypedClosureIndices.isEmpty) return None
+    if (params == null && !deferred) return None
 
     calls.normalizeMethodCallTarget(node, target).flatMap { resolved =>
       typeMethodCallOnObject(node, resolved.term, resolved.targetType, params, context, expected)
@@ -45,9 +53,28 @@ private[compiler] final class InstanceMethodCallSupport(
   ): Option[Term] =
     // An extension block declaring two `name`s with one erasure is already E0084; a call to
     // that name, whichever twin it means, reports nothing of its own (#2475).
-    if (fallback.hasErasureTwinExtension(targetType, node.name, target))
-      calls.typing.withSuppressedReporting(typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected))
-    else typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected)
+    if (fallback.hasErasureTwinExtension(targetType, node.name, target)) {
+      // Only the call's own resolution errors (E0000/E0005/E0006 at the call) are redundant;
+      // an error inside a lambda argument is real and stays (#2550).
+      val start = calls.typing.problemCount
+      val result = typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected)
+      val callLocation = node.location
+      // An argument's start, and a typed lambda's parameters: the twin the call did not mean
+      // reports its mismatch there.
+      val argLocations: Set[Location] = node.args.flatMap {
+        case c: AST.ClosureExpression =>
+          c.location :: c.args.flatMap(a => List(a.location) ++ Option(a.typeRef).map(_.location))
+        case a => List(a.location)
+      }.toSet
+      calls.typing.reporter_.dropProblemsSince(start) { e =>
+        e.errorCode.exists {
+          case "E0005" => e.location == callLocation
+          case "E0000" | "E0006" => e.location == callLocation || argLocations.contains(e.location)
+          case _ => false
+        }
+      }
+      result
+    } else typeMethodCallOnObjectChecked(node, target, targetType, params0, context, expected)
 
   private def typeMethodCallOnObjectChecked(
     node: AST.MethodCall,
@@ -66,7 +93,7 @@ private[compiler] final class InstanceMethodCallSupport(
     // Zero-arg record copy is a full clone: p.copy()
     if (name == "copy" && node.args.isEmpty) {
       calls.tryRecordCopy(node, name, node.args, node.typeArgs, context, target, targetType) {
-        (method, finalParams) => new Call(target, method, finalParams)
+        (receiver, method, finalParams) => new Call(receiver, method, finalParams)
       } match {
         case Some(result) => return result
         case None =>
@@ -78,7 +105,17 @@ private[compiler] final class InstanceMethodCallSupport(
       return fallback.typeMethodCallWithBidirectionalInference(node, target, targetType, context, expected, untypedClosureIndices)
     }
 
-    val methods0 = MethodResolution.findMethods(targetType, name, params0, bodyContext.table)
+    val methods00 = MethodResolution.findMethods(targetType, name, params0, bodyContext.table)
+    // The most specific overload can be one the call may not name (`sb.append(sb2)` finds
+    // AbstractStringBuilder's package-private append(AbstractStringBuilder)). Java resolves
+    // among accessible members only, so retry without the inaccessible ones (#2818); when
+    // nothing else applies the E0013 below stays.
+    val methods0 =
+      if (methods00.length == 1 && !MemberAccess.isMemberAccessible(methods00(0), bodyContext.definition)) {
+        val accessible = MethodResolution.findMethods(targetType, name, params0, bodyContext.table,
+          m => MemberAccess.isMemberAccessible(m, bodyContext.definition))
+        if (accessible.length > 0) accessible else methods00
+      } else methods00
 
     // When no method applies, an argument that is a generic call (e.g.
     // `Result::ok(11)`) may have left its type parameters unbound (-> Object).
@@ -154,8 +191,12 @@ private[compiler] final class InstanceMethodCallSupport(
         None
       case Some(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
-        calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
-          expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
+        // `() -> Option::none()` takes its result type from the target type (#3067).
+        val targetTyped =
+          if (node.typeArgs.nonEmpty) params
+          else calls.retypeTargetTypedClosures(node, method, node.args, params, classSubst, context, expected)
+        calls.buildResolvedCall(node, method, targetTyped, node.typeArgs, classSubst, expected)(
+          expectedArgs => calls.prepareCallParams(node, node.args, method, targetTyped, expectedArgs),
           finalParams => new Call(target, method, finalParams)
         )
     }
@@ -169,7 +210,7 @@ private[compiler] final class InstanceMethodCallSupport(
     expected: Type
   ): Option[Term] = {
     val recordCopy = calls.tryRecordCopy(node, node.name, node.args, node.typeArgs, context, target, targetType) {
-      (method, finalParams) => new Call(target, method, finalParams)
+      (receiver, method, finalParams) => new Call(receiver, method, finalParams)
     }
     recordCopy match { case Some(result) => return result; case None => }
 
@@ -196,6 +237,12 @@ private[compiler] final class InstanceMethodCallSupport(
         None
       case CandidateSelection.Ambiguous(first, second) =>
         calls.reportAmbiguousMethod(node, first, second, node.name)
+        None
+      case CandidateSelection.Selected(method)
+          if !MemberAccess.isMemberAccessible(method, bodyContext.definition, target.`type`) =>
+        // The positional path reports E0013 here; this one compiled a private call that
+        // threw IllegalAccessError at run time (#2916).
+        bodyContext.report(METHOD_NOT_ACCESSIBLE, node, method.affiliation, node.name, method.arguments, bodyContext.definition)
         None
       case CandidateSelection.Selected(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))

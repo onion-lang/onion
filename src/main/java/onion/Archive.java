@@ -243,7 +243,9 @@ public final class Archive {
     /** Says which path is missing; the JDK's message is just the path, with no reason. */
     private static void checkFileTransfer(String verb, String source, String target) {
         Path src = Paths.get(source);
-        if (!Files.isRegularFile(src)) {
+        // Only a missing path or a directory is refused: /dev/stdin, /dev/null, FIFOs and
+        // <(...) are not regular files, but the JDK stream reads them fine.
+        if (!Files.exists(src) || Files.isDirectory(src)) {
             String why = Files.isDirectory(src) ? "not a file: " : "no such file: ";
             throw new RuntimeException("Archive: could not " + verb + " " + source + " to " + target
                 + " (" + why + source + ")");
@@ -258,8 +260,9 @@ public final class Archive {
         }
         Path parent = Paths.get(target).toAbsolutePath().getParent();
         if (parent != null && !Files.isDirectory(parent)) {
+            String why = Files.exists(parent) ? "not a directory: " : "no such directory: ";
             throw new RuntimeException("Archive: could not " + verb + " " + source + " to " + target
-                + " (no such directory: " + parent + ")");
+                + " (" + why + parent + ")");
         }
     }
 

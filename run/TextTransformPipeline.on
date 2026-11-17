@@ -13,20 +13,20 @@ import {
 
 extension String {
   def wordCount(): Int {
-    val trimmed: String = self.trim()
+    val trimmed: String = this.trim()
     if trimmed.isEmpty() { return 0 }
     return Strings::splitRegex(trimmed, "\\s+").size
   }
   def rjust(w: Int): String =
-    if self.length() >= w { self } else { " ".repeat(w - self.length()) + self }
+    if this.length() >= w { this } else { " ".repeat(w - this.length()) + this }
   def ljust(w: Int): String =
-    if self.length() >= w { self } else { self + " ".repeat(w - self.length()) }
+    if this.length() >= w { this } else { this + " ".repeat(w - this.length()) }
   def truncateAt(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n) + "…" }
+    if this.length() <= n { this } else { this.substring(0, n) + "…" }
 }
 
 extension Int {
-  def pluralise(noun: String): String = if self == 1 { "1 " + noun } else { self + " " + noun + "s" }
+  def pluralise(noun: String): String = if this == 1 { "1 " + noun } else { this + " " + noun + "s" }
 }
 
 // ── Category (data-carrying enum) ────────────────────────────────────────────
@@ -121,13 +121,13 @@ public:
   var transforms: List[Object]
 
   def this(name: String) {
-    self.name       = name
-    self.transforms = []
+    this.name       = name
+    this.transforms = []
   }
 
   def add(t: Transform): Pipeline {
     transforms.add(t)
-    return self
+    return this
   }
 
   def run(input: String): RunResult {

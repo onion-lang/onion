@@ -15,6 +15,8 @@ object AST {
   val M_FORWARDED = 1024
   val M_SEALED = 2048
   val M_SYNTHETIC_RECORD = 8192  // Auto-generated record methods (equals, hashCode, toString, copy)
+  /** The closure parameter of the `bind` made from a bare statement of a do block. */
+  val DoStatementParameter = "_unused"
   val M_DO_BINDING = 65536  // A local `val` the rewriter makes from a do-block bind; it warns as the bind's parameter would
   def hasModifier(bitFlags: Int, modifier: Int): Boolean = (bitFlags & modifier) != 0
   def append[A](buffer: scala.collection.mutable.Buffer[A], element: A): Unit = {
@@ -159,7 +161,14 @@ object AST {
   }
   case class CharacterLiteral(location: Location, value: Char) extends Expression
   case class ClosureExpression(location: Location, typeRef: TypeNode, mname: String, args: List[Argument], returns: TypeNode/*nullable*/, body: BlockExpression) extends Expression
-  case class CurrentInstance(location: Location) extends Expression
+  /** `this`. `spelledSelf` marks the retired spelling `self` (RFC #2788), which the type checker
+    * reports as E0117; it is not a case-class field, so patterns and equality ignore it. */
+  case class CurrentInstance(location: Location) extends Expression {
+    private var self_ = false
+    def spelledSelf: Boolean = self_
+    /** Marks this node as written `self`; returns it. */
+    def writtenAsSelf(): CurrentInstance = { self_ = true; this }
+  }
   case class Division(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("/")
   case class DivisionAssignment(location: Location, lhs: Expression, rhs: Expression) extends BinaryExpression("/=")
   case class DoubleLiteral(location: Location, value: Double) extends Expression
@@ -412,9 +421,14 @@ object AST {
    */
   case class ClassDeclaration(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter] = Nil, hasPrimary: Boolean = false,
     /** `invariant e` and `history e` clauses of the body, in source order (RFC #2557). */
-    invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration {
+    invariants: List[Expression] = Nil, histories: List[Expression] = Nil,
+    /** Set when Rewriting lowered an `instance Trait[T]` to this class: the trait application as written. */
+    loweredInstance: Option[TypeNode] = None) extends TypeDeclaration {
     def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection]) =
       this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, Nil, false)
+    /** For the JavaCC parser, which cannot use the default for `loweredInstance`. */
+    def this(location: Location, modifiers: Int, name: String, superClass: TypeNode, superInterfaces: List[TypeNode], defaultSection: Option[AccessSection], sections: List[AccessSection], typeParameters: List[TypeParameter], hasPrimary: Boolean, invariants: List[Expression], histories: List[Expression]) =
+      this(location, modifiers, name, superClass, superInterfaces, defaultSection, sections, typeParameters, hasPrimary, invariants, histories, None)
   }
   case class InterfaceDeclaration(location: Location, modifiers: Int, name: String, superInterfaces: List[TypeNode], methods: List[MethodDeclaration], typeParameters: List[TypeParameter] = Nil,
     invariants: List[Expression] = Nil, histories: List[Expression] = Nil) extends TypeDeclaration {

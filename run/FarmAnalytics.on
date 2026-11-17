@@ -96,18 +96,18 @@ public:
 
 extension Double {
   def round2(): Double {
-    return ((self * 100.0 + 0.5) as Int) * 1.0 / 100.0
+    return ((this * 100.0 + 0.5) as Int) * 1.0 / 100.0
   }
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def lpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }

@@ -33,7 +33,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   private def loadRequired(name: String): ClassType =
     typing.loadRequired(name)
   private def loadTopClass: ClassType =
-    typing.loadRequired(typing.topClass)
+    typing.loadTopClass.orNull
   // Outline-pass type references are all declared positions (return types,
   // fields, globals, throws, inheritance, extension receivers), so raw generic
   // types are forbidden here.
@@ -54,8 +54,12 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
 
   private var constructorCount = 0
 
-  def run(): Unit = {
-    find(topClass).foreach(unitContext.currentMapper = _)
+  /**
+   * Phase A, run for every unit before any unit's [[registerTypeParameters]]: a placeholder
+   * type-parameter arity (Object bounds) for every generic type in this unit.
+   */
+  def registerTypeParameterPlaceholders(): Unit = {
+    typing.findTopClassMapper.foreach(unitContext.currentMapper = _)
     // Phase A: register a placeholder type-parameter arity (Object bounds) for every
     // generic type BEFORE any bounds are resolved, so a self-referential bound like
     // `class C[T extends C[T]]` can resolve `C[T]` (C is already known to be generic)
@@ -69,9 +73,16 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
       case node: AST.RecordDeclaration => placeholders(node, node.typeParameters)
       case _ =>
     }
+  }
+
+  /**
+   * Runs for every unit before any unit's [[run]], so a generic type declared in a later
+   * file already has its type parameters when an earlier file names it (`Crate[Int]`, #2853).
+   */
+  def registerTypeParameters(): Unit = {
     // Pre-pass: register every declared type's type parameters before any
     // hierarchy resolution, so 'class A : B[String]' works even when B is
-    // declared later in the file.
+    // declared later in the file, or in a later file.
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration =>
         typing.kernelNodeOf[ClassDefinition](node).foreach { definition =>
@@ -99,7 +110,10 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
         }
       case _ =>
     }
-    find(topClass).foreach(unitContext.currentMapper = _)
+  }
+
+  def run(): Unit = {
+    typing.findTopClassMapper.foreach(unitContext.currentMapper = _)
     unit.toplevels.foreach {
       case node: AST.ClassDeclaration => processClassDeclaration(node)
       case node: AST.InterfaceDeclaration => processInterfaceDeclaration(node)
@@ -123,7 +137,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     definition_.setTypeParameters(classTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
     definition_.ownTypeVariables = classTypeParams.map(_.variableType).toArray
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
-    if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
+    if (cyclic(definition_)) { report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name); typing.cyclicDefinitions += definition_ }
 
     openTypeParams(emptyTypeParams ++ classTypeParams) {
       node.defaultSection.foreach(processAccessSection)
@@ -142,7 +156,7 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
     definition_.setTypeParameters(interfaceTypeParams.map(p => TypedAST.TypeParameter(p.name, Some(p.upperBound), p.variableType.nullability, p.constraints)).toArray)
     definition_.ownTypeVariables = interfaceTypeParams.map(_.variableType).toArray
     constructTypeHierarchy(definition_, MutableSet[ClassType]())
-    if (cyclic(definition_)) report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name)
+    if (cyclic(definition_)) { report(SemanticError.CYCLIC_INHERITANCE, node, definition_.name); typing.cyclicDefinitions += definition_ }
 
     openTypeParams(emptyTypeParams ++ interfaceTypeParams) {
       node.methods.foreach(processInterfaceMethodDeclaration)
@@ -912,14 +926,19 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   }
 
   private def cyclic(start: ClassDefinition): Boolean = {
-    def loop(node: ClassType, visited: Set[ClassType]): Boolean =
-      node != null && {
-        if (visited.contains(node)) true
-        else {
-          val next = visited + node
-          loop(node.superClass, next) || node.interfaces.exists(loop(_, next))
-        }
+    // `A[T]` and `A[U]` are different applied types but the same class, so the
+    // walk goes through the raw class: a cycle via a generic supertype is a cycle.
+    def loop(node: ClassType, visited: Set[ClassType]): Boolean = node != null && {
+      val raw = node match {
+        case applied: AppliedClassType => applied.raw
+        case other => other
       }
+      if (visited.contains(raw)) true
+      else {
+        val next = visited + raw
+        loop(raw.superClass, next) || raw.interfaces.exists(loop(_, next))
+      }
+    }
 
     loop(start, Set.empty)
   }

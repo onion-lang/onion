@@ -87,7 +87,7 @@ class RecipeCatalog conforms Filterable {
   val recipes: java.util.List[Recipe]
 public:
   def this(recipes: java.util.List[Recipe]) {
-    self.recipes = recipes
+    this.recipes = recipes
   }
   def size(): Int = recipes.size
   def all(): java.util.List[Recipe] = recipes

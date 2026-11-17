@@ -149,14 +149,14 @@ println(pipelineResult.stdout())
 ```onion
 extension Double {
   def celsiusToFahrenheit(): Double {
-    return self * 9.0 / 5.0 + 32.0
+    return this * 9.0 / 5.0 + 32.0
   }
   def kilometersToMiles(): Double {
-    return self * 0.621371
+    return this * 0.621371
   }
   def rounded(decimals: Int): Double {
     val factor = Math::pow(10.0, decimals as Double)
-    return (Math::round(self * factor) as Double) / factor
+    return (Math::round(this * factor) as Double) / factor
   }
 }
 

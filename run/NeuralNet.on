@@ -14,17 +14,17 @@ import {
 
 extension Double {
   def sigmoid(): Double {
-    val e: Double = Math::exp(0.0 - self)
+    val e: Double = Math::exp(0.0 - this)
     return 1.0 / (1.0 + e)
   }
   def sigmoidPrime(): Double {
-    val s: Double = self.sigmoid()
+    val s: Double = this.sigmoid()
     return s * (1.0 - s)
   }
-  def sq(): Double = self * self
+  def sq(): Double = this * this
   def fmt(decimals: Int): String {
     val scale: Double = Math::pow(10.0, decimals as Double)
-    val rounded: Long = Math::round(self * scale)
+    val rounded: Long = Math::round(this * scale)
     val intPart: Long = rounded / (scale as Long)
     val fracPart: Long = Math::abs(rounded % (scale as Long))
     val fracStr: String = "" + fracPart

@@ -60,6 +60,44 @@ class ArgsSpec extends AbstractShellSpec {
       assert(Shell.Success("-5:-5:false") == result)
     }
 
+    it("rejects a non-integer --name value instead of silently using the default (#2881)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    try {
+          |      return "" + o.intOption("count", 3)
+          |    } catch e: IllegalArgumentException {
+          |      return e.getMessage()
+          |    }
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsBadInt.on",
+        Array("--count", "abc")
+      )
+      assert(Shell.Success("invalid value for --count: 'abc' (expected Int)") == result)
+    }
+
+    it("still uses the default when the option is absent (#2881)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    return "" + o.intOption("count", 3)
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsAbsentInt.on",
+        Array[String]()
+      )
+      assert(Shell.Success("3") == result)
+    }
+
     it("accepts a negative decimal as a --name value") {
       val result = shell.run(
         """
@@ -96,6 +134,61 @@ class ArgsSpec extends AbstractShellSpec {
         Array("-v")
       )
       assert(Shell.Success("false:true") == result)
+    }
+
+    it("gives the value of --flag value back to positional() when only flag() asks (#2878)") {
+      val src =
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    return o.flag("verbose") + ":" + o.positional()
+          |  }
+          |}
+          |""".stripMargin
+      assert(Shell.Success("true:[a.txt, b.txt]") ==
+        shell.run(src, "ArgsLazyFlag.on", Array("--verbose", "a.txt", "b.txt")))
+      assert(Shell.Success("true:[x, a.txt]") ==
+        shell.run(src, "ArgsLazyFlag2.on", Array("x", "--verbose", "a.txt")))
+    }
+
+    it("keeps --name value as an option when the script asks option() (#2878)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    return o.flag("out") + ":" + o.option("out", "none") + ":" + o.positional()
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsLazyOption.on",
+        Array("--out", "o.txt", "a.txt")
+      )
+      assert(Shell.Success("true:o.txt:[a.txt]") == result)
+    }
+
+    it("toString shows the reading positional() gives, not the unresolved one (#3034)") {
+      val result = shell.run(
+        """
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val o = Args::parse(args)
+          |    val before = o.toString()
+          |    o.flag("verbose")
+          |    return before + "|" + o.toString()
+          |  }
+          |}
+          |""".stripMargin,
+        "ArgsToString.on",
+        Array("--verbose", "a.txt", "b.txt")
+      )
+      assert(Shell.Success(
+        "Args(options={verbose=a.txt}, flags=[], positional=[b.txt])|" +
+        "Args(options={}, flags=[verbose], positional=[a.txt, b.txt])") == result)
     }
   }
 }

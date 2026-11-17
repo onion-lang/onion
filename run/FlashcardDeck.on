@@ -13,37 +13,37 @@ import { java.util.ArrayList; java.util.LinkedHashMap }
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
   def rep(n: Int): String {
     var r: String = ""
     var i: Int = 0
-    while i < n { r = r + self; i = i + 1 }
+    while i < n { r = r + this; i = i + 1 }
     return r
   }
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n) + "…"
+    if this.length() <= n { return this }
+    return this.substring(0, n) + "…"
   }
 }
 
 extension Int {
   def pct(total: Int): String {
     if total == 0 { return "0" }
-    return "" + (self * 100 / total)
+    return "" + (this * 100 / total)
   }
   def stars(): String {
     var s: String = ""
     var i: Int = 0
-    while i < self { s = s + "★"; i = i + 1 }
-    var j: Int = self
+    while i < this { s = s + "★"; i = i + 1 }
+    var j: Int = this
     while j < 5 { s = s + "☆"; j = j + 1 }
     return s
   }

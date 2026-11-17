@@ -11,10 +11,10 @@ import {
 // ── Extension Methods ──────────────────────────────────────────────────────
 
 extension Double {
-  def round1(): Double = (Math::round(self * 10.0) as Double) / 10.0
-  def round2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+  def round1(): Double = (Math::round(this * 10.0) as Double) / 10.0
+  def round2(): Double = (Math::round(this * 100.0) as Double) / 100.0
   def fmt(w: Int): String {
-    var s: String = "" + self.round2()
+    var s: String = "" + this.round2()
     while s.length() < w { s = " " + s }
     return s
   }
@@ -22,31 +22,31 @@ extension Double {
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def lpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
   def trunc(m: Int): String {
-    if self.length() <= m { return self }
-    return self.substring(0, m - 1) + "."
+    if this.length() <= m { return this }
+    return this.substring(0, m - 1) + "."
   }
 }
 
 extension Int {
   def fmt(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def starRating(): String {
     var out: String = ""
-    foreach i: Int in 0..<self { out = out + "*" }
-    foreach i: Int in self..<5 { out = out + "-" }
+    foreach i: Int in 0..<this { out = out + "*" }
+    foreach i: Int in this..<5 { out = out + "-" }
     return out
   }
 }

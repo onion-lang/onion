@@ -50,7 +50,15 @@ private[compiler] final class MethodCallReportingSupport(
     }
     val hexDigitBHint: AnyRef =
       if (passesHexEndingInBForByte(node, targetType, name, argTypes.length)) SemanticErrorReporter.HexDigitBHint else null
-    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed, java.lang.Boolean.valueOf(calledStatically), enclosingStaticOwner, hexDigitBHint)
+    // A bare `randomInt(a, b)` is the removed `OnionMath::randomInt` that `onion migrate`
+    // rewrites only through `import { onion.OnionMath::* }`; the hint may promise the edit only
+    // there (#3116 block 7). A qualified call is always one migrate rewrites.
+    val randomIntMigrates: java.lang.Boolean = java.lang.Boolean.valueOf(
+      name == "randomInt" && (!isUnqualifiedCall || bodyContext.staticImportedList.getItems.exists { item =>
+        item.getName == "onion.OnionMath" && item.importsMethod("randomInt")
+      })
+    )
+    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed, java.lang.Boolean.valueOf(calledStatically), enclosingStaticOwner, hexDigitBHint, randomIntMigrates)
   }
 
   // `f(0xFFB)` where some `f` of that arity takes a Byte in that position: before #2324 the

@@ -50,13 +50,13 @@ public:
 // ── Extension helpers ─────────────────────────────────────────────────────────
 
 extension Boolean {
-  def toBit(): String = if self { "1" } else { "0" }
+  def toBit(): String = if this { "1" } else { "0" }
 }
 
 extension Int {
   // Bit `index` (0 = least significant) of this integer, as a Boolean.
   def bitAt(index: Int): Boolean {
-    val shifted: Int = self / pow2(index)
+    val shifted: Int = this / pow2(index)
     return shifted % 2 == 1
   }
 }

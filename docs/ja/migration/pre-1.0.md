@@ -284,7 +284,7 @@ println(c.t)   // 9
   そのオブジェクトのメソッドの外からの書き込みは、この検査では追えません。
 - **見えるもの:** `E0110`（契約フィールドへの書き込みを禁じるエラー）が出ます。キャレットは受け手（`o`、`c`、`cs[0]`）を指します。
   メッセージは、そのオブジェクトのメソッドを呼ぶか、コンストラクタで値を設定するよう促します。
-- **そのまま動くもの:** クラス自身のメソッドでの `t = v`、`this.t = v`、`self.t = v`、`t++`、`t += 1` です。ラムダの中でも同じです。
+- **そのまま動くもの:** クラス自身のメソッドでの `t = v`、`this.t = v`、`t++`、`t += 1` です。ラムダの中でも同じです。
   `o.t` を読むことは、どこからでもできます。
 - **`onion migrate` の書き換え規則はありません（意図的です）:** 直すには受け手のクラスにメソッドかコンストラクタを足します。
   どれが合うかは設計の判断です。
@@ -431,7 +431,7 @@ instance Show[Int] {
 
 - **表示されるもの:** 2つ目のインスタンスで **E0097** `instance shapes.Show[java.lang.Integer] is already defined`。
 - **直し方:** インスタンスを1つだけ残し、もう1つを削除してください。
-- **同じパッケージの2つのファイル**（どちらも `module` 行なし）では、これまでどおり **E0008** `duplicated class definition Show$$Integer` になります。直し方は同じです。
+- **同じパッケージの2つのファイル**（どちらも `module` 行なし）でも、同じ **E0097** になります。
 - **型の型引数:** E0097 は外側の型だけを比べます。そのため `Show[List[String]]` と `Show[List[Integer]]` は同じインスタンスとみなされ、衝突します。
 - **`onion migrate` の規則はありません:** どちらのインスタンスを残すかは、あなたが決めることです。
 
@@ -478,3 +478,153 @@ public:
 - **これまでどおり動くもの:** `A` の中や、`A` のサブクラスからの同じ呼び出しです。
 - **直し方:** コンストラクタを `public:` の下に移すか、`A` に `public` なファクトリメソッドを追加してください。
 - **`onion migrate` の規則はありません:** コンストラクタのアクセスを広げるかどうかは、書いた人にしか決められない設計上の判断です。そのため、ヒントが直し方を示します。
+
+## `Strings::split` と `Regex::split` は末尾の空のフィールドを残すようになりました
+
+分割には Java の `String.split` を使っていました。これは末尾の空のフィールドを捨てます。今は Python や JavaScript と同じく残します。そのため、最後の列が空の行でも、その列が残ります。
+
+```onion
+val row = Strings::split("alice,30,", ",")
+println(row.size)   // これまで: 2 で、row[2] は例外になった。今: 3
+println(row[2])     // 今: ""（空文字列）
+```
+
+- **変わったこと:** `Strings::split`、`Strings::splitRegex`、`String` または `Pattern` を渡す `Regex::split` は、最後の区切り文字の後のフィールドをすべて残します。
+- **変わらないもの:** 区切り文字で終わらない入力。空の区切り文字（`Strings::split("abc", "")` はこれまでどおり `[a, b, c]` です）。`Regex::split(s, p, limit)`。Java の `s.split(",")`。これは今も末尾の空のフィールドを捨てます。
+- **表示されるもの:** エラーは出ません。区切り文字で終わるテキストでは、末尾の区切り文字1つにつき `""` が1つ増えます。よくあるのは行への分割です。`"\n"` で終わるテキストに `Strings::split(text, "\n")` を使うと、最後に空の行が付くようになりました。
+- **以前の結果を保つには:**
+  - 行に分けるときは `Strings::lines(text)` を呼びます。`Strings::lines("l1\nl2\n")` は、以前の `split` と同じく `[l1, l2]` を返します。
+  - ほかの区切り文字では `Regex::split(s, pattern, 0)` を呼びます。以前と同じく、末尾の空のフィールドをすべて捨てます。区切り文字は正規表現なので、`.` や `|` はエスケープします。`Regex::split("a.b..", "\\.", 0)` は `[a, b]` を返します。
+- **`onion migrate` の規則はありません:** ほとんどの呼び出しは区切り文字で終わらないテキストを分割するので、結果は変わりません。末尾の空のフィールドがデータ（CSV の列）なのか、不要なもの（最後の改行）なのかは、書いた人にしか分かりません。そのため、書き換えはどちらかの場合に必ず誤ります。
+
+## プリミティブの型引数への `null` はエラーになりました
+
+Onion の `Int` は `null` になりません。型引数がプリミティブの総称的な引数（`List[Int]`、`(Int) -> T`、`Map[String, Int]`）は、`null` を受け付けなくなりました。`Int` のメソッド引数がこれまでずっとそうだったのと同じです（#2872）。
+
+```onion
+val f: (Int) -> String = (i) -> "v"
+f(null)                     // 以前: W0012 の後、実行時にクラッシュした。今: E0000
+
+val xs: List[Int] = [1]
+xs.add(null)                // 以前: W0012。null が格納された。今: E0000
+
+val ys: List[Int?] = [1]
+ys.add(null)                // 問題なし: 型引数が null を許すと書いている
+
+val zs: List[Int] = [5, null]   // 以前: コンパイルでき、zs[1] の読み出しでクラッシュした。今: E0000（#2895）
+```
+
+- **表示されるもの:** `null` の位置で **E0000** `type Int is expected, but type null is used.` になります。型引数を `Int?` と書くよう促すヒントが付きます。
+- **対象:** クラスの型変数で宣言されたメソッド引数です。関数値への `f(null)` と `f.call(null)`、`List` と `Map` の `add`/`set`/`put`、Java の関数型インタフェースの `apply`、自分で書いた総称クラスのメソッド（`Box[Int].put(null)`）が該当します。そのような型として書いたリストやマップのリテラルの中の `null` の要素も該当します（`val zs: List[Int] = [5, null]`、`val m: Map[String, Int] = ["b": null]`）。同じ枠に届くほかの書き方も該当します（#2991）。コンストラクタ（`new Box[Int](null)`、`new R[Int](null)`）、添字への代入（`xs[0] = null`、`m["b"] = null`）です。
+- **直し方:** `null` を格納するつもりなら、型引数を null 許容にしてください。`List[Int?]`、`Map[String, Int?]`、`(Int?) -> T` です。読み出した値は `Int?` になるので、そこで `null` を扱います（`?:` か `!!`）。そうでなければ、`null` ではなく実際の値を渡してください。
+- **`onion migrate` の規則はありません:** 直し方は、宣言する型を変えるか、渡す値を変えるかのどちらかです。どちらが正しいかは、書いた人にしか分かりません。
+
+## `protected` なメソッドは、どの呼び方でも同じようにアクセス検査されるようになりました
+
+名前付き引数を渡すメソッド呼び出しと、型を書かないラムダ引数を渡すメソッド呼び出し（`a.lam((x) -> x + 1)`、`a.lam { x -> x + 1 }`）も、すべての引数を位置で渡す呼び出しと同じアクセス検査を受けるようになりました (#2916)。
+そのため、無関係なクラスからこの方法で `protected` なメソッドを呼ぶことはできなくなりました。
+これは、上のコンストラクタの変更のメソッド版です。
+
+```onion
+class A {
+public:
+  def this() { }
+protected:
+  def pim(a: Int, b: Int = 2): Int = a + b
+}
+println(new A().pim(b = 3, a = 7))   // 以前: 10 と表示された。今: E0013
+println(new A().pim(7, 3))           // 以前も今も E0013
+```
+
+- **表示されるもの:** 呼び出しの位置で **E0013** `method A.pim(Int, Int) is not accessible from class ...` になります。
+- **これまでどおり動くもの:** `A` の中や、`A` のサブクラスからの同じ呼び出しです。
+- **直し方:** メソッドを `public:` の下に移すか、サブクラスから呼んでください。
+- **`onion migrate` の規則はありません:** メソッドのアクセスを広げるかどうかは、書いた人にしか決められない設計上の判断です。そのため、ヒントが直し方を示します。
+
+## `Yaml::stringify` は `Yaml::parse` が読み戻せるものだけを書くようになりました
+
+`Yaml::stringify` は、スカラーのリスト、空の Map の要素、NaN を書いていました。その一部は他の YAML ツールなら読めます。しかし `Yaml::parse` では読み戻せませんでした。今は、入れ子の Map と同じく、`Yaml::stringify` が例外を投げます (#2806)。
+
+```onion
+import { onion.Yaml; onion.Json }
+Yaml::stringify(["apple", "banana"])   // 以前: "- apple\n- banana\n"。今: 例外
+Json::stringify(["apple", "banana"])   // ["apple","banana"]。JSON は YAML 1.2 としても正しい
+Yaml::stringify(["apple", "banana"].map { x -> ["v": x] })   // - v: apple ...
+```
+
+- **表示されるもの:** 実行時の `IllegalArgumentException` です。メッセージが問題を示し、直し方を提案します。
+- **対象:**
+  - Map でないリストの要素: String、数値、`null`、List
+  - 空の Map の要素 (`[[:]]`)
+  - 値のどこかにある、NaN または無限大の `Double` や `Float`
+  - NaN または無限大の成分を持つレコードの `toYaml` (`derive!(Yaml)`) と、`shape ... = yaml` の `print`
+- **これまでどおり動くもの:** フラットな Map と、空でないフラットな Map のリストです。どちらも以前と同じように書かれます。
+- **直し方:**
+  - スカラーのリストには `Json::stringify` を使ってください (YAML 1.2 のツールは JSON を読めます)。または、各要素を Map で包んでください: `xs.map { x -> ["v": x] }`。
+  - 空の Map はリストから除いてください。
+  - 書く前に、NaN や無限大を自分で選んだ値 (`null` や番兵値) に置き換えてください。
+- **`onion migrate` の規則はありません:** 拒否される入力はソースの書き方ではなく実行時の値です。そのため、書き換えでは見つけられません。代わりに例外のメッセージが直し方を示します。
+
+## `Args` の `intOption` は `Int` でない値を拒否するようになりました
+
+`opts.intOption(name, default)` は、値が整数でないときに既定値を返していました。そのため、`--count 10O`（英字の O）のような打ち間違いも、何事もなかったように動いていました。今は例外を投げます。自動 CLI（`def main(count: Int = 3)`）は、同じ入力をすでに拒否していました（#2881）。
+
+```onion
+import { onion.Args }
+def main(args: String[]): void {
+  val opts = Args::parse(args)
+  println(opts.intOption("count", 3))   // --count abc  以前: 3。今: 例外
+}
+```
+
+- **表示されるもの:** 実行時に `IllegalArgumentException: invalid value for --count: 'abc' (expected Int)` が出て、終了コードは 1 です。メッセージはオプション名と値を示します。
+- **変わらないもの:** オプションがなければ、これまでどおり既定値を返します。正しい値（`--count 7`、`--count -5`）もこれまでどおり読み取れます。
+- **以前の結果を保つには:** 例外を捕まえて既定値を使います。
+  `val n = try { opts.intOption("count", 3) } catch e: IllegalArgumentException { 3 }`
+- **`onion migrate` の規則はありません:** 以前の動作は、実行時のエラーを握りつぶしていただけです。ソースには書き換えるものがありません。不正な値でプログラムを止めるべきかどうかは、書いた人にしか分かりません。
+
+## `self` は `this` になりました
+
+`self` は `this` の別の書き方でした。Onion は書き方を `this` の一つにします（RFC #2788）。
+
+```onion
+// 以前
+def this(name: String) { self.name = name }
+def greet(): String = "Hi, #{self.name}"
+
+// 今
+def this(name: String) { this.name = name }
+def greet(): String = "Hi, #{this.name}"
+```
+
+- **表示されるもの:** すべての `self` で、一度に `E0117: `self` は廃止されました。`this` と書いてください。` が出ます。static なコードでは E0050 の代わりに出ます。
+- **予約語のままです:** `self` は自由な名前にはなりません。`` `self` `` と書いたフィールドはこれまでどおり使えます。
+- **プロジェクト全体を更新するには:** `onion migrate src/ tests/` を実行します。コード中の `self` と、文字列の `#{...}` の中の `self` をすべて書き換えます。コメント、文字列の地の文、`\#{self}`、`` `self` `` はそのままです。
+
+## `OnionMath::randomInt` は削除されました。`Rand::nextInt` を使ってください
+
+範囲内のランダムな `Int` を得る方法が二つあり、上限の扱いが逆でした（#3069）。
+残るのは `Rand::nextInt(min, max)` です。`max` は含まれません。`a..<b`、Java、Kotlin と同じです。
+
+```onion
+val die = OnionMath::randomInt(1, 6)   // 以前: 1から6。現在: E0005
+val die = Rand::nextInt(1, 7)          // 1から6
+```
+
+- **表示されるもの:** `E0005` と、`Rand::nextInt(min, max + 1)` を示すヒントです。
+- **変わらないもの:** `Rand::nextInt(min, max)` と `OnionMath::random()` です。
+- **`onion migrate` が書き換えます。** `Rand::nextInt(min, max + 1)` と書くので、以前の呼び出しが返せた値はすべて出ます。
+  - `OnionMath::randomInt(1, 6)` は `Rand::nextInt(1, 7)` になります。
+  - `OnionMath::randomInt(0, xs.size - 1)` は `Rand::nextInt(0, xs.size)` になります。
+  - `OnionMath::randomInt(a, b)` は `Rand::nextInt(a, b + 1)` になります。
+  - `"#{...}"` の中の呼び出しと、別の呼び出しの引数の中の呼び出しも書き換えます。
+  - インポート経由の呼び出しも書き換えます。`import { onion.OnionMath::* }` の後の `randomInt(1, 6)` や、`import { onion.OnionMath as OM; }` の後の `OM::randomInt(1, 6)` です。インポート自体はそのままでもコンパイルできるので、書き換えません。
+  - ファイル自身、または一緒に渡したファイルに独自の `Rand`（クラス、インポート、変数）があるときは、`onion.Rand::nextInt` と書きます。呼び出しが Onion の `Rand` を指したままになります。
+- **書き換えるのは、コンパイラがエラーを報告した呼び出しだけです。** コンパイルできる `randomInt` はあなた自身のもの（`OnionMath` という名前の自作クラスや、継承したメソッド）なので、そのまま残します。
+- **`+ 1` を付ける `max`:** `Int.MAX_VALUE` より小さい数字そのもの（`6`）か、変数、引数、フィールド、呼び出しを読む `max`（`n`、`xs.size`、`Math::abs(n)`）です。
+- **それ以外の定数の max は知らせるだけです。手で直してください。** `2147483647` や、定数の式（`1 << 4`、`Integer::MAX_VALUE`）が該当します。migrate はファイルをそのまま残します。`Rand::nextInt(min, (max) + 1)` と書いてから、もう一度 migrate を実行してください。max が `Int.MAX_VALUE` のときは、代わりに `Rand::nextInt(min - 1, max) + 1` と書いてください。
+- **独自の `randomInt` も持つファイルの、修飾なしの `randomInt(a, b)`** はどちらを指すかわからないので、migrate は知らせるだけで書き換えません。
+- **`import { onion.OnionMath::* }` のないファイルの `randomInt(a, b)`** は削除されたメソッドではないので、migrate は書き換えません。ヒントが手で直す書き換えを示します。
+- **変数に入った max は確認してください。** migrate にはその値がわかりません。実行時に `Int.MAX_VALUE` になりうるなら、そこで `max + 1` が桁あふれし、呼び出しは `IllegalArgumentException` を投げます。その場合は `Rand::nextInt(min - 1, max) + 1` と書いてください。
+- **`Rand::nextInt()` で置き換えられるのは、min が `Int.MIN_VALUE` で max が `Int.MAX_VALUE` の呼び出しだけです。** 負の数も含むあらゆる `Int` を返すので、`randomInt(0, Int.MAX_VALUE)` の代わりにはなりません。
+- **プログラムは一つずつ migrate してください。** 無関係なスクリプトを一緒に渡すと、互いのエラーが隠れることがあります。その場合、呼び出しは書き換えられずに残ります。

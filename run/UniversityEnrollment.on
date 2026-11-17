@@ -61,12 +61,12 @@ interface Summarizable {
 // ─── Extension methods ────────────────────────────────────────────────────────
 
 extension Int {
-  def creditLabel(): String = if self == 1 { "1 credit" } else { "#{self} credits" }
+  def creditLabel(): String = if this == 1 { "1 credit" } else { "#{this} credits" }
 }
 
 extension Double {
   def roundTo2(): String {
-    val shifted = self * 100.0
+    val shifted = this * 100.0
     val truncated = shifted as Int
     val whole = truncated / 100
     val frac = truncated % 100

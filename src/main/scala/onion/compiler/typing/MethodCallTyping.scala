@@ -24,7 +24,7 @@ final class MethodCallTyping(
   private val safeNavigationTypingSupport = new SafeNavigationTypingSupport(bodyContext, this)
   private val staticMethodCallSupport = new StaticMethodCallSupport(typing, this)
   private val unqualifiedMethodCallSupport = new UnqualifiedMethodCallSupport(bodyContext, this, methodCallFallbackSupport, staticMethodCallSupport)
-  private val superMethodCallSupport = new SuperMethodCallSupport(bodyContext, this)
+  private val superMethodCallSupport = new SuperMethodCallSupport(bodyContext, this, methodCallFallbackSupport)
   private val argumentRetyping = new ArgumentExpectedTypeRetyping(typing, this)
 
   /**
@@ -43,6 +43,18 @@ final class MethodCallTyping(
     receiverType: Type = null
   ): Option[Array[Term]] =
     argumentRetyping.retypeArguments(sourceType, name, args, params, context, filter, receiverType)
+
+  /** See [[ArgumentExpectedTypeRetyping.retypeTargetTypedClosures]] (#3067). */
+  private[typing] def retypeTargetTypedClosures(
+    callNode: AST.Node,
+    method: Method,
+    args: Seq[AST.Expression],
+    params: Array[Term],
+    classSubst: scala.collection.immutable.Map[String, Type],
+    context: LocalContext,
+    expected: Type
+  ): Array[Term] =
+    argumentRetyping.retypeTargetTypedClosures(callNode, method, args, params, classSubst, context, expected)
 
   /** Whether any of `args` is "malleable" -- see [[ArgumentExpectedTypeRetyping.isMalleable]]. */
   private[typing] def hasMalleableArgs(args: Seq[AST.Expression]): Boolean =
@@ -213,8 +225,23 @@ final class MethodCallTyping(
   )(
     prepareParams: Array[Type] => Option[Array[Term]],
     buildRawCall: Array[Term] => Term
-  ): Option[Term] =
+  ): Option[Term] = {
+    // `() -> Option::none()` takes its result type from the call's target type (#3067).
+    // The update is made in place: `prepareParams` reads the same array.
+    if (expected != null && context != null && typeArgs.isEmpty && params != null) {
+      val args = node match {
+        case n: AST.MethodCall => n.args
+        case n: AST.StaticMethodCall => n.args
+        case n: AST.UnqualifiedMethodCall => n.args
+        case _ => Nil
+      }
+      if (args.nonEmpty && !ArgumentHelpers.hasNamedArguments(args)) {
+        val retyped = retypeTargetTypedClosures(node, method, args, params, classSubst, context, expected)
+        if (retyped ne params) System.arraycopy(retyped, 0, params, 0, params.length)
+      }
+    }
     methodInvocationBuilderSupport.buildResolvedCall(node, method, params, typeArgs, classSubst, expected, context)(prepareParams, buildRawCall)
+  }
 
   /** Fills a `[T: Trait]` method's trailing dictionary slots (see MethodInvocationBuilderSupport). */
   private[typing] def injectDictionaries(
@@ -463,8 +490,8 @@ final class MethodCallTyping(
     context: LocalContext,
     target: Term,
     targetType: ObjectType
-  )(buildRawCall: (Method, Array[Term]) => Term): Option[Option[Term]] =
-    recordCopySupport.tryRecordCopy(node, name, args, typeArgs, context, target, targetType)(buildRawCall)
+  )(buildCallOn: (Term, Method, Array[Term]) => Term): Option[Option[Term]] =
+    recordCopySupport.tryRecordCopy(node, name, args, typeArgs, context, target, targetType)(buildCallOn)
 
   // hasNamedArguments delegated to ArgumentHelpers object
 

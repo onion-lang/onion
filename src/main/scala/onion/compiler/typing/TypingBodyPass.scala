@@ -211,19 +211,65 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
       val stringType = typing.loadRequired("java.lang.String")
       definition.constructors.headOption.foreach { ctor =>
         val paramTypes = ctor.getArgs.drop(2)
+        // A parameter default (`enum E(a: Int, b: Int = 7)`, #2948) becomes a default of the
+        // hidden constructor, as a record's does: a constant that omits `b` passes a
+        // DefaultArgument, computed by a synthesized static method that sees `a`. The two
+        // leading slots are the hidden name and ordinal, which never have a default.
+        val defaults: Array[Option[Term]] = ctor match {
+          case generated: ConstructorDefinition if node.params.exists(_.defaultValue != null) =>
+            val hidden = List(
+              AST.Argument(node.location, "$enumName", null),
+              AST.Argument(node.location, "$enumOrdinal", null)
+            )
+            methodBodySupport.predefineConstructorDefaults(generated, hidden ++ node.params)
+            val declared = generated.argumentsWithDefaults
+            paramTypes.indices.map(i => if (declared.length == generated.getArgs.length) declared(i + 2).defaultValue else None).toArray
+          case _ => Array.fill(paramTypes.length)(None)
+        }
         val enumContext = new LocalContext
         enumContext.setStatic(true)
         val statements = scala.collection.mutable.Buffer[ActionStatement]()
+        // A constant's arguments bind as `new R(...)` binds a record's (#3062, #3064): positional
+        // ones first, then `name = expr` by name; an unbound parameter takes its default.
+        val paramNames = node.params.map(_.name)
         node.constants.zipWithIndex.foreach { case (constant, ordinal) =>
-          if (constant.args.length != paramTypes.length) {
+          val slots = new Array[AST.Expression](paramTypes.length)
+          var sawNamed = false
+          var hasError = false
+          var positional = 0
+          constant.args.foreach {
+            case named: AST.NamedArgument =>
+              sawNamed = true
+              val index = paramNames.indexOf(named.name)
+              if (index < 0 || index >= slots.length) {
+                bodyContext.report(SemanticError.UNKNOWN_PARAMETER_NAME, named, named.name, paramNames.toArray)
+                hasError = true
+              } else if (slots(index) != null) {
+                bodyContext.report(SemanticError.DUPLICATE_ARGUMENT, named, named.name)
+                hasError = true
+              } else slots(index) = named.value
+            case expr =>
+              if (sawNamed) {
+                bodyContext.report(SemanticError.POSITIONAL_AFTER_NAMED, expr)
+                hasError = true
+              } else {
+                if (positional < slots.length) slots(positional) = expr
+                positional += 1
+              }
+          }
+          val complete = positional <= slots.length && slots.indices.forall(i => slots(i) != null || defaults(i).isDefined)
+          if (hasError) {
+            // already reported
+          } else if (!complete) {
             typing.report(
               SemanticError.CONSTRUCTOR_NOT_FOUND, constant, definition,
               constant.args.map(_ => bodyContext.rootClass: Type).toArray, definition.constructors
             )
           } else {
-            val typedArgs = constant.args.zip(paramTypes).map { case (argExpr, expected) =>
-              typed(argExpr, enumContext, expected).map { term =>
-                assignabilitySupport.processAssignable(argExpr, expected, term)
+            val typedArgs = slots.indices.map { i =>
+              if (slots(i) == null) defaults(i).get
+              else typed(slots(i), enumContext, paramTypes(i)).map { term =>
+                assignabilitySupport.processAssignable(slots(i), paramTypes(i), term)
               }.orNull
             }
             if (typedArgs.forall(_ != null)) {
@@ -398,6 +444,10 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
   def typeCast(node: AST.Cast, context: LocalContext): Option[Term] =
     expressionFormTyping.typeCast(node, context)
 
+  /** Whether `source as destination` is accepted, the relation `as` checks. */
+  def isValidCast(source: Type, destination: Type): Boolean =
+    expressionFormTyping.isValidCast(source, destination)
+
   def typeIsInstance(node: AST.IsInstance, context: LocalContext): Option[Term] =
     expressionFormTyping.typeIsInstance(node, context)
 
@@ -405,8 +455,13 @@ final class TypingBodyPass(private val typing: Typing, private val unitContext: 
     additionTyping.typeAddition(node, context)
 
   def typed(node: AST.Expression, context: LocalContext, expected: Type = null): Option[Term] = {
+    val mark = typing.mutedBoundErrorMark
     val result = expressionDispatchSupport.typed(node, context, expected)
     result.foreach(term => typing.put(node, term))
+    // A bound error muted while this call was typed belongs to its result; once a typing
+    // with reporting on keeps that term, its bound errors are reported (#2538).
+    typing.claimMutedBoundErrors(mark, node, result)
+    result.foreach(typing.reportBoundErrorsKeptIn)
     result
   }
   def translate(node: AST.BlockElement, context: LocalContext): ActionStatement =

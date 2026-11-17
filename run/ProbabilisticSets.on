@@ -44,10 +44,10 @@ def hashStr(s: String, seed: Int): Int {
 // Leading zero count for 32-bit Int (1-32: we add 1 so empty = 0 register)
 extension Int {
   def nlz32(): Int {
-    if self == 0 { return 32 }
-    return JInteger::numberOfLeadingZeros(self)
+    if this == 0 { return 32 }
+    return JInteger::numberOfLeadingZeros(this)
   }
-  def abs32(): Int = if self < 0 { -self } else { self }
+  def abs32(): Int = if this < 0 { -this } else { this }
 }
 
 // ─── HyperLogLog — approximate cardinality ───────────────────────────────────
@@ -368,7 +368,7 @@ public:
 // ─── Extension String for hash convenience ───────────────────────────────────
 
 extension String {
-  def hash32(seed: Int): Int = hashStr(self, seed)
+  def hash32(seed: Int): Int = hashStr(this, seed)
 }
 
 // ─── Section 5: Scale benchmark with synthetic data ──────────────────────────

@@ -33,6 +33,11 @@ final class SelectExpressionTyping(
     val branchExpected: Type =
       if (expected != null && !expected.isBottomType && expected != BasicType.VOID) expected else null
     val condition = typed(node.condition, context).getOrElse(break(None))
+    if (condition.`type` == BasicType.VOID) {
+      // A void call has no value to select on (#2891).
+      bodyContext.report(IS_NOT_BOXABLE_TYPE, node.condition, condition.`type`)
+      break(None)
+    }
 
     val name = context.newName
     val index = context.add(name, condition.`type`, isMutable = true)
@@ -530,38 +535,50 @@ final class SelectExpressionTyping(
         val typedExpr = exprOpt.getOrElse(null)
         if (typedExpr == null) break((null, NoBindings, false, None))
 
+        // A primitive label against a boxed scrutinee (a `List[Int]` element, a
+        // range's loop variable) compares by value, as `==` does: the scrutinee is
+        // unboxed and the label checked against the primitive type (#2933).
+        val unboxedScrutinee: Option[BasicType] =
+          if (typedExpr.isBasicType && !conditionType.isInstanceOf[NullableType])
+            Boxing.unboxedType(bodyContext.table, conditionType)
+          else None
+        val labelTarget: Type = unboxedScrutinee.getOrElse(conditionType)
         // An int case label matches a byte/short/char scrutinee (compared by value,
         // as Java's switch does): the scrutinee is widened to Int for the comparison,
         // so a label that does not fit never matches. Char scrutinees still also
         // accept char literals.
         val narrowableIntLabel = typedExpr.`type` == BasicType.INT &&
-          (conditionType == BasicType.BYTE || conditionType == BasicType.SHORT || conditionType == BasicType.CHAR)
+          (labelTarget == BasicType.BYTE || labelTarget == BasicType.SHORT || labelTarget == BasicType.CHAR)
         // A constant label must fit the scrutinee type, as `val b: Byte = 300` must;
         // narrowing it would make it match a different value (#2376).
         val labelOutOfRange = narrowableIntLabel && (intConstant(typedExpr) match {
-          case Some(v) => conditionType match {
+          case Some(v) => labelTarget match {
             case BasicType.BYTE  => v < Byte.MinValue || v > Byte.MaxValue
             case BasicType.SHORT => v < Short.MinValue || v > Short.MaxValue
             case _               => v < Char.MinValue || v > Char.MaxValue
           }
           case None => false
         })
-        if (!TypeRules.isAssignable(conditionType, typedExpr.`type`) && !narrowableIntLabel || labelOutOfRange) {
-          bodyContext.report(INCOMPATIBLE_TYPE, expr, conditionType, typedExpr.`type`)
+        if (!TypeRules.isAssignable(labelTarget, typedExpr.`type`) && !narrowableIntLabel || labelOutOfRange) {
+          bodyContext.report(INCOMPATIBLE_TYPE, expr, labelTarget, typedExpr.`type`)
           break((null, NoBindings, false, None))
         }
 
         val normalizedExpr =
           if (narrowableIntLabel) typedExpr
-          else if (typedExpr.isBasicType && typedExpr.`type` != conditionType) new AsInstanceOf(typedExpr, conditionType)
+          else if (typedExpr.isBasicType && typedExpr.`type` != labelTarget) new AsInstanceOf(typedExpr, labelTarget)
           else if (typedExpr.isReferenceType && typedExpr.`type` != bodyContext.rootClass) new AsInstanceOf(typedExpr, bodyContext.rootClass)
           else typedExpr
 
         if (normalizedExpr.isReferenceType) {
           body.createEqualsForRef(new RefLocal(bind), normalizedExpr)
         } else {
+          val scrutinee: Term = unboxedScrutinee match {
+            case Some(bt) => Boxing.unboxing(bodyContext.table, new RefLocal(bind), bt)
+            case None     => new RefLocal(bind)
+          }
           val subject =
-            if (narrowableIntLabel) new AsInstanceOf(new RefLocal(bind), BasicType.INT) else new RefLocal(bind)
+            if (narrowableIntLabel) new AsInstanceOf(scrutinee, BasicType.INT) else scrutinee
           new BinaryTerm(EQUAL, BasicType.BOOLEAN, subject, normalizedExpr)
         }
 

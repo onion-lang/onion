@@ -99,7 +99,7 @@ def readabilityLevel(avgLen: Double, uniqueRatio: Double): ReadabilityLevel {
 class TextAnalyzer {
   val topN: Int
 public:
-  def this(topN: Int) { self.topN = topN }
+  def this(topN: Int) { this.topN = topN }
 
   def analyze(doc: Document): AnalysisResult {
     val tokens    = tokenize(doc.body())

@@ -11,32 +11,32 @@ import {
 // ─── Extension helpers ───────────────────────────────────────────────────────
 
 extension Int {
-  def maxOf(other: Int): Int = if self >= other { self } else { other }
-  def minOf(other: Int): Int = if self <= other { self } else { other }
+  def maxOf(other: Int): Int = if this >= other { this } else { other }
+  def minOf(other: Int): Int = if this <= other { this } else { other }
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
-  def abs(): Int = if self < 0 { 0 - self } else { self }
+  def abs(): Int = if this < 0 { 0 - this } else { this }
 }
 
 extension Double {
   def fmt1(): String {
-    if self < 0.0 { return "-" + (0.0 - self).fmt1() }
-    val tenths: Int = (self * 10.0 + 0.5) as Int
+    if this < 0.0 { return "-" + (0.0 - this).fmt1() }
+    val tenths: Int = (this * 10.0 + 0.5) as Int
     return (tenths / 10) + "." + (tenths % 10)
   }
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def lpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -64,7 +64,7 @@ class LazySegTree {
 
 public:
   def this(n: Int) {
-    self.n = n
+    this.n = n
     cap = 1
     while cap < n { cap = cap * 2 }
     val sz: Int = 2 * cap

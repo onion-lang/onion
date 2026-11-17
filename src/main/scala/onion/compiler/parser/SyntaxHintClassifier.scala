@@ -15,6 +15,8 @@ private[compiler] final case class SyntaxHint(
 private[compiler] object SyntaxHintClassifier {
   private val ParenthesizedTrailingLambdaHead = """\A\{\s*\(([^()]*)\)\s*->""".r
   private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
+  // Text just before the offending `(` ends in `)`: a second call suffix after a call.
+  private val CallResultCall = """\)\s*\z""".r
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
   private val TypeofCondition =
     """^\s*(?:if|while|else\s+if)\s+typeof\s+([A-Za-z_][\w.]*)""".r
@@ -410,6 +412,9 @@ private[compiler] object SyntaxHintClassifier {
         hint("error.parsing.hint.constructor_body_this_call")
       case "(" if ConstructorDelegationCall.findFirstMatchIn(textBefore(context, sourceLine)).exists(_.group(1) == "super") =>
         hint("error.parsing.hint.constructor_body_super_call")
+      // `mk()()`: a call's result cannot be called in the same expression.
+      case "(" if CallResultCall.findFirstIn(textBefore(context, sourceLine)).isDefined =>
+        hint("error.parsing.hint.call_result_call")
       case "(" if expected.contains("<ID>") && ParenthesizedCatchClause.findFirstMatchIn(sourceLine).isDefined =>
         hint("error.parsing.hint.catch_parens")
       // Specific foreach syntax must win over the generic removed `for ... in` form.

@@ -697,6 +697,26 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ) shouldBe None
     }
 
+    it("recognizes a call applied to a call's result: `mk()()`") {
+      val hint = classify(
+        found = "(",
+        expected = "\")\"",
+        context = "())",
+        sourceLine = "println(mk()())"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.call_result_call"
+    }
+
+    it("does not flag a `(` that does not follow a `)`") {
+      SyntaxHintClassifier.classify(
+        found = "(",
+        expected = "\")\"",
+        context = "(x)",
+        sourceLine = "println(a (x)"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.call_result_call")
+    }
+
     it("recognizes a JS/Python-style `typeof` operator in an `if` condition") {
       val hint = classify(
         found = "x",

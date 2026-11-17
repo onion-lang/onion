@@ -120,6 +120,58 @@ class GenericInstanceCallViewInferenceSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, out)
       assert(out.trim == "object", out)
     }
+    // The view's argument may be a superclass of the argument: `Timestamp` is a
+    // `Comparable[Date]`. Selection binds T = Date, and so must the call (javac does too).
+    it("binds T to the view's superclass argument, in either argument order") {
+      val (r, out) = runCapturing(
+        """import { java.sql.Timestamp }
+          |class U {
+          |public:
+          |  def later[T](a: Comparable[T], b: T): String = "generic"
+          |  def later(a: Object, b: Object): String = "object"
+          |  def rev[T](b: T, a: Comparable[T]): String = "generic"
+          |  def rev(b: Object, a: Object): String = "object"
+          |  static def slater[T](a: Comparable[T], b: T): String = "generic"
+          |  static def slater(a: Object, b: Object): String = "object"
+          |}
+          |def later[T](a: Comparable[T], b: T): String = "generic"
+          |def later(a: Object, b: Object): String = "object"
+          |def main(args: String[]): Int {
+          |  val t = new Timestamp(0L)
+          |  IO::println(new U().later(t, t)); IO::println(new U().rev(t, t))
+          |  IO::println(U::slater(t, t)); IO::println(later(t, t))
+          |  IO::println(new U().later(t, "x"))
+          |  return 0
+          |}
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim.linesIterator.toList == List("generic", "generic", "generic", "generic", "object"), out)
+    }
+    it("binds T to a user superclass that is Comparable to itself") {
+      val (r, out) = runCapturing(
+        """class Money conforms Comparable[Money] {
+          |public:
+          |  def this {}
+          |  def compareTo(o: Money): Int = 0
+          |}
+          |class Euro extends Money {
+          |public:
+          |  def this {}
+          |}
+          |class U {
+          |public:
+          |  def later[T](a: Comparable[T], b: T): T = b
+          |  def later(a: Object, b: Object): Object = "object"
+          |}
+          |def main(args: String[]): Int {
+          |  val e = new Euro()
+          |  val m: Money = new U().later(e, e)
+          |  IO::println(m === e); return 0
+          |}
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim == "true", out)
+    }
     it("checks every vararg element against the view's T") {
       val (r, out) = runCapturing(
         """def f[T](xs: Comparable[T]...): String = "generic"

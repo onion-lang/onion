@@ -389,15 +389,22 @@ final class ConstructionTyping(
       // defaults filled in. Its formals type the lambda, as they do on the named-argument
       // path (#2919). Like a method call, only constructors whose parameter at each lambda's
       // position can take a lambda are candidates, so an unrelated overload changes nothing.
+      // Only a lambda with an untyped parameter takes this path: that is the call `main`
+      // rejected with E0052. A typed or zero-parameter lambda keeps the eager resolution,
+      // where an `Object` overload with more defaults can still win.
       val classSubst = TypeSubstitution.classSubstitution(typeRef)
-      def closureArity(arg: AST.Expression): Int = arg match {
-        case c: AST.ClosureExpression => c.args.length
+      def closureOf(arg: AST.Expression): Option[AST.ClosureExpression] = arg match {
+        case c: AST.ClosureExpression => Some(c)
         case block: AST.BlockExpression if block.elements.nonEmpty =>
           block.elements.last match {
-            case c: AST.ClosureExpression => c.args.length
-            case _ => -1
+            case c: AST.ClosureExpression => Some(c)
+            case _ => None
           }
-        case _ => -1
+        case _ => None
+      }
+      def closureArity(arg: AST.Expression): Int = closureOf(arg).map(_.args.length).getOrElse(-1)
+      val needsParameterTypes = untypedClosureIndices.exists { i =>
+        closureOf(node.args(i)).exists(_.args.exists(_.typeRef == null))
       }
       def lambdasFit(c: ConstructorRef): Boolean = {
         val formals = c.getArgs
@@ -417,7 +424,7 @@ final class ConstructionTyping(
             lambdasFit(cd)
         case _ => false
       }
-      if (fillsDefaults.length == 1 && !ctors.exists(c => c.getArgs.length == node.args.length && lambdasFit(c))) {
+      if (needsParameterTypes && fillsDefaults.length == 1 && !ctors.exists(c => c.getArgs.length == node.args.length && lambdasFit(c))) {
         break(typeNewObjectWithNamedArgs(node, typeRef, context, null, fillsDefaults))
       }
     }

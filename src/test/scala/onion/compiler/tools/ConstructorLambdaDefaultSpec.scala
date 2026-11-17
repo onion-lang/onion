@@ -58,5 +58,37 @@ class ConstructorLambdaDefaultSpec extends AbstractShellSpec {
           |""".stripMargin, "ld3.on", Array[String]())
       assert(Shell.Success("2,3") == result)
     }
+    it("keeps an Object overload with more defaults for a zero-parameter lambda") {
+      val result = shell.run(
+        """
+          |class A {
+          |public:
+          |  val tag: String
+          |  def this(f: Int -> Int, k: Int = 1) { tag = "fn" + f(k) }
+          |  def this(o: Object, k: Int = 2, j: Int = 3) { tag = "obj" + k }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return new A(() -> 5).tag }
+          |}
+          |""".stripMargin, "ld4.on", Array[String]())
+      assert(Shell.Success("obj2") == result)
+    }
+    it("keeps an Object overload with more defaults for a typed lambda") {
+      val result = shell.run(
+        """
+          |class A {
+          |public:
+          |  val tag: String
+          |  def this(f: (String) -> Int, k: Int = 1) { tag = "fn" + f("ab") }
+          |  def this(o: Object, k: Int = 2, j: Int = 3) { tag = "obj" + k + j }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return new A((x: Int) -> x * 10).tag }
+          |}
+          |""".stripMargin, "ld5.on", Array[String]())
+      assert(Shell.Success("obj23") == result)
+    }
   }
 }

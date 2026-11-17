@@ -6,6 +6,20 @@ import onion.compiler.TypedAST.{ClassType, Type}
 import scala.collection.mutable.{HashMap, Set => MutableSet}
 
 private[compiler] object AppliedTypeViews {
+  /**
+   * An Onion `enum Color` is declared with the raw `java.lang.Enum` as its superclass, but it
+   * is an `Enum[Color]`, as javac reads a Java enum. Reading the views through that applied
+   * superclass gives `Comparable[Color]`, not `Comparable[E]`, so overload selection and
+   * type-argument inference see the same binding for `[T](a: Comparable[T])` (#2845).
+   */
+  private def enumSuperView(raw: ClassType): Option[TypedAST.AppliedClassType] =
+    val sup = raw.superClass
+    if (raw.modifier & onion.compiler.Modifier.ENUM) != 0 && sup != null &&
+        !sup.isInstanceOf[TypedAST.AppliedClassType] && sup.name == "java.lang.Enum" &&
+        sup.typeParameters.length == 1
+    then Some(TypedAST.AppliedClassType(sup, List(raw)))
+    else None
+
   def collectAppliedViewsFrom(target: ClassType): scala.collection.immutable.Map[ClassType, TypedAST.AppliedClassType] =
     val views = HashMap[ClassType, TypedAST.AppliedClassType]()
     val visited = MutableSet[String]()
@@ -53,7 +67,7 @@ private[compiler] object AppliedTypeViews {
           visited += k
           val asApplied = TypedAST.AppliedClassType(raw, List())
           views += raw -> asApplied
-        traverse(raw.superClass, scala.collection.immutable.Map.empty)
+        traverse(enumSuperView(raw).getOrElse(raw.superClass), scala.collection.immutable.Map.empty)
         raw.interfaces.foreach(traverse(_, scala.collection.immutable.Map.empty))
     views.toMap
 }

@@ -143,7 +143,7 @@ private[compiler] final class StaticMethodCallSupport(
           case CandidateSelection.Selected(selected) =>
             finalizeSelection(selected)
           case CandidateSelection.Ambiguous(first, second) =>
-            calls.reportAmbiguousMethod(node, first.method, second.method, node.name)
+            calls.reportAmbiguousMethod(node, first.method, second.method, node.name, calls.types(parameters))
             None
           case CandidateSelection.NoMatch =>
             calls.reportMethodNotFound(node, typeRef, node.name, calls.types(parameters), calledStatically = true)
@@ -245,7 +245,8 @@ private[compiler] final class StaticMethodCallSupport(
     val method = selection match {
       case CandidateSelection.Selected(selected) => selected.method
       case CandidateSelection.Ambiguous(first, second) =>
-        calls.reportAmbiguousMethod(node, first.method, second.method, name)
+        calls.reportAmbiguousMethod(node, first.method, second.method, name,
+          preliminaryParams.map(t => if (t == null) null else t.`type`))
         return None
       case CandidateSelection.NoMatch =>
         calls.reportMethodNotFound(node, typeRef, name, nonClosureTypes.values.toArray, calledStatically = true)

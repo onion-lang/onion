@@ -287,6 +287,11 @@ private[typing] object GenericMethodTypeArguments {
     val upperConstraints = HashMap[String, Type]()
     val lowerConstraints = HashMap[String, Type]()
     val paramNames = typeParams.iterator.map(_.name).toSet
+    // Variables bound by a plain class's applied view (`Timestamp` as `Comparable[Date]`).
+    // Such a binding is exact; an argument whose formal is the bare variable only has to fit
+    // it, so `later[T](a: Comparable[T], b: T)` given two `Timestamp`s binds T = Date, the
+    // binding overload selection used, as javac does (#2845).
+    private val boundByView = scala.collection.mutable.Set[String]()
 
     def addUpper(name: String, bound: Type, position: AST.Node): Unit = {
       if (bound == null || bound.isNullType) return
@@ -310,7 +315,7 @@ private[typing] object GenericMethodTypeArguments {
           else lowerConstraints += name -> rootClass
     }
 
-    def unify(formal: Type, actual: Type, position: AST.Node, returnContext: Boolean = false): Unit = {
+    def unify(formal: Type, actual: Type, position: AST.Node, returnContext: Boolean = false, viaView: Boolean = false): Unit = {
       if (actual.isNullType) return
       formal match
         case w: TypedAST.WildcardType =>
@@ -357,6 +362,16 @@ private[typing] object GenericMethodTypeArguments {
               if (!(prev eq bound)) {
                 val merged = mergeNullability(prev, bound)
                 if (merged != null) inferred += tv.name -> merged
+                else if (!returnContext && !viaView && boundByView.contains(tv.name) &&
+                    isSuperTypeForBounds(prev, bound)) {
+                  // A bare `b: T` argument fits the view's exact binding: keep it.
+                  ()
+                } else if (!returnContext && viaView && !boundByView.contains(tv.name) &&
+                    isSuperTypeForBounds(bound, prev)) {
+                  // The view comes after a bare `b: T` argument it accepts: the view decides.
+                  inferred += tv.name -> bound
+                  boundByView += tv.name
+                }
                 else if (returnContext && (bound eq rootClass)) {
                   // This unification comes from the call's expected RETURN type,
                   // and it collapsed to plain Object -- either a caller-side
@@ -379,6 +394,7 @@ private[typing] object GenericMethodTypeArguments {
               }
             case None =>
               inferred += tv.name -> bound
+              if (viaView) boundByView += tv.name
           }
         case fn: TypedAST.NullableType =>
           // A nullable formal such as `T?` (e.g. a `List[T?]` parameter) must
@@ -401,9 +417,11 @@ private[typing] object GenericMethodTypeArguments {
           def sameRawClass(c1: TypedAST.ClassType, c2: TypedAST.ClassType): Boolean =
             (c1 eq c2) || (c1.name == c2.name)
 
-          def unifyWithApplied(apa: TypedAST.AppliedClassType): Unit =
+          def unifyWithApplied(apa: TypedAST.AppliedClassType, viewOfPlain: Boolean = false): Unit =
             if sameRawClass(apf.raw, apa.raw) && apf.typeArguments.length == apa.typeArguments.length then
-              apf.typeArguments.zip(apa.typeArguments).foreach { (f, a) => unify(f, a, position, returnContext) }
+              apf.typeArguments.zip(apa.typeArguments).foreach { (f, a) =>
+                unify(f, a, position, returnContext, viaView = viewOfPlain && f.isInstanceOf[TypedAST.TypeVariableType])
+              }
 
           actual match
             case apa: TypedAST.AppliedClassType =>
@@ -416,7 +434,7 @@ private[typing] object GenericMethodTypeArguments {
             case ct: ClassType =>
               val views = AppliedTypeViews.collectAppliedViewsFrom(ct)
               views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match
-                case Some(view) => unifyWithApplied(view)
+                case Some(view) => unifyWithApplied(view, viewOfPlain = true)
                 case None =>
             // A primitive argument is passed boxed, so an applied formal reads T off the
             // box's own view: `id(5)` against `Comparable[T]` binds T = Integer, as Java

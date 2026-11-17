@@ -862,8 +862,93 @@ class SemanticErrorReporter(threshold: Int) {
       Seq(target1, name1, args1, target2, name2, args2))
     val hint =
       if (items.length > 2 && items(2) == SemanticErrorReporter.LambdaOverloadHint) Some(message("suggestion.lambdaOverloadAmbiguous"))
+      else if (items.length > 2) items(2) match
+        case call: SemanticErrorReporter.AmbiguousCallArguments =>
+          genericOverloadCastHint(name1, asTypeArray(item1(2)), call.firstVararg, asTypeArray(item2(2)), call.secondVararg, call.argTypes)
+            .orElse(genericOverloadCastHint(name2, asTypeArray(item2(2)), call.secondVararg, asTypeArray(item1(2)), call.firstVararg, call.argTypes))
+        case _ => None
       else None
     problem(position, appendSuggestion(baseMessage, hint))
+  }
+
+  /**
+   * One candidate is generic and the other is not (`g(CharSequence)` beside
+   * `g[T](Comparable[T])`, #2845): name the cast that picks the plain one. The rule:
+   *  - the hinted argument is the first one whose cast to the plain overload's parameter
+   *    type makes the generic overload inapplicable: the generic's parameter there mentions a
+   *    type variable, and the plain parameter's class does not reach the generic one's
+   *    class (`CharSequence` is not a `Comparable`). A slot the generic overload still
+   *    accepts after the cast (`T`, `Comparable[T]` for a `Comparable[String]`) is skipped;
+   *  - an argument in a varargs slot is cast to the element type (`"a" as CharSequence`);
+   *  - with no such argument, or a primitive one, there is no hint: a cast that leaves the
+   *    call ambiguous is worse than none.
+   */
+  private def genericOverloadCastHint(
+    name: String,
+    plain: Array[TypedAST.Type], plainVararg: Boolean,
+    generic: Array[TypedAST.Type], genericVararg: Boolean,
+    args: Array[TypedAST.Type]
+  ): Option[String] = {
+    if (plain.exists(mentionsTypeVariable) || !generic.exists(mentionsTypeVariable)) return None
+    args.indices.find { k =>
+      val a = args(k)
+      a != null && !a.isBasicType && !a.isNullType && {
+        val p = slotType(plain, plainVararg, args, k)
+        val g = slotType(generic, genericVararg, args, k)
+        p != null && g != null && !p.isBasicType && mentionsTypeVariable(g) && reaches(p, g).contains(false)
+      }
+    }.map { k =>
+      format(message("suggestion.genericOverloadCast"),
+        Seq(name, typeNames(plain), ordinal(k + 1), typeName(slotType(plain, plainVararg, args, k))))
+    }
+  }
+
+  /** The parameter type argument `k` fills: the element type when it falls in a varargs slot. */
+  private def slotType(params: Array[TypedAST.Type], vararg: Boolean, args: Array[TypedAST.Type], k: Int): TypedAST.Type = {
+    val last = params.length - 1
+    if (!vararg || last < 0 || k < last) { if (k < params.length) params(k) else null }
+    else params(last) match
+      case at: TypedAST.ArrayType =>
+        val direct = args.length == params.length && k == last && args(k).isInstanceOf[TypedAST.ArrayType]
+        if (direct) at else at.component
+      case other => if (k == last && args.length == params.length) other else null
+  }
+
+  /**
+   * Whether a value of type `p` still fits the generic formal `g` after erasure:
+   * `Some(false)` when it certainly does not (its class is not a subclass of `g`'s class),
+   * `None` when this cannot tell, so no hint is built on it.
+   */
+  private def reaches(p: TypedAST.Type, g: TypedAST.Type): Option[Boolean] = g match
+    case tv: TypedAST.TypeVariableType =>
+      if (tv.upperBound == null) Some(true) else reaches(p, tv.upperBound)
+    case n: TypedAST.NullableType => reaches(p, n.innerType)
+    case w: TypedAST.WildcardType => reaches(p, w.upperBound)
+    case ga: TypedAST.ArrayType => p match
+      case pa: TypedAST.ArrayType => reaches(pa.component, ga.component)
+      case _ => Some(false)
+    case gc: TypedAST.ClassType => p match
+      case n: TypedAST.NullableType => reaches(n.innerType, g)
+      case pc: TypedAST.ClassType if !pc.isInstanceOf[TypedAST.TypeVariableType] =>
+        Some(TypedAST.TypeRules.isSuperType(rawOf(gc), rawOf(pc)))
+      case _ => None
+    case _ => None
+
+  private def ordinal(n: Int): String =
+    if (Message.language == "ja") n.toString
+    else n.toString + (if (n % 100 >= 11 && n % 100 <= 13) "th" else (n % 10) match
+      case 1 => "st"
+      case 2 => "nd"
+      case 3 => "rd"
+      case _ => "th")
+
+  private def mentionsTypeVariable(tp: TypedAST.Type): Boolean = tp match {
+    case _: TypedAST.TypeVariableType => true
+    case ap: TypedAST.AppliedClassType => ap.typeArguments.exists(mentionsTypeVariable)
+    case at: TypedAST.ArrayType => mentionsTypeVariable(at.component)
+    case n: TypedAST.NullableType => mentionsTypeVariable(n.innerType)
+    case w: TypedAST.WildcardType => mentionsTypeVariable(w.upperBound) || w.lowerBound.exists(mentionsTypeVariable)
+    case _ => false
   }
 
   /**
@@ -1375,6 +1460,10 @@ object SemanticErrorReporter {
   /** An extra (third) item on AMBIGUOUS_METHOD: a lambda fits two overloaded extension
    *  methods equally, so the error says how to pick one (#2447). */
   private[compiler] case object LambdaOverloadHint
+
+  /** An extra (third) item on AMBIGUOUS_METHOD: the call's argument types (null for a
+   *  lambda) and whether each candidate is varargs, so a hint can name an argument (#2845). */
+  private[compiler] final case class AmbiguousCallArguments(argTypes: Array[TypedAST.Type], firstVararg: Boolean, secondVararg: Boolean)
 
   /** An extra (fourth) item on DUPLICATE_METHOD: the duplicate is a record component's
    *  accessor colliding with a method the record generates, so the error says so (#2391).

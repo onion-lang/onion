@@ -210,5 +210,46 @@ class RecordAliasComponentSpec extends AbstractShellSpec {
       val msgs = out.swap.toOption.get.filter(_.startsWith("E0061"))
       assert(msgs.exists(_.contains("Name (= java.lang.String)")), msgs)
     }
+
+    // #2959: `import { java.lang.String as JS }` in the record's own file is java.lang.String
+    // there. It used to read as a nested record in a json shape: E0061 listing `String`
+    // as supported while rejecting `java.lang.String`.
+    it("reads a component typed by an import alias of java.lang.String in a json shape") {
+      val r = runMain(
+        """import { java.lang.String as JS; }
+          |record J(n: JS, m: JS?) {
+          |  shape doc = json
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val j = J::doc().parse("{\"n\": \"x\"}").get()
+          |    return j.n() + " " + j.m()
+          |  }
+          |}
+          |""".stripMargin)
+      assert(Shell.Success("x null") == r)
+    }
+
+    // #2959 panel block: a record the module declares under the alias's name is what typing
+    // resolves `JS` to, so the component stays a nested record, as it was before the fix.
+    it("keeps a record named like an imported String alias a nested record") {
+      val r = runMain(
+        """import { java.lang.String as JS; }
+          |record JS(v: Int) {
+          |  shape doc = json
+          |}
+          |record J(n: JS) {
+          |  shape doc = json
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return "" + J::doc().parse("{\"n\":{\"v\":3}}")
+          |  }
+          |}
+          |""".stripMargin)
+      assert(Shell.Success("Ok[value=J(n=JS(v=3))]") == r)
+    }
   }
 }

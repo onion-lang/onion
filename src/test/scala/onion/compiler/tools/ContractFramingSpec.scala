@@ -50,4 +50,12 @@ class ContractFramingSpec extends AnyFunSpec {
     val src = "class Bag {\n  var xs: List[String]\n  var n: Int\n  history n >= old(n) && this.xs != null\npublic:\n  def this { xs = []; n = 0 }\n}"
     assert(e0110At(src).size == 1 && e0110At(src).head.startsWith("4:"))
   }
+  it("points E0110 at its own clause after an earlier invariant fails to type (#2797)") {
+    val src = "class Bag {\n  val xs: List[String]\n  invariant nope > 0\n  invariant xs.size >= 0\npublic:\n  def this { xs = [] }\n}"
+    assert(e0110At(src) == Seq("4:13"))
+  }
+  it("points a history's E0110 at its own clause after an earlier history fails to type (#2797)") {
+    val src = "class Bag {\n  var xs: List[String]\n  var n: Int\n  history nope > 0\n  history n >= old(n) && this.xs != null\npublic:\n  def this { xs = []; n = 0 }\n}"
+    assert(e0110At(src).size == 1 && e0110At(src).head.startsWith("5:"))
+  }
 }

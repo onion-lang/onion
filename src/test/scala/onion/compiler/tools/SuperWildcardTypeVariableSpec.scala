@@ -109,6 +109,19 @@ class SuperWildcardTypeVariableSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(Shell.Success("[y, z][a, y, z]") == r)
     }
+    it("rejects add(42) on an inherited ArrayList[S] member, written or implied (#2535)") {
+      for (call <- Seq("add(42)", "this.add(42)")) {
+        val r = shell.run(
+          s"""import { java.util.* }
+             |class Sub[S] extends ArrayList[S] {
+             |public:
+             |  def sneak(): void { $call }
+             |}
+             |def main(args: String[]): Int { return 0 }
+             |""".stripMargin, "None", Array())
+        assert(Shell.Failure(-1) == r, call)
+      }
+    }
     it("calls an inherited sortWith(Comparator[? super T]) of an Onion base class") {
       val r = shell.run(
         """import { java.util.* }

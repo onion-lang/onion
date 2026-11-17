@@ -50,4 +50,50 @@ class FilesGlobSpec extends AbstractShellSpec {
     )
     assert(Shell.Success("[README.md, a.on, sub/b.on] [a.on, sub/b.on]") == result)
   }
+
+  it("a bracket class with a comma or brace inside a brace group is not split (#3123)") {
+    val dir = (System.getProperty("java.io.tmpdir") + "/onion-files-glob-3123").replace('\\', '/')
+    val result = shell.run(
+      s"""
+        |class Test {
+        |public:
+        |  static def main(args: String[]): String {
+        |    Files::mkdirs("$dir/sub")
+        |    Files::writeText("$dir/a.on", "")
+        |    Files::writeText("$dir/b.on", "")
+        |    Files::writeText("$dir/x.md", "")
+        |    Files::writeText("$dir/{q", "")
+        |    Files::writeText("$dir/sub/c.on", "")
+        |    val mixed = Files::glob("$dir", "{[a,b].on,*.md}")
+        |    val brace = Files::glob("$dir", "[{,}]*")
+        |    return mixed.toString() + " " + brace.toString()
+        |  }
+        |}
+        |""".stripMargin,
+      "FilesGlobBracketComma.on",
+      Array()
+    )
+    assert(Shell.Success("[a.on, b.on, x.md] [{q]") == result)
+  }
+
+  it("a nested brace group expands instead of throwing (#3130)") {
+    val dir = (System.getProperty("java.io.tmpdir") + "/onion-files-glob-3130").replace('\\', '/')
+    val result = shell.run(
+      s"""
+        |class Test {
+        |public:
+        |  static def main(args: String[]): String {
+        |    Files::mkdirs("$dir/a")
+        |    Files::writeText("$dir/c", "")
+        |    Files::writeText("$dir/x.md", "")
+        |    Files::writeText("$dir/z.txt", "")
+        |    return Files::glob("$dir", "{a,{c,x.md}}").toString()
+        |  }
+        |}
+        |""".stripMargin,
+      "FilesGlobNested.on",
+      Array()
+    )
+    assert(Shell.Success("[a, c, x.md]") == result)
+  }
 }

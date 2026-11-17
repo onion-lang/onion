@@ -13,7 +13,7 @@ Onion's standard library consists of built-in modules and interfaces for common 
 | **Concurrency** | `Future`, `Concurrent` (pools, counters, locks, channels) |
 | **Collections** | `Colls` (lists: map/filter/fold, chunked/windowed, sumBy/maxBy), `Iterables`, `Maps`, `Sets`, `Range` (the `a..b`/`a..<b` literal type) |
 | **Text** | `Strings` (case, split, pad, parse), `Text` (wrap/indent/table), `Regex` |
-| **Numbers** | `Math`, `OnionMath` (hyperbolic trig, `clamp`, `hypot`, bounded `randomInt`), `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
+| **Numbers** | `Math`, `OnionMath` (hyperbolic trig, `clamp`, `hypot`), `Stats` (sum/average/median/stddev), `Format` (grouping, bytes, durations) |
 | **Data formats** | `Json`, `Yaml`, `Csv`, `Config` (dot-notation config access) |
 | **Encoding** | `Codec` (base64/hex/url), `Hash` (md5/sha256/…) |
 | **Functional** | `Option`, `Result`, `Future`, `Outcome` + `Defect` (reading external data) |
@@ -275,7 +275,8 @@ val e: Double = Math::E         // 2.71828...
 ## OnionMath Module
 
 An `onion.*` numeric module, distinct from the JDK's `Math`, covering hyperbolic
-trig, safe rounding/clamping, and a bounded random integer. It is default-imported
+trig, safe rounding/clamping, and a random `Double`. For a random `Int` in a range, use
+`Rand::nextInt(min, max)`. It is default-imported
 like the rest of the standard library, so no explicit import is needed.
 
 ### OnionMath::sin / OnionMath::cos / OnionMath::tan / OnionMath::asin / OnionMath::acos / OnionMath::atan / OnionMath::atan2
@@ -345,14 +346,14 @@ val r: Long = OnionMath::round(3.5)       // 4
 val rf: Int = OnionMath::roundFloat(3.5f) // 4
 ```
 
-### OnionMath::random / OnionMath::randomInt
+### OnionMath::random
 
-Random number generation. Unlike `Math::random`, `randomInt` takes bounds directly
-and is tracked by the effect checker as a `Rand` effect:
+A random `Double`, tracked by the effect checker as a `Rand` effect. For a random `Int` in a
+range, use `Rand::nextInt(min, max)` (below); its `max` is exclusive.
 
 ```onion
 val r: Double = OnionMath::random()          // [0.0, 1.0)
-val n: Int = OnionMath::randomInt(1, 10)     // [1, 10], inclusive
+val n: Int = Rand::nextInt(1, 11)            // 1 to 10
 ```
 
 ### OnionMath::signum / OnionMath::signumFloat
@@ -1250,6 +1251,11 @@ val dice: Int = Rand::nextInt(6) + 1      // 1 to 6
 val percent: Int = Rand::nextInt(100)     // 0 to 99
 val d20: Int = Rand::nextInt(1, 21)       // 1 to 20 (min, exclusive max)
 ```
+
+The `max` is exclusive, as in `a..<b`, Java's `ThreadLocalRandom` and Kotlin's
+`Random.nextInt(from, until)`. So `Rand::nextInt(0, xs.size)` is a valid index of `xs`.
+`OnionMath`'s `randomInt`, whose `max` was inclusive, was removed
+(see `docs/migration/pre-1.0.md`).
 
 ### Rand::nextLong (bounded)
 

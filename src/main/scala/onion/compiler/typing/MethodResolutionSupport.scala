@@ -211,6 +211,23 @@ private[compiler] final class MethodResolutionSupport(
     true
   }
 
+  /**
+   * Whether no `null` argument lands on a primitive formal. Java never lets `null` fill a
+   * primitive slot, so `f(null)` against `f(Int)` and `f(String?)` is `f(String?)` (#2876),
+   * as `new K(null)` already is. Used only to prefer among several applicable overloads:
+   * a lone `f(Int)` still resolves and reports E0000 at the `null`.
+   */
+  def nullFitsNoPrimitive(method: Method): Boolean = {
+    val expected = specializedArgs(method)
+    val fixed = if method.isVararg then expected.length - 1 else expected.length
+    var i = 0
+    while i < params.length && i < fixed do
+      val t = params(i).`type`
+      if t != null && t.isNullType && expected(i).isBasicType then return false
+      i += 1
+    true
+  }
+
   val specificityComparator: java.util.Comparator[Method] =
     new java.util.Comparator[Method] {
       override def compare(m1: Method, m2: Method): Int = {

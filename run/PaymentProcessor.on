@@ -15,19 +15,19 @@ import {
 // ─── Extension methods ────────────────────────────────────────────────────────
 
 extension String {
-  def cleanCard(): String = self.replace(" ", "").replace("-", "")
+  def cleanCard(): String = this.replace(" ", "").replace("-", "")
   def maskCard(): String {
-    val s = self.cleanCard()
+    val s = this.cleanCard()
     if s.length() < 4 { return "****" }
     return "****-****-****-" + s.substring(s.length() - 4)
   }
   def lpad(width: Int): String {
-    var s = self
+    var s = this
     while s.length() < width { s = " " + s }
     return s
   }
   def rpad(width: Int): String {
-    var s = self
+    var s = this
     while s.length() < width { s = s + " " }
     return s
   }
@@ -36,13 +36,13 @@ extension String {
 extension Int {
   def pct(total: Int): String {
     if total == 0 { return "N/A" }
-    return "#{self * 100 / total}%"
+    return "#{this * 100 / total}%"
   }
 }
 
 extension Double {
-  def usd(): String = "$" + String::format("%.2f", self)
-  def round2(): Double = (Math::round(self * 100.0) as Double) / 100.0
+  def usd(): String = "$" + String::format("%.2f", this)
+  def round2(): Double = (Math::round(this * 100.0) as Double) / 100.0
 }
 
 // ─── CardType: network detection from card number prefix ─────────────────────

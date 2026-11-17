@@ -10,7 +10,7 @@
 
 extension Int {
   def pad(width: Int): String {
-    val s: String = "#{self}"
+    val s: String = "#{this}"
     if s.length() >= width { return s }
     var r: String = s
     var i: Int = s.length()
@@ -18,19 +18,19 @@ extension Int {
     return r
   }
   def msToStr(): String {
-    if self < 1000 { return "#{self}ms" }
-    return "#{self / 1000}.#{(self % 1000) / 100}s"
+    if this < 1000 { return "#{this}ms" }
+    return "#{this / 1000}.#{(this % 1000) / 100}s"
   }
 }
 
 extension String {
   def truncate(n: Int): String {
-    if self.length() <= n { return self }
-    return self.substring(0, n - 2) + ".."
+    if this.length() <= n { return this }
+    return this.substring(0, n - 2) + ".."
   }
   def padRight(width: Int): String {
-    if self.length() >= width { return self }
-    var r: String = self
+    if this.length() >= width { return this }
+    var r: String = this
     while r.length() < width { r = r + " " }
     return r
   }
@@ -41,8 +41,8 @@ extension String {
 enum Language(langName: String, timeLimit: Int) {
   CPP("C++", 1000), JAVA("Java", 2000), PYTHON("Python", 3000), ONION("Onion", 2000)
 public:
-  def label(): String = self.langName()
-  def limit(): Int = self.timeLimit()
+  def label(): String = this.langName()
+  def limit(): Int = this.timeLimit()
 }
 
 // ─── Verdict: plain enum ──────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ public:
     case Verdict::RUNTIME_ERROR: "RE"
     else:                        "CE"
   }
-  def isAccepted(): Boolean = self == Verdict::ACCEPTED
+  def isAccepted(): Boolean = this == Verdict::ACCEPTED
 }
 
 // ─── ContestPhase: ADT enum ───────────────────────────────────────────────────

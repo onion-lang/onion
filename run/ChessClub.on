@@ -38,32 +38,32 @@ public:
 
 extension Int {
   def pad3(): String {
-    val s: String = "" + self
-    if self < 0 { return s }
-    else if self < 10 { return "  " + s }
-    else if self < 100 { return " " + s }
+    val s: String = "" + this
+    if this < 0 { return s }
+    else if this < 10 { return "  " + s }
+    else if this < 100 { return " " + s }
     else { return s }
   }
   def showDiff(): String =
-    if self > 0 { "+" + self } else { "" + self }
+    if this > 0 { "+" + this } else { "" + this }
 }
 
 extension Double {
   def fmt1(): String {
-    val whole: Int = self as Int
-    val frac: Int = ((self - whole as Double) * 10.0 + 0.5) as Int
+    val whole: Int = this as Int
+    val frac: Int = ((this - whole as Double) * 10.0 + 0.5) as Int
     return "#{whole}.#{frac}"
   }
 }
 
 extension String {
   def padRight(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def padLeft(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }

@@ -209,7 +209,7 @@ def findPath(db: GraphDB, src: Int, dst: Int): QueryResult {
 // ── extension methods ──────────────────────────────────────────────────────
 
 extension Node {
-  def fullLabel(): String = labelOf(self.label()) + "/" + self.name()
+  def fullLabel(): String = labelOf(this.label()) + "/" + this.name()
 }
 
 // ── statistics helper ──────────────────────────────────────────────────────

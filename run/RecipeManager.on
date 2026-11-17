@@ -23,7 +23,7 @@ enum Stars(value: Int) {
 
 extension Cuisine {
   def displayName(): String {
-    select self {
+    select this {
       case Cuisine::ITALIAN:       return "Italian"
       case Cuisine::MEXICAN:       return "Mexican"
       case Cuisine::ASIAN:         return "Asian"
@@ -36,7 +36,7 @@ extension Cuisine {
 
 extension DietaryTag {
   def label(): String {
-    select self {
+    select this {
       case DietaryTag::VEGAN:       return "Vegan"
       case DietaryTag::VEGETARIAN:  return "Vegetarian"
       case DietaryTag::GLUTEN_FREE: return "Gluten-Free"

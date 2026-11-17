@@ -41,25 +41,25 @@ public:
 
 extension Double {
   def fmt2(): String {
-    val r: Long  = JMath::round(self * 100.0)
+    val r: Long  = JMath::round(this * 100.0)
     val i: Long  = r / 100L
     val raw: Long = if r < 0L { 0L - r } else { r }
     val f: Long  = raw % 100L
     val fs: String = if f < 10L { "0" + f } else { "" + f }
     return "#{i}.#{fs}"
   }
-  def pct2(): String = (self * 100.0).fmt2() + "%"
-  def absd(): Double = if self < 0.0 { 0.0 - self } else { self }
+  def pct2(): String = (this * 100.0).fmt2() + "%"
+  def absd(): Double = if this < 0.0 { 0.0 - this } else { this }
 }
 
 extension String {
   def rpadN(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def lpadN(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

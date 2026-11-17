@@ -57,17 +57,17 @@ record Listing(store: Store, product: Product, price: Int, discount: Discount) {
 
 extension Int {
   def cents(): String {
-    val dollars: Int = self / 100
-    val cents: Int   = self % 100
+    val dollars: Int = this / 100
+    val cents: Int   = this % 100
     if cents < 10 { return "$" + dollars + ".0" + cents }
     return "$" + dollars + "." + cents
   }
-  def abs(): Int { if self < 0 { return 0 - self } return self }
+  def abs(): Int { if this < 0 { return 0 - this } return this }
 }
 
 extension Double {
-  def pct(): String = "" + self + "%"
-  def roundInt(): Int = (self + 0.5) as Int
+  def pct(): String = "" + this + "%"
+  def roundInt(): Int = (this + 0.5) as Int
 }
 
 // ── Discount resolver ─────────────────────────────────────────────────────────

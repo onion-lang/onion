@@ -25,11 +25,11 @@ extension String {
 }
 
 extension Int {
-  def absVal(): Int { if self < 0 { return 0 - self } return self }
+  def absVal(): Int { if this < 0 { return 0 - this } return this }
   def clampRange(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
+    if this < lo { return lo }
+    if this > hi { return hi }
+    return this
   }
 }
 

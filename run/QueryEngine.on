@@ -66,8 +66,8 @@ class Row {
   val vals:    List[Value]
 public:
   def this(columns: List[String], vals: List[Value]) {
-    self.columns = columns
-    self.vals    = vals
+    this.columns = columns
+    this.vals    = vals
   }
 
   def getVals(): List[Value] = vals
@@ -87,9 +87,9 @@ class Table {
   val rows:    List[Row]
 public:
   def this(name: String, columns: List[String]) {
-    self.name    = name
-    self.columns = columns
-    self.rows    = []
+    this.name    = name
+    this.columns = columns
+    this.rows    = []
   }
 
   def getRows(): List[Row] = rows

@@ -262,7 +262,7 @@ public:
       if scheme == null {
         throw new RuntimeException("Unbound variable: #{e.name()}")
       }
-      scheme.instantiate(self)
+      scheme.instantiate(this)
 
     case e is EInt:  new TInt()
     case e is EBool: new TBool()

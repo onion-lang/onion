@@ -282,7 +282,7 @@ class DidYouMeanSpec extends AbstractShellSpec {
       // synthetic extension container to fall back to, so it reports plain
       // "not found" with no connection back to the receiver it's actually
       // sitting inside. Hint the explicit form instead of saying nothing.
-      it("hints self.<field> for a bare field reference") {
+      it("hints this.<field> for a bare field reference") {
         failsWithSuggestion(
           """
             |class Box {
@@ -300,11 +300,11 @@ class DidYouMeanSpec extends AbstractShellSpec {
             |  static def main(args: String[]): Int = new Box(5).doubledField
             |}
             |""".stripMargin,
-          "E0002", "self.value"
+          "E0002", "this.value"
         )
       }
 
-      it("hints self.<method> for a bare parens-less zero-arg method reference") {
+      it("hints this.<method> for a bare parens-less zero-arg method reference") {
         failsWithSuggestion(
           """
             |abstract class Shape2 {
@@ -321,11 +321,11 @@ class DidYouMeanSpec extends AbstractShellSpec {
             |  static def main(args: String[]): String = "ok"
             |}
             |""".stripMargin,
-          "E0002", "self.area"
+          "E0002", "this.area"
         )
       }
 
-      it("hints self.<method>(...) for a bare parens'd method call") {
+      it("hints this.<method>(...) for a bare parens'd method call") {
         failsWithSuggestion(
           """
             |extension String {
@@ -337,7 +337,7 @@ class DidYouMeanSpec extends AbstractShellSpec {
             |  static def main(args: String[]): String = "hi".shout()
             |}
             |""".stripMargin,
-          "E0005", "self.toUpperCase"
+          "E0005", "this.toUpperCase"
         )
       }
     }
@@ -401,7 +401,7 @@ class DidYouMeanSpec extends AbstractShellSpec {
             |  val x: Int
             |  val count: Int
             |public:
-            |  def this(x: Int, count: Int) { self.x = x; self.count = count }
+            |  def this(x: Int, count: Int) { this.x = x; this.count = count }
             |}
             |class Test {
             |public:

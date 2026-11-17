@@ -135,8 +135,8 @@ class Parser {
   val tokens: List[Token]
 public:
   def this(tokens: List[Token]) {
-    self.tokens = tokens
-    self.pos = 0
+    this.tokens = tokens
+    this.pos = 0
   }
   def peek(): Token = tokens[pos]
   def advance(): Token = {

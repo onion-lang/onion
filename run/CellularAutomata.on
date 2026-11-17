@@ -19,15 +19,15 @@ import {
 // ─── Extensions ────────────────────────────────────────────────────────────
 
 extension Int {
-  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
+  def clamp(lo: Int, hi: Int): Int = if this < lo { lo } else if this > hi { hi } else { this }
   def repeat(s: String): String {
     var r: String = ""
     var i: Int = 0
-    while i < self { r = r + s; i = i + 1 }
+    while i < this { r = r + s; i = i + 1 }
     return r
   }
   def toBinary(width: Int): String {
-    var n: Int = self
+    var n: Int = this
     var bits: String = ""
     var i: Int = 0
     while i < width {
@@ -41,12 +41,12 @@ extension Int {
 
 extension String {
   def padLeft(width: Int, ch: String): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = ch + s }
     return s
   }
   def padRight(width: Int, ch: String): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + ch }
     return s
   }
@@ -101,9 +101,9 @@ class ElemCA {
 
 public:
   def this(width: Int, rule: Int) {
-    self.width = width
-    self.rule = rule
-    self.cells = []
+    this.width = width
+    this.rule = rule
+    this.cells = []
     var i: Int = 0
     while i < width {
       cells.add(i == width / 2)
@@ -126,7 +126,7 @@ public:
       next.add(nextCell(left, center, right))
       i = i + 1
     }
-    self.cells = next
+    this.cells = next
   }
 
   def rowString(): String {
@@ -167,11 +167,11 @@ class LangtonAnt {
 
 public:
   def this() {
-    self.grid    = new HashMap[String, Boolean]()
-    self.antRow  = 0
-    self.antCol  = 0
-    self.dir     = new North()
-    self.steps   = 0
+    this.grid    = new HashMap[String, Boolean]()
+    this.antRow  = 0
+    this.antCol  = 0
+    this.dir     = new North()
+    this.steps   = 0
   }
 
   def isWhite(row: Int, col: Int): Boolean {

@@ -322,7 +322,7 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
         """class E extends Exception {
           |public:
           |  def this {}
-          |  override def fillInStackTrace(): Throwable { IO::println("FILLIN RAN"); return self }
+          |  override def fillInStackTrace(): Throwable { IO::println("FILLIN RAN"); return this }
           |}
           |def p(): Boolean ensures result { val e = new E(); return true }""".stripMargin)
       assert(!o.stdout.contains("FILLIN RAN"), o.toString)
@@ -334,7 +334,7 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
       val o = compile(
         """class E(m: String) extends Exception(m) {
           |public:
-          |  override def fillInStackTrace(): Throwable { IO::println("FILLIN RAN"); return self }
+          |  override def fillInStackTrace(): Throwable { IO::println("FILLIN RAN"); return this }
           |}
           |def p(): Boolean ensures result { val e = new E("x"); return true }""".stripMargin)
       assert(!o.stdout.contains("FILLIN RAN"), o.toString)
@@ -360,7 +360,7 @@ class BuildRunsOnlyPurePredicatesSpec extends AnyFunSpec {
         """class E extends Exception {
           |public:
           |  def this {}
-          |  override def fillInStackTrace(): Throwable { return self }
+          |  override def fillInStackTrace(): Throwable { return this }
           |}
           |def p(): Boolean ensures result { val e = new E(); return false }""".stripMargin)
       assert(o.errors.contains("E0113"), o.toString)

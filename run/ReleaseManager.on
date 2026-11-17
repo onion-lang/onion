@@ -18,11 +18,11 @@ def versionCmp(a: Version, b: Version): Int {
 }
 
 extension Version {
-  def isNewerThan(other: Version): Boolean = versionCmp(self, other) > 0
-  def isCompatibleWith(other: Version): Boolean = self.major() == other.major()
-  def display(): String = "#{self.major()}.#{self.minor()}.#{self.patch()}"
-  def bumpMinor(): Version = new Version(self.major(), self.minor() + 1, 0)
-  def bumpPatch(): Version = new Version(self.major(), self.minor(), self.patch() + 1)
+  def isNewerThan(other: Version): Boolean = versionCmp(this, other) > 0
+  def isCompatibleWith(other: Version): Boolean = this.major() == other.major()
+  def display(): String = "#{this.major()}.#{this.minor()}.#{this.patch()}"
+  def bumpMinor(): Version = new Version(this.major(), this.minor() + 1, 0)
+  def bumpPatch(): Version = new Version(this.major(), this.minor(), this.patch() + 1)
 }
 
 // ─── Release state (ADT enum) ────────────────────────────────────────────────
@@ -76,7 +76,7 @@ public:
 
 record Dependency(pkgName: String, constraint: Constraint) {
 public:
-  def display(): String = "#{self.pkgName()} #{self.constraint().display()}"
+  def display(): String = "#{this.pkgName()} #{this.constraint().display()}"
 }
 
 record Package(
@@ -87,10 +87,10 @@ record Package(
   deps: List[Dependency]
 ) {
 public:
-  def id(): String = "#{self.name()}@#{self.version().display()}"
-  def isStable(): Boolean = self.state().isProduction()
+  def id(): String = "#{this.name()}@#{this.version().display()}"
+  def isStable(): Boolean = this.state().isProduction()
   def shortInfo(): String =
-    "[#{self.state().label()}] #{self.id()} — #{self.description()}"
+    "[#{this.state().label()}] #{this.id()} — #{this.description()}"
 }
 
 // ─── Registry: stores packages, keyed by name + version ──────────────────────
@@ -162,14 +162,14 @@ public:
 
 extension String {
   def center(width: Int): String {
-    val pad: Int = width - self.length()
-    if pad <= 0 { return self }
+    val pad: Int = width - this.length()
+    if pad <= 0 { return this }
     val left: Int = pad / 2
     val right: Int = pad - left
     var s: String = ""
     var i: Int = 0
     while i < left  { s = s + " "; i++ }
-    s = s + self
+    s = s + this
     i = 0
     while i < right { s = s + " "; i++ }
     return s
@@ -177,7 +177,7 @@ extension String {
   def repeat(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 }

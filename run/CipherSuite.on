@@ -60,10 +60,10 @@ public:
 extension String {
   def lettersOnly(): String {
     var result: String = ""
-    foreach i: Int in 0..<self.length() {
-      val code: Int = self.charAt(i) as Int
+    foreach i: Int in 0..<this.length() {
+      val code: Int = this.charAt(i) as Int
       if (code >= 65 && code <= 90) || (code >= 97 && code <= 122) {
-        result = result + self.charAt(i)
+        result = result + this.charAt(i)
       }
     }
     return result
@@ -71,15 +71,15 @@ extension String {
 
   def countLetters(): Int {
     var n: Int = 0
-    foreach i: Int in 0..<self.length() {
-      val code: Int = self.charAt(i) as Int
+    foreach i: Int in 0..<this.length() {
+      val code: Int = this.charAt(i) as Int
       if (code >= 65 && code <= 90) || (code >= 97 && code <= 122) { n = n + 1 }
     }
     return n
   }
 
   def pad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
@@ -87,7 +87,7 @@ extension String {
 
 extension Int {
   def rpad(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }

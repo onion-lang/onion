@@ -11,28 +11,28 @@ import { java.lang.Character as JChar }
 
 extension Int {
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def pct(total: Int): String {
     if total == 0 { return "  0%" }
-    val p: Int = self * 100 / total
+    val p: Int = this * 100 / total
     return p.lpad(3) + "%"
   }
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
-  def charAt(i: Int): Int = self.charAt(i) as Int
+  def charAt(i: Int): Int = this.charAt(i) as Int
   def repeat(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i = i + 1 }
+    while i < n { s = s + this; i = i + 1 }
     return s
   }
 }

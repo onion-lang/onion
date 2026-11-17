@@ -15,47 +15,47 @@ import { java.util.ArrayList }
 
 extension Int {
   def clamp(lo: Int, hi: Int): Int {
-    if self < lo { return lo }
-    if self > hi { return hi }
-    return self
+    if this < lo { return lo }
+    if this > hi { return hi }
+    return this
   }
-  def toDouble(): Double = self * 1.0
+  def toDouble(): Double = this * 1.0
   def heartRateZone(): String {
-    if self < 100 { return "Rest" }
-    if self < 120 { return "Warm-up" }
-    if self < 140 { return "Fat-burn" }
-    if self < 160 { return "Cardio" }
-    if self < 180 { return "Peak" }
+    if this < 100 { return "Rest" }
+    if this < 120 { return "Warm-up" }
+    if this < 140 { return "Fat-burn" }
+    if this < 160 { return "Cardio" }
+    if this < 180 { return "Peak" }
     return "Anaerobic"
   }
   def plural(word: String): String {
-    if self == 1 { return "1 " + word }
-    return self.toString() + " " + word + "s"
+    if this == 1 { return "1 " + word }
+    return this.toString() + " " + word + "s"
   }
 }
 
 extension Double {
-  def toInt(): Int = self as Int
+  def toInt(): Int = this as Int
   def round1(): String {
-    val scaled: Int = (self * 10.0 + 0.5) as Int
+    val scaled: Int = (this * 10.0 + 0.5) as Int
     val intPart = scaled / 10
     val fracPart = scaled % 10
     return intPart.toString() + "." + fracPart.toString()
   }
-  def kgToLbs(): Double = self * 2.20462
-  def lbsToKg(): Double = self / 2.20462
+  def kgToLbs(): Double = this * 2.20462
+  def lbsToKg(): Double = this / 2.20462
 }
 
 extension String {
   def padRight(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def repeat(n: Int): String {
     var s = ""
     var i = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
   def bar(filled: Int, total: Int, width: Int): String {

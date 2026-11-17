@@ -30,7 +30,7 @@ enum ReportSection(title: String) {
 
 extension Double {
   def fmt2(): String {
-    val rounded = Math::round(self * 100.0)
+    val rounded = Math::round(this * 100.0)
     val intPart = rounded / 100L
     val decPart = rounded % 100L
     val dec: String = if decPart < 10L { "0" + decPart } else { "" + decPart }
@@ -40,12 +40,12 @@ extension Double {
 
 extension Int {
   def stockStatus(): String {
-    if self < 10 { return "LOW" }
-    if self < 100 { return "OK" }
+    if this < 10 { return "LOW" }
+    if this < 100 { return "OK" }
     return "HIGH"
   }
   def padLeft(width: Int): String {
-    var s = "" + self
+    var s = "" + this
     while s.length() < width { s = " " + s }
     return s
   }
@@ -53,7 +53,7 @@ extension Int {
 
 extension String {
   def padLeft(width: Int): String {
-    var s = self
+    var s = this
     while s.length() < width { s = " " + s }
     return s
   }

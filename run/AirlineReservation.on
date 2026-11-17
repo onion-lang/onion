@@ -119,7 +119,7 @@ public:
 
 extension Double {
   def fmt2(): String {
-    val rounded: Long = (self * 100.0).longValue()
+    val rounded: Long = (this * 100.0).longValue()
     val neg: Boolean = rounded < 0L
     val abs: Long = if neg { -rounded } else { rounded }
     val intPart: Long = abs / 100L
@@ -132,12 +132,12 @@ extension Double {
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

@@ -248,14 +248,14 @@ extension String {
   def repeated(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 }
 
 extension Double {
   def fmt2(): String {
-    val s: String = "" + self
+    val s: String = "" + this
     val dot: Int = s.indexOf(".")
     if dot < 0 { return s + ".00" }
     val end: Int = dot + 3

@@ -62,7 +62,7 @@ record Expense(date: String, category: String, amount: Double, memo: String)
 
 extension Double {
   def asCurrency(): String {
-    val cents = ((self * 100.0) + 0.5) as Int
+    val cents = ((this * 100.0) + 0.5) as Int
     val dollars = cents / 100
     val rem = cents % 100
     val remStr = if rem < 10 { "0" + rem } else { "" + rem }

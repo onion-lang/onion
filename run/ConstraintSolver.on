@@ -49,10 +49,10 @@ class Solver {
   var nodeCount_:   Int
 public:
   def this(n: Int, ds: Int, cs: List[Constraint]) {
-    self.n_           = n
-    self.domainSize_  = ds
-    self.constraints_ = cs
-    self.nodeCount_   = 0
+    this.n_           = n
+    this.domainSize_  = ds
+    this.constraints_ = cs
+    this.nodeCount_   = 0
   }
   def nodeCount(): Int = nodeCount_
   def varCount():  Int = n_
@@ -159,7 +159,7 @@ public:
 class NQueensPuzzle conforms Puzzle {
   val n_: Int
 public:
-  def this(n: Int) { self.n_ = n }
+  def this(n: Int) { this.n_ = n }
   def title(): String = "#{n_}-Queens"
 
   // Build a solver for n-queens: all (i,j) pairs with i<j get a constraint
@@ -224,10 +224,10 @@ class ColorPuzzle conforms Puzzle {
   val numColors_: Int
 public:
   def this(t: String, nodes: List[String], es: List[ColorEdge], k: Int) {
-    self.title_     = t
-    self.nodeNames_ = nodes
-    self.edges_     = es
-    self.numColors_ = k
+    this.title_     = t
+    this.nodeNames_ = nodes
+    this.edges_     = es
+    this.numColors_ = k
   }
   def title(): String = title_
 

@@ -9,12 +9,12 @@
 
 extension String {
   def padRight(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def padLeft(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -23,13 +23,13 @@ extension String {
 extension Int {
   def rpt(ch: String): String {
     var out: String = ""
-    foreach _: Int in 0..<self { out = out + ch }
+    foreach _: Int in 0..<this { out = out + ch }
     return out
   }
 }
 
 extension Double {
-  def round1(): Double = ((self * 10.0 + 0.5) as Int) * 1.0 / 10.0
+  def round1(): Double = ((this * 10.0 + 0.5) as Int) * 1.0 / 10.0
 }
 
 // ── Enums ─────────────────────────────────────────────────────────────────────

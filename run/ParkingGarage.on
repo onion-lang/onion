@@ -81,11 +81,11 @@ record LevelUsage(level: Int, occupied: Int, total: Int)
 // ── Extension methods ─────────────────────────────────────────────────────────
 
 extension Double {
-  def asMoney(): String = "$#{self}"
+  def asMoney(): String = "$#{this}"
 }
 
 extension Int {
-  def asHours(): String = if self == 1 { "1 hour" } else { "#{self} hours" }
+  def asHours(): String = if this == 1 { "1 hour" } else { "#{this} hours" }
 }
 
 // ── Garage class ──────────────────────────────────────────────────────────────

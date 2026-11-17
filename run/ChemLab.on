@@ -58,7 +58,7 @@ public:
 // ─── Extension on Double ─────────────────────────────────────────────────────
 
 extension Double {
-  def rounded2(): Double = (self * 100.0d + 0.5d) as Long as Double / 100.0d
+  def rounded2(): Double = (this * 100.0d + 0.5d) as Long as Double / 100.0d
 }
 
 // ─── Element Table ───────────────────────────────────────────────────────────

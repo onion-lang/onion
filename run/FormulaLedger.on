@@ -9,7 +9,7 @@
 extension Int {
   def toColLetter(): String {
     var result: String = ""
-    var n: Int = self
+    var n: Int = this
     while n >= 0 {
       result = ("" + (((n % 26) + 65) as Char)) + result
       n = n / 26 - 1
@@ -20,24 +20,24 @@ extension Int {
 
 extension Double {
   def fmt(): String {
-    val asLong: Long = self as Long
-    if self == (asLong as Double) { return "" + asLong }
-    var s: String = "" + self
+    val asLong: Long = this as Long
+    if this == (asLong as Double) { return "" + asLong }
+    var s: String = "" + this
     val dot: Int = s.indexOf(".")
     if dot >= 0 && s.length() > dot + 4 { s = s.substring(0, dot + 4) }
     return s
   }
-  def round1(): Double = ((self * 10.0 + 0.5) as Long) as Double / 10.0
+  def round1(): Double = ((this * 10.0 + 0.5) as Long) as Double / 10.0
 }
 
 extension String {
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }

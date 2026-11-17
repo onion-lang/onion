@@ -51,12 +51,12 @@ public:
 // ─── Extension methods ─────────────────────────────────────────────────────
 
 extension Double {
-  def rounded(): Int = (self + 0.5) as Int
+  def rounded(): Int = (this + 0.5) as Int
 }
 
 extension Int {
   def commaSep(): String {
-    val s = "" + self
+    val s = "" + this
     if s.length() <= 3 { return s }
     val lo  = s.substring(s.length() - 3)
     val hi  = s.substring(0, s.length() - 3)
@@ -65,7 +65,7 @@ extension Int {
 }
 
 extension String {
-  def padEnd(n: Int): String = String::format("%-" + n + "s", self)
+  def padEnd(n: Int): String = String::format("%-" + n + "s", this)
 }
 
 // ─── LoyaltyEvent: ADT case-enum ──────────────────────────────────────────

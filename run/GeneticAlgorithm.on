@@ -6,9 +6,9 @@
 
 // ─── Extensions ───────────────────────────────────────────────────────────────
 extension Int {
-  def abs(): Int = if self < 0 { 0 - self } else { self }
+  def abs(): Int = if this < 0 { 0 - this } else { this }
   def padded(w: Int): String {
-    val s: String = "" + self
+    val s: String = "" + this
     if s.length() >= w { return s }
     var r: String = s
     while r.length() < w { r = " " + r }
@@ -19,7 +19,7 @@ extension Int {
 extension String {
   def times(n: Int): String {
     var result: String = ""
-    for var i: Int = 0; i < n; i++ { result = result + self }
+    for var i: Int = 0; i < n; i++ { result = result + this }
     return result
   }
 }

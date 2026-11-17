@@ -63,15 +63,15 @@ public:
 
 extension Int {
   def toRaceTime(): String {
-    val mins: Int  = self / 60000
-    val secs: Int  = (self % 60000) / 1000
-    val ms: Int    = self % 1000
+    val mins: Int  = this / 60000
+    val secs: Int  = (this % 60000) / 1000
+    val ms: Int    = this % 1000
     val secStr: String = if secs < 10 { "0" + secs } else { "" + secs }
     val msStr: String  = if ms < 100 { if ms < 10 { "00" + ms } else { "0" + ms } } else { "" + ms }
     return "#{mins}:#{secStr}.#{msStr}"
   }
   def gapTo(other: Int): String {
-    val diff: Int = self - other
+    val diff: Int = this - other
     if diff == 0 { return "LEADER" }
     val sign: String = if diff < 0 { "-" } else { "+" }
     return sign + (if diff < 0 { -diff } else { diff }).toRaceTime()
@@ -80,12 +80,12 @@ extension Int {
 
 extension String {
   def padRight(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def padLeft(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }

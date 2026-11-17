@@ -59,7 +59,7 @@ class Subst {
   var counter: Int
   val table: Map[Int, Ty]
 public:
-  def this { self.counter = 0; self.table = [:] }
+  def this { this.counter = 0; this.table = [:] }
 
   def fresh(): Ty = {
     val id: Int = counter

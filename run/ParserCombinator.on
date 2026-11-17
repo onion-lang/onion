@@ -36,7 +36,7 @@ class Parser[T] {
   val fn: Function1[String, ParseResult[T]];
 public:
   def this(fn: Function1[String, ParseResult[T]]) {
-    self.fn = fn
+    this.fn = fn
   }
   def parse(input: String): ParseResult[T] = fn(input)
 }
@@ -301,7 +301,7 @@ static def parseJArr(input: String): ParseResult[JValue] {
 
 extension Int {
   def padLeft(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -309,9 +309,9 @@ extension Int {
 
 extension String {
   def truncate(n: Int): String =
-    if self.length() > n { self.substring(0, n) + "..." } else { self }
+    if this.length() > n { this.substring(0, n) + "..." } else { this }
   def padRight(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }

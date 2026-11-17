@@ -154,23 +154,23 @@ extension String {
   def times(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
   def padRight(width: Int): String {
-    val need: Int = width - self.length
-    if need <= 0 { return self }
-    return self + " ".times(need)
+    val need: Int = width - this.length
+    if need <= 0 { return this }
+    return this + " ".times(need)
   }
   def padLeft(width: Int): String {
-    val need: Int = width - self.length
-    if need <= 0 { return self }
-    return " ".times(need) + self
+    val need: Int = width - this.length
+    if need <= 0 { return this }
+    return " ".times(need) + this
   }
 }
 
 extension Int {
-  def fmt(): String = ("" + self).padLeft(3)
+  def fmt(): String = ("" + this).padLeft(3)
 }
 
 // ─── Convenience constructors ─────────────────────────────────────────────────

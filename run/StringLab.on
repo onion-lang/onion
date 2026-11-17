@@ -225,10 +225,10 @@ def charFrequency(text: String): List[FreqEntry] {
 extension String {
   def rep(n: Int): String {
     var s = ""
-    foreach i: Int in 1..n { s = s + self }
+    foreach i: Int in 1..n { s = s + this }
     return s
   }
-  def q(): String = "\"" + self + "\""
+  def q(): String = "\"" + this + "\""
 }
 
 def pad(s: String, w: Int): String {

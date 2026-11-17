@@ -17,14 +17,14 @@ extension Int {
   def times(s: String): String {
     var r: String = ""
     var i: Int = 0
-    while i < self { r = r + s; i = i + 1 }
+    while i < this { r = r + s; i = i + 1 }
     return r
   }
 }
 
 extension String {
   def pad(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }

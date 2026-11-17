@@ -5,19 +5,19 @@
 
 extension Int {
   def isPrime(): Boolean {
-    if self < 2 { return false }
-    if self == 2 { return true }
-    if self % 2 == 0 { return false }
+    if this < 2 { return false }
+    if this == 2 { return true }
+    if this % 2 == 0 { return false }
     var d: Int = 3
-    while d * d <= self {
-      if self % d == 0 { return false }
+    while d * d <= this {
+      if this % d == 0 { return false }
       d = d + 2
     }
     return true
   }
 
   def digitSum(): Int {
-    var n: Int = if self < 0 { -self } else { self }
+    var n: Int = if this < 0 { -this } else { this }
     var s: Int = 0
     while n > 0 {
       s = s + n % 10
@@ -27,18 +27,18 @@ extension Int {
   }
 
   def toBinary(): String {
-    if self == 0 { return "0" }
-    var n: Int = if self < 0 { -self } else { self }
+    if this == 0 { return "0" }
+    var n: Int = if this < 0 { -this } else { this }
     var bits: String = ""
     while n > 0 {
       bits = (n % 2).toString() + bits
       n = n / 2
     }
-    return if self < 0 { "-" + bits } else { bits }
+    return if this < 0 { "-" + bits } else { bits }
   }
 
   def gcd(other: Int): Int {
-    var a: Int = if self < 0 { -self } else { self }
+    var a: Int = if this < 0 { -this } else { this }
     var b: Int = if other < 0 { -other } else { other }
     while b != 0 {
       val t: Int = b
@@ -49,10 +49,10 @@ extension Int {
   }
 
   def factorial(): Long {
-    if self <= 1 { return 1L }
+    if this <= 1 { return 1L }
     var acc: Long = 1L
     var i: Int = 2
-    while i <= self {
+    while i <= this {
       acc = acc * (i as Long)
       i++
     }
@@ -64,17 +64,17 @@ extension Int {
 
 extension Double {
   def toPercent(): String {
-    val p: Int = (self * 100.0) as Int
+    val p: Int = (this * 100.0) as Int
     return "#{p}%"
   }
   def clamp(lo: Double, hi: Double): Double =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
 }
 
 // ── Extension methods on Boolean ─────────────────────────────────────────
 
 extension Boolean {
-  def toMark(): String = if self { "yes" } else { "no" }
+  def toMark(): String = if this { "yes" } else { "no" }
 }
 
 // ── ADT enum: how a number is classified ─────────────────────────────────

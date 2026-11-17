@@ -46,7 +46,7 @@ public:
 
 // --- Extension on Int ---
 extension Int {
-  def isOverBudget(budget: Int): Boolean = self > budget
+  def isOverBudget(budget: Int): Boolean = this > budget
 }
 
 // --- Helper functions ---
@@ -58,7 +58,7 @@ def sharePct(part: Int, total: Int): Int {
 // --- Extension on String ---
 extension String {
   def padEnd(width: Int): String {
-    var s = self
+    var s = this
     while s.length() < width { s = s + " " }
     return s
   }

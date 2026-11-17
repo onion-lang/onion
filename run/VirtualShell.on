@@ -44,18 +44,18 @@ enum Command {
 // ─── String path helpers ─────────────────────────────────────────────────────
 extension String {
   def joinPath(part: String): String {
-    if self == "/" { return "/" + part }
-    return self + "/" + part
+    if this == "/" { return "/" + part }
+    return this + "/" + part
   }
   def parentDir(): String {
-    val idx: Int = self.lastIndexOf("/")
+    val idx: Int = this.lastIndexOf("/")
     if idx <= 0 { return "/" }
-    return self.substring(0, idx)
+    return this.substring(0, idx)
   }
   def pathName(): String {
-    val idx: Int = self.lastIndexOf("/")
-    if idx < 0 { return self }
-    return self.substring(idx + 1)
+    val idx: Int = this.lastIndexOf("/")
+    if idx < 0 { return this }
+    return this.substring(idx + 1)
   }
 }
 

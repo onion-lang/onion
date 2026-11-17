@@ -11,14 +11,14 @@ import { java.util.ArrayList }
 
 extension Int {
   def toMinSec(): String {
-    val m: Int = self / 60
-    val s: Int = self % 60
+    val m: Int = this / 60
+    val s: Int = this % 60
     val pad: String = if s < 10 { "0" + s } else { "" + s }
     return "" + m + ":" + pad
   }
   def plural(word: String): String {
-    if self == 1 { return "1 " + word }
-    return "" + self + " " + word + "s"
+    if this == 1 { return "1 " + word }
+    return "" + this + " " + word + "s"
   }
 }
 

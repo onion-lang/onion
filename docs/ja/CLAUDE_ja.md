@@ -524,7 +524,7 @@ try {
 | `fun String.twice()` (Kotlin風) | `extension String { def twice() { } }` - extensionブロック |
 | `extension List[T] { ... }` (Tを新しい型パラメータとして使うつもり) | 非サポート - `extension`は`class Box[T]`と違い独自の`[T]`パラメータリストを持たない。`T`は通常の型参照として解決されるので、これは「新しい型パラメータ」ではなくE0003「型が見つからない」になる。`List`のすべてのインスタンス化を拡張するには`extension List { ... }`、1つの具体的な型だけなら`extension List[Int] { ... }`と書く（`extension List[String]`を並べて書いても問題ない - 異なるインスタンス化同士は衝突しない） |
 | `extension List[Int] { ... }`を2回、または`extension List { ... }`を2つのブロックに分けて書く | E0102 - 1ファイルにつき、同じ受け取り型に対する`extension`ブロックは1つまで。メソッドは最初のブロックにまとめること |
-| `this.field = value` コンストラクタ内 | ✓ 正しい - `this.`/`self.`は使える。今は省略も可能（裸の`field`は暗黙アクセスでフィールドに解決される） |
+| `this.field = value` コンストラクタ内 | ✓ 正しい - `this.`は使える。今は省略も可能（裸の`field`は暗黙アクセスでフィールドに解決される） |
 | `Long.toString(0)` | `Long::toString(0L)` - 静的メソッドは`::`、longは`L`サフィックス |
 | `System.out` | `System::out` - 静的フィールドも`::` |
 | `C::field = v` は非サポート？ | ✓ 正しい - 静的フィールドへの代入は動作する（公開フィールド） |
@@ -654,7 +654,7 @@ try {
 | `typeof x`（JS/Python風） | `x is Type` - 型チェックには`is`演算子を使う |
 | `operator fun plus`（Kotlin風） | `def plus(o: T): T` - 左オペランドの`+ - * / %`はそれぞれplus/minus/times/div/remにマップされる |
 | 文字列テンプレート `$var` や `${expr}` | `"text #{expr}"` - `#{}` 構文を使用 |
-| `this`のみ | `self`も使用可 - 両方とも現在のインスタンスを参照 |
+| `self.x`（Python/Swift/Rust） | `this.x` - `self` は廃止（E0117）。`onion migrate` が書き換える |
 | 予約語を識別子に | `` `class` `` - バッククォートでキーワードをエスケープ |
 | `println("Hi")` | ✓ 正しい - トップレベル関数、または`IO::println` |
 | `Pattern.compile("\\d+")` | `re"\d+"` - 生の正規表現リテラル（二重エスケープ不要） |

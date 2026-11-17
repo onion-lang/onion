@@ -13,13 +13,13 @@ import { java.lang.Math }
 
 extension Double {
   def round1(): Double {
-    val shifted: Double = self * 10.0
+    val shifted: Double = this * 10.0
     val truncated: Int = shifted as Int
     return truncated.doubleValue() / 10.0
   }
-  def pct(): String = "#{(self * 100.0).round1()}%"
+  def pct(): String = "#{(this * 100.0).round1()}%"
   def fmt(): String {
-    val s: String = "" + self.round1()
+    val s: String = "" + this.round1()
     val dot: Int = s.indexOf(".")
     if dot < 0 { return s + ".0" }
     return s
@@ -28,7 +28,7 @@ extension Double {
 
 extension Int {
   def padL(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -36,13 +36,13 @@ extension Int {
 
 extension String {
   def padR(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def trunc(w: Int): String {
-    if self.length() <= w { return self }
-    return self.substring(0, w - 1) + "."
+    if this.length() <= w { return this }
+    return this.substring(0, w - 1) + "."
   }
 }
 

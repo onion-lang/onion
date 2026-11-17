@@ -10,8 +10,8 @@ import { java.lang.Math }
 record City(id: Int, name: String, x: Double, y: Double) {
   public:
   def distanceTo(other: City): Double {
-    val dx: Double = self.x() - other.x()
-    val dy: Double = self.y() - other.y()
+    val dx: Double = this.x() - other.x()
+    val dy: Double = this.y() - other.y()
     return Math::sqrt(dx * dx + dy * dy)
   }
 }
@@ -24,7 +24,7 @@ record EdgeStat(from: String, to: String, dist: Double)
 
 enum CoolingSchedule { Exponential, Linear, Logarithmic }
 extension CoolingSchedule {
-  def label(): String = select self {
+  def label(): String = select this {
     case CoolingSchedule::Exponential:  "Exponential"
     case CoolingSchedule::Linear:       "Linear"
     case CoolingSchedule::Logarithmic:  "Logarithmic"
@@ -35,18 +35,18 @@ extension CoolingSchedule {
 
 extension Double {
   def fmt2(): String {
-    val scaled: Long = (self * 100.0).longValue()
+    val scaled: Long = (this * 100.0).longValue()
     val whole: Long = scaled / 100L
     val frac: Long = (scaled % 100L + 100L) % 100L
     val fracStr: String = if frac < 10L { "0" + frac } else { "" + frac }
     return whole + "." + fracStr
   }
-  def pct(): String = (self * 100.0).fmt2() + "%"
+  def pct(): String = (this * 100.0).fmt2() + "%"
 }
 
 extension Int {
   def padLeft(width: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < width { s = " " + s }
     return s
   }

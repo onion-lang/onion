@@ -175,16 +175,16 @@ class Account conforms Reportable {
 
 public:
   def this(name: String) {
-    self.name = name
-    self.transactions = []
-    self.budgets = []
-    self.nextId = 1
+    this.name = name
+    this.transactions = []
+    this.budgets = []
+    this.nextId = 1
   }
 
   def addTransaction(desc: String, amount: Double, kind: TransactionKind, month: Month, day: Int): Transaction {
     val tx: Transaction = new Transaction(nextId, desc, amount, kind, month, day)
     transactions.add(tx)
-    self.nextId = nextId + 1
+    this.nextId = nextId + 1
     return tx
   }
 
@@ -288,7 +288,7 @@ class ProjectionEngine {
 
 public:
   def this(account: Account) {
-    self.account = account
+    this.account = account
   }
 
   def projectBalance(months: Int, monthlyIncome: Double, monthlyExpense: Double): Double {

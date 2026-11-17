@@ -45,4 +45,16 @@ class NullableArgumentHintSpec extends AnyFunSpec with Diagrams {
     assert(errs.nonEmpty)
     assert(!errs.exists(e => e.message.contains("non-null") && e.message.contains("argument")))
   }
+
+  it("names the nullable argument for a Java constructor too (E0021)") {
+    val errs = errorsOf("val s: String? = \"x\"\nval sb = new StringBuilder(s)")
+    assert(errs.exists(_.errorCode.contains("E0021")))
+    assert(errs.exists(e => e.message.contains("argument 1") || e.message.contains("引数 1")))
+  }
+
+  it("adds no nullable hint to E0021 when the types differ for another reason") {
+    val errs = errorsOf("val sb = new StringBuilder(true, 1)")
+    assert(errs.exists(_.errorCode.contains("E0021")))
+    assert(!errs.exists(e => e.message.contains("non-null") && e.message.contains("argument")))
+  }
 }

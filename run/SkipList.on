@@ -10,22 +10,22 @@ import { java.lang.Integer as JInt; }
 
 extension Int {
   def padLeft(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def clamp(lo: Int, hi: Int): Int =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
 }
 
 extension String {
   def padRight(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def truncate(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n) + "~" }
+    if this.length() <= n { this } else { this.substring(0, n) + "~" }
 }
 
 // ── SkipNode ───────────────────────────────────────────────────────────────────

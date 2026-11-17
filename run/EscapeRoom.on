@@ -121,15 +121,15 @@ public:
 
 extension Int {
   def toMinSec(): String {
-    val m: Int = self / 60
-    val s: Int = self % 60
+    val m: Int = this / 60
+    val s: Int = this % 60
     if s < 10 {
       return "#{m}:0#{s}"
     }
     return "#{m}:#{s}"
   }
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
@@ -137,12 +137,12 @@ extension Int {
 
 extension String {
   def centre(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = " " + s + " " }
     return s.substring(0, w)
   }
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }

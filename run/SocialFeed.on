@@ -23,7 +23,7 @@ enum PostKind { Text, Photo, Link }
 
 record User(id: Int, name: String, bio: String) {
   public:
-  def handle(): String = "@" + self.name().toLowerCase().replace(" ", "_")
+  def handle(): String = "@" + this.name().toLowerCase().replace(" ", "_")
   static def of(id: Int, name: String): User = new User(id, name, "")
 }
 
@@ -41,13 +41,13 @@ record Post(
 ) {
   public:
   def summary(): String {
-    val kindPrefix: String = if self.kind() == PostKind::Text  { "[T]" }
-                        else if self.kind() == PostKind::Photo { "[P]" }
+    val kindPrefix: String = if this.kind() == PostKind::Text  { "[T]" }
+                        else if this.kind() == PostKind::Photo { "[P]" }
                         else                                   { "[L]" }
-    val short: String = if self.body().length() > 60 {
-      self.body().substring(0, 57) + "..."
+    val short: String = if this.body().length() > 60 {
+      this.body().substring(0, 57) + "..."
     } else {
-      self.body()
+      this.body()
     }
     return "#{kindPrefix} #{short}"
   }
@@ -64,8 +64,8 @@ record FeedEntry(
 ) {
   public:
   def display(): String {
-    return "  Post ##{self.post().id()} by #{self.authorName()}: #{self.post().summary()}\n" +
-           "  Reactions: #{self.reactionCount()}  Comments: #{self.commentCount()}  Score: #{self.score()}"
+    return "  Post ##{this.post().id()} by #{this.authorName()}: #{this.post().summary()}\n" +
+           "  Reactions: #{this.reactionCount()}  Comments: #{this.commentCount()}  Score: #{this.score()}"
   }
 }
 
@@ -83,14 +83,14 @@ class Network {
 
 public:
   def this {
-    self.nextPostId    = 1
-    self.nextCommentId = 1
-    self.users    = [:]
-    self.posts    = [:]
-    self.reactions = []
-    self.comments  = []
-    self.follows   = [:]
-    self.weights   = [
+    this.nextPostId    = 1
+    this.nextCommentId = 1
+    this.users    = [:]
+    this.posts    = [:]
+    this.reactions = []
+    this.comments  = []
+    this.follows   = [:]
+    this.weights   = [
       new ReactionWeight(ReactionKind::Like,  1),
       new ReactionWeight(ReactionKind::Love,  3),
       new ReactionWeight(ReactionKind::Laugh, 2),
@@ -99,87 +99,87 @@ public:
     ]
   }
 
-  def userCount(): Int = self.users.size()
-  def postCount(): Int = self.posts.size()
-  def reactionCount(): Int = self.reactions.size
-  def commentCount(): Int = self.comments.size
+  def userCount(): Int = this.users.size()
+  def postCount(): Int = this.posts.size()
+  def reactionCount(): Int = this.reactions.size
+  def commentCount(): Int = this.comments.size
 
   def addUser(u: User): void {
-    self.users[u.id()] = u
-    self.follows[u.id()] = []
+    this.users[u.id()] = u
+    this.follows[u.id()] = []
   }
 
   def follow(followerId: Int, followeeId: Int): void {
-    val list: List[Int]? = self.follows[followerId]
+    val list: List[Int]? = this.follows[followerId]
     if list != null {
       if !list.contains(followeeId) { list.add(followeeId) }
     }
   }
 
   def post(authorId: Int, kind: PostKind, body: String, tags: List[String], ts: Long): Post {
-    val p: Post = new Post(self.nextPostId, authorId, kind, body, tags, ts)
-    self.posts[self.nextPostId] = p
-    self.nextPostId = self.nextPostId + 1
+    val p: Post = new Post(this.nextPostId, authorId, kind, body, tags, ts)
+    this.posts[this.nextPostId] = p
+    this.nextPostId = this.nextPostId + 1
     return p
   }
 
   def react(userId: Int, postId: Int, kind: ReactionKind): void {
     var found: Boolean = false
     var i: Int = 0
-    while i < self.reactions.size {
-      val r: Reaction = self.reactions[i]
+    while i < this.reactions.size {
+      val r: Reaction = this.reactions[i]
       if r.userId() == userId && r.postId() == postId {
-        self.reactions[i] = new Reaction(userId, kind, postId)
+        this.reactions[i] = new Reaction(userId, kind, postId)
         found = true
         break
       }
       i = i + 1
     }
-    if !found { self.reactions.add(new Reaction(userId, kind, postId)) }
+    if !found { this.reactions.add(new Reaction(userId, kind, postId)) }
   }
 
   def comment(authorId: Int, postId: Int, body: String, ts: Long): Comment {
-    val c: Comment = new Comment(self.nextCommentId, postId, authorId, body, ts)
-    self.comments.add(c)
-    self.nextCommentId = self.nextCommentId + 1
+    val c: Comment = new Comment(this.nextCommentId, postId, authorId, body, ts)
+    this.comments.add(c)
+    this.nextCommentId = this.nextCommentId + 1
     return c
   }
 
   def scorePost(postId: Int): Double {
-    val postReactions: List[Reaction] = self.reactions.filter { r -> r.postId() == postId }
+    val postReactions: List[Reaction] = this.reactions.filter { r -> r.postId() == postId }
     var total: Int = 0
     foreach r: Reaction in postReactions {
-      val w: ReactionWeight? = self.weights.find { w -> w.kind() == r.kind() }
+      val w: ReactionWeight? = this.weights.find { w -> w.kind() == r.kind() }
       if w != null { total = total + w.weight() }
     }
-    val commentBonus: Int = self.comments.filter { c -> c.postId() == postId }.size
+    val commentBonus: Int = this.comments.filter { c -> c.postId() == postId }.size
     return (total as Double) + (commentBonus as Double) * 0.5
   }
 
   def allPostsList(): List[Post] {
-    return new ArrayList[Post](self.posts.values())
+    return new ArrayList[Post](this.posts.values())
   }
 
   def allUserIdsList(): List[Int] {
-    val keys: List[Object] = new ArrayList[Object](self.users.keySet())
+    val keys: List[Object] = new ArrayList[Object](this.users.keySet())
     return keys.map { k -> k as Int }
   }
 
   def feedFor(userId: Int): List[FeedEntry] {
-    val followees: List[Int]? = self.follows[userId]
+    val followees: List[Int]? = this.follows[userId]
     if followees == null { return [] }
 
-    val allPosts: List[Post] = self.allPostsList()
+    val allPosts: List[Post] = this.allPostsList()
     val candidatePosts: List[Post] = allPosts
       .filter { p -> followees.contains(p.authorId()) }
       .sortedBy { p -> -(p.ts() as Double) }
 
     val entries: List[FeedEntry] = candidatePosts.map { p ->
-      val author: User? = self.users[p.authorId()]
+      val author: User? = this.users[p.authorId()]
       val authorName: String = if author != null { author.name() } else { "Unknown" }
-      val rc: Int = self.reactions.filter { r -> r.postId() == p.id() }.size
-      val cc: Int = self.comments.filter { c -> c.postId() == p.id() }.size
-      val score: Double = self.scorePost(p.id())
+      val rc: Int = this.reactions.filter { r -> r.postId() == p.id() }.size
+      val cc: Int = this.comments.filter { c -> c.postId() == p.id() }.size
+      val score: Double = this.scorePost(p.id())
       new FeedEntry(p, authorName, rc, cc, score)
     }
 
@@ -187,13 +187,13 @@ public:
   }
 
   def trending(n: Int): List[FeedEntry] {
-    val allPosts: List[Post] = self.allPostsList()
+    val allPosts: List[Post] = this.allPostsList()
     val all: List[FeedEntry] = allPosts.map { p ->
-      val author: User? = self.users[p.authorId()]
+      val author: User? = this.users[p.authorId()]
       val authorName: String = if author != null { author.name() } else { "Unknown" }
-      val rc: Int = self.reactions.filter { r -> r.postId() == p.id() }.size
-      val cc: Int = self.comments.filter { c -> c.postId() == p.id() }.size
-      val score: Double = self.scorePost(p.id())
+      val rc: Int = this.reactions.filter { r -> r.postId() == p.id() }.size
+      val cc: Int = this.comments.filter { c -> c.postId() == p.id() }.size
+      val score: Double = this.scorePost(p.id())
       new FeedEntry(p, authorName, rc, cc, score)
     }
     val sorted: List[FeedEntry] = all.sortedBy { e -> -e.score() }
@@ -208,17 +208,17 @@ public:
 
   def engagementReport(): List[String] {
     val lines: List[String] = []
-    val userIds: List[Int] = self.allUserIdsList()
+    val userIds: List[Int] = this.allUserIdsList()
     foreach uid: Int in userIds {
-      val user: User? = self.users[uid]
+      val user: User? = this.users[uid]
       if user == null { continue }
-      val userPosts: List[Post] = self.allPostsList().filter { p -> p.authorId() == uid }
+      val userPosts: List[Post] = this.allPostsList().filter { p -> p.authorId() == uid }
       val postIds: List[Int] = userPosts.map { p -> p.id() }
       var totalReactions: Int = 0
       var totalComments: Int = 0
       foreach pid: Int in postIds {
-        totalReactions = totalReactions + self.reactions.filter { r -> r.postId() == pid }.size
-        totalComments  = totalComments  + self.comments.filter  { c -> c.postId() == pid }.size
+        totalReactions = totalReactions + this.reactions.filter { r -> r.postId() == pid }.size
+        totalComments  = totalComments  + this.comments.filter  { c -> c.postId() == pid }.size
       }
       val line: String = "  #{user.name()} (#{user.handle()}): #{userPosts.size} posts, #{totalReactions} reactions, #{totalComments} comments"
       lines.add(line)
@@ -228,7 +228,7 @@ public:
 
   def tagStats(): List[String] {
     val tagCounts: Map[String, Int] = [:]
-    foreach post: Post in self.allPostsList() {
+    foreach post: Post in this.allPostsList() {
       foreach tag: String in post.tags() {
         val cur: Int? = tagCounts[tag]
         tagCounts[tag] = if cur != null { cur + 1 } else { 1 }
@@ -244,12 +244,12 @@ public:
   def mutualFollowers(): List[String] {
     val result: List[String] = []
     val seen: List[String] = []
-    val userIds: List[Int] = self.allUserIdsList()
+    val userIds: List[Int] = this.allUserIdsList()
     foreach a: Int in userIds {
       foreach b: Int in userIds {
         if a == b { continue }
-        val fa: List[Int]? = self.follows[a]
-        val fb: List[Int]? = self.follows[b]
+        val fa: List[Int]? = this.follows[a]
+        val fb: List[Int]? = this.follows[b]
         val aFollowsB: Boolean = if fa != null { fa.contains(b) } else { false }
         val bFollowsA: Boolean = if fb != null { fb.contains(a) } else { false }
         if aFollowsB && bFollowsA {
@@ -257,8 +257,8 @@ public:
           val key2: String = "#{b}-#{a}"
           if !seen.contains(key1) && !seen.contains(key2) {
             seen.add(key1)
-            val uA: User? = self.users[a]
-            val uB: User? = self.users[b]
+            val uA: User? = this.users[a]
+            val uB: User? = this.users[b]
             if uA != null && uB != null {
               result.add("  #{uA.name()} <-> #{uB.name()}")
             }

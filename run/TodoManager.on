@@ -9,7 +9,7 @@ enum Priority {
 
 extension Priority {
   def label(): String {
-    select self {
+    select this {
       case Priority::LOW: return "low"
       case Priority::MEDIUM: return "medium"
       case Priority::HIGH: return "high"
@@ -29,7 +29,7 @@ extension String {
 
 extension Int {
   def isEven(): Boolean {
-    return self % 2 == 0
+    return this % 2 == 0
   }
 }
 

@@ -47,22 +47,22 @@ public:
 extension String {
   def repeat(n: Int): String {
     val sb = new StringBuilder()
-    for var i: Int = 0; i < n; i++ { sb.append(self) }
+    for var i: Int = 0; i < n; i++ { sb.append(this) }
     return sb.toString()
   }
   def padRight(width: Int): String {
-    if self.length() >= width { return self }
-    return self + " ".repeat(width - self.length())
+    if this.length() >= width { return this }
+    return this + " ".repeat(width - this.length())
   }
 }
 
 extension Int {
-  def clamp(lo: Int, hi: Int): Int = if self < lo { lo } else if self > hi { hi } else { self }
-  def mod256(): Int { val r: Int = self % 256; return if r < 0 { r + 256 } else { r } }
+  def clamp(lo: Int, hi: Int): Int = if this < lo { lo } else if this > hi { hi } else { this }
+  def mod256(): Int { val r: Int = this % 256; return if r < 0 { r + 256 } else { r } }
   def toHex(): String {
-    if self == 0 { return "0" }
+    if this == 0 { return "0" }
     val digits: String = "0123456789ABCDEF"
-    var n: Int = self
+    var n: Int = this
     var result: String = ""
     while n > 0 { result = "" + digits.charAt(n % 16) + result; n = n / 16 }
     return result
@@ -110,11 +110,11 @@ class BfMachine {
   val out: StringBuilder
 public:
   def this(tapeSize: Int) {
-    self.tape  = new Int[tapeSize]
-    self.dp    = tapeSize / 2
-    self.ip    = 0
-    self.steps = 0
-    self.out   = new StringBuilder()
+    this.tape  = new Int[tapeSize]
+    this.dp    = tapeSize / 2
+    this.ip    = 0
+    this.steps = 0
+    this.out   = new StringBuilder()
   }
 
   def run(instrs: List[BfInstr]): void {

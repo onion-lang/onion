@@ -1048,8 +1048,8 @@ compile time.
 
 ```onion
 extension Double {
-  def pct(): String = "" + self
-  def pct(): String = "" + self   // E0084: duplicated extension method pct() on Double
+  def pct(): String = "" + this
+  def pct(): String = "" + this   // E0084: duplicated extension method pct() on Double
 }
 ```
 
@@ -1222,7 +1222,7 @@ class A {
 
 Fix: name a value-typed field, or a pure method that reads the object.
 
-A field a clause names is written only through `this` (bare `n`, `this.n` or `self.n`). A write
+A field a clause names is written only through `this` (bare `n` or `this.n`). A write
 through any other reference is E0110, whatever its declared type, because no check of one call
 at a time can follow it:
 
@@ -1332,7 +1332,7 @@ public:
 }
 ```
 
-Fix: call the override on `self` (`f()`), or give the superclass method a body.
+Fix: call the override on `this` (`f()`), or give the superclass method a body.
 
 ### `E0116` — Unrelated interface defaults for one method
 
@@ -1818,7 +1818,7 @@ Fix: only use `continue` inside a `while`, `for`, or `foreach` loop.
 
 ### `E0050` — Current instance not available in static context
 
-`this`/`self` was used inside a `static` method, where there is no receiver
+`this` was used inside a `static` method, where there is no receiver
 instance.
 
 ```onion
@@ -1833,6 +1833,22 @@ Fix: drop `static`, or pass the instance in explicitly as a parameter.
 
 `super` inside an `extension` method is also E0050, with its own message:
 the receiver is `this`, so call the method on it.
+
+### `E0117` — `self` is retired
+
+`self` was a second spelling of `this`. It is retired (RFC #2788), so every `self` is this
+error. A file reports all of its `self` uses at once. In static code, E0117 replaces E0050.
+
+```onion
+class Counter {
+  var n: Int
+public:
+  def this { self.n = 0 }   // E0117: write this.n
+}
+```
+
+Fix: write `this`. `onion migrate <path>` rewrites every `self` in the files you name,
+including the ones inside `#{...}` in strings.
 
 ### `E0058` — Label not found
 
@@ -2148,6 +2164,7 @@ up; see [Warnings](#warnings) above for the `W` codes.
 | `E0114` | the Shape … breaks its round-trip contract |
 | `E0115` | `super.…(...)` calls an abstract method of … |
 | `E0116` | class … inherits a default …(…) from each of …, and none of them overrides the others |
+| `E0117` | `self` is retired; write `this` |
 
 ## See also
 

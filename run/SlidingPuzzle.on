@@ -14,26 +14,26 @@ import {
 // ─── Extension helpers ────────────────────────────────────────────────────────
 
 extension Int {
-  def abs(): Int = if self < 0 { -self } else { self }
-  def minWith(other: Int): Int = if self < other { self } else { other }
-  def maxWith(other: Int): Int = if self > other { self } else { other }
+  def abs(): Int = if this < 0 { -this } else { this }
+  def minWith(other: Int): Int = if this < other { this } else { other }
+  def maxWith(other: Int): Int = if this > other { this } else { other }
 }
 
 extension String {
   def padLeft(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = " " + s }
     return s
   }
   def padRight(n: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < n { s = s + " " }
     return s
   }
   def times(n: Int): String {
     var s: String = ""
     var i: Int = 0
-    while i < n { s = s + self; i++ }
+    while i < n { s = s + this; i++ }
     return s
   }
 }
@@ -66,7 +66,7 @@ class PuzzleState {
   public:
   val tiles: Int[]
 
-  def this(tiles: Int[]) { self.tiles = tiles }
+  def this(tiles: Int[]) { this.tiles = tiles }
 
   def blankPos(): Int {
     var i: Int = 0
@@ -162,14 +162,14 @@ class SearchNode conforms java.lang.Comparable[SearchNode] {
   val moveDone: Move?     // move that led to this state (null for the root)
 
   def this(state: PuzzleState, cost: Int, prev: SearchNode?, moveDone: Move?) {
-    self.state    = state
-    self.cost     = cost
-    self.fscore   = cost + state.heuristic()
-    self.prev     = prev
-    self.moveDone = moveDone
+    this.state    = state
+    this.cost     = cost
+    this.fscore   = cost + state.heuristic()
+    this.prev     = prev
+    this.moveDone = moveDone
   }
 
-  override def compareTo(other: SearchNode): Int = self.fscore - other.fscore
+  override def compareTo(other: SearchNode): Int = this.fscore - other.fscore
 }
 
 // ─── A* solver ────────────────────────────────────────────────────────────────

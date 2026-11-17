@@ -230,7 +230,10 @@ private[compiler] final class MethodCallFallbackSupport(
     // stay null — so each unifies against its own formal parameter. Collapsing
     // them shifted a determining argument that follows a closure onto the wrong
     // formal, leaving its type variable unbound (#256).
-    val positionalKnownParams = preliminaryParams
+    // A lambda like `() -> Option::none()` takes its result type from the call's target
+    // type, not the other way round (#3067).
+    val positionalKnownParams =
+      calls.retypeTargetTypedClosures(node, method, args, preliminaryParams, classSubst, context, expected)
     val preliminaryMethodSubst = GenericMethodTypeArguments.inferWithoutDefaults(
       typing, node, method, positionalKnownParams, classSubst, expected
     )
@@ -251,7 +254,7 @@ private[compiler] final class MethodCallFallbackSupport(
             finalParams(i) = null
         }
       } else {
-        finalParams(i) = preliminaryParams(i)
+        finalParams(i) = positionalKnownParams(i)
       }
     }
 

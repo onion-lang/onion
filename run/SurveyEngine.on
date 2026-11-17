@@ -11,14 +11,14 @@ import { java.util.ArrayList }
 
 extension Int {
   def clamp(lo: Int, hi: Int): Int =
-    if self < lo { lo } else if self > hi { hi } else { self }
+    if this < lo { lo } else if this > hi { hi } else { this }
   def lpad(w: Int): String {
-    var s: String = "" + self
+    var s: String = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def stars(max: Int): String {
-    val filled: Int = self.clamp(0, max)
+    val filled: Int = this.clamp(0, max)
     var out: String = ""
     foreach i: Int in 0..<filled { out = out + "*" }
     foreach i: Int in filled..<max { out = out + "." }
@@ -27,20 +27,20 @@ extension Int {
 }
 
 extension Double {
-  def round2(): Double = ((self * 100.0 + 0.5) as Int) * 1.0 / 100.0
+  def round2(): Double = ((this * 100.0 + 0.5) as Int) * 1.0 / 100.0
 }
 
 extension String {
   def rpad(w: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < w { s = s + " " }
     return s
   }
   def truncate(n: Int): String =
-    if self.length() <= n { self } else { self.substring(0, n) + "..." }
+    if this.length() <= n { this } else { this.substring(0, n) + "..." }
   def repeatStr(n: Int): String {
     var out: String = ""
-    foreach i: Int in 0..<n { out = out + self }
+    foreach i: Int in 0..<n { out = out + this }
     return out
   }
 }

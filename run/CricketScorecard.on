@@ -88,16 +88,16 @@ public:
 extension Double {
   def roundTo(n: Int): Double {
     val factor = Math::pow(10.0, n * 1.0)
-    return Math::round(self * factor) * 1.0 / factor
+    return Math::round(this * factor) * 1.0 / factor
   }
   def fmt1(): String {
-    val scaled = (self * 10.0 + 0.05) as Int
+    val scaled = (this * 10.0 + 0.05) as Int
     val ipart = scaled / 10
     val fpart = scaled % 10
     return "" + ipart + "." + fpart
   }
   def fmt2(): String {
-    val scaled = (self * 100.0 + 0.005) as Int
+    val scaled = (this * 100.0 + 0.005) as Int
     val ipart = scaled / 100
     val fpart = scaled % 100
     val fp = if fpart < 10 { "0" + fpart } else { "" + fpart }
@@ -107,12 +107,12 @@ extension Double {
 
 extension Int {
   def pad(w: Int): String {
-    var s = "" + self
+    var s = "" + this
     while s.length() < w { s = " " + s }
     return s
   }
   def lpad(w: Int): String {
-    var s = "" + self
+    var s = "" + this
     while s.length() < w { s = s + " " }
     return s
   }
@@ -120,12 +120,12 @@ extension Int {
 
 extension String {
   def rpad(w: Int): String {
-    var s = self
+    var s = this
     while s.length() < w { s = s + " " }
     return s
   }
   def lpad(w: Int): String {
-    var s = self
+    var s = this
     while s.length() < w { s = " " + s }
     return s
   }

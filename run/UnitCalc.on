@@ -221,12 +221,12 @@ def printTable(reg: UnitRegistry, value: Double, fromSym: String): void {
 
 extension String {
   def padEnd(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = s + " " }
     return s
   }
   def padStart(width: Int): String {
-    var s: String = self
+    var s: String = this
     while s.length() < width { s = " " + s }
     return s
   }

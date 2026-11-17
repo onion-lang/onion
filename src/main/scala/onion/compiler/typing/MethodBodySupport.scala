@@ -293,8 +293,15 @@ private[compiler] final class MethodBodySupport(
       context.setStatic(false)
       definition.invariants = typeContractClauses(invariants, context, ContractScope.Invariant)
       definition.histories = typeContractClauses(histories, context, ContractScope.History)
-      definition.invariantSources = invariants
-      definition.historySources = histories
+      // A clause that failed to type has no term, so keep only the sources that have one: the two
+      // lists are paired by position (#2797).
+      def typedSources(terms: Seq[Term], sources: List[AST.Expression]): List[AST.Expression] = {
+        val kept = new java.util.IdentityHashMap[AST.Expression, Unit]()
+        terms.foreach(t => Option(typing.contractClauseSources.get(t)).foreach(kept.put(_, ())))
+        sources.filter(kept.containsKey)
+      }
+      definition.invariantSources = typedSources(definition.invariants, invariants)
+      definition.historySources = typedSources(definition.histories, histories)
       for (h <- histories) HistoryPreorder.classify(h) match {
         case HistoryPreorder.NotPreorder(reason) => bodyContext.report(SemanticError.HISTORY_NOT_PREORDER, h, reason)
         case _ =>

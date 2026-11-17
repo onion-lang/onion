@@ -118,5 +118,41 @@ class ConstructorLambdaDefaultSpec extends AbstractShellSpec {
           |""".stripMargin, "ld10.on", Array[String]())
       assert(Shell.Success("obj") == result)
     }
+    it("stays E0052 when an Object? constructor takes the same call") {
+      val result = shell.run(
+        """
+          |class A {
+          |public:
+          |  def this(f: Int -> Int, k: Int = 1) { println("fn") }
+          |  def this(o: Object?) { println("obj?") }
+          |}
+          |new A(x -> x)
+          |""".stripMargin, "ld11.on", Array[String]())
+      assert(Shell.Failure(-1) == result)
+    }
+    it("stays E0052 when a type-parameter constructor instantiated at Object takes the call") {
+      val result = shell.run(
+        """
+          |class A[T] {
+          |public:
+          |  def this(f: Int -> Int, k: Int = 1) { println("fn") }
+          |  def this(o: T) { println("T") }
+          |}
+          |new A[Object](x -> x)
+          |""".stripMargin, "ld12.on", Array[String]())
+      assert(Shell.Failure(-1) == result)
+    }
+    it("stays E0052 when Object competes at only one of two lambda positions") {
+      val result = shell.run(
+        """
+          |class A {
+          |public:
+          |  def this(f: Int -> Int, g: Int -> Int, k: Int = 1) { println("fn") }
+          |  def this(o: Object, g: Int -> Int) { println("objfn") }
+          |}
+          |new A(x -> x, y -> y)
+          |""".stripMargin, "ld13.on", Array[String]())
+      assert(Shell.Failure(-1) == result)
+    }
   }
 }

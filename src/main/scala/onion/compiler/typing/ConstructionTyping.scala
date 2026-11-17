@@ -424,21 +424,25 @@ final class ConstructionTyping(
             lambdasFit(cd)
         case _ => false
       }
-      // A constructor whose parameter at a lambda's position is `Object` also takes the lambda,
-      // whether it needs all the arguments or fills defaults. Then a type annotation on the
-      // lambda would silently pick the constructor, so the call stays E0052 as on `main`.
+      // A constructor that could take a function value at any lambda's position (its parameter,
+      // after class substitution and ignoring `?`, is `Object` or a type variable) also takes
+      // the lambda, whether it needs all the arguments or fills defaults. Then a type annotation
+      // on the lambda would silently pick the constructor, so the call stays E0052 as on `main`.
+      def takesAnyValue(formal: Type): Boolean = {
+        val substituted = TypeSubstitution.substituteType(formal, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
+        (substituted match { case n: NullableType => n.innerType; case t => t }) match {
+          case t: ClassType => (t match { case a: AppliedClassType => a.raw; case _ => t }).name == "java.lang.Object"
+          case _: TypeVariableType => true
+          case _ => false
+        }
+      }
       def objectCompetes(c: ConstructorRef): Boolean = {
         val formals = c.getArgs
         val accepts = c match {
           case cd: ConstructorDefinition => cd.argumentsWithDefaults != null && formals.length >= node.args.length && node.args.length >= cd.minArguments
           case _ => formals.length == node.args.length
         }
-        accepts && untypedClosureIndices.forall { i =>
-          formals(i) match {
-            case t: ClassType => t.name == "java.lang.Object"
-            case _ => false
-          }
-        }
+        accepts && untypedClosureIndices.exists(i => takesAnyValue(formals(i)))
       }
       if (needsParameterTypes && fillsDefaults.length == 1 &&
           !ctors.exists(c => c.getArgs.length == node.args.length && lambdasFit(c)) &&

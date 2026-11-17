@@ -194,5 +194,55 @@ class GenericInstanceCallViewInferenceSpec extends AbstractShellSpec {
       assert(Shell.Success(0) == r, out)
       assert(out.trim == "object", out)
     }
+  
+  describe("an Onion enum argument, read as Comparable of itself as javac does") {
+    val withObject =
+      """def id(a: Object): String = "object"
+        |""".stripMargin
+    def topLevel(extra: String) =
+      s"""enum Color { RED, GREEN }
+         |def id[T](a: Comparable[T]): String = "generic"
+         |$extra
+         |def main(args: String[]): Int { val c = Color::RED; IO::println(id(c)); return 0 }
+         |""".stripMargin
+    def instance(extra: String) =
+      s"""enum Color { RED, GREEN }
+         |class U {
+         |public:
+         |  def id[T](a: Comparable[T]): String = "generic"
+         |  $extra
+         |}
+         |def main(args: String[]): Int { IO::println(new U().id(Color::RED)); return 0 }
+         |""".stripMargin
+    def static(extra: String) =
+      s"""enum Color { RED, GREEN }
+         |class U {
+         |public:
+         |  static def id[T](a: Comparable[T]): String = "generic"
+         |  ${extra.replace("def id(", "static def id(")}
+         |}
+         |def main(args: String[]): Int { IO::println(U::id(Color::RED)); return 0 }
+         |""".stripMargin
+    for (form, src) <- List("top-level" -> topLevel, "instance" -> instance, "static" -> static) do
+      it(s"binds T = the enum in the $form form, with an Object overload") {
+        val (r, out) = runCapturing(src(withObject))
+        assert(Shell.Success(0) == r, out)
+        assert(out.trim == "generic", out)
+      }
+      it(s"binds T = the enum in the $form form, with no Object overload") {
+        val (r, out) = runCapturing(src(""))
+        assert(Shell.Success(0) == r, out)
+        assert(out.trim == "generic", out)
+      }
+    it("binds T = the enum when a second argument is the bare T") {
+      val (r, out) = runCapturing(
+        """enum Color { RED, GREEN }
+          |def later[T](a: Comparable[T], b: T): T = b
+          |def main(args: String[]): Int { IO::println(later(Color::RED, Color::GREEN)); return 0 }
+          |""".stripMargin)
+      assert(Shell.Success(0) == r, out)
+      assert(out.trim == "GREEN", out)
+    }
   }
+}
 }

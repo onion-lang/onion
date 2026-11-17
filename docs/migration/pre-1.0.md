@@ -699,12 +699,19 @@ val die = Rand::nextInt(1, 7)          // 1 to 6
     variable), migrate writes `onion.Rand::nextInt`, so the call keeps meaning Onion's `Rand`.
 - **Only calls the compiler reports are rewritten.** A `randomInt` that still compiles is
   your own (a class of yours named `OnionMath`, an inherited method), so it is left as written.
-- **Not rewritten:** a `max` that is a constant equal to `Int.MAX_VALUE`, however it is
-  spelled: `2147483647`, `0x7FFFFFFF`, `Integer::MAX_VALUE`, `(1 << 31) - 1`,
-  `Integer::MAX_VALUE | 0`. A constant migrate cannot evaluate is left the same way.
-  `max + 1` would overflow to `Int.MIN_VALUE`, and `Rand::nextInt` would throw. The migrate
+- **Which `max` gets `+ 1`:**
+  - a constant migrate works out to less than `Int.MAX_VALUE` (`6`, `1 << 4`,
+    `Integer::MAX_VALUE - 1`);
+  - a `max` that reads a variable, a parameter, a field or a call (`n`, `xs.size`,
+    `Math::abs(n)`).
+- **Not rewritten:** any other `max`. That covers `Int.MAX_VALUE` however it is spelled
+  (`2147483647`, `Integer::MAX_VALUE`, `(1 << 31) - 1`), and any constant migrate cannot
+  work out (`2147483647.0 as Int`, `Long::MAX_VALUE as Int >>> 1`, `Short::MAX_VALUE`).
+  `max + 1` could overflow to `Int.MIN_VALUE`, and `Rand::nextInt` would throw. The migrate
   run notes the line and leaves the whole file as written. Write `Rand::nextInt()` for any
   `Int`, or choose the bound by hand, then run migrate again.
+- **A bare `randomInt(a, b)` with no `import { onion.OnionMath::* }`** is not the removed
+  method, so migrate leaves it alone. Its hint shows the edit to make by hand.
 - **Check a max held in a variable.** Migrate cannot know its value. If it can be
   `Int.MAX_VALUE` at run time, `max + 1` overflows there and the call throws
   `IllegalArgumentException`. Write `Rand::nextInt()` for that case.

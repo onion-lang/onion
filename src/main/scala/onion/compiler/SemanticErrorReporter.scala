@@ -231,8 +231,10 @@ class SemanticErrorReporter(threshold: Int) {
         // whose max is exclusive, is the one random Int in a range (#3069). Show the call that
         // keeps the old result rather than a name-similarity guess. A bare `randomInt(a, b)`
         // that nothing resolves is the same call through `import { onion.OnionMath::* }`, which
-        // still compiles but no longer brings it in.
-        Some(message("suggestion.onionMathRandomInt"))
+        // still compiles but no longer brings it in. Only there, or on a qualified call, does
+        // `onion migrate` make the edit, so only then does the hint say it will (#3116 block 7).
+        val migrates = if (items.length > 9) items(9) == java.lang.Boolean.TRUE else !isUnqualifiedCall
+        Some(message(if (migrates) "suggestion.onionMathRandomInt" else "suggestion.onionMathRandomIntByHand"))
       } else if ((fieldNamed(targetType, name) && !inaccessibleFieldNamed(items)) || isArrayLengthProperty(targetType, name)) {
         // `p.name()` where `name` is a field, not a method -- a common mix-up
         // with record component accessors (which really are methods). A

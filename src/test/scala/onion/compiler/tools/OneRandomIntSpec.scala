@@ -237,6 +237,15 @@ class OneRandomIntSpec extends AbstractShellSpec {
       }
     }
 
+    it("does not promise a migrate edit for a bare randomInt with no static import (#3116 block 7)") {
+      val source = "val a = randomInt(1, 6)\nprintln(a)\n"
+      val messages = compile(source).allErrors.map(_.message)
+      assert(messages.exists(_.contains(Message("suggestion.onionMathRandomIntByHand"))), messages)
+      assert(!messages.exists(_.contains("onion migrate")), messages)
+      val (_, after, _) = migrate(source)
+      assert(after == source)
+    }
+
     it("leaves a bare randomInt alone in a file with no static import of OnionMath") {
       val source = "println(randomInt(1, 6))\nprintln(OnionMath::randomInt(1, 6) < 7)\n"
       val (_, after, output) = migrate(source)
@@ -337,12 +346,43 @@ class OneRandomIntSpec extends AbstractShellSpec {
       assert(output.contains("old.on:2:20: note:"), output)
     }
 
-    it("notes a constant max it cannot evaluate, since it may be Int.MAX_VALUE") {
-      val source = "val n = OnionMath::randomInt(0, 'a' as Int)\n"
-      val (_, after, output) = migrate(source)
-      assert(after == source, output)
-      assert(output.contains("old.on:1:20: note:"), output)
-      assert(output.contains("cannot evaluate"), output)
+    // #3116 block 7: the rule lists what is rewritten (a value migrate works out below
+    // Int.MAX_VALUE, or a max that reads a variable or a call); every other constant is noted.
+    Seq(
+      "'a' as Int",
+      "2147483647.0 as Int",
+      "1e10 as Int",
+      "Long::MAX_VALUE as Int >>> 1",
+      "JLong::MAX_VALUE as Int >>> 1",
+      "Short::MAX_VALUE",
+      "6L as Int"
+    ).foreach { max =>
+      it(s"notes a constant max it cannot show is below Int.MAX_VALUE: `$max`") {
+        val source = s"val n = OnionMath::randomInt(0, $max)\n"
+        val (_, after, output) = migrate(source)
+        assert(after == source, output)
+        assert(output.contains("old.on:1:20: note:"), output)
+        assert(output.contains("cannot show"), output)
+      }
+    }
+
+    it("still rewrites a max that reads a variable, a field or a call, and the script runs") {
+      val source =
+        """val n = 6
+          |val xs: List[Int] = [1, 2, 3]
+          |val a = OnionMath::randomInt(0, n)
+          |val b = OnionMath::randomInt(0, xs.size)
+          |val c = OnionMath::randomInt(0, Math::abs(n))
+          |val d = OnionMath::randomInt(0, n as Int)
+          |println(a <= 6 && b <= 3 && c <= 6 && d <= 6)
+          |""".stripMargin
+      val (code, after, output) = migrate(source)
+      assert(code == 0, output)
+      assert(after.contains("val a = Rand::nextInt(0, n + 1)"), s"$after\n$output")
+      assert(after.contains("val b = Rand::nextInt(0, xs.size + 1)"), s"$after\n$output")
+      assert(after.contains("val c = Rand::nextInt(0, Math::abs(n) + 1)"), s"$after\n$output")
+      assert(after.contains("val d = Rand::nextInt(0, (n as Int) + 1)"), s"$after\n$output")
+      assert(compile(after).allErrors.isEmpty, compile(after).allErrors.map(_.message))
     }
 
     it("still rewrites a max that is a constant below Int.MAX_VALUE, in any spelling") {
@@ -352,8 +392,7 @@ class OneRandomIntSpec extends AbstractShellSpec {
         "~0 >>> 2" -> "Rand::nextInt(0, (~0 >>> 2) + 1)",
         "~Integer::MIN_VALUE * 1 - 1" -> "Rand::nextInt(0, (~Integer::MIN_VALUE * 1 - 1) + 1)",
         "0x7FFFFFFE" -> "Rand::nextInt(0, 0x7FFFFFFE + 1)",
-        "Integer::MAX_VALUE - 1" -> "Rand::nextInt(0, Integer::MAX_VALUE)",
-        "Short::MAX_VALUE" -> "Rand::nextInt(0, (Short::MAX_VALUE) + 1)"
+        "Integer::MAX_VALUE - 1" -> "Rand::nextInt(0, Integer::MAX_VALUE)"
       ).foreach { (max, expected) =>
         val (code, after, output) = migrate(s"val n = OnionMath::randomInt(0, $max)\nprintln(n >= 0)\n")
         assert(code == 0, output)

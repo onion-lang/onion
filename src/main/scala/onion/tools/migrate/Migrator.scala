@@ -262,10 +262,10 @@ object Migrator:
    * second argument. A decimal literal is incremented (`6` → `7`), an argument ending in
    * `- 1` loses it (`n - 1` → `n`), an argument built only from names, literals, calls and
    * `+ - * / %` gets `+ 1`, and anything else is parenthesized first (`(a ?: b) + 1`).
-   * `onion.OnionMath::randomInt` is matched too. A `max` that is a constant equal to
-   * `Int.MAX_VALUE`, however it is spelled (`2147483647`, `0x7FFFFFFF`, `Integer::MAX_VALUE`,
-   * `JInteger::MAX_VALUE`, `Integer::MIN_VALUE - 1`), has no `+ 1`, so it is noted and left
-   * as written (#3116 block 5). [[MigrateCommand]] rewrites a call only where the compiler
+   * `onion.OnionMath::randomInt` is matched too. A `max` is rewritten only when migrate can
+   * show its value is below `Int.MAX_VALUE`, or when it reads a variable or a call; any other
+   * constant (`2147483647`, `Integer::MAX_VALUE`, `2147483647.0 as Int`) is noted and left as
+   * written (#3116 block 7). [[MigrateCommand]] rewrites a call only where the compiler
    * reported an error at its name (`reported`), and keeps the file only when it compiles
    * rewritten, so a user's own `OnionMath` or an inherited `randomInt` is never touched.
    */
@@ -452,9 +452,8 @@ object Migrator:
           plusOne(rewritten(maxFrom, maxTo), max, spelling) match
             case Left(why) =>
               Left(Some(Note(line, column,
-                s"this $Subject $why, which Rand::nextInt cannot include " +
-                  "(its max is exclusive, and max + 1 overflows); " +
-                  "left as written. Write Rand::nextInt() for any Int, or pick the bound by hand")))
+                s"this $Subject $why; left as written. " +
+                  "Write Rand::nextInt() for any Int, or pick the bound by hand")))
             case Right(newMax) =>
               val replacement = spelling.rand + "::nextInt" + rewritten(paren, maxFrom) + newMax + rewritten(maxTo, closeAt + 1)
               Right(Edit(from, closeAt + 1 - from, replacement, line, column,
@@ -464,18 +463,23 @@ object Migrator:
                 places = inner.flatMap(_.allPlaces)))
 
     /**
-     * `Right(text)` for the new max, or `Left(why)` when it cannot be one more: a constant equal
-     * to `Int.MAX_VALUE`, whose `+ 1` would overflow to `Int.MIN_VALUE` and make the call throw,
-     * or a constant the tool cannot evaluate, which may be that value (#3116 block 6). The rule
-     * is by form, not by operator: a max with no variable and no call is a constant, and is
-     * rewritten only when its value is known and below `Int.MAX_VALUE`.
+     * `Right(text)` for the new max, or `Left(why)` when migrate cannot show that `max + 1` is
+     * still an `Int` (#3116 block 7). The rule lists what is rewritten, not what is caught: a
+     * max whose value migrate works out below `Int.MAX_VALUE`, or one that reads a variable, a
+     * parameter, a field or a call, which the guide tells the user to check. Every other max,
+     * a constant migrate cannot evaluate (a float, a `Long`, a `Character`, another class's
+     * field), is noted and left as written, so a spelling nobody listed fails safe instead of
+     * overflowing to `Int.MIN_VALUE`.
      */
     private def plusOne(text: String, max: IndexedSeq[Token], spelling: Spelling): Either[String, String] =
       val digits = text.replace("_", "")
       val value = constant(max, spelling.integers)
-      if value.contains(Int.MaxValue) then Left("has a max of Int.MAX_VALUE (2147483647)")
-      else if value.isEmpty && constantForm(max, spelling.integers) then
-        Left("has a constant max the migrate tool cannot evaluate, so it may be Int.MAX_VALUE (2147483647)")
+      if value.contains(Int.MaxValue) then
+        Left("has a max of Int.MAX_VALUE (2147483647), which Rand::nextInt cannot include " +
+          "(its max is exclusive, and max + 1 overflows)")
+      else if value.isEmpty && !readsVariableOrCall(max) then
+        Left("has a constant max the migrate tool cannot show is below Int.MAX_VALUE (2147483647), " +
+          "so max + 1 may overflow")
       else if max.length == 1 && max.head.kind == K.INTEGER && digits.forall(_.isDigit) then
         Right((BigInt(digits) + 1).toString)
       else
@@ -488,35 +492,26 @@ object Migrator:
         else if simple then Right(text + " + 1")
         else Right("(" + text + ") + 1")
 
-    /** Operators that may appear in a constant `Int` expression. */
-    private val ConstantOperators =
-      Set("+", "-", "*", "/", "%", "<<", ">>", ">>>", "&", "|", "^", "~", "(", ")")
-
     /**
-     * Whether `max` is a constant in form: literals, `Integer`'s `MAX_VALUE`/`MIN_VALUE`, the
-     * operators above and `as` casts, with no variable and no call. A max whose value
-     * [[constant]] cannot work out is then left as written, whatever operator hides it.
+     * Whether `max` reads something known only at run time: `this`, a local variable, a
+     * parameter or a field (`n`, `xs.size`), or any call (`f(x)`, `Math::abs(n)`). A name
+     * after `as` is a type, and a dotted name followed by `::` (`Long::`, `java.lang.Integer::`)
+     * is a class, so neither is a variable; a static field read through `::`
+     * (`Long::MAX_VALUE`) is a constant.
      */
-    private def constantForm(max: IndexedSeq[Token], integers: Set[String]): Boolean =
+    private def readsVariableOrCall(max: IndexedSeq[Token]): Boolean =
       val image = (j: Int) => if j >= 0 && j < max.length then max(j).image else ""
-      max.nonEmpty && max.indices.forall { j =>
+      val member = Set(".", "::", "?.")
+      // Whether the dotted name that starts at `j` (`a`, `a.b.C`) is followed by `::`.
+      def qualifier(j: Int): Boolean =
+        var k = j
+        while image(k + 1) == "." && k + 2 < max.length && max(k + 2).kind == K.ID do k += 2
+        image(k + 1) == "::"
+      max.indices.exists { j =>
         val t = max(j)
-        t.kind == K.INTEGER || t.kind == K.CHARACTER || ConstantOperators(t.image) || t.kind == K.K_AS ||
-          image(j - 1) == "as" ||
-          (Set("MAX_VALUE", "MIN_VALUE")(t.image) && image(j - 1) == "::") ||
-          (t.image == "::" && (integers(image(j - 1)) || image(j - 1) == "Integer")) ||
-          (integers(t.image) && image(j + 1) == "::") ||
-          ((t.image == "java" || t.image == "lang" || t.image == "Integer" || t.image == ".") &&
-            javaLangInteger(max, j))
-      }
-
-    /** Whether token `j` is part of a `java.lang.Integer` qualifier in `max`. */
-    private def javaLangInteger(max: IndexedSeq[Token], j: Int): Boolean =
-      val image = (k: Int) => if k >= 0 && k < max.length then max(k).image else ""
-      (0 to 4).exists { back =>
-        val s = j - back
-        image(s) == "java" && image(s + 1) == "." && image(s + 2) == "lang" && image(s + 3) == "." &&
-          image(s + 4) == "Integer" && image(s + 5) == "::"
+        t.kind == K.K_THIS || t.kind == K.K_SELF ||
+          (t.kind == K.ID && image(j + 1) == "(") ||
+          (t.kind == K.ID && !member(image(j - 1)) && image(j - 1) != "as" && !qualifier(j))
       }
 
     /**

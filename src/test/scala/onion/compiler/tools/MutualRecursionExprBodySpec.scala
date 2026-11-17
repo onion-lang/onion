@@ -72,5 +72,21 @@ class MutualRecursionExprBodySpec extends AbstractShellSpec {
       val result = shell.run(script, "MutualRecursionExprBodySmall.on", Array())
       assert(result == Shell.Success("truetruetruetrue"), s"unexpected $result")
     }
+
+    it("keeps a group whose member also calls itself (#3013)") {
+      val script =
+        """
+          |class C {
+          |private:
+          |  static @TailRecursive def a(n: Int): Int = if n == 0 { 0 } else if n % 2 == 0 { a(n - 1) } else { b(n - 1) }
+          |  static @TailRecursive def b(n: Int): Int = if n == 0 { 1 } else { a(n - 1) }
+          |public:
+          |  static def main(args: String[]): Int = a(1000000)
+          |}
+          |""".stripMargin
+
+      val result = shell.run(script, "MutualRecursionSelfCallIf.on", Array())
+      assert(result == Shell.Success(1), s"expected 1, got $result")
+    }
   }
 }

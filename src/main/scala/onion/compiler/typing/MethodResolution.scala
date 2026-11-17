@@ -180,7 +180,12 @@ private[compiler] object MethodResolution {
       if found.length < 2 then found
       else
         val fitting = found.filter(support.typeVariableSlotsFit)
-        if fitting.nonEmpty then fitting else found
+        val tvFit = if fitting.nonEmpty then fitting else found
+        // `null` never fills a primitive slot: prefer the overloads it can (#2876).
+        if tvFit.length < 2 then tvFit
+        else
+          val nullOk = tvFit.filter(support.nullFitsNoPrimitive)
+          if nullOk.nonEmpty then nullOk else tvFit
     if applicableMethods.isEmpty then return new Array[Method](0)
     if applicableMethods.length == 1 then return Array(applicableMethods.head)
 

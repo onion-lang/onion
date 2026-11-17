@@ -73,7 +73,7 @@ private[optimization] object TailCallGraphAnalysis {
     }
 
     if (method.getBlock != null) {
-      method.getBlock.statements.foreach(visitStatement)
+      ReturnSinking.normalizeMethodBody(method.getBlock).statements.foreach(visitStatement)
     }
 
     calls.toSet

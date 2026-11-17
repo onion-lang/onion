@@ -873,6 +873,45 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).arguments.take(2) shouldBe Seq("foo(1)", "\"a)(b\"")
     }
 
+    it("terminates on a line that closes a multi-line string: `\"\"\".trim()(1)` (#3138 block 6)") {
+      import scala.concurrent.{Await, Future}
+      import scala.concurrent.ExecutionContext.Implicits.global
+      import scala.concurrent.duration._
+      val statementEnd = "\";\", <EOL>, <EOF>"
+      val closing = Future(SyntaxHintClassifier.classify("(", statementEnd, "(1)", "\"\"\".trim()(1)", "val s = \"\"\"\nhello\n"))
+      Await.result(closing, 10.seconds).map(_.messageKey) shouldBe Some("error.parsing.hint.call_result_call_unnamed")
+      // Without the earlier lines the `"""` reads as an opening quote; the walk still ends.
+      val opening = Future(SyntaxHintClassifier.classify("(", statementEnd, "(1)", "\"\"\".trim()(1)"))
+      Await.result(opening, 10.seconds)
+    }
+
+    it("does not cut the second call's arguments at a `)` in a char literal or comment") {
+      classify(found = "(", expected = "\")\"", context = "(')'))", sourceLine = "println(wrap(\"a\")(')'))")
+        .arguments.take(2) shouldBe Seq("wrap(\"a\")", "')'")
+      classify(
+        found = "(",
+        expected = "\")\"",
+        context = "(1 /* ) */ + 2))",
+        sourceLine = "println(wrap(\"a\")(1 /* ) */ + 2))"
+      ).arguments.take(2) shouldBe Seq("wrap(\"a\")", "1 /* ) */ + 2")
+    }
+
+    it("keeps `missing_call_parens` for a bare call with spaced arguments: `print (x) (y)`") {
+      classify(found = "(", expected = "\";\", <EOL>, <EOF>", context = "(y)", sourceLine = "print (x) (y)")
+        .messageKey shouldBe "error.parsing.hint.missing_call_parens"
+    }
+
+    it("ignores a declaration keyword inside a string literal: `println(\"def\"); println(mk()(1))`") {
+      val hint = classify(
+        found = "(",
+        expected = "\")\"",
+        context = "(1))",
+        sourceLine = "println(\"def\"); println(mk()(1))"
+      )
+      hint.messageKey shouldBe "error.parsing.hint.call_result_call"
+      hint.arguments.take(2) shouldBe Seq("mk()", "1")
+    }
+
         it("gives no call-result hint in a declaration header that wraps onto earlier lines") {
       val statementEnd = "\";\", <EOL>, <EOF>"
       Seq(

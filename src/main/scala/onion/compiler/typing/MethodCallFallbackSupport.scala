@@ -216,6 +216,13 @@ private[compiler] final class MethodCallFallbackSupport(
         reportNotFound(nonClosureTypes.values.toArray)
         return None
     }
+    // A method found here may still be out of reach: a superclass's private method called
+    // bare with a lambda (`pim { x -> x }`) compiled and threw IllegalAccessError (#3012).
+    // The eager paths check this in selectSingleMethod; the static core does the same.
+    if (!MemberAccess.isMemberAccessible(method, typing.currentDefinition, targetType)) {
+      typing.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, name, method.arguments, typing.currentDefinition)
+      return None
+    }
     val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
     // Preserve positions of the resolved (non-closure) arguments — closure slots
     // stay null — so each unifies against its own formal parameter. Collapsing

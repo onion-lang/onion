@@ -429,6 +429,10 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         calls.reportAmbiguousMethod(node, first, second, node.name)
         None
       case CandidateSelection.Selected(method) =>
+        if (!MemberAccess.isMemberAccessible(method, targetType)) {
+          bodyContext.report(SemanticError.METHOD_NOT_ACCESSIBLE, node, method.affiliation, method.name, method.arguments, targetType)
+          return None
+        }
         if (!ensureInstanceAvailable(node, method, context)) return None
         val classSubst = selfClassSubstitution(method)
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>

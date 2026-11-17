@@ -50,9 +50,47 @@ class InheritedPrivateUnqualifiedCallSpec extends AbstractShellSpec {
       val msgs = codes(subclassCalling("  def pim(a: Int): Int = a", "pim(7)").replace("def run(): Int = pim(7)", "def run(): Int { val f: () -> Int = () -> pim(7); return f() }"))
       assert(msgs.exists(_.startsWith("E0013")), s"expected E0013, got: $msgs")
     }
+
+    // The panel's block on #3152: these three spellings still compiled and crashed.
+    it("is E0013 with an untyped trailing lambda") {
+      val msgs = codes(subclassCalling("  def pim(f: (Int) -> Int): Int = f(1)", "pim { x -> x }"))
+      assert(msgs.exists(_.startsWith("E0013")), s"expected E0013, got: $msgs")
+      assert(msgs.exists(_.contains("A.pim")), s"expected the message to name A.pim, got: $msgs")
+    }
+
+    it("is E0013 with an untyped lambda argument") {
+      val msgs = codes(subclassCalling("  def pim(f: (Int) -> Int): Int = f(1)", "pim((x) -> x)"))
+      assert(msgs.exists(_.startsWith("E0013")), s"expected E0013, got: $msgs")
+    }
+
+    it("is E0013 with named arguments") {
+      val msgs = codes(subclassCalling("  def pim(a: Int, b: Int): Int = a - b", "pim(b = 3, a = 7)"))
+      assert(msgs.exists(_.startsWith("E0013")), s"expected E0013, got: $msgs")
+      assert(msgs.count(_.startsWith("E0013")) == 1, s"expected one E0013, got: $msgs")
+    }
   }
 
   describe("calls that stay legal") {
+    it("an inherited protected method called with an untyped trailing lambda runs") {
+      val src = subclassCalling("protected:\n  def pim(f: (Int) -> Int): Int = f(1)", "pim { x -> x + 6 }").replace("IO::println(new B().run())", "def main(args: String[]): Int { return new B().run() }")
+      assert(shell.run(src, "None", Array()) == Shell.Success(7))
+    }
+
+    it("a class's own private method called with an untyped trailing lambda and named arguments runs") {
+      val src =
+        """
+          |class B {
+          |  def pim(f: (Int) -> Int): Int = f(1)
+          |  def sub(a: Int, b: Int): Int = a - b
+          |public:
+          |  def this {}
+          |  def run(): Int = pim { x -> x + 2 } + pim((x) -> x) + sub(b = 3, a = 7)
+          |}
+          |def main(args: String[]): Int { return new B().run() }
+          |""".stripMargin
+      assert(shell.run(src, "None", Array()) == Shell.Success(8))
+    }
+
     it("an inherited protected method called unqualified runs") {
       val src = subclassCalling("protected:\n  def pim(a: Int): Int = a", "pim(7)").replace("IO::println(new B().run())", "def main(args: String[]): Int { return new B().run() }")
       assert(shell.run(src, "None", Array()) == Shell.Success(7))

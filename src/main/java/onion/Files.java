@@ -390,13 +390,18 @@ public final class Files {
     public static java.util.List<String> glob(String dir, String pattern) throws IOException {
         java.nio.file.Path base = java.nio.file.Paths.get(dir);
         if (pattern.startsWith("./")) pattern = pattern.substring(2);
-        java.nio.file.PathMatcher matcher =
-            base.getFileSystem().getPathMatcher("glob:" + pattern);
+        java.util.ArrayList<java.nio.file.PathMatcher> matchers = new java.util.ArrayList<>();
+        // The JDK rejects nested brace groups; the expansion below handles
+        // them, so a failed compile only matters if nothing else compiles.
+        java.util.regex.PatternSyntaxException original = null;
+        try {
+            matchers.add(base.getFileSystem().getPathMatcher("glob:" + pattern));
+        } catch (java.util.regex.PatternSyntaxException e) {
+            original = e;
+        }
         // A "**/" segment also matches zero directories (as bash globstar and
         // Python glob do); Java's matcher needs at least one. Brace
         // alternatives are expanded first, so each one gets the same rule.
-        java.util.ArrayList<java.nio.file.PathMatcher> matchers = new java.util.ArrayList<>();
-        matchers.add(matcher);
         java.util.LinkedHashSet<String> patterns = new java.util.LinkedHashSet<>();
         for (String alt : expandBraces(pattern, 0)) {
             java.util.List<java.util.List<String>> variants = new java.util.ArrayList<>();
@@ -425,6 +430,7 @@ public final class Files {
                 }
             }
         }
+        if (matchers.isEmpty() && original != null) throw original;
         java.util.ArrayList<String> result = new java.util.ArrayList<>();
         if (!java.nio.file.Files.isDirectory(base)) return result;
         // walkFileTree with a tolerant visitor: unreadable entries (other

@@ -717,6 +717,54 @@ class SyntaxHintClassifierSpec extends AnyFunSpec with Matchers {
       ).map(_.messageKey) should not be Some("error.parsing.hint.call_result_call")
     }
 
+    it("names the callee in the call-result hint") {
+      val hint = classify(
+        found = "(",
+        expected = "\")\"",
+        context = "(2))",
+        sourceLine = "println(adder(1)(2))"
+      )
+
+      hint.messageKey shouldBe "error.parsing.hint.call_result_call"
+      hint.arguments shouldBe Seq("adder")
+    }
+
+    it("names the callee of a parenthesized call: `(mk())()`") {
+      classify(
+        found = "(",
+        expected = "\")\"",
+        context = "())",
+        sourceLine = "println((mk())())"
+      ).arguments shouldBe Seq("mk")
+    }
+
+    it("keeps the block hint for `if (c) (` rather than the call-result hint") {
+      SyntaxHintClassifier.classify(
+        found = "(",
+        expected = "\"{\"",
+        context = "(println(\"a\"))",
+        sourceLine = "if (x > 1) (println(\"a\"))"
+      ).map(_.messageKey) shouldBe Some("error.parsing.hint.block_expected")
+    }
+
+    it("keeps the C-style cast hint for `(String)(o)` rather than the call-result hint") {
+      SyntaxHintClassifier.classify(
+        found = "(",
+        expected = "<EOL>",
+        context = "(o)",
+        sourceLine = "val x = (String)(o)"
+      ).map(_.messageKey) shouldBe Some("error.parsing.hint.c_style_cast")
+    }
+
+    it("does not give the call-result hint for a curried-looking `def f(a: Int)(b: Int)`") {
+      SyntaxHintClassifier.classify(
+        found = "(",
+        expected = "\":\"",
+        context = "(b: Int): Int = a + b",
+        sourceLine = "def f(a: Int)(b: Int): Int = a + b"
+      ).map(_.messageKey) should not be Some("error.parsing.hint.call_result_call")
+    }
+
     it("recognizes a JS/Python-style `typeof` operator in an `if` condition") {
       val hint = classify(
         found = "x",

@@ -926,14 +926,19 @@ final class TypingOutlinePass(private val typing: Typing, private val unitContex
   }
 
   private def cyclic(start: ClassDefinition): Boolean = {
-    def loop(node: ClassType, visited: Set[ClassType]): Boolean =
-      node != null && {
-        if (visited.contains(node)) true
-        else {
-          val next = visited + node
-          loop(node.superClass, next) || node.interfaces.exists(loop(_, next))
-        }
+    // `A[T]` and `A[U]` are different applied types but the same class, so the
+    // walk goes through the raw class: a cycle via a generic supertype is a cycle.
+    def loop(node: ClassType, visited: Set[ClassType]): Boolean = node != null && {
+      val raw = node match {
+        case applied: AppliedClassType => applied.raw
+        case other => other
       }
+      if (visited.contains(raw)) true
+      else {
+        val next = visited + raw
+        loop(raw.superClass, next) || raw.interfaces.exists(loop(_, next))
+      }
+    }
 
     loop(start, Set.empty)
   }

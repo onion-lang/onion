@@ -7,6 +7,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.161.0] - 2026-11-17
+
+### Breaking
+
+- **`OnionMath::randomInt` is removed; `Rand::nextInt(min, max)` is the one random `Int` in a range (#3069).**
+  - Before: `OnionMath::randomInt(1, 6)` could return 6, while `Rand::nextInt(1, 6)` never did.
+  - Now: `OnionMath::randomInt` is E0005 with a hint. `onion migrate` rewrites it to `Rand::nextInt(1, 7)`.
+- **`null` into an `Int` type argument is E0000 in a constructor and an indexed assignment, not only `xs.add(null)` (#2991).**
+  - Before: `new Box[Int](null)`, `new R[Int](null)`, `xs[0] = null` and
+    `m["b"] = null` compiled (W0012 or nothing); the stored `null` crashed when read as an `Int`.
+  - Now: E0000 with the hint to write `Int?`, as for `xs.add(null)`.
+  - To keep storing `null`, declare the type argument nullable: `Box[Int?]`, `List[Int?]`.
+- **`self` is retired; write `this` (#2737, RFC #2788).**
+  - Before: `self` and `this` both meant the current instance.
+  - Now: `self` is error E0117, at every use. `onion migrate <path>` rewrites each one, inside `#{...}` too.
+
+### Fixed
+
+- **`Files::glob("d", "{[a,b].on,*.md}")` returns the matches again (#3123).**
+  - Before: `PatternSyntaxException`, since a comma inside `[...]` split the brace group.
+  - Now: a bracket class is kept whole, as the JDK matcher does; `[{,}]*` works too.
+- **A `@TailRecursive` mutual group with an `if` statement before its tail call returns the right value.**
+  - Before: `if k == 3 { IO::print("") }` followed by `return ev(k - 1, ..)` made the group return `null` (or `0`/`false`), with no warning.
+  - Now: the tail call runs after the `if`, as it does without the annotation.
+- **Named arguments work on a method declared later in the class (#3105).**
+  - Before: `b(y = 1, x = k)` above `def b(x: Int, y: Int)` was E0043 "unknown parameter name".
+  - Now: it compiles, as when `b` is declared first.
+- **`mk().copy(c = "C")` runs `mk()` once, so the copy keeps one object's fields.**
+  - Before: the receiver ran again for each omitted component (`R(a=a2, b=b3, c=C)` after three calls).
+  - Now: it runs once (`R(a=a1, b=b1, c=C)`), for `?.copy(..)` and `copy()` too.
+- **`f({ -> "d" })` compiles: `{ -> body }` is a zero-parameter lambda wherever a value goes (#3070).**
+  - Before: a syntax error at `->` inside call parentheses or an initializer; only the trailing form `f { -> "d" }` worked.
+  - Now: `opt.fold({ -> "none" }, { s -> s })` and `val h: () -> Int = { -> 7 }` compile.
+- **`val q: Option[Int] = o.fold(() -> Option::none(), (s) -> Option::some(s.length()))` compiles (#3067).**
+  - Before: E0000, `Option[Object]` expected. The first lambda fixed the result type before the target type was read.
+  - Now: a lambda whose result is a generic call or a collection literal takes its type from the written target type.
+- **`DateTime::parse("2026-11-11Z", "yyyy-MM-ddXXX")` keeps the offset (#3059).**
+  - Before: a pattern with a date and an offset but no time gave local midnight.
+  - Now: midnight at the offset written in the text, as the javadoc says.
+- **A bare `return` works in a lambda whose result type is inferred (#3041).**
+  - Before: `(x: Int) -> { if x < 0 { return } ... }` was E0020 "cannot return a value".
+  - Now: the lambda is a `void` lambda and `return` exits early.
+- **`Args` `toString()` shows the same reading `positional()` gives (#3034).**
+  - Before: after `flag("verbose")`, `toString()` still showed `options={verbose=a.txt}`.
+  - Now: it shows `flags=[verbose], positional=[a.txt, b.txt]`.
+- **`xs?.map { x -> x * 2 }` compiles: a lambda passed through `?.` takes its parameter types from the method (#3007).**
+  - Before: E0052 "lambda parameter x must specify a type", although the same call with `.` compiled. E0070's hint ("Use ?. to access it safely") led straight to it.
+  - Now: it prints `[2, 4, 6]`, or `null` when `xs` is null. The result is nullable, as for any `?.` call.
+- **A cycle through a generic supertype is a compile error.**
+  - Before: `class A[T] extends B[T]` with `class B[T] extends A[T]` compiled, then crashed with `ClassCircularityError`.
+  - Now: E0016, as for the same classes without `[T]`.
+- **`Regex::matchGroups` and `Regex::captureGroup` name the call in their errors (#2944).**
+  - Before: a bad pattern threw a raw multi-line `PatternSyntaxException`; a missing group threw `IndexOutOfBoundsException: No group 3`.
+  - Now: `Regex::matchGroups: invalid pattern "(" (Unclosed group)`, and `Regex::captureGroup: group 3 does not exist; pattern ... has 1 group(s)`.
+- **`Strings::chars` and `Strings::truncate` no longer split an emoji.**
+  - Before: `chars("a😀b")` had 4 entries, two of them broken halves; `truncate` could end on half an emoji.
+  - Now: `chars` gives one entry per emoji, and `truncate` steps back instead of cutting a pair.
+- **`sha256(42)` no longer hints `Hash::sha256(...)` when `Hash::sha256` cannot take that argument (#2925).**
+  - Before: the "call it as `Cls::name(...)`" hint matched on name and argument count, so `bytes("abc")` was sent to `Format::bytes`, which gave a second E0005.
+  - Now: the hint appears only when an overload accepts the argument types.
+- **`Archive::gzipFile`/`gunzipFile` read `/dev/stdin`, `/dev/null` and pipes again (#2924).**
+  - Before: any non-regular source failed with "no such file".
+  - Now: only a missing path or a directory is refused. A target under a file says "not a directory".
+- **An error inside a lambda is reported at its own line (#2902).**
+  - Before: `10 / x` as a lambda's last expression was reported at the line above it; a one-line lambda was reported at its caller's line.
+  - Now: the report names the line of the failing expression.
+- **A defect with no path no longer prints `: :`, and a missing file says why (#2882).**
+  - Before: `missing.txt:1: : expected a readable file, found /tmp/missing.txt`.
+  - Now: `missing.txt:1: expected a readable file, found no such file`; also `permission denied`.
+- **`new StringBuilder(s)` with `s: String?` now says why it fails (#2877).**
+  - Before: E0021 listed `StringBuilder(String)` and never named the `?`.
+  - Now: E0021 adds the same hint as E0005 (use `!!`, `?:`, or check for null).
+- **`f(null)` picks `f(String?)` over `f(Int)` (#2876).**
+  - Before: E0006, ambiguous between the two, though `new K(null)` already chose the `String?` constructor.
+  - Now: `null` never fills an `Int` slot, so the `String?` overload wins, as in Java.
+- **`p.copy(b = f(), a = g())` runs `f()` first (#2801).**
+  - Before: the arguments ran in field order, so `g()` ran first.
+  - Now: they run in the order written, as for every other call with named arguments.
+- **E0110 points at its own `invariant`/`history` clause (#2797).**
+  - Before: when an earlier clause failed to type, E0110 for a later clause was reported on the earlier clause's line.
+  - Now: it points at the field the later clause names.
+- **W0025 now sees an override two levels down, and one that renames the parameter.**
+  - Before: a contract-free middle class, or `def f(x: Int)` over `def f(k: Int)`, hid the break.
+  - Now: the override is checked against every ancestor it overrides. A `static` method inherits no contract, so it no longer gets W0025.
+
+### Documentation
+
+- **Say to call `flag`/`option` before `positional()` in the scripting guide and stdlib reference (en/ja).**
+
 ## [0.160.0] - 2026-11-16
 
 ### Breaking

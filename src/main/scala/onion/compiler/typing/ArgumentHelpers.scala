@@ -17,6 +17,13 @@ import scala.jdk.CollectionConverters.*
  */
 private[typing] object ArgumentHelpers {
 
+  /** The primitive a non-nullable box class type (`java.lang.Integer`) stands for, if it is one:
+   *  the slot a primitive type argument (`List[Int]`) leaves for a type variable. */
+  def primitiveOfNonNullBox(slot: TypedAST.Type): Option[TypedAST.BasicType] = slot match {
+    case ct: TypedAST.ClassType if !slot.isNullable => onion.compiler.toolbox.Boxing.primitiveOfBoxName(ct.name)
+    case _ => None
+  }
+
   /** Information about named arguments in an argument list */
   case class NamedArgInfo(namedArgNames: Set[String], positionalCount: Int)
 

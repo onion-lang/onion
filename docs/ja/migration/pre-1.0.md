@@ -515,7 +515,7 @@ val zs: List[Int] = [5, null]   // 以前: コンパイルでき、zs[1] の読�
 ```
 
 - **表示されるもの:** `null` の位置で **E0000** `type Int is expected, but type null is used.` になります。型引数を `Int?` と書くよう促すヒントが付きます。
-- **対象:** クラスの型変数で宣言されたメソッド引数です。関数値への `f(null)` と `f.call(null)`、`List` と `Map` の `add`/`set`/`put`、Java の関数型インタフェースの `apply`、自分で書いた総称クラスのメソッド（`Box[Int].put(null)`）が該当します。そのような型として書いたリストやマップのリテラルの中の `null` の要素も該当します（`val zs: List[Int] = [5, null]`、`val m: Map[String, Int] = ["b": null]`）。
+- **対象:** クラスの型変数で宣言されたメソッド引数です。関数値への `f(null)` と `f.call(null)`、`List` と `Map` の `add`/`set`/`put`、Java の関数型インタフェースの `apply`、自分で書いた総称クラスのメソッド（`Box[Int].put(null)`）が該当します。そのような型として書いたリストやマップのリテラルの中の `null` の要素も該当します（`val zs: List[Int] = [5, null]`、`val m: Map[String, Int] = ["b": null]`）。同じ枠に届くほかの書き方も該当します（#2991）。コンストラクタ（`new Box[Int](null)`、`new R[Int](null)`）、添字への代入（`xs[0] = null`、`m["b"] = null`）です。
 - **直し方:** `null` を格納するつもりなら、型引数を null 許容にしてください。`List[Int?]`、`Map[String, Int?]`、`(Int?) -> T` です。読み出した値は `Int?` になるので、そこで `null` を扱います（`?:` か `!!`）。そうでなければ、`null` ではなく実際の値を渡してください。
 - **`onion migrate` の規則はありません:** 直し方は、宣言する型を変えるか、渡す値を変えるかのどちらかです。どちらが正しいかは、書いた人にしか分かりません。
 

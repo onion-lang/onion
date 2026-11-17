@@ -578,8 +578,11 @@ final class ConstructionTyping(
           val classSubst = TypeSubstitution.classSubstitution(applied)
           val formals = constructors(0).getArgs.map(t =>
             TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-          warnNullArguments(constructors(0), node.args.toArray, parameters, formals)
-          Some(new NewObject(appliedCtor, adaptToFormals(parameters, formals)))
+          if (nullIntoPrimitiveTypeArgument(node.args.toArray, parameters, constructors(0).getArgs, formals)) None
+          else {
+            warnNullArguments(constructors(0), node.args.toArray, parameters, formals)
+            Some(new NewObject(appliedCtor, adaptToFormals(parameters, formals)))
+          }
         case _ =>
           warnNullArguments(constructors(0), node.args.toArray, parameters, constructors(0).getArgs)
           Some(new NewObject(constructors(0), adaptToFormals(parameters, constructors(0).getArgs)))
@@ -692,6 +695,26 @@ final class ConstructionTyping(
    */
   private def adaptToFormals(parameters: Array[Term], formals: Array[Type]): Array[Term] =
     Boxing.adaptArguments(bodyContext.table, parameters, formals)
+
+  /** `null` into a constructor slot declared as a class type variable whose type argument is
+   *  a primitive (`new Box[Int](null)`, `new R[Int](null)`) is E0000 with the `Int?` hint, as
+   *  for a method parameter (#2991): the stored value is unboxed later and crashes then.
+   *  True when it reported. */
+  private def nullIntoPrimitiveTypeArgument(args: Array[? <: AST.Node], params: Array[Term], declared: Array[Type], formals: Array[Type]): Boolean = {
+    var reported = false
+    var i = 0
+    while (i < params.length && i < args.length && i < formals.length && i < declared.length) {
+      val p = params(i)
+      if (p != null && args(i) != null && p.`type`.isNullType && declared(i).isInstanceOf[TypedAST.TypeVariableType]) {
+        ArgumentHelpers.primitiveOfNonNullBox(formals(i)).foreach { primitive =>
+          bodyContext.report(INCOMPATIBLE_TYPE, args(i), primitive, p.`type`, onion.compiler.SemanticErrorReporter.PrimitiveTypeArgumentNullHint)
+          reported = true
+        }
+      }
+      i += 1
+    }
+    reported
+  }
 
   /** W0012 for a `null` argument to an Onion-declared constructor's non-null
    *  parameter, as a method call already warns (#2464). A Java constructor's
@@ -1318,6 +1341,7 @@ final class ConstructionTyping(
         suppliedTypes, ctor.affiliation.constructors)
       return None
     }
+    if (nullIntoPrimitiveTypeArgument(sources, result, argsWithDefaults.map(_.argType), formals)) return None
     warnNullArguments(ctor, sources, result, formals)
 
     // Fill missing arguments with default values

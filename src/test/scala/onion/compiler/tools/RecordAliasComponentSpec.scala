@@ -210,5 +210,25 @@ class RecordAliasComponentSpec extends AbstractShellSpec {
       val msgs = out.swap.toOption.get.filter(_.startsWith("E0061"))
       assert(msgs.exists(_.contains("Name (= java.lang.String)")), msgs)
     }
+
+    // #2959: `import { java.lang.String as JS }` in the record's own file is java.lang.String
+    // there. It used to read as a nested record in a json shape: E0061 listing `String`
+    // as supported while rejecting `java.lang.String`.
+    it("reads a component typed by an import alias of java.lang.String in a json shape") {
+      val r = runMain(
+        """import { java.lang.String as JS; }
+          |record J(n: JS, m: JS?) {
+          |  shape doc = json
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val j = J::doc().parse("{\"n\": \"x\"}").get()
+          |    return j.n() + " " + j.m()
+          |  }
+          |}
+          |""".stripMargin)
+      assert(Shell.Success("x null") == r)
+    }
   }
 }

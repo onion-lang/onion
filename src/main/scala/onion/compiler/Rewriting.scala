@@ -267,7 +267,16 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
       case AST.ParameterizedType(base, args)    => unambiguous(base) && args.forall(unambiguous)
       case _                                    => false
     }
-    moduleAliases.filter { case (name, target) => !own.contains(name) && unambiguous(target) } ++ own
+    // `import { java.lang.String as JS }` in this very file: `JS` is java.lang.String here, so a
+    // component written `JS` is a scalar, not a nested record (#2959). Typing still checks the
+    // resolved type against this reading.
+    val importedStrings: scala.collection.immutable.Map[String, AST.TypeDescriptor] =
+      if (unit.imports == null) scala.collection.immutable.Map.empty
+      else unit.imports.mapping.collect {
+        case (alias, "java.lang.String") if alias != "String" && !own.contains(alias) =>
+          alias -> (AST.ReferenceType("java.lang.String", true): AST.TypeDescriptor)
+      }.toMap
+    moduleAliases.filter { case (name, target) => !own.contains(name) && unambiguous(target) } ++ importedStrings ++ own
   }
 
   // See AST.CompilationUnit.needsBodyRewrite: the only body-level transforms are do-notation

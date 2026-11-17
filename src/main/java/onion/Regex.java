@@ -26,7 +26,7 @@ public final class Regex {
      */
     public static List<String> matchGroups(String input, String pattern) {
         if (input == null || pattern == null) return null;
-        Matcher m = MATCH_CACHE.computeIfAbsent(pattern, Pattern::compile).matcher(input);
+        Matcher m = MATCH_CACHE.computeIfAbsent(pattern, p -> compile("matchGroups", p)).matcher(input);
         if (!m.matches()) return null;
         List<String> result = new ArrayList<String>();
         for (int i = 1; i <= m.groupCount(); i++) {
@@ -46,7 +46,11 @@ public final class Regex {
      */
     public static String captureGroup(String input, String pattern, int group) {
         if (input == null || pattern == null) return null;
-        Matcher m = MATCH_CACHE.computeIfAbsent(pattern, Pattern::compile).matcher(input);
+        Matcher m = MATCH_CACHE.computeIfAbsent(pattern, p -> compile("captureGroup", p)).matcher(input);
+        if (group < 0 || group > m.groupCount()) {
+            throw new IllegalArgumentException("Regex::captureGroup: group " + group
+                + " does not exist; pattern \"" + pattern + "\" has " + m.groupCount() + " group(s)");
+        }
         if (!m.matches()) return null;
         return m.group(group);
     }

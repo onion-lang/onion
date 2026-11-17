@@ -90,5 +90,33 @@ class ConstructorLambdaDefaultSpec extends AbstractShellSpec {
           |""".stripMargin, "ld5.on", Array[String]())
       assert(Shell.Success("obj23") == result)
     }
+    it("stays E0052 when an Object constructor takes the same call, so an annotation cannot switch constructors") {
+      val result = shell.run(
+        """
+          |class A {
+          |public:
+          |  def this(f: Int -> Int, k: Int = 1) { println("fn") }
+          |  def this(o: Object) { println("obj") }
+          |}
+          |new A(x -> x)
+          |""".stripMargin, "ld9.on", Array[String]())
+      assert(Shell.Failure(-1) == result)
+    }
+    it("keeps a typed lambda on the Object constructor, as on main") {
+      val result = shell.run(
+        """
+          |class A {
+          |public:
+          |  val tag: String
+          |  def this(f: Int -> Int, k: Int = 1) { tag = "fn" }
+          |  def this(o: Object) { tag = "obj" }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return new A((x: Int) -> x).tag }
+          |}
+          |""".stripMargin, "ld10.on", Array[String]())
+      assert(Shell.Success("obj") == result)
+    }
   }
 }

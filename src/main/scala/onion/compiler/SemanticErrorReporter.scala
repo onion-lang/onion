@@ -243,9 +243,11 @@ class SemanticErrorReporter(threshold: Int) {
         // already failed, so a name+arity match here can only be this stdlib method.
         val className = FormerDefaultImportLookup.find(name, argTypes.length).get
         Some(format(message("suggestion.stdlibNoLongerDefaultImported"), Seq(className, name)))
-      } else if (isUnqualifiedCall && NotDefaultImportedLookup.find(name, argTypes.length).isDefined) {
+      } else if (isUnqualifiedCall && NotDefaultImportedLookup.find(name, argTypes).isDefined) {
         // `sum(xs)`, `sha256(s)`: pure helpers that were never default-imported (#2723).
-        Some(format(message("suggestion.stdlibNotDefaultImported"), Seq(NotDefaultImportedLookup.find(name, argTypes.length).get, name)))
+        // Only when an overload takes these argument types (#2925): `bytes("abc")` must not be
+        // pointed at `Format::bytes(Long)`, which would fail again.
+        Some(format(message("suggestion.stdlibNotDefaultImported"), Seq(NotDefaultImportedLookup.find(name, argTypes).get, name)))
       } else if (ForeignCollectionNames.contains(name) && isListType(targetType)) {
         // The name another language gives a List operation Onion also has, under its own
         // name (Scala `sortBy`/`foldLeft`/`forall`, Kotlin `joinToString`/`sumOf`, Ruby
@@ -637,20 +639,51 @@ class SemanticErrorReporter(threshold: Int) {
     private val classes: Seq[Class[?]] =
       Seq(classOf[onion.Stats], classOf[onion.Hash], classOf[onion.Codec], classOf[onion.Format])
 
-    private lazy val index: Map[(String, Int), String] = {
+    private lazy val index: Map[(String, Int), Seq[(String, Array[Class[?]])]] = {
       val entries = for {
         cls <- classes
         m <- cls.getMethods
         mods = m.getModifiers
         if java.lang.reflect.Modifier.isStatic(mods) && java.lang.reflect.Modifier.isPublic(mods)
         if m.getDeclaringClass == cls
-      } yield (m.getName, m.getParameterCount) -> cls.getSimpleName
-      entries.groupBy(_._1).collect {
-        case (key, matches) if matches.map(_._2).distinct.size == 1 => key -> matches.head._2
-      }
+      } yield (m.getName, m.getParameterCount) -> (cls.getSimpleName, m.getParameterTypes.asInstanceOf[Array[Class[?]]])
+      entries.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
     }
 
-    def find(name: String, arity: Int): Option[String] = index.get((name, arity))
+    /** The one class whose `name` overload accepts `argTypes`; none if no or several classes do. */
+    def find(name: String, argTypes: Array[TypedAST.Type]): Option[String] =
+      val owners = index.getOrElse((name, argTypes.length), Seq.empty)
+        .filter { case (_, params) => params.indices.forall(i => javaParamAccepts(params(i), argTypes(i))) }
+        .map(_._1).distinct
+      if owners.size == 1 then Some(owners.head) else None
+  }
+
+  /** Lenient: an unknown, generic or function-valued argument counts as accepted. */
+  private def javaParamAccepts(param: Class[?], arg: TypedAST.Type): Boolean = {
+    val a = arg match
+      case n: TypedAST.NullableType => n.innerType
+      case other => other
+    def load(n: String): Option[Class[?]] = try Some(Class.forName(n)) catch case _: Throwable => None
+    a match
+      case null => true
+      case _: TypedAST.TypeVariableType => true
+      case _ if a.isNullType || a.isBottomType => !param.isPrimitive
+      case ab: TypedAST.BasicType =>
+        if param.isPrimitive then
+          val order = Seq("byte", "short", "int", "long", "float", "double")
+          (param.getName, ab.name) match
+            case ("boolean", n) => n == "boolean"
+            case (_, "boolean") => false
+            case ("char", n) => n == "char"
+            case (p, "char") => Seq("int", "long", "float", "double").contains(p)
+            case (p, n) => order.indexOf(p) >= order.indexOf(n) && order.contains(n) && order.contains(p)
+        else load(boxedName(ab)).forall(param.isAssignableFrom)
+      case ct: TypedAST.ClassType =>
+        val n = rawOf(ct).name
+        if n.startsWith("onion.Function") then true
+        else if param.isPrimitive then n == java.lang.reflect.Array.get(java.lang.reflect.Array.newInstance(param, 1), 0).getClass.getName
+        else load(n).forall(param.isAssignableFrom)
+      case _ => true
   }
 
   private def fieldNamed(targetType: TypedAST.Type, name: String): Boolean =

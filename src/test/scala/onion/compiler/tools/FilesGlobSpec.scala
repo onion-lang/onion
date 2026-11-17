@@ -75,4 +75,25 @@ class FilesGlobSpec extends AbstractShellSpec {
     )
     assert(Shell.Success("[a.on, b.on, x.md] [{q]") == result)
   }
+
+  it("a nested brace group expands instead of throwing (#3130)") {
+    val dir = (System.getProperty("java.io.tmpdir") + "/onion-files-glob-3130").replace('\\', '/')
+    val result = shell.run(
+      s"""
+        |class Test {
+        |public:
+        |  static def main(args: String[]): String {
+        |    Files::mkdirs("$dir/a")
+        |    Files::writeText("$dir/c", "")
+        |    Files::writeText("$dir/x.md", "")
+        |    Files::writeText("$dir/z.txt", "")
+        |    return Files::glob("$dir", "{a,{c,x.md}}").toString()
+        |  }
+        |}
+        |""".stripMargin,
+      "FilesGlobNested.on",
+      Array()
+    )
+    assert(Shell.Success("[a, c, x.md]") == result)
+  }
 }

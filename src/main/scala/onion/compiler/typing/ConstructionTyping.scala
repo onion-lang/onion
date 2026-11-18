@@ -384,6 +384,72 @@ final class ConstructionTyping(
         case Some(result) => break(result)
         case None => // ambiguous/unresolved: fall through to the eager path, which reports E0052 / constructor-not-found
       }
+      // `new A(x -> x * 2)` for `A(f: Int -> Int, k: Int = 1)`: no constructor takes exactly
+      // this many arguments with a slot for each lambda, but exactly one takes them with
+      // defaults filled in. Its formals type the lambda, as they do on the named-argument
+      // path (#2919). Like a method call, only constructors whose parameter at each lambda's
+      // position can take a lambda are candidates, so an unrelated overload changes nothing.
+      // Only a lambda with an untyped parameter takes this path: that is the call `main`
+      // rejected with E0052. A typed or zero-parameter lambda keeps the eager resolution,
+      // where an `Object` overload with more defaults can still win.
+      val classSubst = TypeSubstitution.classSubstitution(typeRef)
+      def closureOf(arg: AST.Expression): Option[AST.ClosureExpression] = arg match {
+        case c: AST.ClosureExpression => Some(c)
+        case block: AST.BlockExpression if block.elements.nonEmpty =>
+          block.elements.last match {
+            case c: AST.ClosureExpression => Some(c)
+            case _ => None
+          }
+        case _ => None
+      }
+      def closureArity(arg: AST.Expression): Int = closureOf(arg).map(_.args.length).getOrElse(-1)
+      val needsParameterTypes = untypedClosureIndices.exists { i =>
+        closureOf(node.args(i)).exists(_.args.exists(_.typeRef == null))
+      }
+      // A parameter after class substitution, with `?` removed: a nullable function type
+      // takes a lambda just as the function type does.
+      def lambdaSlot(formal: Type): Type =
+        TypeSubstitution.substituteType(formal, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false) match {
+          case n: NullableType => n.innerType
+          case t => t
+        }
+      def lambdasFit(c: ConstructorRef): Boolean = {
+        val formals = c.getArgs
+        formals.length >= node.args.length &&
+          untypedClosureIndices.forall(i => closureCanTarget(lambdaSlot(formals(i)), closureArity(node.args(i))))
+      }
+      val ctors = typeRef.constructors
+      val fillsDefaults = ctors.filter {
+        case cd: ConstructorDefinition =>
+          cd.argumentsWithDefaults != null &&
+            node.args.length < cd.argumentsWithDefaults.length &&
+            node.args.length >= cd.minArguments &&
+            lambdasFit(cd)
+        case _ => false
+      }
+      // Another constructor competes when a function value is assignable to its parameter at
+      // any lambda's position (#2919's rule): a function or SAM type, or a supertype of every
+      // function type (`Object`, a type variable), after class substitution and ignoring `?`.
+      // It would take the lambda too, whether it needs all the arguments or fills defaults, so
+      // a type annotation on the lambda could silently pick it; the call stays E0052 as on `main`.
+      def functionValueFits(formal: Type, arity: Int): Boolean = lambdaSlot(formal) match {
+        case _: TypeVariableType => true
+        case t: ClassType if (t match { case a: AppliedClassType => a.raw; case _ => t }).name == "java.lang.Object" => true
+        case t => closureCanTarget(t, arity)
+      }
+      def competes(c: ConstructorRef): Boolean = {
+        val formals = c.getArgs
+        val accepts = c match {
+          case cd: ConstructorDefinition => cd.argumentsWithDefaults != null && formals.length >= node.args.length && node.args.length >= cd.minArguments
+          case _ => formals.length == node.args.length
+        }
+        accepts && untypedClosureIndices.exists(i => functionValueFits(formals(i), closureArity(node.args(i))))
+      }
+      if (needsParameterTypes && fillsDefaults.length == 1 &&
+          !ctors.exists(c => c.getArgs.length == node.args.length && lambdasFit(c)) &&
+          !ctors.exists(c => !(c eq fillsDefaults.head) && competes(c))) {
+        break(typeNewObjectWithNamedArgs(node, typeRef, context, null, fillsDefaults))
+      }
     }
 
     // Existing positional argument handling. A malleable argument (a
@@ -1072,9 +1138,10 @@ final class ConstructionTyping(
     node: AST.NewObject,
     typeRef: ClassType,
     context: LocalContext,
-    positional: Array[Term] = null
+    positional: Array[Term] = null,
+    only: Seq[ConstructorRef] = null
   ): Option[Term] =
-    resolveConstructorWithNamedArgs(node, node.args, typeRef, context, positional)
+    resolveConstructorWithNamedArgs(node, node.args, typeRef, context, positional, only)
       .filter { case (ctor, _, _) => constructorAccessible(node, ctor) }
       .map { case (ctor, resolved, _) =>
         val params = ArgumentHelpers.evaluateInWrittenOrder(node.args, ctor.argumentsWithDefaults.toSeq.map(_.name), resolved, context)
@@ -1111,13 +1178,15 @@ final class ConstructionTyping(
     args: List[AST.Expression],
     typeRef: ClassType,
     context: LocalContext,
-    positional: Array[Term] = null
+    positional: Array[Term] = null,
+    only: Seq[ConstructorRef] = null
   ): Option[(ConstructorDefinition, Array[Term], Array[AST.Node])] = {
     // Extract named argument info
     val namedInfo = extractNamedArgInfo(args)
 
     // Filter constructors by named argument compatibility
-    val byCount = filterConstructorsByNamedArgs(typeRef.constructors.toIndexedSeq, namedInfo)
+    val pool = if (only == null) typeRef.constructors.toIndexedSeq else typeRef.constructors.toIndexedSeq.filter(c => only.exists(_ eq c))
+    val byCount = filterConstructorsByNamedArgs(pool, namedInfo)
     val candidates =
       if (byCount.length <= 1 || positional == null || positional.contains(null) ||
           namedInfo._2.nonEmpty || positional.length != namedInfo._1) byCount

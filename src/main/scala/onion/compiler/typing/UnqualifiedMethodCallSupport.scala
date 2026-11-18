@@ -96,10 +96,13 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     // and retypes the malleable ones against its resolved parameter types --
     // before giving up and re-running unsuppressed to report the real error.
     val hasMalleable = calls.hasMalleableArgs(node.args)
+    var eagerMutedErrors = false
     val params0 = {
+      val mutedBefore = calls.typing.suppressedErrorCount
       val eager =
         if (hasMalleable) calls.typing.withSuppressedReporting(calls.typedTerms(node.args.toArray, context))
         else calls.typedTerms(node.args.toArray, context)
+      eagerMutedErrors = hasMalleable && eager != null && calls.typing.suppressedErrorCount != mutedBefore
       if (eager != null || !hasMalleable) eager
       else {
         val topLevel = bodyContext.topLevelClass.filter(t => !(t eq targetType))
@@ -154,6 +157,10 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params, expected, context) match {
         case MethodFallbackLookup.Found(term) =>
           checkRegexLiteral(node, term)
+          if (eagerMutedErrors) staticImportCallee(term).foreach { m =>
+            if (!m.isVararg && m.arguments.length == node.args.length)
+              reportErrorsMutedInKeptArguments(node.args, m.arguments, context)
+          }
           Some(term)
         case MethodFallbackLookup.Error =>
           None
@@ -190,10 +197,49 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       if (!ensureInstanceAvailable(node, method, context)) return None
       val classSubst = selfClassSubstitution(method)
       calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
-        expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs),
+        expectedArgs => calls.prepareCallParams(node, node.args, method, params, expectedArgs).map { finalParams =>
+          if (eagerMutedErrors) reportErrorsMutedInKeptArguments(node.args, expectedArgs, context)
+          finalParams
+        },
         finalParams => rawUnqualifiedCall(targetType, method, finalParams, context)
       )
     }
+  }
+
+  /**
+   * The arguments were typed with errors muted (a malleable argument may need the parameter
+   * type to type at all), and that typing is kept when it succeeds. An error it muted that the
+   * parameter type does not cure was lost: a type error in the lambda of `p(call { ... })`
+   * compiled, then failed with a VerifyError (#3174). Once the call is resolved, each argument
+   * is typed once more against its parameter type, with reporting on, to report them.
+   */
+  private def reportErrorsMutedInKeptArguments(
+    args: List[AST.Expression],
+    expectedArgs: Array[Type],
+    context: LocalContext
+  ): Unit =
+    if (calls.typing.reportingEnabled && expectedArgs != null && !ArgumentHelpers.hasNamedArguments(args)) {
+      for (i <- args.indices if i < expectedArgs.length) {
+        val formal = expectedArgs(i)
+        if (formal != null && !mentionsTypeVariable(formal))
+          calls.typed(args(i), context, formal)
+      }
+    }
+
+  /** The method a statically imported call (`println(..)`) resolved to, under any cast. */
+  private def staticImportCallee(term: Term): Option[Method] = term match {
+    case c: CallStatic => Some(c.method)
+    case c: AsInstanceOf => staticImportCallee(c.target)
+    case _ => None
+  }
+
+  private def mentionsTypeVariable(t: Type): Boolean = t match {
+    case _: TypeVariableType => true
+    case applied: AppliedClassType => applied.typeArguments.exists(mentionsTypeVariable)
+    case at: ArrayType => mentionsTypeVariable(at.base)
+    case n: NullableType => mentionsTypeVariable(n.innerType)
+    case w: WildcardType => mentionsTypeVariable(w.upperBound) || w.lowerBound.exists(mentionsTypeVariable)
+    case _ => false
   }
 
   private def declaresCallee(name: String): Boolean = {

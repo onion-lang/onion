@@ -204,7 +204,16 @@ public final class ConfigShape<T> implements Shape<T> {
             String baseTag = baseTag(tag);
             Integer at = keyToLine.get(name);
             if (at == null) {
-                if (!nullable) defects.add(Defect.at(origin, name, tag, "absent"));
+                if (!nullable) {
+                    String near = nearMiss(name, keyToLine.keySet());
+                    if (near == null) {
+                        defects.add(Defect.at(origin, name, tag, "absent"));
+                    } else {
+                        int nearLine = keyToLine.get(near) + 1;
+                        defects.add(Defect.at(Origin.atLine(source, nearLine), name, tag,
+                            "absent (did you mean \"" + near + "\" on line " + nearLine + "?)"));
+                    }
+                }
                 values.add(null);
                 continue;
             }
@@ -229,6 +238,40 @@ public final class ConfigShape<T> implements Shape<T> {
         T value = build.call(values);
         return Outcome.ok(new Lossless<>(value,
             new ConfigResidue(lines, entryLines, values, trailingNewline), this));
+    }
+
+    /**
+     * An unknown key in the document that looks like a misspelling of {@code name}: equal
+     * ignoring case, or within edit distance 2. Keys that another component owns are never
+     * offered. Keys stay case-sensitive; this only feeds the defect text (#2996).
+     */
+    private String nearMiss(String name, java.util.Set<String> keys) {
+        String best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (String key : keys) {
+            if (names.contains(key)) continue;
+            int d = key.equalsIgnoreCase(name) ? 0 : editDistance(name, key);
+            if (d <= 2 && d < bestDistance) {
+                best = key;
+                bestDistance = d;
+            }
+        }
+        return best;
+    }
+
+    private static int editDistance(String a, String b) {
+        int[] prev = new int[b.length() + 1];
+        int[] cur = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) prev[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            cur[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] t = prev; prev = cur; cur = t;
+        }
+        return prev[b.length()];
     }
 
     @Override

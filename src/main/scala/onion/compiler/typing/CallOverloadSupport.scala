@@ -256,8 +256,17 @@ private[compiler] final class CallOverloadSupport(
   ): CandidateSelection[ApplicableMethod] = {
     // Java-style phasing: varargs are only considered when no fixed-arity
     // method is applicable (List.of(1,2,3) prefers of(E,E,E) over of(E...))
+    // A varargs overload handed its array (or null) in the last slot is a fixed-arity call
+    // and stays in the first phase, as in Java: `s(arr)` with `s(Object)`/`s(Object...)`
+    // takes `s(Object...)` (#2955).
+    def fixedArity(a: ApplicableMethod): Boolean =
+      !a.method.isVararg || (argTypes != null && argTypes.length == a.expectedArgs.length &&
+        argTypes.nonEmpty && {
+          val last = argTypes.last
+          last != null && (last.isNullType || (last.isArrayType && TypeRules.isSuperType(a.expectedArgs.last, last)))
+        })
     val phased =
-      if (applicable0.exists(a => !a.method.isVararg)) applicable0.filter(a => !a.method.isVararg)
+      if (applicable0.exists(fixedArity)) applicable0.filter(fixedArity)
       else applicable0
     // `null` never fills a primitive slot: prefer the overloads it can (#2876). When every
     // overload takes a primitive there, keep them all so E0000 still reports at the `null`.

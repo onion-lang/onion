@@ -96,7 +96,7 @@ public final class Json {
     /**
      * Convert a Java object to JSON string.
      * @param obj Object to serialize (Map, List or any other Collection, a Java array,
-     *            a record, String, Number, Boolean, or null). A Collection or array is
+     *            a record, String, Number, Boolean, or null). Any Iterable (a range included) or array is
      *            written as a JSON array, in its iteration order.
      * @return JSON string
      */
@@ -630,6 +630,14 @@ public final class Json {
             // A List keeps its order; a Set or other Collection is written in its own
             // iteration order. Before #2993 a Set fell through to the toString() fallback.
             return stringifyArray((Collection<?>) obj, depth, pretty);
+        } else if (obj instanceof Iterable && !(obj instanceof java.nio.file.Path)) {
+            // An Iterable that is not a Collection, such as a range `1..3` (#3010).
+            // A Path is Iterable<Path> but is a single value, so it keeps the string form.
+            List<Object> items = new ArrayList<>();
+            for (Object item : (Iterable<?>) obj) {
+                items.add(item);
+            }
+            return stringifyArray(items, depth, pretty);
         } else if (obj.getClass().isArray()) {
             // Object and primitive arrays alike; the fallback below wrote the JVM
             // identity string ("[I@2d1dee39"), which changes on every run (#2993).

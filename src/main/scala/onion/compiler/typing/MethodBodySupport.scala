@@ -481,8 +481,14 @@ private[compiler] final class MethodBodySupport(
         case n: TypedAST.NullableType => n.innerType.isInstanceOf[TypedAST.TypeVariableType]
         case _ => false
       })
+    // A slot the parent's type arguments made concrete (`extends C[Integer](..)` turns
+    // `List[T]` into `List[Integer]`) gets the check `new C[Integer](..)` gives it; the
+    // erased match alone let a `List[Double]` in (#3016).
+    def concreteSlotFits: Boolean =
+      TypeCheckingHelpers.containsTypeVariable(formal) || param == null || param.`type` == null ||
+        TypeRelations.isConstructorArgAssignable(formal, param.`type`, bodyContext.table)
     formal == null || javaWildcardSlot ||
-      (!primitiveIntoVar && AssignabilitySupport.typeVariableSlotFits(formal, param, bodyContext.table))
+      (!primitiveIntoVar && concreteSlotFits && AssignabilitySupport.typeVariableSlotFits(formal, param, bodyContext.table))
   }
 
   /** Checks the constructor that `extends C[T](..)` resolved against its type-variable slots.

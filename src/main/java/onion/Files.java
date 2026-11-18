@@ -335,10 +335,17 @@ public final class Files {
         int open = -1;
         int level = 0;
         java.util.List<Integer> commas = new java.util.ArrayList<>();
+        boolean inClass = false; // inside [...]: braces and commas are literal
         for (int i = 0; i < p.length(); i++) {
             char c = p.charAt(i);
             if (c == '\\') { i++; continue; }
-            if (c == '{') {
+            if (inClass) {
+                if (c == ']') inClass = false;
+                continue;
+            }
+            if (c == '[') {
+                inClass = true;
+            } else if (c == '{') {
                 if (level == 0) { open = i; commas.clear(); }
                 level++;
             } else if (c == ',' && level == 1) {
@@ -383,13 +390,18 @@ public final class Files {
     public static java.util.List<String> glob(String dir, String pattern) throws IOException {
         java.nio.file.Path base = java.nio.file.Paths.get(dir);
         if (pattern.startsWith("./")) pattern = pattern.substring(2);
-        java.nio.file.PathMatcher matcher =
-            base.getFileSystem().getPathMatcher("glob:" + pattern);
+        java.util.ArrayList<java.nio.file.PathMatcher> matchers = new java.util.ArrayList<>();
+        // The JDK rejects nested brace groups; the expansion below handles
+        // them, so a failed compile only matters if nothing else compiles.
+        java.util.regex.PatternSyntaxException original = null;
+        try {
+            matchers.add(base.getFileSystem().getPathMatcher("glob:" + pattern));
+        } catch (java.util.regex.PatternSyntaxException e) {
+            original = e;
+        }
         // A "**/" segment also matches zero directories (as bash globstar and
         // Python glob do); Java's matcher needs at least one. Brace
         // alternatives are expanded first, so each one gets the same rule.
-        java.util.ArrayList<java.nio.file.PathMatcher> matchers = new java.util.ArrayList<>();
-        matchers.add(matcher);
         java.util.LinkedHashSet<String> patterns = new java.util.LinkedHashSet<>();
         for (String alt : expandBraces(pattern, 0)) {
             java.util.List<java.util.List<String>> variants = new java.util.ArrayList<>();
@@ -410,9 +422,15 @@ public final class Files {
         }
         for (String joined : patterns) {
             if (!joined.isEmpty() && !joined.equals(pattern)) {
-                matchers.add(base.getFileSystem().getPathMatcher("glob:" + joined));
+                try {
+                    matchers.add(base.getFileSystem().getPathMatcher("glob:" + joined));
+                } catch (java.util.regex.PatternSyntaxException e) {
+                    // an expanded alternative that does not compile adds nothing;
+                    // the original pattern above is always kept
+                }
             }
         }
+        if (matchers.isEmpty() && original != null) throw original;
         java.util.ArrayList<String> result = new java.util.ArrayList<>();
         if (!java.nio.file.Files.isDirectory(base)) return result;
         // walkFileTree with a tolerant visitor: unreadable entries (other

@@ -158,6 +158,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
           sourceContext.context,
           sourceContext.sourceLine,
           sourceContext.precedingText,
+          sourceContext.followingText,
           expectedAll
         )
       )
@@ -186,6 +187,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
           sourceContext.context,
           sourceContext.sourceLine,
           sourceContext.precedingText,
+          sourceContext.followingText,
           error.expectedAll
         )
       )
@@ -219,6 +221,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
           sourceContext.context,
           sourceContext.sourceLine,
           sourceContext.precedingText,
+          sourceContext.followingText,
           expectedAll
         )
       )
@@ -237,6 +240,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
     context: String,
     sourceLine: String,
     precedingText: String,
+    followingText: String,
     expectedAll: String
   ): String = {
     // At EOF the expected-token list is a large, unhelpful dump; report the real
@@ -256,7 +260,7 @@ class Parsing(config: CompilerConfig) extends AnyRef
       else if (found == OnionParser.ShortLiteralOutOfRangeMarker) Message("error.parsing.short_literal_out_of_range")
       else Message("error.parsing.syntax_error", displayTokenImage(found), expected)
     val hint = SyntaxHintClassifier
-      .classify(found, if (expectedAll == null) expected else expectedAll, context, sourceLine, precedingText)
+      .classify(found, if (expectedAll == null) expected else expectedAll, context, sourceLine, precedingText, followingText)
       .map(renderSyntaxHint)
       .getOrElse("")
     if (hint.isEmpty) base else base + " " + hint

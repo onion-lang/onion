@@ -171,7 +171,7 @@ private[compiler] final class InstanceMethodCallSupport(
           calls.selectSingleMethod(node, targetType, name, getters, calls.types(params)) match {
             case Some(getter) if (getter.modifier & AST.M_STATIC) == 0 =>
               val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, getter.affiliation, TypeSubstitution.isSelfReceiver(target))
-              return calls.buildResolvedCall(node, getter, params, node.typeArgs, classSubst, expected)(
+              return calls.buildResolvedCall(node, getter, params, node.typeArgs, classSubst, expected, context)(
                 expectedArgs => calls.prepareCallParams(node, node.args, getter, params, expectedArgs),
                 finalParams => new Call(target, getter, finalParams)
               )
@@ -195,7 +195,7 @@ private[compiler] final class InstanceMethodCallSupport(
         val targetTyped =
           if (node.typeArgs.nonEmpty) params
           else calls.retypeTargetTypedClosures(node, method, node.args, params, classSubst, context, expected)
-        calls.buildResolvedCall(node, method, targetTyped, node.typeArgs, classSubst, expected)(
+        calls.buildResolvedCall(node, method, targetTyped, node.typeArgs, classSubst, expected, context)(
           expectedArgs => calls.prepareCallParams(node, node.args, method, targetTyped, expectedArgs),
           finalParams => new Call(target, method, finalParams)
         )
@@ -247,7 +247,7 @@ private[compiler] final class InstanceMethodCallSupport(
       case CandidateSelection.Selected(method) =>
         val classSubst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
         calls.processNamedArguments(node, node.args, method, context, pretyped).flatMap { params =>
-          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected)(
+          calls.buildResolvedCall(node, method, params, node.typeArgs, classSubst, expected, context)(
             expectedArgs => calls.processParamsWithExpected(node, params, expectedArgs, method)
               .map(ArgumentHelpers.evaluateInWrittenOrder(node.args, method.argumentsWithDefaults.toSeq.map(_.name), _, context)),
             finalParams => new Call(target, method, finalParams)

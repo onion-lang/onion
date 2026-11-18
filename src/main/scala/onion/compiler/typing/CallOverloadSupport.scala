@@ -256,9 +256,22 @@ private[compiler] final class CallOverloadSupport(
   ): CandidateSelection[ApplicableMethod] = {
     // Java-style phasing: varargs are only considered when no fixed-arity
     // method is applicable (List.of(1,2,3) prefers of(E,E,E) over of(E...))
-    val applicable =
+    val phased =
       if (applicable0.exists(a => !a.method.isVararg)) applicable0.filter(a => !a.method.isVararg)
       else applicable0
+    // `null` never fills a primitive slot: prefer the overloads it can (#2876). When every
+    // overload takes a primitive there, keep them all so E0000 still reports at the `null`.
+    val applicable =
+      if (phased.length < 2 || argTypes == null) phased
+      else {
+        val nullOk = phased.filter { a =>
+          argTypes.indices.forall { i =>
+            val t = argTypes(i)
+            !(t != null && t.isNullType && i < a.expectedArgs.length && a.expectedArgs(i).isBasicType)
+          }
+        }
+        if (nullOk.nonEmpty) nullOk else phased
+      }
     if (applicable.isEmpty) CandidateSelection.NoMatch
     else if (applicable.length == 1) CandidateSelection.Selected(applicable.head)
     else {

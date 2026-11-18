@@ -88,8 +88,11 @@ println(double(21))   // 42
 
 Under the hood a function value is an object implementing `onion.Function0` ..
 `onion.Function10`, whose single method is `call`; `double(21)` compiles to
-`double(21)`. You only need to spell `.call` yourself when handing a function
-value to Java code that expects to invoke it by that name.
+`double.call(21)`. You spell `.call` yourself in two cases:
+
+- handing a function value to Java code that expects to invoke it by that name
+- calling a function that another call returned: `adder(1)(2)` is a syntax error,
+  so write `adder(1).call(2)`, or bind it first (`val add1 = adder(1)`, then `add1(2)`)
 
 ## Function Types
 

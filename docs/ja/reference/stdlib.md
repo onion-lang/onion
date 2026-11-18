@@ -13,7 +13,7 @@ Onionの標準ライブラリは、一般的な機能のための組み込みモ
 | **並行処理** | `Future`, `Concurrent`（プール・カウンタ・ロック・チャネル） |
 | **コレクション** | `Colls`（リスト: map/filter/fold, chunked/windowed, sumBy/maxBy）, `Iterables`, `Maps`, `Sets`, `Range`（`a..b`/`a..<b`リテラルの型） |
 | **テキスト** | `Strings`（大小文字・分割・パディング・パース）, `Text`（wrap/indent/table）, `Regex` |
-| **数値** | `Math`, `OnionMath`（双曲線関数, `clamp`, `hypot`, 範囲付き`randomInt`）, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
+| **数値** | `Math`, `OnionMath`（双曲線関数, `clamp`, `hypot`）, `Stats`（sum/average/median/stddev）, `Format`（桁区切り・bytes・duration） |
 | **データ形式** | `Json`, `Yaml`, `Csv`, `Config`（ドット記法での設定値アクセス） |
 | **エンコード** | `Codec`（base64/hex/url）, `Hash`（md5/sha256/…） |
 | **関数型** | `Option`, `Result`, `Future`, `Outcome`・`Defect`（外部データの読み取り） |
@@ -217,8 +217,8 @@ val e: Double = Math::E         // 2.71828...
 
 ## OnionMath モジュール
 
-JDKの`Math`とは別の`onion.*`数値モジュールで、双曲線関数、安全な丸め・クランプ、範囲付きの
-乱数整数を提供します。標準ライブラリの他のモジュールと同様デフォルトでインポートされるため、
+JDKの`Math`とは別の`onion.*`数値モジュールで、双曲線関数、安全な丸め・クランプ、乱数の
+`Double`を提供します。範囲内の乱数の`Int`には`Rand::nextInt(min, max)`を使います。標準ライブラリの他のモジュールと同様デフォルトでインポートされるため、
 明示的なインポートは不要です。
 
 ### OnionMath::sin / OnionMath::cos / OnionMath::tan / OnionMath::asin / OnionMath::acos / OnionMath::atan / OnionMath::atan2
@@ -288,14 +288,14 @@ val r: Long = OnionMath::round(3.5)       // 4
 val rf: Int = OnionMath::roundFloat(3.5f) // 4
 ```
 
-### OnionMath::random / OnionMath::randomInt
+### OnionMath::random
 
-乱数生成。`Math::random`と異なり、`randomInt`は範囲を直接指定でき、エフェクトチェッカーに
-よって`Rand`エフェクトとして追跡されます：
+ランダムな`Double`を返します。エフェクトチェッカーは`Rand`エフェクトとして追跡します。範囲内の
+ランダムな`Int`には`Rand::nextInt(min, max)`（後述）を使ってください。その`max`は含まれません。
 
 ```onion
 val r: Double = OnionMath::random()          // [0.0, 1.0)
-val n: Int = OnionMath::randomInt(1, 10)     // [1, 10]（両端含む）
+val n: Int = Rand::nextInt(1, 11)            // 1から10
 ```
 
 ### OnionMath::signum / OnionMath::signumFloat
@@ -854,6 +854,10 @@ val dice: Int = Rand::nextInt(6) + 1      // 1から6
 val percent: Int = Rand::nextInt(100)     // 0から99
 val d20: Int = Rand::nextInt(1, 21)       // 1から20（min, 排他的max）
 ```
+
+`max`は含まれません。`a..<b`、Javaの`ThreadLocalRandom`、Kotlinの`Random.nextInt(from, until)`と
+同じです。そのため`Rand::nextInt(0, xs.size)`は`xs`の有効な添字になります。
+`max`を含んでいた`OnionMath`の`randomInt`は削除されました（`docs/ja/migration/pre-1.0.md`を参照）。
 
 ### Rand::nextLong（範囲指定）
 

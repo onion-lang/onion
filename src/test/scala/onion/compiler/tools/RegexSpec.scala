@@ -279,6 +279,81 @@ class RegexSpec extends AbstractShellSpec {
     }
 
     describe("invalid pattern") {
+      it("reports an invalid pattern to matchGroups with a Regex::matchGroups-prefixed message") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::matchGroups("x", "(");
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::matchGroups: invalid pattern"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports an invalid pattern to captureGroup with a Regex::captureGroup-prefixed message") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::captureGroup("x", "(", 1);
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::captureGroup: invalid pattern"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
+      it("reports a missing group to captureGroup, naming the call and the group count") {
+        val result = shell.run(
+          """
+            |import { onion.Regex; }
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    try {
+            |      Regex::captureGroup("12", "(\\d+)", 3);
+            |      return "no-throw";
+            |    } catch e: IllegalArgumentException {
+            |      return e.getMessage();
+            |    }
+            |  }
+            |}
+            |""".stripMargin,
+          "None",
+          Array()
+        )
+        result match {
+          case Shell.Success(message) => assert(message.asInstanceOf[String].startsWith("Regex::captureGroup: group 3 does not exist;"))
+          case other => fail(s"expected Shell.Success, got $other")
+        }
+      }
+
       it("reports an invalid pattern to matches with an Regex::matches-prefixed message, not the raw JDK one") {
         val result = shell.run(
           """

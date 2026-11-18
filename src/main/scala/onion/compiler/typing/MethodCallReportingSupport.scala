@@ -50,7 +50,15 @@ private[compiler] final class MethodCallReportingSupport(
     }
     val hexDigitBHint: AnyRef =
       if (passesHexEndingInBForByte(node, targetType, name, argTypes.length)) SemanticErrorReporter.HexDigitBHint else null
-    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed, java.lang.Boolean.valueOf(calledStatically), enclosingStaticOwner, hexDigitBHint)
+    // A bare `randomInt(a, b)` is the removed `OnionMath::randomInt` that `onion migrate`
+    // rewrites only through `import { onion.OnionMath::* }`; the hint may promise the edit only
+    // there (#3116 block 7). A qualified call is always one migrate rewrites.
+    val randomIntMigrates: java.lang.Boolean = java.lang.Boolean.valueOf(
+      name == "randomInt" && (!isUnqualifiedCall || bodyContext.staticImportedList.getItems.exists { item =>
+        item.getName == "onion.OnionMath" && item.importsMethod("randomInt")
+      })
+    )
+    bodyContext.report(METHOD_NOT_FOUND, node, targetType, name, argTypes, java.lang.Boolean.valueOf(isUnqualifiedCall), extensionReceiverHint, inaccessibleFieldNamed, java.lang.Boolean.valueOf(calledStatically), enclosingStaticOwner, hexDigitBHint, randomIntMigrates)
   }
 
   // `f(0xFFB)` where some `f` of that arity takes a Byte in that position: before #2324 the
@@ -80,18 +88,24 @@ private[compiler] final class MethodCallReportingSupport(
   def reportAmbiguousMethods(
     node: AST.Node,
     name: String,
-    methods: Array[Method]
+    methods: Array[Method],
+    argTypes: Array[Type] = null
   ): Unit =
-    reportAmbiguousMethod(node, methods(0), methods(1), name)
+    reportAmbiguousMethod(node, methods(0), methods(1), name, argTypes)
 
+  /** `argTypes` (null for a lambda argument) lets the error name an argument to cast (#2845). */
   def reportAmbiguousMethod(
     node: AST.Node,
     first: Method,
     second: Method,
-    name: String = null
+    name: String = null,
+    argTypes: Array[Type] = null
   ): Unit = {
     val methodName = if (name != null) name else first.name
-    reportAmbiguousSignature(node, first.affiliation, methodName, first.arguments, second.affiliation, methodName, second.arguments)
+    val callInfo =
+      if (argTypes == null) null
+      else onion.compiler.SemanticErrorReporter.AmbiguousCallArguments(argTypes, first.isVararg, second.isVararg)
+    reportAmbiguousSignature(node, first.affiliation, methodName, first.arguments, second.affiliation, methodName, second.arguments, callInfo)
   }
 
   def reportAmbiguousSignature(

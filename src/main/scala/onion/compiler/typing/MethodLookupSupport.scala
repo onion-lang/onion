@@ -31,7 +31,9 @@ final class MethodLookupSupport(
           AMBIGUOUS_METHOD,
           node,
           Array[AnyRef](methods(0).affiliation, name, methods(0).arguments),
-          Array[AnyRef](methods(1).affiliation, name, methods(1).arguments)
+          Array[AnyRef](methods(1).affiliation, name, methods(1).arguments),
+          onion.compiler.SemanticErrorReporter.AmbiguousCallArguments(
+            params.map(t => if (t == null) null else t.`type`), methods(0).isVararg, methods(1).isVararg)
         )
         Left(false)
       } else if (!MemberAccess.isMemberAccessible(methods(0), bodyContext.definition, receiver)) {

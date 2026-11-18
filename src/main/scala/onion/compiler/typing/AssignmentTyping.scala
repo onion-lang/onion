@@ -139,9 +139,23 @@ final class AssignmentTyping(
     else {
       val subst = TypeSubstitution.hierarchySubstitution(target.`type`, method.affiliation, TypeSubstitution.isSelfReceiver(target))
       val slots = TypeSubst.paramArgs(method, subst, scala.collection.immutable.Map.empty)
-      val index = body.processAssignable(indexing.rhs, slots(0), params(0), suppressNullWarning = true)
-      val value = body.processAssignable(rhs, slots(1), params(1), suppressNullWarning = true)
-      if (index == null || value == null) null else new Call(target, method, Array[Term](index, value))
+      // `null` into a slot a primitive type argument fills (`xs[0] = null` on a `List[Int]`) is
+      // E0000 with the `Int?` hint, as `xs.set(0, null)` is (#2991).
+      val nullIntoPrimitive = Seq(indexing.rhs -> 0, rhs -> 1).filter { case (_, i) =>
+        params(i).`type`.isNullType && method.argumentTypeAt(i).isInstanceOf[TypeVariableType] &&
+          ArgumentHelpers.primitiveOfNonNullBox(slots(i)).isDefined
+      }
+      if (nullIntoPrimitive.nonEmpty) {
+        nullIntoPrimitive.foreach { case (node, i) =>
+          bodyContext.report(INCOMPATIBLE_TYPE, node, ArgumentHelpers.primitiveOfNonNullBox(slots(i)).get, params(i).`type`,
+            onion.compiler.SemanticErrorReporter.PrimitiveTypeArgumentNullHint)
+        }
+        null
+      } else {
+        val index = body.processAssignable(indexing.rhs, slots(0), params(0), suppressNullWarning = true)
+        val value = body.processAssignable(rhs, slots(1), params(1), suppressNullWarning = true)
+        if (index == null || value == null) null else new Call(target, method, Array[Term](index, value))
+      }
     }
 
   def processMemberAssign(node: AST.Assignment, context: LocalContext): Term = {

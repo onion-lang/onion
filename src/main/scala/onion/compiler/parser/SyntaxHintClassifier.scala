@@ -15,6 +15,10 @@ private[compiler] final case class SyntaxHint(
 private[compiler] object SyntaxHintClassifier {
   private val ParenthesizedTrailingLambdaHead = """\A\{\s*\(([^()]*)\)\s*->""".r
   private val OldArrowTrailingLambdaHead = """\A\{\s*(?:\(?[^(){}=]*\)?)\s*=>""".r
+  // Text just before the offending `(` ends in `)`: a second call suffix after a call.
+  private val CallResultCall = """\)\s*\z""".r
+  // The keywords that open a declaration header (`def f(a: Int)(`, `case A(x: Int)(`).
+  private val DeclarationKeyword = """\b(def|case|class|record|enum|tool|interface|extension|trait)\b""".r
   private val NotOperatorCondition = """^\s*(?:if|while|else\s+if)\s+not\b""".r
   private val TypeofCondition =
     """^\s*(?:if|while|else\s+if)\s+typeof\s+([A-Za-z_][\w.]*)""".r
@@ -304,7 +308,8 @@ private[compiler] object SyntaxHintClassifier {
     expected: String,
     context: String,
     sourceLine: String,
-    precedingText: String = ""
+    precedingText: String = "",
+    followingText: String = ""
   ): Option[SyntaxHint] = {
     lazy val controlFlowHint = ControlFlowSyntaxHints.classify(found, sourceLine)
 
@@ -620,6 +625,29 @@ private[compiler] object SyntaxHintClassifier {
       case ":" if expected.contains("{") && PythonStyleColonBlockHeader.findFirstMatchIn(sourceLine).isDefined =>
         val matched = PythonStyleColonBlockHeader.findFirstMatchIn(sourceLine).get
         hint("error.parsing.hint.python_style_colon_block", matched.group(1), matched.group(2).trim)
+      // `mk()()`: a call's result cannot be called in the same expression. It sits below every
+      // source-line rule, so `switch (x)(1)`, `unless (x)(...)` keep their own hints; and it is
+      // not given where a block is expected (`if (c) (`), for a C-style cast (`(String)(o)`),
+      // where the line starts with a bare call missing its parentheses (`print (x) (y)` keeps
+      // `missing_call_parens`) or inside a declaration header (#2789's rule). The hint quotes
+      // the first call as written (`obj.f()`, `adder(1)`) and carries the second call's
+      // arguments. A header that wraps onto earlier lines is still a header; the `val` it
+      // suggests is named with a name the file does not use, so typing the advice in never
+      // calls an existing method instead. Every scan reads the text with literals and comments
+      // masked (`maskLiterals`), so no bracket or keyword inside one is ever counted.
+      case "(" if !expected.contains("{") && CStyleCast.findFirstMatchIn(sourceLine).isEmpty &&
+          !missingCallParens(expected, sourceLine) &&
+          CallResultCall.findFirstIn(maskedLineBefore(precedingText, textBefore(context, sourceLine))).isDefined &&
+          !inDeclarationHeader(statementBefore(precedingText, textBefore(context, sourceLine))) =>
+        val args = callResultArguments(context)
+        val name = unusedBindingName(precedingText + sourceLine + followingText)
+        val lineBefore = textBefore(context, sourceLine)
+        callResultFirstCall(lineBefore, maskedLineBefore(precedingText, lineBefore)) match {
+          case Some(firstCall) =>
+            val call = if (firstCall.contains("?.")) "?.call" else ".call"
+            hint("error.parsing.hint.call_result_call", firstCall, args, name, call)
+          case None => hint("error.parsing.hint.call_result_call_unnamed", args, name)
+        }
       case _ if expected.contains("{") && !Set(";", "<EOL>", "<EOF>").exists(expected.contains) =>
         hint("error.parsing.hint.block_expected")
       // A Swift-style `guard let x = expr else { ... }` early exit reads as a bare
@@ -656,9 +684,7 @@ private[compiler] object SyntaxHintClassifier {
       // A complete statement was expected right where a second bare token follows its
       // leading identifier with nothing in between -- most often a call whose arguments
       // were written without parentheses (a Python 2 `print "x"` or Ruby `puts x` habit).
-      case _
-          if expected.contains("<EOL>") && expected.contains(";") && expected.contains("<EOF>") &&
-            BareAdjacentTokens.findFirstMatchIn(sourceLine).exists(m => !ReservedWords.contains(m.group(1))) =>
+      case _ if missingCallParens(expected, sourceLine) =>
         val name = BareAdjacentTokens.findFirstMatchIn(sourceLine).get.group(1)
         hint("error.parsing.hint.missing_call_parens", name)
       case _ =>
@@ -804,6 +830,234 @@ private[compiler] object SyntaxHintClassifier {
       val header = text.substring(0, open).reverse.takeWhile(c => c != '{' && c != '}' && c != ';').reverse
       TypeKeyword.findAllMatchIn(header).toList.lastOption.map(_.group(1))
     }
+  }
+
+  // The generic `missing_call_parens` fallback applies: a complete statement was expected
+  // right where a second bare token follows the line's leading identifier.
+  private def missingCallParens(expected: String, sourceLine: String): Boolean =
+    expected.contains("<EOL>") && expected.contains(";") && expected.contains("<EOF>") &&
+      BareAdjacentTokens.findFirstMatchIn(sourceLine).exists(m => !ReservedWords.contains(m.group(1)))
+
+  // `s` with the inside of every string literal (`"…"`, `"""…"""`), char literal (`'…'`) and
+  // comment (`//…`, `/*…*/`) replaced by spaces, keeping its length and line breaks. The
+  // call-result scans read only this text, so a bracket, quote or keyword inside a literal or
+  // comment is never counted (#2789's rule); the hint quotes the original text at the same
+  // offsets. A literal or comment still open at the end masks to the end.
+  private def maskLiterals(s: String): String = maskLiteralsWithState(s)._1
+
+  // `maskLiterals`, and whether a literal or comment is still open at the end of `s`. A
+  // `"…"` string's `#{…}` interpolation is read the way the lexer reads it: its body is code,
+  // so a nested string literal inside it (`"#{g("(x")}"`) does not end the outer string. The
+  // whole interpolation is masked with the string that holds it.
+  private def maskLiteralsWithState(s: String): (String, Boolean) = {
+    val out = s.toCharArray
+    def blank(k: Int): Unit = if (k < out.length && out(k) != '\n' && out(k) != '\r') out(k) = ' '
+    // After `#{` at `from`: the index after the interpolation's closing `}` on this line, or -1.
+    def interpolationEnd(from: Int): Int = {
+      var j = from
+      var depth = 0
+      while (j < s.length) {
+        s(j) match {
+          case '}' =>
+            if (depth == 0) return j + 1
+            depth -= 1
+            j += 1
+          case '{' => depth += 1; j += 1
+          case '"' =>
+            j += 1
+            while (j < s.length && s(j) != '"') {
+              if (s(j) == '\n' || s(j) == '\r') return -1
+              j += (if (s(j) == '\\') 2 else 1)
+            }
+            if (j >= s.length) return -1
+            j += 1
+          case '\n' | '\r' => return -1
+          case _ => j += 1
+        }
+      }
+      -1
+    }
+    var open = false
+    var i = 0
+    while (i < s.length) {
+      val c = s(i)
+      if (s.startsWith("\"\"\"", i)) {
+        i += 3
+        while (i < s.length && !s.startsWith("\"\"\"", i)) { blank(i); i += 1 }
+        if (i >= s.length) open = true
+        i += 3
+      } else if (c == '"' || c == '\'') {
+        i += 1
+        var closed = false
+        while (!closed && i < s.length && s(i) != '\n') {
+          if (s(i) == c) closed = true
+          else if (s(i) == '\\' && i + 1 < s.length) { blank(i); blank(i + 1); i += 2 }
+          else if (c == '"' && s.startsWith("#{", i) && interpolationEnd(i + 2) >= 0) {
+            val end = interpolationEnd(i + 2)
+            while (i < end) { blank(i); i += 1 }
+          } else { blank(i); i += 1 }
+        }
+        if (!closed) open = true
+        i += 1
+      } else if (s.startsWith("//", i)) {
+        while (i < s.length && s(i) != '\n') { blank(i); i += 1 }
+      } else if (s.startsWith("/*", i)) {
+        while (i < s.length && !s.startsWith("*/", i)) { blank(i); i += 1 }
+        if (i < s.length) { blank(i); blank(i + 1) } else open = true
+        i += 2
+      } else i += 1
+    }
+    (new String(out), open)
+  }
+
+  // A callee the hint may quote: read on its own, every literal in it closes and its brackets
+  // balance. The last check before quoting, so a literal form the masking misreads falls back
+  // to the unnamed `(...).call(...)` form instead of quoting a broken callee (#2789's rule).
+  private def quotableCallee(call: String): Boolean = {
+    val (masked, open) = maskLiteralsWithState(call)
+    !open && masked.foldLeft(0) { (depth, c) =>
+      if (depth < 0) depth
+      else c match {
+        case '(' | '[' => depth + 1
+        case ')' | ']' => depth - 1
+        case _ => depth
+      }
+    } == 0
+  }
+
+  // `lineBefore` (the current line up to the offending `(`) masked as part of the whole file
+  // before it, so a `"""` string or `/*` comment opened on an earlier line is still masked.
+  private def maskedLineBefore(precedingText: String, lineBefore: String): String =
+    maskLiterals(precedingText + lineBefore).substring(precedingText.length)
+
+  // The first call of `mk()()` as written, scanned back from the `)` that ends `text`:
+  // `obj.f()`, `Strings::id(1)`, `new Foo()`, `adder(1)`, `(mk())`. None when no name is in
+  // it (`(1 + 2)`) or its brackets do not balance on the line. The walk reads only `masked`
+  // (`text` with literals and comments masked) and moves back at least one character per
+  // step; the result is the original `text` at the same offsets.
+  private def callResultFirstCall(text: String, masked: String): Option[String] = {
+    val m = masked.reverse.dropWhile(_.isWhitespace).reverse
+    val s = text.substring(0, m.length)
+    def isWord(c: Char) = c.isLetterOrDigit || c == '_'
+    var i = m.length
+    var scanning = true
+    while (scanning && i > 0) {
+      val c = m(i - 1)
+      if (c == ')' || c == ']') {
+        var depth = 0
+        var closed = false
+        while (!closed && i > 0) {
+          m(i - 1) match {
+            case ')' | ']' => depth += 1
+            case '(' | '[' => depth -= 1; if (depth == 0) closed = true
+            case _ =>
+          }
+          i -= 1
+        }
+        if (!closed) return None
+      } else if (isWord(c)) {
+        while (i > 0 && isWord(m(i - 1))) i -= 1
+      } else if (c == '.') {
+        i -= 1
+        if (i > 0 && m(i - 1) == '?') i -= 1
+      } else if (c == ':' && i > 1 && m(i - 2) == ':') {
+        i -= 2
+      } else scanning = false
+    }
+    val newPrefix = """(?:^|[^\w])(new\s+)\z""".r.findFirstMatchIn(m.substring(0, i)).map(_.group(1)).getOrElse("")
+    val call = newPrefix + s.substring(i)
+    val head = s.substring(i).headOption
+    if (head.exists(c => c.isLetter || c == '_' || c == '(') && call.exists(_.isLetter) && quotableCallee(call)) Some(call)
+    else None
+  }
+
+  // The masked text of the statement that ends at `lineBefore` (the current line up to the
+  // offending `(`): the current line, extended back over earlier lines while a bracket opened
+  // on an earlier line is still open, so `def f(a: Int,\n      b: Int)(` reaches back to
+  // `def f(`. At most 50 earlier lines. Literals and comments are masked across lines.
+  private def statementBefore(precedingText: String, lineBefore: String): String = {
+    def unclosed(text: String): Int = text.foldLeft(0) { (depth, c) =>
+      c match {
+        case '(' | '[' => depth - 1
+        case ')' | ']' => depth + 1
+        case _ => depth
+      }
+    }
+    val masked = maskLiterals(precedingText + lineBefore)
+    val maskedLine = masked.substring(precedingText.length)
+    val earlier = masked.substring(0, precedingText.length).split("\n", -1).toVector.dropRight(1)
+    var depth = unclosed(maskedLine)
+    var taken = List.empty[String]
+    var i = earlier.length - 1
+    while (depth > 0 && i >= 0 && taken.length < 50) {
+      depth += unclosed(earlier(i))
+      taken = earlier(i) :: taken
+      i -= 1
+    }
+    (taken :+ maskedLine).mkString("\n")
+  }
+
+  // A `val` name for the call-result hint that appears nowhere in the file as a word, so the
+  // advice cannot shadow or call the user's own `f` (#3138's block: `def g(): Int = mk()()`
+  // with the old fixed `val g` advice loops forever).
+  private def unusedBindingName(source: String): String = {
+    val words = """\w+""".r.findAllIn(source).toSet
+    val candidates = Iterator("f", "fn", "callee") ++ Iterator.from(1).map(n => s"f$n")
+    candidates.find(name => !words.contains(name)).get
+  }
+
+  // #2789's rule: `text` (the masked statement before the offending `(`) ends inside a
+  // declaration header when, scanning from the nearest declaration keyword, no body starts at
+  // bracket depth 0: `=` (not `==`/`!=`/`<=`/`>=`/`=>`), `{`, `->`, or `:` after `case`.
+  // Brackets in type parameters, default arguments and function types sit at depth 1 or more,
+  // so `def f[T extends Comparable[T]](a: T)(`, `def f(a: Int = g(1))(` and
+  // `def apply(f: (Int) -> Int)(` are headers, while `def g(): Int = mk()(` is a body. A
+  // keyword inside a literal or comment is already masked out.
+  private def inDeclarationHeader(text: String): Boolean =
+    DeclarationKeyword.findAllMatchIn(text).toSeq.lastOption match {
+      case None => false
+      case Some(m) =>
+        val rest = text.substring(m.end)
+        val isCase = m.group(1) == "case"
+        var depth = 0
+        var i = 0
+        while (i < rest.length) {
+          val c = rest(i)
+          val prev = if (i > 0) rest(i - 1) else ' '
+          val next = if (i + 1 < rest.length) rest(i + 1) else ' '
+          c match {
+            case '(' | '[' => depth += 1
+            case ')' | ']' => depth -= 1
+            case '{' if depth == 0 => return false
+            case '=' if depth == 0 && !"=!<>".contains(prev) && next != '=' && next != '>' => return false
+            case '-' if depth == 0 && next == '>' => return false
+            case ':' if depth == 0 && isCase && next != ':' && prev != ':' => return false
+            case _ =>
+          }
+          i += 1
+        }
+        true
+    }
+
+  // The second call's arguments, from the `(` that starts `context`; `...` when they do not
+  // close on the same line. A `)` inside a string or char literal or a comment does not close
+  // them.
+  private def callResultArguments(context: String): String = {
+    val line = context.takeWhile(c => c != '\n' && c != '\r')
+    val masked = maskLiterals(line)
+    var depth = 0
+    var idx = 0
+    while (idx < masked.length) {
+      masked(idx) match {
+        case '(' => depth += 1
+        case ')' =>
+          depth -= 1
+          if (depth == 0) return line.substring(1, idx).trim
+        case _ =>
+      }
+      idx += 1
+    }
+    "..."
   }
 
   private def textBefore(context: String, sourceLine: String): String = {

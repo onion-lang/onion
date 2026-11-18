@@ -568,7 +568,9 @@ val zs: List[Int] = [5, null]   // Before: compiled; the read of zs[1] crashed. 
   `f.call(null)` on a function value, `add`/`set`/`put` on `List` and `Map`, `apply` on a
   Java functional interface, and a method of your own generic class (`Box[Int].put(null)`).
   Also a `null` element in a list or map literal written for such a type
-  (`val zs: List[Int] = [5, null]`, `val m: Map[String, Int] = ["b": null]`).
+  (`val zs: List[Int] = [5, null]`, `val m: Map[String, Int] = ["b": null]`), and the other
+  ways into the same slot (#2991): a constructor (`new Box[Int](null)`, `new R[Int](null)`),
+  and an indexed assignment (`xs[0] = null`, `m["b"] = null`).
 - **To update:** if `null` is a value you mean to store, declare the type argument nullable:
   `List[Int?]`, `Map[String, Int?]`, `(Int?) -> T`. Reads then give an `Int?`, so handle
   `null` there (`?:` or `!!`). Otherwise, pass a real value instead of `null`.
@@ -723,3 +725,79 @@ now, with or without `override`:
 - **To silence W0029:** add `override` if the method is meant to replace the base one.
 - **To keep a separate overload:** rename the method (`decOrSkip(k: Int?)`). No `onion
   migrate` rule: only you know whether the method was meant to replace the base one.
+
+## `OnionMath::randomInt` is removed; use `Rand::nextInt`
+
+Onion had two ways to get a random `Int` in a range, with opposite upper bounds (#3069).
+`Rand::nextInt(min, max)` stays. Its `max` is exclusive, as in `a..<b`, Java and Kotlin.
+
+```onion
+val die = OnionMath::randomInt(1, 6)   // Before: 1 to 6. Now: E0005
+val die = Rand::nextInt(1, 7)          // 1 to 6
+```
+
+- **What you see:** `E0005`, with a hint that shows `Rand::nextInt(min, max + 1)`.
+- **Unchanged:** `Rand::nextInt(min, max)` and `OnionMath::random()`.
+- **`onion migrate` rewrites it.** It writes `Rand::nextInt(min, max + 1)`, so every value the
+  old call could return stays possible:
+  - `OnionMath::randomInt(1, 6)` becomes `Rand::nextInt(1, 7)`.
+  - `OnionMath::randomInt(0, xs.size - 1)` becomes `Rand::nextInt(0, xs.size)`.
+  - `OnionMath::randomInt(a, b)` becomes `Rand::nextInt(a, b + 1)`.
+  - Calls inside `"#{...}"`, and a call inside another call's arguments, are rewritten too.
+  - So is a call through an import: `randomInt(1, 6)` after `import { onion.OnionMath::* }`,
+    or `OM::randomInt(1, 6)` after `import { onion.OnionMath as OM; }`. The import itself
+    still compiles, so it is left as written.
+  - When the file, or another file named with it, has its own `Rand` (a class, an import, a
+    variable), migrate writes `onion.Rand::nextInt`, so the call keeps meaning Onion's `Rand`.
+- **Only calls the compiler reports are rewritten.** A `randomInt` that still compiles is
+  your own (a class of yours named `OnionMath`, an inherited method), so it is left as written.
+- **Which `max` gets `+ 1`:** a plain number below `Int.MAX_VALUE` (`6`), or a `max` that
+  reads a variable, a parameter, a field or a call (`n`, `xs.size`, `Math::abs(n)`).
+- **Other constant maxes are noted; edit them by hand.** That covers `2147483647` and any
+  expression of constants (`1 << 4`, `Integer::MAX_VALUE`). Migrate leaves the file as
+  written. Write `Rand::nextInt(min, (max) + 1)`, then run migrate again. When max is
+  `Int.MAX_VALUE`, write `Rand::nextInt(min - 1, max) + 1` instead.
+- **A bare `randomInt(a, b)` in a file that also names its own `randomInt`** may be either
+  one, so migrate notes it and leaves it as written.
+- **A bare `randomInt(a, b)` with no `import { onion.OnionMath::* }`** is not the removed
+  method, so migrate leaves it alone. Its hint shows the edit to make by hand.
+- **Check a max held in a variable.** Migrate cannot know its value. If it can be
+  `Int.MAX_VALUE` at run time, `max + 1` overflows there and the call throws
+  `IllegalArgumentException`. For that case, write `Rand::nextInt(min - 1, max) + 1`.
+- **`Rand::nextInt()` replaces a call only when min is `Int.MIN_VALUE` and max is
+  `Int.MAX_VALUE`.** It returns any `Int`, negatives included, so it does not replace
+  `randomInt(0, Int.MAX_VALUE)`.
+- **Run it on one program at a time.** Unrelated scripts named together can hide each other's
+  errors, and then a call is left as written.
+
+## A generic overload competes with a plain one, as in Java
+
+A plain class now reaches a generic parameter through an interface it implements (#2845).
+`String` is a `Comparable[String]`, so `g[T](c: Comparable[T])` now fits `g("a")`. Where a
+plain overload fits too, Java's rules pick between them.
+
+```onion
+import { java.lang.CharSequence }
+def g(c: CharSequence): String = "charseq"
+def g[T](c: Comparable[T]): String = "generic"
+IO::println(g("a"))                    // Before: charseq. Now: E0006
+IO::println(g("a" as CharSequence))    // charseq, before and now
+```
+
+| Overloads | Call | Before | Now | To keep the old result |
+|---|---|---|---|---|
+| `g(CharSequence)`, `g[T](Comparable[T])` | `g("a")` | `charseq` | E0006 | `g("a" as CharSequence)` |
+| `f(Serializable)`, `f[T](Comparable[T])` | `f("a")` | `serializable` | E0006 | `f("a" as Serializable)` |
+| `f(Object)`, `f[T](Comparable[T])` | `f("a")` | `object` | `generic` | `f("a" as Object)` |
+| `show(Int)`, `show[T](Comparable[T])`, with `xs = [1, 2, 3]` | `show(xs[0])` | `int 1` | `comparable` | `show(xs[0] as Int)` |
+| `log(String, CharSequence)`, `log[T](T, Comparable[T])` | `log("t", "m")` | `plain` | E0006 | `log("t", "m" as CharSequence)` |
+
+- **What you see:** **E0006** `method call is applicable for both …`, with a hint naming the
+  `as` cast. Or, beside `f(Object)` or `show(Int)`, the generic overload runs with no message.
+- **Which argument the hint names:** the first one whose cast rules the generic overload
+  out (the 2nd in `log("t", "m")`). A varargs argument is cast to the element type:
+  `g("a" as CharSequence)` for `g(c: CharSequence...)`.
+- **Still fine:** a call whose argument class does not implement the generic parameter's
+  interface, and a call to only one of the overloads.
+- **No `onion migrate` rule:** finding the affected calls needs overload resolution, and
+  only you know which overload a call meant. The hint shows the cast instead.

@@ -43,6 +43,13 @@ class TypeClassDictionaryPassingSpec extends AbstractShellSpec {
       assert(Shell.Success("3,30") == shell.run(
         prelude + "def both[T: Numeric, U: Numeric](a: List[T], b: List[U]): String { return \"\" + sum(a) + \",\" + sum(b) }\ndef main(args: String[]): String { return both([1,2], [10L,20L]) }", "None", Array()))
     }
+    it("forwards a dictionary through an instance call (#2790)") {
+      val src = prelude +
+        "class Agg { public: def this { }\n def total[T: Numeric](xs: List[T]): T { var acc: T = Numeric[T]::zero()\n foreach x: T in xs { acc = Numeric[T]::plus(acc, x) }\n return acc } }\n" +
+        "def twice[T: Numeric](a: Agg, xs: List[T]): T { val t: T = a.total(xs)\n return Numeric[T]::plus(t, t) }\n" +
+        "def main(args: String[]): Int { return twice(new Agg(), [1,2,4]) }"
+      assert(Shell.Success(14) == shell.run(src, "None", Array()))
+    }
     it("reports a clean error (not a crash) when no instance resolves") {
       assert(Shell.Failure(-1) == shell.run(
         "trait Numeric[T] { def zero(): T }\ndef sum[T: Numeric](xs: List[T]): T { return Numeric[T]::zero() }\ndef main(args: String[]): void { IO::println(sum([1,2,3])) }", "None", Array()))

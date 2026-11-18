@@ -515,7 +515,7 @@ val zs: List[Int] = [5, null]   // 以前: コンパイルでき、zs[1] の読�
 ```
 
 - **表示されるもの:** `null` の位置で **E0000** `type Int is expected, but type null is used.` になります。型引数を `Int?` と書くよう促すヒントが付きます。
-- **対象:** クラスの型変数で宣言されたメソッド引数です。関数値への `f(null)` と `f.call(null)`、`List` と `Map` の `add`/`set`/`put`、Java の関数型インタフェースの `apply`、自分で書いた総称クラスのメソッド（`Box[Int].put(null)`）が該当します。そのような型として書いたリストやマップのリテラルの中の `null` の要素も該当します（`val zs: List[Int] = [5, null]`、`val m: Map[String, Int] = ["b": null]`）。
+- **対象:** クラスの型変数で宣言されたメソッド引数です。関数値への `f(null)` と `f.call(null)`、`List` と `Map` の `add`/`set`/`put`、Java の関数型インタフェースの `apply`、自分で書いた総称クラスのメソッド（`Box[Int].put(null)`）が該当します。そのような型として書いたリストやマップのリテラルの中の `null` の要素も該当します（`val zs: List[Int] = [5, null]`、`val m: Map[String, Int] = ["b": null]`）。同じ枠に届くほかの書き方も該当します（#2991）。コンストラクタ（`new Box[Int](null)`、`new R[Int](null)`）、添字への代入（`xs[0] = null`、`m["b"] = null`）です。
 - **直し方:** `null` を格納するつもりなら、型引数を null 許容にしてください。`List[Int?]`、`Map[String, Int?]`、`(Int?) -> T` です。読み出した値は `Int?` になるので、そこで `null` を扱います（`?:` か `!!`）。そうでなければ、`null` ではなく実際の値を渡してください。
 - **`onion migrate` の規則はありません:** 直し方は、宣言する型を変えるか、渡す値を変えるかのどちらかです。どちらが正しいかは、書いた人にしか分かりません。
 
@@ -633,3 +633,62 @@ val b: Base = new Up(); b.dec(1)                           // 以前: Base と�
 - **逆向きは変わりません:** 基底の `f(k: Int?): void` に対する自前の `f(k: Int): void` は、オーバーロードのままです。そのため、`Base` を通した `null` は基底のメソッドに届きます。`override` を付けると **E0068** です。オーバーライドするなら、パラメータを `Int?` にしてください。
 - **W0029 を消すには:** 基底のメソッドを置き換えるつもりなら、`override` を付けてください。
 - **別のオーバーロードとして残すには:** メソッドの名前を変えてください（`decOrSkip(k: Int?)`）。`onion migrate` の規則はありません。基底のメソッドを置き換えるつもりだったかどうかは、書いた人にしか分かりません。
+
+## `OnionMath::randomInt` は削除されました。`Rand::nextInt` を使ってください
+
+範囲内のランダムな `Int` を得る方法が二つあり、上限の扱いが逆でした（#3069）。
+残るのは `Rand::nextInt(min, max)` です。`max` は含まれません。`a..<b`、Java、Kotlin と同じです。
+
+```onion
+val die = OnionMath::randomInt(1, 6)   // 以前: 1から6。現在: E0005
+val die = Rand::nextInt(1, 7)          // 1から6
+```
+
+- **表示されるもの:** `E0005` と、`Rand::nextInt(min, max + 1)` を示すヒントです。
+- **変わらないもの:** `Rand::nextInt(min, max)` と `OnionMath::random()` です。
+- **`onion migrate` が書き換えます。** `Rand::nextInt(min, max + 1)` と書くので、以前の呼び出しが返せた値はすべて出ます。
+  - `OnionMath::randomInt(1, 6)` は `Rand::nextInt(1, 7)` になります。
+  - `OnionMath::randomInt(0, xs.size - 1)` は `Rand::nextInt(0, xs.size)` になります。
+  - `OnionMath::randomInt(a, b)` は `Rand::nextInt(a, b + 1)` になります。
+  - `"#{...}"` の中の呼び出しと、別の呼び出しの引数の中の呼び出しも書き換えます。
+  - インポート経由の呼び出しも書き換えます。`import { onion.OnionMath::* }` の後の `randomInt(1, 6)` や、`import { onion.OnionMath as OM; }` の後の `OM::randomInt(1, 6)` です。インポート自体はそのままでもコンパイルできるので、書き換えません。
+  - ファイル自身、または一緒に渡したファイルに独自の `Rand`（クラス、インポート、変数）があるときは、`onion.Rand::nextInt` と書きます。呼び出しが Onion の `Rand` を指したままになります。
+- **書き換えるのは、コンパイラがエラーを報告した呼び出しだけです。** コンパイルできる `randomInt` はあなた自身のもの（`OnionMath` という名前の自作クラスや、継承したメソッド）なので、そのまま残します。
+- **`+ 1` を付ける `max`:** `Int.MAX_VALUE` より小さい数字そのもの（`6`）か、変数、引数、フィールド、呼び出しを読む `max`（`n`、`xs.size`、`Math::abs(n)`）です。
+- **それ以外の定数の max は知らせるだけです。手で直してください。** `2147483647` や、定数の式（`1 << 4`、`Integer::MAX_VALUE`）が該当します。migrate はファイルをそのまま残します。`Rand::nextInt(min, (max) + 1)` と書いてから、もう一度 migrate を実行してください。max が `Int.MAX_VALUE` のときは、代わりに `Rand::nextInt(min - 1, max) + 1` と書いてください。
+- **独自の `randomInt` も持つファイルの、修飾なしの `randomInt(a, b)`** はどちらを指すかわからないので、migrate は知らせるだけで書き換えません。
+- **`import { onion.OnionMath::* }` のないファイルの `randomInt(a, b)`** は削除されたメソッドではないので、migrate は書き換えません。ヒントが手で直す書き換えを示します。
+- **変数に入った max は確認してください。** migrate にはその値がわかりません。実行時に `Int.MAX_VALUE` になりうるなら、そこで `max + 1` が桁あふれし、呼び出しは `IllegalArgumentException` を投げます。その場合は `Rand::nextInt(min - 1, max) + 1` と書いてください。
+- **`Rand::nextInt()` で置き換えられるのは、min が `Int.MIN_VALUE` で max が `Int.MAX_VALUE` の呼び出しだけです。** 負の数も含むあらゆる `Int` を返すので、`randomInt(0, Int.MAX_VALUE)` の代わりにはなりません。
+- **プログラムは一つずつ migrate してください。** 無関係なスクリプトを一緒に渡すと、互いのエラーが隠れることがあります。その場合、呼び出しは書き換えられずに残ります。
+
+## 総称メソッドの多重定義が、Java と同じように通常の多重定義と競合するようになりました
+
+通常のクラスは、実装しているインタフェースを通じて総称メソッドの引数に当てはまるようになりました（#2845）。
+`String` は `Comparable[String]` なので、`g[T](c: Comparable[T])` は `g("a")` に当てはまります。
+通常の多重定義も当てはまる場合は、Java の規則でどちらかを選びます。
+
+```onion
+import { java.lang.CharSequence }
+def g(c: CharSequence): String = "charseq"
+def g[T](c: Comparable[T]): String = "generic"
+IO::println(g("a"))                    // 以前: charseq。現在: E0006
+IO::println(g("a" as CharSequence))    // 以前も現在も charseq
+```
+
+| 多重定義 | 呼び出し | 以前 | 現在 | 以前の結果を保つには |
+|---|---|---|---|---|
+| `g(CharSequence)`、`g[T](Comparable[T])` | `g("a")` | `charseq` | E0006 | `g("a" as CharSequence)` |
+| `f(Serializable)`、`f[T](Comparable[T])` | `f("a")` | `serializable` | E0006 | `f("a" as Serializable)` |
+| `f(Object)`、`f[T](Comparable[T])` | `f("a")` | `object` | `generic` | `f("a" as Object)` |
+| `show(Int)`、`show[T](Comparable[T])`、`xs = [1, 2, 3]` | `show(xs[0])` | `int 1` | `comparable` | `show(xs[0] as Int)` |
+| `log(String, CharSequence)`、`log[T](T, Comparable[T])` | `log("t", "m")` | `plain` | E0006 | `log("t", "m" as CharSequence)` |
+
+- **表示されるもの:** **E0006** `method call is applicable for both …` と、`as` による変換を示すヒントです。
+  `f(Object)` や `show(Int)` と並ぶ場合は、メッセージなしで総称メソッドの方が実行されます。
+- **ヒントが示す引数:** 変換すると総称メソッドが当てはまらなくなる、最初の引数です（`log("t", "m")` では第 2 引数）。
+  可変長引数は要素の型に変換します。`g(c: CharSequence...)` なら `g("a" as CharSequence)` です。
+- **今までどおり動くもの:** 引数のクラスが総称メソッドの引数のインタフェースを実装していない呼び出しと、
+  どちらか一方の多重定義しか当てはまらない呼び出しです。
+- **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
+  また、どの多重定義を意図したかは書いた人にしか分かりません。代わりにヒントが `as` を示します。

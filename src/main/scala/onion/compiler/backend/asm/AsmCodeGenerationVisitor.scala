@@ -359,7 +359,18 @@ class AsmCodeGenerationVisitor(
     visitTerm(node.target)
     val argTypes = target.arguments.map(asmType)
     if hasDefaults(node.params) then
-      emitArgumentsWithDefaults(node.params, argTypes, Array(asmType(node.target.`type`)), 0, special = true)
+      // An omitted argument is filled by the default of the method the call resolved to
+      // (#2548), whose getter takes the earlier arguments at that method's types. So
+      // compute them at those types, then convert each to the bridge target's type.
+      val resolvedTypes = node.method.arguments.map(asmType)
+      emitArgumentsWithDefaults(node.params, resolvedTypes, Array(asmType(node.target.`type`)), 0, special = true)
+      val slots = new Array[Int](resolvedTypes.length)
+      for i <- resolvedTypes.indices.reverse do
+        slots(i) = gen.newLocal(resolvedTypes(i))
+        gen.storeLocal(slots(i))
+      for i <- resolvedTypes.indices do
+        gen.loadLocal(slots(i))
+        if resolvedTypes(i) != argTypes(i) then asmCodeGen.adaptValueOnStack(gen, node.method.arguments(i), argTypes(i))
     else
       emitArgumentsWithAdaptation(node.params, argTypes, Array(asmType(node.target.`type`)))
     val returnType = asmType(target.returnType)

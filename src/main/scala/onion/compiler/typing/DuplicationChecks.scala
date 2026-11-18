@@ -362,8 +362,14 @@ private[compiler] object DuplicationChecks {
         val implExact = erasedParamDescriptor(impl.arguments)
         val candidates = baseContracts.getOrElse((impl.name, impl.arguments.length), mutable.ArrayBuffer.empty[BaseContract])
         // A slot of its own type inherited (row 3, a chain, or an abstract one): not this case.
+        // Nor when the class declares the base method's exact types itself (`f(Int)` beside
+        // `f(Int?)`): that sibling overrides the base, and this one is an overload (row 12).
+        def exactSibling(c: BaseContract): Boolean =
+          clazz.methods.exists(o => (o ne impl) && o.name == impl.name && !Modifier.isStatic(o.modifier) &&
+            o.arguments.length == impl.arguments.length && c.exact.contains(erasedParamDescriptor(o.arguments)))
         if !candidates.exists(_.exact.contains(implExact)) then
-          candidates.find(c => !c.viaBridge && c.concrete && !c.isFinal && questionOnly(c.plainNames, c.returnType, c.args, c.concrete, impl)).foreach { c =>
+          candidates.find(c => !c.viaBridge && c.concrete && !c.isFinal && !exactSibling(c) &&
+            questionOnly(c.plainNames, c.returnType, c.args, c.concrete, impl)).foreach { c =>
             val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
             val own = s"${impl.name}(${impl.arguments.map(sourceForm).mkString(", ")})"
             typing.warningReporter_.setSourceFile(typing.unit_.sourceFile)

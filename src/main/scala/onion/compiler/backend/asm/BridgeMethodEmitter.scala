@@ -149,7 +149,11 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     targetOwner match
       case None => true
       case Some(t) => ownOwner match
-        case Some(o) => o eq t
+        // A chain also obeys row 10: an own `f(Int)` never takes a concrete `f(Int?)`
+        // slot with a `void`/primitive return, even when a superclass's `?` bridge
+        // joined the two slots (`Base.f(Int)`, `Mid.f(Int?)`, `Sub.f(Int)`): a `null`
+        // through `Mid` would reach `Sub.f(Int)` and throw.
+        case Some(o) => (o eq t) && !keepsBaseSlot(m, target)
         case None => !keepsBaseSlot(m, target)
 
   // Row 10 of #2896's table: an own `f(Int)` (no code inherited for it) beside an

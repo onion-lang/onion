@@ -680,5 +680,59 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
           |""".stripMargin)
       assert(marked.isEmpty && overload.isEmpty && exact.isEmpty, s"got: $marked / $overload / $exact")
     }
+
+    // Panel block 8 on #3051 at a2d2e98.
+    it("does not warn W0029 when the class also declares the base's exact `f(k: Int)`") {
+      val ws = w29(
+        """
+          |class Base { public: def this {} def f(k: Int): void {} }
+          |class Up extends Base {
+          |public:
+          |  def this {}
+          |  def f(k: Int): void {}
+          |  def f(k: Int?): void {}
+          |}
+          |""".stripMargin)
+      assert(ws.isEmpty, s"got: $ws")
+    }
+
+    it("keeps a `null` through a middle `f(k: Int?)` away from a subclass's `f(k: Int): void`") {
+      val result = shell.run(
+        """
+          |class Base { public: var who: String = ""; def this {} def f(k: Int): void { who = who + "Base" } }
+          |class Mid extends Base { public: def this {} override def f(k: Int?): void { who = who + "Mid" } }
+          |class Sub extends Mid { public: def this {} override def f(k: Int): void { who = who + "Sub" } }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val s = new Sub(); val m: Mid = s; val b: Base = s
+          |    val n5: Int? = 5; val n: Int? = null
+          |    m.f(n5); b.f(3); m.f(n)
+          |    return s.who
+          |  }
+          |}
+          |""".stripMargin,
+        "NullThroughMid.on", Array())
+      assert(result == onion.tools.Shell.Success("MidSubMid"))
+    }
+
+    it("fills an omitted argument of `super.f(x)` through a `?` bridge with the resolved method's default") {
+      val result = shell.run(
+        """
+          |class A { public: def this {} def f(x: Int, y: Int = 5): String = "A" + x + "," + y }
+          |class B extends A { public: def this {} override def f(x: Int?, y: Int = 6): String = "B" + x + "," + y }
+          |class C extends B {
+          |public:
+          |  def this {}
+          |  override def f(x: Int, y: Int = 7): String = "C" + super.f(x) + "|" + super.f(x, 9)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String = new C().f(1)
+          |}
+          |""".stripMargin,
+        "SuperDefaultThroughBridge.on", Array())
+      assert(result == onion.tools.Shell.Success("CB1,5|B1,9"))
+    }
   }
 }

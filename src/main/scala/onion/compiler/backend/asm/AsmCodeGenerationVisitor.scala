@@ -321,8 +321,15 @@ class AsmCodeGenerationVisitor(
     val isInterface = node.method.affiliation.isInterface
 
     // Select correct invoke instruction based on method type
+    val accessor =
+      if localVars.isInstanceOf[ClosureLocalVarContext] then asmCodeGen.protectedAccessorFor(node.method, node.target.`type`)
+      else None
     if isInterface then
       gen.invokeInterface(ownerType, shape.asmMethod)
+    else if accessor.isDefined then
+      // A closure is not a subclass of the host, so it may not call an inherited protected
+      // method of another package; the host's synthetic accessor makes the call (#2910)
+      gen.invokeVirtual(asmType(node.target.`type`), new AsmMethod(accessor.get, shape.descriptor))
     else
       // Since JEP 181 (class file v55+) invokevirtual is legal for private
       // instance methods within a nest, which lets closures (nest members)

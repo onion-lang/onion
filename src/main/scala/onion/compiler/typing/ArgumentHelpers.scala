@@ -17,6 +17,35 @@ import scala.jdk.CollectionConverters.*
  */
 private[typing] object ArgumentHelpers {
 
+  /**
+   * Arguments typed with errors muted (a malleable argument may need the parameter type to
+   * type at all) keep that typing when it succeeds, so an error it muted that the parameter
+   * type does not cure was lost: a type error in the lambda of `p(call { ... })` or
+   * `new K(call { ... })` compiled, then failed with a VerifyError (#3174, #3178). Once the
+   * call is resolved, each argument is typed once more against its parameter type, with
+   * reporting on. `typeAgainst` types one argument at its formal type.
+   */
+  def reportErrorsMutedInKeptArguments(
+    typing: onion.compiler.Typing,
+    args: List[AST.Expression],
+    expectedArgs: Array[TypedAST.Type]
+  )(typeAgainst: (AST.Expression, TypedAST.Type) => Unit): Unit =
+    if (typing.reportingEnabled && expectedArgs != null && !hasNamedArguments(args)) {
+      for (i <- args.indices if i < expectedArgs.length) {
+        val formal = expectedArgs(i)
+        if (formal != null && !mentionsTypeVariable(formal)) typeAgainst(args(i), formal)
+      }
+    }
+
+  private def mentionsTypeVariable(t: TypedAST.Type): Boolean = t match {
+    case _: TypedAST.TypeVariableType => true
+    case applied: TypedAST.AppliedClassType => applied.typeArguments.exists(mentionsTypeVariable)
+    case at: TypedAST.ArrayType => mentionsTypeVariable(at.base)
+    case n: TypedAST.NullableType => mentionsTypeVariable(n.innerType)
+    case w: TypedAST.WildcardType => mentionsTypeVariable(w.upperBound) || w.lowerBound.exists(mentionsTypeVariable)
+    case _ => false
+  }
+
   /** The primitive a non-nullable box class type (`java.lang.Integer`) stands for, if it is one:
    *  the slot a primitive type argument (`List[Int]`) leaves for a type variable. */
   def primitiveOfNonNullBox(slot: TypedAST.Type): Option[TypedAST.BasicType] = slot match {

@@ -206,24 +206,13 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     }
   }
 
-  /**
-   * The arguments were typed with errors muted (a malleable argument may need the parameter
-   * type to type at all), and that typing is kept when it succeeds. An error it muted that the
-   * parameter type does not cure was lost: a type error in the lambda of `p(call { ... })`
-   * compiled, then failed with a VerifyError (#3174). Once the call is resolved, each argument
-   * is typed once more against its parameter type, with reporting on, to report them.
-   */
   private def reportErrorsMutedInKeptArguments(
     args: List[AST.Expression],
     expectedArgs: Array[Type],
     context: LocalContext
   ): Unit =
-    if (calls.typing.reportingEnabled && expectedArgs != null && !ArgumentHelpers.hasNamedArguments(args)) {
-      for (i <- args.indices if i < expectedArgs.length) {
-        val formal = expectedArgs(i)
-        if (formal != null && !mentionsTypeVariable(formal))
-          calls.typed(args(i), context, formal)
-      }
+    ArgumentHelpers.reportErrorsMutedInKeptArguments(calls.typing, args, expectedArgs) { (arg, formal) =>
+      calls.typed(arg, context, formal)
     }
 
   /** The method a statically imported call (`println(..)`) resolved to, under any cast. */
@@ -231,15 +220,6 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     case c: CallStatic => Some(c.method)
     case c: AsInstanceOf => staticImportCallee(c.target)
     case _ => None
-  }
-
-  private def mentionsTypeVariable(t: Type): Boolean = t match {
-    case _: TypeVariableType => true
-    case applied: AppliedClassType => applied.typeArguments.exists(mentionsTypeVariable)
-    case at: ArrayType => mentionsTypeVariable(at.base)
-    case n: NullableType => mentionsTypeVariable(n.innerType)
-    case w: WildcardType => mentionsTypeVariable(w.upperBound) || w.lowerBound.exists(mentionsTypeVariable)
-    case _ => false
   }
 
   private def declaresCallee(name: String): Boolean = {

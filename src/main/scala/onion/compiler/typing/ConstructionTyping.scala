@@ -469,9 +469,17 @@ final class ConstructionTyping(
     val malleableIndices = node.args.zipWithIndex.collect {
       case (expr, i) if isMalleableArgument(expr) && !untypedClosureIndices.contains(i) => i
     }.toSet
+    val mutedBefore = typing.suppressedErrorCount
     val parameters0 =
       if (malleableIndices.nonEmpty) typing.withSuppressedReporting(typedTerms(node.args.toArray, context))
       else typedTerms(node.args.toArray, context)
+    // An error muted while typing the malleable arguments is lost when that typing is kept (#3178).
+    val eagerMutedErrors = malleableIndices.nonEmpty && parameters0 != null && typing.suppressedErrorCount != mutedBefore
+    def reportMutedErrors(formals: Array[Type]): Unit =
+      if (eagerMutedErrors)
+        ArgumentHelpers.reportErrorsMutedInKeptArguments(typing, node.args, formals) { (arg, formal) =>
+          typed(arg, context, formal)
+        }
     if (parameters0 == null) {
       if (malleableIndices.nonEmpty) {
         resolveConstructorForMalleableArgs(node, typeRef, context, malleableIndices) match {
@@ -647,10 +655,12 @@ final class ConstructionTyping(
           if (nullIntoPrimitiveTypeArgument(node.args.toArray, parameters, constructors(0).getArgs, formals)) None
           else {
             warnNullArguments(constructors(0), node.args.toArray, parameters, formals)
+            reportMutedErrors(formals)
             Some(new NewObject(appliedCtor, adaptToFormals(parameters, formals)))
           }
         case _ =>
           warnNullArguments(constructors(0), node.args.toArray, parameters, constructors(0).getArgs)
+          reportMutedErrors(constructors(0).getArgs)
           Some(new NewObject(constructors(0), adaptToFormals(parameters, constructors(0).getArgs)))
       }
     }

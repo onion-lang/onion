@@ -154,5 +154,45 @@ class ConstructorLambdaDefaultSpec extends AbstractShellSpec {
           |""".stripMargin, "ld13.on", Array[String]())
       assert(Shell.Failure(-1) == result)
     }
+    it("stays E0052 when a nullable function-typed constructor takes the same call") {
+      val result = shell.run(
+        """
+          |class A {
+          |public:
+          |  def this(f: Int -> Int, k: Int = 1) { println("ctor default-fn " + f(k)) }
+          |  def this(g: Function1[Int, Int]?) { println("ctor nullable-fn") }
+          |}
+          |new A(x -> x * 2)
+          |""".stripMargin, "ld14.on", Array[String]())
+      assert(Shell.Failure(-1) == result)
+    }
+    it("stays E0052 when a T? constructor instantiated at a function type takes the call") {
+      val result = shell.run(
+        """
+          |class A[T] {
+          |public:
+          |  def this(f: Int -> Int, k: Int = 1) { println("ctor default-fn " + f(k)) }
+          |  def this(o: T?) { println("ctor T?") }
+          |}
+          |new A[Function1[Int, Int]](x -> x * 2)
+          |""".stripMargin, "ld15.on", Array[String]())
+      assert(Shell.Failure(-1) == result)
+    }
+    it("keeps a typed lambda on the nullable function-typed constructor, as on main") {
+      val result = shell.run(
+        """
+          |class A {
+          |public:
+          |  val r: String
+          |  def this(f: Int -> Int, k: Int = 1) { this.r = "default-fn" }
+          |  def this(g: Function1[Int, Int]?) { this.r = "nullable-fn" }
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { return new A((x: Int) -> x * 2).r }
+          |}
+          |""".stripMargin, "ld16.on", Array[String]())
+      assert(Shell.Success("nullable-fn") == result)
+    }
   }
 }

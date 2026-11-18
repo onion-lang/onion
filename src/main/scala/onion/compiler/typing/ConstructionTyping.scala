@@ -406,14 +406,17 @@ final class ConstructionTyping(
       val needsParameterTypes = untypedClosureIndices.exists { i =>
         closureOf(node.args(i)).exists(_.args.exists(_.typeRef == null))
       }
+      // A parameter after class substitution, with `?` removed: a nullable function type
+      // takes a lambda just as the function type does.
+      def lambdaSlot(formal: Type): Type =
+        TypeSubstitution.substituteType(formal, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false) match {
+          case n: NullableType => n.innerType
+          case t => t
+        }
       def lambdasFit(c: ConstructorRef): Boolean = {
         val formals = c.getArgs
         formals.length >= node.args.length &&
-          untypedClosureIndices.forall { i =>
-            closureCanTarget(
-              TypeSubstitution.substituteType(formals(i), classSubst, scala.collection.immutable.Map.empty, defaultToBound = false),
-              closureArity(node.args(i)))
-          }
+          untypedClosureIndices.forall(i => closureCanTarget(lambdaSlot(formals(i)), closureArity(node.args(i))))
       }
       val ctors = typeRef.constructors
       val fillsDefaults = ctors.filter {
@@ -424,29 +427,27 @@ final class ConstructionTyping(
             lambdasFit(cd)
         case _ => false
       }
-      // A constructor that could take a function value at any lambda's position (its parameter,
-      // after class substitution and ignoring `?`, is `Object` or a type variable) also takes
-      // the lambda, whether it needs all the arguments or fills defaults. Then a type annotation
-      // on the lambda would silently pick the constructor, so the call stays E0052 as on `main`.
-      def takesAnyValue(formal: Type): Boolean = {
-        val substituted = TypeSubstitution.substituteType(formal, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false)
-        (substituted match { case n: NullableType => n.innerType; case t => t }) match {
-          case t: ClassType => (t match { case a: AppliedClassType => a.raw; case _ => t }).name == "java.lang.Object"
-          case _: TypeVariableType => true
-          case _ => false
-        }
+      // Another constructor competes when a function value is assignable to its parameter at
+      // any lambda's position (#2919's rule): a function or SAM type, or a supertype of every
+      // function type (`Object`, a type variable), after class substitution and ignoring `?`.
+      // It would take the lambda too, whether it needs all the arguments or fills defaults, so
+      // a type annotation on the lambda could silently pick it; the call stays E0052 as on `main`.
+      def functionValueFits(formal: Type, arity: Int): Boolean = lambdaSlot(formal) match {
+        case _: TypeVariableType => true
+        case t: ClassType if (t match { case a: AppliedClassType => a.raw; case _ => t }).name == "java.lang.Object" => true
+        case t => closureCanTarget(t, arity)
       }
-      def objectCompetes(c: ConstructorRef): Boolean = {
+      def competes(c: ConstructorRef): Boolean = {
         val formals = c.getArgs
         val accepts = c match {
           case cd: ConstructorDefinition => cd.argumentsWithDefaults != null && formals.length >= node.args.length && node.args.length >= cd.minArguments
           case _ => formals.length == node.args.length
         }
-        accepts && untypedClosureIndices.exists(i => takesAnyValue(formals(i)))
+        accepts && untypedClosureIndices.exists(i => functionValueFits(formals(i), closureArity(node.args(i))))
       }
       if (needsParameterTypes && fillsDefaults.length == 1 &&
           !ctors.exists(c => c.getArgs.length == node.args.length && lambdasFit(c)) &&
-          !ctors.exists(c => !(c eq fillsDefaults.head) && objectCompetes(c))) {
+          !ctors.exists(c => !(c eq fillsDefaults.head) && competes(c))) {
         break(typeNewObjectWithNamedArgs(node, typeRef, context, null, fillsDefaults))
       }
     }

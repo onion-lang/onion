@@ -343,6 +343,48 @@ class AsmCodeGenerationVisitor(
       gen.invokeStatic(ownerType, shape.asmMethod)
   
   override def visitCallSuper(node: CallSuper): Unit =
+    // `super.f(x)` where the superclass fills `f`'s slot with a `?` bridge runs the
+    // bridge's target directly, as the superclass's own code would.
+    val superClass = node.target.`type` match
+      case ct: ClassType => ct.superClass
+      case _ => null
+    val redirect =
+      if node.interfaceOwner != null || node.method.affiliation.isInterface then None
+      else asmCodeGen.superCallTarget(superClass, node.method)
+    redirect match
+      case Some(target) => emitRedirectedSuperCall(node, superClass, target)
+      case None => emitSuperCall(node)
+
+  private def emitRedirectedSuperCall(node: CallSuper, superClass: ClassType, target: Method): Unit =
+    visitTerm(node.target)
+    val argTypes = target.arguments.map(asmType)
+    if hasDefaults(node.params) then
+      // An omitted argument is filled by the default of the method the call resolved to
+      // (#2548), whose getter takes the earlier arguments at that method's types. So
+      // compute them at those types, then convert each to the bridge target's type.
+      val resolvedTypes = node.method.arguments.map(asmType)
+      emitArgumentsWithDefaults(node.params, resolvedTypes, Array(asmType(node.target.`type`)), 0, special = true)
+      val slots = new Array[Int](resolvedTypes.length)
+      for i <- resolvedTypes.indices.reverse do
+        slots(i) = gen.newLocal(resolvedTypes(i))
+        gen.storeLocal(slots(i))
+      for i <- resolvedTypes.indices do
+        gen.loadLocal(slots(i))
+        if resolvedTypes(i) != argTypes(i) then asmCodeGen.adaptValueOnStack(gen, node.method.arguments(i), argTypes(i))
+    else
+      emitArgumentsWithAdaptation(node.params, argTypes, Array(asmType(node.target.`type`)))
+    val returnType = asmType(target.returnType)
+    gen.visitMethodInsn(
+      Opcodes.INVOKESPECIAL,
+      AsmUtil.objectType(superClass.name).getInternalName,
+      target.name,
+      AsmType.getMethodDescriptor(returnType, argTypes*),
+      false
+    )
+    val expected = asmType(node.method.returnType)
+    if expected != returnType then asmCodeGen.adaptValueOnStack(gen, target.returnType, expected)
+
+  private def emitSuperCall(node: CallSuper): Unit =
     visitTerm(node.target)
     val argTypes = node.method.arguments.map(asmType)
     if hasDefaults(node.params) then

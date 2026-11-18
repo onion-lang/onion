@@ -156,6 +156,7 @@ onionc --Wno W0001,unused-parameter MyProgram.on
 | `W0025` | `override-breaks-contract` | オーバーライドが継承した契約を壊しうる。ソルバーが反例を見つけた |
 | `W0026` | `contract-not-enforced` | `--contracts runtime` が実行時に守らない契約の節がある |
 | `W0028` | `ensures-not-proved` | メソッドが `ensures` を破りうる。ソルバーが反例を見つけた |
+| `W0029` | `unmarked-nullable-override` | `override` のないメソッドが、`?` だけ違う継承メソッドをオーバーライドしている |
 | `W0027` | `contract-trusted` | `@Trusted` により、検証されない契約を前提にしている |
 
 ### `--contract-seed <n>` / `--contract-samples <n>`

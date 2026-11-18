@@ -676,6 +676,56 @@ def greet(): String = "Hi, #{this.name}"
   and inside `#{...}` in strings. It leaves comments, plain string text, `\#{self}` and
   `` `self` `` alone.
 
+## `override` must match the base method's types up to `?`
+
+An `override` whose parameter is `JInteger` where the base has `Int`, or whose return is
+`Int?` where the base returns `Int`, never overrode anything. It compiled as a new overload,
+and a call through the base type still ran the base method. Now it is **E0068** (#2896).
+
+```onion
+class Base {
+public:
+  def this {}
+  def dec(k: Int): void { println("Base") }
+}
+class Up extends Base {
+public:
+  def this {}
+  override def dec(k: JInteger): void { println("Up") }   // Before: compiled. Now: E0068
+}
+val b: Base = new Up(); b.dec(1)                           // Before: printed Base
+```
+
+- **What you see:** **E0068** `method dec(JInteger) is marked override but does not override
+  any method ...`, followed by the base signature (`dec(Int): void`).
+- **Still fine:** `override def dec(k: Int?)` over `dec(k: Int)`, where the parameter differs
+  only by `?`, now really overrides. A boxed parameter through a generic supertype
+  (`G[JInteger]`) overrides too.
+- **To update:** to override, write the base types (`dec(k: Int)`, or `dec(k: Int?)`). To keep
+  a separate overload, remove `override` and give it parameter types that differ by more
+  than `?`, or another name.
+- **No `onion migrate` rule:** whether the method was meant to override or to overload is
+  your choice, and the two edits run different code. The error shows the base signature
+  instead.
+
+A method whose parameters differ from a base method's **only by `?`** is the same method
+now, with or without `override`:
+
+- **Before:** an unmarked `def dec(k: Int?): void` beside a base `dec(k: Int): void` was a
+  separate overload, and `b.dec(1)` through `Base` ran the base. With a reference return
+  (`String`), the same method already overrode. `override` changed nothing for a reference
+  return but decided the outcome for `void` and primitive returns.
+- **Now:** it overrides for every return type. `override` is a check, as for exact types,
+  and never decides which method runs. Without `override`, the compiler warns **W0029**
+  (`'dec(Int?)' overrides 'dec(Int): void' of Base ...`). Over a `final` base method this is
+  **E0039**, as for the exact types (`setDaemon(on: Boolean?)` in a `Thread` subclass included).
+- **The other direction is unchanged:** an own `f(k: Int): void` beside a base
+  `f(k: Int?): void` stays an overload, so `null` through `Base` still reaches the base
+  method. Marked `override`, it is **E0068**; make the parameter `Int?` to override.
+- **To silence W0029:** add `override` if the method is meant to replace the base one.
+- **To keep a separate overload:** rename the method (`decOrSkip(k: Int?)`). No `onion
+  migrate` rule: only you know whether the method was meant to replace the base one.
+
 ## `OnionMath::randomInt` is removed; use `Rand::nextInt`
 
 Onion had two ways to get a random `Int` in a range, with opposite upper bounds (#3069).

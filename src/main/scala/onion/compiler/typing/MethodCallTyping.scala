@@ -14,6 +14,9 @@ final class MethodCallTyping(
 ) {
   private val callArgumentTypingSupport = new CallArgumentTypingSupport(bodyContext, typed(_, _, _), processAssignable, processAssignableForJavaCallee)
   private val methodInvocationBuilderSupport = new MethodInvocationBuilderSupport(typing, this)
+  private[typing] def reportDuplicateArgument(node: AST.Node, name: String): Unit =
+    bodyContext.report(DUPLICATE_ARGUMENT, node, name)
+
   private val methodCallReportingSupport = new MethodCallReportingSupport(bodyContext)
   private val methodTargetTypingSupport = new MethodTargetTypingSupport(bodyContext)
   private val memberSelectionResolutionSupport = new MemberSelectionResolutionSupport(typing, bodyContext, this)

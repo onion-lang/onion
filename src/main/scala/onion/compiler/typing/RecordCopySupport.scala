@@ -48,9 +48,20 @@ private[compiler] final class RecordCopySupport(calls: MethodCallTyping) {
 
       val named = scala.collection.mutable.LinkedHashMap[String, AST.Expression]()
       args.foreach {
-        case AST.NamedArgument(_, argName, value) => named(argName) = value
+        case na @ AST.NamedArgument(_, argName, value) =>
+          // A name given twice is E0044, as for an ordinary call; the first one would never run (#3100).
+          if (named.contains(argName)) {
+            calls.reportDuplicateArgument(na, argName)
+            break(Some(None))
+          }
+          named(argName) = value
         case _ => break(None) // positional args (or a mix): use the regular path
       }
+      // The record's own `copy` binds a named argument by its own parameter name. This path
+      // fills the call by component position, so it only serves a `copy` whose parameters are
+      // the components in order; any other goes through the ordinary named-argument path (#3100).
+      if (declaresCopy && !definition.methods("copy").exists(m =>
+            m.argumentsWithDefaults.map(_.name).sameElements(components.map(_._1)))) break(None)
       for (argName <- named.keys if !components.exists(_._1 == argName)) {
         if (declaresCopy) break(None)
         calls.reportMethodNotFound(node, targetType, s"copy(${argName} = ...)", Array[Type]())

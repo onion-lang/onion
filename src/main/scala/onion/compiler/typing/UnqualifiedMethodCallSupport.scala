@@ -145,7 +145,11 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         }
       } else (params0, methods0)
 
-    if (methods.length == 0 && declaresCallee(node.name) && node.args.exists(_.isInstanceOf[AST.ClosureExpression])) {
+    val localResult = if (methods.length == 0) localCallable(node, params, context, expected) else None
+
+    if (localResult.isDefined) {
+      localResult.get
+    } else if (methods.length == 0 && declaresCallee(node.name) && node.args.exists(_.isInstanceOf[AST.ClosureExpression])) {
       // A closure with explicitly typed parameters types eagerly as FunctionN, which a
       // Java functional-interface parameter does not accept; retry bidirectionally so the
       // resolved parameter type decides (SAM conversion), as the static/instance paths do.
@@ -216,6 +220,20 @@ private[compiler] final class UnqualifiedMethodCallSupport(
     }
 
   /** The method a statically imported call (`println(..)`) resolved to, under any cast. */
+  /** A local that holds a function shadows a default-imported static of the same name (#3075). */
+  private def localCallable(
+    node: AST.UnqualifiedMethodCall,
+    params: Array[Term],
+    context: LocalContext,
+    expected: Type
+  ): Option[Option[Term]] =
+    if (context.lookup(node.name) == null) None
+    else callableValueCallSupport.resolveCallableValue(node, params, context, expected) match {
+      case MethodFallbackLookup.Found(term) => Some(Some(term))
+      case MethodFallbackLookup.Error => Some(None)
+      case MethodFallbackLookup.NotFound => None
+    }
+
   private def staticImportCallee(term: Term): Option[Method] = term match {
     case c: CallStatic => Some(c.method)
     case c: AsInstanceOf => staticImportCallee(c.target)
@@ -300,6 +318,10 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         // callable value or static import is genuinely absent).
         val params0 = calls.typedTerms(node.args.toArray, context)
         if (params0 == null) return None
+        localCallable(node, params0, context, expected) match {
+          case Some(result) => return result
+          case None =>
+        }
         staticImportMethodCallSupport.resolveStaticImportMethodCall(node, params0, expected, context) match {
           case MethodFallbackLookup.Found(term) =>
             checkRegexLiteral(node, term)

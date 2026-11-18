@@ -1245,6 +1245,7 @@ v["users"][0]["name"].asString()
 キーが存在しない・添字が範囲外のときは null を保持する `Value` を返すので、途中の欠損があっても例外にはなりません
 （末尾で `asString()` 等を呼ぶと `null` になります）。`isNull()` で null かどうか、`size()` で配列・オブジェクトの
 要素数（それ以外は `0`）を調べられ、`raw()` で内部表現（`Map`/`List`/scalar/`null`）を直接取り出せます。
+`asInt()` / `asLong()` は、小数（`3.7`）や型の範囲外の数に対して、切り捨てや桁あふれをした値ではなく `0` を返します。
 
 `Json::parseOrNull(json)` は `Json::parse(json)` と同じですが、不正な入力に対して例外
 `Json.JsonParseException` を投げる代わりに `null` を返します。パース失敗を別扱いのエラーではなく

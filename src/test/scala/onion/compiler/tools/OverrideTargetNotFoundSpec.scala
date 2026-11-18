@@ -508,6 +508,35 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(results.map(_._1).contains(Some("E0039")), s"got: $results")
     }
 
+    // Row 10: an own `f(Int)` beside an inherited final `f(Int?): void` is an overload, not
+    // an override, so E0039 must not fire (panel block 9 on #3051).
+    it("runs an own `f(k: Int)` beside an inherited final `f(k: Int?): void` as an overload") {
+      val result = shell.run(
+        """
+          |class A {
+          |protected:
+          |  var log: String
+          |public:
+          |  def this { log = "" }
+          |  final def f(k: Int?): void { log = log + "A" }
+          |  def seen: String = log
+          |}
+          |class B extends A { public: def this {} def f(k: Int): void { log = log + "B" } }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    val b = new B()
+          |    b.f(1)
+          |    val a: A = b
+          |    a.f(null)
+          |    return b.seen
+          |  }
+          |}
+          |""".stripMargin,
+        "FinalRow10.on", Array())
+      assert(result == onion.tools.Shell.Success("BA"), s"got: $result")
+    }
+
     it("reports E0039 for `setDaemon(on: Boolean?)` over the final JDK `Thread.setDaemon`") {
       val results = errors(
         """

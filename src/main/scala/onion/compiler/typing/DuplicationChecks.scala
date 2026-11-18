@@ -210,8 +210,7 @@ private[compiler] object DuplicationChecks {
               TypeSubstitution.substituteType(contract.returnType, viewSubst, emptyMethodSubst, defaultToBound = true)
             implByName(contract.name).find(impl =>
               impl.arguments.length == specializedArgs.length &&
-                plainNames(impl.arguments) == plainNames(specializedArgs) &&
-                bridgeableReturn(specializedRet, impl.returnType)
+                questionOnly(plainNames(specializedArgs), specializedRet, specializedArgs, true, impl)
             ).foreach { impl =>
               val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location)
                 .orElse(memberLocations.get(impl.name)).getOrElse(fallback)

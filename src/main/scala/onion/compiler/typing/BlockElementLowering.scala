@@ -80,22 +80,24 @@ final class BlockElementLowering(
       }
     case node: AST.BreakExpression =>
       if (!context.inLoop) {
-        bodyContext.report(BREAK_OUTSIDE_LOOP, node)
+        bodyContext.reportLoopJumpOutsideLoop(BREAK_OUTSIDE_LOOP, node)
         new NOP(node.location)
       } else if (node.label != null && !context.hasLabel(node.label)) {
         bodyContext.report(LABEL_NOT_FOUND, node, node.label, context.labels)
         new NOP(node.location)
       } else {
+        bodyContext.acceptLoopJump(node)
         new Break(node.location, node.label)
       }
     case node: AST.ContinueExpression =>
       if (!context.inLoop) {
-        bodyContext.report(CONTINUE_OUTSIDE_LOOP, node)
+        bodyContext.reportLoopJumpOutsideLoop(CONTINUE_OUTSIDE_LOOP, node)
         new NOP(node.location)
       } else if (node.label != null && !context.hasLabel(node.label)) {
         bodyContext.report(LABEL_NOT_FOUND, node, node.label, context.labels)
         new NOP(node.location)
       } else {
+        bodyContext.acceptLoopJump(node)
         new Continue(node.location, node.label)
       }
     case node: AST.LabeledLoop =>

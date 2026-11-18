@@ -295,6 +295,7 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
     // RFC #2557 3.2: an invariant or history may name only value-typed fields.
     new onion.compiler.typing.ContractFramingPass(this).run(table_.classes.values.toSeq)
     reportMutedRetiredSelf()
+    reportMutedLoopJumps()
     diagnostics.finishOrThrow()
     table_.classes.values.toSeq
   }
@@ -352,6 +353,36 @@ class Typing(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Compi
   private def reportMutedRetiredSelf(): Unit =
     retiredSelfMuted.foreach { case (key @ (file, _, _), location) =>
       if (retiredSelfReported.add(key)) diagnostics.reportIn(file, SemanticError.SELF_RETIRED, location, Seq())
+    }
+
+  /**
+   * E0048/E0049, a `break` or `continue` outside a loop, depend only on where they are written:
+   * a lambda body never sees a loop around the lambda. A lambda passed to a call is typed with
+   * reporting suppressed and that typing is kept, so the error was muted and the jump compiled
+   * to nothing (#3113). Like E0117, a place met only while reporting is suppressed is reported
+   * when typing ends, unless a typing with reporting on accepted or reported it there.
+   */
+  private val loopJumpSettled = scala.collection.mutable.Set[(String, Int, Int)]()
+  private val loopJumpMuted = scala.collection.mutable.LinkedHashMap[(String, Int, Int), (SemanticError, Location)]()
+
+  private def loopJumpKey(node: AST.Node): (String, Int, Int) =
+    (unit_.sourceFile, node.location.line, node.location.column)
+
+  /** Reports E0048/E0049 at `node`, or keeps it to report at the end while reporting is suppressed. */
+  private[compiler] def reportLoopJumpOutsideLoop(error: SemanticError, node: AST.Node): Unit = {
+    val key = loopJumpKey(node)
+    if (reportingEnabled) loopJumpSettled += key
+    else if (!loopJumpSettled.contains(key)) loopJumpMuted.getOrElseUpdate(key, (error, node.location))
+    report(error, node)
+  }
+
+  /** A `break`/`continue` at `node` was typed inside a loop with reporting on: nothing to report there. */
+  private[compiler] def acceptLoopJump(node: AST.Node): Unit =
+    if (reportingEnabled) loopJumpSettled += loopJumpKey(node)
+
+  private def reportMutedLoopJumps(): Unit =
+    loopJumpMuted.foreach { case (key @ (file, _, _), (error, location)) =>
+      if (loopJumpSettled.add(key)) diagnostics.reportIn(file, error, location, Seq())
     }
 
   def withSuppressedReporting[A](block: => A): A = {

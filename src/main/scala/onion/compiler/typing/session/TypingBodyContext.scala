@@ -20,8 +20,17 @@ final class TypingBodyContext(
   private val unitProvider: () => AST.CompilationUnit = () => null,
   /** Whether contract clauses are accepted (RFC #2557); `Off` makes a clause an error. */
   val contractMode: ContractMode = ContractMode.Off,
-  private val reportRetiredSelfNode: AST.Node => Unit = _ => ()
+  private val reportRetiredSelfNode: AST.Node => Unit = _ => (),
+  private val reportLoopJumpNode: (SemanticError, AST.Node) => Unit = null,
+  private val acceptLoopJumpNode: AST.Node => Unit = _ => ()
 ) {
+  /** E0048/E0049 at a `break`/`continue` outside a loop, kept while a speculative typing mutes errors (#3113). */
+  def reportLoopJumpOutsideLoop(error: SemanticError, node: AST.Node): Unit =
+    if (reportLoopJumpNode != null) reportLoopJumpNode(error, node) else report(error, node)
+
+  /** A `break`/`continue` at `node` was accepted inside a loop. */
+  def acceptLoopJump(node: AST.Node): Unit = acceptLoopJumpNode(node)
+
   /** E0117 at a `self`, once, even while a speculative typing mutes errors (RFC #2788). */
   def reportRetiredSelf(node: AST.Node): Unit = reportRetiredSelfNode(node)
 
@@ -94,6 +103,8 @@ object TypingBodyContext {
       problemCountProvider = () => typing.problemCount,
       unitProvider = () => unitContext.unit,
       contractMode = typing.contractMode,
-      reportRetiredSelfNode = typing.reportRetiredSelf
+      reportRetiredSelfNode = typing.reportRetiredSelf,
+      reportLoopJumpNode = typing.reportLoopJumpOutsideLoop,
+      acceptLoopJumpNode = typing.acceptLoopJump
     )
 }

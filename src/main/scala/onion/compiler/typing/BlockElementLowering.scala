@@ -165,7 +165,7 @@ final class BlockElementLowering(
                       null,
                       new BinaryTerm(LESS_THAN, BasicType.BOOLEAN, ref(counterVariable), new ArrayLength(ref(collectionVar))),
                       new StatementBlock(
-                        assign(elementVar, indexref(collectionVar, ref(counterVariable))),
+                        assign(elementVar, arrayElementAs(indexref(collectionVar, ref(counterVariable)), elementVar.tp)),
                         block
                       ),
                       update = assign(counterVariable, new BinaryTerm(ADD, BasicType.INT, ref(counterVariable), new IntValue(1)))
@@ -811,6 +811,11 @@ final class BlockElementLowering(
   /** True when the value is a java.util.Map (which has no iterator()). */
   private def isMapType(tp: Type): Boolean =
     TypeRules.isSuperType(bodyContext.load("java.util.Map"), tp)
+
+  /** `foreach a: Long in ints` reads each element as the annotation says: the cast `as`
+   *  would (widen, narrow, box, unbox); a loop with no conversion to make is unchanged (#2984). */
+  private def arrayElementAs(element: Term, target: Type): Term =
+    if (element.`type` == target) element else body.castTerm(element, target)
 
   private def indexref(bind: ClosureLocalBinding, value: Term): Term =
     new RefArray(new RefLocal(bind), value)

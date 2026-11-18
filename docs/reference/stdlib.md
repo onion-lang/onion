@@ -1703,6 +1703,7 @@ Json::getStringOr(obj, "name", "anon") // "anon"
 A missing key or out-of-range index on the `Json::value` wrapper yields a null-holding
 `Value` instead of throwing, so a chain like `v["users"][99]["name"]` stays safe until you
 convert it — `asString()`/`asInt()`/etc. return `null`/`0`/`false` at the end of the chain.
+`asInt()`/`asLong()` also give `0` for a fraction (`3.7`) or a number outside the type's range, never a truncated or wrapped one.
 `Value` also has `isNull()` (was the underlying value `null`?), `size()` (element count for
 an array/object Value, `0` otherwise), and `raw()` (the underlying `Map`/`List`/scalar/`null`).
 

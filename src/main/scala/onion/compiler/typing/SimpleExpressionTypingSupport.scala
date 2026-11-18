@@ -481,8 +481,13 @@ private[compiler] final class SimpleExpressionTypingSupport(
       // next (a bare, receiver-less, parens-less call resolving like
       // `self.<name>`), before this bare name is reported as not found (#2013).
       trySelfMethodQuiet(node, context)
-    else if ((field.modifier & AST.M_STATIC) != 0)
+    else if ((field.modifier & AST.M_STATIC) != 0) {
+      // An inherited private static field is as unreachable bare as through `A::K` (#3155).
+      // The error is reported here and the term kept, so the caller does not add "not found".
+      if (!MemberAccess.isMemberAccessible(field, bodyContext.definition))
+        bodyContext.report(FIELD_NOT_ACCESSIBLE, node, field.affiliation, node.name, bodyContext.definition)
       Some(new RefStaticField(node.location, bodyContext.definition, field))
+    }
     else if (!context.isStatic)
       typeMemberSelection(AST.MemberSelection(node.location, AST.CurrentInstance(node.location), node.name), context)
     else None

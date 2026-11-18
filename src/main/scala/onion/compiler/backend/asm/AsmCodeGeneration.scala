@@ -79,6 +79,10 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
     val closures = mutable.ArrayBuffer[CompiledClass]()
     val closureCodegen: ClosureCodegen =
       new ClosureCodegen(AsmCodeGeneration.this, config.outputDirectory, () => { closureCounter += 1; closureCounter }, compiled => closures += compiled, sourceFileName(host))
+    /** Protected methods of a foreign-package superclass that a closure of this class calls on
+     *  the enclosing instance: the closure class is not a subclass, so the JVM refuses the call
+     *  (#2910). Each gets a synthetic accessor on the host, emitted with the host's methods. */
+    val protectedAccessors = mutable.LinkedHashMap[TypedAST.Method, String]()
     var lastVisitor: AsmCodeGenerationVisitor = null
     var lastVisitorGen: GeneratorAdapter = null
     var lastVisitorLocals: LocalVarContext = null
@@ -91,6 +95,35 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
   private def generatedClosures: mutable.ArrayBuffer[CompiledClass] = state.closures
 
   private val bridgeMethodEmitter = new BridgeMethodEmitter(this)
+
+  private def packageOf(className: String): String =
+    val i = className.lastIndexOf('.')
+    if i < 0 then "" else className.substring(0, i)
+
+  /** The name of the host-class accessor a closure must call for `method` on the enclosing
+   *  instance (typed `targetType`), or None when a direct call is legal: the method is not
+   *  protected, shares the host's package, or is called on something other than the host. */
+  private[asm] def protectedAccessorFor(method: TypedAST.Method, targetType: TypedAST.Type): Option[String] =
+    val st = state
+    if st == null || !Modifier.isProtected(method.modifier) || Modifier.isStatic(method.modifier) then None
+    else targetType match
+      case ct: TypedAST.ClassType if ct.name == st.host.name && !method.affiliation.isInterface
+          && packageOf(method.affiliation.name) != packageOf(st.host.name) =>
+        Some(st.protectedAccessors.getOrElseUpdate(method, "access$" + method.name + "$" + st.protectedAccessors.size))
+      case _ => None
+
+  private def emitProtectedAccessors(cw: ClassWriter, hostName: String): Unit =
+    for (method, accessor) <- state.protectedAccessors do
+      val argTypes = method.arguments.map(asmType)
+      val ret = asmType(method.returnType)
+      val desc = AsmType.getMethodDescriptor(ret, argTypes*)
+      val gen = MethodEmitter.newGenerator(cw, Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC, accessor, ret, argTypes)
+      gen.visitCode()
+      gen.loadThis()
+      gen.loadArgs()
+      gen.invokeVirtual(AsmUtil.objectType(hostName), new AsmMethod(method.name, desc))
+      gen.returnValue()
+      gen.endMethod()
 
   /** The method a `super.f(...)` call must run when the direct superclass `superClass`
    *  fills `method`'s slot with a `?` bridge (`B.f(Int?)` over `A.f(Int)`): that bridge's
@@ -227,6 +260,8 @@ class AsmCodeGeneration(config: CompilerConfig) extends BytecodeGenerator:
         codeMethod(cw, methodDef, name)
 
     bridgeMethodEmitter.emitBridges(cw, classDef)
+    // After the methods: emitting them is what generates the closures that register accessors
+    emitProtectedAccessors(cw, name)
 
     // Closures generated for this class are nest members so they can reach
     // the host's private members (JEP 181); see ClosureCodegen.visitNestHost

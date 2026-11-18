@@ -188,7 +188,7 @@ final class ExpressionFormTyping(
 
   /** `i as Long?` with `i: Int` converts the primitive first and then boxes it, as
     * `val l: Long? = i` does; a single cast would check an `Integer` against `Long` (#2730). */
-  private def castTerm(term: Term, destination: Type): Term = (term.`type`, destination) match {
+  private[typing] def castTerm(term: Term, destination: Type): Term = (term.`type`, destination) match {
     case (bt: BasicType, d: NullableType) if d.innerType.isBasicType && (bt ne d.innerType) =>
       new AsInstanceOf(new AsInstanceOf(term, d.innerType), destination)
     case _ => new AsInstanceOf(term, destination)

@@ -47,6 +47,12 @@ class StringsEnrichedSpec extends AbstractShellSpec {
         Shell.Success("3|2"))
     }
 
+    it("truncate never ends in half an emoji when the cut lands inside the suffix") {
+      run(
+        "return Strings::truncate(\"abcdef\", 1, \"\\uD83D\\uDE00\").length() + \"|\" + Strings::truncate(\"abcdef\", 3, \"\\uD83D\\uDE00\\uD83D\\uDE00\").length()",
+        Shell.Success("0|2"))
+    }
+
     it("center pads on both sides") {
       run(
         "return Strings::center(\"hi\", 6, '*')",

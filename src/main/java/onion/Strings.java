@@ -213,7 +213,12 @@ public final class Strings {
         if (str.length() <= maxLength) return str;
         String tail = suffix == null ? "" : suffix;
         int keep = maxLength - tail.length();
-        if (keep <= 0) return tail.length() <= maxLength ? tail : tail.substring(0, maxLength);
+        if (keep <= 0) {
+            if (tail.length() <= maxLength) return tail;
+            int cut = maxLength;
+            if (cut > 0 && Character.isHighSurrogate(tail.charAt(cut - 1)) && Character.isLowSurrogate(tail.charAt(cut))) cut--;
+            return tail.substring(0, cut);
+        }
         if (Character.isHighSurrogate(str.charAt(keep - 1)) && Character.isLowSurrogate(str.charAt(keep))) keep--;
         return str.substring(0, keep) + tail;
     }

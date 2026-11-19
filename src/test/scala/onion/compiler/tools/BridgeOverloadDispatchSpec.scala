@@ -122,4 +122,26 @@ class BridgeOverloadDispatchSpec extends AbstractShellSpec {
       assert(Shell.Success(1) == result)
     }
   }
+
+  // #2927: a static method cannot implement an instance slot, so it must not be chosen
+  // as the override (which dropped the bridge: AbstractMethodError at the call).
+  describe("A static sibling of a boxed override (#2927)") {
+    it("still bridges the instance override through G[JInteger]") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class C conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  override def n(x: Int): JInteger = 1
+          |  static def n(x: JInteger): JInteger = 2
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new C
+          |    return g.n(4)
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(1) == result)
+    }
+  }
 }

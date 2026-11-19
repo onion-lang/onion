@@ -595,7 +595,7 @@ final class ConstructionTyping(
     // ArgumentExpectedTypeRetyping (#232).
     val retyped =
       if (constructors1.isEmpty || !substitutionValidFor(constructors1, parameters0))
-        retypeConstructorArguments(typeRef, node.args.toArray, parameters0, context)
+        retypeConstructorArguments(typeRef, node.args.toArray, parameters0, context, typeVariableSlotsFit)
       else None
     val parameters = retyped.getOrElse(parameters0)
     val constructors = retyped match {
@@ -871,33 +871,45 @@ final class ConstructionTyping(
     typeRef: ClassType,
     args: Array[AST.Expression],
     params: Array[Term],
-    context: LocalContext
+    context: LocalContext,
+    fits: (ConstructorRef, Array[Term]) => Boolean
   ): Option[Array[Term]] = {
     if (params == null || params.isEmpty) return None
     val malleableIndices = args.indices.filter(i => i < params.length && isMalleableArgument(args(i)))
     if (malleableIndices.isEmpty) return None
 
     val candidates = typeRef.constructors.filter(_.getArgs.length == params.length)
-    if (candidates.length != 1) return None
+    if (candidates.isEmpty) return None
 
     val classSubst = TypeSubstitution.classSubstitution(typeRef)
-    val formals = candidates(0).getArgs.map(t =>
-      TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
-
-    var changed = false
-    val updated = params.clone()
-    for (i <- malleableIndices) {
-      val expectedType = formals(i)
-      if (expectedType != null) {
-        typing.withSuppressedReporting(typed(args(i), context, expectedType)) match {
-          case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
-            updated(i) = term
-            changed = true
-          case _ =>
+    def retypeFor(candidate: ConstructorRef): Option[Array[Term]] = {
+      val formals = candidate.getArgs.map(t =>
+        TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      var changed = false
+      val updated = params.clone()
+      for (i <- malleableIndices) {
+        val expectedType = formals(i)
+        if (expectedType != null) {
+          typing.withSuppressedReporting(typed(args(i), context, expectedType)) match {
+            case Some(term) if term.`type` != null && !(term.`type` eq params(i).`type`) =>
+              updated(i) = term
+              changed = true
+            case _ =>
+          }
         }
       }
+      if (changed) Some(updated) else None
     }
-    if (changed) Some(updated) else None
+    if (candidates.length == 1) retypeFor(candidates(0))
+    else {
+      // Overloads (`this(xs: List[T])` / `this(o: Object)`): as Java infers a factory's type
+      // argument from the slot, try each candidate's slots and keep the first whose retyped
+      // arguments resolve to that very constructor (#2841).
+      candidates.iterator.map(c => retypeFor(c).filter { updated =>
+        val found = typeRef.findConstructor(updated, (f: ConstructorRef) => fits(f, updated))
+        found.length == 1 && (found(0) eq c)
+      }).collectFirst { case Some(updated) => updated }
+    }
   }
 
   /** An argument whose inferred type can shift under an expected type: a

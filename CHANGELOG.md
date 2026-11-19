@@ -7,6 +7,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.162.0] - 2026-11-19
+
+### Breaking
+
+- **`override` must match the base method's types up to `?`; otherwise it is E0068.**
+  - Before: `override def dec(k: JInteger): void` over `dec(k: Int): void`, or `override def f(k: Int?): Int?` over `f(k: Int): Int`, compiled as a silent overload that calls through the base type never reached.
+  - Now: E0068, and the error names the base signature. Use the base types to override, or remove `override` to keep the overload. Through a generic supertype (`G[JInteger]`) a boxed parameter still overrides. See `docs/migration/pre-1.0.md`.
+
+- **A method that adds `?` to a base method's parameter overrides it, with or without `override`.**
+  - Before: unmarked `def dec(k: Int?): void` beside a base `dec(k: Int): void` was an overload; with a `String` return it overrode.
+  - Now: it overrides for every return type, and without `override` it warns W0029. Over a `final` base method it is E0039. Rename it to keep a separate overload.
+  - The other direction is unchanged: an unmarked `f(k: Int): void` beside a base `f(k: Int?): void` stays an overload, so a `null` through the base still reaches the base, also when the base's own `f(k: Int?)` overrides an `f(k: Int)` further up. With `override` it is E0068 (unless an `f(k: Int)` further up is the target).
+- **A generic overload now competes with a plain one, as in Java (#2845).**
+  - `g(CharSequence)` beside `g[T](Comparable[T])`, called as `g("a")`: before `charseq`, now E0006 (ambiguous). Write `g("a" as CharSequence)`; the hint names the argument to cast.
+  - `f(Object)` beside `f[T](Comparable[T])`, called as `f("a")`: before `object`, now `generic`. So does `show(Int)` given a `List[Int]` element. See `docs/migration/pre-1.0.md`.
+
+### Added
+
+- **`mk()()` now says what to write instead of a bare syntax error.**
+  - Before: `Encountered "(", but expecting ")"`, no hint.
+  - Now: the hint quotes your call: `adder(1).call(2)`, or bind it first with a name your file does not use yet (`val f = adder(1)` then `f(2)`).
+
+### Fixed
+
+- **A type error in a lambda inside `new K(call { ... })` is reported.**
+  - Before: no error, then a `VerifyError` (or a silent run of unchecked code).
+  - Now: `E0000` at the bad expression, as for `val k = call { ... }`.
+- **A type error in a lambda passed as `p(call { ... })` is reported (#3174).**
+  - Before: no error; the program compiled, then failed with `VerifyError` or ran unchecked code.
+  - Now: the error is reported where it is (for example `E0000` at the bad value), as for `val s = call { ... }`.
+- **`Strings::truncate` never returns half an emoji when the cut lands inside the suffix.**
+  - Before: `Strings::truncate("abcdef", 1, "😀")` returned a lone surrogate.
+  - Now: it returns `""`.
+- **Reading a superclass's private static field by its bare name is a compile error (#3155).**
+  - Before: `def run(): Int = K` compiled, then threw `IllegalAccessError` when run. `A::K` was already an error.
+  - Now: E0014, with the same hint as `A::K`.
+- **`Files::glob(dir, "{a,{c,x.md}}")` matches `a`, `c` and `x.md` (#3130).**
+  - Before: `PatternSyntaxException: Cannot nest groups`.
+  - Now: nested brace groups expand, as in bash.
+- **`break`/`continue` in a lambda passed to a call is now E0048/E0049 (#3113).**
+  - Before: `call { -> break }` compiled; the loop ran on and the lambda returned `null`.
+  - Now: the same error as `val f: () -> String = () -> { break }`. A loop inside the lambda can still `break` out of itself.
+- **`class S extends C[Integer]([1.5])` is a compile error (#3016).**
+  - Before: it compiled, then the first read of an element threw a `ClassCastException`.
+  - Now: E0021, as `new C[Integer]([1.5])` already gives. Arguments that fit, such as `[1, 2]` or `Collections::emptyList()`, still compile.
+- **A `@TailRecursive` mutual group written as `= if ... else ...` no longer overflows the stack (#3013).**
+  - Before: when one member also called itself, the group was rewritten as a lone loop and `a(1000000)` died with a stack overflow, with no W0016.
+  - Now: the group is optimized together, as it is with `return` statements.
+- **A bare positional call to a superclass's private method is E0013 at compile time (#3012).**
+  - Before: `pim(7, 3)` in a subclass compiled, then stopped with `IllegalAccessError` when it ran.
+  - Now: E0013, as `this.pim(7, 3)` already was.
+- **A bare call skips an inherited private overload for an accessible one (#3012).**
+  - Before: with a private `foo(Int)` in the superclass and a public `foo(Object)`, `foo(1)` stopped with `IllegalAccessError`.
+  - Now: `foo(1)` calls `foo(Object)`, as `this.foo(1)` does.
+- **`Json::stringify(1..3)` writes `[1,2,3]` (#3010).**
+  - Before: a range was written as the string `"Range(1..<4)"`.
+  - Now: any `Iterable` is written as a JSON array.
+- **A misspelled key in a `shape name = config` file now shows up in the error (#2996).**
+  - Before: `port: expected Int, found absent`, with no hint that the file has `prot`.
+  - Now: `port: expected Int, found absent (did you mean "prot" on line 2?)`.
+- **`Json.Value.asInt()` and `asLong()` no longer truncate or wrap (#2995).**
+  - Before: `3.7` gave `3`, and `10000000000` as an `Int` gave `1410065408`.
+  - Now: both give `0`, the same "no value" answer as a missing key. `Json::getInt` already returned `null` for these.
+- **`foreach a: Long in ints` over an `Int[]` compiles and runs (#2984).**
+  - Before: a loop annotation that differs from the array's element type failed with I0000 or a `VerifyError`.
+  - Now: each element is converted as `as` would (widen, narrow, box, unbox), e.g. `Int` to `Long` or `Int` to `Object`.
+- **A json-shape record component typed by `import { java.lang.String as JS }` compiles (#2959).**
+  - Before: E0061 said `JS (= java.lang.String)` was unsupported, while listing `String` as supported.
+  - Now: `JS` reads as a `String`, as `type Name = String` does.
+- **`new A(x -> x * 2)` compiles when a later constructor parameter has a default (#2919).**
+  - Before: E0052, "lambda parameter x must specify a type", although only one constructor could take the lambda.
+  - Now: the lambda takes its type from that constructor's parameter.
+  - Unchanged: if another constructor could also take the lambda (an `Object`, `T`, function or `?` function parameter), the call stays E0052, so adding `: Int` to the lambda never switches constructors.
+- **`new A((x, y) -> x + y)` picks the constructor by lambda arity.**
+  - Before: E0052 when constructors were overloaded by function arity.
+  - Now: the two-parameter constructor is chosen, as for overloaded methods.
+- **A lambda can call an inherited protected method of a Java superclass (#2910).**
+  - Before: `() -> { removeRange(0, 1); size() }` in a subclass of `ArrayList` compiled, then threw `IllegalAccessError`.
+  - Now: it runs, as the same lambda does in Java.
+- **An override whose parameter differs from the base one only by `?` now runs.**
+  - Before: `override def dec(k: Int?): void` over `dec(k: Int): void` compiled, but calls through `Base` ran the base method. With a `String` return the same override did run.
+  - Now: it overrides for any return type both share, also in a chain (`f(Int)`, then `f(Int?)`, then `f(Int)` again) when the return is a reference type. It also fills an abstract `f(k: Int)` beside another type's `f(k: Int?)`, abstract or not, so that no longer throws `AbstractMethodError`. A base that declares both `f(k: Int)` and `f(k: Int?)` keeps its `f(k: Int)` when a subclass overrides only `f(k: Int?)`.
+  - `super.f(x)` in a subclass of such an override runs that override. It used to run the subclass's own `f` again until the stack overflowed.
+  - Still open (#3053): with a `?` base parameter and a plain override returning a reference (`f(k: Int?): String` in the base, `f(k: Int): String` in the subclass), passing `null` through the base type throws, as before.
+- **`id("a")` compiles against `def id[T](c: Comparable[T])` (#2845).**
+  - Before: E0005. Now: `T = String`, as in Java. An Onion `enum Color` binds `T = Color`.
+- **A `[T: Numeric]` method can pass its own dictionary on through an instance call (#2790).**
+  - Before: `a.total(xs)` inside `twice[T: Numeric]` was E0003, "type instance Numeric[T] is not found".
+  - Now: it compiles and forwards `twice`'s dictionary, as `total(xs)` and `Agg::total(xs)` already did.
+
 ## [0.161.0] - 2026-11-17
 
 ### Breaking

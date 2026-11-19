@@ -9933,7 +9933,8 @@ future は <code>isSuccess()</code> と <code>isFailure()</code> の両方が <c
 </span></code></pre></div>
 <p>キーが存在しない・添字が範囲外のときは null を保持する <code>Value</code> を返すので、途中の欠損があっても例外にはなりません
 （末尾で <code>asString()</code> 等を呼ぶと <code>null</code> になります）。<code>isNull()</code> で null かどうか、<code>size()</code> で配列・オブジェクトの
-要素数（それ以外は <code>0</code>）を調べられ、<code>raw()</code> で内部表現（<code>Map</code>/<code>List</code>/scalar/<code>null</code>）を直接取り出せます。</p>
+要素数（それ以外は <code>0</code>）を調べられ、<code>raw()</code> で内部表現（<code>Map</code>/<code>List</code>/scalar/<code>null</code>）を直接取り出せます。
+<code>asInt()</code> / <code>asLong()</code> は、小数（<code>3.7</code>）や型の範囲外の数に対して、切り捨てや桁あふれをした値ではなく <code>0</code> を返します。</p>
 <p><code>Json::parseOrNull(json)</code> は <code>Json::parse(json)</code> と同じですが、不正な入力に対して例外
 <code>Json.JsonParseException</code> を投げる代わりに <code>null</code> を返します。パース失敗を別扱いのエラーではなく
 単なる「値が無い」ケースとして扱いたいときに便利です:</p>

@@ -5825,6 +5825,11 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 <td>A method can break its <code>ensures</code>; the solver found a counterexample</td>
 </tr>
 <tr>
+<td><code>W0029</code></td>
+<td><code>unmarked-nullable-override</code></td>
+<td>A method without <code>override</code> overrides an inherited one that differs from it only by <code>?</code></td>
+</tr>
+<tr>
 <td><code>W0027</code></td>
 <td><code>contract-trusted</code></td>
 <td>A contract is relied on without being verified (<code>@Trusted</code>)</td>

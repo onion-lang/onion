@@ -5367,8 +5367,12 @@ arrow, <code>{ "c" }</code> is a block whose value is <code>"c"</code>, not a la
 </span></code></pre></div>
 <p>Under the hood a function value is an object implementing <code>onion.Function0</code> ..
 <code>onion.Function10</code>, whose single method is <code>call</code>; <code>double(21)</code> compiles to
-<code>double(21)</code>. You only need to spell <code>.call</code> yourself when handing a function
-value to Java code that expects to invoke it by that name.</p>
+<code>double.call(21)</code>. You spell <code>.call</code> yourself in two cases:</p>
+<ul>
+<li>handing a function value to Java code that expects to invoke it by that name</li>
+<li>calling a function that another call returned: <code>adder(1)(2)</code> is a syntax error,
+  so write <code>adder(1).call(2)</code>, or bind it first (<code>val add1 = adder(1)</code>, then <code>add1(2)</code>)</li>
+</ul>
 <h2 id="function-types">Function Types<a class="headerlink" href="#function-types" title="Permanent link">&para;</a></h2>
 <p>Lambdas can be typed using the arrow type syntax <code>(A, B) -&gt; R</code>. For a single parameter, parentheses are optional (<code>A -&gt; R</code>):</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1">// Function with 0 parameters</span>

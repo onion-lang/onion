@@ -10474,6 +10474,7 @@ an explicit fallback instead:</p>
 <p>A missing key or out-of-range index on the <code>Json::value</code> wrapper yields a null-holding
 <code>Value</code> instead of throwing, so a chain like <code>v["users"][99]["name"]</code> stays safe until you
 convert it — <code>asString()</code>/<code>asInt()</code>/etc. return <code>null</code>/<code>0</code>/<code>false</code> at the end of the chain.
+<code>asInt()</code>/<code>asLong()</code> also give <code>0</code> for a fraction (<code>3.7</code>) or a number outside the type's range, never a truncated or wrapped one.
 <code>Value</code> also has <code>isNull()</code> (was the underlying value <code>null</code>?), <code>size()</code> (element count for
 an array/object Value, <code>0</code> otherwise), and <code>raw()</code> (the underlying <code>Map</code>/<code>List</code>/scalar/<code>null</code>).</p>
 <p><code>Json::parseOrNull(json)</code> behaves like <code>Json::parse(json)</code> but returns <code>null</code> on malformed

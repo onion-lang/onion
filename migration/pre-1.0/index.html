@@ -4298,10 +4298,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#override-must-match-the-base-methods-types-up-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        override must match the base method's types up to ?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#onionmathrandomint-is-removed-use-randnextint" class="md-nav__link">
     <span class="md-ellipsis">
       
         OnionMath::randomInt is removed; use Rand::nextInt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-generic-overload-competes-with-a-plain-one-as-in-java" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A generic overload competes with a plain one, as in Java
       
     </span>
   </a>
@@ -5194,10 +5216,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#override-must-match-the-base-methods-types-up-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        override must match the base method's types up to ?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#onionmathrandomint-is-removed-use-randnextint" class="md-nav__link">
     <span class="md-ellipsis">
       
         OnionMath::randomInt is removed; use Rand::nextInt
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-generic-overload-competes-with-a-plain-one-as-in-java" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A generic overload competes with a plain one, as in Java
       
     </span>
   </a>
@@ -5940,11 +5984,58 @@ the auto-CLI (<code>def main(count: Int = 3)</code>) already did for the same in
   and inside <code>#{...}</code> in strings. It leaves comments, plain string text, <code>\#{self}</code> and
   <code>`self`</code> alone.</li>
 </ul>
+<h2 id="override-must-match-the-base-methods-types-up-to"><code>override</code> must match the base method's types up to <code>?</code><a class="headerlink" href="#override-must-match-the-base-methods-types-up-to" title="Permanent link">&para;</a></h2>
+<p>An <code>override</code> whose parameter is <code>JInteger</code> where the base has <code>Int</code>, or whose return is
+<code>Int?</code> where the base returns <code>Int</code>, never overrode anything. It compiled as a new overload,
+and a call through the base type still ran the base method. Now it is <strong>E0068</strong> (#2896).</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">dec</span><span class="p">(</span><span class="n">k</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"Base"</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="p">}</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Up</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a><span class="w">  </span><span class="kd">override</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">dec</span><span class="p">(</span><span class="n">k</span><span class="p">:</span><span class="w"> </span><span class="nc">JInteger</span><span class="p">):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"Up"</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// Before: compiled. Now: E0068</span>
+</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="p">}</span>
+</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Up</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="nf">dec</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w">                           </span><span class="c1">// Before: printed Base</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <strong>E0068</strong> <code>method dec(JInteger) is marked override but does not override
+  any method ...</code>, followed by the base signature (<code>dec(Int): void</code>).</li>
+<li><strong>Still fine:</strong> <code>override def dec(k: Int?)</code> over <code>dec(k: Int)</code>, where the parameter differs
+  only by <code>?</code>, now really overrides. A boxed parameter through a generic supertype
+  (<code>G[JInteger]</code>) overrides too.</li>
+<li><strong>To update:</strong> to override, write the base types (<code>dec(k: Int)</code>, or <code>dec(k: Int?)</code>). To keep
+  a separate overload, remove <code>override</code> and give it parameter types that differ by more
+  than <code>?</code>, or another name.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> whether the method was meant to override or to overload is
+  your choice, and the two edits run different code. The error shows the base signature
+  instead.</li>
+</ul>
+<p>A method whose parameters differ from a base method's <strong>only by <code>?</code></strong> is the same method
+now, with or without <code>override</code>:</p>
+<ul>
+<li><strong>Before:</strong> an unmarked <code>def dec(k: Int?): void</code> beside a base <code>dec(k: Int): void</code> was a
+  separate overload, and <code>b.dec(1)</code> through <code>Base</code> ran the base. With a reference return
+  (<code>String</code>), the same method already overrode. <code>override</code> changed nothing for a reference
+  return but decided the outcome for <code>void</code> and primitive returns.</li>
+<li><strong>Now:</strong> it overrides for every return type. <code>override</code> is a check, as for exact types,
+  and never decides which method runs. Without <code>override</code>, the compiler warns <strong>W0029</strong>
+  (<code>'dec(Int?)' overrides 'dec(Int): void' of Base ...</code>). Over a <code>final</code> base method this is
+  <strong>E0039</strong>, as for the exact types (<code>setDaemon(on: Boolean?)</code> in a <code>Thread</code> subclass included).</li>
+<li><strong>The other direction is unchanged:</strong> an own <code>f(k: Int): void</code> beside a base
+  <code>f(k: Int?): void</code> stays an overload, so <code>null</code> through <code>Base</code> still reaches the base
+  method. Marked <code>override</code>, it is <strong>E0068</strong>; make the parameter <code>Int?</code> to override.</li>
+<li><strong>To silence W0029:</strong> add <code>override</code> if the method is meant to replace the base one.</li>
+<li><strong>To keep a separate overload:</strong> rename the method (<code>decOrSkip(k: Int?)</code>). No <code>onion
+  migrate</code> rule: only you know whether the method was meant to replace the base one.</li>
+</ul>
 <h2 id="onionmathrandomint-is-removed-use-randnextint"><code>OnionMath::randomInt</code> is removed; use <code>Rand::nextInt</code><a class="headerlink" href="#onionmathrandomint-is-removed-use-randnextint" title="Permanent link">&para;</a></h2>
 <p>Onion had two ways to get a random <code>Int</code> in a range, with opposite upper bounds (#3069).
 <code>Rand::nextInt(min, max)</code> stays. Its <code>max</code> is exclusive, as in <code>a..&lt;b</code>, Java and Kotlin.</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w">   </span><span class="c1">// Before: 1 to 6. Now: E0005</span>
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">          </span><span class="c1">// 1 to 6</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w">   </span><span class="c1">// Before: 1 to 6. Now: E0005</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">          </span><span class="c1">// 1 to 6</span>
 </span></code></pre></div>
 <ul>
 <li><strong>What you see:</strong> <code>E0005</code>, with a hint that shows <code>Rand::nextInt(min, max + 1)</code>.</li>
@@ -5980,6 +6071,75 @@ the auto-CLI (<code>def main(count: Int = 3)</code>) already did for the same in
   <code>randomInt(0, Int.MAX_VALUE)</code>.</li>
 <li><strong>Run it on one program at a time.</strong> Unrelated scripts named together can hide each other's
   errors, and then a call is left as written.</li>
+</ul>
+<h2 id="a-generic-overload-competes-with-a-plain-one-as-in-java">A generic overload competes with a plain one, as in Java<a class="headerlink" href="#a-generic-overload-competes-with-a-plain-one-as-in-java" title="Permanent link">&para;</a></h2>
+<p>A plain class now reaches a generic parameter through an interface it implements (#2845).
+<code>String</code> is a <code>Comparable[String]</code>, so <code>g[T](c: Comparable[T])</code> now fits <code>g("a")</code>. Where a
+plain overload fits too, Java's rules pick between them.</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">lang</span><span class="p">.</span><span class="nc">CharSequence</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">g</span><span class="p">(</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"charseq"</span>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="kd">def</span><span class="w"> </span><span class="n">g</span><span class="p">[</span><span class="nc">T</span><span class="p">](</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">Comparable</span><span class="p">[</span><span class="nc">T</span><span class="p">]):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"generic"</span>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="p">))</span><span class="w">                    </span><span class="c1">// Before: charseq. Now: E0006</span>
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">))</span><span class="w">    </span><span class="c1">// charseq, before and now</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Overloads</th>
+<th>Call</th>
+<th>Before</th>
+<th>Now</th>
+<th>To keep the old result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>g(CharSequence)</code>, <code>g[T](Comparable[T])</code></td>
+<td><code>g("a")</code></td>
+<td><code>charseq</code></td>
+<td>E0006</td>
+<td><code>g("a" as CharSequence)</code></td>
+</tr>
+<tr>
+<td><code>f(Serializable)</code>, <code>f[T](Comparable[T])</code></td>
+<td><code>f("a")</code></td>
+<td><code>serializable</code></td>
+<td>E0006</td>
+<td><code>f("a" as Serializable)</code></td>
+</tr>
+<tr>
+<td><code>f(Object)</code>, <code>f[T](Comparable[T])</code></td>
+<td><code>f("a")</code></td>
+<td><code>object</code></td>
+<td><code>generic</code></td>
+<td><code>f("a" as Object)</code></td>
+</tr>
+<tr>
+<td><code>show(Int)</code>, <code>show[T](Comparable[T])</code>, with <code>xs = [1, 2, 3]</code></td>
+<td><code>show(xs[0])</code></td>
+<td><code>int 1</code></td>
+<td><code>comparable</code></td>
+<td><code>show(xs[0] as Int)</code></td>
+</tr>
+<tr>
+<td><code>log(String, CharSequence)</code>, <code>log[T](T, Comparable[T])</code></td>
+<td><code>log("t", "m")</code></td>
+<td><code>plain</code></td>
+<td>E0006</td>
+<td><code>log("t", "m" as CharSequence)</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>What you see:</strong> <strong>E0006</strong> <code>method call is applicable for both …</code>, with a hint naming the
+  <code>as</code> cast. Or, beside <code>f(Object)</code> or <code>show(Int)</code>, the generic overload runs with no message.</li>
+<li><strong>Which argument the hint names:</strong> the first one whose cast rules the generic overload
+  out (the 2nd in <code>log("t", "m")</code>). A varargs argument is cast to the element type:
+  <code>g("a" as CharSequence)</code> for <code>g(c: CharSequence...)</code>.</li>
+<li><strong>Still fine:</strong> a call whose argument class does not implement the generic parameter's
+  interface, and a call to only one of the overloads.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> finding the affected calls needs overload resolution, and
+  only you know which overload a call meant. The hint shows the cast instead.</li>
 </ul>
 
 

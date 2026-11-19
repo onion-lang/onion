@@ -2384,10 +2384,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#override" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        override は、? の違いを除いて基底メソッドと同じ型でなければならなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#onionmathrandomint-randnextint" class="md-nav__link">
     <span class="md-ellipsis">
       
         OnionMath::randomInt は削除されました。Rand::nextInt を使ってください
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#java" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        総称メソッドの多重定義が、Java と同じように通常の多重定義と競合するようになりました
       
     </span>
   </a>
@@ -5215,10 +5237,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#override" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        override は、? の違いを除いて基底メソッドと同じ型でなければならなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#onionmathrandomint-randnextint" class="md-nav__link">
     <span class="md-ellipsis">
       
         OnionMath::randomInt は削除されました。Rand::nextInt を使ってください
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#java" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        総称メソッドの多重定義が、Java と同じように通常の多重定義と競合するようになりました
       
     </span>
   </a>
@@ -5886,11 +5930,41 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li><strong>予約語のままです:</strong> <code>self</code> は自由な名前にはなりません。<code>`self`</code> と書いたフィールドはこれまでどおり使えます。</li>
 <li><strong>プロジェクト全体を更新するには:</strong> <code>onion migrate src/ tests/</code> を実行します。コード中の <code>self</code> と、文字列の <code>#{...}</code> の中の <code>self</code> をすべて書き換えます。コメント、文字列の地の文、<code>\#{self}</code>、<code>`self`</code> はそのままです。</li>
 </ul>
+<h2 id="override"><code>override</code> は、<code>?</code> の違いを除いて基底メソッドと同じ型でなければならなくなりました<a class="headerlink" href="#override" title="Permanent link">&para;</a></h2>
+<p>基底が <code>Int</code> のところを <code>JInteger</code> にした <code>override</code> や、基底の戻り値が <code>Int</code> のところを <code>Int?</code> にした <code>override</code> は、何もオーバーライドしていませんでした。
+新しいオーバーロードとしてコンパイルされ、基底型を通した呼び出しは基底のメソッドを実行していました。
+今は <strong>E0068</strong> になります (#2896)。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">dec</span><span class="p">(</span><span class="n">k</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"Base"</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="p">}</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="kd">class</span><span class="w"> </span><span class="nc">Up</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a><span class="w">  </span><span class="kd">override</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">dec</span><span class="p">(</span><span class="n">k</span><span class="p">:</span><span class="w"> </span><span class="nc">JInteger</span><span class="p">):</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="s2">"Up"</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// 以前: コンパイルできた。今: E0068</span>
+</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="p">}</span>
+</span><span id="__span-23-11"><a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a><span class="kd">val</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">Base</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">Up</span><span class="p">();</span><span class="w"> </span><span class="n">b</span><span class="p">.</span><span class="nf">dec</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w">                           </span><span class="c1">// 以前: Base と表示された</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> <strong>E0068</strong> <code>メソッド dec(JInteger) に override が付いていますが、...</code> と、基底のシグネチャ（<code>dec(Int): void</code>）です。</li>
+<li><strong>これまでどおり動くもの:</strong> <code>dec(k: Int)</code> に対する <code>override def dec(k: Int?)</code> は、パラメータが <code>?</code> だけ違うので、今は本当にオーバーライドします。ジェネリックな上位型（<code>G[JInteger]</code>）を通したボックス型のパラメータもオーバーライドします。</li>
+<li><strong>直し方:</strong> オーバーライドするなら、基底の型（<code>dec(k: Int)</code> か <code>dec(k: Int?)</code>）を書いてください。別のオーバーロードとして残すなら、<code>override</code> を外し、<code>?</code> 以外でも違うパラメータ型にするか、別の名前にしてください。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> オーバーライドのつもりかオーバーロードのつもりかは、書いた人にしか決められません。二つの直し方は別のコードを実行します。そのため、エラーが基底のシグネチャを示します。</li>
+</ul>
+<p>パラメータが基底メソッドと <strong><code>?</code> だけ違う</strong> メソッドは、<code>override</code> の有無にかかわらず、今は同じメソッドです。</p>
+<ul>
+<li><strong>以前:</strong> <code>override</code> のない <code>def dec(k: Int?): void</code> は、基底の <code>dec(k: Int): void</code> とは別のオーバーロードでした。<code>Base</code> を通した <code>b.dec(1)</code> は基底を実行していました。戻り値が参照型（<code>String</code>）なら、同じメソッドがすでにオーバーライドしていました。つまり <code>override</code> は、参照型の戻り値では何も変えず、<code>void</code> やプリミティブの戻り値では結果を決めていました。</li>
+<li><strong>今:</strong> どの戻り値型でもオーバーライドします。<code>override</code> は、型が完全に同じときと同じく検査だけをします。どのメソッドが実行されるかは決めません。<code>override</code> がなければ、コンパイラは <strong>W0029</strong> で警告します（<code>'dec(Int?)' overrides 'dec(Int): void' of Base ...</code>）。基底メソッドが <code>final</code> なら、型が完全に同じときと同じく <strong>E0039</strong> です（<code>Thread</code> のサブクラスの <code>setDaemon(on: Boolean?)</code> も含みます）。</li>
+<li><strong>逆向きは変わりません:</strong> 基底の <code>f(k: Int?): void</code> に対する自前の <code>f(k: Int): void</code> は、オーバーロードのままです。そのため、<code>Base</code> を通した <code>null</code> は基底のメソッドに届きます。<code>override</code> を付けると <strong>E0068</strong> です。オーバーライドするなら、パラメータを <code>Int?</code> にしてください。</li>
+<li><strong>W0029 を消すには:</strong> 基底のメソッドを置き換えるつもりなら、<code>override</code> を付けてください。</li>
+<li><strong>別のオーバーロードとして残すには:</strong> メソッドの名前を変えてください（<code>decOrSkip(k: Int?)</code>）。<code>onion migrate</code> の規則はありません。基底のメソッドを置き換えるつもりだったかどうかは、書いた人にしか分かりません。</li>
+</ul>
 <h2 id="onionmathrandomint-randnextint"><code>OnionMath::randomInt</code> は削除されました。<code>Rand::nextInt</code> を使ってください<a class="headerlink" href="#onionmathrandomint-randnextint" title="Permanent link">&para;</a></h2>
 <p>範囲内のランダムな <code>Int</code> を得る方法が二つあり、上限の扱いが逆でした（#3069）。
 残るのは <code>Rand::nextInt(min, max)</code> です。<code>max</code> は含まれません。<code>a..&lt;b</code>、Java、Kotlin と同じです。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w">   </span><span class="c1">// 以前: 1から6。現在: E0005</span>
-</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">          </span><span class="c1">// 1から6</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w">   </span><span class="c1">// 以前: 1から6。現在: E0005</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">          </span><span class="c1">// 1から6</span>
 </span></code></pre></div>
 <ul>
 <li><strong>表示されるもの:</strong> <code>E0005</code> と、<code>Rand::nextInt(min, max + 1)</code> を示すヒントです。</li>
@@ -5910,6 +5984,74 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li><strong>変数に入った max は確認してください。</strong> migrate にはその値がわかりません。実行時に <code>Int.MAX_VALUE</code> になりうるなら、そこで <code>max + 1</code> が桁あふれし、呼び出しは <code>IllegalArgumentException</code> を投げます。その場合は <code>Rand::nextInt(min - 1, max) + 1</code> と書いてください。</li>
 <li><strong><code>Rand::nextInt()</code> で置き換えられるのは、min が <code>Int.MIN_VALUE</code> で max が <code>Int.MAX_VALUE</code> の呼び出しだけです。</strong> 負の数も含むあらゆる <code>Int</code> を返すので、<code>randomInt(0, Int.MAX_VALUE)</code> の代わりにはなりません。</li>
 <li><strong>プログラムは一つずつ migrate してください。</strong> 無関係なスクリプトを一緒に渡すと、互いのエラーが隠れることがあります。その場合、呼び出しは書き換えられずに残ります。</li>
+</ul>
+<h2 id="java">総称メソッドの多重定義が、Java と同じように通常の多重定義と競合するようになりました<a class="headerlink" href="#java" title="Permanent link">&para;</a></h2>
+<p>通常のクラスは、実装しているインタフェースを通じて総称メソッドの引数に当てはまるようになりました（#2845）。
+<code>String</code> は <code>Comparable[String]</code> なので、<code>g[T](c: Comparable[T])</code> は <code>g("a")</code> に当てはまります。
+通常の多重定義も当てはまる場合は、Java の規則でどちらかを選びます。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">lang</span><span class="p">.</span><span class="nc">CharSequence</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">g</span><span class="p">(</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"charseq"</span>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="kd">def</span><span class="w"> </span><span class="n">g</span><span class="p">[</span><span class="nc">T</span><span class="p">](</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">Comparable</span><span class="p">[</span><span class="nc">T</span><span class="p">]):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"generic"</span>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="p">))</span><span class="w">                    </span><span class="c1">// 以前: charseq。現在: E0006</span>
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">))</span><span class="w">    </span><span class="c1">// 以前も現在も charseq</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>多重定義</th>
+<th>呼び出し</th>
+<th>以前</th>
+<th>現在</th>
+<th>以前の結果を保つには</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>g(CharSequence)</code>、<code>g[T](Comparable[T])</code></td>
+<td><code>g("a")</code></td>
+<td><code>charseq</code></td>
+<td>E0006</td>
+<td><code>g("a" as CharSequence)</code></td>
+</tr>
+<tr>
+<td><code>f(Serializable)</code>、<code>f[T](Comparable[T])</code></td>
+<td><code>f("a")</code></td>
+<td><code>serializable</code></td>
+<td>E0006</td>
+<td><code>f("a" as Serializable)</code></td>
+</tr>
+<tr>
+<td><code>f(Object)</code>、<code>f[T](Comparable[T])</code></td>
+<td><code>f("a")</code></td>
+<td><code>object</code></td>
+<td><code>generic</code></td>
+<td><code>f("a" as Object)</code></td>
+</tr>
+<tr>
+<td><code>show(Int)</code>、<code>show[T](Comparable[T])</code>、<code>xs = [1, 2, 3]</code></td>
+<td><code>show(xs[0])</code></td>
+<td><code>int 1</code></td>
+<td><code>comparable</code></td>
+<td><code>show(xs[0] as Int)</code></td>
+</tr>
+<tr>
+<td><code>log(String, CharSequence)</code>、<code>log[T](T, Comparable[T])</code></td>
+<td><code>log("t", "m")</code></td>
+<td><code>plain</code></td>
+<td>E0006</td>
+<td><code>log("t", "m" as CharSequence)</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>表示されるもの:</strong> <strong>E0006</strong> <code>method call is applicable for both …</code> と、<code>as</code> による変換を示すヒントです。
+  <code>f(Object)</code> や <code>show(Int)</code> と並ぶ場合は、メッセージなしで総称メソッドの方が実行されます。</li>
+<li><strong>ヒントが示す引数:</strong> 変換すると総称メソッドが当てはまらなくなる、最初の引数です（<code>log("t", "m")</code> では第 2 引数）。
+  可変長引数は要素の型に変換します。<code>g(c: CharSequence...)</code> なら <code>g("a" as CharSequence)</code> です。</li>
+<li><strong>今までどおり動くもの:</strong> 引数のクラスが総称メソッドの引数のインタフェースを実装していない呼び出しと、
+  どちらか一方の多重定義しか当てはまらない呼び出しです。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
+  また、どの多重定義を意図したかは書いた人にしか分かりません。代わりにヒントが <code>as</code> を示します。</li>
 </ul>
 
 

@@ -9110,6 +9110,10 @@ JVM の検証器は <code>uninitializedThis</code> に対するフィールド�
 <td><code>W0028</code></td>
 <td>メソッドが <code>ensures</code> を破りうる。本体が節を偽にして終わる値をソルバーが見つけた</td>
 </tr>
+<tr>
+<td><code>W0029</code></td>
+<td><code>override</code> のないメソッドが、<code>?</code> だけ違う継承メソッドをオーバーライドしている（<code>Base.dec(k: Int)</code> に対する <code>dec(k: Int?)</code>）。基底型を通した呼び出しがこのメソッドを実行する。<code>override</code> を付けるか、別のメソッドとして残すなら名前を変える</td>
+</tr>
 </tbody>
 </table>
 <h2 id="_10">診断コード一覧<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>

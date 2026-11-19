@@ -5052,9 +5052,13 @@
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nf">println</span><span class="p">(</span><span class="nf">double</span><span class="p">(</span><span class="mi">21</span><span class="p">))</span><span class="w">       </span><span class="c1">// 42</span>
 </span></code></pre></div>
 <p>内部的には、関数値は <code>onion.Function0</code> 〜 <code>onion.Function10</code> を実装したオブジェクトで、
-唯一のメソッドが <code>call</code> です。<code>double(21)</code> は <code>double(21)</code> にコンパイルされます。
-自分で <code>.call</code> と書く必要があるのは、その名前で呼び出すことを期待する Java コードに
-関数値を渡すときだけです。</p>
+唯一のメソッドが <code>call</code> です。<code>double(21)</code> は <code>double.call(21)</code> にコンパイルされます。
+自分で <code>.call</code> と書くのは次の2つの場合です。</p>
+<ul>
+<li>その名前で呼び出すことを期待する Java コードに関数値を渡すとき</li>
+<li>別の呼び出しが返した関数を呼ぶとき: <code>adder(1)(2)</code> は構文エラーです。
+  <code>adder(1).call(2)</code> と書くか、先に束縛します（<code>val add1 = adder(1)</code> のあとに <code>add1(2)</code>）。</li>
+</ul>
 <h2 id="_6">関数型<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p>矢印型構文 <code>(A, B) -&gt; R</code> でラムダの型を書きます。引数が1つの場合は括弧を省略できます（<code>A -&gt; R</code>）：</p>
 <div class="language-onion highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">func0</span><span class="p">:</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kt">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>

@@ -11,10 +11,13 @@ class ArrayToVarargsOverloadSpec extends AbstractShellSpec {
 
   private val holder =
     """
+      |import { java.util.List as JList; java.util.Set as JSet; java.util.stream.Stream }
       |class H {
       |public:
       |  static def s(o: Object): String = "s(Object)"
       |  static def s(xs: Object...): String = "s(Object...)"
+      |  static def n(o: Object?): String = "n(Object?)"
+      |  static def n(xs: Object...): String = "n(Object...)"
       |  def a(o: Object): String = "a(Object)"
       |  def a(xs: Object...): String = "a(Object...)"
       |}
@@ -49,6 +52,21 @@ class ArrayToVarargsOverloadSpec extends AbstractShellSpec {
     it("a single non-array argument still takes the fixed-arity overload") {
       val r = run("""    return H::s("x") + "," + H::s("x", "y")""", "StaticSingle.on")
       assert(Shell.Success("s(Object),s(Object...)") == r)
+    }
+
+    it("the same generic call picks the same overload at every call site, as Java does") {
+      // `of(E)` with E = String[] and `of(E...)` with E = String instantiate to the same types;
+      // Java takes `of(E...)`. The choice used to depend on the candidates' order.
+      val r = run("""    val sa: String[] = ["a", "b", "c"].toArray(new String[0])
+                    |    val l = JList::of(sa)
+                    |    return "" + JList::of(sa).size() + JList::of(sa).size() + JList::of(sa).size() + l.size() +
+                    |      JSet::of(sa).size() + Stream::of(sa).count()""".stripMargin, "GenericRepeat.on")
+      assert(Shell.Success("333333") == r)
+    }
+
+    it("a static call with null keeps the fixed-arity overload, as before") {
+      val r = run("""    return H::n(null)""", "StaticNull.on")
+      assert(Shell.Success("n(Object?)") == r)
     }
   }
 }

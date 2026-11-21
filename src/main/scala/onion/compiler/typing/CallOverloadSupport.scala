@@ -256,14 +256,14 @@ private[compiler] final class CallOverloadSupport(
   ): CandidateSelection[ApplicableMethod] = {
     // Java-style phasing: varargs are only considered when no fixed-arity
     // method is applicable (List.of(1,2,3) prefers of(E,E,E) over of(E...))
-    // A varargs overload handed its array (or null) in the last slot is a fixed-arity call
-    // and stays in the first phase, as in Java: `s(arr)` with `s(Object)`/`s(Object...)`
-    // takes `s(Object...)` (#2955).
+    // A varargs overload handed its array in the last slot is a fixed-arity call and stays in
+    // the first phase, as in Java: `s(arr)` with `s(Object)`/`s(Object...)` takes
+    // `s(Object...)` (#2955). A `null` there is left to the second phase, as before.
     def fixedArity(a: ApplicableMethod): Boolean =
       !a.method.isVararg || (argTypes != null && argTypes.length == a.expectedArgs.length &&
         argTypes.nonEmpty && {
           val last = argTypes.last
-          last != null && (last.isNullType || (last.isArrayType && TypeRules.isSuperType(a.expectedArgs.last, last)))
+          last != null && last.isArrayType && TypeRules.isSuperType(a.expectedArgs.last, last)
         })
     val phased =
       if (applicable0.exists(fixedArity)) applicable0.filter(fixedArity)
@@ -284,10 +284,22 @@ private[compiler] final class CallOverloadSupport(
     if (applicable.isEmpty) CandidateSelection.NoMatch
     else if (applicable.length == 1) CandidateSelection.Selected(applicable.head)
     else {
-      def compareApplicable(a1: ApplicableMethod, a2: ApplicableMethod): Int =
-        if isMoreSpecific(a1.expectedArgs, a2.expectedArgs, relevantIndices) then -1
-        else if isMoreSpecific(a2.expectedArgs, a1.expectedArgs, relevantIndices) then 1
+      // Two overloads can instantiate to the same parameter types: `of(E)` with E = String[]
+      // and `of(E...)` with E = String, for `JList::of(sa)`. Their declared types then decide,
+      // as in Java (`E[]` is more specific than `E`), so every call site picks the same one.
+      def compareApplicable(a1: ApplicableMethod, a2: ApplicableMethod): Int = {
+        val oneMore = isMoreSpecific(a1.expectedArgs, a2.expectedArgs, relevantIndices)
+        val twoMore = isMoreSpecific(a2.expectedArgs, a1.expectedArgs, relevantIndices)
+        if (oneMore && twoMore) {
+          val (d1, d2) = (declaredErasure(a1), declaredErasure(a2))
+          if (d1.length == d2.length && isMoreSpecific(d1, d2, relevantIndices) && !isMoreSpecific(d2, d1, relevantIndices)) -1
+          else if (d1.length == d2.length && isMoreSpecific(d2, d1, relevantIndices) && !isMoreSpecific(d1, d2, relevantIndices)) 1
+          else -1
+        }
+        else if (oneMore) -1
+        else if (twoMore) 1
         else boxingTiebreak(a1.expectedArgs, a2.expectedArgs, argTypes)
+      }
 
       val sorted = applicable.sortWith((a1, a2) => compareApplicable(a1, a2) < 0)
       if (sorted.length >= 2 && compareApplicable(sorted.head, sorted(1)) >= 0)
@@ -389,6 +401,19 @@ private[compiler] final class CallOverloadSupport(
    * `valueOf(int)` for an Integer). The instance-call path applies the same rule in
    * MethodResolutionSupport. 0 when there are no argument types or the positions disagree.
    */
+  /** A candidate's declared parameter types with each type variable replaced by its bound. */
+  private def declaredErasure(a: ApplicableMethod): Array[Type] = {
+    def erase(t: Type): Type = t match {
+      case tv: TypeVariableType => tv.upperBound
+      case at: ArrayType => at.component match {
+        case tv: TypeVariableType => at.table.loadArray(tv.upperBound, at.dimension)
+        case _ => at
+      }
+      case other => other
+    }
+    a.method.arguments.map(erase)
+  }
+
   private def boxingTiebreak(a1: Array[Type], a2: Array[Type], argTypes: Array[Type]): Int = {
     if (argTypes == null || a1.length != argTypes.length || a2.length != argTypes.length) return 0
     var oneBetter = false

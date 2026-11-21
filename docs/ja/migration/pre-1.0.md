@@ -659,3 +659,33 @@ IO::println(g("a" as CharSequence))    // 以前も現在も charseq
   どちらか一方の多重定義しか当てはまらない呼び出しです。
 - **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
   また、どの多重定義を意図したかは書いた人にしか分かりません。代わりにヒントが `as` を示します。
+
+## `f(x)` と `f(xs...)` に配列を渡すと、Java と同じメソッドが選ばれるようになりました (#2955)
+
+配列に `f(x)` と `f(xs...)` の両方が当てはまるとき、以前の Onion は可変長引数の方を外していました。
+Java はその配列を可変長引数の配列そのものとして扱い、`f(xs...)` を選びます。
+Onion も同じ動作になりました。
+
+```onion
+import { java.util.List as JList }
+val sa: String[] = ["a", "b", "c"].toArray(new String[0])
+IO::println(JList::of(sa).size())             // 以前: 1。現在: 3
+IO::println(JList::of[String[]](sa).size())   // 以前も現在も 1
+```
+
+| 呼び出し | 以前 | 現在 | 以前の結果を保つには |
+|---|---|---|---|
+| `JList::of(sa).size()`、`JSet::of(sa).size()` | `1` | `3` | `JList::of[String[]](sa)` |
+| `Stream::of(sa).count()` | `1` | `3` | `Stream::of[String[]](sa)` |
+| `val n: List[String[]] = JList::of(sa)` | コンパイルできた | E0000 | `JList::of[String[]](sa)` |
+| `s(o: Object)` と `s(xs: Object...)` がある `H::s(sa)` | `s(Object)` | `s(Object...)` | `H::s(sa as Object)` |
+| `ia: Int[]` と、`a(o: Object)`・`a(xs: Object...)` がある `h.a(ia)` | `a(Object...)` | `a(Object)` | `ia` を入れた `Object[]` を渡す: `val w: Object[] = new Object[1]; w[0] = ia; h.a(w)` |
+
+- **表示されるもの:** 多くの場合は何も表示されず、別のメソッドが実行されます。
+  `List[String[]]` と宣言した変数では E0000（`type List[String[]] is expected, but type List[String] is used`）になります。
+- **`Int[]` が逆向きに変わる理由:** `Int[]` は `Object[]` ではありません。
+  そのため Java と同じく、`a(o: Object)` にしか当てはまりません。
+- **今までどおり動くもの:** 配列でない引数 1 個（`s("x")` は `s(Object)`）、引数が複数の呼び出し
+  （`s("x", "y")` は `s(Object...)`）、`s(null)` です。
+- **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
+  また、要素 1 個のつもりか配列全体のつもりかは書いた人にしか分かりません。表に各書き換えを示します。

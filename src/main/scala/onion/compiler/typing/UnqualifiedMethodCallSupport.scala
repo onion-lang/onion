@@ -145,11 +145,16 @@ private[compiler] final class UnqualifiedMethodCallSupport(
         }
       } else (params0, methods0)
 
-    val localResult = if (methods.length == 0) localCallable(node, params, context, expected) else None
+    // A method of the enclosing class comes before a same-named local, as on the
+    // untyped-lambda path: when the class declares the callee and a closure is passed,
+    // the bidirectional retry decides first (#3075's typed-lambda case).
+    val classRetry = methods.length == 0 && declaresCallee(node.name) &&
+      node.args.exists(_.isInstanceOf[AST.ClosureExpression])
+    val localResult = if (methods.length == 0 && !classRetry) localCallable(node, params, context, expected) else None
 
     if (localResult.isDefined) {
       localResult.get
-    } else if (methods.length == 0 && declaresCallee(node.name) && node.args.exists(_.isInstanceOf[AST.ClosureExpression])) {
+    } else if (classRetry) {
       // A closure with explicitly typed parameters types eagerly as FunctionN, which a
       // Java functional-interface parameter does not accept; retry bidirectionally so the
       // resolved parameter type decides (SAM conversion), as the static/instance paths do.

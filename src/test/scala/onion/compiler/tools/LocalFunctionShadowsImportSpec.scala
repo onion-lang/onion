@@ -92,4 +92,38 @@ class LocalFunctionShadowsImportSpec extends AbstractShellSpec {
       assert(codes.contains("E0070"), s"expected E0070 in $codes")
     }
   }
+  describe("a local function value and a same-named method of the enclosing class") {
+    def runClass(src: String): Shell.Result = shell.run(src, "None", Array())
+
+    it("still calls the static method taking a Java SAM type when the lambda is typed") {
+      val r = runClass(
+        """import { java.util.function.IntUnaryOperator }
+          |class C {
+          |public:
+          |  static def apply(op: IntUnaryOperator): Int = op.applyAsInt(10)
+          |  static def main(args: String[]): String {
+          |    val apply: ((Int) -> Int) -> Int = (f) -> 777
+          |    return "" + apply((x: Int) -> x + 1) + " " + apply(x -> x + 1) + " " + apply { x -> x + 1 }
+          |  }
+          |}
+          |""".stripMargin)
+      assert(Shell.Success("11 11 11") == r)
+    }
+
+    it("still calls the instance method taking a Java SAM type when the lambda is typed") {
+      val r = runClass(
+        """import { java.util.function.IntUnaryOperator }
+          |class C {
+          |public:
+          |  def apply(op: IntUnaryOperator): Int = op.applyAsInt(10)
+          |  def go(): String {
+          |    val apply: ((Int) -> Int) -> Int = (f) -> 777
+          |    return "" + apply((x: Int) -> x + 1) + " " + apply(x -> x + 1)
+          |  }
+          |  static def main(args: String[]): String = new C().go()
+          |}
+          |""".stripMargin)
+      assert(Shell.Success("11 11") == r)
+    }
+  }
 }

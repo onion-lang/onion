@@ -2,7 +2,8 @@ package onion.compiler.tools
 
 import onion.tools.Shell
 
-/** `#{...}` holds exactly one term: leftover input is a syntax error, not silently dropped (#3166). */
+/** A call `(...)` left over after the term inside `#{...}` is a syntax error, not silently dropped (#3166).
+  * Other leftovers (`#{ 1 2 }`, `#{x,5}`) are still ignored; see #3207. */
 class InterpolationTrailingInputSpec extends AbstractShellSpec {
   private def run(body: String): Shell.Result =
     shell.run(

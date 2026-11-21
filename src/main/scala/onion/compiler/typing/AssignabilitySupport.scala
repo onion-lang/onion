@@ -315,6 +315,26 @@ private[compiler] object AssignabilitySupport {
       fitsWithoutConversion(slot, actual, table)
   }
 
+  /**
+   * Whether a lambda written as the constructor argument `arg`, typed to `term`, may fill `slot`
+   * (a class type variable's slot, `() -> T`): the assignment rule of `typeVariableSlotFits`,
+   * so `() -> 5` is not a `() -> T` (#3018). A lambda whose only value is `null` types as
+   * `Function0[Object]`; it is let through, since its result takes the slot's type, as
+   * `() -> null` into `() -> T?` always did (#3003).
+   */
+  def lambdaSlotFits(slot: Type, term: Term, arg: AST.Expression, table: ClassTable): Boolean =
+    typeVariableSlotFits(slot, term, table) || returnsOnlyNull(arg)
+
+  def returnsOnlyNull(arg: AST.Expression): Boolean = arg match {
+    case c: AST.ClosureExpression => c.body.elements match {
+      case List(_: AST.NullLiteral) => true
+      case List(AST.ReturnExpression(_, _: AST.NullLiteral)) => true
+      case _ => false
+    }
+    case b: AST.BlockExpression if b.elements.nonEmpty => returnsOnlyNull(b.elements.last.asInstanceOf[AST.Expression])
+    case _ => false
+  }
+
   // `nested` is true inside a type-argument comparison, where type arguments are
   // invariant and a variable must not widen to its bound.
   def structurallyAssignable(expected: Type, actual: Type, table: ClassTable, nested: Boolean = false): Boolean = (expected, actual) match {

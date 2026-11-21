@@ -1108,6 +1108,10 @@ final class ConstructionTyping(
     for (i <- args.indices) {
       if (closureIndices.contains(i)) {
         typed(args(i), context, formals(i)) match {
+          // A slot that mentions a class type variable takes the assignment rule, as an
+          // eager argument does: `() -> 5` is not a `() -> T` (#3018). Falling through
+          // reports the constructor as not found.
+          case Some(t) if !AssignabilitySupport.lambdaSlotFits(formals(i), t, args(i), bodyContext.table) => break(None)
           case Some(t) => finalParams(i) = t
           case None => break(None)
         }

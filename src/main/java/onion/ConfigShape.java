@@ -76,11 +76,13 @@ public final class ConfigShape<T> implements Shape<T> {
         final Map<String, Integer> entryLines;   // component name -> index into lines
         final List<Object> parsedValues;         // typed values as parsed, for unchanged-detection
         final boolean trailingNewline;
+        final boolean bom;                       // the text began with U+FEFF; render keeps it
 
         ConfigResidue(List<Line> lines, Map<String, Integer> entryLines,
-                      List<Object> parsedValues, boolean trailingNewline) {
+                      List<Object> parsedValues, boolean trailingNewline, boolean bom) {
             this.lines = lines; this.entryLines = entryLines;
             this.parsedValues = parsedValues; this.trailingNewline = trailingNewline;
+            this.bom = bom;
         }
     }
 
@@ -170,6 +172,10 @@ public final class ConfigShape<T> implements Shape<T> {
     @Override
     public Outcome<Lossless<T>> parseLossless(String text, Origin origin) {
         String source = origin == null ? "<input>" : origin.source();
+        // A leading byte order mark is an encoding marker, not part of the first key; the
+        // residue remembers it so render writes the file back as it was (#3035).
+        boolean bom = !text.isEmpty() && text.charAt(0) == '\uFEFF';
+        if (bom) text = text.substring(1);
         boolean trailingNewline = text.endsWith("\n");
         String body = trailingNewline ? text.substring(0, text.length() - 1) : text;
         List<Line> lines = scan(body);
@@ -237,7 +243,7 @@ public final class ConfigShape<T> implements Shape<T> {
 
         T value = build.call(values);
         return Outcome.ok(new Lossless<>(value,
-            new ConfigResidue(lines, entryLines, values, trailingNewline), this));
+            new ConfigResidue(lines, entryLines, values, trailingNewline, bom), this));
     }
 
     /**
@@ -350,7 +356,7 @@ public final class ConfigShape<T> implements Shape<T> {
             if (crlf && !insertions.isEmpty()) sb.append('\r');
             sb.append('\n');
         }
-        return sb.toString();
+        return r.bom ? "\uFEFF" + sb : sb.toString();
     }
 
     private boolean sameShape(ConfigShape<?> other) {

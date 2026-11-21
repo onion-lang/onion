@@ -329,15 +329,21 @@ final class AssignmentTyping(
   /** The static field a bare name assigns through when it has no local binding: one of
     * the current class, else a top-level var on the script's synthetic class. */
   private[typing] def implicitStaticField(name: String): Option[(ClassType, FieldRef)] =
-    Option(bodyContext.definition.field(name)).map(f => (bodyContext.definition, f))
-      .orElse(bodyContext.topLevelClass.flatMap(tc => Option(tc.field(name)).map(f => (tc, f))))
-      .filter { case (_, field) => (field.modifier & AST.M_STATIC) != 0 }
+    // `findField` also sees a static inherited from a superclass, as a bare read does (#3175).
+    def isStatic(f: FieldRef): Boolean = (f.modifier & AST.M_STATIC) != 0
+    Option(bodyContext.definition.findField(name)).filter(isStatic).map(f => (bodyContext.definition, f))
+      .orElse(bodyContext.topLevelClass.flatMap(tc => Option(tc.field(name)).filter(isStatic).map(f => (tc, f))))
 
   private def processImplicitStaticFieldAssign(
     owner: ClassType, field: FieldRef, node: AST.Assignment, context: LocalContext
   ): Term = {
     val value = typed(node.rhs, context, field.`type`).getOrElse(null)
     if (value == null) null
+    else if (!MemberAccess.isMemberAccessible(field, bodyContext.definition)) {
+      // An inherited private static is as unreachable bare as through `A::K` (#3155, #3175).
+      bodyContext.report(FIELD_NOT_ACCESSIBLE, node.lhs, field.affiliation, field.name, bodyContext.definition)
+      null
+    }
     else if (isReadOnly(field)) {
       bodyContext.report(CANNOT_ASSIGN_TO_VAL, node.lhs, field.name)
       null

@@ -519,16 +519,10 @@ private[compiler] final class MethodBodySupport(
                 if term.`type` != null then retyped(i) = term
               }
           }
-          // A lambda is judged as `new C[T](..)` judges one (ConstructionTyping's closure
-          // path): by assignability to the slot it was typed against. Both paths still let
-          // `() -> 5` into a `() -> T` slot; that is one bug in both places (#3018).
-          def isLambda(e: AST.Expression): Boolean = e match {
-            case _: AST.ClosureExpression => true
-            case b: AST.BlockExpression => b.elements.nonEmpty && b.elements.last.isInstanceOf[AST.ClosureExpression]
-            case _ => false
-          }
+          // A lambda is judged by the assignment rule too, except one whose result is free
+          // (it never returns, or its only value is `null`) and takes the slot's type (#3003, #3018).
           val fits = misfits.forall { i =>
-            (isLambda(args(i)) || superSlotFits(formals(i), retyped(i))) &&
+            (superSlotFits(formals(i), retyped(i)) || AssignabilitySupport.lambdaResultIsFree(retyped(i))) &&
               TypeRelations.isConstructorArgAssignable(formals(i), retyped(i).`type`, bodyContext.table)
           }
           if fits then (Array(ctor), Boxing.adaptArguments(bodyContext.table, retyped, formals))

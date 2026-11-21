@@ -1253,6 +1253,12 @@ class SemanticErrorReporter(threshold: Int) {
         reportUnknownParameterName(position, items)
       case SemanticError.OVERRIDE_TARGET_NOT_FOUND =>
         reportOverrideTargetNotFound(position, items)
+      case SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD if items.length > 4 =>
+        // The class has the method with a primitive where the contract has its boxed class,
+        // or the reverse: name both spellings (#2922).
+        val base = format(message("error.semantic.unimplementedAbstractMethod"), Seq(asString(items(0)), asString(items(1)), asString(items(2))))
+        problem(position, appendSuggestion(base,
+          Some(format(message("error.suggestion.boxedParameterNotBridged"), Seq(asString(items(3)), asString(items(4)))))))
       case SemanticError.AMBIGUOUS_METHOD =>
         reportAmbiguousMethod(position, items)
       case SemanticError.AMBIGUOUS_CONSTRUCTOR =>

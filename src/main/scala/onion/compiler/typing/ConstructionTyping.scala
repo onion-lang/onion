@@ -903,12 +903,31 @@ final class ConstructionTyping(
     if (candidates.length == 1) retypeFor(candidates(0))
     else {
       // Overloads (`this(xs: List[T])` / `this(o: Object)`): as Java infers a factory's type
-      // argument from the slot, try each candidate's slots and keep the first whose retyped
-      // arguments resolve to that very constructor (#2841).
-      candidates.iterator.map(c => retypeFor(c).filter { updated =>
+      // argument from the slot, try each candidate's slots and keep those whose retyped
+      // arguments resolve to that very constructor (#2841). Exactly one such candidate, or
+      // one more specific than every other, is Java's choice. Two incomparable ones
+      // (`Set[T]?` / `List[T]?` for a `null`-returning factory) are ambiguous in Java, so
+      // nothing is retyped and the call reports E0021 as before, whatever the declaration
+      // order.
+      val qualifying = candidates.toSeq.flatMap(c => retypeFor(c).filter { updated =>
         val found = typeRef.findConstructor(updated, (f: ConstructorRef) => fits(f, updated))
         found.length == 1 && (found(0) eq c)
-      }).collectFirst { case Some(updated) => updated }
+      }.map(c -> _))
+      def formalsOf(c: ConstructorRef): Array[Type] = c.getArgs.map(t =>
+        TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      val mostSpecific = qualifying.filter { case (c, _) =>
+        val cf = formalsOf(c)
+        qualifying.forall { case (d, _) =>
+          (d eq c) || {
+            val df = formalsOf(d)
+            cf.indices.forall(i => cf(i) != null && df(i) != null && TypeRules.isAssignable(df(i), cf(i)))
+          }
+        }
+      }
+      mostSpecific match {
+        case Seq((_, updated)) => Some(updated)
+        case _ => None
+      }
     }
   }
 

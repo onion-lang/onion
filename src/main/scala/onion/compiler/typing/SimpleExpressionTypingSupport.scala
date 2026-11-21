@@ -241,6 +241,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
   private def expectedListElement(expected: Type): Type = expected match {
     case app: AppliedClassType if app.raw.name == "java.util.List" && app.typeArguments.length == 1 =>
       app.typeArguments(0)
+    // `List[Int?]?`: the literal is never null, so the outer `?` only widens the target (#3001).
+    case n: NullableType => expectedListElement(n.innerType)
     case _ => null
   }
 
@@ -561,6 +563,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
   private def expectedMapKeyValue(expected: Type): (Type, Type) = expected match {
     case app: AppliedClassType if app.raw.name == "java.util.Map" && app.typeArguments.length == 2 =>
       (app.typeArguments(0), app.typeArguments(1))
+    case n: NullableType => expectedMapKeyValue(n.innerType)
     case _ => (null, null)
   }
 

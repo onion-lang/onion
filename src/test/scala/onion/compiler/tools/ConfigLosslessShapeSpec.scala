@@ -17,6 +17,27 @@ class ConfigLosslessShapeSpec extends AbstractShellSpec {
       |}
       |""".stripMargin
 
+  describe("a misspelled key (#2996)") {
+    def defects(text: String): String = {
+      val r = shell.run(decl +
+        "class Test {\npublic:\n  static def main(args: String[]): String {\n" +
+        "    return Server::cfg().parseLossless(\"" + text + "\").toString()\n  }\n}\n",
+        "None", Array())
+      r.toString
+    }
+
+    it("names the near-miss key and its line when a component is absent") {
+      val out = defects("HOST = h\\nprot = 8080\\ndebug = true\\n")
+      assert(out.contains("""did you mean "HOST" on line 1?"""), out)
+      assert(out.contains("""did you mean "prot" on line 2?"""), out)
+    }
+
+    it("adds no hint when no unknown key is close") {
+      val out = defects("host = h\\nport = 1\\n")
+      assert(out.contains("debug") && out.contains("absent") && !out.contains("did you mean"), out)
+    }
+  }
+
   describe("L2: print(parse(t)) == t") {
     it("reproduces a messy document byte for byte, trailing newline included") {
       val r = shell.run(decl +

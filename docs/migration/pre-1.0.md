@@ -726,6 +726,32 @@ now, with or without `override`:
 - **To keep a separate overload:** rename the method (`decOrSkip(k: Int?)`). No `onion
   migrate` rule: only you know whether the method was meant to replace the base one.
 
+## A primitive parameter does not implement a boxed abstract method
+
+A class method with `Int` where a non-generic interface or abstract class has `JInteger` (or
+the reverse) was accepted as the implementation. No bridge joined the two, so a call through
+the supertype threw `AbstractMethodError`. Now the class is **E0037** (#2922).
+
+```onion
+interface I { def n(x: JInteger): String }
+class C conforms I {            // Before: compiled. Now: E0037
+public:
+  def this {}
+  def n(x: Int): String = "int " + x
+}
+val i: I = new C; println(i.n(4))   // Before: AbstractMethodError
+```
+
+- **What you see:** **E0037** `class C must implement abstract method n(java.lang.Integer) ...`,
+  then `n(Int) does not implement it ... Declare n(JInteger) to implement it.`
+- **Still fine:** a generic supertype (`G[JInteger]` with `n(x: T)`), where `n(x: Int)` is
+  bridged, and a parameter that differs only by `?` (`n(x: Int?)` for `n(x: Int)`).
+- **To update:** write the supertype's parameter type (`def n(x: JInteger)`). Keep the
+  `Int` method beside it if other code calls it.
+- **No `onion migrate` rule:** a program that hits this never ran the call through the
+  supertype, and only you know which of the two methods it should run. The hint shows the
+  spelling instead.
+
 ## `OnionMath::randomInt` is removed; use `Rand::nextInt`
 
 Onion had two ways to get a random `Int` in a range, with opposite upper bounds (#3069).
@@ -817,7 +843,8 @@ IO::println(ys[0]?.length())    // 1, before and now
 |---|---|---|---|
 | `val ys = ["a", null]; ys[0].length()` | `1` | E0070 | `ys[0]?.length()` or `ys[0]!!.length()` |
 | `total([1, null])` with `total(xs: List[Int])` | compiled, crashed on the `null` | E0005 | take `List[Int?]`, then handle each `null` |
-| `val n: Int = xs[0]` with `xs = [1, null]` | compiled, crashed on the `null` | error | `xs[0] ?: 0` |
+| `val n: Int = xs[1]` with `xs = [1, null]` | compiled, crashed on the `null` | E0070 | `xs[1] ?: 0` |
+| `String::join(",", ["a", null, "c"])` | `a,null,c` | E0005 | `String::join(",", ["a", null, "c"].map { s -> s ?: "null" })` |
 | `[[1, null], [2]]` | `List[List[Int]]` | `List[Object]` | write the inner lists with one element type |
 | `["a", null] + ["b"]` | compiled | E0001 | give both lists the same type: `List[String?]` |
 | `xs.sort(Comparator::nullsFirst(Comparator::naturalOrder()))` with `xs = ["b", null, "a"]` | `[null, a, b]` | E0005 | name the element type once: `Comparator::naturalOrder[String?]()` |
@@ -825,12 +852,43 @@ IO::println(ys[0]?.length())    // 1, before and now
 
 - **What you see:** E0070 (`may be null and cannot be dereferenced directly`); E0000 when
   the list is assigned to a `List[Int]` variable; or E0005 when it is passed to a `List[Int]`
-  parameter or to a Java generic method such as `sort` or `Collections::sort`. The cause is
-  the `null` in the literal.
+  parameter or to a Java generic method such as `xs.sort(comparator)`,
+  `Collections::sort(xs, comparator)` or `String::join`. The cause is the `null` in the literal.
 - **A Java comparator over the element type:** `nullsFirst` passes no `null` to the
   comparator it wraps, but its signature cannot say so. Name `String?` as the type argument
   once, as in the two `sort` rows above. The `!!` there never fails.
 - **A target type still works:** `val ys: List[Int?] = [1, null]`. `List[Int]` is rejected, as the `null` does not fit.
 - **Unchanged:** `[null]`, `[null, null]`, and a literal whose expected type is already known.
+- **Known remaining gap:** a map literal with a `null` value, such as `["a": "x", "b": null]`, still
+  infers a non-null value type. That is #3201, a separate change with its own migration row.
 - **No `onion migrate` rule:** deciding what to do with a `null` (skip it, default it,
   reject it) depends on the program. The edits above show each choice.
+
+## An array passed to `f(x)` / `f(xs...)` picks Java's method (#2955)
+
+When both `f(x)` and `f(xs...)` apply to an array, Onion used to drop the varargs one. Java
+treats the array as the varargs array itself, so it picks `f(xs...)`. Onion now does the same.
+
+```onion
+import { java.util.List as JList }
+val sa: String[] = ["a", "b", "c"].toArray(new String[0])
+IO::println(JList::of(sa).size())             // Before: 1. Now: 3
+IO::println(JList::of[String[]](sa).size())   // 1, before and now
+```
+
+| Call | Before | Now | To keep the old result |
+|---|---|---|---|
+| `JList::of(sa).size()`, `JSet::of(sa).size()` | `1` | `3` | `JList::of[String[]](sa)` |
+| `Stream::of(sa).count()` | `1` | `3` | `Stream::of[String[]](sa)` |
+| `val n: List[String[]] = JList::of(sa)` | compiled | E0000 | `JList::of[String[]](sa)` |
+| `H::s(sa)` with `s(o: Object)` and `s(xs: Object...)` | `s(Object)` | `s(Object...)` | `H::s(sa as Object)` |
+| `h.a(ia)` with `ia: Int[]`, `a(o: Object)` and `a(xs: Object...)` | `a(Object...)` | `a(Object)` | pass an `Object[]` holding `ia`: `val w: Object[] = new Object[1]; w[0] = ia; h.a(w)` |
+
+- **What you see:** usually nothing; the program runs the other method. A variable declared
+  as `List[String[]]` gets E0000 (`type List[String[]] is expected, but type List[String] is used`).
+- **Why `Int[]` changes the other way:** an `Int[]` is not an `Object[]`, so it can only fill
+  `a(o: Object)`, as in Java.
+- **Unchanged:** a single non-array argument (`s("x")` takes `s(Object)`), several arguments
+  (`s("x", "y")` takes `s(Object...)`), and `s(null)`.
+- **No `onion migrate` rule:** finding the affected calls needs overload resolution, and only
+  you know whether you meant one element or the whole array. The table shows each edit.

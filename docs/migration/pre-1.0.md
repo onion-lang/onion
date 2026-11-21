@@ -726,6 +726,32 @@ now, with or without `override`:
 - **To keep a separate overload:** rename the method (`decOrSkip(k: Int?)`). No `onion
   migrate` rule: only you know whether the method was meant to replace the base one.
 
+## A primitive parameter does not implement a boxed abstract method
+
+A class method with `Int` where a non-generic interface or abstract class has `JInteger` (or
+the reverse) was accepted as the implementation. No bridge joined the two, so a call through
+the supertype threw `AbstractMethodError`. Now the class is **E0037** (#2922).
+
+```onion
+interface I { def n(x: JInteger): String }
+class C conforms I {            // Before: compiled. Now: E0037
+public:
+  def this {}
+  def n(x: Int): String = "int " + x
+}
+val i: I = new C; println(i.n(4))   // Before: AbstractMethodError
+```
+
+- **What you see:** **E0037** `class C must implement abstract method n(java.lang.Integer) ...`,
+  then `n(Int) does not implement it ... Declare n(JInteger) to implement it.`
+- **Still fine:** a generic supertype (`G[JInteger]` with `n(x: T)`), where `n(x: Int)` is
+  bridged, and a parameter that differs only by `?` (`n(x: Int?)` for `n(x: Int)`).
+- **To update:** write the supertype's parameter type (`def n(x: JInteger)`). Keep the
+  `Int` method beside it if other code calls it.
+- **No `onion migrate` rule:** a program that hits this never ran the call through the
+  supertype, and only you know which of the two methods it should run. The hint shows the
+  spelling instead.
+
 ## `OnionMath::randomInt` is removed; use `Rand::nextInt`
 
 Onion had two ways to get a random `Int` in a range, with opposite upper bounds (#3069).

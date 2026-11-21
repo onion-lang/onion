@@ -750,7 +750,7 @@ final class ConstructionTyping(
    * constructor call that threw IllegalAccessError at run time (#2827).
    */
   private def constructorAccessible(node: AST.NewObject, ctor: ConstructorRef): Boolean =
-    MemberAccess.isMemberAccessible(ctor, bodyContext.definition) || {
+    MemberAccess.isConstructorAccessibleByNew(ctor, bodyContext.definition) || {
       bodyContext.report(METHOD_NOT_ACCESSIBLE, node, ctor.affiliation, "new", ctor.getArgs, bodyContext.definition)
       false
     }

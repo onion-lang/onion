@@ -512,17 +512,21 @@ private[compiler] object DuplicationChecks {
 
     // Collect all implemented methods from this class AND all ancestor classes
     // Parent classes may already provide concrete implementations for abstract methods
-    val implByNameAndArity = mutable.HashMap[(String, Int), mutable.ArrayBuffer[Array[String]]]()
+    // Each implementation's parameters: erased descriptors, and the types without `?`.
+    final case class Impl(descs: Array[String], plain: Array[String], method: Method, args: Array[Type])
+    val implByNameAndArity = mutable.HashMap[(String, Int), mutable.ArrayBuffer[Impl]]()
 
-    def registerImplementation(m: Method): Unit = {
+    def descriptorsOf(args: Array[Type]): Array[String] = args.map(arg => Erasure.asmType(arg).getDescriptor)
+
+    def registerImplementation(m: Method, args: Array[Type]): Unit = {
       val candidates = implByNameAndArity.getOrElseUpdate((m.name, m.arguments.length), mutable.ArrayBuffer.empty)
-      candidates += m.arguments.map(arg => Erasure.asmType(arg).getDescriptor)
+      candidates += Impl(descriptorsOf(args), plainNames(args).toArray, m, args)
     }
 
     // Add this class's own methods
     for m <- clazz.methods do
       if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
-        registerImplementation(m)
+        registerImplementation(m, m.arguments)
 
     // Also add concrete methods from parent classes (not just interfaces)
     // Also register each under the view's type arguments: `Base[String]`'s `apply(T)` implements
@@ -532,11 +536,10 @@ private[compiler] object DuplicationChecks {
         view.raw.typeParameters.map(_.name).zip(view.typeArguments).toMap
       for m <- view.raw.methods do
         if !Modifier.isStatic(m.modifier) && !Modifier.isPrivate(m.modifier) && !Modifier.isAbstract(m.modifier) then
-          registerImplementation(m)
+          registerImplementation(m, m.arguments)
           if implSubst.nonEmpty then
-            val candidates = implByNameAndArity.getOrElseUpdate((m.name, m.arguments.length), mutable.ArrayBuffer.empty)
-            candidates += m.arguments.map(arg =>
-              Erasure.asmType(TypeSubstitution.substituteType(arg, implSubst, emptyMethodSubst, defaultToBound = true)).getDescriptor)
+            registerImplementation(m, m.arguments.map(arg =>
+              TypeSubstitution.substituteType(arg, implSubst, emptyMethodSubst, defaultToBound = true)))
 
     // Check all abstract methods from superclasses and interfaces
     for (view <- views.values) {
@@ -550,10 +553,27 @@ private[compiler] object DuplicationChecks {
           val specializedArgs =
             contract.arguments.map(tp => TypeSubstitution.substituteType(tp, viewSubst, emptyMethodSubst, defaultToBound = true))
           val pattern = parameterPattern(specializedArgs, typing)
-          val candidates = implByNameAndArity.get((contract.name, specializedArgs.length))
-          if !candidates.exists(_.exists(pattern.accepts)) then
+          // A primitive/boxed difference is bridged only against a generic supertype
+          // (`n(x: Int)` for `G[JInteger]`'s `n(x: T)`, #2559). Against a non-generic one,
+          // `n(x: Int)` beside `n(x: JInteger)` is an overload (#2896's row 5): nothing
+          // implements the contract, and the call threw AbstractMethodError (#2922). Only a
+          // parameter that differs by `?` alone (`Int?` for `Int`) is bridged there.
+          val contractDescs = descriptorsOf(specializedArgs)
+          val contractPlain = plainNames(specializedArgs).toArray
+          def bridged(impl: Impl): Boolean =
+            viewSubst.nonEmpty || impl.descs.indices.forall(i =>
+              impl.descs(i) == contractDescs(i) || impl.plain(i) == contractPlain(i))
+          val candidates = implByNameAndArity.getOrElse((contract.name, specializedArgs.length), mutable.ArrayBuffer.empty)
+          val matching = candidates.filter(impl => pattern.accepts(impl.descs))
+          if !matching.exists(bridged) then
             val paramDescriptor = specializedArgs.map(_.name).mkString(", ")
-            typing.report(SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD, fallback, clazz.name, contract.name, paramDescriptor)
+            def shown(args: Array[Type]): String = s"${contract.name}(${args.map(sourceForm).mkString(", ")})"
+            matching.headOption match
+              case Some(nearMiss) =>
+                typing.report(SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD, fallback, clazz.name, contract.name, paramDescriptor,
+                  shown(nearMiss.args), shown(specializedArgs))
+              case None =>
+                typing.report(SemanticError.UNIMPLEMENTED_ABSTRACT_METHOD, fallback, clazz.name, contract.name, paramDescriptor)
       }
     }
   }

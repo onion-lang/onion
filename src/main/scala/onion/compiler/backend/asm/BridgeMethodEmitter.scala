@@ -58,8 +58,9 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
         else
           val sameName = ownByName.getOrElse(rawMethod.name, Nil)
           val specializedArgs = if sameName.isEmpty then null else rawMethod.arguments.map(substituteClassParams)
+          // A static method never implements an instance slot (#2927).
           val candidates = if sameName.isEmpty then Nil else sameName.filter { m =>
-            m.arguments.length == specializedArgs.length && (
+            !Modifier.isStatic(m.modifier) && m.arguments.length == specializedArgs.length && (
               if subst.isEmpty then
                 // A non-generic supertype: a covariant return override, as in
                 // Java, or a parameter that differs only by `?` (`k: Int?` for an

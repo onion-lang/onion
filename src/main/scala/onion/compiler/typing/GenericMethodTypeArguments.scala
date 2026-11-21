@@ -431,6 +431,17 @@ private[typing] object GenericMethodTypeArguments {
                 views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match
                   case Some(view) => unifyWithApplied(view)
                   case None =>
+                    // The expected return type is a supertype of the formal return
+                    // (`Collection[String]` for a `List[E]`): read the formal through its
+                    // own view of that class, so `E` is fixed by it (#3017).
+                    if returnContext then
+                      val up = AppliedTypeViews.collectAppliedViewsFrom(apf)
+                      up.get(apa.raw).orElse(up.find((k, _) => k.name == apa.raw.name).map(_._2)) match
+                        case Some(view) if view.typeArguments.length == apa.typeArguments.length =>
+                          view.typeArguments.zip(apa.typeArguments).foreach { (f, a) =>
+                            unify(f, a, position, returnContext)
+                          }
+                        case _ =>
             case ct: ClassType =>
               val views = AppliedTypeViews.collectAppliedViewsFrom(ct)
               views.get(apf.raw).orElse(views.find((k, _) => k.name == apf.raw.name).map(_._2)) match

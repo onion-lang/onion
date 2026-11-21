@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.163.0] - 2026-11-21
+
+### Breaking
+
+- **A primitive parameter no longer implements a non-generic abstract method that takes the boxed class, or the reverse; that is E0037.**
+  - Before: `def n(x: Int)` in a class that `conforms I`, where `I` declares `n(x: JInteger)`, compiled. A call through `I` then threw `AbstractMethodError`. Same for `n(x: JInteger)` against `n(x: Int)`.
+  - Now: E0037, with a hint naming the spelling that implements it (`Declare n(JInteger)`). A generic supertype (`G[JInteger]` with `n(x: T)`) and a parameter that differs only by `?` still work. See `docs/migration/pre-1.0.md`.
+
+### Fixed
+
+- **A `static` method next to a boxed `override` no longer breaks the override.**
+  - Before: `override def n(x: Int)` for `G[JInteger]`, plus `static def n(x: JInteger)`, compiled and then threw `AbstractMethodError`.
+  - Now: the instance method is called, as without the static one.
+
 ## [0.162.0] - 2026-11-19
 
 ### Breaking

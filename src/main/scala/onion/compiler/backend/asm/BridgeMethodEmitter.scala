@@ -104,7 +104,9 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
               val implDesc = methodDesc(impl.returnType, impl.arguments)
               if bridgeDesc != implDesc && !emitted.contains((rawMethod.name, bridgeDesc)) then
                 emitted.add((rawMethod.name, bridgeDesc))
-                val access = toAsmModifier(impl.modifier) | Opcodes.ACC_BRIDGE | Opcodes.ACC_SYNTHETIC
+                // Never final, as in javac: a subclass may bridge the same slot again,
+                // and a `final` impl (inherited or own) must not freeze the bridge (#2680).
+                val access = (toAsmModifier(impl.modifier) & ~Opcodes.ACC_FINAL) | Opcodes.ACC_BRIDGE | Opcodes.ACC_SYNTHETIC
                 val bridgeArgTypes = rawMethod.arguments.map(asmType)
                 val bridgeReturnType = asmType(rawMethod.returnType)
                 val gen = MethodEmitter.newGenerator(cw, access, rawMethod.name, bridgeReturnType, bridgeArgTypes)
@@ -136,8 +138,8 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 gen.endMethod()
           }
 
-  // The nearest concrete superclass method with exactly these parameter types that can
-  // implement `slot` (as Java requires): at least as accessible, and returning what the
+  // The nearest superclass method with exactly these parameter types, if it can
+  // implement `slot` (as Java requires): concrete, at least as accessible, and returning what the
   // slot returns or a subtype (`slotReturn`, the slot's return at the type arguments).
   // One that cannot leaves the own overload chosen, rather than a bridge the JVM rejects.
   private def inheritedExact(
@@ -146,12 +148,14 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
     var sup: TypedAST.ClassType = if classDef.isInterface then null else classDef.superClass
     while sup != null do
       val hit = rawOf(sup).methods.find { m =>
-        m.name == slot.name && isVisibleInstance(m) && !Modifier.isAbstract(m.modifier) &&
+        m.name == slot.name && isVisibleInstance(m) &&
           m.arguments.length == args.length &&
           m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(args(i)).name)
       }
+      // The nearest match decides, even an abstract one: it hides any farther body.
       if hit.isDefined then
         return hit.filter { m =>
+          !Modifier.isAbstract(m.modifier) &&
           (Modifier.isPublic(m.modifier) || !Modifier.isPublic(slot.modifier)) &&
             isBridgeableReturn(slotReturn, m.returnType)
         }

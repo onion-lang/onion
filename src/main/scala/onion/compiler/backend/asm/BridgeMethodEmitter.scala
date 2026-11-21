@@ -86,7 +86,13 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
             else
               def exactCount(m: TypedAST.Method): Int =
                 m.arguments.indices.count(i => plain(m.arguments(i)).name == plain(specializedArgs(i)).name)
-              Some(candidates.reduceLeft((a, b) => if exactCount(b) > exactCount(a) then b else a))
+              val best = candidates.reduceLeft((a, b) => if exactCount(b) > exactCount(a) then b else a)
+              // A generic supertype's slot is implemented by an inherited exact override
+              // too (`Base.n(x: JInteger)` for `G[JInteger].n(x: T)`), which beats an own
+              // overload that only matches by boxing (`n(x: Int)`), as in Java (#2680).
+              if subst.nonEmpty && exactCount(best) < specializedArgs.length then
+                inheritedExact(classDef, rawMethod.name, specializedArgs).orElse(Some(best))
+              else Some(best)
 
           implOpt.foreach { impl =>
             // In an interface only a default method (one with a body) has code to bridge to.
@@ -129,6 +135,19 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 gen.returnValue()
                 gen.endMethod()
           }
+
+  // The nearest concrete superclass method with exactly these parameter types, if any.
+  private def inheritedExact(classDef: ClassDefinition, name: String, args: Array[TypedAST.Type]): Option[TypedAST.Method] =
+    var sup: TypedAST.ClassType = if classDef.isInterface then null else classDef.superClass
+    while sup != null do
+      val hit = rawOf(sup).methods.find { m =>
+        m.name == name && isVisibleInstance(m) && !Modifier.isAbstract(m.modifier) &&
+          m.arguments.length == args.length &&
+          m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(args(i)).name)
+      }
+      if hit.isDefined then return hit
+      sup = rawOf(sup).superClass
+    None
 
   private type Slot = (String, String)
   // A slot's declaring method, and the method whose code runs for it (None = abstract).

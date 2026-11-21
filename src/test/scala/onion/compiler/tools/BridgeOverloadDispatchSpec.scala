@@ -144,4 +144,51 @@ class BridgeOverloadDispatchSpec extends AbstractShellSpec {
       assert(Shell.Success(1) == result)
     }
   }
+
+  // #2680: the exact override may be inherited from a superclass.
+  describe("An inherited exact override beside an own primitive overload (#2680)") {
+    it("runs the inherited n(JInteger) through G[JInteger]") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class Base {
+          |public:
+          |  def this {}
+          |  def n(x: JInteger): JInteger = 2
+          |}
+          |class D extends Base conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new D
+          |    return g.n(4)
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(2) == result)
+    }
+
+    it("keeps the own n(Int) when nothing inherited is exact") {
+      val result = run(
+        """
+          |interface G[T] { def n(x: T): JInteger }
+          |class Base {
+          |public:
+          |  def this {}
+          |  def n(x: String): JInteger = 2
+          |}
+          |class D extends Base conforms G[JInteger] {
+          |public:
+          |  def this {}
+          |  def n(x: Int): JInteger = 1
+          |  static def main(args: String[]): JInteger {
+          |    val g: G[JInteger] = new D
+          |    return g.n(4)
+          |  }
+          |}
+          |""")
+      assert(Shell.Success(1) == result)
+    }
+  }
 }

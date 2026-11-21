@@ -2074,6 +2074,12 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
 
   def term(): AST.Expression = expression()
 
+  /** A call `(...)` left over after an interpolation's term (`#{ (1)(2) }`) is a syntax error, as
+   *  outside a string, never silently dropped (issue #3166). Other leftovers (`#{x,5}`) are still
+   *  ignored: existing `run/` samples rely on that. */
+  private[parser] def requireEnd(): Unit =
+    if (kind(1) == K.LPAREN) { recordExpected(K.EOF); throw fail }
+
   private def assignable(): AST.Expression = {
     var a = pipeline()
     val k = kind(1)
@@ -3021,7 +3027,7 @@ final class OnionParser(text: String, lineBase: Int = 0, colBase: Int = 0) {
           if (isPlainIdentifier(exprStr)) AST.Id(Location(line, col, line, col + exprStr.length - 1), exprStr)
           else {
             val sub = new OnionParser(exprStr, line - 1, col - 1)
-            val parsed = try sub.term() catch {
+            val parsed = try { val t = sub.term(); sub.requireEnd(); t } catch {
               case _: Exception =>
                 sub.deepestFailure().foreach { case (subLoc, foundImage, kinds) => adoptFailure(subLoc, foundImage, kinds) }
                 throw fail

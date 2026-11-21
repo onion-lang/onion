@@ -2193,7 +2193,7 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         val arg = AST.Argument(binding.location, binding.name, null, null, false)
         val closureBody = AST.BlockExpression(binding.location, List(restExpr))
         val closureType = AST.TypeNode(binding.location, AST.ReferenceType("onion.Function1", true), true)
-        val closure = AST.ClosureExpression(binding.location, closureType, "call", List(arg), null, closureBody)
+        val closure = AST.ClosureExpression(binding.location, closureType, "call", List(arg), null, closureBody).asDoBind()
 
         // e1.bind(closure)
         AST.MethodCall(binding.location, bindExpr, "bind", List(closure))

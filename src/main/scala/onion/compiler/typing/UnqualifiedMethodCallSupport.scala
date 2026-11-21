@@ -219,7 +219,6 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       calls.typed(arg, context, formal)
     }
 
-  /** The method a statically imported call (`println(..)`) resolved to, under any cast. */
   /** A local that holds a function shadows a default-imported static of the same name (#3075). */
   private def localCallable(
     node: AST.UnqualifiedMethodCall,
@@ -234,6 +233,39 @@ private[compiler] final class UnqualifiedMethodCallSupport(
       case MethodFallbackLookup.NotFound => None
     }
 
+  /**
+   * [[localCallable]] for a call with untyped lambda arguments: the lambdas are typed
+   * against the local's `call` parameters, as `local.call(...)` would type them.
+   * `None` when no local of that name holds a callable value.
+   */
+  private def localCallableWithClosures(
+    node: AST.UnqualifiedMethodCall,
+    context: LocalContext,
+    expected: Type,
+    untypedClosureIndices: Set[Int]
+  ): Option[Option[Term]] =
+    if (node.typeArgs.nonEmpty) None
+    else {
+      val local = context.lookup(node.name)
+      if (local == null) None
+      else local.tp match {
+        case targetType: ObjectType if targetType.methods("call").nonEmpty =>
+          context.recordUsage(node.name)
+          Some(fallback.typeCallWithBidirectionalInferenceCore(
+            node, "call", node.args, Nil, new RefLocal(local), targetType, context, expected, untypedClosureIndices
+          ))
+        case nullable: NullableType if (nullable.innerType match {
+              case o: ObjectType => o.methods("call").nonEmpty
+              case _ => false
+            }) =>
+          context.recordUsage(node.name)
+          bodyContext.report(NULLABLE_MEMBER_ACCESS, node, nullable.displayName)
+          Some(None)
+        case _ => None
+      }
+    }
+
+  /** The method a statically imported call (`println(..)`) resolved to, under any cast. */
   private def staticImportCallee(term: Term): Option[Method] = term match {
     case c: CallStatic => Some(c.method)
     case c: AsInstanceOf => staticImportCallee(c.target)
@@ -299,6 +331,13 @@ private[compiler] final class UnqualifiedMethodCallSupport(
           node, name, node.args, node.typeArgs, top, context, expected, untypedClosureIndices
         )
       case _ =>
+        // A local holding a function value shadows a default-imported static of the same
+        // name here too (#3075): type the call as `local.call(...)`, so the lambda takes
+        // the local's parameter type, before any import is considered.
+        localCallableWithClosures(node, context, expected, untypedClosureIndices) match {
+          case Some(result) => return result
+          case None =>
+        }
         // A static-imported function types its lambda as `Type::name(...)` does, when exactly
         // one imported type has an overload that fits the other arguments (#2667).
         staticImportMethodCallSupport.soleImportedTypeFor(node, context, expected, untypedClosureIndices) match {

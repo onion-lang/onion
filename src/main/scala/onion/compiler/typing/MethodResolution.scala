@@ -169,7 +169,7 @@ private[compiler] object MethodResolution {
       def fixedArity(m: Method): Boolean =
         !m.isVararg || (params.length == m.argumentCount && params.nonEmpty && {
           val last = params.last.`type`
-          last != null && (last.isArrayType || last.isNullType)
+          last != null && (last.isNullType || (last.isArrayType && m.arguments.nonEmpty && TypeRules.isSuperType(m.arguments.last, last)))
         })
       val found =
         if found0.exists(fixedArity) then found0.filter(fixedArity) else found0

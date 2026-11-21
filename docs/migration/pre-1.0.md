@@ -827,3 +827,32 @@ IO::println(g("a" as CharSequence))    // charseq, before and now
   interface, and a call to only one of the overloads.
 - **No `onion migrate` rule:** finding the affected calls needs overload resolution, and
   only you know which overload a call meant. The hint shows the cast instead.
+
+## An array passed to `f(x)` / `f(xs...)` picks Java's method (#2955)
+
+When both `f(x)` and `f(xs...)` apply to an array, Onion used to drop the varargs one. Java
+treats the array as the varargs array itself, so it picks `f(xs...)`. Onion now does the same.
+
+```onion
+import { java.util.List as JList }
+val sa: String[] = ["a", "b", "c"].toArray(new String[0])
+IO::println(JList::of(sa).size())             // Before: 1. Now: 3
+IO::println(JList::of[String[]](sa).size())   // 1, before and now
+```
+
+| Call | Before | Now | To keep the old result |
+|---|---|---|---|
+| `JList::of(sa).size()`, `JSet::of(sa).size()` | `1` | `3` | `JList::of[String[]](sa)` |
+| `Stream::of(sa).count()` | `1` | `3` | `Stream::of[String[]](sa)` |
+| `val n: List[String[]] = JList::of(sa)` | compiled | E0000 | `JList::of[String[]](sa)` |
+| `H::s(sa)` with `s(o: Object)` and `s(xs: Object...)` | `s(Object)` | `s(Object...)` | `H::s(sa as Object)` |
+| `h.a(ia)` with `ia: Int[]`, `a(o: Object)` and `a(xs: Object...)` | `a(Object...)` | `a(Object)` | pass an `Object[]` holding `ia`: `val w: Object[] = new Object[1]; w[0] = ia; h.a(w)` |
+
+- **What you see:** usually nothing; the program runs the other method. A variable declared
+  as `List[String[]]` gets E0000 (`type List[String[]] is expected, but type List[String] is used`).
+- **Why `Int[]` changes the other way:** an `Int[]` is not an `Object[]`, so it can only fill
+  `a(o: Object)`, as in Java.
+- **Unchanged:** a single non-array argument (`s("x")` takes `s(Object)`), several arguments
+  (`s("x", "y")` takes `s(Object...)`), and `s(null)`.
+- **No `onion migrate` rule:** finding the affected calls needs overload resolution, and only
+  you know whether you meant one element or the whole array. The table shows each edit.

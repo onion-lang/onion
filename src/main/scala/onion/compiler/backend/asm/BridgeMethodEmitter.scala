@@ -91,7 +91,7 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
               // too (`Base.n(x: JInteger)` for `G[JInteger].n(x: T)`), which beats an own
               // overload that only matches by boxing (`n(x: Int)`), as in Java (#2680).
               if subst.nonEmpty && exactCount(best) < specializedArgs.length then
-                inheritedExact(classDef, rawMethod.name, specializedArgs).orElse(Some(best))
+                inheritedExact(classDef, rawMethod, specializedArgs, substituteClassParams(rawMethod.returnType)).orElse(Some(best))
               else Some(best)
 
           implOpt.foreach { impl =>
@@ -136,16 +136,25 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
                 gen.endMethod()
           }
 
-  // The nearest concrete superclass method with exactly these parameter types, if any.
-  private def inheritedExact(classDef: ClassDefinition, name: String, args: Array[TypedAST.Type]): Option[TypedAST.Method] =
+  // The nearest concrete superclass method with exactly these parameter types that can
+  // implement `slot` (as Java requires): at least as accessible, and returning what the
+  // slot returns or a subtype (`slotReturn`, the slot's return at the type arguments).
+  // One that cannot leaves the own overload chosen, rather than a bridge the JVM rejects.
+  private def inheritedExact(
+    classDef: ClassDefinition, slot: TypedAST.Method, args: Array[TypedAST.Type], slotReturn: TypedAST.Type
+  ): Option[TypedAST.Method] =
     var sup: TypedAST.ClassType = if classDef.isInterface then null else classDef.superClass
     while sup != null do
       val hit = rawOf(sup).methods.find { m =>
-        m.name == name && isVisibleInstance(m) && !Modifier.isAbstract(m.modifier) &&
+        m.name == slot.name && isVisibleInstance(m) && !Modifier.isAbstract(m.modifier) &&
           m.arguments.length == args.length &&
           m.arguments.indices.forall(i => plain(m.arguments(i)).name == plain(args(i)).name)
       }
-      if hit.isDefined then return hit
+      if hit.isDefined then
+        return hit.filter { m =>
+          (Modifier.isPublic(m.modifier) || !Modifier.isPublic(slot.modifier)) &&
+            isBridgeableReturn(slotReturn, m.returnType)
+        }
       sup = rawOf(sup).superClass
     None
 

@@ -760,7 +760,9 @@ parameter (raw argv) or the last one (rest collector).
 
 The rest collector may also be written `List[String]`
 (`def main(cmd: String, files: List[String])`); it collects the same
-arguments as a list. It must have no default.
+arguments as a list. Like `String[]`, it may be the only parameter
+(`def main(files: List[String])` receives every argument), and it must
+have no default. A misplaced or defaulted one is E0095.
 
 ## Warnings
 

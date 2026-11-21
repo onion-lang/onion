@@ -975,36 +975,38 @@ def main(parseURL: Int = 1, parseUrl: Int = 2): void { IO::println(parseURL + pa
 
 トップレベルの自動 CLI `main` のパラメータの型が、対応するスカラー型（`String`、`Int`、
 `Long`、`Double`、`Float`、`Boolean`、`Short`、`Byte`）でも、最後のパラメータとしての
-`String[]` rest collector でもありません。
+`String[]` か `List[String]` の rest collector でもありません。
 
 ```onion
-def main(name: String, count: Int = 3, tags: List[String] = []): Int {
+def main(name: String, count: Int = 3, opts: Map[String, String] = [:]): Int {
   return 0
 }
-// E0094: `main` はコマンドラインを導出できません: パラメータ `tags` の型
-//        List[String] は引数から読み取れません。
+// E0094: `main` はコマンドラインを導出できません: パラメータ `opts` の型
+//        Map[String,String] は引数から読み取れません。
 ```
 
-スカラー型を使うか、繰り返し・末尾引数を集めたいなら最後のパラメータを `String[]` にして
-ください（例: `def main(cmd: String, files: String[])`）。
+スカラー型を使ってください。末尾の引数を集めたいなら、最後のパラメータを `String[]` か
+`List[String]` にしてください（例: `def main(cmd: String, files: List[String])`）。
 
 可変長引数のパラメータ（`files: String...`）も E0094 です。`files: String[]` と書いてください。
 `tool` では同じ誤りが `E0081` になります。
 
-### `E0095` — `main` の `String[]` パラメータが未対応の位置にある
+### `E0095` — `main` の `String[]` / `List[String]` パラメータが未対応の位置にある
 
-トップレベルの自動 CLI `main` に `String[]` パラメータがありますが、その位置が未対応です
+トップレベルの自動 CLI `main` に `String[]` か `List[String]` のパラメータがありますが、その位置が未対応です
 （単独の引数でも、最後のパラメータでもありません）。
 
 ```onion
 def main(args: String[], flag: Boolean = false): void {
   IO::println("BODY RAN")
 }
-// E0095: `main` のパラメータ `args` (String[]) は未対応の位置にあります。
+// E0095: `main` のパラメータ `args` (String[] または List[String]) は未対応の位置にあります。
 ```
 
-`String[]` パラメータは単独のパラメータ（raw argv）か、デフォルト値のない最後のパラメータ
-（それより前はすべて必須のスカラー）のいずれかでなければなりません。
+このパラメータは単独のパラメータ（raw argv）か、デフォルト値のない最後のパラメータ
+（それより前はすべて必須のスカラー）のいずれかでなければなりません。既定値付きの
+`List[String]`（`tags: List[String] = []`）も E0095 です。既定値を外してください。残りの
+引数がなければ、空のリストになります。
 
 ## try/catch エラー
 
@@ -2120,7 +2122,7 @@ Test.on:2:10: Syntax error. Encountered "{", but expecting ";"
 | `E0092` | cannot instantiate primitive type … with `new` |
 | `E0093` | parameters `…` and `…` of `…` would both answer to the command-line flag `--…` |
 | `E0094` | `main` parameter `…` has type … which cannot be read from an argument |
-| `E0095` | `main` has a String[] parameter, `…`, that is not in a supported position |
+| `E0095` | `main` has a String[] or List[String] parameter, `…`, that is not in a supported position |
 | `E0096` | abstract method … cannot be private |
 | `E0097` | instance … is already defined (at most one instance is allowed per (trait, type)) |
 | `E0098` | enum … mixes shared parameters with `case` cases |

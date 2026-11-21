@@ -722,7 +722,9 @@ def main(cmd: String, files: String[]): void { ... } // スカラーの接頭列
 
 rest コレクタは `List[String]` とも書けます
 （`def main(cmd: String, files: List[String])`）。集める引数は同じで、
-リストとして受け取ります。既定値は付けられません。
+リストとして受け取ります。`String[]` と同じく、唯一のパラメータにもできます
+（`def main(files: List[String])` はすべての引数を受け取ります）。
+既定値は付けられません。位置が違うもの・既定値付きのものは E0095 です。
 
 ## 警告
 

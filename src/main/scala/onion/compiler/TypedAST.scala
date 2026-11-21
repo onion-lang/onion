@@ -862,6 +862,8 @@ object TypedAST {
     var frame: LocalFrame = _
     /** As MethodDefinition.mayContainTry, for the closure's own body. */
     var mayContainTry: Boolean = true
+    /** The body's only value is `null`, so its result type was widened to Object (#3018). */
+    var producesOnlyNull: Boolean = false
 
     def this(`type`: TypedAST.ClassType, method: TypedAST.Method, block: TypedAST.ActionStatement) = {
       this(null, `type`, method, block)

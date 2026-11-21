@@ -67,5 +67,37 @@ class LambdaTypeVariableSlotSpec extends AbstractShellSpec {
       assert(result.isInstanceOf[Shell.Success], out)
       assert(out.contains("hi7null"), out)
     }
+
+    it("still accepts a lambda that never returns, as a not-yet-initialised slot") {
+      val (result, out) = run(lazyClass +
+        """class B[T] extends Lazy[T](() -> throw new RuntimeException("sup"))
+          |class Mk[T] {
+          |public:
+          |  def mk(): Lazy[T] = new Lazy[T](() -> throw new RuntimeException("mk"))
+          |  def both(c: Boolean): Lazy[T] =
+          |    new Lazy[T](() -> if c { throw new RuntimeException("a") } else { throw new RuntimeException("b") })
+          |}
+          |try { new B[String]().f.call() } catch e: RuntimeException { IO::println(e.getMessage()) }
+          |try { new Mk[String]().mk().f.call() } catch e: RuntimeException { IO::println(e.getMessage()) }
+          |try { new Mk[String]().both(false).f.call() } catch e: RuntimeException { IO::println(e.getMessage()) }
+          |""".stripMargin)
+      assert(result.isInstanceOf[Shell.Success], out)
+      assert(out.contains("sup") && out.contains("mk") && out.contains("b"), out)
+    }
+
+    it("still accepts a block lambda whose only value is null") {
+      val (result, out) = run(lazyClass +
+        """class Mk[T] {
+          |public:
+          |  def mk(): Lazy[T] = new Lazy[T](() -> { IO::println("side"); null })
+          |}
+          |class Sub[T] extends Lazy[T](() -> { IO::println("sub"); null })
+          |val a: String? = new Mk[String]().mk().f.call()
+          |val b: String? = new Sub[String]().f.call()
+          |IO::println("got " + a + b)
+          |""".stripMargin)
+      assert(result.isInstanceOf[Shell.Success], out)
+      assert(out.contains("side") && out.contains("sub") && out.contains("got nullnull"), out)
+    }
   }
 }

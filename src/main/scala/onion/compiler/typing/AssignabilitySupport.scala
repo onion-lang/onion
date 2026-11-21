@@ -316,22 +316,23 @@ private[compiler] object AssignabilitySupport {
   }
 
   /**
-   * Whether a lambda written as the constructor argument `arg`, typed to `term`, may fill `slot`
-   * (a class type variable's slot, `() -> T`): the assignment rule of `typeVariableSlotFits`,
-   * so `() -> 5` is not a `() -> T` (#3018). A lambda whose only value is `null` types as
-   * `Function0[Object]`; it is let through, since its result takes the slot's type, as
-   * `() -> null` into `() -> T?` always did (#3003).
+   * Whether a lambda typed to `term` may fill `slot`, a class type variable's slot such as
+   * `() -> T`: the assignment rule of `typeVariableSlotFits`, so `() -> 5` is not a `() -> T`
+   * (#3018). A lambda whose result is free also fits, since that result takes the slot's type:
+   * one that never returns (`() -> throw ...`, `Function0[Nothing]`), and one whose only value
+   * is `null` (`() -> { log(); null }`, widened to `Function0[Object]`), as `() -> null` into
+   * `() -> T?` always did (#3003).
    */
-  def lambdaSlotFits(slot: Type, term: Term, arg: AST.Expression, table: ClassTable): Boolean =
-    typeVariableSlotFits(slot, term, table) || returnsOnlyNull(arg)
+  def lambdaSlotFits(slot: Type, term: Term, table: ClassTable): Boolean =
+    typeVariableSlotFits(slot, term, table) || lambdaResultIsFree(term)
 
-  def returnsOnlyNull(arg: AST.Expression): Boolean = arg match {
-    case c: AST.ClosureExpression => c.body.elements match {
-      case List(_: AST.NullLiteral) => true
-      case List(AST.ReturnExpression(_, _: AST.NullLiteral)) => true
-      case _ => false
-    }
-    case b: AST.BlockExpression if b.elements.nonEmpty => returnsOnlyNull(b.elements.last.asInstanceOf[AST.Expression])
+  def lambdaResultIsFree(term: Term): Boolean = term match {
+    case c: NewClosure =>
+      c.producesOnlyNull || (c.`type` match {
+        case applied: AppliedClassType => applied.typeArguments.lastOption.exists(_.isBottomType)
+        case _ => false
+      })
+    case b: Begin if b.terms.nonEmpty => lambdaResultIsFree(b.terms.last)
     case _ => false
   }
 

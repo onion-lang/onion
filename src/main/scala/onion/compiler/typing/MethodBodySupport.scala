@@ -513,10 +513,10 @@ private[compiler] final class MethodBodySupport(
                 if term.`type` != null then retyped(i) = term
               }
           }
-          // A lambda is judged by the assignment rule too, except one whose only value is
-          // `null`, which takes the slot's type (#3003, #3018).
+          // A lambda is judged by the assignment rule too, except one whose result is free
+          // (it never returns, or its only value is `null`) and takes the slot's type (#3003, #3018).
           val fits = misfits.forall { i =>
-            (superSlotFits(formals(i), retyped(i)) || AssignabilitySupport.returnsOnlyNull(args(i))) &&
+            (superSlotFits(formals(i), retyped(i)) || AssignabilitySupport.lambdaResultIsFree(retyped(i))) &&
               TypeRelations.isConstructorArgAssignable(formals(i), retyped(i).`type`, bodyContext.table)
           }
           if fits then (Array(ctor), Boxing.adaptArguments(bodyContext.table, retyped, formals))

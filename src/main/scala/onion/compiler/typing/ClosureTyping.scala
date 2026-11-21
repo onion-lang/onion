@@ -82,6 +82,7 @@ final class ClosureTyping(
         case t => TypeCheckingHelpers.effectiveType(t)
       }
 
+      var producesOnlyNull = false
       val inferredReturnType =
         if ((inferredTarget == null || needsReturnTypeInference) && node.typeRef.isRelaxed) {
           // Memoized like inferBodyReturnType: the bidirectional call path types the same
@@ -110,6 +111,7 @@ final class ClosureTyping(
           // a usable JVM return type (its default value is absent, so codegen
           // emits a value-less `areturn` -> VerifyError), so the *synthesized
           // method's* return type is widened separately, at `expectedRet` below.
+          producesOnlyNull = inferred.exists(_.isNullType)
           inferred.map(t => if (t.isNullType) bodyContext.rootClass else t)
         } else None
 
@@ -274,6 +276,7 @@ final class ClosureTyping(
                     else body.addReturnNode(block, expectedRet)
                   val result = new NewClosure(staticType, typedMethod, finalBlock)
                   result.mayContainTry = bodyContext.tryCount != triesBefore
+                  result.producesOnlyNull = producesOnlyNull
                   result.frame_=(context.getContextFrame)
                   Some(result)
                 }

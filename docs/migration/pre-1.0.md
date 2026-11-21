@@ -820,9 +820,16 @@ IO::println(ys[0]?.length())    // 1, before and now
 | `val n: Int = xs[0]` with `xs = [1, null]` | compiled, crashed on the `null` | error | `xs[0] ?: 0` |
 | `[[1, null], [2]]` | `List[List[Int]]` | `List[Object]` | write the inner lists with one element type |
 | `["a", null] + ["b"]` | compiled | E0001 | give both lists the same type: `List[String?]` |
+| `xs.sort(Comparator::nullsFirst(Comparator::naturalOrder()))` with `xs = ["b", null, "a"]` | `[null, a, b]` | E0005 | name the element type once: `Comparator::naturalOrder[String?]()` |
+| `xs.sort(Comparator::nullsFirst(String::CASE_INSENSITIVE_ORDER))` with the same `xs` | `[null, a, b]` | E0005 | a comparator over `String?`: `Comparator::nullsFirst[String?]((a, b) -> a!!.compareToIgnoreCase(b!!))` |
 
-- **What you see:** E0070 (`may be null and cannot be dereferenced directly`), or E0005 when
-  the list is passed to a `List[Int]` parameter. The cause is the `null` in the literal.
+- **What you see:** E0070 (`may be null and cannot be dereferenced directly`); E0000 when
+  the list is assigned to a `List[Int]` variable; or E0005 when it is passed to a `List[Int]`
+  parameter or to a Java generic method such as `sort` or `Collections::sort`. The cause is
+  the `null` in the literal.
+- **A Java comparator over the element type:** `nullsFirst` passes no `null` to the
+  comparator it wraps, but its signature cannot say so. Name `String?` as the type argument
+  once, as in the two `sort` rows above. The `!!` there never fails.
 - **A target type still works:** `val ys: List[Int?] = [1, null]`. `List[Int]` is rejected, as the `null` does not fit.
 - **Unchanged:** `[null]`, `[null, null]`, and a literal whose expected type is already known.
 - **No `onion migrate` rule:** deciding what to do with a `null` (skip it, default it,

@@ -711,8 +711,11 @@ IO::println(ys[0]?.length())    // 以前も現在も 1
 | `xs = [1, null]` のとき `val n: Int = xs[0]` | コンパイルでき、`null` で実行時エラー | エラー | `xs[0] ?: 0` |
 | `[[1, null], [2]]` | `List[List[Int]]` | `List[Object]` | 内側のリストの要素型をそろえる |
 | `["a", null] + ["b"]` | コンパイルできた | E0001 | 両方を `List[String?]` にそろえる |
+| `xs = ["b", null, "a"]` のとき `xs.sort(Comparator::nullsFirst(Comparator::naturalOrder()))` | `[null, a, b]` | E0005 | 要素型を一度だけ書く: `Comparator::naturalOrder[String?]()` |
+| 同じ `xs` で `xs.sort(Comparator::nullsFirst(String::CASE_INSENSITIVE_ORDER))` | `[null, a, b]` | E0005 | `String?` を比べる比較器にする: `Comparator::nullsFirst[String?]((a, b) -> a!!.compareToIgnoreCase(b!!))` |
 
-- **表示されるもの:** E0070（`may be null and cannot be dereferenced directly`）です。`List[Int]` の引数に渡した場合は E0005 です。原因はリテラル中の `null` です。
+- **表示されるもの:** E0070（`may be null and cannot be dereferenced directly`）です。`List[Int]` の変数に代入した場合は E0000 です。`List[Int]` の引数や、`sort`・`Collections::sort` などの Java のジェネリックメソッドに渡した場合は E0005 です。原因はリテラル中の `null` です。
+- **要素型に対する Java の比較器:** `nullsFirst` は、包んだ比較器に `null` を渡しません。しかし、そのシグネチャではそれを表せません。上の二つの `sort` の行のように、型引数 `String?` を一度だけ書きます。そこでの `!!` が失敗することはありません。
 - **型を明示すれば今までどおり書けます:** `val ys: List[Int?] = [1, null]`。`null` が入らないため `List[Int]` は拒否されます。
 - **変わらないもの:** `[null]`、`[null, null]`、期待される型が分かっているリテラルです。
 - **`onion migrate` の規則はありません:** `null` をどう扱うか（飛ばす、既定値にする、拒否する）はプログラムごとに違います。上の表が選択肢ごとの直し方を示します。

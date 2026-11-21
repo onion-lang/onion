@@ -299,6 +299,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
     val expectedElem = expectedListElement(expected)
     var elementType: Type = null
     var failed = false
+    var sawNull = false
     var incompatibleLeft: Type = null
     var incompatibleRight: Type = null
 
@@ -321,6 +322,7 @@ private[compiler] final class SimpleExpressionTypingSupport(
         } else {
           typedElements(index) = typedElement
           val normalizedType = normalizeListElementType(typedElement.`type`)
+          if (normalizedType.isNullType) sawNull = true
           if (elementType == null) {
             elementType = normalizedType
           } else {
@@ -364,6 +366,9 @@ private[compiler] final class SimpleExpressionTypingSupport(
         // element (not their join) is what makes the mixed-subtype case work; it is
         // sound because a literal creates a fresh list of that element type.
         else if (expectedElem != null && typedElements.forall(fitsExpectedElement)) expectedElem
+        // No target type: a `null` element makes the element type nullable, so
+        // `[5, null]` is a List[Int?] and cannot slip into a List[Int] slot (#2998).
+        else if (sawNull && !elementType.isNullType && !elementType.isInstanceOf[NullableType]) NullableType.of(elementType)
         else elementType
       val elements =
         if (finalElementType eq expectedElem) typedElements.map(widenToSlot(_, expectedElem))

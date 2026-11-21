@@ -72,4 +72,25 @@ class ListLiteralNullPrimitiveSpec extends AbstractShellSpec {
       assert(errorCodes("val xs = [5, null]\nprintln(xs)\n") == Seq.empty)
     }
   }
+
+  describe("a literal with a null element and no expected type is a list of nullable (#2998)") {
+    it("is not accepted by a List[Int] parameter") {
+      val src = "def total(zs: List[Int]): Int = zs[1] + 1\nprintln(total([1, null]))\n"
+      assert(errorCodes(src) == Seq("E0005"))
+    }
+    it("is not assignable to a List[Int] through a val") {
+      assert(errorCodes("val ys = [5, null]\nval xs: List[Int] = ys\nprintln(xs)\n") == Seq("E0000"))
+    }
+    it("is not assignable to a List[String] for strings") {
+      assert(errorCodes("val ys = [\"a\", null]\nval xs: List[String] = ys\nprintln(xs)\n") == Seq("E0000"))
+    }
+    it("is accepted by a List[Int?] parameter") {
+      val src = "def n(zs: List[Int?]): Int = zs.size\nprintln(n([1, null]))\n"
+      assert(errorCodes(src) == Seq.empty)
+    }
+    it("keeps a null-free literal non-null") {
+      val src = "def total(zs: List[Int]): Int = zs[0]\nprintln(total([1, 2]))\n"
+      assert(errorCodes(src) == Seq.empty)
+    }
+  }
 }

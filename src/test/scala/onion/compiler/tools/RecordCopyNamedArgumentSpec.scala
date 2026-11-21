@@ -50,5 +50,40 @@ class RecordCopyNamedArgumentSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(result == Shell.Success("R(a=x, b=B)"))
     }
+
+    it("binds by name when only one of two own copy overloads is reordered") {
+      val result = shell.run(
+        """
+          |record Q(a: String, b: String) {
+          |public:
+          |  def copy(b: String, a: String): Q = new Q(a, b)
+          |  def copy(a: String, b: Int): Q = new Q(a, "" + b)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new Q("x", "y").copy(a = "A", b = "B").toString() + " " + new Q("x", "y").copy(a = "A", b = 7).toString()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(result == Shell.Success("Q(a=A, b=B) Q(a=A, b=7)"))
+    }
+
+    it("still partially copies through an own copy that takes the components in order") {
+      val result = shell.run(
+        """
+          |record P(a: String, b: String) {
+          |public:
+          |  def copy(a: String, b: String): P = new P(a + "!", b)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new P("x", "y").copy(b = "B").toString()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(result == Shell.Success("P(a=x!, b=B)"))
+    }
   }
 }

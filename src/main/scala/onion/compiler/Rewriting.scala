@@ -366,6 +366,14 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
   private def isStringArrayArg(a: AST.Argument): Boolean =
     !a.isVararg && isStringArrayParam(a.typeRef)
 
+  /** Whether a parameter is `List[String]`: the rest collector may be written as a list too (#2576). */
+  private def isStringListArg(a: AST.Argument): Boolean =
+    !a.isVararg && a.typeRef != null && (dealiasForCli(a.typeRef).desc match {
+      case AST.ParameterizedType(AST.ReferenceType(n, _), List(AST.ReferenceType(e, _))) =>
+        (n == "List" || n == "java.util.List") && (e == "String" || e == "java.lang.String")
+      case _ => false
+    })
+
   // A `List[..]` or array parameter (not varargs): the author wants a list of arguments,
   // which a `tool` cannot take yet (issue #2254), so the message says that.
   private def isListArg(a: AST.Argument): Boolean =
@@ -535,7 +543,8 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
     // A main with required leading scalar parameters and a trailing String[] that
     // collects the remaining arguments, e.g. `def main(cmd: String, files: String[])`.
     val restPattern = (f: AST.FunctionDeclaration) =>
-      f.args.length >= 2 && isStringArrayArg(f.args.last) && f.args.last.defaultValue == null &&
+      f.args.length >= 2 && (isStringArrayArg(f.args.last) || isStringListArg(f.args.last)) &&
+        f.args.last.defaultValue == null &&
         f.args.init.forall(a => cliKindOfArg(a).isDefined && a.defaultValue == null)
 
     // A top-level `main` with parameters must fit one of the supported shapes:
@@ -592,12 +601,17 @@ class Rewriting(config: CompilerConfig) extends AnyRef with Processor[Seq[AST.Co
         )
         val argExprs = f.args.zipWithIndex.map { case (a, i) =>
           if (i < k) convertCliValue(loc, cliKindOf(a.typeRef).get, a.name, AST.Indexing(loc, AST.Id(loc, "args"), AST.IntegerLiteral(loc, i)))
-          else AST.StaticMethodCall(
-            loc,
-            AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false),
-            "rest",
-            List(AST.Id(loc, "args"), AST.IntegerLiteral(loc, k))
-          )
+          else {
+            val rest = AST.StaticMethodCall(
+              loc,
+              AST.TypeNode(loc, AST.ReferenceType("onion.Cli", true), false),
+              "rest",
+              List(AST.Id(loc, "args"), AST.IntegerLiteral(loc, k))
+            )
+            if (isStringListArg(a))
+              AST.StaticMethodCall(loc, AST.TypeNode(loc, AST.ReferenceType("onion.Colls", true), false), "toList", List(rest))
+            else rest
+          }
         }
         toplevels += AST.UnqualifiedMethodCall(loc, "main", argExprs)
 

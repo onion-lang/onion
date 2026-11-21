@@ -714,6 +714,35 @@ IO::println(g("a" as CharSequence))    // 以前も現在も charseq
 - **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
   また、どの多重定義を意図したかは書いた人にしか分かりません。代わりにヒントが `as` を示します。
 
+## `null` 要素を含むリストリテラルは、nullable 要素のリストになりました (#2998)
+
+期待される型がない `[x, null]` は、以前は non-null 型のリストでした。
+現在は nullable 型のリストになり、`null` がチェッカーから見えるようになりました。
+
+```onion
+val ys = ["a", null]
+IO::println(ys[0].length())     // 以前: 1。現在: E0070
+IO::println(ys[0]?.length())    // 以前も現在も 1
+```
+
+| プログラム | 以前 | 現在 | 直し方 |
+|---|---|---|---|
+| `val ys = ["a", null]; ys[0].length()` | `1` | E0070 | `ys[0]?.length()` または `ys[0]!!.length()` |
+| `total(xs: List[Int])` に対する `total([1, null])` | コンパイルでき、`null` で実行時エラー | E0005 | `List[Int?]` を受け取り、各 `null` を処理する |
+| `xs = [1, null]` のとき `val n: Int = xs[1]` | コンパイルでき、`null` で実行時エラー | E0070 | `xs[1] ?: 0` |
+| `String::join(",", ["a", null, "c"])` | `a,null,c` | E0005 | `String::join(",", ["a", null, "c"].map { s -> s ?: "null" })` |
+| `[[1, null], [2]]` | `List[List[Int]]` | `List[Object]` | 内側のリストの要素型をそろえる |
+| `["a", null] + ["b"]` | コンパイルできた | E0001 | 両方を `List[String?]` にそろえる |
+| `xs = ["b", null, "a"]` のとき `xs.sort(Comparator::nullsFirst(Comparator::naturalOrder()))` | `[null, a, b]` | E0005 | 要素型を一度だけ書く: `Comparator::naturalOrder[String?]()` |
+| 同じ `xs` で `xs.sort(Comparator::nullsFirst(String::CASE_INSENSITIVE_ORDER))` | `[null, a, b]` | E0005 | `String?` を比べる比較器にする: `Comparator::nullsFirst[String?]((a, b) -> a!!.compareToIgnoreCase(b!!))` |
+
+- **表示されるもの:** E0070（`may be null and cannot be dereferenced directly`）です。`List[Int]` の変数に代入した場合は E0000 です。`List[Int]` の引数や、`xs.sort(comparator)`・`Collections::sort(xs, comparator)`・`String::join` などの Java のジェネリックメソッドに渡した場合は E0005 です。原因はリテラル中の `null` です。
+- **要素型に対する Java の比較器:** `nullsFirst` は、包んだ比較器に `null` を渡しません。しかし、そのシグネチャではそれを表せません。上の二つの `sort` の行のように、型引数 `String?` を一度だけ書きます。そこでの `!!` が失敗することはありません。
+- **型を明示すれば今までどおり書けます:** `val ys: List[Int?] = [1, null]`。`null` が入らないため `List[Int]` は拒否されます。
+- **変わらないもの:** `[null]`、`[null, null]`、期待される型が分かっているリテラルです。
+- **残っている差:** `["a": "x", "b": null]` のように `null` の値を含むマップリテラルは、今も non-null の値型になります。これは #3201 で、別の変更として移行表の行も別に用意します。
+- **`onion migrate` の規則はありません:** `null` をどう扱うか（飛ばす、既定値にする、拒否する）はプログラムごとに違います。上の表が選択肢ごとの直し方を示します。
+
 ## `f(x)` と `f(xs...)` に配列を渡すと、Java と同じメソッドが選ばれるようになりました (#2955)
 
 配列に `f(x)` と `f(xs...)` の両方が当てはまるとき、以前の Onion は可変長引数の方を外していました。

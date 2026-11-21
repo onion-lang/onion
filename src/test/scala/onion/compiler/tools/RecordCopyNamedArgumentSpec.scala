@@ -85,5 +85,43 @@ class RecordCopyNamedArgumentSpec extends AbstractShellSpec {
           |""".stripMargin, "None", Array())
       assert(result == Shell.Success("P(a=x!, b=B)"))
     }
+
+    it("keeps the partial copy when another own copy overload has a different arity") {
+      val seconds = List("def copy(a: String): P = new P(a + \"?\", \"-\")", "def copy(): P = this", "def copy(n: Int): P = this")
+      seconds.foreach { second =>
+        val result = shell.run(
+          s"""
+            |record P(a: String, b: String) {
+            |public:
+            |  def copy(a: String, b: String): P = new P(a + "!", b)
+            |  $second
+            |}
+            |class Test {
+            |public:
+            |  static def main(args: String[]): String {
+            |    return new P("x", "y").copy(b = "B").toString()
+            |  }
+            |}
+            |""".stripMargin, "None", Array())
+        assert(result == Shell.Success("P(a=x!, b=B)"), second)
+      }
+    }
+
+    it("partially copies through an own copy whose parameter names are not component names") {
+      val result = shell.run(
+        """
+          |record P(x: Int, y: Int) {
+          |public:
+          |  def copy(nx: Int, ny: Int): P = new P(nx, ny)
+          |}
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String {
+          |    return new P(1, 2).copy(y = 5).toString() + " " + new P(1, 2).copy(nx = 7, ny = 8).toString()
+          |  }
+          |}
+          |""".stripMargin, "None", Array())
+      assert(result == Shell.Success("P(x=1, y=5) P(x=7, y=8)"))
+    }
   }
 }

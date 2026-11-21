@@ -692,3 +692,27 @@ IO::println(g("a" as CharSequence))    // 以前も現在も charseq
   どちらか一方の多重定義しか当てはまらない呼び出しです。
 - **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
   また、どの多重定義を意図したかは書いた人にしか分かりません。代わりにヒントが `as` を示します。
+
+## `null` 要素を含むリストリテラルは、nullable 要素のリストになりました (#2998)
+
+期待される型がない `[x, null]` は、以前は non-null 型のリストでした。
+現在は nullable 型のリストになり、`null` がチェッカーから見えるようになりました。
+
+```onion
+val ys = ["a", null]
+IO::println(ys[0].length())     // 以前: 1。現在: E0070
+IO::println(ys[0]?.length())    // 以前も現在も 1
+```
+
+| プログラム | 以前 | 現在 | 直し方 |
+|---|---|---|---|
+| `val ys = ["a", null]; ys[0].length()` | `1` | E0070 | `ys[0]?.length()` または `ys[0]!!.length()` |
+| `total(xs: List[Int])` に対する `total([1, null])` | コンパイルでき、`null` で実行時エラー | E0005 | `List[Int?]` を受け取り、各 `null` を処理する |
+| `xs = [1, null]` のとき `val n: Int = xs[0]` | コンパイルでき、`null` で実行時エラー | エラー | `xs[0] ?: 0` |
+| `[[1, null], [2]]` | `List[List[Int]]` | `List[Object]` | 内側のリストの要素型をそろえる |
+| `["a", null] + ["b"]` | コンパイルできた | E0001 | 両方を `List[String?]` にそろえる |
+
+- **表示されるもの:** E0070（`may be null and cannot be dereferenced directly`）です。`List[Int]` の引数に渡した場合は E0005 です。原因はリテラル中の `null` です。
+- **型を明示すれば今までどおり書けます:** `val ys: List[Int?] = [1, null]`。`null` が入らないため `List[Int]` は拒否されます。
+- **変わらないもの:** `[null]`、`[null, null]`、期待される型が分かっているリテラルです。
+- **`onion migrate` の規則はありません:** `null` をどう扱うか（飛ばす、既定値にする、拒否する）はプログラムごとに違います。上の表が選択肢ごとの直し方を示します。

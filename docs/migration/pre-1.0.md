@@ -801,3 +801,29 @@ IO::println(g("a" as CharSequence))    // charseq, before and now
   interface, and a call to only one of the overloads.
 - **No `onion migrate` rule:** finding the affected calls needs overload resolution, and
   only you know which overload a call meant. The hint shows the cast instead.
+
+## A list literal with a `null` element is a list of nullable (#2998)
+
+`[x, null]` with no expected type used to be a list of the non-null type. It is now a list of
+the nullable type, so the `null` is visible to the checker.
+
+```onion
+val ys = ["a", null]
+IO::println(ys[0].length())     // Before: 1. Now: E0070
+IO::println(ys[0]?.length())    // 1, before and now
+```
+
+| Program | Before | Now | To fix it |
+|---|---|---|---|
+| `val ys = ["a", null]; ys[0].length()` | `1` | E0070 | `ys[0]?.length()` or `ys[0]!!.length()` |
+| `total([1, null])` with `total(xs: List[Int])` | compiled, crashed on the `null` | E0005 | take `List[Int?]`, then handle each `null` |
+| `val n: Int = xs[0]` with `xs = [1, null]` | compiled, crashed on the `null` | error | `xs[0] ?: 0` |
+| `[[1, null], [2]]` | `List[List[Int]]` | `List[Object]` | write the inner lists with one element type |
+| `["a", null] + ["b"]` | compiled | E0001 | give both lists the same type: `List[String?]` |
+
+- **What you see:** E0070 (`may be null and cannot be dereferenced directly`), or E0005 when
+  the list is passed to a `List[Int]` parameter. The cause is the `null` in the literal.
+- **A target type still works:** `val ys: List[Int?] = [1, null]`. `List[Int]` is rejected, as the `null` does not fit.
+- **Unchanged:** `[null]`, `[null, null]`, and a literal whose expected type is already known.
+- **No `onion migrate` rule:** deciding what to do with a `null` (skip it, default it,
+  reject it) depends on the program. The edits above show each choice.

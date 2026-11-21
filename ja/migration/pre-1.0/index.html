@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -2388,6 +2388,17 @@
     <span class="md-ellipsis">
       
         override は、? の違いを除いて基底メソッドと同じ型でなければならなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリミティブ型のパラメータは、ボックス型の抽象メソッドを実装しなくなりました
       
     </span>
   </a>
@@ -5248,6 +5259,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリミティブ型のパラメータは、ボックス型の抽象メソッドを実装しなくなりました
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#onionmathrandomint-randnextint" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5960,11 +5982,29 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <li><strong>W0029 を消すには:</strong> 基底のメソッドを置き換えるつもりなら、<code>override</code> を付けてください。</li>
 <li><strong>別のオーバーロードとして残すには:</strong> メソッドの名前を変えてください（<code>decOrSkip(k: Int?)</code>）。<code>onion migrate</code> の規則はありません。基底のメソッドを置き換えるつもりだったかどうかは、書いた人にしか分かりません。</li>
 </ul>
+<h2 id="_5">プリミティブ型のパラメータは、ボックス型の抽象メソッドを実装しなくなりました<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p>総称型でないインターフェースや抽象クラスが <code>JInteger</code> を取るところで、<code>Int</code> を取るクラスのメソッドが実装として受け入れられていました（逆も同じです）。
+二つをつなぐブリッジはないので、上位型を通した呼び出しは <code>AbstractMethodError</code> を投げていました。
+今は、そのクラスが <strong>E0037</strong> になります (#2922)。</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kd">interface</span><span class="w"> </span><span class="nc">I</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">n</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">JInteger</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kd">class</span><span class="w"> </span><span class="nc">C</span><span class="w"> </span><span class="k">conforms</span><span class="w"> </span><span class="nc">I</span><span class="w"> </span><span class="p">{</span><span class="w">            </span><span class="c1">// 以前: コンパイルできた。今: E0037</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">n</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"int "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">x</span>
+</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="p">}</span>
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="nc">I</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">C</span><span class="p">;</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="n">i</span><span class="p">.</span><span class="nf">n</span><span class="p">(</span><span class="mi">4</span><span class="p">))</span><span class="w">   </span><span class="c1">// 以前: AbstractMethodError</span>
+</span></code></pre></div>
+<ul>
+<li><strong>表示されるもの:</strong> <strong>E0037</strong> <code>クラス C は抽象メソッド n(java.lang.Integer) を実装するか、...</code> と、<code>n(Int) はこのメソッドを実装しません。... 実装するには n(JInteger) と宣言してください。</code> です。</li>
+<li><strong>これまでどおり動くもの:</strong> 総称型の上位型（<code>n(x: T)</code> を持つ <code>G[JInteger]</code>）では、<code>n(x: Int)</code> にブリッジが作られます。<code>?</code> だけ違うパラメータ（<code>n(x: Int)</code> に対する <code>n(x: Int?)</code>）も実装になります。</li>
+<li><strong>直し方:</strong> 上位型のパラメータ型を書いてください（<code>def n(x: JInteger)</code>）。ほかのコードが <code>Int</code> のメソッドを呼んでいるなら、並べて残してかまいません。</li>
+<li><strong><code>onion migrate</code> の規則はありません:</strong> これに当たるプログラムは、上位型を通した呼び出しを一度も実行できていません。また、二つのメソッドのどちらを実行すべきかは、書いた人にしか分かりません。そのため、ヒントが正しい書き方を示します。</li>
+</ul>
 <h2 id="onionmathrandomint-randnextint"><code>OnionMath::randomInt</code> は削除されました。<code>Rand::nextInt</code> を使ってください<a class="headerlink" href="#onionmathrandomint-randnextint" title="Permanent link">&para;</a></h2>
 <p>範囲内のランダムな <code>Int</code> を得る方法が二つあり、上限の扱いが逆でした（#3069）。
 残るのは <code>Rand::nextInt(min, max)</code> です。<code>max</code> は含まれません。<code>a..&lt;b</code>、Java、Kotlin と同じです。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w">   </span><span class="c1">// 以前: 1から6。現在: E0005</span>
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">          </span><span class="c1">// 1から6</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w">   </span><span class="c1">// 以前: 1から6。現在: E0005</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">          </span><span class="c1">// 1から6</span>
 </span></code></pre></div>
 <ul>
 <li><strong>表示されるもの:</strong> <code>E0005</code> と、<code>Rand::nextInt(min, max + 1)</code> を示すヒントです。</li>
@@ -5989,11 +6029,11 @@ Java と同じです。以前は、範囲外の値が黙って桁あふれして
 <p>通常のクラスは、実装しているインタフェースを通じて総称メソッドの引数に当てはまるようになりました（#2845）。
 <code>String</code> は <code>Comparable[String]</code> なので、<code>g[T](c: Comparable[T])</code> は <code>g("a")</code> に当てはまります。
 通常の多重定義も当てはまる場合は、Java の規則でどちらかを選びます。</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">lang</span><span class="p">.</span><span class="nc">CharSequence</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">g</span><span class="p">(</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"charseq"</span>
-</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="kd">def</span><span class="w"> </span><span class="n">g</span><span class="p">[</span><span class="nc">T</span><span class="p">](</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">Comparable</span><span class="p">[</span><span class="nc">T</span><span class="p">]):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"generic"</span>
-</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="p">))</span><span class="w">                    </span><span class="c1">// 以前: charseq。現在: E0006</span>
-</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">))</span><span class="w">    </span><span class="c1">// 以前も現在も charseq</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">lang</span><span class="p">.</span><span class="nc">CharSequence</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">g</span><span class="p">(</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"charseq"</span>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="kd">def</span><span class="w"> </span><span class="n">g</span><span class="p">[</span><span class="nc">T</span><span class="p">](</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">Comparable</span><span class="p">[</span><span class="nc">T</span><span class="p">]):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"generic"</span>
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="p">))</span><span class="w">                    </span><span class="c1">// 以前: charseq。現在: E0006</span>
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">))</span><span class="w">    </span><span class="c1">// 以前も現在も charseq</span>
 </span></code></pre></div>
 <table>
 <thead>

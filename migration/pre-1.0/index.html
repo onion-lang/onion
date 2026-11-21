@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -4309,6 +4309,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-primitive-parameter-does-not-implement-a-boxed-abstract-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A primitive parameter does not implement a boxed abstract method
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#onionmathrandomint-is-removed-use-randnextint" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5227,6 +5238,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-primitive-parameter-does-not-implement-a-boxed-abstract-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A primitive parameter does not implement a boxed abstract method
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#onionmathrandomint-is-removed-use-randnextint" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6031,11 +6053,34 @@ now, with or without <code>override</code>:</p>
 <li><strong>To keep a separate overload:</strong> rename the method (<code>decOrSkip(k: Int?)</code>). No <code>onion
   migrate</code> rule: only you know whether the method was meant to replace the base one.</li>
 </ul>
+<h2 id="a-primitive-parameter-does-not-implement-a-boxed-abstract-method">A primitive parameter does not implement a boxed abstract method<a class="headerlink" href="#a-primitive-parameter-does-not-implement-a-boxed-abstract-method" title="Permanent link">&para;</a></h2>
+<p>A class method with <code>Int</code> where a non-generic interface or abstract class has <code>JInteger</code> (or
+the reverse) was accepted as the implementation. No bridge joined the two, so a call through
+the supertype threw <code>AbstractMethodError</code>. Now the class is <strong>E0037</strong> (#2922).</p>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kd">interface</span><span class="w"> </span><span class="nc">I</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="nf">n</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="nc">JInteger</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kd">class</span><span class="w"> </span><span class="nc">C</span><span class="w"> </span><span class="k">conforms</span><span class="w"> </span><span class="nc">I</span><span class="w"> </span><span class="p">{</span><span class="w">            </span><span class="c1">// Before: compiled. Now: E0037</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="kd">public</span><span class="p">:</span>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="kp">this</span><span class="w"> </span><span class="p">{}</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">  </span><span class="kd">def</span><span class="w"> </span><span class="nf">n</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">Int</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"int "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">x</span>
+</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="p">}</span>
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="kd">val</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="nc">I</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">C</span><span class="p">;</span><span class="w"> </span><span class="nf">println</span><span class="p">(</span><span class="n">i</span><span class="p">.</span><span class="nf">n</span><span class="p">(</span><span class="mi">4</span><span class="p">))</span><span class="w">   </span><span class="c1">// Before: AbstractMethodError</span>
+</span></code></pre></div>
+<ul>
+<li><strong>What you see:</strong> <strong>E0037</strong> <code>class C must implement abstract method n(java.lang.Integer) ...</code>,
+  then <code>n(Int) does not implement it ... Declare n(JInteger) to implement it.</code></li>
+<li><strong>Still fine:</strong> a generic supertype (<code>G[JInteger]</code> with <code>n(x: T)</code>), where <code>n(x: Int)</code> is
+  bridged, and a parameter that differs only by <code>?</code> (<code>n(x: Int?)</code> for <code>n(x: Int)</code>).</li>
+<li><strong>To update:</strong> write the supertype's parameter type (<code>def n(x: JInteger)</code>). Keep the
+  <code>Int</code> method beside it if other code calls it.</li>
+<li><strong>No <code>onion migrate</code> rule:</strong> a program that hits this never ran the call through the
+  supertype, and only you know which of the two methods it should run. The hint shows the
+  spelling instead.</li>
+</ul>
 <h2 id="onionmathrandomint-is-removed-use-randnextint"><code>OnionMath::randomInt</code> is removed; use <code>Rand::nextInt</code><a class="headerlink" href="#onionmathrandomint-is-removed-use-randnextint" title="Permanent link">&para;</a></h2>
 <p>Onion had two ways to get a random <code>Int</code> in a range, with opposite upper bounds (#3069).
 <code>Rand::nextInt(min, max)</code> stays. Its <code>max</code> is exclusive, as in <code>a..&lt;b</code>, Java and Kotlin.</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w">   </span><span class="c1">// Before: 1 to 6. Now: E0005</span>
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">          </span><span class="c1">// 1 to 6</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">OnionMath</span><span class="o">::</span><span class="nf">randomInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">)</span><span class="w">   </span><span class="c1">// Before: 1 to 6. Now: E0005</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="kd">val</span><span class="w"> </span><span class="n">die</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Rand</span><span class="o">::</span><span class="nf">nextInt</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="w">          </span><span class="c1">// 1 to 6</span>
 </span></code></pre></div>
 <ul>
 <li><strong>What you see:</strong> <code>E0005</code>, with a hint that shows <code>Rand::nextInt(min, max + 1)</code>.</li>
@@ -6076,11 +6121,11 @@ now, with or without <code>override</code>:</p>
 <p>A plain class now reaches a generic parameter through an interface it implements (#2845).
 <code>String</code> is a <code>Comparable[String]</code>, so <code>g[T](c: Comparable[T])</code> now fits <code>g("a")</code>. Where a
 plain overload fits too, Java's rules pick between them.</p>
-<div class="language-onion highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">lang</span><span class="p">.</span><span class="nc">CharSequence</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">g</span><span class="p">(</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"charseq"</span>
-</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="kd">def</span><span class="w"> </span><span class="n">g</span><span class="p">[</span><span class="nc">T</span><span class="p">](</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">Comparable</span><span class="p">[</span><span class="nc">T</span><span class="p">]):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"generic"</span>
-</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="p">))</span><span class="w">                    </span><span class="c1">// Before: charseq. Now: E0006</span>
-</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">))</span><span class="w">    </span><span class="c1">// charseq, before and now</span>
+<div class="language-onion highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="n">lang</span><span class="p">.</span><span class="nc">CharSequence</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="kd">def</span><span class="w"> </span><span class="nf">g</span><span class="p">(</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"charseq"</span>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="kd">def</span><span class="w"> </span><span class="n">g</span><span class="p">[</span><span class="nc">T</span><span class="p">](</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">Comparable</span><span class="p">[</span><span class="nc">T</span><span class="p">]):</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"generic"</span>
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="p">))</span><span class="w">                    </span><span class="c1">// Before: charseq. Now: E0006</span>
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="nb">IO</span><span class="o">::</span><span class="nf">println</span><span class="p">(</span><span class="nf">g</span><span class="p">(</span><span class="s2">"a"</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nc">CharSequence</span><span class="p">))</span><span class="w">    </span><span class="c1">// charseq, before and now</span>
 </span></code></pre></div>
 <table>
 <thead>

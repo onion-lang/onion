@@ -160,7 +160,13 @@ object AST {
     def this(location: Location, src: Expression, to: TypeNode) = this(location, src, to, false)
   }
   case class CharacterLiteral(location: Location, value: Char) extends Expression
-  case class ClosureExpression(location: Location, typeRef: TypeNode, mname: String, args: List[Argument], returns: TypeNode/*nullable*/, body: BlockExpression) extends Expression
+  case class ClosureExpression(location: Location, typeRef: TypeNode, mname: String, args: List[Argument], returns: TypeNode/*nullable*/, body: BlockExpression) extends Expression {
+    private var doBind_ = false
+    /** True for the `bind` lambda the rewriter builds from `x <- e` in a `do[M]` block; not a
+      * case-class field, so patterns and equality ignore it. */
+    def isDoBind: Boolean = doBind_
+    def asDoBind(): ClosureExpression = { doBind_ = true; this }
+  }
   /** `this`. `spelledSelf` marks the retired spelling `self` (RFC #2788), which the type checker
     * reports as E0117; it is not a case-class field, so patterns and equality ignore it. */
   case class CurrentInstance(location: Location) extends Expression {

@@ -43,6 +43,18 @@ private[typing] object MemberAccess {
   def isMemberAccessible(member: MemberRef, context: ClassType, receiver: Type): Boolean =
     isMemberAccessible(member, context) && protectedReceiverAllowed(member, context, receiver)
 
+  /**
+   * [[isMemberAccessible]] for a constructor reached through `new`. A protected constructor
+   * of a class in another package is callable only through `super(...)`, never `new`
+   * (JLS 6.6.2.2); the verifier rejects it ("Bad access to protected <init>", #2918).
+   */
+  def isConstructorAccessibleByNew(ctor: MemberRef, context: ClassType): Boolean =
+    isMemberAccessible(ctor, context) && {
+      val owner = ctor.affiliation
+      val protectedOnly = (ctor.modifier & AST.M_PUBLIC) == 0 && (ctor.modifier & AST.M_PROTECTED) != 0
+      !protectedOnly || owner == null || context == null || owner == context || hasSamePackage(owner, context)
+    }
+
   private def protectedReceiverAllowed(member: MemberRef, context: ClassType, receiver: Type): Boolean = {
     val modifier = member.modifier
     val owner = member.affiliation

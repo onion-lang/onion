@@ -573,6 +573,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
     val (expectedKey, expectedValue) = expectedMapKeyValue(expected)
     var keyType: Type = null
     var valueType: Type = null
+    var sawNullKey = false
+    var sawNullValue = false
     var failed = false
 
     val order = node.entries.zipWithIndex.sortBy { case ((_, v), _) => if (isEmptyCollectionLiteral(v)) 1 else 0 }
@@ -595,6 +597,8 @@ private[compiler] final class SimpleExpressionTypingSupport(
           values(index) = typedValue
           val normalizedKey = normalizeListElementType(typedKey.`type`)
           val normalizedValue = normalizeListElementType(typedValue.`type`)
+          if (normalizedKey.isNullType) sawNullKey = true
+          if (normalizedValue.isNullType) sawNullValue = true
           if (keyType == null) {
             keyType = normalizedKey
             valueType = normalizedValue
@@ -628,10 +632,14 @@ private[compiler] final class SimpleExpressionTypingSupport(
       val finalKeyType =
         if (keys.isEmpty) (if (expectedKey != null) expectedKey else bodyContext.rootClass)
         else if (expectedKey != null && keys.forall(k => fitsExpected(expectedKey, k))) expectedKey
+        // No target type: a `null` key or value makes that type nullable, as in a list
+        // literal, so `["a": 1, "b": null]` is a Map[String, Int?] (#3201).
+        else if (sawNullKey && !keyType.isNullType && !keyType.isInstanceOf[NullableType]) NullableType.of(keyType)
         else keyType
       val finalValueType =
         if (values.isEmpty) (if (expectedValue != null) expectedValue else bodyContext.rootClass)
         else if (expectedValue != null && values.forall(v => fitsExpected(expectedValue, v))) expectedValue
+        else if (sawNullValue && !valueType.isNullType && !valueType.isInstanceOf[NullableType]) NullableType.of(valueType)
         else valueType
       val finalKeys = if (finalKeyType eq expectedKey) keys.map(widenToSlot(_, expectedKey)) else keys
       val finalValues = if (finalValueType eq expectedValue) values.map(widenToSlot(_, expectedValue)) else values

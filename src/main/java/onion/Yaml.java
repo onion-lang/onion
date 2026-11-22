@@ -306,6 +306,11 @@ public final class Yaml {
                 String rest = trimmed.equals("-") ? "" : trimmed.substring(2).trim();
                 keyColumn = rest.isEmpty() ? -1 : rawLine.indexOf(rest, dashColumn + 1);
                 if (!rest.isEmpty()) {
+                    if (rest.charAt(0) != '{' && rest.charAt(0) != '[' && findKeySeparator(rest) < 0) {
+                        throw new YamlParseException(
+                            "A sequence of scalars is out of scope (write each item as a 'key: value' "
+                                + "mapping, or use Json for plain lists): " + rawLine.trim(), lineNumber);
+                    }
                     parseKeyValueLine(rest, lineNumber, current);
                 }
             } else {

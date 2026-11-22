@@ -32,6 +32,13 @@ class EnsuresVerifySpec extends AnyFunSpec {
     assert(ws.size == 1 && ws.head.message.contains("'f'"), ws.toString)
   }
 
+  it("W0028 leaves no empty example when the body breaks the ensures for every call (#3265)") {
+    val (ws, _) = run("class B {\npublic:\n  def this { }\n  def bump2(): Int ensures result <= 3 { return 9 }\n}")
+    assert(ws.size == 1, ws.toString)
+    assert(!ws.head.message.contains("when ."), ws.head.message)
+    assert(ws.head.message.contains("for every call"), ws.head.message)
+  }
+
   it("does not check a @Trusted method") {
     val (ws, err) = run(cls("result < x", "@Trusted"))
     assert(ws.isEmpty && !err.contains("[ensures] proved"), err)

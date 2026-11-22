@@ -157,6 +157,9 @@ public final class Net {
         /**
          * Everything until the peer closes, undecoded.
          *
+         * If a read times out, the bytes already read are kept, so a later `readLine`,
+         * `readAll` or `readBytes` still sees them.
+         *
          * A byte array rather than a List because this is the Java boundary — the same
          * place `Files::readBytes` sits — and a List of boxed bytes for a megabyte of
          * payload would be absurd.
@@ -164,16 +167,15 @@ public final class Net {
         public byte[] readBytes() {
             try {
                 skipLfAfterCr();
-                InputStream in = input;
-                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-                partial.writeTo(out);
-                partial.reset();
+                // Read into `partial`, so a timeout keeps what arrived; a retry continues it.
                 byte[] buffer = new byte[BUFFER];
                 int read;
-                while ((read = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, read);
+                while ((read = input.read(buffer)) != -1) {
+                    partial.write(buffer, 0, read);
                 }
-                return out.toByteArray();
+                byte[] all = partial.toByteArray();
+                partial.reset();
+                return all;
             } catch (IOException e) {
                 throw new RuntimeException("Net: read failed on " + remoteAddress()
                     + " (" + e.getMessage() + ")", e);

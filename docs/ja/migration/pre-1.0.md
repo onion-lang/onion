@@ -815,6 +815,7 @@ val c: Option[Int] = if b { other } else { tail }   // 以前: コンパイル�
 |---|---|---|---|
 | `val c: Option[Int] = if b { other } else { tail }` | コンパイルでき、`c.get() + 1` が `ClassCastException` を投げた | E0000 | 分岐を期待される型にそろえるか、`Object` のような広い型にする |
 | `def f(b: Boolean): Option[Int] = if b { other } else { tail }` | コンパイルできた | E0000 | 同上 |
+| `val lo: List[Object] = ch2(() -> if b { objs } else { strs })`（総称の `() -> U` 引数に渡すラムダ） | コンパイルでき、動いた（`List` は不変なので、もともと型安全ではなかった） | `strs` で E0000 | 分岐を `List[Object]` にそろえるか、広い型にする |
 
 - **表示されるもの:** E0000（`type Option[Int] is expected, but type Option[String] is used`）です。
   キャレットは型の合わない分岐を指します。

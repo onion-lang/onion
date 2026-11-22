@@ -935,6 +935,7 @@ val c: Option[Int] = if b { other } else { tail }   // Before: compiled. Now: E0
 |---|---|---|---|
 | `val c: Option[Int] = if b { other } else { tail }` | compiled; `c.get() + 1` threw `ClassCastException` | E0000 | give the branch the target's type, or use a wider target such as `Object` |
 | `def f(b: Boolean): Option[Int] = if b { other } else { tail }` | compiled | E0000 | the same |
+| `val lo: List[Object] = ch2(() -> if b { objs } else { strs })` (a lambda for a generic `() -> U` parameter) | compiled and ran (`List` is invariant, so it was never sound) | E0000 at `strs` | widen the branch to `List[Object]`, or use a wider target |
 
 - **What you see:** E0000 (`type Option[Int] is expected, but type Option[String] is used`),
   with the caret at the branch that does not fit.

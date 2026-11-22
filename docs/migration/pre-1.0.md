@@ -859,8 +859,9 @@ IO::println(ys[0]?.length())    // 1, before and now
   once, as in the two `sort` rows above. The `!!` there never fails.
 - **A target type still works:** `val ys: List[Int?] = [1, null]`. `List[Int]` is rejected, as the `null` does not fit.
 - **Unchanged:** `[null]`, `[null, null]`, and a literal whose expected type is already known.
-- **Known remaining gap:** a map literal with a `null` value, such as `["a": "x", "b": null]`, still
-  infers a non-null value type. That is #3201, a separate change with its own migration row.
+- **Map literals too (#3201):** `["a": "x", "b": null]` with no expected type is a
+  `Map[String, String?]`. `t(["a": 1, "b": null])` with `t(m: Map[String, Int])` was
+  compiled and crashed at the read; it is now E0005. Take `Map[String, Int?]`, or drop the `null`.
 - **No `onion migrate` rule:** deciding what to do with a `null` (skip it, default it,
   reject it) depends on the program. The edits above show each choice.
 
@@ -918,6 +919,31 @@ val s: String = q.x()   // Before: E0000. Now: s
 - **Unchanged:** the bytecode, a non-generic record, and a user-defined `copy` method.
 - **No `onion migrate` rule:** finding the affected calls needs overload resolution, and
   only you know which method you meant. The table shows each edit.
+
+## Branches with other type arguments are checked against the target (#3241)
+
+Two branches of one generic class with different type arguments join as the raw class,
+and a raw value used to fit any target. Now, when the `if`, `select` or `try` has an
+applied target type, each branch is checked against it.
+
+```onion
+val other: Option[String] = Option::some("str")
+val tail: Option[Int] = Option::none()
+val c: Option[Int] = if b { other } else { tail }   // Before: compiled. Now: E0000 at `other`
+```
+
+| Program | Before | Now | To keep it compiling |
+|---|---|---|---|
+| `val c: Option[Int] = if b { other } else { tail }` | compiled; `c.get() + 1` threw `ClassCastException` | E0000 | give the branch the target's type, or use a wider target such as `Object` |
+| `def f(b: Boolean): Option[Int] = if b { other } else { tail }` | compiled | E0000 | the same |
+| `val lo: List[Object] = ch2(() -> if b { objs } else { strs })` (a lambda for a generic `() -> U` parameter) | compiled and ran (`List` is invariant, so it was never sound) | E0000 at `strs` | widen the branch to `List[Object]`, or use a wider target |
+
+- **What you see:** E0000 (`type Option[Int] is expected, but type Option[String] is used`),
+  with the caret at the branch that does not fit.
+- **Unchanged:** branches that fit the target, a target such as `Object`, and a join with
+  no target (`val c = if b { other } else { tail }` is still a raw `Option`).
+- **No `onion migrate` rule:** the program holds a value of the wrong type, and only you
+  know which branch is wrong. The error points at it.
 
 ## A named call above its callee binds by name, as a call below it does (#3110)
 

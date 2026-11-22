@@ -655,9 +655,11 @@ class MutualRecursionOptimization(config: CompilerConfig)
       callParams
     )
 
-    // Return the result
-    val returnStmt = new Return(loc, stateMachineCall)
-    new StatementBlock(loc, returnStmt)
+    // Return the result; a `void` member has none
+    if (originalMethod.returnType eq BasicType.VOID)
+      new StatementBlock(loc, new ExpressionActionStatement(loc, stateMachineCall), new Return(loc, null))
+    else
+      new StatementBlock(loc, new Return(loc, stateMachineCall))
   }
 
   /**
@@ -706,7 +708,8 @@ class MutualRecursionOptimization(config: CompilerConfig)
         stateIds,
         loopVarOffset,
         stateLoopVarIndex,
-        paramCount
+        paramCount,
+        returnType
       )
 
       if (config.verbose) {
@@ -732,63 +735,49 @@ class MutualRecursionOptimization(config: CompilerConfig)
     stateIds: Map[MethodDefinition, Int],
     loopVarOffset: Int,
     stateLoopVarIndex: Int,
-    paramCount: Int
+    paramCount: Int,
+    returnType: Type
   ): StatementBlock = {
     val loc: Location = null
     // Overloads share a name, so a call is matched to its member by identity.
     def stateIdOf(target: MethodDefinition): Option[Int] =
       stateIds.collectFirst { case (method, id) if method eq target => id }
 
-    def transformStatement(stmt: ActionStatement): ActionStatement = {
+    val isVoid = returnType eq BasicType.VOID
+
+    def transitionFor(target: MethodDefinition, params: Array[Term]): Option[ActionStatement] =
+      stateIdOf(target).filterNot(_ => params.exists(_.isInstanceOf[DefaultArgument])).map { id =>
+        transformTailCallToStateTransition(params, id, loopVarOffset, stateLoopVarIndex, params.map(_.`type`))
+      }
+
+    // `tail` is whether nothing runs after `stmt` in the member; a bare call there is a
+    // `void` member's tail call (#3131).
+    def transformStatement(stmt: ActionStatement, tail: Boolean): ActionStatement = {
       stmt match {
+        case bare: ExpressionActionStatement if isVoid && tail && TailCallGraphAnalysis.bareCall(bare).isDefined =>
+          TailCallGraphAnalysis.groupCall(bare.term)
+            .flatMap { case (target, params) => transitionFor(target, params) }
+            .getOrElse(stmt)
+
         case ret: Return if ret.term != null =>
-          // Check if this is a tail call to another method in the group
-          ret.term match {
-            case call: Call =>
-              call.method match {
-                case targetMethod: MethodDefinition if stateIdOf(targetMethod).isDefined && !call.parameters.exists(_.isInstanceOf[DefaultArgument]) =>
-                  // Transform to: update params, set state, continue
-                  if (config.verbose) {
-                    trace(s"[Mutual TCO]       Found tail call: ${targetMethod.name} -> state ${stateIdOf(targetMethod).get}")
-                  }
-                  transformTailCallToStateTransition(
-                    call.parameters,
-                    stateIdOf(targetMethod).get,
-                    loopVarOffset,
-                    stateLoopVarIndex,
-                    call.parameters.map(_.`type`)
-                  )
-                case _ =>
-                  ret
+          // A tail call to another member of the group becomes a state transition.
+          TailCallGraphAnalysis.groupCall(ret.term)
+            .flatMap { case (target, params) =>
+              transitionFor(target, params).map { t =>
+                if (config.verbose) trace(s"[Mutual TCO]       Found tail call: ${target.name} -> state ${stateIdOf(target).get}")
+                t
               }
-            case call: CallStatic =>
-              call.method match {
-                case targetMethod: MethodDefinition if stateIdOf(targetMethod).isDefined && !call.parameters.exists(_.isInstanceOf[DefaultArgument]) =>
-                  if (config.verbose) {
-                    trace(s"[Mutual TCO]       Found static tail call: ${targetMethod.name} -> state ${stateIdOf(targetMethod).get}")
-                  }
-                  transformTailCallToStateTransition(
-                    call.parameters,
-                    stateIdOf(targetMethod).get,
-                    loopVarOffset,
-                    stateLoopVarIndex,
-                    call.parameters.map(_.`type`)
-                  )
-                case _ =>
-                  ret
-              }
-            case _ =>
-              ret
-          }
+            }
+            .getOrElse(ret)
 
         case block: StatementBlock =>
-          val transformed = transformStatementsInBlock(block.statements.toSeq)
+          val transformed = transformStatementsInBlock(block.statements.toSeq, tail)
           new StatementBlock(block.location, transformed: _*)
 
         case ifStmt: IfStatement =>
-          val transformedThen = transformStatement(ifStmt.thenStatement)
+          val transformedThen = transformStatement(ifStmt.thenStatement, tail)
           val transformedElse = if (ifStmt.elseStatement != null) {
-            transformStatement(ifStmt.elseStatement)
+            transformStatement(ifStmt.elseStatement, tail)
           } else null
           new IfStatement(ifStmt.location, ifStmt.condition, transformedThen, transformedElse)
 
@@ -800,11 +789,16 @@ class MutualRecursionOptimization(config: CompilerConfig)
     // Each statement keeps its place. A tail call after an `if` with no `else` used to be
     // moved into that `else`, so a `then` branch that did not return left the state with
     // no transition, and the group returned the default value (#3107).
-    def transformStatementsInBlock(stmts: Seq[ActionStatement]): Seq[ActionStatement] =
-      stmts.map(transformStatement)
+    def transformStatementsInBlock(stmts: Seq[ActionStatement], tail: Boolean): Seq[ActionStatement] =
+      stmts.zipWithIndex.map { case (s, i) =>
+        transformStatement(s, tail && TailCallGraphAnalysis.endsTail(stmts, i + 1))
+      }
 
-    val transformedStatements = transformStatementsInBlock(body.statements.toSeq)
-    new StatementBlock(loc, transformedStatements: _*)
+    val transformedStatements = transformStatementsInBlock(body.statements.toSeq, tail = true)
+    // A `void` member may end without a `return`; in the merged loop that would start the
+    // next round in the same state, forever.
+    val ending = if (isVoid) Seq[ActionStatement](new Return(loc, null)) else Seq.empty
+    new StatementBlock(loc, (transformedStatements ++ ending): _*)
   }
 
   /**
@@ -863,6 +857,7 @@ class MutualRecursionOptimization(config: CompilerConfig)
    */
   private def createDefaultReturn(returnType: Type): StatementBlock = {
     val loc: Location = null
+    if (returnType eq BasicType.VOID) return new StatementBlock(loc, new Return(loc, null))
     val defaultValue: Term = returnType match {
       case TypedAST.BasicType.INT | TypedAST.BasicType.BYTE |
            TypedAST.BasicType.SHORT | TypedAST.BasicType.CHAR =>

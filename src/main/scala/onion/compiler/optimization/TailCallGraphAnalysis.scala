@@ -40,8 +40,19 @@ private[optimization] object TailCallGraphAnalysis {
   def findTailCalls(method: MethodDefinition): Set[MethodDefinition] = {
     val calls = mutable.Set[MethodDefinition]()
 
-    def visitStatement(stmt: ActionStatement): Unit = {
+    val isVoid = method.returnType eq BasicType.VOID
+
+    // `tail` is whether nothing runs after `stmt` in the method (#3131).
+    def visitStatements(stmts: Seq[ActionStatement], tail: Boolean): Unit =
+      stmts.zipWithIndex.foreach { case (stmt, i) =>
+        visitStatement(stmt, tail && endsTail(stmts, i + 1))
+      }
+
+    def visitStatement(stmt: ActionStatement, tail: Boolean): Unit = {
       stmt match {
+        case bare if isVoid && tail && bareCall(bare).isDefined =>
+          bareCall(bare).foreach(calls += _)
+
         case ret: Return if ret.term != null =>
           ret.term match {
             case call: Call =>
@@ -60,12 +71,12 @@ private[optimization] object TailCallGraphAnalysis {
           }
 
         case block: StatementBlock =>
-          block.statements.foreach(visitStatement)
+          visitStatements(block.statements.toSeq, tail)
 
         case ifStmt: IfStatement =>
-          visitStatement(ifStmt.thenStatement)
+          visitStatement(ifStmt.thenStatement, tail)
           if (ifStmt.elseStatement != null) {
-            visitStatement(ifStmt.elseStatement)
+            visitStatement(ifStmt.elseStatement, tail)
           }
 
         case _ =>
@@ -73,9 +84,30 @@ private[optimization] object TailCallGraphAnalysis {
     }
 
     if (method.getBlock != null) {
-      ReturnSinking.normalizeMethodBody(method.getBlock).statements.foreach(visitStatement)
+      visitStatements(ReturnSinking.normalizeMethodBody(method.getBlock).statements.toSeq, tail = true)
     }
 
     calls.toSet
   }
+
+  /**
+   * In a `void` method a tail call is a bare statement `f(..)`, not `return f(..)`: the
+   * method it calls, when the statement is one (#3131).
+   */
+  def bareCall(stmt: ActionStatement): Option[MethodDefinition] = stmt match {
+    case e: ExpressionActionStatement =>
+      e.term match {
+        case c: Call       => c.method match { case m: MethodDefinition => Some(m); case _ => None }
+        case c: CallStatic => c.method match { case m: MethodDefinition => Some(m); case _ => None }
+        case _             => None
+      }
+    case _ => None
+  }
+
+  /** Whether the statements from `from` on do nothing: none, or only a bare `return`. */
+  def endsTail(stmts: Seq[ActionStatement], from: Int): Boolean =
+    stmts.drop(from).forall {
+      case r: Return => r.term == null
+      case _         => false
+    }
 }

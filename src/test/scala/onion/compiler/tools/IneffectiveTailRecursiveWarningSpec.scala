@@ -72,6 +72,38 @@ class IneffectiveTailRecursiveWarningSpec extends AnyFunSpec {
       assert(w16.isEmpty, w16.map(_.message))
     }
 
+    it("warns for a lone overridable @TailRecursive method (#3032)") {
+      val result = compileWarnings(
+        """
+          |class C {
+          |  var base: Int
+          |public:
+          |  def this { base = 7 }
+          |  @TailRecursive
+          |  def sum(n: Int, acc: Long): Long = if n == 0 { acc + base } else { sum(n - 1, acc + n) }
+          |}
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      val w16 = result.diagnostics.warnings.filter(_.category.code == "W0016")
+      assert(w16.length == 1, s"expected one W0016, got: ${result.diagnostics.warnings.map(_.message)}")
+      assert(w16.head.message.contains("sum"))
+    }
+
+    it("does not warn for a lone private @TailRecursive method that becomes a loop (#3032)") {
+      val result = compileWarnings(
+        """
+          |class C {
+          |private:
+          |  @TailRecursive
+          |  def sum(n: Int, acc: Long): Long = if n == 0 { acc } else { sum(n - 1, acc + n) }
+          |public:
+          |  def run(n: Int): Long = sum(n, 0L)
+          |}
+          |""".stripMargin)
+      assert(!result.hasErrors)
+      assert(result.diagnostics.warnings.filter(_.category.code == "W0016").isEmpty)
+    }
+
     it("warns when the annotated group is not private") {
       val result = compileWarnings(
         """

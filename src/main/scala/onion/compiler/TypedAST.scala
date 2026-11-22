@@ -486,6 +486,11 @@ object TypedAST {
      */
     var isTopLevelContainer: Boolean = false
 
+    /** For an `extension` block's synthetic container: the receiver as the block wrote it
+     *  (`List[Int]`, `Big_Box`), so a diagnostic names `List[Int].shout`, not the mangled
+     *  class name (#3009). */
+    var extensionReceiverName: Option[String] = None
+
     override def typeParameters: Array[TypedAST.TypeParameter] = typeParameters_
 
     def setTypeParameters(typeParameters: Array[TypedAST.TypeParameter]): Unit =

@@ -72,4 +72,39 @@ class ConstructorGenericFactoryOverloadSpec extends AbstractShellSpec {
       }
     }
   }
+
+  describe("a varargs or default-parameter constructor that already resolves the call") {
+    // `main` calls the fallback constructor here; retyping must not change it silently.
+    it("keeps the varargs constructor for a generic factory argument") {
+      val src =
+        """import { java.util.* }
+          |class D {
+          |public:
+          |  def this(xs: List[String]) { IO::println("list") }
+          |  def this(o: Object...) { IO::println("varargs " + o.length) }
+          |}
+          |new D(Collections::emptyList())
+          |new D(List::of())
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result != Shell.Failure(-1), out)
+      assert(out.trim.linesIterator.toList == List("varargs 1", "varargs 1"), out)
+    }
+
+    it("keeps the default-parameter constructor for a generic factory argument") {
+      val src =
+        """import { java.util.* }
+          |class D {
+          |public:
+          |  def this(xs: List[String]) { IO::println("list") }
+          |  def this(xs: Set[String]) { IO::println("set") }
+          |  def this(o: Object, n: Int = 7) { IO::println("obj-default " + n) }
+          |}
+          |new D(Collections::emptyList())
+          |""".stripMargin
+      val (result, out) = run(src)
+      assert(result != Shell.Failure(-1), out)
+      assert(out.trim == "obj-default 7", out)
+    }
+  }
 }

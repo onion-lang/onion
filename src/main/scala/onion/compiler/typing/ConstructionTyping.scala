@@ -666,14 +666,9 @@ final class ConstructionTyping(
     }
   }
 
-  /**
-   * Resolves `new C(a, b, c)` against a varargs constructor `C(x: X, ys: Y...)` when no
-   * constructor takes the arguments as written: the fixed arguments must fit their slots
-   * and every trailing one the array's element type, as for a varargs method (#2839).
-   * Returns None when no varargs constructor fits, so the caller reports E0021;
-   * Some(None) when it reported an error itself; Some(Some(term)) on success.
-   */
-  private def varargConstruction(node: AST.NewObject, typeRef: ClassType, parameters: Array[Term]): Option[Option[Term]] = {
+  /** The varargs constructors that accept `parameters` spread into their trailing array. */
+  private def varargCandidates(typeRef: ClassType, parameters: Array[Term])
+      : Seq[(ConstructorRef, Array[Type], ArrayType)] = {
     val table = bodyContext.table
     def formalsOf(c: ConstructorRef): Array[Type] = typeRef match {
       case applied: TypedAST.AppliedClassType =>
@@ -682,7 +677,7 @@ final class ConstructionTyping(
           TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
       case _ => c.getArgs
     }
-    val candidates = typeRef.constructors.toSeq.filter(_.isVararg).flatMap { c =>
+    typeRef.constructors.toSeq.filter(_.isVararg).flatMap { c =>
       val formals = formalsOf(c)
       val fixed = formals.length - 1
       formals.lastOption match {
@@ -701,6 +696,25 @@ final class ConstructionTyping(
         case _ => None
       }
     }
+  }
+
+  /**
+   * Resolves `new C(a, b, c)` against a varargs constructor `C(x: X, ys: Y...)` when no
+   * constructor takes the arguments as written: the fixed arguments must fit their slots
+   * and every trailing one the array's element type, as for a varargs method (#2839).
+   * Returns None when no varargs constructor fits, so the caller reports E0021;
+   * Some(None) when it reported an error itself; Some(Some(term)) on success.
+   */
+  private def varargConstruction(node: AST.NewObject, typeRef: ClassType, parameters: Array[Term]): Option[Option[Term]] = {
+    val table = bodyContext.table
+    def formalsOf(c: ConstructorRef): Array[Type] = typeRef match {
+      case applied: TypedAST.AppliedClassType =>
+        val classSubst = TypeSubstitution.classSubstitution(applied)
+        c.getArgs.map(t =>
+          TypeSubstitution.substituteType(t, classSubst, scala.collection.immutable.Map.empty, defaultToBound = false))
+      case _ => c.getArgs
+    }
+    val candidates = varargCandidates(typeRef, parameters)
     candidates match {
       case Seq() => None
       case Seq((ctor, formals, arrayType)) =>
@@ -860,6 +874,20 @@ final class ConstructionTyping(
     })
 
   /**
+   * Whether the default-parameter or varargs fallback already resolves a call with `params`.
+   * With overloads, `main` lets that fallback choose (`this(o: Object...)` beside
+   * `this(xs: List[String])`), so retyping must not override it silently.
+   */
+  private def fallbackResolves(typeRef: ClassType, params: Array[Term]): Boolean =
+    typeRef.constructors.exists {
+      case cd: ConstructorDefinition =>
+        cd.argumentsWithDefaults != null &&
+          params.length < cd.argumentsWithDefaults.length &&
+          params.length >= cd.minArguments
+      case _ => false
+    } || varargCandidates(typeRef, params).nonEmpty
+
+  /**
    * When no constructor matched the eagerly-typed arguments, retype malleable
    * arguments (list/map literals, and generic static/unqualified/new-object
    * calls) against a uniquely arity-matched constructor's substituted formal
@@ -901,6 +929,7 @@ final class ConstructionTyping(
       if (changed) Some(updated) else None
     }
     if (candidates.length == 1) retypeFor(candidates(0))
+    else if (fallbackResolves(typeRef, params)) None
     else {
       // Overloads (`this(xs: List[T])` / `this(o: Object)`): as Java infers a factory's type
       // argument from the slot, try each candidate's slots and keep those whose retyped

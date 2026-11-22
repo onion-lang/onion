@@ -733,6 +733,68 @@ class OverrideTargetNotFoundSpec extends AbstractShellSpec {
       assert(marked.isEmpty && overload.isEmpty && exact.isEmpty, s"got: $marked / $overload / $exact")
     }
 
+    // Panel block on #3227 at 43e4b8f: an unmarked `dec(k: Int): String` beside a concrete
+    // `dec(k: Int?): String` overrode before #3053 and is an overload now, so `b.dec(1)`
+    // through the base went from `Up` to `Base` with no warning left to say so: W0030.
+    def w30(src: String): Seq[String] = {
+      val config = onion.compiler.CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = onion.compiler.WarningLevel.On)
+      new OnionCompiler(config).compileDetailed(Seq(new StreamInputSource(() => new StringReader(src), "W30.on")))
+        .diagnostics.warnings.filter(_.category.code == "W0030").map(_.message)
+    }
+
+    it("warns W0030 for an unmarked `dec(k: Int)` beside a concrete `dec(k: Int?)`, for every return type") {
+      for ret <- Seq("String", "void", "Int") do
+        val body = ret match
+          case "String" => "= \"x\""
+          case "Int" => "= 1"
+          case _ => "{}"
+        val ws = w30(
+          s"""
+             |class Base { public: def this {} def dec(k: Int?): $ret $body }
+             |class Up extends Base { public: def this {} def dec(k: Int): $ret $body }
+             |""".stripMargin)
+        assert(ws.length == 1 && ws.head.contains(s"dec(Int?): $ret") && ws.head.contains("Base"), s"$ret: got: $ws")
+    }
+
+    it("runs the base method for `b.dec(1)` through the base, as W0030 says") {
+      val result = shell.run(
+        """
+          |class Base { public: def this {} def dec(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} def dec(k: Int): String = "Up" }
+          |class Test {
+          |public:
+          |  static def main(args: String[]): String { val b: Base = new Up(); val u: Up = new Up(); return b.dec(1) + u.dec(1) + b.dec(null) }
+          |}
+          |""".stripMargin,
+        "W30Runs.on", Array())
+      assert(result == onion.tools.Shell.Success("BaseUpBase"))
+    }
+
+    it("does not warn W0030 with a nullable parameter, beside an own `f(k: Int?)`, over a final base, or in the reverse direction") {
+      val overrides = w30(
+        """
+          |class Base { public: def this {} def f(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} def f(k: Int?): String = "Up" }
+          |""".stripMargin)
+      val sibling = w30(
+        """
+          |class Base { public: def this {} def f(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} def f(k: Int?): String = "Up?" def f(k: Int): String = "Up" }
+          |""".stripMargin)
+      val finalBase = w30(
+        """
+          |class Base { public: def this {} final def f(k: Int?): String = "Base" }
+          |class Up extends Base { public: def this {} def f(k: Int): String = "Up" }
+          |""".stripMargin)
+      val reverse = w30(
+        """
+          |class Base { public: def this {} def f(k: Int): String = "Base" }
+          |class Up extends Base { public: def this {} def f(k: Int?): String = "Up" }
+          |""".stripMargin)
+      assert(overrides.isEmpty && sibling.isEmpty && finalBase.isEmpty && reverse.isEmpty,
+        s"got: $overrides / $sibling / $finalBase / $reverse")
+    }
+
     // Panel block 8 on #3051 at a2d2e98.
     it("does not warn W0029 when the class also declares the base's exact `f(k: Int)`") {
       val ws = w29(

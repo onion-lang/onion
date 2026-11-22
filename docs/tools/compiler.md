@@ -157,6 +157,7 @@ actually reports -- there is no pass yet that detects it, so suppressing it is a
 | `W0026` | `contract-not-enforced` | A contract clause is not enforced at run time by `--contracts runtime` |
 | `W0028` | `ensures-not-proved` | A method can break its `ensures`; the solver found a counterexample |
 | `W0029` | `unmarked-nullable-override` | A method without `override` overrides an inherited one that differs from it only by `?` |
+| `W0030` | `unmarked-nullable-overload` | A method without `override` looks like an override of an inherited one that differs only by `?`, but is an overload |
 | `W0027` | `contract-trusted` | A contract is relied on without being verified (`@Trusted`) |
 
 ### `--contract-seed <n>` / `--contract-samples <n>`

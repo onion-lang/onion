@@ -724,6 +724,12 @@ now, with or without `override`:
   base method. Before, with a reference return (`String`) it overrode through a bridge that
   unboxed, and `null` through `Base` threw. Marked `override`, it is **E0068**; make the
   parameter `Int?` to override, or remove `override` to keep the overload.
+- **Unmarked, it now warns W0030**, since `b.f(1)` through `Base` silently changed from the
+  own method to the base one (`Up` → `Base`):
+  `'f(Int)' does not override 'f(Int?): String' of Base ...`. Make the parameter `Int?` to
+  override, or rename the method to keep the overload.
+- **Known exception:** a chain `A.f(Int)`, `B.f(Int?)` (`override`), `C.f(Int): String`
+  (`override`) still bridges, so `null` through `B` can still throw there.
 - **To silence W0029:** add `override` if the method is meant to replace the base one.
 - **To keep a separate overload:** rename the method (`decOrSkip(k: Int?)`). No `onion
   migrate` rule: only you know whether the method was meant to replace the base one.

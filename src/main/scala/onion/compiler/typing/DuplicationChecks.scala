@@ -376,6 +376,20 @@ private[compiler] object DuplicationChecks {
               s"'$own' overrides '${c.signature}' of ${c.owner}, because the two differ only by '?'; " +
                 "a call through the base type runs it. Mark it 'override', or rename it to keep a separate method")
           }
+        // The other direction (`dec(k: Int)` beside `Base.dec(k: Int?)`): an overload, so a
+        // call through the base runs the base method, though the two look like an override.
+        // Before #3053 it overrode with a reference return; say so, since nothing else does (W0030).
+        if !candidates.exists(_.exact.contains(implExact)) then
+          candidates.find(c => !c.viaBridge && c.concrete && !c.isFinal && !exactSibling(c) &&
+            c.plainNames == plainNames(impl.arguments) && unboxes(impl.arguments, c.args)).foreach { c =>
+            val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
+            val own = s"${impl.name}(${impl.arguments.map(sourceForm).mkString(", ")})"
+            typing.warningReporter_.setSourceFile(typing.unit_.sourceFile)
+            typing.warningReporter_.report(WarningCategory.UnmarkedNullableOverload, location,
+              s"'$own' does not override '${c.signature}' of ${c.owner}, because its parameter is not nullable; " +
+                s"a call through ${c.owner} runs ${c.owner}'s method. Make the parameter nullable ('?') to override, " +
+                "or rename it to keep a separate method")
+          }
   }
 
   // Whether codegen bridges `impl` to the non-generic base method `c` (the same name, the

@@ -376,17 +376,31 @@ private[compiler] object DuplicationChecks {
               s"'$own' overrides '${c.signature}' of ${c.owner}, because the two differ only by '?'; " +
                 "a call through the base type runs it. Mark it 'override', or rename it to keep a separate method")
           }
+        // The other direction (`dec(k: Int)` beside `Base.dec(k: Int?)`): an overload, so a
+        // call through the base runs the base method, though the two look like an override.
+        // Before #3053 it overrode with a reference return; say so, since nothing else does (W0030).
+        if !candidates.exists(_.exact.contains(implExact)) then
+          candidates.find(c => !c.viaBridge && c.concrete && !c.isFinal && !exactSibling(c) &&
+            c.plainNames == plainNames(impl.arguments) && unboxes(impl.arguments, c.args)).foreach { c =>
+            val location = typing.lookupAST(impl.asInstanceOf[Node]).map(_.location).getOrElse(fallback)
+            val own = s"${impl.name}(${impl.arguments.map(sourceForm).mkString(", ")})"
+            typing.warningReporter_.setSourceFile(typing.unit_.sourceFile)
+            typing.warningReporter_.report(WarningCategory.UnmarkedNullableOverload, location,
+              s"'$own' does not override '${c.signature}' of ${c.owner}, because its parameter is not nullable; " +
+                s"a call through ${c.owner} runs ${c.owner}'s method. Make the parameter nullable ('?') to override, " +
+                "or rename it to keep a separate method")
+          }
   }
 
   // Whether codegen bridges `impl` to the non-generic base method `c` (the same name, the
   // same parameter types up to `?`), as `BridgeMethodEmitter` does: the return must pass
-  // through, and an own `f(Int)` beside a concrete `f(Int?)` is bridged only with a
-  // reference return, a `null` through the base would otherwise throw (#2896, row 10).
+  // through, and an own `f(Int)` beside a concrete `f(Int?)` is never bridged: a `null`
+  // through the base would throw (#2896 row 10, #3053).
   private def questionOnly(
     basePlainNames: Seq[String], baseReturn: Type, baseArgs: Array[Type], baseConcrete: Boolean, impl: Method
   ): Boolean =
     basePlainNames == plainNames(impl.arguments) && bridgeableReturn(baseReturn, impl.returnType) &&
-      !(baseConcrete && unboxes(impl.arguments, baseArgs) && !referenceCovariant(baseReturn, impl.returnType))
+      !(baseConcrete && unboxes(impl.arguments, baseArgs))
 
   private def unboxes(own: Array[Type], inherited: Array[Type]): Boolean =
     own.indices.exists(i => isPrimitiveJvm(own(i)) && !isPrimitiveJvm(inherited(i)))
@@ -394,9 +408,6 @@ private[compiler] object DuplicationChecks {
   private def isPrimitiveJvm(tp: Type): Boolean =
     val sort = Erasure.asmType(tp).getSort
     sort != org.objectweb.asm.Type.OBJECT && sort != org.objectweb.asm.Type.ARRAY
-
-  private def referenceCovariant(inherited: Type, own: Type): Boolean =
-    !inherited.isBasicType && !own.isBasicType && TypeRules.isSuperType(inherited, own)
 
   /**
    * Reports E0083 when catch clause `index`'s exception type is already covered by an
@@ -441,6 +452,8 @@ private[compiler] object DuplicationChecks {
 
   def checkErasureSignatureCollisions(typing: Typing, clazz: ClassDefinition, fallback: Location): Unit = {
     val seen = mutable.HashMap[(String, String), Method]()
+    // A script that lost its container name to a user class is already E0008 (#3060).
+    if typing.scriptOverClassNames.contains(clazz.name) then return
     for m <- clazz.methods do
       val key = (m.name, erasedMethodDesc(m))
       if seen.contains(key) then

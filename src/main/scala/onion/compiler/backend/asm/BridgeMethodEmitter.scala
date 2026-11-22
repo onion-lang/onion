@@ -186,15 +186,17 @@ final class BridgeMethodEmitter(private val codegen: AsmCodeGeneration) {
         // slot with a `void`/primitive return, even when a superclass's `?` bridge
         // joined the two slots (`Base.f(Int)`, `Mid.f(Int?)`, `Sub.f(Int)`): a `null`
         // through `Mid` would reach `Sub.f(Int)` and throw.
-        case Some(o) => (o eq t) && !keepsBaseSlot(m, target)
+        // A chain with a reference return still bridges (row 7, `CCCCC`): its `f(Int?)`
+        // joins the base's `f(Int)` slot. A `null` through the middle class still throws
+        // there; that is left to a follow-up.
+        case Some(o) => (o eq t) && !(keepsBaseSlot(m, target) && !isCovariantReturn(target.returnType, m.returnType))
         case None => !keepsBaseSlot(m, target)
 
   // Row 10 of #2896's table: an own `f(Int)` (no code inherited for it) beside an
-  // inherited concrete `f(Int?)` takes the slot only as it did before the `?` rule, with
-  // a reference return (a covariant override). With a `void` or primitive return it is
-  // an overload: a bridge would unbox, and a `null` through the base would throw (#3053).
+  // inherited concrete `f(Int?)` is an overload, whatever it returns: a bridge would
+  // unbox, and a `null` through the base would throw (#3053).
   private[asm] def keepsBaseSlot(m: TypedAST.Method, target: TypedAST.Method): Boolean =
-    unboxes(m.arguments, target.arguments) && !isCovariantReturn(target.returnType, m.returnType)
+    unboxes(m.arguments, target.arguments)
 
   // Some parameter is a primitive where the inherited one is its boxed `?` form.
   private def unboxes(own: Array[TypedAST.Type], inherited: Array[TypedAST.Type]): Boolean =

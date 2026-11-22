@@ -798,3 +798,27 @@ val s: String = q.x()   // 以前: E0000。現在: s
 - **今までどおり動くもの:** バイトコード、総称でないレコード、利用者が定義した `copy` メソッドです。
 - **`onion migrate` の規則はありません:** 影響を受ける呼び出しを見つけるには多重定義の解決が必要です。
   また、どのメソッドのつもりかは書いた人にしか分かりません。表に各書き換えを示します。
+
+## 型引数の違う分岐が、期待される型で検査されるようになりました (#3241)
+
+同じ総称クラスで型引数だけが違う二つの分岐は、原型（raw: 型引数のないクラス）に合流します。
+以前は、原型の値がどの期待される型にも合っていました。
+現在は、`if`・`select`・`try` に型引数つきの期待される型があれば、各分岐をその型で検査します。
+
+```onion
+val other: Option[String] = Option::some("str")
+val tail: Option[Int] = Option::none()
+val c: Option[Int] = if b { other } else { tail }   // 以前: コンパイルできた。現在: `other` で E0000
+```
+
+| プログラム | 以前 | 現在 | コンパイルを通すには |
+|---|---|---|---|
+| `val c: Option[Int] = if b { other } else { tail }` | コンパイルでき、`c.get() + 1` が `ClassCastException` を投げた | E0000 | 分岐を期待される型にそろえるか、`Object` のような広い型にする |
+| `def f(b: Boolean): Option[Int] = if b { other } else { tail }` | コンパイルできた | E0000 | 同上 |
+
+- **表示されるもの:** E0000（`type Option[Int] is expected, but type Option[String] is used`）です。
+  キャレットは型の合わない分岐を指します。
+- **今までどおり動くもの:** 期待される型に合う分岐、`Object` のような期待される型、
+  期待される型のない合流です（`val c = if b { other } else { tail }` は今も原型の `Option` です）。
+- **`onion migrate` の規則はありません:** プログラムが間違った型の値を持っています。
+  どの分岐が間違いかは書いた人にしか分かりません。エラーがその分岐を指します。

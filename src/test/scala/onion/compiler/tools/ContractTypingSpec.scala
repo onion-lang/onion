@@ -94,6 +94,13 @@ class ContractTypingSpec extends AnyFunSpec {
       assert(codes(src).contains("E0107"), codes(src).toString)
     }
 
+    it("rejects old() inside a lambda of a history or an ensures (#2732)") {
+      val history = "class A {\n  history n >= 0 && ((x: Int) -> x >= old(n)).call(n)\nprotected:\n  var n: Int\npublic:\n  def this { n = 1 }\n}"
+      assert(codes(history).contains("E0107"), codes(history).toString)
+      val ensures = "class A {\n  var n: Int\npublic:\n  def f(): void ensures ((x: Int) -> x >= old(n)).call(n) { n = n + 1 }\n}"
+      assert(codes(ensures).contains("E0107"), codes(ensures).toString)
+    }
+
     it("leaves old and result ordinary names outside a clause") {
       val src =
         """class A {

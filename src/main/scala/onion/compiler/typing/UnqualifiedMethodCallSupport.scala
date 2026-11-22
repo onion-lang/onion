@@ -474,6 +474,10 @@ private[compiler] final class UnqualifiedMethodCallSupport(
    */
   private def typeOld(node: AST.UnqualifiedMethodCall, context: LocalContext): Option[Term] =
     context.contractScope match {
+      case Some(ContractScope.Post) | Some(ContractScope.History) if context.isClosure =>
+        // The value on entry is saved in the method's frame; a lambda has its own, so it would crash (#2732).
+        bodyContext.report(SemanticError.CONTRACT_MISPLACED, node, "Lambda")
+        None
       case Some(ContractScope.Post) | Some(ContractScope.History) =>
         val inner = calls.typed(node.args.head, context)
         // Under the run-time guard the value on entry is kept: a local, assigned before the body runs.

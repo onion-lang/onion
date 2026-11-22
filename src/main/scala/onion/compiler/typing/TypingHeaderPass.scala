@@ -2,7 +2,7 @@ package onion.compiler.typing
 
 import onion.compiler.*
 import onion.compiler.TypedAST.*
-import onion.compiler.toolbox.Paths
+import onion.compiler.toolbox.{Message, Paths}
 import onion.compiler.typing.session.NameResolutionContext
 import onion.compiler.typing.session.TypingUnitContext
 
@@ -284,8 +284,7 @@ final class TypingHeaderPass(private val typing: Typing, private val unitContext
       val other = typing.topLevelContainerOwners.get(typing.topClass).map(_.sourceFile).getOrElse(
         existing match { case cd: ClassDefinition => cd.getSourceFile; case _ => "another file" })
       typing.report(SemanticError.DUPLICATE_CLASS, unit.location,
-        typing.topClass + " (the top-level code of " + unit.sourceFile + " and of " +
-          other + " would both become this class; rename one file)")
+        typing.topClass + " " + Message("error.semantic.duplicatedClass.sameNameScripts", unit.sourceFile, other))
       typing.duplicateScriptUnits.add(unit)
       return
     }

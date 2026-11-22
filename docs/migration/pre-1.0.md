@@ -892,3 +892,29 @@ IO::println(JList::of[String[]](sa).size())   // 1, before and now
   (`s("x", "y")` takes `s(Object...)`), and `s(null)`.
 - **No `onion migrate` rule:** finding the affected calls needs overload resolution, and only
   you know whether you meant one element or the whole array. The table shows each edit.
+
+## A copy of a generic record keeps its type arguments (#3101)
+
+`copy(..)` on a generic record used to return the record with bare type variables, so a
+component read from the copy had type `A`. The copy now has the receiver's own type, as
+`this` already had.
+
+```onion
+record P[A, B](x: A, y: B)
+val q = new P[String, Int]("s", 1).copy(y = 2)
+val s: String = q.x()   // Before: E0000. Now: s
+```
+
+| Program | Before | Now | To keep the old result |
+|---|---|---|---|
+| `f(q.x())` with `f(o: Object)` and `f(s: String)` | `f(Object)` | `f(String)` | `f(q.x() as Object)` |
+| `val r: P[Object, Int] = p.copy(y = 3)` with `p: P[String, Int]` | compiled | E0000 | `new P[Object, Int](p.x(), 3)` |
+| `take(p.copy())` with `take(r: P[Object, Int])` | compiled | E0005 | `take(new P[Object, Int](p.x(), p.y()))` |
+
+- **What you see:** E0000 (`type P[Object, Int] is expected, but type P[String, Int] is
+  used`), E0005 for an argument, or, for an overloaded call, nothing: the other method runs.
+- **Why the assignment is rejected:** type arguments are invariant. `val r: P[Object, Int] = p`
+  without `copy` was already E0000; the copy now follows the same rule.
+- **Unchanged:** the bytecode, a non-generic record, and a user-defined `copy` method.
+- **No `onion migrate` rule:** finding the affected calls needs overload resolution, and
+  only you know which method you meant. The table shows each edit.

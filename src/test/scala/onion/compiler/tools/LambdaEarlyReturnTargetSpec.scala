@@ -1,6 +1,9 @@
 package onion.compiler.tools
 
+import onion.compiler.{CompilerConfig, OnionCompiler, StreamInputSource, WarningLevel}
 import onion.tools.Shell
+
+import java.io.StringReader
 
 /**
  * Issue #3117: an early `return` in a block lambda passed to a generic method was
@@ -13,6 +16,41 @@ class LambdaEarlyReturnTargetSpec extends AbstractShellSpec {
 
   private def run(body: String, name: String) =
     shell.run("import { onion.Option; java.util.List; }\n" + body, name, Array())
+
+  private def w12Lines(source: String): Seq[Int] = {
+    val config = CompilerConfig(Seq("."), null, "UTF-8", "", 10, warningLevel = WarningLevel.On)
+    val result = new OnionCompiler(config)
+      .compileDetailed(Seq(new StreamInputSource(() => new StringReader(source), "W.on")))
+    assert(!result.hasErrors, s"unexpected errors: ${result.diagnostics}")
+    result.diagnostics.warnings.filter(_.category.code == "W0012").map(_.location.line).toSeq
+  }
+
+  describe("an early `return null` into a nullable target is not a W0012 (#3239 panel)") {
+    it("String? target with an early return null and a generic-call-free tail") {
+      val lines = w12Lines(
+        """def ch2[U](f: () -> U): U = f()
+          |def pick(b: Boolean): String? = ch2(() -> {
+          |  if b { return null }
+          |  "x"
+          |})
+          |println(pick(true)); println(pick(false))
+          |""".stripMargin)
+      assert(lines.isEmpty, s"W0012 lines: $lines")
+    }
+
+    it("Option[Int]? target with a variable tail") {
+      val lines = w12Lines(
+        """def ch2[U](f: () -> U): U = f()
+          |val none: Option[Int] = Option::none()
+          |val n: Option[Int]? = ch2(() -> {
+          |  if 1 > 2 { return null }
+          |  none
+          |})
+          |println(n)
+          |""".stripMargin)
+      assert(lines.isEmpty, s"W0012 lines: $lines")
+    }
+  }
 
   describe("an early return in a lambda is checked against the call's target type (#3117)") {
     it("Option[String] returned early where the target pins Option[Int] (the issue's repro)") {

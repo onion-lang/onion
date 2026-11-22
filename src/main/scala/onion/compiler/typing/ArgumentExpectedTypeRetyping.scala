@@ -189,12 +189,13 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
     if (expected == null || params == null || method.typeParameters.isEmpty || method.isVararg) return params
     if (params.length != method.argumentCount || args.length != params.length) return params
     // `Option[Int]?` pins `U` as `Option[Int]`, which then fits the nullable target.
+    val nullableTarget = expected.isInstanceOf[NullableType]
     val target = expected match {
       case n: NullableType => n.innerType
       case t => t
     }
     if (target.isBasicType) return params
-    val weak = args.indices.filter(i => params(i) != null && isTargetTypedClosure(args(i)))
+    val weak = args.indices.filter(i => params(i) != null && isTargetTypedClosure(args(i), nullableTarget))
     if (weak.isEmpty) return params
     val withoutWeak = params.clone()
     weak.foreach(withoutWeak(_) = null)
@@ -258,9 +259,10 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
    * whose result is malleable (a generic call or a collection literal), or that has
    * an explicit `return`: its results join to a raw type (`Option[String]` and
    * `Option[Int]` -> `Option`) that fits the target whatever the last expression is,
-   * so only the re-type checks each `return` against the target (#3234).
+   * so only the re-type checks each `return` against the target (#3234). Not for a
+   * nullable target: the re-type drops its `?`, so a valid `return null` would warn W0012.
    */
-  private def isTargetTypedClosure(expr: AST.Expression): Boolean = {
+  private def isTargetTypedClosure(expr: AST.Expression, nullableTarget: Boolean): Boolean = {
     val closure = expr match {
       case c: AST.ClosureExpression => c
       case AST.BlockExpression(_, List(c: AST.ClosureExpression), _) => c
@@ -271,7 +273,7 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
         case AST.ReturnExpression(_, result) => result != null && isMalleable(result)
         case e: AST.Expression => isMalleable(e)
         case _ => false
-      }) || ReturnNodeDetector.containsReturn(closure.body))
+      }) || (!nullableTarget && ReturnNodeDetector.containsReturn(closure.body)))
   }
 
   /** A single method (by name) whose arity accepts `argCount` arguments, else None. */

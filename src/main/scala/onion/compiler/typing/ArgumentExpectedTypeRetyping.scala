@@ -259,7 +259,8 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
    * whose result is malleable (a generic call or a collection literal), or that has
    * an explicit `return`: its results join to a raw type (`Option[String]` and
    * `Option[Int]` -> `Option`) that fits the target whatever the last expression is,
-   * so only the re-type checks each `return` against the target (#3234). Not for a
+   * so only the re-type checks each `return` against the target (#3234). The same
+   * holds for a last expression that branches (#3243). Not for a
    * nullable target: the re-type drops its `?`, so a valid `return null` would warn W0012.
    */
   private def isTargetTypedClosure(expr: AST.Expression, nullableTarget: Boolean): Boolean = {
@@ -273,7 +274,20 @@ private[compiler] final class ArgumentExpectedTypeRetyping(
         case AST.ReturnExpression(_, result) => result != null && isMalleable(result)
         case e: AST.Expression => isMalleable(e)
         case _ => false
-      }) || (!nullableTarget && ReturnNodeDetector.containsReturn(closure.body)))
+      }) || (!nullableTarget && (ReturnNodeDetector.containsReturn(closure.body) ||
+        isBranching(closure.body.elements.last))))
+  }
+
+  /**
+   * An `if`/`else`, `select` or `try` whose branches may join to a raw type (#3243):
+   * `if b { other } else { tail }` with `Option[String]` and `Option[Int]` branches
+   * joins to `Option`, which fits the target, so only the re-type checks each branch.
+   */
+  private def isBranching(e: AST.Node): Boolean = e match {
+    case AST.IfExpression(_, _, _, elseBlock) => elseBlock != null
+    case _: AST.SelectExpression => true
+    case _: AST.TryExpression => true
+    case _ => false
   }
 
   /** A single method (by name) whose arity accepts `argCount` arguments, else None. */

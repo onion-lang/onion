@@ -293,7 +293,8 @@ class MutualRecursionOptimization(config: CompilerConfig)
   private def reportLoneIneffective(classDef: ClassDefinition, method: MethodDefinition): Unit = {
     val sourceFile = Option(classDef.getSourceFile).getOrElse("")
     val m = method.modifier
-    val overridable = (m & AST.M_PRIVATE) == 0 && (m & AST.M_STATIC) == 0 && (m & AST.M_FINAL) == 0
+    val overridable = (m & AST.M_PRIVATE) == 0 && (m & AST.M_STATIC) == 0 && (m & AST.M_FINAL) == 0 &&
+      !TailCallOptimization.ownerCannotBeExtended(method)
     val reason =
       if (overridable) "it can be overridden; make it private, static or final"
       else "its self-call is in a form that cannot be rewritten into a loop"
